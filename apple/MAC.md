@@ -5,10 +5,10 @@ Install as in [INSTALL.md](INSTALL.md), open a Mac graph, press Queue. Every
 Mac graph has published an episode on a Mac mini M4 / 16 GB:
 
 ```
-workflows/variants/otr_mac16_low.json          procedural lanes, no weights
-workflows/variants/otr_mac16_still.json        sd15 stills with motion
-workflows/variants/otr_mac16_video.json        ltx098 video diffusion
-workflows/variants/otr_mac16_animatediff.json  SD 1.5 motion from the prompt
+workflows/otr_mac16_low.json          procedural lanes, no weights
+workflows/otr_mac16_still.json        sd15 stills with motion
+workflows/otr_mac16_video.json        ltx098 video diffusion
+workflows/otr_mac16_animatediff.json  SD 1.5 motion from the prompt
 ```
 
 Start with `otr_mac16_low` if you want the fastest proof that it works at all.

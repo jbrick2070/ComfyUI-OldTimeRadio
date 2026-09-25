@@ -261,7 +261,7 @@ def test_the_profile_canvas_matches_the_declaration():
 def test_the_8gb_variant_workflow_agrees_with_the_declaration():
     """Same guard, one channel further out: the shipped variant's director
     widgets are what actually produce the (now unconsumed) stamp."""
-    doc = json.loads((REPO / "workflows" / "variants"
+    doc = json.loads((REPO / "workflows"
                       / "otr_8gb_video.json").read_text("utf-8"))
     director = next(n for n in doc["nodes"]
                     if str(n.get("type") or "") == "OTR_VideoDirector")

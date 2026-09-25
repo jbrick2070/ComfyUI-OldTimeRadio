@@ -23,6 +23,28 @@ Closed receipts used to be a third file, `docs/GO_FORWARD_ARCHIVE.md`. It went
 with the docs/ folder on 2026-09-24 (`git show a0ff6c8c~1:docs/GO_FORWARD_ARCHIVE.md`
 is its last version); closed rows now leave the plan for `apple/HANDOFF_LOG.md`.
 
+## 2026-09-25 -- THE VARIANTS LIVE BESIDE THE CANONICAL; THE GALLERY LISTS ALL 25
+
+Operator: "we can't store the variants in a subfolder", then "All 24" when asked
+how many the gallery should show. This REVERSES the 2026-09-02 ruling "ONE JSON
+for now -- otr_canonical". ComfyUI's template gallery globs `*/workflows/*.json`
+one level deep, so the 24 graphs in `workflows/variants/` shipped in every
+install and no user could find them from the menu; the 4060's fresh-user walk
+is what surfaced it.
+
+- The 24 variant JSONs and their `.launch.md` recipes are in `workflows/`,
+  beside `otr_canonical.json`. `scripts/build_variants.py` writes there, and
+  `--check` fails if `workflows/variants/` comes back with a file in it.
+- Still ONE template folder. The 2026-09-01 silent 404 came from a SECOND
+  template-named folder (`example_workflows/` beside `workflows/`), never from
+  how many graphs one folder holds; the earlier plan note that said otherwise
+  was wrong. `tests/test_workflow_templates_single_folder.py` pins the listed
+  set to the canonical plus exactly the matrix's shipping rows.
+- The canonical is still the first run. The boot banner names it and says the
+  other entries are per-machine presets.
+- `.comfyignore` excludes `workflows/*.launch.md` and nothing else there; a
+  `*.json` glob would strip every graph out of every install.
+
 ## 2026-09-25 -- ASSET CLEANUP IS THE SECOND SANCTIONED AUTO-DELETE, CHOSEN PER RUN
 
 Operator: bring the space-saver back, three settings, on the first node where

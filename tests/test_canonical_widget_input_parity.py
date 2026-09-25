@@ -147,7 +147,7 @@ def test_the_descriptor_matches_what_the_node_class_declares():
 #
 # Guarding the canonical alone would have left that live.
 
-VARIANTS_DIR = REPO_ROOT / "workflows" / "variants"
+from tests._support.shipped_graphs import variant_paths  # noqa: E402
 
 
 def _graph_workflows():
@@ -157,8 +157,7 @@ def _graph_workflows():
     are correctly excluded rather than special-cased by filename.
     """
     out = []
-    for path in sorted(list(VARIANTS_DIR.glob("*.json"))
-                       + [CANONICAL]):
+    for path in sorted(variant_paths() + [CANONICAL]):
         try:
             with open(path, "r", encoding="utf-8") as fh:
                 data = json.load(fh)
@@ -192,7 +191,7 @@ def test_every_workflow_has_widget_input_parity(wf_path):
 
 @pytest.mark.parametrize(
     "wf_path",
-    [p for p in _graph_workflows() if p.parent.name == "variants"],
+    [p for p in _graph_workflows() if p.name != CANONICAL.name],
     ids=lambda p: p.name)
 def test_every_variant_director_carries_max_render_frames(wf_path):
     """THE MUTATION TARGET for C1b. Strip the descriptor from any variant and
@@ -252,7 +251,7 @@ def test_a_pinned_frame_ceiling_reaches_the_variant_by_name(tmp_path,
 
 @pytest.mark.parametrize(
     "wf_path",
-    [Path("workflows/otr_canonical.json")] + list(Path("workflows/variants").glob("*.json")),
+    [Path("workflows/otr_canonical.json")] + variant_paths(),
     ids=lambda p: p.name
 )
 def test_voice_nodes_have_zero_widgets(wf_path):

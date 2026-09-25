@@ -11,11 +11,13 @@ present (2026-08-29 to 2026-09-01) the gallery listed ``otr_canonical`` and
 own docs/2026-08-23-workflow-discoverability-PROBLEM.md had warned about
 exactly this. This test keeps the pack to a single template folder.
 
-Operator ruling 2026-09-02: ONE JSON for now -- ``otr_canonical`` (kokoro on both
-voice slots) -- plus the script-only graph. The 4060 floor template that shipped
-2026-08-29 to 2026-09-02 is gone from the gallery; per-machine saved dropdowns
-live in ``workflows/variants/`` (generated, never hand-edited), and a 4060
-dropdown-friendly JSON is saved only after that testing is done.
+Operator ruling 2026-09-02 was ONE JSON in the gallery -- ``otr_canonical``
+(kokoro on both voice slots) -- with the per-machine saved dropdowns in
+``workflows/variants/``. REVERSED 2026-09-25 (operator: "we can't store the
+variants in a subfolder"): ComfyUI's gallery globs one level, so those graphs
+shipped and were never listed. They now sit beside the canonical and the gallery
+lists all of them. Still ONE template folder -- the 404 above came from a second
+template-named folder, never from how many graphs one folder holds.
 """
 from __future__ import annotations
 
@@ -35,8 +37,20 @@ def test_exactly_one_template_folder_exists():
 
 
 def test_gallery_lists_exactly_the_ruled_graphs():
+    """The canonical plus exactly the rows the workflow matrix ships -- no
+    hand-authored stray (it would list in the menu with no row behind it), and
+    no shipping row whose graph is missing (the menu would be one short)."""
+    from nodes._otr_shared.capability_profiles import shipping_ids
     listed = sorted(p.stem for p in (REPO / "workflows").glob("*.json"))
-    assert listed == ["otr_canonical"], listed
+    expected = sorted(["otr_canonical"] + [
+        pid if pid.startswith("otr_") else "otr_" + pid
+        for pid in shipping_ids()])
+    assert listed == expected, (
+        "gallery drift -- extra: %r, missing: %r"
+        % (sorted(set(listed) - set(expected)),
+           sorted(set(expected) - set(listed))))
+    assert not (REPO / "workflows" / "variants").exists(), (
+        "workflows/variants/ is back; a graph there never reaches the gallery")
 
 
 def test_canonical_ships_kokoro_on_both_voice_slots():

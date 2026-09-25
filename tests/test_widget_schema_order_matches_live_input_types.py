@@ -43,7 +43,6 @@ import pytest
 
 _REPO = Path(__file__).resolve().parents[1]
 _WORKFLOWS = _REPO / "workflows"
-_VARIANTS = _WORKFLOWS / "variants"
 
 # ComfyUI renders an input as a WIDGET when its declared type is a COMBO (a
 # list of choices) or one of these primitives -- and not when the declaration
@@ -114,7 +113,6 @@ def _graphs() -> list:
     `test_workflow_link_target_indexes` collecting one item of seventeen.
     """
     out = list(sorted(_WORKFLOWS.glob("*.json")))
-    out += sorted(_VARIANTS.glob("*.json"))
     keep = []
     for path in out:
         if "external_examples" in path.parts:

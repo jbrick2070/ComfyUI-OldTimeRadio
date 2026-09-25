@@ -4,7 +4,7 @@ This is the small, boring headless entrypoint agents should use when the
 operator asks for an API render/smoke:
 
 * Load workflows/otr_canonical.json from this repo, or one of its generated
-  variants under workflows/variants/ via --workflow (a saved-dropdown
+  variants beside it in workflows/ via --workflow (a saved-dropdown
   projection of the same graph, never an ad-hoc one).
 * Apply engine/dropdown capability profiles through the single profile applier.
 * Patch only creative/story widgets directly, through otr_api.patch_creative.

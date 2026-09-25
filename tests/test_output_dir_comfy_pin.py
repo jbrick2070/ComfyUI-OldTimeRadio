@@ -27,7 +27,6 @@ from nodes._otr_shared import env as otr_env
 REPO = Path(__file__).resolve().parent.parent
 INIT = REPO / "__init__.py"
 CANONICAL = REPO / "workflows" / "otr_canonical.json"
-VARIANTS = REPO / "workflows" / "variants"
 _FORBIDDEN_OBS = (
     "ComfyUI-Installs",
     r"Documents\ComfyUI\output",
@@ -36,9 +35,8 @@ _FORBIDDEN_OBS = (
 
 
 def _shipping_graphs():
-    graphs = [CANONICAL]
-    graphs.extend(sorted(VARIANTS.glob("otr_*.json")))
-    return [p for p in graphs if p.is_file() and ".env." not in p.name]
+    from tests._support.shipped_graphs import shipped_graphs
+    return [p for p in shipped_graphs() if p.is_file()]
 
 
 def _mux_nodes(graph):

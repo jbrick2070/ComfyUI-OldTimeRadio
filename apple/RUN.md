@@ -11,16 +11,16 @@ shows.
 
 **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio** (named
 after the pack's folder, so a git clone lists it as **ComfyUI-OldTimeRadio**).
-There is exactly one entry, **`otr_canonical`**. That is the authored graph, and it is the
+Start with **`otr_canonical`**. That is the authored graph, and it is the
 one to start with on any machine: it names no vendor anywhere and resolves your
 GPU at run time, so the same file is correct on NVIDIA, on Apple Silicon and on
 CPU. (Dragging `workflows/otr_canonical.json` onto the canvas loads the same
 file.)
 
-If you would rather have a graph pre-set for your hardware, drag one of the saved
-variants in `workflows/variants/` onto the canvas instead —
-[MACHINES.md](MACHINES.md#which-graph-do-i-open) names the file for your machine. Those do
-not appear under Browse Templates; they are files you drag.
+If you would rather have a graph pre-set for your hardware, the other entries in
+the same list are exactly that -- the canonical with its dropdowns set for one
+machine (`otr_8gb_still`, `otr_16gb_video`, `otr_mac16_low`, ...).
+[MACHINES.md](MACHINES.md#which-graph-do-i-open) names the one for your machine.
 
 ## Press Queue
 

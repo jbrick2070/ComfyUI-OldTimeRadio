@@ -281,18 +281,18 @@ tools/
 # whitespace.
 assets/
 #
-# workflows/variants/*.md -- 94 generated LAUNCH RECIPES, one per variant,
+# workflows/*.launch.md -- the generated LAUNCH RECIPES, one per variant,
 # written by scripts/build_variants.py. Every one of them is a headless command
 # built on runners under scripts/, which `scripts/*` above already stops
 # shipping, so on a registry install they document commands the installer
-# cannot run. THE .json VARIANTS THEMSELVES KEEP SHIPPING, and they are the only
-# per-machine graph a registry user gets: ComfyUI's template browser globs one
-# directory level (`*/workflows/*.json`), so it lists the canonical and nothing
-# else. The README's "One graph in the menu" callout and its "Other setups"
-# bullet both tell the reader to drag `workflows/variants/otr_*.json` onto the
-# canvas, which only works because this pattern is deliberately .md-only.
-# Never widen it to workflows/variants/.
-workflows/variants/*.md
+# cannot run. THE .json VARIANTS THEMSELVES KEEP SHIPPING. Until 2026-09-25 they
+# sat in workflows/variants/, where ComfyUI's template browser (it globs one
+# directory level, `*/workflows/*.json`) never listed them; they now sit beside
+# the canonical in workflows/ and the gallery lists all 25 (operator: "we can't
+# store the variants in a subfolder"). This pattern is deliberately
+# .launch.md-only: never widen it to a *.json glob, which would strip the
+# graphs out of every install.
+workflows/*.launch.md
 
 # 2026-09-17: session scratch, and it is the second line of defence -- the
 # header above is right that untracked files never ship, which is exactly why

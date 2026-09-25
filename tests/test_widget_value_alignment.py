@@ -12,7 +12,7 @@ WHY THIS MATTERS NOW: the project is willing to delete inert widgets rather
 than leave dishonest controls in the graph (operator ruling 2026-08-28 -- *"why
 not delete an inert widget and just make the adjustments so it's ok -- that's
 being lazy not to remove an inert widget"*). That deletion is a MIGRATION: the
-canonical AND every file under `workflows/variants/` must be re-indexed in the
+canonical AND every generated variant beside it in `workflows/` must be re-indexed in the
 same change. The realistic mistake is not doing it wrong everywhere -- it is
 updating the canonical and MISSING A VARIANT.
 
@@ -39,7 +39,6 @@ from pathlib import Path
 _REPO = Path(__file__).resolve().parents[1]
 _CANONICAL = _REPO / "workflows" / "otr_canonical.json"
 _WORKFLOWS = _REPO / "workflows"
-_VARIANTS = _REPO / "workflows" / "variants"
 
 
 def _workflows():
@@ -59,8 +58,9 @@ def _workflows():
     `workflows/` is a graph this guard must cover.
     """
     out = [_CANONICAL]
+    # Since 2026-09-25 this one glob covers the variants too: they moved up
+    # from workflows/variants/ to sit beside the canonical.
     out.extend(sorted(p for p in _WORKFLOWS.glob("*.json") if p != _CANONICAL))
-    out.extend(sorted(_VARIANTS.glob("*.json")))
     return [p for p in out if p.is_file()]
 
 

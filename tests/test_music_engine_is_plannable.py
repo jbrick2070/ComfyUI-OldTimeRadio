@@ -241,9 +241,8 @@ class ShippedGraphWiresTheAudioChainTests(unittest.TestCase):
     def _graphs(self):
         yield "otr_canonical.json", json.loads(
             (ROOT / "workflows" / "otr_canonical.json").read_text(encoding="utf-8"))
-        for path in sorted((ROOT / "workflows" / "variants").glob("*.json")):
-            if path.name.endswith(".env.json"):
-                continue
+        from tests._support.shipped_graphs import variant_paths
+        for path in variant_paths():
             yield path.name, json.loads(path.read_text(encoding="utf-8"))
 
     def test_every_shipped_graph_gates_its_audio_chain_to_the_validator(self):

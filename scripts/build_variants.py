@@ -4,10 +4,10 @@ Per the 2026-07-09 platform-portability final spec, section 1. An OFFLINE CLI
 (never a node): a platform variant = TWO artifacts generated together from
 the ONE canonical graph + a committed capability profile:
 
-  1. workflows/variants/otr_<profile_id>.json  -- apply_profile(canonical,
+  1. workflows/otr_<profile_id>.json  -- apply_profile(canonical,
      profile) + stamps written into OTR_WorkflowValidator's EXISTING
      widgets (profile_id / master_hash / generated_by / its own path).
-  2. workflows/variants/otr_<profile_id>.launch.md -- the launch recipe
+  2. workflows/otr_<profile_id>.launch.md -- the launch recipe
      from the SAME validated profile object (args, sage flag, env, key
      NAMES only -- values are never stored -- and install pointers).
 
@@ -49,12 +49,21 @@ from nodes._otr_workflow_apply import (  # noqa: E402
 )
 
 CANONICAL = REPO / "workflows" / "otr_canonical.json"
-VARIANTS_DIR = REPO / "workflows" / "variants"
+#: THE VARIANTS LIVE BESIDE THE CANONICAL, IN workflows/ ITSELF (operator,
+#: 2026-09-25: "we can't store the variants in a subfolder"). ComfyUI's template
+#: gallery globs `*/workflows/*.json` ONE level deep, so `workflows/variants/`
+#: shipped 24 graphs no user could find from the menu. One folder is still the
+#: rule that matters -- the 2026-09-01 silent 404 came from a SECOND
+#: template-named folder, not from how many graphs one folder holds
+#: (tests/test_workflow_templates_single_folder.py).
+VARIANTS_DIR = REPO / "workflows"
+#: The retired subfolder. `--check` fails if it reappears with a graph in it.
+RETIRED_VARIANTS_DIR = REPO / "workflows" / "variants"
 GENERATED_BY = "scripts/build_variants.py"
 
 #: THE SHIPPING SET, DERIVED FROM THE MATRIX (2026-09-24). The rows in
 #: `config/workflow_matrix.json` that say `ships` are the only configs that emit a
-#: graph into `workflows/variants/`. Edit that file and this follows; there is no
+#: graph into `workflows/`. Edit that file and this follows; there is no
 #: second list to keep in step, which is the entire reason it moved out of here.
 #:
 #: Still an allow-list, deliberately, exactly as the hand-kept tuple was: a row
@@ -118,7 +127,7 @@ def _committed_profile_ids() -> list[str]:
     what was allowed to. Two silent failures came out of that: a new matrix row
     with no file twin was never emitted, and an emptied folder made `--all` emit
     nothing and still exit 0. `--check` hid it, because it enumerates the
-    already-committed graphs in `workflows/variants/` and never looks at the
+    already-committed graphs in `workflows/` and never looks at the
     source folder at all.
 
     `shipping_ids()` reads the matrix, so the enumeration and the allow-list are
@@ -171,7 +180,7 @@ def build_variant(profile_id: str, *, schemas=None, mapping=None,
                             schemas=schemas)
     master_hash = semantic_master_hash(applied, mapping=mapping,
                                        schemas=schemas)
-    variant_rel = f"workflows/variants/{_variant_stem(profile_id)}.json"
+    variant_rel = f"workflows/{_variant_stem(profile_id)}.json"
     nid = _validator_node_id(applied)
     for widget, value in (
         ("workflow_json_path", variant_rel),
@@ -423,8 +432,15 @@ def cmd_check() -> int:
 
     # The paired <variant>.env.json recipe-knob files also match otr_*.json but are
     # NOT variants -- exclude them (video-tiers 2026-07-20).
+    # The canonical lives in the same folder and is the SOURCE, not a variant.
     committed = sorted(p for p in VARIANTS_DIR.glob("otr_*.json")
-                       if not p.name.endswith(".env.json"))
+                       if not p.name.endswith(".env.json")
+                       and p.name != CANONICAL.name)
+    if RETIRED_VARIANTS_DIR.is_dir() and any(RETIRED_VARIANTS_DIR.iterdir()):
+        failures.append(
+            "workflows/variants/ is back with files in it; the variants live "
+            "in workflows/ since 2026-09-25, and a graph in the subfolder is "
+            "invisible to the template gallery")
     if not committed:
         print("check: no committed variants yet (nothing to diff); "
               "soft-skip guard " +

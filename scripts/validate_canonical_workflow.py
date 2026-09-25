@@ -7,7 +7,7 @@ which CLAUDE.md forbids). Callable from the suite gate + from CI.
 Usage:
     python scripts/validate_canonical_workflow.py                       # canonical
     python scripts/validate_canonical_workflow.py workflows/otr_canonical.json
-    python scripts/validate_canonical_workflow.py workflows/variants/otr_foo.json
+    python scripts/validate_canonical_workflow.py workflows/otr_foo.json
 """
 from __future__ import annotations
 

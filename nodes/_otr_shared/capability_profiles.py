@@ -436,7 +436,7 @@ def matrix_rows(path: Optional[str] = None) -> dict:
 
 
 def shipping_ids(path: Optional[str] = None) -> tuple:
-    """The ids that emit a graph into ``workflows/variants/``, matrix order.
+    """The ids that emit a graph into ``workflows/``, matrix order.
 
     An allow-list, deliberately, exactly as the hand-kept tuple this replaces
     was: a row has to say `ships` to reach a user, so a new row defaults to NOT

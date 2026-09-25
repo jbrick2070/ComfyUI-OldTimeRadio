@@ -355,7 +355,9 @@ first, before any engine work, and an actual OOM decides it — no estimate gate
 
 Verified present in the repo and enforced by tests:
 
-* `workflows/variants/<profile>.json` **and** `<profile>.launch.md` — generated
+* `workflows/otr_<row>.json` **and** `otr_<row>.launch.md` — generated (in
+  `workflows/variants/` when this spec was written; beside the canonical since
+  2026-09-25)
   for every committed profile (70 launch files exist today).
 * `apple/ENGINE_MATRIX.md` — regenerate via `tools/engine_matrix.py`; parity is
   enforced.

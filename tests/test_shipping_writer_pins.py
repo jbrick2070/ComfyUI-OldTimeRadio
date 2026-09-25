@@ -107,7 +107,7 @@ def test_shipping_variant_widgets_carry_the_live_label():
     """Saved graphs must store the live COMBO label, not a stale bare id."""
     qwen_label = default_llm_option()
     for pid in bv.SHIPPING_SET:
-        path = os.path.join(_REPO, "workflows", "variants", f"{pid}.json")
+        path = os.path.join(_REPO, "workflows", f"{pid}.json")
         with open(path, encoding="utf-8") as fh:
             blob = json.load(fh)
         text = json.dumps(blob)

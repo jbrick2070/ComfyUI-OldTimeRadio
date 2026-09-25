@@ -154,8 +154,9 @@ Select-String -Pattern OldTimeRadio <comfyui console log>    # Windows PowerShel
 
 **Workflow -> Browse Templates -> EXTENSIONS -> comfyui-old-time-radio.** The
 entry is named after the pack's folder, so on a git clone it reads
-`ComfyUI-OldTimeRadio`; the console banner prints the exact name at boot. There
-is exactly one entry, `otr_canonical`. Open it and press **Queue**. Change
+`ComfyUI-OldTimeRadio`; the console banner prints the exact name at boot. Open
+`otr_canonical` (the other entries are per-machine presets; do not pick one for
+the user) and press **Queue**. Change
 nothing: every dropdown already holds a working value.
 
 `act_count` on **OTR_LedgerScriptWriter** already ships at `1` in
@@ -194,16 +195,16 @@ Each of these cost a real session before it was written down.
   node" or cannot resolve an install target. That is a registry-side state, not
   a local fault.
 * **Do not edit files in the pack to make an install work.** If something needs
-  editing, that is a bug worth reporting, not a local patch. The saved graphs in
-  `workflows/variants/` are GENERATED -- editing one is silently undone the next
+  editing, that is a bug worth reporting, not a local patch. The per-machine
+  graphs in `workflows/` are GENERATED -- editing one is silently undone the next
   time they are rebuilt.
 * **Do not assume the output folder from the launch flags.** The pack honours
   `OTR_OUTPUT_DIR`, so a machine can publish somewhere other than ComfyUI's
   `--output-directory`. Take the truth from the server log's pinned line or from
   `obs_publish OK ->`.
-* **Do not pick a per-machine graph for the user.** The graphs under
-  `workflows/variants/` are presets, and the canonical template in the menu is
-  the intended first run. Shipping rows have a published episode behind them.
+* **Do not pick a per-machine graph for the user.** The `otr_<machine>_<kind>`
+  entries beside the canonical in Browse Templates are presets, and
+  `otr_canonical` is the intended first run. Shipping rows have a published episode behind them.
   `otr_amd_still` reads `draft` in its profile but DOES have one -- an outside
   tester published an episode from it on a Radeon AI PRO R9700 under ROCm 7.2
   on 2026-09-14. The `status` field records promotion, not proof; for proof

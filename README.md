@@ -207,8 +207,10 @@ pauses on `[OldTimeRadio]` lines, that is what it is doing.
 
 **Load the show.** **Workflow → Browse Templates → EXTENSIONS →
 comfyui-old-time-radio** (the entry is named after the pack's folder, so a git
-clone lists it as **ComfyUI-OldTimeRadio**). There is exactly one entry,
-**`otr_canonical`**. Open it and press **Queue**. (If the gallery lists it but opening it fails, drag
+clone lists it as **ComfyUI-OldTimeRadio**). Open **`otr_canonical`** and press
+**Queue** -- it runs on any machine. (The other entries are the same show preset
+for one machine each; see [A graph pre-set for your
+machine](#a-graph-pre-set-for-your-machine).) (If the gallery lists it but opening it fails, drag
 `custom_nodes/ComfyUI-OldTimeRadio/workflows/otr_canonical.json` onto the canvas
 instead -- same graph, and it has happened.) You do not have to change anything: every dropdown already
 holds a working value, and the ones set to *roll* pick for themselves, so two runs
@@ -460,12 +462,13 @@ will not.
 
 `otr_canonical` names no vendor anywhere and resolves your device at run time,
 so it is correct as shipped on NVIDIA, Apple Silicon and CPU. If you would rather
-skip the dropdowns, the pack also ships **a generated graph per machine profile in
-`custom_nodes/ComfyUI-OldTimeRadio/workflows/variants/`** -- one per machine class and episode kind, named
-`otr_<machine>_<tier>.json`. Browse Templates lists only the canonical -- its
-scanner looks one directory deep -- so these are files you **drag onto the
-canvas** or open with Workflow → Open. Never hand-edit one; each is the canonical
-with its dropdowns set, regenerated from it, and checked against it.
+skip the dropdowns, the pack also ships **a generated graph per machine, right
+beside the canonical in Browse Templates** (and in
+`custom_nodes/ComfyUI-OldTimeRadio/workflows/`) -- one per machine class and
+episode kind, named `otr_<machine>_<kind>`. Pick one from the menu, drag the file
+onto the canvas, or open it with Workflow → Open. Never hand-edit one; each is
+the canonical with its dropdowns set, regenerated from it, and checked against
+it.
 
 The tiers are named by what the episode is made of. **low** runs the procedural
 visualiser lanes and needs no video or image weights at all. **still** generates
@@ -504,8 +507,8 @@ yet promoted -- it is a status, not a verdict on proof: the AMD stills graph
 reads `draft` and has an outside tester's published episode behind it.
 
 `scripts/otr_provision.py` needs the **git clone**: `scripts/` is not in a
-Manager install. The saved graphs in `workflows/variants/` need nothing but a
-drag, and the weights a graph selects download at queue time whenever the pack
+Manager install. The saved graphs in `workflows/` need nothing but a pick from
+Browse Templates, and the weights a graph selects download at queue time whenever the pack
 can fetch them itself.
 
 A few engines build their graph out of another pack's nodes. Those are ComfyUI
@@ -686,7 +689,7 @@ holds, so it ships off; on a much larger model the switch is
 `JUDGE_ATTRIBUTION` in `nodes/_otr_ledger_clean.py`.
 
 **AMD has a receipt.** An outside tester ran
-`workflows/variants/otr_amd_still.json` end to end on a Radeon AI PRO R9700
+`otr_amd_still.json` end to end on a Radeon AI PRO R9700
 (RDNA4) under ROCm 7.2 on Ubuntu 24.04, 2026-09-14, with no edits to the graph,
 and published a finished episode. Nobody on the project owns a Radeon, so what
 is proven is the still tier on that one card: RDNA3, Windows and the 8 GB AMD

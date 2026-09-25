@@ -687,7 +687,7 @@ than "has this been run on AMD?". So treat an unmarked AMD cell as the absence
 of a hard blocker, nothing more.
 
 **AMD HAS A RECEIPT, and this paragraph used to deny it.** An outside tester ran
-`workflows/variants/otr_amd_still.json` end to end on a Radeon AI PRO R9700
+`otr_amd_still.json` end to end on a Radeon AI PRO R9700
 (32 GB, RDNA4 / gfx1201) under ROCm 7.2 on Ubuntu 24.04 and published a finished
 episode, with no edits to the graph -- commit `0fc0fb90`, 2026-09-14, pack commit
 `0b38424`. Four engines are marked **proven** there from their own artifacts
@@ -869,7 +869,7 @@ def _variant_for(profile_id: str) -> str:
     collide with an `otr_X`. So the mapping is total and unambiguous.
     """
     stem = profile_id if profile_id.startswith("otr_") else "otr_%s" % profile_id
-    return "workflows/variants/%s.json" % stem
+    return "workflows/%s.json" % stem
 
 
 def manual_artifacts(lane: str, provision, fetcher) -> list:

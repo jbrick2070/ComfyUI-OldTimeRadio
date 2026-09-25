@@ -22,8 +22,8 @@ quantisation policy or to the estimator silently rewrites every label -- and
 every saved graph pinned to the old spelling breaks at submit time, minutes into
 a run, rather than here in two seconds.
 
-SCOPE: the HAND-MAINTAINED graphs only. The 45 files under workflows/variants/
-are generated and are already covered by `scripts/build_variants.py --check`,
+SCOPE: the HAND-MAINTAINED graphs only. The generated variants beside it in workflows/
+are already covered by `scripts/build_variants.py --check`,
 which regenerates and diffs them.
 """
 from __future__ import annotations

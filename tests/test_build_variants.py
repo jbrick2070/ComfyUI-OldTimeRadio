@@ -132,7 +132,7 @@ def test_build_variant_emits_shipping_cloud_skus(
         profile_id, canonical, schemas, mapping):
     variant, rel, recipe = bv.build_variant(
         profile_id, schemas=schemas, mapping=mapping, canonical=canonical)
-    assert rel == f"workflows/variants/{profile_id}.json"
+    assert rel == f"workflows/{profile_id}.json"
     vnode = next(n for n in variant["nodes"]
                  if n["type"] == "OTR_WorkflowValidator")
     assert value(vnode, "profile_id") == profile_id
@@ -165,7 +165,7 @@ def test_build_variant_cpu_row_stamps_and_selfchecks(canonical, schemas,
                                                      mapping):
     variant, rel, recipe = bv.build_variant(
         CPU_ROW, schemas=schemas, mapping=mapping, canonical=canonical)
-    assert rel == "workflows/variants/otr_cloud_low.json"
+    assert rel == "workflows/otr_cloud_low.json"
     # An id that already carries the prefix is not doubled; a bare one gains it.
     assert bv._variant_stem("probe") == "otr_probe"
     vnode = next(n for n in variant["nodes"]
@@ -334,7 +334,7 @@ def test_the_committed_variants_match_their_source(capsys):
 
     `test_check_detects_variant_drift` monkeypatches VARIANTS_DIR to a tmp_path
     and emits a single profile into it, so it verifies that drift detection
-    WORKS. Nothing verified that `workflows/variants/` -- the 24 graphs a user
+    WORKS. Nothing verified that the variants in `workflows/` -- the 24 graphs a user
     actually loads -- still matches the source it is generated from. That was
     checked only when a person remembered to run the CLI by hand.
 
@@ -350,7 +350,7 @@ def test_the_committed_variants_match_their_source(capsys):
     rc = bv.cmd_check()
     out = capsys.readouterr().out
     assert rc == 0, (
-        "the committed workflows/variants/ tree no longer matches what its "
+        "the committed variants in workflows/ no longer match what their "
         "source regenerates. Run:\n"
         "    python scripts/build_variants.py --all\n"
         "and commit the result -- or, if the regeneration is what is wrong, "
@@ -361,8 +361,8 @@ def test_the_committed_variants_match_their_source(capsys):
     # and by design when it finds no committed variants at all. The socket
     # audit shipped earlier today passed while reading 1 file of 25 for
     # exactly this reason, so the count is pinned rather than assumed.
-    committed = sorted(p for p in bv.VARIANTS_DIR.glob("otr_*.json")
-                       if not p.name.endswith(".env.json"))
+    from tests._support.shipped_graphs import variant_paths
+    committed = variant_paths()
     assert len(committed) >= 20, (
         "expected the full shipped set, found %d -- this test would be "
         "passing by checking almost nothing" % len(committed))

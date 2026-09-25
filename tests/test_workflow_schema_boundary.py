@@ -125,8 +125,8 @@ def test_every_shipped_graph_round_trips_unchanged():
     registry = {t: {"nodeData": {"input": s.get("input", {})}}
                 for t, s in schemas.items()}
 
-    graphs = [_ROOT / "workflows" / "otr_canonical.json"]
-    graphs += sorted((_ROOT / "workflows" / "variants").glob("otr_*.json"))
+    from tests._support.shipped_graphs import shipped_graphs
+    graphs = shipped_graphs()
     assert len(graphs) >= 20, "expected the canonical plus the variants, got %d" % len(graphs)
 
     import tempfile

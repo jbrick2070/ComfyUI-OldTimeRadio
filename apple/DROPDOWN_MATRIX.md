@@ -8,11 +8,11 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | column | machine | reproduce with |
 |---|---|---|
-| 8 GB NVIDIA | RTX 4060 / 3070 / 2080 class | `workflows/variants/otr_8gb_video.json` |
-| 16 GB+ NVIDIA | RTX 5080 / 4080 / 3090 class | `workflows/variants/otr_16gb_video.json` |
-| Mac 16 GB | Apple Silicon, unified memory | `workflows/variants/otr_mac16_video.json` |
-| AMD ROCm | Windows or Linux -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `workflows/variants/otr_amd_still.json` |
-| CPU only | no GPU at all | `workflows/variants/otr_cloud_low.json` |
+| 8 GB NVIDIA | RTX 4060 / 3070 / 2080 class | `workflows/otr_8gb_video.json` |
+| 16 GB+ NVIDIA | RTX 5080 / 4080 / 3090 class | `workflows/otr_16gb_video.json` |
+| Mac 16 GB | Apple Silicon, unified memory | `workflows/otr_mac16_video.json` |
+| AMD ROCm | Windows or Linux -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `workflows/otr_amd_still.json` |
+| CPU only | no GPU at all | `workflows/otr_cloud_low.json` |
 
 ## Every dropdown
 
@@ -193,7 +193,7 @@ than "has this been run on AMD?". So treat an unmarked AMD cell as the absence
 of a hard blocker, nothing more.
 
 **AMD HAS A RECEIPT, and this paragraph used to deny it.** An outside tester ran
-`workflows/variants/otr_amd_still.json` end to end on a Radeon AI PRO R9700
+`otr_amd_still.json` end to end on a Radeon AI PRO R9700
 (32 GB, RDNA4 / gfx1201) under ROCm 7.2 on Ubuntu 24.04 and published a finished
 episode, with no edits to the graph -- commit `0fc0fb90`, 2026-09-14, pack commit
 `0b38424`. Four engines are marked **proven** there from their own artifacts

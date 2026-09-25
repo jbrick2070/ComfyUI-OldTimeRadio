@@ -61,12 +61,14 @@ def mappings():
 
 
 def _workflows():
-    """Every shipped graph, INCLUDING the variants in their subdirectory.
+    """Every shipped graph, INCLUDING the variants.
 
     `glob` rather than `rglob` was the first version of this and it found
-    exactly ONE file -- the canonical -- because the 24 variants live under
-    `workflows/variants/`. The audit reported clean having examined 4% of the
-    graphs, and only the non-vacuity test at the bottom of this file caught it.
+    exactly ONE file -- the canonical -- because the 24 variants then lived
+    under `workflows/variants/`. The audit reported clean having examined 4% of
+    the graphs, and only the non-vacuity test at the bottom of this file caught
+    it. Since 2026-09-25 the variants sit beside the canonical; `rglob` stays so
+    a graph that lands in any subfolder is still read.
     """
     files = sorted(WORKFLOW_DIR.rglob("*.json"))
     assert files, "no workflows found; this test would pass by checking nothing"

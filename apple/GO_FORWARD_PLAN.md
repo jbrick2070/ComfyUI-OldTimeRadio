@@ -137,16 +137,14 @@ These ride the same publish and are deliberately last. The floor is
 moving -- graphs are still being regenerated -- and a publish is the one action
 here that reaches strangers and cannot be taken back.
 
-* **Gallery.** Comfy's scanner globs `*/workflows/*.json` -- ONE level, no
-  recursion, no manifest option (`app/custom_node_manager.py`). So listing the
-  24 variants means putting 24 JSONs at the top of `workflows/`, which is the
-  exact shape that produced SILENT 404s when the pack briefly had two template
-  folders; `tests/test_workflow_templates_single_folder.py` exists because of
-  it. There is NO functional gap today: the variants ship (`.comfyignore`
-  excludes only their `*.md` launch recipes and says "Never widen it to
-  workflows/variants/"), they load when dragged, and `apple/MACHINES.md` opens
-  with a per-machine table naming the exact file. What is missing is menu
-  discovery, and the canonical in the menu already runs on every machine.
+* **Gallery -- built 2026-09-25, rides 2.3.4.** Comfy's scanner globs
+  `*/workflows/*.json` one level deep, so the 24 variants in
+  `workflows/variants/` shipped but never listed. Operator: "we can't store the
+  variants in a subfolder" -- they now sit beside the canonical and the gallery
+  lists all 25. The old worry here was wrong: the 2026-09-01 silent 404 came
+  from a SECOND template-named folder, never from how many graphs one folder
+  holds; `tests/test_workflow_templates_single_folder.py` still keeps it to one
+  folder and now pins the listed set to the canonical plus the shipping rows.
 * **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active and the registry icon
   points at `/main/`. One click, his.
 * **Flagged registry versions.** 2.1.5, 2.1.6, 2.3.0 and 2.3.1 are Flagged;

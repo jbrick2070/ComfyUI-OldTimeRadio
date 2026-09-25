@@ -1,6 +1,6 @@
 # AMD / ROCm
 
-It ran. On 2026-09-14 an outside tester put `workflows/variants/otr_amd_still.json`
+It ran. On 2026-09-14 an outside tester put `otr_amd_still.json`
 through end to end on a Radeon and got a finished episode -- script, cast,
 voices, music, stills, captions, credits, muxed. Clean pass, no traceback, no
 edits to the graph.
@@ -18,7 +18,7 @@ edits to the graph.
 One graph ships for AMD, and it is the one that ran:
 
 ```
-workflows/variants/otr_amd_still.json    still image with motion, Kokoro voices, Stable Audio 3
+workflows/otr_amd_still.json    still image with motion, Kokoro voices, Stable Audio 3
 ```
 
 It is the canonical with AMD-appropriate dropdowns already saved: a
@@ -183,7 +183,7 @@ In a second terminal, one act, no timeout:
 ```bash
 python custom_nodes/ComfyUI-OldTimeRadio/scripts/otr_canonical_api_run.py \
   --comfyui-url http://127.0.0.1:8188 \
-  --workflow custom_nodes/ComfyUI-OldTimeRadio/workflows/variants/otr_amd_still.json \
+  --workflow custom_nodes/ComfyUI-OldTimeRadio/workflows/otr_amd_still.json \
   --act-count 1 \
   --timeout 0
 ls -la output/otr/obs/

@@ -23,7 +23,7 @@ test is a genuine cross-check of the consolidation. Once `config/profiles/` is
 deleted it would be comparing the matrix to itself, and it must be removed in
 that same change rather than left behind looking like it still proves something.
 
-WHAT REPLACES IT IS ALREADY ON DISK. `workflows/variants/` holds the 24 graphs
+WHAT REPLACES IT IS ALREADY ON DISK. `workflows/` holds the 24 graphs
 GENERATED FROM THE CONFIGS. So after the source is switched to the matrix,
 `--check` passing against those committed graphs is itself a non-circular proof
 -- the oracle was produced by the source being replaced. That only holds if the
@@ -108,8 +108,8 @@ def test_every_shipping_row_has_a_committed_variant(matrix):
     they exist because something emitted them.
     """
     ships = {r["id"] for r in matrix["rows"] if r.get("ships")}
-    variants = {p.stem for p in (REPO / "workflows" / "variants").glob("otr_*.json")
-                if not p.name.endswith(".env.json")}
+    from tests._support.shipped_graphs import variant_paths
+    variants = {p.stem for p in variant_paths()}
     assert ships, "the matrix marks no row as shipping"
     assert ships == variants, (
         "rows marked `ships` with no committed graph: %s\n"

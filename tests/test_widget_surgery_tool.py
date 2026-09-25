@@ -327,5 +327,6 @@ def test_the_shipped_files_match_the_shape_save_would_write():
     import glob
     canonical = CANONICAL.read_text(encoding="utf-8")
     assert canonical.count("\n") > 100 and canonical.endswith("\n")
-    for p in glob.glob(str(REPO / "workflows" / "variants" / "*.json")):
+    from tests._support.shipped_graphs import variant_paths
+    for p in variant_paths():
         assert Path(p).read_text(encoding="utf-8").count("\n") <= 1, p

@@ -34,7 +34,6 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 CANONICAL = REPO / "workflows" / "otr_canonical.json"
-VARIANTS = REPO / "workflows" / "variants"
 
 
 def _combo_choices():
@@ -93,8 +92,8 @@ def _saved_combo_values(path, choices):
 
 def _graphs():
     graphs = [p for p in [CANONICAL] if p.is_file()]
-    if VARIANTS.is_dir():
-        graphs.extend(sorted(VARIANTS.glob("otr_*.json")))
+    from tests._support.shipped_graphs import variant_paths
+    graphs.extend(variant_paths())
     return graphs
 
 

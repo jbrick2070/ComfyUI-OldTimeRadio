@@ -460,15 +460,15 @@ if _otr_dup is None:
 # gallery -- so the very first message a new install prints named a template
 # that is not there, which is the exact failure the paragraph above exists to
 # prevent. Verified against the PUBLISHED bundle rather than the repo, because
-# .comfyignore decides what ships: workflows/ contains exactly
-# otr_canonical.json. Its otr_canonical.jpg gallery thumbnail was deleted
-# 2026-09-11 (operator call): the still was an 8/22-era frame grab, three
-# weeks older than the graph it advertised. The template still lists and
-# opens; only the card image is gone. otr_story_only.json was deleted
-# 2026-09-07, and the gallery lists only the directory level
-# (`*/workflows/*.json`), so the machine variants under workflows/variants/
-# ship as files to drag in but never appear there: the gallery serves ONE
-# template and this line names one. `otr_4060_floor` is gone altogether:
+# .comfyignore decides what ships. The otr_canonical.jpg gallery thumbnail was
+# deleted 2026-09-11 (operator call): the still was an 8/22-era frame grab,
+# three weeks older than the graph it advertised. otr_story_only.json was
+# deleted 2026-09-07. The gallery lists only the directory level
+# (`*/workflows/*.json`), so on 2026-09-25 the 24 machine variants moved up
+# from workflows/variants/ into workflows/ beside the canonical (operator: "we
+# can't store the variants in a subfolder") and the gallery now lists all 25.
+# The banner names the canonical, which runs on any machine, and points at
+# apple/MACHINES.md for the per-card pick. `otr_4060_floor` is gone altogether:
 # every machine configuration is a row in config/workflow_matrix.json since
 # 2026-09-24, and there is no row by that name. If a template is added or
 # dropped, this line changes in the same edit.
@@ -485,11 +485,12 @@ if _otr_dup is None:
 _pack_folder = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
 if _otr_dup is None:
     print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "
-          f"EXTENSIONS > {_pack_folder} > otr_canonical  (the only one "
-          "the gallery lists -- pick it, then Queue Prompt) -- or drag "
-          "workflows/otr_canonical.json onto the canvas. Nothing needs changing: "
-          "it resolves your device at run time. The finished episode lands in "
-          "<output>/otr/obs/.")
+          f"EXTENSIONS > {_pack_folder} > otr_canonical  (runs on any "
+          "machine -- pick it, then Queue Prompt; the other entries there are "
+          "the same show preset for a specific card, listed in "
+          "apple/MACHINES.md) -- or drag workflows/otr_canonical.json onto the "
+          "canvas. Nothing needs changing: it resolves your device at run "
+          "time. The finished episode lands in <output>/otr/obs/.")
 
 # =====================================================================
 # HTTP route: GET /otr/latest_ledger

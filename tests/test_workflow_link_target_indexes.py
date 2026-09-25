@@ -50,7 +50,7 @@ def _workflow_paths() -> list[Path]:
     where a bad re-index LANDS -- `build_variants.py` projects the canonical
     into all 16, so one wrong dst_slot is written sixteen more times.
 
-    `rglob` reaches `workflows/variants/`. It also reaches
+    `rglob` reaches every variant beside the canonical. It also reaches
     `workflows/external_examples/`, which is why the filter below exists:
     those are vendored third-party graphs carrying a stranger's absolute
     paths, `.comfyignore` keeps them out of the published zip, and nothing in

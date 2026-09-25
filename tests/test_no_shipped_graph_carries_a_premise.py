@@ -25,8 +25,9 @@ from tests._support.writer_slots import value as widget_value
 
 PACK_ROOT = Path(__file__).resolve().parent.parent
 
-WORKFLOWS = [PACK_ROOT / "workflows" / "otr_canonical.json"] + sorted(
-    (PACK_ROOT / "workflows" / "variants").glob("*.json"))
+from tests._support.shipped_graphs import shipped_graphs  # noqa: E402
+
+WORKFLOWS = shipped_graphs()
 
 #: Slot index of custom_premise on OTR_LedgerScriptWriter, positional.
 _PREMISE_SLOT = 4

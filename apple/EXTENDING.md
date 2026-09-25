@@ -63,8 +63,8 @@ says whether what you built will actually work. The writer page is
 
 - **A shipped workflow is a matrix row, not a JSON you write.** Edit
   `config/workflow_matrix.json`, then `python scripts/build_variants.py --all`.
-  The files in `workflows/variants/` are generated. The canonical is the one
-  graph you may author.
+  Every `workflows/otr_*.json` except the canonical is generated. The canonical
+  is the one graph you may author.
 
 - **Removing is the same job as adding, done atomically** — registry row, module,
   pipeline entries, tests, and a grep that returns exactly the survivors you
@@ -164,16 +164,16 @@ differ -- a smaller writer on 8 GB, a cloud partner stack -- that is
 
 ## Adding or changing a shipped workflow
 
-A **shipped workflow** is a saved graph a person can open: the canonical in
-Browse Templates, or a per-machine file they drag from `workflows/variants/`.
+A **shipped workflow** is a saved graph a person can open from Browse Templates:
+the canonical, or one of the per-machine graphs listed beside it.
 It is not an engine and it is not a lane. A lane is a dropdown value every
 graph already has; the section above is that job. Reach for a new graph only
 when the *saved pins* should differ -- a smaller writer on 8 GB, a cloud
 partner stack, a Mac device policy.
 
 **The source of truth is one file: `config/workflow_matrix.json`.** Each row is
-one workflow. Edit that file. Do not hand-edit anything in
-`workflows/variants/` -- those JSON files and their `.launch.md` recipes are
+one workflow. Edit that file. Do not hand-edit any `workflows/otr_*.json`
+other than the canonical -- those JSON files and their `.launch.md` recipes are
 generated, and the next rebuild silently undoes you. A new shipping graph is a
 matrix row only -- there is no second place a workflow can be defined.
 
@@ -183,10 +183,13 @@ This wants the git clone. `scripts/` is not in a registry install.
 
 **Changing the authored graph** -- a new node, a new socket, a new widget -- is
 an edit to `workflows/otr_canonical.json`, in the same change as the node
-code. Unwired code is dead. Browse Templates lists exactly that one file. Do
-not add an `example_workflows/` folder -- ComfyUI mounts both at the same URL
-and the gallery 404s. Do not drop a second JSON next to the canonical;
-per-machine graphs live under `workflows/variants/`.
+code. Unwired code is dead. Do not add an `example_workflows/` folder --
+ComfyUI mounts both at the same URL and the gallery 404s. Do not drop a
+hand-written JSON next to the canonical either: every other `workflows/*.json`
+is a generated per-machine graph, the gallery lists them all, and
+`tests/test_workflow_templates_single_folder.py` holds that set to the
+canonical plus exactly the matrix's shipping rows. (They lived in
+`workflows/variants/` until 2026-09-25, where the gallery never saw them.)
 
 A new optional widget is always **appended** at the end of `widgets_values`.
 Inserting in the middle silently shifts every saved value. Removing a widget
@@ -259,8 +262,7 @@ the one that would otherwise lie.
 ### Stopping one
 
 Set `"ships"` false (or delete the row), **and delete** the matching files in
-`workflows/variants/` (the `.json` and `.launch.md` that `--all` emitted for
-that id). Leaving the files is not enough to fail `--check`: a row that still
+`workflows/` (the `.json` and `.launch.md` that `--all` emitted for that id). Leaving the files is not enough to fail `--check`: a row that still
 exists -- even with `"ships"` false -- is what `load_profile` reads, so the
 leftover graph regenerates cleanly.
 
