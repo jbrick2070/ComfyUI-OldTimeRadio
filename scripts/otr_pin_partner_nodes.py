@@ -52,12 +52,16 @@ def _resolve_comfy_root() -> Path:
     env = os.environ.get("OTR_COMFY_CORE_ROOT", "").strip()
     if env:
         candidates.append(Path(env))
-    # The install the render server boots (scripts/_otr_soak_server_launch.cmd
-    # runs THIS main.py on the pack's venv). A second install on the same box
-    # ("ComfyUI (1)") used to be tried first; its core wants a newer
-    # comfy-aimdo than the venv carries, every comfy_api_nodes import failed,
-    # and the pin reported live partner nodes as "not found" (2026-09-25).
+    # The install the 5080's render server boots
+    # (scripts/_otr_soak_server_launch.cmd runs THIS main.py on the pack's
+    # venv), FIRST. "ComfyUI (1)" is the 4060's install (a Desktop reinstall
+    # added the suffix; production_ledger.py documents it) and is second.
+    # The order matters on the 5080, which has both: with "(1)" first, a core
+    # wanting a newer comfy-aimdo than the venv carries made every
+    # comfy_api_nodes import fail and the pin read live nodes as "not found"
+    # (2026-09-25).
     candidates.append(Path(r"C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI"))
+    candidates.append(Path(r"C:\Users\jeffr\ComfyUI-Installs\ComfyUI (1)\ComfyUI"))
     candidates.append(REPO_ROOT.parent.parent)
     for cand in candidates:
         if (cand / "comfy_api_nodes").is_dir():

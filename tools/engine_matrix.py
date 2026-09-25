@@ -156,7 +156,15 @@ REFERENCE_BEAT_FRAMES = 442
 #: bakeoff receipt that was never in the tree -- the load-
 #: bearing safety number for the heaviest engine cited a receipt nobody could
 #: open, and nothing surfaced that until a human went looking.
-_DOC_CITATION = re.compile(r"(?:apple|docs)/[A-Za-z0-9._-]+")
+_DOC_CITATION = re.compile(r"(?:vram-recipe-lab/)?(?:apple|docs)/[A-Za-z0-9._-]+")
+
+#: A citation INTO THE SIBLING LAB REPO (``vram-recipe-lab/docs/...``) is real
+#: evidence that lives outside this pack. It cannot be checked from here -- the
+#: lab is not on a stranger's box, nor on every developer box -- so it renders
+#: as an external citation on every machine instead of resolving against this
+#: repo and reading MISSING (2026-09-25: the scan used to capture only the
+#: ``docs/...`` tail of ``eng_humo.py``'s lab citation).
+_EXTERNAL_PREFIX = "vram-recipe-lab/"
 
 #: Wording that marks a doc path as REFUTED rather than relied upon, so a
 #: comment explaining that a receipt is missing does not itself get counted as
@@ -294,7 +302,8 @@ def _cap_and_evidence(engine, name):
                 if _REFUTES.search(window):
                     continue
                 cited.add(ref)
-    for ref in sorted(cited):
+    external = sorted(ref for ref in cited if ref.startswith(_EXTERNAL_PREFIX))
+    for ref in sorted(cited - set(external)):
         target = ROOT / ref
         if not (target.exists() or list(ROOT.glob(ref + "*"))):
             missing.append(ref)
@@ -302,7 +311,9 @@ def _cap_and_evidence(engine, name):
     if missing:
         evidence = "**MISSING: %s**" % ", ".join(missing)
     elif cited:
-        evidence = ", ".join(sorted(cited))
+        evidence = ", ".join(
+            ["`%s` (sibling lab repo)" % ref for ref in external]
+            + sorted(cited - set(external)))
     else:
         evidence = "none cited"
     return (str(cap) if cap else "-"), source, evidence
