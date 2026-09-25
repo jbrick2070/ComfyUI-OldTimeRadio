@@ -274,16 +274,25 @@ def _assert_profile_models_present(profile_name, schemas, offline=False) -> list
     Returns the checked names. A profile with no ``preflight.required_models``
     is not an error -- most profiles do not declare any.
     """
-    import json as _json
-
-    path = REPO_ROOT / "config" / "profiles" / ("%s.json" % profile_name)
-    if not path.is_file():
-        return []
+    # THE PROFILE IS A MATRIX ROW. This read `config/profiles/<id>.json` until
+    # that folder was retired, and from then on it found no file for any id
+    # and silently checked nothing (found 2026-09-25).
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from nodes._otr_shared.capability_profiles import ProfileError, load_profile
+    from nodes._otr_visual_assets import MANIFEST as _SELF_FETCHED
     try:
-        profile = _json.loads(path.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001 -- a malformed profile fails later, louder
-        return []
+        profile = load_profile(profile_name)
+    except ProfileError:
+        return []                  # "none", or no such row: nothing declared
     required = ((profile.get("preflight") or {}).get("required_models") or [])
+    # A FILE THE PACK FETCHES FOR ITSELF IS NOT A REFUSAL. The validator's
+    # queue-time preflight downloads every allowlisted weight a selected lane
+    # needs -- before the writer runs, so the failure this gate exists to
+    # prevent cannot happen for them -- and refusing here because such a file
+    # is not on disk YET would block exactly the download that fixes it.
+    self_fetched = {name for (_category, name) in _SELF_FETCHED}
+    required = [n for n in required if os.path.basename(str(n)) not in self_fetched]
     if not required:
         return []
     # ONLY A FILENAME IS GATEABLE HERE, and this split is the whole fix
@@ -410,7 +419,8 @@ def main(argv: list[str] | None = None) -> int:
     selector = parser.add_mutually_exclusive_group()
     selector.add_argument(
         "--profile", default="none",
-        help="explicit capability profile id, e.g. none or otr_cloud_lanes",
+        help="a row id of config/workflow_matrix.json, e.g. otr_16gb_video, "
+             "or none",
     )
     selector.add_argument(
         "--machine", default=None,

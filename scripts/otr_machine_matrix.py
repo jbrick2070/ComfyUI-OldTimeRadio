@@ -263,9 +263,7 @@ def load_profiles() -> list:
         sys.path.insert(0, _HERE)
     import otr_provision as provision
 
-    # EVERY WORKFLOW THE MATRIX KNOWS, PLUS THE LAB RIGS -- not a folder glob.
-    # The 24 shipped rows live in `config/workflow_matrix.json` now, so globbing
-    # `config/profiles/` would omit them entirely once that folder goes.
+    # EVERY WORKFLOW THE MATRIX KNOWS -- not a folder glob.
     if _REPO not in sys.path:
         sys.path.insert(0, _REPO)
     from nodes._otr_shared.capability_profiles import (
@@ -544,18 +542,16 @@ def render() -> str:
     _voice_engines_table(A)
 
     A("## A bigger card does not currently get you more\n")
-    A("The tier is `16 GB+` because that is the truth: nothing in "
-      "`config/profiles/` declares a VRAM ceiling above 16, so a 24 GB or "
-      "32 GB card runs exactly what a 16 GB one runs.\n")
-    A("There is currently no separate 24/32 GB machine key or heavy-rental "
-      "profile. More memory gives headroom, but the install planner still "
-      "selects the 16 GB+ row. A future larger recipe belongs here only after "
-      "its config and reproducible receipt both exist.\n")
+    A("The machine class is `16 GB+`: there is no separate 24/32 GB machine "
+      "key, so the install planner selects the 16 GB+ row for any card that "
+      "size. One shipped workflow targets a bigger card on purpose -- "
+      "`otr_24gb_native_foley`, LTX 2.5 on the int8 DiT with a 22 GB writer "
+      "ceiling -- and you open it by hand.\n")
     A("**That matters when you are paying by the hour.** A rented 24 GB card "
-      "ran the 16 GB haunted profile and peaked at 15,990 MB. Rented Ampere "
-      "has since published both Wan 2.2 TI2V and LTX-2b, proving useful reach "
-      "beyond the floor lane. A bigger card still does not auto-select HuMo or "
-      "LTX 2.5: choose an explicit qualification profile and preserve its exact "
+      "ran the 16 GB haunted workflow and peaked at 15,990 MB, and rented "
+      "Ampere has published LTX-2b, so the smaller lanes reach well beyond the "
+      "floor. A bigger card still does not auto-select HuMo or the 24 GB LTX "
+      "2.5 lane: pick the workflow explicitly and keep its exact "
       "hardware/software/RAM receipt.\n")
 
     A("## Hardware episode receipts, with their exact scope\n")

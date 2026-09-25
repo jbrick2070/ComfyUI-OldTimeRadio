@@ -22,10 +22,8 @@ maintains and nobody can see. This project already shipped a README claiming an
 because the claim lived somewhere nobody re-read. Values in data are values a
 reader can check.
 
-WHAT THIS DOES NOT TOUCH: `config/profiles/*.json` still exists for EXPERIMENTS
--- the `otr_w45_*` campaign harness, `otr_soak_*`, `otr_sbcov_*`. Those answer
-"which experiment am I running", not "which machine am I on". `--profile` keeps
-working for them.
+The 24 shipped workflows are rows of `config/workflow_matrix.json`; this file
+answers only "which machine am I on".
 """
 from __future__ import annotations
 

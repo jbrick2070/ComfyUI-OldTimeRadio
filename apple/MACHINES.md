@@ -50,7 +50,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `cloud_ltx25_audio_in` | none | -- | key | key | key | key | key |
 | `cloud_ltx25_foley_plus` | none | -- | key | key | key | key | key |
 | `cloud_seedance_2` | none, **but see below** | -- | key | key | key | key | key |
-| `cloud_vidu_q2_pro_fast_720p` | none, **but see below** | -- | key | key | key | key | key |
+| `cloud_vidu_q2_pro_fast_720p` | none | -- | key | key | key | key | key |
 | `cloud_wan_i2v` | none | -- | key | key | key | key | key |
 | `cloud_wan_i2v_audio` | none | -- | key | key | key | key | key |
 | `google_omni_video` | none | -- | key | key | key | key | key |

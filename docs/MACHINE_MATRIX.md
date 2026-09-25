@@ -89,8 +89,8 @@ Video engines they select: `still_motion`
 |---|---|---|---|---|---|---|
 | `otr_mac16_animatediff` | animatediff15_lightning_video | kokoro | stable_audio_3 | sd15 | `shipping` | complete; Python <=3.13 |
 | `otr_mac16_low` | viz_camera | kokoro | stable_audio_3 | sd15 | `shipping` | complete; Python <=3.13 |
-| `otr_mac16_still` | still_motion | kokoro | stable_audio_3 | sd15 | `shipping` | missing exact owner |
-| `otr_mac16_video` | ltx098_low_video | kokoro | stable_audio_3 | sd15 | `shipping` | missing exact owner |
+| `otr_mac16_still` | still_motion | kokoro | stable_audio_3 | sd15 | `shipping` | complete; Python <=3.13 |
+| `otr_mac16_video` | ltx098_low_video | kokoro | stable_audio_3 | sd15 | `shipping` | complete; Python <=3.13 |
 
 ## 16 GB+  --  7 experimental profile(s), 6 shipping
 
@@ -119,9 +119,9 @@ Video engines they select: `ltx25_native_foley_24gb`
 |---|---|---|---|---|---|---|
 | `otr_cloud_deluxe_3act` | cloud_ltx25_foley_plus | cloud_elevenlabs | sonilo | cloud_flux_pro | `shipping` | complete |
 | `otr_cloud_deluxe_audio_in_3act` | cloud_ltx25_audio_in | cloud_elevenlabs | sonilo | cloud_flux_pro | `shipping` | complete |
-| `otr_cloud_low` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
-| `otr_cloud_low_1act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
-| `otr_cloud_low_5act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
+| `otr_cloud_low` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | complete |
+| `otr_cloud_low_1act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | complete |
+| `otr_cloud_low_5act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | complete |
 
 ## Voice engines
 
@@ -139,11 +139,9 @@ What each voice engine needs, read from the audio registry. Kokoro is the shippe
 
 ## A bigger card does not currently get you more
 
-The tier is `16 GB+` because that is the truth: nothing in `config/profiles/` declares a VRAM ceiling above 16, so a 24 GB or 32 GB card runs exactly what a 16 GB one runs.
+The machine class is `16 GB+`: there is no separate 24/32 GB machine key, so the install planner selects the 16 GB+ row for any card that size. One shipped workflow targets a bigger card on purpose -- `otr_24gb_native_foley`, LTX 2.5 on the int8 DiT with a 22 GB writer ceiling -- and you open it by hand.
 
-There is currently no separate 24/32 GB machine key or heavy-rental profile. More memory gives headroom, but the install planner still selects the 16 GB+ row. A future larger recipe belongs here only after its config and reproducible receipt both exist.
-
-**That matters when you are paying by the hour.** A rented 24 GB card ran the 16 GB haunted profile and peaked at 15,990 MB. Rented Ampere has since published both Wan 2.2 TI2V and LTX-2b, proving useful reach beyond the floor lane. A bigger card still does not auto-select HuMo or LTX 2.5: choose an explicit qualification profile and preserve its exact hardware/software/RAM receipt.
+**That matters when you are paying by the hour.** A rented 24 GB card ran the 16 GB haunted workflow and peaked at 15,990 MB, and rented Ampere has published LTX-2b, so the smaller lanes reach well beyond the floor. A bigger card still does not auto-select HuMo or the 24 GB LTX 2.5 lane: pick the workflow explicitly and keep its exact hardware/software/RAM receipt.
 
 ## Hardware episode receipts, with their exact scope
 

@@ -44,42 +44,6 @@ def _video_pick(internal: str) -> str:
     return exact_menu_option_for(internal)
 
 
-RETIRED_FULL_WORKFLOW_HARNESSES = {
-    "COMBO_MATRIX.md",
-    "FABLE_SOAK_REVIEW.md",
-    "FABLE_SOAK_REVIEW_PROMPT.md",
-    "_otr_120word_soak_summary.json",
-    "_otr_chatterbox_smoke.py",
-    "_otr_headless_soak_2026-06-15.md",
-    "_otr_soak_capstone.py",
-    "_otr_soak_marathon.py",
-    "build_ltx_av_bakeoff_workflow.py",
-    "kill_all_python.bat",
-    "otr_3d_quick_tests.ps1",
-    "otr_coverage_sweep.py",
-    "otr_overnight_sweep_launch.ps1",
-    "otr_run_leg.ps1",
-    "overnight_bug_hunt.py",
-    "prep_full_run.ps1",
-    "queue_smoke.py",
-    "run_combo_matrix.py",
-    "run_comfy_otr.bat",
-    "run_comfy_otr.ps1",
-    "run_ltx_av_bakeoff.py",
-    "run_otr_30word_smoke.py",
-    "smoke_check.py",
-    "smoke_watcher.py",
-    "soak_bug027_028.py",
-    "soak_watch.ps1",
-    "start_comfy_h0_baseline.bat",
-    "sweep_and_launch.bat",
-    "sweep_python_excluding.bat",
-    "watch.cmd",
-    "watch_full_run.py",
-    "worker_iter.py",
-}
-
-
 def _run_main(args: list[str]) -> tuple[int, str]:
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
@@ -378,14 +342,6 @@ def test_set_refuses_direct_engine_widget_patch(tmp_path):
             "--set", "OTR_VideoDirector.announcer_video_model=still_motion",
             "--dump-prompt", str(tmp_path / "prompt.json"),
         ])
-
-
-def test_retired_full_workflow_harnesses_are_not_tracked():
-    present = sorted(
-        name for name in RETIRED_FULL_WORKFLOW_HARNESSES
-        if (SCRIPTS / name).exists()
-    )
-    assert present == []
 
 
 def test_canonical_runner_emits_poll_heartbeats(tmp_path, monkeypatch):

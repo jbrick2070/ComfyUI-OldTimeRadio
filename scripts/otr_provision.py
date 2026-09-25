@@ -1417,6 +1417,7 @@ _REMOTE_NO_WEIGHT_VIDEO_ENGINES = {
     "cloud_wan_i2v_audio",
     "cloud_ltx25_foley_plus",
     "cloud_ltx25_audio_in",
+    "cloud_vidu_q2_pro_fast_720p",
     "google_omni_video",
     "google_veo_video",
 }
@@ -1525,32 +1526,6 @@ NO_LANE_REASON = {
     "google_lyria": "remote",
     "sonilo": "remote",
     # Image models fetched by their own loaders / documented manual downloads.
-    # sd15 IS NOT "hf_cache", and calling it that printed the word "auto" into
-    # two shipped documents (2026-09-12). The hf_cache contract above is "the
-    # engine's own loader fetches it"; sd15's loader does the opposite --
-    # `nodes/_otr_image_engines/sd15.py` raises EngineUnusable(MISSING_MODEL)
-    # and hands the reader an `hf_hub_download` line to run plus a file to copy
-    # into `models/checkpoints/`, because a CheckpointLoaderSimple model lives
-    # in ComfyUI's model tree, not in the HF cache. `scripts/` can fetch it,
-    # but `scripts/` does not ship in the registry bundle, so for anyone who
-    # installed the pack the normal way it is a manual step. The README's own
-    # legend defines auto as "fetched on first use ... just pick it and run",
-    # which was false here.
-    #
-    # SUPERSEDED THE SAME DAY, and the entry stays for the reader rather than
-    # being deleted. At 20:43 on 2026-09-12 the checkpoint was added to
-    # `_otr_visual_assets.MANIFEST`, so `OTR_WorkflowValidator` now fetches it
-    # at queue time when a selected lane needs a still -- the word "auto" is
-    # true again, this time for a mechanism that exists. THIS FILE IS NOT THAT
-    # MECHANISM and still has no lane for it, which is why the value is
-    # unchanged; the dropdown matrix asks the GRAPH first and only falls back
-    # to this table (see `graph_fetched_engines` in otr_dropdown_matrix.py).
-    #
-    # THE ONE PLACE THIS STILL BITES: the AnimateDiff lanes need this same file
-    # for themselves and declare `accepts_still = False`, so the graph skips
-    # the image engine as "provably unused" and nobody fetches it. That path is
-    # documented by hand in README section 2b.
-    "sd15": "manual_doc",
     "lumina_image": "manual_doc",
     "flux_gen1": "manual_doc",
     "ideogram4_local": "manual_doc",
@@ -1559,12 +1534,11 @@ NO_LANE_REASON = {
     # them here records the gap instead of hiding it.
     "cloud_kling_avatar": "remote_unprovisioned",
     "cloud_seedance_2": "remote_unprovisioned",
-    "cloud_vidu_q2_pro_fast_720p": "remote_unprovisioned",
     # Upscale ships one model. "off" does nothing at all, which is neither a
     # download nor a service.
     "off": "builtin",
-    # Same correction as sd15 above, same evidence: "pulled on first use" was
-    # the claim and the adapter refutes it. `eng_spandrel_esrgan.py` raises with
+    # "Pulled on first use" was the claim once, and the adapter refutes it:
+    # `eng_spandrel_esrgan.py` raises with
     # a GitHub release URL to download "into models/upscale_models" and a
     # pointer to `scripts/ensure_upscale_models.py`. A 67 MB file is small
     # friction, but it is friction, and the matrix is where a stranger looks to
@@ -1613,6 +1587,8 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
     if kind == "image":
         if engine == "z_image_turbo":
             return Lane("z_image_int8" if low_vram else "z_image", False)
+        if engine == "sd15":
+            return Lane("sd15", False)
         if engine in _REMOTE_NO_WEIGHT_IMAGE_ENGINES:
             return None
         return UNROUTED

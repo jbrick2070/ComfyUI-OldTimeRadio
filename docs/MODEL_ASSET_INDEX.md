@@ -35,6 +35,7 @@ python scripts/otr_fetch_lane_weights.py ltx25_native_16gb
 python scripts/otr_fetch_lane_weights.py ltx25_native_24gb
 python scripts/otr_fetch_lane_weights.py ltx25_native_blackwell
 python scripts/otr_fetch_lane_weights.py ltx_8gb
+python scripts/otr_fetch_lane_weights.py sd15
 python scripts/otr_fetch_lane_weights.py stable_audio_3
 python scripts/otr_fetch_lane_weights.py z_image
 python scripts/otr_fetch_lane_weights.py z_image_blackwell
@@ -97,7 +98,7 @@ Anything not listed there is a manual install -- see its row below.
 | `flux_gen1` | 1 weight file(s) | manual download | - |
 | `ideogram4_local` | 9 weight file(s) | manual download | - |
 | `lumina_image` | 3 weight file(s) | manual download | - |
-| `sd15` | 1 weight file(s); `Comfy-Org/stable-diffusion-v1-5-archive` | manual download | - |
+| `sd15` | 1 weight file(s); `Comfy-Org/stable-diffusion-v1-5-archive` | `otr_fetch_lane_weights.py sd15` | - |
 | `z_image_turbo` | 3 weight file(s) | manual download | - |
 
 ## Engines that are a separate INSTALL, not a download

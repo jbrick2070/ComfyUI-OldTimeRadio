@@ -72,6 +72,7 @@ LANE_INFO = {
     "stable_audio_3": (3.46, "THE MUSIC MODEL. Sits on the shared path, so "
                              "without it EVERY profile fails at the music node."),
     "ltx_8gb": (16.13, "LTX 2b distilled + T5 encoder. Real video diffusion."),
+    "sd15": (1.99, "IMAGE model, SD 1.5 fp16. The Mac rows' still engine."),
     "ltx25_native_16gb": (25.38, "LTX 2.5, mix4x8 DiT + w4a8 encoder + VAEs + "
                                  "upscaler. The 16 GB silent, foley, mime and "
                                  "audio-in lanes all load exactly these."),
@@ -411,6 +412,20 @@ LANES = {
             "05ad0f3298ceee7c64df7cbdc86406ba7872b7d7",
             995_778_752,
             "eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8",
+        ),
+    ],
+    # ~2.0 GB. THE MAC ROWS' STILL ENGINE: `otr_mac16_still` and
+    # `otr_mac16_video` mint their stills on sd15, which loads this one
+    # checkpoint through CheckpointLoaderSimple. Ungated; the same file the
+    # AnimateDiff lanes open, so a box holding either already has it.
+    "sd15": [
+        WeightSpec(
+            "Comfy-Org/stable-diffusion-v1-5-archive",
+            "v1-5-pruned-emaonly-fp16.safetensors",
+            "checkpoints/v1-5-pruned-emaonly-fp16.safetensors",
+            "9cfd069101959ca3828bf9c04a4419870832b74f",
+            2_132_696_762,
+            "e9476a13728cd75d8279f6ec8bad753a66a1957ca375a1464dc63b37db6e3916",
         ),
     ],
     # ~16.1 GB. COMPLETE: `eng_ltx_8gb` names exactly these two files, and the
