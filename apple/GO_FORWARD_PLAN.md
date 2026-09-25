@@ -286,6 +286,24 @@ Parked, large: loading models through `comfy.model_management` so ComfyUI
 can evict them for other packs (touches every model load; multi-box proof),
 and the V3 `comfy_api` node schema (24 classes, workflow-adjacent).
 
+### 0g. Baseline the creativity presets against the model makers (later)
+
+Operator 2026-09-25: "I don't know if I ever had a baseline or compared
+the creativity setting to a canonical, so we could be really off." A
+correctness check, not story-quality chasing. `creativity` is wired end
+to end (`_otr_writer_inputs._CREATIVITY_TEMP_MAP` / `_TOP_P_MAP` ->
+`compose_line` base temperature and the local generate top_p; canonical
+ships `balanced` = 0.85 / 0.95, plus `min_p` 0.05 and
+`repetition_penalty` 1.03). The presets are ONE map for every writer model,
+while each maker publishes its own recommended sampling, and they differ
+widely -- to be read from the model cards, not memory: Mistral-Nemo
+recommends a low temperature (about 0.3), Qwen3 about 0.7 / 0.8 / top_k 20,
+Gemma about 1.0 / 0.95 / top_k 64. The work: table each shipped writer
+model's card recommendation beside our four presets; decide whether
+`balanced` should mean "the maker's default for THIS model" (a per-model
+map in the catalog) with the other three as offsets from it. His ear
+decides whether any change ships.
+
 ## 3. TEST
 
 Open by his word (2026-09-25). The wave -- the 5080 overnight review, the 4060
