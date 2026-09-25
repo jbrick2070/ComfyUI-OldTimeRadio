@@ -172,7 +172,16 @@ def resolve_voice_ref_path(ref):
         candidates.append(os.path.join(models_dir, stripped))
     except Exception:  # noqa: BLE001 -- non-Comfy contexts (tests / CLI)
         pass
+    # The pack's models root: the tree ComfyUI is configured with inside a
+    # running server, the env/legacy chain outside one (2026-09-25).
+    try:
+        from .._otr_models_root import _models_root
+        candidates.append(os.path.join(os.fspath(_models_root()), stripped))
+    except Exception:  # noqa: BLE001 -- ModelsRootUnresolved off Windows
+        pass
     # The extra models root after the Comfy Desktop 1.0.4 model-path migration.
+    # LAST and existence-gated like every candidate here; retire it once a box
+    # other than the reference machine has resolved its refs through the owner.
     candidates.append(os.path.join("C:\\ComfyUI-Models", stripped))
     for cand in candidates:
         if cand and os.path.exists(cand):

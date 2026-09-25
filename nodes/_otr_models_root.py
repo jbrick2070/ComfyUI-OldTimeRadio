@@ -34,7 +34,7 @@ except ImportError:  # pragma: no cover -- flat test imports
 #: import it under that name, and renaming it inside a removal would be churn
 #: rather than a fix -- a second public spelling is exactly the kind of drift
 #: this extraction exists to end.
-__all__ = ["ModelsRootUnresolved", "_models_root"]
+__all__ = ["ModelsRootUnresolved", "_models_root", "model_type_dir"]
 
 
 class ModelsRootUnresolved(RuntimeError):
@@ -171,3 +171,70 @@ def _models_root() -> Path:
             "relative here and would create a directory of that name." % str(legacy)
         )
     return legacy
+
+
+#: ComfyUI's own legacy folder names (``folder_paths.map_legacy``), mirrored so
+#: the answer off the runtime matches the answer on it.
+_LEGACY_CATEGORY = {"unet": "diffusion_models", "clip": "text_encoders"}
+
+_PIN_VARS = ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT")
+
+
+def _registered_dirs(category: str, folder_paths=None) -> list:
+    """The folders ComfyUI scans for ``category``, first one first; empty
+    outside a running ComfyUI, for an unknown category, or for a stub without
+    ``get_folder_paths``."""
+    try:
+        if folder_paths is None:
+            import folder_paths  # ComfyUI runtime only
+        return [Path(p).expanduser()
+                for p in folder_paths.get_folder_paths(category)]
+    except Exception:  # noqa: BLE001 -- outside ComfyUI, or KeyError
+        return []
+
+
+def _is_under(folder: Path, root: Path) -> bool:
+    here = os.path.normcase(os.path.abspath(os.fspath(folder)))
+    top = os.path.normcase(os.path.abspath(os.fspath(root)))
+    try:
+        return os.path.commonpath([here, top]) == top
+    except ValueError:  # different drives
+        return False
+
+
+def model_type_dir(category: str, *, folder_paths=None) -> Path:
+    r"""The folder for one model TYPE: where ComfyUI looks for it first, which
+    is where a new download of that type belongs.
+
+    WHY PER TYPE (2026-09-25). ``_models_root()`` is one folder and callers
+    joined a type name onto it. But extra_model_paths.yaml sets every type
+    separately -- ``is_default`` applies per yaml block, to the keys that block
+    declares -- so on the reference machine ``checkpoints`` resolves first to
+    ``C:\ComfyUI-Models\checkpoints`` while ``upscale_models`` resolves first
+    to the Documents tree. "Root plus type" can name a folder ComfyUI does not
+    read first for that type. Inside ComfyUI, ask ComfyUI.
+
+    1. ``unet`` and ``clip`` become ``diffusion_models`` and ``text_encoders``.
+    2. Inside a running ComfyUI, the registered folders for the type. With an
+       env pin set, the first of them that sits UNDER the pin, else the first
+       -- a pin naming a folder ComfyUI does not scan would fetch files the
+       loader cannot load (the visual-assets rule: native order wins).
+    3. Otherwise ``_models_root() / category``, where an env pin is exclusive.
+
+    ``folder_paths`` may be passed in (the visual-assets gate is handed one);
+    otherwise the runtime module is imported lazily, so this module stays
+    cold-import clean. Never raises inside ComfyUI: ``checkpoints`` is always
+    registered, so step 3 resolves there. Off Windows with nothing resolvable
+    it raises ``ModelsRootUnresolved``, as ``_models_root()`` does.
+    """
+    category = _LEGACY_CATEGORY.get(category, category)
+    registered = _registered_dirs(category, folder_paths)
+    if registered:
+        raw = next((otr_env.get(v) for v in _PIN_VARS if otr_env.get(v)), None)
+        if raw:
+            pin = Path(raw).expanduser()
+            for folder in registered:
+                if _is_under(folder, pin):
+                    return folder
+        return registered[0]
+    return _models_root() / category

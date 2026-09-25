@@ -309,7 +309,7 @@ def test_weight_resolution_does_not_stop_at_one_hardcoded_location():
     import inspect
     src = inspect.getsource(MeshStageEngine._ckpt_path)
     assert "folder_paths" in src
-    assert "configured_models_root" in src
+    assert "model_type_dir" in src
 
 
 def test_the_env_pin_still_wins_over_every_probe(monkeypatch, tmp_path):

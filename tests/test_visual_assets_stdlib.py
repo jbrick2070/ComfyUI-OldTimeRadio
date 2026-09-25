@@ -558,6 +558,7 @@ class RuntimeBridgeTests(_NativeFixtureCase):
             trace.events.append(("verified", trace.verified_downloads))
             return {"status": "downloaded", "verified": True, "bytes_verified": len(body)}
 
+        real_model_type_dir = importlib.import_module("nodes._otr_models_root").model_type_dir
         modules = {
             prefix: module(prefix),
             prefix + "._otr_shared": module(prefix + "._otr_shared",
@@ -571,6 +572,10 @@ class RuntimeBridgeTests(_NativeFixtureCase):
                 Ltx8gbEngine=lambda: self.ltx),
             prefix + "._otr_visual_asset_download": module(prefix + "._otr_visual_asset_download",
                 fetch_verified=fake_download),
+            # The REAL owner, so the download destination is the one the gate
+            # computes in production: the fake's first folder for the type.
+            prefix + "._otr_models_root": module(prefix + "._otr_models_root",
+                model_type_dir=real_model_type_dir),
             "folder_paths": module("folder_paths", get_full_path=self.folders.get_full_path,
                                    get_folder_paths=self.folders.get_folder_paths),
             "comfy": module("comfy", model_management=SimpleNamespace(
@@ -618,6 +623,16 @@ class RuntimeBridgeTests(_NativeFixtureCase):
         self.assertEqual(len({destination for _, destination, _ in trace.downloads}), 5)
         self.assertTrue(all(row["path"] is not None for row in self.requests()))
         self.assertTrue(all(kwargs == {"token": False, "timeout": 30} for _, kwargs in trace.heads))
+
+    def test_every_download_lands_in_the_first_registered_folder_of_its_type(self):
+        """The gate writes through ``model_type_dir`` (2026-09-25): the folder
+        ComfyUI reads first for the type, never a joined root."""
+        with self.runtime() as trace:
+            bridge.ensure_prompt_visual_assets(canonical_prompt(), "63")
+        firsts = {Path(folders[0]) for folders in self.folders.roots.values()}
+        parents = {destination.parent for _, destination, _ in trace.downloads}
+        self.assertTrue(parents)
+        self.assertLessEqual(parents, firsts)
 
     def test_existing_nvfp4_is_unchanged_and_never_enters_download_path(self):
         self.install_defaults()

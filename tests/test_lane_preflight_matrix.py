@@ -212,7 +212,7 @@ EXPECTED_RED: dict = {
     # registered through extra_model_paths.yaml was invisible on the runtime and
     # one installed under this box's real models root was invisible off it. It
     # now probes the env pin, `folder_paths`, the historical dirs, then lane 1's
-    # `wan_shared.configured_models_root()` LAST -- additive, so it can only turn
+    # `_otr_models_root.model_type_dir("checkpoints")` LAST -- additive, so it can only turn
     # a false negative into the truth.
     # G2 was S8b-11 plus an inline branch: the lane declared no render_canvas and
     # picked its size with a magic-number sniff inside render_clip (832x480 and

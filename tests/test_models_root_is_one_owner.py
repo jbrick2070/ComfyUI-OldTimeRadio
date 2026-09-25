@@ -270,32 +270,26 @@ def test_no_other_module_defines_a_second_models_root():
 def test_every_caller_imports_the_owner_at_its_real_site():
     """The consumers import LAZILY, so this reads their source.
 
-    Both of these deliberately import inside a function to keep their own cold
-    imports clean -- each has a test asserting exactly that -- so there is no
-    module attribute to compare. Source inspection is the right tool for "is
-    the import at its real site naming the right module", which is the one
-    question here.
+    Each deliberately imports inside a function to keep its own cold import
+    clean, so there is no module attribute to compare. Source inspection is the
+    right tool for "is the import at its real site naming the right function",
+    which is the one question here. Per-type readers and writers ask
+    ``model_type_dir``; the two that want the tree itself ask ``_models_root``.
     """
+    import importlib
     import inspect
 
-    from nodes._otr_audio_engines import base as audio_base
-    from nodes._otr_video_engines import wan_shared
-
-    for module in (audio_base, wan_shared):
-        src = inspect.getsource(module)
-        assert "_otr_models_root import _models_root" in src, (
-            "%s should import the models root from its neutral owner"
-            % module.__name__)
-
-
-def test_wan_shareds_configured_root_still_matches(monkeypatch, tmp_path):
-    """The equality that an earlier drift broke, re-asserted after the move."""
-    from nodes._otr_video_engines import wan_shared
-
-    for key in _ENV:
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(tmp_path / "w"))
-    assert wan_shared.configured_models_root() == str(mr._models_root())
+    expected = {
+        "nodes._otr_audio_engines.base": "_otr_models_root import _models_root",
+        "nodes._otr_hf_env": "_otr_models_root import _models_root",
+        "nodes._otr_video_engines.wan_shared": "_otr_models_root import model_type_dir",
+        "nodes._otr_video_engines.eng_humo": "_otr_models_root import model_type_dir",
+        "nodes._otr_video_engines.eng_mesh_stage": "_otr_models_root import model_type_dir",
+        "nodes._otr_visual_assets": "_otr_models_root import model_type_dir",
+    }
+    for name, needle in expected.items():
+        src = inspect.getsource(importlib.import_module(name))
+        assert needle in src, "%s should import %r" % (name, needle)
 
 
 def test_the_owner_stays_cold_import_clean():

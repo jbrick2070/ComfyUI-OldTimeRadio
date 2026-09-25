@@ -58,8 +58,9 @@ log = logging.getLogger("OTR._otr_hf_env")
 
 _REG_KEY = "Environment"
 _REG_HF_HOME = "HF_HOME"
-#: The Windows box's models root. It is the ONE default on that platform and
-#: nothing here changes that.
+#: The HF cache the reference machine already holds. Kept only while it is
+#: populated (it has a ``hub/`` folder), so an existing cache is never abandoned;
+#: every other Windows box gets ``<models root>\huggingface``.
 _DEFAULT_HF_HOME_WINDOWS = r"C:\ComfyUI-Models\huggingface"
 
 
@@ -82,9 +83,22 @@ def _default_hf_home() -> str:
     Off Windows the answer is Hugging Face's OWN default, ``~/.cache/huggingface``
     -- the same root every other tool on the machine already uses, so a model
     fetched by any of them is a model this pack does not fetch again.
+
+    ON WINDOWS (2026-09-25) it is ``_models_root() / "huggingface"``, the tree
+    the user configured, not a hardcoded ``C:\ComfyUI-Models`` other installs
+    do not have -- unless that old cache exists and holds a ``hub/`` folder,
+    which keeps the reference machine's existing cache where it is (on that
+    machine the two answers are the same folder anyway). The owner is imported
+    here, lazily, because this module must import before the model catalog.
     """
     if sys.platform == "win32":
-        return _DEFAULT_HF_HOME_WINDOWS
+        if (Path(_DEFAULT_HF_HOME_WINDOWS) / "hub").is_dir():
+            return _DEFAULT_HF_HOME_WINDOWS
+        try:
+            from ._otr_models_root import _models_root
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_models_root import _models_root  # type: ignore
+        return str(_models_root() / "huggingface")
     return str(Path.home() / ".cache" / "huggingface")
 _WEIGHT_SUFFIXES = (".safetensors", ".bin")
 # Twin of _otr_model_catalog._WEIGHT_INDEX_NAMES -- keep the two in step.

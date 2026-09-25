@@ -63,7 +63,6 @@ from .cheap_families import _CheapFamilyBase
 from .directory_clip import validate_directory_clip
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .registry import EngineUnusable, EngineUsabilityReason, register
-from .wan_shared import configured_models_root
 
 try:
     from .._otr_shared import env as otr_env
@@ -467,10 +466,10 @@ class MeshStageEngine(_CheapFamilyBase):
         invisible even in-process, because ``folder_paths`` was never asked.
 
         The probe order is ADDITIVE BY CONSTRUCTION: every prior probe still
-        wins, and ``configured_models_root()`` -- lane 1's ONE spelling of
-        "where this box keeps its models", reused here rather than reimplemented
-        a third time -- is consulted LAST, so it can only turn a false negative
-        into the truth.
+        wins, and ``model_type_dir("checkpoints")`` -- the pack's ONE owner of
+        "where this box keeps this type", reused here rather than reimplemented
+        -- is consulted LAST, so it can only turn a false negative into the
+        truth.
 
         Returns a path that may not exist when nothing resolves (the caller,
         ``_installed``, probes existence), so the refusal can NAME a file.
@@ -491,8 +490,8 @@ class MeshStageEngine(_CheapFamilyBase):
         if hf_home:
             candidate_dirs.append(
                 os.path.join(os.path.dirname(hf_home), "checkpoints"))
-        candidate_dirs.append(
-            os.path.join(configured_models_root(), "checkpoints"))
+        from .._otr_models_root import model_type_dir
+        candidate_dirs.append(os.fspath(model_type_dir("checkpoints")))
         for d in candidate_dirs:
             for name in self.CKPT_NAMES:
                 p = os.path.join(d, name)

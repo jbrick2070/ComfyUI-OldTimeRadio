@@ -438,12 +438,12 @@ class HuMoEngine(_MC.MotionEngineBase):
                 return hit
         except Exception:  # noqa: BLE001 - headless/CPU: fall through to joins
             pass
-        from .wan_shared import configured_models_root
+        from .._otr_models_root import model_type_dir
         joined = os.path.join(_COMFY_ROOT, "models", "diffusion_models", name)
         if os.path.exists(joined):
             return joined
         configured = os.path.join(
-            configured_models_root(), "diffusion_models", name)
+            os.fspath(model_type_dir("diffusion_models")), name)
         return configured if os.path.exists(configured) else joined
 
     def _ckpt_path(self):

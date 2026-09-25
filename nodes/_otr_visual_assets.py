@@ -1131,6 +1131,7 @@ def ensure_prompt_visual_assets(prompt, unique_id):
         # Use Comfy's native execution-context hook, not a server/API call or
         # worker thread. The total-only constructor also supports older Comfy.
         from comfy.utils import ProgressBar
+        from ._otr_models_root import model_type_dir as _model_type_dir
         total_download_bytes = sum(item["metadata"]["size"] for item in missing)
         completed_bytes = 0
         gui_progress = ProgressBar(1000)
@@ -1138,7 +1139,10 @@ def ensure_prompt_visual_assets(prompt, unique_id):
         for item in missing:
             cancel()
             # Native order wins; never silently switch to a writable alternate.
-            destination = Path(folder_paths.get_folder_paths(item["category"])[0]) / item["token"]
+            # The owner answers with the folder ComfyUI reads first for this
+            # type (under an env pin when one of them sits there).
+            destination = _model_type_dir(item["category"],
+                                          folder_paths=folder_paths) / item["token"]
             started = time.monotonic()
             last_report = [0.0]
 

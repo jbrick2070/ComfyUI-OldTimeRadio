@@ -39,35 +39,6 @@ _WAN_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, distorted, watermark, text, static")
 
 
-def configured_models_root():
-    """Where THIS box keeps its models, off the ComfyUI runtime.
-
-    ONE spelling for the whole project, FOR REAL (2026-09-04): this IS
-    ``_otr_models_root._models_root`` -- the env pins, then the reference
-    box's tree if it exists, then ``folder_paths.models_dir`` -- so a reader
-    who finds the answer in one place finds the same answer in the other.
-    Until then this re-implemented the chain and drifted from it (it returned
-    the legacy literal unconditionally), while claiming to be the same.
-
-    This is the OFF-RUNTIME fallback: every caller probes ``folder_paths``
-    first and existence-gates the join, so inside a live server this only
-    answers when the runtime did not. Outside one it is the difference
-    between "this lane is not installed" and the truth (lesson L1: a
-    hardcoded root knows one location; the operator's box is allowed to be
-    somewhere else). ``_otr_paths.comfy_models_dir()`` (``OTR_MODELS_DIR``)
-    is a third, parked convention -- GO_FORWARD_PLAN 1.4a.
-
-    Never raises. Returns a path string that may not exist; every caller
-    probes existence for itself. The owner is imported LAZILY so this
-    module's cold-import statement above stays true.
-    """
-    try:
-        from .._otr_models_root import _models_root
-    except ImportError:  # pragma: no cover -- flat (sys.path) test import
-        from _otr_models_root import _models_root  # type: ignore
-    return str(_models_root())
-
-
 # --------------------------------------------------------------------------- #
 # M7 silent-clip contract proof (GO_FORWARD 4A) -- ffprobe the emitted mp4 and
 # PROVE the color/stream contract before the mux trusts the self-declared dict.
@@ -448,7 +419,7 @@ class WanInitImageMixin:
         an adapter that just wants the historical answer keeps asking
         ``_resolve_model_file``.
 
-        THE CONFIGURED MODELS ROOT IS THE THIRD PROBE (lane 1, 2026-08-11), and
+        THE TYPE'S OWN FOLDER IS THE THIRD PROBE (lane 1, 2026-08-11), and
         it is why this helper is worth anything OFF the ComfyUI runtime. Inside
         a live server ``folder_paths`` reads ``extra_model_paths.yaml`` and
         finds the weights wherever the operator put them. Outside one -- in the
@@ -456,10 +427,15 @@ class WanInitImageMixin:
         installed?" -- ``import folder_paths`` fails and the only remaining
         probe was ``<comfy_root>/models/<category>``, which on a box whose
         weights live somewhere else answers NO for a weight that is plainly
-        there. So the same override chain the rest of the project already uses
-        (``_otr_models_root._models_root``) is consulted last: it changes no
-        answer that was previously a hit, and turns a false negative into the
-        truth. Additive by construction -- every earlier probe still wins."""
+        there. So the pack's one owner, ``_otr_models_root.model_type_dir``
+        (the folder ComfyUI reads first for that type, else the models root
+        plus the type), is consulted last: it changes no answer that was
+        previously a hit, and turns a false negative into the truth. Additive
+        by construction -- every earlier probe still wins."""
+        try:
+            from .._otr_models_root import model_type_dir
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            from _otr_models_root import model_type_dir  # type: ignore
         for category in categories:
             try:
                 import folder_paths            # ComfyUI runtime only
@@ -468,9 +444,8 @@ class WanInitImageMixin:
                     return hit
             except Exception:                   # noqa: BLE001 -- no ComfyUI (tests)
                 pass
-            for root in (os.path.join(self._comfy_root(), "models"),
-                         configured_models_root()):
-                cand = os.path.join(root, category, name)
+            for cand in (os.path.join(self._comfy_root(), "models", category, name),
+                         os.path.join(os.fspath(model_type_dir(category)), name)):
                 if os.path.exists(cand):
                     return cand
         return None
@@ -684,5 +659,5 @@ class WanInitImageMixin:
 __all__ = [
     "_parse_fps", "ffprobe_clip_fields", "ffprobe_counted_frames",
     "assemble_beat_segments", "validate_silent_clip_contract",
-    "WanInitImageMixin", "_WAN_DEFAULT_NEGATIVE", "configured_models_root",
+    "WanInitImageMixin", "_WAN_DEFAULT_NEGATIVE",
 ]

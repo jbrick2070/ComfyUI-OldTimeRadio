@@ -15457,3 +15457,13 @@ not promote it to the Bug Bible on this evidence alone.
 - promotion: candidate ("a directory existing is not a configuration: ask
   the host's model-path registry before a hardcoded path"), not yet checked
   against otr_coverage_index.yaml / BUG_BIBLE.yaml.
+- follow-up (2026-09-25, 5080): per-type lookup. `_otr_models_root.model_type_dir(category)`
+  answers with the folder ComfyUI reads first for that type (an env pin selects among
+  the registered folders; outside ComfyUI it is `_models_root()/category`), because
+  extra_model_paths.yaml sets each type separately and "root + type" was a guess
+  (live: checkpoints[0] under C:\ComfyUI-Models, upscale_models[0] under Documents).
+  The visual-assets downloader, the Wan/HuMo/mesh fallbacks, the HF cache default,
+  the voice-ref resolver and the IndexTTS2 refs script route through the owner;
+  `wan_shared.configured_models_root()` is deleted. Measured: 38 resolver answers
+  byte-identical at HEAD and on the patch under the live 5080 registry, the test
+  stub and no ComfyUI. Coverage: tests/test_model_type_dir.py.

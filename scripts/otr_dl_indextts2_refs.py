@@ -33,7 +33,15 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BANK = os.path.join(REPO, "config", "voice_reference_bank.json")
-DEFAULT_REFS_DIR = os.path.join("C:\\", "ComfyUI-Models", "TTS", "refs", "indextts2")
+def _models_root_str():
+    """The pack's models root (``nodes/_otr_models_root.py``), as a string."""
+    if REPO not in sys.path:
+        sys.path.insert(0, REPO)
+    from nodes._otr_models_root import _models_root
+    return str(_models_root())
+
+
+DEFAULT_REFS_DIR = os.path.join(_models_root_str(), "TTS", "refs", "indextts2")
 HF_REPO = "kyutai/tts-voices"
 FEMALE_F0_HZ = 165.0     # median voiced F0 at/above this -> tag female (generic, pitch-based)
 OUT_RATE = 44100         # match the existing refs (mono PCM_16, ~8 s)
@@ -211,7 +219,8 @@ def _resolve_ref_audit_path(ref_path):
         return ref_path
     rp = ref_path.replace("\\", "/")
     stripped = rp[len("models/"):] if rp.startswith("models/") else rp
-    for cand in (os.path.join("C:\\ComfyUI-Models", stripped),
+    for cand in (os.path.join(_models_root_str(), stripped),
+                 os.path.join("C:\\ComfyUI-Models", stripped),
                  os.path.join(os.path.dirname(REPO), rp),
                  os.path.abspath(ref_path)):
         if os.path.exists(cand):
