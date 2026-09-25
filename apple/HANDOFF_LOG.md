@@ -38,6 +38,22 @@ Suite: full run on the gallery move, the same 12 inherited reds as
 Server: the 5080 server on :8000 is resident and idle (PID from
   scripts/_otr_soak_server_launch.cmd); nothing queued.
 
+## 2026-09-25 -- HEAD 6ee02d79 (main) -- REVIEW (TEST_WAVE Part A: the overnight chain)
+
+Did (5080, read-only from `output/otr/yt_server.log`): Part A reviewed and
+  recorded in apple/TEST_WAVE.md. 4 prompts queued, 4 published, no failure;
+  ended by the 08:00 clock after the mime leg (04:48:18). AnimateDiff never
+  queued, so A3 (first live otr_16gb_animatediff on the per-engine gate) and
+  A4 (Ghost Half B counts) are owed: one 16 GB AnimateDiff leg on this box.
+  The log's trailing tracebacks were this window's own /object_info probes
+  during the custom_nodes cleanup, not the chain's.
+  Also today, earlier: the plan pass (6ee02d79) -- live box rewritten,
+  registry section reduced to his items, row 0a's clause, row 0b (name the
+  node pack per engine via wrapper_bridge._pack_hint), the V3 row's graph
+  count 63 -> 25, section 3's standing.
+Next: the one owed leg above; row 0b; the kibitz lane on the plan once the
+  CLIs are free (cursor+agy are on a553ac3b); 2.3.5 on his word.
+
 ## 2026-09-25 -- HEAD a553ac3b (main) -- CODE (writer LLM folder; queue-time node-pack gate; reviews folded; Bible 12.174)
 
 Did (5080, the only window; Fable driving from the writer-folder build on):

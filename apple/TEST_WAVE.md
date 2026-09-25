@@ -68,6 +68,32 @@ before handoff: `covenant_ink_20260924_232810` (otr_16gb_still),
   it. Then the dirty partial red-test patch in that tree (see the handoff log)
   gets finished or dropped on its own; it is not part of this wave.
 
+**Part A outcome (reviewed 2026-09-25 afternoon from `yt_server.log`, 1.7 MB,
+last written 08:34; HEAD of the chain's pack was `fe17f426`).**
+A1: ended by the clock. Four prompts queued, four `Prompt executed`, no
+fifth `got prompt`: the mime leg finished at 08:10, past the 08:00 cutoff,
+so the AnimateDiff leg never queued. No `FAILED -- no episode`, no
+`RenderError`, no `PREFLIGHT FAIL`, no interrupt.
+A2: 4 queued / 4 published, in order: `covenant_ink_20260924_232810`
+(otr_16gb_still, 00:10:53), `notched_key_20260924_234023` (otr_16gb_video,
+01:32:07), `black_fog_20260925_011016` (otr_16gb_foley, 02:16:02),
+`counting_three_20260925_033216` (otr_16gb_mime, 04:48:18 -- a measurement,
+not a failure; his judgement whether a one-act mime leg should take that).
+Every weight the legs used read `[OTR.assets] EXISTING`.
+A3: NOT RUN (the leg never queued). Still owed for the 16 GB row. The 4060
+proved the auto-download half on the 8 GB row the same day (B3, `297f65ef`),
+and the node-class half is now the queue-time gate (`02758478`).
+A4: NOT MEASURED -- zero `Ghost Half B` lines all night, because only the
+AnimateDiff leg emits them. Owed with A3.
+A5: nothing to classify. The five WARNING tracebacks at boot are the known
+duplicate-pack / `models` folder scan noise (same on every boot); the three
+ERROR tracebacks at the END of the log are `/object_info` probes at 08:33
+from the 5080 window hitting the half-moved `ComfyUI-OTR-UpstreamStoryLab`
+pack during that morning's custom_nodes cleanup -- not the chain's, and that
+pack is gone.
+A6: done -- the box was reset per section 4 at 09:23 for the cleanup legs;
+the red-test patch landed as `004d07ac`.
+
 ## Part B -- 4060 regression, 8 GB rows
 
 Pull first (`git fetch origin main`, `git log --oneline HEAD..origin/main`,

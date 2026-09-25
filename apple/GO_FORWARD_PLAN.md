@@ -184,8 +184,10 @@ no arc.
 Open by his word (2026-09-25). The wave -- the 5080 overnight review, the 4060
 regression on the 8 GB rows, the suite and the Bug Bible -- is
 [TEST_WAVE](TEST_WAVE.md). Do not freeze a head for it: each receipt records
-the HEAD it ran. Standing 2026-09-25 afternoon: Part A (the 5080 overnight
-review) not done. Part B on the 4060: B2 PASSED through the GUI on a fresh
+the HEAD it ran. Standing 2026-09-25 afternoon: Part A reviewed (4 queued /
+4 published, no failure; the AnimateDiff leg never queued before the cutoff,
+so A3 and the Ghost Half B measurement A4 stay OWED on the 16 GB row -- one
+`otr_16gb_animatediff` leg on the 5080 settles both). Part B on the 4060: B2 PASSED through the GUI on a fresh
 2.3.4 install (`c2f14301`); B3's weight auto-download proof PASSED and the
 leg then FAILED on the missing AnimateDiff-Evolved pack (PBUG-20260925-02,
 fixed `02758478`); the operator is wiping the 4060 for a fresh start, so the
