@@ -15354,3 +15354,65 @@ not promote it to the Bug Bible on this evidence alone.
   contract. Recorded here as the live evidence trail; the 5080 is raising it
   to the operator to report upstream to Comfy-Org separately.
 - promotion: (none -- third-party defect, not promoted)
+
+## PBUG-20260925-02 -- a fresh Manager install can queue an AnimateDiff graph and burn 18 minutes before failing on a node pack it never offered
+- surfaced: live fresh-install walk on the 4060, Part B leg B3
+  (otr_8gb_animatediff), operator-driven, Comfy Desktop 2.3.4 installed
+  fresh through the registry Manager (apple/FRESH_INSTALL_4060_2026-09-25.md,
+  entry 35), 2026-09-25
+- symptom: a fresh Comfy Desktop instance with only comfyui-old-time-radio
+  installed (confirmed on disk: custom_nodes\ has no other real package,
+  just the two stock example files) queues otr_8gb_animatediff without
+  complaint. The run proceeds through preflight, the three
+  [OTR.assets] weight downloads (SD1.5 checkpoint + AnimateDiff v3 motion
+  module + v3 adapter, all byte-verified, no PREFLIGHT FAIL -- this part
+  is correct and is PR #6's own claim), a full 3-act writer pass, casting,
+  and a complete base-video encode (4664 frames). Only THEN, at node
+  "9d - Video Render", does it fail:
+  RenderError: shot shot_music_opening_001 engine
+  'animatediff15_v3_haunted_video' failed to render; fallbacks are
+  disabled (FailureKind.DEPENDENCY_MISSING) -- fix the engine or its
+  inputs: video engine 'animatediff15_v3_haunted_video' is not usable for
+  role 'text_to_video': missing required ComfyUI node class(es):
+  ADE_StandardStaticContextOptions, ADE_AnimateDiffLoaderGen1 -- Ghost
+  Signal needs ComfyUI-AnimateDiff-Evolved installed (pinned to the
+  recorded 2026-08-22 commit) and a server restart
+  Wall time to this failure: 18 minutes 22 seconds ("Prompt executed in
+  00:18:22"). The episode never reaches otr/obs.
+- root cause: the queue-time gate validates that the required WEIGHT
+  FILES are present/fetchable (that is what PREFLIGHT checks and what
+  [OTR.assets] plans against), but it does not check that the required
+  ComfyUI NODE CLASSES for the selected engine are registered. A missing
+  node pack is therefore only discovered when the render driver actually
+  tries to build the animatediff graph, deep into the run, after every
+  upstream phase (writer, cast, audio, base video) has already spent
+  real time and GPU cycles. ComfyUI-AnimateDiff-Evolved is a genuine,
+  documented, MANUAL third-party dependency (apple/DEPENDENCIES.md,
+  matching the README's own dependencies table) -- OTR has never claimed
+  to auto-install it, and that design choice is not itself the bug. The
+  bug is that nothing checks for it until 18 minutes in, and the
+  registry Manager's own install flow for comfyui-old-time-radio never
+  surfaces "you also need this" to the user who just followed the
+  documented low-friction path.
+- fix: none in this repo yet. Two candidate directions raised by the
+  5080: (1) have the queue-time gate refuse a Ghost Signal graph at t=0
+  when a selected engine's required node classes are not registered,
+  the same way it already refuses on missing weights; (2) reword the
+  RenderError so the actionable fix ("Install ComfyUI-AnimateDiff-Evolved
+  from Manager and restart") is the FIRST sentence, with the
+  FailureKind enum and ADE_* class names as supporting detail after --
+  the current ordering is written for the pack's own authors, not for
+  the user hitting it.
+- verify idea: from a Comfy Desktop instance with comfyui-old-time-radio
+  installed and NO other custom node packs, queue otr_8gb_animatediff
+  (or otr_16gb_animatediff) and confirm the refusal happens before any
+  writer/audio/video work starts, not 18 minutes into it.
+- bible-worthy: yes, candidate -- "a queue-time gate that checks weight
+  availability but not node-class availability lets a missing
+  third-party dependency burn a full render's worth of time before
+  failing" is a reusable lesson for any ComfyUI custom-node pack with
+  optional/pluggable engines, not specific to this one dependency.
+  Recording as a candidate rather than promoting outright; the operator
+  or the 5080 should judge admission-index coverage.
+- promotion: (pending -- candidate only, not yet checked against
+  otr_coverage_index.yaml / BUG_BIBLE.yaml)
