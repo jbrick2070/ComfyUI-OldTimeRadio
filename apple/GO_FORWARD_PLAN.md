@@ -225,11 +225,14 @@ ComfyUI's app view (`extra.linearMode: true`, `extra.linearData.inputs` =
 `[node_id, widget]` pairs, `outputs` = node ids; supported by frontend
 1.52.7) shows a graph as a simple form. The operator's input list: act
 count, the models, asset cleanup, the Lemmy roll, language, story bank,
-visual style. Mapped: Story Writer (node 1) `act_count`,
-`creative_writing_model`, `technical_model`, `asset_cleanup`,
-`lemmy_cameo`, `episode_language`, `source_bank`, `visual_style`; plus the
-video/image picks on node 87 and voices on node 80 if "the models" includes
-them. Output: node 14 (Mux and Publish). Open questions for one design
+visual style; and for the writer LLMs, the cloud A/B slots as well
+(operator: "don't forget the OpenRouter A/B, Comfy A/B and Google A/B").
+Mapped: Story Writer (node 1) `act_count`, `creative_writing_model`,
+`technical_model`, `openrouter_slot_a_model`, `openrouter_slot_b_model`,
+`comfy_slot_a_model`, `comfy_slot_b_model`, `google_api_slot_a_model`,
+`google_api_slot_b_model`, `asset_cleanup`, `lemmy_cameo`,
+`episode_language`, `source_bank`, `visual_style`; plus the video/image
+picks on node 87 and voices on node 80 if "the models" includes them. Output: node 14 (Mux and Publish). Open questions for one design
 round before code: canonical itself or a separate `otr_app.json`; whether
 the premise/title text belongs; how variants inherit it; whether an older
 frontend ignores the metadata harmlessly.
