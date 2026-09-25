@@ -333,8 +333,23 @@ and dated. Measured 2026-09-25:
 | google/gemma-2-2b-it | none published | fallback 0.85 / 0.95, never greedy |
 | openrouter / comfy / google_api slots | none | send no sampling keys; provider default |
 
-Design reviewed by a Sonnet contrarian before code; built after the Kling
-removal lands (both regenerate the workflow files).
+Design reviewed by a Sonnet contrarian before code (verdict FIX, folded):
+- presence_penalty is NOT a transformers generate() kwarg (5.17.0 rejects
+  unused kwargs), so Qwen's card value is recorded, not applied; our
+  repetition_penalty 1.03 stays.
+- The dialogue retry bump is capped at max(model base, 1.0): Gemma at 1.0
+  would otherwise retry at 1.1, past the BUG-014 collapse line.
+- Quant twins are SEPARATE catalog rows, so the baseline resolves through
+  one function keyed by the canonical id (`_canonical_qwen_id` /
+  `hf_weights_id`), never copied per row.
+- top_k is new wiring (never passed today).
+- Also remove: video_engine.py ~1791 report line (unconditional),
+  `_otr_workflow_apply.CREATIVE_WHITELIST` entry, and update ~10 tests
+  that pin the widget (test_openrouter_slot_widgets_s2, test_workflow_json_
+  guardrails ~867, test_widget_surgery_tool ~291, test_otr_api_type_
+  validation, test_otr_api_companions).
+- Cloud None-temperature is already honoured by all three backends.
+Built after the Kling removal lands (both regenerate the workflow files).
 
 ## 3. TEST
 
