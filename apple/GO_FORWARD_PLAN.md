@@ -151,9 +151,11 @@ here that reaches strangers and cannot be taken back.
   2.3.2 and 2.3.3 are Active (read 2026-09-25). The API gives no reason --
   there is no `status_reason`, no scan result and no queue position on any
   endpoint. His Discord, not a code change.
-* **2.3.4 carries `asset_cleanup`** (built `3e01b1c6`, 2026-09-25): a new
-  trailing writer widget the saved graphs need, so the Active 2.3.3 cannot run
-  what `main` ships. Bump when he says; `pyproject.toml` is untouched until then.
+* **2.3.4 published 2026-09-25** on his word ("find your latest release which
+  will not be the active release"): carries `asset_cleanup` (`3e01b1c6`, proven
+  live off / partial / full on the 5080 before the bump) and the 25-entry
+  gallery (`c0c286be`). Pending until Comfy-Org's scan; the 4060 installs it by
+  picking 2.3.4 explicitly in the Manager's version picker.
 
 ## 2. CODE -- decided, in order
 
