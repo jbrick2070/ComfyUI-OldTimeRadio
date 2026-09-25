@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 try:
     from ._otr_shared import env as otr_env
@@ -1796,7 +1796,11 @@ def vram_badge_for(repo_id: str) -> str:
     if download_gb > 0:
         # Fits nothing in the table -- say the size and say nothing false.
         return " (%.1f GB download)" % download_gb
-    return " (%.1f GB%s)" % (float(est), suffix)
+    # No catalog download size (an uncurated cache hit): the resident
+    # estimate is the only number there is. This line referenced an undefined
+    # `suffix` from 3734162 until 2026-09-25, so such a row raised NameError
+    # inside the dropdown builder instead of getting its badge.
+    return " (%.1f GB)" % float(est)
 
 
 def _top_installed_alternatives(hub_root: Path | None = None) -> list[str]:

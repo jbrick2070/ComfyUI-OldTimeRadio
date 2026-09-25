@@ -297,40 +297,18 @@ def test_humo_console_face_prompts_preserve_authored_atmosphere():
 _TALKING_ENGINE = "cloud_kling_avatar"
 
 
-def test_mint_talking_announcer_gets_mouth_still(monkeypatch):
-    # The talking_roles (computed from policy by the director) determines the mouth still.
+def test_talking_announcer_keeps_the_faceless_radio_object_row(monkeypatch):
+    # A lip-syncing announcer engine does not turn the announcer row into a
+    # face: the row that points at the portrait stays the faceless radio object.
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
         talking_roles={"announcer_visual": True},
         video_models={"announcer_video_model": {"engine_id": _TALKING_ENGINE}})
     objs = {o["object_id"]: o for o in out["objects"]}
-    
-    # 1) The WIDE still gets the rubbery mouth
-    assert "rubbery mouth" in objs["still_announcer_visual_radio_face_169"]["prompt"]
-    assert "still_music_visual_radio_face_169" not in objs
-    
-    # 2) The 'announcer' row (which points to the portrait) stays radio_object
     assert "rubbery" not in objs["announcer"]["prompt"]
     assert objs["announcer"]["radio_host_style"] == "radio_object"
     assert objs["announcer"]["prompt"] == mbp.build_radio_host_prompt(
         _SPACE_META, "portrait", "radio_object")
-
-
-def test_mint_talking_music_gets_radio_with_lips(monkeypatch):
-    # Music is always a radio. When its selected engine lip-syncs, it receives
-    # the same wide radio-with-lips init as a talking announcer.
-    out, _w = mbp.derive_image_prompts(
-        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
-        talking_roles={"music_visual": True},
-        video_models={
-            "announcer_video_model": {"engine_id": "viz_mxc_cpu"},
-            "music_video_model": {"engine_id": _TALKING_ENGINE},
-            "character_video_model": {"engine_id": "viz_camera"},
-        })
-    objs = {o["object_id"]: o for o in out["objects"]}
-    face = objs["still_music_visual_radio_face_169"]
-    assert face["role"] == "music_visual"
-    assert "rubbery mouth" in face["prompt"]
 
 
 def test_humo_radio_host_uses_announcer_slot_when_music_is_procedural(monkeypatch):
@@ -348,49 +326,14 @@ def test_humo_radio_host_uses_announcer_slot_when_music_is_procedural(monkeypatc
     assert "dial" in host["prompt"] and "face" in host["prompt"]
 
 
-def test_force_map_to_talking_announcer_mints_mouth_still(monkeypatch):
-    # The saved workflow can carry a non-still-consuming announcer slot; a smoke
-    # leg can then force announcer_visual to a lip-syncing engine. MetaBrief must
-    # honor the same effective engine as render/dispatcher, not the stale saved slot.
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP",
-                       "announcer_visual=%s" % _TALKING_ENGINE)
-    out, _w = mbp.derive_image_prompts(
-        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
-        talking_roles={},
-        video_models={"announcer_video_model": {"engine_id": "viz_green"}})
-    objs = {o["object_id"]: o for o in out["objects"]}
-    assert "still_announcer_visual_radio_face_169" in objs
-
-
-def test_force_map_to_non_talking_engine_does_not_mint_mouth_still(monkeypatch):
-    # The radio-face still belongs to a lip-syncing engine only. A forced
-    # audio-in lane that conditions the picture on the waveform without
-    # lip-syncing keeps the faceless scene-still contract.
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP",
-                       "announcer_visual=ltx25_native_audio_in_16gb")
-    out, _w = mbp.derive_image_prompts(
-        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
-        talking_roles={},
-        video_models={"announcer_video_model": {"engine_id": "viz_green"}})
-    objs = {o["object_id"] for o in out["objects"]}
-    assert "still_announcer_visual_radio_face_169" not in objs
-
-
-def test_mint_humo_no_mouth_still(monkeypatch):
-    # If the announcer engine is HuMo (and not talking), the mouth still is not minted.
+def test_humo_host_portrait_uses_console_face(monkeypatch):
+    # A HuMo announcer with hosts enabled gets the console_face host portrait.
     monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
         talking_roles={},
         video_models={"announcer_video_model": {"engine_id": "humo"}})
     objs = {o["object_id"]: o for o in out["objects"]}
-    
-    # 1) NO wide mouth still
-    assert "still_announcer_visual_radio_face_169" not in objs
-    
-    # 2) The PORTRAIT gets console_face because HuMo is enabled
     assert objs[mbp.RADIO_HOST_PORTRAIT_ID]["prompt"] == mbp.build_radio_host_prompt(
         _SPACE_META, "portrait", "console_face")
         

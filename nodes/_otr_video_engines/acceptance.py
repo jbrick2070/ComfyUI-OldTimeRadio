@@ -92,9 +92,8 @@ def _shots(ledger):
     Non-record rows are FILTERED rather than tolerated, and that is deliberate:
     every rule below does ``shot.get(...)``, so one stray string or list in
     ``video.shots`` raised ``AttributeError`` out of whichever rule reached it
-    first. Through ``scripts/grade_episode.py`` that escaped as a traceback with
-    exit code 1 -- the code reserved for "graded, findings found" -- so
-    automation keying on exit codes read a CRASHED grader as a graded episode.
+    first, so a caller keying on the result read a CRASHED grader as a graded
+    episode.
 
     The rows that were dropped here are not swallowed: :func:`grade_ledger_shape`
     reports each one by position. This function makes the rules SAFE; that one

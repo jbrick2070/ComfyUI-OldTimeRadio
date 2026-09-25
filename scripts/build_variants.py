@@ -24,7 +24,7 @@ the operator ratifies each named decision and clears the list first.
 
 Usage:
   python scripts/build_variants.py --all
-  python scripts/build_variants.py --profiles cpu_floor,8gb_lite
+  python scripts/build_variants.py --profiles otr_8gb_low,otr_16gb_low
   python scripts/build_variants.py --check
 """
 from __future__ import annotations

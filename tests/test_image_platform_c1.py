@@ -588,59 +588,6 @@ def test_dispatch_appends_visual_safety_to_image_requests(
     assert led["images"]["images"][0]["prompt_hash"] == calls["last"]["prompt_hash"]
 
 
-def test_dispatch_renders_forced_talking_announcer_radio_face(
-        clean_image_registry, tmp_path, monkeypatch):
-    """Regression for the missing ledger row:
-    OTR_FORCE_ENGINE_MAP can turn the saved announcer slot into a talking
-    (lip-syncing) engine, so the dispatcher must render/stamp the MetaBrief
-    radio-face object instead of skipping it as an unused viz still."""
-    clean_image_registry._registry.clear()
-    ireg.register(_img_stub(name="flux_gen1"))
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP",
-                       "announcer_visual=cloud_kling_avatar")
-    ledger = {"episode_id": "ep_radio_face", "cast": []}
-    policy = {
-        "policy_version": 2,
-        "image_models": {
-            "announcer_image_model": {"engine_id": "flux_gen1"},
-            "character_image_model": {"engine_id": "flux_gen1"}},
-        "video_models": {
-            "announcer_video_model": {"engine_id": "viz_green"},
-            "music_video_model": {"engine_id": "viz_green"},
-            "character_video_model": {"engine_id": "viz_green"}},
-        "seed": {"request_seed": 0},
-        "granularity": {},
-    }
-    obj = {
-        "object_id": "still_announcer_visual_radio_face_169",
-        "kind": "portrait",
-        "role": "announcer_visual",
-        "w": 1472,
-        "h": 832,
-        "prompt": "a vintage radio with a huge rubbery mouth",
-        "prompt_hash": "ph_radio_face",
-        "source": "ltx_radio_face",
-    }
-    calls = {"n": 0, "last": None}
-
-    def gen_fn(req):
-        calls["n"] += 1
-        calls["last"] = req
-        return _np_pixels(77)
-
-    led, done, _report, _warnings = disp.dispatch_images(
-        ledger, policy, _payload(obj), gen_fn=gen_fn,
-        output_dir=str(tmp_path), lockdir=tmp_path / "lease.lockdir")
-    assert calls["n"] == 1 and done.startswith("image:done:")
-    assert calls["last"]["object_id"] == "still_announcer_visual_radio_face_169"
-    row = led["images"]["images"][0]
-    assert row["object_id"] == "still_announcer_visual_radio_face_169"
-    assert row["role"] == "announcer_visual"
-    assert row["w"] == 1472 and row["h"] == 832
-    assert row["path"].replace("\\", "/").endswith(".png")
-
-
 def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, tmp_path):
     # All video roles = viz_green (renamed from visualizer 2026-06-30, item 2;
     # no init_image) -> NO still generated, gen_fn never called -> an

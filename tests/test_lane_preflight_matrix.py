@@ -43,6 +43,7 @@ from nodes._otr_shared import still_plan_helpers as sph
 from nodes._otr_video_engines import frame_contract as fc
 from nodes._otr_video_engines import motion_common as mc
 from nodes._otr_video_engines import registry as vreg
+from tests._support.frame_contract_reader import declares_continuity_kwarg
 
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

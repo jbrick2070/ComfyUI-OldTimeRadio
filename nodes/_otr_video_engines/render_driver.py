@@ -276,10 +276,9 @@ BOOKEND_SCENE_PROMPT_KNOWN_RED = {
             "('radio-styled by design') -- but that 'policy' resolves to "
             "build_request's static string with a style cue prefixed, not a "
             "considered motion decision, and it predates the pack motion "
-            "registers existing. VERIFIED 2026-09-03: wired to BOTH bookend "
-            "roles in otr_g4_humo.json and otr_w45_humo.json, both "
-            "status=SHIPPING -- it ships this defect today, it is not "
-            "theoretical. OWED: decide whether a face lane should be "
+            "registers existing. No shipped workflow selects it for a bookend "
+            "(the lab rigs that did were retired 2026-09-25), but the "
+            "dropdown still offers it. OWED: decide whether a face lane should be "
             "selectable for a console bookend at all; fix it or rip it from "
             "those roles. Do not leave it silently motionless.",
     "humo_1.7B": "audio-driven face lane in the humo family. OWED: the same "
@@ -295,14 +294,13 @@ BOOKEND_SCENE_PROMPT_KNOWN_RED = {
                         "in ZERO profiles, so it is unreachable on a bookend "
                         "today. OWED: keep it here until it is either wired "
                         "and fixed, or retired.",
-    "cloud_wan_i2v": "cloud text-driven lane. VERIFIED 2026-09-03: wired to "
-                     "both bookend roles in otr_cloud_low.json and "
-                     "otr_cloud_lanes.json, both status=draft. OWED: fix the "
-                     "prompt path before either profile is promoted.",
-    "cloud_wan_i2v_audio": "cloud text-driven lane. VERIFIED 2026-09-03: wired "
-                           "to both bookend roles in the same two draft "
-                           "profiles as cloud_wan_i2v. OWED: same fix, same "
-                           "deadline -- before promotion.",
+    "cloud_wan_i2v": "cloud text-driven lane. No shipped workflow selects "
+                     "it (the cloud rows run cloud_vidu_q2_pro_fast_720p). "
+                     "OWED: fix the prompt path before any workflow selects "
+                     "it for a bookend.",
+    "cloud_wan_i2v_audio": "cloud text-driven lane. No shipped workflow "
+                           "selects it. OWED: the same fix as cloud_wan_i2v, "
+                           "before any workflow selects it for a bookend.",
     "cloud_vidu_q2_pro_fast_720p": "cloud text-driven lane. VERIFIED "
                                    "2026-09-03: appears in ZERO profiles, "
                                    "unreachable on a bookend today. OWED: wire "
@@ -1947,6 +1945,65 @@ def _style_cue_after_pinned_opener(vstyle, prompt):
     if cued == rest:                      # default pack -> empty cue
         return text
     return "%s %s" % (H3_REFERENCE_OPENER, cued)
+
+
+def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
+    """Map an OTR shot role + beat id to a motion-register key (the pack's
+    ``motion_registers`` / :data:`_MOTION_REGISTER_KEYS`), or ``""`` if the
+    beat is not a radio-console motion beat. Pure."""
+    sid = str(shot_id or "")
+    role = str(shot_role or "")
+    # A SYNTHETIC opening-music beat can carry an announcer_visual role (the
+    # b000_music_open structure is definitive, NOT the role) -- check it first.
+    # `shot_music_opening_001` IS THE SHAPE PRODUCTION MINTS, and it does not
+    # end with `b000_music_open`. Measured 2026-09-03 across every music_visual
+    # shot on disk: 100% are `shot_music_opening_001` / `shot_music_closing_001`
+    # and 0% match the legacy suffix, so this branch had stopped firing entirely
+    # and every cold open fell through to the flat `music_inter` register.
+    #
+    # THAT SILENTLY REVERTED A DECISION THE OPERATOR HAD ALREADY MADE. The note
+    # below records a GPU A/B that restored the dynamic open as the default
+    # ("moves ~9x more", operator: "moving grooving"). A naming drift then
+    # un-restored it without touching the line that expresses the choice --
+    # which is why the drift was invisible: nothing looked wrong, the register
+    # simply never got asked for.
+    if (is_synthetic_open
+            or sid.endswith(_OPENING_MUSIC_SUFFIX)
+            or "music_opening" in sid):
+        # Operator 2026-06-12 had retargeted this to the calm music_inter because
+        # the aggressive music_open verbs (whip-pans / "vibrates aggressively" /
+        # dynamic dolly push) SMEARED on the 2B LTX model. 2026-06-15: that smear
+        # was the 1472x832 OVER-RESOLUTION mush (BUG-412), FIXED at native 832x480
+        # -- a GPU A/B proved music_open now renders SHARP (Laplacian 934 vs 83)
+        # AND moves ~9x more (paired with the ksampler default). So the dynamic
+        # open is RESTORED as the default (operator "moving grooving"). music_inter
+        # stays available via OTR_LTX_OPEN_MOTION_KEY=music_inter.
+        _open_key = otr_env.get("OTR_LTX_OPEN_MOTION_KEY", "music_open")
+        # A2: membership check against the STATIC key set (the values moved
+        # to the style pack; the retired fixture dict is not consulted).
+        return (_open_key if _open_key in _MOTION_REGISTER_KEYS
+                else "music_inter")
+    if role == "announcer_visual":
+        return "announcer"
+    if role == "music_visual":
+        # "closing" DOES NOT CONTAIN "close" -- c-l-o-s-i-n-g. That one missing
+        # letter is why every sign-off in production selected `music_inter`.
+        # Production mints `shot_music_closing_001`; the token list below was
+        # written for an older id shape and matched none of it. Measured
+        # 2026-09-03 across the music_visual shots on disk: 100% are
+        # `shot_music_opening_001` / `shot_music_closing_001`, 0% match the old
+        # tokens. See the opening half above for the same drift.
+        # TOKEN MEMBERSHIP, NOT SUBSTRING. `"tag"` is inside "montage" and
+        # "stage", and substring matching on ids is exactly how `"close"`
+        # silently stopped matching `"closing"` in the first place. Splitting on
+        # "_" tests the id's own segments, so a longer word containing a token
+        # can never fire it. `"closing"` is listed as its own token because that
+        # is what production mints.
+        _tokens = set(sid.split("_"))
+        if _tokens & {"closing", "close", "outro", "end", "tag", "off"}:
+            return "music_close"
+        return "music_inter"
+    return ""
 
 
 #: Deterministic fallback for a CHARACTER face beat whose shot carries no M4

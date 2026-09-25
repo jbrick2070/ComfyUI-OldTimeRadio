@@ -106,8 +106,7 @@ _LOG = logging.getLogger("OTR.video.ltx_8gb")
 # evidence) treats "ltx_video / ltx_8gb" as ONE block, and the shared facts are the
 # ones the directive is actually built from: same family, same cfg-1.0 distilled
 # default (so the negative is inert on both), same i2v-anchor doctrine (the still
-# carries the LOOK, the prompt moves), same tight char budget. The authority is
-# `eng_ltx_video.PROMPT_STYLE_DIRECTIVE` / `.PROMPT_STYLE_NOTES`. Read it there.
+# carries the LOOK, the prompt moves), same tight char budget.
 #
 # THE ENCODERS ARE NOT THE SAME, and an earlier version of this comment said they
 # were -- a Sonnet QA pass caught it. This tier's 0.9.8 checkpoint carries no text
@@ -1115,9 +1114,8 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
         S8b-13 (lane 8, 2026-08-11) ADDED THE FIRST AND LAST OF THOSE. This is an
         LTX-Video 0.9.8 engine -- the exact family BUG-070 was written for -- and
-        it was the only one of the three LTX lanes with NO Sage gate at all,
-        while both siblings call ``assert_sage_not_patched`` (``eng_ltx_video``,
-        ``eng_ltx_av``). int8-PV SageAttention process-aborts LTX with no
+        it was the only one of the three LTX lanes of the day with NO Sage gate
+        at all, while both siblings called ``assert_sage_not_patched``. int8-PV SageAttention process-aborts LTX with no
         traceback, so "no gate" means the failure mode is a dead process rather
         than a named refusal. The node gate was the same shape of hole one level
         down: a missing LTXV class surfaced at ``load()`` -- mid-render, after
@@ -1241,9 +1239,9 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         cfg = self._resolve_render_config()
         # MOTION BAKED IN (2026-08-27). Was "subtle natural motion, cinematic
         # light" -- the damping instruction the 2026-08-17 kinetic amendment
-        # killed, still shipping here. This lane's dialect is its LTX parent's
-        # (see eng_ltx_video.PROMPT_STYLE_DIRECTIVE), so: a named action, and
-        # the light kept because this tier's prompt carries its own look.
+        # killed, still shipping here. This lane speaks the LTX prompt dialect,
+        # so: a named action, and the light kept because this lane's prompt
+        # carries its own look.
         # `_compose_positive` is the seam a sibling (razzle_ltx_8gb) overrides;
         # a local variable here would make that override impossible.
         positive = self._compose_positive(request)

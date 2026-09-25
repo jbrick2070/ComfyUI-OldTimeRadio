@@ -1,15 +1,12 @@
-"""S4b/S4c (2026-07-02): face-forward portrait mint for a lip-syncing
-(talking) lane + radio-face default-on for its bookends.
+"""S4b (2026-07-02): face-forward portrait mint for a lip-syncing (talking)
+lane.
 
 Proof8 root cause: S4 routed character inits to the PORTRAIT, but the
 brief-styled portrait mint produced dark profile/wide compositions (mouth
 not visible) -- the lip-sync coupling had nothing to drive. S4b threads a
 per-role ``talking`` map through the director policy chain and mints those
 portraits face-forward + warm, skipping the era/grade tails (the exact
-ltx_radio_mouth split that fixed the radio). S4c makes talking bookends
-default-face -- the legacy A/B env toggle is gone; the face is purely
-auto-derived from the lip-syncing engine (operator eyeball: "should be
-talking lips?").
+ltx_radio_mouth split that fixed the radio).
 """
 import json
 
@@ -126,30 +123,3 @@ def test_llm_instruction_carries_talking_framing():
     assert "DIRECTLY at the camera" in req
     assert "never a profile" in req
     assert STYLE_ANCHOR_TALKING in req
-
-
-# --------------------------------------------------------------------------- #
-# S4c: radio-face stills mint by default for talking bookends
-# --------------------------------------------------------------------------- #
-
-
-def _radio_face_ids(payload):
-    return {o["object_id"] for o in payload["objects"]
-            if str(o.get("object_id", "")).endswith("_radio_face_169")}
-
-
-def test_radio_face_mints_for_talking_bookends_without_env():
-    payload, _w = derive_image_prompts(
-        _CAST, _META, llm_fn=None,
-        talking_roles={"announcer_visual": True, "music_visual": True})
-    ids = _radio_face_ids(payload)
-    # Music stays radio-shaped in every mode. An explicitly audio-driven music
-    # engine gets the matching radio-with-lips still; non-audio-driven music
-    # still uses its faceless radio scene.
-    assert "still_announcer_visual_radio_face_169" in ids
-    assert "still_music_visual_radio_face_169" in ids
-
-
-def test_radio_face_absent_without_talking_or_env():
-    payload, _w = derive_image_prompts(_CAST, _META, llm_fn=None)
-    assert _radio_face_ids(payload) == set()

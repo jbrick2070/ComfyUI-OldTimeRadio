@@ -357,20 +357,6 @@ def _humo_hosts_enabled() -> bool:
     return otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
 
 
-#: LTX audio-in bookends use a WIDE radio-face still for their I2V init. Music
-#: remains a radio in every visual mode; when it is explicitly audio-driven it
-#: receives the same radio-with-lips treatment as the announcer (operator
-#: 2026-07-12). Other music engines retain their faceless radio scene still.
-#: Object ids MUST match render_driver._ltx_radio_face_object_id.
-_LTX_RADIO_FACE_ROLES = ("announcer_visual", "music_visual")
-
-
-def _ltx_radio_face_object_id(role: str) -> str:
-    """object_id of the WIDE radio-face still for ``role`` (ltx talking radio-face).
-    Matches render_driver._ltx_radio_face_object_id."""
-    return "still_%s_radio_face_169" % str(role or "")
-
-
 def _radio_face_overtness(meta) -> str:
     """Brief-driven overtness of the radio face (operator: 'brief-driven mix').
     Retro-futurist / sci-fi briefs get a bold playful cartoon face; everything
@@ -2357,42 +2343,6 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             "negative_prompt": radio_host_negative("console_face"),
             "source": "radio_host_portrait",
         })
-
-    # ADDENDUM -- the WIDE ltx talking radio-face stills for the
-    # ltx_audio_in bookends. WIDE by construction (aspect="wide") so the wide
-    # ltx_audio_in engine is never fed a pillarboxed portrait -- the exact trap
-    # the kibitz flagged. Per-role object_id matches
-    # render_driver._ltx_radio_face_object_id; seed-pinned in the dispatcher
-    # (shares the bookend seed). No-baby negative populated.
-    # When a bookend role's engine lip-syncs (talking_roles via the director
-    # policy), the radio-face still mints. A non-audio-driven music engine stays
-    # a faceless radio scene; an explicitly LTX-audio music engine gets lips.
-    _talk = talking_roles or {}
-    if any(_talk.get(r) and _still_required(r) for r in _LTX_RADIO_FACE_ROLES):
-        _fw, _fh = still_dims_for_aspect("wide", PORTRAIT_W, PORTRAIT_H)
-        for _abrole in _LTX_RADIO_FACE_ROLES:
-            if not (_talk.get(_abrole) and _still_required(_abrole)):
-                continue
-            # Talking-radio kibitz r1 (2026-07-01): the ltx bookend still uses the
-            # LTX-ONLY mouth-forward style. The radio IS the host, and ltx_audio_in
-            # (no face detector) needs the biggest, clearest mouth region to drive
-            # -- the Sub-plan-C probe lever. The same literal radio-with-lips
-            # contract applies to announcer and explicitly audio-driven music;
-            # ordinary music remains the faceless radio scene. The HuMo
-            # console_face look stays a separate family-specific path.
-            _fprompt = build_radio_host_prompt(
-                meta, "wide", radio_host_style="ltx_radio_mouth",
-                vstyle=_vstyle)
-            objects.append({
-                "object_id": _ltx_radio_face_object_id(_abrole),
-                "kind": "portrait",
-                "role": _abrole,
-                "w": _fw, "h": _fh,
-                "prompt": _fprompt,
-                "prompt_hash": _content_hash(_fprompt),
-                "negative_prompt": radio_host_negative("ltx_radio_mouth"),
-                "source": "ltx_radio_face",
-            })
 
     # SCENE-STILL objects (ST-2): open/announcer/outro from pure helpers on
     # the LINES -- never video.shots (image gen runs BEFORE ShotLock). The

@@ -396,7 +396,7 @@ def render() -> str:
     A("```\n"
       "python scripts/otr_fetch_lane_weights.py haunted\n"
       "# writer, voices and music download themselves into HF_HOME on first use\n"
-      "python scripts/otr_canonical_api_run.py --profile otr_nvidia_8gb_haunted "
+      "python scripts/otr_canonical_api_run.py --profile otr_8gb_animatediff "
       "--act-count 1\n"
       "```\n")
     A("That lane is `animatediff15_v3_haunted_video` with `kokoro` voices and "

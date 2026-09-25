@@ -12,7 +12,7 @@ their machine wants one row, not a narrative of how the row was discovered.
 
 WHY IT IS GENERATED. The stranger-facing machine answer, proof receipts, and
 measurements come from `config/machine_classes.json`; experimental profile
-detail comes from `config/experiments/*.json`. A hand-written compatibility table
+detail comes from `config/workflow_matrix.json`. A hand-written compatibility table
 is the single most rot-prone document a project can own.
 
 THE CONFIDENCE LEVELS ARE NOT THE SAME CLAIM, and the table says which:
@@ -29,7 +29,6 @@ honest unknown.
 from __future__ import annotations
 
 import argparse
-import glob
 import io
 import json
 import os
@@ -462,9 +461,10 @@ def render() -> str:
       "ComfyUI Desktop and the portable build ship it runs through kokoro-onnx "
       "on the CPU (the same voices, about six times faster than realtime); on "
       "Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro "
-      "backend packaged yet; there, run `--profile otr_4060_floor` for the bark "
-      "route or switch the OTR_CastLock voice dropdowns to bark.")
-    A("\nApple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a "
+      "backend packaged yet; there, switch the OTR_CastLock voice dropdowns "
+      "to bark.")
+    A("\nApple Silicon runs the `otr_mac16_*` workflows, PROVEN on a named "
+      "physical system -- a "
       "Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and "
       "2026-09-08, including local `sd15` stills and local `ltx_8gb` video "
       "diffusion. It is not promoted to a machine key: a machine key implies a "
@@ -607,8 +607,8 @@ def render() -> str:
     A("* A `draft` row is not a promise. Most have never been run end to end.\n")
     A("* `install recipe` describes whether every selected artifact has one "
       "exact automatic or manual owner. It is not a hardware result.\n")
-    A("* AMD/ROCm is largely unexplored -- `otr_amd8_rocm` exists and is not "
-      "proven. **Apple Silicon is NOT in that bucket**: `otr_mac_mps` has "
+    A("* AMD/ROCm is largely unexplored -- `otr_amd_still` ships and is not "
+      "proven. **Apple Silicon is NOT in that bucket**: it has "
       "published episodes on a Mac mini M4 / 16 GB, and the engine-proof table "
       "above carries its receipts (`viz_camera`, `sd15`, `ltx_8gb`, and all "
       "four `still_*` lanes). This line used to say non-NVIDIA generally was "

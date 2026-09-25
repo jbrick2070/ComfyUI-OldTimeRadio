@@ -259,8 +259,8 @@ class TestStampAssertion:
         assert os.environ["OTR_ACTIVE_PROFILE"] == NV16
         assert len(os.environ["OTR_SNAPSHOT_HASH"]) == 64
 
-    def test_no_cuda_aborts_suggesting_a_real_tier(self, monkeypatch):
-        """The abort names a suggested tier, and that tier has to be one a user
+    def test_no_cuda_aborts_suggesting_a_real_workflow(self, monkeypatch):
+        """The abort names a suggested workflow, and it has to be one a user
         can open: a matrix row, or the canonical itself (which resolves its
         device at run time and is the proven CPU-only path)."""
         import re
@@ -273,11 +273,11 @@ class TestStampAssertion:
         with pytest.raises(ValueError, match="requires CUDA") as excinfo:
             node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
                           profile_id=NV16)
-        suggested = re.findall(r"suggested tier: (\S+)", str(excinfo.value))
+        suggested = re.findall(r"suggested workflow: (\S+)", str(excinfo.value))
         assert suggested, str(excinfo.value)
         real = set(cp.known_profile_ids()) | {"otr_canonical"}
         assert set(suggested) <= real, (
-            "the abort suggests a tier nobody can open: %r" % suggested)
+            "the abort suggests a workflow nobody can open: %r" % suggested)
 
     def test_validate_anyway_false_never_skips_the_assertion(self, monkeypatch):
         monkeypatch.setattr(WorkflowValidator, "_detect_host",

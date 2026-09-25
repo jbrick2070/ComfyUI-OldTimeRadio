@@ -576,7 +576,7 @@ class OTRVideoDirector:
             # the subject's head off.
             "aspects": self._role_aspects(resolved_video, effective_video),
             # Per-role TALKING flag (S4b 2026-07-02): whether the engine
-            # lip-syncs (wants_talking_prompt, the ia2v register), so
+            # lip-syncs (its wants_talking_prompt hook), so
             # the image node mints FACE-FORWARD portraits for that lane --
             # proof8 showed brief-styled profile portraits cannot drive lips.
             # Also EFFECTIVE as of chunk 1b: MetaBrief's _effective_talking_roles
@@ -637,8 +637,8 @@ class OTRVideoDirector:
     @staticmethod
     def _role_talking(resolved_video, effective_by_role=None):
         """Map each video ROLE to whether its EFFECTIVE engine renders TALKING
-        lip-sync (the engine's ``wants_talking_prompt`` hook -- the ia2v
-        register), so stills can be minted face-forward for that lane (S4b).
+        lip-sync (the engine's ``wants_talking_prompt`` hook), so stills can be
+        minted face-forward for that lane (S4b).
         Hook errors resolve False here: the RENDER path stays the loud
         enforcer of a misconfigured recipe; the director only styles stills.
 

@@ -198,8 +198,7 @@ def resolve_seed_and_mode(
     # with the FIXED deterministic bookend seed so the host face is reproducible
     # run-to-run and open/inter/close share ONE canonical face.
     _oid = str(object_id or "")
-    if (str(kind or "") == "scene_open" or _oid == "radio_host_portrait"
-            or _oid.endswith("_radio_face_169")):   # ltx talking radio-face
+    if str(kind or "") == "scene_open" or _oid == "radio_host_portrait":
         try:
             return (int(otr_env.get("OTR_RADIO_BOOKEND_SEED", 4242)), "")
         except (TypeError, ValueError):

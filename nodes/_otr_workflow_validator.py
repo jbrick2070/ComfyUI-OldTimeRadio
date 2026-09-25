@@ -470,8 +470,9 @@ class WorkflowValidator:
                       master_hash: str, generated_by: str) -> str:
         """The S2 startup assertion: a STAMPED workflow must match the
         committed profile AND the detected host reality, else the prompt
-        ABORTS with a reason -> suggestion table (no cuda -> cpu_floor;
-        mac -> cpu_floor). ACTIVE whenever profile_id is non-empty;
+        ABORTS with a reason and a workflow to open instead (a Mac with MPS
+        -> otr_mac16_low; anything else -> the canonical, which resolves its
+        device at run time). ACTIVE whenever profile_id is non-empty;
         ``validate_anyway`` can NEVER skip it. On pass, exports the active
         profile id (every execution -- stale values from a previous prompt
         are overwritten). The VRAM OOM budget is owned by the operator's
@@ -548,12 +549,19 @@ class WorkflowValidator:
         )
         host = self._detect_host()
         problems = []
+        # A SUGGESTION MUST BE SOMETHING THE USER CAN OPEN. This named
+        # `cpu_floor`, a lab rig that no longer exists, so every abort pointed
+        # at nothing (found 2026-09-25). A Mac with a live MPS device has its
+        # own shipped rows; everything else gets the canonical, which picks
+        # the device at run time.
+        suggestion = ("otr_mac16_low"
+                      if host["platform"] == "mac" and host.get("has_mps")
+                      else "otr_canonical")
         if profile["device_backend"] == "cuda" and not host["has_cuda"]:
-            suggestion = "cpu_floor"
             problems.append(
                 f"profile {profile_id!r} requires CUDA but this host has none"
                 + (" (mac)" if host["platform"] == "mac" else "")
-                + f" -> suggested tier: {suggestion}")
+                + f" -> suggested workflow: {suggestion}")
         # S5 host-reality extensions (platform-portability): MPS-backend
         # profiles need a live MPS device; a vendor-pinned profile must
         # match the detected vendor (ROCm presents as cuda -- the hip tell
@@ -561,7 +569,7 @@ class WorkflowValidator:
         if profile["device_backend"] == "mps" and not host.get("has_mps"):
             problems.append(
                 f"profile {profile_id!r} requires MPS but this host has "
-                "none -> suggested tier: cpu_floor")
+                f"none -> suggested workflow: {suggestion}")
         _pvendor = profile.get("gpu_vendor")
         if (_pvendor in ("nvidia", "amd", "apple")
                 and (host.get("has_cuda") or host.get("has_mps"))
@@ -573,7 +581,7 @@ class WorkflowValidator:
             problems.append(
                 f"profile {profile_id!r} targets platform "
                 f"{profile['platform']!r}; this host is "
-                f"{host['platform']!r} -> suggested tier: cpu_floor")
+                f"{host['platform']!r} -> suggested workflow: {suggestion}")
         try:
             assert_running_server(contract_for_profile(profile))
         except BootContractError as exc:
