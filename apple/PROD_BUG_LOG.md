@@ -15310,36 +15310,45 @@ exposure is real and measured, but no render died proving it. Treat it as
 admitted-by-ruling rather than as satisfying the ordinary admission rule, and do
 not promote it to the Bug Bible on this evidence alone.
 
-## PBUG-20260925-01 -- Comfy Desktop's registry Install silently does not install OTR
+## PBUG-20260925-01 -- Comfy Desktop's registry Install intermittently does not install OTR
 - surfaced: live fresh-install walk on the 4060, operator-driven, both the
   Comfy Desktop app and C:\ComfyUI-Models wiped by hand first
-  (apple/FRESH_INSTALL_4060_2026-09-25.md, entries 6-15), 2026-09-25
+  (apple/FRESH_INSTALL_4060_2026-09-25.md, entries 6-22), 2026-09-25
 - symptom: in Comfy Desktop's Nodes Manager, searching "old time" finds
-  ComfyUI-OldTimeRadio (registry, publisher fluxus, version 2.3.3 Active).
-  Clicking Install (2.3.3 selected explicitly) shows a full success sequence
-  -- spinner, "Installing comfyui-old-time-radio 0 of 0" toast, then a green
-  "To apply changes, please restart ComfyUI" toast -- and nothing happens.
-  After restart: the Nodes panel finds no OTR nodes ("No nodes match
-  'Ledger'"); the boot log's "Import times for custom nodes:" section lists
-  only the stock `websocket_image_save.py`, no OTR entry and no
-  Skipped/error line; `custom_nodes\` on disk has only the two stock example
-  files; `user\comfyui.log` has zero matches for "old.time.radio" or
-  "fluxus" anywhere. Reproduced twice, same shape both times, including the
-  "Apply Changes"/manual-restart toast hanging with the backend not
-  actually running.
-- root cause: unknown, and structurally cannot be OTR's -- there is no trace
-  the install was ever attempted (no git clone, no log line, no partial
-  files), so whatever is failing is inside Comfy Desktop's own
+  ComfyUI-OldTimeRadio (registry, publisher fluxus). Clicking Install with a
+  version selected explicitly shows a full success sequence -- spinner,
+  "Installing comfyui-old-time-radio 0 of 0" toast, then a green "To apply
+  changes, please restart ComfyUI" toast. TWO of four observed attempts did
+  nothing: after restart the Nodes panel found no OTR nodes ("No nodes match
+  'Ledger'"), the boot log's "Import times for custom nodes:" section had no
+  OTR entry and no Skipped/error line, `custom_nodes\` on disk had only the
+  two stock example files, and `user\comfyui.log` had zero matches for
+  "old.time.radio" or "fluxus" anywhere (version 2.3.3, both times). The
+  OTHER two attempts worked: once after an unrelated later app reboot with
+  no new Install click seen by this session (version 2.3.3), and once
+  immediately on the very next try, custom_nodes wiped clean first, on a
+  DIFFERENT version (2.3.4, explicitly picked from the version dropdown
+  while it was still NodeVersionStatusPending) -- confirmed loaded via node
+  search, the Templates gallery ("Showing 25 of 25 templates"), and opening
+  otr_8gb_low with no 404. The failure is INTERMITTENT, not permanent, and
+  not obviously tied to which version was picked (2.3.3 both failed and
+  eventually worked).
+- root cause: unknown, and structurally cannot be OTR's -- on both failures
+  there was no trace the install was ever attempted (no git clone, no log
+  line, no partial files), so whatever fails is inside Comfy Desktop's own
   Manager/registry-fetch mechanism before it ever reaches this pack's code.
   5080 independently agreed: nothing in nodes/, workflows/, or __init__.py
-  is implicated.
+  is implicated. Not enough signal from this session to name the actual
+  trigger (restart timing, cache state, something else).
 - fix: none possible from this repo. Not a code defect in OTR.
 - verify idea: from a clean Comfy Desktop instance with an empty
   custom_nodes\, search the registry for comfyui-old-time-radio, click
   Install, then check (a) the Nodes panel for a distinctive OTR class name,
   (b) the boot log's "Import times for custom nodes:" section, and (c)
-  custom_nodes\ on disk. A fix should make all three agree; today all three
-  agree it is absent.
+  custom_nodes\ on disk. Repeat several times across full app restarts (not
+  just the in-app "Apply Changes") to characterize the intermittency rate --
+  this session saw 2 failures then 2 successes in four tries, too few to
+  call a rate.
 - bible-worthy: no -- this is a third-party app defect (Comfy Desktop's own
   install/apply-changes flow), not a reusable OTR or ComfyUI-custom-node
   contract. Recorded here as the live evidence trail; the 5080 is raising it
