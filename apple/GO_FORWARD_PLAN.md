@@ -12,6 +12,16 @@ this file does not restate them, and does not restate the review or push rules.
 **For what already happened -- commits, measurements, receipts -- read
 [HANDOFF_LOG](HANDOFF_LOG.md), newest entry first.**
 
+## Live box -- 5080, do not reset (2026-09-25)
+
+ComfyUI is on port 8000. A 1-act chain
+(`C:\Users\jeffr\Documents\ComfyUI\output\otr\yt_chain.ps1`) runs until
+08:00 local on 2026-09-25 or the first failure. At handoff the mime leg
+(prompt `ea876b5c`) was still rendering; AnimateDiff is next. Do not kill
+python, do not interrupt the queue, and do not reboot the server. Receipts
+are the 2026-09-25 RENDER entry in the handoff log. Uncommitted files in
+the tree are a partial red-test patch: do not commit them with other work.
+
 ## Operating order (hard)
 
 1. **SCOPE AND DECIDE** -- more than one defensible answer? It lives here, and
