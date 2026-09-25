@@ -187,6 +187,7 @@ apple/ENGINE_MATRIX.md
 apple/EXTENDING_OTR.md
 apple/GO_FORWARD_PLAN.md
 apple/H3_LICENSE_ATTESTATION.md
+apple/HF_HOME_WINDOWS_PIN.md
 apple/HANDOFF_LOG.md
 apple/IDEOGRAM4_LICENSE_ATTESTATION.md
 apple/IMAGE_GEN_PREFLIGHT.md
@@ -197,8 +198,10 @@ apple/MAC_PORTABILITY_GUIDE.md
 apple/MODEL_ASSET_INDEX.md
 apple/OTR_STANDING_RULINGS.md
 apple/PROD_BUG_LOG.md
+apple/ROUTE_DELETION_PLAN.md
 apple/RUNPOD_INSTALL.md
 apple/SPEC_haunted_image_to_video.md
+apple/TEST_WAVE.md
 apple/TTS_VOICE_PREFLIGHT.md
 apple/VIDEO_LANE_PREFLIGHT.md
 apple/comfy-credits-setup.md
