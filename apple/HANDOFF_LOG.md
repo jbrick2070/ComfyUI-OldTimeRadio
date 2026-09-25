@@ -38,6 +38,61 @@ Suite: full run on the gallery move, the same 12 inherited reds as
 Server: the 5080 server on :8000 is resident and idle (PID from
   scripts/_otr_soak_server_launch.cmd); nothing queued.
 
+## 2026-09-25 -- HEAD a553ac3b (main) -- CODE (writer LLM folder; queue-time node-pack gate; reviews folded; Bible 12.174)
+
+Did (5080, the only window; Fable driving from the writer-folder build on):
+  8f8ccebb: the writer LLM downloads as real files into ComfyUI's `LLM`
+  model folder (operator: "real folder", "best practice", no Developer Mode
+  assumption). New module nodes/_otr_llm_folder.py; both resolvers check the
+  folder first, then the hub cache unchanged; nothing migrated or deleted.
+  5080 measured before/after in a HEAD worktree: gemma-4-12b-it resolved to
+  the same hub snapshot, same split-revision template, download
+  short-circuited -- byte-identical. Docs: README, INSTALL, LLM_PREFLIGHT,
+  the standing ruling, a companion note on row 0a (unchanged).
+  02758478: PBUG-20260925-02 fixed -- `_refuse_missing_node_packs` at queue
+  time, before any download, node classes only, fix-first message; Ghost
+  Signal's own refusal leads with the same hint. Plus the cursor/agy
+  findings on 8f8ccebb: receipt follows a structural check (hf_hub 1.32
+  returns a non-empty local_dir when the Hub is down), provisioner warmer
+  routed through the catalog, complete beats partial across roots, stale
+  .tmp receipts ignored, config.json part of complete, unsharded hand-placed
+  models count, LLM_PREFLIGHT rewritten, hf_download_driver's dead kwarg
+  (two sites), `_otr_paths.resolve_hf_model_path` ripped (65 lines, zero
+  callers).
+  a553ac3b: Sonnet + agy BLOCK on 02758478, both grounded: the
+  provisioner loads the catalog BY PATH, and three bare relative imports
+  (auto_download_if_missing, validate_model_id, estimate_model_size_gb's
+  no-Hub branch) raised ImportError on entry there -- the warmer swallowed it
+  as FAILED, so a provisioned box downloaded nothing. My provision test had
+  mocked the catalog and proved routing, not the call; it now loads the real
+  standalone catalog and runs the seam through it plus both refusal branches.
+  cursor: transfers in progress now block completeness on the sharded branch
+  too. agy: an empty node registry is "nothing to check", not "everything is
+  missing". PROD_BUG_LOG PBUG-02 gets its fix line.
+  Bible ed7064e (comfyui-custom-node-survival-guide main): 12.174 "a
+  queue-time gate that checks weights but not node classes burns a full
+  render before failing"; index row promoted from PBUG-20260925-02; README
+  count 358 -> 359; 24 passed.
+Suite: full run on each push, the same 12 inherited reds as fe17f426 every
+  time, nothing new. Scoped: 190 passed on the touched files at the last
+  push. Registry scan replica clean.
+Models: writer folder design -- five Composer lanes (grounded), Grok as the
+  contrarian (BLOCK on two must-fixes, both built in: completeness rule,
+  independent metadata lookup). 8f8ccebb: Sonnet HOLD (executed), cursor
+  and agy yes-with-fixes (all grounded and folded in 02758478). 02758478:
+  Sonnet BLOCK (the standalone-import regression, real), agy BLOCK (same
+  finding), cursor yes-with-fixes (the in-progress-transfer hole, real; the
+  rest brief critique). a553ac3b: Sonnet re-review running at push time (the BLOCK finding is fixed and tested against the real standalone load); result follows as its own commit. Reviewers left HEAD
+  and the tree untouched every round (checked).
+Leftovers for him: C:\ComfyUI-Models\LLM\converted (6.7 GB, the removed
+  GGUF backend's) -- the new scan ignores it; delete or keep. Local branch
+  worktree-agent-aaf3612b6248a9d9e is a dead pointer.
+Next: 2.3.5 waits on his word (2.3.4 is Pending and the scan replica says it
+  will Flag over an internal doc that shipped; the tree is clean now). 4060:
+  B3 retry on 02758478+ proves the gate live (refusal at t=0 without ADE),
+  then B4. Row 0a (short Windows HF_HOME) still open, writer no longer on
+  that path.
+
 ## 2026-09-25 -- HEAD e7a4806a (main) -- CODE + DOCS (row 0b asset_cleanup built; stale pointers; one local copy)
 
 Did (5080 window, now the only window; the server on :8000 was not touched):
