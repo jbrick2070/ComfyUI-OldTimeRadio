@@ -1,7 +1,8 @@
 """Shared in-process motion-engine helpers (A-S5 / CW-6: LTX + Wan).
 
-The motion video engines -- ltx_video (text->video), wan_i2v (image->video), and
-humo (A-S6) -- run IN-PROCESS in the main ComfyUI cu130 / torch-2.10 venv: they
+The motion video engines -- ``ltx_8gb`` (image->video), ``ltx25`` (LTX 2.5),
+humo (A-S6, audio-driven face), and the MiniMax H3 / Ghost Signal / visualizer
+families -- run IN-PROCESS in the main ComfyUI cu130 / torch-2.10 venv: they
 call the installed ComfyUI wrapper node classes directly (no GraphBuilder),
 unlike a Path-B cu128 subprocess sidecar. This module factors the pieces
 those in-process motion adapters share, so each adapter file stays small and
@@ -11,9 +12,10 @@ every guard is tested once:
   ``prepare`` plus a V-4 patcher-detach ``teardown`` that NEVER calls
   ``unload_all_models``;
 * the BUG-070 SageAttention contamination gate -- int8-PV SageAttention
-  process-aborts LTX with NO traceback, so ``ltx_video`` fails CLOSED before its
-  first forward (``assert_sage_not_patched``) and ``wan_i2v`` is routed to a
-  sidecar when Sage is resident (``resolve_isolation``);
+  process-aborts LTX with NO traceback, so ``ltx_8gb`` fails CLOSED before its
+  first forward (``assert_sage_not_patched``); ``resolve_isolation`` still
+  answers whether a lane must escalate to a sidecar when Sage is resident,
+  though every currently registered lane declares ``ISOLATION_IN_PROCESS``;
 * ``init_image`` aspect handling that maps a source image into the canvas with a
   SINGLE uniform scale (``resolve_aspect_transform`` / ``assert_no_silent_stretch``)
   so a portrait init never silently stretches into a landscape canvas
@@ -116,7 +118,7 @@ def assert_sage_not_patched(engine_name, family, *, modules=None, env=None):
 def resolve_isolation(declared_isolation, sage_patched):
     """Resolve an engine's runtime isolation tier (pure).
 
-    ``sidecar_optional`` (wan_i2v) escalates to ``sidecar_required`` when
+    ``sidecar_optional`` escalates to ``sidecar_required`` when
     SageAttention is resident -- running in-process next to a Sage-patched
     attention is toxic (BUG-070). ``sidecar_required`` stays required; everything
     else runs ``in_process``.
@@ -1323,9 +1325,10 @@ class MotionEngineBase:
     #: role's SELECTED image (init still) by default -- the image dispatcher reads
     #: this ONE capability to decide whether to mint the still, so a new video engine
     #: gets the chosen image automatically with NO per-engine whitelist ("one and
-    #: done"). Audio-only lanes (ltx_av_music) override to False; the pure procedural
-    #: floors (visualizer / abstract) declare False too. ltx_video inherits True here,
-    #: which is what lets a flux2/flux still drive a silent LTX i2v clip. Plain attr
+    #: done"). Audio-only lanes (the retired ltx_av_music) override to False; the
+    #: pure procedural floors (visualizer / abstract) declare False too.
+    #: ``ltx_8gb`` inherits True here, which is what lets a flux2/flux still
+    #: drive a silent LTX i2v clip. Plain attr
     #: (cold-import clean).
     accepts_still = True
 

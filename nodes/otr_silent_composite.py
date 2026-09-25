@@ -1022,7 +1022,8 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
     dec_vf_parts.append("tpad=stop_mode=clone:stop_duration=3600")
     # Fable final gate MF-1: force EXPLICIT bt709 on the yuv->rgb24 decode.
     # Every clip source is bt709-tagged by the V-1 contract (matrix stamps in
-    # eng_wan_ti2v / eng_ltx_av / eng_visualizer). Without this, ffmpeg 8's
+    # every producer, e.g. eng_ltx_8gb / eng_humo / eng_visualizer). Without
+    # this, ffmpeg 8's
     # negotiation still honors the tag correctly here -- but the encoder side
     # (below) is what needed the fix; adding this belt keeps the pair
     # symmetric and removes the version dependency for future ffmpeg builds.

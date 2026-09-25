@@ -77,8 +77,8 @@ class ContractEnvConflict(RuntimeError):
     values, and is caught by nothing.
 
     SCOPE, HONESTLY (2026-07-26). Raised by adapters whose env pin can leave
-    a declared menu (LTX duration, LTX-AV, and historically the retired
-    Pixverse ``word_razzle`` lane). The wider question --
+    a declared menu (LTX duration, and historically the retired LTX-AV and
+    Pixverse ``word_razzle`` lanes). The wider question --
     whether an env var may lower a declared CEILING at all -- is deliberately
     NOT answered here: several of those vars are documented operator knobs for
     VRAM-constrained boxes (the WAN 8GB launch contract depends on one), so

@@ -153,8 +153,9 @@ class VisualizerEngine:
                 "viz_green needs ffmpeg on PATH (or set OTR_FFMPEG)", kind="video")
         # NOTE: audio_ref is NOT gated here. The per-beat audio is SLICED at
         # render time, so the assert_usable request_template carries an empty
-        # audio_ref for music/announcer beats (mirrors eng_ltx_av, which also
-        # audio-conditions but does not gate audio_ref pre-render). render_clip is
+        # audio_ref for music/announcer beats (mirrors the retired eng_ltx_av
+        # lane, which also audio-conditioned but did not gate audio_ref
+        # pre-render). render_clip is
         # the LOUD audio gate -- a beat that truly has no audio fails the episode
         # there (no fallbacks). (Fixed after the 2026-06-18 visualizer soak: the
         # old check aborted shot_b000_music_open before render.)

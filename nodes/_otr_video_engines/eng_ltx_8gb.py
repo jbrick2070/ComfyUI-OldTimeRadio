@@ -2,7 +2,7 @@
 
 The 8GB-tier LTX sibling. It animates a still into motion on the OFFICIAL LTX-Video
 **0.9.8 distilled 2B** all-in-one checkpoint (`ltxv-2b-0.9.8-distilled.safetensors`),
-NOT the LTX-2.3 22B stack (`eng_ltx_video` / `eng_ltx_av`) and NOT the forbidden
+NOT the retired LTX-2.3 22B stack and NOT the forbidden
 original `ltx-video-2b-v0.9.safetensors`. It is its own adapter/recipe: the 0.9.8
 graph was captured from a LIVE `/object_info` + a functional in-process smoke on the
 5080 (2026-07-20).
@@ -24,7 +24,7 @@ The graph (discovery-verified):
   VAEDecode / VAEDecodeTiled -> IMAGE
 
 Single-pass, NO upscaler (the 8GB routes stay single-pass; the internal x2 latent
-upscaler is the 16GB ltx_video route only). SILENT output (V-1); OTR master audio is
+upscaler was the retired 16GB LTX 2.3 route only). SILENT output (V-1); OTR master audio is
 muxed later by OTR_MasterAudioMux. Length is LTX's 8n+1 rule (min 9): an ask off
 that grid renders the next legal rung UP and the surplus is TRIMMED in real
 frames, so every frame delivered is a rendered frame in order. An ask this
@@ -103,15 +103,16 @@ _LOG = logging.getLogger("OTR.video.ltx_8gb")
 # RESEARCH doc (2026-08-17-per-engine-prompt-style-guide-RESEARCH.md, in the docs
 # dir -- named WITHOUT a path prefix because `tools/engine_matrix.py` scrapes
 # engine sources for cap-evidence citations and a phrasing doc is not frame
-# evidence) treats "ltx_video / ltx_8gb" as ONE block, and the shared facts are the
-# ones the directive is actually built from: same family, same cfg-1.0 distilled
+# evidence) treated the retired ltx_video lane and ltx_8gb as ONE block, and the
+# shared facts are the ones the directive is actually built from: same family, same cfg-1.0 distilled
 # default (so the negative is inert on both), same i2v-anchor doctrine (the still
 # carries the LOOK, the prompt moves), same tight char budget.
 #
 # THE ENCODERS ARE NOT THE SAME, and an earlier version of this comment said they
 # were -- a Sonnet QA pass caught it. This tier's 0.9.8 checkpoint carries no text
-# encoder and borrows the shared T5-XXL (`_LTX8_DEFAULT_T5`); `eng_ltx_video` runs
-# GEMMA-3 through `LTXAVTextEncoderLoader`. Two different encoder architectures.
+# encoder and borrows the shared T5-XXL (`_LTX8_DEFAULT_T5`); the retired
+# `eng_ltx_video` ran GEMMA-3 through `LTXAVTextEncoderLoader`. Two different
+# encoder architectures.
 # It does not change the shared directive, because not one clause of it is
 # encoder-specific -- it is all i2v doctrine, cfg and budget. But it IS the
 # condition for splitting: the moment a clause turns encoder-specific (anything of
@@ -177,9 +178,10 @@ PREQUALIFICATION_ENV = "OTR_LTX_8GB_PREQUALIFICATION"
 #: See ``recipe_receipt`` -- a sweep's artifacts must be distinguishable from
 #: production's in the durable ledger, because they are not the same recipe.
 #:
-#: SOURCED, not spelled (LANE 2): the same mark is stamped by the WAN adapters
-#: through their own lane, and two literals with one value is how a ledger grows
-#: two dialects. ``recipe_departures`` owns the format for every adapter.
+#: SOURCED, not spelled (LANE 2): any other adapter sharing this mechanism
+#: stamps the same mark through its own lane, and two literals with one value
+#: is how a ledger grows two dialects. ``recipe_departures`` owns the format
+#: for every adapter.
 PREQUALIFICATION_RECIPE_SUFFIX = _RD.PREQUALIFICATION_SUFFIX
 
 #: THE FROZEN ltx_8gb RECIPE, v1 (B6, 2026-07-27).
@@ -577,7 +579,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     )
     # LTX-Video 0.9.x Open Weights License (Lightricks; HF license:other) -- commercial
     # use permitted below the revenue threshold (same revenue-capped community model
-    # already treated as clean elsewhere; same LTX family as ltx_video/ltx_av).
+    # already treated as clean elsewhere; same LTX family as the retired 22B lanes).
     # NOTE: commercial_clean is NOT a selection gate -- it drives only the release-gate
     # non-blocking warning + the release filename tag. Operator confirms at license review.
     commercial_clean = True
@@ -669,13 +671,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         the shipped configuration sets it. It refuses loudly and points at
         ``extra_model_paths.yaml``, which is the channel that does reach the
         loader and is already live on this box. If the tripwire never fires,
-        delete the variable and this branch.
-
-        SCOPED TO THIS ADAPTER on purpose. ``eng_wan_ti2v`` / ``eng_wan_i2v``
-        carry the same lie (their loaders also take bare tokens), but their test
-        suites use ``*_DIR`` as the mock seam for a no-ComfyUI box
-        (``tests/test_wan_loader_preflight.py`` says so in its own docstring), so
-        fixing them means migrating those fixtures first. Separate chunk."""
+        delete the variable and this branch."""
         by_token = self._resolve_model_file(categories, token, env_dir)
         # A ``*_DIR`` override wins in _resolve_model_file on EXISTENCE ALONE and
         # never consults folder_paths -- but the graph hands the loader the bare
@@ -1606,10 +1602,11 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "recipe": raw.get("recipe"),
             # The extension receipts (2026-08-06). This is the SECOND producer
             # seam: a field the engine returns and this method drops is a field
-            # the grader never sees, and this adapter does NOT share the WAN
-            # pair's ``wan_shared._clip_from_raw`` passthrough -- it has its own,
-            # right here, which is exactly why the receipt went missing on this
-            # lane and nowhere else.
+            # the grader never sees, and this adapter does NOT share
+            # ``wan_shared``'s ``_clip_from_raw`` passthrough (unlike
+            # ``eng_minimax_h3``) -- it has its own, right here, which is
+            # exactly why the receipt went missing on this lane and nowhere
+            # else.
             "native_frame_count": raw.get("native_frame_count"),
             "extension_mode": raw.get("extension_mode"),
             "render_canvas": raw.get("render_canvas"),

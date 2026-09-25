@@ -3,8 +3,9 @@
 HuMo is OTR's heaviest engine: an audio-conditioned image-to-video model that
 animates a reference PORTRAIT (init_image) in sync with a speech AUDIO reference
 into a talking-character clip. It is the ``audio_driven_face`` family -- the
-talking-head path for the announcer + character roles. Like ltx_video / wan_i2v
-it runs IN-PROCESS in the main ComfyUI cu130 venv (it loads
+talking-head path for the announcer + character roles. Like the other in-process
+motion engines (e.g. ``ltx_8gb``) it runs IN-PROCESS in the main ComfyUI cu130
+venv (it loads
 MODEL+CLIP+VAE+AUDIO_ENCODER internally via ``comfy.model_management``) and is the
 SINGLE resident heavy engine while it holds the AS-3 lease. Native output is
 480x832 @ 25 fps; a portrait init is fit to the canvas with ONE uniform scale,
@@ -471,7 +472,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         (verify-at-build). Imports nothing heavy -- runs at
         lock/validate time on the CPU box. HuMo loads in-process; its
         SageAttention tolerance is a GPU-smoke verify item, NOT a hard CPU gate
-        (unlike ltx_video's BUG-070 int8-PV abort)."""
+        (unlike ltx_8gb's BUG-070 int8-PV abort)."""
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
@@ -531,7 +532,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         or rebuilt weight, which is the drift being guarded against.
 
         Its own four lines ON PURPOSE. ``wan_shared`` says the same thing for
-        the WAN lanes and ``eng_ltx_8gb`` for its own, and that file's docstring
+        its own callers and ``eng_ltx_8gb`` for its own, and that file's docstring
         records why: reaching across lanes for a four-line stat is the coupling
         this build keeps paying for. The MECHANISM is a convention; the DATA is
         per adapter.
@@ -599,10 +600,11 @@ class HuMoEngine(_MC.MotionEngineBase):
     def _session_node_ids(self):
         """The graph ids ``prepare`` hoists: every pure file-to-handle LOADER.
 
-        WIDER THAN THE WAN LANES, and the difference is a real property of this
-        family rather than a preference. WAN renders with ``free_after_use=True``
-        precisely so umt5 and the diffusion UNET are never co-resident, so
-        hoisting its CLIP would delete that mitigation. HuMo renders FULLY
+        WIDER THAN THE PEER LANES, and the difference is a real property of this
+        family rather than a preference. Those lanes render with
+        ``free_after_use=True`` precisely so their text encoder and the
+        diffusion UNET are never co-resident, so hoisting their CLIP would
+        delete that mitigation. HuMo renders FULLY
         RESIDENT by contract (BUG-265: forcing inter-node eviction fragmented
         the allocator into an OOM), so every loader is resident for the whole
         render anyway -- hoisting them changes how many times they are READ,
@@ -647,7 +649,7 @@ class HuMoEngine(_MC.MotionEngineBase):
     def prepare(self, host_caps, profile, session_ctx):
         """Load every heavy handle ONCE PER BEAT instead of once per segment.
 
-        The ``eng_wan_i2v`` sequence, followed deliberately: ``super().prepare()``
+        The established prepare sequence, followed deliberately: ``super().prepare()``
         takes the cross-process GPU lease and resolves classes, a LOADER-ONLY
         mini-graph runs with ``on_result`` registering each patcher as it lands
         (if a later node raised, ``run_graph`` never returns a results dict and
@@ -1002,7 +1004,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         # checkable: the 49-frame landscape cap asserts ~15.9 GB citing a
         # bakeoff receipt that is not in this repo, and nothing this engine
         # ever ran could confirm or refute it. Every other
-        # heavy engine reports its render-window peak, and `ltx_audio_in`'s 79
+        # heavy engine reports its render-window peak, and a sibling lane's 79
         # logged samples are what finally settled ITS frame question -- from
         # data already on disk. Telemetry only, no enforcement (the admission
         # boundary in ``render_driver`` owns refusal), and the log line matches
@@ -1150,7 +1152,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         Carries the TIER (the four HuMo engines are different weights and
         different ceilings) and whether the distill LoRA was in the graph,
         because those two facts are what a reader needs to know whether two
-        clips are comparable. Versioned in the string, like the WAN lanes: bump
+        clips are comparable. Versioned in the string, like ``ltx_8gb``: bump
         the version when the graph changes, never edit a shipped one.
 
         RECEIPTS READ ``_lora_is_skipped``, NOT RAW TRUTHINESS (retro review

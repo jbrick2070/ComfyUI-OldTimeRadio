@@ -1,6 +1,6 @@
 """Shared ComfyUI wrapper-node bridge for the in-process video motion engines.
 
-The in-process motion engines (humo / ltx_video / wan_i2v) render by driving the
+The in-process motion engines (humo / ltx_8gb / ltx25) render by driving the
 installed ComfyUI wrapper NODE CLASSES directly (no GraphBuilder, no HTTP server,
 V invariant): resolve the node class out of ComfyUI's ``NODE_CLASS_MAPPINGS``,
 execute a small DECLARATIVE node graph in dependency order, pull the decoded

@@ -111,8 +111,7 @@ class CoveragePlan:
         path. Routed by segment count alone, such a beat rendered its extra
         frames and kept every one of them, so the clip outran its own audio.
 
-        Not an exotic case. `ltx_audio_in` at a 442-frame beat renders 449 and
-        owes a 7-frame trim; `humo` at 100 renders 101 and owes 1. Any beat
+        Not an exotic case. `humo` at 100 renders 101 and owes 1. Any beat
         whose audio-derived length misses the engine's ladder is affected, which
         is most of them.
 
@@ -171,9 +170,10 @@ def join_mode_for(contract: FrameContract, target_visible_frames: int) -> str:
 
     The half-measure was worse than either end state, and a QA panel proved it
     on real code: once engines declared real ceilings while the opt-in stayed
-    shut, an ordinary 8-second beat on wan_i2v (max 177 frames) had no legal
-    single render AND no multi-clip escape, so ``partition_beat`` refused and
-    took the whole episode's plan-build down with it. Declaring a ceiling
+    shut, an ordinary 8-second beat on a lane with a low frame ceiling
+    (max 177 frames) had no legal single render AND no multi-clip escape, so
+    ``partition_beat`` refused and took the whole episode's plan-build down
+    with it. Declaring a ceiling
     without granting the second clip removes the fallback and withholds the
     replacement. The two belong in one change.
     """

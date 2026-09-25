@@ -589,7 +589,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
 
     #: THE PEER-LANE SEAM (2026-08-22). CLASS attributes, not module constants
     #: read from inside methods, and the distinction is the whole point:
-    #: `eng_fastwan_8gb` records that a parent reading module-level constants
+    #: A prior sibling lane recorded that a parent reading module-level constants
     #: means "a subclass declaring its own recipe would have SILENTLY rendered
     #: with the parent's and stamped its own receipt on the result". A peer lane
     #: on a different motion module must actually LOAD that module, and its

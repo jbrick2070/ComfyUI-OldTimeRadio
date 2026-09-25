@@ -268,9 +268,9 @@ DELIVERABLE_EXTENSION_MODES = ("none",)
 #: THE PRODUCER CONTRACT THIS RECEIPT ASSUMES, stated here because it is
 #: load-bearing and a count alone cannot reveal its violation: **manufactured
 #: frames are APPENDED AT THE TAIL**, so a segment's real frames are the prefix
-#: ``[0, native_frame_count)``. Every shipped producer honours it -- WAN pads at
-#: the tail and now refuses to pad a coverage-planned segment at all, and
-#: ``ltx_8gb`` delivers only rendered frames in order. An engine that padded at
+#: ``[0, native_frame_count)``. Every shipped producer honours it -- a padding
+#: lane pads at the tail and refuses to pad a coverage-planned segment at all,
+#: and ``ltx_8gb`` delivers only rendered frames in order. An engine that padded at
 #: the HEAD would satisfy this arithmetic while lying, because the frames the
 #: seam drops would be counted as the manufactured ones. Any new engine that
 #: extends a clip must extend it at the end, or must not stamp these fields.
@@ -564,7 +564,7 @@ def grade_multiclip_honesty(ledger, manifest):
     ``frame_count`` cannot answer this: a ping-pong-extended clip carries
     exactly the number a real one does, which is what makes the pad forgeable.
     ``extension_mode`` and the native counts are the receipts WIRE-W3b put on
-    every WAN clip for precisely this check.
+    every motion-engine clip for precisely this check.
 
     SILENCE IS NOT A PASS. A multi-clip beat whose row carries NO extension
     receipt at all is reported too -- an engine that never declares how its
@@ -576,7 +576,7 @@ def grade_multiclip_honesty(ledger, manifest):
     numbers were produced at different SCOPES -- the first for one SEGMENT, the
     second for the whole assembled BEAT, because ``render_beat_coverage`` built
     the beat clip by copying its LAST segment and overwriting only four keys.
-    So an honest ``wan_ti2v`` beat of three real 81-frame renders was graded
+    So an honest beat of three real 81-frame renders was graded
     "241 delivered, of which only 81 were rendered", and **the rule fired on
     exactly the beats that proved it was satisfied.**
 

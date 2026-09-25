@@ -1,11 +1,13 @@
-"""Shared PURE helpers for the two in-process Wan motion engines.
+"""Shared PURE helpers, originally factored for the two in-process Wan motion
+engines and now reused by every in-process motion adapter that needs the same
+mechanics.
 
 ``wan_i2v`` (14B I2V; ``WanImageToVideo`` graph) and ``wan_ti2v`` (5B TI2V;
-``Wan22ImageToVideoLatent`` graph) share the SAME image/aspect/dims/clip-contract
-mechanics but have DIFFERENT loaders, node candidates and graphs. Per GO_FORWARD
-section 4A ("share only pure dims/aspect/materialize/canonicalize helpers; keep
-loaders + node candidates + graph SEPARATE") this module factors ONLY the pure
-helpers, via:
+``Wan22ImageToVideoLatent`` graph) -- both since retired -- shared the SAME
+image/aspect/dims/clip-contract mechanics but had DIFFERENT loaders, node
+candidates and graphs. Per GO_FORWARD section 4A ("share only pure
+dims/aspect/materialize/canonicalize helpers; keep loaders + node candidates +
+graph SEPARATE") this module factors ONLY the pure helpers, via:
 
 * the module-level M7 silent-clip-contract functions (``_parse_fps`` /
   ``ffprobe_clip_fields`` / ``validate_silent_clip_contract``) -- engine-agnostic
@@ -69,8 +71,8 @@ def configured_models_root():
 # --------------------------------------------------------------------------- #
 # M7 silent-clip contract proof (GO_FORWARD 4A) -- ffprobe the emitted mp4 and
 # PROVE the color/stream contract before the mux trusts the self-declared dict.
-# Module-level + engine-agnostic; both Wan engines (and any future probe) reuse
-# the SAME proof. Re-exported from eng_wan_i2v for back-compatible test imports.
+# Module-level + engine-agnostic; every adapter that renders a silent clip
+# reuses the SAME proof.
 # --------------------------------------------------------------------------- #
 def _parse_fps(rate):
     """An ffprobe ``num/den`` frame-rate string -> rounded int fps (0 if
@@ -78,8 +80,7 @@ def _parse_fps(rate):
 
     THE RULE MOVED, THE NAME DID NOT. This repo had grown the same rational
     parse in at least three places and fixed it three times; it now lives once,
-    at the shared ffprobe boundary. The name stays here because ``eng_wan_i2v``
-    re-exports it and the clip-contract tests import it through that door.
+    at the shared ffprobe boundary. The clip-contract tests pin it here by name.
     """
     from .._otr_shared.ffprobe import parse_fps_int
     return parse_fps_int(rate)
@@ -634,7 +635,7 @@ class WanInitImageMixin:
             # consumers as vram_peak_mb: it rides the manifest row into
             # stamp_durable(meta.render_engines), which is how a published
             # episode can be asked which render recipe produced it. Threaded
-            # HERE rather than copied into each WAN adapter because a passthrough
+            # HERE rather than copied into each adapter because a passthrough
             # written twice is a passthrough that drifts once. None for a raw
             # that did not carry it -- every consumer already uses clip.get().
             "recipe": raw.get("recipe"),

@@ -382,8 +382,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     #: flag drives the release-gate warning and the release filename tag, never
     #: selection (the H3 precedent). No license attestation exists on this box
     #: for the LTX 2.5 Distilled weights the way the H3 attestation file does
-    #: for H3, and the sibling LTX 2.3 lanes' ``True`` is about the LTX-2
-    #: Community model, which is a different release. Claiming clean on
+    #: for H3. Claiming clean on
     #: inheritance is exactly the kind of assumption a release gate exists to
     #: catch, so it warns until the operator confirms at license review.
     #:
@@ -956,9 +955,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         after ``prepare()``, and before every segment, so it may only describe
         things that do not change across the load. Every per-segment value --
         prompt, seed, frame count, canvas, the still -- is deliberately absent.
-        There is no recipe token to carry either, unlike the LTX 2.3 lanes:
-        this lane has exactly one locked recipe, so the weights ARE the
-        identity.
+        There is no recipe token to carry either, unlike lanes with more than
+        one recipe: this lane has exactly one locked recipe, so the weights
+        ARE the identity.
 
         Not cached, by design. The entire job is to notice a weight that MOVED,
         so the receipts are re-stat'ed on every ask -- a stat per weight, never

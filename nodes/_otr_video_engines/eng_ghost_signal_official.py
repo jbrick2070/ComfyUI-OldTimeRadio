@@ -123,7 +123,7 @@ ADAPTER_V3_MIN_BYTES = 95_000_000
 #: below stays the sweep knob, and the receipt stamps whatever ran.
 ADAPTER_V3_STRENGTH = 0.5
 
-#: The sweep knob, following the eng_fastwan_8gb recipe-override pattern.
+#: The sweep knob, following the established recipe-override pattern.
 ADAPTER_V3_STRENGTH_ENV = "OTR_GHOST_HAUNTED_LORA_STRENGTH"
 
 

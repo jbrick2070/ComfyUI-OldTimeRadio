@@ -819,7 +819,8 @@ def extract_beats(ledger: dict) -> list:
 #: opening theme plays over the episode head (audio starts at first-line
 #: start_s, typically ~8-10s in) but no ledger LINE covers that span, so the
 #: head fell to the procgen floor. A synthetic music_visual beat gives the
-#: open a REAL rendered scene on the music engine (ltx_video in production).
+#: open a REAL rendered scene on the music engine (the retired ltx_video lane
+#: at the time this was written).
 OPENING_MUSIC_BEAT_ID = "b000_music_open"
 _OPENING_MIN_S = 2.0
 
@@ -2273,10 +2274,13 @@ def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
     ``frame_contract.PLANNING_CAP_ENGINES`` it NARROWS the contract this beat
     is partitioned against -- see :func:`frame_contract.effective_frame_contract`
     for why membership is a per-engine decision with a live proof attached
-    rather than a rollout. (This read "why that allowlist is one engine long
-    and why WAN must stay out of it"; both halves went stale. It is three
-    engines, and ``wan_ti2v`` joined on 2026-08-02 when the no-mirror ruling
-    removed the adapter-side ping-pong that had made its ceiling harmless.)
+    rather than a rollout. (This note has already gone stale twice: it once
+    read "why that allowlist is one engine long and why WAN must stay out of
+    it", then "it is three engines" once the retired ``wan_ti2v`` joined on
+    2026-08-02 when the no-mirror ruling removed the adapter-side ping-pong
+    that had made its ceiling harmless. ``wan_ti2v`` is gone with the rest of
+    the Wan lanes; :data:`frame_contract.PLANNING_CAP_ENGINES` is the live
+    membership, not this prose.)
     A default of 0 was proposed and rejected: it would let a caller that forgot
     the ceiling plan silently unpinned, which is the exact silent-fallback
     shape this build exists to remove. There is one caller; it passes the
@@ -3120,8 +3124,8 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
     #: same ``policy`` object ``lock()`` stamps onto the ledger, and handed to
     #: every ``_stamp_coverage_plan`` call. For the engines in
     #: ``frame_contract.PLANNING_CAP_ENGINES`` it narrows what the partitioner
-    #: may emit; for every other engine -- WAN above all -- it is inert here and
-    #: stays an adapter-side native cap, which is what keeps the 8GB WAN tier's
+    #: may emit; for every other engine it is inert here and stays an
+    #: adapter-side native cap, which is what kept the retired 8GB WAN tier's
     #: 17-frame contract from becoming 17-frame BEATS.
     max_render_frames = _planning_ceiling(policy)
     def engine_for(role):

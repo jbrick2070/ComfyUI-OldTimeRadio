@@ -58,8 +58,8 @@ LTX25_UPSCALER_MODEL = (
 #: the joint AV tensor the sampler consumes. So a silent lane still loads the
 #: audio VAE and still computes the audio side through all 8 steps -- it only
 #: skips ``LTXVAudioVAEDecode`` (node 34) at the end. This is exactly what
-#: ``eng_ltx_av.py`` already does, and it means "we discard the audio" never
-#: meant "we avoid paying for it".
+#: the retired ``eng_ltx_av`` lane already did, and it means "we discard the
+#: audio" never meant "we avoid paying for it".
 LTX25_AUDIO_VAE_REQUIRED_EVEN_WHEN_SILENT = True
 
 # ---------------------------------------------------------------------------
@@ -148,8 +148,8 @@ LTX25_NEGATIVE_PROMPT = ""
 # ---------------------------------------------------------------------------
 
 #: ``VAEDecodeTiled`` (golden JSON node 33), verbatim. These live HERE rather
-#: than as literals in the adapter for one specific reason: the sibling
-#: ``eng_ltx_av`` decodes through an ENV-DRIVEN helper whose default is
+#: than as literals in the adapter for one specific reason: the retired
+#: sibling ``eng_ltx_av`` decoded through an ENV-DRIVEN helper whose default was
 #: **4096 / 8** -- whole-clip, no temporal tiling -- and its comment praises
 #: that default for having no inter-tile seam. Copying that helper into this
 #: lane, which is the natural thing to do when modelling one adapter on
@@ -275,16 +275,17 @@ LTX25_TWO_STAGE_RECIPE_ID = "ltx_2_5_two_stage"
 #: JSON is authoritative -- it is the file that ran. Same effect (frame 0 is
 #: pinned to the still), different node.
 #:
-#: THE NODE IS ALREADY KNOWN HERE, WHICH IS THE DE-RISK: ``eng_ltx_av.py:822``
-#: and ``eng_ltx_video.py:1233`` both wire ``LTXVImgToVideoInplace`` already.
+#: THE NODE IS ALREADY KNOWN HERE, WHICH IS THE DE-RISK: the retired
+#: ``eng_ltx_av`` and ``eng_ltx_video`` lanes both wired ``LTXVImgToVideoInplace``
+#: already.
 #:
-#: BUT AT A DIFFERENT STRENGTH, AND THAT IS THE ONE THING TO WATCH. The audio
-#: lane deliberately uses **0.7, a SOFT anchor** (`eng_ltx_av.py:972`: "a SOFT
+#: BUT AT A DIFFERENT STRENGTH, AND THAT IS THE ONE THING TO WATCH. The retired
+#: audio lane deliberately used **0.7, a SOFT anchor** ("a SOFT
 #: anchor so the audio can..."), and this file's own note at `:423` records why
 #: -- "strength 1.0 hard-pins the still". So 1.0 here is a HARDER anchor than
-#: the sibling lane uses. It holds identity firmly at frame 0 and leaves frames
+#: that sibling lane used. It holds identity firmly at frame 0 and leaves frames
 #: 1..96 free, which is a different trade from a soft anchor applied across the
-#: clip (`eng_ltx_video.py`'s "i2v-anchor doctrine").
+#: clip (the retired ``eng_ltx_video``'s "i2v-anchor doctrine").
 #:
 #: **CORRECTED 2026-08-19: 1.0 IS THE NODE'S UNTOUCHED DEFAULT, NOT A
 #: MEASUREMENT.** This note previously said "adopted as the lab measured it",

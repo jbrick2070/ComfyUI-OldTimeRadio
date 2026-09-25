@@ -12,13 +12,14 @@ THE FIX. Name the DEPARTURES from the frozen recipe:
 A cell that changed nothing still reads ``+prequalification``, so the marking
 contract B6 established is unchanged.
 
-WHY THIS MODULE EXISTS AT ALL. Three adapters now carry the freeze mechanism
-(``ltx_8gb``, ``wan_ti2v``, ``wan_i2v``) across two lanes that must NOT import
-each other -- ``eng_ltx_8gb`` reaching into ``wan_recipe`` would be exactly the
-cross-lane coupling this build keeps paying for. But the suffix is read by ONE
-consumer chain, so its FORMAT must be one implementation or the ledger grows
-two dialects. This module is that implementation and nothing else: pure
-functions over plain data, no engine imports, no environment reads.
+WHY THIS MODULE EXISTS AT ALL. The freeze mechanism was shared across several
+adapters on lanes that must NOT import each other -- one adapter reaching into
+another lane's own recipe module would be exactly the cross-lane coupling this
+build keeps paying for. ``ltx_8gb`` is the current carrier. The suffix is read
+by ONE consumer chain regardless of how many adapters use it, so its FORMAT
+must be one implementation or the ledger grows two dialects. This module is
+that implementation and nothing else: pure functions over plain data, no
+engine imports, no environment reads.
 
 WHAT IT DELIBERATELY DOES NOT DO. It does not truncate the departure list. A
 cap would silently destroy the distinguishability the whole chunk exists for,

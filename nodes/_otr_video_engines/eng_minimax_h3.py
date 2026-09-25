@@ -126,8 +126,8 @@ inert one, none at all. Frame counts sit on the installed node's own grid
 canvas, and the node's ``length`` tooltip declares a trained band of ~124-362.
 
 "NO NEGATIVE PROMPT AT ALL" IS A DIFFERENT FACT FROM "THE NEGATIVE IS INERT", and
-this is the one engine where the distinction matters. On ``flux_gen1``,
-``ltx_video``, ``ltx_av`` and ``fastwan_8gb`` a negative is accepted and then not
+this is the one engine where the distinction matters. On ``flux_gen1`` and
+``ltx_8gb`` a negative is accepted and then not
 consulted, because cfg 1.0 has no unconditional branch to evaluate it against;
 here there is no input field to populate in the first place. For a writer the
 practical instruction is identical, which is why the directive's remaining clauses
@@ -695,8 +695,7 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     @staticmethod
     def _ref_path(ref):
         """A filesystem path out of an ``audio_ref`` that may be a bare string
-        OR a mapping carrying a ``path`` key (the AudioRef shape). Same helper
-        shape ``eng_ltx_av`` uses for the same field."""
+        OR a mapping carrying a ``path`` key (the AudioRef shape)."""
         if not ref:
             return ""
         if isinstance(ref, str):
@@ -709,7 +708,8 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         """The shared Wan-style request PLUS ``audio_path``.
 
         ``WanInitImageMixin._build_render_request`` has no audio field -- the
-        WAN lanes have no audio input -- so the audio-in lane would silently see
+        original silent Wan lanes it was built for had no audio input -- so the
+        audio-in lane would silently see
         ``None`` and refuse every beat. Added on the BASE rather than only on
         lane 20 so the two lanes' plans have one shape, and it is inert for lane
         19 (a request with no ``audio_ref`` yields "").

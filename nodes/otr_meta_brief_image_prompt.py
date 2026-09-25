@@ -284,14 +284,14 @@ _RADIO_OBJECT_ANCHOR_WIDE = "%s, %s" % (RADIO_OBJECT_GEOMETRY_WIDE,
                                         RADIO_OBJECT_LOOK_DEFAULT)
 #: LTX-ONLY mouth-forward radio face (talking-radio kibitz r1, 2026-07-01).
 #: style="ltx_radio_mouth" is used ONLY by the ltx talking radio-face still mint
-#: (the init stills the EXISTING ltx_audio_in bookend engine receives -- no new
+#: (the init stills the EXISTING audio-in bookend engine receives -- no new
 #: video model / path). NEVER used by the HuMo hosts: the console_face look
 #: above stays byte-unchanged (a mouth-tuned change
 #: could hurt HuMo face-readability -- the Codex MUST-FIX #4 split). LTX-2.3
 #: has no face/landmark detector; it drives whatever READS as a mouth, so the
 #: subject puts a PROMINENT rubbery grille-mouth right after the form noun
 #: (FLUX weights earlier tokens). Sub-plan C probes whether this actually
-#: lip-syncs; until then ltx_audio_in stays documented as AMBIENT motion.
+#: lip-syncs; until then the audio-in lane stays documented as AMBIENT motion.
 #: MATERIAL-ANCHORED (live catch 2026-07-02, probe B): the image dispatcher
 #: leans on the POSITIVE prompt for facelessness, so
 #: the object-row "no human" negative is inert on the still engines -- the
@@ -351,7 +351,7 @@ def radio_host_negative(style: str = "console_face") -> str:
 RADIO_HOST_PORTRAIT_ID = "radio_host_portrait"
 
 #: Toggle: default OFF = byte-identical (no radio-host FACE object minted; the
-#: bookends keep today's ltx_audio_in animated-console behavior).
+#: bookends keep today's audio-in animated-console behavior).
 def _humo_hosts_enabled() -> bool:
     """True iff OTR_ENABLE_HUMO_HOSTS is opted ON (default OFF)."""
     return otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
@@ -450,7 +450,7 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
         #
         # RULED EXEMPT, NOT A DEFECT (operator, 2026-09-12). The open question
         # was whether this early return contradicts a tail policy the
-        # `ltx_audio_in` bookend declares, and whether the fix was a third
+        # audio-in bookend declares, and whether the fix was a third
         # policy token. His ruling is EXEMPT: this path is allowed to skip the
         # tail, and no token is added.
         #
@@ -614,7 +614,7 @@ def _effective_talking_roles(talking_roles, video_models):
     ``policy["talking"]`` is correct for a fresh, unforced graph. This helper
     upgrades it when a render-time force-map or radio-is-host redirect means the
     final engine is a talking engine, which is the missing-radio-face failure
-    mode for ltx_audio_in announcer bookends."""
+    mode for the audio-in announcer bookends (``ltx25_native_audio_in_16gb``)."""
     out = {str(k): bool(v) for k, v in (talking_roles or {}).items()}
     try:
         try:
@@ -2162,7 +2162,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             # static/i2v engine, or a force-map to a static engine) it is the
             # FACELESS radio_object. The env flag stays a conjunct because it
             # gates whether HuMo survives to the announcer at render (else
-            # _enforce_radio_is_host redirects it to ltx_audio_in). The chosen
+            # _enforce_radio_is_host redirects it to ltx25_native_audio_in_16gb).
+            # The chosen
             # style is STAMPED (radio_host_style) so the cross-node render guard
             # can fail CLOSED on a stale ledger (BUG-LOCAL-129 face-only failure).
             _humo_face = (_humo_hosts_enabled()
