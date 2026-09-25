@@ -238,6 +238,14 @@ Director (node 87) `announcer_video_model`, `music_video_model`,
 (node 80) `char_voice_engine`, `announcer_voice_engine`; Theme Music
 (node 83) `engine`, and `music_style` for My Story; Silent Composite
 (node 84) `upscale_engine` (operator: "upscaler").
+LAYOUT, top to bottom (operator 2026-09-25): the story choice first --
+`source_bank`, `source_ref`, `visual_style`; then the shape --
+`act_count`, `num_characters`, `creativity` (operator: "maybe creativity
+level"), `episode_language`, `lemmy_cameo`, `asset_cleanup`; then every
+model picker; and AT THE BOTTOM the My Story fields, which only the My
+Story bank reads -- `episode_title`, `custom_premise`, `story_characters`,
+`story_plot`, `story_setting`, `story_author`, and Theme Music's
+`music_style`.
 THE RULE (operator: "basically almost everything in our variant matrix"):
 the app shows the matrix's USER-CHOICE deltas -- `features.act_count`,
 `features.num_characters`, the `llm.*_model` and cloud slot picks,
