@@ -20,8 +20,11 @@ ComfyUI is on port 8000. A 1-act chain
 (prompt `ea876b5c`) was still rendering; AnimateDiff is next. Do not kill
 python, do not interrupt the queue, and do not reboot the server. Receipts
 are the 2026-09-25 RENDER entry in the handoff log; the morning review is
-Part A of [TEST_WAVE](TEST_WAVE.md). Uncommitted files in the tree are a
-partial red-test patch: do not commit them with other work.
+Part A of [TEST_WAVE](TEST_WAVE.md). The red-test patch that sat uncommitted
+in this tree landed as `004d07ac` (07:52); the tree was clean after it, and the
+operator's rule from that morning is that it stays clean: no unpushed patches.
+With it, `test_g4_admission_honesty` is green; `test_g2_canvas_truth` is the
+one inherited red left for Part A.
 
 ## Operating order (hard)
 
