@@ -36,6 +36,10 @@ def _req(**over):
 
 
 def _mp4_fixture(tmp_path) -> pathlib.Path:
+    """5s so canonicalize_video has enough source to reach _req()'s
+    timing.target_frame_count=125 (5s @ 25fps) within
+    VIDEO_FRAME_SHORTFALL_SLACK -- a shorter fixture undershoots the plan
+    and canonicalize_video refuses rather than paper over the gap."""
     out = tmp_path / "provider.mp4"
     subprocess.run(
         [
@@ -46,11 +50,11 @@ def _mp4_fixture(tmp_path) -> pathlib.Path:
             "-f",
             "lavfi",
             "-i",
-            "testsrc=size=128x72:rate=12:duration=1",
+            "testsrc=size=128x72:rate=12:duration=5",
             "-f",
             "lavfi",
             "-i",
-            "sine=frequency=330:duration=1",
+            "sine=frequency=330:duration=5",
             "-c:v",
             "libx264",
             "-pix_fmt",

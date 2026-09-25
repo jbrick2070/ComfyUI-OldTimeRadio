@@ -9,12 +9,13 @@ from tests._support.writer_slots import value, widget_names
 REPO = Path(__file__).resolve().parents[1]
 
 #: The writer's saved control count, measured against the canonical graph on
-#: 2026-09-13 after ``perfect_run_spacesaver`` was removed. This is a COUNT, not
-#: a position -- it is the one number in this module that is allowed to be a
+#: 2026-09-24 after two writer controls were removed with their backend
+#: (see e5ff488b). This is a COUNT, not a
+#: position -- it is the one number in this module that is allowed to be a
 #: literal, and it changes only when a control is genuinely added or dropped.
-#: Every VALUE below is found by widget NAME, so nothing here needs renumbering
-#: when the writer's controls are reordered.
-WRITER_WIDGET_COUNT = 36
+#: Every VALUE below is found by widget NAME, so nothing here needs
+#: renumbering when the writer's controls are reordered.
+WRITER_WIDGET_COUNT = 35
 
 
 def load_graph(path):
@@ -55,14 +56,18 @@ class OneActTemplateTests(unittest.TestCase):
         creative = value(writer, "creative_writing_model")
         self.assertEqual(value(writer, "technical_model"), creative,
                          "both writer slots must select the same model")
-        # The badge is `(<download> GB[, <tags>])` since 2026-09-09 -- the size
-        # is the DOWNLOAD, and machine-fit tags may follow it (`mac16`,
-        # `mac16-tight`, `nv8`, `gated`, ...). This pattern used to anchor
-        # immediately after `GB)`, which made it a single-number parser that
-        # rejects every current label; the structural claim it is really making
-        # is "a real COMBO value carrying its size", not "exactly one number".
-        self.assertRegex(creative, r"^\S+/\S+ \(\d+(\.\d+)? GB(, [\w\- ]+)?\)$",
-                         "the size suffix is part of the COMBO value; a bare "
-                         "repo id matches no choice and can resolve to index 0")
+        # The badge is `(<download> GB download[, <tags>])` since 2026-09-09 --
+        # the size is the DOWNLOAD (stated explicitly as such, per
+        # otr_model_catalog._model_choice_suffix), and machine-fit tags may
+        # follow it (`mac16`, `mac16-tight`, `nv8`, `gated`, ...). This pattern
+        # used to anchor immediately after `GB)`, which made it a single-number
+        # parser that rejects every current label; the structural claim it is
+        # really making is "a real COMBO value carrying its size", not "exactly
+        # one number".
+        self.assertRegex(
+            creative,
+            r"^\S+/\S+ \(\d+(\.\d+)? GB( download)?(, [\w\- ]+)?\)$",
+            "the size suffix is part of the COMBO value; a bare "
+            "repo id matches no choice and can resolve to index 0")
         self.assertEqual(len(widget_names(writer)), WRITER_WIDGET_COUNT)
         self.assertEqual(len(writer["widgets_values"]), WRITER_WIDGET_COUNT)

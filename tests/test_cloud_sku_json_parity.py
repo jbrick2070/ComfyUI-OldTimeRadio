@@ -6,15 +6,14 @@ video/writer dropdowns, and validator stamps. This test keeps that contract.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
 from nodes import _otr_workflow_apply as wa
+from nodes._otr_shared import capability_profiles as cp
 
 REPO = Path(__file__).resolve().parents[1]
-PROFILES = REPO / "config" / "profiles"
 
 CHEAP = (
     "otr_cloud_low_1act",
@@ -35,6 +34,12 @@ PROFILE_OK = {
     "role_overrides.announcer_visual",
     "role_overrides.music_visual",
     "role_overrides.character_visual",
+    # The deluxe SKU upgrades its stills engine along with its video engine
+    # (flux_pro vs. luma_photon_flash) -- the same "costume" drift as the
+    # video dropdowns above, just on the image role overrides.
+    "role_overrides.announcer_image",
+    "role_overrides.music_image",
+    "role_overrides.character_image",
 }
 
 WIDGET_OK = {
@@ -45,6 +50,9 @@ WIDGET_OK = {
     "OTR_VideoDirector.announcer_video_model",
     "OTR_VideoDirector.music_video_model",
     "OTR_VideoDirector.character_video_model",
+    "OTR_VideoDirector.announcer_image_model",
+    "OTR_VideoDirector.music_image_model",
+    "OTR_VideoDirector.character_image_model",
     "OTR_WorkflowValidator.profile_id",
     "OTR_WorkflowValidator.master_hash",
     "OTR_WorkflowValidator.workflow_json_path",
@@ -68,7 +76,7 @@ def _flatten(obj, prefix=""):
 
 
 def _load_profile(pid):
-    return json.loads((PROFILES / f"{pid}.json").read_text(encoding="utf-8"))
+    return cp.load_profile(pid)
 
 
 def _profile_diffs(a, b):

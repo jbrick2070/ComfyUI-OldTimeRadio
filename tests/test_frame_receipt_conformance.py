@@ -29,7 +29,10 @@ WHAT EACH ENGINE OWES, and it is not the same for all of them (spec 7.3):
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -42,6 +45,8 @@ from nodes._otr_shared import cloud_media_canonical as _cmc
 from nodes._otr_video_engines import acceptance as acc
 from nodes._otr_video_engines import frame_contract as fc
 from nodes._otr_video_engines import registry as reg
+
+_FFMPEG = shutil.which("ffmpeg")
 
 #: A raw a local adapter's pure builder can shape. It carries the receipts a
 #: real render would have stamped, so a builder that DROPS them on the floor --
@@ -62,6 +67,21 @@ def _stub_asset(tmp_path):
         provider_job_id="job-probe")
 
 
+def _make_av_fixture(tmp_path) -> Path:
+    """A real 2s test clip with a tone, for the one engine that harvests
+    audio out of its own provider file before the picture gets canonicalized
+    (see the ``cloud_ltx25_foley_plus`` branch of ``_clip_for`` below)."""
+    out = tmp_path / "provider_av.mp4"
+    subprocess.run(
+        [_FFMPEG, "-v", "error", "-y",
+         "-f", "lavfi", "-i", "testsrc=size=128x72:rate=25:duration=2",
+         "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+         "-c:v", "libx264", "-pix_fmt", "yuv420p",
+         "-c:a", "aac", "-shortest", str(out)],
+        check=True, capture_output=True, timeout=120)
+    return out
+
+
 def _clip_for(engine, tmp_path, monkeypatch):
     """This engine's delivered clip dict, however it happens to build one.
 
@@ -79,6 +99,17 @@ def _clip_for(engine, tmp_path, monkeypatch):
     reported a video row where production ships a directory -- so the ordering
     here is what makes the "a directory clip owes nothing" exemption honest
     rather than an assumption.
+
+    ``cloud_ltx25_foley_plus`` is a FIFTH shape: it harvests the provider's
+    native audio bed out of the raw file BEFORE calling the parent
+    ``canonicalize`` (docstring: "harvested BEFORE canonicalize_video strips
+    the picture"), so its ``canonicalize`` reads ``raw["path"]`` straight off
+    disk with real ffmpeg rather than going through the
+    ``cloud_media_canonical.canonicalize_video`` seam every other provider
+    lane uses. The generic stub raw (no real media file) 500s here with
+    CORRUPT_OUTPUT, not because the engine forgot its receipt -- it never gets
+    that far -- so this branch hands it a real fixture instead of skipping the
+    engine outright.
     """
     directory = getattr(engine, "_directory_clip", None)
     if callable(directory):
@@ -89,6 +120,19 @@ def _clip_for(engine, tmp_path, monkeypatch):
     floor = getattr(engine, "_floor_clip", None)
     if callable(floor):
         return floor(_REQUEST, "probe.mp4", 25, 50)
+    if getattr(engine, "name", None) == "cloud_ltx25_foley_plus":
+        if not _FFMPEG:
+            pytest.skip("ffmpeg not on PATH; cloud_ltx25_foley_plus "
+                        "harvests real audio and cannot be probed without it")
+        from nodes._otr_video_engines import foley_stems as fs
+        monkeypatch.setattr(fs, "durable_foley_dir", lambda: str(tmp_path))
+        src = _make_av_fixture(tmp_path)
+        raw = {"path": str(src), "content_type": "video/mp4",
+               "duration_s": None, "provider_job_id": "probe",
+               "raw_meta": {}}
+        asset = _stub_asset(tmp_path)
+        monkeypatch.setattr(_cmc, "canonicalize_video", lambda *a, **k: asset)
+        return engine.canonicalize(raw, _REQUEST, {})
     asset = _stub_asset(tmp_path)
     monkeypatch.setattr(_cmc, "canonicalize_video", lambda *a, **k: asset)
     return engine.canonicalize(dict(_RAW), _REQUEST, {})

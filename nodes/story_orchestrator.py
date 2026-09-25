@@ -770,6 +770,8 @@ def _llm_rank_news_candidates(
         _OTRML.raise_if_processing_interrupted()
         log.info("[NewsFetcher] Preparing technical model for NewsCuration; "
                  "download/load precede the 65s generation budget")
+        # LLM slot: technical -- headline ranking uses the technical slot
+        # (see _do_rank_call below for why: structured short-output task).
         cache_entry = _OTRML.request_slot(
             "technical", model_id, policy=policy,
         )
@@ -895,6 +897,8 @@ def _llm_rerank_with_bodies(
         _OTRML.raise_if_processing_interrupted()
         log.info("[NewsFetcher] Preparing technical model for NewsCurationDeep; "
                  "download/load precede the 40s generation budget")
+        # LLM slot: technical -- body-aware rerank uses the technical slot
+        # (see _do_rerank_call below: single-index structured output).
         cache_entry = _OTRML.request_slot(
             "technical", model_id, policy=policy,
         )

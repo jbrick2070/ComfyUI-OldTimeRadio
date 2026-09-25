@@ -53,9 +53,12 @@ def test_resolve_hf_token_is_cross_platform_safe():
 
 
 def test_estimate_curated_returns_catalog_value():
-    # Curated entries skip the network call entirely.
+    # Curated entries skip the network call entirely. DEFAULT_LLM is
+    # Qwen/Qwen3.5-4B (approx_safetensors_gb=8.68 in CURATED_LLM_MODELS) --
+    # this used to be a 24 GB model (Mistral-Nemo-class) before the default
+    # moved to the smaller writer; the pinned value follows the default.
     out = catalog.estimate_model_size_gb(catalog.DEFAULT_LLM)
-    assert out == 24.0
+    assert out == 8.68
 
 
 def test_estimate_uncurated_uses_hf_api_seam():
@@ -280,8 +283,8 @@ def test_auto_download_sends_the_weights_where_it_says_it_will(
 def test_auto_download_disk_space_precheck(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
     monkeypatch.setenv("HF_TOKEN", "fake-token")
-    # Force the free-disk check to report 1 GB free; Mistral-Nemo
-    # needs 24 GB + 5 GB margin -> raise.
+    # Force the free-disk check to report 1 GB free; DEFAULT_LLM
+    # (Qwen/Qwen3.5-4B, 8.68 GB) needs 8.68 GB + 5 GB margin -> raise.
     monkeypatch.setattr(catalog, "_free_disk_bytes_for", lambda _p: 1 * 1024**3)
     snap = MagicMock()
     with pytest.raises(InsufficientDiskSpaceError) as exc:
@@ -292,7 +295,7 @@ def test_auto_download_disk_space_precheck(tmp_path, monkeypatch):
         )
     snap.assert_not_called()
     msg = str(exc.value)
-    assert "24" in msg or "29" in msg  # 24 + 5 margin
+    assert "8.7" in msg or "13.7" in msg  # 8.68 rounded + 5 margin
     assert "1.0" in msg or "1 GB" in msg.lower() or "1." in msg
 
 

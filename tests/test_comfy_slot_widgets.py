@@ -733,14 +733,15 @@ def test_error_snippet_reads_comfy_top_level_message():
 
 
 def test_every_cloud_credits_json_raises_the_run_cap():
-    from pathlib import Path
-    import json
+    # config/profiles/*.json was retired; workflow_matrix.json is the single
+    # source of truth for every shipping workflow now (see
+    # nodes/_otr_shared/capability_profiles.py).
+    from nodes._otr_shared import capability_profiles as cp
 
-    root = Path(__file__).resolve().parents[1] / "config" / "profiles"
-    rows = list(root.glob("otr_cloud*.json"))
-    assert rows, "no cloud profiles"
-    for path in rows:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        env = ((data.get("launch") or {}).get("env") or {})
+    cloud_ids = [pid for pid in cp.matrix_rows() if pid.startswith("otr_cloud")]
+    assert cloud_ids, "no cloud profiles"
+    for pid in cloud_ids:
+        profile = cp.load_profile(pid)
+        env = ((profile.get("launch") or {}).get("env") or {})
         cap = int(env.get("OTR_COMFY_MAX_TOKENS_PER_RUN") or 0)
-        assert cap >= 1_000_000, "%s missing Credits run cap" % path.name
+        assert cap >= 1_000_000, "%s missing Credits run cap" % pid

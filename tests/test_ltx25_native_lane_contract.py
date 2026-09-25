@@ -85,6 +85,30 @@ def test_the_graph_loads_the_lanes_own_weights(cls):
     assert eng._text_encoder_name().endswith(".safetensors")
 
 
+def test_the_24gb_and_blackwell_tiers_declare_the_same_pinned_canvas():
+    """G2.2's per-lane pin, for the four tiers that inherit ``render_canvas``
+    from ``Ltx25VideoEngine`` without overriding it -- 16gb Foley and Mime
+    are pinned by name in tests/test_ltx25_video_lane.py; these four never
+    got the same explicit name+dims pairing, which is what the lane
+    preflight matrix (G2) reads for before trusting the declaration.
+    832x480, 32-legal on both axes: see
+    test_the_declared_canvas_is_832x480_and_32_legal for why (768x432
+    corrupts the tensor, 1024x576 OOMs)."""
+    for name, cls in (
+            ("ltx25_native_foley_24gb", eng_ltx25.Ltx25NativeFoleyWideEngine),
+            ("ltx25_native_foley_blackwell",
+             eng_ltx25.Ltx25NativeFoleyBlackwellEngine),
+            ("ltx25_native_mime_24gb", eng_ltx25.Ltx25NativeMime24gbEngine),
+            ("ltx25_native_audio_in_24gb",
+             eng_ltx25.Ltx25NativeAudioIn24gbEngine),
+    ):
+        eng = cls()
+        assert eng.name == name
+        assert tuple(eng.render_canvas) == (832, 480)
+        assert eng.render_canvas[0] % 32 == 0
+        assert eng.render_canvas[1] % 32 == 0
+
+
 def test_the_silent_lane_loads_the_16gb_weight():
     eng = eng_ltx25.Ltx25VideoEngine()
     assert eng._dit_name() == eng_ltx25.LTX25_NATIVE_DIT_16GB
