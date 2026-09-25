@@ -525,9 +525,6 @@ def test_the_profile_canvas_agrees_with_the_declaration():
         picks = {pub.resolve_engine_id(v)
                  for k, v in (prof.get("role_overrides") or {}).items()
                  if k.endswith("_visual")}
-        slot = (prof.get("slot_overrides") or {}).get("video_render_engine")
-        if slot:
-            picks.add(pub.resolve_engine_id(slot))
         if "mesh_stage" not in picks:
             continue
         render = prof.get("render") or {}

@@ -254,8 +254,8 @@ def test_the_profile_canvas_matches_the_declaration():
     profile = load_profile("otr_8gb_video")
     render = profile.get("render") or {}
     assert (int(render.get("canvas_w")), int(render.get("canvas_h"))) == DECLARED
-    assert (profile.get("slot_overrides") or {}).get(
-        "video_render_engine") == LANE
+    assert (profile.get("role_overrides") or {}).get(
+        "character_visual") == LANE
 
 
 def test_the_8gb_variant_workflow_agrees_with_the_declaration():

@@ -223,7 +223,6 @@ def test_cloud_row_dry_run_binds_every_slot_it_sets(
     announcer_voice = _node(prompt, "OTR_AnnouncerVoice")
     music = _node(prompt, "OTR_StableAudioTheme")
     director = _node(prompt, "OTR_VideoDirector")
-    render = _node(prompt, "OTR_VideoRenderBatch")
     assert writer["inputs"]["creative_writing_model"] == "google_api:slot-a"
     assert writer["inputs"]["technical_model"] == "google_api:slot-b"
     assert writer["inputs"]["google_api_slot_a_model"] == "gemini-flash-latest"
@@ -241,7 +240,6 @@ def test_cloud_row_dry_run_binds_every_slot_it_sets(
     assert director["inputs"]["announcer_image_model"] == image_engine
     assert director["inputs"]["music_image_model"] == image_engine
     assert director["inputs"]["character_image_model"] == image_engine
-    assert render["inputs"]["engine"] == video_engine
 
 
 def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):

@@ -189,10 +189,7 @@ def collect_profiles() -> dict:
     """engine -> the matrix rows that select it, so a user can start from a workflow."""
     by_engine = {}
     resolve_engine_id = _public_engine_resolver()
-    video_keys = {
-        "character_visual", "announcer_visual", "music_visual",
-        "video_render_engine",
-    }
+    video_keys = {"character_visual", "announcer_visual", "music_visual"}
     if _REPO not in sys.path:
         sys.path.insert(0, _REPO)
     from nodes._otr_shared.capability_profiles import (
@@ -203,7 +200,7 @@ def collect_profiles() -> dict:
         slots = doc.get("slot_overrides", {}) or {}
         for key in ("character_visual", "announcer_visual", "music_visual",
                     "char_voice_engine", "announcer_voice_engine",
-                    "music_engine", "video_render_engine"):
+                    "music_engine"):
             eng = roles.get(key) or slots.get(key)
             if eng:
                 # Public-id resolution owns the VIDEO surface only. Voice and

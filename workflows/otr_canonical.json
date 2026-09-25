@@ -2487,18 +2487,6 @@
           "shape": 7,
           "type": "STRING",
           "link": 267
-        },
-        {
-          "localized_name": "engine",
-          "name": "engine",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "engine"
-          },
-          "link": null
-
-
         }
       ],
       "outputs": [
@@ -2526,9 +2514,7 @@
       "properties": {
         "Node name for S&R": "OTR_VideoRenderBatch"
       },
-      "widgets_values": [
-        "viz_camera"
-      ],
+      "widgets_values": [],
       "color": "#102F35",
       "bgcolor": "#3B3D42"
     },

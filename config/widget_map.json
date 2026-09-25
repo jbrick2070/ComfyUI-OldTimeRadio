@@ -342,15 +342,6 @@
         ]
       ]
     },
-    "slot_overrides.video_render_engine": {
-      "registry": "video",
-      "targets": [
-        [
-          "OTR_VideoRenderBatch",
-          "engine"
-        ]
-      ]
-    },
     "upscale_stage.device": {
       "registry": null,
       "targets": [

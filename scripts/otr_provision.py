@@ -1618,7 +1618,6 @@ def profile_lanes(profile) -> dict:
     pid = str(profile.get("id") or "").strip()
     roles = profile.get("role_overrides", {}) or {}
     slots = profile.get("slot_overrides", {}) or {}
-    slot_video = str(slots.get("video_render_engine") or "").strip()
     role_pairs = (
         ("announcer_visual", "announcer_image"),
         ("music_visual", "music_image"),
@@ -1626,13 +1625,11 @@ def profile_lanes(profile) -> dict:
     )
     selected_role_videos = {}
     for video_key, image_key in role_pairs:
-        raw = str(roles.get(video_key) or slot_video).strip()
+        raw = str(roles.get(video_key) or "").strip()
         selected_role_videos[image_key] = _PUBLIC_VIDEO_IDS.get(raw, raw)
     selected_videos = {
         selected for selected in selected_role_videos.values() if selected
     }
-    if slot_video:
-        selected_videos.add(_PUBLIC_VIDEO_IDS.get(slot_video, slot_video))
     images = {
         str(roles.get(image_key) or "").strip()
         for _video_key, image_key in role_pairs

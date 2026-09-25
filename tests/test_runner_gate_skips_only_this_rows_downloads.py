@@ -78,7 +78,6 @@ def test_an_allowlisted_file_no_selected_engine_fetches_is_still_checked(monkeyp
         "role_overrides": {"announcer_visual": "viz_green",
                            "character_visual": "viz_green",
                            "music_visual": "viz_green"},
-        "slot_overrides": {"video_render_engine": "viz_green"},
         "preflight": {"required_models": [_SD15]},
     }
     with pytest.raises(SystemExit) as refused:
@@ -89,7 +88,6 @@ def test_an_allowlisted_file_no_selected_engine_fetches_is_still_checked(monkeyp
 def test_a_file_this_rows_engine_fetches_is_not_a_refusal(monkeypatch):
     profile = {
         "role_overrides": {"announcer_visual": "animatediff15_lightning_video"},
-        "slot_overrides": {"video_render_engine": "animatediff15_lightning_video"},
         "preflight": {"required_models": [_SD15]},
     }
     assert _gate(monkeypatch, profile) == []
@@ -105,7 +103,7 @@ def test_every_matrix_row_gates_only_what_its_own_engines_do_not_fetch(monkeypat
         profile = load(rid)
         picks = set((profile.get("role_overrides") or {}).values())
         slots = profile.get("slot_overrides") or {}
-        picks.update(slots.get(k) for k in ("video_render_engine", "music_engine"))
+        picks.add(slots.get("music_engine"))
         fetched = set()
         for pick in {p for p in picks if p}:
             try:
@@ -138,7 +136,6 @@ def test_one_engine_that_cannot_plan_does_not_empty_the_skip_list(monkeypatch):
     profile = {
         "role_overrides": {"character_image": "z_image_turbo",
                            "character_visual": "animatediff15_v3_haunted_video"},
-        "slot_overrides": {"video_render_engine": "animatediff15_v3_haunted_video"},
         "preflight": {"required_models": [_SD15]},
     }
     assert _gate(monkeypatch, profile) == []

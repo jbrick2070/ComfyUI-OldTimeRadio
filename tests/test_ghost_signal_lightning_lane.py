@@ -394,7 +394,7 @@ def test_the_profile_plans_the_lightning_bundle_and_no_image_weights():
     download."""
     m = _provision_module()
     prof = m.load_profile("otr_mac16_animatediff")
-    assert prof["slot_overrides"]["video_render_engine"] == ENGINE_ID
+    assert prof["role_overrides"]["character_visual"] == ENGINE_ID
     plan = m.profile_lanes(prof)
     assert plan["automatic"] == ["lightning", "stable_audio_3"], plan
     assert not any("z_image" in lane for lane in plan["automatic"])
@@ -405,7 +405,7 @@ def test_the_haunted_lane_still_plans_exactly_what_it_did():
     """CLAUDE.md 0B in one assertion: the sibling is provably unchanged."""
     m = _provision_module()
     prof = m.load_profile("otr_8gb_animatediff")
-    assert prof["slot_overrides"]["video_render_engine"] == (
+    assert prof["role_overrides"]["character_visual"] == (
         "animatediff15_v3_haunted_video")
     assert m.profile_lanes(prof)["automatic"] == ["haunted", "stable_audio_3"]
 

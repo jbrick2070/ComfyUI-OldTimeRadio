@@ -38,7 +38,6 @@ def test_no_weight_video_routes_are_registered_and_asset_free():
 def _with_every_visual(profile: dict, video: str) -> dict:
     """A copy of one matrix row with every video selection moved to `video`."""
     swapped = copy.deepcopy(profile)
-    swapped["slot_overrides"]["video_render_engine"] = video
     for key in ("announcer_visual", "music_visual", "character_visual"):
         swapped["role_overrides"][key] = video
     return swapped

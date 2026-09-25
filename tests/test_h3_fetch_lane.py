@@ -40,7 +40,6 @@ def _h3_profile(provision, row_id, video):
     """
     profile = copy.deepcopy(provision.load_profile(row_id))
     profile["id"] = "%s_%s" % (row_id, video)
-    profile["slot_overrides"]["video_render_engine"] = video
     for key in ("announcer_visual", "music_visual", "character_visual"):
         profile["role_overrides"][key] = video
     return profile

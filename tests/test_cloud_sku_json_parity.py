@@ -35,7 +35,6 @@ PROFILE_OK = {
     "role_overrides.announcer_visual",
     "role_overrides.music_visual",
     "role_overrides.character_visual",
-    "slot_overrides.video_render_engine",
 }
 
 WIDGET_OK = {

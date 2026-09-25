@@ -109,7 +109,6 @@ def build_profile(row, matrix=None) -> dict:
             "char_voice_engine": m.get("char_voice"),
             "announcer_voice_engine": m.get("announcer_voice"),
             "music_engine": m.get("music"),
-            "video_render_engine": video,
         },
         "features": m.get("features"),
         "seed_policy": m.get("seed_policy"),

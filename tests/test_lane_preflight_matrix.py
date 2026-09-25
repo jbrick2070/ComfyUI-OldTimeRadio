@@ -704,9 +704,6 @@ def profile_canvases_for(name) -> dict:
         for key, value in (prof.get("role_overrides") or {}).items():
             if key.endswith("_visual"):
                 picks.add(pub.resolve_engine_id(value))
-        slot = (prof.get("slot_overrides") or {}).get("video_render_engine")
-        if slot:
-            picks.add(pub.resolve_engine_id(slot))
         if name not in picks:
             continue
         render = prof.get("render") or {}

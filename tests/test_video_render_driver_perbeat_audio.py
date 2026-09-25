@@ -707,7 +707,7 @@ class TestVideoRenderBatchMasterAudioInput:
         assert received == ["/my/master.mp4"], \
             "master_audio_path must reach _render_episode"
 
-    def test_widgets_values_hold_only_the_engine_slot(self):
+    def test_the_render_node_has_no_widget_slots(self):
         """forceInput master_audio_path must NOT add a widgets_values slot."""
         import json, os
         wf_path = os.path.join(_REPO, "workflows", "otr_canonical.json")
@@ -715,12 +715,12 @@ class TestVideoRenderBatchMasterAudioInput:
             wf = json.load(f)
         n92 = next(n for n in wf["nodes"] if n["id"] == 92)
         wv = n92.get("widgets_values", [])
-        # One widget slot: engine (the soak/single harness widgets were
-        # removed 2026-09-24). patched_ledger_json + master_audio_path are
-        # forceInput so they are NOT in widgets_values.
-        assert len(wv) == 1, (
-            "widgets_values must have exactly 1 entry (forceInput fields "
-            "excluded); got %d: %r" % (len(wv), wv))
+        # No widget slots: the harness widgets and the engine widget were
+        # removed 2026-09-24. patched_ledger_json + master_audio_path are
+        # forceInput so they are NOT in widgets_values either.
+        assert wv == [], (
+            "widgets_values must be empty (forceInput fields excluded); "
+            "got %r" % (wv,))
 
     def test_workflow_link_264_wired(self):
         """Chunk E cleanbreak: link 264 (node7[1] -> node92.master_audio_path)

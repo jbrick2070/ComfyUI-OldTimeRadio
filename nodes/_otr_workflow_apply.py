@@ -718,9 +718,8 @@ def _director_option_value(node_type: str, widget: str, value: Any) -> Any:
     member of the live combo, so ComfyUI renders the dropdown invalid and one
     save can coerce it to index 0. Label every registered engine via
     ``exact_menu_option_for``. Unregistered / ADD_CUSTOM / empty pass through.
-    ``OTR_VideoRenderBatch.engine`` is a STRING widget and keeps the raw
-    internal id. Callers that need the internal id resolve the saved label
-    with ``_engine_id_from_pick``."""
+    Callers that need the internal id resolve the saved label with
+    ``_engine_id_from_pick``."""
     if node_type != "OTR_VideoDirector" or widget not in _VIDEO_DIRECTOR_WIDGETS:
         return value
     if not isinstance(value, str) or not value or value == "+ Add Custom Model":

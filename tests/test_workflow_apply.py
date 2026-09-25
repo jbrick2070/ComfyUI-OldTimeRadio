@@ -228,9 +228,6 @@ def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_
             nodes_by_type, schemas, "OTR_StableAudioTheme", "engine"
         ) == "sonilo"
         assert _widget_value(
-            nodes_by_type, schemas, "OTR_VideoRenderBatch", "engine"
-        ) == "cloud_vidu_q2_pro_fast_720p"
-        assert _widget_value(
             nodes_by_type, schemas, "OTR_VideoDirector", "character_image_model"
         ) == "cloud_luma_photon_flash"
         for widget in (
@@ -281,9 +278,6 @@ def test_apply_otr_cloud_deluxe_3act_is_sonnet_luna_and_ltx25_foley(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter",
         "openrouter_slot_b_model"
     ) == "(enable OpenRouter)"
-    assert _widget_value(
-        nodes_by_type, schemas, "OTR_VideoRenderBatch", "engine"
-    ) == "cloud_ltx25_foley_plus"
     for widget in (
         "announcer_video_model", "music_video_model", "character_video_model",
     ):
@@ -309,9 +303,6 @@ def test_apply_otr_cloud_deluxe_audio_in_3act_is_sonnet_luna_and_ltx25_a2v(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter",
         "comfy_slot_b_model"
     ) == "openai/gpt-5.6-luna"
-    assert _widget_value(
-        nodes_by_type, schemas, "OTR_VideoRenderBatch", "engine"
-    ) == "cloud_ltx25_audio_in"
     for widget in (
         "announcer_video_model", "music_video_model", "character_video_model",
     ):

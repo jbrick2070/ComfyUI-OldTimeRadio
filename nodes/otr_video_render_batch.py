@@ -478,12 +478,6 @@ class OTRVideoRenderBatch:
     def INPUT_TYPES(cls):
         return {
             "optional": {
-                "engine": ("STRING", {"default": "viz_camera", "tooltip": (
-                    "The row's declared video engine, written by the workflow "
-                    "matrix (slot_overrides.video_render_engine) so a saved graph "
-                    "names it. Not read at render time: each beat routes by its "
-                    "planned per-role engine."
-                )}),
                 "patched_ledger_json": ("STRING", {
                     "default": "{}", "multiline": True, "forceInput": True,
                     "tooltip": (
@@ -521,8 +515,8 @@ class OTRVideoRenderBatch:
             "hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"},
         }
 
-    def render(self, engine="viz_camera", patched_ledger_json="{}",
-               master_audio_path="", image_done="", api_key_comfy_org=None):
+    def render(self, patched_ledger_json="{}", master_audio_path="",
+               image_done="", api_key_comfy_org=None):
         from ._otr_shared.cloud_media_invoke import stash_comfy_api_key
         stash_comfy_api_key(api_key_comfy_org)
         # ``image_done`` is the W4 ordering gate (opaque STRING token from

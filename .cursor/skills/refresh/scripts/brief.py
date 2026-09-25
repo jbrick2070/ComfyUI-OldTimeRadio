@@ -39,12 +39,6 @@ def _director_video(graph: dict) -> list[str]:
     return [str(v) for v in wv[:3]]
 
 
-def _render_engine(graph: dict) -> str:
-    node = _node(graph, "OTR_VideoRenderBatch")
-    wv = (node or {}).get("widgets_values") or []
-    return str(wv[0]) if wv else ""
-
-
 def _profile(root: Path, pid: str) -> dict:
     path = root / "config" / "profiles" / ("%s.json" % pid)
     return json.loads(path.read_text(encoding="utf-8"))
@@ -61,21 +55,18 @@ def main() -> int:
     )
     print("CANONICAL")
     print("  video", " | ".join(_director_video(canon)))
-    print("  render", _render_engine(canon))
     print("LOCAL", len(local))
     for pid in local:
         prof = _profile(root, pid)
         roles = prof.get("role_overrides") or {}
-        slots = prof.get("slot_overrides") or {}
         print(
-            "  %s  writer=%s  video=%s/%s/%s  render=%s  image=%s"
+            "  %s  writer=%s  video=%s/%s/%s  image=%s"
             % (
                 pid,
                 (prof.get("llm") or {}).get("creative_model"),
                 roles.get("announcer_visual"),
                 roles.get("music_visual"),
                 roles.get("character_visual"),
-                slots.get("video_render_engine"),
                 roles.get("character_image"),
             )
         )
@@ -83,11 +74,10 @@ def main() -> int:
     for pid in cloud:
         prof = _profile(root, pid)
         roles = prof.get("role_overrides") or {}
-        slots = prof.get("slot_overrides") or {}
         llm = prof.get("llm") or {}
         feat = prof.get("features") or {}
         print(
-            "  %s  act=%s  writer=%s  comfy=%s  or=%s  video=%s  render=%s  image=%s"
+            "  %s  act=%s  writer=%s  comfy=%s  or=%s  video=%s  image=%s"
             % (
                 pid,
                 feat.get("act_count"),
@@ -95,7 +85,6 @@ def main() -> int:
                 llm.get("comfy_slot_a_model"),
                 llm.get("openrouter_slot_a_model"),
                 roles.get("character_visual"),
-                slots.get("video_render_engine"),
                 roles.get("character_image"),
             )
         )

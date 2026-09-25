@@ -312,7 +312,7 @@ def load_profiles() -> list:
             "vendor": d.get("gpu_vendor", "?"),
             "backend": d.get("device_backend", "?"),
             "platform": d.get("platform", "any"),
-            "video": ro.get("character_visual") or so.get("video_render_engine") or "-",
+            "video": ro.get("character_visual") or "-",
             "image": ro.get("character_image") or "-",
             "voice": so.get("char_voice_engine") or "-",
             "music": so.get("music_engine") or "-",

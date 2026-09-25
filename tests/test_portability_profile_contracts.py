@@ -9,10 +9,9 @@ from nodes._otr_video_engines import registry as vreg
 
 
 def _ltx25_engines(profile: dict) -> list:
-    """Every LTX 2.5 engine the row selects, across its roles and the render slot."""
+    """Every LTX 2.5 engine the row selects, across its roles."""
     picks = [v for k, v in (profile.get("role_overrides") or {}).items()
              if k.endswith("_visual")]
-    picks.append((profile.get("slot_overrides") or {}).get("video_render_engine"))
     engines = []
     for pick in picks:
         name = resolve_engine_id(pick) if pick else None

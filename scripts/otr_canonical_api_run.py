@@ -305,7 +305,7 @@ def _assert_profile_models_present(profile_name, schemas, offline=False) -> list
     # the AnimateDiff lane downloads for itself (measured live 2026-09-24).
     selected = set((profile.get("role_overrides") or {}).values())
     slots = profile.get("slot_overrides") or {}
-    selected.update(slots.get(k) for k in ("video_render_engine", "music_engine"))
+    selected.add(slots.get("music_engine"))
     self_fetched = set()
     for engine in {resolve_engine_id(str(e)) for e in selected if e}:
         try:
