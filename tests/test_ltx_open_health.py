@@ -8,7 +8,7 @@ from nodes._otr_video_engines import render_driver as rd
 
 def _manifest(rows):
     return {"episode_id": "e", "clips": rows,
-            "roles_effective": {row["role"]: "ltx_video" for row in rows}}
+            "roles_effective": {row["role"]: "ltx_8gb" for row in rows}}
 
 
 def _row(beat_id, role, engine_id, exists=True):
@@ -18,16 +18,17 @@ def _row(beat_id, role, engine_id, exists=True):
 
 def test_healthy_ltx_open_passes():
     m = _manifest([
-        _row("b000_music_open", "music_visual", "ltx_video"),
-        _row("b001", "announcer_visual", "ltx_video"),
+        _row("b000_music_open", "music_visual", "ltx_8gb"),
+        _row("b001", "announcer_visual", "ltx_8gb"),
         _row("b002", "character_video", "humo"),
     ])
     assert rd.check_ltx_open_health(m) == []
 
 
-def test_ltx_av_open_also_healthy():
-    m = _manifest([_row("b001", "announcer_visual", "ltx_audio_in"),
-                   _row("b000_music_open", "music_visual", "ltx_audio_in")])
+def test_ltx25_audio_in_open_also_healthy():
+    m = _manifest([_row("b001", "announcer_visual", "ltx25_native_audio_in_16gb"),
+                   _row("b000_music_open", "music_visual",
+                        "ltx25_native_audio_in_16gb")])
     assert rd.check_ltx_open_health(m) == []
 
 
@@ -53,7 +54,7 @@ def test_procgen_fallback_open_flagged():
 
 def test_clips_zero_open_flagged():
     # clips=0: the open beat exists=False (no LTX clip on disk at all)
-    m = _manifest([_row("b001", "announcer_visual", "ltx_video", exists=False)])
+    m = _manifest([_row("b001", "announcer_visual", "ltx_8gb", exists=False)])
     bad = rd.check_ltx_open_health(m)
     assert len(bad) == 1
     assert bad[0]["exists"] is False
@@ -113,7 +114,7 @@ def test_only_proven_ltx_intent_demands_an_ltx_open(intent, expected, caplog):
 
 
 def test_actual_ltx_without_intent_cannot_establish_health():
-    man = {"clips": [_row("b1", "announcer_visual", "ltx_video")]}
+    man = {"clips": [_row("b1", "announcer_visual", "ltx_8gb")]}
     report = {}
     assert rd.check_ltx_open_health(man, strict=True, report_out=report) == []
     assert report["status"] == "unknown"
@@ -123,14 +124,14 @@ def test_manifest_uses_frozen_effective_intent_not_picked_or_mutated_shot(tmp_pa
     path = tmp_path / "clip.mp4"
     path.write_bytes(b"observed clip")
     result = {"ledger": {"video": {
-        "roles": {"announcer_visual": "ltx_video"},
+        "roles": {"announcer_visual": "ltx_8gb"},
         "roles_effective": {"announcer_visual": "still_pan"},
-        "shots": [{"shot_id": "s1", "role": "announcer_visual", "engine_id": "ltx_video"}],
+        "shots": [{"shot_id": "s1", "role": "announcer_visual", "engine_id": "ltx_8gb"}],
     }}, "clips": {"s1": {"engine_id": "still_pan", "path": str(path)}}}
     man = rd.build_clip_manifest(result)
     assert man["roles_effective"] == {"announcer_visual": "still_pan"}
     assert man["ltx_open_health"]["status"] == "not_requested"
-    result["ledger"]["video"]["roles_effective"]["announcer_visual"] = "ltx_video"
+    result["ledger"]["video"]["roles_effective"]["announcer_visual"] = "ltx_8gb"
     assert man["roles_effective"]["announcer_visual"] == "still_pan"
     failed = rd.build_clip_manifest(result)
     assert failed["ltx_open_health"]["status"] == "degraded"

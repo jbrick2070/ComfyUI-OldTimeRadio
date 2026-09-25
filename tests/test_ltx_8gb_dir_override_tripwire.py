@@ -15,9 +15,10 @@ reach the loader and is already live on this box. Registering the folder from
 inside preflight (`folder_paths.add_model_folder_path`) was rejected: ComfyUI
 ships no unregister, so a CHECK would mutate global state permanently.
 
-SCOPED TO THIS ADAPTER on purpose. `tests/test_wan_loader_preflight.py` uses
-`*_DIR` as its no-ComfyUI mock seam, so `wan_shared._resolve_model_file` had to
-stay behaviour-identical under the split; the last two controls pin that.
+SCOPED TO THIS ADAPTER on purpose. Other adapters still ask
+`wan_shared._resolve_model_file` the historical question (MiniMax H3 hands it
+its `OTR_MINIMAX_H3_*_DIR` overrides), so it had to stay behaviour-identical
+under the split; the last two controls pin that.
 
 The junction / case-fold half of the comparison belongs to `_same_file`, which
 is unit-tested in `tests/test_ltx_8gb_session_config.py`. What is tested HERE is
@@ -38,7 +39,7 @@ _ENVS = (
     "OTR_LTX_8GB_CKPT", "OTR_LTX_8GB_CKPT_DIR", "OTR_LTX_8GB_CKPT_NAME",
     "OTR_LTX_8GB_T5_DIR", "OTR_LTX_8GB_T5_NAME", "OTR_LTX_8GB_STEPS",
     "OTR_LTX_8GB_TILED_VAE", "OTR_LTX_8GB_T5_DEVICE",
-    "OTR_WAN_I2V_VAE_DIR", "OTR_WAN_I2V_CLIP_DIR",
+    "OTR_MINIMAX_H3_VAE_DIR", "OTR_MINIMAX_H3_VAE_NAME",
     # The ceiling is the ONE knob still parsed on this file's `assert_usable`
     # path outside prequalification, so a malformed host value would turn a
     # MISSING_MODEL assertion into MALFORMED_CONFIG. The frozen knobs are
@@ -359,24 +360,23 @@ def test_CONTROL_by_token_IGNORES_the_DIR_by_contract(
         ("checkpoints",), m._LTX8_DEFAULT_CKPT) == _registered_ckpt(eng)
 
 
-def test_CONTROL_wan_resolve_model_file_still_lets_a_DIR_win(
+def test_CONTROL_shared_resolve_model_file_still_lets_a_DIR_win(
         tmp_path, monkeypatch):
     """`wan_shared._resolve_model_file` was REFACTORED (its tail split into
-    `_resolve_model_file_by_token`) and must stay behaviour-identical: the Wan
-    suites use `*_DIR` as their no-ComfyUI mock seam, and a DIR that wins on
-    existence alone -- with nothing registered anywhere -- is exactly what
-    those fixtures rely on. Fixing Wan's copy of this lie needs its fixtures
-    migrated first; that is a separate chunk, and this control is what keeps
-    it separate."""
-    from nodes._otr_video_engines.eng_wan_ti2v import WanTi2vEngine
+    `_resolve_model_file_by_token`) and must stay behaviour-identical: MiniMax
+    H3 still hands it an `OTR_MINIMAX_H3_*_DIR` override, and a DIR that wins
+    on existence alone -- with nothing registered anywhere -- is the historical
+    answer that lane still asks for. Fixing the shared copy of this lie is a
+    separate chunk, and this control is what keeps it separate."""
+    from nodes._otr_video_engines.eng_minimax_h3 import MiniMaxH3VideoEngine
 
     d = tmp_path / "vae_dir"
     d.mkdir()
     (d / "some_vae.safetensors").write_bytes(b"v")
-    monkeypatch.setenv("OTR_WAN_I2V_VAE_DIR", str(d))
+    monkeypatch.setenv("OTR_MINIMAX_H3_VAE_DIR", str(d))
 
-    wan = WanTi2vEngine()
-    wan._comfy_root = lambda: str(tmp_path / "nowhere")
-    assert wan._resolve_model_file(
+    h3 = MiniMaxH3VideoEngine()
+    h3._comfy_root = lambda: str(tmp_path / "nowhere")
+    assert h3._resolve_model_file(
         ("vae",), "some_vae.safetensors",
-        "OTR_WAN_I2V_VAE_DIR") == str(d / "some_vae.safetensors")
+        "OTR_MINIMAX_H3_VAE_DIR") == str(d / "some_vae.safetensors")

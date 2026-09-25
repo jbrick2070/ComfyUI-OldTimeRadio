@@ -131,18 +131,19 @@ def test_unresolved_custom_slot_is_still_a_warning_not_a_raise(monkeypatch):
 # --------------------------------------------------------------------------- #
 def test_humo_redirect_output_is_registered_and_passes(monkeypatch):
     """With OTR_ENABLE_HUMO_HOSTS unset, a humo pick freezes to the
-    ltx_audio_in redirect. Both the pick (humo, registered) and the effective
-    engine (ltx_audio_in, registered) satisfy the boundary -- pinning that
-    validation runs on the union without double-charging the redirect.
+    ltx25_native_audio_in_16gb redirect. Both the pick (humo, registered) and
+    the effective engine (ltx25_native_audio_in_16gb, registered) satisfy the
+    boundary -- pinning that validation runs on the union without
+    double-charging the redirect.
 
     EXACT on purpose (QA finding, 2026-08-23): the harness deletes
     OTR_ENABLE_HUMO_HOSTS before every call, so the redirect is deterministic
     here and `eff` can never legitimately be "humo". The first draft asserted
-    membership in {"ltx_audio_in", "humo"}, under which a regression that
+    membership in {redirect target, "humo"}, under which a regression that
     silently disabled the radio-is-host redirect would have slipped through."""
     policy = _direct(monkeypatch, announcer="humo")
     eff = policy["effective_video_models"]["announcer_visual"]
-    assert eff == "ltx_audio_in"
+    assert eff == "ltx25_native_audio_in_16gb"
     # and the director accepted both halves of the redirect pair -- reaching
     # this line IS the assertion that no ValueError fired.
 

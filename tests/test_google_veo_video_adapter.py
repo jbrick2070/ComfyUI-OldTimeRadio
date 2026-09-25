@@ -375,8 +375,8 @@ def test_google_veo_video_has_no_partner_or_local_engine_call_path():
         "invoke_partner_node",
         "cloud_media_invoke",
         "eng_cloud_video",
-        "eng_ltx_video",
-        "eng_wan_i2v",
+        "eng_ltx25",
+        "eng_ltx_8gb",
         "eng_humo",
         "create_interaction",
     }

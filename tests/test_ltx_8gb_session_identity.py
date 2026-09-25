@@ -188,35 +188,18 @@ _ENGINES_WITH_A_SESSION = {
     "ltx25_native_mime_24gb",
     "ltx25_native_audio_in_16gb",
     "ltx25_native_audio_in_24gb",
-                               # (engine name differs; recipe + weights match)
-    "wan_ti2v",                 # WIRE-W3a, 2026-07-29
-    "wan_ti2v",                # WIRE-W3b, 2026-07-29
-    "fastwan_8gb",             # 2026-08-01 -- inherits WanTi2vEngine's, and its
-                               # LoRA rides it for free: _wan_session_receipts is
-                               # built from _loader_names() + _aux_loader_files(),
-                               # so a swapped or resized LoRA opens a new session.
     "humo",                    # WIRE-W4a, 2026-07-29
     "humo_1.7B",               # WIRE-W4a -- inherits HuMoEngine's
     "humo_1.7B_169",           # WIRE-W4a -- inherits HuMoEngine's
     "humo_14B_169",            # WIRE-W4a -- inherits HuMoEngine's
-    # The last two local splitters, added together 2026-07-29 after the live
-    # 45-word campaign found the gap the hard way: leg `ltx_video` wrote a
-    # script, minted its stills and assembled its audio, then refused at the
-    # render gate 730s in with SessionIdentityUnavailable. `ltx_audio_in` had
-    # the same hole one leg behind it. With these two the roster invariant is
-    # closed for LOCAL engines, and
-    # tests/test_multiclip_session_identity_roster.py now holds it from the
-    # partitioner's side so the next capped adapter cannot be missed.
-    "ltx_video",               # 2026-07-29, live campaign
-    "ltx_audio_in",            # 2026-07-29, same fix (declared on _LtxAvBase)
     # LANE 19, 2026-08-12. The first engine to join this set by ARRIVING rather
     # than by being repaired -- and it did not get the choice. It splits (a
     # discrete menu topping out at ~15 s cannot cover a 30 s beat in one call)
     # and it holds local handles, so test_multiclip_session_identity_roster
     # refused it the moment it registered. That is the roster invariant closing
-    # from the partitioner's side exactly as the note above predicted, one lane
-    # after it was written. Its identity is engine + frozen recipe + a re-stat
-    # of all three weights (never a hash of 21 GB).
+    # from the partitioner's side, which is the job that file holds so the next
+    # capped adapter cannot be missed. Its identity is engine + frozen recipe +
+    # a re-stat of all three weights (never a hash of 21 GB).
     "minimax_h3_video",        # 2026-08-12, lane 19
     # LANE 20, 2026-08-12. Inherits the identity from `_MiniMaxH3Base` -- and
     # it is NOT the same tuple as its sibling's, because the identity is built
@@ -229,13 +212,12 @@ _ENGINES_WITH_A_SESSION = {
     # test_multiclip_session_identity_roster refused it the moment it
     # registered. Worth recording that the refusal came from the roster gate on
     # a lane that had never rendered -- which is the whole point of that gate.
-    # The 2026-07-29 note above describes what it cost to learn the same thing
-    # from a live leg: 730 seconds in, after the script, the stills and the
-    # audio were already paid for.
+    # Learning the same thing from a live leg on 2026-07-29 cost 730 seconds,
+    # after the script, the stills and the audio were already paid for.
     #
     # Its identity is engine + a re-stat of all FOUR weights, with no recipe
-    # token -- unlike the LTX 2.3 lanes there is exactly one locked recipe
-    # here, so the weights ARE the identity. The audio VAE is one of the four
+    # token -- there is exactly one locked recipe here, so the weights ARE the
+    # identity. The audio VAE is one of the four
     # even though the lane emits no audio, so a swapped audio VAE correctly
     # opens a new session.
     "ltx25_video",             # 2026-08-19, Chunk A
@@ -246,8 +228,8 @@ def test_CONTROL_the_rollout_is_a_NAMED_LIST_and_this_is_the_list():
     """If this starts failing, someone widened the blast radius -- or narrowed
     it -- without saying so here.
 
-    This used to assert that ``wan_ti2v`` alone stayed silent, which made it a
-    control over exactly one engine: ``wan_ti2v`` gained an identity at WIRE-W3a
+    This used to assert that one engine alone stayed silent, which made it a
+    control over exactly one engine: that engine gained an identity at WIRE-W3a
     and no test in this file noticed. Asserting the whole SET is the control
     that was meant, and it fails in both directions.
     """

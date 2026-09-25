@@ -444,7 +444,7 @@ class TestSceneStillObjects:
 
     def test_image_producer_reserves_future_opening_music_target(self):
         """The mirror of the closing reservation, and the live bug that proved
-        the opening was owed one too (2026-07-29, profile otr_w45_word_razzle).
+        the opening was owed one too (2026-07-29, on a since-retired lab rig).
 
         The open still is minted under the SYNTHETIC id b000_music_open. Once
         EpisodeAssembler mirrors the opening cue into ledger.lines at

@@ -10,7 +10,7 @@ CPU coverage for the five clip-fill pieces:
   5. otr_silent_composite._warn_clip_underrun -- LOUD-warn (never raise) when a
      real clip is far shorter than its beat target.
 
-No GPU, no model load. (wan_ti2v's _floor_length wiring is covered in test_wan_ti2v.)
+No GPU, no model load.
 """
 from __future__ import annotations
 
@@ -37,21 +37,26 @@ def test_budget_none_free_trusts_target(monkeypatch):
     # No live VRAM read (CPU box) -> trust the audio-derived target, snapped to a
     # valid 4n+1 <= target (the render-window NVML probe still guards at render).
     _clear_cost_env(monkeypatch)
-    assert mc.compute_real_frame_budget(None, 280, 1472, 832, "wan_ti2v") == 277
-    assert mc.compute_real_frame_budget(0, 33, 1472, 832, "wan_ti2v") == 33
+    assert mc.compute_real_frame_budget(None, 280, 1472, 832, "ltx_8gb") == 277
+    assert mc.compute_real_frame_budget(0, 33, 1472, 832, "ltx_8gb") == 33
 
 
 @pytest.fixture
 def qualified_row(monkeypatch):
-    """Qualify `wan_ti2v`'s row so the SLOPE refusal can be exercised at all.
+    """Seed and qualify a row for `ltx_8gb` so the SLOPE refusal can be
+    exercised at all.
 
     No row is qualified in production (``QUALIFIED_COST_ROWS`` is empty and
-    ``test_no_row_is_qualified_today_and_that_is_deliberate`` guards that), so
-    since 2026-08-13 the per-frame refusal cannot fire for any shipped engine.
-    These tests are about whether the pricing arithmetic refuses CORRECTLY when
-    a row is trusted -- a separate question from whether any row is trusted.
+    ``test_no_row_is_qualified_today_and_that_is_deliberate`` guards that), and
+    ``FRAME_COST_MODEL`` itself is empty, so the per-frame refusal cannot fire
+    for any shipped engine. These tests are about whether the pricing
+    arithmetic refuses CORRECTLY when a row is trusted -- a separate question
+    from whether any row is trusted. The seed is the fallback tuple, which is
+    the figure every engine is already priced at.
     """
-    monkeypatch.setattr(mc, "QUALIFIED_COST_ROWS", frozenset({"wan_ti2v"}))
+    monkeypatch.setitem(mc.FRAME_COST_MODEL, "ltx_8gb", mc._DEFAULT_FRAME_COST)
+    monkeypatch.setattr(mc, "QUALIFIED_COST_ROWS", frozenset({"ltx_8gb"}))
+    assert mc.cost_row_may_refuse("ltx_8gb")
 
 
 def test_budget_warns_under_pressure_and_still_returns_the_target(
@@ -77,7 +82,7 @@ def test_budget_warns_under_pressure_and_still_returns_the_target(
     """
     _clear_cost_env(monkeypatch)
     with caplog.at_level("WARNING"):
-        got = mc.compute_real_frame_budget(14775.0, 280, 1472, 832, "wan_ti2v")
+        got = mc.compute_real_frame_budget(14775.0, 280, 1472, 832, "ltx_8gb")
     assert got == 277, "the snapped target is returned, never silently resized"
     assert any("affordable" in r.getMessage() for r in caplog.records), \
         "the cost model must still SAY what it predicts"
@@ -112,7 +117,7 @@ def test_budget_warns_when_starved_and_still_returns_the_target(
     """
     _clear_cost_env(monkeypatch)
     with caplog.at_level("WARNING"):
-        got = mc.compute_real_frame_budget(8000.0, 280, 1472, 832, "wan_ti2v")
+        got = mc.compute_real_frame_budget(8000.0, 280, 1472, 832, "ltx_8gb")
     assert got == 277
     assert any("overhead" in r.getMessage() for r in caplog.records)
 
@@ -121,10 +126,10 @@ def test_an_unqualified_row_may_not_refuse_on_OVERHEAD_either(monkeypatch):
     """The half that is easy to leave armed by accident. No fixture: this is
     production, where nothing is qualified."""
     _clear_cost_env(monkeypatch)
-    assert not mc.cost_row_may_refuse("wan_ti2v")
+    assert not mc.cost_row_may_refuse("ltx_8gb")
     # budget 6800 is well under the 7000 overhead, and it still may not refuse.
     assert mc.compute_real_frame_budget(
-        8000.0, 33, 1472, 832, "wan_ti2v") == 33
+        8000.0, 33, 1472, 832, "ltx_8gb") == 33
 
 
 def test_a_malformed_cost_model_is_fatal_even_unqualified(monkeypatch):
@@ -133,11 +138,11 @@ def test_a_malformed_cost_model_is_fatal_even_unqualified(monkeypatch):
     -- somebody's env override is broken -- and it stays loud for every engine
     whether or not its row may refuse a render."""
     _clear_cost_env(monkeypatch)
-    assert not mc.cost_row_may_refuse("wan_ti2v")
+    assert not mc.cost_row_may_refuse("ltx_8gb")
     for bad in ("-1", "nan", "inf"):
         monkeypatch.setenv("OTR_VIDEO_COST_PER_FRAME_MB", bad)
         with pytest.raises(mc.MotionBudgetError):
-            mc.compute_real_frame_budget(14500.0, 33, 832, 480, "wan_ti2v")
+            mc.compute_real_frame_budget(14500.0, 33, 832, 480, "ltx_8gb")
 
 
 def test_qualifying_a_name_with_no_row_does_not_arm_the_fallback(monkeypatch):
@@ -158,13 +163,13 @@ def test_qualifying_a_name_with_no_row_does_not_arm_the_fallback(monkeypatch):
 def test_budget_never_exceeds_target(monkeypatch):
     # Abundant VRAM never renders MORE than the beat needs.
     _clear_cost_env(monkeypatch)
-    out = mc.compute_real_frame_budget(60000.0, 49, 1472, 832, "wan_ti2v")
+    out = mc.compute_real_frame_budget(60000.0, 49, 1472, 832, "ltx_8gb")
     assert out <= 49 and (out - 1) % 4 == 0
 
 
 def test_budget_scales_cost_with_pixel_area(monkeypatch, qualified_row, caplog):
     """S4 rewrite: old expectation was bigger-canvas -> fewer predicted frames
-    (a shrink). NEW: the snapped target (277 for target=280 on wan_ti2v) is
+    (a shrink). NEW: the snapped target (277 for target=280) is
     canvas-independent -- per-frame VRAM cost still scales with pixel area, so
     at a free-VRAM level where the smaller canvas's cheaper per-frame cost
     affords the full snapped target, the SAME free level's larger canvas
@@ -174,49 +179,49 @@ def test_budget_scales_cost_with_pixel_area(monkeypatch, qualified_row, caplog):
     # small affordable (34000-7000)/60.33=447 >= 277 -> returns the snapped target 277.
     """
     _clear_cost_env(monkeypatch)
-    small = mc.compute_real_frame_budget(40000.0, 280, 832, 480, "wan_ti2v")
+    small = mc.compute_real_frame_budget(40000.0, 280, 832, 480, "ltx_8gb")
     assert small == 277
     # The bigger canvas is predicted unaffordable at the same free level. Since
     # 2026-09-23 that is a WARNING: the snapped target comes back either way
     # and the allocator gets to decide. Cost still scales with pixel area --
     # that is what the warning reports -- it just no longer ends the run.
     with caplog.at_level("WARNING"):
-        big = mc.compute_real_frame_budget(40000.0, 280, 1472, 832, "wan_ti2v")
+        big = mc.compute_real_frame_budget(40000.0, 280, 1472, 832, "ltx_8gb")
     assert big == 277
     assert any("affordable" in r.getMessage() for r in caplog.records)
 
 
-@pytest.mark.parametrize("engine, free_mb, frames", [
+@pytest.mark.parametrize("free_mb, frames", [
     # The two 45-word render-gate legs that died on 2026-08-13, with the exact
-    # numbers off their own MotionBudgetError messages.
-    ("fastwan_8gb", 9549.0, 69),
-    ("wan_ti2v", 9389.0, 125),
+    # numbers off their own MotionBudgetError messages. Those lanes are gone;
+    # the numbers are priced here on a live lane at the very same seed row.
+    (9549.0, 69),
+    (9389.0, 125),
     # And the refusal this repo has cited as the disqualifying evidence since
     # 2026-08-02: a length an engine that had already shipped an episode was
     # told it could not afford.
-    ("wan_ti2v", 13481.0, 173),
+    (13481.0, 173),
 ])
-def test_an_unqualified_row_may_not_price_frames(monkeypatch, engine,
-                                                 free_mb, frames):
+def test_an_unqualified_row_may_not_price_frames(monkeypatch, free_mb, frames):
     """THE REGRESSION. An unqualified row PREDICTS; it may not REFUSE.
 
     ``compute_real_frame_budget`` was the second call site of the disqualified
     ``(7000.0, 185.0)`` row and the only one that never asked
     ``cost_row_may_refuse``. ``render_driver._assert_beat_affordable`` has asked
-    since it was written and reports "admission NOT enforced"; this path,
-    reached from ``eng_wan_ti2v._floor_length``, priced frames and raised
-    anyway -- which is what took both legs.
+    since it was written and reports "admission NOT enforced"; this path priced
+    frames and raised anyway -- which is what took both legs.
 
-    Note what this is NOT: the plan's first prescription was to delete the two
+    Note what this is NOT: the plan's first prescription was to delete the
     ``FRAME_COST_MODEL`` rows, and that is a proven no-op --
     ``_DEFAULT_FRAME_COST`` is the byte-identical tuple, so every call above
-    refuses exactly the same way with the table empty. Hence
+    would refuse exactly the same way with the table empty. Hence
     ``test_deleting_a_row_changes_nothing_which_is_why_the_gate_is_the_fix``.
 
     All three cases sit ABOVE the overhead floor, so they isolate the per-frame
     price; the overhead half has its own test above.
     """
     _clear_cost_env(monkeypatch)
+    engine = "ltx_8gb"
     assert not mc.cost_row_may_refuse(engine), "fixture assumes no qualified row"
     assert mc.compute_real_frame_budget(
         free_mb, frames, 832, 480, engine) == frames
@@ -224,19 +229,20 @@ def test_an_unqualified_row_may_not_price_frames(monkeypatch, engine,
 
 def test_deleting_a_row_changes_nothing_which_is_why_the_gate_is_the_fix(
         monkeypatch):
-    """The seed rows are byte-identical to the fallback, so removing one is
-    invisible at runtime. Pinning this stops the "just delete the row" fix from
-    being proposed a third time."""
+    """The seed row was byte-identical to the fallback, so a row is invisible at
+    runtime: the table is empty now and every engine is priced at the fallback
+    exactly as it was with a row. Pinning this stops the "just delete the row"
+    fix from being proposed a third time."""
     _clear_cost_env(monkeypatch)
     assert mc._DEFAULT_FRAME_COST == (7000.0, 185.0)
-    for engine in ("wan_ti2v", "fastwan_8gb"):
-        assert mc.FRAME_COST_MODEL[engine] == mc._DEFAULT_FRAME_COST, (
-            "%s's seed row is no longer byte-identical to the fallback -- the "
-            "no-op argument in compute_real_frame_budget step 3a needs "
-            "re-deriving before it is trusted again" % engine)
-        with_row = mc._cost_model_for(engine)
-        monkeypatch.delitem(mc.FRAME_COST_MODEL, engine)
-        assert mc._cost_model_for(engine) == with_row
+    engine = "ltx_8gb"
+    assert engine not in mc.FRAME_COST_MODEL
+    without_row = mc._cost_model_for(engine)
+    monkeypatch.setitem(mc.FRAME_COST_MODEL, engine, mc._DEFAULT_FRAME_COST)
+    assert mc._cost_model_for(engine) == without_row, (
+        "a seed row equal to the fallback no longer prices identically -- the "
+        "no-op argument in compute_real_frame_budget ('why the table being "
+        "empty is not the fix') needs re-deriving before it is trusted again")
 
 
 def test_budget_env_overrides_cost_model(monkeypatch):
@@ -244,7 +250,7 @@ def test_budget_env_overrides_cost_model(monkeypatch):
     monkeypatch.setenv("OTR_VIDEO_COST_OVERHEAD_MB", "1000")
     monkeypatch.setenv("OTR_VIDEO_COST_PER_FRAME_MB", "10")
     # (min(14775,14500)*0.85 - 1000)/10 = (12325-1000)/10 = 1132 -> capped at target.
-    assert mc.compute_real_frame_budget(14775.0, 81, 1472, 832, "wan_ti2v") == 81
+    assert mc.compute_real_frame_budget(14775.0, 81, 1472, 832, "ltx_8gb") == 81
 
 
 def test_free_vram_mb_is_none_or_positive():
@@ -256,7 +262,7 @@ def test_free_vram_mb_is_none_or_positive():
 
 def test_budget_exposed_on_motion_base():
     assert mc.MotionEngineBase.compute_real_frame_budget(
-        None, 33, 832, 480, "wan_ti2v") == 33
+        None, 33, 832, 480, "ltx_8gb") == 33
 
 
 # --------------------------------------------------------------------------- #
@@ -314,17 +320,17 @@ def test_persist_moves_clip_to_episode_clips_dir(monkeypatch, tmp_path):
 
     src_dir = tmp_path / "scratch"
     src_dir.mkdir()
-    src = src_dir / "otr_wan_ti2v_abc.mp4"
+    src = src_dir / "otr_ltx_8gb_abc.mp4"
     src.write_bytes(b"fake-mp4-bytes")
     clips_dir = tmp_path / "ep" / "clips"
     monkeypatch.setattr(paths, "otr_clips_dir", lambda eid: clips_dir)
 
     result = {
         "clips": {"shot_b001": {"type": "video", "path": str(src),
-                                 "engine_id": "wan_ti2v"}},
+                                 "engine_id": "ltx_8gb"}},
         "ledger": {"video": {"shots": [
             {"shot_id": "shot_b001", "role": "retired_role_a",
-             "engine_id": "wan_ti2v"}]}},
+             "engine_id": "ltx_8gb"}]}},
     }
     rd.persist_episode_clips(result, "ep")
     new_path = result["clips"]["shot_b001"]["path"]
@@ -332,7 +338,7 @@ def test_persist_moves_clip_to_episode_clips_dir(monkeypatch, tmp_path):
     assert os.path.isfile(new_path)
     assert not src.exists()                  # moved, not copied
     assert "retired_role_a" in os.path.basename(new_path)
-    assert "wan_ti2v" in os.path.basename(new_path)
+    assert "ltx_8gb" in os.path.basename(new_path)
 
 
 def test_persist_noop_without_episode_id(tmp_path):
@@ -480,7 +486,7 @@ def _manifest(rows, fps=25):
 #
 # Both were frame REUSE, and they lived in the assembler rather than in any
 # adapter -- which is exactly why they survived the engine-layer mirror rip:
-# `extend_frames_to_target` was deleted, `eng_ltx_video`'s boomerang retired,
+# `extend_frames_to_target` was deleted, the LTX adapter's boomerang retired,
 # and the composite went on looping the same short clip afterwards. Two
 # independent review lanes found it in the same pass, and GO_FORWARD_PLAN had
 # tracked it as chunk 7c "still open" since 2026-07-27.
@@ -494,13 +500,13 @@ def test_a_short_clip_is_terminal_at_composite_time(monkeypatch):
     """The headline inversion: 17 frames against a 280-frame beat used to LOOP."""
     from nodes import otr_silent_composite as sc
     monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
-    rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
+    rows = [{"shot_id": "shot_b001", "engine_id": "ltx_8gb", "path": "x.mp4",
              "exists": True, "frame_count": 17, "target_frame_count": 280,
              "start_s": None}]
     with pytest.raises(sc.ClipUnderrunsItsBeat) as exc:
         sc.plan_timeline_segments(_manifest(rows))
     assert exc.value.real == 17 and exc.value.target == 280
-    assert "shot_b001" in str(exc.value) and "wan_ti2v" in str(exc.value)
+    assert "shot_b001" in str(exc.value) and "ltx_8gb" in str(exc.value)
     # The message must name the REMEDY, not just the number: the fix is always
     # in the render, never in the timeline.
     assert "coverage planning" in str(exc.value)
@@ -513,7 +519,7 @@ def test_the_fill_env_switch_can_no_longer_bring_looping_back(monkeypatch):
     that removed `allow_mirror` rather than defaulting it off.
     """
     from nodes import otr_silent_composite as sc
-    rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
+    rows = [{"shot_id": "shot_b001", "engine_id": "ltx_8gb", "path": "x.mp4",
              "exists": True, "frame_count": 17, "target_frame_count": 280,
              "start_s": None}]
     for val in ("0", "1"):
@@ -564,7 +570,7 @@ def test_a_clip_that_covers_its_beat_is_untouched(monkeypatch):
     """The normal path. Exact coverage plans one clip segment, no loop flag."""
     from nodes import otr_silent_composite as sc
     monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
-    rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
+    rows = [{"shot_id": "shot_b001", "engine_id": "ltx_8gb", "path": "x.mp4",
              "exists": True, "frame_count": 280, "target_frame_count": 280,
              "start_s": None}]
     segs, total = sc.plan_timeline_segments(_manifest(rows))
@@ -577,7 +583,7 @@ def test_an_OVER_long_clip_is_fine(monkeypatch):
     """Rendering MORE than the beat needs is normal -- a ladder rung overshoots
     and the assembler trims. Only a shortfall is a coverage failure."""
     from nodes import otr_silent_composite as sc
-    rows = [{"shot_id": "shot_b001", "engine_id": "ltx_audio_in", "path": "x.mp4",
+    rows = [{"shot_id": "shot_b001", "engine_id": "ltx25_native_audio_in_16gb", "path": "x.mp4",
              "exists": True, "frame_count": 449, "target_frame_count": 442,
              "start_s": None}]
     segs, total = sc.plan_timeline_segments(_manifest(rows))

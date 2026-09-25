@@ -55,17 +55,17 @@ ENGINE_MATRIX_PATH = os.path.join(REPO_ROOT, "docs", "ENGINE_MATRIX.md")
 CANVAS_FPS = 25
 
 #: Lanes whose output Sage silently corrupts, so they must REFUSE rather than
-#: render noise. LTX 0.9.8/2.3 is the family BUG-070 was written for; MiniMax H3
-#: joins this set with its adapters (Comfy-Org/ComfyUI#15263, and the per-model
-#: KJ probe FAILED on sm_120).
+#: render noise. LTX is the family BUG-070 was written for; MiniMax H3 joins
+#: this set with its adapters (Comfy-Org/ComfyUI#15263, and the per-model KJ
+#: probe FAILED on sm_120).
 #: `ltx25_video` joins on FAMILY, not on a probe of its own (2026-08-19). BUG-070
 #: is an LTX-family defect -- int8-PV Sage process-ABORTS an LTX render with no
 #: traceback -- and this lane is LTX 2.5 through the same sampler path as the
-#: three LTX lanes above it. Waiting for a per-model probe before demanding the
+#: LTX 0.9.8 lanes beside it. Waiting for a per-model probe before demanding the
 #: gate would mean the FIRST evidence is a dead process on a real leg, which is
 #: the cost `ltx_8gb` already paid (S8b-13: the one LTX lane with no gate).
 SAGE_SENSITIVE = frozenset({
-    "ltx_video", "ltx_audio_in", "ltx_8gb", "razzle_ltx_8gb", "ltx25_video",
+    "ltx_8gb", "razzle_ltx_8gb", "ltx25_video",
     "minimax_h3_video", "minimax_h3_audio_in",
 })
 
@@ -175,12 +175,6 @@ for _lane in _STILL_LANES + _PROCEDURAL_LANES:
 # then, the suite fails and says so.
 # ---------------------------------------------------------------------------
 EXPECTED_RED: dict = {
-    # LANE 1 CLOSED 2026-08-11 -- wan_ti2v's G1 and G2 rows left this table when
-    # the lane went green. The defects were: a hardcoded
-    # models/checkpoints/wan2.2-i2v.safetensors default with a bare
-    # os.path.exists that never consulted folder_paths (S8b-1 / lesson L1), and
-    # an undeclared render_canvas that let the lane fall through to 1472x832
-    # (S1 / lesson L2). Both are now pinned by tests/test_wan_ti2v.py.
     # LANE 2 CLOSED 2026-08-11 -- humo_14B_169's G2 row left this table. The
     # defect was S8b-4: the request was rewritten to 1472x832 while the graph
     # rendered 832x480 (3.07x), and OTR_HUMO_WIDTH/HEIGHT could move it again,
@@ -192,21 +186,6 @@ EXPECTED_RED: dict = {
     # claiming 832x480 on a lane whose whole identity is the pillarbox.
     # LANE 4 CLOSED 2026-08-11 -- the last HuMo tier declares its canvas,
     # and BOTH its profiles stopped claiming landscape on the pillarbox.
-    # LANE 7 CLOSED 2026-08-11 -- ltx_audio_in's G2 and G6 rows left this
-    # table. G6 was S8b-9: OTR_LTX_AV_RESERVE_VRAM_GB was the one module-scope
-    # numeric env read this adapter's own _env_num guard was never applied to,
-    # so a typo raised at import, the guarded import swallowed it, and the lane
-    # vanished from the dropdown (registry 27 -> 26) while frame_contract_for
-    # silently answered SINGLE_ONLY. G2 was S3 + S8b-10 together, and they
-    # turned out to be the same defect: the canvas was computed by an inline
-    # RECIPE-DEPENDENT branch in the driver (832x480 under ia2v, 512x288
-    # otherwise) that declared_render_canvas would have overruled anyway, and
-    # 832x480 halves to the ia2v stage-A latent 416x240 -- 240 % 32 == 16.
-    # Because LTXVLatentUpsampler doubles with NO target size, the delivered
-    # canvas IS 2x the stage-A base, so only a /64 canvas has a legal stage A.
-    # The lane declares (1024, 576), the halving is validated at its root, and
-    # an env canvas that disagrees is a named refusal. Pinned by
-    # tests/test_ltx_av_ia2v_canonical.py and tests/test_ltx_av_driver_wiring.py.
     # LANE 8 CLOSED 2026-08-11 -- ltx_8gb's G2 and G6 rows left this table. G6
     # was S8b-13: the only one of the three LTX lanes with NO
     # assert_sage_not_patched gate, on the exact family BUG-070 was written for
@@ -644,7 +623,7 @@ def gate_g2_canvas(name, eng):
         if not _canvas_pin_exists(name, canvas):
             bad.append(
                 "declares render_canvas %dx%d with no test pinning it: every "
-                "other declaring lane has one (tests/test_fastwan_8gb.py, "
+                "other declaring lane has one (e.g. "
                 "tests/test_ltx_8gb_canonical_canvas.py), and without a pin "
                 "the declaration can drift away from the graph in silence"
                 % (int(canvas[0]), int(canvas[1])))
@@ -673,16 +652,13 @@ def gate_g2_canvas(name, eng):
     return bad
 
 
-_PROFILES_DIR = os.path.join(REPO_ROOT, "config", "experiments")
-
-
 def _load_profiles():
-    """Every shipped workflow AND every experiment rig, keyed by id.
+    """Every shipped workflow, keyed by id.
 
-    THE SHIPPED HALF COMES FROM THE MATRIX, RESOLVED. Until 2026-09-24 this globbed one
-    folder that happened to hold both, so the gates below judged lanes against the
-    shipping configurations too. Those are now rows in `config/workflow_matrix.json`, and
-    losing them changed two gate verdicts -- which is the wrong half to lose: G2 exists
+    FROM THE MATRIX, RESOLVED. Until 2026-09-24 this globbed one folder that held the
+    shipping configurations and the lab rigs together; the rigs are retired and the
+    shipped workflows are rows in `config/workflow_matrix.json`. Losing them once changed
+    two gate verdicts -- which is the wrong thing to lose: G2 exists
     because a lane that declares no `render_canvas` while its configurations set
     `render.canvas_w/h` sends node 87 a number it never honours, and a SHIPPED workflow
     doing that is somebody's episode.
@@ -706,20 +682,8 @@ def _load_profiles():
                 out[pid] = resolved_profile(pid, canonical)
             except ProfileError:
                 continue
-    except Exception:  # noqa: BLE001 -- see the rig loop's note; a gate reads
-        pass           # what it can, and other tests own the matrix's health
-
-    # The experiment rigs, read as files exactly as before.
-    if os.path.isdir(_PROFILES_DIR):
-        for fname in sorted(os.listdir(_PROFILES_DIR)):
-            if not fname.endswith(".json"):
-                continue
-            try:
-                with open(os.path.join(_PROFILES_DIR, fname), "r",
-                          encoding="utf-8") as fh:
-                    out.setdefault(fname[:-5], json.load(fh))
-            except Exception:  # noqa: BLE001 -- a malformed rig is another
-                continue      # test's business; this gate reads what parses
+    except Exception:  # noqa: BLE001 -- a gate reads what it can, and other
+        pass           # tests own the matrix's health
     return out
 
 
@@ -1416,11 +1380,12 @@ def test_a_halving_two_stage_lane_declares_a_64_legal_canvas():
     So the delivered canvas IS 2x the stage-A base, and stage A is /32-legal
     only when the full canvas is /64 on BOTH axes.
 
-    It was recorded against `ltx_audio_in` in lane 7 and was live in
-    `eng_ltx_video`'s HQ two-stage path the whole time (416x240 at its declared
-    832x480). It hid because 1472x832 -- the old landscape default -- is also
-    /64, so the path was legal until the lane moved to 832x480 and nobody
-    rechecked the geometry against the new canvas.
+    It was recorded against the LTX 2.3 audio-in lane in lane 7 and was live in
+    the LTX 2.3 video lane's HQ two-stage path the whole time (416x240 at its
+    declared 832x480) -- both lanes since retired. It hid because 1472x832 --
+    the old landscape default -- is also /64, so the path was legal until the
+    lane moved to 832x480 and nobody rechecked the geometry against the new
+    canvas.
 
     Generic over the registry on purpose: a future adapter that adopts the
     halve-then-x2 idiom is covered when it lands, not when someone remembers

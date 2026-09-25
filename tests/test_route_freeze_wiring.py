@@ -33,21 +33,18 @@ def _resolved(announcer, music, character):
     }
 
 
-def _direct(monkeypatch, announcer="humo_1.7B", music="ltx_audio_in",
-            character="wan_ti2v", **env):
+def _direct(monkeypatch, announcer="humo_1.7B",
+            music="ltx25_native_audio_in_16gb", character="ltx_8gb", **env):
     """Drive the real OTR_VideoDirector and return its parsed policy.
 
-    The character slot named the Wan 2.2 **14B** ``wan_i2v`` until that engine
-    was RETIRED on 2026-08-26 (it never fit the 14.5 GiB envelope). The
-    director calls ``check_retired_engine`` at the selection boundary, so a
-    retired pick now raises ``RetiredEngineError`` inside this fixture -- every
-    test in this file died before reaching its own assertion, which is why one
-    dead default produced twelve failures.
+    The default slots are live STAND-INS, not subjects. The director refuses a
+    pick that is not a registered engine, so a default naming a removed lane
+    kills every test in this file before it reaches its own assertion -- one
+    dead default once produced twelve failures here.
 
-    It is the **5B** ``wan_ti2v`` now: the surviving local image-to-video lane,
-    registered, and role-valid for ``character_video``. This is a live stand-in
-    for the fixture, NOT a retargeted assertion -- nothing here asserts a
-    14B-specific property of the character slot, and the one test that does
+    The character slot is ``ltx_8gb``: a local image-to-video lane, registered,
+    and role-valid for ``character_video``. Nothing here asserts a
+    lane-specific property of the character slot, and the one test that does
     care about the character route (``test_character_video_is_never_redirected``)
     passes its own engine in explicitly.
     """
@@ -76,11 +73,12 @@ def test_redirected_bookend_gets_a_WIDE_still_not_a_decapitated_portrait(monkeyp
 
     Pick a PORTRAIT HuMo for announcer_visual. With OTR_ENABLE_HUMO_HOSTS unset
     (the default), the radio-is-host guard redirects that beat to the WIDE
-    ``ltx_audio_in`` console. Before chunk 1b the aspect map was derived from
-    the PICKED portrait engine, so an 832x1216 portrait still was minted and the
-    wide render centre-cropped it. ``eng_ltx_av.py:345-347`` records the outcome
-    verbatim: OTR_VideoDirector "defaulted to a 832x1216 PORTRAIT still that the
-    wide render then centre-cropped, lopping the subject's head off."
+    audio-in lane (``render_driver._NEVER_HUMO_REDIRECT_ENGINE``). Before chunk
+    1b the aspect map was derived from the PICKED portrait engine, so an
+    832x1216 portrait still was minted and the wide render centre-cropped it.
+    The audio-in adapter of the day recorded the outcome verbatim:
+    OTR_VideoDirector "defaulted to a 832x1216 PORTRAIT still that the wide
+    render then centre-cropped, lopping the subject's head off."
 
     The aspect must now describe the engine that ACTUALLY renders.
     """
@@ -101,8 +99,8 @@ def test_talking_also_describes_the_EFFECTIVE_engine(monkeypatch):
     Added 2026-07-25 by QA: a mutation test showed that reverting `talking` to
     the PICKED engine left the ENTIRE suite green, so the second half of the
     same fix shipped unproven. The failure it guards: an announcer beat picks a
-    lip-syncing HuMo that the radio-is-host guard redirects to the
-    `ltx_audio_in` console, which does not lip-sync. If `talking` still
+    lip-syncing HuMo that the radio-is-host guard redirects to the wide
+    audio-in lane, which declares no talking prompt. If `talking` still
     described the picked engine, the image phase would keep minting
     face-forward "talking" portraits for an engine that never moves a mouth.
     """
@@ -213,17 +211,15 @@ def test_groups_and_shots_are_minted_from_the_frozen_map(monkeypatch):
 def test_a_policy_without_the_freeze_falls_back_to_the_picked_map():
     """A pre-1b or hand-built policy keeps its old meaning exactly.
 
-    The engine id is a STAND-IN for "whatever the picked map happens to say".
-    It read ``wan_i2v`` and moved to the live 5B ``wan_ti2v`` with the
-    2026-08-26 retirement, so this file carries no dead engine name. Nothing
-    was orphaned: this path never ran the retired-id guard in the first place
-    (ShotLock does not re-validate a hand-built map), so the property under
-    test -- the picked map wins when there is no freeze -- is unchanged.
+    The engine id is a STAND-IN for "whatever the picked map happens to say",
+    kept on a live lane so this file carries no dead engine name. The property
+    under test -- the picked map wins when there is no freeze -- does not depend
+    on which lane it is.
     """
     policy = {"policy_version": 2,
-              "video_models": _resolved("wan_ti2v", "wan_ti2v", "wan_ti2v")}
+              "video_models": _resolved("ltx_8gb", "ltx_8gb", "ltx_8gb")}
     _groups, shots = _plan(policy, role="character_video")
-    assert shots[0]["engine_id"] == "wan_ti2v"
+    assert shots[0]["engine_id"] == "ltx_8gb"
 
 
 # ---------------------------------------------------------------------------
@@ -263,10 +259,10 @@ def test_shotlock_accepts_a_matching_environment(monkeypatch):
 
 def test_shotlock_ignores_a_policy_with_no_snapshot():
     """Pre-1b / hand-built ledgers are not retro-fitted into the contract."""
-    # Same stand-in swap as above (wan_i2v retired 2026-08-26): the id is
-    # incidental here, only the ABSENCE of routing_env_snapshot is asserted.
+    # The id is incidental here, only the ABSENCE of routing_env_snapshot is
+    # asserted.
     policy = {"policy_version": 2,
-              "video_models": _resolved("wan_ti2v", "wan_ti2v", "wan_ti2v")}
+              "video_models": _resolved("ltx_8gb", "ltx_8gb", "ltx_8gb")}
     out = _lock_with(policy)
     assert out[3].startswith("shot_lock:done:")
 
@@ -310,7 +306,7 @@ def test_both_nodes_share_one_fingerprint(monkeypatch):
 # Chunk 1c -- the render-time EQUALITY ASSERTION
 # ---------------------------------------------------------------------------
 
-def _frozen_ledger(engine="ltx_audio_in", role="announcer_visual",
+def _frozen_ledger(engine="ltx25_native_audio_in_16gb", role="announcer_visual",
                    frozen_engine=None, env=None):
     """A ledger shaped like one ShotLock stamps after the 1b freeze."""
     return {
@@ -362,7 +358,8 @@ def test_a_forced_map_does_NOT_rewrite_a_frozen_ledger(monkeypatch):
 def test_shot_that_disagrees_with_the_frozen_route_is_terminal(monkeypatch):
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    ledger = _frozen_ledger(engine="humo", frozen_engine="ltx_audio_in")
+    ledger = _frozen_ledger(engine="humo",
+                            frozen_engine="ltx25_native_audio_in_16gb")
     with pytest.raises(rd.RenderError, match="frozen route says"):
         rd.assert_frozen_route(ledger)
 
@@ -371,9 +368,8 @@ def test_shot_that_diverges_from_its_group_is_terminal(monkeypatch):
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     ledger = _frozen_ledger()
-    # ANY engine that differs from the shot row proves the divergence check;
-    # this read "wan_i2v" until that engine retired 2026-08-26.
-    ledger["video"]["execution_groups"][0]["engine_id"] = "wan_ti2v"
+    # ANY engine that differs from the shot row proves the divergence check.
+    ledger["video"]["execution_groups"][0]["engine_id"] = "ltx_8gb"
     with pytest.raises(rd.RenderError, match="execution group"):
         rd.assert_frozen_route(ledger)
 
@@ -402,8 +398,9 @@ def test_frozen_route_from_ledger_reads_only_a_real_map():
     assert rd.frozen_route_from_ledger({"video": {}}) == {}
     assert rd.frozen_route_from_ledger({"video": {"roles_effective": {}}}) == {}
     assert rd.frozen_route_from_ledger(
-        {"video": {"roles_effective": {"announcer_visual": "ltx_audio_in"}}}
-    ) == {"announcer_visual": "ltx_audio_in"}
+        {"video": {"roles_effective": {
+            "announcer_visual": "ltx25_native_audio_in_16gb"}}}
+    ) == {"announcer_visual": "ltx25_native_audio_in_16gb"}
 
 
 def test_build_request_from_shot_does_not_redirect_under_a_frozen_route(monkeypatch):
@@ -421,7 +418,7 @@ def test_build_request_from_shot_does_not_redirect_under_a_frozen_route(monkeypa
         rd.build_request_from_shot(shot, ledger)
     except Exception:  # noqa: BLE001 -- request building may fail for other reasons
         pass
-    assert shot["engine_id"] == "humo"   # NOT mutated to ltx_audio_in
+    assert shot["engine_id"] == "humo"   # NOT mutated to the redirect target
 
 
 def test_end_to_end_freeze_survives_the_render_boundary(monkeypatch):

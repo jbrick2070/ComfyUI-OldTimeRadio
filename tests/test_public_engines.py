@@ -7,6 +7,7 @@ extended downloader integrity check. UTF-8, no BOM, ASCII-only.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -15,6 +16,7 @@ import sys
 import pytest
 
 from nodes import otr_video_director as vd
+from nodes._otr_shared import capability_profiles as cp
 from nodes._otr_shared import public_engines as pub
 from nodes._otr_shared.public_engines import resolve_engine_id
 from nodes._otr_video_engines import registry as vreg
@@ -25,8 +27,8 @@ _TIER = {
     # The low/high convention (operator ruling 2026-08-09) lands ONE LANE AT A
     # TIME with the video transplant, not as a family sweep -- so this dict
     # grew by one row per lane and the `<vramtier>gb` rows retired as their own
-    # lanes closed. Lane 9 (2026-08-11) retired the LAST of them
-    # (`ltx23_16gb_video`), so every row below is now a low/high id.
+    # lanes closed; the last went on 2026-08-11, so every row below is a
+    # low/high id.
     # Lane 1, 2026-08-11: wan_i2v.
     "wan22_high_i2v": "wan_i2v",
     # Lane 2, 2026-08-11: the ruled hero cast. The id states audio_in and the
@@ -40,28 +42,10 @@ _TIER = {
     "humo17_high_audio_in_wide": "humo_1.7B_169",
     # Lane 4, 2026-08-11: the last HuMo tier.
     "humo14_high_audio_in_portrait": "humo",
-    # Lane 5, 2026-08-11: the first MOVE. `wan_8gb` left this table
-    # for _LEGACY_ENGINE_ALIASES in the same edit -- never two public
-    # ids on one internal id.
-    "wan22_high_video": "wan_ti2v",
-    # Lane 6, 2026-08-11: an IDENTITY row on the way out needs no alias.
-    "wan22_high_fast": "fastwan_8gb",
-    # Lane 7, 2026-08-11: the second MOVE. `ltx23_16gb_audio_in` left this
-    # table for _LEGACY_ENGINE_ALIASES in the same edit. `low` is measured --
-    # 7.36 GiB warm at the newly declared 1024x576x193 -- and the `16gb` token
-    # said the opposite of the truth on the cheapest local video lane there is.
-    "ltx23_low_audio_in": "ltx_audio_in",
-    # Lane 8, 2026-08-11: an IDENTITY row out, so no alias -- same shape as
-    # lane 6's fastwan_8gb. `low` is measured here (6,835 MB net, cold, at
-    # 512x288x161), not inherited from the `8gb` token it replaces.
+    # Lane 8, 2026-08-11: an IDENTITY row out, so no alias. `low` is measured
+    # here (6,835 MB net, cold, at 512x288x161), not inherited from the `8gb`
+    # token it replaces.
     "ltx098_low_video": "ltx_8gb",
-    # Lane 9, 2026-08-11: the third MOVE, and the last `16gb` token retires with
-    # it. `high` is measured against its own SIBLING on the same stack and
-    # canvas -- 13,313 MB net here against ltx23_low_audio_in's 11,872 -- not
-    # against a card. The retired token was wrong in the opposite direction from
-    # `8gb`: "16GB" read as a comfortable fit for a 16 GB card while the render
-    # peaks at 97.6% of one.
-    "ltx23_high_video": "ltx_video",
     # Lane 19, 2026-08-12: the first ADD rather than a rename or a move -- a new
     # engine, so there is no old public id to retire and no alias row. `low` is
     # measured at H3's legal 124-model / 129-canvas-frame floor: 6,315 MB cold
@@ -116,10 +100,8 @@ def test_the_naming_convention_rows_state_the_model_they_load():
     RetiredEngineError instead of the generic "no engine named ..." message.
     The registry assertion that used to close this test went with the rip --
     `wan_i2v` has no CAPABILITIES row any more, because the engine is
-    unregistered. It is NOT retargeted at `wan_ti2v`: that is the 5B TI2V lane,
-    a different model with different loaders and a different frame floor, and
-    it has its own coverage. What replaces the dead assertion is the property
-    that actually matters now -- the id these rows point at is retired.
+    unregistered. What replaces the dead assertion is the property that
+    actually matters now -- the id these rows point at is retired.
     """
     assert pub._PUBLIC_ENGINES["wan22_high_i2v"] == "wan_i2v"
     assert pub._LEGACY_ENGINE_ALIASES["wan21_high_i2v"] == "wan_i2v"
@@ -201,10 +183,15 @@ def test_menu_shows_public_ids_uniquely():
     for public in _TOMBSTONE_PUBLIC_IDS:
         assert not any(o.startswith(public) for o in combo), (
             "%s is retired and must not render as a menu option" % public)
-    # the renamed internal ids never leak into the menu
-    assert "wan_ti2v (16:9)" not in combo
-    assert "ltx_video (16:9)" not in combo
-    assert "ltx_audio_in (16:9)" not in combo
+    # the renamed internal ids never leak into the menu: a lane that HAS a
+    # public id is offered only under it
+    for public, internal in _LIVE_TIER.items():
+        if internal == public:
+            continue
+        leaked = [o for o in combo if o.split(" ")[0] == internal]
+        assert not leaked, (
+            "%s is offered under its internal id %r as well as %s"
+            % (leaked, internal, public))
     assert vd.ADD_CUSTOM in combo
     assert len(combo) == len(set(combo))               # no duplicates
 
@@ -241,8 +228,9 @@ def test_exact_menu_option_for_non_tier_and_missing():
 # boundary: applier admissibility
 # --------------------------------------------------------------------------- #
 def test_director_admissible_accepts_public_legacy_and_bare():
-    ok = ("wan_8gb (16:9)", "ltx_8gb (16:9)", "ltx23_16gb_video (16:9)",
-          "wan_ti2v", "visualizer", "humo (portrait)")
+    ok = ("ltx098_low_video (16:9)", "ltx_8gb (16:9)",
+          "ltx25_high_video (16:9)", "ltx25_video", "visualizer",
+          "still_kenburns (16:9)", "humo (portrait)")
     for value in ok:
         assert _is_engine_director_admissible("announcer_video_model", value)
     assert not _is_engine_director_admissible("music_video_model", "not_an_engine")
@@ -257,17 +245,25 @@ def test_profile_apply_writes_public_menu_option():
     canonical = json.load(open(os.path.join(root, "workflows", "otr_canonical.json"),
                                encoding="utf-8"))
     schemas = build_offline_schemas()
-    applied = apply_profile(canonical, "otr_8gb_wan", schemas=schemas)
-    director = [n for n in applied["nodes"]
-                if n.get("type") == "OTR_VideoDirector"][0]
-    wv = director.get("widgets_values") or []
-    # The LIVE public option, not the internal id -- and not the RETIRED
-    # public id either. `wan_8gb` moved to the alias table in lane 5
-    # (2026-08-11), so an applier still writing it would be writing a
-    # string that resolves but is no longer in the menu the UI offers.
-    assert "wan22_high_video (16:9)" in wv
-    assert "wan_ti2v" not in wv
-    assert not any(str(v).startswith("wan_8gb") for v in wv)
+
+    def _director_values(profile):
+        applied = apply_profile(canonical, profile, schemas=schemas)
+        director = [n for n in applied["nodes"]
+                    if n.get("type") == "OTR_VideoDirector"][0]
+        return director.get("widgets_values") or []
+
+    # The LIVE public option, not the internal id.
+    wv = _director_values("otr_16gb_video")
+    assert _expected_label("ltx25_high_video", "ltx25_video") in wv
+    assert "ltx25_video" not in wv
+    # And never a LEGACY id: an applier still writing one would be writing a
+    # string that resolves but is no longer in the menu the UI offers. No row
+    # names one, so this is a real row with one role spelled the old way.
+    legacy = copy.deepcopy(cp.load_profile("otr_8gb_still"))
+    legacy["role_overrides"]["announcer_visual"] = "still_kenburns"
+    wv = _director_values(legacy)
+    assert vd.exact_menu_option_for("still_motion") in wv
+    assert not any(str(v).startswith("still_kenburns") for v in wv)
 
 
 def test_director_direct_resolves_public_pick_to_internal_engine_id():
@@ -275,8 +271,8 @@ def test_director_direct_resolves_public_pick_to_internal_engine_id():
     policy (the ShotLock-internal-only invariant: downstream never sees the public
     label)."""
     out = vd.OTRVideoDirector().direct(
-        announcer_video_model="wan_8gb (16:9)",
-        music_video_model="ltx23_16gb_video (16:9)",
+        announcer_video_model="ltx25_high_video (16:9)",
+        music_video_model="ltx098_low_video (16:9)",
         character_video_model="ltx_8gb (16:9)",
         announcer_image_model="flux_gen1",
         music_image_model="flux_gen1",
@@ -285,15 +281,15 @@ def test_director_direct_resolves_public_pick_to_internal_engine_id():
     )
     policy = json.loads(out[0])
     vm = policy["video_models"]
-    assert vm["announcer_video_model"]["engine_id"] == "wan_ti2v"
-    assert vm["music_video_model"]["engine_id"] == "ltx_video"
+    assert vm["announcer_video_model"]["engine_id"] == "ltx25_video"
+    assert vm["music_video_model"]["engine_id"] == "ltx_8gb"
     assert vm["character_video_model"]["engine_id"] == "ltx_8gb"
     # `seed_mode`/`request_seed` are gone from direct() (2026-09-13, write-only
     # widgets removed) -- the emitted VIDEO policy has no "seed" key at all.
     assert "seed" not in policy
     # NO public label survives anywhere in the emitted policy string
     for public in _TIER:
-        assert public not in out[0] or public == "ltx_8gb"   # ltx_8gb IS internal
+        assert public not in out[0], public
 
 
 # --------------------------------------------------------------------------- #
@@ -301,9 +297,9 @@ def test_director_direct_resolves_public_pick_to_internal_engine_id():
 # --------------------------------------------------------------------------- #
 def test_parse_engine_override_resolves_public_and_legacy():
     from nodes._otr_video_engines.render_driver import parse_engine_override
-    assert parse_engine_override("*=wan_8gb") == {"*": "wan_ti2v"}
-    assert parse_engine_override("music_visual=ltx23_16gb_video") == {
-        "music_visual": "ltx_video"}
+    assert parse_engine_override("*=ltx25_high_video") == {"*": "ltx25_video"}
+    assert parse_engine_override("music_visual=still_kenburns") == {
+        "music_visual": "still_motion"}
     assert parse_engine_override("character_video=visualizer") == {
         "character_video": "viz_green"}
     with pytest.raises(ValueError):
@@ -320,23 +316,23 @@ def test_cross_validate_resolves_public_id():
     decls = {"video": vreg.CAPABILITIES, "audio": areg.CAPABILITIES,
              "image": ireg.CAPABILITIES}
     mapping = cp.load_widget_mapping()
-    prof = dict(cp.load_profile("otr_8gb_wan"))
-    # Baseline: this committed NVIDIA profile deliberately carries wan_ti2v.
-    # AMD profiles are images-only, so they are not a valid fixture for this
+    prof = dict(cp.load_profile("otr_8gb_video"))
+    # Baseline: this matrix row names its lane by the INTERNAL id ltx_8gb.
+    # AMD rows are images-only, so they are not a valid vehicle for this
     # public-video-id boundary.
     cp.cross_validate_profile(prof, mapping, decls)
-    # Swap every wan_ti2v override to the LIVE PUBLIC id; it must STILL
-    # validate. Legacy `wan_8gb` alias coverage lives in the dedicated alias
-    # boundary below.
+    # Swap every ltx_8gb override to the LIVE PUBLIC id; it must STILL
+    # validate. Legacy alias coverage lives in the dedicated alias boundary
+    # below.
     swapped = 0
     for section in ("role_overrides", "slot_overrides"):
         sec = dict(prof.get(section) or {})
         for k, v in list(sec.items()):
-            if v == "wan_ti2v":
-                sec[k] = "wan22_high_video"
+            if v == "ltx_8gb":
+                sec[k] = "ltx098_low_video"
                 swapped += 1
         prof[section] = sec
-    assert swapped >= 1, "otr_8gb_wan should carry a wan_ti2v override"
+    assert swapped >= 1, "otr_8gb_video should carry an ltx_8gb override"
     cp.cross_validate_profile(prof, mapping, decls)   # public id resolves -> OK
 
 
@@ -389,10 +385,12 @@ def test_a_renamed_lane_MOVES_its_old_public_id_and_never_keeps_two():
 
     So a rename MOVES: the old id lands in `_LEGACY_ENGINE_ALIASES`, where it
     still resolves every saved graph, profile and variant that names it, and
-    never renders as a second menu option.
+    never renders as a second menu option. The moves that wrote this rule
+    retired with their lanes, so every row of the alias table is held to it.
     """
     combo = vd._video_model_combo()
-    for old, internal in (("wan_8gb", "wan_ti2v"),):
+    assert pub._LEGACY_ENGINE_ALIASES, "the alias table is empty"
+    for old, internal in pub._LEGACY_ENGINE_ALIASES.items():
         assert old not in pub._PUBLIC_ENGINES, (
             "%s must MOVE to the alias table, not stay a second public row"
             % old)

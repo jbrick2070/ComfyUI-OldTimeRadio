@@ -52,16 +52,20 @@ def _shot_for(engine, frames, role="character_video"):
     return shots[0]
 
 
+def _cap(contract):
+    """The longest single clip a contract allows: its max, or the top rung of a
+    discrete ladder (the LTX 2.5 lanes declare one rung and no max)."""
+    return int(contract.max_frames) or int(max(contract.discrete_frames))
+
+
 # ---------------------------------------------------------------------------
 # The chain lanes: a successor owns NO still and must not be asked for one
 # ---------------------------------------------------------------------------
 
-#: The Wan 2.2 14B i2v lane (`wan_i2v`) was a fourth member until it was
-#: retired 2026-08-26 for not fitting the 14.5 GiB envelope. Its row is DROPPED
-#: rather than retargeted at `wan_ti2v`: the 5B TI2V lane is a different model
-#: with its own loaders and its own frame floor, and it was already carrying its
-#: own row here, so nothing this parametrization proved went unowned.
-CHAIN_ENGINES = ["wan_ti2v", "ltx_8gb", "ltx_video"]
+#: The chain-capable local lanes: the LTX 0.9.8 lane and its sibling, capped
+#: by a max, and the LTX 2.5 lane, capped by a discrete ladder -- so both shapes
+#: of ceiling are driven past.
+CHAIN_ENGINES = ["ltx_8gb", "razzle_ltx_8gb", "ltx25_video"]
 
 
 @pytest.mark.parametrize("engine", CHAIN_ENGINES)
@@ -75,7 +79,7 @@ def test_a_chained_successor_needs_no_still_of_its_own(engine):
     deliberately never ordered.
     """
     contract = fc.frame_contract_for(vreg.get_engine(engine))
-    frames = int(contract.max_frames) + 60          # comfortably past the cap
+    frames = _cap(contract) + 60                    # comfortably past the cap
     shot = _shot_for(engine, frames)
     plan = cp.CoveragePlan.from_dict(shot["coverage_plan"])
 
@@ -95,7 +99,7 @@ def test_segment_zero_still_resolves_the_beats_own_still(engine):
     scene still, which every pre-existing branch already resolves. Pinned so a
     fix to the successors cannot quietly move segment 0 too."""
     contract = fc.frame_contract_for(vreg.get_engine(engine))
-    shot = _shot_for(engine, int(contract.max_frames) + 60)
+    shot = _shot_for(engine, _cap(contract) + 60)
     assert rd.jump_segment_still_path({}, shot, 0) is None
 
 

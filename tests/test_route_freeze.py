@@ -83,12 +83,12 @@ def _resolve(role, engine_id, snapshot=_OFF, mapping=None):
         snapshot=snapshot,
         force_mapping=mapping or {},
         redirect_applies=_redirects,
-        redirect_target="ltx_audio_in",
+        redirect_target="ltx25_native_audio_in_16gb",
     )
 
 
 def test_no_env_is_identity():
-    assert _resolve("character_video", "wan_i2v") == "wan_i2v"
+    assert _resolve("character_video", "ltx_8gb") == "ltx_8gb"
 
 
 def test_empty_pick_stays_empty():
@@ -104,12 +104,12 @@ def test_force_map_star_is_the_catch_all():
 def test_explicit_role_beats_star():
     assert _resolve("character_video", "humo",
                     mapping={"*": "viz_camera",
-                             "character_video": "wan_i2v"}) == "wan_i2v"
+                             "character_video": "ltx_8gb"}) == "ltx_8gb"
 
 
 def test_redirect_fires_for_bookend_roles_only():
-    assert _resolve("announcer_visual", "humo") == "ltx_audio_in"
-    assert _resolve("music_visual", "humo") == "ltx_audio_in"
+    assert _resolve("announcer_visual", "humo") == "ltx25_native_audio_in_16gb"
+    assert _resolve("music_visual", "humo") == "ltx25_native_audio_in_16gb"
     # character_video is never subject to the guard
     assert _resolve("character_video", "humo") == "humo"
 
@@ -129,8 +129,8 @@ def test_cloud_audio_driven_face_stays_cloud():
 def test_order_is_force_map_then_redirect():
     """ORDER IS THE CONTRACT, and it matches the render path exactly."""
     # Forcing a HuMo onto a bookend still redirects.
-    assert _resolve("announcer_visual", "wan_i2v",
-                    mapping={"*": "humo"}) == "ltx_audio_in"
+    assert _resolve("announcer_visual", "ltx_8gb",
+                    mapping={"*": "humo"}) == "ltx25_native_audio_in_16gb"
     # Forcing a non-HuMo onto a bookend that WOULD have redirected does not.
     assert _resolve("announcer_visual", "humo",
                     mapping={"*": "viz_camera"}) == "viz_camera"
@@ -178,8 +178,9 @@ def test_parse_delegates_the_grammar_to_the_render_driver():
             seen["spec"] = spec
             return {"*": "viz_camera"}
 
-    assert rf.parse_force_map("*=wan_8gb", driver=_Driver()) == {"*": "viz_camera"}
-    assert seen["spec"] == "*=wan_8gb"
+    assert rf.parse_force_map("*=ltx098_low_video",
+                              driver=_Driver()) == {"*": "viz_camera"}
+    assert seen["spec"] == "*=ltx098_low_video"
 
 
 # ---------------------------------------------------------------------------
@@ -206,9 +207,9 @@ def test_freeze_role_engines_applies_the_redirect_live():
 
 
 def test_frozen_target_is_the_constant_not_a_literal():
-    """Two former mirrors hard-coded ``"ltx_audio_in"``. If that constant is
-    ever renamed, this test fails instead of the product silently splitting
-    into an image phase and a render phase that disagree."""
+    """Two former mirrors hard-coded the target as a bare literal. If that
+    constant is ever renamed, this test fails instead of the product silently
+    splitting into an image phase and a render phase that disagree."""
     import nodes._otr_video_engines  # noqa: F401
     from nodes._otr_video_engines import render_driver as rd
 

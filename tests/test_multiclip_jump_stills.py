@@ -45,13 +45,10 @@ CHAIN_CONTRACT = fc.FrameContract(
 #: test below overrides its frame contract outright, so the only properties
 #: actually leaned on are that the id is registered and that its lane consumes
 #: a scene still (`_lane_consumes_a_still` -> True, via a required `init_image`).
-#: This was `wan_i2v` -- the Wan 2.2 14B -- until that engine was retired
-#: 2026-08-26 for not fitting the 14.5 GiB envelope. `wan_ti2v` (the 5B TI2V
-#: lane) inherits the seat because it was verified to hold BOTH of those
-#: properties, not because the names look alike: it is a different model with
-#: different loaders and a different frame floor, and none of that reaches these
-#: tests because the contract is monkeypatched over it either way.
-CARRIER_ENGINE = "wan_ti2v"
+#: `ltx_8gb` holds the seat because it was verified to hold BOTH of those
+#: properties; its own loaders and frame floor never reach these tests, because
+#: the contract is monkeypatched over it wherever the shape matters.
+CARRIER_ENGINE = "ltx_8gb"
 
 
 def _use_contract(monkeypatch, contract, engine_id=CARRIER_ENGINE):
@@ -167,16 +164,14 @@ def test_chunk_4_is_behaviour_inert_today():
     inside the carrier lane's cap, so the partitioner returns ONE segment and a
     single-clip beat owes nothing.
 
-    The correction was forced by the retirement, which retargeted this fixture
-    from the 14B onto the 5B. Both lanes plan a 50-frame beat to ONE segment
-    (max_frames=177, quantum 4, strict_first_frame on each), so the retarget
-    changed no behaviour here -- it is the same single-segment planning path.
+    The carrier plans a 50-frame beat to ONE segment (max_frames=161, 8n+1,
+    strict_first_frame) -- the single-segment planning path.
 
     THE STAMP-ABSENCE ASSERTION ALONE CANNOT CATCH A SPLIT, which is why the
     segment_count assertion below it exists (added 2026-08-26 after an
-    adversarial review). `wan_ti2v` declares continuity=strict_first_frame, so a
-    split on this lane becomes a CHAIN, and a chained beat stamps no jump-still
-    requests at all -- that is exactly what
+    adversarial review). The carrier declares continuity=strict_first_frame, so
+    a split on this lane becomes a CHAIN, and a chained beat stamps no
+    jump-still requests at all -- that is exactly what
     `test_a_chained_beat_gets_no_stamp_at_all` pins. Measured: narrowing the
     carrier to max_frames=25 split this beat into THREE chained segments and the
     stamp-absence assertion still returned True. So absence of the stamp proves
@@ -186,10 +181,9 @@ def test_chunk_4_is_behaviour_inert_today():
     (segment_count), or a beat that owes no segment stills was stamped with them
     (jump_still_requests).
 
-    ONE PROPERTY THE CARRIER HAS AND THE 14B DID NOT: `wan_ti2v` is in
-    `frame_contract.PLANNING_CAP_ENGINES`, so its effective contract is
-    narrowable by `policy["max_render_frames"]`. These fixtures deliberately
-    leave that key unset, which is why declared == effective here.
+    The carrier is in `frame_contract.PLANNING_CAP_ENGINES`, so its effective
+    contract is narrowable by `policy["max_render_frames"]`. These fixtures
+    deliberately leave that key unset, which is why declared == effective here.
     """
     beats = _beats(n=3)
     _groups, shots = sl.build_execution_plan(beats, _budget(beats), {},

@@ -90,7 +90,7 @@ def test_acceptance_API_places_HQ_in_all_three_role_slots():
     path = Path(__file__).parents[1] / "workflows" / "otr_canonical.json"
     workflow = json.loads(path.read_text(encoding="utf-8"))
     schemas = build_offline_schemas()
-    applied = apply_profile(workflow, "otr_ltx25_high_video", schemas=schemas)
+    applied = apply_profile(workflow, "otr_16gb_video", schemas=schemas)
     doc = workflow_to_api_prompt(applied, schemas)
     director = next(spec for spec in doc.values()
                     if spec.get("class_type") == "OTR_VideoDirector")
@@ -523,9 +523,10 @@ def test_the_locked_sampling_values_reach_the_graph(graph):
 
 
 def test_the_decode_knobs_come_from_the_recipe_not_the_sibling(graph):
-    """``eng_ltx_av`` decodes whole-clip at an env-driven 4096/8. Inheriting
-    that by resemblance would swap a measured recipe value for a different one
-    on a lane with 0.02 GiB of headroom, and nothing would say so."""
+    """The retired LTX 2.3 audio lane decoded whole-clip at an env-driven
+    4096/8. Inheriting that by resemblance would swap a measured recipe value
+    for a different one on a lane with 0.02 GiB of headroom, and nothing would
+    say so."""
     dec = graph["decode"]["inputs"]
     assert dec["temporal_size"] == R.LTX25_STAGE2_DECODE_TEMPORAL_SIZE == 64
     assert (dec["temporal_overlap"]
@@ -568,9 +569,9 @@ def test_the_video_vae_is_ONE_loader_matching_the_golden_recipe(graph):
     decode -- exactly lab node 2.
 
     A DRAFT SPLIT IT IN TWO AND THAT WAS CUT, so this test guards the cut
-    rather than the split. The split was inherited by resemblance from
-    ``eng_ltx_av`` on the theory that a separate encode-side node lets
-    ``free_after_use`` drop the VAE before the sampler peak. It cannot:
+    rather than the split. The split was inherited by resemblance from the
+    retired LTX 2.3 audio lane on the theory that a separate encode-side node
+    lets ``free_after_use`` drop the VAE before the sampler peak. It cannot:
     ``_topo_order`` is Kahn with ties on sorted node id and a ``VAELoader`` has
     no dependencies, so the decode-side copy is scheduled in the FIRST batch
     anyway and is held until its only consumer runs at the very end. The

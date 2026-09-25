@@ -1,4 +1,5 @@
-"""B3 -- the tier ceiling PLANS, for exactly one lane, and WAN does not move.
+"""B3 -- the tier ceiling PLANS, for the allowlisted lanes only, and the rest of
+the roster does not move.
 
 ``max_render_frames`` is a per-clip render-length ceiling that rides
 profile -> OTR_VideoDirector widget -> policy -> ledger. Until B3 the coverage
@@ -7,13 +8,11 @@ STATIC contract, so a tier that pinned 65 still got 161-frame segments it
 cannot afford.
 
 THE TRAP THIS FILE EXISTS TO GUARD (judgment section 3): the ceiling is NOT a
-general planning cap. WAN reads 17, renders a short native clip, and
-ping-pongs it up to the beat length -- its beat length is unchanged by the
-ceiling. Narrowing WAN's contract before ``partition_beat`` would turn every
-WAN beat into a pile of 17-frame renders and silently rewrite the low-VRAM
-tier PBUG-20260723-02 just fixed. So the derivation is scoped to
-``frame_contract.PLANNING_CAP_ENGINES``, an allowlist of one, and the WAN
-regression below ships in the same commit as the narrowing.
+general planning cap. A ceiling that plans and a ceiling that merely caps a
+render are different things, so the derivation is scoped to
+``frame_contract.PLANNING_CAP_ENGINES`` -- a named allowlist -- and a lane
+outside it must plan exactly the same topology pinned or unpinned. That
+regression is pinned below.
 
 WHAT MAKES THESE TESTS NON-DECORATIVE. A pre-code panel warned that the
 obvious assertions here ("a receipt was stamped", "the ceiling rode the
@@ -27,8 +26,6 @@ arithmetic that would have happened anyway.
 """
 
 from __future__ import annotations
-
-import pathlib
 
 import pytest
 
@@ -211,55 +208,35 @@ def test_a_ceiling_exactly_at_the_floor_is_legal():
 
 
 # ---------------------------------------------------------------------------
-# THE WAN REGRESSION -- ships in this commit by judgment section 3
+# THE ALLOWLIST REGRESSION -- judgment section 3
 # ---------------------------------------------------------------------------
 
-def test_a_pinned_ceiling_NOW_narrows_wan_ti2v_coverage_topology():
-    """INVERTED 2026-08-02. This asserted that a pinned tier ceiling must NOT
-    move WAN's topology, because the ceiling was a RENDER cap the adapter
-    filled by mirroring. The mirror is gone: a ceiling the planner cannot see
-    is now a beat the engine REFUSES, so the ceiling must reach the planner.
+def test_a_pinned_ceiling_does_NOT_move_a_lane_outside_the_allowlist():
+    """A ceiling reaches the planner only for an allowlisted engine.
+
+    ``humo_1.7B`` declares a max (177) the 65-frame ceiling would narrow if the
+    derivation were a general planning cap, and this beat is long enough that
+    its unpinned plan carries a segment over the ceiling -- so an unscoped
+    derivation could not hide here. Its plan must be identical pinned and
+    unpinned, and no receipt may be stamped for a narrowing that never happened.
     """
-    pinned = _plan_one("wan_ti2v", 17)
-    unpinned = _plan_one("wan_ti2v", None)
-    assert pinned["coverage_plan"] != unpinned["coverage_plan"], (
-        "a pinned ceiling must now narrow WAN's topology: %r vs %r"
+    assert "humo_1.7B" not in fc.PLANNING_CAP_ENGINES
+    pinned = _plan_one("humo_1.7B", CEILING_ON_GRID)
+    unpinned = _plan_one("humo_1.7B", None)
+    assert max(_renders(unpinned)) > CEILING_ON_GRID, (
+        "the unpinned plan must exceed the ceiling or this proves nothing; "
+        "got %r" % (_renders(unpinned),))
+    assert pinned["coverage_plan"] == unpinned["coverage_plan"], (
+        "a pinned ceiling moved a lane outside the allowlist: %r vs %r"
         % (_renders(pinned), _renders(unpinned)))
-    assert max(_renders(pinned)) <= 17, (
-        "every planned segment must fit the pinned ceiling; got %r"
-        % (_renders(pinned),))
-    assert pinned.get("coverage_contract") is not None, (
-        "a narrowed plan must stamp its coverage_contract receipt")
+    assert pinned.get("coverage_contract") is None
 
 
-def test_wan_ti2v_has_NO_ping_pong_mirror():
-    """The operator's rule, pinned in the source: original video for every
-    second of audio.
-
-    This test used to assert the OPPOSITE -- that the ping-pong call survives --
-    because the mirror was the 8GB tier's way of filling a beat it could not
-    render in one pass. The ruling of 2026-08-02 ends that: a short render is a
-    refusal, and coverage planning covers the beat with native segments
-    instead. A mirrored tail is re-used video wearing a new timestamp.
-    """
-    source = pathlib.Path(
-        vreg.get_engine("wan_ti2v").__class__.__module__.replace(".", "/"))
-    path = pathlib.Path(__file__).resolve().parents[1] / (str(source) + ".py")
-    text = path.read_text(encoding="utf-8")
-    assert "extend_frames_to_target" not in text, (
-        "wan_ti2v must never mirror: every second of audio gets ORIGINAL "
-        "video, so a VRAM-bounded short render refuses and the planner covers "
-        "the beat with native segments")
-
-
-def test_a_coverage_planned_wan_beat_is_all_NATIVE_segments():
-    """The replacement for the mirror, on the beat that actually failed live.
-
-    173 frames refused as one render; it now covers as several native segments
-    whose visible frames sum to exactly the beat.
-    """
+def test_a_coverage_planned_capped_beat_is_all_NATIVE_segments():
+    """What replaced the mirror: a beat longer than the tier ceiling covers as
+    several native segments whose visible frames sum to exactly the beat."""
     contract = fc.effective_frame_contract(
-        "wan_ti2v", fc.frame_contract_for(vreg.get_engine("wan_ti2v")), 81)
+        "ltx_8gb", fc.frame_contract_for(vreg.get_engine("ltx_8gb")), 81)
     plan = cp.partition_beat(173, contract)
     assert plan.segment_count > 1
     assert all(s.render_frames <= 81 for s in plan.segments)
@@ -308,21 +285,12 @@ def test_the_derivation_is_a_NAMED_allowlist():
     per-engine decision with a live proof attached, and this fails until someone
     updates it deliberately.
 
-    Was an allowlist of ONE until 2026-08-01. ``fastwan_8gb`` joined with the
-    live proof the constant's own comment demands: a canonical run refused by
-    name -- "fastwan_8gb was handed a coverage-planned segment of 177 frame(s)
-    but this tier pins its render ceiling at 17". Both WAN-family adapters are
-    CHAINABLE (strict_first_frame), so partition_beat plans multi-clip coverage
-    for them, and a multi-clip beat never reaches ``_floor_length`` -- the
-    ping-pong that makes a low ceiling harmless on the single-clip path never
-    runs. Listing the engine lets the planner see the cap.
-
-    ``wan_ti2v`` is deliberately NOT here. Its ceiling stays a RENDER cap and
-    its topology stays unmoved (pinned below); the same contradiction is latent
-    for it and is logged as its own defect rather than fixed inside this build."""
-    assert fc.PLANNING_CAP_ENGINES == ("ltx_8gb", "razzle_ltx_8gb",
-                                       "fastwan_8gb", "wan_ti2v")
-    assert "wan_ti2v" in fc.PLANNING_CAP_ENGINES
+    ``ltx_8gb`` plans real coverage: its declared continuity makes it
+    CHAINABLE, so partition_beat plans multi-clip segments up to the contract
+    max, and a tier that pins a lower render ceiling must be visible to the
+    planner or plan and contract disagree and the render refuses the segment by
+    name. ``razzle_ltx_8gb`` is the same substrate."""
+    assert fc.PLANNING_CAP_ENGINES == ("ltx_8gb", "razzle_ltx_8gb")
 
 
 # ---------------------------------------------------------------------------
@@ -391,7 +359,9 @@ def test_the_render_boundary_refuses_a_receipt_whose_ENGINE_was_swapped():
     CONTRACT receipt -- not by arithmetic accident.
     """
     shot = _plan_one("ltx_8gb", CEILING_ON_GRID)
-    shot["engine_id"] = "wan_ti2v"
+    # The sibling on the SAME substrate and the SAME ladder: only the engine
+    # differs, so an arithmetic check could never tell the two apart.
+    shot["engine_id"] = "razzle_ltx_8gb"
     with pytest.raises(rd.RenderError, match="COVERAGE CONTRACT"):
         rd.assert_coverage_plans(_ledger_from(shot, CEILING_ON_GRID))
 
@@ -428,7 +398,7 @@ def test_the_boundary_refuses_a_MALFORMED_receipt():
 def test_an_unpinned_ledger_with_no_ceiling_key_still_validates():
     """Every hand-built fixture and both HTTP entry points build a video
     section with no ``max_render_frames`` key at all."""
-    shot = _plan_one("wan_ti2v", None)
+    shot = _plan_one("ltx25_video", None)
     ledger = {"episode_id": "ep_b3", "video": {"shots": [dict(shot)]}}
     assert rd.assert_coverage_plans(ledger) == 1
 
@@ -452,16 +422,16 @@ def test_the_ceiling_has_exactly_one_normalization(raw, expected):
     nobody can parse must not silently become a small number.
 
     THE ADAPTER SIDE IS THE THIRD SITE and it is checked here (2026-07-27
-    post-code panel). ``motion_common.profile_max_render_frames`` is what
-    ``eng_wan_ti2v._floor_length`` reads to resolve WAN's native cap at render
-    time; it was a hand-copied fourth expression that agreed with the others
-    only because someone copied carefully. A test named "exactly one
-    normalization" that never touched the site its own docstring cited was
-    exactly the decorative shape this build keeps finding.
+    post-code panel). ``motion_common.profile_max_render_frames`` is what an
+    in-process adapter reads to resolve its tier cap at render time; it was a
+    hand-copied fourth expression that agreed with the others only because
+    someone copied carefully. A test named "exactly one normalization" that
+    never touched the site its own docstring cited was exactly the decorative
+    shape this build keeps finding.
     """
     assert fc.normalized_planning_ceiling(raw) == expected
     assert sl._planning_ceiling({"max_render_frames": raw}) == expected
-    engine = vreg.get_engine("wan_ti2v")
+    engine = vreg.get_engine("ltx_8gb")
     engine._active_profile = {"max_render_frames": raw}
     try:
         assert engine.profile_max_render_frames() == expected

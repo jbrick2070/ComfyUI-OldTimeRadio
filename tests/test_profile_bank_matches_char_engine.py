@@ -6,7 +6,7 @@ Four profiles paired `voice_bank: default` with `char_voice_engine: kokoro`
 `default` with `bark` (`[bark_legacy]`); CastLock raised VoiceCastingError for
 all five at the first episode -- the exact Mac / AMD / CPU rows the "ship all
 audio lanes on kokoro" ruling is about. This keeps the pairing honest for every
-profile, so a new lab preset cannot ship the same trap.
+workflow, so a new matrix row cannot ship the same trap.
 """
 from __future__ import annotations
 
@@ -25,17 +25,15 @@ _REPO = os.path.dirname(_HERE)
 
 
 def _pinned_profiles():
-    """Every SHIPPED workflow and every experiment rig that names a character voice.
+    """Every workflow that names a character voice.
 
-    BOTH, and the shipped half is the one that matters. This used to glob
-    `config/profiles/*.json`; that folder is gone, and the shipped workflows are now
-    rows in `config/workflow_matrix.json` where `char_voice_engine` is a declared key
-    indicator, so all 24 state one. The five configurations whose broken pairing this
-    test exists for were shipped rows -- reading only the rigs would watch the lab and
-    ignore the graphs a stranger opens.
+    This used to glob `config/profiles/*.json`; that folder is gone, and every
+    workflow is now a row in `config/workflow_matrix.json` where
+    `char_voice_engine` is a declared key indicator, so all 24 state one. The
+    five configurations whose broken pairing this test exists for were shipped
+    rows -- the graphs a stranger opens.
 
-    Resolved through `load_profile`, which takes a matrix row when there is one and
-    falls back to `config/experiments/<id>.json` otherwise.
+    Resolved through `load_profile`, which reads matrix rows and nothing else.
     """
     from nodes._otr_shared.capability_profiles import (
         ProfileError, known_profile_ids, load_profile)
@@ -52,7 +50,7 @@ def _pinned_profiles():
             rows.append((pid, engine, str(so.get("voice_bank") or "")))
 
     assert rows, "nothing pins a character voice engine -- this test is checking nothing"
-    # NON-VACUITY, sharpened: the shipped workflows must be in here, not just rigs.
+    # NON-VACUITY, sharpened: the shipped workflows must be in here.
     # `char_voice_engine` is a key indicator, so every matrix row states one; if none
     # of them appear, the enumeration has silently stopped reaching the matrix.
     import json as _json

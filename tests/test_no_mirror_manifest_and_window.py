@@ -281,8 +281,8 @@ def test_rows_with_no_shot_id_do_not_all_collapse_onto_one_key():
 # ---------------------------------------------------------------------------
 # The boundedness stamp (7.3)
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("engine_id", ["wan_ti2v", "ltx_video", "humo",
-                                       "ltx_8gb", "ltx_audio_in"])
+@pytest.mark.parametrize("engine_id", ["ltx25_video", "humo", "ltx_8gb",
+                                       "ltx25_native_audio_in_16gb"])
 def test_a_bounded_engine_is_stamped_TRUE(engine_id):
     shot = {"engine_id": engine_id}
     sl._stamp_frame_bounded(shot)
@@ -314,6 +314,6 @@ def test_a_zero_length_beat_still_gets_its_boundedness():
     """It is stamped by its own function precisely so it does not inherit
     ``_stamp_coverage_plan``'s early return for a beat that renders nothing --
     the engine is not in doubt just because the beat is empty."""
-    shot = {"engine_id": "wan_ti2v", "target_frame_count": 0}
+    shot = {"engine_id": "ltx_8gb", "target_frame_count": 0}
     sl._stamp_frame_bounded(shot)
     assert shot["frame_bounded"] is True

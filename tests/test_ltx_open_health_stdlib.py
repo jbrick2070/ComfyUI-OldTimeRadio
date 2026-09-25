@@ -17,7 +17,7 @@ from unittest import mock
 
 REPO = Path(__file__).resolve().parents[1]
 PREVIOUS_LTX_ENGINES = frozenset({
-    "ltx_video", "ltx25_video", "ltx_audio_in",
+    "ltx25_video",
 })
 
 

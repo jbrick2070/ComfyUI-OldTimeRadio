@@ -1,8 +1,9 @@
 """An engine the partitioner can split MUST be able to name its own handles.
 
-THE LIVE FAILURE (45-word campaign, leg `ltx_video`, 2026-07-29, 730s in):
+THE LIVE FAILURE (45-word campaign, 2026-07-29, 730s in, on an LTX lane since
+retired):
 
-    SessionIdentityUnavailable: engine 'ltx_video' would render 2 segments from
+    SessionIdentityUnavailable: engine '...' would render 2 segments from
     ONE set of handles but declares no session_identity(), so nothing can prove
     the model segment 2 renders with is the one segment 1 loaded. Declare the
     identity (engine, recipe, weights) or render this beat single-clip.
@@ -14,7 +15,7 @@ handles, and an engine that cannot describe those handles cannot prove they did
 not move underneath it.
 
 What was wrong is WHERE it was discovered. `session_identity()` was added one
-engine at a time -- ltx_8gb first, then wan_i2v, wan_ti2v and humo across the
+engine at a time -- ltx_8gb first, then the other local lanes across the
 wiring block -- and nothing ever checked the REST of the roster. So an engine
 the partitioner is perfectly willing to split reached a GPU leg, wrote a
 script, minted its stills, assembled its audio, and only THEN discovered it
@@ -46,7 +47,8 @@ FPS = 25
 
 #: A beat long enough that any engine with a real per-clip ceiling has to split
 #: it. Thirty seconds is not exotic -- the campaign's 45-word episodes produce
-#: beats well past every heavy lane's cap, which is how `ltx_video` found this.
+#: beats well past every heavy lane's cap, which is how the live failure found
+#: this.
 LONG_BEAT = FPS * 30
 
 
@@ -199,15 +201,8 @@ def test_this_gate_is_not_vacuous():
         "live roster and CAPABILITIES disagree: only-live=%s only-declared=%s"
         % (sorted(set(names) - set(vreg.CAPABILITIES)),
            sorted(set(vreg.CAPABILITIES) - set(names))))
-    # `wan_i2v` (the Wan 2.2 14B) was an anchor here until it was retired
-    # 2026-08-26 for not fitting the 14.5 GiB envelope. Requiring it in the live
-    # roster now asserts a falsehood, so the row is REMOVED rather than pointed
-    # at `wan_ti2v` -- the 5B TI2V lane is a different model and already anchors
-    # itself on the line above. Nothing is orphaned: the retirement is asserted
-    # positively three lines down, where RETIRED_ENGINE_IDS must not intersect
-    # the live roster, which is the stronger of the two checks anyway.
-    for anchor in ("humo", "ltx_video", "ltx_8gb", "wan_ti2v",
-                   "fastwan_8gb", "viz_green", "still_flat"):
+    for anchor in ("humo", "ltx25_video", "ltx_8gb", "minimax_h3_video",
+                   "viz_green", "still_flat"):
         assert anchor in names, anchor
     from nodes._otr_shared.public_engines import RETIRED_ENGINE_IDS
     assert not (set(names) & RETIRED_ENGINE_IDS), (
@@ -219,20 +214,18 @@ def test_this_gate_is_not_vacuous():
 
 
 def test_the_engines_that_forced_this_gate_are_still_covered_by_it():
-    """`ltx_video` is the engine that failed live; `ltx_8gb`, `humo` and
-    `wan_ti2v` are three that already had an identity. If a contract change
-    ever drops one of them out of scope, this says so rather than letting the
-    gate quietly stop watching it.
+    """`ltx_8gb` and `humo` already had an identity when the gate was written,
+    and the LTX 2.5 pair declared theirs because of the live failure. If a
+    contract change ever drops one of them out of scope, this says so rather
+    than letting the gate quietly stop watching it.
 
-    `wan_i2v` was a fourth until the 14B was retired 2026-08-26. Its row is
-    dropped rather than retargeted -- `wan_ti2v` is a different model and is
-    already listed on its own account -- and it cost nothing to drop, because
-    the `continue` guard below had silently stopped billing the row the moment
-    the engine left the registry.
+    Every named lane must be REGISTERED: a guard that skipped an absent lane
+    silently stopped billing its row the moment the engine left the registry.
     """
-    for name in ("ltx_video", "ltx_audio_in", "ltx_8gb", "humo", "wan_ti2v"):
-        if name not in vreg.all_engine_names():
-            continue
+    names = vreg.all_engine_names()
+    for name in ("ltx25_video", "ltx25_native_audio_in_16gb", "ltx_8gb",
+                 "humo"):
+        assert name in names, name
         assert name in IN_SCOPE, (
             "%s is no longer a splittable local engine, so the identity gate "
             "no longer covers it. If that is intended, say so here; if it is a "
@@ -370,16 +363,15 @@ def test_CONTROL_a_bare_string_identity_is_not_enough_to_name_handles():
     assert len(wrapped) == 1, "a name-only identity names no handles"
 
 
-@pytest.mark.parametrize("name", ["ltx_video", "ltx_audio_in"])
+@pytest.mark.parametrize("name", ["ltx25_video", "ltx25_native_audio_in_16gb"])
 def test_the_live_lanes_carry_their_WEIGHTS_not_just_their_name(name):
-    """The two lanes added after the live failure must name what they load.
+    """The lanes that declared an identity after the live failure must name
+    what they load.
 
     An identity of just `(engine_name,)` passes every structural check above
     and detects NOTHING: it is identical before and after a weight is swapped,
     which is the entire failure this machinery exists to catch.
     """
-    if name not in vreg.all_engine_names():
-        pytest.skip("%s not registered" % name)
     engine = vreg.get_engine(name)
     identity = bs.session_identity(engine)
     assert identity is not None
@@ -387,12 +379,13 @@ def test_the_live_lanes_carry_their_WEIGHTS_not_just_their_name(name):
         "%s's identity is %r -- too thin to name its handles. It must carry a "
         "receipt per required weight, or a swapped checkpoint is invisible to "
         "it." % (name, identity))
-    assert any("transformer" in part for part in identity), (
-        "%s's identity does not mention its transformer weight: %r"
+    # The LTX 2.5 transformer is labelled by its architecture: the DiT.
+    assert any("DiT" in part for part in identity), (
+        "%s's identity does not mention its transformer (DiT) weight: %r"
         % (name, identity))
 
 
-@pytest.mark.parametrize("name", ["ltx_video", "ltx_audio_in"])
+@pytest.mark.parametrize("name", ["ltx25_video", "ltx25_native_audio_in_16gb"])
 def test_a_weight_receipt_is_stable_and_moves_when_the_file_moves(name, tmp_path):
     """The receipt is the part that has to NOTICE a swap.
 
@@ -402,8 +395,6 @@ def test_a_weight_receipt_is_stable_and_moves_when_the_file_moves(name, tmp_path
     file so both halves of its contract are exercised: two quiet reads agree,
     and rewriting the file changes the answer.
     """
-    if name not in vreg.all_engine_names():
-        pytest.skip("%s not registered" % name)
     engine = vreg.get_engine(name)
     weight = tmp_path / "fake_weight.gguf"
     weight.write_bytes(b"x" * 2048)
@@ -448,14 +439,14 @@ def test_CONTROL_the_cloud_gap_tripwire_is_an_exact_set_not_a_shrug():
     assert "word_razzle" not in CLOUD_SPLITTERS, (
         "word_razzle is retired 2026-09-17; a retired id must never reappear "
         "in the live cloud gap")
-    # This row guards the SUBSTRING hazard: `cloud_wan_i2v` is a legitimate
-    # member of the gap above, and a local Wan lane sharing most of that name
-    # must never be swept in with it. The local lane named here was `wan_i2v`
-    # until the 14B was retired 2026-08-26; `wan_ti2v` takes its place because
-    # the hazard is unchanged and the property was checked rather than assumed
-    # -- the 5B declares `sidecar_optional` isolation, so `_holds_local_handles`
-    # answers True for it and it lands in IN_SCOPE, never in CLOUD_SPLITTERS.
-    for name in ("ltx_video", "ltx_audio_in", "humo", "wan_ti2v"):
+    # This row guards the SUBSTRING hazard: `cloud_ltx25_audio_in` and
+    # `cloud_ltx25_foley_plus` are legitimate members of the gap above, and
+    # the local LTX 2.5 lanes sharing most of those names must never be swept
+    # in with them. They load weights in-process, so `_holds_local_handles`
+    # answers True for them and they land in IN_SCOPE, never in
+    # CLOUD_SPLITTERS.
+    for name in ("ltx25_video", "ltx25_native_audio_in_16gb",
+                 "ltx25_native_foley_16gb", "humo", "ltx_8gb"):
         assert name not in CLOUD_SPLITTERS, (
             "%s holds local handles and must never appear in the cloud gap"
             % name)

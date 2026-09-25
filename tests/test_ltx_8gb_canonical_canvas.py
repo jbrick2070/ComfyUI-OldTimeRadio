@@ -2,8 +2,8 @@
 
 THE DEFECT (O1). ``build_request_from_shot`` overwrites the request canvas to
 the shared landscape default for every non-face family, with deliberate
-per-engine branches after it for ``ltx_video`` and ``ltx_audio_in`` -- and none
-for ``ltx_8gb``. So the tier that exists because 8 GB cannot afford the pixels
+per-engine branches after it for two LTX lanes (since retired) -- and none for
+``ltx_8gb``. So the tier that exists because 8 GB cannot afford the pixels
 rendered at 1472x832: 8.3x the pixels its own profile asked for.
 
 THE DESIGN, AND WHY IT IS NOT THE OBVIOUS ONE. The profile's 512x288 already
@@ -104,24 +104,15 @@ def test_engines_that_declare_NOTHING_are_left_alone():
     """The seam is per-adapter opt-in by declaration. An engine that declares
     no canvas keeps whatever the existing chain gives it -- this is not a
     global canvas rewrite wearing one engine's name."""
-    # ltx_video LEFT this group deliberately on 2026-08-02 (kibitz r3): its
-    # 169-frame decode floor is only true at one canvas, so an undeclared canvas
-    # was a live channel for invalidating a static contract via
-    # OTR_LTX_RENDER_CANVAS. It now declares (832, 480). wan_i2v left the same
-    # way on 2026-08-11 (video transplant, lane 1) for the same reason -- with
-    # no declaration it fell through to 1472x832, 3.07x the pixels its tier was
-    # configured for, on a 14B fp8 lane at a 14.5 GiB gate. The invariant this
-    # test guards is unchanged -- an engine that declares NOTHING is still
-    # untouched -- and still_pan now carries the control.
-    # `humo` left this list in lane 4 (2026-08-11) when the HuMo family
-    # closed -- the third occupant to leave. `ltx_audio_in` left in lane 7 the
-    # same day: its ia2v graph halves the canvas for stage A and doubles it
-    # back with a fixed-x2 upsampler, so an undeclared canvas could produce a
-    # stage-A latent LTX's /32 grid rejects. It declares (1024, 576) now.
-    # `mesh_stage` left in lane 10: it had been choosing 1472x832 with an
-    # inline sniff inside render_clip, which is a declaration everywhere except
-    # where anything could read it, and it declares (1472, 832) properly now.
-    # What remains are lanes whose own packets have not run yet.
+    # Occupants have left this list one at a time, each because it gained a
+    # declaration of its own: the LTX lanes (a canvas-dependent decode floor
+    # made an undeclared canvas a live channel for invalidating a static
+    # contract), the HuMo family in lane 4, and `mesh_stage` in lane 10 (it
+    # had been choosing 1472x832 with an inline sniff inside render_clip,
+    # which is a declaration everywhere except where anything could read it).
+    # The invariant this test guards is unchanged -- an engine that declares
+    # NOTHING is still untouched. What remains are lanes whose own packets
+    # have not run yet.
     for other in ("still_pan", "viz_mxc_cpu"):
         assert rd.declared_render_canvas(other) is None
     assert rd.declared_render_canvas("an_engine_that_does_not_exist") is None
@@ -140,12 +131,12 @@ def test_render_single_takes_the_DECLARATION_not_the_aspect_default(
     EVERY solo lane smoke runs through that function, so every lane was
     validating the aspect default rather than its declaration. It stayed
     invisible through six lanes because all six declared exactly what this path
-    already produced (832x480 wide, 480x832 portrait). `ltx_audio_in` was the
-    first lane to declare something else, and its stage-A /32 guard failed the
-    live render immediately -- which is how this was found.
+    already produced (832x480 wide, 480x832 portrait). A since-retired LTX
+    audio lane was the first to declare something else, and its stage-A /32
+    guard failed the live render immediately -- which is how this was found.
 
-    Asserted here rather than on ltx_audio_in alone: the property belongs to
-    the declaration mechanism, not to one lane.
+    Asserted here on the 8 GB lane: the property belongs to the declaration
+    mechanism, not to one lane.
     """
     captured = {}
     monkeypatch.setattr(rd, "build_request",
@@ -210,10 +201,10 @@ def test_a_SIBLING_lane_still_takes_the_landscape_default():
     untouched, or this was a global canvas rewrite rather than a per-adapter
     declaration.
 
-    The control has moved three times, which is itself the story: wan_ti2v held
-    it until 2026-08-02, wan_i2v until 2026-08-11 morning, mesh_stage until
-    lane 10 that same day, and every handover happened because the lane gained
-    a declaration of its own. still_pan holds it now (humo cannot -- it is a
+    The control has moved three times, which is itself the story: two retired
+    lanes held it before mesh_stage, which held it until lane 10, and every
+    handover happened because the lane gained a declaration of its own.
+    still_pan holds it now (humo cannot -- it is a
     face family and takes the portrait canvas). When still_pan declares its
     canvas in lane 16, this control moves again rather than the test being
     deleted: the invariant outlives every occupant.
@@ -223,20 +214,17 @@ def test_a_SIBLING_lane_still_takes_the_landscape_default():
                                               ledger)) == LANDSCAPE
 
 
-def test_ltx_video_keeps_its_own_declared_canvas():
-    """ltx_video keeps ITS canvas; the ltx_8gb branch sits after it and must
-    not disturb it. That is the property, and it is unchanged.
+def test_ltx25_video_keeps_its_own_declared_canvas():
+    """A sibling LTX lane keeps ITS canvas; the ltx_8gb declaration must not
+    disturb it. That is the property.
 
-    The number moved 832x480 -> 1024x576 by operator ruling (2026-08-11):
-    the HQ two-stage path halves for stage A and upsamples with a fixed-x2
-    node, so both axes must be /64 or stage A is illegal. Read from the
-    declaration rather than repeated here, so the next move does not make
-    this test lie (lesson L10).
+    Read from the declaration rather than repeated here, so the next move does
+    not make this test lie (lesson L10).
     """
-    from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine
-    ledger = _ledger(engine="ltx_video")
+    ledger = _ledger(engine="ltx25_video")
     got = _canvas(rd.build_request_from_shot(_shot(ledger), ledger))
-    assert got == tuple(LtxVideoEngine.render_canvas)
+    assert got == tuple(vreg.get_engine("ltx25_video").render_canvas)
+    assert got != DECLARED
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +258,7 @@ def test_FORCING_this_engine_onto_a_non_16_9_workflow_still_renders():
     workflow's canvas. Under the ledger-reading draft that refused the whole
     episode; under the declaration it renders at 512x288, which is the point.
     """
-    ledger = _ledger(canvas={"w": 832, "h": 480}, engine="wan_ti2v")
+    ledger = _ledger(canvas={"w": 832, "h": 480}, engine="ltx25_video")
     shot = _shot(ledger)
     shot["engine_id"] = LANE                       # what the force map does
     assert _canvas(rd.build_request_from_shot(shot, ledger)) == DECLARED
@@ -289,17 +277,20 @@ def test_the_ledger_fps_cannot_displace_it_either():
 def test_the_profile_canvas_matches_the_declaration():
     """The DEAD channel keeps exactly one job.
 
-    ``config/profiles/otr_8gb_ltx.json`` still carries `render.canvas_w/h`, and
-    nothing on the render path consumes it any more. It is not authority -- but
-    it must not silently disagree with the adapter either, or the next reader
-    trusts the wrong number. This is the O1 judgment's item 6, and it is the
-    reason the profile channel may stay unconsumed rather than be deleted.
+    The ``otr_8gb_video`` row of ``config/workflow_matrix.json`` still carries
+    `render.canvas_w/h`, and nothing on the render path consumes it any more.
+    It is not authority -- but it must not silently disagree with the adapter
+    either, or the next reader trusts the wrong number. This is the O1
+    judgment's item 6, and it is the reason the profile channel may stay
+    unconsumed rather than be deleted. The row carries no frame rate of its
+    own; the rate reaches the graph through the variant's director widget,
+    which the next test pins.
     """
-    profile = json.loads(
-        (REPO / "config" / "profiles" / "otr_8gb_ltx.json").read_text("utf-8"))
+    from nodes._otr_shared.capability_profiles import load_profile
+
+    profile = load_profile("otr_8gb_video")
     render = profile.get("render") or {}
     assert (int(render.get("canvas_w")), int(render.get("canvas_h"))) == DECLARED
-    assert int(render.get("fps")) == 25
     assert (profile.get("slot_overrides") or {}).get(
         "video_render_engine") == LANE
 
@@ -308,7 +299,7 @@ def test_the_8gb_variant_workflow_agrees_with_the_declaration():
     """Same guard, one channel further out: the shipped variant's director
     widgets are what actually produce the (now unconsumed) stamp."""
     doc = json.loads((REPO / "workflows" / "variants"
-                      / "otr_8gb_ltx.json").read_text("utf-8"))
+                      / "otr_8gb_video.json").read_text("utf-8"))
     director = next(n for n in doc["nodes"]
                     if str(n.get("type") or "") == "OTR_VideoDirector")
     values = director["widgets_values"]
