@@ -403,9 +403,9 @@ class MeshStageEngine(_CheapFamilyBase):
     #: fixed-x2 upsampler here, the frames come out of Blender at full size --
     #: though 1472x832 happens to satisfy it anyway.
     #:
-    #: The lane's ONE profile (``config/profiles/otr_w45_mesh_stage.json``)
-    #: carries the same numbers, so the config an operator reads agrees with
-    #: the render.
+    #: This declaration is where the numbers live. The lane's old experiment
+    #: rig (``otr_w45_mesh_stage``) carried the same values and went with the
+    #: retired rigs folder on 2026-09-24; mesh_stage has no workflow-matrix row.
     #:
     #: **That profile channel is NOT dead, and the corpus wording that calls it
     #: "read by nothing" is wrong** (traced end to end 2026-08-11, lane 11's

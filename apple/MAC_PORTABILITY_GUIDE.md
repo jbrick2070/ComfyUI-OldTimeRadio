@@ -74,8 +74,8 @@ What that table does NOT say is just as load-bearing:
 Install the pack, load `otr_canonical` from
 **Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio**, press Run.
 
-The shipped graph is wired from the `otr_mac_mps` profile
-(`config/profiles/otr_mac_mps.json`): writer on Metal, Kokoro voices, Stable
+The shipped Mac graph is the `otr_mac16_low` row of
+`config/workflow_matrix.json`: writer on Metal, Kokoro voices, Stable
 Audio 3 music, and three visualizer video lanes that mint no still. **No image
 weights and no API key are needed.**
 

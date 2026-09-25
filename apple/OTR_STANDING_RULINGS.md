@@ -1538,6 +1538,8 @@ that raises `NewsProScriptError("final_draft", ...)` when an envelope is not an
 exact `SceneEnvelope` or does not match its advisory scene plan. Never called.
 A guard nobody invokes is not protection, and deleting it would silently accept
 a loss nobody chose.
+**Outcome 2026-09-25:** wired at the envelope build in `_otr_scifi_news_pro`,
+the one site that constructs one.
 
 **4. `_vram_log.vram_sentinel`** -- a decorator that snapshots VRAM at entry and
 calls `force_vram_offload()` when a TTS/audio function starts above a 6 GB
@@ -1546,6 +1548,10 @@ hard gate", so it is not a missing guarantee -- but on a 16 GB card whose known
 failure mode is a late OOM, an unapplied VRAM sentinel is worth a look rather
 than a delete. (`story_orchestrator` also imported `force_vram_offload` without
 using it; that import was swept.)
+**Outcome 2026-09-25:** deleted, together with `force_vram_offload` and the
+cleanup-callback registry nothing ever invoked, on the operator's call: "I don't
+need a VRAM sentinel -- the VRAM measures don't say much, and most hardware has
+better ones anyway."
 
 **THE ORDINARY DEAD HELPERS ARE GONE NOW (408 lines, suite unchanged at 12096 --
 not one test touched, which is what "dead" should mean).** Removed:

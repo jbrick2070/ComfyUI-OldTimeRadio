@@ -219,7 +219,7 @@ def test_no_device_and_no_palette_names_a_drum():
     haystack += " " + " ".join(
         pal.instruments.lower() for pal in (
             P.HOUSE_PALETTE, P.EARLY_CONSORT, P.BAROQUE_CHAMBER,
-            P.ROMANTIC_CHAMBER, P.ELECTRIC_COMBO, P.SCIFI_ORCHESTRA))
+            P.ROMANTIC_CHAMBER, P.ELECTRIC_COMBO))
     hits = [w for w in percussion if w in haystack]
     assert not hits, hits
 
@@ -254,7 +254,7 @@ def test_nothing_in_the_palette_names_the_withdrawn_texture():
     text = " ".join(
         p.instruments + " " + p.idiom
         for p in (P.HOUSE_PALETTE, P.EARLY_CONSORT, P.BAROQUE_CHAMBER,
-                  P.ROMANTIC_CHAMBER, P.ELECTRIC_COMBO, P.SCIFI_ORCHESTRA)
+                  P.ROMANTIC_CHAMBER, P.ELECTRIC_COMBO)
     ) + " " + " ".join(d for _p, d, _pace, _t in P._MOOD_DEVICES) + " " + P.DEFAULT_DEVICE
     low = text.lower()
     assert not [w for w in _NOISE_WORDS if w in low], low
@@ -333,5 +333,5 @@ def test_every_bank_genre_leads_with_its_rhythm_section_and_is_marked_rhythmic()
         assert palette.rhythmic is True, palette.key
         assert palette.instruments.startswith(first), palette.key
     for palette in (P.HOUSE_PALETTE, P.EARLY_CONSORT, P.BAROQUE_CHAMBER,
-                    P.ROMANTIC_CHAMBER, P.ELECTRIC_COMBO, P.SCIFI_ORCHESTRA):
+                    P.ROMANTIC_CHAMBER, P.ELECTRIC_COMBO):
         assert palette.rhythmic is False, palette.key

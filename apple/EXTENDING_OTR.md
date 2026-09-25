@@ -1,7 +1,6 @@
 # Extending OTR -- add your own source bank
 
-**Status:** requirements contract of record (2026-07-24). Deep reference:
-`docs/SOURCE_BANK_GUIDE.md` (the shipped-bank playbook this doc builds on).
+**Status:** requirements contract of record (2026-07-24).
 Every field name below is grounded against the live code; re-verify pins at
 build time.
 
@@ -93,8 +92,8 @@ stamps `final_video_path` and publishes to `otr/obs/` (`obs_publish OK`).
 plus a `tts_skip_reason`.
 
 The authored-inputs table (exact minimum fields for cast / scenes / shots /
-beats / lines / music) lives in `docs/SOURCE_BANK_GUIDE.md` section 7. That
-table plus the consumer list above IS the complete-ledger contract.
+beats / lines / music) lived in the retired source-bank guide; the consumer
+list above IS the complete-ledger contract now.
 
 ---
 
@@ -335,7 +334,7 @@ canonical `text` before the freeze cascade.
 
 ## 5. Author checks before you activate
 
-1. Read `docs/SOURCE_BANK_GUIDE.md` sections 5 and 7 end to end.
+1. Read the consumer list and the authored-inputs fields above end to end.
 2. Run your fetcher against your REAL source at both size extremes -- prompts
    silently tune themselves to the source shape they were tested on.
 3. Extract cast FROM your source where the source has one; never let the

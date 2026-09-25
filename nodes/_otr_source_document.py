@@ -92,8 +92,9 @@ class _Transient:
     than leaks: not a dataclass (asdict/astuple raise TypeError), no
     ``__dict__`` (``vars()`` raises), and pickling is refused by name.
 
-    The durable representation is ``SourceOverview.receipt()`` -- hashes,
-    offsets and counts, never text.
+    ``SourceOverview`` and its ``receipt()`` went with it on 2026-09-05; the
+    rule it encoded stands for anything durable here: hashes, offsets and
+    counts, never text.
     """
 
     __slots__ = ()

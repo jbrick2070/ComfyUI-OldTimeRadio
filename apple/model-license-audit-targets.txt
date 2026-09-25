@@ -1,6 +1,6 @@
 # Sprint D D0b license audit targets
 # One repo_id per line. Comments start with #. Blank lines ignored.
-# Each repo_id must have a corresponding docs/model-license-<sanitized>.md
+# Each repo_id must have a corresponding apple/model-license-<sanitized>.md
 # audit file. Sanitization: lowercase the repo_id; replace '/' with '--';
 # strip nothing else. See tools/audit_model_license.py for the canonical
 # sanitizer and validator.

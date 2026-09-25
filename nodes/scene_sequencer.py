@@ -2272,8 +2272,9 @@ class EpisodeAssembler:
                         # Post-BUG-129b: music cues route to LTX (not
                         # HuMo), so this cap is gated by LTX coherence,
                         # not HuMo's 177-frame ceiling. See
-                        # batch_ltx_render.py LTX_MAX_FRAMES=705 (28.16s
-                        # absolute hardware ceiling) and the clip_length
+                        # the LTX hardware ceiling of 705 frames (28.16s;
+                        # once LTX_MAX_FRAMES in the retired batch_ltx_render)
+                        # and the clip_length
                         # widget default (also 22.0s for parity).
                         _MUSIC_MAX_CHUNK_DUR_S = 22.0
 

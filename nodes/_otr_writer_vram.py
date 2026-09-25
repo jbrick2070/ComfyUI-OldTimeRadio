@@ -7,8 +7,8 @@ ledger. Evicting the LLM there -- after the script, before the downstream TTS /
 render phase -- keeps it from being co-resident with Bark / Kokoro / HuMo / FLUX
 during render.
 
-This is NOT a between-phases offload (CLAUDE.md "never force_vram_offload
-between LLM phases"): every writer LLM phase has already run by the call site,
+This is NOT a between-phases offload (the old rule: never offload VRAM
+between LLM phases): every writer LLM phase has already run by the call site,
 so a full teardown is correct here.
 
 Pure helper, no widget / INPUT_TYPES / socket -> no workflow-JSON wiring

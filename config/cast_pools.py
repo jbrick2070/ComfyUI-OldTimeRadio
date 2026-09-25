@@ -546,8 +546,8 @@ LEMMY_AUDITION_LINES = {
 #: The route contract version this tier speaks. Mirrors the qualified validator's
 #: `SUPPORTED_ROUTE_CONTRACT_VERSIONS` and is duplicated rather than imported
 #: because this module is config and that one is a node -- an import the other way
-#: is a cycle. `tests/test_lemmy_provisional_tier.py` pins the two together, so
-#: they cannot drift silently.
+#: is a cycle. NOTHING pins the two together any more -- the test that did was
+#: retired -- so they can drift; check both when either moves.
 PROVISIONAL_ROUTE_CONTRACT_VERSIONS = (1,)
 
 #: The two states a provisional route may be in, and the difference between them

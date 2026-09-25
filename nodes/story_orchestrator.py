@@ -54,9 +54,8 @@ from datetime import datetime, timedelta
 # The node and module are retired; the import went with them.
 # Per-phase VRAM telemetry (v1.4 Theme C). CUDA-absent safe.
 from ._vram_log import vram_snapshot, vram_reset_peak
-# (`force_vram_offload` was dropped from this import 2026-08-28: zero AST
-# loads in this module -- an import is not a use. The function itself lives
-# on in _vram_log and its real callers.)
+# (`force_vram_offload` was dropped from this import 2026-08-28 and removed
+# from _vram_log altogether 2026-09-25 -- it never had a caller.)
 
 # Canonical OTR paths -- single source of truth for output locations.
 # (director_raw_dump_dir was deleted in voice-path-cleanbreak S23.1
@@ -1418,22 +1417,6 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
 # Any '=== SCENE FINAL ===' is promoted to 'END' (terminator) below.
 
 
-# ── Name cleanup (fuzzy match against canonical cast) ────────────
-# BUG-020 fix: Under maximum chaos, LLMs hallucinate variant spellings
-# (NEMEO_SIRIKIT instead of NEMO SIRIKIT). This pure-Python pass reads
-# the canonical cast from config/episode_cast.txt and fuzzy-matches
-# every CHARACTER: line against the roster. No LLM call, no VRAM cost.
-
-# Register the LLM unloader with the VRAM Power Wash system so that
-# force_vram_offload() at node entry points also evicts the LLM.
-# `register_vram_cleanup`'s caller (`force_vram_offload` in
-# `_vram_log.py`) already wraps each callback invocation in
-# `try/except: pass`, so the callback contract is "no-arg callable"
-# only -- no wrapper required.
-from ._vram_log import register_vram_cleanup
-from . import _otr_model_loader as _otr_loader_mod
-
-register_vram_cleanup(_otr_loader_mod.unload_llm)
 
 
 

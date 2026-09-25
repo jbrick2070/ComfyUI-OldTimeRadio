@@ -104,11 +104,7 @@ ELECTRIC_COMBO = Palette(
     "Hammond organ, sustained electric guitar, soft bass guitar",
     "1960s instrumental combo",
 )
-SCIFI_ORCHESTRA = Palette(
-    "scifi_orchestra",
-    "theremin, sustained strings, low brass, distant french horn",
-    "1950s science-fiction radio orchestra",
-)
+
 
 #: THE PER-BANK GENRES (operator, 2026-09-12). Each leads with the thing
 #: that actually defines it -- the drum machine, the congas, the rhythm

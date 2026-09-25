@@ -369,8 +369,8 @@ def test_no_vram_cleanup_via_loader_wrapper():
     """`story_orchestrator._vram_cleanup_via_loader` was a thin try/except
     wrapper added at S31 B4 to satisfy `register_vram_cleanup`'s callback
     contract. S31.5 B3 audited the contract:
-    `_vram_log.force_vram_offload` already wraps each registered
-    callback in `try/except: pass`, so a no-raise wrapper is NOT
+    `_vram_log.force_vram_offload` (itself removed 2026-09-25) wrapped each
+    registered callback in `try/except: pass`, so a no-raise wrapper was NOT
     required -- the contract is "no-arg callable" only. The wrapper
     was eliminated; `_otr_model_loader.unload_llm` registers directly.
     """
@@ -380,7 +380,7 @@ def test_no_vram_cleanup_via_loader_wrapper():
         "`_vram_cleanup_via_loader` was eliminated at S31.5 B3 "
         "(Outcome A). Reintroduction creates pure delegation "
         "overhead -- the cleanup-callback contract does not require "
-        "a no-raise wrapper (see `_vram_log.force_vram_offload`). "
+        "a no-raise wrapper (the invoker it deferred to is gone too). "
         "If a future signature change forces the wrapper back, "
         "document the requirement in the new function's docstring."
     )

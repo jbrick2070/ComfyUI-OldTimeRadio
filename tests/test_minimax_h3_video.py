@@ -452,7 +452,6 @@ def test_no_shared_module_reaches_a_sibling_by_an_absolute_nodes_import():
       SOFTLY into ``_FAMILY_FALLBACK``. Every engine added since that table was
       written resolved to family "" in production, which is not in
       MOTION_FAMILIES, so those lanes were silently motion-EXEMPT.
-    * ``slot_matrix.eligible_engines_for_role`` -- raised outright.
 
     AST-BASED, and that is the point. The first draft grepped the source text
     and failed on the fixed code -- tripped by the COMMENT that explains the

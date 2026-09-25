@@ -5,10 +5,9 @@ Lemmy voice"* -- after `ED HIBBERT`, in a cast of ANNOUNCER / ERIN BURNS / ED
 HIBBERT with no Lemmy anywhere, spoke the cameo's Cockney for a whole episode.
 
 WHY THIS FILE EXISTS WHEN THE FIX ALREADY SHIPPED. The reservation landed in
-`8f3c7615` and `tests/test_lemmy_provisional_tier.py` already checks the helper:
-that `reserved_voice_ref_ids()` holds his clone refs, that it does NOT sweep in
-the catalogue voices he merely borrows, and that reserving cannot starve Lemmy of
-his own voice. **None of those exercise the selector.** They prove the LIST is
+`8f3c7615`, and `tests/test_lemmy_reserved_voice_pools.py` checks the helper:
+that `reserved_voice_ref_ids()` is non-empty and every id it names exists in
+the bank. **Neither exercises the selector.** They prove the LIST is
 right; nothing proved the POOL obeys it, and the pool is where the bug lived.
 
 That distinction is not academic here. The leak was seen AGAIN sixteen hours

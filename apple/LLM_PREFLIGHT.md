@@ -121,7 +121,7 @@ Defaulted but set explicitly on every production row: `prompt_profile`,
 `license_audit_status`, `provider`.
 
 **Licensing is not optional.** `license` + `license_audit_status` mirror a
-per-repo audit at `docs/model-license-<sanitized>.md`. A Quant twin shares
+per-repo audit at `apple/model-license-<sanitized>.md`. A Quant twin shares
 the parent's audit; do not invent a second licence file for the same
 weights.
 

@@ -5000,6 +5000,11 @@ def run_scifi_news_pro_episode(
         update={"news_close_read": read.news_close_read}
     )
     envelope = _build_envelope(int(resolved["act_count"]))
+    # Wired 2026-09-25; standing ruling #3 said this guard must not be deleted.
+    # The envelope was just built, so this asserts _build_envelope is
+    # self-consistent -- rebuilt from its own scene_count it equals itself --
+    # and fails closed as final_draft the day that stops being true.
+    _validate_scene_envelope(envelope)
     f2["episode_shape"] = {
         "act_count": int(resolved["act_count"]),
         "suggested_scenes": envelope.scene_count,

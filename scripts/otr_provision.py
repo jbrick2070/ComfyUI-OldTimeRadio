@@ -1368,7 +1368,6 @@ _ANIMATEDIFF_ENGINES = {
     "animatediff15_v3_video",
     "animatediff15_v2_video",
     "animatediff15_video",
-    "ghost_signal_official",
 }
 # Registered OTR-native video routes that own no downloadable video weights.
 # They still consume the separately routed image/music lanes below. Keeping

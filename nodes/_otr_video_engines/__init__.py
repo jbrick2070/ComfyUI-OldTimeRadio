@@ -241,9 +241,10 @@ except Exception:  # noqa: BLE001
 # THE PROMPT-ONLY LANE, and the first one that declares it. `accepts_still` is
 # False and `still_plan` is EMPTY, so the image phase mints nothing for it --
 # not a portrait, not a scene still, nothing -- and G3.7's lane-derived role set
-# reads that declaration rather than an engine name. It is a NORMAL selectable
-# row (requires_flag=None, empty default_roles) and it fails CLOSED until both
-# pinned artifacts are on disk and the ADE pack is installed.
+# reads that declaration rather than an engine name. Its id is RETIRED
+# (`RETIRED_ENGINE_IDS` in public_engines); the class stays as the parent the
+# Ghost peers subclass, and a peer fails CLOSED until both pinned artifacts
+# are on disk and the ADE pack is installed.
 #
 # Cold-import clean (V-12: torch, numpy and every ComfyUI class are lazy inside
 # load/render_clip; ghost_signal_prompt imports only hashlib/re). Guarded so a
@@ -255,7 +256,7 @@ except Exception:  # noqa: BLE001
 
 
 # The two OFFICIAL-module Ghost peers (2026-08-22). ADDITIVE: they sit beside
-# animatediff15_video, which is unchanged and remains the lane that rendered the
+# animatediff15_video -- the retired parent whose recipe rendered the
 # published episode. They exist because the default module ships with NO LICENCE
 # GRANT -- the one blocker to submitting this lane anywhere -- and because the
 # spec's own Phase-0 inventory of v2/v3 was never carried out.

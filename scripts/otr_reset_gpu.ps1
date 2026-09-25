@@ -42,9 +42,7 @@ $NeverKill = @(
 $KillMarkers = @(
     'ComfyUI.*main\.py',
     'otr_soak',
-    'otr_sweep',
-    '_otr_headless',
-    'run_video_arm_bakeoff'
+    '_otr_headless'
 )
 
 function Get-ResetTargets {

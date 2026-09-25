@@ -273,7 +273,7 @@ def test_kokoro_castlock_policy_rows_have_no_bark_presets():
 
     RENAMED 2026-09-20 from "...spoken_rows...": the rows here are policy
     and deterministic stamps. Lemmy's provisional rows clear the preset by
-    the same rule (tests/test_lemmy_provisional_tier.py), so the name is
+    the same rule -- its test was retired -- so the name is
     narrow only because this test's fixtures are."""
     from nodes.cast_lock import CastLock
 

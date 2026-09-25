@@ -22,8 +22,7 @@ $targets = Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
         $_.CommandLine -and (
             $_.CommandLine -match 'ComfyUI\\ComfyUI\\main\.py' -or
             $_.CommandLine -match 'otr_canonical_api_run' -or
-            $_.CommandLine -match 'otr_soak' -or
-            $_.CommandLine -match 'otr_banksweep'
+            $_.CommandLine -match 'otr_soak'
         )
     }
 
