@@ -169,6 +169,67 @@ writer no longer downloads into this cache (`8f8ccebb`, the `LLM` folder);
 the pin still governs Bark, MusicGen, the visual assets and the provisioner,
 and the 162-character tail it sizes for was always the visual one.
 
+### 0b. Wire the talking-face still to the audio-driven lanes (not a rip)
+
+With Kling Avatar removed (a1e5548f) no engine implements
+`wants_talking_prompt()`, so the talking still mode -- the director's
+`_role_talking`, MetaBrief's `_engine_wants_talking_prompt`, the
+`when_engine_talking` still-plan token, `TALKING_PORTRAIT_GEOMETRY` ("face-
+forward frontal close-up bust ... the whole face and mouth clearly visible")
+and the packs' `portrait_look_talking` -- is always off. The operator: "I
+think it uses stills that include a face and lips; most audio-in models do."
+MEASURED from the registry, and it narrows the question:
+- The LTX 2.5 / MiniMax H3 / cloud LTX 2.5 "audio-in" lanes are
+  `audio_conditioned_video`: the picture reacts to the sound, they do NOT
+  lip-sync. Their stills are scene stills (macro open, three-quarter beat,
+  medium-shot character in a wide 16:9 environment) and their portrait row
+  is `never`. The matrix keeps character beats OFF the LTX audio-in lane on
+  purpose (a face there would lip-sync to the ambient mix). Talking stills
+  would be WRONG for them. Leave them alone.
+- HuMo (all four) is the one `audio_driven_face` (true lip-sync) engine. Its
+  portrait row is `always`: "three-quarter portrait, full head and face"
+  (portrait) or "medium shot, head and shoulders" (16:9) -- not the frontal
+  mouth-visible close-up, although its own motion prompt says "keep the
+  mouth visible and the head toward camera". HuMo is in NO shipped graph.
+DECIDED (operator, same day): RIP the talking mode. "I don't want just a
+talking face; LTX 2.5 audio-in can handle talking faces that move and have
+action; I don't want to bring it to the brand level of talking face." Remove
+`wants_talking_prompt` lookups (director `_role_talking`, MetaBrief
+`_engine_wants_talking_prompt` / `_effective_talking_roles`), the
+`when_engine_talking` still-plan token, `TALKING_PORTRAIT_GEOMETRY` and the
+talking look segment, and the packs' `portrait_look_talking` -- the packs
+carry sha256 receipts, so regenerate/re-pin them and grep tests for the
+hashes first. HuMo keeps its current portrait framing. Scene stills with
+action stay the path for every audio lane.
+CORRECTION (operator: "audio-in, we do feed clean audio"): the audio-in lane
+already gets each character's CLEAN own voice on a character beat;
+`render_driver._uses_ambient_master_audio` excludes character-face beats from
+the master slice (2026-06-26), and only lineless announcer/music bookends use
+the mix. The `otr_8gb_ltx25_native_audio_in` display text in
+config/workflow_matrix.json ("CHARACTER BEATS STAY ON THE FOLEY LANE ON
+PURPOSE: an audio-in lane on a character face would lip-sync to the ambient
+master mix") is STALE -- correct it, and ask the operator whether that graph
+should now route character beats to the audio-in lane too.
+
+### 0b2. One lane per graph, and drop "native" from the names (operator 2026-09-25)
+
+- RULE: an audio-in graph uses audio-in for all three roles, a foley graph
+  foley, a mime graph mime. Only `workflows/otr_8gb_ltx25_native_audio_in.json`
+  breaks it (character_visual is `ltx25_native_foley_16gb`); switch it to
+  `ltx25_native_audio_in_16gb` and correct that row's stale display text.
+  Prove character lip-sync on one leg of that graph.
+- "native" meant "ComfyUI's own loaders, not GGUF"; GGUF is gone, so the word
+  is noise. Rename in ONE commit: engine ids `ltx25_native_{foley,mime,
+  audio_in}_{16gb,24gb}` and `ltx25_native_foley_blackwell`, and workflow files
+  `otr_8gb_ltx25_native_{foley,mime,audio_in}.json` and
+  `otr_24gb_native_foley.json`. Plain rename: no alias, no "renamed to"
+  message, no back-compat of any kind (operator: "don't worry about back
+  compat"). Shortcodes, tests, docs, preflight tables and the matrix follow.
+- Open: keep or remove the four engines no workflow selects
+  (`ltx25_native_foley_blackwell`, `ltx25_native_mime_24gb`,
+  `ltx25_native_audio_in_24gb`, `minimax_h3_audio_in`).
+- Generated docs should show a music column if they do not already.
+
 ### 0c. Portability fixes (Composer audit 2026-09-25, each claim grounded)
 
 Found by asking "what assumes the developer's machine?" after the models
