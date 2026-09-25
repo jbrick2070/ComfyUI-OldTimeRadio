@@ -114,9 +114,9 @@ OTR resolves these node CLASSES by name. Since 2026-09-25 the queue-time gate ch
 | pack | who needs it | what breaks without it |
 |---|---|---|
 | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | the animatediff lane | that lane only |
-| [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) | `ltx_8gb` (the 0.9.x lane), per [patches/README.md](../patches/README.md) and its kornia pad patch | NOT `ltx25`: every class the LTX 2.5 lanes ask for (ImgToVideoInplace, LatentUpsampler, DualCFGGuider, Concat/SeparateAVLatent, AudioVAEDecode, EmptyLatentAudio, ModalityGuidance) is ComfyUI core since v0.32.0 (section 0). Measured 2026-09-25 from the live server's `/object_info` `python_module`: `comfy_extras.nodes_lt*`, not the pack. And the pack's own registry (75 node ids) contains NONE of the classes any OTR engine asks for, while no OTR module imports its Python -- so on a current ComfyUI it is a dependency of nothing shipped. The 4060's B4 leg on a wiped box without it is the live confirmation; after that the provisioner stops cloning and patching it (plan row 0b). |
+| [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) | `ltx_8gb` (the 0.9.x lane), per [patches/README.md](../patches/README.md) and its kornia pad patch | NOT `ltx25`: every class the LTX 2.5 lanes ask for (ImgToVideoInplace, LatentUpsampler, DualCFGGuider, Concat/SeparateAVLatent, AudioVAEDecode, EmptyLatentAudio, ModalityGuidance) is ComfyUI core since v0.32.0 (section 0). Measured 2026-09-25 from the live server's `/object_info` `python_module`: `comfy_extras.nodes_lt*`, not the pack. And the pack's own registry (77 node ids) contains NONE of the classes any OTR engine asks for, while no OTR module imports its Python -- so on a current ComfyUI it is a dependency of nothing shipped. The 4060's B4 leg on a wiped box without it is the live confirmation; after that the provisioner stops cloning and patching it (plan row 0b). |
 
-`scripts/otr_provision.py` clones all three. If you install by hand, clone into `<comfy>/custom_nodes/` and restart ComfyUI -- node classes are registered at startup.
+`scripts/otr_provision.py` clones both. If you install by hand, clone into `<comfy>/custom_nodes/` and restart ComfyUI -- node classes are registered at startup.
 
 ## 4. Model weights
 
