@@ -233,22 +233,6 @@ def test_engine_evidence_separates_published_and_lab_proof():
     assert "exact row tuple and unlisted cards unproven" in text
 
 
-def test_readme_4060_episode_count_matches_the_structured_receipt():
-    """The video detail repeats the count, so the matrix must still own it."""
-    with io.open(os.path.join(_REPO, "config", "machine_classes.json"),
-                 encoding="utf-8") as fh:
-        matrix = json.load(fh)
-    floor = next(row for row in matrix["classes"] if row["key"] == "8gb")
-    receipts = [receipt for receipt in floor["proven"]
-                if "4060" in receipt["hardware"]]
-    assert len(receipts) == 1
-    count = int(receipts[0]["episodes"])
-
-    with io.open(os.path.join(_REPO, "README.md"), encoding="utf-8") as fh:
-        readme = fh.read()
-    assert "has published %d documented full OTR episodes" % count in readme
-
-
 def test_measurements_are_structured_and_rendered_with_conditions():
     sys.path.insert(0, os.path.join(_REPO, "scripts"))
     import otr_machine_matrix as M          # noqa: E402

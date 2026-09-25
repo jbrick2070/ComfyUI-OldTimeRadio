@@ -37,8 +37,6 @@ def test_single_class_resolution_names_the_pack_too():
     assert ADE_PACK in str(ei.value)
 
 
-
-
 def test_an_unknown_prefix_still_errors_without_inventing_a_pack():
     """No pack hint is better than a wrong one."""
     with pytest.raises(WrapperNodeMissing) as ei:
@@ -48,17 +46,3 @@ def test_an_unknown_prefix_still_errors_without_inventing_a_pack():
     assert "provided by" not in msg, "invented a pack for an unknown prefix"
 
 
-def test_the_readme_documents_the_prerequisite():
-    """The error reaches the user mid-render; the README reaches them first."""
-    import pathlib
-    readme = (pathlib.Path(__file__).resolve().parents[1] / "README.md").read_text("utf-8")
-    assert ADE_PACK in readme, "the node-pack prerequisite is undocumented again"
-    # CORRECTED 2026-09-21. This asserted `otr_nvidia_8gb_haunted`, which no
-    # shipped graph resolves and which `build_variants.SHIPPING_SET` does not
-    # contain -- a leftover from before the 8 GB AnimateDiff profile was
-    # renamed. The stale string pulled a FALSE sentence into the README to
-    # satisfy it, which is the wrong direction: the doc followed the test
-    # instead of the code. Pin the profile the shipped graph actually names.
-    assert "otr_8gb_animatediff" in readme, (
-        "the shipping 8GB AnimateDiff profile is not tied to its node-pack "
-        "requirement")

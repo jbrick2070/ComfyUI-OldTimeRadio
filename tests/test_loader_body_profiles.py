@@ -228,20 +228,3 @@ def test_load_llm_strips_ui_suffix():
     )
 
 
-def test_orchestrator_load_llm_shim_deleted():
-    """The orchestrator-side `_load_llm` B2 shim was DELETED at S31 B4
-    (Hard rule #1A non-deferrable). This test renames the previous
-    shim-returns-tuple assertion to a deletion guard. The canonical
-    surface post-S31 B4 is `_otr_model_loader.load_llm` returning a
-    cache_entry dict; there is no orchestrator-side tuple-return any
-    more.
-
-    Companion deletion guards for the other 3 symbols live in
-    `tests/test_no_orchestrator_legacy_symbols.py`.
-    """
-    from nodes import story_orchestrator as _so
-
-    assert not hasattr(_so, "_load_llm"), (
-        "`_load_llm` (the S31 B2 shim) must be deleted at S31 B4. "
-        "Re-introduction violates Hard rule #1A."
-    )

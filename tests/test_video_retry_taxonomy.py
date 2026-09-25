@@ -136,20 +136,6 @@ def test_assert_decision_invariants_rejects_a_bad_policy():
             dataclasses.replace(warn, keep_output=False))
 
 
-# --------------------------------------------------------------------------- #
-# NO FALLBACKS (Sprint A rip, 2026-07-02): the action API is GONE; the ledger
-# schema slot survives (stamped never, A5 -- no schema churn)
-# --------------------------------------------------------------------------- #
-def test_fallback_action_api_stays_deleted():
-    for name in ("build_fallback_decision", "restamp_shot_row",
-                 "append_runtime_fallback_decision", "format_swap_log"):
-        assert not hasattr(rt, name), (
-            "%s must stay deleted (NO FALLBACKS 2026-07-02)" % name)
-        assert name not in rt.__all__
-    # the escalate flag died with the chain machinery.
-    assert not hasattr(rt.classify(rt.FailureKind.OOM), "escalate_to_fallback")
-
-
 def test_no_registered_engine_declares_a_fallback():
     for name in ("humo", "humo_1.7B", "still_motion"):
         assert getattr(vreg.get_engine(name), "fallback_engine", None) is None

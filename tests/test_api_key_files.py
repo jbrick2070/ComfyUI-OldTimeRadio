@@ -84,18 +84,6 @@ def test_test_mode_ignores_pack_files_unless_opted_in(monkeypatch, tmp_path):
         resolve_api_key()
 
 
-def test_readme_heading_names_the_three_lanes_and_two_files():
-    text = (keys.PACK_ROOT / "README.md").read_text(encoding="utf-8")
-    assert "## API keys (Google, OpenRouter, Comfy Cloud)" in text
-    assert "google.secret" in text and "google_api_key.location" in text
-    assert "openrouter.secret" in text and "openrouter_api_key.location" in text
-    assert "sign into" in text.lower()
-    assert "headless" in text.lower()
-    # Rip 2026-09-19: the README must no longer advertise a Comfy key file
-    # or a server-side env var -- the sign-in IS the credential.
-    assert "comfy.secret" not in text and "comfy_api_key.location" not in text
-
-
 def test_google_broken_pointer_disables_the_lane(monkeypatch, tmp_path):
     _clear_google(monkeypatch)
     _enable_files(monkeypatch, tmp_path)

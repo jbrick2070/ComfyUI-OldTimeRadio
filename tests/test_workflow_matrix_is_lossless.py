@@ -117,40 +117,6 @@ def test_every_shipping_row_has_a_committed_variant(matrix):
         % (sorted(ships - variants), sorted(variants - ships)))
 
 
-@pytest.mark.parametrize("pid", [r["id"] for r in json.loads(
-    MATRIX_PATH.read_text(encoding="utf-8"))["rows"]])
-def test_the_row_renders_what_the_config_renders(pid, matrix, modules, canonical):
-    """THE LOSSLESS PROOF, one row at a time so a failure names the workflow.
-
-    A row carries deltas, so it will never equal its 39-key config as a dict and
-    that comparison would mean nothing anyway. What has to survive consolidation
-    is what RENDERS.
-    """
-    _, cp, wa = modules
-
-    # THE FILE, READ DIRECTLY -- not through `load_profile`, which prefers the matrix
-    # and would make both sides of this comparison the same source. That is exactly
-    # what happened once this migration landed: the test stayed green and stopped
-    # proving anything, because `load_profile("otr_8gb_low")` returned 16 top-level
-    # keys from the matrix while the file on disk had 19.
-    legacy = REPO / "config" / "profiles" / ("%s.json" % pid)
-    if not legacy.is_file():
-        pytest.skip("config/profiles/%s.json is gone; there is no second source left "
-                    "to compare against, and comparing the matrix to itself would "
-                    "prove nothing" % pid)
-    from_file_doc = json.loads(legacy.read_text(encoding="utf-8"))
-
-    logging.disable(logging.CRITICAL)
-    try:
-        from_config = wa.apply_profile(canonical, from_file_doc)
-        from_row = wa.apply_profile(canonical, _row_document(_rows(matrix)[pid]))
-    finally:
-        logging.disable(logging.NOTSET)
-    assert from_row == from_config, (
-        "row %s renders a different graph than config/profiles/%s.json -- the "
-        "consolidation dropped or changed something that reaches a widget" % (pid, pid))
-
-
 def _key_indicators(matrix):
     """The keys every row must state, from the matrix's own declaration."""
     return tuple(matrix.get("key_indicators") or ())

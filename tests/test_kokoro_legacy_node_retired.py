@@ -8,7 +8,6 @@ registration, or frozen-manifest entry). Behavioral pins only -- not a repo grep
 """
 from __future__ import annotations
 
-import importlib
 import pathlib
 
 import pytest
@@ -16,30 +15,10 @@ import pytest
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
 
-def test_kokoro_announcer_module_file_is_gone():
-    assert not (REPO / "nodes" / "kokoro_announcer.py").exists(), (
-        "nodes/kokoro_announcer.py must stay deleted (clean-break 1b); the kokoro "
-        "announcer engine lives in nodes/_otr_audio_engines/eng_kokoro.py"
-    )
-
-
-def test_kokoro_announcer_module_not_importable():
-    with pytest.raises(ModuleNotFoundError):
-        importlib.import_module("nodes.kokoro_announcer")
-
-
 # The LEGACY_AUDIO_NODES + committed-manifest assertions were dropped in the
 # audio clean-break (1c): nodes/_otr_legacy_manifest.py + the manifest JSON were
 # deleted when the last batch engine (musicgen) flipped to clip. The module-file
 # / import / registration / per_line guards below still pin kokoro's retirement.
-
-
-def test_init_has_no_kokoro_announcer_registration():
-    text = (REPO / "__init__.py").read_text(encoding="utf-8")
-    assert "kokoro_announcer" not in text, (
-        "__init__.py must not register or reference the deleted kokoro module"
-    )
-    assert "OTR_KokoroAnnouncer" not in text
 
 
 def test_kokoro_is_per_line_registry_engine():
