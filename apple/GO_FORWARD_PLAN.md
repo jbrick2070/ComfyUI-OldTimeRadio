@@ -172,78 +172,118 @@ the huggingface_hub-shaped user cache). Spec:
 ### 0b. Asset cleanup after publish -- `asset_cleanup` on the writer (decided 2026-09-25)
 
 Operator: bring the space-saver back, three settings, on the first node where
-the choices are made. Default `off`. Grounded against the tree on 2026-09-25;
-the old one (`perfect_run_spacesaver`, 2026-05-02, inert from 2026-08-08 when
-its host node was ripped, widget removed 2026-09-13) wiped the WRONG episode on
-its first day (BUG-LOCAL-014: it found the ledger by an mtime walk). Everything
-below that looks like paranoia is that bug.
+the choices are made. Default `off`. Grounded against the tree on 2026-09-25
+and reviewed the same day by two outside contrarians (ChatGPT, and a Cursor
+Spark pass grounded on the tree); every objection that survived checking is
+folded in below, and the design is FINAL -- the only open item is the wording
+of the three choices, which is his call. The old one
+(`perfect_run_spacesaver`, 2026-05-02, inert from 2026-08-08 when its host
+node was ripped, widget removed 2026-09-13) wiped the WRONG episode on its
+first day: BUG-LOCAL-014, commit `d2c2df81` (the number resolves only in git
+now), because it found the ledger by an mtime walk -- and that walker is still
+live today as the singleton's last-resort fallback (`_otr_ledger.py:637-647`).
+Everything below that looks like paranoia is that bug.
 
-**The widget.** `OTR_LedgerScriptWriter` gets one COMBO `asset_cleanup` =
-`off` | `partial` | `full`, default `off`, appended as the LAST widget: after
-`episode_language`, before the `gate_in` socket in INPUT_TYPES; `widgets_values`
-slot 36 at the end of node 1; the descriptor at the end of node 1's `inputs[]`
-so no link's `dst_slot` moves. Tooltip in plain words: off keeps everything;
-partial deletes the sound and the pictures and keeps every text file (ledger,
-canon, treatment, manifests, captions, QA); full deletes the whole episode
-folder; all three leave `otr/obs` alone. Then `build_variants.py --all` and
-`--check`: every matrix row inherits `off` (no row states it; a machine that
-wants `partial` gets it as a row edit later, not code). Fix the order
-assertion in `tests/test_episode_language_writer.py:39-40` (episode_language ->
-asset_cleanup -> gate_in) and whatever pins the writer's widget count.
+**The widget.** `OTR_LedgerScriptWriter` gets one COMBO `asset_cleanup`,
+default `off`, appended as the LAST widget: after `episode_language`, before
+the `gate_in` socket in INPUT_TYPES; `widgets_values` index 35 (the 36th
+value) at the end of node 1; the descriptor at the end of node 1's `inputs[]`
+so no link's `dst_slot` moves (five widgets already sit after the `gate_in`
+socket there, so this is the established shape). Three choices whose FIRST
+word is his: `off`, `partial (keep the text files)`, `full (keep only the obs
+video)`. Both reviewers, independently, found bare `partial` / `full`
+unreadable in a dropdown (partial WHAT? full delete or full keep?); the ledger
+stamp is the first word, so the slugs stay `off|partial|full`. If he prefers
+the bare words, that is one tuple. Tooltip in plain words: off keeps
+everything; partial deletes the sound and the pictures and keeps every text
+file (ledger, canon, treatment, manifests, captions, QA); full deletes the
+whole episode folder; all three leave `otr/obs` alone. Then
+`build_variants.py --all` and `--check`: every matrix row inherits `off` (no
+row states it; a machine that wants `partial` gets it as a row edit later, not
+code). Fix the order assertion in `tests/test_episode_language_writer.py:39-40`
+(episode_language -> asset_cleanup -> gate_in) and whatever pins the writer's
+widget count.
 
-**The carrier.** The writer stamps `meta.asset_cleanup` beside
-`delivery_intent` (`OTR_LedgerScriptWriter.py` ~3629) on BOTH the fresh path
-and the replay path: it is a per-run housekeeping choice, not story content,
-so `production_ledger._REPLAY_RUN_VOLATILE_META` gains `asset_cleanup` and a
-replay never inherits its source's choice. `off` stamps nothing (absent key =
-off, the `episode_language` convention). The mux reads the stamp off the same
-in-flight ledger `_publication_decision` already loads; an unknown value reads
-as `off` with one log line.
+**The carrier.** The writer stamps `meta.asset_cleanup` (the slug) beside
+`delivery_intent` (`OTR_LedgerScriptWriter.py` ~3629) on the fresh path. The
+replay branch returns before that site is reached (~3225), so on a replay the
+stamp plus `led.save()` go inside the replay branch BEFORE `script_json` is
+built (~3217) -- it is a per-run housekeeping choice, not story content, so
+`production_ledger._REPLAY_RUN_VOLATILE_META` gains `asset_cleanup` and a
+replay never inherits its source's choice. The load-bearing test: replay a
+bundle whose source ledger says `full` with the widget `off`, assert the key
+is absent. `off` stamps nothing (absent key = off, the `episode_language`
+convention). The mux reads the stamp off the in-flight ledger it already
+loads; an unknown value reads as `off` with one log line.
 
 **Where it fires.** `OTRMasterAudioMux.mux`, inside the existing try, after
 the delivery gate and the janitor sweep, and AFTER `_canvas_preview(final,
 obs_copy)` has been computed -- it extracts its poster frame from the
 archival `final`, which `full` deletes -- so: compute `ui`, clean, return.
-The `ui` text line names the outcome.
+The `ui` text and the report line name the obs copy as the surviving
+deliverable; they never print a removed archival path as if it were there.
+The ledger's `final_video_path` / `final_audio_path` are left as rendered (the
+history is true); the receipt below is the tombstone that explains them.
 
 **The identity guard.** The episode dir comes ONLY from
 `_inflight_episode_for_stem(stem)`: the singleton's dir must be a direct child
 of `otr_episodes_root()`, not `_`-prefixed, and the video stem must belong to
-that id. No mtime walk, no fallback. Three more facts must agree or it
-refuses: `silent_video_path` and `final` both resolve INSIDE that dir;
-`obs_copy` resolves OUTSIDE it; the dir is not `otr_obs_dir()` or a parent of
-it. It never enumerates the episodes root. It touches exactly one directory,
-and only the one this run wrote.
+that id. Then the RUN TOKEN: the ledger found for that stem must carry
+`meta.delivery_intent.delivery_token` equal to the token on the `script_json`
+wire -- the comparison `_assert_delivery_binding` already makes for required
+deliveries (~1130), reused here in a non-raising form -- and a wire with no
+token means no cleanup. That binding is what makes the live mtime fallback
+harmless: a ledger the walker wandered to from another run cannot carry this
+run's token. Three more facts must agree or it refuses: `silent_video_path`
+and `final` both resolve INSIDE that dir; `obs_copy` resolves OUTSIDE it; the
+dir is not `otr_obs_dir()` or a parent of it. No symlink or junction is ever
+followed: an entry that `is_symlink()` is unlinked as an entry, never resolved
+and never descended -- the rule `_otr_janitor.py:140` already uses -- and one
+planner test plants a symlinked dir inside the episode folder. It never
+enumerates the episodes root. It touches exactly one directory, and only the
+one this run wrote.
 
 **The publish proof.** Runs only when `obs_copy` is not None (a BLOCKED
-episode is never cleaned; the archival final is its only copy), the file
-exists and is non-empty -- on top of the stream probes `_publish_to_obs`
-already did -- and `_stamp_terminal_paths` did not report failure, so a
-`partial` ledger carries `obs_final_path` before anything is removed.
+episode is never cleaned: the archival final is its only copy, and a withheld
+publication is recoverable by design), the file exists and is non-empty -- on
+top of the stream probes `_publish_to_obs` already did -- and the ledger,
+RE-READ from disk after the stamp, carries `meta.obs_final_path` equal to
+`obs_copy` (normcase + abspath): the same structural check the
+required-delivery gate makes (~1917-1938). `_stamp_terminal_paths` returns
+prose and its return is never a signal; the mux says so itself.
 
 **What each setting does.** `partial`: walk the dir; delete files whose
-extension is on a DELETE list (`.mp4 .mkv .mov .webm .wav .flac .mp3 .m4a
-.png .jpg .jpeg .webp .gif .exr .npy`); keep everything else -- an unknown
-extension is KEPT, because the safe mistake is a kept file; remove dirs left
-empty; then stamp `meta.asset_cleanup_receipt` (mode, removed files and
-bytes, kept, skipped, when) into the surviving ledger so a reader knows why
-the WAVs are gone. `full`: `shutil.rmtree(episode_dir)`. Measured 2026-09-25
-on 90.5 GB across 135 media-bearing episode dirs: partial keeps 0.3% of the
-bytes, full keeps none. He already does `partial` by hand -- 2,291 folders in
-the tree hold only the ledger and text.
+lower-cased extension is on a DELETE list (`.mp4 .mkv .mov .webm .wav .flac
+.mp3 .m4a .png .jpg .jpeg .webp .gif .exr .npy`); keep everything else -- an
+unknown extension is KEPT, because the safe mistake is a kept file; remove
+dirs left empty. The receipt is two-phase: BEFORE the first unlink, stamp
+`meta.asset_cleanup_receipt = {state: started, mode, when}` and save, so a
+crash mid-delete leaves a record; after, update it to `state: done` with the
+removed files and bytes, kept, skipped (each named), `replay_freeze_possible:
+false`, and the time. `full`: `shutil.rmtree(episode_dir)` (the started
+receipt goes with the folder). Measured 2026-09-25 on 90.5 GB across 135
+media-bearing episode dirs: partial keeps 0.3% of the bytes, full keeps none.
+He already does `partial` by hand -- 2,291 folders in the tree hold only the
+ledger and text -- and exactly one replay bundle has been frozen in seven
+weeks, which is why partial keeps the text and not the master WAV.
 
 **Failure is a report line, never a raise.** The episode is already
 published. A locked file (a Windows handle) is skipped and named. Report:
-`asset_cleanup <mode>: removed N files (M MB), kept K, skipped S`. Nothing
-after it can bring the folder back: `save_ledger_safe` does not mkdir, and the
-next writer run binds the singleton to a new ledger.
+`asset_cleanup <mode>: removed N files (M MB), kept K, skipped S`. One
+exception: `_Interrupted` is a RuntimeError subclass
+(`otr_master_audio_mux.py:324`), so the broad catch comes AFTER an explicit
+`except _Interrupted: raise`, exactly as the mux does at ~1955 -- a plain
+`except Exception` would swallow a cancel. Nothing after it can bring the
+folder back: `save_ledger_safe` does not mkdir, and the next writer run binds
+the singleton to a new ledger.
 
 **Say the consequences out loud (tooltip and RUN.md).** A `partial` or
 `full` episode cannot be frozen into a replay bundle afterwards
 (`otr_freeze_replay_bundle.py` needs the master WAV and `stills/`,
-`portraits/`): freeze first, or run it `off`. The harness and the 5-minute
-rule read `otr/obs` and the leg log, never the episode dir. `apple/evidence`
-cites dirs the cleanup can never reach.
+`portraits/`; the canon is optional there), and the refusal is loud
+(`SystemExit: no *_master.wav`): freeze first, or run it `off`. The harness
+and the 5-minute rule read `otr/obs` and the leg log, never the episode dir.
+`apple/evidence` cites dirs the cleanup can never reach.
 
 **Contract docs.** `_otr_janitor.py`'s header says episode assets are never
 auto-deleted and calls itself the ONE sanctioned auto-delete: amend it to name
@@ -255,14 +295,21 @@ ruling to [standing rulings](OTR_STANDING_RULINGS.md).
 video_paths) -> (delete, keep, refusal)` exercised on a `tmp_path` tree:
 partial keeps every text file; full lists the dir; off is empty; one test per
 refusal (not a direct child, obs inside the dir, a video outside it, obs
-missing or empty, unknown mode). A source-inspection test that the mux calls
-it after the preview and after the delivery gate. The four workflow guards.
+missing or empty, unknown mode, a symlinked dir inside the folder, a missing
+or mismatched run token). Planner tests do not prove the executor, so two
+EXECUTION tests on a `tmp_path` tree: one holds a file open (a Windows lock)
+and asserts the run skips it, names it, and still writes the done receipt;
+one makes the rmtree fail on a single entry the same way. A source-inspection
+test that the mux calls it after the preview and after the delivery gate. The
+four workflow guards.
 
 **Registry.** A widget the saved graphs need: 2.3.4 when he says.
 
-**Review.** New capability on the canonical: one outside contrarian on this
-design (the ChatGPT prompt handed over 2026-09-25), then the cursor lane plus
-Sonnet on the pushed diff.
+**Review record.** ChatGPT: build with changes A G I J. Cursor Spark: build
+with changes A G J plus seven fold-ins. All folded above except one ChatGPT
+item that named a function this repo does not have (`peek_ledger`); its
+intent -- never reach the mtime walker -- is met by the token binding. Then
+the cursor lane plus Sonnet on the pushed diff.
 
 ## 3. TEST
 
