@@ -175,8 +175,8 @@ Operator: bring the space-saver back, three settings, on the first node where
 the choices are made. Default `off`. Grounded against the tree on 2026-09-25
 and reviewed the same day by two outside contrarians (ChatGPT, and a Cursor
 Spark pass grounded on the tree); every objection that survived checking is
-folded in below, and the design is FINAL -- the only open item is the wording
-of the three choices, which is his call. The old one
+folded in below, and the design is FINAL, wording included (operator, same
+day: "use the full text so we make it easy for people"). The old one
 (`perfect_run_spacesaver`, 2026-05-02, inert from 2026-08-08 when its host
 node was ripped, widget removed 2026-09-13) wiped the WRONG episode on its
 first day: BUG-LOCAL-014, commit `d2c2df81` (the number resolves only in git
@@ -189,12 +189,14 @@ default `off`, appended as the LAST widget: after `episode_language`, before
 the `gate_in` socket in INPUT_TYPES; `widgets_values` index 35 (the 36th
 value) at the end of node 1; the descriptor at the end of node 1's `inputs[]`
 so no link's `dst_slot` moves (five widgets already sit after the `gate_in`
-socket there, so this is the established shape). Three choices whose FIRST
-word is his: `off`, `partial (keep the text files)`, `full (keep only the obs
-video)`. Both reviewers, independently, found bare `partial` / `full`
-unreadable in a dropdown (partial WHAT? full delete or full keep?); the ledger
-stamp is the first word, so the slugs stay `off|partial|full`. If he prefers
-the bare words, that is one tuple. Tooltip in plain words: off keeps
+socket there, so this is the established shape). Three choices, and every one
+says what it KEEPS, in full, because a stranger reads this dropdown cold:
+`off (keep everything)`, `partial (keep only the text files)`, `full (keep
+only the published video)`. Both reviewers, independently, found bare
+`partial` / `full` unreadable (partial WHAT? full delete or full keep?), and
+the operator chose the full text. The ledger stamp is the FIRST WORD of the
+chosen label, so the slugs are `off|partial|full` and the labels can be
+reworded later without touching a stamp. Tooltip in plain words: off keeps
 everything; partial deletes the sound and the pictures and keeps every text
 file (ledger, canon, treatment, manifests, captions, QA); full deletes the
 whole episode folder; all three leave `otr/obs` alone. Then
