@@ -875,12 +875,11 @@ class TestWriterB2aSurface:
         # re-assert that it exists.
 
     def test_writer_broadcasts_normalized_model_ids(self):
-        """AST-walk OTR_LedgerScriptWriter source. Both new outputs
-        must route through _strip_label_suffix before being broadcast.
-        Stripping happens in _resolve_inputs and the writer returns
-        resolved["creative_writing_model"] / ["technical_model"]
-        unchanged -- so it is enough to verify _strip_label_suffix is
-        invoked inside _resolve_inputs.
+        """Both writer model outputs are broadcast as bare ids. The label
+        stripping happens in _resolve_inputs (through
+        _otr_model_catalog._canonical_qwen_id, which calls
+        _strip_label_suffix) and the writer returns
+        resolved["creative_writing_model"] / ["technical_model"] unchanged.
         """
         import ast
 
@@ -901,20 +900,29 @@ class TestWriterB2aSurface:
                 target = node
                 break
         assert target is not None, "_resolve_inputs not found"
-        # Count _strip_label_suffix calls inside _resolve_inputs.
-        strip_calls = 0
+        # Both slots go through _canonical_qwen_id, which strips the label
+        # first (it also maps the retired ``:nf4`` spelling). The source walk
+        # proves the WIRING at the real site; the calls below prove the
+        # normalizer itself. _resolve_inputs is not called here: it fetches
+        # news feeds and loads a scoring model, which a unit test must not.
+        normalize_calls = 0
         for sub in ast.walk(target):
             if isinstance(sub, ast.Call):
                 fn = sub.func
                 if (
                     isinstance(fn, ast.Attribute)
-                    and fn.attr == "_strip_label_suffix"
+                    and fn.attr == "_canonical_qwen_id"
                 ):
-                    strip_calls += 1
-        assert strip_calls >= 2, (
-            f"expected _resolve_inputs to call _strip_label_suffix at "
-            f"least twice (once per slot); found {strip_calls}"
+                    normalize_calls += 1
+        assert normalize_calls >= 2, (
+            f"expected _resolve_inputs to normalize both model slots "
+            f"through _canonical_qwen_id; found {normalize_calls}"
         )
+        from nodes import _otr_model_catalog as catalog
+        labelled = catalog.DEFAULT_LLM + catalog.NOT_DOWNLOADED_SUFFIX
+        assert catalog._canonical_qwen_id(labelled) == catalog.DEFAULT_LLM
+        assert catalog._canonical_qwen_id(
+            "google/gemma-4-12b-it (11.9 GB)") == "google/gemma-4-12b-it"
 
     def test_writer_uses_slot_scheduler_not_direct_load_llm(self):
         """B2b clean-break: writer.run must NOT call `.load_llm(...)`
