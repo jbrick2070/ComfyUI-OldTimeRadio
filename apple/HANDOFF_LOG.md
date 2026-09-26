@@ -42,7 +42,10 @@ LIVE LEGS -- 5080 (HEAD at boot noted; obs is <output>/otr/obs):
   otr_google_still 1-act ES  PASS 4:00  canvas_firewood_es_20260925_224243 ("La lona bajo la lena")
   otr_google_still my_story  PASS 11:39 grey_reef_20260925_224927 (Sam, Robin unstated -> gender_unspecified)
   otr_8gb_ltx25_audio_in 1-act PASS 2:00:29 stone_key_20260925_230558 (server booted 37b39dc2; the checkout moved to 84640918 mid-leg -- already-imported modules, no effect). LIPS vs LINES: his eye.
-  App mode: RUN pressed in the browser pane on otr_app (09fea0ed) at ~01:05; result recorded in the next entry.
+  App mode: RUN pressed in the browser pane on otr_app (09fea0ed) at ~01:05 ->
+    PASS 9:13 final_bee_list_20260926_010709 ("The Last Bee on the List"),
+    and the episode PLAYED in the app pane (node 85 ui.video). The progress
+    bars moved in ComfyUI's stream: writer 6/6, Character Voices 1/4..4/4.
 LIVE LEGS -- 4060 (TEST_WAVE Part B, fresh start at 1585d38a; receipts in the
   4060 driver's log, every PASS published on the 4060's own obs):
   B3a refusal PASS 7 s; B3 animatediff PASS 60:07; B4 ltx_8gb WITHOUT

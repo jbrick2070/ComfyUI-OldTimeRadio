@@ -413,7 +413,7 @@ and (by 0e) every generated workflow has its own id. Left, in order:
   pretty-printing the per-machine workflows; hand-stamping
   `extra.frontendVersion` (nothing loads on it; a fixed value goes stale).
 
-### 0e. OTR app mode -- code DONE 2026-09-25 night; live look owed
+### 0e. OTR app mode -- DONE 2026-09-26, proven live; his look is the last word
 
 Built as the operator chose ("Both"), after one contrarian design round
 (Sonnet: CHANGE on three points, all taken). `config/app_mode.json` holds
@@ -439,8 +439,11 @@ CPU-only server: the gallery category reads "Old-Time Radio", `otr_app`
 and `otr_8gb_low` open straight into app view with the labels and notes.
 `tests/test_app_mode.py` pins both forms, the labels, the output node, the ids, and
 that every matrix user-choice key is on the advanced form while no
-machine-tuning key is. OWED, his eyes: open `otr_app` and one per-machine
-card from the gallery, press Run, see the episode play in the app pane.
+machine-tuning key is. PROVEN LIVE 2026-09-26 01:05 on the 5080 (09fea0ed):
+`otr_app` opened from the gallery, Run pressed in the app form, "The Last
+Bee on the List" published in 9:13 (`final_bee_list_20260926_010709`) and
+PLAYED in the app pane (history: node 85 `video` = the obs mp4). Left for
+him: his own look, and any label wording he wants different.
 
 ### 0f. Custom-node best practice gaps (audit 2026-09-25, docs.comfy.org + core)
 
@@ -457,9 +460,11 @@ order:
    the local voice lines, the scene sequencer. Nodes already showing a
    sampler bar or the Comfy partner heartbeat get no second bar; the direct
    Google API voice gets it on the fan-out path too (Cursor review). Cancel
-   lands at the next item boundary. STILL SILENT: `google_image` stills and
+   lands at the next item boundary. PROVEN LIVE 2026-09-26 (the app run above):
+   the writer's bar finished 6/6 and Character Voices stepped 1/4..4/4 in
+   ComfyUI's own progress stream. STILL SILENT: `google_image` stills and
    `google_lyria` music (cloud-side, no heartbeat) -- same fix shape if the
-   Google workflow's bar is wanted there. LIVE CHECK OWED: watch it move.
+   Google workflow's bar is wanted there.
 3. `requires-comfyui` in `[tool.comfy]`, set to the oldest core that runs
    the canonical workflow -- measured, never guessed; too high blocks installs.
 4. DONE: `build_variants.py --all` writes a gallery thumbnail beside the
