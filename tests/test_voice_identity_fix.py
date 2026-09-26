@@ -881,10 +881,8 @@ def test_a_malformed_ceiling_falls_back_to_the_shipped_one(raw, expected, monkey
 # started honouring it again would silently re-point a character at a retired
 # id with nothing going red.
 #
-# AIMED AT THE RENDER PATH, NOT THE ROUTE MODULE. Written the obvious way this
-# would call the route module's own resolver -- which has no production callers
-# and is deleted in the next commit, so the test would pass while proving
-# nothing about rendering. It asks the code that actually resolves identity.
+# AIMED AT THE RENDER PATH. The route module that once had its own resolver is
+# deleted; this asks the code that actually resolves identity.
 # --------------------------------------------------------------------------- #
 
 def test_a_frozen_ledger_route_does_not_override_the_stamped_voice():

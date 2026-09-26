@@ -84,7 +84,7 @@ def test_p1_2_every_announcer_voice_engine_is_registered_and_serves_the_role():
 # --- P2: bank truth -------------------------------------------------------
 
 
-def test_p2_1_every_routed_voice_ref_resolves_to_exactly_one_bank_row():
+def test_p2_1_every_recurring_voice_ref_resolves_to_exactly_one_bank_row():
     """P2.1 -- a recurring character's voice must resolve to EXACTLY ONE bank
     row for its (voice_ref_id, engine); zero or two is a miss, not a coin flip.
 
@@ -98,24 +98,25 @@ def test_p2_1_every_routed_voice_ref_resolves_to_exactly_one_bank_row():
     """
     bank, _ = load_voice_bank()
     table = getattr(POOLS, "RECURRING_CHARACTER_VOICES", {}) or {}
-    routes = {eng: {"qualification_record": {"voice_ref_id": vid}}
-              for by_engine in table.values()
-              for eng, vid in by_engine.items()}
+    assignments = [(character, engine, ref_id)
+                   for character, by_engine in table.items()
+                   for engine, ref_id in by_engine.items()]
+    assert assignments, "RECURRING_CHARACTER_VOICES is empty; nothing to check"
 
-    for engine, route in routes.items():
-        ref_id = route["qualification_record"]["voice_ref_id"]
+    for character, engine, ref_id in assignments:
         matches = [e for e in bank
                    if e.voice_ref_id == ref_id and e.engine == engine]
         assert len(matches) == 1, (
-            "route %r names %r on %r and the bank holds %d matching rows"
-            % (route.get("route_id"), ref_id, engine, len(matches))
+            "%s is assigned %r on %r and the bank holds %d matching rows"
+            % (character, ref_id, engine, len(matches))
         )
 
 
 def test_p2_2_a_preset_engine_may_carry_zero_bank_rows():
     """P2.2 -- Do NOT read "no bank rows" as "engine is broken". Bark is
-    preset-driven by design, so a missing row is the correct state and a route
-    for it is inexpressible (a route requires a bank-resident voice_ref_id)."""
+    preset-driven by design, so a missing row is the correct state and a
+    recurring-character assignment for it is inexpressible (an assignment names
+    a bank-resident voice_ref_id)."""
     rows = _bank_rows()
 
     for engine in _PRESET_ONLY_ENGINES:
@@ -250,9 +251,6 @@ def test_p3_5_a_mirror_carries_its_sources_speaker_id():
             assert mirror.get("speaker_id") == src["speaker_id"], (
                 "%s mirror of %r lost its speaker_id"
                 % (engine, src["voice_ref_id"]))
-
-
-# --- P4: the route contract -----------------------------------------------
 
 
 # --- P5: engine runtime declarations --------------------------------------

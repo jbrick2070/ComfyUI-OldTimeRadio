@@ -79,7 +79,7 @@ av>=17.0.0
 
 Each pins torch/transformers versions that would brick ComfyUI's own venv, so they run as supervised subprocess workers over line-delimited JSON with ZERO shared torch.
 
-**Do NOT edit their adapters to make paths work on your OS.** Qualified voice routes are pinned to an adapter fingerprint, so any edit un-qualifies every route audited against it and the cast silently falls back to an ordinary draw -- the episode still renders, which is what makes it easy to miss. Use the environment variables instead.
+**Do NOT edit their adapters to make paths work on your OS.** Use the environment variables instead.
 
 ### `indextts2`
 

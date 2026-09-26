@@ -2,23 +2,21 @@
 """What must still be true after the recurring-character voice rewrite.
 
 WHY THIS FILE EXISTS. A bespoke qualified/provisional/unrouted voice-route
-subsystem is being replaced by a plain table of recurring-character catalogue
-assignments. Most of what that subsystem tests dies with it -- the receipt
-validators, the degradation reason codes, the audition manifests. But a set of
-properties underneath it are not about routes at all, and a cutover that quietly
-dropped them would look green the whole way: the clear-then-stamp atomicity, the
-dispatch identity a cast row resolves to, the in-graph cache identity, and the
-reservation that keeps one character's own recording out of everybody else's
-draw.
+subsystem was replaced by a plain table of recurring-character catalogue
+assignments (`RECURRING_CHARACTER_VOICES`). Most of what that subsystem tested
+died with it -- the receipt validators, the degradation reason codes, the
+audition manifests. But a set of properties underneath it are not about routes
+at all, and a cutover that quietly dropped them would have looked green the
+whole way: the clear-then-stamp atomicity, the dispatch identity a cast row
+resolves to, the in-graph cache identity, and the reservation that keeps one
+character's own recording out of everybody else's draw.
 
-Those are captured HERE, against the CURRENT code, BEFORE anything is deleted.
-That ordering is the point. Characterization written after a cutover describes
-the new behaviour and proves nothing about what was lost.
+Those were captured HERE, against the code as it stood, BEFORE anything was
+deleted. That ordering was the point. Characterization written after a cutover
+describes the new behaviour and proves nothing about what was lost.
 
-THE ONE THING THAT CHANGES WHEN THE CUTOVER LANDS is `_lock_recurring_row`
-below. Every test in this file reaches CastLock through that single seam, so
-retargeting the file is one function rewrite rather than eighteen. Nothing else
-here names a tier, a route, a receipt or a policy.
+Every test in this file reaches CastLock through one seam,
+`_lock_recurring_row` below.
 
 A NOTE ON ABSENCE. Where a test asserts a field is not present it uses
 `not in`, never a falsy check. A field written as "" or {} is a different
@@ -69,14 +67,9 @@ def _rows(ledger_json):
 
 
 # ---------------------------------------------------------------------------
-# THE SEAM. Everything tier-shaped in this file is here and nowhere else.
-#
-# Today the only way to get CastLock to stamp a recurring character's assigned
-# voice is through the provisional-route policy, so that is what this builds.
-# When the catalogue table lands, rewrite THIS function to install the table and
-# delete `_assignment_record`; every test below should then pass unchanged. If
-# one does not, the cutover changed a behaviour this file says must survive, and
-# that is the signal it exists to give.
+# THE SEAM. `assign` installs a one-character `RECURRING_CHARACTER_VOICES`
+# table and `_lock_recurring_row` locks a cast against it; every test below
+# reaches CastLock this way and no other.
 # ---------------------------------------------------------------------------
 
 def _registry(engine, voice_ref_id):

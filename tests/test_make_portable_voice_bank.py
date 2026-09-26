@@ -60,16 +60,6 @@ def test_portable_bank_preserves_non_index_rows_and_replaces_only_index(tmp_path
     index = [row for row in result["voices"] if row.get("engine") == "indextts2"]
 
     assert actual_non_index == expected_non_index
-    # THE ROUTE-EXCEPTION ASSERTION IS GONE, and dropping it is more honest
-    # than retargeting it. It used to compare the script's output against
-    # `LEMMY_VOICE_POLICY`, which was an INDEPENDENT source and therefore
-    # caught the script's hardcoded literal drifting from the live casting
-    # policy. Pointing it at the script's own constant instead -- the obvious
-    # way to survive the policy's deletion -- made it compare the producer to
-    # itself: true for any value the constant could hold, so it could not fail.
-    # A tautology that reads as coverage is worse than no assertion, and the
-    # field itself is removed two commits from here. The other eleven
-    # assertions in this test are unaffected and still independent.
     assert [(row["voice_ref_id"], row["gender"]) for row in index] == [
         ("idx_portable_male_v1", "male"),
         ("idx_portable_female_v1", "female"),
@@ -244,65 +234,13 @@ def test_cli_emits_runtime_override_and_schema_valid_bank(tmp_path, capsys):
 
     from nodes import _otr_voice_bank
     entries, _digest = _otr_voice_bank.load_voice_bank(str(output))
-    assert _otr_voice_bank.unavailable_qualified_route_ids(str(output)) == {
-        "lemmy-indextts2-algenib-cockney-v2"}
     assert any(row.engine == "kokoro" for row in entries)
     assert {row.gender for row in entries if row.engine == "indextts2"} == {
         "male", "female"}
 
 
-@pytest.mark.parametrize("value", [
-    "route-a",
-    [""],
-    [" route-a"],
-    ["route-a "],
-    ["route-a", "route-a"],
-    [17],
-])
-def test_malformed_unavailable_route_ids_are_rejected(tmp_path, value):
-    from nodes import _otr_voice_bank
-
-    source = json.loads((ROOT / "config" / "voice_reference_bank.json").read_text(
-        encoding="utf-8"))
-    source["unavailable_qualified_route_ids"] = value
-    bank = tmp_path / "bad-route-exceptions.json"
-    bank.write_text(json.dumps(source), encoding="utf-8")
-
-    with pytest.raises(
-            _otr_voice_bank.VoiceBankError,
-            match="unavailable_qualified_route_ids"):
-        _otr_voice_bank.load_voice_bank(str(bank))
-
-
-def test_shipped_bank_has_no_route_exception_and_metadata_is_sha_bound(tmp_path):
-    from nodes import _otr_voice_bank
-
-    source = json.loads((ROOT / "config" / "voice_reference_bank.json").read_text(
-        encoding="utf-8"))
-    bank = tmp_path / "bank.json"
-    bank.write_text(json.dumps(source), encoding="utf-8")
-    _entries, original_sha = _otr_voice_bank.load_voice_bank(str(bank))
-    assert _otr_voice_bank.unavailable_qualified_route_ids(
-        source_sha256=original_sha) == frozenset()
-
-    source["unavailable_qualified_route_ids"] = ["later-route"]
-    bank.write_text(json.dumps(source), encoding="utf-8")
-    assert _otr_voice_bank.unavailable_qualified_route_ids(
-        source_sha256=original_sha) == frozenset()
-    _entries, later_sha = _otr_voice_bank.load_voice_bank(str(bank))
-    assert _otr_voice_bank.unavailable_qualified_route_ids(
-        source_sha256=later_sha) == {"later-route"}
-
-
-
-
-
-
-
-
-
-
-def test_exact_exception_is_safe_in_preserve_ledger_mode(tmp_path, monkeypatch):
+def test_a_portable_bank_lock_in_preserve_ledger_mode_sheds_the_bark_preset(
+        tmp_path, monkeypatch):
     tool = _load()
     male = tmp_path / "male.wav"
     female = tmp_path / "female.wav"
@@ -329,9 +267,10 @@ def test_exact_exception_is_safe_in_preserve_ledger_mode(tmp_path, monkeypatch):
         script_json=ledger, cast_voice_policy="preserve_ledger")[0])
     lemmy = locked["cast"][0]
 
-    # The portable exception must not prove a qualified route. A non-bark
-    # stamp (provisional or otherwise) clears leftover v2/* so the ledger
-    # does not credit Bark for a voice nobody heard (Lime 20260917).
+    # A portable bank carries no private IndexTTS2 row for him, so he takes
+    # whatever it does carry. Nothing stamps `voice_route`, and a non-bark
+    # stamp clears the leftover v2/* so the ledger does not credit Bark for a
+    # voice nobody heard (Lime 20260917).
     assert "voice_route" not in lemmy
     engine = str(lemmy.get("voice_engine") or "")
     if engine and engine != "bark":

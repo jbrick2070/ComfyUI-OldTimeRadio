@@ -8,7 +8,7 @@ review caught them. The real mixed bus is **48,000 Hz** -- `scene_sequencer.py`
 sets `sample_rate = 48000  # standardize output` unconditionally, and the publish
 encode is `-ar 48000` (`otr_master_audio_mux.py`). So:
 
-    indextts2   22050  -> resampled 22050 -> 48000     (Lemmy's qualified route)
+    indextts2   22050  -> resampled 22050 -> 48000     (Lemmy's own clone row)
     chatterbox  24000  -> resampled 24000 -> 48000
     kokoro      24000  -> resampled 24000 -> 48000
     bark        24000  -> resampled 24000 -> 48000

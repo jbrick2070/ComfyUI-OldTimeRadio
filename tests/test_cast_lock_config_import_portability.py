@@ -16,11 +16,10 @@ the bug reproduced on the very first real ComfyUI Desktop render on the 4060 --
 This is not a one-off: the same two-tier shape (relative attempt, absolute
 fallback) already existed at 10+ other ``cast_pools`` call sites across
 ``nodes/_otr_casting.py``, ``nodes/_otr_voice_bank.py``,
-``nodes/_otr_scifi_news_pro.py``, and ANOTHER
-function in this exact same file three lines above
-(``_lemmy_voice_policy``, :41+) -- proof that the pattern was known
-and simply not applied here. This test pins the shape so it cannot regress at
-any of the guarded call sites, and would have failed on the bug as filed.
+``nodes/_otr_scifi_news_pro.py``, and in another function of ``cast_lock.py``
+itself (since removed) -- proof that the pattern was known and simply not
+applied here. This test pins the shape so it cannot regress at any of the
+guarded call sites, and would have failed on the bug as filed.
 """
 from __future__ import annotations
 

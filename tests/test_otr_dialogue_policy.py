@@ -96,14 +96,3 @@ def test_roster_shaped_values_are_rejected_as_active_speakers(roster_shaped):
 def test_the_speaker_category_is_keyword_only():
     with pytest.raises(TypeError):
         append_dialogue_policy(_BASE_PROMPT, ("LEMMY",))
-
-
-# ---------------------------------------------------------------------------
-# Qualification receipts -- a route is approved only if it can PROVE it.
-#
-# `approved_native_routes` used to list bark with
-# `qualification_receipt: "canonical_bark_preset_v1"` -- a bare string asserting
-# an audition that never happened, inside the very policy meant to keep Lemmy
-# consistent. That is BUG-12.86: a field that reads as evidence and is not.
-# These pin the honest shape so it cannot quietly come back.
-# ---------------------------------------------------------------------------

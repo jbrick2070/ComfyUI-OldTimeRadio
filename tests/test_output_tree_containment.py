@@ -332,11 +332,11 @@ def test_the_composite_fingerprint_hook_checks_every_step():
 
 
 # --------------------------------------------------------------------------
-# the legacy voice reference -- a UNC path arriving inside a JSON document
+# a voice reference -- a UNC path arriving inside a JSON document
 # --------------------------------------------------------------------------
 def test_a_remote_voice_reference_is_refused_before_it_is_statted():
-    """A cast row with no `voice_route` is accepted as a LEGACY reference
-    and `resolve_voice_ref_path` passes an
+    """A cast row's voice reference is read straight off the ledger, and
+    `resolve_voice_ref_path` passes an
     already-absolute value straight through (`base.py:140`) -- so a
     `ledger_json` naming a UNC share reached `os.path.exists` at eleven call
     sites and Windows authenticated to the host the workflow chose. Found

@@ -585,14 +585,13 @@ def _indextts2_source_root(comfy: str) -> str:
 
 
 def _exclude_and_link_indextts2_root(comfy: str, source: str) -> None:
-    """Keep the pinned ComfyUI checkout clean without editing qualified bytes.
+    """Keep the pinned ComfyUI checkout clean without editing the adapter.
 
-    The shipped IndexTTS2 voice route fingerprints both its adapter and worker;
-    changing either operational default would honestly require a new human
-    audition. Linux therefore installs the persistent checkout beside ComfyUI
-    and exposes the adapter's historical ``ComfyUI/index-tts`` path as a local
-    symlink. The exact local alias is excluded through Git's own info/exclude so
-    a second pod-provision pass still proves the tracked core is clean.
+    Linux installs the persistent checkout beside ComfyUI and exposes the
+    adapter's historical ``ComfyUI/index-tts`` path as a local symlink, so the
+    adapter's own default needs no change. The exact local alias is excluded
+    through Git's own info/exclude so a second pod-provision pass still proves
+    the tracked core is clean.
 
     Windows keeps its historical in-tree default (and explicit overrides still
     win), but receives the same local exclusion when ComfyUI is a Git checkout.
@@ -1051,12 +1050,10 @@ def link_windows_shaped_python(root: str) -> str:
     """Make `.venv/Scripts/python.exe` resolve on Linux, by symlink.
 
     Every isolated adapter falls back to `<engine>/.venv/Scripts/python.exe`
-    -- a Windows shape -- when OTR_<ENGINE>_VENV is unset. Branching on
-    os.name inside the adapter is the forbidden fix: qualified voice routes
-    are pinned to an adapter FINGERPRINT, and editing one un-qualifies every
-    route audited against it while the episode still renders.
+    -- a Windows shape -- when OTR_<ENGINE>_VENV is unset. This makes that
+    default resolve without branching on os.name inside the adapter.
 
-    A symlink moves no fingerprint and needs no environment. That matters
+    A symlink needs no environment. That matters
     more than it sounds: env vars are set by whoever launches ComfyUI, and a
     pod restart boots it from /start.sh with none of them, so an env-only
     install silently loses all three cloners on every restart.
@@ -1075,13 +1072,12 @@ def link_windows_shaped_python(root: str) -> str:
 
 
 def link_indextts2_runtime_python(root: str) -> str:
-    """Publish IndexTTS2's Linux compatibility executable without a re-audition.
+    """Publish IndexTTS2's Linux compatibility executable without editing the adapter.
 
-    The qualified adapter and worker bytes are immutable until a human approves
-    a new audition. On Linux the adapter's historical Windows-shaped executable
-    is therefore an external launcher: it establishes the vendor cwd and forces
-    the already-pinned Hugging Face cache offline, then execs uv's real Python.
-    Windows keeps its qualified native executable unchanged.
+    On Linux the adapter's historical Windows-shaped executable is an external
+    launcher: it establishes the vendor cwd and forces the already-pinned
+    Hugging Face cache offline, then execs uv's real Python. Windows keeps its
+    native executable unchanged.
     """
     if os.name == "nt":
         return link_windows_shaped_python(root)
@@ -1132,12 +1128,8 @@ def install_isolated_voice(comfy: str, name: str, pip_args: list) -> None:
     """Build one isolated voice engine's venv and report its env var.
 
     THE ENV VAR IS THE POINT. Each adapter resolves a Windows-shaped default
-    (`.venv/Scripts/python.exe`), and the obvious fix -- branching on os.name
-    inside the adapter -- is the wrong one: qualified voice routes are pinned to
-    an adapter FINGERPRINT, so editing that file un-qualifies every route
-    audited against it and the cast silently drops to an ordinary draw. That
-    cost the shipped Lemmy route once already. Setting OTR_<ENGINE>_VENV moves
-    no fingerprint.
+    (`.venv/Scripts/python.exe`); setting OTR_<ENGINE>_VENV points it at the
+    venv built here without editing the adapter.
 
     chatterbox (MIT) and dia (Apache) are the two commercial-clean cloners and
     the ONLY cloning engines the announcer accepts -- indextts2 is excluded

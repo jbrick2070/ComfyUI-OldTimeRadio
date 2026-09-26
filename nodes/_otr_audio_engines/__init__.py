@@ -36,15 +36,13 @@ from . import (  # noqa: E402,F401
 )
 
 # eng_indextts2 is EXCLUDED FROM THE COMFY REGISTRY BUNDLE (.comfyignore). Its
-# adapter is byte-hashed by _otr_voice_route.RUNTIME_FINGERPRINT_SOURCES and
-# carries the one subprocess spawn plus the env reads the registry YARA scan
-# flags; it is also a voice-CLONING engine that needs a sidecar venv and
+# adapter carries the one subprocess spawn plus the env reads the registry YARA
+# scan flags; it is also a voice-CLONING engine that needs a sidecar venv and
 # reference WAVs a registry install does not have. It ships in the GITHUB tree
-# with full capability (the Lemmy route and its fingerprint intact), and on a
-# registry install the file is simply absent, so the engine does not register --
-# exactly the partial-install resilience the pack already relies on. kokoro (the
-# shipped default on both voice slots), bark, chatterbox, dia and the cloud
-# engines are unaffected.
+# with full capability, and on a registry install the file is simply absent, so
+# the engine does not register -- exactly the partial-install resilience the
+# pack already relies on. kokoro (the shipped default on both voice slots),
+# bark, chatterbox, dia and the cloud engines are unaffected.
 try:
     from . import eng_indextts2  # noqa: E402,F401
 except ImportError:

@@ -96,17 +96,14 @@ _DEFAULT_CHAR_ENGINE = "kokoro"
 #: a survivor from a previous lock is not stale metadata -- it is the file or the
 #: cloud voice that actually gets rendered.
 #:
-#: `voice_route` is here because it means "a QUALIFIED route was proved". A row
-#: locked once under the IndexTTS2 route and re-locked on another engine keeps it
-#: and the voice node then raises ENGINE DISAGREEMENT -- a render killed by a
-#: leftover.
+#: `voice_route` is here because it is stale identity. Ledgers locked before
+#: 2026-09-24 still carry the dict; nothing reads it any more, and a re-stamped
+#: row should not keep a claim about a voice it no longer speaks with.
 #:
-#: `voice_preset` IS DELIBERATELY NOT HERE. It is bark's identity, it is written
-#: far upstream at writer time by `lemmy_row()`, and `_stamp` has never touched
-#: it. The 2026-08-16 acceptance leg proved the two-stage behaviour that depends
-#: on it surviving: the frozen row keeps the writer-stage Bark preset while
-#: delivery resolves the qualified IndexTTS2 route. Clearing it here would delete
-#: a fact this module does not own.
+#: `voice_preset` IS DELIBERATELY NOT HERE. It is bark's identity, written far
+#: upstream at writer time by `lemmy_row()`, and a blanket clear cannot express
+#: its rule: `_stamp` clears a leftover `v2/` preset on any NON-bark stamp and
+#: leaves it on a bark one (Lime, 2026-09-17).
 _STALE_IDENTITY_FIELDS = (
     "voice_route",
     "voice_ref_path",
@@ -285,8 +282,9 @@ def _recurring_character_bank_ref(entry, engine, bank_entries, language):
     This resolver has no such gate; a reserved row is delivered on the strength
     of being in the bank. That trade is intentional. The fingerprint produced
     eighteen false demotions in nineteen commits (measured, and recorded in
-    `tests/test_stale_ledger_voice_guard_removed.py`), it silently substituted a
-    stranger's voice as its failure mode, and the operator's standing direction
+    `tests/test_stale_ledger_voice_guard_removed.py` until `83e6040d` pruned
+    that file), it silently substituted a stranger's voice as its failure
+    mode, and the operator's standing direction
     is that a guard is legitimate only against a silent WRONG result -- which
     this one caused rather than prevented. The residual risk is real and is
     accepted: if the indextts2 adapter drifts far enough to change how that
@@ -557,11 +555,11 @@ class CastLock:
             meta = {}
             led["meta"] = meta
         revision = int(meta.get("cast_lock_revision") or 0) + 1
-        # STEP 1 (plan 5.2): the revision is stamped BEFORE any route is
-        # resolved. A qualified re-pin can raise, and when it does the ledger
-        # must already carry the revision that attempted it -- a failure with no
-        # revision on it is a failure nobody can locate afterwards. The rest of
-        # the CastLock-owned meta is stamped after casting, as before.
+        # STEP 1 (plan 5.2): the revision is stamped BEFORE any voice is cast.
+        # Casting can raise, and when it does the ledger must already carry the
+        # revision that attempted it -- a failure with no revision on it is a
+        # failure nobody can locate afterwards. The rest of the CastLock-owned
+        # meta is stamped after casting, as before.
         meta["cast_lock_revision"] = revision
 
         # Concrete engines FIRST, then banks. `auto` is not a YAML engine --
@@ -590,10 +588,9 @@ class CastLock:
                 char_voice_engine=char_voice_engine)
 
         # STEP 2 (plan 5.2): resolve the bank and stamp the engine metadata ONCE,
-        # for BOTH modes, before any route is looked at. It used to happen inside
-        # each branch, which meant a route could not be proved against the engine
-        # that was going to render it -- the agreement check needs the engine in
-        # hand first.
+        # for BOTH modes, before any row is cast. A recurring character's voice
+        # is looked up per engine, so the engine that will render it has to be
+        # in hand first.
         char_bank = self._bank_following_engine(
             "char_voice", char_voice_engine, voice_bank)
         ann_bank = self._bank_following_engine(
@@ -894,8 +891,8 @@ class CastLock:
         # own __package__). Absolute fallback for tests, which add the repo
         # root to sys.path directly. This is the SAME two-tier shape already
         # used at :50-55 in this file and at 10+ other cast_pools call sites
-        # (_otr_casting.py, _otr_voice_bank.py, _otr_voice_route.py,
-        # _otr_scifi_news_pro.py) -- this one function was missing it.
+        # (_otr_casting.py, _otr_voice_bank.py, _otr_scifi_news_pro.py) --
+        # this one function was missing it.
         #
         # 2026-08-25 PBUG: a bare `from config import cast_pools` here (no
         # relative-first, no fallback) worked by ACCIDENT in every proof leg
@@ -914,11 +911,10 @@ class CastLock:
                 from config import cast_pools as _POOLS  # type: ignore
             except ImportError:
                 # Fail soft HERE, fail closed DOWNSTREAM (this file's own
-                # convention -- see _lemmy_voice_policy above). The
-                # announcer row is left unstamped; _assert_voice_preset_invariant,
-                # run by the caller right after this returns, raises a named,
-                # actionable error instead of this function's own opaque
-                # ModuleNotFoundError traceback.
+                # convention). The announcer row is left unstamped;
+                # _assert_voice_preset_invariant, run by the caller right after
+                # this returns, raises a named, actionable error instead of
+                # this function's own opaque ModuleNotFoundError traceback.
                 report.append(
                     "bark voices: cast_pools import failed (broken install?) "
                     "-- announcer left unstamped, downstream invariant will "
@@ -1821,7 +1817,7 @@ class CastLock:
         # when the stamped engine IS bark, ``voice_preset`` is the spoken
         # id and is left alone (Lemmy's frozen v2/* beside a bark row).
         #
-        # THIS INCLUDES LEMMY'S PROVISIONAL STAMPS, and the question was
+        # THIS INCLUDES LEMMY'S OWN STAMPS, and the question was
         # settled by dates (2026-09-20). A 2026-08-16 test pinned the writer
         # preset SURVIVING a chatterbox audition stamp; a 2026-09-01 portable
         # bank test pinned it CLEARED on a kokoro one; the Lime clear of
@@ -1829,7 +1825,7 @@ class CastLock:
         # every consumer: only bark's dispatch USES `voice_preset` to choose
         # a voice; kokoro reads `voice_ref_id`, the credits prefer
         # `voice_engine` / `voice_ref_id`, and no bark stage runs after a
-        # non-bark provisional stamp inside one render. One more reader,
+        # non-bark stamp inside one render. One more reader,
         # found by the QA pass on the pushed diff: `_otr_voice_node_common`
         # copies the field into every engine's resolved request, where it is
         # part of the audio-cache key. So a non-bark row's key changes once,

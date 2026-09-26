@@ -145,11 +145,8 @@ def render() -> str:
 
     A("## 3. Isolated-venv voice engines\n")
     A("%s\n" % _WHY_ISOLATED)
-    A("**Do NOT edit their adapters to make paths work on your OS.** Qualified "
-      "voice routes are pinned to an adapter fingerprint, so any edit "
-      "un-qualifies every route audited against it and the cast silently falls "
-      "back to an ordinary draw -- the episode still renders, which is what "
-      "makes it easy to miss. Use the environment variables instead.\n")
+    A("**Do NOT edit their adapters to make paths work on your OS.** Use the "
+      "environment variables instead.\n")
     for name, dirname, source, build, envs, why in ISOLATED:
         A("### `%s`\n" % name)
         A("* install to: `<comfy-root>/%s` (or anywhere, and set the env var)" % dirname)

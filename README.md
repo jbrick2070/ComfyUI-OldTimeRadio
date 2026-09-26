@@ -778,32 +778,8 @@ airwaves.
 
 ## Known failures
 
-The test suite is not green, and this release ships anyway. The failing tests
-fall into a few classes, and none of them sits on the default path of a fresh
-install rendering an episode on the procedural visualiser lanes the
-canonical ships:
-
-- **Cloud-lane fixtures.** The Google video adapters and a cloud LTX receipt
-  test fail on a partner-result contract the fixture no longer satisfies, and
-  the cloud workflows drift from their expected-widget list.
-- **Artifacts that are not on this machine.** Some receipts cite audition
-  wavs under `otr/episodes/lemmy_cross_engine/` by hash. The files were
-  removed from the maintainer's output tree and the receipts still name them.
-- **The portable voice bank.** Four tests in
-  `tests/test_make_portable_voice_bank.py` exercise the retired voice-route
-  subsystem (`VoiceRouteError`, `approved_native_routes`,
-  `_lemmy_voice_policy`) that casting stopped consulting at the
-  recurring-character cutover. `nodes/_otr_voice_route.py` has no importers
-  left under `nodes/`, and these four tests go with it once that module is
-  deleted. Lemmy himself is cast correctly today: a bank row whose
-  `reserved_for` field names him outranks the shared catalogue entry --
-  his own recordings on indextts2/chatterbox/dia, a shared voice from
-  `RECURRING_CHARACTER_VOICES` on kokoro/cloud_elevenlabs/google_tts.
-- **Workflow and sweep checks.** A few 8 GB video workflows declare a canvas
-  their engine overrules, a static sweep finds LLM call sites without a slot
-  tag, and the auto-download disk-space precheck reads this machine's free
-  space.
-
-[apple/known-failures.md](apple/known-failures.md) explains why the
-expected-failure set is kept empty on purpose. If one of these reaches you
-in practice, open an issue with the episode's ledger attached.
+None at the tip of `main`: the full test suite passes (16965 passed, 0
+failed, 2026-09-26). [apple/known-failures.md](apple/known-failures.md)
+explains why the expected-failure set is kept empty on purpose -- a failing
+test is fixed or deleted with its feature, never parked. If something fails
+for you in practice, open an issue with the episode's ledger attached.

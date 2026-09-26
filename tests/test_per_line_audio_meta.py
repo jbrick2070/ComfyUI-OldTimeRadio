@@ -173,15 +173,15 @@ class TestStampPerLineAudioMeta:
 # ---------------------------------------------------------------------------
 # PARTIAL-STAMP AND FLUSH-REPORTING COVERAGE, moved here 2026-09-24.
 #
-# These lived in tests/test_voice_route_reference_contract.py, which is slated
-# for deletion with the voice-route subsystem. They are not about routes:
+# These lived in tests/test_voice_route_reference_contract.py, which was
+# deleted with the voice-route subsystem. They are not about routes:
 # `stamp_per_line_audio_meta` and `_persist_ledger_stamps` are shared ledger
 # infrastructure every voice line goes through regardless of engine.
 #
-# Two of them were MIXED and have been split rather than moved whole -- the
-# route-id assertions stayed behind to die with their field, the sample-rate and
-# engine assertions came here. Moving a mixed test whole would have carried a
-# dying field into a surviving file.
+# Two of them were MIXED and were split rather than moved whole -- the
+# route-id assertions stayed behind and died with their field, the sample-rate
+# and engine assertions came here. Moving a mixed test whole would have carried
+# a dying field into a surviving file.
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()

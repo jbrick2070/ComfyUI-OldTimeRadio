@@ -104,3 +104,77 @@ REVOKED:     none
 **G0 IS CLOSED. Test A is unblocked.** The operator approved on the record
 above, against the 2026-08-10 snapshot of both documents quoted in this card --
 not against an assumption, which is what the gate existed to prevent.
+
+---
+
+## Listen record, kept here when the route machinery was deleted (2026-09-26)
+
+The qualified/provisional voice-route subsystem -- `nodes/_otr_voice_route.py`
+and `LEMMY_VOICE_POLICY` in `config/cast_pools.py` -- was deleted on
+2026-09-26. **The approval above and the listens below still stand; only the
+receipt machinery that encoded them is retired.** Lemmy's voice is owned today
+by `RECURRING_CHARACTER_VOICES` (`config/cast_pools.py`) plus the
+`reserved_for` field on his clone rows in `config/voice_reference_bank.json`.
+What those receipts held is copied below from the policy as it stood at
+`eadb8ab2`. Paths are under ComfyUI's output root; the three manifests
+re-hashed to the values below on 2026-09-26.
+
+### 2026-08-18 -- IndexTTS2, blinded, PASS (the standing listen)
+
+- Listen path: `otr/episodes/lemmy_production_audition_ceiling_2026-08-18/`,
+  `MANIFEST.json` sha256
+  `344ccdf8b798117de724702920c808621e048cb94c95b4fed13496c4610acff1`. The
+  emotion ceiling was chosen by ear on
+  `otr/episodes/lemmy_emotion_ladder_logodds_2026-08-18/`.
+- Record `prod-audition-2026-08-18`, route id
+  `lemmy-indextts2-algenib-cockney-v2`, voice `idx_lemmy_algenib_cockney_v1`,
+  seed `20260818`.
+- Reference `models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav`, sha256
+  `47e733d51ea58773142f934f3484cf3633cada5fe603b672cdfc47c712a60db2`.
+- Runtime at the listen: `IndexTTS-2`, engine_impl_version `d47779386ce91209`
+  (`9bee950a7920fd00` under the older four-file recipe), weight_revision
+  `6238972345f704ef`.
+- Verdict: three arms, blinded, through the production dispatch. The character
+  seed won 3-0 and the emotion ceiling 2-1; the operator picked effective
+  emotion mass 0.560 on the ladder. Settled, not open.
+
+### 2026-08-10 -- IndexTTS2, blinded, PASS (superseded 2026-08-18)
+
+- Record `g1-test-a-2026-08-10`, route id `lemmy-indextts2-algenib-cockney-v1`,
+  engine_impl_version `b965453f355661a3`.
+- `otr/episodes/g1_lemmy_test_a/MANIFEST.json` sha256
+  `34dd4c9d8b3404814d1d7d0703d8f0e8f71893a62455169eae67b8199c90da67`.
+- Best Cockney of three arms and the preferred arm; the incumbent reference
+  was heard as Indian rather than Cockney without its label showing.
+  Superseded because the voice-identity fix (PBUG-20260817-09) changed the
+  seed handling and emotion blend it was judged on.
+
+### The frozen audition lines (`lemmy-audition-v1`, approved 2026-08-10)
+
+- Neutral: "Signal's clean this side, Captain. I've got the relay warmed up
+  and waiting on your word."
+- Emotional: "Don't you touch that dial! I've been chasing this frequency for
+  six hours and I'll not lose it now!"
+
+### The clone rows (one reference, one cross-engine manifest)
+
+All three clone rows carry the same reference bytes (sha256 `47e733d5...`
+above) and are `reserved_for: lemmy` in the bank. Chatterbox and dia spoke the
+frozen lines at seed `20260816` on 2026-08-17 into
+`otr/episodes/lemmy_cross_engine/` (`MANIFEST.json` sha256
+`ac55c90ce8325705862d6f8fbdaaadaf4153681444363dca4572f5583d4b2762`; listen
+page `LISTEN.html`, decisions `DECISIONS.json`). The operator's 2026-08-17
+note kept both as provisional; the clips themselves are no longer on disk.
+
+| engine | voice id | route id | neutral clip sha256 | emotional clip sha256 |
+|---|---|---|---|---|
+| indextts2 | `idx_lemmy_algenib_cockney_v1` | `lemmy-indextts2-algenib-cockney-v2` | (qualified above) | (qualified above) |
+| chatterbox | `cb_lemmy_algenib_cockney_v1` | `lemmy-chatterbox-algenib-cockney-provisional-v1` | `4ac0a455825b77c4f4026b8ce0b03faa84935fefe5fb84d0a1dba1c454d64a8d` | `fbd9a72962160b71fc479dd8fda3dfc772506ab5b0ffc320c15973aceb576437` |
+| dia | `dia_lemmy_algenib_cockney_v1` | `lemmy-dia-algenib-cockney-provisional-v1` | `b576a561c2fb9c97d2cd8774f066537962582eccd9bf9fbbd334649ca74ba355` | `840acfde18b31e1b8fc0cc78e07c564d891a9a990621619e4a87742216830a72` |
+
+The same 2026-08-17 page confirmed kokoro `bm_george` by name (neutral
+`996d9e005e49ce6fc217c5df6b964e733c20a0cb2c43763240aff1ce9c6d230d`,
+emotional `3902f5354d96fc75f61709122bb1ce11c64e530af3abe36a51cff726847e46ab`).
+It, `gt_algenib` (google_tts) and `el_daniel` (cloud_elevenlabs) are his
+`RECURRING_CHARACTER_VOICES` assignments today; the two cloud voices were never
+rendered.

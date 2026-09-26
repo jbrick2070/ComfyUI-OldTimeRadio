@@ -1,8 +1,8 @@
 # Known test failures
 
 `EXPECTED_FAILED_NODEIDS` in `tests/conftest.py` is an **empty frozenset on
-purpose**. The suite is not green. An empty set makes every fail print as
-NEW, so a window diffs the failing SET, never the count.
+purpose**. An empty set makes every fail print as NEW, so a window diffs the
+failing SET, never the count.
 
 Do not fill that set with a remembered 45-49 list. A guessed ledger hides a
 real break.
@@ -43,24 +43,11 @@ Worktree-only (not a live-checkout finding):
 `test_installed_pack_not_stale` and the two `test_w45_campaign_bank_pinning`
 rows.
 
-## Last chunk-gate SET (2026-09-17, HEAD `90e75d33`)
+## Last chunk-gate SET (2026-09-26, HEAD `eadb8ab2`)
 
-34 failed / 16052 collected / ~11 min. Empty `EXPECTED_FAILED_NODEIDS`, so
-the guard listed all 34. Log:
-`%TEMP%\\otr_fullsuite_20260917.log`.
-
-Closed in this recovery (My Story alias now routes through
-`set_line_text_metrics`; music pin follows `spoken_term`):
-
-* `test_brief_reader.py::test_the_music_prompt_normalises_its_setting_terms`
-* `test_text_metric_ownership.py::test_production_nodes_do_not_bypass_canonical_text_metric_owner`
-
-CastLock leftover Bark `v2/` after kokoro `auto_registry` is no longer a
-plan row: `_stamp` already clears it. Regenerating
-`apple/MODEL_ASSET_INDEX.md` left the live plan (apple/ is the index).
-
-The other 30 stay on the SET until a later row owns them. Do not add them
-to `EXPECTED_FAILED_NODEIDS`.
+16973 passed, 0 failed. The SET is empty: no known-failure class is open.
+The 34-failure set recorded at `90e75d33` (2026-09-17) is fully closed, and
+the four portable-bank route tests left with the voice-route subsystem.
 
 ## The strict xfail opened 2026-08-12 is CLOSED
 

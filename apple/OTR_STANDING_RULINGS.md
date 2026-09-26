@@ -23,6 +23,24 @@ Closed receipts used to be a third file, `docs/GO_FORWARD_ARCHIVE.md`. It went
 with the docs/ folder on 2026-09-24 (`git show a0ff6c8c~1:docs/GO_FORWARD_ARCHIVE.md`
 is its last version); closed rows now leave the plan for `apple/HANDOFF_LOG.md`.
 
+## 2026-09-26 -- THE VOICE-ROUTE MODULE IS DELETED; THE KNOWN-FAILURE CLASS LIST IS EMPTY
+
+`nodes/_otr_voice_route.py` is gone, with everything that only compiled
+because it existed: the `LEMMY_VOICE_POLICY` / `LEMMY_AUDITION_LINES` /
+`QUALIFICATION_RECEIPT_REQUIRED_FIELDS` / `PROVISIONAL_*` block in
+`config/cast_pools.py`, and the bank's `unavailable_qualified_route_ids`
+exception list (its parse, its cache, its helper, and the portable-bank
+script's write and check of it). This closes the "deleting it is separate
+work" line in the 2026-09-24 entry below. The Lemmy listens are recorded in
+`apple/RIGHTS_DECISION_LEMMY_VOICE.md`.
+
+**The known-failure class list is empty.** The full suite at `eadb8ab2` was
+16973 passed, 0 failed, so the classes the 2026-09-20 entry below shipped with
+-- the cloud-lane fixtures, the receipts naming deleted audition wavs, the four
+portable-bank route tests, the 8 GB canvas truth rows, the LLM slot sweep --
+are all closed. `EXPECTED_FAILED_NODEIDS` stays an empty frozenset
+(`apple/known-failures.md`).
+
 ## 2026-09-25 -- NO CREATIVITY DIAL: EACH WRITER MODEL SAMPLES AT ITS MAKER'S BASELINE
 
 Operator: "great, null, and let's rip the creativity"; "find the canonical temp
@@ -1947,6 +1965,11 @@ one costs more than the length does.**
 * **The voice-identity question is CLOSED 2026-08-18 ON A BLINDED LISTEN. DO NOT
   RE-OPEN IT.** Three arms, blinded; the seed fix won 3-0, the emotion ceiling
   2-1. Receipts: `otr/episodes/lemmy_production_audition_ceiling_2026-08-18/`.
+  * **SUPERSEDED IN PART 2026-09-26:** the listen stands; the receipt machinery
+    that encoded it (`nodes/_otr_voice_route.py`, `LEMMY_VOICE_POLICY`) is
+    retired. Lemmy's identity is `RECURRING_CHARACTER_VOICES` plus the
+    `reserved_for` field on his bank rows. The record is in
+    `apple/RIGHTS_DECISION_LEMMY_VOICE.md`, "Listen record".
 * **Voice-pool concentration: CLOSED 2026-08-19 -- do not re-open.** Flip, live
   proof and rip all shipped (`429b73aa`).
 * **PBUG-20260817-07 (stage directions in captions): WILL-NOT-FIX**, operator

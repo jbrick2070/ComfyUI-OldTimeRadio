@@ -107,13 +107,9 @@ scripts/*
 # stdlib plus third-party packages (torch, torchaudio, chatterbox, dia,
 # indextts, soundfile, numpy) resolved from the engine's own ISOLATED venv,
 # never a sibling file under scripts/ -- no other scripts/ file needs to
-# ship. The IndexTTS2 adapter is a special case. Its qualified voice-route
-# runtime fingerprint intentionally hashes the whole adapter, so changing only
-# its recovery wording would withdraw a human-audited route even though
-# synthesis is byte-identical. Ship the exact installer its stable error names
-# instead. The other installers and _otr_idx_download_weights.py remain
-# GitHub-only; their adapters can name a URL without changing a qualified
-# runtime receipt.
+# ship. The sidecar installers and _otr_idx_download_weights.py remain
+# GitHub-only. (IndexTTS2's whole surface left the zip on 2026-09-05; see
+# below.)
 #
 # scripts/ is rewritten to scripts/* (excludes the directory's CONTENTS,
 # not the directory itself) because a gitignore-style negation cannot
@@ -156,16 +152,15 @@ scripts/*
 !scripts/otr_openrouter_refresh.py
 
 # 2026-09-05: the ONE node module excluded from the registry bundle, and the
-# reason is the registry scan, not correctness. eng_indextts2.py is byte-hashed
-# by _otr_voice_route.RUNTIME_FINGERPRINT_SOURCES, so the idiomatic spelling fix
-# that cleared every other env/subprocess finding cannot be applied here without
-# demoting the human-approved Lemmy voice route until a GPU re-audition. Rather
-# than pay that, the voice-CLONING engine (which needs a sidecar venv and
-# reference WAVs a registry user does not have anyway) is dropped from the zip.
-# The package __init__ imports it in a try/except, so its absence just means the
-# engine does not register -- kokoro (the shipped default), bark, chatterbox,
-# dia and the cloud engines are all still present. Full capability, Lemmy route
-# and fingerprint all remain in the GitHub tree.
+# reason is the registry scan, not correctness. eng_indextts2.py carries the one
+# subprocess spawn plus the env reads the registry YARA scan flags, and it has
+# not been moved onto the shared env/process owners (that migration is its own
+# change). It is also a voice-CLONING engine that needs a sidecar venv and
+# reference WAVs a registry user does not have anyway, so it is dropped from the
+# zip. The package __init__ imports it in a try/except, so its absence just
+# means the engine does not register -- kokoro (the shipped default), bark,
+# chatterbox, dia and the cloud engines are all still present. Full capability
+# remains in the GitHub tree.
 nodes/_otr_audio_engines/eng_indextts2.py
 
 # 2026-08-22: internal-only material that was shipping to every installer --

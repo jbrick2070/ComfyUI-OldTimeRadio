@@ -104,6 +104,8 @@ ALLOWED = {
 #: `os.environ` site under nodes/ lands outside it and fails on the next run,
 #: including on the other box's next pull, which is the intended behaviour.
 PENDING = {
+    # Not blocked: its fingerprint reason died with the voice-route subsystem;
+    # the migration itself is a different commit.
     "nodes/_otr_audio_engines/eng_indextts2.py",
     "nodes/_otr_writer_heartbeat.py",
 }
@@ -114,19 +116,6 @@ PENDING = {
 #: table exists so a later batch does not sweep one up mechanically and pay a
 #: cost nobody priced.
 BLOCKED = {
-    "nodes/_otr_audio_engines/eng_indextts2.py": (
-        "a voice-CLONING adapter: it owns the one subprocess spawn and the "
-        "env reads the registry scan flags, so migrating it is a real diff "
-        "rather than a spelling change. THE ORIGINAL REASON HERE IS DEAD and "
-        "is recorded rather than deleted: any byte changed in this file used "
-        "to move the adapter's sha256 and demote the shipped Lemmy voice "
-        "route until a GPU re-audition re-qualified it, which cost 6 voice "
-        "tests on 2026-09-04. That gate was the route subsystem's runtime "
-        "fingerprint and it no longer exists, so the stated UNBLOCK -- the "
-        "next re-audition of that route -- can never happen. Do not invent a "
-        "replacement condition here; the remaining cost is the migration "
-        "itself, which belongs in its own change. "
-        "the migration rides along with it, never ahead of it."),
     "nodes/_otr_writer_heartbeat.py": (
         "a LEAF by contract: tests/test_writer_heartbeat_is_visible.py asserts "
         "it contains no `from ._otr` import at all, because a pack import "

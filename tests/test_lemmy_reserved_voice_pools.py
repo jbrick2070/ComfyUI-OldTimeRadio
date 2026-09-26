@@ -58,13 +58,14 @@ def test_the_reservation_is_not_empty():
 def test_reserved_ids_are_still_present_in_the_unfiltered_bank():
     """TEETH, and the one that matters most. If Lemmy's rows were simply deleted
     from the bank every test here would pass while he lost his own voice. The
-    reservation must hide him from the CHOOSERS, never from the catalogue -- his
-    qualified route stamps these ids directly in CastLock."""
+    reservation must hide him from the CHOOSERS, never from the catalogue --
+    CastLock's `_recurring_character_bank_ref` stamps these ids onto him
+    directly."""
     bank_ids = {e.voice_ref_id for e in _bank()}
     missing = sorted(reserved_voice_ref_ids() - bank_ids)
     assert not missing, (
         f"reserved ids {missing} are not in the bank at all -- the guard would "
-        f"pass for the wrong reason and Lemmy's own route cannot resolve"
+        f"pass for the wrong reason and Lemmy's own recording cannot resolve"
     )
 
 

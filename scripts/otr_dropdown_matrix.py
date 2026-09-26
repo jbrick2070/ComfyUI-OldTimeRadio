@@ -916,9 +916,9 @@ def stripped_engines() -> set:
 
     Derived, not listed: read the ignore file for engine modules, then read
     each module for the ids its classes declare. One entry today
-    (`eng_indextts2.py`, excluded because it is byte-hashed into a voice-route
-    fingerprint), but the rule is what matters -- a second exclusion must not
-    need a human to remember this function exists.
+    (`eng_indextts2.py`, excluded for the registry scan and its sidecar venv),
+    but the rule is what matters -- a second exclusion must not need a human to
+    remember this function exists.
     """
     ignore = os.path.join(_REPO, ".comfyignore")
     if not os.path.exists(ignore):

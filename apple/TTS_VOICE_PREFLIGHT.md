@@ -1,13 +1,13 @@
 # TTS Voice Preflight
 
-Run this checklist whenever a character/announcer TTS engine is added, a voice
-route is added or re-tiered, or the voice bank is regenerated. Format and
-acceptance protocol follow `SOURCE_BANK_PREFLIGHT.md` (the house pattern) and
-`VIDEO_LANE_PREFLIGHT.md` (the sibling that named this file): every hard item
-receives `PASS`, `FAIL`, or an explicitly allowed `N/A`, plus evidence -- a file
-and line, test name, validator output, or receipt path. Save an
-`ID | status | evidence` matrix; the final receipt names that matrix and its
-SHA-256. Any hard `FAIL` stops the work.
+Run this checklist whenever a character/announcer TTS engine is added, a
+recurring character's voice is assigned or changed, or the voice bank is
+regenerated. Format and acceptance protocol follow `SOURCE_BANK_PREFLIGHT.md`
+(the house pattern) and `VIDEO_LANE_PREFLIGHT.md` (the sibling that named this
+file): every hard item receives `PASS`, `FAIL`, or an explicitly allowed `N/A`,
+plus evidence -- a file and line, test name, validator output, or receipt path.
+Save an `ID | status | evidence` matrix; the final receipt names that matrix
+and its SHA-256. Any hard `FAIL` stops the work.
 
 Machine enforcement lives in `tests/test_tts_voice_preflight_matrix.py`. This
 document narrates those gates and is **never a substitute for running them** --
@@ -56,24 +56,19 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
 
 ## Gate 2 -- Bank truth
 
-- **P2.1 A recurring character's bank match must be exactly one row.**
-  **UPDATED 2026-09-24.** This used to be the qualified-route resolver's
-  invariant (no fallback, zero-or-two a hard cast-time failure); that
-  resolver no longer runs. The invariant survived by moving to
-  `_recurring_character_bank_ref` (`nodes/cast_lock.py:271-388`), which
-  checks it against BOTH sources it consults -- a `reserved_for` bank row,
-  then a `RECURRING_CHARACTER_VOICES` id -- but its failure shape changed:
-  an ambiguous or missing match is now a SOFT MISS, reported while the
-  character takes the ordinary draw, not a hard failure at cast time.
-  *Twin:* `test_p2_1_every_routed_voice_ref_resolves_to_exactly_one...`
-  still checks the retired `LEMMY_VOICE_POLICY["approved_native_routes"]`
-  data for internal consistency, which is a narrower claim than this gate
-  now makes.
+- **P2.1 A recurring character's voice must resolve to exactly one bank row.**
+  `_recurring_character_bank_ref` (`nodes/cast_lock.py`) checks it against
+  both sources it consults, in order -- a bank row `reserved_for` the
+  character, then his `RECURRING_CHARACTER_VOICES` id for the engine. Zero or
+  two matches is a SOFT MISS: reported, and the character takes the ordinary
+  draw rather than failing the cast. *Twin:*
+  `test_p2_1_every_recurring_voice_ref_resolves_to_exactly_one_bank_row`,
+  which checks every `RECURRING_CHARACTER_VOICES` assignment against the bank.
 - **P2.2 A preset engine may legitimately carry ZERO bank rows.** Do not read
   "no bank rows" as "engine is broken". Bark is preset-driven by design and its
-  adapter reads `voice_preset`, so a route for it is *inexpressible* -- a route
-  requires a bank-resident `voice_ref_id`. Check `voice_ref_kind` /
-  `voice_ref_field` before concluding a row is missing.
+  adapter reads `voice_preset`, so a recurring-character assignment for it is
+  *inexpressible* -- an assignment names a bank-resident `voice_ref_id`. Check
+  `voice_ref_kind` / `voice_ref_field` before concluding a row is missing.
   *Twin:* `test_p2_2_a_preset_engine_may_carry_zero_bank_rows`.
 - **P2.3 The `ref_sha256` sentinels say which kind of row this is.** A real
   64-hex digest for clone rows; the literal `"cloud"` for cloud presets (which
@@ -88,18 +83,15 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   *No twin:* this is a procedure, not a state.
 - **P2.5 The bank's paths are relative to the MODELS root, not the repo.** On
   this box `models/TTS/refs/...` resolves under `C:\ComfyUI-Models\`, and a
-  repo-root join produces a path that has never existed. **Citation fixed
-  2026-09-24:** the stale `nodes/_otr_voice_route.py:144-155` pointer (that
-  file's importers under `nodes/` are gone) is replaced by the real current
-  location -- `resolve_voice_ref_path` (`nodes/_otr_audio_engines/base.py:120`),
-  called via `_resolve_ref_to_disk` in
-  `nodes/_otr_voice_node_common.py:58-101`. Always resolve through
-  `resolve_voice_ref_path` / `_resolve_ref_to_disk`.
+  repo-root join produces a path that has never existed. The resolver is
+  `resolve_voice_ref_path` (`nodes/_otr_audio_engines/base.py`), called via
+  `_resolve_ref_to_disk` in `nodes/_otr_voice_node_common.py`. Always resolve
+  through `resolve_voice_ref_path` / `_resolve_ref_to_disk`.
 - **P2.6 There is no accent or nationality field.** The schema has none; accent
   rides informally in `timbre` (`el_daniel` -> `"british"`) or `style_tags`
-  (`bm_george` -> `"british_leaning"`), and the qualified Lemmy clone row
-  carries **no Cockney tag at all** -- its accent lives in the id string and the
-  wav bytes. Never assert an accent from a bank row; it is not recorded there.
+  (`bm_george` -> `"british_leaning"`), and Lemmy's clone rows carry **no
+  Cockney tag at all** -- the accent lives in the id string and the wav
+  bytes. Never assert an accent from a bank row; it is not recorded there.
 - **P2.7 A name next to `VOICE_PROFILES` does not mean it draws from
   `VOICE_PROFILES`.** `config/cast_pools.py`'s `ANNOUNCER_PRESETS`
   (immediately below the Bark `VOICE_PROFILES` table, same file) LOOKS like a
@@ -147,53 +139,14 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   `--force` overrides deliberately.
   *Twin:* `test_p3_the_mirror_generator_refuses_to_delete_what_it_cannot_recreate`.
 
-## Gate 4 -- The route contract
+## Gate 4 -- RETIRED 2026-09-26
 
-- **P4.1 Qualification requires a HUMAN.** `operator_verdict` is in
-  `QUALIFICATION_RECEIPT_REQUIRED_FIELDS` and the comment says why: *"a human
-  said yes; nothing else can supply this"*. No automated pass may fill it. A
-  driver-signed verdict is the evidence-shaped-but-not-evidence pattern: bark
-  once claimed `qualification_receipt: "canonical_bark_preset_v1"`, a bare
-  string asserting an audition that never happened.
-  *Citation caveat (2026-08-16):* the comment at `config/cast_pools.py:382-387`
-  attributes that to `BUG-12.86`, but Bible `12.86` is
-  *receipt-keyed-on-a-string-the-producer-never-emits*
-  (`BUG_BIBLE.yaml:7070-7082`), which is a different shape. The lesson stands on
-  its own evidence; the id is unverified and is deliberately not repeated here
-  until someone traces the real record.
-  *Twin:* `test_p4_1_qualification_still_requires_a_human` plus the fail-closed
-  parametrize in `test_p4_2_an_unproven_route_is_never_qualified`.
-- **P4.2 NEVER stamp a non-qualified route into `cast_row["voice_route"]`.**
-  **NOTE 2026-09-24: this describes code that still exists but is unreachable.**
-  Casting stopped calling `resolve_and_verify_reference` or anything else in
-  `_otr_voice_route.py` at the recurring-character cutover; nothing under
-  `nodes/` imports that module any more, so nothing stamps
-  `cast_row["voice_route"]` today. Left as written rather than rewritten --
-  see the README and `apple/OTR_STANDING_RULINGS.md` 2026-09-24 entry for the
-  current casting path.
-  `resolve_and_verify_reference` treats ANY non-empty `voice_route` dict as a
-  route claim (`nodes/_otr_voice_route.py:595-597`) and **raises**
-  `VoiceRouteError` unless `status` is exactly the qualified status
-  (`:626-629`). A second-tier route stamped there kills **every render** on that
-  engine. Carry a lower tier as ordinary bank identity plus your own fields on
-  the cast row instead.
-- **P4.3 `rights.scope` is prose and is never parsed.** It is read only as a
-  non-blank string (`:216-220`); a route whose scope read *"cloud engines only"*
-  would validate identically. If an engine-class restriction matters, enforce it
-  with an explicit allowlist, not a sentence.
-- **P4.4 `audition_manifest.path` / `.sha256` are shape-checked only** and never
-  opened or verified against disk (`:305-312`). Hash audition artifacts at write
-  time if the receipt is meant to be trustworthy later.
-- **P4.5 RETIRED 2026-09-24 -- the mechanism is gone, not moved.** This gate
-  policed a route-tier dormancy trap: `grep approved_native_routes
-  nodes/cast_lock.py` now returns zero hits. Casting resolves a recurring
-  character through `_recurring_character_bank_ref` instead (see P2.1),
-  which has no tier concept and nothing to go dormant on an emptied dict.
-- **P4.6 A qualification manifest is EVIDENCE; do not point a general tool at
-  its output directory.** The qualified IndexTTS2 route references
-  `g1_lemmy_test_a/MANIFEST.json` by sha256, so a generalized harness that ever
-  wrote to that hardcoded directory would silently invalidate the only real
-  audition receipt in the tree. Give a new harness its own output root.
+The route contract (P4.1-P4.6) policed the qualified/provisional voice-route
+subsystem, which is deleted. A recurring character's voice is now
+`RECURRING_CHARACTER_VOICES` plus the bank's `reserved_for` field (P2.1). The
+Lemmy listens the route receipts encoded are recorded in
+`RIGHTS_DECISION_LEMMY_VOICE.md`; the audition directories they cite are still
+evidence, so a new harness gets its own output root.
 
 ## Gate 5 -- Engine runtime declarations
 
@@ -225,9 +178,9 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   API key from `OTR_GOOGLE_API_KEY` / `GEMINI_API_KEY` / `GOOGLE_API_KEY` and
   fails loudly without one; `elevenlabs` goes through `invoke_partner_node`
   (credits + auth). Neither may fire unless the cast opted into it.
-- **P6.2 Say "configured", never "rendered" or "working".** A cloud row that was
-  mapped but never heard is `configured_unrendered`. It may appear in a listen
-  page as pending; it may never appear as an audition arm.
+- **P6.2 Say "configured", never "rendered" or "working".** A cloud voice that
+  was mapped but never heard is configured, not rendered. It may appear in a
+  listen page as pending; it may never appear as an audition arm.
 
 ## Gate 7 -- Proof
 
@@ -242,7 +195,7 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   at 15-40 GPU-minutes each. Prove the engine in the harness and the routing in
   one canonical leg.
 - **P7.3 A degraded success is not success.** If the acceptance leg lands on the
-  ordinary draw rather than the intended route, the gate FAILS even though the
+  ordinary draw rather than the intended voice, the gate FAILS even though the
   render is green -- production may stay fail-soft, but the gate may not.
 
 ## Receipt

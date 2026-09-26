@@ -258,18 +258,17 @@ def test_indextts2_adapter_and_its_scripts_share_a_bundle_status():
     """IndexTTS2 ships as a UNIT or not at all -- adapter, worker, installer and
     weights downloader together.
 
-    All four still EXIST in the tree (the GitHub install keeps full capability
-    and the Lemmy voice route). What must never happen is a MIXED bundle: a
+    All four still EXIST in the tree (the GitHub install keeps full
+    capability). What must never happen is a MIXED bundle: a
     shipped adapter whose fail-closed error names an installer the zip does not
     carry (the 2026-09-01 defect), OR -- the inverse -- a shipped script for an
     adapter that is not there.
 
     As of 2026-09-05 the whole IndexTTS2 surface is EXCLUDED from the registry
-    bundle: the adapter is byte-hashed by the voice-route fingerprint, so the
-    idiomatic spelling that cleared every other scan finding cannot be applied
-    to it without demoting the approved Lemmy route, and it is a clone engine a
-    registry user cannot use anyway. So the expected state is: adapter excluded,
-    all three scripts excluded, every file still present in the tree.
+    bundle: the adapter carries the subprocess spawn and env reads the registry
+    scan flags, and it is a clone engine a registry user cannot use anyway. So
+    the expected state is: adapter excluded, all three scripts excluded, every
+    file still present in the tree.
     """
     from pathlib import Path
 

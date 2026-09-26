@@ -63,7 +63,7 @@ _ANNOUNCER_REF_ID = "vz_bill_boerst"  # a real on-disk male CC0 ref
 #: Source-id prefixes stripped before the mirror prefix is applied, so the
 #: mirrored id reads `cb_lemmy_algenib_cockney_v1` rather than
 #: `cb_idx_lemmy_algenib_cockney_v1`. `idx_` was added 2026-08-16 when the first
-#: non-`vz_` indextts2 row (the qualified Lemmy clone) became mirrorable.
+#: non-`vz_` indextts2 row (Lemmy's own clone) became mirrorable.
 _STRIPPED_SOURCE_PREFIXES = ("vz_", "idx_")
 
 
