@@ -9,8 +9,9 @@ took the seeded gender-agnostic draw. `_otr_my_story` leaves an unstated
 gender empty on purpose and still does. Now google_tts takes that same draw;
 the voice is a coin the episode seed flips, so it is deterministic.
 
-A STATED gender is honoured unchanged: no cross-gender fallback for a
-provider voice.
+A stated MAN or WOMAN is honoured unchanged: no cross-gender fallback for
+a provider voice. A gender no Google voice carries (`other`, `neutral`,
+`non-binary`) takes the same seeded draw as an unstated one.
 
 BOTH CASTING POLICIES (the two-policies rule): `auto_registry` casts ordinary
 rows at CastLock, which is where the refusal lived. `preserve_ledger` does
@@ -73,15 +74,18 @@ def test_preserve_ledger_is_unchanged_for_both_rows():
     assert "voice_ref_id" not in rows["c02"]
 
 
-def test_a_writer_rolled_other_takes_the_seeded_draw(google_bank):
-    """The first live otr_google_still leg (2026-09-25) died in CastLock on a
-    writer-rolled `other` (row c04): no Google voice carries that gender, and
-    the refusal meant for a stated man or woman caught it. It now takes the
-    same seeded gender-agnostic draw Kokoro gives it."""
-    other = {"char_id": "c04", "name": "UNIT NINE", "gender": "other",
-             "voice_preset": "v2/en_speaker_4"}
-    rows = _lock([dict(other), dict(STATED)], seed=11)
+@pytest.mark.parametrize("token", ["other", "neutral", "non-binary"])
+def test_a_gender_no_google_voice_carries_takes_the_seeded_draw(google_bank, token):
+    """The first live otr_google_still leg (2026-09-25, prompt cd9e589e) died
+    in CastLock on a cast row the writer gave gender `other` (c04): no Google
+    voice carries it, and the refusal meant for a stated man or woman caught
+    it. Any such token now takes the same seeded gender-agnostic draw Kokoro
+    gives it, and the ledger says so."""
+    row = {"char_id": "c04", "name": "UNIT NINE", "gender": token,
+           "voice_preset": "v2/en_speaker_4"}
+    rows = _lock([dict(row), dict(STATED)], seed=11)
     assert rows["c04"].get("voice_ref_id") in google_bank
-    again = _lock([dict(other), dict(STATED)], seed=11)
+    assert rows["c04"].get("voice_cast_fallback") == "gender_unservable"
+    again = _lock([dict(row), dict(STATED)], seed=11)
     assert again["c04"]["voice_ref_id"] == rows["c04"]["voice_ref_id"]
     assert google_bank[rows["c02"]["voice_ref_id"]].gender == "male"

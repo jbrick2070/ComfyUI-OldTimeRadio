@@ -1827,6 +1827,7 @@ class OTRVoiceNodeBase:
                         if not cloud_line_floor_reason(exc):
                             break
                     _line_progress.step()
+            _line_progress.finish()
 
             _floored_lines = []
             for j in line_jobs:

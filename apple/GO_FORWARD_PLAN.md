@@ -241,13 +241,15 @@ clean, full suite green.
   machine and Queue stops on the named missing-key message.
 - **0i** (b2cf4251): every language row admits `google_tts` after
   `kokoro`; the 30 Gemini voices are tagged with all eight languages.
-- **0j** (dca81735): a character with no stated gender is cast on
-  `google_tts` by the episode seed; a stated gender it cannot serve still
-  refuses by name.
+- **0j** (dca81735, 610bda1e): a character with no stated gender -- or a
+  gender no Google voice carries, like the writer's `other` -- is cast on
+  `google_tts` by the episode seed; a stated man or woman is never crossed.
+  The `other` half was found LIVE: the first English leg died in CastLock
+  on row c04 (prompt cd9e589e); the fix re-ran and published.
 
-OWED, one leg each on the 5080 (1 act, `otr_google_still`): English
-(downloads nothing, publishes); one non-English language (0i); a
-`my_story` cast with an unstated gender (0j).
+LIVE 2026-09-25 on the 5080: English PASSED (`refined_metal_20260925_223823`,
+219 s, after 610bda1e). OWED: one non-English language (0i); a `my_story`
+cast with an unstated gender (0j).
 
 ### 0k. The Comfy credential rides the V3 channel: one small credential node (operator: "I dunno what is best practice" -- this is it)
 
