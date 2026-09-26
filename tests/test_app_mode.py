@@ -175,7 +175,7 @@ def test_a_row_without_a_label_is_refused():
         bv.app_linear_data(wf, "story_only", bad)
 
 
-NOTE_KEYS = ("my_story_note", "title_note", "source_ref_note", "pickers_note")
+NOTE_KEYS = ("premise_note", "title_note", "source_ref_note", "pickers_note")
 
 
 def test_every_note_fits_the_one_line_the_form_draws():
@@ -203,4 +203,4 @@ def test_the_notes_reach_the_form_as_descriptions():
     config.description), so the note must be in the SHIPPED row."""
     rows = {r[1]: r for r in _load(APP)["extra"]["linearData"]["inputs"]}
     assert rows["source_ref"][2] == {"description": CONFIG["source_ref_note"]}
-    assert rows["custom_premise"][2] == {"description": CONFIG["my_story_note"]}
+    assert rows["custom_premise"][2] == {"description": CONFIG["premise_note"]}
