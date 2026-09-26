@@ -431,7 +431,13 @@ resolves them per file and refuses a missing, duplicated or linked widget:
 - the mux node also returns the published episode as a `video` entry when
   it sits under ComfyUI's output folder, so the app pane plays it (the
   canvas keeps its poster frame).
-`tests/test_app_mode.py` pins both forms, the output node, the ids, and
+Each form row carries a plain-English label ("Acts", "Story bank",
+"Space saver") written as the widget input's `label` -- what ComfyUI's
+own Rename writes -- on the generated workflows only; the canonical keeps
+its raw widget names. SEEN LIVE 2026-09-26 in the browser pane on a
+CPU-only server: the gallery category reads "Old-Time Radio", `otr_app`
+and `otr_8gb_low` open straight into app view with the labels and notes.
+`tests/test_app_mode.py` pins both forms, the labels, the output node, the ids, and
 that every matrix user-choice key is on the advanced form while no
 machine-tuning key is. OWED, his eyes: open `otr_app` and one per-machine
 card from the gallery, press Run, see the episode play in the app pane.

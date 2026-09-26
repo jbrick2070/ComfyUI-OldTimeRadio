@@ -147,6 +147,25 @@ def test_a_node_type_that_is_not_unique_is_refused():
         bv.app_linear_data(wf, "story_only", CONFIG)
 
 
+@pytest.mark.parametrize("path", [APP] + variant_paths(), ids=lambda p: p.stem)
+def test_every_form_row_carries_its_plain_english_label(path):
+    wf = _load(path)
+    nodes = {n["id"]: n for n in wf["nodes"]}
+    for node_id, widget, *_ in wf["extra"]["linearData"]["inputs"]:
+        node = nodes[node_id]
+        slot = next(s for s in node["inputs"]
+                    if (s.get("widget") or {}).get("name") == widget)
+        assert slot.get("label") == CONFIG["labels"][f"{node['type']}.{widget}"]
+
+
+def test_the_canonical_keeps_its_raw_widget_names():
+    """The operator's canvas: labels live on the generated forms only."""
+    for node in _load(CANONICAL)["nodes"]:
+        for slot in node.get("inputs") or []:
+            if slot.get("widget"):
+                assert "label" not in slot, (node["type"], slot["widget"]["name"])
+
+
 def test_the_notes_reach_the_form_as_descriptions():
     """ComfyUI 1.52.7 draws `description` under the widget
     (InputWidgetConfig {height?, description?}; AppModeWidgetList reads

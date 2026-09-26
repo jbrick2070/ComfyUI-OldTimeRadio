@@ -208,6 +208,16 @@ def app_linear_data(workflow: dict, list_key: str, config=None) -> dict:
         if len(entry) > 2:
             row.append({"description": config[entry[2]]})
         inputs.append(row)
+        # The form shows `widget.label` before the raw name, and ComfyUI's
+        # own Rename stores that label on the widget's input slot -- so the
+        # plain-English name rides the same field. Every listed row must
+        # have one: a raw `act_count` on a stranger's form is the defect.
+        label = (config.get("labels") or {}).get(f"{node_type}.{widget}")
+        if not label:
+            raise EmitRefused(
+                f"app list {list_key!r}: {node_type}.{widget} has no label "
+                "in config/app_mode.json")
+        slots[0]["label"] = label
     output = only(config["output_node_type"])
     return {"inputs": inputs, "outputs": [output["id"]]}
 
