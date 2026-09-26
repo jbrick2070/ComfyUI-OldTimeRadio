@@ -1164,9 +1164,9 @@ def _refuse_unmet_boot_contracts(engines, state=None):
     THE SECOND HALF OF THE SAME LESSON (PBUG-20260925-02, and the 2026-09-25
     rule: a check the render asks that is knowable at t=0 is asked at t=0).
     An engine that declares boot contracts WITHOUT ``default`` -- MiniMax H3
-    today: ``--reserve-vram 12 --disable-pinned-memory`` and no SageAttention
-    -- cannot run on a stock boot, and its own ``assert_usable`` says so only
-    at the first video beat. Once its weights auto-download (2026-09-26) that
+    today, which needs SageAttention off -- cannot run on a boot that breaks
+    its contract, and its own ``assert_usable`` says so only at the first
+    video beat. Once its weights auto-download (2026-09-26) that
     would be ~39 GB fetched, a script written and every voice rendered before
     the refusal.
 
@@ -1216,18 +1216,22 @@ def _refuse_unmet_boot_contracts(engines, state=None):
             continue
         if any(not _bc.check_running_server(c, state=state) for c in known):
             continue
-        # EVERY boot the engine accepts, not only the first: H3 runs on 'h3'
-        # (a 12 GiB reserve) OR 'h3_8gb_lab' (no reserve), and telling an 8 GB
-        # card to reserve 12 GiB is the wrong fix (Cursor review, 2026-09-26).
-        ways = []
-        for c in known:
-            argv = " ".join(_bc.launch_args_for(c)) or "its default settings"
-            ways.append("%s (the %r boot)" % (argv, c))
+        # EVERY boot the engine accepts, not only the first (Cursor review,
+        # 2026-09-26): one engine may accept several boots, and naming only the
+        # first can hand a card the wrong fix.
         unmet = _bc.check_running_server(known[0], state=state)
+        if unmet and all("SageAttention" in u for u in unmet):
+            # The only thing wrong is Sage -- no launch flag fixes that.
+            fix = "Start ComfyUI without SageAttention"
+        else:
+            ways = []
+            for c in known:
+                argv = " ".join(_bc.launch_args_for(c)) or "its default settings"
+                ways.append("%s (the %r boot)" % (argv, c))
+            fix = "Restart ComfyUI with %s" % " or ".join(ways)
         problems.append(
-            "Restart ComfyUI with %s -- the video engine '%s' cannot run on "
-            "the boot this server has: %s"
-            % (" or ".join(ways), name, "; ".join(unmet) or "no accepted boot matches"))
+            "%s -- the video engine '%s' cannot run on the boot this server "
+            "has: %s" % (fix, name, "; ".join(unmet) or "no accepted boot matches"))
     if problems:
         raise VisualAssetError(
             "%s. Nothing was downloaded or rendered; fix this and press Run "

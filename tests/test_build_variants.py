@@ -195,7 +195,9 @@ def test_build_variant_cpu_row_stamps_and_selfchecks(canonical, schemas,
 def test_8gb_h3_launch_recipe_emits_no_reserve_clamp(
         tmp_rows, canonical, schemas, mapping):
     """The recipe's argv comes from the NAMED boot contract: the 8 GB H3 lab
-    shape emits no reserve clamp, while the 16 GB H3 contract reserves 12 GiB.
+    shape emits only its pinned-memory switch, and the H3 contract emits
+    nothing since 2026-09-26 (operator: no artificial reserve; it constrains
+    only SageAttention, which no launch flag carries).
     No matrix row names either contract, so each is a real row with only its
     `launch.boot_contract` changed."""
     lab = tmp_rows("otr_8gb_low", "otr_8gb_h3_lab_probe",
@@ -213,8 +215,7 @@ def test_8gb_h3_launch_recipe_emits_no_reserve_clamp(
         control, schemas=schemas, mapping=mapping, canonical=canonical)
     control_args = next(line for line in control_recipe.splitlines()
                         if line.startswith("- args:"))
-    assert control_args == \
-        "- args: `--reserve-vram 12 --disable-pinned-memory`"
+    assert control_args == "- args: `(none)`"
 
 
 def test_build_variant_leaves_canonical_untouched(canonical, schemas,

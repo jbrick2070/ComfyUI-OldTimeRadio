@@ -1,10 +1,10 @@
 """The queue-time boot-contract gate (2026-09-26).
 
-MiniMax H3 declares boot contracts without ``default`` (``--reserve-vram 12
---disable-pinned-memory``, no SageAttention). Once its ~39 GB auto-downloads,
-the only thing standing between a stock boot and a 39 GB fetch, a written
-script and rendered voices -- then a refusal at the first video beat -- is a
-check asked at queue time. These tests pin that it is asked, before the
+MiniMax H3 declares boot contracts without ``default`` (SageAttention off;
+since 2026-09-26 nothing else -- the operator ruled out artificial reserves).
+Once its ~39 GB auto-downloads, the only thing standing between a Sage boot
+and a 39 GB fetch, a written script and rendered voices -- then a refusal at
+the first video beat -- is a check asked at queue time. These tests pin that it is asked, before the
 download, with the fix first.
 """
 from __future__ import annotations
@@ -21,15 +21,19 @@ H3_BOOT = {"available": True, "reserve_vram_gb": 12.0,
            "disable_pinned_memory": True, "cpu": False, "sage_attention": False}
 
 
-def test_h3_on_a_stock_boot_is_refused_with_the_restart_first():
+def test_h3_runs_on_a_stock_sage_free_boot():
+    """Operator 2026-09-26: no artificial reserve. H3's contract asks only for
+    SageAttention off, so a stock boot passes; an OOM there is recorded."""
+    va._refuse_unmet_boot_contracts({"minimax_h3_video"}, state=STOCK)
+
+
+def test_sage_alone_is_refused_with_the_sage_fix_first():
     with pytest.raises(va.VisualAssetError) as info:
-        va._refuse_unmet_boot_contracts({"minimax_h3_video"}, state=STOCK)
+        va._refuse_unmet_boot_contracts(
+            {"minimax_h3_video"}, state=dict(STOCK, sage_attention=True))
     msg = str(info.value)
-    assert msg.startswith("Restart ComfyUI with --reserve-vram 12 --disable-pinned-memory")
-    assert "minimax_h3_video" in msg and "Nothing was downloaded" in msg
-    # Both accepted boots are offered -- an 8 GB card is not told to reserve
-    # 12 GiB as its only option (Cursor review, 2026-09-26).
-    assert "'h3_8gb_lab' boot" in msg and "'h3' boot" in msg
+    assert msg.startswith("Start ComfyUI without SageAttention")
+    assert "--reserve-vram" not in msg and "Nothing was downloaded" in msg
 
 
 def test_h3_on_its_own_boot_passes():

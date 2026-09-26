@@ -56,9 +56,9 @@ DEFAULT = "default"
 HUMO_DIET = "humo_diet"
 
 #: The MiniMax H3 boot: sage-free (Sage silently turns H3 output to noise --
-#: Comfy-Org/ComfyUI#15263, and the per-model KJ probe FAILED on sm_120) plus
-#: pinned memory disabled. Declared here ahead of its adapters so the mechanism
-#: and its second consumer land without a schema change.
+#: Comfy-Org/ComfyUI#15263, and the per-model KJ probe FAILED on sm_120) and
+#: not CPU-only. That is all it asks since 2026-09-26 (see the reversal at the
+#: end of this note); the history below is why it once asked for more.
 #:
 #: **`reserve_vram_gb` MOVED None -> 12.0 in lane 19 (2026-08-12), on the lab
 #: receipts, and it is the difference between this lane fitting and not.** The
@@ -77,6 +77,16 @@ HUMO_DIET = "humo_diet"
 #: passed its own check, and still let the lane load its way over the ceiling --
 #: a contract that constrains the two knobs that were easy to write down and not
 #: the one that decides the outcome.
+#:
+#: **REVERSED 2026-09-26, the operator's rule:** "we need to unload models after
+#: they are used, and if it OOMs we record it, not artificially create a
+#: scenario" -- and "I don't like messing with reserves". The 12 GiB reserve and
+#: the pinned-memory switch were exactly that: boot flags a user had to set to
+#: steer one lane around a measured peak. They are gone from this contract. It
+#: keeps the one knob that is a CORRECTNESS defect rather than a memory
+#: preference -- SageAttention, which turns H3's output to noise with no error
+#: -- and CPU-only off. A stock, Sage-free boot now satisfies it; H3 on a stock
+#: boot is re-measured live, and an out-of-memory there is recorded as a bug.
 H3 = "h3"
 
 #: Physical 8 GB MiniMax H3 lab launch shape. It emits NO
@@ -111,9 +121,9 @@ BOOT_CONTRACTS = {
         "cpu": False,
     },
     H3: {
-        "reserve_vram_gb": 12.0,     # see the H3 note above: measured, not tidy
-        "disable_pinned_memory": True,
-        "sage_attention": False,
+        "reserve_vram_gb": None,     # no artificial reserve (operator 2026-09-26)
+        "disable_pinned_memory": None,
+        "sage_attention": False,     # a correctness defect, not a preference
         "cpu": False,
     },
     H3_8GB_LAB: {
@@ -393,8 +403,8 @@ def contract_from_running_server(candidates=None):
       ``assert_running_server`` check that follows is what issues the
       fail-closed "unverifiable Sage" reason in the operator's language.
     * **Most-constrained wins, deterministically.** With floors, one server can
-      satisfy several contracts (reserve 12 + pinned-off satisfies both ``h3``
-      and ``humo_diet``). Ordering by reserve floor, then by how many knobs the
+      satisfy several contracts (pinned-off + Sage-free satisfies both ``h3``
+      and ``h3_8gb_lab``). Ordering by reserve floor, then by how many knobs the
       contract pins, makes the answer the MOST specific boot the server can be
       -- not whichever name happened to sort first.
     """

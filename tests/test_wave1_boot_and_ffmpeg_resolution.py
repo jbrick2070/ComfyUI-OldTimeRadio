@@ -29,23 +29,25 @@ def _state(reserve, pinned, sage):
 # --------------------------------------------------------------------------- #
 # boot-contract identification
 # --------------------------------------------------------------------------- #
-def test_reserving_MORE_than_h3_asks_still_identifies_as_h3(monkeypatch):
-    """THE REFUSAL THIS FIXES. `--reserve-vram 16` is inside the envelope H3
-    was measured in (12), and the satisfaction check has always agreed. Only
-    IDENTIFICATION disagreed, so H3 rejected a boot that honoured it."""
+def test_reserving_MORE_than_a_contract_asks_still_identifies_as_it(monkeypatch):
+    """THE REFUSAL THIS FIXES. A reserve is a FLOOR: `--reserve-vram 16` is
+    inside the envelope the humo diet was measured in (2.921), and the
+    satisfaction check has always agreed. Only IDENTIFICATION disagreed, so a
+    lane rejected a boot that honoured it. (H3 was the lane it bit; H3 carries
+    no reserve since 2026-09-26, so the rule is pinned on the diet.)"""
     monkeypatch.setattr(bc, "running_server_boot_state",
-                        lambda: _state(16.0, True, False))
-    assert bc.contract_from_running_server() == bc.H3
+                        lambda: _state(16.0, True, None))
+    assert bc.contract_from_running_server() == bc.HUMO_DIET
 
 
 def test_a_server_that_satisfies_two_contracts_reports_the_most_specific(
         monkeypatch):
-    """reserve 12 + pinned-off satisfies the humo diet's 2.921 floor as well as
-    H3's 12. The answer must be the MOST constrained boot the server can be,
-    not whichever contract name happened to sort first."""
+    """Pinned-off + Sage-free satisfies both `h3` (Sage off) and `h3_8gb_lab`
+    (Sage off AND pinned off). The answer must be the MOST constrained boot the
+    server can be, not whichever contract name happened to sort first."""
     monkeypatch.setattr(bc, "running_server_boot_state",
-                        lambda: _state(12.0, True, False))
-    assert bc.contract_from_running_server() == bc.H3
+                        lambda: _state(None, True, False))
+    assert bc.contract_from_running_server() == bc.H3_8GB_LAB
 
 
 def test_sage_known_ACTIVE_disqualifies_the_sage_free_contract(monkeypatch):
@@ -63,16 +65,16 @@ def test_sage_UNKNOWN_stays_a_candidate_so_the_named_check_can_speak(
     reach `assert_running_server`, whose refusal names the real reason -- an
     unverifiable clamp may not be assumed on a lane Sage silently corrupts."""
     monkeypatch.setattr(bc, "running_server_boot_state",
-                        lambda: _state(12.0, True, None))
+                        lambda: _state(None, False, None))
     assert bc.contract_from_running_server() == bc.H3
     with pytest.raises(bc.BootContractError):
         bc.assert_running_server(bc.H3)
 
 
-def test_a_stock_server_is_still_not_an_h3_boot(monkeypatch):
-    """The guard doing its job: no reserve, no pinned clamp -> default."""
+def test_a_stock_server_with_sage_on_is_not_an_h3_boot(monkeypatch):
+    """The guard doing its job: Sage known on -> default, never h3."""
     monkeypatch.setattr(bc, "running_server_boot_state",
-                        lambda: _state(None, False, None))
+                        lambda: _state(None, False, True))
     assert bc.contract_from_running_server() == bc.DEFAULT
 
 

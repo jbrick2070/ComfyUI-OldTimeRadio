@@ -390,35 +390,26 @@ def test_a_wrong_boot_is_refused_at_PREFLIGHT_by_name(engine, monkeypatch):
     monkeypatch.setattr(
         bc, "running_server_boot_state",
         lambda: {"available": True, "reserve_vram_gb": None,
-                 "disable_pinned_memory": False, "sage_attention": False})
+                 "disable_pinned_memory": False, "sage_attention": True})
     with pytest.raises(bc.BootContractError) as excinfo:
         engine.assert_usable({}, H3_PROFILE)
-    assert "reserve-vram" in str(excinfo.value)
+    assert "SageAttention" in str(excinfo.value)
 
 
 # ---------------------------------------------------------------------------
 # THE BOOT CONTRACT ITSELF -- lane 19 moved a number in it
 # ---------------------------------------------------------------------------
-def test_the_h3_contract_carries_the_MEASURED_reserve_clamp():
-    """12.0 is a measurement, not a preference.
-
-    Every MiniMax H3 leg on this box that cleared the 14.5 GiB gate held
-    ``--reserve-vram 12``, including the trained 1344x768 canvas at 9.15 GiB.
-    The one I2V leg without it peaked 15.39 GiB on a SMALLER canvas and a
-    SHORTER length, and failed. Dropping this knob would let the lane load its
-    way over the ceiling while the contract still passed its own check.
-    """
+def test_the_h3_contract_asks_only_that_sage_be_off():
+    """The operator's rule, 2026-09-26: models unload after use, and an
+    out-of-memory is RECORDED as a bug -- never pre-empted with an artificial
+    reserve. The 12 GiB reserve and the pinned-memory switch lane 19 measured
+    are gone; what stays is SageAttention off, which is a correctness defect
+    (noise reported as success), and CPU-only off."""
     spec = bc.contract_spec("h3")
-    assert spec["reserve_vram_gb"] == 12.0
-    assert spec["disable_pinned_memory"] is True
+    assert spec["reserve_vram_gb"] is None
+    assert spec["disable_pinned_memory"] is None
     assert spec["sage_attention"] is False
-
-
-def test_the_reserve_clamp_REACHES_the_launcher():
-    """A boot pin that no launcher turns into argv clamps nothing (lesson L6)."""
-    env = bc.launch_env_for("h3")
-    assert env["OTR_HEADLESS_RESERVE_VRAM_GB"] == "12"
-    assert env["OTR_HEADLESS_DISABLE_PINNED"] == "1"
+    assert spec["cpu"] is False
 
 
 def test_selecting_a_contract_does_not_weaken_the_proof_against_the_server():
@@ -430,8 +421,8 @@ def test_selecting_a_contract_does_not_weaken_the_proof_against_the_server():
     """
     problems = bc.check_running_server(
         "h3", state={"available": True, "reserve_vram_gb": None,
-                     "disable_pinned_memory": True, "sage_attention": False})
-    assert problems and "reserve-vram" in problems[0]
+                     "disable_pinned_memory": True, "sage_attention": True})
+    assert problems and "SageAttention" in problems[0]
 
 
 def test_no_shared_module_reaches_a_sibling_by_an_absolute_nodes_import():

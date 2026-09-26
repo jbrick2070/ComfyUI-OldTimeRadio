@@ -161,10 +161,14 @@ def test_the_env_mapping_only_emits_knobs_a_launcher_actually_reads():
     subject of this test is the knob that gets NO row, so both halves are
     asserted: the two knobs a launcher reads DO emit, and Sage still does not.
     """
-    env = bc.launch_env_for(bc.H3)
+    env = bc.launch_env_for(bc.HUMO_DIET)
     assert env == {"OTR_HEADLESS_DISABLE_PINNED": "1",
-                   "OTR_HEADLESS_RESERVE_VRAM_GB": "12"}
+                   "OTR_HEADLESS_RESERVE_VRAM_GB": "2.921"}
     assert not any("SAGE" in k.upper() for k in env)
+    # H3 constrains ONLY Sage since 2026-09-26 (operator: no artificial
+    # reserve) -- and Sage has no launcher row, so H3 emits nothing at all.
+    assert bc.launch_env_for(bc.H3) == {}
+    assert bc.launch_args_for(bc.H3) == []
 
 
 # ---------------------------------------------------------------------------
@@ -628,30 +632,32 @@ def test_the_policy_every_adapter_receives_carries_no_boot_contract():
 
 
 def test_h3_stops_refusing_itself_when_the_server_really_is_booted_for_h3(monkeypatch):
-    """THE LIVE FAILURE, 2026-08-26. The soak booted MiniMax H3 correctly with
-    `--reserve-vram 12 --disable-pinned-memory`, and the adapter rejected itself
-    as INCOMPATIBLE_PROFILE 9.6 minutes in, having never reached H3 sampling.
+    """THE LIVE FAILURE, 2026-08-26. The soak booted MiniMax H3 correctly and
+    the adapter rejected itself as INCOMPATIBLE_PROFILE 9.6 minutes in, having
+    never reached H3 sampling.
 
     The profile is silent (see the test above), so the check asks the SERVER
-    what it was really started with before refusing.
+    what it was really started with before refusing. Since 2026-09-26 the H3
+    boot is a plain stock boot with SageAttention off (operator: no artificial
+    reserve), so that is the state it must recognise.
     """
     from nodes._otr_video_engines import registry as vreg
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
-        "available": True, "reserve_vram_gb": 12.0,
-        "disable_pinned_memory": True})
+        "available": True, "reserve_vram_gb": None,
+        "disable_pinned_memory": False, "sage_attention": False})
     assert bc.contract_from_running_server() == bc.H3
     h3 = vreg.get_engine("minimax_h3_video")
     assert bc.check_engine_against_profile(h3, _stripped_policy()) == []
 
 
-def test_h3_still_refuses_on_a_stock_boot(monkeypatch):
+def test_h3_still_refuses_on_a_sage_boot(monkeypatch):
     """THE GUARD MUST STILL GUARD. Probing the server is not a licence to pass:
-    H3 on a server that was NOT booted for it is exactly the case the contract
-    exists to catch, and it must still refuse."""
+    SageAttention turns H3's output to noise and reports success, so H3 on a
+    Sage boot is exactly the case the contract exists to catch."""
     from nodes._otr_video_engines import registry as vreg
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
         "available": True, "reserve_vram_gb": None,
-        "disable_pinned_memory": False})
+        "disable_pinned_memory": False, "sage_attention": True})
     assert bc.contract_from_running_server() == bc.DEFAULT
     h3 = vreg.get_engine("minimax_h3_video")
     assert bc.check_engine_against_profile(h3, _stripped_policy()) != []
