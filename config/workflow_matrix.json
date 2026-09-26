@@ -786,7 +786,6 @@
         "video.device_policy": "cpu"
       },
       "launch": {
-        "boot_contract": "cpu",
         "env": {}
       },
       "preflight": {

@@ -49,6 +49,15 @@ def test_the_row_ships_on_the_cpu_and_names_its_key():
     assert WORKFLOW.is_file()
 
 
+def test_it_runs_on_an_ordinary_comfyui_too():
+    """No --cpu boot contract. Nothing here needs CPU-only mode, and the
+    proven 2026-09-19 preset ran on a normally booted (GPU) server; the
+    contract would refuse every user who opens this from their usual
+    ComfyUI."""
+    from nodes._otr_shared.boot_contracts import DEFAULT, contract_for_profile
+    assert contract_for_profile(cp.load_profile(ROW_ID)) == DEFAULT
+
+
 def test_the_shape_and_every_device_are_what_the_card_says(graph):
     """3 acts, 3 characters, and nothing asks for a GPU. The card quotes a
     1-act proof and says so; this pins the shape it actually opens at."""

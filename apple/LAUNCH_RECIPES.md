@@ -892,7 +892,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 ### ComfyUI launch
 
-- args: `--cpu`
+- args: `(none)`
 - sage_attention: False
 
 ### Environment
