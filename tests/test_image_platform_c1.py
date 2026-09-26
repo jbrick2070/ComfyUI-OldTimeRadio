@@ -1359,6 +1359,36 @@ def test_reresolve_stale_pending_rekeys_to_renamed_episode(tmp_path, monkeypatch
     assert records and all(r.levelname == "INFO" for r in records)
 
 
+def test_reresolve_moves_the_wire_paths_with_the_id(tmp_path, monkeypatch):
+    """The re-key switches the id; the wire's episode-local paths must follow
+    it into the renamed dir, or every later reader looks in a directory that
+    no longer exists. A path outside the episode is left alone, and the
+    caller's own object is the one that moves."""
+    import os
+    from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    root, ledger_path = _episodes_fixture(tmp_path)
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path", lambda: ledger_path,
+    )
+    old = root / "pending_20260611_010101"
+    wire = {"meta": {"freeze_timestamp": "freeze-image-reresolve"},
+            "images": {"images": [
+                {"image_id": "p1", "path": str(old / "stills" / "c1.png")}]},
+            "audio": {"master": str(old / "audio" / "master.wav"),
+                      "model": r"C:\ComfyUI-Models\vae\ae.safetensors"}}
+    same = wire
+    _reresolve_episode_stills_dir(
+        "pending_20260611_010101", str(old / "stills"), [], ledger=wire)
+    new = root / "signal_lost_rapid_roots_x"
+    assert same is wire
+    assert os.path.normcase(wire["images"]["images"][0]["path"]) == \
+        os.path.normcase(str(new / "stills" / "c1.png"))
+    assert os.path.normcase(wire["audio"]["master"]) == \
+        os.path.normcase(str(new / "audio" / "master.wav"))
+    assert wire["audio"]["model"] == r"C:\ComfyUI-Models\vae\ae.safetensors"
+
+
 def test_reresolve_pending_dir_still_live_is_untouched(tmp_path, monkeypatch):
     from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
     monkeypatch.delenv("OTR_TEST_MODE", raising=False)

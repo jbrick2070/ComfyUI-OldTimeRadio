@@ -600,6 +600,22 @@ def _reresolve_episode_stills_dir(ep, ep_dir, warnings, ledger=None):
                 "stale pending id (its dir was renamed after capture); stills "
                 "re-keyed to the active ledger's episode dir %r (same episode, "
                 "post-rename name).", ep, new_ep)
+            # THE ID AND ITS PATHS MOVE TOGETHER (2026-09-26), as in
+            # ShotLock's post-audio overlay. The caller writes the new id onto
+            # the wire; every episode-local path the wire already carries
+            # still points into the renamed-away pending dir, so move them in
+            # the same step, in place, with the walker the rename itself uses.
+            if isinstance(ledger, dict):
+                from .production_ledger import _rebase_episode_local_paths
+                rebased, moved = _rebase_episode_local_paths(
+                    ledger, str(Path(episodes_root) / str(ep)),
+                    str(new_episode_dir))
+                if moved and isinstance(rebased, dict):
+                    ledger.clear()
+                    ledger.update(rebased)
+                    log.info(
+                        "[OTR_ImageGenDispatcher] moved %d wire path(s) from "
+                        "%s onto %s", moved, ep, new_ep)
             return str(new_episode_dir / "stills"), new_ep
     except Exception as exc:  # noqa: BLE001 -- never block dispatch on the probe
         log.warning(
@@ -1552,10 +1568,6 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "must carry a video_models map before any still is rendered. "
             "Refusing image generation rather than assuming a consumer."
         )
-    cast = ledger.get("cast") if isinstance(ledger.get("cast"), list) else []
-    images_section = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
-    cache_index = dict(images_section.get("cache_index") or {})
-    images = list(images_section.get("images") or [])
     seed_cfg = (image_policy or {}).get("seed") or {}
     # Credits: per-role image-engine histogram (role -> {engine_id: count}),
     # stamped into meta after the loop so the dossier can show image model per
@@ -1585,6 +1597,12 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     # output-directory hint.  Carry it through the wire so VideoRenderBatch
     # never recreates the retired pending workspace.
     ledger["episode_id"] = ep
+    # Bound AFTER the re-key, which may rebuild the wire's sections to move
+    # their paths; a binding taken earlier would hold the pre-move rows.
+    cast = ledger.get("cast") if isinstance(ledger.get("cast"), list) else []
+    images_section = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
+    cache_index = dict(images_section.get("cache_index") or {})
+    images = list(images_section.get("images") or [])
     ep_rows: list = []
 
     rev = int(images_section.get("image_revision") or 0) + 1
