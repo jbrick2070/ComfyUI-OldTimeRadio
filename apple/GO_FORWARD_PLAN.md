@@ -240,12 +240,20 @@ should now route character beats to the audio-in lane too.
   * `ltx25_native_mime_24gb`, `ltx25_native_audio_in_24gb` -- auto-download
     (int8 transformer + the same shared files). Prove on a 24 GB pod; one pod
     session can prove all three.
-  * `minimax_h3_audio_in` (and its sibling `minimax_h3_video`, which no
-    workflow selects either) -- FAILS the bar: ~59 GB fetched only by the
-    manual `scripts/otr_fetch_lane_weights.py minimax_h3`, and used under a
-    licence MiniMax granted the operator personally
-    (`apple/H3_LICENSE_ATTESTATION.md`), which does not pass to strangers.
-    Removal awaits his confirmation, since he negotiated that grant.
+  * `minimax_h3_video` and `minimax_h3_audio_in` (dropdown names
+    `h3_low_video`, `h3_low_audio_in`; no workflow selects either) -- KEEP
+    and MAKE THEM AUTO-DOWNLOAD (operator: "keep them as long as they are
+    auto download"; "MiniMax 3 is popular, so people have it"). Today they
+    are "manual": ~59 GB fetched only by
+    `scripts/otr_fetch_lane_weights.py minimax_h3`. Measured 2026-09-25: the
+    files come from `Comfy-Org/MiniMax-H3`, which is PUBLIC and NOT GATED
+    (anonymous 302 on the pinned revision 4cc1d817), licence "other"; Comfy's
+    own gallery ships several MiniMax H3 templates. Work: move those pinned
+    WeightSpecs (revision, size, sha256 already in the fetcher) into
+    `_otr_visual_assets._SOURCES`, cover both engines in `_COVERED` with their
+    weight tokens so `planned_downloads` names them, drop the dropdown's
+    "manual" row, and re-prove both on a leg that downloads its own weights
+    (h3_low_video is already proven on 16 GB; h3_low_audio_in "fits").
 - Generated docs should show a music column if they do not already.
 
 ### 0c. Portability fixes (Composer audit 2026-09-25, each claim grounded)
