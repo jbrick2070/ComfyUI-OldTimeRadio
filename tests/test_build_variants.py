@@ -323,6 +323,8 @@ def test_check_still_checks_the_canonical_thumbnail_with_no_variants(
     monkeypatch.setattr(bv, "GALLERY_THUMB", master)
     assert bv.cmd_check() == 1
     (empty / (bv.CANONICAL.stem + ".jpg")).write_bytes(master.read_bytes())
+    # The advanced app (plan 0e) ships beside the canonical, with its own art.
+    (empty / "otr_app.jpg").write_bytes(master.read_bytes())
     assert bv.cmd_check() == 0
 
 
@@ -339,6 +341,10 @@ def test_check_detects_variant_drift(tmp_path, monkeypatch, canonical,
                            encoding="utf-8", newline="\n")
     monkeypatch.setattr(bv, "VARIANTS_DIR", vdir)
     monkeypatch.setattr(bv, "LAUNCH_RECIPES", recipes_doc)
+    # The advanced app (plan 0e) is generated from the canonical; a missing
+    # or hand-edited one is drift like any variant.
+    app = vdir / "otr_app.json"
+    app.write_text(bv._dump(bv.build_app(canonical)), encoding="utf-8")
     # The gallery thumbnail: one copy beside the canonical and each variant,
     # byte-identical to the master (2026-09-25).
     master = tmp_path / "otr_gallery_thumb.jpg"
@@ -359,6 +365,15 @@ def test_check_detects_variant_drift(tmp_path, monkeypatch, canonical,
     orphan.write_bytes(master.read_bytes())
     assert bv.cmd_check() == 1
     orphan.unlink()
+    assert bv.cmd_check() == 0
+
+    good_app = app.read_text(encoding="utf-8")
+    app.write_text(good_app.replace('"linearMode":true', '"linearMode":false'),
+                   encoding="utf-8")
+    assert bv.cmd_check() == 1
+    app.unlink()
+    assert bv.cmd_check() == 1
+    app.write_text(good_app, encoding="utf-8")
     assert bv.cmd_check() == 0
 
     # A hand-edited recipes doc is drift.

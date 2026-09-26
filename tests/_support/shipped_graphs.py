@@ -18,13 +18,17 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO / "workflows"
 CANONICAL = WORKFLOWS / "otr_canonical.json"
+#: The advanced app (plan 0e): generated from the canonical, not from a matrix
+#: row, so it is not a variant -- but it ships, so it is a shipped graph.
+APP = WORKFLOWS / "otr_app.json"
 
 
 def variant_paths() -> list:
     """Every generated variant graph, sorted: each ``workflows/otr_*.json``
-    except the canonical and any ``*.env.json`` sidecar."""
+    except the canonical, the app and any ``*.env.json`` sidecar."""
     return sorted(p for p in WORKFLOWS.glob("otr_*.json")
-                  if p != CANONICAL and not p.name.endswith(".env.json"))
+                  if p not in (CANONICAL, APP)
+                  and not p.name.endswith(".env.json"))
 
 
 def variant_path(stem: str) -> Path:
@@ -33,5 +37,5 @@ def variant_path(stem: str) -> Path:
 
 
 def shipped_graphs() -> list:
-    """The canonical first, then every variant."""
-    return [CANONICAL] + variant_paths()
+    """The canonical first, then the app, then every variant."""
+    return [CANONICAL, APP] + variant_paths()

@@ -171,3 +171,38 @@ class TestTheWithheldEpisodeSaysSo:
         ui = MUX._canvas_preview(str(episode), "/obs/copy.mp4")
         assert ui["text"] == ["/obs/copy.mp4"]
         assert "not published" not in ui["text"][0]
+
+
+class TestTheAppPlaysTheEpisode:
+    """Plan 0e: ComfyUI's app pane draws every list of {filename, subfolder,
+    type} the output node returns and plays a .mp4 by its suffix. /view
+    serves only files under the output directory, so only those are offered."""
+
+    @pytest.fixture
+    def comfy_output(self, tmp_path, monkeypatch):
+        out = tmp_path / "output"
+        mod = types.ModuleType("folder_paths")
+        mod.get_output_directory = lambda: str(out)  # type: ignore[attr-defined]
+        mod.get_temp_directory = lambda: str(tmp_path / "temp")  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "folder_paths", mod)
+        _stub_ffmpeg(monkeypatch, path=None)   # no poster; the video still comes
+        return out
+
+    def test_the_published_copy_is_offered_as_a_playable_video(
+            self, episode, comfy_output):
+        obs = comfy_output / "otr" / "obs"
+        obs.mkdir(parents=True)
+        published = obs / "gauge_20260913__sbke_final.mp4"
+        published.write_bytes(b"\x00" * 8)
+        ui = MUX._canvas_preview(str(episode), str(published))
+        assert ui["video"] == [{"filename": published.name,
+                                "subfolder": "otr/obs", "type": "output"}]
+
+    def test_a_file_outside_the_output_tree_is_not_offered(
+            self, episode, comfy_output):
+        ui = MUX._canvas_preview(str(episode), str(episode))
+        assert "video" not in ui
+
+    def test_without_comfyui_nothing_is_offered(self, episode, monkeypatch):
+        monkeypatch.setitem(sys.modules, "folder_paths", None)
+        assert MUX._served_output_ref(str(episode)) is None

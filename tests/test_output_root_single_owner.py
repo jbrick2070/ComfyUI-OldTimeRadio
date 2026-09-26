@@ -35,6 +35,12 @@ _GET_OUTPUT_DIRECTORY_ALLOWED = {
     # A diagnostic node writing otr/vram_tests -- outside the episodes/obs
     # contract by design, never part of a render. GO_FORWARD_PLAN 1.4a.
     NODES / "vram_context_test.py",
+    # The mux does NOT decide where anything is written here. It asks whether
+    # the published episode can be served by ComfyUI's /view, which serves only
+    # folder_paths' OWN output dir -- a question OTR_OUTPUT_DIR (the owner's
+    # tier 1) can answer differently. Wrong root = a video that 404s in the
+    # app pane (plan 0e, `_served_output_ref`).
+    NODES / "otr_master_audio_mux.py",
 }
 _OBS_DIR_READERS = {OWNER, NODES / "_otr_ledger.py"}
 _OUTPUT_DIR_READERS = {OWNER, NODES / "_otr_video_engines" / "eng_mesh_stage.py"}

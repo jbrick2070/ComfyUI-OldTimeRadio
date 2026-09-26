@@ -448,114 +448,28 @@ SCRIPT / START HERE group: type a premise or pick a bank, press Queue,
 where the episode lands, where to report problems. Canonical + per-machine workflows
 regenerated; widget/link audits as usual.
 
-### 0e. OTR app mode -- design first (operator 2026-09-25)
+### 0e. OTR app mode -- code DONE 2026-09-25 night; live look owed
 
-ComfyUI's app view (`extra.linearMode: true`, `extra.linearData.inputs` =
-`[node_id, widget]` pairs, `outputs` = node ids; supported by frontend
-1.52.7) shows a workflow as a simple form. The operator's input list: act
-count, the models, asset cleanup, the Lemmy roll, language, story bank,
-visual style; and for the writer LLMs, the cloud A/B slots as well
-(operator: "don't forget the OpenRouter A/B, Comfy A/B and Google A/B").
-Mapped: Story Writer (node 1) `act_count`, `creative_writing_model`,
-`technical_model`, `openrouter_slot_a_model`, `openrouter_slot_b_model`,
-`comfy_slot_a_model`, `comfy_slot_b_model`, `google_api_slot_a_model`,
-`google_api_slot_b_model`, `asset_cleanup` (the space saver: off / partial / full), `lemmy_cameo`,
-`episode_language`, `source_bank`, `visual_style`. "The models" means ALL
-of them (operator: "all LLM models, video, voice TTS, music"): Video
-Director (node 87) `announcer_video_model`, `music_video_model`,
-`character_video_model` and the three `*_image_model` picks; Cast Lock
-(node 80) `char_voice_engine`, `announcer_voice_engine`; Theme Music
-(node 83) `engine`, and `music_style` for My Story; Silent Composite
-(node 84) `upscale_engine` (operator: "upscaler").
-LAYOUT, top to bottom (operator 2026-09-25 evening -- REPLACES the earlier
-story-choice-first order): `episode_language`, `act_count`,
-`num_characters` (no creativity dial: it was removed the same day, each
-model samples at its maker's baseline), `lemmy_cameo`, `source_bank`,
-`source_ref`, `visual_style`; then the video lanes (announcer / music /
-character video model) with `upscale_engine` beside them; the three image
-models; the two voice engines; Theme Music's `engine`; the writer LLMs
-(`creative_writing_model`, `technical_model`) followed by their six cloud
-slots (OpenRouter / Comfy / Google, A and B); and AT THE BOTTOM the My
-Story fields, which only the My Story bank reads -- `episode_title`,
-`custom_premise`, `story_characters`, `story_plot`, `story_setting`,
-`story_author`, and Theme Music's `music_style`; and LAST, after My Story
-and not inside it, `asset_cleanup` (the space saver; operator: "default
-to off ... under My Story at the end"). It already defaults to
-`off (keep everything)` in code and in all 25 shipped workflows. It sits
-after the My Story block rather than in it because My Story fields apply
-only to the My Story bank and cleanup applies to every episode. Placement
-of `source_ref`, `lemmy_cameo` and `upscale_engine` was proposed by the
-driver, not named by the operator -- confirm at design time.
-ORDER IS FREE (verified in frontend 1.52.7 source, not assumed): the form
-renders `extra.linearData.inputs` in list order -- `appModeStore`
-preserves it on load, `useResolvedSelectedInputs` maps it as stored, and
-nothing sorts it; each entry is `[node, widget]` (or `[node, widget,
-{height}]`), so inputs from different nodes interleave freely and a
-multi-line My Story box can be given a height. The app builder also lets
-a person drag to reorder.
-THE RANDOMIZER the operator asked for beside bank and style ALREADY EXISTS: each
-dropdown's first option is a roll (`roll (any eligible bank)`,
-`roll (any style)`, `_otr_rolls.py`), so in the app it is that dropdown's
-top choice, not a new switch.
-THE SCROLL WORRY (operator: "worried people won't see the other
-dropdowns"): about 26 dropdowns then 7 My Story text fields. My Story
-LAST keeps every dropdown above the fold; the cost is that a My Story user
-must scroll to the bottom. App mode CANNOT group or collapse inputs
-(verified: frontend 1.52.7 `InputWidgetConfig` is `{height?, description?}`
-on a flat list), so there is no fold to put anything above -- design for
-scroll. The "My Story: fill in the fields at the bottom" hint belongs in
-that app-only `description`, not the node tooltip, which also shows on
-the canvas.
-DECIDE BEFORE ANY CODE (contrarian review 2026-09-25, each claim checked
-against the files):
-- HOST. `apply_profile` deep-copies the whole canonical, `extra` included,
-  so `extra.linearMode: true` on `otr_canonical.json` would open EVERY
-  gallery card as an app (the frontend maps that boolean to its initial
-  mode). Put it on the generated cards only, or on a separate
-  `otr_app.json` -- never on the canonical the operator edits on the canvas.
-- CARD OR FORM -- DECIDED 2026-09-25 (operator: "Both"). The per-machine
-  cards open story-only (the card IS the lane); ONE separate advanced app
-  shows the pickers and says an out-of-memory is the user's to accept.
-  The trade-off as it was put: the list above exposes the
-  video, image, voice, music and writer pickers, while the per-machine
-  tuning (quant, VRAM ceiling, canvas, device) stays hidden and tuned for
-  the card's own lane. So an 8 GB user can pick a lane the card cannot run
-  and meet an out-of-memory -- the same outcome as changing that dropdown on
-  the canvas today, but now on the stranger-facing surface. Either the card
-  is the lane (the app shows story choices only) or the form is (pickers
-  shown, and the out-of-memory accepted and said so).
-- THE INPUT LIST IS HAND-ORDERED, NOT GENERATED. `key_indicators` in the
-  matrix omits the six cloud slots and includes the hidden tuning keys, so
-  "generate from the matrix plus extras" both drops what the operator named
-  and adds what should hide. An explicit allow-list in the operator's order;
-  a test can still check that no NEW matrix user-choice key is missing.
-- `source_ref` MUST NOT SIT UNDER A BANK LEFT ON THE ROLL. The shipped
-  default is `roll (any eligible bank)`, and a pinned `source_ref` with the
-  roll is refused by name (`OTR_LedgerScriptWriter.py` ~2206). The frontend
-  has no conditional fields, so either leave `source_ref` out of the app or
-  place it where the pairing is obvious and describe it.
-- UNIQUE WORKFLOW IDS become a dependency. All 25 shipped files carry the
-  same `id` (09a7142b-...), and the frontend treats a same-id load as the
-  same active workflow. 0d rejected unique ids ("no consumer needs it");
-  app mode may be that consumer -- prove or fix before shipping apps.
-THE RULE (operator: "basically almost everything in our workflow matrix"):
-the app shows the matrix's USER-CHOICE deltas -- `features.act_count`,
-`features.num_characters`, the `llm.*_model` and cloud slot picks,
-`role_overrides.*`, `slot_overrides.*` -- plus the story knobs the matrix
-does not vary (cleanup, Lemmy, language, bank, visual style, upscaler).
-It HIDES the matrix's machine-tuning deltas (`llm.device`,
-`llm.quant_policy`, `llm.vram_ceiling_gb`, `audio.voice_device`,
-`image.dtype_policy`, `video.dtype_policy`, `video.device_policy`,
-`render.canvas_*`, `seed_policy.*`): the per-machine workflow already set them
-for that card. Generate the app's input list from the matrix plus that
-extras list in `build_variants.py`, so a new matrix knob cannot be missing
-from the app. Output: node 85 (`OTR_MasterAudioMux`, titled "14 - Mux and
-Publish", which is where "node 14" came from). It returns STRINGs, and
-whether the app pane plays the episode from it is UNPROVEN -- check live.
-Open questions for one design
-round before code: canonical itself or a separate `otr_app.json`; whether
-the premise/title text belongs; how the per-machine workflows inherit it; whether an older
-frontend ignores the metadata harmlessly.
+Built as the operator chose ("Both"), after one contrarian design round
+(Sonnet: CHANGE on three points, all taken). `config/app_mode.json` holds
+two hand-ordered forms by node type + widget; `scripts/build_variants.py`
+resolves them per file and refuses a missing, duplicated or linked widget:
+- every per-machine workflow opens STORY-ONLY (language, acts, cast, Lemmy,
+  bank, style, the My Story fields, the space saver last) -- the card is
+  the lane, its machine tuning stays hidden;
+- NEW `workflows/otr_app.json` is the canonical opened with EVERY picker in
+  his order (plus `source_ref` under the bank, described: refused with the
+  roll); it is generated, checked, stamped and has its gallery art;
+- the canonical carries neither (`--check` fails if it ever does);
+- every generated workflow has its own `id` (uuid5 of its stem; the
+  frontend reads a same-id load as the same workflow);
+- the mux node also returns the published episode as a `video` entry when
+  it sits under ComfyUI's output folder, so the app pane plays it (the
+  canvas keeps its poster frame).
+`tests/test_app_mode.py` pins both forms, the output node, the ids, and
+that every matrix user-choice key is on the advanced form while no
+machine-tuning key is. OWED, his eyes: open `otr_app` and one per-machine
+card from the gallery, press Run, see the episode play in the app pane.
 
 ### 0f. Custom-node best practice gaps (audit 2026-09-25, docs.comfy.org + core)
 

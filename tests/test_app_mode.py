@@ -1,0 +1,121 @@
+# -*- coding: utf-8 -*-
+"""Every shipped workflow opens as a ComfyUI app form (plan row 0e).
+
+WHY (operator 2026-09-25, "Both"). ComfyUI's app view shows a workflow as a
+form: `extra.linearMode` opens it that way, `extra.linearData.inputs` is the
+form top to bottom, and `outputs` names the node whose result the app pane
+shows. Each per-machine workflow opens STORY-ONLY -- the card is the lane and
+its machine tuning stays hidden -- and workflows/otr_app.json is the canonical
+with every picker, in the operator's order. The canonical carries neither; it
+is the workflow he edits on the canvas.
+
+The lists are hand-ordered in config/app_mode.json; `build_variants.py`
+resolves them against each file's own node ids. These tests read the SHIPPED
+files, so a regenerated workflow that lost its form fails here by name.
+
+Headless. No ComfyUI server, no model, no GPU.
+"""
+from __future__ import annotations
+
+import json
+import pathlib
+import sys
+
+import pytest
+
+REPO = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "scripts"))
+sys.path.insert(0, str(REPO))
+
+import build_variants as bv  # noqa: E402
+from nodes import _otr_workflow_apply as wa  # noqa: E402
+from tests._support.shipped_graphs import APP, CANONICAL, shipped_graphs, variant_paths  # noqa: E402
+
+CONFIG = json.loads((REPO / "config" / "app_mode.json").read_text(encoding="utf-8"))
+
+#: Matrix keys the per-machine workflow tunes for its own card. The advanced
+#: app never shows them: they are not choices, they are what makes the card fit.
+MACHINE_TUNING = {
+    "llm.device", "llm.quant_policy", "llm.vram_ceiling_gb", "llm.attn_impl",
+    "audio.voice_device", "image.dtype_policy", "video.dtype_policy",
+    "video.device_policy", "video.max_render_frames",
+}
+
+
+def _load(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _pairs(workflow):
+    nodes = {n["id"]: n for n in workflow["nodes"]}
+    return [(nodes[row[0]]["type"], row[1])
+            for row in workflow["extra"]["linearData"]["inputs"]]
+
+
+def test_the_canonical_is_not_an_app():
+    extra = _load(CANONICAL).get("extra") or {}
+    assert "linearMode" not in extra and "linearData" not in extra
+
+
+@pytest.mark.parametrize("path", variant_paths(), ids=lambda p: p.stem)
+def test_every_card_opens_as_the_story_only_form(path):
+    wf = _load(path)
+    assert wf["extra"]["linearMode"] is True
+    assert _pairs(wf) == [tuple(e[:2]) for e in CONFIG["story_only"]]
+
+
+def test_otr_app_opens_as_the_advanced_form():
+    wf = _load(APP)
+    assert wf["extra"]["linearMode"] is True
+    assert _pairs(wf) == [tuple(e[:2]) for e in CONFIG["advanced"]]
+
+
+@pytest.mark.parametrize("path", [APP] + variant_paths(), ids=lambda p: p.stem)
+def test_every_form_row_is_a_drawable_widget_and_the_output_is_the_mux(path):
+    wf = _load(path)
+    nodes = {n["id"]: n for n in wf["nodes"]}
+    for row in wf["extra"]["linearData"]["inputs"]:
+        slots = [s for s in nodes[row[0]].get("inputs") or []
+                 if (s.get("widget") or {}).get("name") == row[1]]
+        assert len(slots) == 1 and slots[0].get("link") is None, row
+    (out,) = wf["extra"]["linearData"]["outputs"]
+    assert nodes[out]["type"] == CONFIG["output_node_type"]
+
+
+def test_every_shipped_workflow_has_its_own_id():
+    ids = [_load(p)["id"] for p in shipped_graphs()]
+    assert len(ids) == len(set(ids)), ids
+    assert _load(CANONICAL)["id"] == "09a7142b-5ada-4855-bfcf-041a5e65c555"
+
+
+def test_the_advanced_form_offers_every_matrix_choice_and_no_machine_tuning():
+    """A new matrix knob a person chooses cannot be missing from the app, and
+    a knob that only makes a card fit cannot leak into it."""
+    managed = wa.load_widget_mapping()["managed"]
+    matrix = json.loads((REPO / "config" / "workflow_matrix.json").read_text(encoding="utf-8"))
+    keys = set()
+    for row in matrix["rows"]:
+        keys.update(row.get("deltas", {}))
+    shown = {tuple(e[:2]) for e in CONFIG["advanced"]}
+    for key in sorted(keys):
+        targets = {tuple(t) for t in managed.get(key, {}).get("targets", [])}
+        if not targets:
+            continue
+        if key in MACHINE_TUNING or key.startswith(("render.", "seed_policy.")):
+            assert not (targets & shown), key
+        else:
+            assert targets & shown, key
+
+
+def test_notes_are_app_only_descriptions_that_exist():
+    for list_key in ("story_only", "advanced"):
+        for entry in CONFIG[list_key]:
+            if len(entry) > 2:
+                assert isinstance(CONFIG[entry[2]], str) and CONFIG[entry[2]].strip()
+
+
+def test_a_missing_widget_is_refused_not_dropped():
+    wf = _load(CANONICAL)
+    bad = dict(CONFIG, story_only=[["OTR_LedgerScriptWriter", "no_such_widget"]])
+    with pytest.raises(bv.EmitRefused, match="no widget 'no_such_widget'"):
+        bv.app_linear_data(wf, "story_only", bad)

@@ -37,12 +37,13 @@ def test_exactly_one_template_folder_exists():
 
 
 def test_gallery_lists_exactly_the_ruled_graphs():
-    """The canonical plus exactly the rows the workflow matrix ships -- no
+    """The canonical, the advanced app (plan 0e: generated from the canonical
+    by build_variants), plus exactly the rows the workflow matrix ships -- no
     hand-authored stray (it would list in the menu with no row behind it), and
     no shipping row whose graph is missing (the menu would be one short)."""
     from nodes._otr_shared.capability_profiles import shipping_ids
     listed = sorted(p.stem for p in (REPO / "workflows").glob("*.json"))
-    expected = sorted(["otr_canonical"] + [
+    expected = sorted(["otr_canonical", "otr_app"] + [
         pid if pid.startswith("otr_") else "otr_" + pid
         for pid in shipping_ids()])
     assert listed == expected, (

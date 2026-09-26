@@ -134,6 +134,29 @@ def _probe_float(path: str, stream: str) -> float:
         return -1.0
 
 
+def _served_output_ref(path) -> "dict | None":
+    """`{filename, subfolder, type: "output"}` for a file ComfyUI's /view can
+    serve, or None. /view serves only files under the output directory, so a
+    file outside it (a custom OTR_OBS_DIR elsewhere) is not offered."""
+    try:
+        import folder_paths  # ComfyUI's own; absent under bare pytest
+        root = os.path.realpath(folder_paths.get_output_directory())
+    except Exception:  # noqa: BLE001 -- no ComfyUI, nothing to serve from
+        return None
+    full = os.path.realpath(str(path or ""))
+    if not path or not os.path.isfile(full):
+        return None
+    try:
+        rel = os.path.relpath(full, root)
+    except ValueError:  # another drive on Windows
+        return None
+    if rel == os.pardir or rel.startswith(os.pardir + os.sep):
+        return None
+    subfolder, filename = os.path.split(rel)
+    return {"filename": filename, "subfolder": subfolder.replace(os.sep, "/"),
+            "type": "output"}
+
+
 def _canvas_preview(final_path: str, obs_copy) -> dict:
     """A poster frame and the path, for the ComfyUI canvas. Never raises.
 
@@ -159,6 +182,14 @@ def _canvas_preview(final_path: str, obs_copy) -> dict:
             ui["text"] = [where]
         if not final_path or not os.path.isfile(final_path):
             return ui
+        # THE EPISODE ITSELF, playable in ComfyUI's app view (plan 0e). The
+        # app pane draws every list of {filename, subfolder, type} a node
+        # returns and plays a .mp4 by its suffix, so the published copy (or,
+        # when it was withheld, the archive) is offered under its own key;
+        # the canvas keeps its poster frame below.
+        playable = _served_output_ref(obs_copy or final_path)
+        if playable:
+            ui["video"] = [playable]
         try:
             import folder_paths  # ComfyUI's own; absent under bare pytest
             temp_dir = folder_paths.get_temp_directory()

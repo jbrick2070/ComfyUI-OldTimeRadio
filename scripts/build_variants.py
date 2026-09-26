@@ -31,8 +31,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
+import uuid
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -123,6 +125,107 @@ def _pack_identity_failures(paths, version: str) -> list[str]:
             out.append(f"{path.name}: extra.info is back (pyproject is the "
                        "version authority; nothing reads extra.info)")
     return out
+
+
+#: APP MODE (plan row 0e; operator 2026-09-25: "Both"). ComfyUI's app view
+#: shows a workflow as a form: `extra.linearMode` opens it that way and
+#: `extra.linearData.inputs` is the form, top to bottom, in list order. Every
+#: per-machine workflow gets the STORY-ONLY form -- the card is the lane, its
+#: machine tuning stays hidden -- and one extra generated file,
+#: workflows/otr_app.json, is the canonical with the ADVANCED form (every
+#: picker, in the operator's order). The canonical itself carries neither:
+#: it is the workflow the operator edits on the canvas, and `apply_profile`
+#: copies its `extra` into every card, so a flag set there would reach all.
+APP_MODE_CONFIG = REPO / "config" / "app_mode.json"
+APP_WORKFLOW_NAME = "otr_app.json"
+
+
+def _app_path() -> Path:
+    """workflows/otr_app.json, resolved against VARIANTS_DIR at call time --
+    a module-level path would ignore a test that points VARIANTS_DIR at a
+    scratch folder, and write into the real one."""
+    return VARIANTS_DIR / APP_WORKFLOW_NAME
+
+#: EVERY GENERATED WORKFLOW GETS ITS OWN `id` (plan 0e). They all used to carry
+#: the canonical's, and the frontend decides "the same workflow, reloaded" by
+#: that id once a path matches. uuid5 of the file stem: stable across
+#: regenerations, distinct across files. The canonical keeps its own.
+_WORKFLOW_ID_NAMESPACE = uuid.uuid5(
+    uuid.NAMESPACE_URL,
+    "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/workflows")
+
+
+def workflow_id_for(stem: str) -> str:
+    return str(uuid.uuid5(_WORKFLOW_ID_NAMESPACE, stem))
+
+
+def load_app_mode() -> dict:
+    return json.loads(APP_MODE_CONFIG.read_text(encoding="utf-8"))
+
+
+def app_linear_data(workflow: dict, list_key: str, config=None) -> dict:
+    """Resolve one hand-ordered app list against this workflow's node ids.
+
+    Refuses -- never skips -- a node type that is missing or not unique, a
+    widget that node does not declare, or a widget converted to a linked
+    input (the form cannot draw it). A silently dropped row is a form with a
+    control missing and nobody told."""
+    config = config if config is not None else load_app_mode()
+    by_type: dict = {}
+    for node in workflow.get("nodes", []):
+        by_type.setdefault(node.get("type"), []).append(node)
+
+    def only(node_type):
+        hits = by_type.get(node_type) or []
+        if len(hits) != 1:
+            raise EmitRefused(
+                f"app list {list_key!r}: expected ONE {node_type} node, "
+                f"found {len(hits)}")
+        return hits[0]
+
+    inputs = []
+    for entry in config[list_key]:
+        node_type, widget = entry[0], entry[1]
+        node = only(node_type)
+        slots = [slot for slot in node.get("inputs") or []
+                 if isinstance(slot.get("widget"), dict)
+                 and slot["widget"].get("name") == widget]
+        if not slots:
+            raise EmitRefused(
+                f"app list {list_key!r}: {node_type} (node {node['id']}) "
+                f"has no widget {widget!r}")
+        if slots[0].get("link") is not None:
+            raise EmitRefused(
+                f"app list {list_key!r}: {node_type}.{widget} is a linked "
+                "input on this workflow, which app mode cannot draw")
+        row = [node["id"], widget]
+        if len(entry) > 2:
+            row.append({"description": config[entry[2]]})
+        inputs.append(row)
+    output = only(config["output_node_type"])
+    return {"inputs": inputs, "outputs": [output["id"]]}
+
+
+def stamp_app_mode(workflow: dict, list_key: str, config=None) -> dict:
+    """Open this workflow as an app with the named form. In place."""
+    extra = workflow.setdefault("extra", {})
+    extra["linearMode"] = True
+    extra["linearData"] = app_linear_data(workflow, list_key, config)
+    return workflow
+
+
+def build_app(canonical=None) -> dict:
+    """workflows/otr_app.json: the canonical, opened as the advanced app.
+
+    Runs on any machine for the canonical's reason -- it resolves its device
+    at run time -- and carries the canonical's empty validator stamps, which
+    the validator reads as "not a machine variant" and does not assert."""
+    canonical = canonical if canonical is not None else _load_canonical()
+    app = copy.deepcopy(canonical)
+    app["id"] = workflow_id_for(Path(APP_WORKFLOW_NAME).stem)
+    stamp_app_mode(app, "advanced")
+    stamp_pack_identity(app, live_pack_version())
+    return app
 #: EVERY LAUNCH RECIPE IN ONE GENERATED DOC (2026-09-25). They used to sit
 #: beside each graph as workflows/<variant>.launch.md: 24 near-identical files in
 #: the folder ComfyUI's template gallery reads, which is a folder for loadable
@@ -256,6 +359,10 @@ def build_variant(profile_id: str, *, schemas=None, mapping=None,
     applied = apply_profile(canonical, profile, mapping=mapping,
                             schemas=schemas)
     stamp_pack_identity(applied, live_pack_version())
+    # `extra` and `id` sit outside semantic_master_hash by construction, so
+    # neither moves the hash stamped below.
+    stamp_app_mode(applied, "story_only")
+    applied["id"] = workflow_id_for(_variant_stem(profile_id))
     master_hash = semantic_master_hash(applied, mapping=mapping,
                                        schemas=schemas)
     variant_rel = f"workflows/{_variant_stem(profile_id)}.json"
@@ -434,9 +541,11 @@ def _committed_variant_paths() -> list[Path]:
     # The paired <variant>.env.json recipe-knob files also match otr_*.json but are
     # NOT variants -- exclude them (video-tiers 2026-07-20).
     # The canonical lives in the same folder and is the SOURCE, not a variant.
+    # otr_app.json is generated from the canonical, not from a matrix row,
+    # and is emitted and checked on its own (`build_app`).
     return sorted(p for p in VARIANTS_DIR.glob("otr_*.json")
                   if not p.name.endswith(".env.json")
-                  and p.name != CANONICAL.name)
+                  and p.name not in (CANONICAL.name, APP_WORKFLOW_NAME))
 
 
 def _committed_recipes(schemas, mapping, canonical) -> list[tuple[str, str]]:
@@ -456,7 +565,8 @@ def _committed_recipes(schemas, mapping, canonical) -> list[tuple[str, str]]:
 
 def _thumbnail_targets() -> list[Path]:
     """`<stem>.jpg` beside the canonical and every committed variant."""
-    return ([VARIANTS_DIR / (CANONICAL.stem + ".jpg")]
+    return ([VARIANTS_DIR / (CANONICAL.stem + ".jpg"),
+             _app_path().with_suffix(".jpg")]
             + [path.with_suffix(".jpg") for path in _committed_variant_paths()])
 
 
@@ -514,6 +624,8 @@ def cmd_emit(profile_ids: list[str], explicit: bool) -> int:
         print(f"EMITTED {rel}")
     for pid, why in refused:
         print(f"REFUSED {pid}:\n{why}\n")
+    _app_path().write_text(_dump(build_app(canonical)), encoding="utf-8")
+    print(f"EMITTED workflows/{APP_WORKFLOW_NAME}")
     if emitted:
         _write_launch_recipes(schemas, mapping, canonical)
         _write_thumbnails()
@@ -658,6 +770,21 @@ def cmd_check() -> int:
                 or stamped.get("generated_by") != GENERATED_BY):
             failures.append(f"{vpath.name}: stamp disagreement "
                             f"(profile_id/master_hash/generated_by)")
+    app_path = _app_path()
+    if not app_path.is_file():
+        failures.append(f"{APP_WORKFLOW_NAME}: missing (run --all)")
+    else:
+        try:
+            want_app = _dump(build_app(canonical))
+        except EmitRefused as e:
+            failures.append(f"{APP_WORKFLOW_NAME}: regeneration refused ({e})")
+        else:
+            if app_path.read_text(encoding="utf-8") != want_app:
+                failures.append(f"{APP_WORKFLOW_NAME}: DRIFT vs regeneration "
+                                "(generated, never hand-edited)")
+    if "linearMode" in (canonical.get("extra") or {}):
+        failures.append(f"{CANONICAL.name}: carries extra.linearMode -- app "
+                        "mode belongs on the generated workflows only")
     if not LAUNCH_RECIPES.is_file():
         failures.append(f"{LAUNCH_RECIPES.name}: missing (run --all)")
     elif LAUNCH_RECIPES.read_text(encoding="utf-8") != \
@@ -665,8 +792,9 @@ def cmd_check() -> int:
         failures.append(f"{LAUNCH_RECIPES.name}: DRIFT vs regeneration "
                         "(generated, never hand-edited)")
     failures.extend(_thumbnail_failures())
-    failures.extend(_pack_identity_failures([CANONICAL] + committed,
-                                            live_pack_version()))
+    failures.extend(_pack_identity_failures(
+        [CANONICAL] + ([app_path] if app_path.is_file() else [])
+        + committed, live_pack_version()))
     for f in failures:
         print("CHECK FAIL:", f)
     print(f"check: {len(committed)} variants, {len(failures)} failures")
