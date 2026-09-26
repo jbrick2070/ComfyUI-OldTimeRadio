@@ -36,7 +36,7 @@ detail is its row below.
 2. **NEXT CODING SPRINT.** 0k (the V3 credential node -- the largest item
    left, a canonical-workflow change with a design round first); the 0d
    visual items (palette, Story Writer collapsed, the Start-here note);
-   0c item 5 (Kokoro under a registered `TTS` model folder); and the B4
+   0c item 5 (PARKED 2026-09-26 -- see the row); and the B4
    RAM finding: `ltx_8gb` reloads its 9 GB T5 (`t5xxl_fp16`, pinned to the
    CPU) into system RAM for EVERY clip segment -- free RAM saw-toothed
    between ~0.4 and ~20 GB on the 32 GB 4060 (2026-09-26); a 16 GB-RAM box
@@ -330,9 +330,23 @@ and the platform quant bakes NF4 only when the vendor is NVIDIA.
 **Backlog, 4-8 (grounded, not yet hardened into steps):**
 4. `prestartup_script.py:126-144` pins HF_HOME to `<comfy>/models/huggingface`
    by file depth before `_otr_hf_env` runs. Folds into item 0a above.
-5. Kokoro (`eng_kokoro.py:72-77`, `_otr_kokoro_voice_prefetch.py`) joins
-   `TTS/KokoroTTS` onto `models_dir`; register a `TTS` category and use
-   `model_type_dir`. Move both together.
+5. PARKED 2026-09-26, with the reason -- no user has hit it. Kokoro
+   (`eng_kokoro.py:72-77`, `_otr_kokoro_voice_prefetch.py`) joins
+   `TTS/KokoroTTS` onto `models_dir`, so an `extra_model_paths.yaml` that
+   relocates model types does not move Kokoro. It still WORKS there; it just
+   ignores the yaml. A design round (Sonnet contrarian) grounded the facts:
+   boot order is fine (`main.py:231` applies the yaml before `:237` runs
+   prestartup), no installed pack registers a `TTS` category, and Kokoro
+   never resolves the voice bank's `ref_path` (it keys on `voice_ref_id`).
+   The fix is what fails the bar: a yaml `TTS:` entry would move Kokoro away
+   from its existing files, so it either re-downloads at boot (and an
+   offline box then fails the render, because the engine refuses to fetch
+   mid-render), or needs a "read the first folder that has Kokoro" rule --
+   which must test COMPLETENESS (the ONNX file plus the voices), not
+   existence, or it repeats the empty-folder defect `_has_entries` fixed in
+   `_otr_models_root` on 2026-09-25, and would sit beside `model_type_dir`'s
+   own first-registered rule as a second selection rule. Reopen when a real
+   user reports Kokoro landing outside a relocated models tree.
 6. `_otr_model_loader.py` hardcodes CUDA device 0 (~1030, ~1289) and tells
    Accelerate the CPU has 64 GiB (~556). Thread the resolved device; size
    the CPU lane from available RAM. DEVICE HALF DONE 2026-09-25 (1c0b1dd4):
