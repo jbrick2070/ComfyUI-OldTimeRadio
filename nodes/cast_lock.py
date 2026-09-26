@@ -1345,8 +1345,9 @@ class CastLock:
             # gender-agnostic draw below. Provider voices are gendered, so
             # the pick is a coin the episode seed flips: deterministic, and
             # _otr_my_story still leaves the gender empty on purpose. A
-            # STATED gender is still honoured with no cross-gender fallback
-            # (see the re-raise in the except below).
+            # stated MAN or WOMAN is still honoured with no cross-gender
+            # fallback (see the re-raise in the except below); `other`, which
+            # the Google catalogue carries no rows for, takes the draw too.
             # THE HYBRID LLM VOICE-FIT BRANCH WAS HERE AND IS GONE (2026-08-18).
             # It read meta.voice_cast_decision, re-validated the LLM's proposed
             # voice_ref_id, and on success stamped it and `continue`d -- skipping
@@ -1401,7 +1402,14 @@ class CastLock:
                     language=language,
                 )
             except VoiceCastingError as exc:
-                if target_engine == "google_tts" and gender:
+                # Only a stated man or woman is refused here: a provider voice
+                # never crosses a gender the story named. `other` -- a fifth
+                # of every writer roll, and a gender no Google voice carries --
+                # takes the same seeded gender-agnostic draw Kokoro gives it.
+                # Refusing it killed the first otr_google_still leg
+                # (2026-09-25, cast row c04) and would have killed about half
+                # of all three-character Google episodes.
+                if target_engine == "google_tts" and gender in ("male", "female"):
                     raise
                 # BORROW THE GENDER FROM ENGLISH BEFORE GIVING UP ON IT
                 # (operator 2026-09-19, option A). Kokoro ships ONE French

@@ -143,9 +143,10 @@ before it keeps anything else, and does not stop the render:
   author never said) -- a draw from the language pool that ignores gender,
   fixed by the episode seed so the same episode always casts the same voice.
 
-`google_tts` follows the same rule for an unstated gender. A **stated** gender
-it cannot serve still stops the render with a named error rather than
-reusing, borrowing, or crossing gender.
+`google_tts` follows the same rule for an unstated gender and for `other`
+(the Google voices are all men or women). A character the story names a
+**man** or a **woman** is never given the other gender's voice: if that ever
+cannot be served, the render stops with a named error instead.
 
 `allow_voice_reuse` (on by default) controls something narrower: whether two
 characters can share an already-used, gender-matching voice before the

@@ -71,3 +71,17 @@ def test_preserve_ledger_is_unchanged_for_both_rows():
     rows = _lock([dict(UNSTATED), dict(STATED)], policy="preserve_ledger")
     assert "voice_ref_id" not in rows["c01"]
     assert "voice_ref_id" not in rows["c02"]
+
+
+def test_a_writer_rolled_other_takes_the_seeded_draw(google_bank):
+    """The first live otr_google_still leg (2026-09-25) died in CastLock on a
+    writer-rolled `other` (row c04): no Google voice carries that gender, and
+    the refusal meant for a stated man or woman caught it. It now takes the
+    same seeded gender-agnostic draw Kokoro gives it."""
+    other = {"char_id": "c04", "name": "UNIT NINE", "gender": "other",
+             "voice_preset": "v2/en_speaker_4"}
+    rows = _lock([dict(other), dict(STATED)], seed=11)
+    assert rows["c04"].get("voice_ref_id") in google_bank
+    again = _lock([dict(other), dict(STATED)], seed=11)
+    assert again["c04"]["voice_ref_id"] == rows["c04"]["voice_ref_id"]
+    assert google_bank[rows["c02"]["voice_ref_id"]].gender == "male"
