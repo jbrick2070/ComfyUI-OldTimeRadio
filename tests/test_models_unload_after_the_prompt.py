@@ -53,10 +53,23 @@ def test_the_validator_asks_before_anything_can_refuse():
     assert ask < src.index("self._admit_story_input(")
 
 
+def test_the_validator_clears_an_earlier_prompts_leftovers_first():
+    """The writer LLM and Bark live outside ComfyUI's model manager; a prompt
+    that failed before their teardown leaves them resident. The next prompt
+    releases them before anything else (Sonnet review, 64d1b256)."""
+    src = inspect.getsource(wv.WorkflowValidator.validate)
+    clear = src.index("free_otr_pipeline_residue(")
+    assert clear < src.index("self._assert_stamp(")
+    assert clear < src.index("self._admit_story_input(")
+
+
 def test_a_refused_episode_still_releases(monkeypatch):
     """Drive the real validate(): a story admission refusal raises, and the
     release was already requested."""
     queue = _install_server(monkeypatch)
+    cleared = []
+    monkeypatch.setattr(levers, "free_otr_pipeline_residue",
+                        lambda **kw: cleared.append(kw.get("reason")) or {})
 
     def _refuse(self, prompt, unique_id):
         raise ValueError("no story")
@@ -70,3 +83,4 @@ def test_a_refused_episode_still_releases(monkeypatch):
     else:  # pragma: no cover
         raise AssertionError("the stand-in refusal did not fire")
     assert queue.flags == {"free_memory": True}
+    assert cleared and cleared[0].startswith("prompt start")

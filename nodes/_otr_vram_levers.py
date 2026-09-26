@@ -310,9 +310,14 @@ def release_models_after_this_prompt() -> bool:
     at a time, so there is no other episode to disturb.
 
     Before this, a finished render left the server holding ~9-10 GB until the
-    next episode's pre-render cleanup. The out-of-band caches ComfyUI cannot
-    see (writer LLM, Bark) are already released after the script phase and at
-    the pre-render and inter-beat seams by :func:`free_otr_pipeline_residue`.
+    next episode's pre-render cleanup.
+
+    THE BOUNDARY, stated plainly (Sonnet review, 64d1b256): this frees what
+    ComfyUI manages. The out-of-band caches it cannot see -- the writer LLM
+    and Bark -- are released by their own teardown after the script phase and
+    at the pre-render and inter-beat seams. When a prompt FAILS before those
+    run, they can outlive it; the validator therefore also releases any such
+    leftovers when the next prompt starts, so every run begins clean.
 
     Returns True when the request was recorded. Never raises: with no running
     ComfyUI (tests, CLI) there is nothing to release.
