@@ -682,15 +682,18 @@ def otr_runtime_log_path() -> Path:
 
 
 def legacy_pack_runtime_log_path() -> Path:
-    """Former pack-root log location; read-only fallback for telemetry parsers."""
+    """Former pack-root log location. Frozen: shown by the log viewer as
+    history, never read as current telemetry."""
     return Path(__file__).resolve().parents[1] / "otr_runtime.log"
 
 
 def otr_runtime_log_read_paths() -> list[Path]:
-    """Paths telemetry readers should scan: legacy pack log (if any) then primary.
+    """Paths the log VIEWER shows: legacy pack log (if any) then primary.
 
     Writers only append to :func:`otr_runtime_log_path`; the legacy file is
-    read-only, like the writer-LLM hub-cache precedent -- never migrated."""
+    read-only, like the writer-LLM hub-cache precedent -- never migrated.
+    Not for current telemetry: the legacy file holds only earlier runs
+    (``video_engine._get_latest_telemetry`` reads the live log alone)."""
     primary = otr_runtime_log_path()
     legacy = legacy_pack_runtime_log_path()
     paths: list[Path] = []
@@ -698,11 +701,6 @@ def otr_runtime_log_read_paths() -> list[Path]:
         paths.append(legacy)
     paths.append(primary)
     return paths
-
-
-def otr_runtime_log_read_path() -> Path:
-    """Single-path helper: the primary write target (may not exist yet)."""
-    return otr_runtime_log_path()
 
 
 def otr_sidecar_stderr_path(basename: str) -> Path:
@@ -876,7 +874,6 @@ __all__ = [
     "otr_state_dir",
     "otr_runtime_log_path",
     "legacy_pack_runtime_log_path",
-    "otr_runtime_log_read_path",
     "otr_runtime_log_read_paths",
     "otr_sidecar_stderr_path",
     # director_raw_dump_dir entry removed in voice-path-cleanbreak S23.1

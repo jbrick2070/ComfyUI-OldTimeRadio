@@ -1602,15 +1602,21 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
 
 
 def _get_latest_telemetry():
-    """Parse the otr_runtime.log for the most recent VRAM and Speed stats."""
-    from ._otr_paths import otr_runtime_log_read_paths
+    """Parse the live otr_runtime.log for the most recent VRAM and Speed stats.
+
+    ONLY the live log. The legacy pack-root log is frozen (nothing has written
+    it since the runtime log moved to the state dir), so every line in it is
+    from an earlier run; reading it here let a field the live tail lacks fall
+    through to a stale value from a different run. An unknown field keeps its
+    default instead."""
+    from ._otr_paths import otr_runtime_log_path
 
     # Defaults
     peak_gb = "???"
     speed = "???"
     model = "UNKNOWN CORE"
 
-    log_paths = [str(p) for p in otr_runtime_log_read_paths()]
+    log_paths = [str(otr_runtime_log_path())]
     if not any(os.path.exists(p) for p in log_paths):
         return peak_gb, speed, model
 

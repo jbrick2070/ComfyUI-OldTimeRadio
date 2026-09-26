@@ -330,7 +330,10 @@ and the platform quant bakes NF4 only when the vendor is NVIDIA.
    go to `model.device`); fix only if a two-GPU user reports it.
 7. DONE 2026-09-25 (c04aad46 + 2c952de1, Cursor): the cloud media cache,
    the sidecar stderr files and `otr_runtime.log` write under the output
-   tree; the old pack-folder billing ledger is copied forward once.
+   tree; the old pack-folder billing ledger is copied forward once. The
+   episode's telemetry line reads the live log only -- the frozen
+   pack-folder log is shown by `otr_tail_logs` as history, never read as
+   current (a Sonnet review reproduced a stale model name leaking in).
 8. Lower: Chatterbox/Dia default venv path is Windows-only (`Scripts/`);
    `video_engine.py:2342-2346` falls back to `~/Documents/ComfyUI/output`;
    NVFP4 is preferred among installed files without a hardware check;
