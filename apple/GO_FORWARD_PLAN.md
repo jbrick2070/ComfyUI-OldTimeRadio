@@ -373,7 +373,10 @@ Qwen row returns `"none"`, not `"bnb_nf4"`.
    `model_type_dir`. Move both together.
 6. `_otr_model_loader.py` hardcodes CUDA device 0 (~1030, ~1289) and tells
    Accelerate the CPU has 64 GiB (~556). Thread the resolved device; size
-   the CPU lane from available RAM.
+   the CPU lane from available RAM. DEVICE HALF DONE 2026-09-25 (1c0b1dd4):
+   item 1 turned a second-GPU pick from a crash into a writer silently
+   loaded on GPU 0, so load_llm now probes and places on the policy's CUDA
+   ordinal. The 64 GiB CPU-lane half is still open.
 7. Writes inside the pack folder: cloud cache
    (`cloud_media_backend.py:446-450`), Chatterbox/Dia stderr
    (`eng_chatterbox.py:109`, `eng_dia.py:114`, outside any try), and
@@ -383,6 +386,12 @@ Qwen row returns `"none"`, not `"bnb_nf4"`.
    `video_engine.py:2342-2346` falls back to `~/Documents/ComfyUI/output`;
    NVFP4 is preferred among installed files without a hardware check;
    `config/otr_windows_extra_model_paths.yaml` names `C:/ComfyUI-Models`.
+LOW PRIORITY, operator ruling 2026-09-25 ("no biggie" / "doesn't matter
+much") -- both are off-default picks only; do not re-raise:
+- Gemma 4 12B on AMD still bakes NF4 (its implied `bnb_nf4` wins over
+  vendor). The AMD default writer is Qwen, which item 3 fixed.
+- Bark's first load on Metal reclaims no MPS pool (`_unload_bark` does).
+  Kokoro is the default voice on every local lane.
 Every fix measures the 5080 unchanged (CLAUDE.md section 0B): items 1-3
 touch shared code with a fallback branch that never fires today on a
 single-GPU NVIDIA box -- print the resolved value before/after in the
@@ -474,15 +483,43 @@ Director (node 87) `announcer_video_model`, `music_video_model`,
 (node 80) `char_voice_engine`, `announcer_voice_engine`; Theme Music
 (node 83) `engine`, and `music_style` for My Story; Silent Composite
 (node 84) `upscale_engine` (operator: "upscaler").
-LAYOUT, top to bottom (operator 2026-09-25): the story choice first --
-`source_bank`, `source_ref`, `visual_style`; then the shape --
-`act_count`, `num_characters` (no creativity dial: it was removed the same
-day, each model samples at its maker's baseline), `episode_language`,
-`lemmy_cameo`, `asset_cleanup`; then every
-model picker; and AT THE BOTTOM the My Story fields, which only the My
-Story bank reads -- `episode_title`, `custom_premise`, `story_characters`,
-`story_plot`, `story_setting`, `story_author`, and Theme Music's
-`music_style`.
+LAYOUT, top to bottom (operator 2026-09-25 evening -- REPLACES the earlier
+story-choice-first order): `episode_language`, `act_count`,
+`num_characters` (no creativity dial: it was removed the same day, each
+model samples at its maker's baseline), `lemmy_cameo`, `source_bank`,
+`source_ref`, `visual_style`; then the video lanes (announcer / music /
+character video model) with `upscale_engine` beside them; the three image
+models; the two voice engines; Theme Music's `engine`; the writer LLMs
+(`creative_writing_model`, `technical_model`) followed by their six cloud
+slots (OpenRouter / Comfy / Google, A and B); and AT THE BOTTOM the My
+Story fields, which only the My Story bank reads -- `episode_title`,
+`custom_premise`, `story_characters`, `story_plot`, `story_setting`,
+`story_author`, and Theme Music's `music_style`; and LAST, after My Story
+and not inside it, `asset_cleanup` (the space saver; operator: "default
+to off ... under My Story at the end"). It already defaults to
+`off (keep everything)` in code and in all 25 shipped workflows. It sits
+after the My Story block rather than in it because My Story fields apply
+only to the My Story bank and cleanup applies to every episode. Placement
+of `source_ref`, `lemmy_cameo` and `upscale_engine` was proposed by the
+driver, not named by the operator -- confirm at design time.
+ORDER IS FREE (verified in frontend 1.52.7 source, not assumed): the form
+renders `extra.linearData.inputs` in list order -- `appModeStore`
+preserves it on load, `useResolvedSelectedInputs` maps it as stored, and
+nothing sorts it; each entry is `[node, widget]` (or `[node, widget,
+{height}]`), so inputs from different nodes interleave freely and a
+multi-line My Story box can be given a height. The app builder also lets
+a person drag to reorder.
+THE RANDOMIZER the operator asked for beside bank and style ALREADY EXISTS: each
+dropdown's first option is a roll (`roll (any eligible bank)`,
+`roll (any style)`, `_otr_rolls.py`), so in the app it is that dropdown's
+top choice, not a new switch.
+THE SCROLL WORRY (operator: "worried people won't see the other
+dropdowns"): about 26 dropdowns then 7 My Story text fields. My Story
+LAST keeps every dropdown above the fold; the cost is that a My Story user
+must scroll to the bottom, so the `source_bank` tooltip should say "My
+Story: fill in the fields at the bottom of this form." Whether app mode can
+group or collapse inputs is unverified -- check frontend 1.52.7 at design
+time before assuming it can.
 THE RULE (operator: "basically almost everything in our workflow matrix"):
 the app shows the matrix's USER-CHOICE deltas -- `features.act_count`,
 `features.num_characters`, the `llm.*_model` and cloud slot picks,
@@ -494,7 +531,9 @@ It HIDES the matrix's machine-tuning deltas (`llm.device`,
 `render.canvas_*`, `seed_policy.*`): the per-machine workflow already set them
 for that card. Generate the app's input list from the matrix plus that
 extras list in `build_variants.py`, so a new matrix knob cannot be missing
-from the app. Output: node 14 (Mux and Publish). Open questions for one design
+from the app. Output: node 85 (`OTR_MasterAudioMux`) -- the only node in
+the canonical with no outgoing link; an earlier draft here said "node 14",
+which does not exist. Open questions for one design
 round before code: canonical itself or a separate `otr_app.json`; whether
 the premise/title text belongs; how the per-machine workflows inherit it; whether an older
 frontend ignores the metadata harmlessly.
