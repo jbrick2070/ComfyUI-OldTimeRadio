@@ -1329,11 +1329,16 @@ class CastLock:
             # is now the only consumer.)
             from ._otr_roster_gender import canonical_bank_gender
             gender = canonical_bank_gender(entry.get("gender"))
-            if not gender and target_engine == "google_tts":
-                raise VoiceCastingError(
-                    f"{char_id}: google_tts character casting needs a cast "
-                    f"gender to choose a gender-plausible provider voice. "
-                    f"NO FALLBACK.")
+            # AN UNSTATED GENDER ON google_tts TAKES THE SEEDED DRAW (0j,
+            # operator 2026-09-25: "random genders and leave it nebulous").
+            # This used to refuse -- NO FALLBACK -- so a My Story character
+            # whose author never said a gender stopped the render on the
+            # Google lane while the same row took Kokoro's seeded,
+            # gender-agnostic draw below. Provider voices are gendered, so
+            # the pick is a coin the episode seed flips: deterministic, and
+            # _otr_my_story still leaves the gender empty on purpose. A
+            # STATED gender is still honoured with no cross-gender fallback
+            # (see the re-raise in the except below).
             # THE HYBRID LLM VOICE-FIT BRANCH WAS HERE AND IS GONE (2026-08-18).
             # It read meta.voice_cast_decision, re-validated the LLM's proposed
             # voice_ref_id, and on success stamped it and `continue`d -- skipping
@@ -1388,7 +1393,7 @@ class CastLock:
                     language=language,
                 )
             except VoiceCastingError as exc:
-                if target_engine == "google_tts":
+                if target_engine == "google_tts" and gender:
                     raise
                 # BORROW THE GENDER FROM ENGLISH BEFORE GIVING UP ON IT
                 # (operator 2026-09-19, option A). Kokoro ships ONE French

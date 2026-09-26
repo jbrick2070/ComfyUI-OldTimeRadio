@@ -129,12 +129,23 @@ one with the better voices.
 ### What the caster actually does with a bank
 
 Characters are cast one at a time, language-filtered first and gender-matched
-second. **But gender is not a guarantee.** When a gender's column in the
-eligible language pool runs out of untaken voices, the caster does not stop the
-render -- it falls back to another voice from that same language, any gender,
-and keeps going. It never crosses into English to fill a thin French, Italian
-or other non-English pool. `google_tts` is the one engine that refuses instead
-of using the gender-blind fallback.
+second. When the matched voice is not available, the caster keeps the gender
+before it keeps anything else, and does not stop the render:
+
+- **Every voice of that gender in the language is already taken** -- two
+  characters share one same-gender voice from that language rather than one
+  of them getting the other gender.
+- **The language has no voice of that gender at all** (Kokoro's French pool is
+  one woman, `ff_siwis`) -- it borrows a same-gender English voice. The
+  episode's language still sets the pronunciation, so the voice is
+  wrong-accented but the right gender.
+- **Neither works, or no gender was stated** (a My Story character whose
+  author never said) -- a draw from the language pool that ignores gender,
+  fixed by the episode seed so the same episode always casts the same voice.
+
+`google_tts` follows the same rule for an unstated gender. A **stated** gender
+it cannot serve still stops the render with a named error rather than
+reusing, borrowing, or crossing gender.
 
 `allow_voice_reuse` (on by default) controls something narrower: whether two
 characters can share an already-used, gender-matching voice before the
