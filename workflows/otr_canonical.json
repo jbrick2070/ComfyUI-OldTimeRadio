@@ -110,8 +110,8 @@
         "",
         ""
       ],
-      "color": "#1B2940",
-      "bgcolor": "#3B3D42",
+      "color": "#323",
+      "bgcolor": "#535",
       "title": "Preflight - Workflow Validator"
     },
     {
@@ -568,8 +568,8 @@
         "English",
         "off (keep everything)"
       ],
-      "color": "#1B2940",
-      "bgcolor": "#3B3D42"
+      "color": "#323",
+      "bgcolor": "#535"
     },
     {
       "id": 3,
@@ -681,8 +681,8 @@
         "",
         0
       ],
-      "color": "#3C1C37",
-      "bgcolor": "#3B3D42"
+      "color": "#323",
+      "bgcolor": "#535"
     },
     {
       "id": 4,
@@ -791,8 +791,8 @@
         0.0,
         "off"
       ],
-      "color": "#3C1C37",
-      "bgcolor": "#3B3D42"
+      "color": "#323",
+      "bgcolor": "#535"
     },
     {
       "id": 7,
@@ -938,8 +938,8 @@
         8,
         500
       ],
-      "color": "#3C1C37",
-      "bgcolor": "#3B3D42"
+      "color": "#323",
+      "bgcolor": "#535"
     },
     {
       "id": 12,
@@ -1045,8 +1045,8 @@
         "1920x1080",
         false
       ],
-      "color": "#382712",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 62,
@@ -1190,8 +1190,8 @@
         true,
         true
       ],
-      "color": "#1B2940",
-      "bgcolor": "#3B3D42"
+      "color": "#323",
+      "bgcolor": "#535"
     },
     {
       "id": 80,
@@ -1320,8 +1320,8 @@
         "kokoro",
         "default"
       ],
-      "color": "#173220",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 81,
@@ -1393,8 +1393,8 @@
         "ver": "2.3.6"
       },
       "widgets_values": [],
-      "color": "#173220",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 82,
@@ -1466,8 +1466,8 @@
         "ver": "2.3.6"
       },
       "widgets_values": [],
-      "color": "#173220",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 83,
@@ -1567,8 +1567,8 @@
         "stable_audio_3",
         ""
       ],
-      "color": "#173220",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 84,
@@ -1698,8 +1698,8 @@
         "off",
         "cpu"
       ],
-      "color": "#382712",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 85,
@@ -1815,8 +1815,8 @@
         25,
         ""
       ],
-      "color": "#3C1C37",
-      "bgcolor": "#3B3D42"
+      "color": "#323",
+      "bgcolor": "#535"
     },
     {
       "id": 86,
@@ -1935,8 +1935,8 @@
         "",
         ""
       ],
-      "color": "#382712",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 87,
@@ -2117,8 +2117,8 @@
         "no_fp8_no_fp4",
         0
       ],
-      "color": "#102F35",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 88,
@@ -2251,8 +2251,8 @@
         "{}",
         "fp8_ok"
       ],
-      "color": "#102F35",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 89,
@@ -2315,8 +2315,8 @@
         "ver": "2.3.6"
       },
       "widgets_values": [],
-      "color": "#102F35",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 90,
@@ -2408,8 +2408,8 @@
         "ver": "2.3.6"
       },
       "widgets_values": [],
-      "color": "#102F35",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 91,
@@ -2493,8 +2493,8 @@
         "ver": "2.3.6"
       },
       "widgets_values": [],
-      "color": "#102F35",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 92,
@@ -2561,8 +2561,8 @@
         "ver": "2.3.6"
       },
       "widgets_values": [],
-      "color": "#102F35",
-      "bgcolor": "#3B3D42"
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 95,
@@ -2625,8 +2625,8 @@
         "ver": "2.3.6"
       },
       "widgets_values": [],
-      "color": "#382712",
-      "bgcolor": "#3B3D42",
+      "color": "#432",
+      "bgcolor": "#653",
       "title": "13 - Credits Roll"
     },
     {
@@ -2684,7 +2684,9 @@
         "cnr_id": "comfyui-old-time-radio",
         "ver": "2.3.6"
       },
-      "widgets_values": []
+      "widgets_values": [],
+      "color": "#323",
+      "bgcolor": "#535"
     }
   ],
   "links": [
@@ -3171,7 +3173,7 @@
         1160,
         1872
       ],
-      "color": "#6F86AA",
+      "color": "#a1309b",
       "font_size": 24,
       "flags": {}
     },
@@ -3184,7 +3186,7 @@
         560,
         1368
       ],
-      "color": "#77987E",
+      "color": "#b58b2a",
       "font_size": 24,
       "flags": {}
     },
@@ -3197,7 +3199,7 @@
         1680,
         512
       ],
-      "color": "#A17B9A",
+      "color": "#a1309b",
       "font_size": 24,
       "flags": {}
     },
@@ -3210,7 +3212,7 @@
         1680,
         664
       ],
-      "color": "#AD916B",
+      "color": "#b58b2a",
       "font_size": 24,
       "flags": {}
     },
@@ -3223,7 +3225,7 @@
         560,
         432
       ],
-      "color": "#A17B9A",
+      "color": "#a1309b",
       "font_size": 24,
       "flags": {}
     },
@@ -3236,7 +3238,7 @@
         2800,
         752
       ],
-      "color": "#6A9CA6",
+      "color": "#b58b2a",
       "font_size": 24,
       "flags": {}
     }
