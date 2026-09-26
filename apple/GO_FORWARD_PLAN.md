@@ -53,81 +53,10 @@ proven wrong. Aesthetic drift is closed.
 
 Open forks. One word from him closes a row into section 2, or cuts it.
 
-* **Pre-push hook.** No hook exists (`.githooks/` is not in the repo). The fork:
-  add one that runs `build_variants --check` plus the widget / link / doc-parity
-  / registry-scan tests before a push, or keep relying on the full suite each
-  window runs. Changes how both boxes push.
-
-* **Google BYO lane: stills-only by his ruling (67332dc5).** Veo on his paid
-  Tier 1 project allows 2 requests a minute and 10 a day per model, and an
-  episode makes 16 Veo calls, so no Veo shape fits. The stills shape (Gemini
-  image, `still_flat`, Google TTS, Lyria, Flash / Flash-Lite writers) published
-  English Hamlet 1.1 in 218 s on 2026-09-19 with no 429s. Veo override:
-  `OTR_GOOGLE_VEO_MODEL_ID`. **The fork:** does a Google profile ship as a
-  variant (a `SHIPPING_SET` recipe, a matrix row, the README block -- all
-  generated) or stay a lane preset applied by hand? If Veo ever returns: 8-second
-  clips (one call per beat) or a disclosed opt-in model rotation. One word from
-  him.
-
-* **Non-English episodes admit only Kokoro, so Shakespeare-in-translation
-  cannot run on the Google lane until he says which languages Google TTS
-  may voice.** Measured 2026-09-19: French Hamlet on `google_veo_low_1act`
-  stopped in 29 s at `cast_lock.py:62-65` -- "engine 'google_tts' is not
-  admitted on a French episode (row engines: ['kokoro']). Kokoro is the
-  dance leader day 1." That is his 2026-09-12 ruling working as written
-  (`config/episode_languages.json` rows list the admitted engines; English
-  admits everything). Gemini TTS speaks every language the switch carries,
-  so admitting it is one list entry per row -- but a voice on a language is
-  an ear decision, not a config edit (see the French `ff_siwis` day). The
-  English Hamlet leg proves the lane on Shakespeare content meanwhile. One
-  word per language, or "all", and the rows get it.
-
-* **`google_tts` refuses a cast row with no gender; `my_story` leaves an
-  unstated gender empty by design.** Measured 2026-09-19 on the second live
-  leg of `google_veo_low_1act`: the canonical's bank is `roll`, the roll
-  landed on `my_story`, two of three characters (Stomp, Whiskers) carried
-  `gender: None` because the operator's story never states one -- and
-  `_otr_my_story.py:26` says so on purpose ("a gender they did not state is
-  never guessed from a name"). `cast_lock.py:1332-1336` (re-grounded
-  2026-09-25) then raises `VoiceCastingError ... NO FALLBACK`
-  for `google_tts`, where the Kokoro
-  path takes the gender-agnostic draw and ships. Two rules that are each
-  right collide only on this lane. The fork: (a) let `google_tts` take the
-  same seeded gender-agnostic draw Kokoro takes when the SOURCE deliberately
-  left gender empty (provider voices are gendered, so the pick is a coin
-  the seed flips -- deterministic, disclosed in the report line); or (b)
-  keep the refusal and have `my_story` say up front that a Google-voiced
-  run needs every character's gender stated in the story. (a) ships more
-  episodes; (b) never puts a voice on a character the author left open.
-  The lane test moved on with `--source-bank original` (LLM-owned cast, the
-  40/40/20 draw always sets a gender). One word from him picks it.
-
-* **The Comfy key rides a V1 hidden input, and ComfyUI copies V1 inputs into
-  error history.** Since the 2026-09-19 credential rip, nine nodes (writer,
-  ShotLock, meta-brief prompt, stills, video, music, both voice nodes, the
-  validator) declare `"hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"}`.
-  That is the V1 channel: `execution.py:230` puts the key into
-  `input_data_all`, and when a node RAISES, `execution.py:630-653` serializes
-  every input -- hidden included -- into `execution_error.current_inputs`,
-  which lands in `/history`. Before the rip only the writer had this
-  exposure; now every credit-spending host does. ComfyUI's own partner nodes
-  avoid it by being V3 `io.ComfyNode` classes: the same credential arrives
-  through `v3_data` (`execution.py:196-209`), which the error path never
-  serializes. **Codex r2 named this as the pack-side mitigation and it is
-  real.** The fork: convert the nine hosts to V3 (schema order must match the
-  saved widget order byte-for-byte across the 25 shipped graphs, and the writer alone is
-  ~3,500 lines), OR add one small V3 credential node that stashes the key per
-  prompt and is wired into every host's `gate_in` (a canonical-graph change
-  plus all variants, and it must return NaN from IS_CHANGED or a cache hit
-  serves a stale key). Both are arc-sized. Interim risk, stated exactly: the
-  reader needs `/history` on the server, and only a queue that both carries
-  a key and raises exposes it. On the desktop boxes the server binds
-  127.0.0.1, so that reader is already on the machine. **On the pod it is
-  not:** [RUNPOD_INSTALL](RUNPOD_INSTALL.md) launches on `0.0.0.0` for the
-  RunPod proxy, so on a pod a key-bearing queue that raises exposes the key
-  to anyone the proxy admits (codex r3). Until the V3 shape
-  lands, a pod run that spends Comfy credits should be treated as sharing
-  its key with the proxy's audience. One word from him picks the shape.
+* All five forks that stood here were closed by his word on 2026-09-25 and
+  are now section 2 rows 0h-0k (the pre-push hook is cut: "12 minutes of
+  tests for every commit, probably not needed"; the suite at every push
+  stays the guard).
 
 ### The registry -- his clicks and his word
 
@@ -341,8 +270,9 @@ old engine id just stops resolving -- that is the intended behaviour.
   surfaced, one commit: (1) `MACHINES.md`'s "Which graph do I open?" gets
   one sentence pointing at that table for "what each graph uses"; (2) the
   generator's tier headings read "N experimental profile(s), N shipping" --
-  the retired word (operator: "THERE ARE NO PROFILES"); change the
-  generator's heading string to "graph(s)", regenerate. The canonical has
+  the retired word (operator: "THERE ARE NO PROFILES"); the strings are
+  `scripts/otr_machine_matrix.py:510` (the VRAM-band heading) and `:531` (the
+  "draft profile(s)" summary); change both to "variant(s)" -- the word is WORKFLOW VARIANT (operator, same day: "no profiles, we have workflow variants") -- and regenerate. The canonical has
   no matrix row and so no line there; its picks are its saved widgets
   (music `stable_audio_3`).
   Music engines as shipped, measured from the matrix the same day: every
@@ -352,6 +282,68 @@ old engine id just stops resolving -- that is the intended behaviour.
   "measured" there), so SA3 on Mac is confirmed, not assumed. The AMD cell
   is still `?`: `otr_amd_still` selects SA3 unproven, which is the
   experimental-AMD position already on record.
+
+### 0h. Google lane ships as a variant, stills only (operator 2026-09-25: "yes we should have a Google JSON with stills")
+
+The stills shape (Gemini image, `still_flat`, Google TTS, Lyria, Flash /
+Flash-Lite writers) published English Hamlet 1.1 in 218 s on 2026-09-19
+with no 429s; it has been a hand-applied lane preset since. Work: one new
+row in `config/workflow_matrix.json` (id `otr_google_still`; deltas copied
+from the proven preset -- the image, visual, voice, music and writer picks
+above; `google_api_slot_a/b_model` set to the Flash / Flash-Lite ids), so
+`build_variants.py --all` emits `workflows/otr_google_still.json`, its
+recipe section, its thumbnail, and every generated doc row; add it to the
+matrix's shipping set so the gallery lists 26. Video stays OFF this graph
+(Veo's 2/min, 10/day quota cannot carry an episode's 16 calls; override
+remains `OTR_GOOGLE_VEO_MODEL_ID`). Prove with one 1-act leg on the 5080
+that downloads nothing and publishes.
+
+### 0i. Google TTS is admitted on every language Kokoro is (operator: "all supported as Kokoro, just shove it Kokoro's stuff")
+
+`config/episode_languages.json` rows list the admitted voice engines;
+non-English rows admit only `kokoro`, so a non-English episode on the
+Google lane stops at `cast_lock.py:62-65`. Work: for every language row
+whose engines list contains `kokoro`, append `google_tts`; English already
+admits everything. Test: parametrize over the rows and assert
+`google_tts in engines` wherever `kokoro in engines`. His ear on any
+language stays his (the French `ff_siwis` day), but admission is now a
+config fact, not a per-language wait.
+
+### 0j. `my_story` on Google TTS: the seeded draw, gender left unstated (operator: "random genders and leave it nebulous")
+
+`cast_lock.py:1332-1336` raises `VoiceCastingError ... NO FALLBACK` for
+`google_tts` when a cast row carries `gender: None`; the Kokoro path takes
+the seeded gender-agnostic draw instead. `_otr_my_story.py:26` leaves an
+unstated gender empty on purpose and keeps doing so. Work: give
+`google_tts` the same seeded draw Kokoro takes at that site (provider
+voices are gendered, so the pick is a coin the episode seed flips --
+deterministic, and the report line names it "gender drawn by seed"), and
+delete the refusal branch. Test: a `my_story` cast with `gender: None` on
+`google_tts` casts without raising and the same seed picks the same voice
+twice; a stated gender is honoured unchanged.
+
+### 0k. The Comfy credential rides the V3 channel: one small credential node (operator: "I dunno what is best practice" -- this is it)
+
+Best practice, stated plainly: in the app, the user's ComfyUI login IS the
+credential and nothing in the graph or the environment should carry a key;
+headless (a pod, `scripts/otr_api.py`) there is no login, so the key
+travels per prompt as `extra_data.api_key_comfy_org`, which the submitter
+already does. The defect is only how our nine credit-spending hosts RECEIVE
+it: a V1 `"hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"}` input,
+which `execution.py:630-653` serializes into `/history` when a node raises
+-- on a pod bound to `0.0.0.0` that is anyone the proxy admits. Comfy's own
+partner nodes avoid it as V3 `io.ComfyNode` classes, whose `v3_data` the
+error path never serializes. Work (the smaller of the two shapes): one V3
+credential node, `OTR_ComfyCredential`, that reads the key from `v3_data`,
+stashes it per prompt in a process-local map keyed by prompt id, and
+returns a token the nine hosts take on `gate_in`; the hosts drop their V1
+hidden input and fetch the key from the map by their prompt id. It returns
+NaN from `IS_CHANGED` so a cache hit never serves a stale key. This is a
+canonical-graph change (one node, nine links) plus all 25 variants
+regenerated -- the section 0 three-part rule applies. Prove: queue a
+credit-spending graph with a deliberately failing host and read
+`/history`: the key must not appear. Until it lands, a pod run that spends
+Comfy credits is treated as sharing its key with the proxy's audience.
 
 ### 0c. Portability fixes (Composer audit 2026-09-25, each claim grounded)
 
