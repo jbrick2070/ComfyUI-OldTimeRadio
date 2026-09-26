@@ -2350,16 +2350,19 @@ class SignalLostVideoRenderer:
             _early_led = _get_ledger()
             out_dir = str(_early_led.out_dir)
         except Exception as _exc:  # noqa: BLE001
-            # Fall back to legacy if the ledger is somehow unavailable
-            # (test harness, headless invocation). This preserves the
-            # pre-Phase-G behavior in those edge cases.
+            # No ledger, so no episode workspace: the render is scratch by
+            # definition. _shared/tmp is the contract-compliant scratch tier
+            # (janitor-swept), resolved through ComfyUI's live output root --
+            # the old ~/Documents/ComfyUI/output/otr/audio fallback named this
+            # developer's own layout and broke on any other box.
+            try:
+                from . import _otr_paths as _OTRP  # type: ignore
+            except ImportError:  # loaded with nodes/ on sys.path
+                import _otr_paths as _OTRP  # type: ignore
+            out_dir = str(_OTRP.otr_shared_tmp_dir())
             log.warning(
                 "[Video] ledger singleton unavailable for out_dir (%s); "
-                "falling back to legacy output/otr/audio/", _exc,
-            )
-            out_dir = os.path.join(
-                os.path.expanduser("~"), "Documents", "ComfyUI",
-                "output", "otr", "audio"
+                "falling back to %s", _exc, out_dir,
             )
         os.makedirs(out_dir, exist_ok=True)
 

@@ -160,16 +160,27 @@ def test_no_shipped_default_hardcodes_this_developers_home():
     portability defect. `scene_sequencer.DEFAULT_OUT` was
     `~/Documents/ComfyUI/output/otr/audio` -- wrong on a registry install, on
     the 8 GB box, and on any two-tree split, and invisible to a suite that runs
-    where the guess happens to be true."""
+    where the guess happens to be true. `video_engine.py` carried the same
+    hardcoded home in its no-ledger fallback until 0c-8 moved it to the
+    shared scratch tier."""
     from nodes import scene_sequencer
     assert scene_sequencer.DEFAULT_OUT == ""
     for name in ("scene_sequencer.py", "otr_caption_burn.py", "otr_master_audio_mux.py",
                  "otr_silent_composite.py", "otr_credits_roll.py",
-                 "otr_post_upscale_procgen_blend.py"):
+                 "otr_post_upscale_procgen_blend.py", "video_engine.py"):
         src = (_NODES / name).read_text(encoding="utf-8")
         code = "\n".join(l for l in src.split("\n") if not l.lstrip().startswith("#"))
         assert 'expanduser("~")' not in code, (
             "%s builds a shipped path from this machine's home directory" % name)
+
+
+def test_video_ledger_fallback_uses_the_shared_scratch_tier():
+    """No ledger means no episode workspace, so the procgen mp4 is scratch by
+    definition: the fallback resolves through `_otr_paths` (the live output
+    root's janitor-swept tier), and the warning that says so is kept."""
+    src = (_NODES / "video_engine.py").read_text(encoding="utf-8")
+    assert "otr_shared_tmp_dir" in src
+    assert "ledger singleton unavailable for out_dir" in src
 
 
 @pytest.mark.parametrize("filename,spec", sorted(CONFINED_DESTINATIONS.items()))
