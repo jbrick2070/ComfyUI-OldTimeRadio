@@ -1216,14 +1216,18 @@ def _refuse_unmet_boot_contracts(engines, state=None):
             continue
         if any(not _bc.check_running_server(c, state=state) for c in known):
             continue
-        contract = known[0]
-        unmet = _bc.check_running_server(contract, state=state)
-        if unmet:
-            argv = " ".join(_bc.launch_args_for(contract))
-            problems.append(
-                "Restart ComfyUI with %s -- the video engine '%s' needs its %r "
-                "boot, and this server was not started that way: %s"
-                % (argv or "the settings below", name, contract, "; ".join(unmet)))
+        # EVERY boot the engine accepts, not only the first: H3 runs on 'h3'
+        # (a 12 GiB reserve) OR 'h3_8gb_lab' (no reserve), and telling an 8 GB
+        # card to reserve 12 GiB is the wrong fix (Cursor review, 2026-09-26).
+        ways = []
+        for c in known:
+            argv = " ".join(_bc.launch_args_for(c)) or "its default settings"
+            ways.append("%s (the %r boot)" % (argv, c))
+        unmet = _bc.check_running_server(known[0], state=state)
+        problems.append(
+            "Restart ComfyUI with %s -- the video engine '%s' cannot run on "
+            "the boot this server has: %s"
+            % (" or ".join(ways), name, "; ".join(unmet) or "no accepted boot matches"))
     if problems:
         raise VisualAssetError(
             "%s. Nothing was downloaded or rendered; fix this and press Run "

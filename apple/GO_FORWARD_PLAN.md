@@ -111,6 +111,24 @@ is `RECURRING_CHARACTER_VOICES` + `reserved_for`. Full suite 16965 passed,
 `otr_8gb_low`, Lemmy forced in): PASS 9:26, `cold_iron_hum_20260926_053814`;
 Lemmy cast on kokoro as `bm_george`, his recurring-table voice.
 
+### 0m. H3 sets its own memory reserve -- no boot flags (operator 2026-09-26: "I don't like messing with reserves")
+
+MiniMax H3 is the one lane that needs a special server boot: `--reserve-vram
+12 --disable-pinned-memory` (the `h3` contract) or `--disable-pinned-memory`
+(`h3_8gb_lab`). Since `32c1d7f9` a stock boot is refused at queue time with
+those flags -- correct, and exactly what he does not want users doing.
+Grounded 2026-09-26 on ComfyUI 0.37.4: both knobs are module globals read at
+call time -- `comfy.model_management.EXTRA_RESERVED_VRAM` (via
+`extra_reserved_memory()`, :877-888) and `MAX_PINNED_MEMORY` (:1594-1642). So
+the H3 adapter could apply its own reserve and switch pinning off for the
+length of its render, restore both after (in a finally), and accept the
+`default` boot. OPEN QUESTIONS for a design round before code: does a runtime
+reserve reproduce the measured boot-flag envelope (the 12 GiB was measured
+as a boot flag); what happens to memory already pinned before the switch;
+and whether other lanes in the same episode must see the stock values
+restored. PROOF: one H3 leg on a STOCK boot on the 5080 matching the boot-flag
+leg's peak and publishing. No workflow selects H3, so nothing waits on this.
+
 ### 0a. Windows HF_HOME -- DONE 2026-09-25 (`a0875708`, `89a95212`)
 
 One chooser pins a short root when the models-adjacent pin cannot fit

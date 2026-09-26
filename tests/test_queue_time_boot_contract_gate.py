@@ -27,6 +27,9 @@ def test_h3_on_a_stock_boot_is_refused_with_the_restart_first():
     msg = str(info.value)
     assert msg.startswith("Restart ComfyUI with --reserve-vram 12 --disable-pinned-memory")
     assert "minimax_h3_video" in msg and "Nothing was downloaded" in msg
+    # Both accepted boots are offered -- an 8 GB card is not told to reserve
+    # 12 GiB as its only option (Cursor review, 2026-09-26).
+    assert "'h3_8gb_lab' boot" in msg and "'h3' boot" in msg
 
 
 def test_h3_on_its_own_boot_passes():
