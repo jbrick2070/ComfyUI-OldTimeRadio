@@ -396,8 +396,10 @@ def render() -> str:
       "python scripts/otr_canonical_api_run.py --profile otr_8gb_animatediff "
       "--act-count 1\n"
       "```\n")
-    A("That lane is `animatediff15_v3_haunted_video` with `kokoro` voices and "
-      "`musicgen`, and it is the one proven on 8 GB, 16 GB and 24 GB cards.\n")
+    # The VIDEO lane only: music is its own dropdown, not tied to a video lane
+    # (operator, 2026-09-26).
+    A("That video lane is `animatediff15_v3_haunted_video`, proven on 8 GB, "
+      "16 GB and 24 GB cards.\n")
     return "\n".join(L) + "\n"
 
 
