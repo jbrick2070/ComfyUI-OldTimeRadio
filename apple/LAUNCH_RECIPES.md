@@ -456,8 +456,6 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - ltx-2.5-video-vae-bf16.safetensors
 - ltx-2.5-audio-vae-bf16.safetensors
 - ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors
-- stable_audio_3_small_music_base.safetensors
-- t5gemma_b_b_ul2.safetensors
 
 ## otr_8gb_ltx25_foley
 
@@ -502,8 +500,6 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - ltx-2.5-video-vae-bf16.safetensors
 - ltx-2.5-audio-vae-bf16.safetensors
 - ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors
-- stable_audio_3_small_music_base.safetensors
-- t5gemma_b_b_ul2.safetensors
 
 ## otr_8gb_ltx25_mime
 
@@ -548,8 +544,6 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - ltx-2.5-video-vae-bf16.safetensors
 - ltx-2.5-audio-vae-bf16.safetensors
 - ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors
-- stable_audio_3_small_music_base.safetensors
-- t5gemma_b_b_ul2.safetensors
 
 ## otr_8gb_still
 
