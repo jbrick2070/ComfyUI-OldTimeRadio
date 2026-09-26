@@ -1506,6 +1506,13 @@ class OTRSilentComposite:
     """Registered as ``OTR_SilentComposite``. Render output -> ONE always-silent
     canonical video (bt709/yuv420p/CFR, audio stripped). Mux happens downstream."""
 
+    DESCRIPTION = (
+        "Assembles rendered video clips and the procedural CRT base into one standardized, "
+        "silent, CFR video stream tagged for BT.709 color. Strips existing audio to preserve the "
+        "audio-is-king pipeline contract and performs optional per-clip AI upscaling. Adjust "
+        "canvas dimensions, fallback frame rate, or the upscale model engine and device."
+    )
+
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "composite"
     RETURN_TYPES = ("STRING", "STRING")

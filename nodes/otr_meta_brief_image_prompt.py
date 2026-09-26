@@ -2502,6 +2502,14 @@ def _resolve_writer_llm(meta, warnings):
 class OTRMetaBriefImagePromptGen:
     """Registered as ``OTR_MetaBriefImagePromptGen``. Brief -> per-character image prompts."""
 
+    DESCRIPTION = (
+        "Composes descriptive still-image prompts for characters and scenes using the "
+        "propagating creative brief stamped in the ledger. Formats visual prompts and aspect "
+        "ratios to match downstream video engines with optional language-model prompt "
+        "refinement. Wire script and image policy JSON inputs or route through an optional "
+        "execution gate."
+    )
+
     CATEGORY = "OldTimeRadio/v2/image"
     FUNCTION = "generate"
     RETURN_TYPES = ("STRING", "STRING")

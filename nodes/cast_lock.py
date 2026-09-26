@@ -416,6 +416,14 @@ def _recurring_character_bank_ref(entry, engine, bank_entries, language):
 class CastLock:
     """Registered as ``OTR_CastLock``. Single v2 ledger authority."""
 
+    DESCRIPTION = (
+        "Locks character and announcer voice assignments between the script freeze "
+        "cascade and audio synthesis. Maps cast members to reference audio from the voice "
+        "bank, enforces language compatibility, and stamps the canonical ledger consumed "
+        "by downstream audio nodes. Adjust the casting policy, toggle voice reuse when "
+        "casts exceed the bank, or set default voice engines for characters and the announcer."
+    )
+
     CATEGORY = "OldTimeRadio/v2/audio"
     FUNCTION = "lock"
     RETURN_TYPES = ("STRING", "INT", "STRING", "STRING")

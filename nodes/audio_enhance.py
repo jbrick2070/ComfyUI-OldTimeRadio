@@ -312,6 +312,14 @@ def _apply_tape_emulation(waveform: torch.Tensor, sample_rate: int, intensity_st
 class AudioEnhance:
     """48 kHz stereo mastering for the scene bus; every effect is opt-in."""
 
+    DESCRIPTION = (
+        "Masters dialogue audio to 48 kHz stereo with optional spatial and vintage "
+        "analog effects. Resamples input waveforms, converts mono signals to stereo, "
+        "and applies optional bass warmth, low-pass chirp cleanup, Haas widening, and "
+        "tape emulation. Adjust spatial width or tape emulation intensity for retro "
+        "character, or leave defaults for clean pass-through mastering."
+    )
+
     CATEGORY = "OldTimeRadio"
     FUNCTION = "enhance"
     RETURN_TYPES = ("AUDIO",)
@@ -321,7 +329,9 @@ class AudioEnhance:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "audio": ("AUDIO",),
+                "audio": ("AUDIO", {
+                    "tooltip": "Input audio to resample and enhance (mono or stereo, any sample rate)."
+                }),
             },
             "optional": {
                 "target_sample_rate": ("INT", {

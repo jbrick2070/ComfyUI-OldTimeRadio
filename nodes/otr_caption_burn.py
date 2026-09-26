@@ -429,6 +429,14 @@ class OTRCaptionBurn:
     ``burn_captions`` and REFUSE on any failure. See the module docstring.
     """
 
+    DESCRIPTION = (
+        "Burns open SDH subtitles and the episode title card directly onto the silent "
+        "composited video stream. Operates strictly on video frames so audio remains "
+        "lossless and synchronized downstream. Toggle caption burning on or off, "
+        "select caption styling between standard SDH and retro CRT, or adjust vertical "
+        "margins and frame rate."
+    )
+
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "burn"
     RETURN_TYPES = ("STRING", "STRING")

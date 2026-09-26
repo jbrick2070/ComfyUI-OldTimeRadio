@@ -427,6 +427,14 @@ class OTRVideoRenderBatch:
     loop in-process (NODE_CLASS_MAPPINGS populated). OUTPUT_NODE so it can be the
     terminal of a render-gate workflow."""
 
+    DESCRIPTION = (
+        "Executes the in-process video rendering loop across planned shots using registered "
+        "video models. Verifies that all required still images exist on disk before rendering, "
+        "tracks VRAM usage, and emits a frame-accurate clip manifest for composite assembly. "
+        "Connect the planned ledger, frozen master audio path, and the image-done gate to "
+        "control rendering."
+    )
+
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "render"
     RETURN_TYPES = ("STRING", "STRING")

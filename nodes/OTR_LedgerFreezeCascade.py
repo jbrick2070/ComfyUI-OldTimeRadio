@@ -74,6 +74,14 @@ def _episode_seed_from_ledger(ledger_json: str) -> int:
 class OTR_LedgerFreezeCascade:
     """Finalize the accepted ledger without quality-driven reauthoring."""
 
+    DESCRIPTION = (
+        "Validates ledger structure, runs readiness checks, and freezes the production "
+        "ledger before media rendering begins. Unloads resident story-writing language "
+        "models from memory to free VRAM for downstream audio and video generation. "
+        "Toggle individual diagnostic audit phase flags or inspect the freeze verdict "
+        "to ensure story and cast integrity."
+    )
+
     CATEGORY = "OldTimeRadio/v2"
     FUNCTION = "run"
     RETURN_TYPES = ("STRING", "STRING", "STRING", "INT", "STRING", "INT", "STRING")

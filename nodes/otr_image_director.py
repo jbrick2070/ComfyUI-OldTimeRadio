@@ -151,6 +151,14 @@ class OTRImageDirector:
     """Registered as ``OTR_ImageDirector``. Per-role granularity / fresh-cap / seed
     policy; image-model picks come from OTR_VideoDirector via video_policy_json."""
 
+    DESCRIPTION = (
+        "Defines still-image generation policies for the visual pipeline upstream of video "
+        "rendering. Sets image reuse granularity, generation limits, and seed derivation "
+        "rules while forwarding model choices from the video director into an image policy. "
+        "Adjust granularity modes per role, limit total fresh stills rendered, or set the "
+        "request seed."
+    )
+
     CATEGORY = "OldTimeRadio/v2/image"
     FUNCTION = "direct"
     RETURN_TYPES = ("STRING",)

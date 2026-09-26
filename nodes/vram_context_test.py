@@ -186,6 +186,14 @@ class VRAMContextTest:
     as the node's STRING output.
     """
 
+    DESCRIPTION = (
+        "A diagnostic node that benchmarks real VRAM and system memory utilization across "
+        "increasing prompt context lengths for a selected language model. Loads the model "
+        "using production loader infrastructure, runs incremental token probes, and logs "
+        "resource metrics to the ledger. Select which model to probe, configure comma-separated "
+        "probe token lengths, or adjust test generation token length."
+    )
+
     CATEGORY = "OTR/v2/Diagnostics"
     FUNCTION = "execute"
     RETURN_TYPES = ("STRING",)

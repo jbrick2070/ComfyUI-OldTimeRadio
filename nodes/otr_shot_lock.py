@@ -3346,6 +3346,13 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
 class OTRShotLock:
     """Registered as ``OTR_ShotLock``. Single ``ledger['video']`` authority."""
 
+    DESCRIPTION = (
+        "Locks the video plan and shot budget against the frozen audio timeline, acting as the "
+        "video authority. Runs creative prompt derivation for character-bearing shots, partitions "
+        "the episode into execution groups, and stamps the video plan into the ledger. Wire upstream "
+        "script, audio-done gate, and video policy inputs to coordinate video planning."
+    )
+
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "lock"
     # episode_id output is ADDITIVE (still-spine ST-6 / DS-3): ShotLock holds

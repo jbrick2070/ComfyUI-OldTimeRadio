@@ -1409,6 +1409,14 @@ class OTRMasterAudioMux:
     """Registered as ``OTR_MasterAudioMux``. Terminal audio mux (V-1: the ONLY
     node that adds audio). ``-c:a copy``, NO ``-shortest``, byte-identical assert."""
 
+    DESCRIPTION = (
+        "The terminal publication node that muxes frozen master audio onto the silent video "
+        "composite using lossless stream copying. Verifies audio-video duration agreement, "
+        "asserts bit-for-bit audio integrity, and copies the completed episode to the OBS "
+        "delivery directory when eligible. Connect the silent video and master audio paths, "
+        "or adjust declared frame rate and output file paths."
+    )
+
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "mux"
     RETURN_TYPES = ("STRING", "STRING")

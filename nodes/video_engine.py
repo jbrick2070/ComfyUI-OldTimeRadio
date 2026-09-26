@@ -2064,6 +2064,13 @@ def _write_story_treatment(out_path, episode_title, led,
 class SignalLostVideoRenderer:
     """Generate a procedural CRT-aesthetic MP4 from an OTR episode."""
 
+    DESCRIPTION = (
+        "Renders procedural CRT sci-fi radio-floor video directly from episode audio using "
+        "mathematical waveforms without AI generation. Draws animated oscilloscope graphics, "
+        "frequency spectrum bars, CRT scanlines, and episode title cards on CPU at broadcast "
+        "resolution. Adjust video frame rate or change the output resolution dropdown."
+    )
+
     CATEGORY = "OldTimeRadio"
     FUNCTION = "render_video"
     # title_card_plan_json APPENDED, never inserted: output order is positional
@@ -2076,7 +2083,9 @@ class SignalLostVideoRenderer:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "audio": ("AUDIO",),
+                "audio": ("AUDIO", {
+                    "tooltip": "Master episode audio that drives the procedural CRT waveforms and master timing."
+                }),
                 "script_json": ("STRING", {
                     "multiline": True, "default": "[]",
                     "tooltip": "Parsed script JSON (pipeline compat)"

@@ -101,6 +101,14 @@ class StableAudioTheme:
     See PBUG-20260907-04. musicgen remains fully selectable.
     """
 
+    DESCRIPTION = (
+        "Generates opening and closing musical theme cues tailored to the episode's setting, "
+        "mood, and genre from the creative brief. Dispatches cue generation to the selected audio "
+        "model and outputs a batched audio tensor with a manifest for the episode assembler. "
+        "Change the music engine dropdown, specify a custom music style prompt, or connect "
+        "execution gates."
+    )
+
     CATEGORY = "OldTimeRadio/v2/audio"
     FUNCTION = "generate"
     # 720-bakeoff C3: ONE padded AUDIO batch of ALL cues + the manifest that

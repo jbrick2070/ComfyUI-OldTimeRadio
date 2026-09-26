@@ -2548,6 +2548,14 @@ def _inprocess_gen_fn(request):
 class OTRImageGenDispatcher:
     """Registered as ``OTR_ImageGenDispatcher``. Cache-checked image gen + ledger + image_done."""
 
+    DESCRIPTION = (
+        "Coordinates still image generation for character portraits and scene backgrounds "
+        "against a content-addressed disk cache. Reuses existing stills on cache hits, "
+        "renders missing images using the selected image model, records image paths in the "
+        "ledger, and emits the image-done signal. Connect script, image policy, and prompt "
+        "wires or supply ordering gates."
+    )
+
     CATEGORY = "OldTimeRadio/v2/image"
     FUNCTION = "dispatch"
     RETURN_TYPES = ("STRING", "STRING", "STRING")

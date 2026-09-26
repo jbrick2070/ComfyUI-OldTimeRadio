@@ -375,6 +375,13 @@ def plan_scope_frames(manifest, out_w, out_h, ffprobe="ffprobe",
 class SceneAwareScopes:
     """Render scene-aware GREEN-ONLY scopes on BLACK -> scopes_only.mp4."""
 
+    DESCRIPTION = (
+        "Renders green-only audio-reactive oscilloscope and frequency displays into video "
+        "gutters dynamically based on shot aspect ratios from the clip manifest. Places "
+        "circular scopes in the margins of portrait shots while keeping landscape shots clear. "
+        "Adjust output canvas width and height, or enable the bottom landscape audio bars visualizer."
+    )
+
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "render_scopes"
     RETURN_TYPES = ("STRING",)

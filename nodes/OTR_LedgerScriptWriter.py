@@ -2123,6 +2123,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
     (style-engine consolidation, 2026-07-05).
     """
 
+    DESCRIPTION = (
+        "Authors the radio drama outline, cast roster, and beat-by-beat dialogue using "
+        "local or remote language models, initializing the production ledger. Can fetch "
+        "science news feeds or build stories from custom premises, deriving act breaks and "
+        "late-bound episode titles. Change the custom premise, act count, requested character "
+        "count, seed, or creative and technical model selections."
+    )
+
     @classmethod
     def INPUT_TYPES(cls):
         # Widget order matches the pre-rename writer widget

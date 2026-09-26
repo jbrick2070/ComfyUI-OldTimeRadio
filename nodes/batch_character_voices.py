@@ -29,6 +29,14 @@ class BatchCharacterVoices(OTRVoiceNodeBase):
     Engine order is legacy-first: index 0 is the byte-identical default.
     """
 
+    DESCRIPTION = (
+        "Synthesizes spoken dialogue for all dramatic characters in the script using "
+        "voice assignments from the production ledger. Dispatches character lines to "
+        "the chosen speech engine and packs the resulting audio into a batch for "
+        "sequencing. Change the engine dropdown to select IndexTTS2, Chatterbox, Dia, "
+        "Bark, Kokoro, or cloud voice models, or connect execution gates."
+    )
+
     ROLE = "char_voice"
     LINE_ROLES = ("character",)
     DONE_PREFIX = "char_voice"

@@ -729,6 +729,14 @@ class PostUpscaleProcgenBlend:
     SilentComposite's output directly. See the module docstring.
     """
 
+    DESCRIPTION = (
+        "Blends procedural CRT visual effects over the silent video composite while passing "
+        "audio through untouched. Overlays animated scanlines, oscilloscope patterns, and "
+        "audio-reactive flicker to fill pillarbox margins with authentic sci-fi CRT signatures. "
+        "Adjust the blend mode, opacity, black crush threshold, or toggle green-only overlay "
+        "and bottom audio bars."
+    )
+
     @classmethod
     def INPUT_TYPES(cls):
         return {

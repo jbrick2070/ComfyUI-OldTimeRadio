@@ -849,6 +849,13 @@ def _verify_bus_clip_counts(
 class SceneSequencer:
     """Render a script scene: TTS for each line, music passthrough, pauses."""
 
+    DESCRIPTION = (
+        "Sequences voiced dialogue clips from characters and the announcer end-to-end against "
+        "the script ledger. Resamples clips to 48 kHz, manages inter-line pauses and pacing, "
+        "and records exact line timing back into the ledger. Adjust start and end line ranges, "
+        "shift dialogue timing with dialogue offset, or supply an output directory override."
+    )
+
     CATEGORY = "OldTimeRadio"
     FUNCTION = "sequence"
     RETURN_TYPES = ("AUDIO", "STRING")
@@ -1355,6 +1362,14 @@ class EpisodeAssembler:
     starts. No more Bark-vs-FLUX VRAM contention.
     """
 
+    DESCRIPTION = (
+        "Assembles sequenced scene dialogue with opening and closing theme music into "
+        "the final episode audio track. Normalizes broadcast delivery loudness, writes "
+        "the master WAV file, and emits the topological audio-done signal that unblocks "
+        "video generation. Adjust opening and closing theme durations, crossfade timing, "
+        "or connect custom music cue audio and manifest inputs."
+    )
+
     # ---- canonical replay (campaign item 0, 2026-09-02) ------------------- #
     @staticmethod
     def _replay_from_descriptor(replay_descriptor):
@@ -1523,7 +1538,9 @@ class EpisodeAssembler:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "scene_audio": ("AUDIO",),
+                "scene_audio": ("AUDIO", {
+                    "tooltip": "Sequenced dialogue audio stream from SceneSequencer."
+                }),
                 # `episode_title` stood here until 2026-09-14, defaulting to
                 # "The Last Frequency". Its own tooltip said the published
                 # title comes from the ledger and not from here, which is the
@@ -1535,8 +1552,12 @@ class EpisodeAssembler:
                 # OTR_LedgerScriptWriter is the one workflow-facing owner.
             },
             "optional": {
-                "opening_theme_audio": ("AUDIO",),
-                "closing_theme_audio": ("AUDIO",),
+                "opening_theme_audio": ("AUDIO", {
+                    "tooltip": "Opening theme audio stream (used when no music cue manifest is wired)."
+                }),
+                "closing_theme_audio": ("AUDIO", {
+                    "tooltip": "Closing theme audio stream (used when no music cue manifest is wired)."
+                }),
                 "opening_duration_sec": ("FLOAT", {
                     "default": 10.0, "min": 0.0, "max": 60.0, "step": 1.0,
                     "tooltip": "Max duration of opening theme"

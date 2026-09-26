@@ -1838,6 +1838,14 @@ class OTRCreditsRoll:
     to node 93's output and hands the mux (85) the video path + the DECLARED
     credits-tail duration (credits-aware guard)."""
 
+    DESCRIPTION = (
+        "Renders and appends a late retro sci-fi console credits sequence to the tail "
+        "of the video before final audio muxing. Displays episode metadata, AI model "
+        "receipts, ledger statistics, cast assignments, and the full scrolling transcript "
+        "over a held final video frame. Outputs the extended silent video along with the "
+        "declared credits duration so downstream mux timing guards remain aligned."
+    )
+
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "roll"
     RETURN_TYPES = ("STRING", "FLOAT", "STRING")

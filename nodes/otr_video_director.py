@@ -241,6 +241,14 @@ def _registry_descriptors() -> list:
 class OTRVideoDirector:
     """Registered as ``OTR_VideoDirector``. Per-role model-selection policy."""
 
+    DESCRIPTION = (
+        "Configures visual model selections and rendering policies across announcer, music, "
+        "and character roles. Sets per-role video models, source still-image models, canvas "
+        "dimensions, frame rates, and render length ceilings before emitting the video policy. "
+        "Change video or still model dropdowns for any role, adjust canvas resolution, or cap "
+        "per-clip render frames."
+    )
+
     CATEGORY = "OldTimeRadio/v2/video"
     FUNCTION = "direct"
     RETURN_TYPES = ("STRING",)

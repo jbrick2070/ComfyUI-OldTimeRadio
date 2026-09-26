@@ -32,6 +32,14 @@ class AnnouncerVoice(OTRVoiceNodeBase):
     Engine order is legacy-first: kokoro is the byte-identical default.
     """
 
+    DESCRIPTION = (
+        "Synthesizes narration, opening introductions, and outro bookends for the "
+        "episode using the selected voice engine. Dispatches each announcer line "
+        "from the script to generate an audio batch for the scene sequencer. Change "
+        "the engine dropdown to switch between Kokoro, Chatterbox, Dia, Bark, or "
+        "cloud TTS, or connect optional execution gates."
+    )
+
     ROLE = "announcer_voice"
     LINE_ROLES = ("announcer",)
     DONE_PREFIX = "announcer"
