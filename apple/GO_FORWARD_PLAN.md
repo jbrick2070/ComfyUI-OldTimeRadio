@@ -412,9 +412,8 @@ order:
    auto-publishes, so it never goes in on its own. Served live from `main`
    like the Icon. The Icon stays the animated GIF (his call), though the
    spec asks for square and at most 400x400; it has been accepted as is.
-   GitHub social preview: `assets/github-social-preview.jpg` is refreshed
-   to the same art at 2:1 (1280x640); GitHub has no API for it, so HE
-   uploads it in Settings -> General -> Social preview.
+   (GitHub social preview: done 2026-09-25, the same art at 2:1, uploaded by
+   the operator and confirmed live through the API.)
 Parked, large: loading models through `comfy.model_management` so ComfyUI
 can evict them for other packs (touches every model load; multi-box proof),
 and the V3 `comfy_api` node schema (24 classes, workflow-adjacent).
