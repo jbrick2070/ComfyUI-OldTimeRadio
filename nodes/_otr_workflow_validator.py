@@ -742,14 +742,23 @@ class WorkflowValidator:
         # success: ComfyUI unloads every model when this prompt finishes.
         # And release anything an earlier prompt that FAILED left behind outside
         # ComfyUI's model manager (writer LLM, Bark), so this run starts clean.
+        # Memory hygiene may never stop validation: when the levers module
+        # cannot be imported (a stripped test package, a partial install) the
+        # run goes on and says so, rather than failing a correct graph.
         try:
-            from ._otr_vram_levers import (free_otr_pipeline_residue,
-                                           release_models_after_this_prompt)
-        except ImportError:  # pragma: no cover -- flat test imports
-            from _otr_vram_levers import (  # type: ignore
-                free_otr_pipeline_residue, release_models_after_this_prompt)
-        release_models_after_this_prompt()
-        free_otr_pipeline_residue(reason="prompt start: leftovers from an earlier prompt")
+            try:
+                from ._otr_vram_levers import (free_otr_pipeline_residue,
+                                               release_models_after_this_prompt)
+            except ImportError:  # flat test imports
+                from _otr_vram_levers import (  # type: ignore
+                    free_otr_pipeline_residue, release_models_after_this_prompt)
+        except ImportError as exc:
+            log.warning("[OTR_WorkflowValidator] unload-after-use unavailable, "
+                        "continuing: %s", exc)
+        else:
+            release_models_after_this_prompt()
+            free_otr_pipeline_residue(
+                reason="prompt start: leftovers from an earlier prompt")
         # The stamp assertion + env export run FIRST whenever profile_id is
         # non-empty -- validate_anyway only skips the CONTRACT check below,
         # never this (decision doc section 4; CI rejects snapshots shipping

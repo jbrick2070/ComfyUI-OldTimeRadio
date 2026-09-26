@@ -106,7 +106,8 @@ class VisualAssetValidatorTests(unittest.TestCase):
             # asked at all, and asked early, is pinned in
             # tests/test_ffmpeg_master_mux_capability.py.
             "master_mux_gap_for_prompt": lambda prompt: None,
-            "log": SimpleNamespace(info=lambda *args: None, error=lambda *args: None),
+            "log": SimpleNamespace(info=lambda *args: None, warning=lambda *args: None,
+                                   error=lambda *args: None),
         }
         exec(compile(module, str(SOURCE), "exec"), namespace)
         self.cls = namespace["OTR_WorkflowValidator"]
