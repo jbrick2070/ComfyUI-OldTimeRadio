@@ -422,6 +422,9 @@ own Rename writes -- on the generated workflows only; the canonical keeps
 its raw widget names. SEEN LIVE 2026-09-26 in the browser pane on a
 CPU-only server: the gallery category reads "Old-Time Radio", `otr_app`
 and `otr_8gb_low` open straight into app view with the labels and notes.
+(Later the same day the per-machine workflows moved to opening on the canvas,
+the operator's call; `otr_app` alone opens as the form, and Enter app mode
+shows it on the others -- f785f657.)
 `tests/test_app_mode.py` pins both forms, the labels, the output node, the ids, and
 that every matrix user-choice key is on the advanced form while no
 machine-tuning key is. PROVEN LIVE 2026-09-26 01:05 on the 5080 (09fea0ed):

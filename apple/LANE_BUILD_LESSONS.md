@@ -308,7 +308,8 @@ to honour cannot tell "applied" from "written down".
 **Twin assertion:**
 `tests/test_boot_contracts.py::test_the_launcher_turns_both_diet_knobs_into_argv`
 -- which asserts the hook exists AND that the variable reaches the command line,
-because declared is not applied.
+because declared is not applied. (That test and the diet knobs it covered were
+deleted with every VRAM reserve on 2026-09-26, 205e96ad; the lesson stands.)
 
 **What bit (2): the smoke's number was not the corpus's number, and that is
 L7 rather than a contradiction.** The live cold render peaked at 14,604 MB
@@ -620,6 +621,8 @@ silently corrupts. **Recording an error nobody reads is swallowing it.**
 named `test_unknowable_is_not_the_same_as_satisfied` and its body asserted
 `check_running_server(HUMO_DIET) == []` -- the name stated the invariant, the
 body enforced its violation. That is why this survived six lanes of green runs.
+(`HUMO_DIET` itself was deleted on 2026-09-26, 205e96ad; the test now checks the
+H3 contracts.)
 
 **The distinction that makes the fix correct:** a contract that constrains
 NOTHING (`default`) is genuinely satisfied by an unreadable server -- there is
@@ -1563,7 +1566,10 @@ family's name and the incumbent lane's id across the driver and judge each hit:
 which are correctly lane-specific and which are membership tests waiting to
 happen. `_still_spine_requires_scene` was the one that correctly stayed
 lane-specific here -- `ltx_audio_in` consumes a wide SCENE still, while this
-lane presents a portrait as `<Picture 1>`.
+lane presents a portrait as `<Picture 1>`. (Superseded 2026-09-26, 3a61a421:
+the portrait never existed on a real episode, and this lane now presents each
+beat's own still, like `ltx_audio_in`. The lesson about auditing membership
+tests stands.)
 
 **What bit (3): the API serialization is not the in-process call.** The lab's
 `COMFY_AUTOGROW_V3` reference sockets serialize DOTTED

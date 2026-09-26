@@ -29,10 +29,12 @@ setting it.
 | **Google** | Google, per token / per image / per second of video | `google.secret`, or a path in `google_api_key.location`, or `OTR_GOOGLE_API_KEY` / `GEMINI_API_KEY` / `GOOGLE_API_KEY`. Writer, voices, music and stills have generous limits; **Veo allows only 2 requests a minute and 10 a day per model on paid Tier 1**, against ~16 clips per episode, so the shipped `otr_google_still` workflow composites stills instead. On a higher tier, switch its three visual dropdowns to `google_veo_video`. |
 | **Comfy Credits** | Your Comfy account's credits | Sign into the Comfy app -- that sign-in is the only credential the pack reads (no key file, no server-side env var). Headless only: `OTR_COMFY_API_KEY` on the *submitting* machine, sent by `scripts/otr_api.py` as `extra_data.api_key_comfy_org`. There is no enable flag: the pick plus the key is the whole switch. |
 
-They are not symmetric, and older notes in `docs/` claim they "differ only in who
-pays" — they do not. **OpenRouter and Google are gated purely on a key being
-present**: set the key and the lane is reachable. **Comfy Credits needs an
-explicit opt-in flag** as well as an account.
+They are not symmetric -- older notes claimed they "differ only in who pays",
+and they do not. **OpenRouter and Google are gated purely on a key being
+present**: set the key and the lane is reachable. **Comfy Credits has no enable
+flag either**, but its key is your Comfy sign-in (or `OTR_COMFY_API_KEY` on the
+submitting machine when headless), held by the Comfy Credential node, so it
+needs an account rather than a key file.
 
 There is no `OTR_ENABLE_OPENROUTER` flag. It existed once, it was removed, and
 setting it does nothing.

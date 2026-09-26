@@ -2301,8 +2301,8 @@ full `r2 -> r3 -> r4` gate defined in `docs/LEAN_MEAN_CLEANUP.md`.
 
 ## KNOWN OPEN -- do not rediscover these
 
-* `FRAME_COST_MODEL` is keyed by engine NAME while recipe/quant/LoRA/reserve are
-  env-configurable; a measured row needs a calibration IDENTITY.
+* `FRAME_COST_MODEL` is keyed by engine NAME while recipe/quant/LoRA are
+  env-configurable (no VRAM reserve exists since 2026-09-26); a measured row needs a calibration IDENTITY.
 * Three adapters still cite missing receipts (`mesh_stage`, `viz_green`,
   `viz_mxc_mandala`).
 * The HuMo lip-sync onset fix is SPECIFIED but unbuilt, blocked on M1 classification

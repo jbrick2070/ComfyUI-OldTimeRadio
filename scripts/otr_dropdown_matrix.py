@@ -1036,8 +1036,9 @@ def render_apple(rows: list) -> str:
     # ------------------------------------------------------------- 1. workflow
     L.append("## Which workflow do I open?\n\n")
     L.append("**On a first run, open the canonical.** It names no vendor "
-             "anywhere and resolves your device at run time, it is the one workflow "
-             "in Browse Templates, and it fetches no video or image weights -- "
+             "anywhere and resolves your device at run time, it is the "
+             "otr_canonical entry in Browse Templates, and it fetches no video or "
+             "image weights -- "
              "which is why every machine class below can run it. The per-machine "
              "rows are a STEP UP once that has worked: each one is the canonical "
              "with its dropdowns pinned to heavier lanes, so the first queue on "

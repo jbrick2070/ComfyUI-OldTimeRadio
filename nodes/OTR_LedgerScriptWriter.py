@@ -2906,7 +2906,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "otr_freeze_replay_bundle.py) = re-render THAT episode's "
                         "ledger through the whole canonical graph as a new episode: "
                         "no writer, no TTS, no music, no stills minted; same seeds, "
-                        "same audio, only the video phase runs. The A/A null."),
+                        "same audio, only the video phase runs, on the engine the "
+                        "bundle froze (derive a bundle with --derive-engine to "
+                        "replay on another lane). The A/A null."),
                 }),
                 # THE MULTILINGUAL ONE-SWITCH (2026-09-18). The ONLY language
                 # control in the pack, APPENDED after replay_from and before

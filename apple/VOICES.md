@@ -52,7 +52,7 @@ separate dropdowns and can hold different values.
 
 **Automatic** means the weights arrive on their own the first time they are
 needed and you do nothing. Kokoro is fetched earlier still -- at ComfyUI
-*startup*, before you ever press Queue -- which is why the default voice is
+*startup*, before you ever press Run -- which is why the default voice is
 always ready.
 
 **Kokoro is the default for a reason**, not because it was first. It is the only

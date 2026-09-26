@@ -138,7 +138,7 @@ and moves the mouth to it. Every HuMo lane is a large download and wants a
 | Dropdown | What it makes | Needs |
 |---|---|---|
 | `h3_low_video` | a 33B model with a still pinned as the first frame. No audio anywhere in its graph | automatic, about 39 GB |
-| `h3_low_audio_in` | the same stack conditioned on a reference portrait plus the beat's own audio | automatic, about 40 GB |
+| `h3_low_audio_in` | the same stack conditioned on each beat's own still (the character still on a character beat, the scene still on a bookend) plus the beat's own audio | automatic, about 40 GB |
 
 The two largest downloads on this page, both 16 GB territory, and the slowest
 local lanes in the pack by a wide margin. Neither emits audio. Both download

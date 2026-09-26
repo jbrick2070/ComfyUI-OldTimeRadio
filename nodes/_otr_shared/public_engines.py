@@ -145,10 +145,11 @@ _PUBLIC_LABEL = {
         "MiniMax H3 33B silent video - low VRAM (7.3 GiB at 864x480; needs the "
         "sage-free h3 boot, and it is the slowest local lane by far)"),
     # Same two warnings as its sibling, plus what it actually adds: this is the
-    # only LOCAL lane that conditions on a reference PORTRAIT and audio together.
+    # only LOCAL lane that conditions on a reference picture and audio together
+    # -- each beat's own still since 2026-09-26 (3a61a421), not a portrait.
     "h3_low_audio_in": (
-        "MiniMax H3 33B audio-in - low VRAM (6.9-7.2 GiB at 864x480; reference "
-        "portrait + the beat's own audio; needs the sage-free h3 boot, and it "
+        "MiniMax H3 33B audio-in - low VRAM (6.9-7.2 GiB at 864x480; each "
+        "beat's own still + its own audio; needs the sage-free h3 boot, and it "
         "is as slow as its silent sibling)"),
     "ltx25_high_video": (
         "LTX 2.5 Distilled mix4x8 HQ two-stage silent video - 16 GB "

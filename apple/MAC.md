@@ -1,7 +1,7 @@
 # Apple Silicon
 
 It works, and the short version is that you do not have to do anything special.
-Install as in [INSTALL.md](INSTALL.md), open a Mac graph, press Queue. Every
+Install as in [INSTALL.md](INSTALL.md), open a Mac graph, press Run. Every
 Mac graph has published an episode on a Mac mini M4 / 16 GB:
 
 ```
