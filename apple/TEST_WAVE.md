@@ -173,6 +173,19 @@ belong in the Bible repo (exclude `.claude/` from its scans -- a stale nested
 agent worktree doubled four of the file lists -- and update or retire those
 pins); that is a cross-pack contract, so it waits for the operator's word.
 
+**Fixed 2026-09-26 on his word** (Bible `85cb0de2`, OTR `267e9f48`): the
+regression against OTR now reads **46 passed, 0 failed** (14 skipped, 3
+xfailed). The four checks look for a real CALL or the rule's own sanctioned
+shape, and a synthetic pack with a bare `unload_all_models`, a four-deep
+module-level chain, an unguarded `Popen` and an output node writing beside
+its own file still fails all of them. The pins on ripped mechanisms skip with
+the reason or follow the live code. ONE pin was right and OTR was wrong:
+BUG-12.120 names a test proving the portrait identity seed -- every
+`scene_character` still of one character draws that character's portrait
+seed -- and the 09-04 rip (`47bf95d6`) had deleted it along with
+`resolve_object_seed`, while the mechanism itself stayed live. Restored
+against `resolve_seed_and_mode`.
+
 
 ## Owed, not in this wave
 

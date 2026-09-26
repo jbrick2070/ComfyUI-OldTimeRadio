@@ -52,17 +52,16 @@ LIVE LEGS -- 4060 (TEST_WAVE Part B, fresh start at 1585d38a; receipts in the
   LTXVideo PASS 33:39; B1 low PASS 10:57; B5/B6/B7 refused by the runner
   preflight (fixed 0d44385c) -- re-run at 0d44385c in progress at write time.
 BUG BIBLE (Part C): 11 red / 38 green; Sonnet triage: 0 real OTR regressions
-  (4 heuristic false positives, 7 stale pins on ripped mechanisms). The fixes
-  are in the Bible repo -- his word first (cross-pack contract).
+  (4 heuristic false positives, 7 stale pins on ripped mechanisms). FIXED on
+  his word: Bible 85cb0de2 -> 46 passed, 0 failed against OTR. One pin was
+  right: the portrait identity-seed test the 09-04 rip deleted is restored
+  (OTR 267e9f48) -- the mechanism was live and had no positive test.
 
 FOR HIM IN THE MORNING:
   - Open otr_app from Browse Templates -> Old-Time Radio; press Run.
   - Watch stone_key_20260925_230558: do the character lips follow their lines?
-  - Say whether to clean up: the worktrees -tooltips, otr-pack-writes,
-    -worktree (bark-fix), otr-hf-home, otr-portability, the nested
-    .claude/worktrees/agent-a13be... (its commit is already on main), and the
-    stale branch worktree-agent-aaf3612b6248a9d9e (a 09-24 WIP made obsolete).
-  - Bible repo fixes: go / not.
+  - (Answered: the worktree cleanup is DONE -- `main` is the only worktree
+    and the only local branch; the Bible fixes are DONE, above.)
   - 2.3.7: on his word.
 
 ## 2026-09-25 -- HEAD e6e396b1 (main) -- CODE + PLAN HARDENED (evening)
