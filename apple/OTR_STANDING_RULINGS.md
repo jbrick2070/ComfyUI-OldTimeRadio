@@ -34,8 +34,9 @@ script's write and check of it). This closes the "deleting it is separate
 work" line in the 2026-09-24 entry below. The Lemmy listens are recorded in
 `apple/RIGHTS_DECISION_LEMMY_VOICE.md`.
 
-**The known-failure class list is empty.** The full suite at `eadb8ab2` was
-16973 passed, 0 failed, so the classes the 2026-09-20 entry below shipped with
+**The known-failure class list is empty.** The full suite at `88211ed2` was
+16965 passed, 0 failed (16973 at `eadb8ab2` before the voice-route deletion),
+so the classes the 2026-09-20 entry below shipped with
 -- the cloud-lane fixtures, the receipts naming deleted audition wavs, the four
 portable-bank route tests, the 8 GB canvas truth rows, the LLM slot sweep --
 are all closed. `EXPECTED_FAILED_NODEIDS` stays an empty frozenset

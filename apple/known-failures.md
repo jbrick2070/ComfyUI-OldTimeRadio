@@ -43,9 +43,11 @@ Worktree-only (not a live-checkout finding):
 `test_installed_pack_not_stale` and the two `test_w45_campaign_bank_pinning`
 rows.
 
-## Last chunk-gate SET (2026-09-26, HEAD `eadb8ab2`)
+## Last chunk-gate SET (2026-09-26, HEAD `88211ed2`)
 
-16973 passed, 0 failed. The SET is empty: no known-failure class is open.
+16965 passed, 0 failed (after the voice-route deletion: 16973 at `eadb8ab2`,
+less 10 tests removed with it, plus 2 renamed). The SET is empty: no
+known-failure class is open.
 The 34-failure set recorded at `90e75d33` (2026-09-17) is fully closed, and
 the four portable-bank route tests left with the voice-route subsystem.
 
