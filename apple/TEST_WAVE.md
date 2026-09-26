@@ -205,6 +205,17 @@ free_memory flag took the card from 15,460 MiB to 2,029 MiB within ~5 s --
 before, a finished render stayed ~9-10 GB resident. All 26 shipped workflows'
 33 app-form rows resolve against the live server's `/object_info`.
 
+**4060 receipts 2026-09-26 (fresh install, C:\OTR-CleanRoom portable, reported by
+the 4060 agent's logs):** B5 `otr_8gb_ltx25_foley` RESULT SUCCESS,
+`signal_lost_the_ring_in_the_dark_20260926_052736` (05:19 -> 09:22); B6
+`otr_8gb_ltx25_mime` RESULT SUCCESS, `signal_lost_the_brass_lever_slam_20260926_093134`
+(09:23 -> 13:48); B7 had passed at 05:18. Writer probes, raw: Comfy-native
+`gemma4_e2b_it_int8_convrot` through TextGenerate -- cold 11.9 s / 377 words,
+NVML 462 -> 5,100 MiB (+4.53 GiB); warm 8.8 s / 367 words. Transformers
+E2B mobile-QAT -- 3.1 tok/s, torch peak 6.39 GiB, NVML 7,505 MiB. The 4060
+has no symlink rights (Hugging Face said so), so PBUG-20260926-02 could not
+reach it.
+
 
 ## Owed, not in this wave
 
