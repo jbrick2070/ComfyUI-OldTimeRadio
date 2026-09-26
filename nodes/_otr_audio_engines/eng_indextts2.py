@@ -210,10 +210,21 @@ class IndexTTS2Engine:
         args = [py, worker, "--model-dir", model_dir]
         if self._use_fp16():
             args.append("--fp16")
-        err_path = os.path.join(_REPO_ROOT, "_otr_indextts2_worker.err")
-        self._stderr = open(err_path, "ab", buffering=0)
+        try:
+            from .._otr_paths import otr_sidecar_stderr_path
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_paths import otr_sidecar_stderr_path  # type: ignore
+        err_path = otr_sidecar_stderr_path("_otr_indextts2_worker.err")
+        self._stderr = None
+        stderr = subprocess.DEVNULL
+        try:
+            err_path.parent.mkdir(parents=True, exist_ok=True)
+            self._stderr = open(err_path, "ab", buffering=0)
+            stderr = self._stderr
+        except OSError:
+            pass
         proc = subprocess.Popen(
-            args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self._stderr,
+            args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr,
             text=True, encoding="utf-8", bufsize=1, cwd=os.path.dirname(model_dir))
         # BOUNDED, like both siblings (2026-09-12). This was a bare
         # `proc.stdout.readline()` with no timeout, on the engine that is the

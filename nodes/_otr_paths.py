@@ -669,6 +669,48 @@ def otr_state_dir() -> Path:
     return _validate_contract(otr_shared_root() / "state")
 
 
+def otr_runtime_log_path() -> Path:
+    """Persistent OTR runtime heartbeat log (VRAM, orchestrator, video).
+
+    Lives under ``otr_state_dir()`` so registry installs (often read-only)
+    and ComfyUI-Manager pack replacements do not erase it. ``OTR_RUNTIME_LOG_PATH``
+    overrides the destination verbatim."""
+    pinned = (otr_env.get("OTR_RUNTIME_LOG_PATH") or "").strip()
+    if pinned:
+        return Path(pinned).expanduser()
+    return _validate_contract(otr_state_dir() / "otr_runtime.log")
+
+
+def legacy_pack_runtime_log_path() -> Path:
+    """Former pack-root log location; read-only fallback for telemetry parsers."""
+    return Path(__file__).resolve().parents[1] / "otr_runtime.log"
+
+
+def otr_runtime_log_read_path() -> Path:
+    """Path telemetry readers should open: primary when present, else legacy."""
+    primary = otr_runtime_log_path()
+    if primary.is_file():
+        return primary
+    legacy = legacy_pack_runtime_log_path()
+    if legacy.is_file():
+        return legacy
+    return primary
+
+
+def otr_sidecar_stderr_path(basename: str) -> Path:
+    """Captured stderr for Path-B audio sidecar workers (formerly pack root).
+
+    ``OTR_SIDECAR_STDERR_DIR`` overrides the directory; the basename is fixed
+    per engine (``_otr_chatterbox_worker.err``, etc.)."""
+    name = os.path.basename(str(basename or "").strip())
+    if not name:
+        raise OtrPathContractError("sidecar stderr basename must be non-empty")
+    override = (otr_env.get("OTR_SIDECAR_STDERR_DIR") or "").strip()
+    if override:
+        return Path(override).expanduser() / name
+    return _validate_contract(otr_state_dir() / name)
+
+
 def otr_obs_dir() -> Path:
     """OBS-watched final-deliverable dir: ``$OTR_OBS_DIR`` when pinned
     (returned AS TYPED -- unresolved, and not held to the in-tree contract:
@@ -824,6 +866,10 @@ __all__ = [
     "otr_composited_dir",
     "otr_obs_dir",
     "otr_state_dir",
+    "otr_runtime_log_path",
+    "legacy_pack_runtime_log_path",
+    "otr_runtime_log_read_path",
+    "otr_sidecar_stderr_path",
     # director_raw_dump_dir entry removed in voice-path-cleanbreak S23.1
     "comfyui_log_path",
 ]

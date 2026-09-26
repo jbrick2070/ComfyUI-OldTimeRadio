@@ -41,12 +41,12 @@ from datetime import datetime, timezone
 
 log = logging.getLogger("OTR")
 
-# Runtime log path - same file the orchestrator uses. Kept local to this
-# module so callers do not have to thread a path through.
-_RUNTIME_LOG_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "otr_runtime.log",
-)
+def _runtime_log_path() -> str:
+    try:
+        from ._otr_paths import otr_runtime_log_path
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_paths import otr_runtime_log_path  # type: ignore
+    return str(otr_runtime_log_path())
 
 
 def _cuda_available() -> bool:
@@ -59,8 +59,10 @@ def _cuda_available() -> bool:
 
 def _write_runtime_log(line: str) -> None:
     try:
+        log_path = _runtime_log_path()
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
         ts = datetime.now().strftime("%H:%M:%S")
-        with open(_RUNTIME_LOG_PATH, "a", encoding="utf-8") as f:
+        with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"[{ts}] {line}\n")
     except Exception:
         # Never let telemetry take down a generation run.

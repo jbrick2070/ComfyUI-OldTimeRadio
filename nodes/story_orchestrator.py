@@ -84,7 +84,8 @@ def _runtime_log(msg):
     """Write a persistent heartbeat to otr_runtime.log for monitoring."""
     try:
         ts = datetime.now().strftime("%H:%M:%S")
-        log_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "otr_runtime.log")
+        log_path = str(_OTR_PATHS.otr_runtime_log_path())
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"[{ts}] {msg}\n")
     except Exception:

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import tempfile
 
 from . import _otr_sidecar as _SC
@@ -111,15 +112,27 @@ class DiaEngine:
                     "installs Dia from source, and fetches its weights, "
                     "separate from the main ComfyUI venv) before rendering "
                     "with dia" % (label, path))
-        err_path = os.path.join(_REPO_ROOT, "_otr_dia_worker.err")
-        stderr = open(err_path, "ab", buffering=0)
+        try:
+            from .._otr_paths import otr_sidecar_stderr_path
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_paths import otr_sidecar_stderr_path  # type: ignore
+        err_path = otr_sidecar_stderr_path("_otr_dia_worker.err")
+        stderr_handle = None
+        stderr = subprocess.DEVNULL
+        try:
+            err_path.parent.mkdir(parents=True, exist_ok=True)
+            stderr_handle = open(err_path, "ab", buffering=0)
+            stderr = stderr_handle
+        except OSError:
+            pass
         try:
             proc = otr_proc.popen(
                 [py, worker, "--model", self._model_id()], stdin=otr_proc.PIPE,
                 stdout=otr_proc.PIPE, stderr=stderr, text=True, encoding="utf-8",
                 bufsize=1)
         except Exception:
-            stderr.close()
+            if stderr_handle is not None:
+                stderr_handle.close()
             raise
         try:
             line = _SC.read_protocol_line(proc, _SC.startup_timeout(), "Dia readiness")
@@ -127,14 +140,14 @@ class DiaEngine:
             if not isinstance(ready, dict):
                 raise ValueError("readiness was not a JSON object: %r" % line[:200])
         except (TimeoutError, EOFError, ValueError) as exc:
-            _SC.close_worker(proc, stderr)
+            _SC.close_worker(proc, stderr_handle)
             raise RuntimeError("Dia worker failed to start: %s (see %s)" % (exc, err_path))
         if ready.get("ready") is not True:
-            _SC.close_worker(proc, stderr)
+            _SC.close_worker(proc, stderr_handle)
             raise RuntimeError(
                 "Dia worker failed to start: %s (see %s)" % (ready.get("error"), err_path))
         self._proc = proc
-        self._stderr = stderr
+        self._stderr = stderr_handle
 
     def unload(self):
         proc, self._proc = self._proc, None

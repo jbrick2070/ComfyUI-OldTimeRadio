@@ -442,11 +442,20 @@ def provider_semaphore_size(provider_id: str) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _legacy_pack_cloud_media_cache_root() -> Path:
+    """Former default inside the installed pack; still read, never migrated."""
+    return Path(__file__).resolve().parents[2] / "otr" / "cache" / "cloud_media"
+
+
 def resolve_cache_root() -> Path:
     override = otr_env.get("OTR_CLOUD_MEDIA_CACHE_DIR", "").strip()
     if override:
         return Path(override)
-    return Path(__file__).resolve().parents[2] / "otr" / "cache" / "cloud_media"
+    try:
+        from .._otr_paths import otr_shared_cache_dir
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import otr_shared_cache_dir  # type: ignore
+    return Path(otr_shared_cache_dir()) / "cloud_media"
 
 
 # ---------------------------------------------------------------------------
@@ -643,19 +652,38 @@ class CloudMediaSession:
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / "billing_ledger.jsonl"
 
-        legacy = self.cache_root / "billing_ledger.jsonl"
-        if legacy.is_file() and not dest.exists():
+        legacy_sources = []
+        cache_legacy = self.cache_root / "billing_ledger.jsonl"
+        if cache_legacy not in legacy_sources:
+            legacy_sources.append(cache_legacy)
+        if not override:
+            try:
+                at_default_cache = (
+                    Path(self.cache_root).resolve()
+                    == resolve_cache_root().resolve()
+                )
+            except OSError:
+                at_default_cache = False
+            if at_default_cache:
+                pack_legacy = (
+                    _legacy_pack_cloud_media_cache_root() / "billing_ledger.jsonl"
+                )
+                if pack_legacy not in legacy_sources:
+                    legacy_sources.insert(0, pack_legacy)
+        for legacy in legacy_sources:
+            if not legacy.is_file() or dest.exists():
+                continue
             try:
                 shutil.copy2(str(legacy), str(dest))
                 log.info(
-                    "[cloud_media] copied the billing ledger forward out of the "
-                    "pack directory: %s -> %s (the original is left in place)",
+                    "[cloud_media] copied the billing ledger forward out of a "
+                    "legacy location: %s -> %s (the original is left in place)",
                     legacy, dest)
+                break
             except OSError as exc:  # noqa: BLE001
-                # Never let an audit-trail relocation break a render.
                 log.warning(
                     "[cloud_media] could not copy the billing ledger forward "
-                    "(%s); appending to %s from here", exc, dest)
+                    "from %s (%s); trying next legacy source", legacy, exc)
 
         self._ledger_path = dest
         return self._ledger_path

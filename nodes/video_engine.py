@@ -1603,7 +1603,8 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
 
 def _get_latest_telemetry():
     """Parse the otr_runtime.log for the most recent VRAM and Speed stats."""
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "otr_runtime.log")
+    from ._otr_paths import otr_runtime_log_read_path
+    log_path = str(otr_runtime_log_read_path())
     
     # Defaults
     peak_gb = "???"

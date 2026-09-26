@@ -56,6 +56,7 @@ _EPISODE_HELPERS = [
 _NOARG_HELPERS = [
     P.otr_episodes_root, P.otr_obs_dir, P.otr_state_dir,
     P.otr_shared_root, P.otr_shared_cache_dir, P.otr_shared_tmp_dir,
+    P.otr_runtime_log_path,
 ]
 
 
