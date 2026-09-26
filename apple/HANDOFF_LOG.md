@@ -51,6 +51,11 @@ Suite: 16928 passed, 0 failed at f011bb79 (full); every later chunk ran its
   16973 passed, 0 failed (full, 11:43); a fresh 0.37.4 server loads all 25
   nodes; 1-act otr_8gb_low PASSED 9:49, crack_repair_20260926_045130 in obs.
 
+  88211ed2 ROW 0, voice-route deletion (Opus worker on the hardened spec;
+    driver review + set-diff): 16965 passed / 0 failed = 16973 - 10 + 2. LIVE
+    at 88211ed2, Lemmy forced in: PASS 9:26, cold_iron_hum_20260926_053814,
+    Lemmy = kokoro bm_george (his recurring voice). README Known failures now
+    says the suite is green.
 STILL RUNNING: the 4060 re-run of B7/B5/B6 at 0d44385c (background agent).
 OWED (Sprint 3, the final regression): the 4060 B4 free-RAM re-measure on
   f011bb79+; B5/B6/B7 results; 2.3.7 on his word (the registry Banner line

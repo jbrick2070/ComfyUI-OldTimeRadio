@@ -102,12 +102,14 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 
 ## 2. CODE -- decided, in order
 
-### 0. Remaining voice-route deletion (hardened 2026-09-24)
+### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
 
-The unused `nodes/_otr_voice_route.py` module and the policy / portable-bank
-fields that only compile if it exists. Spec:
-[ROUTE_DELETION_PLAN](ROUTE_DELETION_PLAN.md) (re-grounded 2026-09-25).
-Do not start from the 51b6c146 draft. Do not re-rip `91ad5961`.
+`nodes/_otr_voice_route.py` and everything that only compiled because of it
+are gone, per [ROUTE_DELETION_PLAN](ROUTE_DELETION_PLAN.md); voice identity
+is `RECURRING_CHARACTER_VOICES` + `reserved_for`. Full suite 16965 passed,
+0 failed (= 16973 - 10 removed + 2 renamed, set-diffed). LIVE (5080, 1-act
+`otr_8gb_low`, Lemmy forced in): PASS 9:26, `cold_iron_hum_20260926_053814`;
+Lemmy cast on kokoro as `bm_george`, his recurring-table voice.
 
 ### 0a. Windows HF_HOME -- DONE 2026-09-25 (`a0875708`, `89a95212`)
 
