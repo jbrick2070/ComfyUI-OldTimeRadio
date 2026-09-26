@@ -39,6 +39,7 @@ story_orchestrator only.
 """
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import logging
 import os
@@ -524,7 +525,8 @@ def _plan_max_memory(
     fit here and will now say so instead of pretending.
 
     THE >= 14.5 GiB CARD IS UNAFFECTED, and this is not an assertion. That
-    path passes an explicit ``device_map={"": 0}``; an explicit dict device
+    path passes an explicit ``device_map={"": N}`` (N = the policy's GPU,
+    0 on a single-GPU box); an explicit dict device
     map is used verbatim, so ``infer_auto_device_map`` never runs and
     ``max_memory`` was never consulted there in the first place. Removing it
     changes nothing on a 16 GB card. A 12-14.5 GiB card DOES change: it loses
@@ -549,13 +551,44 @@ def _plan_max_memory(
 def _cuda_index(device) -> int:
     """The CUDA ordinal a resolved device string names; 0 for bare "cuda".
 
-    ``device_options._name`` writes ``"cuda"`` for GPU 0 and ``"cuda:N"``
-    only for a real, offered N > 0, and ``LLMRuntimePolicy`` admits nothing
-    else, so this never invents an index that is not there."""
+    ``LLMRuntimePolicy`` guarantees the FORMAT (``cuda(:N)?``), so the int()
+    below cannot fail on a policy device. Whether GPU N EXISTS on this host
+    is not this function's question -- ``_on_cuda_device`` asks it."""
     d = str(device or "")
     if d.startswith("cuda:"):
         return int(d.split(":", 1)[1])
     return 0
+
+
+def _on_cuda_device(device):
+    """Make the policy's GPU the CURRENT CUDA device for a block.
+
+    torch.cuda.synchronize / empty_cache / ipc_collect / memory_allocated
+    and bitsandbytes' own placement all act on the current device, which
+    is 0 unless something sets it -- so a writer placed on GPU N was
+    being synced, washed and measured on GPU 0 (a contrarian review of
+    1c0b1dd4). Setting the device for the whole load fixes every such
+    call at once, including ones not yet written, rather than chasing
+    them one by one.
+
+    ``"cuda"``, ``"cuda:0"``, ``"cpu"``, ``"mps"`` and a CUDA-less host get
+    a nullcontext: a single-GPU box runs no new code. For N > 0 this is a
+    FRESH torch.cuda.device(N) on every call -- never cache one; its saved
+    previous index is per instance -- and it restores the previous device
+    on exit, exception or not. A GPU the host does not have is refused
+    by name instead of surfacing as a raw torch error mid-load."""
+    index = _cuda_index(device)
+    if index == 0:
+        return contextlib.nullcontext()
+    import torch
+    if not torch.cuda.is_available():
+        return contextlib.nullcontext()
+    count = torch.cuda.device_count()
+    if index >= count:
+        raise ModelLoaderError(
+            "writer device %r names GPU %d, but this host shows %d CUDA "
+            "device(s)" % (device, index, count))
+    return torch.cuda.device(index)
 
 
 def _cpu_overflow_max_memory(total_vram: float, gpu_index: int = 0) -> dict:
@@ -1759,6 +1792,9 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
     import gc
 
     model_id = entry.get("model_id") if entry is not None else None
+    # Read BEFORE `del entry` below: the wash must run on the GPU this
+    # model was placed on, not the current one.
+    placed_on = entry.get("device") if entry is not None else ""
     _memory_log.memory_snapshot("llm_retirement_before", model_id=model_id)
     if entry is not None:
         model = entry.get("model")
@@ -1775,15 +1811,16 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
         import torch  # noqa: F401
 
         if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            try:
-                torch.cuda.ipc_collect()
-            except Exception as exc:  # noqa: BLE001
-                log.debug("[OTR_ModelLoader] ipc_collect skipped: %s", exc)
-            try:
-                torch.cuda.synchronize()
-            except Exception as exc:  # noqa: BLE001
-                log.debug("[OTR_ModelLoader] synchronize skipped: %s", exc)
+            with _on_cuda_device(placed_on):
+                torch.cuda.empty_cache()
+                try:
+                    torch.cuda.ipc_collect()
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("[OTR_ModelLoader] ipc_collect skipped: %s", exc)
+                try:
+                    torch.cuda.synchronize()
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("[OTR_ModelLoader] synchronize skipped: %s", exc)
         elif getattr(torch, "mps", None) and torch.backends.mps.is_available():
             # Emptying the allocator returns free blocks. It does not establish
             # that this function or its caller released every model reference.
@@ -2267,9 +2304,11 @@ def request_slot(
     # through _self_unload makes this a no-op unless _my_cache_epoch is
     # still current, i.e. unless this call still owns whatever is resident.
     try:
-        cache_entry = load_llm(
-            normalized, context_verdict=ctx_verdict, hub_root=_hub_root, policy=_policy,
-        )
+        with _on_cuda_device(getattr(_policy, "device", "")):
+            cache_entry = load_llm(
+                normalized, context_verdict=ctx_verdict, hub_root=_hub_root,
+                policy=_policy,
+            )
     except Exception:
         log.warning(
             "[Selector] load_llm raised for %s; running self-unload "

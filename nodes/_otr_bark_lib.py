@@ -210,8 +210,10 @@ def _load_bark(model_id="suno/bark", device=None):
         # S30 B4b: route through the modern loader's unload_llm.
         #
         # A post-eviction wash is NOT warranted here: `unload_llm` delegates to
-        # `_teardown_gpu_for_entry`, which unconditionally runs `gc.collect()`
-        # and both `torch.cuda.empty_cache()` and `torch.mps.empty_cache()`.
+        # `_teardown_gpu_for_entry`, which runs `gc.collect()` and then empties
+        # the allocator of whichever backend is present -- CUDA (`empty_cache`,
+        # `ipc_collect`, `synchronize`) or, on a Mac, MPS (`torch.mps`'s
+        # `empty_cache` and `synchronize`); one or the other, not both.
         # Whatever the evicted writer frees is already reclaimed by that call.
         try:
             from ._otr_model_loader import unload_llm
