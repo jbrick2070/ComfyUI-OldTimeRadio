@@ -1,7 +1,8 @@
 """One Qwen identity -- Quant is baked from the machine, not a twin.
 
 NVIDIA/cuda loads NF4; Mac/CPU loads full. The retired ``:nf4`` spelling
-still validates onto the same row. Gemma 4 12B bakes NF4 with one identity.
+still validates onto the same row. Gemma 4 12B bakes NF4 with one identity,
+except vendor apple, which loads full precision.
 """
 from __future__ import annotations
 
@@ -103,6 +104,46 @@ def test_amd_rocm_reports_cuda_but_does_not_bake_nf4():
     # rather than crashing on a missing argument.
     assert catalog.effective_quant_policy(
         catalog.DEFAULT_LLM, "none", device="cuda",
+    ) == "bnb_nf4"
+
+
+@pytest.mark.parametrize(
+    "vendor,expected",
+    [
+        ("amd", "bnb_nf4"),
+        ("apple", "none"),
+        ("nvidia", "bnb_nf4"),
+        ("unknown", "bnb_nf4"),
+        ("", "bnb_nf4"),
+    ],
+)
+def test_gemma_implied_nf4_by_vendor(vendor, expected):
+    """Gemma 4 12B bakes NF4. Apple loads full: bitsandbytes is not a
+    darwin dependency, so a baked NF4 policy cannot import there. AMD
+    keeps NF4: bitsandbytes 0.49.2+ supports ROCm QLoRA 4-bit on gfx1201.
+    ``unknown`` and ``""`` stay on the implied policy. The suite reports
+    unknown, and an earlier cut of this fix treated that as not-NVIDIA."""
+    assert catalog.effective_quant_policy(
+        "google/gemma-4-12b-it", "none", device="cuda", vendor=vendor,
+    ) == expected
+    # Vendor wins over the device string. ROCm says cuda; a Mac says mps.
+    assert catalog.effective_quant_policy(
+        "google/gemma-4-12b-it (23.9 GB, nv16 nv24)", "bnb_8bit",
+        device="mps", vendor=vendor,
+    ) == expected
+
+
+def test_qwen27b_implied_nf4_follows_the_same_apple_exception():
+    """The 27B row bakes NF4 the same way Gemma does. Apple resolves to
+    full precision; NVIDIA and AMD do not move."""
+    assert catalog.effective_quant_policy(
+        "Qwen/Qwen3.8-27B", "none", device="mps", vendor="apple",
+    ) == "none"
+    assert catalog.effective_quant_policy(
+        "Qwen/Qwen3.8-27B", "none", device="cuda", vendor="nvidia",
+    ) == "bnb_nf4"
+    assert catalog.effective_quant_policy(
+        "Qwen/Qwen3.8-27B", "none", device="cuda", vendor="amd",
     ) == "bnb_nf4"
 
 

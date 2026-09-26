@@ -254,7 +254,10 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         "gemma-4-12b-it, which measured 30.7 tok/s median on the same box. "
         "NF4 IS BAKED INTO THE PICK, not a second Quant knob: unquantized "
         "this is 51.75 GiB and no consumer card holds it, so the row owns "
-        "the policy rather than letting a widget produce an OOM. "
+        "the policy rather than letting a widget produce an OOM. Vendor "
+        "apple is the one exception and loads full precision, because this "
+        "pack does not install bitsandbytes on darwin; the VRAM gate is "
+        "what names that miss. "
         "THINKING TEMPLATE, SUPPRESSED -- it emits an OPEN '<think>' by "
         "default, exactly like the 4B, so chat_template_kwargs must reach "
         "every generate call or the writer is forced to reason. "
@@ -383,7 +386,9 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         "NF4 measured at 7.15 GiB allocated / 7.29 GiB peak on the 16 GB "
         "RTX 5080, including coherent prose and LMFE-constrained JSON. The "
         "only Gemma 4 12B: NF4 is baked into the pick, not a second Quant "
-        "knob. No full / NVFP4 twin. No LoRA, Ollama, sidecar, or port.",
+        "knob. Vendor apple loads full precision, because this pack does "
+        "not install bitsandbytes on darwin. AMD keeps NF4. No full / "
+        "NVFP4 twin. No LoRA, Ollama, sidecar, or port.",
         prompt_profile="modern",
         chat_template_kind="transformers_default",
         stop_tokens=(),
@@ -715,17 +720,24 @@ def effective_quant_policy(
 ) -> str:
     """Quant the pick actually loads.
 
-    Qwen is one COMBO identity: NVIDIA -> NF4, Mac/CPU/AMD -> full.
-    Gemma 4 12B bakes NF4. A leftover Quant widget is ignored.
+    Qwen 4B is one COMBO identity: NVIDIA -> NF4, Mac/CPU/AMD -> full.
+    A row whose implied policy is ``bnb_nf4`` or ``bnb_8bit`` (Gemma 4 12B,
+    Qwen 27B) bakes that policy. Vendor ``apple`` is the exception and
+    loads full precision: ``requirements.txt`` excludes bitsandbytes on
+    darwin, so a baked NF4 policy hard-fails at import on a stock Mac.
+    AMD keeps the baked NF4 policy. bitsandbytes 0.49.2 and 0.50.2 both
+    mark QLoRA 4-bit supported on ROCm for gfx1201, the outside tester's
+    R9700. The pack floor is ``bitsandbytes>=0.42.0`` off darwin.
+    A leftover Quant widget is ignored.
 
     ``vendor`` (``device_options.vendor()``: "nvidia"/"amd"/"apple"/"cpu"/
     "unknown") is the correct signal -- ROCm reports ``device="cuda"`` to
-    torch too, so the ``device``-string heuristic below silently baked NF4
-    (bitsandbytes, which ROCm cannot run) onto an AMD box. A caller that
-    cannot supply ``vendor``, or whose host reports "unknown" (no GPU
-    detected at all, e.g. this test suite's ``CUDA_VISIBLE_DEVICES=''``),
-    degrades to that heuristic rather than treating "we could not tell" as
-    "confirmed not NVIDIA".
+    torch too, so the ``device``-string heuristic below baked NF4 onto an
+    AMD box for platform rows. A caller that cannot supply ``vendor``, or
+    whose host reports "unknown" (no GPU detected at all, e.g. this test
+    suite's ``CUDA_VISIBLE_DEVICES=''``), keeps a ``bnb_*`` implied policy
+    and degrades to that heuristic for a platform row. "unknown" is never
+    treated as confirmed not-NVIDIA.
     """
     widget = str(quant_policy or "")
     if not isinstance(model_id, str) or not model_id:
@@ -740,6 +752,11 @@ def effective_quant_policy(
             if str(device or "").lower().startswith("cuda")
             else "none"
         )
+    # Apple only. AMD and CPU stay on the implied bnb policy: current
+    # bitsandbytes documents QLoRA 4-bit for both. Empty and "unknown"
+    # stay too -- the suite reports "unknown".
+    if implied.startswith("bnb_") and vendor == "apple":
+        return "none"
     if implied:
         return implied
     return widget
