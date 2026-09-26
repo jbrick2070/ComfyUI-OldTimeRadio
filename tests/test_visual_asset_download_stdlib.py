@@ -455,6 +455,30 @@ class FetchVerifiedTests(unittest.TestCase):
         the library can, and the receipt records the difference."""
         self.assertTrue(self.invoke()["resume_supported"])
 
+    def test_a_fetch_that_returns_the_caches_symlink_publishes_the_real_file(self):
+        """PBUG-20260926-02, reproduced in the Hugging Face cache's own shape:
+        the fetch returns `snapshots/<commit>/<file>`, a RELATIVE symlink to
+        `blobs/<sha256>`. The published final must be a real file that reads
+        the payload -- not a copy of that symlink, whose relative target means
+        nothing from the model folder. (On Windows os.link does not follow
+        symlinks, which is how the broken link was made.)"""
+        blob = self.root / "hub" / "models--fixture" / "blobs" / self.metadata["sha256"]
+        blob.parent.mkdir(parents=True, exist_ok=True)
+        blob.write_bytes(self.body)
+        snapshot = (self.root / "hub" / "models--fixture" / "snapshots"
+                    / self.metadata["commit"] / "blob.safetensors")
+        snapshot.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.symlink(os.path.join("..", "..", "blobs", self.metadata["sha256"]), snapshot)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest("this machine cannot create symlinks (%s)" % exc)
+        receipt = self.invoke(fetch=lambda spec, meta, progress=None: str(snapshot))
+        self.assertEqual(receipt["status"], "downloaded")
+        self.assertFalse(os.path.islink(self.destination),
+                         "the final is a symlink copied out of the cache")
+        self.assertTrue(os.path.isfile(self.destination))
+        self.assertEqual(self.destination.read_bytes(), self.body)
+
     def test_a_cross_device_fetch_still_publishes_via_copy(self):
         """The fetched file may live in an HF cache on another VOLUME, where
         os.link raises EXDEV. This caught a real gap: the first cut's fallback

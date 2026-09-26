@@ -274,6 +274,16 @@ def fetch_verified(
         if progress is not None:
             progress(0, metadata["size"])
         source = Path(fetch(spec, metadata, progress))
+        # THE REAL FILE, NOT THE CACHE'S SYMLINK TO IT (PBUG-20260926-02).
+        # huggingface_hub returns a path inside its snapshot tree, and where
+        # the OS allows symlinks that path is a RELATIVE symlink
+        # (`../../../blobs/<sha256>`) into the blob store. Windows `os.link`
+        # does not follow symlinks: it hard-links the link itself, so the
+        # model folder received a symlink whose relative target resolved
+        # nowhere from its new directory, and the native loader correctly
+        # refused it after a complete, hash-verified 21 GB download. Resolving
+        # first makes both the hash and the publish act on the blob.
+        source = Path(os.path.realpath(source))
         _check_cancel(cancel)
         if not source.is_file():
             raise VisualAssetDownloadError("fetch did not produce a readable file")
