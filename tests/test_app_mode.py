@@ -119,3 +119,38 @@ def test_a_missing_widget_is_refused_not_dropped():
     bad = dict(CONFIG, story_only=[["OTR_LedgerScriptWriter", "no_such_widget"]])
     with pytest.raises(bv.EmitRefused, match="no widget 'no_such_widget'"):
         bv.app_linear_data(wf, "story_only", bad)
+
+
+def test_a_row_listed_twice_is_refused():
+    wf = _load(CANONICAL)
+    row = ["OTR_LedgerScriptWriter", "act_count"]
+    with pytest.raises(bv.EmitRefused, match="listed twice"):
+        bv.app_linear_data(wf, "story_only", dict(CONFIG, story_only=[row, row]))
+
+
+def test_a_linked_widget_is_refused():
+    """A widget converted to a linked input cannot be drawn in the form."""
+    wf = _load(CANONICAL)
+    writer = next(n for n in wf["nodes"] if n["type"] == "OTR_LedgerScriptWriter")
+    slot = next(s for s in writer["inputs"]
+                if (s.get("widget") or {}).get("name") == "act_count")
+    slot["link"] = 99999
+    with pytest.raises(bv.EmitRefused, match="linked input"):
+        bv.app_linear_data(wf, "story_only", CONFIG)
+
+
+def test_a_node_type_that_is_not_unique_is_refused():
+    wf = _load(CANONICAL)
+    writer = next(n for n in wf["nodes"] if n["type"] == "OTR_LedgerScriptWriter")
+    wf["nodes"].append(dict(writer, id=99998))
+    with pytest.raises(bv.EmitRefused, match="expected ONE OTR_LedgerScriptWriter"):
+        bv.app_linear_data(wf, "story_only", CONFIG)
+
+
+def test_the_notes_reach_the_form_as_descriptions():
+    """ComfyUI 1.52.7 draws `description` under the widget
+    (InputWidgetConfig {height?, description?}; AppModeWidgetList reads
+    config.description), so the note must be in the SHIPPED row."""
+    rows = {r[1]: r for r in _load(APP)["extra"]["linearData"]["inputs"]}
+    assert rows["source_ref"][2] == {"description": CONFIG["source_ref_note"]}
+    assert rows["custom_premise"][2] == {"description": CONFIG["my_story_note"]}

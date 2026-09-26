@@ -134,8 +134,9 @@ def _pack_identity_failures(paths, version: str) -> list[str]:
 #: machine tuning stays hidden -- and one extra generated file,
 #: workflows/otr_app.json, is the canonical with the ADVANCED form (every
 #: picker, in the operator's order). The canonical itself carries neither:
-#: it is the workflow the operator edits on the canvas, and `apply_profile`
-#: copies its `extra` into every card, so a flag set there would reach all.
+#: it is the workflow the operator edits on the canvas, and a flag there
+#: would open ITS gallery card as an app too. (The cards would not inherit
+#: it: `stamp_app_mode` overwrites each card's form after `apply_profile`.)
 APP_MODE_CONFIG = REPO / "config" / "app_mode.json"
 APP_WORKFLOW_NAME = "otr_app.json"
 
@@ -184,8 +185,13 @@ def app_linear_data(workflow: dict, list_key: str, config=None) -> dict:
         return hits[0]
 
     inputs = []
+    seen = set()
     for entry in config[list_key]:
         node_type, widget = entry[0], entry[1]
+        if (node_type, widget) in seen:
+            raise EmitRefused(
+                f"app list {list_key!r}: {node_type}.{widget} is listed twice")
+        seen.add((node_type, widget))
         node = only(node_type)
         slots = [slot for slot in node.get("inputs") or []
                  if isinstance(slot.get("widget"), dict)
