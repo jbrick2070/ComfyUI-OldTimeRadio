@@ -328,7 +328,7 @@ touch shared code with a fallback branch that never fires today on a
 single-GPU NVIDIA box -- print the resolved value before/after in the
 commit message, same as the models-root and per-type work earlier today.
 
-### 0d. Gallery and JSON hygiene -- DONE 2026-09-26 but for the viewport retune
+### 0d. Gallery and JSON hygiene -- DONE 2026-09-26
 
 Done 2026-09-25 and out of this row: every node stamped `cnr_id` + `ver`
 from the live pyproject (`--check` enforces it), `extra.info` dropped, the
@@ -342,7 +342,9 @@ and (by 0e) every generated workflow has its own id. Left, in order:
 - DONE `f9552204` (text `2b3c0ec8`): the Start-here MarkdownNote, with
   NOTE_NODE_TYPES skipped by both converters, the identity stamp and the
   parity checks.
-- **Retune `extra.ds`** (saved viewport) once the layout settles.
+- CHECKED 2026-09-26, no change: the saved viewport (`extra.ds`, scale 0.48,
+  offset [28, 16]) opens on the START HERE group's top-left, and the Start-here
+  note lands near screen (340, 453) px -- in view on any ordinary window.
 - **Rejected, with the reason:** an `index.json` in workflows/ (the glob
   would list it as a template named "index"); renaming files for prettier
   titles (stems are coupled to matrix ids, stamps, headless runs, tests);
