@@ -15467,3 +15467,41 @@ not promote it to the Bug Bible on this evidence alone.
   `wan_shared.configured_models_root()` is deleted. Measured: 38 resolver answers
   byte-identical at HEAD and on the patch under the live 5080 registry, the test
   stub and no ComfyUI. Coverage: tests/test_model_type_dir.py.
+
+## PBUG-20260926-01 -- the 8 GB LTX lane reloads its 9.8 GB T5 into system RAM for every clip segment
+- surfaced: TEST_WAVE Part B leg B4 on the 4060 (`otr_8gb_video`, lane
+  `ltx_8gb`, fresh start at 1585d38a), 2026-09-26, published
+  `broken_horsehair_20260925_235312` in 33:39 -- the leg PASSED; the defect
+  is in its RAM trace.
+- symptom: free system RAM saw-toothed between ~20 GB and 0.42 GB on a
+  32 GB box, one tooth per clip segment. A 16 GB-RAM machine would page on
+  every segment.
+- root cause: `eng_ltx_8gb._build_graph` puts the T5 `CLIPLoader`
+  (`t5xxl_fp16.safetensors`, ~9.8 GB, device `cpu`) in EVERY segment graph,
+  and `run_graph(free_after_use=True)` drops it once the two encodes have
+  run. `prepare()` hoists only the checkpoint per beat -- deliberately, since
+  hoisting the T5 would pin 9.8 GB beside the sampler. So each segment paid a
+  full T5 load (about twice its size while it loads) for texts the previous
+  segment had just encoded: every segment of a beat carries the same
+  positive and negative text (`segment_index` moves the audio window, the
+  still, the frame count and the seed, never the text).
+- fix (2026-09-26, 5080, f011bb79): a conditioning cache on the engine,
+  keyed on the T5 file's identity plus the exact text read off the graph;
+  a segment whose texts are already encoded takes those encodes as
+  externals and the loader node leaves the graph. Published only after the
+  graph ran; bounded LRU of 4; a HIT hands out a private copy. Kill switch
+  `OTR_LTX_8GB_CONDITIONING_CACHE=0`. Keeping the T5 itself resident was the
+  first design and a contrarian refuted it (on a Mac the `cpu` device is the
+  GPU's memory; on CUDA it competes with the sampler's mapped weights).
+  Coverage: tests/test_ltx_8gb_graph_and_loads.py (the hoisted-beat count
+  now reads clip 1 / pos 1 / neg 1, plus the conditioning-cache cases).
+- live verify (5080, f011bb79, 1-act `otr_8gb_video`): PASS 12:52,
+  `unstable_ink_20260926_034958` published to otr/obs. 13 segments: the T5
+  loaded 6 times (one per beat) instead of 13; 7 segments ran with no T5
+  at all; the shared negative hit on 12 of 13. The 5080 is not RAM-bound
+  (free RAM stayed above 26 GB), so the free-RAM low on the 8 GB box is
+  re-measured on the 4060's next B4 run.
+- promotion: candidate ("a per-segment graph must not reload a heavy text
+  encoder for text it has already encoded -- cache the conditioning, keyed on
+  the encoder file's identity and the exact text"), not yet checked against
+  otr_coverage_index.yaml / BUG_BIBLE.yaml.

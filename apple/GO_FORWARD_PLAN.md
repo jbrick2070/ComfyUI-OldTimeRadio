@@ -37,7 +37,10 @@ detail is its row below.
    left, a canonical-workflow change with a design round first); the 0d
    visual items (palette, Story Writer collapsed, the Start-here note);
    0c item 5 (PARKED 2026-09-26 -- see the row); and the B4
-   RAM finding: `ltx_8gb` reloads its 9 GB T5 (`t5xxl_fp16`, pinned to the
+   RAM finding -- CODE DONE 2026-09-26 (`f011bb79`, PBUG-20260926-01: a
+   conditioning cache, one T5 load per beat instead of per segment; 5080
+   proof leg 6 loads of 13, PASS 12:52; the 4060 free-RAM re-measure is
+   owed). Was: `ltx_8gb` reloads its 9 GB T5 (`t5xxl_fp16`, pinned to the
    CPU) into system RAM for EVERY clip segment -- free RAM saw-toothed
    between ~0.4 and ~20 GB on the 32 GB 4060 (2026-09-26); a 16 GB-RAM box
    would page. Keep the encoder (or its conditioning) resident across an
