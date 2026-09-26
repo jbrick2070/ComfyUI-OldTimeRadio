@@ -78,6 +78,36 @@ def test_machine_rows_drive_the_exact_writer_model_into_both_slots():
         assert profile["llm"]["technical_model"] == row["writer_model"]
 
 
+def test_a_class_with_shipped_workflows_names_what_they_ship():
+    """2026-09-26 audit: the 8gb class named google/gemma-4-E2B-it unquantised
+    and every class defaulted to MusicGen, while every otr_8gb_* workflow ships
+    Qwen3.5-4B NF4 and every local workflow ships Stable Audio 3 (since
+    2026-09-13). So `--machine 8gb` built a pipeline no workflow ships -- the
+    rejected 4.3 tok/s transformers E2B path among it. A class that has shipped
+    workflows names their writer, quant and music; its video stays its own
+    curated pick."""
+    sys.path.insert(0, os.path.join(_REPO, "scripts"))
+    import otr_machine_profile as P          # noqa: E402
+
+    with open(os.path.join(_REPO, "config", "workflow_matrix.json"),
+              encoding="utf-8") as fh:
+        workflows = json.load(fh)["rows"]
+    matrix = P.load_matrix()
+    checked = 0
+    for row in P.rows(matrix):
+        shipped = [w for w in workflows if w.get("ships")
+                   and str(w.get("id", "")).startswith("otr_%s_" % row["key"])]
+        profile = P.build_profile(row, matrix)
+        for w in shipped:
+            d = w["deltas"]
+            assert profile["llm"]["creative_model"] == d["llm.creative_model"], w["id"]
+            assert profile["llm"]["quant_policy"] == d["llm.quant_policy"], w["id"]
+            assert profile["slot_overrides"]["music_engine"] == \
+                d["slot_overrides.music_engine"], w["id"]
+            checked += 1
+    assert checked >= 8, "expected the 8gb, 16gb and amd workflows to be compared"
+
+
 def test_machine_selector_accepts_only_exact_public_keys():
     sys.path.insert(0, os.path.join(_REPO, "scripts"))
     import otr_machine_profile as P          # noqa: E402

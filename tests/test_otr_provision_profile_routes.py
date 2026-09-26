@@ -149,9 +149,11 @@ def test_haunted_machine_paths_do_not_require_unconsumed_klein_weights(
         machine_key):
     provision = _provisioner()
 
+    # stable_audio_3 is provisioned too since 2026-09-26: the machine classes
+    # now default to the music engine every local workflow ships, not MusicGen.
     assert provision.profile_lanes(
         provision.load_machine_profile(machine_key)) == {
-            "automatic": ["haunted"],
+            "automatic": ["haunted", "stable_audio_3"],
             "manual": [],
         }
 

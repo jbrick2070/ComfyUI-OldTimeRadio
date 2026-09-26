@@ -138,8 +138,8 @@
       "vram_min_gb": 8,
       "vram_max_gb": 9,
       "platform": "any",
-      "writer": "gemma-4-E2B",
-      "writer_model": "google/gemma-4-E2B-it",
+      "writer": "Qwen3.5-4B",
+      "writer_model": "Qwen/Qwen3.5-4B",
       "note": "The physical RTX 4060 published documented episodes through the writer/video/voice/music path (2026-08-29) and later shipping-set workflows on the physical card (2026-09-13). LTX 2.5 also renders on 8 GB (~14 min a clip; known_limits) but is not the row's video default. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package. Image default is z_image_turbo.",
       "proof_summary": "**EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; shipping-set workflows published 2026-09-13",
       "key": "8gb",
@@ -147,7 +147,7 @@
       "image": "z_image_turbo",
       "char_voice": "kokoro",
       "writer_ceiling_gb": 6.8,
-      "quant_policy": "none",
+      "quant_policy": "bnb_nf4",
       "render": {
         "canvas_w": 512,
         "canvas_h": 288
@@ -257,7 +257,7 @@
     "image": "z_image_turbo",
     "voice_bank": "kokoro_builtin",
     "announcer_voice": "kokoro",
-    "music": "musicgen",
+    "music": "stable_audio_3",
     "quant_policy": "bnb_nf4",
     "features": {
       "burn_captions": true,
