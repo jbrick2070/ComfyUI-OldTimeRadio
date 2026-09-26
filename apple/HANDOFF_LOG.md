@@ -47,12 +47,14 @@ BUG BIBLE (separate repo): 85cb0de2 729cf9c7 9eaab8a5 -- the regression is
   final HOLD. 61b44d9d promotes 12.175 (PBUG-20260925-03) and 12.176
   (PBUG-20260926-01), drafted by agy Flash and rewritten.
 Suite: 16928 passed, 0 failed at f011bb79 (full); every later chunk ran its
-  affected tests (up to 5064 at once) and --check 25/0.
+  affected tests (up to 5064 at once) and --check 25/0. FINAL HEAD b545d1f2:
+  16973 passed, 0 failed (full, 11:43); a fresh 0.37.4 server loads all 25
+  nodes; 1-act otr_8gb_low PASSED 9:49, crack_repair_20260926_045130 in obs.
 
 STILL RUNNING: the 4060 re-run of B7/B5/B6 at 0d44385c (background agent).
 OWED (Sprint 3, the final regression): the 4060 B4 free-RAM re-measure on
-  f011bb79+; a full suite on the final HEAD; B5/B6/B7 results; 2.3.7 on his
-  word (the registry Banner line rides it).
+  f011bb79+; B5/B6/B7 results; 2.3.7 on his word (the registry Banner line
+  rides it). The full suite on the final HEAD is DONE (above).
 
 FOR HIM:
   - Look at the canvas in purple and gold (any workflow, graph view).

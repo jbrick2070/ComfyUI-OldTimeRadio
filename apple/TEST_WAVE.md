@@ -186,6 +186,13 @@ seed -- and the 09-04 rip (`47bf95d6`) had deleted it along with
 `resolve_object_seed`, while the mechanism itself stayed live. Restored
 against `resolve_seed_and_mode`.
 
+**Final-HEAD receipts 2026-09-26 early morning (5080, HEAD `b545d1f2`, after
+Sprint 2's code landed):** full suite 16973 passed, 0 failed (11:43); Bug
+Bible 46 passed / 0 failed; a fresh server on ComfyUI 0.37.4 loads all 25
+nodes; a 1-act `otr_8gb_low` leg through the headless runner PASSED in
+9:49 and published `crack_repair_20260926_045130` -- the canonical with the
+Start-here note and the credential node, end to end.
+
 
 ## Owed, not in this wave
 
