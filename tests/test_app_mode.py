@@ -71,21 +71,33 @@ def test_otr_app_opens_as_the_app_with_the_same_form():
     assert _pairs(wf) == [tuple(e[:2]) for e in CONFIG["form"]]
 
 
-def test_the_form_reads_story_then_models_then_my_story():
-    """His order, stated as a rule rather than a copy of the list: every story
-    row comes before every model picker, and the My Story rows come last
-    (Space saver closes the form)."""
-    rows = [tuple(e[:2]) for e in CONFIG["form"]]
-    names = [w for _t, w in rows]
-    assert names[-1] == "asset_cleanup"
-    my_story = ["story_characters", "story_plot", "story_setting",
-                "story_author", "music_style"]
-    assert names[-6:-1] == my_story
-    story_end = names.index("custom_premise")
-    first_model = names.index("creative_writing_model")
-    assert story_end < first_model
-    for w in ("episode_language", "act_count", "source_bank", "episode_title"):
-        assert names.index(w) < first_model, w
+def test_the_form_follows_his_order():
+    """The operator, 2026-09-26, after using the form: "language, size, acts,
+    story bank, visual style, video model, TTS model, music model, story
+    writing models including cloud sub options, upscaler, my story fields".
+    Rows he did not name sit next to their nearest relative: the source row
+    under its bank, each still under its video, and story idea / title /
+    Lemmy just above My Story. Space saver closes the form."""
+    names = [w for _t, w in (tuple(e[:2]) for e in CONFIG["form"])]
+    assert names == [
+        "episode_language", "num_characters", "act_count",
+        "source_bank", "source_ref",
+        "visual_style",
+        "announcer_video_model", "announcer_image_model",
+        "character_video_model", "character_image_model",
+        "music_video_model", "music_image_model",
+        "announcer_voice_engine", "char_voice_engine",
+        "engine",
+        "creative_writing_model", "technical_model",
+        "openrouter_slot_a_model", "openrouter_slot_b_model",
+        "comfy_slot_a_model", "comfy_slot_b_model",
+        "google_api_slot_a_model", "google_api_slot_b_model",
+        "upscale_engine",
+        "custom_premise", "episode_title", "lemmy_cameo",
+        "story_characters", "story_plot", "story_setting", "story_author",
+        "music_style",
+        "asset_cleanup",
+    ]
 
 
 @pytest.mark.parametrize("path", [APP] + variant_paths(), ids=lambda p: p.stem)
@@ -224,12 +236,10 @@ def test_the_notes_reach_the_form_as_descriptions():
     assert rows["custom_premise"][2] == {"description": CONFIG["premise_note"]}
 
 
-def test_the_bank_leads_and_each_role_groups_voice_video_still():
-    """Fable's layout inside his order: the story bank first (every other
-    story row depends on it), and each role's model rows adjacent -- the still
-    directly under its video, since it only matters for that video."""
+def test_each_still_sits_directly_under_its_video():
+    """A still only matters for the video it feeds, so it sits right under
+    that video's picker."""
     names = [w for _t, w in (tuple(e[:2]) for e in CONFIG["form"])]
-    assert names[0] == "source_bank"
     for video, still in (("announcer_video_model", "announcer_image_model"),
                          ("character_video_model", "character_image_model"),
                          ("music_video_model", "music_image_model")):
