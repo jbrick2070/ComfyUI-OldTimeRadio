@@ -118,6 +118,29 @@ def test_get_visual_style_valid_embedded_pack(valid_card_dict):
     assert style_obj.positive_tail == pack["positive_tail"]
 
 
+def test_a_ledger_frozen_before_the_talking_rip_still_replays(valid_card_dict):
+    """Sonnet QA on b118c377: the talking-face still mode was ripped and
+    `portrait_look_talking` left the pack schema, so every pre-2026-09-25
+    ledger whose embedded pack still carried it failed `get_visual_style`
+    with "unknown key(s)". The field stays KNOWN (never read) so frozen
+    history replays; it is accepted as stored, so the receipt still matches."""
+    card = vs.VisualStyleCardModel.model_validate(valid_card_dict)
+    pack = dict(vs.compose_pack_from_card(card))
+    pack["portrait_look_talking"] = "a frozen talking look from before the rip"
+    import hashlib
+    sha256 = hashlib.sha256(json.dumps(
+        pack, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")).hexdigest()
+    meta = {
+        "visual_style": "visual_storybased",
+        "embedded_visual_style_pack": pack,
+        "visual_style_receipt": {"status": "dynamic", "sha256": sha256},
+    }
+    style_obj = vs.get_visual_style(meta)
+    assert style_obj.style_id == "visual_storybased"
+    assert not hasattr(style_obj, "portrait_look_talking")
+
+
 def test_floor_style_pool_excludes_dynamic():
     floor_pool = rolls.floor_style_ids()
     assert "visual_storybased" not in floor_pool

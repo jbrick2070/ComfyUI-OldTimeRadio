@@ -150,9 +150,18 @@ _REQUIRED_FIELDS: "dict[str, type]" = {
 #: the canonical bytes against the stored receipt, so a REQUIRED key would fail
 #: every pre-existing ledger and a compensating default would change the bytes
 #: and trip the sha instead.
+#: `portrait_look_talking` is RETIRED (2026-09-25, the talking-face still
+#: mode was ripped with the Kling Avatar engine, b118c377). No shipped pack
+#: carries it and nothing reads it. It stays KNOWN only so the
+#: `embedded_visual_style_pack` in every episode ledger minted before that day
+#: still validates on replay -- the same frozen-history reason as the two
+#: fields above, and for the same reason it is accepted as-is, never stripped
+#: or defaulted, since either would change the bytes the sha256 receipt pins.
+#: Found by Sonnet QA on b118c377.
 _OPTIONAL_FIELDS: "dict[str, type]" = {
     "negative_tail": str,
     "checkpoint": str,
+    "portrait_look_talking": str,
 }
 
 #: Every key a pack may legally carry. The unknown-key guard reads THIS;
