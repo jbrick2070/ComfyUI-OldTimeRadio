@@ -3522,21 +3522,24 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # default (radio-styled by design). Never silent. (2026-06-26: the
         # _is_char_face_beat arm also routes ltx_audio_in CHARACTER beats here
         # so they get the character fallback, not the generic radio default.)
-        if _is_char_face_beat and phase == "cast_preflight":
+        if _is_char_face_beat:
             # Creative is derived after cast preflight; see the lane-formatter
-            # note above. The engine is named because this line fires for every
-            # face lane, not only HuMo, and the old wording sent a 2026-09-26
-            # diagnosis of the H3 audio-in lane off to the HuMo seam.
-            _LOG.info(
-                "[OTR.render_driver] character face beat %s on %r has no "
-                "creative prompt yet at cast preflight (derived after it)",
-                _beat_id_for_shot(shot), _eng_id)
-        elif _is_char_face_beat:
-            _LOG.warning(
-                "[OTR.render_driver] character face beat %s on %r carries NO "
-                "creative prompt (ShotLock seam gap) -- rendering on the "
-                "gear-free character fallback prompt (LOUD)",
-                _beat_id_for_shot(shot), _eng_id)
+            # note above. Only the LOG differs by phase: the fallback prompt
+            # below is what the preflight request carries either way. The
+            # engine is named because this line fires for every face lane, not
+            # only HuMo, and the old wording sent a 2026-09-26 diagnosis of the
+            # H3 audio-in lane off to the HuMo seam.
+            if phase == "cast_preflight":
+                _LOG.info(
+                    "[OTR.render_driver] character face beat %s on %r has no "
+                    "creative prompt yet at cast preflight (derived after it)",
+                    _beat_id_for_shot(shot), _eng_id)
+            else:
+                _LOG.warning(
+                    "[OTR.render_driver] character face beat %s on %r carries "
+                    "NO creative prompt (ShotLock seam gap) -- rendering on the "
+                    "gear-free character fallback prompt (LOUD)",
+                    _beat_id_for_shot(shot), _eng_id)
             _cf_fallback = _prefix_video_style_cue(
                 _vstyle, _CHAR_FACE_FALLBACK_PROMPT)
             req["text_prompt"] = _cf_fallback
