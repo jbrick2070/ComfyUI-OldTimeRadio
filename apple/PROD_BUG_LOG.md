@@ -15544,5 +15544,7 @@ not promote it to the Bug Bible on this evidence alone.
   already in the cache, so this run proved the publish and the native
   resolution; the network transfer and hash had passed in the failing run.
   The published file is a regular file (link count 2: the cache blob).
-- promotion: PENDING -- the portable rule is "resolve a library-returned
-  cache path before hard-linking or copying it into another folder".
+- promotion: PROMOTED 2026-09-26 as Bible 12.177 ("resolve a
+  library-returned cache path before hard-linking or copying it into another
+  folder"), with its otr_coverage_index.yaml row and a static check in
+  tests/bug_bible_regression.py.
