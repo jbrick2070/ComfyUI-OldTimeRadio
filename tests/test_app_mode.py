@@ -166,6 +166,37 @@ def test_the_canonical_keeps_its_raw_widget_names():
                 assert "label" not in slot, (node["type"], slot["widget"]["name"])
 
 
+def test_a_row_without_a_label_is_refused():
+    wf = _load(CANONICAL)
+    labels = dict(CONFIG["labels"])
+    labels.pop("OTR_LedgerScriptWriter.act_count")
+    bad = dict(CONFIG, labels=labels)
+    with pytest.raises(bv.EmitRefused, match="has no label"):
+        bv.app_linear_data(wf, "story_only", bad)
+
+
+NOTE_KEYS = ("my_story_note", "title_note", "source_ref_note", "pickers_note")
+
+
+def test_every_note_fits_the_one_line_the_form_draws():
+    """The form draws a note on one truncated line (a fixed-height row with
+    `truncate`); 30 characters is what showed in full at the pane's width."""
+    for key in NOTE_KEYS:
+        assert 0 < len(CONFIG[key]) <= 30, (key, CONFIG[key])
+
+
+@pytest.mark.parametrize("path", [APP] + variant_paths(), ids=lambda p: p.stem)
+def test_every_configured_note_is_on_its_shipped_row(path):
+    wf = _load(path)
+    nodes = {n["id"]: n for n in wf["nodes"]}
+    shipped = {(nodes[r[0]]["type"], r[1]): r[2] if len(r) > 2 else None
+               for r in wf["extra"]["linearData"]["inputs"]}
+    form = "advanced" if path == APP else "story_only"
+    for entry in CONFIG[form]:
+        want = {"description": CONFIG[entry[2]]} if len(entry) > 2 else None
+        assert shipped[(entry[0], entry[1])] == want, entry
+
+
 def test_the_notes_reach_the_form_as_descriptions():
     """ComfyUI 1.52.7 draws `description` under the widget
     (InputWidgetConfig {height?, description?}; AppModeWidgetList reads

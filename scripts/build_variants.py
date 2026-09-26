@@ -798,9 +798,10 @@ def cmd_check() -> int:
             if app_path.read_text(encoding="utf-8") != want_app:
                 failures.append(f"{APP_WORKFLOW_NAME}: DRIFT vs regeneration "
                                 "(generated, never hand-edited)")
-    if "linearMode" in (canonical.get("extra") or {}):
-        failures.append(f"{CANONICAL.name}: carries extra.linearMode -- app "
-                        "mode belongs on the generated workflows only")
+    if {"linearMode", "linearData"} & set(canonical.get("extra") or {}):
+        failures.append(f"{CANONICAL.name}: carries extra.linearMode or "
+                        "linearData -- app mode belongs on the generated "
+                        "workflows only")
     if not LAUNCH_RECIPES.is_file():
         failures.append(f"{LAUNCH_RECIPES.name}: missing (run --all)")
     elif LAUNCH_RECIPES.read_text(encoding="utf-8") != \
