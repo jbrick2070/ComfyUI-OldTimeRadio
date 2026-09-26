@@ -67,6 +67,24 @@ OWED (Sprint 3, the final regression): the 4060 B4 free-RAM re-measure on
   f011bb79+; B5/B6/B7 results; 2.3.7 on his word (the registry Banner line
   rides it). The full suite on the final HEAD is DONE (above).
 
+2.3.7 -- READY ON HIS WORD (not published; 105 commits since 2.3.6 at 96ea436a).
+  What a user would notice:
+  - Every per-machine workflow opens as an app form; otr_app has every picker.
+  - A Google-only workflow (otr_google_still); Google TTS speaks every
+    episode language.
+  - Progress bars on the writer, the voices and the scene sequencer.
+  - The 8 GB LTX lane loads its T5 once per beat, not per clip.
+  - ComfyUI-LTXVideo is no longer needed; MiniMax H3 downloads its own
+    weights, and a server booted wrong for H3 is refused at once.
+  - The Comfy API key can no longer appear in the queue history.
+  - A Start-here note, the stock purple-and-gold palette, "Run" and
+    "Extensions > Old-Time Radio" in every doc; a gallery thumbnail per card.
+  - The talking-face still mode, the creativity dial and the Kling Avatar
+    engine are gone (his rulings of 09-25).
+  pyproject change for the bump: version 2.3.7 and the Banner line (plan 0f
+  item 6). requires-comfyui stays out until the oldest working core is
+  MEASURED (0f item 3). Suite green at every step; the 4060 legs below.
+
 FOR HIM:
   - Look at the canvas in purple and gold (any workflow, graph view).
   - Desktop instances: keep "ComfyUI" (it holds the junctions to this repo);
