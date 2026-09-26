@@ -1,0 +1,8 @@
+{
+  "templateWorkflows": {
+    "category": {
+      "ComfyUI-OldTimeRadio": "Old-Time Radio",
+      "comfyui-old-time-radio": "Old-Time Radio"
+    }
+  }
+}
