@@ -73,7 +73,8 @@ class LLMRuntimePolicy:
     lane_allowlist: tuple[str, ...] = ALL_LANES
 
     def __post_init__(self) -> None:
-        if self.device not in _DEVICES:
+        if not (self.device == "cuda" or self.device.startswith("cuda:")
+                or self.device in ("cpu", "mps")):
             raise LLMPolicyError(
                 f"llm.device {self.device!r} not in {_DEVICES}")
         if self.attn_impl not in _ATTN_IMPLS:

@@ -711,12 +711,21 @@ def resolve_pick_for_quant(model_id: str, quant_policy: str) -> str:
 
 
 def effective_quant_policy(
-    model_id: str, quant_policy: str, *, device: str = "",
+    model_id: str, quant_policy: str, *, device: str = "", vendor: str = "",
 ) -> str:
     """Quant the pick actually loads.
 
-    Qwen is one COMBO identity: NVIDIA/cuda -> NF4, Mac/CPU -> full.
+    Qwen is one COMBO identity: NVIDIA -> NF4, Mac/CPU/AMD -> full.
     Gemma 4 12B bakes NF4. A leftover Quant widget is ignored.
+
+    ``vendor`` (``device_options.vendor()``: "nvidia"/"amd"/"apple"/"cpu"/
+    "unknown") is the correct signal -- ROCm reports ``device="cuda"`` to
+    torch too, so the ``device``-string heuristic below silently baked NF4
+    (bitsandbytes, which ROCm cannot run) onto an AMD box. A caller that
+    cannot supply ``vendor``, or whose host reports "unknown" (no GPU
+    detected at all, e.g. this test suite's ``CUDA_VISIBLE_DEVICES=''``),
+    degrades to that heuristic rather than treating "we could not tell" as
+    "confirmed not NVIDIA".
     """
     widget = str(quant_policy or "")
     if not isinstance(model_id, str) or not model_id:
@@ -724,6 +733,8 @@ def effective_quant_policy(
     row = _by_repo_id().get(_canonical_qwen_id(model_id))
     implied = getattr(row, "implied_quant_policy", "") or ""
     if implied == "platform":
+        if vendor and vendor != "unknown":
+            return "bnb_nf4" if vendor == "nvidia" else "none"
         return (
             "bnb_nf4"
             if str(device or "").lower().startswith("cuda")

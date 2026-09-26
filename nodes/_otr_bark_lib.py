@@ -198,7 +198,12 @@ def _load_bark(model_id="suno/bark", device=None):
     if _BARK_CACHE["model"] is None:
         import gc
         gc.collect()
-        torch.cuda.empty_cache()
+        # Same guard shape as _unload_bark's empty_cache call below: on CUDA
+        # the condition is True and the call still runs, byte-identical
+        # behaviour; on Mac/CPU-only torch, torch.cuda.empty_cache() asserts
+        # CUDA is built and crashes the first load instead of a silent no-op.
+        if getattr(torch, "cuda", None) and torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         # -- VRAM Hardening v1.4: Strict Handoff --
         # If Gemma is in VRAM, evict it now before loading Bark.

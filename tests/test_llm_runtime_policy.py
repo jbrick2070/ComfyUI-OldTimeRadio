@@ -44,6 +44,16 @@ def test_policy_validation_fails_loud(kw):
         lp.LLMRuntimePolicy(**kw)
 
 
+@pytest.mark.parametrize("device", ["cuda:1", "cuda:2"])
+def test_a_second_gpu_device_string_is_accepted(device):
+    """device_options._name() appends ':%d' for any nonzero gpu index
+    (gpu:1 -> cuda:1); the exact-match check against _DEVICES rejected it,
+    crashing the writer build on any multi-GPU host. Single-GPU boxes
+    always resolve to bare "cuda" and are unaffected."""
+    policy = lp.LLMRuntimePolicy(device=device)
+    assert policy.device == device
+
+
 def test_cache_key_covers_artifact_fields_only():
     """vram_ceiling_gb (pre-load gate) + lane_allowlist (admission) must
     NOT force a reload; device/attn/quant fields must."""

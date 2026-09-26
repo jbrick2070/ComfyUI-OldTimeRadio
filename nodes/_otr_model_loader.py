@@ -899,12 +899,14 @@ def _policy_with_baked_quant(policy: Any, model_id: str) -> Any:
     Quant widget is ignored.
     """
     from . import _otr_model_catalog as _otr_catalog
+    from ._otr_shared import device_options as _device_options
 
     if policy is None:
         return policy
     current = getattr(policy, "quant_policy", "")
     baked = _otr_catalog.effective_quant_policy(
         model_id, current, device=getattr(policy, "device", ""),
+        vendor=_device_options.vendor(),
     )
     if baked == current:
         return policy

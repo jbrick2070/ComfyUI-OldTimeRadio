@@ -86,6 +86,42 @@ def test_platform_and_gemma_bake_quant_from_the_pick():
     ) == "none"
 
 
+def test_amd_rocm_reports_cuda_but_does_not_bake_nf4():
+    """ROCm reports device="cuda" to torch too (device_options.vendor()'s
+    whole reason for existing), so the old device-string-only heuristic
+    silently baked bitsandbytes NF4 onto an AMD box, which cannot run it.
+    ``vendor`` is the correct signal and wins over ``device`` whenever a
+    caller can supply it."""
+    assert catalog.effective_quant_policy(
+        catalog.DEFAULT_LLM, "none", device="cuda", vendor="amd",
+    ) == "none"
+    # NVIDIA is unaffected: vendor="nvidia" agrees with the device heuristic.
+    assert catalog.effective_quant_policy(
+        catalog.DEFAULT_LLM, "none", device="cuda", vendor="nvidia",
+    ) == "bnb_nf4"
+    # No vendor supplied at all: degrades to the pre-fix device heuristic
+    # rather than crashing on a missing argument.
+    assert catalog.effective_quant_policy(
+        catalog.DEFAULT_LLM, "none", device="cuda",
+    ) == "bnb_nf4"
+
+
+def test_policy_with_baked_quant_reads_vendor_not_just_device(monkeypatch):
+    """Wiring check, not just the unit: `_policy_with_baked_quant` is one of
+    the three real callers the fix threads `vendor` through. Stub
+    `device_options.vendor()` (which it calls internally, since it cannot
+    accept vendor as an argument -- ``load_llm`` never resolves one) to
+    return "amd" and confirm the baked policy actually reflects it, the same
+    way an AMD box's real `comfy.model_management.is_amd()` would."""
+    from nodes import _otr_model_loader as loader
+    from nodes._otr_shared import device_options as device_options_mod
+
+    monkeypatch.setattr(device_options_mod, "vendor", lambda: "amd")
+    policy = lp.LLMRuntimePolicy(device="cuda", quant_policy="bnb_nf4")
+    baked = loader._policy_with_baked_quant(policy, catalog.DEFAULT_LLM)
+    assert baked.quant_policy == "none"
+
+
 def test_chat_template_kwargs_fire_for_the_one_qwen():
     assert chat_template_kwargs(catalog.DEFAULT_LLM) == {"enable_thinking": False}
     assert chat_template_kwargs(catalog.DEFAULT_LLM_NF4) == {

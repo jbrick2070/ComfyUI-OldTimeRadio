@@ -592,13 +592,14 @@ def _resolve_inputs(
     resolved_device = _OTR_DEVICE_OPTIONS.resolve_device(
         llm_device, fallback="cuda",
     )
+    resolved_vendor = _OTR_DEVICE_OPTIONS.vendor()
     cre_q = _otr_model_catalog.effective_quant_policy(
         creative_writing_model, str(llm_quant_policy),
-        device=resolved_device,
+        device=resolved_device, vendor=resolved_vendor,
     )
     tec_q = _otr_model_catalog.effective_quant_policy(
         technical_model, str(llm_quant_policy),
-        device=resolved_device,
+        device=resolved_device, vendor=resolved_vendor,
     )
     baked_quant = cre_q if cre_q == tec_q else str(llm_quant_policy)
 

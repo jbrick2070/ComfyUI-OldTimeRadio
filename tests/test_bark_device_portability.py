@@ -244,6 +244,42 @@ def test_bark_restores_torch_tensor_and_arange_when_generate_raises():
     assert torch.arange is original_arange, "patch leaked after generate() raised"
 
 
+def test_bark_first_load_does_not_crash_without_cuda(monkeypatch):
+    """2026-09-25 fix: `_load_bark` called `torch.cuda.empty_cache()`
+    unconditionally on first load, a few lines after resolving the device to
+    "mps"/"cpu" for exactly the hosts that have no CUDA build. On a real Mac
+    or CPU-only torch wheel that call raises "Torch not compiled with CUDA
+    enabled" -- simulated here by making empty_cache raise that same
+    AssertionError, so an unguarded call fails this test the same way it
+    fails on that hardware. `_unload_bark`'s already-guarded empty_cache
+    call (mirrored by this fix) proves the guard shape works; this proves
+    the SAME shape was applied to the first-load site too.
+
+    The real load path is driven past the guard and into the actual
+    transformers import/from_pretrained call, which fails for an unrelated,
+    expected reason (no cached model, no network) in this offline test
+    environment -- that failure is allowed. Only an AssertionError (the bug's
+    signature) fails this test.
+    """
+    import torch
+
+    monkeypatch.setattr(bl, "_BARK_CACHE",
+                         {"model": None, "processor": None, "device": None})
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+    def _raise_not_compiled():
+        raise AssertionError("Torch not compiled with CUDA enabled")
+
+    monkeypatch.setattr(torch.cuda, "empty_cache", _raise_not_compiled)
+
+    try:
+        bl._load_bark(device="cpu")
+    except AssertionError:
+        raise
+    except Exception:
+        pass  # any later, unrelated failure (no cached model / no network)
+
+
 def test_bark_generate_path_has_no_hardcoded_cuda_literal():
     """Source-level backstop, in the style of this repo's other bark tests.
 
