@@ -42,12 +42,15 @@ RETIRED = sorted(RETIRED_ENGINE_IDS)
 # The contract itself: type, fields, message -- ONE spelling, pinned
 # ---------------------------------------------------------------------------
 
-def test_the_retired_set_is_exactly_the_sixteen_known_ids():
+def test_the_retired_set_is_exactly_the_twenty_three_known_ids():
     # Five from the 2026-08-06 SFX-bed rip, five from the 2026-08-23 dormant-3D
     # retirement (lean-mean order 4), five from the 2026-08-23 Ghost narrowing
-    # (operator: "delete any animatediff that are not haunted"), and one from
+    # (operator: "delete any animatediff that are not haunted"), one from
     # the 2026-09-17 cloud Pixverse rip (operator: "WORD_RAZZLE / CLOUD
-    # GETS RIPPED"). Local `razzle_ltx_8gb` stays.
+    # GETS RIPPED"), and seven from the 2026-09-25 "native" rename (0b2 step
+    # 2) -- these were DEFAULT widget values on four shipped, gallery-
+    # published workflows, unlike the obscure `wan_i2v` lane below.
+    # Local `razzle_ltx_8gb` stays.
     # The 14B `wan_i2v` lane (2026-08-26, "rip the large wan we don't need")
     # LEFT this set on the 2026-09-25 clean rip of local Wan: a saved graph
     # naming it now gets the ordinary unregistered-engine refusal, the same
@@ -74,9 +77,16 @@ def test_the_retired_set_is_exactly_the_sixteen_known_ids():
         "triposr",
         "still_parallax",
         "word_razzle",
+        "ltx25_native_foley_16gb",
+        "ltx25_native_foley_24gb",
+        "ltx25_native_foley_blackwell",
+        "ltx25_native_mime_16gb",
+        "ltx25_native_mime_24gb",
+        "ltx25_native_audio_in_16gb",
+        "ltx25_native_audio_in_24gb",
     })
     assert isinstance(RETIRED_ENGINE_IDS, frozenset)
-    assert len(RETIRED_ENGINE_IDS) == 16, (
+    assert len(RETIRED_ENGINE_IDS) == 23, (
         "the count in this test's name is part of the guard -- rename it in "
         "the same edit that grows the set")
 

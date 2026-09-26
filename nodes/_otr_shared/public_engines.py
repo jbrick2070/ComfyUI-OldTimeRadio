@@ -244,6 +244,25 @@ RETIRED_ENGINE_IDS = frozenset({
     # is a named tombstone so a saved graph or force-map still fails as
     # RetiredEngineError, never as a silent remap and never as "not registered".
     "word_razzle",
+    # THE SEVEN "native"-NAMED LTX 2.5 IDS, RENAMED 2026-09-25 (0b2 step 2,
+    # operator: "'native' meant 'ComfyUI's own loaders, not GGUF'; GGUF is
+    # gone, the word is noise"). These were the VideoDirector's DEFAULT
+    # widget values on four shipped, gallery-published workflows
+    # (otr_8gb_ltx25_native_foley/mime/audio_in, otr_24gb_native_foley) --
+    # not an obscure lane like wan_i2v above, which the same rename policy
+    # deliberately left OFF this set. Plain rename, no alias (operator:
+    # "don't worry about back compat") -- but a stale saved copy of one of
+    # those four workflows, or a `--profile otr_8gb_ltx25_native_foley`
+    # leftover, deserves the truthful "renamed, no longer selectable"
+    # diagnosis, not the generic unregistered-engine refusal that reads like
+    # a broken install.
+    "ltx25_native_foley_16gb",
+    "ltx25_native_foley_24gb",
+    "ltx25_native_foley_blackwell",
+    "ltx25_native_mime_16gb",
+    "ltx25_native_mime_24gb",
+    "ltx25_native_audio_in_16gb",
+    "ltx25_native_audio_in_24gb",
 })
 
 

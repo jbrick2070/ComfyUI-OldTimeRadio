@@ -74,6 +74,17 @@ _RETIRED_IDS = frozenset({
     # local razzle_ltx_8gb stays. The id must remain unregistered and
     # unaliased so a stale graph fails as RetiredEngineError.
     "word_razzle",
+    # The seven "native"-named LTX 2.5 ids, renamed 2026-09-25 (0b2 step 2).
+    # These were DEFAULT widget values on four shipped, gallery-published
+    # workflows, so a tombstone (not a silent alias) is what a stale saved
+    # copy must land on.
+    "ltx25_native_foley_16gb",
+    "ltx25_native_foley_24gb",
+    "ltx25_native_foley_blackwell",
+    "ltx25_native_mime_16gb",
+    "ltx25_native_mime_24gb",
+    "ltx25_native_audio_in_16gb",
+    "ltx25_native_audio_in_24gb",
 })
 
 #: Deleted symbols per module -- the CLOSED set. A symbol reappearing on its

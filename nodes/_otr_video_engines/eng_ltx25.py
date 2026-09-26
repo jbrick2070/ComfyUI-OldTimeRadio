@@ -3478,7 +3478,7 @@ class Ltx25NativeAudioInMixin:
 @register
 class Ltx25NativeAudioIn16gbEngine(Ltx25NativeAudioInMixin,
                                    Ltx25NativeFoley16gbEngine):
-    """16 GB NATIVE audio-in. mix4x8, picture driven by the beat's own sound."""
+    """16 GB audio-in. mix4x8, picture driven by the beat's own sound."""
 
     name = "ltx25_audio_in_16gb"
     engine_version = "1"
@@ -3489,7 +3489,7 @@ class Ltx25NativeAudioIn16gbEngine(Ltx25NativeAudioInMixin,
 @register
 class Ltx25NativeAudioIn24gbEngine(Ltx25NativeAudioInMixin,
                                    Ltx25NativeFoleyWideEngine):
-    """24 GB AND UP NATIVE audio-in. int8, same coupling as the 16 GB lane."""
+    """24 GB AND UP audio-in. int8, same coupling as the 16 GB lane."""
 
     name = "ltx25_audio_in_24gb"
     engine_version = "1"
@@ -3499,7 +3499,7 @@ class Ltx25NativeAudioIn24gbEngine(Ltx25NativeAudioInMixin,
 
 @register
 class Ltx25NativeMime16gbEngine(Ltx25NativeFoley16gbEngine):
-    """The 16 GB NATIVE lane as a SILENT PERFORMANCE carrying its own score.
+    """The 16 GB lane as a SILENT PERFORMANCE carrying its own score.
 
     This class body is almost empty on purpose: the picture, the harvest of
     the audio latent, the second-pass
@@ -3531,7 +3531,7 @@ class Ltx25NativeMime16gbEngine(Ltx25NativeFoley16gbEngine):
 
 @register
 class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
-    """The 24 GB AND UP NATIVE lane as a silent performance. int8.
+    """The 24 GB AND UP lane as a silent performance. int8.
 
     Same relationship to ``ltx25_foley_24gb`` that
     ``ltx25_mime_16gb`` has to the 16 GB lane, and the same one-row
