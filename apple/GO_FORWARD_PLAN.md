@@ -211,20 +211,96 @@ PURPOSE: an audio-in lane on a character face would lip-sync to the ambient
 master mix") is STALE -- correct it, and ask the operator whether that graph
 should now route character beats to the audio-in lane too.
 
-### 0b2. One lane per graph, and drop "native" from the names (operator 2026-09-25)
+### 0b2. One lane per graph, and drop "native" from the names (operator 2026-09-25, HARDENED)
 
-- RULE: an audio-in graph uses audio-in for all three roles, a foley graph
-  foley, a mime graph mime. Only `workflows/otr_8gb_ltx25_native_audio_in.json`
-  breaks it (character_visual is `ltx25_native_foley_16gb`); switch it to
-  `ltx25_native_audio_in_16gb` and correct that row's stale display text.
-  Prove character lip-sync on one leg of that graph.
-- "native" meant "ComfyUI's own loaders, not GGUF"; GGUF is gone, so the word
-  is noise. Rename in ONE commit: engine ids `ltx25_native_{foley,mime,
-  audio_in}_{16gb,24gb}` and `ltx25_native_foley_blackwell`, and workflow files
-  `otr_8gb_ltx25_native_{foley,mime,audio_in}.json` and
-  `otr_24gb_native_foley.json`. Plain rename: no alias, no "renamed to"
-  message, no back-compat of any kind (operator: "don't worry about back
-  compat"). Shortcodes, tests, docs, preflight tables and the matrix follow.
+**Step 1 -- fix the one graph that breaks the one-lane rule.**
+`config/workflow_matrix.json` row `otr_8gb_ltx25_native_audio_in` has
+`character_visual: ltx25_native_foley_16gb` while `announcer_visual` and
+`music_visual` are `ltx25_native_audio_in_16gb` (measured 2026-09-25 by
+reading every row's three `role_overrides.*_visual` deltas). Change
+`character_visual` to `ltx25_native_audio_in_16gb` so all three match.
+Also correct that row's `display_name` text in the same file, which still
+reads "CHARACTER BEATS STAY ON THE FOLEY LANE ON PURPOSE: an audio-in lane
+on a character face would lip-sync to the ambient master mix" -- FALSE
+per `render_driver._uses_ambient_master_audio`, which excludes
+character-face beats from the ambient slice already (2026-06-26); a
+character beat on this lane gets that character's own clean voice. Say so.
+Regenerate (`scripts/build_variants.py --all`), `--check` clean, then one
+`otr_8gb_ltx25_native_audio_in` leg (1 act) proving a character beat's
+lips track that character's own line, not the mix.
+
+**Step 2 -- the rename, in one later commit, mechanical.** "native" meant
+"ComfyUI's own loaders, not GGUF"; GGUF is gone, the word is noise. 64
+files carry it (measured 2026-09-25 via
+`grep -rlI "ltx25_native_\|_native_foley\|native_audio_in\|native_mime"`,
+excluding `otr/`, `kibitz-runs/`, `_tmp_*`, `.claude/`, and the two
+append-only logs `PROD_BUG_LOG.md`/`HANDOFF_LOG.md`, which are history and
+do not change). Heaviest: `tests/test_nonaudio_prompt_policy.py` (52),
+`apple/ENGINE_MATRIX.md` (42, generated -- regenerate, do not hand-edit),
+`config/workflow_matrix.json` (28), `tests/test_ltx25_foley_bed.py` (23),
+`apple/LAUNCH_RECIPES.md` (18, generated), `nodes/_otr_video_engines/
+eng_ltx25.py` (16), `render_driver.py` + `foley_stems.py` (14 each).
+
+Exact renames -- ENGINE IDS (7):
+`ltx25_native_foley_16gb` -> `ltx25_foley_16gb`
+`ltx25_native_foley_24gb` -> `ltx25_foley_24gb`
+`ltx25_native_foley_blackwell` -> `ltx25_foley_blackwell`
+`ltx25_native_mime_16gb` -> `ltx25_mime_16gb`
+`ltx25_native_mime_24gb` -> `ltx25_mime_24gb`
+`ltx25_native_audio_in_16gb` -> `ltx25_audio_in_16gb`
+`ltx25_native_audio_in_24gb` -> `ltx25_audio_in_24gb`
+
+Exact renames -- WORKFLOW FILE STEMS (4 of the 25; the other 21, including
+`otr_16gb_foley.json` and `otr_16gb_mime.json`, keep their filename and only
+change the engine ids they reference):
+`otr_8gb_ltx25_native_foley.json` -> `otr_8gb_ltx25_foley.json`
+`otr_8gb_ltx25_native_mime.json` -> `otr_8gb_ltx25_mime.json`
+`otr_8gb_ltx25_native_audio_in.json` -> `otr_8gb_ltx25_audio_in.json`
+`otr_24gb_native_foley.json` -> `otr_24gb_foley.json`
+
+Shortcode VALUES stay (`nodes/_otr_shared/shortcodes.py`): `n16f`/`n24f`/
+`nbwf`/`n16m`/`n24m`/`n16a`/`n24a` are already opaque three-or-four-letter
+codes baked into every published episode filename ever rendered on these
+lanes; only the dict KEY (the engine id) renames, so old filenames keep
+their meaning. Do not touch the values.
+
+Order: (1) rename the 7 engine ids at their `@register` class attribute /
+registry dict key and every reference in the same module
+(`eng_ltx25.py`, `render_driver.py`, `foley_stems.py`, `registry.py`,
+`_otr_visual_assets.py`'s `_SOURCES`/`_COVERED`, `otr_provision.py`,
+`otr_fetch_lane_weights.py`); (2) rename the shortcode dict keys only;
+(3) update `config/workflow_matrix.json` (28 refs: `role_overrides.*_visual`
+values and the 4 `"id"` fields for the renamed workflow files), rename the 4
+files on disk with `git mv`; (4) run
+`python scripts/build_variants.py --all` (regenerates every variant, plus
+`apple/ENGINE_MATRIX.md`, `apple/LAUNCH_RECIPES.md`, `apple/MACHINE_MATRIX.md`,
+`apple/DROPDOWN_MATRIX.md`, `apple/MACHINES.md` -- never hand-edit these);
+`--check` clean; (5) fix every remaining test file in the 64 (mostly literal
+engine-id strings and fixture names -- `test_nonaudio_prompt_policy.py`,
+`test_ltx25_foley_bed.py`, `test_render_engines_recipe_stamp.py`,
+`test_wire_w5_acceptance_grader.py`, `test_ltx_open_health*.py`,
+`test_ltx_8gb_session_identity.py`, `test_video_render_driver_perbeat_audio.py`,
+`test_multiclip_session_identity_roster.py`, `test_foley_beat_clip_audio.py`,
+`test_route_freeze*.py`, `test_ltx25_native_lane_contract.py` -- RENAME this
+file too, it is named after the retired word -- `test_wire_w7_mouth_ownership.py`,
+`test_minimax_h3_audio_in.py`, `test_ltx25_video_lane.py`,
+`test_brief_radio_host.py`, `test_brief_prompt_finishing.py`,
+`test_video_director_unknown_engine.py`, `test_video_platform_aseam.py`,
+`test_route_a_14b_promotion.py`, `test_visual_styles_a2.py`,
+`test_visual_styles_b.py`, `test_terminal_frame.py`,
+`test_nonverbal_story_context.py`, `test_no_mirror_manifest_and_window.py`,
+`test_ltx25_every_lane_builds_a_graph.py`, `test_ghost_signal_prompt.py`,
+`test_frame_receipt_conformance.py`, `test_clip_fill.py`,
+`test_capability_profiles.py`, `test_video_ledger.py`); (6) hand-edit the
+prose docs that are not generated: `apple/GO_FORWARD_PLAN.md` (this section,
+cut once done), `apple/VIDEO_MODELS.md`, `apple/MODEL_ASSET_INDEX.md`,
+`apple/TEST_WAVE.md`, `nodes/otr_meta_brief_image_prompt.py` (a comment).
+Full suite green, `--check` clean, re-grep the six search strings above:
+zero hits outside `otr/`, the two append-only logs, and git history.
+
+Plain rename: no alias, no "renamed to X" message, no back-compat of any
+kind (operator: "don't worry about back compat"). A saved graph naming an
+old engine id just stops resolving -- that is the intended behaviour.
 - DECIDED (operator 2026-09-25: "let's try keeping the engines if they
   work, and we can test them"): KEEP the four engines no workflow selects
   (`ltx25_native_foley_blackwell`, `ltx25_native_mime_24gb`,
@@ -254,21 +330,66 @@ should now route character beats to the audio-in lane too.
     weight tokens so `planned_downloads` names them, drop the dropdown's
     "manual" row, and re-prove both on a leg that downloads its own weights
     (h3_low_video is already proven on 16 GB; h3_low_audio_in "fits").
-- Generated docs should show a music column if they do not already.
+- UNSCOPED, needs a decision before code: "generated docs should show a
+  music column if they do not already" has no grounded target. Checked
+  2026-09-25: `apple/DROPDOWN_MATRIX.md` already has a full "Voice and
+  music -- local" section (`musicgen`/`stable_audio_3`/`stable_audio_music`
+  rows); `apple/MACHINES.md` is a which-workflow-to-open table with no
+  per-engine columns at all; `apple/MACHINE_MATRIX.md` is per-engine proof
+  status, one row per engine, no per-workflow view. No generator in
+  `scripts/otr_dropdown_matrix.py` or `otr_machine_matrix.py` builds a
+  per-workflow table that lists role_overrides but omits
+  `slot_overrides.music_engine`. Cut this line, or say which doc and which
+  column before it becomes a coding row.
 
 ### 0c. Portability fixes (Composer audit 2026-09-25, each claim grounded)
 
 Found by asking "what assumes the developer's machine?" after the models
-root defect (PBUG-20260925-03). Ranked by what a stranger would hit:
+root defect (PBUG-20260925-03). Ranked by what a stranger would hit. The
+top 3 are HARDENED below; 4-8 stay a reviewed backlog, one commit each.
 
-1. `llm_policy.py:51,76-78` rejects `cuda:N`, but the writer advertises
-   `gpu:N` and `device_options.resolve_device` returns `cuda:N`: a second-GPU
-   pick crashes the writer build.
-2. `_otr_bark_lib.py:201` calls `torch.cuda.empty_cache()` unguarded: first
-   Bark load crashes on a Mac or CPU-only torch.
-3. `_otr_model_catalog.py` `effective_quant_policy` reads ROCm's "cuda" as
-   NVIDIA and turns the AMD graph's `quant_policy="none"` into NF4, which
-   bitsandbytes cannot run on ROCm. Use `device_options.vendor()`.
+**1. Second-GPU pick crashes the writer build.**
+`nodes/_otr_shared/llm_policy.py:51`: `_DEVICES = ("cuda", "cpu", "mps")`.
+The writer's `llm_device` widget offers `gpu:1`, `gpu:2`... on a multi-GPU
+host (`device_options.py:69-89`); `resolve_device` (`device_options.py:91-
+134`) turns `gpu:1` into `"cuda:1"` via `_name()` (`:136-144`, which appends
+`:%d` for any nonzero index). `LLMRuntimePolicy.__post_init__`
+(`llm_policy.py:75-78`) then does `if self.device not in _DEVICES: raise
+LLMPolicyError`, and `"cuda:1"` is not `"cuda"`. Fix: replace the exact-match
+check with `self.device == "cuda" or self.device.startswith("cuda:") or
+self.device in ("cpu", "mps")`. Single-GPU boxes (5080, 4060) always
+resolve to bare `"cuda"`, so this is additive. Test: construct
+`LLMRuntimePolicy(device="cuda:1", ...)` and assert no raise; keep the
+existing bad-value test (`"tpu"` still raises).
+
+**2. Bark crashes on first load on a Mac or CPU-only torch.**
+`nodes/_otr_bark_lib.py:201` calls `torch.cuda.empty_cache()`
+unconditionally inside `if _BARK_CACHE["model"] is None:`, a few lines
+after the device is resolved to `"mps"`/`"cpu"` for exactly that host. Fix:
+guard it, matching the ALREADY-guarded call at `:331` in the same file --
+read that guard and mirror its shape (do not invent a new one). Test:
+monkeypatch `torch.cuda.is_available` False (or stub `torch.cuda` absent
+entirely) and drive the real load path; assert no `AssertionError`.
+
+**3. AMD/ROCm quantisation.**
+`nodes/_otr_model_catalog.py:713-733` `effective_quant_policy`: the
+`implied == "platform"` branch does
+`"bnb_nf4" if str(device or "").lower().startswith("cuda") else "none"`.
+ROCm reports `"cuda"` to torch too (that is `device_options.vendor()`'s
+whole reason for existing, per its own docstring at `device_options.py:148-
+158`), so an AMD box's Qwen pick silently bakes NF4, which bitsandbytes
+cannot run on ROCm. Fix: change the condition to
+`device_options.vendor() == "nvidia"` (import already available at every
+call site: `OTR_LedgerScriptWriter.py:519,523`, `_otr_writer_inputs.py:
+595,599`, `_otr_model_loader.py:906` all call `effective_quant_policy`
+today WITHOUT reading vendor first -- thread `device_options.vendor()` as
+a new keyword, default `""`, so a caller that cannot supply it degrades to
+today's `device`-string heuristic rather than crashing on a missing arg).
+No AMD hardware on the 5080 to reproduce live: test with a stubbed
+`device_options.vendor` returning `"amd"` and `device="cuda"`, assert the
+Qwen row returns `"none"`, not `"bnb_nf4"`.
+
+**Backlog, 4-8 (grounded, not yet hardened into steps):**
 4. `prestartup_script.py:126-144` pins HF_HOME to `<comfy>/models/huggingface`
    by file depth before `_otr_hf_env` runs. Folds into item 0a above.
 5. Kokoro (`eng_kokoro.py:72-77`, `_otr_kokoro_voice_prefetch.py`) joins
@@ -286,7 +407,10 @@ root defect (PBUG-20260925-03). Ranked by what a stranger would hit:
    `video_engine.py:2342-2346` falls back to `~/Documents/ComfyUI/output`;
    NVFP4 is preferred among installed files without a hardware check;
    `config/otr_windows_extra_model_paths.yaml` names `C:/ComfyUI-Models`.
-Every fix measures the 5080 unchanged (CLAUDE.md section 0B).
+Every fix measures the 5080 unchanged (CLAUDE.md section 0B): items 1-3
+touch shared code with a fallback branch that never fires today on a
+single-GPU NVIDIA box -- print the resolved value before/after in the
+commit message, same as the models-root and per-type work earlier today.
 
 ### 0d. Gallery and JSON hygiene (template diff + Grok review, 2026-09-25)
 
@@ -296,13 +420,27 @@ graphs against the 555 official templates and frontend 1.52.7, every claim
 grounded here: same litegraph 0.4 shape, same top-level keys, valid links,
 groups and widget descriptors. What is left is what a stranger SEES first.
 In order:
-- **Stamp every node with `cnr_id` + `ver`.** Official templates carry
-  `properties.cnr_id` / `properties.ver` on every node (51 of 62); the
-  frontend's `getCnrIdFromNode` reads it, and it is how "Install Missing
-  Nodes" finds the pack. Ours: 1 of 21 nodes has `cnr_id`, none has `ver`.
-  Stamp all 21 with `comfyui-old-time-radio` and the pyproject version, in
-  the canonical and in build_variants; a test pins `ver` == pyproject. Verify
-  on the 4060 whether `ver` 2.3.6 makes Manager fetch the Pending version.
+- **Stamp every node with `cnr_id` + `ver` (HARDENED).** Measured
+  2026-09-25: canonical has 21 nodes, exactly 1 (`OTR_WorkflowValidator`)
+  carries `properties.cnr_id: "comfyui-old-time-radio"`; none carries
+  `ver`. Official templates carry both on most nodes; the frontend's
+  `getCnrIdFromNode` reads `cnr_id` (falls back to `aux_id`), and it is how
+  "Install Missing Nodes" finds the pack. Work: (1) in
+  `scripts/build_variants.py::build_variant` (`:162+`), after loading the
+  canonical and before stamping the validator's own widgets, add `cnr_id`
+  and `ver` to every node's `properties` dict, pulled from a pinned
+  `PACK_CNR_ID = "comfyui-old-time-radio"` and the LIVE pyproject version
+  (parse `pyproject.toml`'s `version = "..."` line at build time, do not
+  hardcode a copy that drifts -- see the DEPENDENCIES.md generator lesson
+  from earlier today, PBUG-adjacent); (2) apply the same stamp to
+  `otr_canonical.json` itself by hand once, then regenerate; (3)
+  `scripts/build_variants.py --check` gains a check that every node in
+  every committed file (canonical + 24 variants) has `cnr_id ==
+  "comfyui-old-time-radio"` and `ver == <live pyproject version>`; (4) a
+  new test asserts the same against the real files. Verify on the 4060
+  whether a `ver` bump makes Manager's Missing-Nodes flow fetch the exact
+  Pending version rather than Active -- report only, this does not gate
+  the commit.
 - **Drop `extra.info`.** It says `version: "2.0-alpha"`; nothing in nodes/,
   scripts/, tests/ or js/ reads it. pyproject is the version authority.
 - **A friendly category name through `/i18n`.** Core serves each custom
