@@ -146,11 +146,13 @@ def test_the_sequencer_steps_once_per_line():
     assert "_line_progress.finish()" in ast.unparse(tree)
 
 
-def test_local_voices_step_per_line_and_cloud_voices_keep_the_heartbeat():
+def test_voices_step_per_line_unless_a_partner_heartbeat_draws_the_bar():
     tree = _tree("nodes/_otr_voice_node_common.py")
     assert _assigned(tree, "_line_progress") == [
-        "NodeProgress(0 if adapter_is_cloud_side(adapter) else len(misses), "
-        "'voice lines')"]
+        "NodeProgress(0 if adapter_draws_partner_heartbeat(adapter) else "
+        "len(misses), 'voice lines')"]
+    src = ast.unparse(tree)
+    assert "on_item_done=lambda _job: _line_progress.step()" in src
     serial = [loop for loop in _loops_over(tree, "misses")
               if any(isinstance(s, ast.Expr)
                      and ast.unparse(s.value) == "_line_progress.step()"
@@ -168,3 +170,27 @@ def test_the_helper_has_production_callers_only_at_those_three_sites():
                        "nodes/_otr_voice_node_common.py",
                        "nodes/scene_sequencer.py"]
     assert np_mod.__all__ == ["NodeProgress"]
+
+
+def test_the_fanout_reports_each_finished_job_on_the_calling_thread():
+    import threading
+    from nodes._otr_shared.cloud_fanout import run_cloud_fanout
+
+    caller = threading.get_ident()
+    seen = []
+    outcome = run_cloud_fanout(
+        ["a", "b", "c"], item_id=lambda s: s,
+        execute=lambda s: (_ for _ in ()).throw(RuntimeError(s)) if s == "b" else s,
+        workers=2,
+        on_item_done=lambda s: seen.append((s, threading.get_ident())))
+    assert sorted(s for s, _ in seen) == ["a", "b", "c"]
+    assert {tid for _, tid in seen} == {caller}
+    assert set(outcome.results) == {"a", "c"} and set(outcome.errors) == {"b"}
+
+
+@pytest.mark.parametrize("name,heartbeat", [
+    ("cloud_elevenlabs", True), ("cloud_sonilo", True),
+    ("google_tts", False), ("kokoro", False), ("chatterbox", False)])
+def test_only_partner_engines_count_as_drawing_the_bar(name, heartbeat):
+    from nodes._otr_shared.cloud_fanout import adapter_draws_partner_heartbeat
+    assert adapter_draws_partner_heartbeat(types.SimpleNamespace(name=name)) is heartbeat

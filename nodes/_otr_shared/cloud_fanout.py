@@ -74,6 +74,22 @@ def adapter_is_cloud_side(obj) -> bool:
     return name.startswith("cloud_")
 
 
+def adapter_draws_partner_heartbeat(obj) -> bool:
+    """True when this adapter's calls go through a Comfy partner node.
+
+    The ``cloud_*`` engines call ``cloud_media_invoke.invoke_partner_node``,
+    whose wait loop redraws the node's progress bar every 20 s. Every other
+    engine -- local ones, and the direct Google API lanes (``google_tts``,
+    ``google_image``, ``google_lyria``) that are cloud-side without being
+    partner nodes -- draws nothing while it works, so a caller may give it
+    an item bar (``node_progress.NodeProgress``) without two bars fighting.
+    """
+    if obj is None:
+        return False
+    name = str(getattr(obj, "name", "") or getattr(obj, "engine_id", "") or "")
+    return name.startswith("cloud_")
+
+
 def run_cloud_fanout(
     items,
     *,
@@ -82,6 +98,7 @@ def run_cloud_fanout(
     predecessors=None,
     workers=None,
     prompt_id=None,
+    on_item_done=None,
 ):
     """Request many provider jobs; collect by id.
 
@@ -92,6 +109,10 @@ def run_cloud_fanout(
     Results and errors are keyed by id. The caller walks the original
     ``items`` order to commit or to raise the first error, so a clip
     that landed first never becomes beat one.
+
+    ``on_item_done(item)``, when given, is called on the CALLING thread
+    each time a job finishes, success or error -- the executing node's
+    own thread, which is where a ComfyUI progress bar must be updated.
     """
     items = list(items or ())
     if not items:
@@ -166,6 +187,8 @@ def run_cloud_fanout(
                     from .cloud_media_backend import is_cloud_budget_error
                     if is_cloud_budget_error(exc):
                         halt_submit = True
+                if on_item_done is not None:
+                    on_item_done(item)
             _submit(pool)
 
     leftover = [_pid(s) for s in pending]

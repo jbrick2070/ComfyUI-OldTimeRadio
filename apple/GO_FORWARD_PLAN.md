@@ -540,8 +540,11 @@ order:
 2. DONE 2026-09-25: `nodes/_otr_shared/node_progress.py` draws ComfyUI's bar
    over the three loops that showed nothing -- the writer's per-beat compose,
    the local voice lines, the scene sequencer. Nodes already showing a
-   sampler bar or the cloud heartbeat get no second bar. Cancel lands at the
-   next item boundary. LIVE CHECK OWED: watch the bar move on a real leg.
+   sampler bar or the Comfy partner heartbeat get no second bar; the direct
+   Google API voice gets it on the fan-out path too (Cursor review). Cancel
+   lands at the next item boundary. STILL SILENT: `google_image` stills and
+   `google_lyria` music (cloud-side, no heartbeat) -- same fix shape if the
+   Google workflow's bar is wanted there. LIVE CHECK OWED: watch it move.
 3. `requires-comfyui` in `[tool.comfy]`, set to the oldest core that runs
    the canonical workflow -- measured, never guessed; too high blocks installs.
 4. DONE: `build_variants.py --all` writes a gallery thumbnail beside the

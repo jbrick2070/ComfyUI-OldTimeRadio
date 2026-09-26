@@ -1769,10 +1769,18 @@ class OTRVoiceNodeBase:
                 line_jobs.append(job)
 
             from ._otr_shared.cloud_fanout import (
-                adapter_is_cloud_side, cloud_fanout_workers, run_cloud_fanout,
-                snapshot_prompt_id,
+                adapter_draws_partner_heartbeat, adapter_is_cloud_side,
+                cloud_fanout_workers, run_cloud_fanout, snapshot_prompt_id,
             )
             misses = [j for j in line_jobs if j["audio"] is None]
+            # The node's own bar, one step per rendered line (plan 0f item
+            # 2), on the serial and the fan-out path alike. A Comfy partner
+            # engine (cloud_elevenlabs) already redraws the bar with its
+            # heartbeat, so it gets none; Kokoro, the cloners and the
+            # direct Google API voice draw nothing of their own.
+            _line_progress = NodeProgress(
+                0 if adapter_draws_partner_heartbeat(adapter) else len(misses),
+                "voice lines")
             outcome_errors = {}
             workers = cloud_fanout_workers()
             fan_ok = (
@@ -1790,7 +1798,8 @@ class OTRVoiceNodeBase:
                     item_id=lambda j: j["job_id"],
                     execute=lambda j: _forward_one_voice_line(adapter, engine, j),
                     workers=min(workers, len(misses)),
-                    prompt_id=snapshot_prompt_id())
+                    prompt_id=snapshot_prompt_id(),
+                    on_item_done=lambda _job: _line_progress.step())
                 if outcome.stuck_ids and not outcome.errors:
                     raise RuntimeError(
                         "cloud TTS fan-out stuck: %s" % outcome.stuck_ids)
@@ -1810,12 +1819,6 @@ class OTRVoiceNodeBase:
                 # edge cases. Each line is attempted on its own now, and only
                 # a stamped job-scoped verdict is survivable -- an ordinary
                 # crash still stops the walk exactly as before.
-                # A LOCAL engine gets the node's own bar, one step per line
-                # (plan 0f item 2). A cloud engine on this path already
-                # draws the partner heartbeat; two bars would fight.
-                _line_progress = NodeProgress(
-                    0 if adapter_is_cloud_side(adapter) else len(misses),
-                    "voice lines")
                 for j in misses:
                     try:
                         j["audio"] = _forward_one_voice_line(adapter, engine, j)
