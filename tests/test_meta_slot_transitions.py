@@ -50,7 +50,6 @@ def _make_scheduler(creative_id: str, technical_id: str):
     sched = _SlotScheduler(
         creative_id=creative_id,
         technical_id=technical_id,
-        top_p=0.92,
         min_p=0.0,
         repetition_penalty=1.0,
     )

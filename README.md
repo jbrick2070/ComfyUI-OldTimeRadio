@@ -268,7 +268,6 @@ All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
 | `custom_premise` | A sentence or two of your own. Blank means the source decides. |
 | `source_bank` | Where the story comes from. Ships on *roll*, which picks any eligible bank. |
 | `visual_style` | How it looks. Ships on *roll*. The ids are in [apple/STYLES.md](apple/STYLES.md). |
-| `creativity` | `balanced` by default. |
 | `lemmy_cameo` | Whether a character named Lemmy drops by. Ships on *roll*, about an 11% chance. |
 | `episode_language` | One switch. See [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md). |
 | `asset_cleanup` | What to delete from the episode's working folder once it is published: `off (keep everything)`, `partial (keep only the text files)` or `full (keep only the published video)`. Ships **off**. See [Where things land](#where-things-land). |

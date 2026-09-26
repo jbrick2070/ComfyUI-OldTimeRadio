@@ -16,7 +16,7 @@ REPO = Path(__file__).resolve().parents[1]
 #: literal, and it changes only when a control is genuinely added or dropped.
 #: Every VALUE below is found by widget NAME, so nothing here needs
 #: renumbering when the writer's controls are reordered.
-WRITER_WIDGET_COUNT = 36
+WRITER_WIDGET_COUNT = 35
 
 
 def load_graph(path):

@@ -262,7 +262,57 @@ root defect (PBUG-20260925-03). Ranked by what a stranger would hit:
    `config/otr_windows_extra_model_paths.yaml` names `C:/ComfyUI-Models`.
 Every fix measures the 5080 unchanged (CLAUDE.md section 0B).
 
-### 0d. "Start here" note on the canonical canvas
+### 0d. Gallery and JSON hygiene (template diff + Grok review, 2026-09-25)
+
+Field-by-field diff of `otr_canonical.json` against the official
+`video_wan2_2_14B_s2v` template, then Grok's read-only pass over all 25
+graphs against the 555 official templates and frontend 1.52.7, every claim
+grounded here: same litegraph 0.4 shape, same top-level keys, valid links,
+groups and widget descriptors. What is left is what a stranger SEES first.
+In order:
+- **Stamp every node with `cnr_id` + `ver`.** Official templates carry
+  `properties.cnr_id` / `properties.ver` on every node (51 of 62); the
+  frontend's `getCnrIdFromNode` reads it, and it is how "Install Missing
+  Nodes" finds the pack. Ours: 1 of 21 nodes has `cnr_id`, none has `ver`.
+  Stamp all 21 with `comfyui-old-time-radio` and the pyproject version, in
+  the canonical and in build_variants; a test pins `ver` == pyproject. Verify
+  on the 4060 whether `ver` 2.3.6 makes Manager fetch the Pending version.
+- **Drop `extra.info`.** It says `version: "2.0-alpha"`; nothing in nodes/,
+  scripts/, tests/ or js/ reads it. pyproject is the version authority.
+- **A `.jpg` thumbnail for EVERY stem, all 25.** Frontend 1.52.7 builds each
+  custom-pack card with `mediaSubtype: "jpg"` hardcoded and requests
+  `/api/workflow_templates/<pack>/<stem>.jpg`; one thumbnail for the canonical
+  alone leaves 24 blank cards. `build_variants.py --all` copies one master
+  image under every variant's name; `--check` fails on a missing one.
+- **A friendly category name through `/i18n`.** Core serves each custom
+  node's `locales/<lang>/main.json`; the frontend localizes the pack category
+  from `templateWorkflows.category.<folder name>`. Ship `locales/en/main.json`
+  with BOTH keys -- `ComfyUI-OldTimeRadio` (git clone) and
+  `comfyui-old-time-radio` (registry install) -- reading "Old-Time Radio".
+  Per-workflow titles are NOT localizable for custom packs in this frontend
+  (they are the filename stem), so the stems stay; do not rename files.
+- **Standard palette pass (cosmetic, his eye).** Measured: 1,421 of 4,635
+  official nodes are coloured, almost all from five short pairs
+  (`#222/#000`, `#432/#653`, `#232/#353`, `#322/#533`, `#223/#335`); 587
+  groups use `#3f789e`. Ours are custom hexes on a shared `#3B3D42`. Map the
+  five stage colours onto standard pairs, keeping the stages distinct.
+- **Story Writer collapsed on load (his eye).** 520x1760 with 35 widgets is
+  a wall; `flags.collapsed` keeps every value and position, and the Start
+  here note says "expand 1 - Story Writer". Never split the node.
+- **Retune `extra.ds`** (saved viewport) once the layout settles.
+- **Rejected or deferred, with the reason:** an `index.json` in workflows/
+  (the glob would list it as a template named "index"); renaming files for
+  prettier titles (stems are coupled to matrix ids, stamps, headless runs,
+  tests); replacing `seed_mode` / `request_seed` with stock seed controls
+  (the deterministic request hash is a feature); a blanket `shape: 7` sweep;
+  moving validator stamps out of widgets (readers and writers would all
+  move); `properties.models` links; subgraphs; `widgets_values_named` (a
+  second copy to keep in sync); unique UUIDs per variant (no consumer needs
+  it); `localized_name` cleanup; pretty-printing variants (dev polish only);
+  hand-stamping `extra.frontendVersion` (553 of 555 carry it, nothing loads
+  on it, and a fixed value goes stale at once).
+
+#### The "Start here" note
 
 Comfy's official templates all carry an on-canvas Markdown note; ours has
 none, so a stranger sees 21 boxes and no instructions. One note in the
@@ -291,8 +341,9 @@ Director (node 87) `announcer_video_model`, `music_video_model`,
 (node 84) `upscale_engine` (operator: "upscaler").
 LAYOUT, top to bottom (operator 2026-09-25): the story choice first --
 `source_bank`, `source_ref`, `visual_style`; then the shape --
-`act_count`, `num_characters`, `creativity` (operator: "maybe creativity
-level"), `episode_language`, `lemmy_cameo`, `asset_cleanup`; then every
+`act_count`, `num_characters` (no creativity dial: it was removed the same
+day, each model samples at its maker's baseline), `episode_language`,
+`lemmy_cameo`, `asset_cleanup`; then every
 model picker; and AT THE BOTTOM the My Story fields, which only the My
 Story bank reads -- `episode_title`, `custom_premise`, `story_characters`,
 `story_plot`, `story_setting`, `story_author`, and Theme Music's
@@ -336,71 +387,6 @@ order:
 Parked, large: loading models through `comfy.model_management` so ComfyUI
 can evict them for other packs (touches every model load; multi-box proof),
 and the V3 `comfy_api` node schema (24 classes, workflow-adjacent).
-
-### 0g. Baseline the creativity presets against the model makers (later)
-
-Operator 2026-09-25: "I don't know if I ever had a baseline or compared
-the creativity setting to a canonical, so we could be really off." A
-correctness check, not story-quality chasing. `creativity` is wired end
-to end (`_otr_writer_inputs._CREATIVITY_TEMP_MAP` / `_TOP_P_MAP` ->
-`compose_line` base temperature and the local generate top_p; canonical
-ships `balanced` = 0.85 / 0.95, plus `min_p` 0.05 and
-`repetition_penalty` 1.03). The presets are ONE map for every writer model,
-while each maker publishes its own recommended sampling, and they differ
-widely -- to be read from the model cards, not memory: Mistral-Nemo
-recommends a low temperature (about 0.3), Qwen3 about 0.7 / 0.8 / top_k 20,
-Gemma about 1.0 / 0.95 / top_k 64. The work: table each shipped writer
-model's card recommendation beside our four presets; decide whether
-`balanced` should mean "the maker's default for THIS model" (a per-model
-map in the catalog) with the other three as offsets from it. His ear
-decides whether any change ships.
-DIRECTION (operator, same day: "open to removing it and just having
-baseline ... cloud models change all the time, can we have a null
-temperature -- is that more future proof?"): YES, "model default" as the
-shipped default. MEASURED from the local generation_config.json files:
-Gemma 4 12B ships temp 1.0 / top_p 0.95 / top_k 64 (our balanced runs it
-cooler); Qwen3 8B ships 0.6 / 0.95 / top_k 20 (our balanced runs it much
-hotter); Mistral-Nemo ships NO sampling defaults. So: local models use
-their own generation_config; cloud slots send no temperature (the provider
-applies the model's default); a model that ships nothing (Nemo) falls back
-to today's balanced -- never greedy, which would flatten dialogue. The dial
-either goes, or becomes tighter / model default / looser as offsets from
-the model's own baseline. Mind `compose_line`'s +0.1 per retry, which needs
-a base number. Seed is separate and untouched.
-DECIDED (operator, same day): "great, null, and let's rip the creativity";
-"find the canonical temp baseline for each model and that's it"; "remember
-we have various safetensor quants". Reading generation_config alone is NOT
-enough -- the default writer ships none -- so the baseline is a per-model
-field on each catalog row (quant twins inherit through their row), sourced
-and dated. Measured 2026-09-25:
-
-| catalog row | temperature / top_p / top_k | source |
-|---|---|---|
-| Qwen/Qwen3.5-4B (default) | 0.7 / 0.8 / 20 (+ presence_penalty 1.5) | model card, non-thinking general (no generation_config: 404) |
-| Qwen/Qwen3.8-27B | 1.0 / 0.95 / 20 | generation_config.json |
-| google/gemma-4-E2B-it, E4B-it, 12b-it | 1.0 / 0.95 / 64 | generation_config.json |
-| unsloth/Llama-3.2-3B-Instruct | 0.6 / 0.9 / - | generation_config.json |
-| mistralai/Mistral-Nemo-Instruct-2407 | 0.35 / - / - | model card examples (generation_config has none) |
-| google/gemma-2-2b-it | none published | fallback 0.85 / 0.95, never greedy |
-| openrouter / comfy / google_api slots | none | send no sampling keys; provider default |
-
-Design reviewed by a Sonnet contrarian before code (verdict FIX, folded):
-- presence_penalty is NOT a transformers generate() kwarg (5.17.0 rejects
-  unused kwargs), so Qwen's card value is recorded, not applied; our
-  repetition_penalty 1.03 stays.
-- The dialogue retry bump is capped at max(model base, 1.0): Gemma at 1.0
-  would otherwise retry at 1.1, past the BUG-014 collapse line.
-- Quant twins are SEPARATE catalog rows, so the baseline resolves through
-  one function keyed by the canonical id (`_canonical_qwen_id` /
-  `hf_weights_id`), never copied per row.
-- top_k is new wiring (never passed today).
-- Also remove: video_engine.py ~1791 report line (unconditional),
-  `_otr_workflow_apply.CREATIVE_WHITELIST` entry, and update ~10 tests
-  that pin the widget (test_openrouter_slot_widgets_s2, test_workflow_json_
-  guardrails ~867, test_widget_surgery_tool ~291, test_otr_api_type_
-  validation, test_otr_api_companions).
-- Cloud None-temperature is already honoured by all three backends.
-Built after the Kling removal lands (both regenerate the workflow files).
 
 ## 3. TEST
 

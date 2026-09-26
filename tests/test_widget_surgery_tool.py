@@ -138,8 +138,12 @@ def test_removing_a_widget_repairs_the_link_that_follows_it():
     # descriptors 30 and 31, so gate_in moved 31 -> 30 and link 279 followed it
     # by identity. min_p sits ahead of the cut and did not move, which is the
     # asymmetry that makes this fixture worth keeping.
-    EXPECTED_INPUT_POS = 15
-    EXPECTED_GATE_POS = 30
+    #
+    # Re-pinned 2026-09-25: `creativity` (descriptor 14, ahead of min_p) came
+    # out, so THIS time both moved up one -- min_p 15 -> 14, gate_in 30 -> 29
+    # -- and link 279 followed gate_in by identity again.
+    EXPECTED_INPUT_POS = 14
+    EXPECTED_GATE_POS = 29
     expected_input_pos = EXPECTED_INPUT_POS
 
     gate_pos, gate_inp = next(
@@ -288,12 +292,12 @@ def test_rename_widget_changes_the_name_and_nothing_else():
     before_values = list(node["widgets_values"])
     before_links = {r[0]: list(r) for r in wf["links"]}
 
-    touched = ws.rename_widget(wf, "OTR_LedgerScriptWriter", "creativity", "flair")
+    touched = ws.rename_widget(wf, "OTR_LedgerScriptWriter", "lemmy_cameo", "cameo_roll")
 
-    assert touched, "creativity is no longer on the writer"
+    assert touched, "lemmy_cameo is no longer on the writer"
     after = next(n for n in wf["nodes"] if n.get("type") == "OTR_LedgerScriptWriter")
     names = ws.widget_names(after)
-    assert names == ["flair" if n == "creativity" else n for n in before_order]
+    assert names == ["cameo_roll" if n == "lemmy_cameo" else n for n in before_order]
     assert after["widgets_values"] == before_values, "a rename moved a value"
     assert {r[0]: list(r) for r in wf["links"]} == before_links, "a rename moved a link"
     assert ws.verify(wf, "after-rename") == []

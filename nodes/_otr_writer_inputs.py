@@ -13,8 +13,7 @@ The writer imports all of it back under its original names, so
 ``OTR_LedgerScriptWriter._resolve_inputs`` and every constant a test reaches for
 still resolve exactly where they always did. This is a SEAM, not a rewrite.
 
-The widget CHOICE LISTS came with it on purpose. ``_CREATIVITY_CHOICES``,
-``_LEMMY_CAMEO_CHOICES``, ``_ACT_COUNT_CHOICES`` and ``_FABLE2_MAX_CAST`` are the
+The widget CHOICE LISTS came with it on purpose. ``_LEMMY_CAMEO_CHOICES``, ``_ACT_COUNT_CHOICES`` and ``_FABLE2_MAX_CAST`` are the
 menus whose values this function is the sole interpreter of; leaving them behind
 would have split one contract across two files and forced an import back into
 the writer, which is the cycle this split exists to avoid. Their ORDER and
@@ -65,27 +64,6 @@ log = logging.getLogger("OTR")
 _FABLE2_MAX_CAST = 10
 
 
-# ---------------------------------------------------------------------------
-# Creativity preset maps (lifted verbatim from legacy at
-# _otr_legacy_writer.py:755-768; BUG-014 chaos clamp preserved)
-# ---------------------------------------------------------------------------
-
-_CREATIVITY_TEMP_MAP = {
-    "safe & tight":   0.6,
-    "balanced":       0.85,
-    "wild & rough":   0.92,
-    "maximum chaos":  0.95,  # BUG-014: 1.35 caused total format collapse
-}
-
-_CREATIVITY_TOP_P_MAP = {
-    "safe & tight":   0.9,
-    "balanced":       0.95,
-    "wild & rough":   0.98,
-    "maximum chaos":  0.99,
-}
-
-_CREATIVITY_CHOICES = list(_CREATIVITY_TEMP_MAP.keys())
-
 # BUG-LOCAL-260: operator control for the LEMMY easter-egg cameo. The
 # roll itself is OS-entropy (cast_pools.roll_lemmy, decoupled from the
 # C7 seed); this widget lets the operator override the ~11% chance.
@@ -95,16 +73,6 @@ _LEMMY_CAMEO_FORCE = {
     "always include": True,         # force the cameo into the cast
     "never include": False,         # keep the cameo out of the cast
 }
-
-
-def _resolve_creativity(creativity: str) -> tuple[float, float]:
-    """Map a creativity widget value to (temperature, top_p).
-
-    Unknown values default to balanced (0.85 / 0.95). Returns floats.
-    """
-    temp = _CREATIVITY_TEMP_MAP.get(creativity, _CREATIVITY_TEMP_MAP["balanced"])
-    top_p = _CREATIVITY_TOP_P_MAP.get(creativity, _CREATIVITY_TOP_P_MAP["balanced"])
-    return (float(temp), float(top_p))
 
 
 #: Act count used when the widget value is missing or out of range. Three
@@ -134,7 +102,6 @@ def _resolve_inputs(
     custom_premise: str = "",
     include_act_breaks: bool = True,
     act_count: str = "auto",
-    creativity: str = "balanced",
     optimization_profile: str = "Standard",
     # Phase 4 v4 (2026-05-11) sampling knobs. Tier 2 fix #17
     # defaults flipped to 0.05 / 1.03 (validated improvement over
@@ -271,7 +238,6 @@ def _resolve_inputs(
             _DEFAULT_ACT_COUNT,
         )
         act_count_int = _DEFAULT_ACT_COUNT
-    temperature, top_p = _resolve_creativity(creativity)
     custom = (custom_premise or "").strip()
 
     # kibitz r2-r4: bank-shape dispatch BEFORE the custom check (r3 D7).
@@ -664,9 +630,6 @@ def _resolve_inputs(
         ),
         "include_act_breaks":   bool(include_act_breaks),
         "act_count":            int(act_count_int),
-        "creativity":           str(creativity),
-        "temperature":          float(temperature),
-        "top_p":                float(top_p),
         "optimization_profile": str(optimization_profile),
         # Phase 4 v4 (2026-05-11) sampling knobs. Clamped to widget
         # ranges so a hand-edited workflow JSON can't slip through

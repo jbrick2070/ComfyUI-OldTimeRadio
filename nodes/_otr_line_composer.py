@@ -1062,7 +1062,7 @@ def compose_line_draft(
     creative_fn,
     req: LineRequest,
     max_attempts: int = 2,
-    base_temperature: float = _BASE_TEMPERATURE,
+    base_temperature: float | None = _BASE_TEMPERATURE,
     max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     creative_repo_id: str | None = None,
@@ -1108,10 +1108,18 @@ def compose_line_draft(
     ask = messages
     cooled = False
     for attempt_idx in range(max_attempts):
-        temperature = (
-            _STRUCTURAL_RETRY_TEMPERATURE if cooled
-            else base_temperature + (0.1 * attempt_idx)
-        )
+        if cooled:
+            temperature = _STRUCTURAL_RETRY_TEMPERATURE
+        elif base_temperature is None:
+            # A cloud slot: send no temperature on any attempt, so the
+            # provider applies the model's own default (2026-09-25).
+            temperature = None
+        else:
+            # The bump stops at the model's own baseline or 1.0, whichever is
+            # higher: Gemma samples at 1.0 by default, and +0.1 would retry at
+            # 1.1 -- past the line where scripts collapsed (BUG-014).
+            temperature = min(base_temperature + (0.1 * attempt_idx),
+                              max(base_temperature, 1.0))
         try:
             try:
                 # LLM slot: creative -- one authored character line.
@@ -1161,7 +1169,7 @@ def compose_line(
     creative_fn,
     req: LineRequest,
     max_attempts: int = 2,
-    base_temperature: float = _BASE_TEMPERATURE,
+    base_temperature: float | None = _BASE_TEMPERATURE,
     max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     creative_repo_id: str | None = None,

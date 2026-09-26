@@ -479,11 +479,12 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     if meta.get("slot_transitions") is not None:
         writer_grid.append(("Slot routing:", "%s A<->B transition(s)"
                             % meta.get("slot_transitions")))
-    if gp.get("creativity"):
-        writer_grid.append(("Creativity:", str(gp.get("creativity"))))
-    if gp.get("temperature") is not None or gp.get("top_p") is not None:
-        writer_grid.append(("Temp / top_p:", "%s / %s" % (
-            gp.get("temperature"), gp.get("top_p"))))
+    creative_sampling = (gp.get("sampling") or {}).get("creative")
+    if creative_sampling:
+        # The creative model's own baseline (temperature, top_p, top_k); a
+        # cloud slot stamps None and gets no row (provider default).
+        writer_grid.append(("Sampling:", "temp %s / top_p %s / top_k %s" % tuple(
+            "-" if v is None else v for v in creative_sampling)))
     if gp.get("num_characters") is not None:
         # A first-order dropdown (recipe card): how many characters were asked.
         writer_grid.append(("Characters:", str(gp.get("num_characters"))))

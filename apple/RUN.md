@@ -65,7 +65,6 @@ show, all on the **OTR_LedgerScriptWriter** node unless noted.
 | `custom_premise` | A sentence or two of your own. Blank means the source bank decides. |
 | `source_bank` | Where the story comes from — ships on *roll*, which picks any eligible bank. |
 | `visual_style` | How it looks — ships on *roll*, which picks any of them. |
-| `creativity` | `balanced` by default. |
 | `episode_language` | One switch for writing, Kokoro casting, caption labels/wrapping/fonts, and audience-facing credits. See [MULTILINGUAL.md](MULTILINGUAL.md). |
 | `asset_cleanup` | What to delete from the episode's working folder once it is published. Ships **off**. See [Saving disk space](#saving-disk-space). |
 

@@ -1792,8 +1792,7 @@ def _write_story_treatment(out_path, episode_title, led,
         if _calls:
             W_("  Calls by slot      :  "
                + ", ".join("%s=%s" % (k, v) for k, v in sorted(_calls.items())))
-        W_(f"  Creativity         :  {_g(gp, 'creativity')}")
-        W_(f"  Temperature        :  {_g(gp, 'temperature')}    top_p: {_g(gp, 'top_p')}")
+        W_(f"  Sampling           :  {_g(gp, 'sampling')}")
         W_(f"  Optimization       :  {_g(gp, 'optimization_profile')}")
         W_(f"  Seed source        :  {_g(gp, 'seed_source')}")
         # 2026-08-14: the "Target words" half is gone with the word

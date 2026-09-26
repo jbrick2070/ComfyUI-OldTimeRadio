@@ -126,7 +126,6 @@ def _make_ctx(tmp_path: Path, monkeypatch, **overrides) -> WriterTailContext:
     scheduler = _SlotScheduler(
         creative_id="stub/creative-model",
         technical_id="stub/technical-model",
-        top_p=0.9,
         min_p=0.0,
         repetition_penalty=1.0,
     )

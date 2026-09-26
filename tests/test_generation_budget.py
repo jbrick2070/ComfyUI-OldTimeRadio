@@ -199,8 +199,7 @@ def test_scheduler_fit_includes_schema_and_does_not_count_as_generation(bound, m
     from nodes._otr_generation_budget import ProviderCapacityMessages
     entry, runs, moves, refs, generated = _exact_prompt_entry(monkeypatch)
     monkeypatch.setattr(model_loader, "request_slot", lambda *args, **kwargs: entry)
-    scheduler = writer._SlotScheduler(creative_id="Qwen/Qwen3.5-4B", technical_id="Qwen/Qwen3.5-4B",
-                                      top_p=.92, min_p=0, repetition_penalty=1)
+    scheduler = writer._SlotScheduler(creative_id="Qwen/Qwen3.5-4B", technical_id="Qwen/Qwen3.5-4B", min_p=0, repetition_penalty=1)
     slot = scheduler.for_slot("creative")
     if bound:
         slot = slot._otr_bind_schema(_FitSchema)

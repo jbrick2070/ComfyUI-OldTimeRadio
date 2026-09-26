@@ -970,7 +970,6 @@ CREATIVE_WHITELIST = frozenset({
     "openrouter_slot_a_model", "openrouter_slot_b_model",
     "comfy_slot_a_model", "comfy_slot_b_model",
     "creative_writing_model", "technical_model",
-    "creativity",
     # source_bank (Stage 2C) -- the story-path selector; mirror of the package
     # whitelist. Non-runnable picks still fail LOUD at run().
     "source_bank",

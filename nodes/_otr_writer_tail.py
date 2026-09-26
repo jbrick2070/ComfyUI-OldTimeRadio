@@ -1011,7 +1011,10 @@ class WriterTailMixin:
                 regen_title = _generate_title_from_script(
                     creative_generate_fn,
                     assembled_script,
-                    temperature=resolved["temperature"],
+                    # The creative model's own baseline (None for a cloud
+                    # slot: the provider applies its default).
+                    temperature=(_otr_model_catalog.sampling_baseline(
+                        resolved["creative_writing_model"]) or (None,))[0],
                     premise=outline.premise,
                     arc_verdict="",
                     # QA F1 (2026-07-09): bank-aware framing via banks.json
@@ -1067,9 +1070,18 @@ class WriterTailMixin:
             # explicitly (B3 onward).
             "creative_writing_model": resolved["creative_writing_model"],
             "technical_model":        resolved["technical_model"],
-            "creativity":            resolved["creativity"],
-            "temperature":           resolved["temperature"],
-            "top_p":                 resolved["top_p"],
+            # Each model's own (temperature, top_p, top_k) baseline, or None
+            # for a cloud slot (provider default). Replaced the creativity /
+            # temperature / top_p stamp on 2026-09-25.
+            "sampling": {
+                slot: (list(baseline) if baseline else None)
+                for slot, baseline in (
+                    ("creative", _otr_model_catalog.sampling_baseline(
+                        resolved["creative_writing_model"])),
+                    ("technical", _otr_model_catalog.sampling_baseline(
+                        resolved["technical_model"])),
+                )
+            },
             "act_count":             resolved["act_count"],
             "include_act_breaks":    resolved["include_act_breaks"],
             "optimization_profile":  resolved["optimization_profile"],

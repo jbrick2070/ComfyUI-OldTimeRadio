@@ -23,6 +23,51 @@ Closed receipts used to be a third file, `docs/GO_FORWARD_ARCHIVE.md`. It went
 with the docs/ folder on 2026-09-24 (`git show a0ff6c8c~1:docs/GO_FORWARD_ARCHIVE.md`
 is its last version); closed rows now leave the plan for `apple/HANDOFF_LOG.md`.
 
+## 2026-09-25 -- NO CREATIVITY DIAL: EACH WRITER MODEL SAMPLES AT ITS MAKER'S BASELINE
+
+Operator: "great, null, and let's rip the creativity"; "find the canonical temp
+baseline for each model and that's it"; "remember we have various safetensor
+quants". The `creativity` widget -- four presets mapping to ONE temperature /
+top_p pair for every model -- is gone from `OTR_LedgerScriptWriter`, removed
+with `scripts/otr_widget_surgery.py` (value slot 14, a mid-list COMBO: the
+saved vector is 35 wide, `gate_in` moved to descriptor 29 and its link
+followed by identity; variants regenerated). Measured before the rip:
+`balanced` (0.85 / 0.95) ran Qwen3 hotter and Gemma 4 cooler than their
+makers intend, and Mistral-Nemo at more than double its card's value.
+
+- `_otr_model_catalog.SAMPLING_BASELINES` holds (temperature, top_p, top_k)
+  per CANONICAL model id, from each maker's generation_config.json or model
+  card; `sampling_baseline(model_id)` resolves a quant twin to its base model
+  through the canonical id, never a per-row copy that could drift. A local
+  model with no published baseline (google/gemma-2-2b-it, an uncurated cache
+  find) gets `SAMPLING_FALLBACK` -- the old balanced numbers -- so it still
+  samples: greedy decoding flattens dialogue.
+- A cloud slot returns None: no sampling key is sent and the provider applies
+  the model's own default. All three cloud backends already honour a None
+  temperature.
+- Each slot samples at ITS model's numbers (`_SlotScheduler.sampling_for`);
+  the widget-set `min_p` and `repetition_penalty` still apply on top. top_k is
+  new wiring. Qwen's card `presence_penalty` is recorded in a comment, not
+  applied: transformers generate() rejects unknown kwargs.
+- The dialogue retry bump (+0.1 per attempt) is capped at max(base, 1.0):
+  Gemma at 1.0 would otherwise retry at 1.1, past the BUG-014 collapse line.
+- The ledger stamps `meta.gen_params_initial.sampling` = the creative and
+  technical baselines in place of creativity / temperature / top_p; the
+  credits roll and the treatment report print that.
+
+| catalog row | temperature / top_p / top_k | source |
+|---|---|---|
+| Qwen/Qwen3.5-4B (default) | 0.7 / 0.8 / 20 | model card, instruct general (no generation_config: 404); card also lists presence_penalty 1.5 |
+| Qwen/Qwen3.8-27B | 1.0 / 0.95 / 20 | generation_config.json |
+| google/gemma-4-E2B-it, E4B-it, 12b-it | 1.0 / 0.95 / 64 | generation_config.json |
+| unsloth/Llama-3.2-3B-Instruct | 0.6 / 0.9 / - | generation_config.json |
+| mistralai/Mistral-Nemo-Instruct-2407 | 0.35 / - / - | model card examples (generation_config has no sampling keys) |
+| google/gemma-2-2b-it | none published | SAMPLING_FALLBACK 0.85 / 0.95 |
+| openrouter / comfy / google_api slots | none | no keys sent; provider default |
+
+Coverage: `tests/test_model_sampling_baseline.py`, which calls the real
+functions (the catalog resolver, the scheduler, the retry loop).
+
 ## 2026-09-25 -- MOVED FROM THE PLAN: "already scoped" and the plan's constraints
 
 The plan holds only unfinished work (its first rule); these two sections are

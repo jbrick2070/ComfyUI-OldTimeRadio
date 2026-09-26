@@ -835,10 +835,6 @@ CREATIVE_WHITELIST = frozenset({
     "openrouter_slot_a_model", "openrouter_slot_b_model",
     "comfy_slot_a_model", "comfy_slot_b_model",
     "creative_writing_model", "technical_model",
-    # creativity is a pure CREATIVE dial (temperature/top_p preset on node 1), not an
-    # engine/feature widget -- safe to set directly from a soak (apply_profile never
-    # manages it). Lets OTR_COMBO_CREATIVITY=maximum chaos reach the writer.
-    "creativity",
     # source_bank (Stage 2C multi-modal story schema) is the story-path
     # selector on node 1 -- a pure creative/content dial; apply_profile never
     # manages it. Headless drivers may set it; a non-runnable pick still

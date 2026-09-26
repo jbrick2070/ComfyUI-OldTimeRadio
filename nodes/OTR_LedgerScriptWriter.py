@@ -14,12 +14,14 @@ Pipeline (unchanged from v2.0 LPL):
          target_length presets ("30 words", "tiny"). Words are the
          single canonical length unit for story writing; seconds is
          only computed post-hoc for the est_minutes output socket.
-       - creativity → (temperature, top_p) preset map.
+       - sampling: each model's own baseline (_otr_model_catalog.
+         sampling_baseline); no creativity dial since 2026-09-25.
     3. Load LLM via _otr_model_loader.
     4. generate_outline (validated against OutlineSchema).
     5. new_ledger + episode_canon + set_cast.
     6. Per-beat loop:
-         - character / announcer → compose_line (uses creativity temp/top_p)
+         - character / announcer → compose_line (the creative model's own
+           baseline temperature)
          - non-voiced (music_*)  → render-contract rows, text stays empty
     7. set_lines + speaker_role post-patch.
     8. Post-composition title regen (Jeffrey 2026-05-10): when the user
@@ -51,7 +53,7 @@ Pipeline (unchanged from v2.0 LPL):
        guardrails. canon.title is updated and episode_canon.json is
        written here (deferred from step 5 specifically for this).
     9. Stamp meta block (gen_params_initial, episode_title, title_source,
-       creativity, optimization_profile).
+       optimization_profile).
    10. Save ledger.
 
 Output contract:
@@ -78,7 +80,6 @@ Widget surface (current as of 2026-05-23):
                                     beats between acts; False -> continuous)
         act_count         combo   ('1'-'7' -- THE one length-shaped knob;
                                    always honoured, never derived)
-        creativity        combo   (maps to temperature + top_p preset)
         min_p             FLOAT   (sampling tail cut; 0.0 disables)
         repetition_penalty FLOAT  (anti-loop penalty; 1.0 disables)
         max_new_tokens_cap INT    (per-line composer token ceiling)
@@ -225,15 +226,11 @@ from ._otr_structured_call import StructuredCallFailedError
 # this module -- which is what makes the split legal at all.
 from ._otr_writer_inputs import (  # noqa: F401 -- re-exported for callers/tests
     _ACT_COUNT_CHOICES,
-    _CREATIVITY_CHOICES,
-    _CREATIVITY_TEMP_MAP,
-    _CREATIVITY_TOP_P_MAP,
     _DEFAULT_ACT_COUNT,
     _FABLE2_MAX_CAST,
     _LEMMY_CAMEO_CHOICES,
     _LEMMY_CAMEO_FORCE,
     _bank_has_no_source_contract,
-    _resolve_creativity,
     _resolve_inputs,
 )
 
@@ -570,7 +567,6 @@ class _SlotScheduler:
         *,
         creative_id: str,
         technical_id: str,
-        top_p: float,
         min_p: float,
         repetition_penalty: float,
         policy: Any = None,
@@ -584,7 +580,6 @@ class _SlotScheduler:
         # by request_slot itself).
         self.policy = policy
         self.sampling = {
-            "top_p": float(top_p),
             "min_p": float(min_p or 0.0),
             "repetition_penalty": float(repetition_penalty or 1.0),
         }
@@ -754,6 +749,15 @@ class _SlotScheduler:
             "_otr_response_format": None,
         }
 
+    def sampling_for(self, slot: str) -> dict:
+        """The sampling knobs for `slot`: its OWN model's top_p / top_k
+        (`_otr_model_catalog.sampling_baseline`), plus the widget-set min_p and
+        repetition_penalty. The two slots can hold different models, so the
+        baseline is per slot, never one number for the episode."""
+        baseline = _otr_model_catalog.sampling_baseline(self.ids[slot])
+        top_p, top_k = (baseline[1], baseline[2]) if baseline else (None, None)
+        return {**self.sampling, "top_p": top_p, "top_k": top_k}
+
     def for_slot(self, slot: str):
         """Return a generate_fn closure that targets `slot`. Each call
         ensures the right model is resident before generation fires."""
@@ -776,7 +780,7 @@ class _SlotScheduler:
                 base = _build_truncating_generate_fn(
                     cache_entry,
                     schema_model=schema_model,
-                    **scheduler.sampling,
+                    **scheduler.sampling_for(slot),
                 )
                 kwargs = {
                     "temperature": temperature,
@@ -817,10 +821,11 @@ class _SlotScheduler:
 def _build_truncating_generate_fn(
     cache_entry: dict,
     *,
-    top_p: float = 0.92,
+    top_p: float | None = 0.92,
     min_p: float = 0.0,
     repetition_penalty: float = 1.0,
     schema_model: Any = None,
+    top_k: int | None = None,
 ):
     """Return a generate_fn that NEVER truncates a prompt.
 
@@ -831,8 +836,10 @@ def _build_truncating_generate_fn(
     for an artifact raises ``PromptContextOverflowError`` instead of quietly
     losing its system/schema prefix.
 
-    Closure captures the episode-level sampling knobs from the
-    writer widgets: top_p, min_p, repetition_penalty. The per-call
+    Closure captures the sampling knobs: top_p and top_k come from the
+    model's own baseline (`_otr_model_catalog.sampling_baseline`, 2026-09-25;
+    None = the maker publishes none, so the key is not sent), min_p and
+    repetition_penalty from the writer widgets. The per-call
     args (`temperature`, `max_new_tokens`, optional `stop`) are
     whatever the line composer / outline / picker passes.
 
@@ -875,7 +882,8 @@ def _build_truncating_generate_fn(
         return _gai_llm.make_google_api_generate_fn(cache_entry)
     model = cache_entry["model"]
     tokenizer = cache_entry["tokenizer"]
-    active_top_p = float(top_p)
+    active_top_p = None if top_p is None else float(top_p)
+    active_top_k = None if top_k is None else int(top_k)
     active_min_p = float(min_p or 0.0)
     active_rep_penalty = float(repetition_penalty or 1.0)
     # Tier 1 fix #8 (2026-05-11): one-shot warning + auto-fallback
@@ -959,7 +967,6 @@ def _build_truncating_generate_fn(
         gen_kwargs = {
             "do_sample": True,
             "temperature": float(temperature),
-            "top_p": active_top_p,
             "max_new_tokens": effective_max_new_tokens,
             "pad_token_id": prepared["pad_token_id"],
             "eos_token_id": prepared["eos_token_ids"] or None,
@@ -967,6 +974,10 @@ def _build_truncating_generate_fn(
         # Only forward non-default values so older transformers
         # versions that don't accept `min_p` as a kwarg keep working
         # silently when the widget is at its disabled default.
+        if active_top_p is not None:
+            gen_kwargs["top_p"] = active_top_p
+        if active_top_k is not None:
+            gen_kwargs["top_k"] = active_top_k
         if active_min_p > 0.0 and not _min_p_unsupported[0]:
             gen_kwargs["min_p"] = active_min_p
         if active_rep_penalty != 1.0:
@@ -2106,7 +2117,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
     _otr_line_composer, _otr_model_loader) plus production_ledger
     into the legacy 4-slot output contract. Widget set restored 2026-05-10
     so users get back episode_title / target_words / num_characters /
-    creativity / target_length / model controls. Style is no longer a
+    target_length / model controls. Style is no longer a
     widget -- it comes from the single deterministic engine call
     (style-engine consolidation, 2026-07-05).
     """
@@ -2474,19 +2485,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # is a UI command, not a registry row -- no new widget, no
                 # positional slot shift, and ZERO canonical-JSON diff (a
                 # graph persists the selected VALUE, never the choice list).
-                "creativity": (_CREATIVITY_CHOICES, {
-                    "default": "balanced",
-                    "tooltip": (
-                        "Creativity dial — overrides raw temperature "
-                        "+ top_p with curated presets:\n"
-                        "  safe & tight   -> temp 0.60, top_p 0.90\n"
-                        "  balanced       -> temp 0.85, top_p 0.95\n"
-                        "  wild & rough   -> temp 0.92, top_p 0.98\n"
-                        "  maximum chaos  -> temp 0.95, top_p 0.99\n"
-                        "(BUG-014: temp > 1.0 caused format collapse, "
-                        "so 'maximum chaos' caps at 0.95.)"
-                    ),
-                }),
                 # `perfect_run_spacesaver` stood here until 2026-09-13. It was
                 # a no-op from 2026-08-08 (its consumer,
                 # `_spacesaver_cleanup_if_flagged`, went with the retired
@@ -2514,9 +2512,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "#17 (2026-05-11) flipped this from 0.0 — "
                         "preserving an unvalidated baseline is not "
                         "preservation. 0.0 = disabled.\n\n"
-                        "Aggressive: 0.10. Pairs with the existing "
-                        "creativity top_p — when both are active the "
-                        "tail cut is the union."
+                        "Aggressive: 0.10. Pairs with the model's own "
+                        "top_p — when both are active the tail cut is "
+                        "the union."
                     ),
                 }),
                 "repetition_penalty": ("FLOAT", {
@@ -3035,7 +3033,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         custom_premise="",
         include_act_breaks=True,
         act_count=0,
-        creativity="balanced",
         optimization_profile="Standard",
         # Phase 4 v4 (2026-05-11) sampling knobs appended at end.
         # Tier 2 fix #17 (2026-05-11): min_p / repetition_penalty
@@ -3474,7 +3471,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             custom_premise=custom_premise,
             include_act_breaks=include_act_breaks,
             act_count=act_count,
-            creativity=creativity,
             optimization_profile=optimization_profile,
             # Phase 4 v4 (2026-05-11) sampling knobs.
             min_p=min_p,
@@ -3524,14 +3520,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         log.info(
             "[OTR_LedgerScriptWriter] start: creative_model=%r, "
             "technical_model=%r, act_count=%d, num_characters=%d, "
-            "creativity=%r (temp=%.2f top_p=%.2f), seed_source=%s, "
-            "episode_title=%r",
+            "sampling=creative %r / technical %r (model baselines), "
+            "seed_source=%s, episode_title=%r",
             resolved["creative_writing_model"],
             resolved["technical_model"],
             resolved["act_count"],
             resolved["num_characters"],
-            resolved["creativity"],
-            resolved["temperature"], resolved["top_p"],
+            _otr_model_catalog.sampling_baseline(resolved["creative_writing_model"]),
+            _otr_model_catalog.sampling_baseline(resolved["technical_model"]),
             resolved["seed_source"], resolved["episode_title"],
         )
 
@@ -3591,7 +3587,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         slot_scheduler = _SlotScheduler(
             creative_id=resolved["creative_writing_model"],
             technical_id=resolved["technical_model"],
-            top_p=resolved["top_p"],
             # Phase 4 v4 (2026-05-11) sampling knobs.
             min_p=resolved["min_p"],
             repetition_penalty=resolved["repetition_penalty"],
@@ -5287,7 +5282,12 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # `assemble_script_text_from_ledger`, which reads the saved ledger.
         last_lines: list = []  # rolling window of LAST_LINES_WINDOW
 
-        base_temp = resolved["temperature"]
+        # The creative model's OWN baseline temperature (2026-09-25; the
+        # creativity dial is gone). None for a cloud slot: every attempt then
+        # sends no temperature and the provider applies the model's default.
+        _creative_baseline = _otr_model_catalog.sampling_baseline(
+            resolved["creative_writing_model"])
+        base_temp = _creative_baseline[0] if _creative_baseline else None
 
         # Phase 1 (2026-05-11): build outline_spine + voice_card map
         # ONCE. Both are stable across every composer call in the

@@ -58,7 +58,7 @@ class TestWidgetSurface:
         declared order, recorded in tests/test_openrouter_slot_widgets_s2.py::
         _EXPECTED_INPUT_ORDER) moved it out of that leading spot and into the
         "How does it read?" thematic group instead: it now sits right after
-        `lemmy_cameo` and leads `creativity`, `min_p`, `repetition_penalty`,
+        `lemmy_cameo` and leads `min_p`, `repetition_penalty`,
         `max_new_tokens_cap`, immediately followed by `creative_writing_model`
         (the start of the "Which brain writes it?" group). The claim this
         test makes is unchanged in kind -- that the toggle and the widgets
@@ -70,7 +70,6 @@ class TestWidgetSurface:
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
         assert_relative_order(order, [
             "story_scaffold",
-            "creativity",
             "min_p",
             "repetition_penalty",
             "max_new_tokens_cap",

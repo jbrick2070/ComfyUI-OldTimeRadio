@@ -408,7 +408,6 @@
       "custom_premise",
       "include_act_breaks",
       "act_count",
-      "creativity",
       "min_p",
       "repetition_penalty",
       "max_new_tokens_cap",

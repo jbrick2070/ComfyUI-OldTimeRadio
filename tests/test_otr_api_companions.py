@@ -200,6 +200,12 @@ def _writer_schemas_s5() -> dict:
     # it, because the frozen synthetic double below is testing the by-name
     # patch mechanism against a fixed shape, not against the live writer.
     required.pop("perfect_run_spacesaver", None)
+    # 2026-09-25: `creativity` was deleted from the live node -- each writer
+    # model samples at its maker's own baseline now, so the episode-wide
+    # preset dial had nothing left to set. ONLY this helper drops it; the
+    # frozen synthetic double keeps its `creativity` COMBO as one of its
+    # fixed 28 shapes, exactly as it kept `target_words`.
+    required.pop("creativity", None)
     required["llm_device"] = (
         ["cuda", "cpu", "mps"], {"default": "cuda"},
     )
@@ -564,7 +570,7 @@ def test_round_trip_canonical_node1_inputs_correct():
     # moved 31 -> 30 with the gate_in socket.
     # 36 since 2026-09-25: `asset_cleanup` (row 0b) appended as the trailing
     # widget, after episode_language and before the gate_in socket.
-    assert len(dump) == 36, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 35, f"node 1 widgets_values length drift: {len(dump)}"
     # creative/technical shifted 3/4 -> 2/3 when slot 1 was removed.
     expected_creative = dump[2]
     expected_technical = dump[3]

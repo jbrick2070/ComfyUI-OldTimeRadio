@@ -317,7 +317,6 @@ def _scheduler():
     return _SlotScheduler(
         creative_id="creative/model",
         technical_id="technical/model",
-        top_p=0.92,
         min_p=0.0,
         repetition_penalty=1.0,
     )

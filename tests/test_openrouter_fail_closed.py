@@ -252,8 +252,7 @@ def test_json_object_is_never_forced_on_the_local_transformers_lane(monkeypatch)
     )
     sched = _SlotScheduler(
         creative_id="mistralai/Mistral-Nemo-Instruct-2407",
-        technical_id="mistralai/Mistral-Nemo-Instruct-2407",
-        top_p=0.92, min_p=0.0, repetition_penalty=1.0,
+        technical_id="mistralai/Mistral-Nemo-Instruct-2407", min_p=0.0, repetition_penalty=1.0,
     )
     fn = sched.for_slot("technical")
     assert getattr(fn, "_otr_supports_json_object", False) is False, (

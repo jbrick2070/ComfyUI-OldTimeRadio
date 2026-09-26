@@ -621,6 +621,49 @@ def _canonical_qwen_id(model_id: str) -> str:
     return bare
 
 
+#: EACH LOCAL WRITER MODEL SAMPLES AT ITS MAKER'S OWN BASELINE (operator
+#: 2026-09-25: "find the canonical temp baseline for each model and that's
+#: it"). Replaces the creativity dial, which applied ONE preset map to every
+#: model -- measured that day, it ran Qwen3 hotter and Gemma 4 cooler than
+#: their makers intend, and Mistral-Nemo at more than double its card's value.
+#: (temperature, top_p, top_k); None means "the maker publishes none, do not
+#: send the key". Keyed by the CANONICAL id, so a quant twin row resolves to
+#: its base model through `_canonical_qwen_id` / `hf_weights_id` instead of
+#: carrying a copy that could drift. presence_penalty (Qwen's card) is not a
+#: transformers generate() argument and is recorded here in the comment only.
+SAMPLING_BASELINES = {
+    # model card, instruct (non-thinking) general; the repo has no
+    # generation_config.json. Card also lists presence_penalty 1.5.
+    "Qwen/Qwen3.5-4B": (0.7, 0.8, 20),
+    "Qwen/Qwen3.8-27B": (1.0, 0.95, 20),             # generation_config.json
+    "google/gemma-4-E2B-it": (1.0, 0.95, 64),        # generation_config.json
+    "google/gemma-4-E4B-it": (1.0, 0.95, 64),        # generation_config.json
+    "google/gemma-4-12b-it": (1.0, 0.95, 64),        # generation_config.json
+    "unsloth/Llama-3.2-3B-Instruct": (0.6, 0.9, None),  # generation_config.json
+    # generation_config.json has no sampling keys; the card's own examples use
+    # temperature 0.35.
+    "mistralai/Mistral-Nemo-Instruct-2407": (0.35, None, None),
+}
+
+#: A local model with no published baseline (google/gemma-2-2b-it, or a model
+#: found in the cache that the catalog does not curate). The old "balanced"
+#: preset, so it still SAMPLES: a model left greedy flattens dialogue.
+SAMPLING_FALLBACK = (0.85, 0.95, None)
+
+
+def sampling_baseline(model_id: str):
+    """``(temperature, top_p, top_k)`` for a LOCAL writer model, or ``None``
+    for a cloud slot, whose provider applies the model's own default when no
+    sampling key is sent."""
+    bare = _canonical_qwen_id(model_id) if isinstance(model_id, str) else ""
+    row = _by_repo_id().get(bare)
+    if row is not None and getattr(row, "provider", "local") != "local":
+        return None
+    return (SAMPLING_BASELINES.get(bare)
+            or SAMPLING_BASELINES.get(hf_weights_id(bare))
+            or SAMPLING_FALLBACK)
+
+
 def hf_weights_id(model_id: str) -> str:
     """The Hugging Face repo that actually holds this pick's snapshot."""
     if not isinstance(model_id, str) or not model_id.strip():

@@ -63,7 +63,10 @@ def _led():
             "gen_params_initial": {
                 "creative_writing_model": "mistralai/Mistral-Nemo-Instruct-2407",
                 "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
-                "creativity": "balanced", "temperature": 0.85, "top_p": 0.95,
+                # Each slot's model baseline (temperature, top_p, top_k), the
+                # stamp that replaced creativity/temperature/top_p 2026-09-25.
+                "sampling": {"creative": [0.85, 0.95, None],
+                             "technical": [0.85, 0.95, None]},
                 "target_words": 120, "seed_source": "os-entropy",
             },
             "slot_transitions": 0,

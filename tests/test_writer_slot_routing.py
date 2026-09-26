@@ -186,7 +186,6 @@ def _patched_scheduler(monkeypatch, *, creative_id, technical_id):
     scheduler = W._SlotScheduler(
         creative_id=creative_id,
         technical_id=technical_id,
-        top_p=0.95,
         min_p=0.05,
         repetition_penalty=1.03,
     )
@@ -225,7 +224,6 @@ def test_scheduler_declares_catalog_local_schema_binding(monkeypatch):
     scheduler = W._SlotScheduler(
         creative_id=local_id,
         technical_id=local_id,
-        top_p=.92,
         min_p=0.0,
         repetition_penalty=1.0,
     )
@@ -262,7 +260,6 @@ def test_scheduler_local_schema_binding_reaches_truncating_generator(monkeypatch
     scheduler = W._SlotScheduler(
         creative_id=local_id,
         technical_id=local_id,
-        top_p=.87,
         min_p=.04,
         repetition_penalty=1.03,
     )
@@ -273,9 +270,13 @@ def test_scheduler_local_schema_binding_reaches_truncating_generator(monkeypatch
 
     bound = plain._otr_bind_schema(ExactSchema)  # type: ignore[attr-defined]
     assert bound([], temperature=.2, max_new_tokens=77) == 77
+    # top_p / top_k are the slot model's OWN baseline (2026-09-25), read
+    # through the catalog rather than an episode-wide creativity preset.
+    baseline = W._otr_model_catalog.sampling_baseline(local_id)
     assert seen == {
         "schema_model": ExactSchema,
-        "top_p": .87,
+        "top_p": baseline[1],
+        "top_k": baseline[2],
         "min_p": .04,
         "repetition_penalty": 1.03,
     }

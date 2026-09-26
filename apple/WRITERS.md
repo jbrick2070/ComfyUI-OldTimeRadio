@@ -153,19 +153,15 @@ tuned, and the honest advice is to leave them alone.
 | `repetition_penalty` | 1.03 | 1.0 - 1.2 | Stops a small model looping on a character's name. 1.0 turns it off. Above 1.08 commonly makes short lines worse, not better. |
 | `max_new_tokens_cap` | 200 | 40 - 400 | How much the model may write per line before it is cut off. A budget, not a length target -- raising it does not make the episode longer. |
 
-**If you want to change how the show reads, use `creativity` instead.** It is
-the dial that was built for this, and it moves temperature and top_p together
-to settings that are known to hold together:
-
-| `creativity` | Result |
-|---|---|
-| `safe & tight` | Predictable, on the nose |
-| `balanced` | The default |
-| `wild & rough` | Looser |
-| `maximum chaos` | As loose as it goes without the script falling apart |
-
-The cap on `maximum chaos` is not shyness. Past it the model stops producing
-usable script format at all.
+**There is no creativity dial (removed 2026-09-25).** Each writer model
+samples at the settings its own maker publishes -- temperature, top_p and
+top_k from the model's generation_config or model card -- and a cloud model
+runs at its provider's default. One preset map for every model had Qwen3
+running hotter and Gemma 4 cooler than their makers intend, and
+Mistral-Nemo at more than double its card's value. If you want the show to
+read differently, pick a different writer model; the sampling follows the
+pick. The per-model table lives in `OTR_STANDING_RULINGS.md` under "NO
+CREATIVITY DIAL".
 
 ---
 

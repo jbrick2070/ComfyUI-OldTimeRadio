@@ -59,7 +59,7 @@ _EXPECTED_INPUT_ORDER = [
     # How big, and who is in it?
     "act_count", "include_act_breaks", "num_characters", "lemmy_cameo",
     # How does it read?
-    "story_scaffold", "creativity",
+    "story_scaffold",
     "min_p", "repetition_penalty", "max_new_tokens_cap",
     # Which brain writes it?
     "creative_writing_model", "technical_model",
@@ -139,8 +139,8 @@ def test_widget_order_appends_slots_at_end():
     # The socket, called out separately because it is the one entry here that
     # is NOT a widget and does NOT consume a saved value slot.
     widgets = [n for n in order if n != "gate_in"]
-    assert len(widgets) == 36, (
-        "the writer should declare 36 widgets plus the gate_in socket; got %d"
+    assert len(widgets) == 35, (
+        "the writer should declare 35 widgets plus the gate_in socket; got %d"
         % len(widgets))
 
 

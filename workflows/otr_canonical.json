@@ -252,16 +252,6 @@
           "link": null
         },
         {
-          "localized_name": "creativity",
-          "name": "creativity",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "creativity"
-          },
-          "link": null
-        },
-        {
           "localized_name": "min_p",
           "name": "min_p",
           "shape": 7,
@@ -546,7 +536,6 @@
         2,
         "roll (~11% chance)",
         "auto",
-        "balanced",
         0.05,
         1.03,
         200,
@@ -2967,7 +2956,7 @@
       63,
       0,
       1,
-      30,
+      29,
       "STRING"
     ],
     [

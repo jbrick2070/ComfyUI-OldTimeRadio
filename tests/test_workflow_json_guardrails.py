@@ -620,7 +620,6 @@ class TestWriterB2aSurface:
         #   4  custom_premise             ""
         #   5  include_act_breaks         True
         #   6  act_count                  "1"
-        #   7  creativity                 "balanced"
         #   8  perfect_run_spacesaver     False
         #   9  min_p                      0.05
         #  10  repetition_penalty         1.03
@@ -711,9 +710,16 @@ class TestWriterB2aSurface:
         # widget, taking the vector 35 -> 36. Declared after
         # `episode_language` and before the `gate_in` forceInput, so it lands
         # last and no earlier index and no link dst_slot moved. It ships off.
-        assert len(wv) == 36, (
-            f"writer widgets_values length drift: {len(wv)} (expected 36 "
-            f"after the 2026-09-25 append of asset_cleanup; every earlier "
+        #
+        # 2026-09-25, later the same day: `creativity` (value slot 14, a
+        # MID-LIST COMBO) was REMOVED with scripts/otr_widget_surgery.py,
+        # taking the vector 36 -> 35. Each writer model samples at its maker's
+        # own baseline now (_otr_model_catalog.sampling_baseline). Every
+        # descriptor after it moved up one, so `gate_in` went 30 -> 29 and the
+        # one link past it followed by identity.
+        assert len(wv) == 35, (
+            f"writer widgets_values length drift: {len(wv)} (expected 35 "
+            f"after the 2026-09-25 removal of creativity; every earlier "
             f"count is recorded in the history above)"
         )
         assert wv[slot('asset_cleanup')] == "off (keep everything)", (
@@ -863,9 +869,6 @@ class TestWriterB2aSurface:
         assert isinstance(wv[slot('technical_model')], str) and wv[slot('technical_model')], (
             f"technical_model widget value not a non-empty string: "
             f"{wv[slot('technical_model')]!r}"
-        )
-        assert wv[slot('creativity')] == "balanced", (
-            f"creativity widget drifted: {wv[slot('creativity')]!r}"
         )
         # `perfect_run_spacesaver` was pinned here until 2026-09-13, when the
         # widget was removed outright -- inert since 2026-08-08, and held in

@@ -14,8 +14,7 @@ from tests.test_openrouter_model_gone import enabled_env, _reset, _row, _ok, _go
 
 
 def scheduler():
-    return writer._SlotScheduler(creative_id="configured/creative", technical_id="configured/technical",
-                                 top_p=.9, min_p=0, repetition_penalty=1)
+    return writer._SlotScheduler(creative_id="configured/creative", technical_id="configured/technical", min_p=0, repetition_penalty=1)
 
 
 def invoke(sched, helper="compose_line", slot="creative"):
