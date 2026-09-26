@@ -42,7 +42,7 @@ is a good answer on every one of those machines, AMD included.
 The 16 GB+
 NVIDIA workflows -- the pack's flagship tier -- ship the bigger `gemma-4-12b-it`
 instead; leaving those two slots alone is still a good answer there, but it
-means a roughly 24 GB download the first time you Queue, not the 8.7 GB one
+means a roughly 24 GB download the first time you press Run, not the 8.7 GB one
 described below. That 12B identity is NF4 baked into `google/gemma-4-12b-it`
 -- there is no other 12B variant and no second Quant knob. It is the only
 Gemma 4 12B in the catalog and in every shipping workflow that uses it. Mac and
@@ -129,7 +129,7 @@ with and what every episode published on an M4 used.
 ## What downloads, and when
 
 Nothing downloads when you pick a model. It downloads the first time you press
-Queue with that model selected, and never again. The console says so:
+Run with that model selected, and never again. The console says so:
 
 ```
 [OTR] Downloading Qwen/Qwen3.5-4B -- 8.7 GB -> ... (first run only)
@@ -212,7 +212,7 @@ The pre-set AMD, Mac and CPU workflows already ship with that policy set to `non
 so this only comes up if you changed it or built a workflow yourself.
 
 **"InsufficientDiskSpaceError".** Exactly what it says, with the arithmetic
-shown. Free up space and Queue again.
+shown. Free up space and press Run again.
 
 **The first run sits for a long time with no error.** It is downloading. Read
 the console for the `[OTR] Downloading` line and its size.

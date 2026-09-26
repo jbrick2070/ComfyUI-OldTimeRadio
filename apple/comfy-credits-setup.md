@@ -32,8 +32,9 @@ queue's Comfy API key is the whole switch.
    **Headless (no app sign-in):** put the key in `OTR_COMFY_API_KEY` in the
    environment of the machine that *submits* the prompt and submit through
    `scripts/otr_api.py`. The submitter sends it as
-   `extra_data.api_key_comfy_org` and ComfyUI injects it into every node
-   exactly as the app's sign-in would. The ComfyUI server itself never reads
+   `extra_data.api_key_comfy_org` and ComfyUI hands it to the workflow's
+   **0 - Comfy Credential** node exactly as the app's sign-in would; that node
+   passes it to the rest and never lets it reach an error report. The ComfyUI server itself never reads
    that variable.
 2. On the **1. Story Writer** node, two pickers are always present:
    `comfy_slot_a_model` (creative) and `comfy_slot_b_model` (technical). Pick a

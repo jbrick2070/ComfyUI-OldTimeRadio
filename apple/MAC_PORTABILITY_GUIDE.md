@@ -72,7 +72,7 @@ What that table does NOT say is just as load-bearing:
 ## 1. Press Run -- the zero-download path
 
 Install the pack, load `otr_canonical` from
-**Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio**, press Run.
+**Workflow > Browse Templates > Extensions > Old-Time Radio**, press Run.
 
 The shipped Mac graph is the `otr_mac16_low` row of
 `config/workflow_matrix.json`: writer on Metal, Kokoro voices, Stable
@@ -1006,7 +1006,7 @@ not all the same one:
 
 | lane | credential it actually measures |
 | --- | --- |
-| every `cloud_*` row, `elevenlabs`, `sonilo` | Comfy Cloud -- the queue's `api_key_comfy_org` hidden input: a **signed-in ComfyUI session**, or `OTR_COMFY_API_KEY` in the environment of a headless *submitter* running `scripts/otr_api.py` (the server never reads it) |
+| every `cloud_*` row, `elevenlabs`, `sonilo` | Comfy Cloud -- the queue's `api_key_comfy_org`, received by the **0 - Comfy Credential** node: a **signed-in ComfyUI session**, or `OTR_COMFY_API_KEY` in the environment of a headless *submitter* running `scripts/otr_api.py` (the server never reads it) |
 | `google_omni_video`, `google_veo_video`, `google_image`, `google_tts`, `google_lyria` | a direct BYO Google API key -- these do not touch Comfy Cloud at all |
 
 The compliance matrix's "Cloud lanes" section records exactly how far this was

@@ -482,15 +482,15 @@ if _otr_dup is None:
 # contradicted the README besides: the canonical resolves the device at run
 # time and every dropdown already holds a working value. Say what the README
 # says, or say nothing.
-# The gallery names its EXTENSIONS entry after this pack's FOLDER (ComfyUI's
-# custom_node_manager keys on the directory that holds workflows/), so it reads
-# comfyui-old-time-radio on a Manager install and ComfyUI-OldTimeRadio on a git
-# clone. Print the one this install will actually show.
-_pack_folder = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
+# The gallery keys its Extensions entry on this pack's FOLDER (ComfyUI's
+# custom_node_manager keys on the directory that holds workflows/), and
+# locales/en/main.json maps BOTH folder names -- comfyui-old-time-radio from the
+# Manager, ComfyUI-OldTimeRadio from a git clone -- to "Old-Time Radio", which
+# is what the frontend shows (seen live on 1.52.7, 2026-09-26).
 if _otr_dup is None:
     print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "
-          f"EXTENSIONS > {_pack_folder} > otr_canonical  (runs on any "
-          "machine -- pick it, then Queue Prompt; the other entries there are "
+          "Extensions > Old-Time Radio > otr_canonical  (runs on any "
+          "machine -- pick it, then press Run; the other entries there are "
           "the same show preset for a specific card, listed in "
           "apple/MACHINES.md) -- or drag workflows/otr_canonical.json onto the "
           "canvas. Nothing needs changing: it resolves your device at run "

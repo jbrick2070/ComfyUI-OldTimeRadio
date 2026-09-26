@@ -2,7 +2,7 @@
 
 **You do not need this file.** The install path in the README is the normal one
 and most people should just follow it: install from Extensions -> Node Manager, put
-ffmpeg on PATH, restart, open the template, press Queue. This page exists for
+ffmpeg on PATH, restart, open the template, press Run. This page exists for
 people who would rather hand the job to Claude Code, Codex, Cursor, Gemini CLI,
 Copilot or any other agent with a terminal -- and for the agent itself, which is
 the real audience below.
@@ -152,11 +152,10 @@ Select-String -Pattern OldTimeRadio <comfyui console log>    # Windows PowerShel
 
 ### Run one episode
 
-**Workflow -> Browse Templates -> EXTENSIONS -> comfyui-old-time-radio.** The
-entry is named after the pack's folder, so on a git clone it reads
-`ComfyUI-OldTimeRadio`; the console banner prints the exact name at boot. Open
+**Workflow -> Browse Templates -> Extensions -> Old-Time Radio.** The entry
+reads the same whether the pack came from the Manager or a git clone. Open
 `otr_canonical` (the other entries are per-machine presets; do not pick one for
-the user) and press **Queue**. Change
+the user) and press **Run**. Change
 nothing: every dropdown already holds a working value.
 
 `act_count` on **OTR_LedgerScriptWriter** already ships at `1` in

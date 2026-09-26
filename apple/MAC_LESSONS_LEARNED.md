@@ -181,7 +181,7 @@ Neither is a functional fault. Both should be reworded to name the actual device
    repaired, Queue Prompt still ran the *previous* graph's widget values
    (`gemma-4-E2B-it` + NF4 + `viz_green`) because the frontend keeps the loaded
    graph. Always re-load from
-   `Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio >
+   `Workflow > Browse Templates > Extensions > Old-Time Radio >
    otr_canonical` rather than reusing the canvas.
 4. **The template gallery is behind a button named "Extensions", not "Manager".**
    ComfyUI 0.34.6 has no button labelled "Manager" anywhere; it opens a panel

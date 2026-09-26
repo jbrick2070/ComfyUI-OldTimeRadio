@@ -158,7 +158,7 @@ you need with ComfyUI's own Python:
 **Nothing by hand.** There is no setup script to run and no model to place
 yourself. Almost everything arrives the first time you queue: the one exception
 is the Kokoro voice set, which the pack fetches at STARTUP so the default voice
-is ready before you ever press Queue -- a few hundred MB on Python 3.13, where
+is ready before you ever press Run -- a few hundred MB on Python 3.13, where
 it also brings the ONNX model. If the console pauses on `[OldTimeRadio]` lines
 during a restart, that is what it is doing.
 

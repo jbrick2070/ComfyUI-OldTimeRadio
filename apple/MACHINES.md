@@ -10,7 +10,7 @@ Three questions, in the order people ask them.
 
 | Your machine | Open this | Also install |
 |---|---|---|
-| Anything, to start | `workflows/otr_canonical.json` (Workflow &rarr; Browse Templates &rarr; EXTENSIONS &rarr; comfyui-old-time-radio) | nothing |
+| Anything, to start | `workflows/otr_canonical.json` (Workflow &rarr; Browse Templates &rarr; Extensions &rarr; Old-Time Radio) | nothing |
 | 8 GB NVIDIA -- RTX 4060 / 3070 / 2080 class | `workflows/otr_8gb_video.json` | nothing |
 | 16 GB+ NVIDIA -- RTX 5080 / 4080 / 3090 class | `workflows/otr_16gb_video.json` | nothing |
 | Mac 16 GB -- Apple Silicon, unified memory | `workflows/otr_mac16_video.json` | nothing |

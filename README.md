@@ -7,8 +7,8 @@
 1. In ComfyUI open **Extensions -> Node Manager**, search **old time radio**, click **Install**.
 2. Install ffmpeg: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
 3. Restart ComfyUI.
-4. **Workflow -> Browse Templates -> EXTENSIONS -> comfyui-old-time-radio**, open `otr_canonical`.
-5. Press **Queue**. The first run downloads about 12 GB. Your episode is an `.mp4` in
+4. **Workflow -> Browse Templates -> Extensions -> Old-Time Radio**, open `otr_canonical`.
+5. Press **Run**. The first run downloads about 12 GB. Your episode is an `.mp4` in
    `<your ComfyUI output folder>/otr/obs/`.
 
 **It performs your story, not only its own.** On the **OTR_LedgerScriptWriter**
@@ -63,7 +63,7 @@ before: a script written on your own machine from tonight's news, a public-domai
 story, a scene of Shakespeare, or nothing at all; a cast of neural voices and an
 announcer; a theme composed in the musical style of wherever the story came
 from; pictures to watch while you listen;
-burned captions and a credit roll. One workflow, one press of **Queue**, and a
+burned captions and a credit roll. One workflow, one press of **Run**, and a
 finished `.mp4` lands in your output folder.
 
 One `episode_language` switch carries writing, Kokoro casting, captions and
@@ -132,8 +132,10 @@ engines are built, tested and waiting:
 Sign into Comfy **with a Comfy API key** (the API-key option on ComfyUI's
 sign-in dialog; a plain email or Google login injects no key). That is the
 whole instruction. The pack reads the same
-`api_key_comfy_org` hidden input ComfyUI's own partner nodes use, and
-nothing else: no key file, no environment variable on the server.
+`api_key_comfy_org` ComfyUI's own partner nodes use, and nothing else: no
+key file, no environment variable on the server. One node, **0 - Comfy
+Credential**, receives it and hands it on, and that node cannot fail -- so the
+key never appears in an error report or in the queue history.
 
 Headless box with no login: put the key in `OTR_COMFY_API_KEY` in the
 environment of the machine that *submits* the prompt and submit through
@@ -153,7 +155,7 @@ working ComfyUI (Desktop, portable or a git install -- any of them), about
 episode's working files need room too -- and one of the machines below. You do not need an account, an API key, a paid
 service, or any of the saved workflows further down this page:
 those are per-machine presets you can grow into. Installing the pack and
-pressing **Queue** is the whole path.
+pressing **Run** is the whole path.
 
 | Your machine | What to expect on a first short episode |
 |---|---|
@@ -205,10 +207,8 @@ fetches the Kokoro voices (a few hundred MB, and on Python 3.13 the ONNX model
 with them) so the default voice is ready before you ever queue -- if the console
 pauses on `[OldTimeRadio]` lines, that is what it is doing.
 
-**Load the show.** **Workflow → Browse Templates → EXTENSIONS →
-comfyui-old-time-radio** (the entry is named after the pack's folder, so a git
-clone lists it as **ComfyUI-OldTimeRadio**). Open **`otr_canonical`** and press
-**Queue** -- it runs on any machine. (The other entries are the same show preset
+**Load the show.** **Workflow → Browse Templates → Extensions → Old-Time
+Radio**. Open **`otr_canonical`** and press **Run** -- it runs on any machine. (The other entries are the same show preset
 for one machine each; see [A workflow pre-set for your
 machine](#a-workflow-pre-set-for-your-machine).) (If the gallery lists it but opening it fails, drag
 `custom_nodes/ComfyUI-OldTimeRadio/workflows/otr_canonical.json` onto the canvas

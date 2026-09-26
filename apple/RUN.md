@@ -1,6 +1,6 @@
 # Your first episode
 
-The short version: open the canonical workflow, press **Queue**, wait. You do not
+The short version: open the canonical workflow, press **Run**, wait. You do not
 have to choose anything. Every dropdown already has a working value, and the ones
 set to *roll* pick for themselves, so two runs in a row give you two different
 shows.
@@ -9,8 +9,7 @@ shows.
 
 ## Open the workflow
 
-**Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio** (named
-after the pack's folder, so a git clone lists it as **ComfyUI-OldTimeRadio**).
+**Workflow → Browse Templates → Extensions → Old-Time Radio**.
 Start with **`otr_canonical`**. That is the canonical workflow, and it is the
 one to start with on any machine: it names no vendor anywhere and resolves your
 GPU at run time, so the same file is correct on NVIDIA, on Apple Silicon and on
@@ -22,7 +21,7 @@ the same list are exactly that -- the canonical with its dropdowns set for one
 machine (`otr_8gb_still`, `otr_16gb_video`, `otr_mac16_low`, ...).
 [MACHINES.md](MACHINES.md#which-workflow-do-i-open) names the one for your machine.
 
-## Press Queue
+## Press Run
 
 The first run downloads about 12 GB (see [INSTALL.md](INSTALL.md#weights-what-you-do-not-have-to-do)) and
 then writes, casts, performs, scores and cuts an episode. Later runs skip the
@@ -75,7 +74,7 @@ run reproducible is the frozen ledger, not a number you set. If you want two
 comparable runs, pin `source_bank` and `visual_style` instead.
 
 Two of those ship on **roll** on purpose: the canonical is meant to hand you a
-different show each time you press Queue. Pin them when you want to compare two
+different show each time you press Run. Pin them when you want to compare two
 runs, because a rolled bank and a rolled style change more than anything else you
 could adjust.
 

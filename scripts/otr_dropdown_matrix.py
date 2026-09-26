@@ -1050,8 +1050,8 @@ def render_apple(rows: list) -> str:
     L.append("| Your machine | Open this | Also install |\n")
     L.append("|---|---|---|\n")
     L.append("| Anything, to start | `workflows/otr_canonical.json` "
-             "(Workflow &rarr; Browse Templates &rarr; EXTENSIONS &rarr; "
-             "comfyui-old-time-radio) | nothing |\n")
+             "(Workflow &rarr; Browse Templates &rarr; Extensions &rarr; "
+             "Old-Time Radio) | nothing |\n")
     for machine in MACHINES:
         graph, caveat = recommended_graph(machine["profile"])
         if caveat:
