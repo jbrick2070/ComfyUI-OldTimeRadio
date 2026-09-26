@@ -388,6 +388,28 @@ def overlay_audio_timing(ledger: dict, strict: bool = False) -> dict:
         # rather than the stale frozen-wire placeholder.
         disk_episode_id = str(disk.get("episode_id") or "").strip()
         if disk_episode_id:
+            # THE ID AND ITS PATHS MOVE TOGETHER (2026-09-26). The rename moved
+            # the whole per-episode directory and rebased the DURABLE ledger,
+            # but the wire still points into the old directory -- imported
+            # replay stills most of all. Switching only the id here made every
+            # later check see "nothing renamed" and read paths that no longer
+            # exist (a replay failed with "9 imported image row(s) have no file
+            # on disk" while all 9 were present). Rebase with the walker the
+            # rename itself uses, in place, so the caller's object and the
+            # `lines` binding stay the ones the merge below writes through.
+            _wire_id = str(ledger.get("episode_id") or "").strip()
+            if _wire_id and _wire_id != disk_episode_id:
+                from .production_ledger import _rebase_episode_local_paths
+                _new_dir = Path(p).parent.parent
+                _rebased, _moved = _rebase_episode_local_paths(
+                    ledger, str(_new_dir.parent / _wire_id), str(_new_dir))
+                if _moved and isinstance(_rebased, dict):
+                    ledger.clear()
+                    ledger.update(_rebased)
+                    lines = ledger.get("lines") or []
+                    log.info("[OTR_ShotLock] post-audio overlay moved %d wire "
+                             "path(s) from %s onto %s", _moved, _wire_id,
+                             disk_episode_id)
             ledger["episode_id"] = disk_episode_id
 
         # EpisodeAssembler is the producer/owner of this entire section. Disk

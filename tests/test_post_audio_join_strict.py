@@ -228,3 +228,61 @@ def test_the_floor_renderer_call_site_stays_fail_soft():
     assert "overlay_audio_timing(led)" in src, (
         "the floor renderer's overlay call changed shape -- if strict= was "
         "added here, read overlay_audio_timing's docstring first")
+
+
+def _renamed_episode(tmp_path, old_id, new_id):
+    """A moved episode: the durable ledger and one still under the NEW dir."""
+    root = tmp_path / "episodes"
+    new_dir = root / new_id
+    (new_dir / "audio").mkdir(parents=True)
+    (new_dir / "stills").mkdir()
+    still = new_dir / "stills" / "still_b001.png"
+    still.write_bytes(b"png")
+    disk = new_dir / "audio" / ("%s_ledger.json" % new_id)
+    disk.write_text(json.dumps({
+        "episode_id": new_id, "meta": {"freeze_timestamp": "freeze-1"},
+        "lines": [{"line_id": "b001", "speaker_role": "announcer"}]}),
+        encoding="utf-8")
+    old_path = str(root / old_id / "stills" / "still_b001.png")
+    return disk, still, old_path
+
+
+def test_the_id_switch_moves_the_wire_paths_with_it(live, tmp_path):
+    """A replay workspace renamed mid-run (2026-09-26): the overlay takes the
+    new id from disk, and the imported still paths must follow it -- or the
+    replay check reads a directory that no longer exists. An external path is
+    left alone."""
+    import os
+    old_id = "signal_lost_src_20260926_140925_rp6f54f60a"
+    new_id = "signal_lost_final_20260926_142438"
+    disk, still, old_path = _renamed_episode(tmp_path, old_id, new_id)
+    live.setattr("nodes._otr_ledger.in_flight_ledger_path", lambda: disk)
+    wire = _wire(episode_id=old_id)
+    wire["images"] = {"images": [
+        {"image_id": "img_b001", "path": old_path},
+        {"image_id": "shared", "path": r"C:\ComfyUI-Models\vae\ae.safetensors"}]}
+
+    out = sl.overlay_audio_timing(wire, strict=True)
+
+    assert out["episode_id"] == new_id
+    rows = out["images"]["images"]
+    assert os.path.normcase(rows[0]["path"]) == os.path.normcase(str(still))
+    assert os.path.isfile(rows[0]["path"])
+    assert rows[1]["path"] == r"C:\ComfyUI-Models\vae\ae.safetensors"
+    assert out["lines"], "the merge still wrote through to the rebased lines"
+
+
+def test_the_fail_soft_overlay_rebases_the_callers_own_object(live, tmp_path):
+    """Without strict the overlay mutates the caller's ledger in place, as it
+    always has; the rebase keeps that identity."""
+    import os
+    old_id, new_id = "pending_20260926_135947", "signal_lost_x_20260926_140925"
+    disk, still, old_path = _renamed_episode(tmp_path, old_id, new_id)
+    live.setattr("nodes._otr_ledger.in_flight_ledger_path", lambda: disk)
+    wire = _wire(episode_id=old_id)
+    wire["images"] = {"images": [{"image_id": "img_b001", "path": old_path}]}
+
+    out = sl.overlay_audio_timing(wire)
+
+    assert out is wire
+    assert os.path.normcase(wire["images"]["images"][0]["path"]) == os.path.normcase(str(still))
