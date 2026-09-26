@@ -1,11 +1,12 @@
 """Pre-writer native visual-weight readiness for the shipped canonical graph.
 
-No model imports or network at module import. Only the TWENTY-SEVEN allowlisted
-files below can be fetched (three z_image_turbo, two ltx_8gb, three
-stable_audio_3, one sd15, two lumina_image -- the Flux ae VAE is already the
-z_image row -- seven for the native LTX 2.5 lanes, four for the
-AnimateDiff lanes, whose SD 1.5 checkpoint is the sd15 row, and five for the
-two MiniMax H3 lanes, which are fetched at an exact pinned revision).
+No model imports or network at module import. Only the allowlisted files in
+``_SOURCES`` below can be fetched: the z_image_turbo, ltx_8gb, stable_audio_3,
+sd15 and lumina_image weights (the Flux ae VAE is the z_image row), the native
+LTX 2.5 and AnimateDiff lane weights (AnimateDiff's SD 1.5 checkpoint is the sd15
+row), and -- at an exact pinned revision -- the two MiniMax H3 lanes' weights and
+the Comfy-native Gemma 4 writer's text encoder. The list is the count; this
+paragraph deliberately does not repeat a total that would drift.
 Existing native loader choices are preserved, not rehash-qualified, and
 readiness is NOT a claim of GPU/render compatibility. Other engines keep
 their existing adapter checks with explicit uncovered logs.
@@ -58,6 +59,18 @@ _PINNED_SOURCES = (
      "vae/minimax_h3_audio_vae_fp32.safetensors",
      "4cc1d817b6184899b41293954329f576cb5ae86b", 605_254_808,
      "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48"),
+    # THE COMFY-NATIVE GEMMA 4 WRITER (plan row 0n, 2026-09-26). Not a video
+    # weight: the writer's own text model, which ComfyUI loads through the stock
+    # CLIPLoader from `text_encoders`. It rides this table because the pinned
+    # fetch, the progress bar and the native re-resolve are exactly what a
+    # stranger's first episode needs, and a second downloader would be a second
+    # thing to get wrong. Separate from the LTX 2.5 Gemma encoder file: the two
+    # share a folder, not an identity. Pin read from the Hub API, token-less
+    # (gated False); _otr_comfy_textgen_backend holds the same values.
+    ("text_encoders", "Comfy-Org/gemma-4",
+     "text_encoders/gemma4_e2b_it_int8_convrot.safetensors",
+     "63d0f7c476756b88910170c1df75e2384ea1af31", 5_199_997_904,
+     "efeca0fcad2f863e5ed0a75e3af952b72bc963604c1dda6d20aee87a32b17566"),
 )
 
 _SOURCES = (
@@ -302,6 +315,25 @@ def _resolve_slot(inputs, slot, custom, kind):
                            "engine selection for %s" % (kind, slot))
 
 
+def _native_writer_lookup():
+    """``(native_writer_weights, strip_label)`` for the writer's model picks, or
+    None when neither the package nor the flat import context can reach them.
+
+    Guarded exactly like :func:`_default_role_video_slots`, for the same reason:
+    ``tests/test_visual_assets_stdlib.py`` loads this file with no parent
+    package. Production always reaches both; the caller logs the None case."""
+    try:
+        from ._otr_comfy_textgen_backend import native_writer_weights
+        from ._otr_model_catalog import _strip_label_suffix
+    except Exception:  # noqa: BLE001 -- isolation harness / flat import context
+        try:
+            from _otr_comfy_textgen_backend import native_writer_weights  # type: ignore
+            from _otr_model_catalog import _strip_label_suffix  # type: ignore
+        except Exception:  # noqa: BLE001
+            return None
+    return native_writer_weights, _strip_label_suffix
+
+
 def _default_role_video_slots():
     """``{role: video_slot}`` from the shared authority, or ``{}`` if it cannot
     be reached.
@@ -417,7 +449,8 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
     bundles bind frozen selections, so their live widgets must not trigger
     downloads. Mixed replay/live writers behind one validator are ambiguous.
     """
-    result = {"engines": set(), "skipped": [], "replay": False}
+    result = {"engines": set(), "writer_models": set(), "skipped": [],
+              "replay": False}
     if unique_id is None or not str(unique_id).strip():
         result["skipped"].append("legacy call without live prompt context")
         return result
@@ -433,6 +466,33 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
         result["replay"] = True
         result["skipped"].append("replay uses frozen bundle assets, not live dropdowns")
         return result
+    # THE WRITER'S OWN WEIGHTS (plan row 0n). Both slots are read: either may
+    # name the Comfy-native writer, and one pick shared by both fetches once.
+    # A label the catalog does not know is not this module's to refuse -- the
+    # writer's own preflight does that -- so it simply needs nothing here. NOT
+    # `_literal`: a linked or absent writer widget must never refuse the whole
+    # readiness pass (and with it every video weight); it is noted and skipped.
+    picks = []
+    for node in writers:
+        inputs = node.get("inputs") or {}
+        for widget in ("creative_writing_model", "technical_model"):
+            picked = inputs.get(widget)
+            if isinstance(picked, str):
+                if picked.strip():
+                    picks.append(picked)
+            elif picked is not None:
+                result["skipped"].append(
+                    "%s is linked, so the weight it names is not planned here" % widget)
+    lookup = _native_writer_lookup() if picks else None
+    if picks and lookup is None:
+        result["skipped"].append("native writer lookup unavailable in this import "
+                                 "context; writer weights are not planned here")
+    if lookup is not None:
+        native_writer_weights, strip_label = lookup
+        for picked in picks:
+            model_id = strip_label(picked)
+            if native_writer_weights(model_id):
+                result["writer_models"].add(model_id)
     directors = [n for n in scoped if n.get("class_type") == "OTR_VideoDirector"]
     if not directors:
         result["skipped"].append("no directly gated VideoDirector; native adapter checks remain")
@@ -516,7 +576,7 @@ def _same_file(left, right):
 
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
                     sd15=None, lumina=None, ltx25=None, animatediff=None,
-                    minimax_h3=None, env=None):
+                    minimax_h3=None, env=None, writer_models=()):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
     A missing nondefault choice is a refusal, never a default-weight fallback.
@@ -700,6 +760,15 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
             for label, categories, default, _floor in lane._weight_rows():
                 add(categories[0], lane._token_for(label, default),
                     explicit=str(env.get("OTR_MINIMAX_H3_%s_NAME" % label) or ""))
+    if writer_models:
+        lookup = _native_writer_lookup()
+        if lookup is None:
+            raise VisualAssetError("native writer weights requested but the writer "
+                                   "lookup is unavailable; no download")
+        native_writer_weights = lookup[0]
+        for model_id in sorted(writer_models):
+            for category, token in native_writer_weights(model_id):
+                add(category, token)
     return requests
 
 
@@ -1287,7 +1356,8 @@ def ensure_prompt_visual_assets(prompt, unique_id):
     _refuse_missing_node_packs(plan["engines"])
     _refuse_unmet_boot_contracts(plan["engines"])
     engines = plan["engines"] & _COVERED
-    if not engines:
+    writer_models = set(plan.get("writer_models") or ())
+    if not engines and not writer_models:
         return {"status": "not-covered", "notes": plan["skipped"], "receipts": []}
     import folder_paths
     from comfy import model_management
@@ -1295,7 +1365,8 @@ def ensure_prompt_visual_assets(prompt, unique_id):
     cancel = model_management.throw_exception_if_processing_interrupted
     cancel()
     requests = native_requests(engines, folder_paths=folder_paths,
-                               env=otr_env.snapshot(), **adapters)
+                               env=otr_env.snapshot(), writer_models=writer_models,
+                               **adapters)
     missing = [r for r in requests if r["path"] is None]
     receipts = []
     gui_progress = None
@@ -1375,7 +1446,8 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                      time.monotonic() - started, native)
         # Re-resolve adapter picks as well as native token identity after writes.
         after = native_requests(engines, folder_paths=folder_paths,
-                                env=otr_env.snapshot(), **adapters)
+                                env=otr_env.snapshot(), writer_models=writer_models,
+                                **adapters)
         if ([(r["category"], r["token"]) for r in after]
                 != [(r["category"], r["token"]) for r in requests]
                 or any(r["path"] is None for r in after)):
@@ -1384,7 +1456,9 @@ def ensure_prompt_visual_assets(prompt, unique_id):
     cancel()
     if gui_progress is not None:
         gui_progress.update_absolute(1000)
-    log.info("[OTR.assets] READY engines=%s files=%d (availability only; "
-             "render/GPU/publish success not qualified)", ",".join(sorted(engines)), len(requests))
+    log.info("[OTR.assets] READY engines=%s writers=%s files=%d (availability "
+             "only; render/GPU/publish success not qualified)",
+             ",".join(sorted(engines)) or "-", ",".join(sorted(writer_models)) or "-",
+             len(requests))
     return {"status": "ready", "engines": sorted(engines), "receipts": receipts,
             "notes": plan["skipped"]}

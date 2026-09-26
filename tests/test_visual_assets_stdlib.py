@@ -576,6 +576,12 @@ class RuntimeBridgeTests(_NativeFixtureCase):
             # computes in production: the fake's first folder for the type.
             prefix + "._otr_models_root": module(prefix + "._otr_models_root",
                 model_type_dir=real_model_type_dir),
+            # The planner reads the writer's model picks (plan row 0n): the REAL
+            # identity leaf and the REAL label stripper, both import-light.
+            prefix + "._otr_comfy_textgen_backend": importlib.import_module(
+                "nodes._otr_comfy_textgen_backend"),
+            prefix + "._otr_model_catalog": importlib.import_module(
+                "nodes._otr_model_catalog"),
             "folder_paths": module("folder_paths", get_full_path=self.folders.get_full_path,
                                    get_folder_paths=self.folders.get_folder_paths),
             "comfy": module("comfy", model_management=SimpleNamespace(
@@ -623,6 +629,24 @@ class RuntimeBridgeTests(_NativeFixtureCase):
         self.assertEqual(len({destination for _, destination, _ in trace.downloads}), 5)
         self.assertTrue(all(row["path"] is not None for row in self.requests()))
         self.assertTrue(all(kwargs == {"token": False, "timeout": 30} for _, kwargs in trace.heads))
+
+    def test_an_installed_comfy_native_writer_weight_reaches_ready(self):
+        """Plan row 0n: a writer picking the Comfy-native Gemma model joins the
+        same readiness pass as the video weights. Installed, it is preserved and
+        never enters the download path; the READY receipt names the writer."""
+        from nodes import _otr_comfy_textgen_backend as native
+        self.install_defaults()
+        self.folders.put(native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)
+        prompt = canonical_prompt()
+        prompt["1"]["inputs"]["creative_writing_model"] = (
+            native.MODEL_ID + " (5.2 GB download)")
+        prompt["1"]["inputs"]["technical_model"] = native.MODEL_ID
+        with self.runtime(forbid_hf=True) as trace:
+            result = bridge.ensure_prompt_visual_assets(prompt, "63")
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(trace.downloads, [])
+        tokens = [(row["category"], row["token"]) for row in self.requests()]
+        self.assertEqual(tokens.count((native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)), 0)
 
     def test_every_download_lands_in_the_first_registered_folder_of_its_type(self):
         """The gate writes through ``model_type_dir`` (2026-09-25): the folder
