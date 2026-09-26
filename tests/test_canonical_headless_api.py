@@ -393,6 +393,20 @@ def test_video_lane_applies_after_a_machine_key_too(tmp_path):
         assert director[widget] == "h3_low_video (16:9)", widget
 
 
+def test_video_lane_refuses_a_replay_and_names_the_derive_command(tmp_path):
+    """2026-09-26: a replay keeps the engine its frozen plan names, so the flag
+    moved dropdowns nothing read and a probe rendered the wrong lane while the
+    runner printed the requested one. It is refused, with the supported fix."""
+    with pytest.raises(SystemExit, match="--derive-engine ltx25_video"):
+        _run_main([
+            "--offline-schemas", "--dry-run",
+            "--profile", "otr_16gb_video",
+            "--video-lane", "ltx25_high_video",
+            "--replay-from", str(tmp_path / "bundle"),
+            "--dump-prompt", str(tmp_path / "prompt.json"),
+        ])
+
+
 def test_video_lane_refuses_a_name_that_is_not_in_the_dropdown(tmp_path):
     with pytest.raises(SystemExit, match="not a video lane in the dropdown"):
         _run_main([

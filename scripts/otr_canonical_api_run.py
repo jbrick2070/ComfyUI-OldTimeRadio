@@ -194,7 +194,32 @@ def _schemas(offline: bool) -> dict:
     return workflow_apply.build_offline_schemas()
 
 
+def _refuse_video_lane_on_replay(args) -> None:
+    """A REPLAY RENDERS ON THE ENGINE ITS BUNDLE NAMES (2026-09-26). The
+    frozen plan's shots already carry their engine, and ShotLock reuses that
+    plan, so --video-lane only moved dropdowns nothing read: a timing probe
+    asked for LTX 2.5 and rendered H3 while this runner printed the new lane.
+    The supported way to replay on another lane is a derived bundle."""
+    lane = getattr(args, "video_lane", None)
+    bundle = getattr(args, "replay_from", None)
+    if not (lane and bundle):
+        return
+    engine = str(lane)
+    try:
+        from nodes._otr_shared.public_engines import resolve_engine_id
+        engine = resolve_engine_id(str(lane)) or engine
+    except Exception:  # noqa: BLE001 -- the message still names the lane
+        pass
+    raise SystemExit(
+        "--video-lane does not apply to --replay-from: a replay renders every "
+        "shot on the engine its frozen plan names. To replay on %r, derive a "
+        "bundle first:\n  python scripts/otr_freeze_replay_bundle.py %s "
+        "--derive-engine %s\nthen pass the derived bundle to --replay-from."
+        % (str(lane), bundle, engine))
+
+
 def build_api_prompt(args) -> tuple[dict, list[str]]:
+    _refuse_video_lane_on_replay(args)
     # Default: the canonical workflow, with the deliberate path assertion.
     # Opt-in --workflow loads an EXPLICIT graph (the story-only scoring graph),
     # which is a workflow change the caller has deliberately asked for -- not a
@@ -494,7 +519,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="set the announcer, character and music video "
                              "dropdowns to this video lane (e.g. "
                              "h3_low_video), as picking it in the app does; "
-                             "applied after --profile/--machine")
+                             "applied after --profile/--machine. Not with "
+                             "--replay-from: a replay keeps its bundle's "
+                             "engine (derive a bundle with "
+                             "otr_freeze_replay_bundle.py --derive-engine)")
     parser.add_argument("--premise", default=None)
     parser.add_argument("--source-bank", default=None)
     parser.add_argument("--visual-style", default=None)
