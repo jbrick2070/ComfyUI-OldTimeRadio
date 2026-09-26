@@ -340,8 +340,10 @@ and the platform quant bakes NF4 only when the vendor is NVIDIA.
    `config/otr_windows_extra_model_paths.yaml` names `C:/ComfyUI-Models`.
 LOW PRIORITY, operator ruling 2026-09-25 ("no biggie" / "doesn't matter
 much") -- both are off-default picks only; do not re-raise:
-- Gemma 4 12B on AMD still bakes NF4 (its implied `bnb_nf4` wins over
-  vendor). The AMD default writer is Qwen, which item 3 fixed.
+- Gemma 4 12B on AMD bakes NF4 ON PURPOSE since a06ee44d (Cursor): the
+  bitsandbytes docs list gfx1201, and a Sonnet review confirmed it. Qwen on
+  AMD stays full precision (item 3) because that is what the Radeon tester's
+  published episode proved. A Mac now loads Gemma full precision.
 - Bark's first load on Metal reclaims no MPS pool (`_unload_bark` does).
   Kokoro is the default voice on every local lane.
 Every fix measures the 5080 unchanged (CLAUDE.md section 0B): items 1-3
@@ -481,7 +483,10 @@ against the files):
   gallery card as an app (the frontend maps that boolean to its initial
   mode). Put it on the generated cards only, or on a separate
   `otr_app.json` -- never on the canonical the operator edits on the canvas.
-- CARD OR FORM (a product call, the operator's). The list above exposes the
+- CARD OR FORM -- DECIDED 2026-09-25 (operator: "Both"). The per-machine
+  cards open story-only (the card IS the lane); ONE separate advanced app
+  shows the pickers and says an out-of-memory is the user's to accept.
+  The trade-off as it was put: the list above exposes the
   video, image, voice, music and writer pickers, while the per-machine
   tuning (quant, VRAM ceiling, canvas, device) stays hidden and tuned for
   the card's own lane. So an 8 GB user can pick a lane the card cannot run
@@ -530,10 +535,13 @@ interrupt checks on the heavy nodes, a static dependency list, no
 eval/exec/runtime pip, and `.comfyignore` stripping dev files. Gaps, in
 order:
 
-1. DONE 2026-09-25 (cf75a95e, Cursor): `DESCRIPTION` on all 24 nodes and a
+1. DONE 2026-09-25 (cf75a95e, agy): `DESCRIPTION` on all 24 nodes and a
    tooltip on all 184 inputs; `tests/test_node_descriptions.py` pins both.
-2. Live UI status from the long nodes (`PromptServer.instance.send_sync` or
-   ProgressBar) so a minutes-long render does not look stalled.
+2. DONE 2026-09-25: `nodes/_otr_shared/node_progress.py` draws ComfyUI's bar
+   over the three loops that showed nothing -- the writer's per-beat compose,
+   the local voice lines, the scene sequencer. Nodes already showing a
+   sampler bar or the cloud heartbeat get no second bar. Cancel lands at the
+   next item boundary. LIVE CHECK OWED: watch the bar move on a real leg.
 3. `requires-comfyui` in `[tool.comfy]`, set to the oldest core that runs
    the canonical workflow -- measured, never guessed; too high blocks installs.
 4. DONE: `build_variants.py --all` writes a gallery thumbnail beside the

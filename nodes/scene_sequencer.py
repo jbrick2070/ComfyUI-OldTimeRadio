@@ -38,8 +38,10 @@ from .story_orchestrator import _runtime_log
 
 try:
     from ._otr_shared import env as otr_env
+    from ._otr_shared.node_progress import NodeProgress
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
+    from _otr_shared.node_progress import NodeProgress  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -1080,7 +1082,10 @@ class SceneSequencer:
         # text-match.
         dialogue_positions: list[dict] = []
 
+        # The node's own bar, one step per ledger line (plan 0f item 2).
+        _line_progress = NodeProgress(len(lines_to_render), "sequencer lines")
         for i, item in enumerate(lines_to_render):
+            _line_progress.at(i)
             # Ledger discriminator: speaker_role replaces the legacy
             # parser-list "type" tag. Mapping:
             #   character / announcer  -> dialogue branch
@@ -1228,6 +1233,7 @@ class SceneSequencer:
                         "dur_s": float(seg_len) / float(sample_rate),
                     })
                 current_sample_pos += seg_len
+        _line_progress.finish()
 
         # C2 (S2 P1.3) TWO-BUS TERMINAL CHECK: consumed == provided on BOTH
         # buses. The mid-loop else-branch already fails loud on a SHORTFALL

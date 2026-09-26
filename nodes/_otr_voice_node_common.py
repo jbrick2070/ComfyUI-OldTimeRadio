@@ -34,8 +34,10 @@ except ImportError:  # pragma: no cover -- flat test imports
 
 try:
     from ._otr_shared import env as otr_env
+    from ._otr_shared.node_progress import NodeProgress
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
+    from _otr_shared.node_progress import NodeProgress  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -1808,6 +1810,12 @@ class OTRVoiceNodeBase:
                 # edge cases. Each line is attempted on its own now, and only
                 # a stamped job-scoped verdict is survivable -- an ordinary
                 # crash still stops the walk exactly as before.
+                # A LOCAL engine gets the node's own bar, one step per line
+                # (plan 0f item 2). A cloud engine on this path already
+                # draws the partner heartbeat; two bars would fight.
+                _line_progress = NodeProgress(
+                    0 if adapter_is_cloud_side(adapter) else len(misses),
+                    "voice lines")
                 for j in misses:
                     try:
                         j["audio"] = _forward_one_voice_line(adapter, engine, j)
@@ -1815,6 +1823,7 @@ class OTRVoiceNodeBase:
                         outcome_errors[j["job_id"]] = exc
                         if not cloud_line_floor_reason(exc):
                             break
+                    _line_progress.step()
 
             _floored_lines = []
             for j in line_jobs:

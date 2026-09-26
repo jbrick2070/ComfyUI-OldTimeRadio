@@ -131,6 +131,7 @@ from . import _vram_log as _memory_log
 # S1 platform-portability: the explicit LLM runtime policy (stdlib-only).
 from ._otr_shared import llm_policy as _llm_policy
 from ._otr_shared import device_options as _OTR_DEVICE_OPTIONS
+from ._otr_shared.node_progress import NodeProgress
 
 # Stage 2C (multi-modal story schema, 2026-07-05): the story-routing layer
 # supplies the source_bank dropdown (list_bank_ids at INPUT_TYPES) and the
@@ -5733,7 +5734,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 )
                 _ex_lines_by_beat_id = {}
 
-        for beat in outline.beats:
+        # The node's own bar, one step per beat (plan 0f item 2): this
+        # compose loop is the writer's longest stretch with nothing moving.
+        _beat_progress = NodeProgress(len(outline.beats), "writer beats")
+        for _beat_index, beat in enumerate(outline.beats):
+            _beat_progress.at(_beat_index)
             traits = (beat.mood or "").strip() or DEFAULT_TRAITS
             cleaned: str
             cid: str
@@ -6064,6 +6069,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             }
             _OTRL.patch_line_fields(led.data, beat.beat_id, _line_fields)
             led.save()
+        _beat_progress.finish()
 
         if _verbatim_entries:
             if _verbatim_cursor != len(_verbatim_entries):
