@@ -97,7 +97,9 @@ def test_the_credential_node_never_raises(monkeypatch):
     def _boom(**_kw):
         raise RuntimeError("queue-key would be in this message")
     monkeypatch.setattr(occ, "set_auth", _boom)
-    assert node.bind("queue-key") == (cred.KEY_PRESENT,)
+    # A key that could not be bound is reported ABSENT (Cursor, 2e78e2b6):
+    # the token must never claim a credential the spend paths do not have.
+    assert node.bind("queue-key") == (cred.KEY_ABSENT,)
     import math
     assert math.isnan(cred.OTR_ComfyCredential.IS_CHANGED())
 
@@ -154,8 +156,12 @@ def test_a_key_bound_to_an_earlier_prompt_is_never_spent(monkeypatch):
     assert occ._bearer() == "queue-a-key"
     monkeypatch.setattr(cmb, "live_prompt_id", lambda: "prompt-b")
     assert occ._bearer() is None
+    # Cannot read the executing prompt: a BOUND key is refused, not trusted.
     monkeypatch.setattr(cmb, "live_prompt_id", lambda: None)
-    assert occ._bearer() == "queue-a-key"      # outside a running ComfyUI
+    assert occ._bearer() is None
+    # A key set with no prompt id (a direct call outside any queue) is kept.
+    occ.set_auth(api_key="direct-key")
+    assert occ._bearer() == "direct-key"
 
 
 def test_the_executing_prompt_is_never_swept(monkeypatch):

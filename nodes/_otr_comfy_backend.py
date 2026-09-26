@@ -462,13 +462,18 @@ def clear_auth() -> None:
 def _bearer() -> str | None:
     """The credential to send: the Comfy API key OTR_ComfyCredential bound
     for the prompt now executing. Nothing else -- and not a key bound to an
-    earlier prompt, which is a stale key even though it is still held."""
+    earlier prompt, which is a stale key even though it is still held.
+
+    A BOUND key is spent only while its own prompt is the one executing: if
+    the executing prompt cannot be read, the key is refused rather than
+    trusted (inside ComfyUI it is always readable during a queue; the case
+    exists so the rule has no exception). A key set without a prompt id --
+    a direct call outside any queue -- is returned as before."""
     key = _auth.get("api_key") or None
     bound = _auth.get("prompt_id")
     if key and bound:
         from ._otr_shared.cloud_media_backend import live_prompt_id
-        live = live_prompt_id()
-        if live and live != bound:
+        if live_prompt_id() != bound:
             return None
     return key
 

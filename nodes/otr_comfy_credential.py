@@ -44,8 +44,10 @@ KEY_ABSENT = "comfy_key:absent"
 
 
 def bind_queue_credential(api_key) -> bool:
-    """Bind this queue's Comfy API key to the running prompt. True when a key
-    was given. Never raises, and never logs the key or an exception message
+    """Bind this queue's Comfy API key to the running prompt. True only when a
+    key was given AND bound -- a key that could not be bound is reported as
+    absent, so the node's token never claims a credential the spend paths do
+    not have. Never raises, and never logs the key or an exception message
     that might quote it.
 
     Always SETS the writer backend's auth, even to nothing: a queue that
@@ -54,6 +56,7 @@ def bind_queue_credential(api_key) -> bool:
     if this node is missing from a later graph.
     """
     key = api_key.strip() if isinstance(api_key, str) else ""
+    bound = False
     try:
         from ._otr_shared.cloud_media_invoke import (
             current_prompt_id, stash_comfy_api_key)
@@ -66,11 +69,12 @@ def bind_queue_credential(api_key) -> bool:
                                     prompt_id=prompt_id or None)
         if key:
             stash_comfy_api_key(key)
+            bound = True
     except Exception as exc:  # noqa: BLE001 -- this node must never raise
         log.warning("[OTR credential] the queue's Comfy key could not be "
                     "bound (%s); cloud lanes will refuse with the reason",
                     type(exc).__name__)
-    return bool(key)
+    return bound
 
 
 class OTR_ComfyCredential:
