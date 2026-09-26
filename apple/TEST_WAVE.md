@@ -193,6 +193,18 @@ nodes; a 1-act `otr_8gb_low` leg through the headless runner PASSED in
 9:49 and published `crack_repair_20260926_045130` -- the canonical with the
 Start-here note and the credential node, end to end.
 
+**Receipts 2026-09-26 late morning (5080, after the no-reserve / unload-after-
+use changes):** full suite 17006 passed at `6f4cdd95`, 17012 at `5df92ba4`
+and 17012 at `2d7aa995` (the app-form reorder swapped two order tests one for
+one), 0 failed each time; Bug Bible 46 passed. LIVE on a fresh STOCK boot (no
+reserve exists; Sage-free launcher): the queue-time gate passed MiniMax H3
+(`--video-lane h3_low_video`, 1 act) and clip 1 rendered 243 model frames at
+864x480 with a render-phase peak of 15,959 MB and no out-of-memory; the leg
+was then stopped by the operator's call. On that prompt's end ComfyUI's
+free_memory flag took the card from 15,460 MiB to 2,029 MiB within ~5 s --
+before, a finished render stayed ~9-10 GB resident. All 26 shipped workflows'
+33 app-form rows resolve against the live server's `/object_info`.
+
 
 ## Owed, not in this wave
 
