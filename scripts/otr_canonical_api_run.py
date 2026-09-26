@@ -38,6 +38,7 @@ from otr_api import (  # noqa: E402
     fetch_schemas,
     load_workflow,
     patch_creative,
+    patch_widget_by_name,
     poll_history,
     queue_snapshot,
     submit_prompt,
@@ -89,6 +90,39 @@ def _apply_set(workflow: dict, schemas: dict, patch: str) -> str:
     value = _parse_value(raw_value)
     patch_creative(workflow, nid, widget, value, schemas)
     return f"{node_ref}.{widget}={value!r}"
+
+
+#: The three video dropdowns a person sets in the app, one per role.
+VIDEO_LANE_WIDGETS = (
+    "announcer_video_model", "character_video_model", "music_video_model")
+
+
+def _apply_video_lane(workflow: dict, schemas: dict, lane: str) -> list[str]:
+    """Set all three video dropdowns to one video lane, as the app does.
+
+    This is ComfyUI's own headless practice: change a widget's value in the
+    workflow, then POST it to /prompt -- exactly what picking the dropdown in
+    the app does, so no new workflow is needed to try a lane (operator,
+    2026-09-26: "hand roll the dropdown for a headless run"). It is the one
+    engine widget this runner lets a caller set, and only through the
+    dropdown's own label lookup, so the value is always a real menu entry;
+    ``--set`` still refuses engine widgets.
+    """
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from nodes._otr_shared.public_engines import resolve_engine_id
+    from nodes.otr_video_director import exact_menu_option_for
+    try:
+        option = exact_menu_option_for(resolve_engine_id(str(lane)))
+    except ValueError as exc:
+        raise SystemExit(
+            f"--video-lane {lane!r} is not a video lane in the dropdown ({exc})")
+    director = _node_id_for(workflow, "OTR_VideoDirector")
+    applied = []
+    for widget in VIDEO_LANE_WIDGETS:
+        patch_widget_by_name(workflow, director, widget, option, schemas)
+        applied.append(f"OTR_VideoDirector.{widget}={option!r}")
+    return applied
 
 
 def _apply_writer_shortcuts(workflow: dict, schemas: dict, args) -> list[str]:
@@ -180,13 +214,22 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
     elif args.profile and args.profile.lower() != "none":
         workflow = apply_profile_to_workflow(workflow, args.profile, schemas)
         applied.append(f"profile={args.profile}")
-        checked = _assert_profile_models_present(
-            args.profile, schemas, offline=bool(args.offline_schemas))
-        if checked:
-            print("[canonical-api] preflight: %d required model(s) visible to "
-                  "the server: %s" % (len(checked), ", ".join(checked)),
-                  flush=True)
+        if getattr(args, "video_lane", None):
+            # The row's required models belong to the video lane it names,
+            # which --video-lane replaces; the queue-time preflight fetches
+            # and checks the chosen lane's own weights instead.
+            print("[canonical-api] preflight: row model check skipped -- "
+                  "--video-lane replaces the row's video lane", flush=True)
+        else:
+            checked = _assert_profile_models_present(
+                args.profile, schemas, offline=bool(args.offline_schemas))
+            if checked:
+                print("[canonical-api] preflight: %d required model(s) "
+                      "visible to the server: %s"
+                      % (len(checked), ", ".join(checked)), flush=True)
 
+    if getattr(args, "video_lane", None):
+        applied.extend(_apply_video_lane(workflow, schemas, args.video_lane))
     applied.extend(_apply_writer_shortcuts(workflow, schemas, args))
     for patch in args.set:
         applied.append(_apply_set(workflow, schemas, patch))
@@ -425,6 +468,11 @@ def main(argv: list[str] | None = None) -> int:
                              "(scripts/otr_freeze_replay_bundle.py). The writer, "
                              "cast, TTS, music and stills pass through frozen; "
                              "only the video phase and the publish tail run.")
+    parser.add_argument("--video-lane", default=None, dest="video_lane",
+                        help="set the announcer, character and music video "
+                             "dropdowns to this video lane (e.g. "
+                             "h3_low_video), as picking it in the app does; "
+                             "applied after --profile/--machine")
     parser.add_argument("--premise", default=None)
     parser.add_argument("--source-bank", default=None)
     parser.add_argument("--visual-style", default=None)

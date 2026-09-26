@@ -332,6 +332,45 @@ def test_google_api_llm_slots_are_headless_bindable(tmp_path, monkeypatch):
     assert writer["inputs"]["google_api_slot_b_model"] == "gemini-flash-lite-latest"
 
 
+def test_video_lane_sets_the_three_video_dropdowns_as_the_app_does(tmp_path):
+    """Operator 2026-09-26: try a video lane headless by hand-picking the
+    dropdown, not by adding a workflow. The row's stills stay as the row set
+    them; only the three video dropdowns move."""
+    dump = tmp_path / "prompt.json"
+    rc, out = _run_main([
+        "--offline-schemas", "--dry-run",
+        "--profile", "otr_16gb_video",
+        "--video-lane", "h3_low_video",
+        "--dump-prompt", str(dump),
+    ])
+    assert rc == 0
+    director = _node(json.loads(dump.read_text(encoding="utf-8")),
+                     "OTR_VideoDirector")["inputs"]
+    pick = _video_pick("minimax_h3_video")
+    for widget in canonical.VIDEO_LANE_WIDGETS:
+        assert director[widget] == pick, widget
+        assert f"OTR_VideoDirector.{widget}={pick!r}" in out
+    assert "row model check skipped" in out
+    rc, _ = _run_main([
+        "--offline-schemas", "--dry-run", "--profile", "otr_16gb_video",
+        "--dump-prompt", str(tmp_path / "row.json"),
+    ])
+    row_director = _node(json.loads((tmp_path / "row.json").read_text(
+        encoding="utf-8")), "OTR_VideoDirector")["inputs"]
+    for widget in ("announcer_image_model", "character_image_model",
+                   "music_image_model"):
+        assert director[widget] == row_director[widget], widget
+
+
+def test_video_lane_refuses_a_name_that_is_not_in_the_dropdown(tmp_path):
+    with pytest.raises(SystemExit, match="not a video lane in the dropdown"):
+        _run_main([
+            "--offline-schemas", "--dry-run",
+            "--video-lane", "no_such_lane",
+            "--dump-prompt", str(tmp_path / "prompt.json"),
+        ])
+
+
 def test_set_refuses_direct_engine_widget_patch(tmp_path):
     with pytest.raises(ValueError, match="creative whitelist"):
         _run_main([
