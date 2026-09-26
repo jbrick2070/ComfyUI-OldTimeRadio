@@ -2,7 +2,7 @@
   "_comment": [
     "WHAT A GIVEN MACHINE SHOULD RUN. This file is JUDGEMENT, declared once,",
     "in data. Each class row is self-contained and its `key` is the exact value",
-    "accepted by `--machine`; there is no hidden per-machine profile file.",
+    "accepted by `--machine`; there is no hidden per-machine workflow file.",
     "",
     "IT IS NEVER DERIVED. Several recipes may fit any class, and choosing between",
     "them is operator judgement about recipe quality, not arithmetic on a VRAM",
@@ -140,8 +140,8 @@
       "platform": "any",
       "writer": "gemma-4-E2B",
       "writer_model": "google/gemma-4-E2B-it",
-      "note": "The physical RTX 4060 published documented episodes through the writer/video/voice/music path (2026-08-29) and later shipping-set graphs on the physical card (2026-09-13). LTX 2.5 also renders on 8 GB (~14 min a clip; known_limits) but is not the row's video default. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package. Image default is z_image_turbo.",
-      "proof_summary": "**EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; shipping-set graphs published 2026-09-13",
+      "note": "The physical RTX 4060 published documented episodes through the writer/video/voice/music path (2026-08-29) and later shipping-set workflows on the physical card (2026-09-13). LTX 2.5 also renders on 8 GB (~14 min a clip; known_limits) but is not the row's video default. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package. Image default is z_image_turbo.",
+      "proof_summary": "**EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; shipping-set workflows published 2026-09-13",
       "key": "8gb",
       "video": "animatediff15_v3_haunted_video",
       "image": "z_image_turbo",
@@ -157,7 +157,7 @@
           "hardware": "RTX 4060 8 GB",
           "episodes": 11,
           "date": "2026-09-13",
-          "scope": "six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29) plus four more on 2026-09-13, one for each 8 GB graph that ships -- otr_8gb_low, otr_8gb_still, otr_8gb_video and otr_8gb_animatediff, every one an act-count-1 episode published to obs on the physical card",
+          "scope": "six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29) plus four more on 2026-09-13, one for each 8 GB workflow that ships -- otr_8gb_low, otr_8gb_still, otr_8gb_video and otr_8gb_animatediff, every one an act-count-1 episode published to obs on the physical card",
           "evidence": "the 4060 drill log (retired 2026-09-24; in git history) steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK); the 4060 drill log (retired 2026-09-24; in git history) 2026-09-13 (shipping_set_20260913_045924, three filenames and byte counts verified on disk; the animatediff re-test at 14:04 verified as D:\\output\\otr\\obs\\the_strangling_flicker_20260913_140440__rfrc__adhv__none__koko__orig__q354b__mgen_final.mp4)"
         }
       ]
@@ -231,7 +231,7 @@
       "platform": "any",
       "writer": "Qwen3.5-4B",
       "writer_model": "Qwen/Qwen3.5-4B",
-      "note": "Largely unexplored. Windows first -- the pack is Windows-native and AMD ships a ROCm build of PyTorch for Radeon on Windows (ROCm 7.2.x) -- and Linux welcome. PyTorch ROCm presents through the cuda API, but no episode has published from AMD hardware. This row carries the shipped otr_amd_still graph's picks -- the unquantized Qwen3.5-4B writer, Z-Image Turbo stills and no-FP8 policies; these are candidates, not borrowed NVIDIA proof. AMD ships still/procedural motion over Z-Image Turbo stills until a video-diffusion lane publishes on AMD. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package. No AMD episode has published on either.",
+      "note": "Largely unexplored. Windows first -- the pack is Windows-native and AMD ships a ROCm build of PyTorch for Radeon on Windows (ROCm 7.2.x) -- and Linux welcome. PyTorch ROCm presents through the cuda API, but no episode has published from AMD hardware. This row carries the shipped otr_amd_still workflow's picks -- the unquantized Qwen3.5-4B writer, Z-Image Turbo stills and no-FP8 policies; these are candidates, not borrowed NVIDIA proof. AMD ships still/procedural motion over Z-Image Turbo stills until a video-diffusion lane publishes on AMD. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package. No AMD episode has published on either.",
       "key": "amd",
       "device_backend": "cuda",
       "video": "still_motion",

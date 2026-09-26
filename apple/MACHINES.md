@@ -199,7 +199,7 @@ This pack cannot fetch them, and no table here can tell you the filename, becaus
 **How you get the weights.** Two things do the fetching for an **auto** row, and
 neither of them is a script you have to run: the engine's own library pulls it
 through the Hugging Face cache, or `OTR_WorkflowValidator` -- a node inside the
-graph -- downloads it at queue time. A **manual** row may still have a helper in
+workflow -- downloads it at queue time. A **manual** row may still have a helper in
 `scripts/`, but `scripts/` is not in the registry bundle, so from a normal
 install it is a step you take by hand and it is labelled as one.
 

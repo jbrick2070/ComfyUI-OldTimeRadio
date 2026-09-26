@@ -17,7 +17,7 @@ you the whole episode.
 You do not have to choose -- every pre-set workflow already ships a writer that
 fits its own tier. Which one depends on which workflow you opened:
 
-| Graph | Both slots ship |
+| Workflow | Both slots ship |
 |---|---|
 | 8 GB NVIDIA, AMD | **one Qwen row** (`Qwen/Qwen3.5-4B`). NVIDIA bakes NF4. There is no `:nf4` picker entry. |
 | 16 GB Mac, canonical | **the same Qwen row**. Mac loads full (`none`). |

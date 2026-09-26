@@ -11,18 +11,18 @@ work and what has been tested."* He is right. A reader arriving with a card in
 their machine wants one row, not a narrative of how the row was discovered.
 
 WHY IT IS GENERATED. The stranger-facing machine answer, proof receipts, and
-measurements come from `config/machine_classes.json`; experimental profile
+measurements come from `config/machine_classes.json`; experimental workflow
 detail comes from `config/workflow_matrix.json`. A hand-written compatibility table
 is the single most rot-prone document a project can own.
 
 THE CONFIDENCE LEVELS ARE NOT THE SAME CLAIM, and the table says which:
-  * `shipping` / `draft` come from the profile's own `status` field -- the
+  * `shipping` / `draft` come from the workflow's own `status` field -- the
     project's standing judgement about whether a combination is ready.
   * PROVEN means an episode actually rendered and published, with the evidence
     named in the notes below the table. That is a much stronger claim than
     `shipping`, and only a handful of rows have it.
   * LAB-PROVEN means an isolated recipe produced receipt-bearing media on the
-    named physical hardware. It does not promote a full OTR profile.
+    named physical hardware. It does not promote a full OTR workflow.
 Nothing here is inferred from "it looks like it should fit". A blank is an
 honest unknown.
 """
@@ -43,7 +43,7 @@ _REPO = os.path.dirname(_HERE)
 _CLASS_FILE = os.path.join(_REPO, "config", "machine_classes.json")
 
 #: Not a profile: a mapping config that lives in the same directory and would
-#: otherwise render as a "draft profile not vouched for".
+#: otherwise render as a "draft workflow not vouched for".
 _NOT_PROFILES = {"widget_mapping"}
 
 
@@ -67,8 +67,8 @@ def load_engine_evidence() -> list:
     """Load and validate receipt-backed engine/hardware proof rows.
 
     This is deliberately separate from machine-class proof. A class receipt
-    says its recommended full profile published; an engine evidence row can
-    also preserve a narrower isolated lab result without promoting that profile.
+    says its recommended full workflow published; an engine evidence row can
+    also preserve a narrower isolated lab result without promoting that workflow.
     """
     try:
         doc = json.load(io.open(_CLASS_FILE, encoding="utf-8"))
@@ -449,7 +449,7 @@ def render() -> str:
         A("* **%s** -> `<ComfyUI Python> scripts/otr_provision.py --machine %s --list`"
           % (row.get("label"), row.get("key")))
     A("\nProvisioning installs and verifies artifacts; it does not rewrite the "
-      "saved graph. To apply one row atomically to the real canonical workflow "
+      "saved workflow. To apply one row atomically to the real canonical workflow "
       "on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/"
       "otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 "
       "--machine 8gb --act-count 1 --source-bank original --visual-style "
@@ -477,13 +477,13 @@ def render() -> str:
       "a 2m07s episode to `otr/obs/` in 19 minutes 54 seconds. The writer is "
       "nearly all of that: Qwen3.5-4B generates at about 3 tokens a second "
       "on a CPU, while Kokoro runs at 0.12x realtime and the procedural "
-      "video lanes draw their own frames. A second CPU-only graph published "
-      "the same day in 34.5 minutes; that graph (`otr_cpu_low`) was retired "
+      "video lanes draw their own frames. A second CPU-only workflow published "
+      "the same day in 34.5 minutes; that workflow (`otr_cpu_low`) was retired "
       "on 2026-09-23 because its writer was a Comfy Credits slot, which made "
       "it a cloud tier with procedural visuals -- `otr_cloud_low` pays the "
       "same writer and gets real stills and cloud video. The canonical "
       "receipt above is unaffected and is the one that matters: CPU-only "
-      "works on the graph the quickstart actually tells you to open.\n")
+      "works on the workflow the quickstart actually tells you to open.\n")
     A("")
 
     A("## How to read the confidence column\n")

@@ -27,7 +27,7 @@ ship 3.13, where that build cannot be installed, so a non-English
 than speaking it in English. Use a 3.10-3.12 venv if you want to hear
 another language.
 
-Change nothing else in the graph. You need an NVIDIA card with 8 GB or more, a 16 GB
+Change nothing else in the workflow. You need an NVIDIA card with 8 GB or more, a 16 GB
 Apple Silicon Mac, or just a CPU (start ComfyUI with `--cpu`; slow but it works),
 plus about 25 GB of free disk. No account, no API key, nothing paid. If a step
 fails, [Make an episode](#make-an-episode) below walks through each one.
@@ -55,7 +55,7 @@ vinegar syndrome through one night in the lab. Written, cast, performed, scored,
 drawn and cut on one machine, from a Library of Congress feed. Its sound effects
 are not a library: this episode ran the foley lane (<code>otr_16gb_foley</code>),
 where the video model generates the scene's own audio and the workflow mixes it
-under the voices. The default graph draws its pictures from the audio instead;
+under the voices. The default workflow draws its pictures from the audio instead;
 the foley lane is a 16 GB pick, not the starting point.</em></p>
 
 That is how every episode opens. What follows is a radio drama nobody has heard
@@ -151,16 +151,16 @@ What those lanes turn on, and how to pick a hosted writer, is
 working ComfyUI (Desktop, portable or a git install -- any of them), about
 **25 GB of free disk** -- the first run fetches roughly 12 GB of models, and an
 episode's working files need room too -- and one of the machines below. You do not need an account, an API key, a paid
-service, or any of the saved graphs further down this page:
+service, or any of the saved workflows further down this page:
 those are per-machine presets you can grow into. Installing the pack and
 pressing **Queue** is the whole path.
 
 | Your machine | What to expect on a first short episode |
 |---|---|
 | NVIDIA, 16 GB or more | Minutes for a one-act show. Every default is proven here, and all but the heaviest video lanes are open to you. |
-| NVIDIA, 10 to 15 GB | Minutes. The defaults are proven both above and below you, so run the canonical as shipped. No pre-set graph exists for this class yet. |
+| NVIDIA, 10 to 15 GB | Minutes. The defaults are proven both above and below you, so run the canonical as shipped. No pre-set workflow exists for this class yet. |
 | NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
-| Apple Silicon, 16 GB | **It runs.** Every Mac graph published a finished episode on a 16 GB M4 on 2026-09-13 -- the writer is the same Qwen3.5-4B the canonical ships, unquantized, unchanged. Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first anyway: memory is unified, so an out-of-memory here can reboot the machine, and the fit has no margin for anything else running. |
+| Apple Silicon, 16 GB | **It runs.** Every Mac workflow published a finished episode on a 16 GB M4 on 2026-09-13 -- the writer is the same Qwen3.5-4B the canonical ships, unquantized, unchanged. Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first anyway: memory is unified, so an out-of-memory here can reboot the machine, and the fit has no margin for anything else running. |
 | No GPU at all | About twenty minutes, and it works -- measured, not assumed. Start ComfyUI with `--cpu`. |
 | AMD | **It runs.** First full episode off a Radeon on 2026-09-14 -- RDNA4 (R9700), Ubuntu 24.04, ROCm 7.2, clean pass. Still tier only, and RDNA3 / Windows / 8 GB are untested. [apple/ROCM.md](apple/ROCM.md) has the receipt and what is still open. |
 
@@ -209,10 +209,10 @@ pauses on `[OldTimeRadio]` lines, that is what it is doing.
 comfyui-old-time-radio** (the entry is named after the pack's folder, so a git
 clone lists it as **ComfyUI-OldTimeRadio**). Open **`otr_canonical`** and press
 **Queue** -- it runs on any machine. (The other entries are the same show preset
-for one machine each; see [A graph pre-set for your
-machine](#a-graph-pre-set-for-your-machine).) (If the gallery lists it but opening it fails, drag
+for one machine each; see [A workflow pre-set for your
+machine](#a-workflow-pre-set-for-your-machine).) (If the gallery lists it but opening it fails, drag
 `custom_nodes/ComfyUI-OldTimeRadio/workflows/otr_canonical.json` onto the canvas
-instead -- same graph, and it has happened.) You do not have to change anything: every dropdown already
+instead -- same workflow, and it has happened.) You do not have to change anything: every dropdown already
 holds a working value, and the ones set to *roll* pick for themselves, so two runs
 in a row give you two different shows.
 
@@ -310,7 +310,7 @@ folder name is historical; the guides cover every platform.)
 | [apple/ROCM.md](apple/ROCM.md) | What is different on AMD? |
 | [apple/RUNPOD.md](apple/RUNPOD.md) | How do I rent a GPU for a lane my card cannot hold? |
 | [apple/CLOUD.md](apple/CLOUD.md) | How do I turn on a paid writer? |
-| [apple/EXTENDING.md](apple/EXTENDING.md) | How do I add an engine, bank, writer, or language? A video lane that is only new weights is the short case, and it is a dropdown entry rather than a new graph. |
+| [apple/EXTENDING.md](apple/EXTENDING.md) | How do I add an engine, bank, writer, or language? A video lane that is only new weights is the short case, and it is a dropdown entry rather than a new workflow. |
 | [apple/PREFLIGHT.md](apple/PREFLIGHT.md) | Will what I built actually work? |
 | [apple/LLM_PREFLIGHT.md](apple/LLM_PREFLIGHT.md) | How do I add a writer LLM? |
 
@@ -431,7 +431,7 @@ ledger (`episode_canon.json`) recording what actually ran.
 The engine dropdowns live on **OTR_VideoDirector** (video and image roles),
 **OTR_CastLock** (the two voice slots) and **OTR_StableAudioTheme** (music). The
 writer dropdowns are on **OTR_LedgerScriptWriter**. You never need every weight
-in this workflow: one graph ships, and its dropdowns decide what it loads.
+in this workflow: one workflow ships, and its dropdowns decide what it loads.
 
 | role | the canonical ships | what it costs |
 |---|---|---|
@@ -457,11 +457,11 @@ will not.
 
 ---
 
-## A graph pre-set for your machine
+## A workflow pre-set for your machine
 
 `otr_canonical` names no vendor anywhere and resolves your device at run time,
 so it is correct as shipped on NVIDIA, Apple Silicon and CPU. If you would rather
-skip the dropdowns, the pack also ships **a generated graph per machine, right
+skip the dropdowns, the pack also ships **a generated workflow per machine, right
 beside the canonical in Browse Templates** (and in
 `custom_nodes/ComfyUI-OldTimeRadio/workflows/`) -- one per machine class and
 episode kind, named `otr_<machine>_<kind>`. Pick one from the menu, drag the file
@@ -476,15 +476,15 @@ diffusion. **foley** is video that generates its own sound, mixed under the
 voices; **mime** is the same render as a silent performance -- the video's
 own sound carries its beats and the voices and music are muted there.
 **animatediff** is SD 1.5 motion driven by the text prompt alone; it mints
-no still. Kokoro voices on every graph; the upscaler is off.
+no still. Kokoro voices on every workflow; the upscaler is off.
 
 **Each machine-tier preset opens at three acts and three characters, and the hardware proof
 behind `shipping` was a one-act episode.** The qualification run smokes every
-graph in a night, which means overriding the act count; the preset itself is
+workflow in a night, which means overriding the act count; the preset itself is
 unchanged and is what you get when you open it. Both facts are true and neither
 implies the other.
 
-Every pre-set graph scores with **Stable Audio 3**, the same engine the
+Every pre-set workflow scores with **Stable Audio 3**, the same engine the
 canonical opens on -- ungated, and commercially clean. The one exception is
 the CPU preset, which scores with **MusicGen**, because Stable Audio 3 declares
 CUDA and Metal only. MusicGen is noncommercial (see
@@ -495,19 +495,19 @@ Which file to open, what each engine costs, and every hand-fetched weight:
 [apple/MACHINES.md](apple/MACHINES.md).
 
 Every
-`shipping` graph in that table has put a finished episode into `otr/obs/`
+`shipping` workflow in that table has put a finished episode into `otr/obs/`
 on the hardware its row names, all on 2026-09-13, the day 2.0.0 was published:
 the 8 GB rows on a physical RTX 4060 laptop, which by now
 has published 11 documented full OTR episodes through this pack; the 16 GB rows
 on an RTX 5080 laptop; the Apple rows on a Mac mini M4 with 16 GB; and the CPU
 row on that same 5080 laptop with
 ComfyUI started in `--cpu` mode, the card present and unused. `draft` means not
-yet promoted -- it is a status, not a verdict on proof: the AMD stills graph
+yet promoted -- it is a status, not a verdict on proof: the AMD stills workflow
 reads `draft` and has an outside tester's published episode behind it.
 
 `scripts/otr_provision.py` needs the **git clone**: `scripts/` is not in a
-Manager install. The saved graphs in `workflows/` need nothing but a pick from
-Browse Templates, and the weights a graph selects download at queue time whenever the pack
+Manager install. The saved workflows in `workflows/` need nothing but a pick from
+Browse Templates, and the weights a workflow selects download at queue time whenever the pack
 can fetch them itself.
 
 A few engines build their graph out of another pack's nodes. Those are ComfyUI
@@ -528,7 +528,7 @@ that names the pack and its URL.
 
 **Most engines fetch their own weights** the first time a dropdown selects them
 -- either through the engine's own library and the Hugging Face cache, or through
-`OTR_WorkflowValidator`, a node inside the graph that looks at what you actually
+`OTR_WorkflowValidator`, a node inside the workflow that looks at what you actually
 picked and pulls only that, before the writer runs. Two places, both inside
 your ComfyUI models tree:
 
@@ -546,7 +546,7 @@ your ComfyUI models tree:
   it later creates a second cache rather than moving the first.
 
 **You do not need a Hugging Face token to run OTR.** Everything the canonical
-selects, and everything the 8 GB and Mac graphs select, is ungated. A token is
+selects, and everything the 8 GB and Mac workflows select, is ungated. A token is
 needed only for the handful of gated rows -- `google/gemma-2-2b-it` and
 `stable_audio_music` -- and for those you accept the licence on
 the model's page while signed in, then log in locally once:
@@ -556,7 +556,7 @@ hf auth login
 ```
 
 **Never paste a token into a workflow widget.** No node here asks for one, and a
-value saved into a graph travels with it -- into every workflow you share, every
+value saved into a workflow travels with it -- into every workflow you share, every
 queue entry, and the metadata of every image you generate. A token in the login
 file, or in `HF_TOKEN` in the environment that launches ComfyUI, is the whole
 setup. ComfyUI Desktop on Windows does not inherit user-scope environment
@@ -655,7 +655,7 @@ throwing an episode away. Install a full ffmpeg (`winget install Gyan.FFmpeg`,
 `brew install ffmpeg`, or a static Linux build) and the next run has them.
 
 **It ran, but nothing showed up in ComfyUI.** The last node draws one still
-from the finished episode; nothing else in the graph draws anything, and the
+from the finished episode; nothing else in the workflow draws anything, and the
 still is skipped rather than retried if it cannot be made. Either way the
 episode is a file: look in `<your ComfyUI output folder>/otr/obs/` for the
 finished `.mp4`, and in `otr/episodes/<episode>/` for the working files it was
@@ -699,7 +699,7 @@ holds, so it ships off; on a much larger model the switch is
 
 **AMD has a receipt.** An outside tester ran
 `otr_amd_still.json` end to end on a Radeon AI PRO R9700
-(RDNA4) under ROCm 7.2 on Ubuntu 24.04, 2026-09-14, with no edits to the graph,
+(RDNA4) under ROCm 7.2 on Ubuntu 24.04, 2026-09-14, with no edits to the workflow,
 and published a finished episode. Nobody on the project owns a Radeon, so what
 is proven is the still tier on that one card: RDNA3, Windows and an 8 GB AMD
 workflow are still unmeasured. `otr_amd_still` ships `draft` because `status`

@@ -415,7 +415,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_8gb_ltx25_native_audio_in
 
 - file: `workflows/otr_8gb_ltx25_native_audio_in.json`
-- workflow: `otr_8gb_ltx25_native_audio_in` (8 GB NVIDIA (Ada or newer) -- AUDIO-IN: every beat -- announcer, character, and music -- is conditioned on its own real waveform, so the picture follows the sound instead of inventing it. A character beat is conditioned on that character's own clean voice, never the ambient master mix: render_driver._uses_ambient_master_audio already excludes character-face beats from the ambient slice (2026-06-26), so the audio-in lane was never actually unsafe for character faces -- an earlier note here claimed otherwise and was wrong. On the same mix4x8 weights the proven 8 GB foley lane already downloads, so this lane costs no new files. Modality guidance rises from 1.0 -- where it is a documented no-op -- to 3.0, which strengthens the cross-modal coupling and costs one extra forward pass per step while it is active, so this lane is slower than the foley lane's. mix4x8 measured 707.0 s for a 97-frame clip on a 4060. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The 12.86 GB transformer exceeds 8 GB and therefore streams, and the Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately, so its 9.88 GB lands in host RAM rather than VRAM. Measured on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". NOT PROVEN ON A LEG ANYWHERE, AND THAT IS A WARNING RATHER THAN A FORMALITY: the audio-in engine has never completed an episode at any tier, it asks for a third required input (audio_ref) that no other lane needs, and the 24 GB workflow it is modelled on carries the same caveat. Expect to debug it. Run otr_8gb_ltx25_native_foley if you want a lane that works today.)
+- workflow: `otr_8gb_ltx25_native_audio_in` (8 GB NVIDIA (Ada or newer) -- AUDIO-IN: every beat -- announcer, character, and music -- is conditioned on its own real waveform, so the picture follows the sound instead of inventing it. A character beat is conditioned on that character's own clean voice, never the ambient master mix, so this lane is safe for character faces -- an earlier note here claimed otherwise and was wrong. On the same mix4x8 weights the proven 8 GB foley lane already downloads, so this lane costs no new files. Modality guidance rises from 1.0 -- where it is a documented no-op -- to 3.0, which strengthens the cross-modal coupling and costs one extra forward pass per step while it is active, so this lane is slower than the foley lane's. mix4x8 measured 707.0 s for a 97-frame clip on a 4060. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The 12.86 GB transformer exceeds 8 GB and therefore streams, and the Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately, so its 9.88 GB lands in host RAM rather than VRAM. Measured on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". NOT PROVEN ON A LEG ANYWHERE, AND THAT IS A WARNING RATHER THAN A FORMALITY: the audio-in engine has never completed an episode at any tier, it asks for a third required input (audio_ref) that no other lane needs, and the 24 GB engine it is modelled on carries the same caveat. Expect to debug it. Run otr_8gb_ltx25_native_foley if you want a lane that works today.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `a24d71b513bf965165b1c129ac1d30f3e600c5f4d55758d43d5631ff03b1c856`
@@ -634,7 +634,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_amd_still
 
 - file: `workflows/otr_amd_still.json`
-- workflow: `otr_amd_still` (AMD ROCm (an outside tester published an episode from this graph on a Radeon AI PRO R9700 under ROCm 7.2, 2026-09-14, no edits). A still image with motion, Kokoro voices, Stable Audio 3. quant_policy is 'none' because bitsandbytes on ROCm is unmeasured -- see apple/ROCM.md.)
+- workflow: `otr_amd_still` (AMD ROCm (an outside tester published an episode from this workflow on a Radeon AI PRO R9700 under ROCm 7.2, 2026-09-14, no edits). A still image with motion, Kokoro voices, Stable Audio 3. quant_policy is 'none' because bitsandbytes on ROCm is unmeasured -- see apple/ROCM.md.)
 - status: draft
 - platform/backend/vendor: any/cuda/amd
 - master_hash: `de20122e99d56f893e4701c8f89a0e8eccd36b74f3752fe1c46ba6c1a2e1518e`
@@ -800,7 +800,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_cloud_low_1act
 
 - file: `workflows/otr_cloud_low_1act.json`
-- workflow: `otr_cloud_low_1act` (Comfy Cloud 1-act trial -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), same cheapest partners as the 3-act and 5-act graphs (Vidu Q2 Pro Fast I2V). Short paid-length smoke. Needs OTR_COMFY_API_KEY.)
+- workflow: `otr_cloud_low_1act` (Comfy Cloud 1-act trial -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), same cheapest partners as the 3-act and 5-act workflows (Vidu Q2 Pro Fast I2V). Short paid-length smoke. Needs OTR_COMFY_API_KEY.)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
 - master_hash: `44e65640a738a4ab27bc475529f7882e3a1224a4264b1935f47d4376391c9991`
@@ -842,7 +842,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_cloud_low_5act
 
 - file: `workflows/otr_cloud_low_5act.json`
-- workflow: `otr_cloud_low_5act` (Comfy Cloud 5-act -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), same cheapest partners as the 1-act trial and 3-act graphs (Vidu Q2 Pro Fast I2V). Long paid-length episode. Needs OTR_COMFY_API_KEY.)
+- workflow: `otr_cloud_low_5act` (Comfy Cloud 5-act -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), same cheapest partners as the 1-act trial and 3-act workflows (Vidu Q2 Pro Fast I2V). Long paid-length episode. Needs OTR_COMFY_API_KEY.)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
 - master_hash: `8ce80d03648246519a96099887a6449395b9de120098ee37c43d278d4cf5d667`

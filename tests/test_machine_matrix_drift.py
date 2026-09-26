@@ -227,9 +227,9 @@ def test_engine_evidence_separates_published_and_lab_proof():
     assert "| `minimax_h3_fl2va_raw_recipe` (MiniMax H3 FL2VA raw ComfyUI recipe with native audio) | **LAB-PROVEN** | RTX 4060 Laptop, 8 GB, Ada |" in text
     assert "setup, model load, queued prompt, reserve clamp" in text
     assert "## Hardware episode receipts, with their exact scope" in text
-    # 2026-09-13: four more 4060 episodes, one per 8 GB graph in the shipping set.
+    # 2026-09-13: four more 4060 episodes, one per 8 GB workflow in the shipping set.
     assert "RTX 4060 8 GB -- 11 episode(s)" in text
-    assert "shipping-set graphs published 2026-09-13" in text
+    assert "shipping-set workflows published 2026-09-13" in text
     assert "exact row tuple and unlisted cards unproven" in text
 
 

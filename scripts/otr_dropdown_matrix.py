@@ -347,7 +347,7 @@ def os_friction() -> dict:
 def writer_rows() -> list:
     """The WRITER dimension, which this table was silent about entirely.
 
-    THE GAP THIS CLOSES. Every shipped graph needs a writer LLM, and every one
+    THE GAP THIS CLOSES. Every shipped workflow needs a writer LLM, and every one
     of the seven episodes published on the M4 used the same one -- yet neither
     this document nor its curated file mentioned writers at all. A per-dropdown
     matrix that omits the dimension carrying the largest single download, and
@@ -629,7 +629,7 @@ _LEGEND = """
 **How you get the weights.** Two things do the fetching for an **auto** row, and
 neither of them is a script you have to run: the engine's own library pulls it
 through the Hugging Face cache, or `OTR_WorkflowValidator` -- a node inside the
-graph -- downloads it at queue time. A **manual** row may still have a helper in
+workflow -- downloads it at queue time. A **manual** row may still have a helper in
 `scripts/`, but `scripts/` is not in the registry bundle, so from a normal
 install it is a step you take by hand and it is labelled as one.
 
@@ -864,7 +864,7 @@ def packs_by_engine() -> dict:
 
 
 def _variant_for(profile_id: str) -> str:
-    """The saved graph a matrix row emits, by `build_variants.py`'s own rule.
+    """The saved workflow a matrix row emits, by `build_variants.py`'s own rule.
 
     `build_variants._variant_stem` prefixes `otr_` unless the id already carries
     it, and `_committed_profile_ids` refuses outright when a bare `X` would
@@ -960,9 +960,9 @@ def graph_engine_values(path: str) -> set:
     return out
 
 
-#: A graph someone actually RAN to a published episode, and where the receipt
-#: is. A profile's `status` field does NOT track this -- `otr_amd_still` carries
-#: an outside tester's finished episode and its profile still reads `draft` --
+#: A workflow someone actually RAN to a published episode, and where the receipt
+#: is. A workflow's `status` field does NOT track this -- `otr_amd_still` carries
+#: an outside tester's finished episode and its status still reads `draft` --
 #: so reading `status` alone concluded "AMD has never run" twice in one session,
 #: once in this generator's own prose. Proof lives here; `status` stays a
 #: promotion decision.
@@ -995,11 +995,11 @@ def recommended_graph(profile_id: str) -> tuple:
     graph = _variant_for(profile_id)
     full = os.path.join(_REPO, graph)
     if not os.path.exists(full):
-        return ("workflows/otr_canonical.json", "no per-machine graph is generated")
+        return ("workflows/otr_canonical.json", "no per-machine workflow is generated")
     blocked = sorted(graph_engine_values(full) & stripped_engines())
     if blocked:
         return ("workflows/otr_canonical.json",
-                "the per-machine graph selects %s, which is not in an installed "
+                "the per-machine workflow selects %s, which is not in an installed "
                 "copy" % ", ".join("`%s`" % b for b in blocked))
     if status != "shipping":
         # A graph in the shipping set (2026-09-13) is the answer even while
@@ -1016,7 +1016,7 @@ def recommended_graph(profile_id: str) -> tuple:
                 return (graph, receipt)
             return (graph, "in the shipping set, not yet proven on this hardware")
         return ("workflows/otr_canonical.json",
-                "the per-machine graph is still a draft")
+                "the per-machine workflow is still a draft")
     return (graph, "")
 
 
@@ -1218,7 +1218,7 @@ def _profile_engines(profile_id: str) -> set:
         # A recipe legitimately names the DROPDOWN LABEL a human sees
         # (`h3_low_video`) rather than the internal id (`minimax_h3_video`).
         # There is exactly one function that maps one to the other; a substring
-        # test is not a second one, and using it credited every profile with
+        # test is not a second one, and using it credited every workflow with
         # every engine.
         try:
             engine = public.resolve_engine_id(name)
