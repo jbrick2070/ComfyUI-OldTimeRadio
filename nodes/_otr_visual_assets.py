@@ -1178,9 +1178,16 @@ def _boot_fix(bc, known, state):
         clauses.append("without --cpu")
     if spec["disable_pinned_memory"] and not state.get("disable_pinned_memory"):
         clauses.append("with --disable-pinned-memory")
+    sage_unread = (spec["sage_attention"] is False
+                   and state.get("sage_attention") is None)
     if clauses:
-        return "Restart ComfyUI " + " and ".join(clauses), unmet
-    if spec["sage_attention"] is False and state.get("sage_attention") is None:
+        fix = "Restart ComfyUI " + " and ".join(clauses)
+        if sage_unread:
+            # Name the unreadable Sage too, not only the flag that is wrong
+            # (Sonnet review, 205e96ad).
+            fix += ", and confirm it runs without SageAttention (the check could not read it)"
+        return fix, unmet
+    if sage_unread:
         return ("Could not confirm ComfyUI is running without SageAttention",
                 unmet)
     return "Restart ComfyUI to match the %r boot" % best, unmet

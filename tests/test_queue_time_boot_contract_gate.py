@@ -51,6 +51,17 @@ def test_sage_and_cpu_together_name_both():
         "Restart ComfyUI without SageAttention and without --cpu --")
 
 
+def test_an_unreadable_sage_beside_cpu_names_both():
+    """Sage unread AND --cpu on: the lead names the --cpu fix and the
+    unreadable Sage, not the flag alone (Sonnet review, 205e96ad)."""
+    state = dict(STOCK, cpu=True, sage_attention=None, sage_probe_error="probe raised")
+    with pytest.raises(va.VisualAssetError) as info:
+        va._refuse_unmet_boot_contracts({"minimax_h3_video"}, state=state)
+    msg = str(info.value)
+    assert msg.startswith("Restart ComfyUI without --cpu, and confirm it runs "
+                          "without SageAttention")
+
+
 def test_a_lab_only_engine_is_told_to_turn_pinned_memory_off(monkeypatch):
     """h3_8gb_lab still needs pinned memory off; an engine that accepts ONLY
     that boot is told so."""
