@@ -346,11 +346,14 @@ def test_video_lane_sets_the_three_video_dropdowns_as_the_app_does(tmp_path):
     assert rc == 0
     director = _node(json.loads(dump.read_text(encoding="utf-8")),
                      "OTR_VideoDirector")["inputs"]
-    pick = _video_pick("minimax_h3_video")
+    # The literal label the app's dropdown shows -- not recomputed through the
+    # lookup the code under test uses (Sonnet review, 9e677825).
+    pick = "h3_low_video (16:9)"
     for widget in canonical.VIDEO_LANE_WIDGETS:
         assert director[widget] == pick, widget
         assert f"OTR_VideoDirector.{widget}={pick!r}" in out
     assert "row model check skipped" in out
+    assert "preflight downloads and checks" in out
     rc, _ = _run_main([
         "--offline-schemas", "--dry-run", "--profile", "otr_16gb_video",
         "--dump-prompt", str(tmp_path / "row.json"),
@@ -360,6 +363,34 @@ def test_video_lane_sets_the_three_video_dropdowns_as_the_app_does(tmp_path):
     for widget in ("announcer_image_model", "character_image_model",
                    "music_image_model"):
         assert director[widget] == row_director[widget], widget
+
+
+def test_video_lane_warns_when_nothing_checks_the_lanes_weights(tmp_path):
+    """HuMo is in the dropdown but the pack does not download it, so no
+    preflight checks its weights; the runner must say so, not imply one does."""
+    rc, out = _run_main([
+        "--offline-schemas", "--dry-run",
+        "--profile", "otr_16gb_video",
+        "--video-lane", "humo_1.7B",
+        "--dump-prompt", str(tmp_path / "prompt.json"),
+    ])
+    assert rc == 0
+    assert "nothing checks its weights before the run" in out
+
+
+def test_video_lane_applies_after_a_machine_key_too(tmp_path):
+    dump = tmp_path / "prompt.json"
+    rc, out = _run_main([
+        "--offline-schemas", "--dry-run",
+        "--machine", "16gb",
+        "--video-lane", "h3_low_video",
+        "--dump-prompt", str(dump),
+    ])
+    assert rc == 0
+    director = _node(json.loads(dump.read_text(encoding="utf-8")),
+                     "OTR_VideoDirector")["inputs"]
+    for widget in canonical.VIDEO_LANE_WIDGETS:
+        assert director[widget] == "h3_low_video (16:9)", widget
 
 
 def test_video_lane_refuses_a_name_that_is_not_in_the_dropdown(tmp_path):

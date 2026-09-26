@@ -111,12 +111,34 @@ def _apply_video_lane(workflow: dict, schemas: dict, lane: str) -> list[str]:
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
     from nodes._otr_shared.public_engines import resolve_engine_id
+    from nodes._otr_visual_assets import VisualAssetError, planned_downloads
     from nodes.otr_video_director import exact_menu_option_for
+    engine = resolve_engine_id(str(lane))
     try:
-        option = exact_menu_option_for(resolve_engine_id(str(lane)))
+        option = exact_menu_option_for(engine)
     except ValueError as exc:
         raise SystemExit(
             f"--video-lane {lane!r} is not a video lane in the dropdown ({exc})")
+    # Say plainly whether anything checks this lane's weights before the run.
+    # The queue-time preflight downloads and checks only the lanes the pack
+    # fetches itself; for any other lane a missing file surfaces when the lane
+    # loads -- the same as picking it in the app (Sonnet review, 9e677825).
+    try:
+        fetched = planned_downloads({engine})
+    except VisualAssetError as exc:
+        fetched = set()
+        print(f"[canonical-api] video lane {lane!r}: the queue-time preflight "
+              f"will refuse it ({exc})", flush=True)
+    else:
+        if fetched:
+            print(f"[canonical-api] video lane {lane!r}: the queue-time "
+                  f"preflight downloads and checks its {len(fetched)} weight "
+                  f"file(s)", flush=True)
+        else:
+            print(f"[canonical-api] WARNING video lane {lane!r}: the pack does "
+                  f"not download this lane, so nothing checks its weights "
+                  f"before the run; a missing file shows up when the lane "
+                  f"loads", flush=True)
     director = _node_id_for(workflow, "OTR_VideoDirector")
     applied = []
     for widget in VIDEO_LANE_WIDGETS:
@@ -216,8 +238,8 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
         applied.append(f"profile={args.profile}")
         if getattr(args, "video_lane", None):
             # The row's required models belong to the video lane it names,
-            # which --video-lane replaces; the queue-time preflight fetches
-            # and checks the chosen lane's own weights instead.
+            # which --video-lane replaces; _apply_video_lane says what, if
+            # anything, checks the chosen lane's weights instead.
             print("[canonical-api] preflight: row model check skipped -- "
                   "--video-lane replaces the row's video lane", flush=True)
         else:
