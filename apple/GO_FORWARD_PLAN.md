@@ -176,7 +176,11 @@ clean, full suite green.
   * `ltx25_mime_24gb`, `ltx25_audio_in_24gb` -- auto-download
     (int8 transformer + the same shared files). Prove on a 24 GB pod; one pod
     session can prove all three.
-  * `minimax_h3_video` and `minimax_h3_audio_in` (dropdown names
+  * DONE 2026-09-26 (`32c1d7f9`): both now auto-download at queue time from
+    pinned specs, and a queue-time gate refuses a boot H3 cannot run on --
+    LIVE on a stock 5080 boot: refused in 2 s, restart flags first, nothing
+    downloaded. Owed: a leg on a box WITHOUT the weights, proving the fetch.
+    Was: `minimax_h3_video` and `minimax_h3_audio_in` (dropdown names
     `h3_low_video`, `h3_low_audio_in`; no workflow selects either) -- KEEP
     and MAKE THEM AUTO-DOWNLOAD (operator: "keep them as long as they are
     auto download"; "MiniMax 3 is popular, so people have it"). Today they

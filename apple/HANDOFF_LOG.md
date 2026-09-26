@@ -56,6 +56,12 @@ Suite: 16928 passed, 0 failed at f011bb79 (full); every later chunk ran its
     at 88211ed2, Lemmy forced in: PASS 9:26, cold_iron_hum_20260926_053814,
     Lemmy = kokoro bm_george (his recurring voice). README Known failures now
     says the suite is green.
+  32c1d7f9 0b2 MINIMAX H3 AUTO-DOWNLOAD (Opus worker; the driver added the
+    queue-time boot gate the worker flagged -- without it a stock boot would
+    fetch ~39 GB, write and voice, then refuse at the first video beat). LIVE
+    on a stock 5080 boot: h3_low_video refused in 2 s, restart flags first,
+    nothing downloaded. For his eye: H3_LICENSE_ATTESTATION section 3 still
+    says his own hardware only.
 STILL RUNNING: the 4060 re-run of B7/B5/B6 at 0d44385c (background agent).
 OWED (Sprint 3, the final regression): the 4060 B4 free-RAM re-measure on
   f011bb79+; B5/B6/B7 results; 2.3.7 on his word (the registry Banner line
