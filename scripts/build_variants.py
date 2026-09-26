@@ -134,13 +134,14 @@ def _pack_identity_failures(paths, version: str) -> list[str]:
     return out
 
 
-#: APP MODE (plan row 0e; operator 2026-09-25: "Both"). ComfyUI's app view
-#: shows a workflow as a form: `extra.linearMode` opens it that way and
-#: `extra.linearData.inputs` is the form, top to bottom, in list order. Every
-#: per-machine workflow gets the STORY-ONLY form -- the card is the lane, its
-#: machine tuning stays hidden -- and one extra generated file,
-#: workflows/otr_app.json, is the canonical with the ADVANCED form (every
-#: picker, in the operator's order). The canonical itself carries neither:
+#: APP MODE (plan row 0e). ComfyUI's app view shows a workflow as a form:
+#: `extra.linearData.inputs` is the form, top to bottom, in list order, and
+#: `extra.linearMode` opens the workflow straight into it. ONE FORM everywhere,
+#: in the operator's order (2026-09-26, after seeing the story-only form live:
+#: "story, models, My Story at the bottom"). The per-machine workflows OPEN ON
+#: THE GRAPH (his call) and reach the form through the App button; one extra
+#: generated file, workflows/otr_app.json, is the canonical opened AS the app.
+#: The canonical itself carries neither:
 #: it is the workflow the operator edits on the canvas, and a flag there
 #: would open ITS gallery card as an app too. (The cards would not inherit
 #: it: `stamp_app_mode` overwrites each card's form after `apply_profile`.)
@@ -229,16 +230,18 @@ def app_linear_data(workflow: dict, list_key: str, config=None) -> dict:
     return {"inputs": inputs, "outputs": [output["id"]]}
 
 
-def stamp_app_mode(workflow: dict, list_key: str, config=None) -> dict:
-    """Open this workflow as an app with the named form. In place."""
+def stamp_app_mode(workflow: dict, list_key: str = "form", config=None, *,
+                   open_as_app: bool) -> dict:
+    """Give this workflow the named form; open it AS the app only when asked.
+    In place. The form is reachable from the App button either way."""
     extra = workflow.setdefault("extra", {})
-    extra["linearMode"] = True
+    extra["linearMode"] = bool(open_as_app)
     extra["linearData"] = app_linear_data(workflow, list_key, config)
     return workflow
 
 
 def build_app(canonical=None) -> dict:
-    """workflows/otr_app.json: the canonical, opened as the advanced app.
+    """workflows/otr_app.json: the canonical, opened as the app.
 
     Runs on any machine for the canonical's reason -- it resolves its device
     at run time -- and carries the canonical's empty validator stamps, which
@@ -246,7 +249,7 @@ def build_app(canonical=None) -> dict:
     canonical = canonical if canonical is not None else _load_canonical()
     app = copy.deepcopy(canonical)
     app["id"] = workflow_id_for(Path(APP_WORKFLOW_NAME).stem)
-    stamp_app_mode(app, "advanced")
+    stamp_app_mode(app, "form", open_as_app=True)
     stamp_pack_identity(app, live_pack_version())
     return app
 #: EVERY LAUNCH RECIPE IN ONE GENERATED DOC (2026-09-25). They used to sit
@@ -384,7 +387,7 @@ def build_variant(profile_id: str, *, schemas=None, mapping=None,
     stamp_pack_identity(applied, live_pack_version())
     # `extra` and `id` sit outside semantic_master_hash by construction, so
     # neither moves the hash stamped below.
-    stamp_app_mode(applied, "story_only")
+    stamp_app_mode(applied, "form", open_as_app=False)
     applied["id"] = workflow_id_for(_variant_stem(profile_id))
     master_hash = semantic_master_hash(applied, mapping=mapping,
                                        schemas=schemas)

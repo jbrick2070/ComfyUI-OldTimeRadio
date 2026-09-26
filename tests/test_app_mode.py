@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Every shipped workflow opens as a ComfyUI app form (plan row 0e).
+"""Every generated workflow carries a ComfyUI app form (plan row 0e).
 
-WHY (operator 2026-09-25, "Both"). ComfyUI's app view shows a workflow as a
-form: `extra.linearMode` opens it that way, `extra.linearData.inputs` is the
-form top to bottom, and `outputs` names the node whose result the app pane
-shows. Each per-machine workflow opens STORY-ONLY -- the card is the lane and
-its machine tuning stays hidden -- and workflows/otr_app.json is the canonical
-with every picker, in the operator's order. The canonical carries neither; it
-is the workflow he edits on the canvas.
+ComfyUI's app view shows a workflow as a form: `extra.linearData.inputs` is the
+form top to bottom, `outputs` names the node whose result the app pane shows,
+and `extra.linearMode` opens the workflow straight into it. ONE FORM, in the
+operator's order (2026-09-26, after seeing the story-only form live: "story,
+models, My Story at the bottom"). The per-machine workflows open on the GRAPH
+(his call) and reach the form with the App button; workflows/otr_app.json opens
+as the app. The canonical carries neither; it is the workflow he edits on the
+canvas.
 
 The lists are hand-ordered in config/app_mode.json; `build_variants.py`
 resolves them against each file's own node ids. These tests read the SHIPPED
@@ -33,8 +34,8 @@ from tests._support.shipped_graphs import APP, CANONICAL, shipped_graphs, varian
 
 CONFIG = json.loads((REPO / "config" / "app_mode.json").read_text(encoding="utf-8"))
 
-#: Matrix keys the per-machine workflow tunes for its own card. The advanced
-#: app never shows them: they are not choices, they are what makes the card fit.
+#: Matrix keys the per-machine workflow tunes for its own card. The form never
+#: shows them: they are not choices, they are what makes the card fit.
 MACHINE_TUNING = {
     "llm.device", "llm.quant_policy", "llm.vram_ceiling_gb", "llm.attn_impl",
     "audio.voice_device", "image.dtype_policy", "video.dtype_policy",
@@ -58,16 +59,33 @@ def test_the_canonical_is_not_an_app():
 
 
 @pytest.mark.parametrize("path", variant_paths(), ids=lambda p: p.stem)
-def test_every_card_opens_as_the_story_only_form(path):
+def test_every_card_opens_on_the_graph_with_the_full_form(path):
     wf = _load(path)
-    assert wf["extra"]["linearMode"] is True
-    assert _pairs(wf) == [tuple(e[:2]) for e in CONFIG["story_only"]]
+    assert wf["extra"]["linearMode"] is False
+    assert _pairs(wf) == [tuple(e[:2]) for e in CONFIG["form"]]
 
 
-def test_otr_app_opens_as_the_advanced_form():
+def test_otr_app_opens_as_the_app_with_the_same_form():
     wf = _load(APP)
     assert wf["extra"]["linearMode"] is True
-    assert _pairs(wf) == [tuple(e[:2]) for e in CONFIG["advanced"]]
+    assert _pairs(wf) == [tuple(e[:2]) for e in CONFIG["form"]]
+
+
+def test_the_form_reads_story_then_models_then_my_story():
+    """His order, stated as a rule rather than a copy of the list: every story
+    row comes before every model picker, and the My Story rows come last
+    (Space saver closes the form)."""
+    rows = [tuple(e[:2]) for e in CONFIG["form"]]
+    names = [w for _t, w in rows]
+    assert names[-1] == "asset_cleanup"
+    my_story = ["story_characters", "story_plot", "story_setting",
+                "story_author", "music_style"]
+    assert names[-6:-1] == my_story
+    story_end = names.index("custom_premise")
+    first_model = names.index("announcer_video_model")
+    assert story_end < first_model
+    for w in ("episode_language", "act_count", "source_bank", "episode_title"):
+        assert names.index(w) < first_model, w
 
 
 @pytest.mark.parametrize("path", [APP] + variant_paths(), ids=lambda p: p.stem)
@@ -88,7 +106,7 @@ def test_every_shipped_workflow_has_its_own_id():
     assert _load(CANONICAL)["id"] == "09a7142b-5ada-4855-bfcf-041a5e65c555"
 
 
-def test_the_advanced_form_offers_every_matrix_choice_and_no_machine_tuning():
+def test_the_form_offers_every_matrix_choice_and_no_machine_tuning():
     """A new matrix knob a person chooses cannot be missing from the app, and
     a knob that only makes a card fit cannot leak into it."""
     managed = wa.load_widget_mapping()["managed"]
@@ -96,7 +114,7 @@ def test_the_advanced_form_offers_every_matrix_choice_and_no_machine_tuning():
     keys = set()
     for row in matrix["rows"]:
         keys.update(row.get("deltas", {}))
-    shown = {tuple(e[:2]) for e in CONFIG["advanced"]}
+    shown = {tuple(e[:2]) for e in CONFIG["form"]}
     for key in sorted(keys):
         targets = {tuple(t) for t in managed.get(key, {}).get("targets", [])}
         if not targets:
@@ -108,7 +126,7 @@ def test_the_advanced_form_offers_every_matrix_choice_and_no_machine_tuning():
 
 
 def test_notes_are_app_only_descriptions_that_exist():
-    for list_key in ("story_only", "advanced"):
+    for list_key in ("form",):
         for entry in CONFIG[list_key]:
             if len(entry) > 2:
                 assert isinstance(CONFIG[entry[2]], str) and CONFIG[entry[2]].strip()
@@ -116,16 +134,16 @@ def test_notes_are_app_only_descriptions_that_exist():
 
 def test_a_missing_widget_is_refused_not_dropped():
     wf = _load(CANONICAL)
-    bad = dict(CONFIG, story_only=[["OTR_LedgerScriptWriter", "no_such_widget"]])
+    bad = dict(CONFIG, form=[["OTR_LedgerScriptWriter", "no_such_widget"]])
     with pytest.raises(bv.EmitRefused, match="no widget 'no_such_widget'"):
-        bv.app_linear_data(wf, "story_only", bad)
+        bv.app_linear_data(wf, "form", bad)
 
 
 def test_a_row_listed_twice_is_refused():
     wf = _load(CANONICAL)
     row = ["OTR_LedgerScriptWriter", "act_count"]
     with pytest.raises(bv.EmitRefused, match="listed twice"):
-        bv.app_linear_data(wf, "story_only", dict(CONFIG, story_only=[row, row]))
+        bv.app_linear_data(wf, "form", dict(CONFIG, form=[row, row]))
 
 
 def test_a_linked_widget_is_refused():
@@ -136,7 +154,7 @@ def test_a_linked_widget_is_refused():
                 if (s.get("widget") or {}).get("name") == "act_count")
     slot["link"] = 99999
     with pytest.raises(bv.EmitRefused, match="linked input"):
-        bv.app_linear_data(wf, "story_only", CONFIG)
+        bv.app_linear_data(wf, "form", CONFIG)
 
 
 def test_a_node_type_that_is_not_unique_is_refused():
@@ -144,7 +162,7 @@ def test_a_node_type_that_is_not_unique_is_refused():
     writer = next(n for n in wf["nodes"] if n["type"] == "OTR_LedgerScriptWriter")
     wf["nodes"].append(dict(writer, id=99998))
     with pytest.raises(bv.EmitRefused, match="expected ONE OTR_LedgerScriptWriter"):
-        bv.app_linear_data(wf, "story_only", CONFIG)
+        bv.app_linear_data(wf, "form", CONFIG)
 
 
 @pytest.mark.parametrize("path", [APP] + variant_paths(), ids=lambda p: p.stem)
@@ -172,7 +190,7 @@ def test_a_row_without_a_label_is_refused():
     labels.pop("OTR_LedgerScriptWriter.act_count")
     bad = dict(CONFIG, labels=labels)
     with pytest.raises(bv.EmitRefused, match="has no label"):
-        bv.app_linear_data(wf, "story_only", bad)
+        bv.app_linear_data(wf, "form", bad)
 
 
 NOTE_KEYS = ("premise_note", "title_note", "source_ref_note", "pickers_note")
@@ -191,7 +209,7 @@ def test_every_configured_note_is_on_its_shipped_row(path):
     nodes = {n["id"]: n for n in wf["nodes"]}
     shipped = {(nodes[r[0]]["type"], r[1]): r[2] if len(r) > 2 else None
                for r in wf["extra"]["linearData"]["inputs"]}
-    form = "advanced" if path == APP else "story_only"
+    form = "form"
     for entry in CONFIG[form]:
         want = {"description": CONFIG[entry[2]]} if len(entry) > 2 else None
         assert shipped[(entry[0], entry[1])] == want, entry
