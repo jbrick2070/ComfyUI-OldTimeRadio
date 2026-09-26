@@ -72,5 +72,19 @@ def test_an_unknown_contract_name_refuses_by_name(monkeypatch):
         name = real.name
 
     monkeypatch.setattr(vreg, "get_engine", lambda eid: _Odd())
-    with pytest.raises(va.VisualAssetError, match="cannot check"):
+    with pytest.raises(va.VisualAssetError, match="no boot contract this pack can check"):
         va._refuse_unmet_boot_contracts({"minimax_h3_video"}, state=STOCK)
+
+
+def test_an_unknown_name_beside_a_known_one_is_skipped_like_render_time(monkeypatch):
+    """Cursor, 78ab8d74: ("no_such_contract", "h3_8gb_lab") must pass a boot
+    that satisfies h3_8gb_lab, as the render path's identification would."""
+    from nodes._otr_video_engines import registry as vreg
+
+    class _Mixed:
+        compatible_boot_contracts = ("no_such_contract", "h3_8gb_lab")
+
+    monkeypatch.setattr(vreg, "get_engine", lambda eid: _Mixed())
+    lab = {"available": True, "reserve_vram_gb": None,
+           "disable_pinned_memory": True, "sage_attention": False, "cpu": False}
+    va._refuse_unmet_boot_contracts({"minimax_h3_video"}, state=lab)

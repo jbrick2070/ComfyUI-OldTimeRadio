@@ -1204,19 +1204,20 @@ def _refuse_unmet_boot_contracts(engines, state=None):
             continue
         if not allowed or _bc.DEFAULT in allowed:
             continue
-        # Met when ANY contract the engine allows is satisfied by this boot --
-        # the render-time identification among the engine's own candidates.
-        # A contract name the table does not know is an engine bug; it refuses
-        # here by name rather than escaping as a different exception type.
-        try:
-            if any(not _bc.check_running_server(c, state=state) for c in allowed):
-                continue
-            contract = allowed[0]
-            unmet = _bc.check_running_server(contract, state=state)
-        except Exception as exc:  # noqa: BLE001 -- fail closed, named
-            problems.append("the video engine '%s' declares a boot contract this "
-                            "pack cannot check (%s)" % (name, exc))
+        # Unknown contract names are skipped, as the render-time
+        # identification skips them (boot_contracts.contract_from_running_server
+        # filters its candidates the same way); only an engine that declares NO
+        # known contract is refused, by name. Then: met when ANY known contract
+        # is satisfied by this boot.
+        known = tuple(c for c in allowed if _bc.known_contract(c))
+        if not known:
+            problems.append("the video engine '%s' declares no boot contract "
+                            "this pack can check (%s)" % (name, ", ".join(allowed)))
             continue
+        if any(not _bc.check_running_server(c, state=state) for c in known):
+            continue
+        contract = known[0]
+        unmet = _bc.check_running_server(contract, state=state)
         if unmet:
             argv = " ".join(_bc.launch_args_for(contract))
             problems.append(
