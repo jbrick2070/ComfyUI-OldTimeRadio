@@ -216,14 +216,13 @@ instead -- same workflow, and it has happened.) You do not have to change anythi
 holds a working value, and the ones set to *roll* pick for themselves, so two runs
 in a row give you two different shows.
 
-**Or use it as an app.** Two gallery entries open as a simple form instead of
-the canvas (ComfyUI's app view): **`otr_app`** lists every choice -- language,
-acts, cast, story bank, visual style, then the video, image, voice, music and
-writer models, then the My Story fields and the space saver -- and each
-per-machine workflow below opens as a shorter form with only the story
-choices, because its models are already the ones that fit that machine. Fill
-it in and press Run; the finished episode plays in the app. Every entry can
-still be switched to the full canvas.
+**Or use it as an app.** Every gallery entry carries the same simple form
+(ComfyUI's app view): language, acts, cast, story bank, visual style, then the
+video, image, voice, music and writer models, then the My Story fields and the
+space saver. **`otr_app`** opens straight into it. The per-machine workflows
+below open on the canvas with their machine's models already chosen; press
+**Enter app mode** to switch one to the form. Fill it in and press Run; the
+finished episode plays in the app.
 
 **Wait, then look in `<your ComfyUI output folder>/otr/obs/`.** The first run
 downloads about **12 GB** -- the writer, the music model and its text encoder, and

@@ -139,7 +139,8 @@ def _pack_identity_failures(paths, version: str) -> list[str]:
 #: `extra.linearMode` opens the workflow straight into it. ONE FORM everywhere,
 #: in the operator's order (2026-09-26, after seeing the story-only form live:
 #: "story, models, My Story at the bottom"). The per-machine workflows OPEN ON
-#: THE GRAPH (his call) and reach the form through the App button; one extra
+#: THE GRAPH (his call) and reach the form through the Enter app mode
+#: button; one extra
 #: generated file, workflows/otr_app.json, is the canonical opened AS the app.
 #: The canonical itself carries neither:
 #: it is the workflow the operator edits on the canvas, and a flag there
