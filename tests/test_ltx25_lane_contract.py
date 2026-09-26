@@ -112,7 +112,7 @@ def test_the_24gb_and_blackwell_tiers_declare_the_same_pinned_canvas():
 def test_the_silent_lane_loads_the_16gb_weight():
     eng = eng_ltx25.Ltx25VideoEngine()
     assert eng._dit_name() == eng_ltx25.LTX25_NATIVE_DIT_16GB
-    assert eng._native_te_device == "cpu"
+    assert eng._native_te_device == "default"
     assert eng._quant_label() == "mix4x8"
 
 

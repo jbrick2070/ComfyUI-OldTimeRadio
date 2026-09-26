@@ -428,18 +428,18 @@ def test_the_render_clip_call_site_passes_the_instances_own_expectation():
         "pin will fail its own cache's liveness check again")
 
 
-def test_every_16gb_lane_still_expects_cpu_placement():
-    """The base declaration, and every 16 GB lane that pins, must keep
-    demanding CPU -- this is the blast-radius pin for the whole fix. The big
-    cards decline the pin and say so."""
+def test_every_lane_encodes_on_the_accelerator_and_its_cache_agrees():
+    """2026-09-26: the 16 GB CPU pin was measured costing 104-207 s a clip with
+    the GPU idle and protecting no headroom (peak unchanged, no OOM), so every
+    tier now encodes on the accelerator. The cache's liveness expectation is
+    one fact with the placement, on every lane, or the cache rejects its own
+    entries on every read (the 2026-09-21 defect)."""
     for cls in (eng_ltx25.Ltx25VideoEngine,
                 eng_ltx25.Ltx25FoleyPlusEngine,
                 eng_ltx25.Ltx25NativeFoley16gbEngine,
                 eng_ltx25.Ltx25NativeMime16gbEngine,
-                eng_ltx25.Ltx25NativeAudioIn16gbEngine):
-        assert cls._encoder_cache_expects_cpu is True, cls.__name__
-        assert cls._native_te_device == "cpu", cls.__name__
-    for cls in (eng_ltx25.Ltx25NativeFoleyWideEngine,
+                eng_ltx25.Ltx25NativeAudioIn16gbEngine,
+                eng_ltx25.Ltx25NativeFoleyWideEngine,
                 eng_ltx25.Ltx25NativeFoleyBlackwellEngine,
                 eng_ltx25.Ltx25NativeMime24gbEngine,
                 eng_ltx25.Ltx25NativeAudioIn24gbEngine):

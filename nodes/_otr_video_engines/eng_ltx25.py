@@ -471,23 +471,35 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     #: Where the text encoder runs, as the stock ``CLIPLoader`` device widget
     #: takes it: ``"cpu"`` or ``"default"`` (the accelerator).
     #:
-    #: MEASURED, not chosen by taste. A GPU-side encode of the Gemma-4 12B
-    #: encoder is what tips a 16 GB card, so the 16 GB lanes pin it to CPU. On
-    #: the RTX PRO 4500 a CPU-placed encode held the process at 701% CPU with
-    #: the GPU idle for minutes per beat, so a 24 GB+ lane paying the pin is
-    #: spending minutes to protect headroom it already has.
+    #: THE ACCELERATOR, ON EVERY TIER (2026-09-26). The 16 GB lanes used to
+    #: pin the Gemma-4 12B encoder to the CPU, measured at the time as what
+    #: tipped a 16 GB card. The pin's cost was measured on 2026-09-26: every
+    #: clip encoded its positive prompt on the CPU through eager w4a8
+    #: dequantization (py-spy caught it) for 104-207 s with the GPU idle -- the
+    #: same symptom the RTX PRO 4500 showed at 701% CPU. Re-measured on the RTX
+    #: 5080 with models unloaded after use and no VRAM reserve (operator ruling
+    #: 2026-09-26: an OOM is recorded, never pre-empted), same frozen episode
+    #: and seeds: ltx25_video 343/239 s -> 163/134 s a clip, render-window peak
+    #: 16,065 -> 16,080 MB; ltx25_foley_16gb 208 s cold at 16,123 MB. No OOM:
+    #: the peak belongs to the DiT, and ComfyUI unloads the encoder before it.
+    #: Frames are NOT byte-identical -- CUDA runs the LTX projection at another
+    #: intermediate precision -- so a clip keeps its subject and framing but
+    #: may take a different camera push; the operator's eye judges (A/B sheets
+    #: in output/otr/ab_ltx25_te/). The 8 GB workflows run these same lane
+    #: classes, so an 8 GB card now encodes on the GPU too; its measurement
+    #: follows, and an OOM there is recorded, not pre-empted with a pin.
     #:
     #: ``_encoder_cache_expects_cpu`` MUST track this. The cache's liveness
     #: check tests for CPU placement, so a lane that stops pinning and does
     #: not say so writes a cache entry it then rejects on every single read
     #: (the defect found live on 2026-09-21).
-    _native_te_device = "cpu"
+    _native_te_device = "default"
 
     #: Whether THIS lane's cache is expected to find its handle on the CPU.
     #: Read by ``_cached_clip_is_live``. A lane that sets ``_native_te_device``
     #: to ``"default"`` sets this False in the SAME change, or its own cache can
     #: never pass its own liveness check.
-    _encoder_cache_expects_cpu = True
+    _encoder_cache_expects_cpu = False
 
     def _dit_name(self):
         return otr_env.get("OTR_LTX25_NATIVE_DIT", self._native_dit)
@@ -3083,9 +3095,9 @@ class Ltx25NativeFoley16gbEngine(Ltx25FoleyPlusEngine):
     engine_version = "1"
     default_roles = ()
     _native_dit = LTX25_NATIVE_DIT_16GB
-    #: KEEPS THE PIN, inherited from the base. 16 GB is exactly the class the
-    #: pin was written for, and this lane is the one that would tip without
-    #: it. _encoder_cache_expects_cpu stays True with it.
+    #: Inherits the accelerator placement (2026-09-26). This was the lane the
+    #: old CPU pin protected; measured without it, the render-window peak was
+    #: 16,123 MB with no OOM (see the base class).
 
 
 class Ltx25NativeAudioInMixin:

@@ -279,15 +279,36 @@ def test_an_unresolvable_weight_drops_the_cache_entirely(eng, run_graph_spy,
 
 
 def test_a_DEAD_cached_clip_is_dropped_and_reloaded(eng, run_graph_spy):
+    """A cached handle whose model is gone is dead, and is reloaded rather than
+    handed to the graph. Since 2026-09-26 this lane makes no placement promise
+    (its encoder runs on the accelerator), so death is a missing model, not a
+    device -- the next test holds the other half."""
     eng.begin_encoder_scope()
     _render(eng)
 
-    class _OffCpu:
+    class _Dead:
         load_device = "cuda:0"
-        offload_device = "cuda:0"
-        model = object()
+        offload_device = "cpu"
+        model = None
 
-    eng._encoder_scope["clip"][0].patcher = _OffCpu()
+    eng._encoder_scope["clip"][0].patcher = _Dead()
     _render(eng)
     assert "te" in run_graph_spy[1]["graph"], (
-        "a CLIP that drifted off the CPU must be reloaded, not reused")
+        "a CLIP whose model is gone must be reloaded, not reused")
+
+
+def test_a_LIVE_cached_clip_is_reused_wherever_comfy_put_it(eng, run_graph_spy):
+    """ComfyUI's memory manager may move the encoder between clips; on a lane
+    with no placement promise that is not staleness, so the handle is reused."""
+    eng.begin_encoder_scope()
+    _render(eng)
+
+    class _Moved:
+        load_device = "cuda:0"
+        offload_device = "cpu"
+        model = object()
+
+    eng._encoder_scope["clip"][0].patcher = _Moved()
+    _render(eng)
+    assert "te" not in run_graph_spy[1]["graph"], (
+        "a live CLIP on another device must be reused, not reloaded")

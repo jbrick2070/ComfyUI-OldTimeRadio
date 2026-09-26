@@ -644,15 +644,15 @@ def test_the_render_path_stamps_native_equal_to_delivered():
         "the pre-trim bookkeeping is gone; reintroducing it is the bug")
 
 
-def test_the_silent_lane_is_the_16gb_weight_with_its_encoder_pinned(eng, graph):
+def test_the_silent_lane_is_the_16gb_weight_with_its_encoder_on_the_gpu(eng, graph):
     """ltx25_video loads the same mix4x8 DiT as the 16 GB foley and mime
-    lanes, and asks for the text encoder on the CPU as a widget value on the
-    stock loader -- a GPU-side encode of the Gemma-4 12B encoder is what tips
-    a 16 GB card."""
+    lanes, and asks the stock loader for the text encoder on the accelerator
+    (2026-09-26: the old CPU pin cost minutes a clip and protected no
+    headroom -- see Ltx25VideoEngine._native_te_device)."""
     assert eng._dit_name() == eng_ltx25.LTX25_NATIVE_DIT_16GB
     assert eng._text_encoder_name() == eng_ltx25.LTX25_NATIVE_TEXT_ENCODER
-    assert graph["te"]["inputs"]["device"] == "cpu"
-    assert eng._encoder_cache_expects_cpu is True
+    assert graph["te"]["inputs"]["device"] == "default"
+    assert eng._encoder_cache_expects_cpu is False
     cands = eng._node_candidates()
     assert cands["unet"] == ("UNETLoader",)
     assert cands["te"] == ("CLIPLoader",)
