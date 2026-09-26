@@ -381,72 +381,37 @@ touch shared code with a fallback branch that never fires today on a
 single-GPU NVIDIA box -- print the resolved value before/after in the
 commit message, same as the models-root and per-type work earlier today.
 
-### 0d. Gallery and JSON hygiene (template diff + Grok review, 2026-09-25)
+### 0d. Gallery and JSON hygiene -- what is left is what a stranger SEES
 
-Field-by-field diff of `otr_canonical.json` against the official
-`video_wan2_2_14B_s2v` template, then Grok's read-only pass over all 25
-workflows against the 555 official templates and frontend 1.52.7, every claim
-grounded here: same litegraph 0.4 shape, same top-level keys, valid links,
-groups and widget descriptors. What is left is what a stranger SEES first.
-In order:
-- **Stamp every node with `cnr_id` + `ver` (HARDENED).** Measured
-  2026-09-25: canonical has 21 nodes, exactly 1 (`OTR_WorkflowValidator`)
-  carries `properties.cnr_id: "comfyui-old-time-radio"`; none carries
-  `ver`. Official templates carry both on most nodes; the frontend's
-  `getCnrIdFromNode` reads `cnr_id` (falls back to `aux_id`), and it is how
-  "Install Missing Nodes" finds the pack. Work: (1) in
-  `scripts/build_variants.py::build_variant` (`:162+`), after loading the
-  canonical and before stamping the validator's own widgets, add `cnr_id`
-  and `ver` to every node's `properties` dict, pulled from a pinned
-  `PACK_CNR_ID = "comfyui-old-time-radio"` and the LIVE pyproject version
-  (parse `pyproject.toml`'s `version = "..."` line at build time, do not
-  hardcode a copy that drifts -- see the DEPENDENCIES.md generator lesson
-  from earlier today, PBUG-adjacent); (2) apply the same stamp to
-  `otr_canonical.json` itself by hand once, then regenerate; (3)
-  `scripts/build_variants.py --check` gains a check that every node in
-  every committed file (canonical + 24 workflows) has `cnr_id ==
-  "comfyui-old-time-radio"` and `ver == <live pyproject version>`; (4) a
-  new test asserts the same against the real files. Verify on the 4060
-  whether a `ver` bump makes Manager's Missing-Nodes flow fetch the exact
-  Pending version rather than Active -- report only, this does not gate
-  the commit.
-- **Drop `extra.info`.** It says `version: "2.0-alpha"`; nothing in nodes/,
-  scripts/, tests/ or js/ reads it. pyproject is the version authority.
-- **A friendly category name through `/i18n`.** Core serves each custom
-  node's `locales/<lang>/main.json`; the frontend localizes the pack category
-  from `templateWorkflows.category.<folder name>`. Ship `locales/en/main.json`
-  with BOTH keys -- `ComfyUI-OldTimeRadio` (git clone) and
-  `comfyui-old-time-radio` (registry install) -- reading "Old-Time Radio".
-  Per-workflow titles are NOT localizable for custom packs in this frontend
-  (they are the filename stem), so the stems stay; do not rename files.
-- **Standard palette pass (cosmetic, his eye).** Measured: 1,421 of 4,635
-  official nodes are coloured, almost all from five short pairs
-  (`#222/#000`, `#432/#653`, `#232/#353`, `#322/#533`, `#223/#335`); 587
-  groups use `#3f789e`. Ours are custom hexes on a shared `#3B3D42`. Map the
-  five stage colours onto standard pairs, keeping the stages distinct.
-- **Story Writer collapsed on load (his eye).** 520x1760 with 35 widgets is
-  a wall; `flags.collapsed` keeps every value and position, and the Start
-  here note says "expand 1 - Story Writer". Never split the node.
+Done 2026-09-25 and out of this row: every node stamped `cnr_id` + `ver`
+from the live pyproject (`--check` enforces it), `extra.info` dropped, the
+gallery category reads "Old-Time Radio" through `locales/en/main.json`,
+and (by 0e) every generated workflow has its own id. Left, in order:
+- **Standard palette pass (cosmetic, HIS EYE).** 1,421 of 4,635 official
+  nodes are coloured, almost all from five short pairs (`#222/#000`,
+  `#432/#653`, `#232/#353`, `#322/#533`, `#223/#335`); 587 groups use
+  `#3f789e`. Ours are custom hexes on a shared `#3B3D42`. Map the five
+  stage colours onto standard pairs, keeping the stages distinct.
+- **Story Writer collapsed on load (HIS EYE).** 520x1760 with 35 widgets is
+  a wall; `flags.collapsed` keeps every value and position. Never split it.
+- **The "Start here" note.** One Markdown note in the SCRIPT / START HERE
+  group: type a premise or pick a bank, press Queue, where the episode
+  lands, where to report problems. PREREQUISITES found 2026-09-25 night:
+  `scripts/otr_api.py::workflow_to_api_prompt` emits EVERY node, and a
+  frontend-only `MarkdownNote` would be refused by /prompt -- the converters
+  (otr_api and the canonical runner) must skip frontend-only nodes, and
+  `stamp_pack_identity` must not stamp a core node with this pack's
+  `cnr_id`. Lower urgency since 0e: every card now opens as an app form.
 - **Retune `extra.ds`** (saved viewport) once the layout settles.
-- **Rejected or deferred, with the reason:** an `index.json` in workflows/
-  (the glob would list it as a template named "index"); renaming files for
-  prettier titles (stems are coupled to matrix ids, stamps, headless runs,
-  tests); replacing `seed_mode` / `request_seed` with stock seed controls
-  (the deterministic request hash is a feature); a blanket `shape: 7` sweep;
-  moving validator stamps out of widgets (readers and writers would all
-  move); `properties.models` links; subgraphs; `widgets_values_named` (a
-  second copy to keep in sync); unique UUIDs per workflow (no consumer needs
-  it); `localized_name` cleanup; pretty-printing the per-machine workflows (dev polish only);
-  hand-stamping `extra.frontendVersion` (553 of 555 carry it, nothing loads
-  on it, and a fixed value goes stale at once).
-
-#### The "Start here" note
-
-Comfy's official templates all carry an on-canvas Markdown note; ours has
-none, so a stranger sees 21 boxes and no instructions. One note in the
-SCRIPT / START HERE group: type a premise or pick a bank, press Queue,
-where the episode lands, where to report problems. Canonical + per-machine workflows
-regenerated; widget/link audits as usual.
+- **Rejected, with the reason:** an `index.json` in workflows/ (the glob
+  would list it as a template named "index"); renaming files for prettier
+  titles (stems are coupled to matrix ids, stamps, headless runs, tests);
+  replacing `seed_mode` / `request_seed` with stock seed controls (the
+  deterministic request hash is a feature); a blanket `shape: 7` sweep;
+  moving validator stamps out of widgets; `properties.models` links;
+  subgraphs; `widgets_values_named`; `localized_name` cleanup;
+  pretty-printing the per-machine workflows; hand-stamping
+  `extra.frontendVersion` (nothing loads on it; a fixed value goes stale).
 
 ### 0e. OTR app mode -- code DONE 2026-09-25 night; live look owed
 
