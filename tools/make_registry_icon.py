@@ -184,9 +184,105 @@ def draw_frame(k):
     return img
 
 
-frames = [draw_frame(k) for k in range(FRAMES)]
-out = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\assets\otr_icon.gif"
-frames[0].save(out, save_all=True, append_images=frames[1:], duration=DUR_MS,
-               loop=0, optimize=True, disposal=2)
-frames[8].save(out.replace(".gif", ".png"))
-print("wrote", out)
+# --------------------------------------------------------------------------
+# SQUARE GALLERY THUMBNAIL (2026-09-25). ComfyUI's template gallery shows a
+# square card per workflow and, for a custom pack, requests
+# /api/workflow_templates/<pack>/<stem>.jpg -- a static JPEG. Same schematic
+# language as the registry card (operator: "functional, not literal"), laid
+# out as a 2x2 grid of the four stages so it reads at gallery size. NO COUNTS
+# on it, for the same reason as the card above.
+# --------------------------------------------------------------------------
+SQ = 400
+SQ_CELL_W, SQ_CELL_H = 164, 104
+SQ_XS = [26, 210]
+SQ_YS = [112, 232]
+
+
+def square_thumbnail():
+    img = Image.new("RGB", (SQ, SQ), INK_BG_TOP)
+    d = ImageDraw.Draw(img)
+    for y in range(SQ):
+        d.line([(0, y), (SQ, y)], fill=mix(INK_BG_TOP, INK_BG_BOT, y / SQ))
+    hz = 354
+    d.line([(0, hz), (SQ, hz)], fill=GRID, width=1)
+    for i in range(-7, 16):
+        d.line([(SQ / 2 + i * 26, hz), (SQ / 2 + i * 110, SQ)], fill=GRID, width=1)
+    step, y = 4, hz + 3
+    while y < SQ:
+        d.line([(0, y), (SQ, y)], fill=GRID, width=1)
+        step = int(step * 1.5) + 1
+        y += step
+
+    title = "OLD TIME RADIO"
+    f_sq_title = ImageFont.truetype(BOLD, 30)
+    tw = spaced_w(d, title, f_sq_title, 4)
+    tx = (SQ - tw) / 2
+    spaced(d, (tx + 2, 26), title, f_sq_title, (86, 40, 120), 4)
+    spaced(d, (tx, 24), title, f_sq_title, PAPER, 4)
+    d.rectangle([tx - 4, 64, tx + tw + 4, 69], fill=MAGENTA)
+    d.text((tx - 4, 78), "EPISODE SIGNAL PATH", font=f_fig, fill=CYAN)
+
+    f_sq_cell = ImageFont.truetype(BOLD, 18)
+    f_sq_sub = ImageFont.truetype(REG, 14)
+    order = [(0, 0), (1, 0), (0, 1), (1, 1)]   # reading order: Z path
+    for i, ((name, sub, hue), (cx, cy)) in enumerate(zip(CELLS, order)):
+        x, y = SQ_XS[cx], SQ_YS[cy]
+        lit = 1.0 if i == 2 else 0.25   # MASTER glows, as on the card
+        bevel(d, x, y, SQ_CELL_W, SQ_CELL_H, mix((36, 24, 74), (58, 40, 108), lit),
+              mix((120, 96, 190), hue, lit), (22, 12, 48))
+        d.rectangle([x + 3, y + 3, x + SQ_CELL_W - 3, y + 26], fill=hue)
+        d.text((x + 10, y + 5), name, font=f_sq_cell, fill=(20, 12, 40))
+        d.text((x + 10, y + SQ_CELL_H - 24), sub, font=f_sq_sub,
+               fill=mix((168, 156, 214), PAPER, lit))
+        if i == 2:
+            x0, x1, mid = x + 10, x + SQ_CELL_W - 10, y + 52
+            pts = [(px, mid + 14 * math.sin((px - x0) / (x1 - x0) * 9.4)
+                    * math.sin((px - x0) / (x1 - x0) * math.pi))
+                   for px in range(int(x0), int(x1))]
+            d.line(pts, fill=MINT, width=2)
+        else:
+            for r, wfrac in enumerate((0.74, 0.52, 0.64)):
+                yb = y + 38 + r * 10
+                d.line([(x + 10, yb), (x + 10 + (SQ_CELL_W - 20) * wfrac, yb)],
+                       fill=mix((96, 82, 158), hue, 0.6), width=3)
+
+    # connectors: SCRIPT -> VOICES, down and back to MASTER, across to EPISODE
+    arrow = (150, 130, 220)
+    ym = SQ_YS[0] + SQ_CELL_H / 2
+    d.line([(SQ_XS[0] + SQ_CELL_W + 4, ym), (SQ_XS[1] - 10, ym)], fill=arrow, width=4)
+    d.polygon([(SQ_XS[1] - 12, ym - 8), (SQ_XS[1] - 1, ym), (SQ_XS[1] - 12, ym + 8)], fill=arrow)
+    xr = SQ_XS[1] + SQ_CELL_W / 2
+    xl = SQ_XS[0] + SQ_CELL_W / 2
+    yv0, yv1 = SQ_YS[0] + SQ_CELL_H + 3, SQ_YS[1] - 3
+    ymid = (yv0 + yv1) / 2
+    d.line([(xr, yv0), (xr, ymid)], fill=arrow, width=4)
+    d.line([(xr, ymid), (xl, ymid)], fill=arrow, width=4)
+    d.line([(xl, ymid), (xl, yv1 - 8)], fill=arrow, width=4)
+    d.polygon([(xl - 8, yv1 - 10), (xl, yv1), (xl + 8, yv1 - 10)], fill=arrow)
+    ym2 = SQ_YS[1] + SQ_CELL_H / 2
+    d.line([(SQ_XS[0] + SQ_CELL_W + 4, ym2), (SQ_XS[1] - 10, ym2)], fill=arrow, width=4)
+    d.polygon([(SQ_XS[1] - 12, ym2 - 8), (SQ_XS[1] - 1, ym2), (SQ_XS[1] - 12, ym2 + 8)], fill=arrow)
+
+    for cx, cy in ((12, 12), (SQ - 12, 12), (12, SQ - 12), (SQ - 12, SQ - 12)):
+        d.line([(cx - 7, cy), (cx + 7, cy)], fill=GRID, width=1)
+        d.line([(cx, cy - 7), (cx, cy + 7)], fill=GRID, width=1)
+    return img
+
+
+if __name__ == "__main__":
+    import sys
+
+    ASSETS = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\assets"
+    thumb = ASSETS + r"\otr_gallery_thumb.jpg"
+    square_thumbnail().save(thumb, quality=90)
+    print("wrote", thumb)
+    # The registry card is hand-finished beyond this script (see the module
+    # docstring), so it is only rewritten on an explicit request. On
+    # 2026-09-25 an unguarded run overwrote it; it was restored from git.
+    if "--registry-gif" in sys.argv:
+        frames = [draw_frame(k) for k in range(FRAMES)]
+        out = ASSETS + r"\otr_icon.gif"
+        frames[0].save(out, save_all=True, append_images=frames[1:], duration=DUR_MS,
+                       loop=0, optimize=True, disposal=2)
+        frames[8].save(out.replace(".gif", ".png"))
+        print("wrote", out)
