@@ -3420,6 +3420,17 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             if _lane_text.strip() and _lane_text != _lane_inputs["text_prompt"]:
                 text_prompt = _lane_text
                 _lane_composed = True
+            elif phase == "cast_preflight":
+                # NOT A DEFECT AT CAST PREFLIGHT (2026-09-26). ShotLock builds
+                # this request before `derive_creative_directives` runs, so the
+                # shot carries no creative and every lane has nothing to
+                # compose. The LOUD line below fired on every character beat of
+                # a clean-box run and sent the diagnosis after a lane that was
+                # fine; the render-phase build still reports a real miss.
+                _LOG.info(
+                    "[OTR.render_driver] lane formatter for %r composed nothing "
+                    "on beat %s at cast preflight (creative is derived after "
+                    "it)", _eng_id, _visual_beat_id)
             else:
                 # A formatter that returns nothing is a BUG in that lane, not a
                 # reason to render a blank picture. Fall through to the legacy
@@ -3511,12 +3522,21 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # default (radio-styled by design). Never silent. (2026-06-26: the
         # _is_char_face_beat arm also routes ltx_audio_in CHARACTER beats here
         # so they get the character fallback, not the generic radio default.)
-        if _is_char_face_beat:
+        if _is_char_face_beat and phase == "cast_preflight":
+            # Creative is derived after cast preflight; see the lane-formatter
+            # note above. The engine is named because this line fires for every
+            # face lane, not only HuMo, and the old wording sent a 2026-09-26
+            # diagnosis of the H3 audio-in lane off to the HuMo seam.
+            _LOG.info(
+                "[OTR.render_driver] character face beat %s on %r has no "
+                "creative prompt yet at cast preflight (derived after it)",
+                _beat_id_for_shot(shot), _eng_id)
+        elif _is_char_face_beat:
             _LOG.warning(
-                "[OTR.render_driver] HuMo character beat %s carries NO M4 "
+                "[OTR.render_driver] character face beat %s on %r carries NO "
                 "creative prompt (ShotLock seam gap) -- rendering on the "
                 "gear-free character fallback prompt (LOUD)",
-                _beat_id_for_shot(shot))
+                _beat_id_for_shot(shot), _eng_id)
             _cf_fallback = _prefix_video_style_cue(
                 _vstyle, _CHAR_FACE_FALLBACK_PROMPT)
             req["text_prompt"] = _cf_fallback

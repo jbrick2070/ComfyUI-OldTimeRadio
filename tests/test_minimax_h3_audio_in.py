@@ -403,3 +403,41 @@ def test_the_capabilities_row_lists_the_audio_vae_this_lane_really_loads():
     # And the sibling still does not claim it.
     assert not any("audio" in r
                    for r in vreg.CAPABILITIES[SIBLING]["model_requirements"])
+
+
+def _no_creative_shot():
+    shot = _lane_shot("character_video", "b003")
+    shot.pop("creative")
+    return shot
+
+
+def _still_led():
+    return _still_ledger([
+        {"kind": "scene_character", "beat_id": "b003", "path": _CHARACTER_STILL}])
+
+
+def test_cast_preflight_does_not_cry_seam_gap(caplog):
+    """ShotLock builds the cast-time request before creative is derived, so an
+    empty prompt there is expected. On 2026-09-26 the LOUD render-phase lines
+    fired at preflight on every character beat and misdirected the diagnosis."""
+    import logging
+    caplog.set_level(logging.INFO)
+    rd.build_request_from_shot(_no_creative_shot(), _still_led(),
+                               phase="cast_preflight")
+    loud = [r.getMessage() for r in caplog.records
+            if r.levelno >= logging.WARNING]
+    assert not [m for m in loud if "seam gap" in m or "empty prompt" in m], loud
+
+
+def test_a_render_without_creative_is_still_loud_and_names_the_engine(caplog):
+    """The same miss at render is a real seam gap and stays LOUD, naming the
+    engine rather than calling every face lane HuMo."""
+    import logging
+    caplog.set_level(logging.INFO)
+    rd.build_request_from_shot(_no_creative_shot(), _still_led())
+    loud = [r.getMessage() for r in caplog.records
+            if r.levelno >= logging.WARNING]
+    gap = [m for m in loud if "seam gap" in m]
+    assert gap and LANE in gap[0], loud
+    assert "HuMo" not in gap[0]
+
