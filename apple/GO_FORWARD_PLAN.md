@@ -230,8 +230,22 @@ should now route character beats to the audio-in lane too.
   (`ltx25_native_foley_blackwell`, `ltx25_native_mime_24gb`,
   `ltx25_native_audio_in_24gb`, `minimax_h3_audio_in`) and PROVE each one:
   a 1-act leg per engine, hand-picked on the canonical, on hardware that
-  fits it (the 24gb tiers need the 24 GB pod). One that fails is fixed or
-  removed in the commit that says which.
+  fits it. One that fails is fixed or removed in the commit that says which.
+  THE BAR (operator, same day): kept only if proven to work, not GGUF, and it
+  downloads itself -- "if they required extra work, no". Measured against
+  `_otr_visual_assets.planned_downloads`:
+  * `ltx25_native_foley_blackwell` -- auto-downloads (NVFP4 transformer + the
+    shared LTX 2.5 VAEs, upscaler and Gemma encoder). Needs a big Blackwell:
+    prove it on a RunPod Blackwell pod.
+  * `ltx25_native_mime_24gb`, `ltx25_native_audio_in_24gb` -- auto-download
+    (int8 transformer + the same shared files). Prove on a 24 GB pod; one pod
+    session can prove all three.
+  * `minimax_h3_audio_in` (and its sibling `minimax_h3_video`, which no
+    workflow selects either) -- FAILS the bar: ~59 GB fetched only by the
+    manual `scripts/otr_fetch_lane_weights.py minimax_h3`, and used under a
+    licence MiniMax granted the operator personally
+    (`apple/H3_LICENSE_ATTESTATION.md`), which does not pass to strangers.
+    Removal awaits his confirmation, since he negotiated that grant.
 - Generated docs should show a music column if they do not already.
 
 ### 0c. Portability fixes (Composer audit 2026-09-25, each claim grounded)
