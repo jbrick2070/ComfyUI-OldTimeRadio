@@ -68,12 +68,24 @@ def test_stamp_sets_both_keys_on_every_node_and_is_idempotent():
     assert wf["nodes"][1]["properties"]["x"] == 1  # existing keys survive
 
 
+def test_a_canvas_note_is_never_stamped_as_this_pack():
+    """A Note / MarkdownNote is a ComfyUI core node; the frontend's conflict
+    detection reads `cnr_id`, so it keeps the empty properties it saves with."""
+    wf = {"nodes": [{"id": 1, "type": "OTR_X"},
+                    {"id": 2, "type": "MarkdownNote", "properties": {}}]}
+    bv.stamp_pack_identity(wf, "9.9.9")
+    assert wf["nodes"][0]["properties"]["cnr_id"] == bv.PACK_CNR_ID
+    assert wf["nodes"][1]["properties"] == {}
+
+
 @pytest.mark.parametrize("path", _shipped_paths(), ids=lambda p: p.stem)
 def test_every_node_in_every_shipped_workflow_carries_the_stamp(path):
     version = bv.live_pack_version()
     wf = _load(path)
     assert wf["nodes"], path.name
     for node in wf["nodes"]:
+        if node["type"] in bv.NOTE_NODE_TYPES:
+            continue      # ComfyUI core; see the note test above
         props = node.get("properties") or {}
         assert props.get("cnr_id") == bv.PACK_CNR_ID, (path.name, node["id"], node["type"])
         assert props.get("ver") == version, (path.name, node["id"], node["type"], props.get("ver"))

@@ -47,8 +47,8 @@ from nodes._otr_shared.boot_contracts import (  # noqa: E402
     contract_for_profile, launch_args_for,
 )
 from nodes._otr_workflow_apply import (  # noqa: E402
-    apply_profile, build_offline_schemas, load_widget_mapping,
-    patch_widget_by_name, semantic_master_hash,
+    NOTE_NODE_TYPES, apply_profile, build_offline_schemas,
+    load_widget_mapping, patch_widget_by_name, semantic_master_hash,
 )
 
 CANONICAL = REPO / "workflows" / "otr_canonical.json"
@@ -91,12 +91,17 @@ def live_pack_version() -> str:
 
 
 def stamp_pack_identity(workflow: dict, version: str) -> dict:
-    """Set `properties.cnr_id` / `properties.ver` on EVERY node, in place.
+    """Set `properties.cnr_id` / `properties.ver` on every OTR node, in place.
 
-    Every node in the canonical is one of this pack's, so every node gets
-    the stamp. Idempotent. `properties` is outside semantic_master_hash by
-    construction, so this never moves a variant's hash."""
+    Every node in the canonical is one of this pack's EXCEPT a canvas note
+    (NOTE_NODE_TYPES): that is a ComfyUI core node, and stamping it with this
+    pack's id would tell the frontend's conflict detection it comes from here.
+    The frontend saves a note with empty `properties`, so it keeps them.
+    Idempotent. `properties` is outside semantic_master_hash by construction,
+    so this never moves a variant's hash."""
     for node in workflow.get("nodes", []):
+        if node.get("type") in NOTE_NODE_TYPES:
+            continue
         props = node.setdefault("properties", {})
         props["cnr_id"] = PACK_CNR_ID
         props["ver"] = version
@@ -114,6 +119,8 @@ def _pack_identity_failures(paths, version: str) -> list[str]:
             continue
         bad = []
         for node in wf.get("nodes", []):
+            if node.get("type") in NOTE_NODE_TYPES:
+                continue
             props = node.get("properties") or {}
             if props.get("cnr_id") != PACK_CNR_ID or props.get("ver") != version:
                 bad.append(f"{node.get('id')}:{node.get('type')}")

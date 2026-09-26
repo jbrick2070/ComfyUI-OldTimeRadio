@@ -39,6 +39,11 @@ from typing import Any, Callable
 
 import requests
 
+#: Equal to ``nodes._otr_workflow_apply.NOTE_NODE_TYPES`` (parity-pinned by
+#: tests/test_workflow_notes_are_never_sent.py). Copied rather than imported so
+#: this module keeps loading without the node package on its path.
+NOTE_NODE_TYPES = frozenset({"Note", "MarkdownNote"})
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -565,6 +570,8 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
     for node in workflow.get("nodes", []):
         nid = str(node["id"])
         ntype = node["type"]
+        if ntype in NOTE_NODE_TYPES:
+            continue      # a canvas note: the frontend never sends one either
 
         inputs: dict[str, Any] = {}
         linked_names: set[str] = set()

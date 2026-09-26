@@ -1,7 +1,7 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 95,
+  "last_node_id": 96,
   "last_link_id": 292,
   "nodes": [
     {
@@ -2621,6 +2621,29 @@
       "color": "#382712",
       "bgcolor": "#3B3D42",
       "title": "13 - Credits Roll"
+    },
+    {
+      "id": 96,
+      "type": "MarkdownNote",
+      "pos": [
+        680,
+        928
+      ],
+      "size": [
+        480,
+        420
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "## Start here\n\n1. On **1 - Story Writer**, pick a **source_bank**: `original` writes a new radio drama, `shakespeare` or `public_domain` adapts a classic, `my_story` builds your own story from the `story_*` fields, and `roll (any eligible bank)` picks one for you. The list holds the rest.\n2. Optional: type an idea in **custom_premise** -- every bank uses it.\n3. Press **Run**. The first run on a machine downloads the models it needs, so it takes longer.\n4. The finished episode (an MP4 with sound) lands in `ComfyUI/output/otr/obs/`. Working files stay under `output/otr/episodes/`.\n\nThe per-machine workflows under Browse Templates > Old-Time Radio open as a simple form (the app view).\n\nQuestions or problems: https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues\n"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
     }
   ],
   "links": [

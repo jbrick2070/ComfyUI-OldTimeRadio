@@ -47,7 +47,20 @@ from ._otr_shared.capability_profiles import (
 
 log = logging.getLogger("OTR.workflow_apply")
 
+#: The NOTE node types ComfyUI's frontend draws on the canvas and never sends
+#: to the server (``NoteNode`` / ``MarkdownNoteNode`` set ``isVirtualNode`` in
+#: frontend 1.52.7). A shipped workflow may carry one -- the Start-here note --
+#: and every consumer that turns a workflow into server work skips them.
+#:
+#: NOT EVERY VIRTUAL NODE, ON PURPOSE. ``Reroute`` and ``PrimitiveNode`` are
+#: virtual too, but they carry links and a PrimitiveNode's value is baked into
+#: its target by the frontend; skipping them blindly here would drop a value
+#: silently. No shipped workflow has either, and the converters keep emitting
+#: them so /prompt refuses loudly rather than a render going quietly wrong.
+NOTE_NODE_TYPES = frozenset({"Note", "MarkdownNote"})
+
 __all__ = [
+    "NOTE_NODE_TYPES",
     "build_offline_schemas",
     "serialized_slot_names",
     "ordered_widget_names",
@@ -533,6 +546,8 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
     for node in workflow.get("nodes", []):
         nid = str(node["id"])
         ntype = node["type"]
+        if ntype in NOTE_NODE_TYPES:
+            continue      # drawn on the canvas, never sent (see the constant)
         inputs: dict[str, Any] = {}
         linked_names: set = set()
         for inp in node.get("inputs", []) or []:

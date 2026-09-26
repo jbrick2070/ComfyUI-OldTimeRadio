@@ -222,7 +222,11 @@ def verify(wf, label):
     nodes_by_id = {n["id"]: n for n in wf.get("nodes", [])}
     for node in wf.get("nodes", []):
         wv = node.get("widgets_values")
-        if isinstance(wv, list):
+        # A canvas note (Note / MarkdownNote) saves its text as a widget
+        # value with no input descriptor -- that is how the frontend writes
+        # it, and the note is never sent to the server.
+        if isinstance(wv, list) and node.get("type") not in (
+                "Note", "MarkdownNote"):
             n_desc = len(widget_descriptor_indexes(node))
             if n_desc != len(wv):
                 problems.append(

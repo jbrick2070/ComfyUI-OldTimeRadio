@@ -32,6 +32,8 @@ from pathlib import Path
 
 import pytest
 
+from nodes._otr_workflow_apply import NOTE_NODE_TYPES
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CANONICAL = REPO_ROOT / "workflows" / "otr_canonical.json"
 
@@ -48,6 +50,8 @@ def _widget_inputs(node):
 def _nodes_with_widget_values():
     out = []
     for node in _canonical().get("nodes") or []:
+        if node.get("type") in NOTE_NODE_TYPES:
+            continue      # a canvas note: its text has no descriptor by design
         wv = node.get("widgets_values")
         if isinstance(wv, list):
             out.append(node)
@@ -179,6 +183,8 @@ def test_every_workflow_has_widget_input_parity(wf_path):
         values = node.get("widgets_values")
         if not isinstance(values, list):
             continue
+        if node.get("type") in NOTE_NODE_TYPES:
+            continue      # a canvas note: its text has no descriptor by design
         winputs = [i for i in (node.get("inputs") or []) if i.get("widget")]
         if len(winputs) != len(values):
             offenders.append((node.get("id"), node.get("type"),

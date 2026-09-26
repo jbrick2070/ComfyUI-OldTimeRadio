@@ -102,6 +102,8 @@ def _workflow_to_api_prompt(workflow, schemas):
     for node in workflow["nodes"]:
         nid = node["id"]
         ntype = node["type"]
+        if ntype in ("Note", "MarkdownNote"):
+            continue      # a canvas note is never sent to the server
         linked = node_links.get(nid, {})
         converted = node_converted_widgets.get(nid, set())
 

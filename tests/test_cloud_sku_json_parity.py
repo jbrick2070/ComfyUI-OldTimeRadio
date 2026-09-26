@@ -91,6 +91,8 @@ def _profile_diffs(a, b):
 def _widget_map(wf, schemas):
     out = {}
     for n in wf["nodes"]:
+        if n["type"] in wa.NOTE_NODE_TYPES:
+            continue      # a canvas note has no schema and is never sent
         names = wa.serialized_slot_names(n["type"], schemas)
         wv = n.get("widgets_values") or []
         for i, val in enumerate(wv):

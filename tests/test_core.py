@@ -434,7 +434,7 @@ class TestWorkflowJSONFull:
         # workflow carries either node, and the pack itself is no longer a
         # dependency since 2026-09-26, so neither type is known here any more.)
         known = {
-            "PreviewAudio", "PreviewImage", "Note",
+            "PreviewAudio", "PreviewImage", "Note", "MarkdownNote",
             "CheckpointLoaderSimple", "SaveImage",
             # HuMo loader chain
             "UNETLoader", "CLIPLoader", "VAELoader",
