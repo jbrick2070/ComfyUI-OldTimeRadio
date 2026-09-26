@@ -426,14 +426,25 @@ def test_deterministic_delivery_vector_is_clean_and_complete():
 
 
 # --- platform-correct venv default (0c-8, 2026-09-25) ----------------------- #
-def test_default_venv_python_is_platform_correct(monkeypatch):
+def test_default_venv_python_is_platform_correct(tmp_path, monkeypatch):
     from nodes._otr_audio_engines import _otr_sidecar as SC
+    root = tmp_path / "chatterbox"
     monkeypatch.setattr(SC.os, "name", "nt")
-    assert SC.default_venv_python("C:/ComfyUI/chatterbox") == os.path.join(
-        "C:/ComfyUI/chatterbox", ".venv", "Scripts", "python.exe")
+    assert SC.default_venv_python(str(root)) == os.path.join(
+        str(root), ".venv", "Scripts", "python.exe")
+    # posix with no provisioned Scripts entry: the real venv interpreter.
     monkeypatch.setattr(SC.os, "name", "posix")
-    assert SC.default_venv_python("/opt/ComfyUI/chatterbox") == os.path.join(
-        "/opt/ComfyUI/chatterbox", ".venv", "bin", "python")
+    assert SC.default_venv_python(str(root)) == os.path.join(
+        str(root), ".venv", "bin", "python")
+    # posix WITH the provisioner's Scripts entry: the launcher wins. For
+    # IndexTTS2 it sets the offline env (Composer QA: routing around it runs
+    # the worker online on a network-less pod); for chatterbox/dia it is an
+    # equivalent symlink. This is what a provisioned pod resolves.
+    launcher = root / ".venv" / "Scripts" / "python.exe"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_bytes(b"launcher")
+    assert SC.default_venv_python(str(root)) == os.path.join(
+        str(root), ".venv", "Scripts", "python.exe")
 
 
 def test_windows_venv_default_is_byte_identical(monkeypatch):
@@ -447,19 +458,20 @@ def test_windows_venv_default_is_byte_identical(monkeypatch):
         assert SC.default_venv_python(os.path.join(mod._COMFY_ROOT, sub)) == old
 
 
-def test_all_three_engines_fall_back_to_the_platform_default(monkeypatch):
+def test_all_three_engines_delegate_to_the_shared_helper(monkeypatch):
     from nodes import _otr_audio_engines as AE
     from nodes._otr_audio_engines import _otr_sidecar as SC
+    from nodes._otr_audio_engines import (
+        eng_chatterbox, eng_dia, eng_indextts2)
     for var in ("OTR_CHATTERBOX_VENV", "OTR_DIA_VENV", "OTR_INDEXTTS2_VENV"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setattr(SC.os, "name", "posix")
-    for name in ("chatterbox", "dia", "indextts2"):
-        got = AE.get_engine(name)._venv_python().replace("\\", "/")
-        assert got.endswith(".venv/bin/python"), (name, got)
-    monkeypatch.setattr(SC.os, "name", "nt")
-    for name in ("chatterbox", "dia", "indextts2"):
-        got = AE.get_engine(name)._venv_python().replace("/", "\\")
-        assert got.endswith(".venv\\Scripts\\python.exe"), (name, got)
+    for name, mod, sub in (("chatterbox", eng_chatterbox, "chatterbox"),
+                           ("dia", eng_dia, "dia"),
+                           ("indextts2", eng_indextts2, "index-tts")):
+        for os_name in ("nt", "posix"):
+            monkeypatch.setattr(SC.os, "name", os_name)
+            assert AE.get_engine(name)._venv_python() == SC.default_venv_python(
+                os.path.join(mod._COMFY_ROOT, sub)), (name, os_name)
 
 
 def test_venv_env_overrides_still_win(monkeypatch):

@@ -17,7 +17,8 @@ NOTE: every Chatterbox output carries Resemble AI's imperceptible PerTh watermar
 
 Config (env, with box defaults under ``ComfyUI/chatterbox``):
   ``OTR_CHATTERBOX_VENV``   isolated venv python (``.venv/Scripts/python.exe``
-  on Windows, ``.venv/bin/python`` elsewhere)
+  on Windows, ``.venv/bin/python`` elsewhere; a provisioned ``Scripts``
+  launcher still wins on Linux/Mac)
   ``OTR_CHATTERBOX_WORKER`` worker script (``scripts/_otr_chatterbox_worker.py``)
 
 Import-time is side-effect-free (C-5). UTF-8, no BOM, ASCII-only source.

@@ -20,7 +20,8 @@ quality upgrade with no code change.
 
 Config (env, with box defaults under ``ComfyUI/dia``):
   ``OTR_DIA_VENV``   isolated venv python (``.venv/Scripts/python.exe``
-  on Windows, ``.venv/bin/python`` elsewhere)
+  on Windows, ``.venv/bin/python`` elsewhere; a provisioned ``Scripts``
+  launcher still wins on Linux/Mac)
   ``OTR_DIA_WORKER`` worker script (``scripts/_otr_dia_worker.py``)
   ``OTR_DIA_MODEL``  HF model id (default ``nari-labs/Dia-1.6B-0626``)
 

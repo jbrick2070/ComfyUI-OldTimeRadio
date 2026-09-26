@@ -12,7 +12,8 @@ weights are installed (C-7). ``interface == "per_line"``.
 
 Config (env, with box defaults under ``ComfyUI/index-tts``):
   ``OTR_INDEXTTS2_VENV``   isolated venv python (``.venv/Scripts/python.exe``
-  on Windows, ``.venv/bin/python`` elsewhere)
+  on Windows, ``.venv/bin/python`` elsewhere; a provisioned ``Scripts``
+  launcher still wins on Linux/Mac)
   ``OTR_INDEXTTS2_DIR``    weights dir (``checkpoints``, holds ``config.yaml``)
   ``OTR_INDEXTTS2_WORKER`` worker script (``scripts/_otr_indextts2_worker.py``)
   ``OTR_INDEXTTS2_FP16``   ``1`` to load fp16 (default fp32)

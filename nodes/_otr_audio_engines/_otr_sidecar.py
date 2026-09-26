@@ -34,17 +34,31 @@ except ImportError:  # pragma: no cover -- flat test imports
 def default_venv_python(engine_root):
     """Isolated-venv interpreter under ``engine_root``, platform-correct.
 
-    ``.venv/Scripts/python.exe`` on Windows, ``.venv/bin/python`` elsewhere --
-    the layout ``uv venv`` / ``python -m venv`` actually creates on each
-    platform. The three Path-B adapters (chatterbox, dia, indextts2) used to
-    hardcode the Windows shape, so a default install on Linux or Mac pointed
-    at an interpreter that does not exist. Windows output is byte-identical
-    to the old ``_default(".venv", "Scripts", "python.exe")``; the env
-    overrides (OTR_*_VENV) are read by the callers and unchanged. Mirrors the
-    provisioner's own ``_indextts2_venv_python`` branching.
+    ``.venv/Scripts/python.exe`` on Windows, always -- byte-identical to the
+    old ``_default(".venv", "Scripts", "python.exe")`` the three Path-B
+    adapters (chatterbox, dia, indextts2) hardcoded.
+
+    On Linux/Mac the provisioner's ``.venv/Scripts/python.exe`` still wins
+    WHEN IT EXISTS, and that exception is the whole point: for IndexTTS2 it
+    is not an interpreter but the OFFLINE LAUNCHER
+    (``link_indextts2_runtime_python``) that sets HF_HUB_OFFLINE=1 /
+    TRANSFORMERS_OFFLINE=1 and the vendor cwd before execing the real venv
+    python -- the runtime adapter is documented as finding that wrapper
+    through its default path (RUNPOD_INSTALL.md), and routing around it
+    would run the worker online on a network-less pod. For chatterbox/dia
+    the provisioned Scripts path is a plain symlink to bin/python, so
+    preferring it changes nothing there. A manual install with no Scripts
+    entry falls through to ``.venv/bin/python``, the interpreter venv
+    layouts actually create on posix -- which is the fix: the old default
+    pointed at an interpreter that does not exist there.
+
+    The env overrides (OTR_*_VENV) are read by the callers and unchanged.
     """
+    _windows_shaped = os.path.join(engine_root, ".venv", "Scripts", "python.exe")
     if os.name == "nt":
-        return os.path.join(engine_root, ".venv", "Scripts", "python.exe")
+        return _windows_shaped
+    if os.path.exists(_windows_shaped):
+        return _windows_shaped
     return os.path.join(engine_root, ".venv", "bin", "python")
 
 
