@@ -1002,6 +1002,42 @@ class TestPortraitIdentitySeed:
               "f17d")
 
 
+    def test_every_beat_of_one_character_draws_the_portrait_seed(self):
+        """One face per character: every scene_character still of c01 draws
+        the seed c01's own portrait rendered with. The portrait's object_id IS
+        the char_id, so its draw is the plain request-hash of (c01, portrait
+        prompt hash) -- the literal below is that digest, written down so a
+        change to the derivation cannot pass by moving both sides at once.
+        """
+        import hashlib
+
+        from nodes import otr_image_gen_dispatcher as disp
+
+        portrait = disp.resolve_seed_and_mode(self.RH, "c01", "pp_portrait")
+        assert portrait == (1692108723, "")
+        assert 1692108723 == int(
+            hashlib.sha256(b"0:c01:pp_portrait").hexdigest()[:8], 16)
+        for oid in ("still_b002", "still_b004", "still_b006"):
+            assert disp.resolve_seed_and_mode(
+                self.RH, oid, "ph_" + oid, kind="scene_character",
+                char_id="c01", portrait_prompt_hash="pp_portrait",
+            ) == (portrait[0], "seed")
+
+    def test_zimage_reference_rejection_keeps_the_identity_seed(self):
+        """The 2026-08-20 grid fix disables only the corrupt generic latent.
+        It must not also remove the already-proven portrait-derived seed.
+        (Bug Bible BUG-12.120 names this test as the live receipt.)
+        """
+        from nodes import otr_image_gen_dispatcher as disp
+        from nodes._otr_image_engines import registry as ireg
+
+        assert ireg.get_engine("z_image_turbo").accepts_reference_image is False
+        portrait = disp.resolve_seed_and_mode(self.RH, "c01", "pp_portrait")[0]
+        assert disp.resolve_seed_and_mode(
+            self.RH, "still_b002", "ph_scene", kind="scene_character",
+            char_id="c01", portrait_prompt_hash="pp_portrait",
+        ) == (portrait, "seed")
+
     def test_placement_after_the_mode_gate_keeps_the_fixed_contract(self):
         """Placed before the gate this returns a hashed seed instead of 7, and
         placed before `base` is assigned it raises UnboundLocalError inside a
