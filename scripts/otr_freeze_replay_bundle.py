@@ -97,6 +97,15 @@ def find_master(ep_dir: pathlib.Path, ledger: dict) -> pathlib.Path:
     named = [p for p in hits if p.name.startswith(ep_dir.name)]
     hits = sorted(named or hits, key=lambda p: p.stat().st_mtime)
     if not hits:
+        # AN EPISODE WHOSE VIDEO PHASE FAILED never reaches the mux that stamps
+        # `final_audio_path` and renames the master, so the provisional
+        # `pending_*` file is the ONLY master -- and the right one. Freezing
+        # such an episode is how a video defect is smoke-tested without paying
+        # for the writer, voices and music again. More than one pending master
+        # is ambiguous and still refused.
+        pending = list((ep_dir / "audio").glob("pending_*_master.wav"))
+        if len(pending) == 1:
+            return pending[0].resolve()
         raise SystemExit("no *_master.wav under %s" % (ep_dir / "audio"))
     return hits[-1].resolve()
 

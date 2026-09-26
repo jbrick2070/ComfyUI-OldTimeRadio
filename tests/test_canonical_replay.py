@@ -526,3 +526,31 @@ def test_the_verifier_recomputes_the_receipt_sha():
     assert vr.recompute_sha(row) == row["actual_request_sha"]
     row["text_prompt"] = "changed"
     assert vr.recompute_sha(row) != row["actual_request_sha"]
+
+
+def test_the_freezer_takes_the_lone_pending_master_of_a_failed_episode(tmp_path):
+    """A video-phase failure leaves only the provisional `pending_*` master (no
+    `final_audio_path`); that file is the master. Two pending masters are
+    ambiguous and refused; a renamed master still wins over a pending one."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "otr_freeze_replay_bundle_under_test",
+        str(Path(__file__).resolve().parents[1] / "scripts"
+            / "otr_freeze_replay_bundle.py"))
+    freezer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(freezer)
+
+    ep = tmp_path / "signal_lost_fixture_20260926_000000"
+    audio = ep / "audio"
+    audio.mkdir(parents=True)
+    lone = audio / "pending_20260926_000000_master.wav"
+    lone.write_bytes(b"RIFF")
+    assert freezer.find_master(ep, {}) == lone.resolve()
+
+    (audio / "pending_20260926_000001_master.wav").write_bytes(b"RIFF")
+    with pytest.raises(SystemExit):
+        freezer.find_master(ep, {})
+
+    final = audio / "signal_lost_fixture_20260926_000000_master.wav"
+    final.write_bytes(b"RIFF")
+    assert freezer.find_master(ep, {}) == final.resolve()
