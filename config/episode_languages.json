@@ -13,7 +13,7 @@
       "admitted": true,
       "sort_order": 10,
       "native_header": "English",
-      "row_revision": 3,
+      "row_revision": 4,
       "authoring": {
         "spoken_name": "English",
         "writer_instruction": "Write the episode in English. Titles, dialogue, and announcer copy are English.",
@@ -120,7 +120,8 @@
             "am_puck",
             "am_santa"
           ]
-        }
+        },
+        "google_tts": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -134,7 +135,7 @@
       "admitted": true,
       "sort_order": 20,
       "native_header": "Español",
-      "row_revision": 3,
+      "row_revision": 4,
       "authoring": {
         "spoken_name": "español",
         "writer_instruction": "Escribe el episodio en español. Títulos, diálogo y locución del locutor en español. No traduzcas un borrador en inglés: genera en español.",
@@ -212,7 +213,8 @@
             "em_alex",
             "em_santa"
           ]
-        }
+        },
+        "google_tts": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -226,7 +228,7 @@
       "admitted": true,
       "sort_order": 30,
       "native_header": "Português",
-      "row_revision": 2,
+      "row_revision": 3,
       "authoring": {
         "spoken_name": "português",
         "writer_instruction": "Escreva o episódio em português brasileiro. Títulos, diálogo e locução do locutor em português. Não traduza um rascunho em inglês: gere em português.",
@@ -304,7 +306,8 @@
             "pm_alex",
             "pm_santa"
           ]
-        }
+        },
+        "google_tts": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -318,7 +321,7 @@
       "admitted": true,
       "sort_order": 40,
       "native_header": "Italiano",
-      "row_revision": 2,
+      "row_revision": 3,
       "authoring": {
         "spoken_name": "italiano",
         "writer_instruction": "Scrivi l'episodio in italiano. Titoli, dialoghi e locuzione dell'annunciatore in italiano. Non tradurre una bozza inglese: genera in italiano.",
@@ -395,7 +398,8 @@
             "if_sara",
             "im_nicola"
           ]
-        }
+        },
+        "google_tts": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -409,7 +413,7 @@
       "admitted": true,
       "sort_order": 50,
       "native_header": "Français",
-      "row_revision": 2,
+      "row_revision": 3,
       "authoring": {
         "spoken_name": "français",
         "writer_instruction": "Écris l'épisode en français. Titres, dialogues et locution de l'annonceur en français. Ne traduis pas un brouillon anglais: génère en français.",
@@ -485,7 +489,8 @@
           "voices": [
             "ff_siwis"
           ]
-        }
+        },
+        "google_tts": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -499,7 +504,7 @@
       "admitted": true,
       "sort_order": 60,
       "native_header": "हिन्दी",
-      "row_revision": 2,
+      "row_revision": 3,
       "authoring": {
         "spoken_name": "हिन्दी",
         "writer_instruction": "पूरा एपिसोड हिन्दी में लिखो। शीर्षक, संवाद और उद्घोषक की भाषा हिन्दी हो। अंग्रेज़ी ड्राफ्ट का अनुवाद मत करो — सीधे हिन्दी में लिखो।",
@@ -578,7 +583,8 @@
             "hm_omega",
             "hm_psi"
           ]
-        }
+        },
+        "google_tts": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -592,7 +598,7 @@
       "admitted": true,
       "sort_order": 70,
       "native_header": "日本語",
-      "row_revision": 2,
+      "row_revision": 3,
       "authoring": {
         "spoken_name": "日本語",
         "writer_instruction": "エピソード全体を日本語で書いてください。タイトル、台詞、アナウンサーも日本語。英語原稿の翻訳ではなく、最初から日本語で書くこと。",
@@ -672,7 +678,8 @@
             "jf_tebukuro",
             "jm_kumo"
           ]
-        }
+        },
+        "google_tts": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -688,7 +695,7 @@
       "admitted": true,
       "sort_order": 80,
       "native_header": "普通话",
-      "row_revision": 2,
+      "row_revision": 3,
       "authoring": {
         "spoken_name": "普通话",
         "writer_instruction": "请用普通话写完整集。标题、对白和播音员台词都用中文。不要翻译英文草稿，直接用中文创作。",
@@ -771,7 +778,8 @@
             "zm_yunxia",
             "zm_yunyang"
           ]
-        }
+        },
+        "google_tts": {}
       },
       "admission": {
         "source_bank_exclusions": [],

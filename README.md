@@ -636,7 +636,8 @@ If yours lives somewhere unusual, set `OTR_FFMPEG` to the binary's full path.
 runs English through `kokoro-onnx` on the CPU; non-English rows do not use that
 backend. Python 3.14 has no Kokoro build yet and is refused. The message names
 the exact pip line. An English episode can use Bark instead, except on a 16 GB
-Mac where Bark is a memory hazard. Non-English rows admit Kokoro only.
+Mac where Bark is a memory hazard. Non-English rows admit Kokoro and Google
+TTS (hosted, your own Google API key).
 
 **A gated model returns HTTP 401.** `gemma-2-2b-it` and `stable_audio_music` need
 a licence click on Hugging Face plus a login; every default weight is ungated,

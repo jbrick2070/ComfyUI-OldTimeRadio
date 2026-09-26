@@ -170,8 +170,10 @@ This registry mirrors `kokoro` 0.9.4 `LANG_CODES`. A new row needs a real
 Kokoro language code and real voice files. Adding a label for a language Kokoro
 does not serve creates a menu entry that cannot speak; that is not support.
 
-If a different TTS engine is required, add and qualify that engine first. The
-day-one registry admits Kokoro only.
+Every row admits Kokoro and Google TTS (`google_tts` -- hosted, your own
+Google API key). Google's prebuilt voices are not tied to a language: the
+model speaks whatever language the text is in, so the row carries no voice
+list for it. Any other engine must be added and qualified first.
 
 ### Add a row to `config/episode_languages.json`
 
