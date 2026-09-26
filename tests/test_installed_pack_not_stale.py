@@ -74,6 +74,8 @@ def _drifted(installed: Path) -> list:
 
 
 def test_the_installed_pack_matches_this_repo():
+    if (REPO / ".git").is_file():
+        pytest.skip("running from a git worktree; installed pack check is meaningless")
     installed = _installed_pack()
     if installed is None:
         pytest.skip("no separate installed pack on this machine")
@@ -101,6 +103,8 @@ def test_the_installed_pack_carries_no_extra_engines():
     registers, which puts a retired lane back in the dropdown on the one
     machine that matters: the one actually rendering.
     """
+    if (REPO / ".git").is_file():
+        pytest.skip("running from a git worktree; installed pack check is meaningless")
     installed = _installed_pack()
     if installed is None:
         pytest.skip("no separate installed pack on this machine")

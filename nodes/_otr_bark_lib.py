@@ -208,6 +208,11 @@ def _load_bark(model_id="suno/bark", device=None):
         # -- VRAM Hardening v1.4: Strict Handoff --
         # If Gemma is in VRAM, evict it now before loading Bark.
         # S30 B4b: route through the modern loader's unload_llm.
+        #
+        # A post-eviction wash is NOT warranted here: `unload_llm` delegates to
+        # `_teardown_gpu_for_entry`, which unconditionally runs `gc.collect()`
+        # and both `torch.cuda.empty_cache()` and `torch.mps.empty_cache()`.
+        # Whatever the evicted writer frees is already reclaimed by that call.
         try:
             from ._otr_model_loader import unload_llm
             unload_llm()
