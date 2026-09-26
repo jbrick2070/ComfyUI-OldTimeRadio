@@ -84,7 +84,7 @@ def _resolve(role, engine_id, snapshot=_OFF, mapping=None):
         snapshot=snapshot,
         force_mapping=mapping or {},
         redirect_applies=_redirects,
-        redirect_target="ltx25_native_audio_in_16gb",
+        redirect_target="ltx25_audio_in_16gb",
     )
 
 
@@ -109,8 +109,8 @@ def test_explicit_role_beats_star():
 
 
 def test_redirect_fires_for_bookend_roles_only():
-    assert _resolve("announcer_visual", "humo") == "ltx25_native_audio_in_16gb"
-    assert _resolve("music_visual", "humo") == "ltx25_native_audio_in_16gb"
+    assert _resolve("announcer_visual", "humo") == "ltx25_audio_in_16gb"
+    assert _resolve("music_visual", "humo") == "ltx25_audio_in_16gb"
     # character_video is never subject to the guard
     assert _resolve("character_video", "humo") == "humo"
 
@@ -131,7 +131,7 @@ def test_order_is_force_map_then_redirect():
     """ORDER IS THE CONTRACT, and it matches the render path exactly."""
     # Forcing a HuMo onto a bookend still redirects.
     assert _resolve("announcer_visual", "ltx_8gb",
-                    mapping={"*": "humo"}) == "ltx25_native_audio_in_16gb"
+                    mapping={"*": "humo"}) == "ltx25_audio_in_16gb"
     # Forcing a non-HuMo onto a bookend that WOULD have redirected does not.
     assert _resolve("announcer_visual", "humo",
                     mapping={"*": "viz_camera"}) == "viz_camera"

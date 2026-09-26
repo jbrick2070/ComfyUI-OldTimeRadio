@@ -98,13 +98,13 @@ class LtxOpenHealthTests(unittest.TestCase):
                          PREVIOUS_LTX_ENGINES | {
                              "ltx_8gb", "razzle_ltx_8gb",
                              "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in",
-                             "ltx25_native_foley_16gb",
-                             "ltx25_native_foley_24gb",
-                             "ltx25_native_foley_blackwell",
-                             "ltx25_native_mime_16gb",
-                             "ltx25_native_mime_24gb",
-                             "ltx25_native_audio_in_16gb",
-                             "ltx25_native_audio_in_24gb",
+                             "ltx25_foley_16gb",
+                             "ltx25_foley_24gb",
+                             "ltx25_foley_blackwell",
+                             "ltx25_mime_16gb",
+                             "ltx25_mime_24gb",
+                             "ltx25_audio_in_16gb",
+                             "ltx25_audio_in_24gb",
                          })
 
     def test_every_registered_ltx25_lane_is_in_the_allowlist(self):

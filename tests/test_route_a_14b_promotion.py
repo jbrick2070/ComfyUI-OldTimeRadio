@@ -153,8 +153,8 @@ def test_the_frame_cap_follows_the_MODEL_not_the_orientation():
 # --------------------------------------------------------------------------- #
 def _direct_policy():
     pol_json, = vd.OTRVideoDirector().direct(
-        announcer_video_model="ltx25_native_audio_in_16gb (16:9)",
-        music_video_model="ltx25_native_audio_in_16gb (16:9)",
+        announcer_video_model="ltx25_audio_in_16gb (16:9)",
+        music_video_model="ltx25_audio_in_16gb (16:9)",
         announcer_image_model="flux_gen1",
         music_image_model="flux_gen1",
         character_image_model="flux_gen1",

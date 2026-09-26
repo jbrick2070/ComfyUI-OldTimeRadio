@@ -34,7 +34,7 @@ def _resolved(announcer, music, character):
 
 
 def _direct(monkeypatch, announcer="humo_1.7B",
-            music="ltx25_native_audio_in_16gb", character="ltx_8gb", **env):
+            music="ltx25_audio_in_16gb", character="ltx_8gb", **env):
     """Drive the real OTR_VideoDirector and return its parsed policy.
 
     The default slots are live STAND-INS, not subjects. The director refuses a
@@ -276,7 +276,7 @@ def test_both_nodes_share_one_fingerprint(monkeypatch):
 # Chunk 1c -- the render-time EQUALITY ASSERTION
 # ---------------------------------------------------------------------------
 
-def _frozen_ledger(engine="ltx25_native_audio_in_16gb", role="announcer_visual",
+def _frozen_ledger(engine="ltx25_audio_in_16gb", role="announcer_visual",
                    frozen_engine=None, env=None):
     """A ledger shaped like one ShotLock stamps after the 1b freeze."""
     return {
@@ -329,7 +329,7 @@ def test_shot_that_disagrees_with_the_frozen_route_is_terminal(monkeypatch):
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     ledger = _frozen_ledger(engine="humo",
-                            frozen_engine="ltx25_native_audio_in_16gb")
+                            frozen_engine="ltx25_audio_in_16gb")
     with pytest.raises(rd.RenderError, match="frozen route says"):
         rd.assert_frozen_route(ledger)
 
@@ -369,8 +369,8 @@ def test_frozen_route_from_ledger_reads_only_a_real_map():
     assert rd.frozen_route_from_ledger({"video": {"roles_effective": {}}}) == {}
     assert rd.frozen_route_from_ledger(
         {"video": {"roles_effective": {
-            "announcer_visual": "ltx25_native_audio_in_16gb"}}}
-    ) == {"announcer_visual": "ltx25_native_audio_in_16gb"}
+            "announcer_visual": "ltx25_audio_in_16gb"}}}
+    ) == {"announcer_visual": "ltx25_audio_in_16gb"}
 
 
 def test_build_request_from_shot_does_not_redirect_under_a_frozen_route(monkeypatch):

@@ -82,7 +82,7 @@ def _led(meta):
 
 def _shot(sid="shot_b000_music_open", role="music_visual", sids=None):
     return {"shot_id": sid, "beat_id": "b000",
-            "engine_id": "ltx25_native_audio_in_16gb",
+            "engine_id": "ltx25_audio_in_16gb",
             "role": role, "family": "audio_conditioned_video",
             "target_frame_count": 25, "source_line_ids": list(sids or []),
             "char_id": "", "creative": {}}

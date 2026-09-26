@@ -54,7 +54,7 @@ def test_the_ANNOUNCER_and_the_MUSIC_bookends_owe_the_RADIO():
     structurally redirects away from HuMo, for the same reason."""
     for role in ("announcer_visual", "music_visual"):
         assert mp.mouth_owner_for_beat(
-            engine_id="ltx25_native_audio_in_16gb", family="audio_conditioned_video",
+            engine_id="ltx25_audio_in_16gb", family="audio_conditioned_video",
             role=role, is_character_face=False) == mp.MOUTH_RADIO
 
 
@@ -84,7 +84,7 @@ def test_the_UNOWNED_case_is_REFUSED_by_name():
     whether that still has lips. Before this chunk it rendered silently."""
     with pytest.raises(mp.MouthPolicyError) as caught:
         mp.mouth_owner_for_beat(
-            engine_id="ltx25_native_audio_in_16gb", family="audio_conditioned_video",
+            engine_id="ltx25_audio_in_16gb", family="audio_conditioned_video",
             role="background_abstract", is_character_face=False)
     assert "NO FALLBACK" in str(caught.value)
     assert "background_abstract" in str(caught.value)
@@ -220,7 +220,7 @@ def test_THE_SET_SPEAKS_THROUGHOUT_is_a_legal_episode():
     """And it is the DEFAULT look, not a degraded one -- an episode with no
     human face at all passes without comment."""
     assert _faces([
-        _beat("b0", engine_id="ltx25_native_audio_in_16gb",
+        _beat("b0", engine_id="ltx25_audio_in_16gb",
               family="audio_conditioned_video", role="announcer_visual",
               char_id="", face=False),
         _beat("b1", engine_id="wan_i2v", family="image_to_video",
@@ -320,7 +320,7 @@ def test_a_MULTI_CLIP_CABINET_beat_is_NOT_EVEN_REPORTED():
     cut across as many clips as the beat needs, silently. Without this the
     single-take clause would nag about every long announcer beat."""
     faces, long_takes, _demoted = mp.audit_episode_faces([
-        _beat("b0", engine_id="ltx25_native_audio_in_16gb",
+        _beat("b0", engine_id="ltx25_audio_in_16gb",
               family="audio_conditioned_video", role="announcer_visual",
               char_id="", face=False, multi=True),
     ])
@@ -407,7 +407,7 @@ def test_SHOTLOCK_translates_its_own_rows_and_asks_the_policy():
         {"shot_id": "shot_b1", "engine_id": "humo", "role": "character_video",
          "char_id": "ada",
          "coverage_plan": {"segments": [{"index": 0, "render_frames": 33}]}},
-        {"shot_id": "shot_b0", "engine_id": "ltx25_native_audio_in_16gb",
+        {"shot_id": "shot_b0", "engine_id": "ltx25_audio_in_16gb",
          "role": "announcer_visual", "char_id": "",
          "coverage_plan": {"segments": [{"index": 0, "render_frames": 97}]}},
     ])

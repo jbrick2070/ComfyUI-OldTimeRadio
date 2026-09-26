@@ -262,7 +262,7 @@
         "nv8": "measured"
       },
       "size_gb": 22.7,
-      "note": "Same mix4x8 DiT and w4a8 encoder as ltx25_native_foley_16gb. MEASURED, not proven: that weight rendered a 97-frame clip on an RTX 5080 Laptop (205.3 s) and on an RTX 4060 Laptop (707.0 s), but no episode has published on this silent lane with it."
+      "note": "Same mix4x8 DiT and w4a8 encoder as ltx25_foley_16gb. MEASURED, not proven: that weight rendered a 97-frame clip on an RTX 5080 Laptop (205.3 s) and on an RTX 4060 Laptop (707.0 s), but no episode has published on this silent lane with it."
     },
     "ltx_8gb": {
       "memory": {

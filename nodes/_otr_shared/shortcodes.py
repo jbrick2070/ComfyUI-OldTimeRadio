@@ -124,18 +124,18 @@ VIDEO_LANE = {
     # The LTX 2.5 tiers, 2026-09-22. Without these an episode that
     # any of them dominates publishes as "unk" -- the video identity missing
     # from the one artifact the operator actually reads.
-    "ltx25_native_foley_16gb": "n16f",
-    "ltx25_native_foley_24gb": "n24f",
-    "ltx25_native_foley_blackwell": "nbwf",
-    # The native MIME and AUDIO-IN lanes, registered 2026-09-23 and missing
+    "ltx25_foley_16gb": "n16f",
+    "ltx25_foley_24gb": "n24f",
+    "ltx25_foley_blackwell": "nbwf",
+    # The MIME and AUDIO-IN lanes, registered 2026-09-23 and missing
     # from this table until a QA pass found it -- which is exactly the failure
     # the comment above describes: their first proof episode would have
     # published as "unk", so the one artifact the operator reads would not have
     # named the lane it was meant to prove.
-    "ltx25_native_mime_16gb": "n16m",
-    "ltx25_native_mime_24gb": "n24m",
-    "ltx25_native_audio_in_16gb": "n16a",
-    "ltx25_native_audio_in_24gb": "n24a",
+    "ltx25_mime_16gb": "n16m",
+    "ltx25_mime_24gb": "n24m",
+    "ltx25_audio_in_16gb": "n16a",
+    "ltx25_audio_in_24gb": "n24a",
     "animatediff15_v3_haunted_video": "adhv",
     "animatediff15_v3_stillin_lab_video": "adsl",
     "animatediff15_lightning_video": "adlt",

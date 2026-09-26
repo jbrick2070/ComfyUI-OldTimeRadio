@@ -118,9 +118,9 @@ weights first, so an early failure costs the least:
 | B2 | `otr_8gb_still` | `still_motion` | Z-Image Turbo stills on 8 GB | PASSED through the GUI on a wiped 2.3.4 install (`c2f14301`, 32:09) |
 | B3 | `otr_8gb_animatediff` | `animatediff15_v3_haunted_video` | SD 1.5 checkpoint, v3 motion module and v3 adapter all download at queue time; no `PREFLIGHT FAIL` | the download half PASSED (`297f65ef`); the leg FAILED at render on the missing AnimateDiff-Evolved pack (PBUG-20260925-02, gate fixed `02758478`); retry owed on the fresh start |
 | B4 | `otr_8gb_video` | `ltx_8gb` | LTX 0.9.8 2B plus T5 fetched at queue time | owed on the fresh start, WITHOUT ComfyUI-LTXVideo installed (see below) |
-| B5 | `otr_8gb_ltx25_native_foley` | `ltx25_native_foley_16gb` | the ~25 GB LTX 2.5 stack on 8 GB; measured 707 s per 97-frame clip on this card | owed |
-| B6 | `otr_8gb_ltx25_native_mime` | `ltx25_native_mime_16gb` | same weights, `EXISTING` | owed |
-| B7 | `otr_8gb_ltx25_native_audio_in` | `ltx25_native_audio_in_16gb` | same weights, `EXISTING` | owed |
+| B5 | `otr_8gb_ltx25_foley` | `ltx25_foley_16gb` | the ~25 GB LTX 2.5 stack on 8 GB; measured 707 s per 97-frame clip on this card | owed |
+| B6 | `otr_8gb_ltx25_mime` | `ltx25_mime_16gb` | same weights, `EXISTING` | owed |
+| B7 | `otr_8gb_ltx25_audio_in` | `ltx25_audio_in_16gb` | same weights, `EXISTING` | owed |
 
 **The fresh-start order (operator 2026-09-25: wipe the 4060's OTR install and
 models root first).** Test ONE commit the 5080 names, not a moving `main`.

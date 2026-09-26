@@ -75,7 +75,7 @@ def _fresh_registry():
 
 #: The live LTX audio-in lane: on the LTX bookend scene branch for radio beats
 #: and an audio-in character lane on character beats.
-_AUDIO_IN_LANE = "ltx25_native_audio_in_16gb"
+_AUDIO_IN_LANE = "ltx25_audio_in_16gb"
 
 #: The minted scene still for the synthetic music-open beat. The audio-in lane
 #: conditions on it and refuses to render without one (no portrait fallback).

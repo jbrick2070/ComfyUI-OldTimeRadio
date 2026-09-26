@@ -105,11 +105,11 @@ just do not carry the label, which is reserved for the audio-reactive family.
 |---|---|---|
 | `ltx098_low_video` | animates the beat's still. The cheapest local video lane | automatic, about 16 GB |
 | `ltx25_high_video` | LTX 2.5, two-stage: rendered small, then refined to a large decode. Silent. 16 GB weights | automatic, about 25 GB |
-| `ltx25_native_foley_16gb` | the same picture, and it **keeps the model's own sound**. 16 GB weights | automatic, about 25 GB |
-| `ltx25_native_foley_24gb` | the same, on the 24 GB+ weights (any modern NVIDIA) | automatic, about 33 GB |
-| `ltx25_native_foley_blackwell` | the same, on Blackwell-only weights | automatic, about 24 GB |
-| `ltx25_native_mime_16gb`, `ltx25_native_mime_24gb` | the same picture, and the model's sound **replaces** the episode audio over those beats | automatic, same files as the foley lane of that size |
-| `ltx25_native_audio_in_16gb`, `ltx25_native_audio_in_24gb` | the picture follows the beat's own audio instead of inventing sound | automatic, same files as the foley lane of that size |
+| `ltx25_foley_16gb` | the same picture, and it **keeps the model's own sound**. 16 GB weights | automatic, about 25 GB |
+| `ltx25_foley_24gb` | the same, on the 24 GB+ weights (any modern NVIDIA) | automatic, about 33 GB |
+| `ltx25_foley_blackwell` | the same, on Blackwell-only weights | automatic, about 24 GB |
+| `ltx25_mime_16gb`, `ltx25_mime_24gb` | the same picture, and the model's sound **replaces** the episode audio over those beats | automatic, same files as the foley lane of that size |
+| `ltx25_audio_in_16gb`, `ltx25_audio_in_24gb` | the picture follows the beat's own audio instead of inventing sound | automatic, same files as the foley lane of that size |
 
 Every LTX row downloads its own weights the first time you queue it -- no
 account, no licence click, no Hugging Face token -- and loads through
@@ -224,7 +224,7 @@ from are in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) and
 
 ## The lanes that change the sound
 
-The `ltx25_native_foley_*` and `ltx25_native_mime_*` rows are the same picture
+The `ltx25_foley_*` and `ltx25_mime_*` rows are the same picture
 as `ltx25_high_video`. The difference is that they keep the audio the model
 generated alongside it.
 

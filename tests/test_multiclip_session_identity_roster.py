@@ -223,7 +223,7 @@ def test_the_engines_that_forced_this_gate_are_still_covered_by_it():
     silently stopped billing its row the moment the engine left the registry.
     """
     names = vreg.all_engine_names()
-    for name in ("ltx25_video", "ltx25_native_audio_in_16gb", "ltx_8gb",
+    for name in ("ltx25_video", "ltx25_audio_in_16gb", "ltx_8gb",
                  "humo"):
         assert name in names, name
         assert name in IN_SCOPE, (
@@ -363,7 +363,7 @@ def test_CONTROL_a_bare_string_identity_is_not_enough_to_name_handles():
     assert len(wrapped) == 1, "a name-only identity names no handles"
 
 
-@pytest.mark.parametrize("name", ["ltx25_video", "ltx25_native_audio_in_16gb"])
+@pytest.mark.parametrize("name", ["ltx25_video", "ltx25_audio_in_16gb"])
 def test_the_live_lanes_carry_their_WEIGHTS_not_just_their_name(name):
     """The lanes that declared an identity after the live failure must name
     what they load.
@@ -385,7 +385,7 @@ def test_the_live_lanes_carry_their_WEIGHTS_not_just_their_name(name):
         % (name, identity))
 
 
-@pytest.mark.parametrize("name", ["ltx25_video", "ltx25_native_audio_in_16gb"])
+@pytest.mark.parametrize("name", ["ltx25_video", "ltx25_audio_in_16gb"])
 def test_a_weight_receipt_is_stable_and_moves_when_the_file_moves(name, tmp_path):
     """The receipt is the part that has to NOTICE a swap.
 
@@ -445,8 +445,8 @@ def test_CONTROL_the_cloud_gap_tripwire_is_an_exact_set_not_a_shrug():
     # in with them. They load weights in-process, so `_holds_local_handles`
     # answers True for them and they land in IN_SCOPE, never in
     # CLOUD_SPLITTERS.
-    for name in ("ltx25_video", "ltx25_native_audio_in_16gb",
-                 "ltx25_native_foley_16gb", "humo", "ltx_8gb"):
+    for name in ("ltx25_video", "ltx25_audio_in_16gb",
+                 "ltx25_foley_16gb", "humo", "ltx_8gb"):
         assert name not in CLOUD_SPLITTERS, (
             "%s holds local handles and must never appear in the cloud gap"
             % name)

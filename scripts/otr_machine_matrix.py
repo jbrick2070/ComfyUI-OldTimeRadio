@@ -545,7 +545,7 @@ def render() -> str:
     A("The machine class is `16 GB+`: there is no separate 24/32 GB machine "
       "key, so the install planner selects the 16 GB+ row for any card that "
       "size. One shipped workflow targets a bigger card on purpose -- "
-      "`otr_24gb_native_foley`, LTX 2.5 on the int8 DiT with a 22 GB writer "
+      "`otr_24gb_foley`, LTX 2.5 on the int8 DiT with a 22 GB writer "
       "ceiling -- and you open it by hand.\n")
     A("**That matters when you are paying by the hour.** A rented 24 GB card "
       "ran the 16 GB haunted workflow and peaked at 15,990 MB, and rented "

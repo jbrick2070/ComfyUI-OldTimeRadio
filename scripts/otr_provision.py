@@ -1351,14 +1351,14 @@ _PUBLIC_VIDEO_IDS = {
 #: Automatic, because the whole stack is ungated and the point of dropping the
 #: quant pack was that these lanes fetch their own weights.
 _LTX25_NATIVE_LANES = {
-    "ltx25_video": "ltx25_native_16gb",
-    "ltx25_native_foley_16gb": "ltx25_native_16gb",
-    "ltx25_native_mime_16gb": "ltx25_native_16gb",
-    "ltx25_native_audio_in_16gb": "ltx25_native_16gb",
-    "ltx25_native_foley_24gb": "ltx25_native_24gb",
-    "ltx25_native_mime_24gb": "ltx25_native_24gb",
-    "ltx25_native_audio_in_24gb": "ltx25_native_24gb",
-    "ltx25_native_foley_blackwell": "ltx25_native_blackwell",
+    "ltx25_video": "ltx25_16gb",
+    "ltx25_foley_16gb": "ltx25_16gb",
+    "ltx25_mime_16gb": "ltx25_16gb",
+    "ltx25_audio_in_16gb": "ltx25_16gb",
+    "ltx25_foley_24gb": "ltx25_24gb",
+    "ltx25_mime_24gb": "ltx25_24gb",
+    "ltx25_audio_in_24gb": "ltx25_24gb",
+    "ltx25_foley_blackwell": "ltx25_blackwell",
 }
 _HUMO14_ENGINES = {"humo", "humo_14B_169"}
 _HUMO17_ENGINES = {"humo_1.7B", "humo_1.7B_169"}

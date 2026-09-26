@@ -583,7 +583,7 @@ def test_an_OVER_long_clip_is_fine(monkeypatch):
     """Rendering MORE than the beat needs is normal -- a ladder rung overshoots
     and the assembler trims. Only a shortfall is a coverage failure."""
     from nodes import otr_silent_composite as sc
-    rows = [{"shot_id": "shot_b001", "engine_id": "ltx25_native_audio_in_16gb", "path": "x.mp4",
+    rows = [{"shot_id": "shot_b001", "engine_id": "ltx25_audio_in_16gb", "path": "x.mp4",
              "exists": True, "frame_count": 449, "target_frame_count": 442,
              "start_s": None}]
     segs, total = sc.plan_timeline_segments(_manifest(rows))

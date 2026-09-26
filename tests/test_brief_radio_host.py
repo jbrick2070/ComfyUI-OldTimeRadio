@@ -378,7 +378,7 @@ def test_enforce_radio_is_host_redirects_when_toggle_off(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     shot = _humo_bookend_shot()
     rd._enforce_radio_is_host(shot)
-    assert shot["engine_id"] == "ltx25_native_audio_in_16gb"  # today's behavior byte-for-byte
+    assert shot["engine_id"] == "ltx25_audio_in_16gb"  # today's behavior byte-for-byte
 
 
 def test_enforce_radio_is_host_noop_when_toggle_on(monkeypatch):
@@ -453,7 +453,7 @@ def test_build_request_off_redirects_bookend_to_audio_in_lane(tmp_path, monkeypa
     shot = _humo_bookend_shot(role="announcer_visual")
     with pytest.raises(rd.RenderError, match="NO scene still"):
         rd.build_request_from_shot(shot, led)
-    assert shot["engine_id"] == "ltx25_native_audio_in_16gb"  # redirect happened first
+    assert shot["engine_id"] == "ltx25_audio_in_16gb"  # redirect happened first
 
 
 def test_build_request_off_redirect_renders_from_the_scene_still(tmp_path, monkeypatch):
@@ -463,7 +463,7 @@ def test_build_request_off_redirect_renders_from_the_scene_still(tmp_path, monke
     led = _bookend_ledger(tmp_path, with_face=False, with_scene_still=True)
     shot = _humo_bookend_shot()
     req = rd.build_request_from_shot(shot, led)    # must NOT raise
-    assert shot["engine_id"] == "ltx25_native_audio_in_16gb"
+    assert shot["engine_id"] == "ltx25_audio_in_16gb"
     assert req["observability"]["init_source"] == "scene_still"
     assert req["observability"]["init_image"] == "still_b000.png"
 

@@ -1033,7 +1033,7 @@ def test_preflight_defers_ltx_ambient_audio_to_render_batch(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     beats = [{"beat_id": "b6", "role": "music_visual", "char_id": ""}]
     budget = {"total_frames": 50, "per_beat": {"b6": 50}}
-    policy = {"video_models": {"music_video_model": "ltx25_native_audio_in_16gb"}}
+    policy = {"video_models": {"music_video_model": "ltx25_audio_in_16gb"}}
     ledger = {
         "lines": [{"line_id": "b6", "char_id": ""}],
         "images": {"images": [
@@ -1055,7 +1055,7 @@ def test_preflight_defers_ltx_ambient_audio_to_render_batch(monkeypatch):
     _groups, shots = sl.build_execution_plan(beats, budget, {}, policy,
                                              ledger=ledger)
 
-    assert shots[0]["engine_id"] == "ltx25_native_audio_in_16gb"
+    assert shots[0]["engine_id"] == "ltx25_audio_in_16gb"
 
 
 def test_preflight_defers_seedance_scene_still_to_image_phase(monkeypatch):

@@ -647,6 +647,6 @@ def test_two_heavy_roles_still_validate():
     profile["role_overrides"]["music_visual"] = "humo"                   # force heavy
     decls = _declarations_by_registry()
     enabled = cp.enabled_engines(profile, decls["video"])
-    assert "ltx25_native_audio_in_16gb" in enabled and "humo" in enabled
+    assert "ltx25_audio_in_16gb" in enabled and "humo" in enabled
     assert "humo_1.7B" in enabled       # legacy selectable engine stays registered
     cp.cross_validate_profile(profile, cp.load_widget_mapping(), decls)

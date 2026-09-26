@@ -107,8 +107,8 @@ def test_unresolved_custom_slot_is_still_a_warning_not_a_raise(monkeypatch):
 # --------------------------------------------------------------------------- #
 def test_humo_redirect_output_is_registered_and_passes(monkeypatch):
     """With OTR_ENABLE_HUMO_HOSTS unset, a humo pick freezes to the
-    ltx25_native_audio_in_16gb redirect. Both the pick (humo, registered) and
-    the effective engine (ltx25_native_audio_in_16gb, registered) satisfy the
+    ltx25_audio_in_16gb redirect. Both the pick (humo, registered) and
+    the effective engine (ltx25_audio_in_16gb, registered) satisfy the
     boundary -- pinning that validation runs on the union without
     double-charging the redirect.
 
@@ -119,7 +119,7 @@ def test_humo_redirect_output_is_registered_and_passes(monkeypatch):
     silently disabled the radio-is-host redirect would have slipped through."""
     policy = _direct(monkeypatch, announcer="humo")
     eff = policy["effective_video_models"]["announcer_visual"]
-    assert eff == "ltx25_native_audio_in_16gb"
+    assert eff == "ltx25_audio_in_16gb"
     # and the director accepted both halves of the redirect pair -- reaching
     # this line IS the assertion that no ValueError fired.
 

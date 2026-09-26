@@ -3043,7 +3043,7 @@ class Ltx25NativeFoleyWideEngine(Ltx25FoleyPlusEngine):
     The receipts live in apple/PROD_BUG_LOG.md; what belongs here is the file.
     """
 
-    name = "ltx25_native_foley_24gb"
+    name = "ltx25_foley_24gb"
     engine_version = "1"
     default_roles = ()
     _native_dit = LTX25_NATIVE_DIT_WIDE
@@ -3088,7 +3088,7 @@ class Ltx25NativeFoleyBlackwellEngine(Ltx25FoleyPlusEngine):
     LTX-Video (BUG-070), and the VAE decoder already calls
     ``comfy_kitchen.na3d``. There was no Blackwell speedup left to claim."""
 
-    name = "ltx25_native_foley_blackwell"
+    name = "ltx25_foley_blackwell"
     engine_version = "1"
     default_roles = ()
     _native_dit = LTX25_NATIVE_DIT_BLACKWELL
@@ -3106,7 +3106,7 @@ class Ltx25NativeFoley16gbEngine(Ltx25FoleyPlusEngine):
     ``ltx25_video`` lane and both 16 GB mime/audio-in lanes load the same file.
     """
 
-    name = "ltx25_native_foley_16gb"
+    name = "ltx25_foley_16gb"
     engine_version = "1"
     default_roles = ()
     _native_dit = LTX25_NATIVE_DIT_16GB
@@ -3480,7 +3480,7 @@ class Ltx25NativeAudioIn16gbEngine(Ltx25NativeAudioInMixin,
                                    Ltx25NativeFoley16gbEngine):
     """16 GB NATIVE audio-in. mix4x8, picture driven by the beat's own sound."""
 
-    name = "ltx25_native_audio_in_16gb"
+    name = "ltx25_audio_in_16gb"
     engine_version = "1"
     default_roles = ()
     required_inputs = ("text_prompt", "init_image", "audio_ref")
@@ -3491,7 +3491,7 @@ class Ltx25NativeAudioIn24gbEngine(Ltx25NativeAudioInMixin,
                                    Ltx25NativeFoleyWideEngine):
     """24 GB AND UP NATIVE audio-in. int8, same coupling as the 16 GB lane."""
 
-    name = "ltx25_native_audio_in_24gb"
+    name = "ltx25_audio_in_24gb"
     engine_version = "1"
     default_roles = ()
     required_inputs = ("text_prompt", "init_image", "audio_ref")
@@ -3520,7 +3520,7 @@ class Ltx25NativeMime16gbEngine(Ltx25NativeFoley16gbEngine):
     WAV, so a global zero would silence the episode.
     """
 
-    name = "ltx25_native_mime_16gb"
+    name = "ltx25_mime_16gb"
     engine_version = "1"
 
     #: SELECTABLE, NEVER A DEFAULT -- and here more emphatically than anywhere
@@ -3533,14 +3533,14 @@ class Ltx25NativeMime16gbEngine(Ltx25NativeFoley16gbEngine):
 class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
     """The 24 GB AND UP NATIVE lane as a silent performance. int8.
 
-    Same relationship to ``ltx25_native_foley_24gb`` that
-    ``ltx25_native_mime_16gb`` has to the 16 GB lane, and the same one-row
+    Same relationship to ``ltx25_foley_24gb`` that
+    ``ltx25_mime_16gb`` has to the 16 GB lane, and the same one-row
     difference at the mux. Everything about the weight, the encoder placement
     and the recipe is inherited; see the sibling above for why the body is
     empty and why this id is per-window rather than global.
     """
 
-    name = "ltx25_native_mime_24gb"
+    name = "ltx25_mime_24gb"
     engine_version = "1"
     default_roles = ()
 
@@ -3598,11 +3598,11 @@ del _tier_cls
 #: to lanes conditioned on speech; `cloud_ltx25_audio_in` and the native
 #: audio-in lanes are correctly absent.
 _JOINT_AV_ENGINES = _JOINT_AV_ENGINES + (
-    "ltx25_native_foley_16gb",
-    "ltx25_native_foley_24gb",
-    "ltx25_native_foley_blackwell",
-    "ltx25_native_mime_16gb",
-    "ltx25_native_mime_24gb",
+    "ltx25_foley_16gb",
+    "ltx25_foley_24gb",
+    "ltx25_foley_blackwell",
+    "ltx25_mime_16gb",
+    "ltx25_mime_24gb",
 )
 
 

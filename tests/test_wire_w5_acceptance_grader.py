@@ -104,11 +104,11 @@ def _manifest(rows):
 # ---------------------------------------------------------------------------
 
 def test_a_CLEAN_episode_produces_NO_findings():
-    ledger = _ledger([_shot("shot_b0", "announcer_visual", "ltx25_native_audio_in_16gb"),
+    ledger = _ledger([_shot("shot_b0", "announcer_visual", "ltx25_audio_in_16gb"),
                       _shot("shot_b1", "character_video", "humo")],
-                     {"announcer_visual": "ltx25_native_audio_in_16gb",
+                     {"announcer_visual": "ltx25_audio_in_16gb",
                       "character_video": "humo"})
-    manifest = _manifest([_row("shot_b0", "ltx25_native_audio_in_16gb"),
+    manifest = _manifest([_row("shot_b0", "ltx25_audio_in_16gb"),
                           _row("shot_b1", "humo")])
     assert acc.grade_episode(ledger, manifest) == []
 
@@ -161,13 +161,13 @@ def test_TWO_SHOTS_EXCHANGING_ENGINES_is_caught_and_the_HISTOGRAM_cannot():
     """r4's own argument for cutting histograms, run as an experiment rather
     than asserted: swap two shots' engines and every aggregate total is
     IDENTICAL, while the per-shot grader reports both."""
-    frozen = {"announcer_visual": "ltx25_native_audio_in_16gb", "character_video": "humo"}
-    shots = [_shot("shot_b0", "announcer_visual", "ltx25_native_audio_in_16gb"),
+    frozen = {"announcer_visual": "ltx25_audio_in_16gb", "character_video": "humo"}
+    shots = [_shot("shot_b0", "announcer_visual", "ltx25_audio_in_16gb"),
              _shot("shot_b1", "character_video", "humo")]
-    honest = _manifest([_row("shot_b0", "ltx25_native_audio_in_16gb"),
+    honest = _manifest([_row("shot_b0", "ltx25_audio_in_16gb"),
                         _row("shot_b1", "humo")])
     swapped = _manifest([_row("shot_b0", "humo"),
-                         _row("shot_b1", "ltx25_native_audio_in_16gb")])
+                         _row("shot_b1", "ltx25_audio_in_16gb")])
     assert honest["engine_histogram"] == swapped["engine_histogram"], (
         "the premise of this test is that the totals cannot tell them apart")
     assert acc.grade_episode(_ledger(shots, frozen), honest) == []
@@ -190,9 +190,9 @@ def test_a_PLANNED_beat_with_NO_CLIP_is_its_OWN_named_finding():
 def test_a_beat_that_RENDERS_NOTHING_owes_nothing():
     """CONTROL. A zero-frame row is not a missing clip; demanding one would
     make every non-rendering beat a finding."""
-    ledger = _ledger([_shot("shot_b0", "announcer_visual", "ltx25_native_audio_in_16gb",
+    ledger = _ledger([_shot("shot_b0", "announcer_visual", "ltx25_audio_in_16gb",
                             frames=0)],
-                     {"announcer_visual": "ltx25_native_audio_in_16gb"})
+                     {"announcer_visual": "ltx25_audio_in_16gb"})
     assert acc.grade_delivered(ledger, _manifest([])) == []
 
 

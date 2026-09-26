@@ -181,7 +181,7 @@ class TestAmbientAudioMusicBeatGap:
         monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
         # The audio-in family + the viz_green engine = ambient master lanes.
         assert rd._uses_ambient_master_audio(
-            "ltx25_native_audio_in_16gb", "audio_conditioned_video") is True
+            "ltx25_audio_in_16gb", "audio_conditioned_video") is True
         assert rd._uses_ambient_master_audio("viz_green", "abstract") is True
         # HuMo / talk (audio_driven_face) is EXCLUDED -- it needs the OWN voice,
         # never a master-mix slice (would lip-sync to the wrong audio).
@@ -275,7 +275,7 @@ class TestRadioIsHostGuard:
             shot = {"shot_id": "s", "beat_id": "b", "role": role,
                     "engine_id": engine_id, "family": "audio_driven_face"}
             rd._enforce_radio_is_host(shot)
-            assert shot["engine_id"] == "ltx25_native_audio_in_16gb", (
+            assert shot["engine_id"] == "ltx25_audio_in_16gb", (
                 role, engine_id)
             assert shot["family"] == "audio_conditioned_video", (role, engine_id)
 
@@ -291,13 +291,13 @@ class TestRadioIsHostGuard:
     def test_mixed_video_section_reclaims_before_local_engine(self):
         section = {"shots": [
             {"engine_id": "cloud_seedance_2"},
-            {"engine_id": "ltx25_native_audio_in_16gb"},
+            {"engine_id": "ltx25_audio_in_16gb"},
         ]}
         assert rd._section_has_local_video_engine(section) is True
         assert rd._should_reclaim_between_engines(
-            "cloud_seedance_2", "ltx25_native_audio_in_16gb") is True
+            "cloud_seedance_2", "ltx25_audio_in_16gb") is True
         assert rd._should_reclaim_between_engines(
-            "ltx25_native_audio_in_16gb", "cloud_seedance_2") is False
+            "ltx25_audio_in_16gb", "cloud_seedance_2") is False
 
     def test_character_video_humo_is_untouched(self):
         # character_video is the ONLY role HuMo may still serve (real dialogue
@@ -359,9 +359,9 @@ class TestRadioIsHostGuard:
                 "target_frame_count": 50, "source_line_ids": ["b000"],
                 "creative": {}}
         with pytest.raises(rd.DeferredImageGapError,
-                           match="ltx25_native_audio_in_16gb.*NO scene still"):
+                           match="ltx25_audio_in_16gb.*NO scene still"):
             rd.build_request_from_shot(shot, ledger)
-        assert shot["engine_id"] == "ltx25_native_audio_in_16gb"
+        assert shot["engine_id"] == "ltx25_audio_in_16gb"
         assert shot["family"] == "audio_conditioned_video"
 
 

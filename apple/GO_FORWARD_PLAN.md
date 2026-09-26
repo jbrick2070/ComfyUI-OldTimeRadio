@@ -134,115 +134,57 @@ CORRECTION (operator: "audio-in, we do feed clean audio"): the audio-in lane
 already gets each character's CLEAN own voice on a character beat;
 `render_driver._uses_ambient_master_audio` excludes character-face beats from
 the master slice (2026-06-26), and only lineless announcer/music bookends use
-the mix. The `otr_8gb_ltx25_native_audio_in` display text in
-config/workflow_matrix.json ("CHARACTER BEATS STAY ON THE FOLEY LANE ON
-PURPOSE: an audio-in lane on a character face would lip-sync to the ambient
-master mix") is STALE -- correct it, and ask the operator whether that workflow
-should now route character beats to the audio-in lane too.
+the mix. RESOLVED via 0b2 Step 1 (2026-09-25): the stale `otr_8gb_ltx25_audio_in`
+display text was corrected and the row now routes character beats to the
+audio-in lane, same as announcer and music.
 
 ### 0b2. One lane per workflow, and drop "native" from the names (operator 2026-09-25, HARDENED)
 
-**Step 1 -- fix the one workflow that breaks the one-lane rule.**
-`config/workflow_matrix.json` row `otr_8gb_ltx25_native_audio_in` has
-`character_visual: ltx25_native_foley_16gb` while `announcer_visual` and
-`music_visual` are `ltx25_native_audio_in_16gb` (measured 2026-09-25 by
-reading every row's three `role_overrides.*_visual` deltas). Change
-`character_visual` to `ltx25_native_audio_in_16gb` so all three match.
-Also correct that row's `display_name` text in the same file, which still
-reads "CHARACTER BEATS STAY ON THE FOLEY LANE ON PURPOSE: an audio-in lane
-on a character face would lip-sync to the ambient master mix" -- FALSE
-per `render_driver._uses_ambient_master_audio`, which excludes
-character-face beats from the ambient slice already (2026-06-26); a
-character beat on this lane gets that character's own clean voice. Say so.
-Regenerate (`scripts/build_variants.py --all`), `--check` clean, then one
-`otr_8gb_ltx25_native_audio_in` leg (1 act) proving a character beat's
-lips track that character's own line, not the mix.
+**Step 1 -- DONE 2026-09-25 (commit 66272d49).** `otr_8gb_ltx25_native_audio_in`'s
+`character_visual` was moved onto the same engine as `announcer_visual` and
+`music_visual`, and the row's `display_name` no longer claims the audio-in
+lane is unsafe for character faces (false per
+`render_driver._uses_ambient_master_audio`, which already excludes
+character-face beats from the ambient slice, 2026-06-26). Regenerated,
+`--check` clean. STILL OWED: a live `otr_8gb_ltx25_audio_in` leg (1 act)
+proving a character beat's lips track that character's own line, not the
+mix -- code-complete and reviewed, not yet proven on hardware.
 
-**Step 2 -- the rename, in one later commit, mechanical.** "native" meant
-"ComfyUI's own loaders, not GGUF"; GGUF is gone, the word is noise. 64
-files carry it (measured 2026-09-25 via
-`grep -rlI "ltx25_native_\|_native_foley\|native_audio_in\|native_mime"`,
-excluding `otr/`, `kibitz-runs/`, `_tmp_*`, `.claude/`, and the two
-append-only logs `PROD_BUG_LOG.md`/`HANDOFF_LOG.md`, which are history and
-do not change). Heaviest: `tests/test_nonaudio_prompt_policy.py` (52),
-`apple/ENGINE_MATRIX.md` (42, generated -- regenerate, do not hand-edit),
-`config/workflow_matrix.json` (28), `tests/test_ltx25_foley_bed.py` (23),
-`apple/LAUNCH_RECIPES.md` (18, generated), `nodes/_otr_video_engines/
-eng_ltx25.py` (16), `render_driver.py` + `foley_stems.py` (14 each).
-
-Exact renames -- ENGINE IDS (7):
-`ltx25_native_foley_16gb` -> `ltx25_foley_16gb`
-`ltx25_native_foley_24gb` -> `ltx25_foley_24gb`
-`ltx25_native_foley_blackwell` -> `ltx25_foley_blackwell`
-`ltx25_native_mime_16gb` -> `ltx25_mime_16gb`
-`ltx25_native_mime_24gb` -> `ltx25_mime_24gb`
-`ltx25_native_audio_in_16gb` -> `ltx25_audio_in_16gb`
-`ltx25_native_audio_in_24gb` -> `ltx25_audio_in_24gb`
-
-Exact renames -- WORKFLOW FILE STEMS (4 of the 25; the other 21, including
-`otr_16gb_foley.json` and `otr_16gb_mime.json`, keep their filename and only
-change the engine ids they reference):
-`otr_8gb_ltx25_native_foley.json` -> `otr_8gb_ltx25_foley.json`
-`otr_8gb_ltx25_native_mime.json` -> `otr_8gb_ltx25_mime.json`
-`otr_8gb_ltx25_native_audio_in.json` -> `otr_8gb_ltx25_audio_in.json`
-`otr_24gb_native_foley.json` -> `otr_24gb_foley.json`
-
-Shortcode VALUES stay (`nodes/_otr_shared/shortcodes.py`): `n16f`/`n24f`/
-`nbwf`/`n16m`/`n24m`/`n16a`/`n24a` are already opaque three-or-four-letter
-codes baked into every published episode filename ever rendered on these
-lanes; only the dict KEY (the engine id) renames, so old filenames keep
-their meaning. Do not touch the values.
-
-Order: (1) rename the 7 engine ids at their `@register` class attribute /
-registry dict key and every reference in the same module
-(`eng_ltx25.py`, `render_driver.py`, `foley_stems.py`, `registry.py`,
-`_otr_visual_assets.py`'s `_SOURCES`/`_COVERED`, `otr_provision.py`,
-`otr_fetch_lane_weights.py`); (2) rename the shortcode dict keys only;
-(3) update `config/workflow_matrix.json` (28 refs: `role_overrides.*_visual`
-values and the 4 `"id"` fields for the renamed workflow files), rename the 4
-files on disk with `git mv`; (4) run
-`python scripts/build_variants.py --all` (regenerates every variant, plus
-`apple/ENGINE_MATRIX.md`, `apple/LAUNCH_RECIPES.md`, `apple/MACHINE_MATRIX.md`,
-`apple/DROPDOWN_MATRIX.md`, `apple/MACHINES.md` -- never hand-edit these);
-`--check` clean; (5) fix every remaining test file in the 64 (mostly literal
-engine-id strings and fixture names -- `test_nonaudio_prompt_policy.py`,
-`test_ltx25_foley_bed.py`, `test_render_engines_recipe_stamp.py`,
-`test_wire_w5_acceptance_grader.py`, `test_ltx_open_health*.py`,
-`test_ltx_8gb_session_identity.py`, `test_video_render_driver_perbeat_audio.py`,
-`test_multiclip_session_identity_roster.py`, `test_foley_beat_clip_audio.py`,
-`test_route_freeze*.py`, `test_ltx25_native_lane_contract.py` -- RENAME this
-file too, it is named after the retired word -- `test_wire_w7_mouth_ownership.py`,
-`test_minimax_h3_audio_in.py`, `test_ltx25_video_lane.py`,
-`test_brief_radio_host.py`, `test_brief_prompt_finishing.py`,
-`test_video_director_unknown_engine.py`, `test_video_platform_aseam.py`,
-`test_route_a_14b_promotion.py`, `test_visual_styles_a2.py`,
-`test_visual_styles_b.py`, `test_terminal_frame.py`,
-`test_nonverbal_story_context.py`, `test_no_mirror_manifest_and_window.py`,
-`test_ltx25_every_lane_builds_a_graph.py`, `test_ghost_signal_prompt.py`,
-`test_frame_receipt_conformance.py`, `test_clip_fill.py`,
-`test_capability_profiles.py`, `test_video_ledger.py`); (6) hand-edit the
-prose docs that are not generated: `apple/GO_FORWARD_PLAN.md` (this section,
-cut once done), `apple/VIDEO_MODELS.md`, `apple/MODEL_ASSET_INDEX.md`,
-`apple/TEST_WAVE.md`, `nodes/otr_meta_brief_image_prompt.py` (a comment).
-Full suite green, `--check` clean, re-grep the six search strings above:
-zero hits outside `otr/`, the two append-only logs, and git history.
-
-Plain rename: no alias, no "renamed to X" message, no back-compat of any
-kind (operator: "don't worry about back compat"). A saved workflow naming an
-old engine id just stops resolving -- that is the intended behaviour.
+**Step 2 -- DONE 2026-09-25, mechanical rename, plain (no alias, no
+back-compat -- a saved workflow naming an old engine id just stops
+resolving).** Dropped "native" from the 7 engine ids
+(`ltx25_native_foley_16gb` -> `ltx25_foley_16gb` and the other six the same
+way) and the 4 workflow file stems it touched
+(`otr_8gb_ltx25_native_foley.json` -> `otr_8gb_ltx25_foley.json`, `_mime`
+and `_audio_in` the same way, `otr_24gb_native_foley.json` ->
+`otr_24gb_foley.json`; the other 21 workflows keep their filename and only
+change the engine ids they reference), plus the 3 lane-fetch weight-family
+tokens in `otr_fetch_lane_weights.py` (`ltx25_native_16gb` ->
+`ltx25_16gb`, `_24gb`, `_blackwell` likewise) that the plan's own
+measurement grep caught but did not list by name. Shortcode VALUES
+(`n16f`/`n24f`/`nbwf`/`n16m`/`n24m`/`n16a`/`n24a`) were left untouched --
+only the dict keys renamed, so old published filenames keep their meaning.
+`test_ltx25_native_lane_contract.py` renamed to `test_ltx25_lane_contract.py`.
+Re-grep of the six search strings across the repo (excluding `otr/`, the
+two append-only logs, and git history) found zero remaining hits meaning a
+live engine id; every survivor is a generic English "native" (native
+resolution, native audio track, `native_frame_count` the ledger field,
+Python identifiers like `_native_dit`) or a reference to an
+already-retired, unregistered id kept for historical accuracy. `--check`
+clean, full suite green.
 - DECIDED (operator 2026-09-25: "let's try keeping the engines if they
   work, and we can test them"): KEEP the four engines no workflow selects
-  (`ltx25_native_foley_blackwell`, `ltx25_native_mime_24gb`,
-  `ltx25_native_audio_in_24gb`, `minimax_h3_audio_in`) and PROVE each one:
+  (`ltx25_foley_blackwell`, `ltx25_mime_24gb`,
+  `ltx25_audio_in_24gb`, `minimax_h3_audio_in`) and PROVE each one:
   a 1-act leg per engine, hand-picked on the canonical, on hardware that
   fits it. One that fails is fixed or removed in the commit that says which.
   THE BAR (operator, same day): kept only if proven to work, not GGUF, and it
   downloads itself -- "if they required extra work, no". Measured against
   `_otr_visual_assets.planned_downloads`:
-  * `ltx25_native_foley_blackwell` -- auto-downloads (NVFP4 transformer + the
+  * `ltx25_foley_blackwell` -- auto-downloads (NVFP4 transformer + the
     shared LTX 2.5 VAEs, upscaler and Gemma encoder). Needs a big Blackwell:
     prove it on a RunPod Blackwell pod.
-  * `ltx25_native_mime_24gb`, `ltx25_native_audio_in_24gb` -- auto-download
+  * `ltx25_mime_24gb`, `ltx25_audio_in_24gb` -- auto-download
     (int8 transformer + the same shared files). Prove on a 24 GB pod; one pod
     session can prove all three.
   * `minimax_h3_video` and `minimax_h3_audio_in` (dropdown names

@@ -285,7 +285,7 @@ def test_humo_announcer_beat_keeps_radio_styling(monkeypatch):
                                 "microphone, ON AIR sign"), "source": "llm"}
     shot = _face_shot("announcer_visual", creative)
     req = rd.build_request_from_shot(shot, _FACE_LEDGER)
-    assert shot["engine_id"] == "ltx25_native_audio_in_16gb"  # redirected off HuMo
+    assert shot["engine_id"] == "ltx25_audio_in_16gb"  # redirected off HuMo
     assert "microphone" in req["text_prompt"].lower()   # exempt BY DESIGN
     assert req["observability"]["prompt_source"] == "shared_video_prompting_engine"
 
@@ -315,7 +315,7 @@ def test_announcer_beat_missing_creative_redirects_off_humo_to_radio_console(
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     shot = _face_shot("announcer_visual", {})
     req = rd.build_request_from_shot(shot, _FACE_LEDGER)
-    assert shot["engine_id"] == "ltx25_native_audio_in_16gb"  # redirected off HuMo
+    assert shot["engine_id"] == "ltx25_audio_in_16gb"  # redirected off HuMo
     assert req["observability"]["prompt_source"] == "motion_role"
     assert "console" in req["text_prompt"].lower()
 

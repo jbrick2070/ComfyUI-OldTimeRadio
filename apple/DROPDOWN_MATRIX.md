@@ -54,16 +54,16 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 | `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `ltx098_low_video` | **auto** | 16.1 GiB | **proven** | **proven** | **proven** | ? | not offered |
 | `razzle_ltx_8gb` | **auto** | 16.1 GiB | fits | fits | fits | ? | not offered |
-| `ltx25_native_foley_blackwell` | **auto** | 24.2 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_foley_blackwell` | **auto** | 24.2 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_audio_in_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_foley_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_high_video` | **auto** | 25.4 GiB | measured | measured | not offered | ? | not offered |
-| `ltx25_native_audio_in_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
-| `ltx25_native_foley_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
-| `ltx25_native_mime_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_mime_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
 | `humo14_high_audio_in_portrait` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo14_high_audio_in_wide` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `ltx25_native_audio_in_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
-| `ltx25_native_foley_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
-| `ltx25_native_mime_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_audio_in_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_foley_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_mime_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `h3_low_audio_in` | manual | 42.5 GiB | **OOM** | fits | not offered | ? | not offered |
 

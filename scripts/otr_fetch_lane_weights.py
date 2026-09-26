@@ -73,11 +73,11 @@ LANE_INFO = {
                              "without it EVERY profile fails at the music node."),
     "ltx_8gb": (16.13, "LTX 2b distilled + T5 encoder. Real video diffusion."),
     "sd15": (1.99, "IMAGE model, SD 1.5 fp16. The Mac rows' still engine."),
-    "ltx25_native_16gb": (25.38, "LTX 2.5, mix4x8 DiT + w4a8 encoder + VAEs + "
+    "ltx25_16gb": (25.38, "LTX 2.5, mix4x8 DiT + w4a8 encoder + VAEs + "
                                  "upscaler. The 16 GB silent, foley, mime and "
                                  "audio-in lanes all load exactly these."),
-    "ltx25_native_24gb": (32.54, "LTX 2.5, int8 DiT. The 24 GB lanes."),
-    "ltx25_native_blackwell": (24.16, "LTX 2.5, nvfp4 DiT. Blackwell (sm_120) "
+    "ltx25_24gb": (32.54, "LTX 2.5, int8 DiT. The 24 GB lanes."),
+    "ltx25_blackwell": (24.16, "LTX 2.5, nvfp4 DiT. Blackwell (sm_120) "
                                       "only."),
     "humo": (26.74, "HuMo 14B talking-face lane. Locally episode-proven on "
                     "a 16 GB Blackwell 5080 at 13.06 GiB VRAM / 27.53 GiB "
@@ -289,7 +289,7 @@ LANES = {
     # read off the Hub API on 2026-09-25. `nodes/_otr_visual_assets.py`
     # allowlists the same files, so a registry install fetches them at queue
     # time without this script.
-    "ltx25_native_16gb": [
+    "ltx25_16gb": [
         WeightSpec(
             "joeygambino/LTX-2.5-Quantized",
             "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors",
@@ -331,7 +331,7 @@ LANES = {
             "eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8",
         ),
     ],
-    "ltx25_native_24gb": [
+    "ltx25_24gb": [
         WeightSpec(
             "joeygambino/LTX-2.5-Quantized",
             "LTX25-distilled-DiT-comfy-int8.safetensors",
@@ -373,7 +373,7 @@ LANES = {
             "eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8",
         ),
     ],
-    "ltx25_native_blackwell": [
+    "ltx25_blackwell": [
         WeightSpec(
             "joeygambino/LTX-2.5-Quantized",
             "LTX25-distilled-DiT-comfy-nvfp4.safetensors",

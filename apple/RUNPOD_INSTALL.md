@@ -340,7 +340,7 @@ To fetch a lane's files ahead of the first render instead of at queue time:
 
 ```bash
 "$COMFY_PY" "$OTR_REPO_ROOT/scripts/otr_fetch_lane_weights.py" --list
-"$COMFY_PY" "$OTR_REPO_ROOT/scripts/otr_fetch_lane_weights.py" ltx25_native_16gb
+"$COMFY_PY" "$OTR_REPO_ROOT/scripts/otr_fetch_lane_weights.py" ltx25_16gb
 ```
 
 ### H3: local-only authorization boundary

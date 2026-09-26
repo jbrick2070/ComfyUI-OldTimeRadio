@@ -310,8 +310,8 @@ def render() -> str:
                 # lane, and the canonical graph fetches the selected lane's
                 # files itself at queue time (`nodes/_otr_visual_assets.py`).
                 how = ("auto at queue time; or `otr_fetch_lane_weights.py "
-                       "ltx25_native_16gb` / `ltx25_native_24gb` / "
-                       "`ltx25_native_blackwell`")
+                       "ltx25_16gb` / `ltx25_24gb` / "
+                       "`ltx25_blackwell`")
             elif row["engine"] == "kokoro":
                 # Voices and the ONNX model are fetched by the boot prefetch
                 # (`_otr_kokoro_voice_prefetch`); the torch model rides the HF

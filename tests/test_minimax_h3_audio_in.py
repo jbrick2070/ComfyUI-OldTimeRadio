@@ -209,8 +209,8 @@ def test_a_character_beat_on_this_lane_is_a_character_FACE():
 #: The other audio-in lanes that share the character-face membership.
 SIBLING_AUDIO_IN_LANES = (
     "cloud_ltx25_audio_in",
-    "ltx25_native_audio_in_16gb",
-    "ltx25_native_audio_in_24gb",
+    "ltx25_audio_in_16gb",
+    "ltx25_audio_in_24gb",
 )
 
 

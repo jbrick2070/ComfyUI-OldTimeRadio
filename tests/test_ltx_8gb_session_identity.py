@@ -174,9 +174,9 @@ _ENGINES_WITH_A_SESSION = {
     # Ltx25FoleyPlusEngine's identity: a beat session keys on the engine plus
     # its weight receipts, and these differ only in WHICH file loads. The recipe, the
     # 97-frame rung and the joint-AV latent are the inherited ones.
-    "ltx25_native_foley_24gb",
-    "ltx25_native_foley_blackwell",
-    "ltx25_native_foley_16gb",
+    "ltx25_foley_24gb",
+    "ltx25_foley_blackwell",
+    "ltx25_foley_16gb",
     # 2026-09-23 -- the native MIME and AUDIO-IN lanes. THESE WERE ALREADY
     # MISSING before the low-res lane was added, and this test was already
     # failing at 2c677bc6 for exactly that reason: all four were registered
@@ -184,10 +184,10 @@ _ENGINES_WITH_A_SESSION = {
     # parents' identities -- mime differs from foley only at the mux, and
     # audio-in only in the waveform it is handed, neither of which a beat
     # session can see.
-    "ltx25_native_mime_16gb",
-    "ltx25_native_mime_24gb",
-    "ltx25_native_audio_in_16gb",
-    "ltx25_native_audio_in_24gb",
+    "ltx25_mime_16gb",
+    "ltx25_mime_24gb",
+    "ltx25_audio_in_16gb",
+    "ltx25_audio_in_24gb",
     "humo",                    # WIRE-W4a, 2026-07-29
     "humo_1.7B",               # WIRE-W4a -- inherits HuMoEngine's
     "humo_1.7B_169",           # WIRE-W4a -- inherits HuMoEngine's

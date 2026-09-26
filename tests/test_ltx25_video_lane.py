@@ -42,7 +42,7 @@ from nodes._otr_video_engines.frame_contract import (
 ENGINE = "ltx25_video"
 #: Its foley sibling: the SAME graph and weights, keeping the audio this lane
 #: discards.
-FOLEY = "ltx25_native_foley_16gb"
+FOLEY = "ltx25_foley_16gb"
 
 
 @pytest.fixture()
@@ -118,7 +118,7 @@ def test_nothing_is_reserved_and_the_RULE_still_stands():
         % sorted(reserved & registered))
     for internal in reserved:
         assert internal not in pub._INTERNAL_TO_PUBLIC
-    assert {"ltx25_native_foley_16gb", "ltx25_native_mime_16gb"} <= registered
+    assert {"ltx25_foley_16gb", "ltx25_mime_16gb"} <= registered
 
 
 def test_the_foley_lane_is_registered_and_on_the_capability_roster():

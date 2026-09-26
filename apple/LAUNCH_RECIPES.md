@@ -12,12 +12,12 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - [otr_16gb_mime](#otr_16gb_mime)
 - [otr_16gb_still](#otr_16gb_still)
 - [otr_16gb_video](#otr_16gb_video)
-- [otr_24gb_native_foley](#otr_24gb_native_foley)
+- [otr_24gb_foley](#otr_24gb_foley)
 - [otr_8gb_animatediff](#otr_8gb_animatediff)
 - [otr_8gb_low](#otr_8gb_low)
-- [otr_8gb_ltx25_native_audio_in](#otr_8gb_ltx25_native_audio_in)
-- [otr_8gb_ltx25_native_foley](#otr_8gb_ltx25_native_foley)
-- [otr_8gb_ltx25_native_mime](#otr_8gb_ltx25_native_mime)
+- [otr_8gb_ltx25_audio_in](#otr_8gb_ltx25_audio_in)
+- [otr_8gb_ltx25_foley](#otr_8gb_ltx25_foley)
+- [otr_8gb_ltx25_mime](#otr_8gb_ltx25_mime)
 - [otr_8gb_still](#otr_8gb_still)
 - [otr_8gb_video](#otr_8gb_video)
 - [otr_amd_still](#otr_amd_still)
@@ -76,10 +76,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_foley
 
 - file: `workflows/otr_16gb_foley.json`
-- workflow: `otr_16gb_foley` (16 GB NVIDIA -- video that generates its own sound, mixed under the voices. Lane ltx25_native_foley_16gb (mix4x8-13.8GB) through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. MEASURED on an RTX 5080 Laptop 2026-09-23: one 97-frame 1664x960 clip with foley in 205.3 s.)
+- workflow: `otr_16gb_foley` (16 GB NVIDIA -- video that generates its own sound, mixed under the voices. Lane ltx25_foley_16gb (mix4x8-13.8GB) through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. MEASURED on an RTX 5080 Laptop 2026-09-23: one 97-frame 1664x960 clip with foley in 205.3 s.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `229112b3fe6b1321a83bcc0836886443ab2dff1c66a8542c0213af3dc17e75f6`
+- master_hash: `f9b82b3cdf3d6b8b6133d30b1290b6a3df3c5ca4967ca71546a5e8f5a675274c`
 
 ### ComfyUI launch
 
@@ -161,10 +161,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_mime
 
 - file: `workflows/otr_16gb_mime.json`
-- workflow: `otr_16gb_mime` (16 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_native_mime_16gb on the same mix4x8-13.8GB DiT as the 16 GB foley lane, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling.)
+- workflow: `otr_16gb_mime` (16 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_mime_16gb on the same mix4x8-13.8GB DiT as the 16 GB foley lane, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `8c031ad48bde1ce0f417bfc688df2608d76e4793269bc2fd6947e18727ac983d`
+- master_hash: `c228072708fc1e549354b32c080ff874f3be4d6a58d8c29bd30cde9d044c3303`
 
 ### ComfyUI launch
 
@@ -286,13 +286,13 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - ltx-2.5-audio-vae-bf16.safetensors
 - ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors
 
-## otr_24gb_native_foley
+## otr_24gb_foley
 
-- file: `workflows/otr_24gb_native_foley.json`
-- workflow: `otr_24gb_native_foley` (24 GB AND UP, ANY modern NVIDIA (Ada, Ampere or Blackwell) -- video that generates its own sound. Lane ltx25_native_foley_24gb (int8, stock ComfyUI loaders), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Qwen3.8-27B at a 22 GB ceiling. Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.)
+- file: `workflows/otr_24gb_foley.json`
+- workflow: `otr_24gb_foley` (24 GB AND UP, ANY modern NVIDIA (Ada, Ampere or Blackwell) -- video that generates its own sound. Lane ltx25_foley_24gb (int8, stock ComfyUI loaders), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Qwen3.8-27B at a 22 GB ceiling. Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.)
 - status: draft
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `8ba2d6740862f77e3a4e65bc7d57c896da3ea750b9c4ef84360712bbe232e337`
+- master_hash: `e0d8dcc74669c64524556986370b23eb5a65952b66855830ce64243a3d9593b6`
 
 ### ComfyUI launch
 
@@ -412,13 +412,13 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 - (registry-driven; see the engine rows for the selected lanes)
 
-## otr_8gb_ltx25_native_audio_in
+## otr_8gb_ltx25_audio_in
 
-- file: `workflows/otr_8gb_ltx25_native_audio_in.json`
-- workflow: `otr_8gb_ltx25_native_audio_in` (8 GB NVIDIA (Ada or newer) -- AUDIO-IN: every beat -- announcer, character, and music -- is conditioned on its own real waveform, so the picture follows the sound instead of inventing it. A character beat is conditioned on that character's own clean voice, never the ambient master mix, so this lane is safe for character faces -- an earlier note here claimed otherwise and was wrong. On the same mix4x8 weights the proven 8 GB foley lane already downloads, so this lane costs no new files. Modality guidance rises from 1.0 -- where it is a documented no-op -- to 3.0, which strengthens the cross-modal coupling and costs one extra forward pass per step while it is active, so this lane is slower than the foley lane's. mix4x8 measured 707.0 s for a 97-frame clip on a 4060. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The 12.86 GB transformer exceeds 8 GB and therefore streams, and the Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately, so its 9.88 GB lands in host RAM rather than VRAM. Measured on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". NOT PROVEN ON A LEG ANYWHERE, AND THAT IS A WARNING RATHER THAN A FORMALITY: the audio-in engine has never completed an episode at any tier, it asks for a third required input (audio_ref) that no other lane needs, and the 24 GB engine it is modelled on carries the same caveat. Expect to debug it. Run otr_8gb_ltx25_native_foley if you want a lane that works today.)
+- file: `workflows/otr_8gb_ltx25_audio_in.json`
+- workflow: `otr_8gb_ltx25_audio_in` (8 GB NVIDIA (Ada or newer) -- AUDIO-IN: every beat -- announcer, character, and music -- is conditioned on its own real waveform, so the picture follows the sound instead of inventing it. A character beat is conditioned on that character's own clean voice, never the ambient master mix, so this lane is safe for character faces -- an earlier note here claimed otherwise and was wrong. On the same mix4x8 weights the proven 8 GB foley lane already downloads, so this lane costs no new files. Modality guidance rises from 1.0 -- where it is a documented no-op -- to 3.0, which strengthens the cross-modal coupling and costs one extra forward pass per step while it is active, so this lane is slower than the foley lane's. mix4x8 measured 707.0 s for a 97-frame clip on a 4060. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The 12.86 GB transformer exceeds 8 GB and therefore streams, and the Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately, so its 9.88 GB lands in host RAM rather than VRAM. Measured on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". NOT PROVEN ON A LEG ANYWHERE, AND THAT IS A WARNING RATHER THAN A FORMALITY: the audio-in engine has never completed an episode at any tier, it asks for a third required input (audio_ref) that no other lane needs, and the 24 GB engine it is modelled on carries the same caveat. Expect to debug it. Run otr_8gb_ltx25_foley if you want a lane that works today.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `a24d71b513bf965165b1c129ac1d30f3e600c5f4d55758d43d5631ff03b1c856`
+- master_hash: `4f772a32c4732e7a7c5325e1e80f4589e85b8c4cd955e3c447b2d20d0a972d4c`
 
 ### ComfyUI launch
 
@@ -458,13 +458,13 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - stable_audio_3_small_music_base.safetensors
 - t5gemma_b_b_ul2.safetensors
 
-## otr_8gb_ltx25_native_foley
+## otr_8gb_ltx25_foley
 
-- file: `workflows/otr_8gb_ltx25_native_foley.json`
-- workflow: `otr_8gb_ltx25_native_foley` (8 GB NVIDIA (Ada or newer) -- video that generates its own sound: lane ltx25_native_foley_16gb (mix4x8, stock ComfyUI loaders), gemma4-12b-ltx25-comfy-w4a8 text encoder. Qwen3.5-4B writer at a 6.8 GB ceiling, z_image_turbo stills, Kokoro voices, Stable Audio 3. Every weight here is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). The 12.86 GB transformer exceeds 8 GB and therefore streams; that is expected and is the trade this tier makes. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately -- a GPU-side encode of it tips even a 16 GB card -- so its 9.88 GB lands in host RAM, not VRAM. MEASURED on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in, ComfyUI RSS 12.95 GB. It passed, with under a gigabyte to spare. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". VRAM itself was never close: peak 7441 of 8188 MiB with 232 MiB max reserved and no driver spill.)
+- file: `workflows/otr_8gb_ltx25_foley.json`
+- workflow: `otr_8gb_ltx25_foley` (8 GB NVIDIA (Ada or newer) -- video that generates its own sound: lane ltx25_foley_16gb (mix4x8, stock ComfyUI loaders), gemma4-12b-ltx25-comfy-w4a8 text encoder. Qwen3.5-4B writer at a 6.8 GB ceiling, z_image_turbo stills, Kokoro voices, Stable Audio 3. Every weight here is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). The 12.86 GB transformer exceeds 8 GB and therefore streams; that is expected and is the trade this tier makes. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately -- a GPU-side encode of it tips even a 16 GB card -- so its 9.88 GB lands in host RAM, not VRAM. MEASURED on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in, ComfyUI RSS 12.95 GB. It passed, with under a gigabyte to spare. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". VRAM itself was never close: peak 7441 of 8188 MiB with 232 MiB max reserved and no driver spill.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `1cba434aaf221b8c30a5282a130cc22fdf06a4cdb7216e5f0eb4cd9e4a51e2bf`
+- master_hash: `351f91f7b24b07f1654c3a1aa8955875f402db7b6b2931d9a6e0e1670d29d6ad`
 
 ### ComfyUI launch
 
@@ -504,13 +504,13 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - stable_audio_3_small_music_base.safetensors
 - t5gemma_b_b_ul2.safetensors
 
-## otr_8gb_ltx25_native_mime
+## otr_8gb_ltx25_mime
 
-- file: `workflows/otr_8gb_ltx25_native_mime.json`
-- workflow: `otr_8gb_ltx25_native_mime` (8 GB NVIDIA (Ada or newer) -- MIME: a silent performance carrying its own score. On the same mix4x8 weights the proven 8 GB foley lane already downloads, so this lane costs no new files. It differs from otr_8gb_ltx25_native_foley at ONE place only -- the mux, where the model's own generated bed plays at full level and the voice and music master is mixed to zero (1.00 foley / 0.00 master instead of 0.50 / 0.50). The TTS and music are still generated and then mixed out; that waste is deliberate and is what lets the mime engine be a four-line subclass instead of a second pipeline. mix4x8 measured 707.0 s for a 97-frame clip on a 4060. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The 12.86 GB transformer exceeds 8 GB and therefore streams, and the Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately, so its 9.88 GB lands in host RAM rather than VRAM. Measured on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". NOT YET PROVEN ON A LEG AT THIS TIER: the engine is proven at 16 and 24 GB and the weights are proven at 8 GB, but this combination has not rendered an episode.)
+- file: `workflows/otr_8gb_ltx25_mime.json`
+- workflow: `otr_8gb_ltx25_mime` (8 GB NVIDIA (Ada or newer) -- MIME: a silent performance carrying its own score. On the same mix4x8 weights the proven 8 GB foley lane already downloads, so this lane costs no new files. It differs from otr_8gb_ltx25_foley at ONE place only -- the mux, where the model's own generated bed plays at full level and the voice and music master is mixed to zero (1.00 foley / 0.00 master instead of 0.50 / 0.50). The TTS and music are still generated and then mixed out; that waste is deliberate and is what lets the mime engine be a four-line subclass instead of a second pipeline. mix4x8 measured 707.0 s for a 97-frame clip on a 4060. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The 12.86 GB transformer exceeds 8 GB and therefore streams, and the Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately, so its 9.88 GB lands in host RAM rather than VRAM. Measured on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". NOT YET PROVEN ON A LEG AT THIS TIER: the engine is proven at 16 and 24 GB and the weights are proven at 8 GB, but this combination has not rendered an episode.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `01c05ff050c59b5638b2070f28c1b4a7b81c0d030bff2aca9d1fa788041c0a2b`
+- master_hash: `3d54befe2eb1c0675a946bfca2c60534126bfb7e442a7805974f482eff0bf9c5`
 
 ### ComfyUI launch
 

@@ -95,11 +95,11 @@ def test_the_24gb_and_blackwell_tiers_declare_the_same_pinned_canvas():
     test_the_declared_canvas_is_832x480_and_32_legal for why (768x432
     corrupts the tensor, 1024x576 OOMs)."""
     for name, cls in (
-            ("ltx25_native_foley_24gb", eng_ltx25.Ltx25NativeFoleyWideEngine),
-            ("ltx25_native_foley_blackwell",
+            ("ltx25_foley_24gb", eng_ltx25.Ltx25NativeFoleyWideEngine),
+            ("ltx25_foley_blackwell",
              eng_ltx25.Ltx25NativeFoleyBlackwellEngine),
-            ("ltx25_native_mime_24gb", eng_ltx25.Ltx25NativeMime24gbEngine),
-            ("ltx25_native_audio_in_24gb",
+            ("ltx25_mime_24gb", eng_ltx25.Ltx25NativeMime24gbEngine),
+            ("ltx25_audio_in_24gb",
              eng_ltx25.Ltx25NativeAudioIn24gbEngine),
     ):
         eng = cls()

@@ -67,9 +67,9 @@ Nothing here is inferred from "it looks like it should fit". A blank is an unkno
 |---|---|---|---|---|---|---|
 | `otr_8gb_animatediff` | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_8gb_low` | viz_camera | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_8gb_ltx25_native_audio_in` | ltx25_native_audio_in_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_8gb_ltx25_native_foley` | ltx25_native_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_8gb_ltx25_native_mime` | ltx25_native_mime_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_ltx25_audio_in` | ltx25_audio_in_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_ltx25_foley` | ltx25_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_ltx25_mime` | ltx25_mime_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_8gb_still` | still_motion | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_8gb_video` | ltx_8gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
@@ -97,19 +97,19 @@ Video engines they select: `still_motion`
 | row | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
 | `otr_16gb_animatediff` | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_foley` | ltx25_native_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_foley` | ltx25_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_low` | viz_camera | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_mime` | ltx25_native_mime_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_mime` | ltx25_mime_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_still` | still_motion | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_video` | ltx25_high_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
 <details><summary>1 draft workflow(s) here -- not vouched for</summary>
 
-Video engines they select: `ltx25_native_foley_24gb`
+Video engines they select: `ltx25_foley_24gb`
 
 | row | video | voice |
 |---|---|---|
-| `otr_24gb_native_foley` | ltx25_native_foley_24gb | kokoro |
+| `otr_24gb_foley` | ltx25_foley_24gb | kokoro |
 
 </details>
 
@@ -139,7 +139,7 @@ What each voice engine needs, read from the audio registry. Kokoro is the shippe
 
 ## A bigger card does not currently get you more
 
-The machine class is `16 GB+`: there is no separate 24/32 GB machine key, so the install planner selects the 16 GB+ row for any card that size. One shipped workflow targets a bigger card on purpose -- `otr_24gb_native_foley`, LTX 2.5 on the int8 DiT with a 22 GB writer ceiling -- and you open it by hand.
+The machine class is `16 GB+`: there is no separate 24/32 GB machine key, so the install planner selects the 16 GB+ row for any card that size. One shipped workflow targets a bigger card on purpose -- `otr_24gb_foley`, LTX 2.5 on the int8 DiT with a 22 GB writer ceiling -- and you open it by hand.
 
 **That matters when you are paying by the hour.** A rented 24 GB card ran the 16 GB haunted workflow and peaked at 15,990 MB, and rented Ampere has published LTX-2b, so the smaller lanes reach well beyond the floor. A bigger card still does not auto-select HuMo or the 24 GB LTX 2.5 lane: pick the workflow explicitly and keep its exact hardware/software/RAM receipt.
 

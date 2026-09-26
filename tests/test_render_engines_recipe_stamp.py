@@ -20,7 +20,7 @@ from nodes import otr_credits_roll as cr  # noqa: E402
 
 def _manifest_with_recipe():
     return {
-        "engine_histogram": {"ltx25_native_audio_in_16gb": 1, "still_pan": 1},
+        "engine_histogram": {"ltx25_audio_in_16gb": 1, "still_pan": 1},
         "video_revision": 3,
         # `exists: True` is REQUIRED on every row here, and was not until
         # 2026-08-26. These fixtures predate the sanctioned-gap work: the
@@ -32,7 +32,7 @@ def _manifest_with_recipe():
         # so explicitly. A fixture that means "this beat produced no clip"
         # should set `exists: False` and expect no delivered credit.
         "clips": [
-            {"shot_id": "s1", "role": "music_visual", "engine_id": "ltx25_native_audio_in_16gb",
+            {"shot_id": "s1", "role": "music_visual", "engine_id": "ltx25_audio_in_16gb",
              "recipe": "distilled_native", "quant": "Q2_K", "use_lora": False,
              "render_canvas": "512x288", "vram_peak_mb": 13900, "exists": True},
             {"shot_id": "s2", "role": "announcer_visual", "engine_id": "still_pan",
@@ -43,16 +43,16 @@ def _manifest_with_recipe():
 
 def test_payload_preserves_existing_keys():
     payload = _build_render_engines_payload(_manifest_with_recipe(), 13900)
-    assert payload["histogram"] == {"ltx25_native_audio_in_16gb": 1, "still_pan": 1}
+    assert payload["histogram"] == {"ltx25_audio_in_16gb": 1, "still_pan": 1}
     assert payload["video_revision"] == 3
     assert payload["vram_peak_mb"] == 13900
-    assert payload["by_role"]["music_visual"] == {"ltx25_native_audio_in_16gb": 1}
+    assert payload["by_role"]["music_visual"] == {"ltx25_audio_in_16gb": 1}
 
 
 def test_payload_per_clip_recipe_receipt():
     payload = _build_render_engines_payload(_manifest_with_recipe(), 13900)
     pc = {p["shot_id"]: p for p in payload["per_clip"]}
-    assert pc["s1"]["delivered_engine"] == "ltx25_native_audio_in_16gb"
+    assert pc["s1"]["delivered_engine"] == "ltx25_audio_in_16gb"
     assert pc["s1"]["recipe"] == "distilled_native"
     assert pc["s1"]["quant"] == "Q2_K"
     assert pc["s1"]["use_lora"] is False
@@ -64,7 +64,7 @@ def test_payload_per_clip_recipe_receipt():
 
 def test_payload_by_engine_rollup():
     payload = _build_render_engines_payload(_manifest_with_recipe(), 13900)
-    assert payload["by_engine"]["ltx25_native_audio_in_16gb"]["quant"] == "Q2_K"
+    assert payload["by_engine"]["ltx25_audio_in_16gb"]["quant"] == "Q2_K"
     assert payload["by_engine"]["still_pan"]["recipe"] is None
 
 
@@ -88,9 +88,9 @@ def test_build_clip_manifest_threads_recipe_receipt(tmp_path):
     result = {
         "ledger": {"video": {"shots": [
             {"shot_id": "s1", "role": "music_visual",
-             "target_frame_count": 100, "engine_id": "ltx25_native_audio_in_16gb"}]},
+             "target_frame_count": 100, "engine_id": "ltx25_audio_in_16gb"}]},
             "lines": []},
-        "clips": {"s1": {"type": "video", "path": str(_c1), "engine_id": "ltx25_native_audio_in_16gb",
+        "clips": {"s1": {"type": "video", "path": str(_c1), "engine_id": "ltx25_audio_in_16gb",
                          "frame_count": 100, "recipe": "sharp_lora",
                          "quant": "Q3_K_M", "use_lora": True,
                          "render_canvas": "512x288", "vram_peak_mb": 15500}},
@@ -132,11 +132,11 @@ def _payload(*clips):
 def test_by_engine_no_longer_lets_the_first_clip_speak_for_the_rest():
     """THE DEFECT, as its own test: two clips, one engine, two recipes."""
     p = _payload(
-        _clip("s1", "ltx25_native_audio_in_16gb", recipe="RECIPE_LTX8_I2V_v2"),
-        _clip("s2", "ltx25_native_audio_in_16gb",
+        _clip("s1", "ltx25_audio_in_16gb", recipe="RECIPE_LTX8_I2V_v2"),
+        _clip("s2", "ltx25_audio_in_16gb",
               recipe="RECIPE_LTX8_I2V_v2+prequalification[tiled_vae=off]"),
     )
-    row = p["by_engine"]["ltx25_native_audio_in_16gb"]
+    row = p["by_engine"]["ltx25_audio_in_16gb"]
     assert row["recipe"] != "RECIPE_LTX8_I2V_v2"          # the OLD behaviour
     assert row["recipe"] is None
     assert row["varied"] == ["recipe"]

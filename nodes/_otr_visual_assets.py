@@ -150,10 +150,10 @@ _LTX_8GB_WEIGHT_ENGINES = frozenset({"ltx_8gb", "razzle_ltx_8gb"})
 #: names, so this set only says WHICH engines are covered, never what they load.
 _LTX25_WEIGHT_ENGINES = frozenset({
     "ltx25_video",
-    "ltx25_native_foley_16gb", "ltx25_native_foley_24gb",
-    "ltx25_native_foley_blackwell",
-    "ltx25_native_mime_16gb", "ltx25_native_mime_24gb",
-    "ltx25_native_audio_in_16gb", "ltx25_native_audio_in_24gb",
+    "ltx25_foley_16gb", "ltx25_foley_24gb",
+    "ltx25_foley_blackwell",
+    "ltx25_mime_16gb", "ltx25_mime_24gb",
+    "ltx25_audio_in_16gb", "ltx25_audio_in_24gb",
 })
 #: Every registered AnimateDiff lane. They load SD 1.5 INSIDE their own graph,
 #: not through an image slot (``accepts_still = False``), so each lane is asked

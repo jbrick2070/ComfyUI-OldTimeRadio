@@ -31,9 +31,9 @@ Resolve the models root through `nodes/_otr_models_root.py::_models_root()` rath
 python scripts/otr_fetch_lane_weights.py haunted
 python scripts/otr_fetch_lane_weights.py humo
 python scripts/otr_fetch_lane_weights.py lightning
-python scripts/otr_fetch_lane_weights.py ltx25_native_16gb
-python scripts/otr_fetch_lane_weights.py ltx25_native_24gb
-python scripts/otr_fetch_lane_weights.py ltx25_native_blackwell
+python scripts/otr_fetch_lane_weights.py ltx25_16gb
+python scripts/otr_fetch_lane_weights.py ltx25_24gb
+python scripts/otr_fetch_lane_weights.py ltx25_blackwell
 python scripts/otr_fetch_lane_weights.py ltx_8gb
 python scripts/otr_fetch_lane_weights.py sd15
 python scripts/otr_fetch_lane_weights.py stable_audio_3
@@ -62,7 +62,7 @@ Anything not listed there is a manual install -- see its row below.
 | `google_omni_video` | nothing on disk | - | - |
 | `google_veo_video` | nothing on disk | - | - |
 | `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual download](RUNPOD_INSTALL.md) | - |
-| `ltx25` | 4 weight file(s) | auto at queue time; or `otr_fetch_lane_weights.py ltx25_native_16gb` / `ltx25_native_24gb` / `ltx25_native_blackwell` | - |
+| `ltx25` | 4 weight file(s) | auto at queue time; or `otr_fetch_lane_weights.py ltx25_16gb` / `ltx25_24gb` / `ltx25_blackwell` | - |
 | `ltx_8gb` | 2 weight file(s) | `otr_fetch_lane_weights.py ltx_8gb` | 2 profile(s) |
 | `mesh_stage` | 3 weight file(s) | manual download | - |
 | `minimax_h3` | 5 weight file(s) | explicit operator-local `otr_fetch_lane_weights.py minimax_h3` | - |

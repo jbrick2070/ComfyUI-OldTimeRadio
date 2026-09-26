@@ -456,7 +456,7 @@ CAPABILITIES = {
     # tensor the sampler consumes, so preflight must fail CLOSED without it --
     # the opposite of the minimax_h3_video row above, which deliberately OMITS
     # its audio VAE because that lane genuinely never loads one. Identical to
-    # ltx25_native_foley_16gb below: same weights, the audio simply discarded.
+    # ltx25_foley_16gb below: same weights, the audio simply discarded.
     "ltx25_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
@@ -475,7 +475,7 @@ CAPABILITIES = {
     # filenames describes the TRANSFORMER's own packing, which the loader
     # reads from the file. It is not a claim about the text encoder, which is
     # the separate w4a8 artifact on every tier.
-    "ltx25_native_foley_24gb": {
+    "ltx25_foley_24gb": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
@@ -489,7 +489,7 @@ CAPABILITIES = {
     # microarchitecture -- device_backends is vendor-level -- so the refusal,
     # if any, comes from the loader on older silicon. Named here so a reader
     # of the menu is not surprised by that.
-    "ltx25_native_foley_blackwell": {
+    "ltx25_foley_blackwell": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
@@ -499,7 +499,7 @@ CAPABILITIES = {
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
-    "ltx25_native_foley_16gb": {
+    "ltx25_foley_16gb": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
@@ -517,7 +517,7 @@ CAPABILITIES = {
     # same weights, same recipe, same graph. Mime differs only at the mux, in
     # foley_stems.FOLEY_LANE_GAINS (1.00 foley / 0.00 master), so a row that
     # differed here would be describing a difference that does not exist.
-    "ltx25_native_mime_16gb": {
+    "ltx25_mime_16gb": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
@@ -527,7 +527,7 @@ CAPABILITIES = {
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
-    "ltx25_native_mime_24gb": {
+    "ltx25_mime_24gb": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
@@ -540,7 +540,7 @@ CAPABILITIES = {
     # The NATIVE AUDIO-IN lanes. Same weights and same stack as their foley
     # parents -- audio-in is a CONDITIONING mode, not a different model, so a
     # row that named different artifacts would be inventing a difference.
-    "ltx25_native_audio_in_16gb": {
+    "ltx25_audio_in_16gb": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
@@ -550,7 +550,7 @@ CAPABILITIES = {
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
-    "ltx25_native_audio_in_24gb": {
+    "ltx25_audio_in_24gb": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,

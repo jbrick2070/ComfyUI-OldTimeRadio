@@ -2053,7 +2053,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             # static/i2v engine, or a force-map to a static engine) it is the
             # FACELESS radio_object. The env flag stays a conjunct because it
             # gates whether HuMo survives to the announcer at render (else
-            # _enforce_radio_is_host redirects it to ltx25_native_audio_in_16gb).
+            # _enforce_radio_is_host redirects it to ltx25_audio_in_16gb).
             # The chosen
             # style is STAMPED (radio_host_style) so the cross-node render guard
             # can fail CLOSED on a stale ledger (BUG-LOCAL-129 face-only failure).

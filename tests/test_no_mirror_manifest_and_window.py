@@ -282,7 +282,7 @@ def test_rows_with_no_shot_id_do_not_all_collapse_onto_one_key():
 # The boundedness stamp (7.3)
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("engine_id", ["ltx25_video", "humo", "ltx_8gb",
-                                       "ltx25_native_audio_in_16gb"])
+                                       "ltx25_audio_in_16gb"])
 def test_a_bounded_engine_is_stamped_TRUE(engine_id):
     shot = {"engine_id": engine_id}
     sl._stamp_frame_bounded(shot)

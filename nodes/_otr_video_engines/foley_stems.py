@@ -130,14 +130,14 @@ FOLEY_RECEIPT_KEYS = (
 #: beats instead of across the episode, which is a DIFFERENT MIX arrived at by
 #: omission rather than by choosing it.
 FOLEY_LANE_GAINS = {
-    "ltx25_native_foley_16gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
-    "ltx25_native_foley_24gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
-    "ltx25_native_foley_blackwell": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
+    "ltx25_foley_16gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
+    "ltx25_foley_24gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
+    "ltx25_foley_blackwell": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     # The mime lanes: mime REPLACES the programme in its own beats rather
     # than bedding under it. They stay OUT of GLOBAL_MASTER_GAIN_LANES for that reason -- see the
     # membership test on that set.
-    "ltx25_native_mime_16gb": (1.00, 0.00),
-    "ltx25_native_mime_24gb": (1.00, 0.00),
+    "ltx25_mime_16gb": (1.00, 0.00),
+    "ltx25_mime_24gb": (1.00, 0.00),
     # THE AUDIO-IN LANES TAKE NO BED, AND THAT IS THE POINT OF THEM.
     #
     # They subclass the foley lane, so they harvest and decode an audio latent
@@ -153,8 +153,8 @@ FOLEY_LANE_GAINS = {
     # joint AV latent is split, and the stem is still written, because a
     # durable artifact costs nothing and the next person comparing the model's
     # rendition against the source will want it.
-    "ltx25_native_audio_in_16gb": (0.00, 1.00),
-    "ltx25_native_audio_in_24gb": (0.00, 1.00),
+    "ltx25_audio_in_16gb": (0.00, 1.00),
+    "ltx25_audio_in_24gb": (0.00, 1.00),
     # Same 0.50/0.50 bed as local Foley -- harvested from the partner mp4
     # instead of the audio latent, then mixed by this table, not a second mux.
     "cloud_ltx25_foley_plus": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
@@ -175,9 +175,9 @@ FOLEY_LANE_GAINS = {
 #: held two, and the count was wrong again the moment the tier lanes were
 #: added. A membership rule survives the next addition; a tally does not.
 GLOBAL_MASTER_GAIN_LANES = frozenset({
-    "ltx25_native_foley_16gb",
-    "ltx25_native_foley_24gb",
-    "ltx25_native_foley_blackwell",
+    "ltx25_foley_16gb",
+    "ltx25_foley_24gb",
+    "ltx25_foley_blackwell",
     "cloud_ltx25_foley_plus",
 })
 
@@ -209,8 +209,8 @@ def is_foley_route(video_policy_json):
 
     IDS ARE RESOLVED BEFORE THEY ARE COMPARED. ``effective_video_models`` can
     hold a public menu string, an internal id, or a legacy alias depending on
-    how the policy was frozen, so a bare ``== "ltx25_native_foley_16gb"`` would
-    answer False for ``'ltx25_native_foley_16gb (16:9)'`` -- an episode that really is on
+    how the policy was frozen, so a bare ``== "ltx25_foley_16gb"`` would
+    answer False for ``'ltx25_foley_16gb (16:9)'`` -- an episode that really is on
     the route. Both callers use THIS function for exactly that reason.
 
     Pure and total: unparseable, empty or absent policy means "not a foley

@@ -143,15 +143,15 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
     # exactly that and in how their bed is mixed. The three foley ids were
     # ALREADY missing here before the mime and audio-in pairs were registered
     # -- this list is an inline literal precisely because it goes stale.
-    "ltx25_native_foley_16gb",
-    "ltx25_native_foley_24gb",
-    "ltx25_native_foley_blackwell",
-    "ltx25_native_mime_16gb",
-    "ltx25_native_mime_24gb",
+    "ltx25_foley_16gb",
+    "ltx25_foley_24gb",
+    "ltx25_foley_blackwell",
+    "ltx25_mime_16gb",
+    "ltx25_mime_24gb",
     # Audio-in composes the same bookend text; what differs is the WAVEFORM it
     # is handed, which is not a prompt concern either.
-    "ltx25_native_audio_in_16gb",
-    "ltx25_native_audio_in_24gb",
+    "ltx25_audio_in_16gb",
+    "ltx25_audio_in_24gb",
     "cloud_ltx25_foley_plus",
     "cloud_ltx25_audio_in",
 })
@@ -2083,7 +2083,7 @@ _AUDIO_IN_CHARACTER_ENGINES = (
     # character's own clean audio -- which is what a lip-sync lane wants. The
     # ambient master slice is the
     # LINELESS-beat path, not the character path.
-    "ltx25_native_audio_in_16gb", "ltx25_native_audio_in_24gb")
+    "ltx25_audio_in_16gb", "ltx25_audio_in_24gb")
 
 
 def _is_character_face_beat(shot):
@@ -2169,7 +2169,7 @@ def _role_of_shot(shot) -> str:
 #: conditions the radio picture on the beat's own waveform -- exactly the job
 #: the 8 GB audio-in workflow gives it on these two roles. Reused, not a new
 #: engine.
-_NEVER_HUMO_REDIRECT_ENGINE = "ltx25_native_audio_in_16gb"
+_NEVER_HUMO_REDIRECT_ENGINE = "ltx25_audio_in_16gb"
 
 #: The brief-driven radio-HOST FACE object minted once per episode by MetaBrief
 #: under OTR_ENABLE_HUMO_HOSTS (must match
@@ -6541,10 +6541,10 @@ _LTX_OPEN_ENGINES = frozenset(
      # It has now been missed once per lane family. The durable fix is a
      # capability declared on the engine and derived here; that is a
      # registry change and wants its own review, not a quiet edit.
-     "ltx25_native_foley_16gb", "ltx25_native_foley_24gb",
-     "ltx25_native_foley_blackwell",
-     "ltx25_native_mime_16gb", "ltx25_native_mime_24gb",
-     "ltx25_native_audio_in_16gb", "ltx25_native_audio_in_24gb"})
+     "ltx25_foley_16gb", "ltx25_foley_24gb",
+     "ltx25_foley_blackwell",
+     "ltx25_mime_16gb", "ltx25_mime_24gb",
+     "ltx25_audio_in_16gb", "ltx25_audio_in_24gb"})
 #: Roles whose beats are the radio-console OPENER -- expected to render on an
 #: LTX engine, not the procgen/still floor (the 6/15 clips=0 soft-open).
 _LTX_OPEN_ROLES = frozenset({"announcer_visual", "music_visual"})
