@@ -423,3 +423,50 @@ def test_deterministic_delivery_vector_is_clean_and_complete():
     assert all(0.0 <= float(x) <= 1.0 for x in v.values())
     # pure / deterministic: same input -> same output
     assert v == deterministic_delivery_vector("Help! Run! Danger!", 0.5)
+
+
+# --- platform-correct venv default (0c-8, 2026-09-25) ----------------------- #
+def test_default_venv_python_is_platform_correct(monkeypatch):
+    from nodes._otr_audio_engines import _otr_sidecar as SC
+    monkeypatch.setattr(SC.os, "name", "nt")
+    assert SC.default_venv_python("C:/ComfyUI/chatterbox") == os.path.join(
+        "C:/ComfyUI/chatterbox", ".venv", "Scripts", "python.exe")
+    monkeypatch.setattr(SC.os, "name", "posix")
+    assert SC.default_venv_python("/opt/ComfyUI/chatterbox") == os.path.join(
+        "/opt/ComfyUI/chatterbox", ".venv", "bin", "python")
+
+
+def test_windows_venv_default_is_byte_identical(monkeypatch):
+    from nodes._otr_audio_engines import _otr_sidecar as SC
+    from nodes._otr_audio_engines import (
+        eng_chatterbox, eng_dia, eng_indextts2)
+    monkeypatch.setattr(SC.os, "name", "nt")
+    for mod, sub in ((eng_chatterbox, "chatterbox"), (eng_dia, "dia"),
+                     (eng_indextts2, "index-tts")):
+        old = os.path.join(mod._COMFY_ROOT, sub, ".venv", "Scripts", "python.exe")
+        assert SC.default_venv_python(os.path.join(mod._COMFY_ROOT, sub)) == old
+
+
+def test_all_three_engines_fall_back_to_the_platform_default(monkeypatch):
+    from nodes import _otr_audio_engines as AE
+    from nodes._otr_audio_engines import _otr_sidecar as SC
+    for var in ("OTR_CHATTERBOX_VENV", "OTR_DIA_VENV", "OTR_INDEXTTS2_VENV"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(SC.os, "name", "posix")
+    for name in ("chatterbox", "dia", "indextts2"):
+        got = AE.get_engine(name)._venv_python().replace("\\", "/")
+        assert got.endswith(".venv/bin/python"), (name, got)
+    monkeypatch.setattr(SC.os, "name", "nt")
+    for name in ("chatterbox", "dia", "indextts2"):
+        got = AE.get_engine(name)._venv_python().replace("/", "\\")
+        assert got.endswith(".venv\\Scripts\\python.exe"), (name, got)
+
+
+def test_venv_env_overrides_still_win(monkeypatch):
+    from nodes import _otr_audio_engines as AE
+    monkeypatch.setenv("OTR_CHATTERBOX_VENV", "C:/custom/cbx/python.exe")
+    monkeypatch.setenv("OTR_DIA_VENV", "C:/custom/dia/python.exe")
+    monkeypatch.setenv("OTR_INDEXTTS2_VENV", "C:/custom/idx/python.exe")
+    assert AE.get_engine("chatterbox")._venv_python() == "C:/custom/cbx/python.exe"
+    assert AE.get_engine("dia")._venv_python() == "C:/custom/dia/python.exe"
+    assert AE.get_engine("indextts2")._venv_python() == "C:/custom/idx/python.exe"

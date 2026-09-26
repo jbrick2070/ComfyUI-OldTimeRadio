@@ -11,7 +11,8 @@ fallback -- a render fails closed with a NAMED error until the Path B worker +
 weights are installed (C-7). ``interface == "per_line"``.
 
 Config (env, with box defaults under ``ComfyUI/index-tts``):
-  ``OTR_INDEXTTS2_VENV``   isolated venv python (``.venv/Scripts/python.exe``)
+  ``OTR_INDEXTTS2_VENV``   isolated venv python (``.venv/Scripts/python.exe``
+  on Windows, ``.venv/bin/python`` elsewhere)
   ``OTR_INDEXTTS2_DIR``    weights dir (``checkpoints``, holds ``config.yaml``)
   ``OTR_INDEXTTS2_WORKER`` worker script (``scripts/_otr_indextts2_worker.py``)
   ``OTR_INDEXTTS2_FP16``   ``1`` to load fp16 (default fp32)
@@ -174,7 +175,7 @@ class IndexTTS2Engine:
 
     # ---- config resolution (env override -> box default) ----
     def _venv_python(self):
-        return os.environ.get("OTR_INDEXTTS2_VENV") or _default(".venv", "Scripts", "python.exe")
+        return os.environ.get("OTR_INDEXTTS2_VENV") or _SC.default_venv_python(_default())
 
     def _model_dir(self):
         return os.environ.get("OTR_INDEXTTS2_DIR") or _default("checkpoints")

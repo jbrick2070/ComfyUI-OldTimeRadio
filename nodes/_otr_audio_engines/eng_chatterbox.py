@@ -16,7 +16,8 @@ failed start / mid-request crash never leaks the stderr handle or a zombie.
 NOTE: every Chatterbox output carries Resemble AI's imperceptible PerTh watermark.
 
 Config (env, with box defaults under ``ComfyUI/chatterbox``):
-  ``OTR_CHATTERBOX_VENV``   isolated venv python (``.venv/Scripts/python.exe``)
+  ``OTR_CHATTERBOX_VENV``   isolated venv python (``.venv/Scripts/python.exe``
+  on Windows, ``.venv/bin/python`` elsewhere)
   ``OTR_CHATTERBOX_WORKER`` worker script (``scripts/_otr_chatterbox_worker.py``)
 
 Import-time is side-effect-free (C-5). UTF-8, no BOM, ASCII-only source.
@@ -78,7 +79,7 @@ class ChatterboxEngine:
 
     # ---- config resolution (env override -> box default) ----
     def _venv_python(self):
-        return otr_env.get("OTR_CHATTERBOX_VENV") or _default(".venv", "Scripts", "python.exe")
+        return otr_env.get("OTR_CHATTERBOX_VENV") or _SC.default_venv_python(_default())
 
     def _worker_script(self):
         return otr_env.get("OTR_CHATTERBOX_WORKER") or os.path.join(

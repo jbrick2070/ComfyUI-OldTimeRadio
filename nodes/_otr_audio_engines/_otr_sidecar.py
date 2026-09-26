@@ -31,6 +31,23 @@ try:
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
+def default_venv_python(engine_root):
+    """Isolated-venv interpreter under ``engine_root``, platform-correct.
+
+    ``.venv/Scripts/python.exe`` on Windows, ``.venv/bin/python`` elsewhere --
+    the layout ``uv venv`` / ``python -m venv`` actually creates on each
+    platform. The three Path-B adapters (chatterbox, dia, indextts2) used to
+    hardcode the Windows shape, so a default install on Linux or Mac pointed
+    at an interpreter that does not exist. Windows output is byte-identical
+    to the old ``_default(".venv", "Scripts", "python.exe")``; the env
+    overrides (OTR_*_VENV) are read by the callers and unchanged. Mirrors the
+    provisioner's own ``_indextts2_venv_python`` branching.
+    """
+    if os.name == "nt":
+        return os.path.join(engine_root, ".venv", "Scripts", "python.exe")
+    return os.path.join(engine_root, ".venv", "bin", "python")
+
+
 def _env_float(name, default):
     try:
         v = float(otr_env.get(name, "") or default)

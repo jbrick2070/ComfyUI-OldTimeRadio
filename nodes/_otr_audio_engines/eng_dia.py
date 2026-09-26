@@ -19,7 +19,8 @@ the adapter sends the matching transcript and the worker prepends it -- a drop-i
 quality upgrade with no code change.
 
 Config (env, with box defaults under ``ComfyUI/dia``):
-  ``OTR_DIA_VENV``   isolated venv python (``.venv/Scripts/python.exe``)
+  ``OTR_DIA_VENV``   isolated venv python (``.venv/Scripts/python.exe``
+  on Windows, ``.venv/bin/python`` elsewhere)
   ``OTR_DIA_WORKER`` worker script (``scripts/_otr_dia_worker.py``)
   ``OTR_DIA_MODEL``  HF model id (default ``nari-labs/Dia-1.6B-0626``)
 
@@ -80,7 +81,7 @@ class DiaEngine:
 
     # ---- config resolution (env override -> box default) ----
     def _venv_python(self):
-        return otr_env.get("OTR_DIA_VENV") or _default(".venv", "Scripts", "python.exe")
+        return otr_env.get("OTR_DIA_VENV") or _SC.default_venv_python(_default())
 
     def _worker_script(self):
         return otr_env.get("OTR_DIA_WORKER") or os.path.join(
