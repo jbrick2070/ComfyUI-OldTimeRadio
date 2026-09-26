@@ -6,7 +6,7 @@ form top to bottom, `outputs` names the node whose result the app pane shows,
 and `extra.linearMode` opens the workflow straight into it. ONE FORM, in the
 operator's order (2026-09-26, after seeing the story-only form live: "story,
 models, My Story at the bottom"). The per-machine workflows open on the GRAPH
-(his call) and reach the form with the App button; workflows/otr_app.json opens
+(his call) and reach the form with Enter app mode; workflows/otr_app.json opens
 as the app. The canonical carries neither; it is the workflow he edits on the
 canvas.
 
