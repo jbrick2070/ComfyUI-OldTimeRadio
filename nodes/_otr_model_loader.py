@@ -546,14 +546,26 @@ def _plan_max_memory(
     return None
 
 
-def _cpu_overflow_max_memory(total_vram: float) -> dict:
+def _cuda_index(device) -> int:
+    """The CUDA ordinal a resolved device string names; 0 for bare "cuda".
+
+    ``device_options._name`` writes ``"cuda"`` for GPU 0 and ``"cuda:N"``
+    only for a real, offered N > 0, and ``LLMRuntimePolicy`` admits nothing
+    else, so this never invents an index that is not there."""
+    d = str(device or "")
+    if d.startswith("cuda:"):
+        return int(d.split(":", 1)[1])
+    return 0
+
+
+def _cpu_overflow_max_memory(total_vram: float, gpu_index: int = 0) -> dict:
     """Physical GPU budget plus a RAM overflow lane. Not a size-tag guess.
 
     Used only after the underlying loader failed to place on the accelerator.
     Disk is omitted: OTR does not support disk offload.
     """
     gpu = max(1.0, float(total_vram) if total_vram else 1.0)
-    return {0: f"{gpu:.2f}GiB", "cpu": "64GiB"}
+    return {int(gpu_index): f"{gpu:.2f}GiB", "cpu": "64GiB"}
 
 
 def _is_memory_placement_failure(exc: BaseException) -> bool:
@@ -982,6 +994,12 @@ def load_llm(
         from . import _otr_hf_env as _OTR_HF
         _policy = _policy_with_baked_quant(_policy, _stripped_model_id)
         device = _policy.device
+        # THE WRITER LANDS ON THE GPU THE POLICY NAMES (2026-09-25). Every
+        # probe and placement below used to say device 0; once the policy
+        # admitted "cuda:N" (0c item 1) a second-GPU pick stopped crashing
+        # and started loading onto GPU 0 instead -- a silent wrong. Bare
+        # "cuda" is index 0, so every single-GPU box is byte-identical.
+        _gpu_index = _cuda_index(device)
 
         # S1: quantization is an EXPLICIT policy field. The legacy tag
         # predicate (Obsidian profile + "4-bit"/"9b"/"12b"/"nemo"/...
@@ -1029,7 +1047,7 @@ def load_llm(
         # tokenizer to prevent the 15GB transient spike on 16GB cards.
         total_vram = 0
         if torch.cuda.is_available():
-            total_vram = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            total_vram = torch.cuda.get_device_properties(_gpu_index).total_memory / (1024**3)
 
         # 2026-04-30: Sync BEFORE eviction. bnb-NF4 + Blackwell sm_120 +
         # CUDA 13 surfaces cudaErrorUnknown on the post-eviction call
@@ -1081,7 +1099,7 @@ def load_llm(
 
         # Post-Wash Analytics
         if torch.cuda.is_available():
-            free_gb = (torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved(0)) / (1024**3)
+            free_gb = (torch.cuda.get_device_properties(_gpu_index).total_memory - torch.cuda.memory_reserved(_gpu_index)) / (1024**3)
             _runtime_log(f"[StoryOrchestrator] Zero-Prime VRAM State: {free_gb:.1f}GB Free. Capacity: {total_vram:.1f}GB")
 
         # -- VRAM Budgeting (Early Allocation) --
@@ -1289,13 +1307,19 @@ def load_llm(
             common_kwargs["quantization_config"] = quant_config
             # Flagship Sovereignty: force 100% GPU on 14.5+ GiB cards.
             if total_vram >= 14.5:
-                common_kwargs["device_map"] = {"": 0}
+                common_kwargs["device_map"] = {"": _gpu_index}
                 _runtime_log(
                     f"[StoryOrchestrator] Flagship Sovereignty: "
                     f"Forcing 100% GPU for {_stripped_model_id} "
                     f"(total_vram={total_vram:.2f} GiB)"
                 )
             else:
+                # A quantized load with no device_map lands on the CURRENT
+                # device (0), and model.to(device) is skipped for it below,
+                # so a non-zero GPU must be named here. Index 0 passes
+                # nothing, exactly as before.
+                if _gpu_index and "device_map" not in common_kwargs:
+                    common_kwargs["device_map"] = {"": _gpu_index}
                 # REPORT THE PLACEMENT THAT WAS ACTUALLY REQUESTED, not the
                 # branch's name (2026-09-06). This line used to read
                 # "device_map=auto path" whenever the card was under 14.5 GiB,
@@ -1460,7 +1484,8 @@ def load_llm(
                         "native text decoder with strict checkpoint coverage")
                 _retry_max_memory = common_kwargs.get("max_memory")
                 if not (isinstance(_retry_max_memory, dict) and "cpu" in _retry_max_memory):
-                    _retry_max_memory = _cpu_overflow_max_memory(total_vram)
+                    _retry_max_memory = _cpu_overflow_max_memory(
+                        total_vram, gpu_index=_gpu_index)
                 _retry_kwargs["max_memory"] = _retry_max_memory
                 _retry_kwargs["device_map"] = _plan_nf4_cpu_offload(
                     _retry_config,

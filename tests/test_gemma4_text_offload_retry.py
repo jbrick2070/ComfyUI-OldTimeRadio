@@ -288,6 +288,7 @@ class E4BRetryBoundaryTests(unittest.TestCase):
             "_init_kwargs": dict(self.common),
             "_validate_native_text_loading_info": native_validate,
             "total_vram": 8.0,
+            "_gpu_index": 0,
         })
 
     def execute(self):

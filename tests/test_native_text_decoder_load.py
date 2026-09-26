@@ -327,11 +327,12 @@ class NativeTextBoundaryTests(unittest.TestCase):
                 or "out of memory" in str(exc).lower()
                 or "exceed allowed memory" in str(exc).lower()
             ),
-            "_cpu_overflow_max_memory": lambda vram: {
-                0: f"{max(1.0, float(vram) if vram else 1.0):.2f}GiB",
+            "_cpu_overflow_max_memory": lambda vram, gpu_index=0: {
+                gpu_index: f"{max(1.0, float(vram) if vram else 1.0):.2f}GiB",
                 "cpu": "64GiB",
             },
             "total_vram": 8.0,
+            "_gpu_index": 0,
         }
 
     def test_initial_load_uses_the_text_config_and_validates_coverage(self):

@@ -252,10 +252,11 @@ RETIRED_ENGINE_IDS = frozenset({
     # not an obscure lane like wan_i2v above, which the same rename policy
     # deliberately left OFF this set. Plain rename, no alias (operator:
     # "don't worry about back compat") -- but a stale saved copy of one of
-    # those four workflows, or a `--profile otr_8gb_ltx25_native_foley`
-    # leftover, deserves the truthful "renamed, no longer selectable"
-    # diagnosis, not the generic unregistered-engine refusal that reads like
-    # a broken install.
+    # those four workflows still names these ENGINE ids, and deserves the
+    # named RetiredEngineError ("retired and no longer selectable"), not
+    # the generic unregistered-engine refusal that reads like a broken
+    # install. (A leftover old workflow FILENAME is a different miss: that
+    # is a missing file, and this set does not see it.)
     "ltx25_native_foley_16gb",
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",

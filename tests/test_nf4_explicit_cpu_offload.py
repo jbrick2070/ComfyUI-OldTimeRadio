@@ -138,6 +138,7 @@ class ExplicitOffloadTests(unittest.TestCase):
               "_is_memory_placement_failure": production_function("_is_memory_placement_failure"),
               "_cpu_overflow_max_memory": production_function("_cpu_overflow_max_memory"),
               "total_vram": 8.0,
+              "_gpu_index": 0,
               # PBUG-20260906-07: "test-model" is not a curated native-text
               # row, so it takes the composite path -- the parent config and
               # a plain copy of common_kwargs, i.e. exactly what this test
@@ -239,12 +240,17 @@ class ExplicitOffloadTests(unittest.TestCase):
         # from_pretrained. What REMAINS hardware-scoped is the device
         # SELECTION, and that is the part the 16 GB box depends on: at
         # >=14.5 GiB the flagship branch still pins the whole model to device 0.
-        for total, expected_map in ((8.00, None), (15.99, {"": 0})):
-            with self.subTest(total_vram=total):
+        # A SECOND GPU (2026-09-25): the policy may name cuda:N, and the
+        # quantized path skips model.to(device), so both branches must
+        # place on that ordinal explicitly. Index 0 is unchanged above.
+        for total, gpu, expected_map in ((8.00, 0, None), (15.99, 0, {"": 0}),
+                                         (8.00, 1, {"": 1}), (15.99, 1, {"": 1})):
+            with self.subTest(total_vram=total, gpu_index=gpu):
                 budget = planner("google/gemma-4-12b-it", total,
                                  cuda_available=True, quant_policy="bnb_nf4")
                 self.assertIsNone(budget, "no card gets a cap any more")
                 ns = {"max_memory": budget, "common_kwargs": {}, "total_vram": total,
+                      "_gpu_index": gpu,
                       "_stripped_model_id": "google/gemma-4-12b-it",
                       "_runtime_log": lambda *a: None}
                 exec(code, ns)

@@ -20,6 +20,7 @@ Field classes (one per field -- spec section 2):
 from __future__ import annotations
 
 import dataclasses
+import re
 from typing import Any
 
 # Lane vocabulary. Local lanes are named for what runs in-process; remote
@@ -49,6 +50,10 @@ LANE_BY_LOADER_BACKEND: dict[str, str] = {
 }
 
 _DEVICES = ("cuda", "cpu", "mps")
+#: A concrete CUDA device: bare "cuda" (GPU 0) or "cuda:N" with a real
+#: ordinal. Not "cuda:" or "cuda:foo" -- those are malformed widget values,
+#: and the loader parses the ordinal as an int.
+_CUDA_DEVICE = re.compile(r"cuda(:\d+)?")
 _ATTN_IMPLS = ("sdpa", "flash_attention_2", "eager")
 _QUANT_POLICIES = ("bnb_nf4", "bnb_8bit", "none")
 
@@ -73,10 +78,11 @@ class LLMRuntimePolicy:
     lane_allowlist: tuple[str, ...] = ALL_LANES
 
     def __post_init__(self) -> None:
-        if not (self.device == "cuda" or self.device.startswith("cuda:")
+        if not (_CUDA_DEVICE.fullmatch(self.device)
                 or self.device in ("cpu", "mps")):
             raise LLMPolicyError(
-                f"llm.device {self.device!r} not in {_DEVICES}")
+                f"llm.device {self.device!r} is not one of {_DEVICES} "
+                "or 'cuda:N'")
         if self.attn_impl not in _ATTN_IMPLS:
             raise LLMPolicyError(
                 f"llm.attn_impl {self.attn_impl!r} not in {_ATTN_IMPLS}")
