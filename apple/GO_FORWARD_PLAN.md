@@ -111,23 +111,43 @@ is `RECURRING_CHARACTER_VOICES` + `reserved_for`. Full suite 16965 passed,
 `otr_8gb_low`, Lemmy forced in): PASS 9:26, `cold_iron_hum_20260926_053814`;
 Lemmy cast on kokoro as `bm_george`, his recurring-table voice.
 
-### 0m. H3 carries no reserve -- CODE DONE 2026-09-26 (`84c98900`); OWED: one live H3 leg on a stock boot
+### 0m. No VRAM reserves; models unload after use -- DONE 2026-09-26
 
-The operator, 2026-09-26: "I don't like messing with reserves"; "we need to
-unload models after they are used, and if it OOMs we record it, not
-artificially create a scenario". That settled the design question this row
-used to hold (a runtime reserve set by the adapter) by removing the reserve
-altogether: the `h3` contract now asks only for SageAttention off (a
-correctness defect -- noise reported as success) and CPU-only off. A stock,
-Sage-free boot satisfies it; the queue-time gate refuses only a Sage boot,
-and says "Start ComfyUI without SageAttention" first. `h3_8gb_lab` (the
-4060's pinned-memory-off lab boot) is unchanged.
+The operator: "I don't like messing with reserves"; "we need to unload models
+after they are used, and if it OOMs we record it, not artificially create a
+scenario". Code: `84c98900` `6f4cdd95` (H3), `205e96ad` `7c6e9cb2` (no reserve
+knob anywhere, humo_diet deleted, launcher passes none), `64d1b256` `5df92ba4`
+(the validator sets ComfyUI's own free_memory flag; a prompt-start sweep
+clears an earlier failed prompt's writer LLM / Bark). Reviews: Sonnet on each,
+agy and Cursor HOLD on the set.
+LIVE, stock boot: H3 clip 1 rendered (243 frames, 864x480, peak 15,959 MB, no
+OOM); on prompt end the card fell 15,460 -> 2,029 MiB in ~5 s (cancelled) and
+to 1,824 MiB after the successful `rattling_tray_20260926_115907` (1 act,
+otr_16gb_video, 1:45:46, in obs). Before this, a finished render stayed
+~9-10 GB resident.
+STILL OWED, not blocking: the clean H3 auto-download proof -- ref2va was moved
+off the box to `C:\OTR-H3-moved-aside\`; `--video-lane h3_low_audio_in` on a
+fresh boot must fetch it (21 GB) and render.
 
-OWED: one H3 leg on the 5080 on a STOCK Sage-free boot, 1 act. If it
-publishes, record the peak. If it runs out of memory, that is a PBUG with
-the log line -- NOT a reason to put a reserve back. The fix for an OOM is
-the lane releasing what it no longer needs, per the rule. No workflow
-selects H3, so nothing else waits on this.
+### 0n. A Comfy-native Gemma 4 writer -- MEASURED 2026-09-26, design not started
+
+ComfyUI ships an official `llm_gemma4_text_gen` template: the stock CLIPLoader
+plus the built-in TextGenerate node, running Gemma 4 inside ComfyUI's own model
+management (dynamic loading, unload after use). Comfy-Org publishes
+`gemma4_e2b_it_int8_convrot` (5.2 GB), `gemma4_e4b_it_int8_convrot` (8.1 GB),
+`gemma4_e4b_it_fp8_scaled` (9.1 GB), `gemma4_12b_int8_convrot` (12.1 GB) and bf16.
+Measured on the 5080 through that node (raw, one run each):
+| writer path | prompt / output | speed | VRAM above desktop |
+|---|---|---:|---:|
+| Comfy-native E2B int8_convrot | ~70 / 526-580 tok | 77 cold, 125 warm tok/s | ~4.5 GiB |
+| Comfy-native E2B int8_convrot | 14,336 / 983-1,287 tok | 82-92 tok/s incl. prefill | ~7.9 GiB |
+| transformers E2B mobile-QAT | ~70 / 640 tok | 4.3 tok/s | ~9.3 GiB |
+| current 12B NF4 writer (bitsandbytes) | episode | 16-18 tok/s | ~8-9 GB |
+The mobile-QAT transformers path unpacks every layer on every token
+(`transformers/integrations/gemma_quant.py` forward), which is its slowness.
+OWED: the 4060's own numbers (probe queued with the 4060 agent), and a design
+round before any code -- OTR's writer loads through transformers today, so this
+is a writer-backend choice, not a catalog row. His call on whether to open it.
 
 ### 0a. Windows HF_HOME -- DONE 2026-09-25 (`a0875708`, `89a95212`)
 
