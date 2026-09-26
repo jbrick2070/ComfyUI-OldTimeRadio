@@ -77,8 +77,8 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `ltx25_audio_in_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_foley_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_mime_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
-| `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `h3_low_audio_in` | manual | 42.5 GiB | **OOM** | fits | not offered | ? | not offered |
+| `h3_low_video` | **auto** | 39.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `h3_low_audio_in` | **auto** | 39.5 GiB | **OOM** | fits | not offered | ? | not offered |
 
 **Image -- local**
 
@@ -149,18 +149,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 Every file a **manual** row needs: the repository to download it from, and the folder under your ComfyUI `models/` directory to put it in. `gated` means you must accept the model's licence on Hugging Face first, while signed in.
 
 Two engines can share one group and still download different amounts, because they draw different files from it. **The size in the machine grid above is what YOUR pick costs**; the total on a heading here is the whole group. A heading with no total means that group's manifest predates byte receipts -- the machine grid still has the figure.
-
-### h3_operator_only &mdash; 59.1 GiB total
-
-Selected by: `h3_low_audio_in`, `h3_low_video`
-
-| File | From | Put it in | Size | Gated |
-|---|---|---|---|---|
-| `minimax_h3_fl2va_pruned_int8_convrot.safetensors` | [`Comfy-Org/MiniMax-H3`](https://huggingface.co/Comfy-Org/MiniMax-H3) | `models/diffusion_models/` | 19.53 GiB | no |
-| `minimax_h3_ref2va_pruned_int8_convrot.safetensors` | [`Comfy-Org/MiniMax-H3`](https://huggingface.co/Comfy-Org/MiniMax-H3) | `models/diffusion_models/` | 19.53 GiB | no |
-| `qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors` | [`Comfy-Org/MiniMax-H3`](https://huggingface.co/Comfy-Org/MiniMax-H3) | `models/text_encoders/` | 14.61 GiB | no |
-| `minimax_h3_video_vae_fp16.safetensors` | [`Comfy-Org/MiniMax-H3`](https://huggingface.co/Comfy-Org/MiniMax-H3) | `models/vae/` | 4.85 GiB | no |
-| `minimax_h3_audio_vae_fp32.safetensors` | [`Comfy-Org/MiniMax-H3`](https://huggingface.co/Comfy-Org/MiniMax-H3) | `models/vae/` | 0.56 GiB | no |
 
 ### humo &mdash; 26.7 GiB total
 

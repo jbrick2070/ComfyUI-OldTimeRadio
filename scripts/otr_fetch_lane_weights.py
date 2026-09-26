@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import os
 import sys
 import urllib.parse
@@ -46,6 +47,32 @@ class WeightSpec(NamedTuple):
     revision: str = "main"
     expected_bytes: int | None = None
     expected_sha256: str | None = None
+
+
+def _queue_time_pinned_specs() -> dict:
+    """``{basename: WeightSpec}`` for every source the queue-time preflight
+    fetches at an exact pin (``_PINNED_SOURCES`` in
+    ``nodes/_otr_visual_assets.py``).
+
+    ONE SOURCE OF TRUTH. A lane built from this table cannot pin a different
+    revision, size or SHA-256 from the one the graph downloads at queue time.
+    The module is loaded BY PATH: it imports only the standard library at
+    module scope, so this works in a fresh interpreter with no ComfyUI.
+    """
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "nodes", "_otr_visual_assets.py")
+    spec = importlib.util.spec_from_file_location("_otr_fetch_queue_time_pins", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    out = {}
+    for category, repo, filename, revision, size, sha256 in module._PINNED_SOURCES:
+        name = filename.rsplit("/", 1)[-1]
+        out[name] = WeightSpec(repo, filename, "%s/%s" % (category, name),
+                               revision, size, sha256)
+    return out
+
+
+_PINNED = _queue_time_pinned_specs()
 
 #: lane -> list of (hf_repo, path_in_repo, models_subfolder)
 #: Sizes in the comments are the real blob sizes read from the HF API.
@@ -83,9 +110,12 @@ LANE_INFO = {
                     "a 16 GB Blackwell 5080 at 13.06 GiB VRAM / 27.53 GiB "
                     "host RAM; use at least 32 GiB host RAM. Other NVIDIA "
                     "families remain lab candidates until a live receipt."),
-    "minimax_h3": (59.084, "MiniMax H3 FL2VA + REF2VA operator-local lane. "
-                           "The NVFP4 text encoder is not Blackwell-only; "
-                           "physical 8 GB remains unqualified."),
+    "minimax_h3_video": (38.99, "MiniMax H3 FL2VA (h3_low_video): DiT + NVFP4 "
+                                "encoder + video VAE. The encoder is not "
+                                "Blackwell-only; 8 GB is unqualified."),
+    "minimax_h3_audio_in": (39.55, "MiniMax H3 REF2VA (h3_low_audio_in): the "
+                                   "same encoder and video VAE, its own DiT, "
+                                   "plus the audio VAE."),
 }
 
 #: The least you can install and still render an episode. Everything else is a
@@ -230,54 +260,29 @@ LANES = {
             "85c4a61c30e0497aa44b91d93a893b624708461a56fe5485183b28fa07e2dfb3",
         ),
     ],
-    # 63,440,965,087 bytes (59.084 GiB). COMPLETE operator-local H3 recipe for
-    # both OTR adapters: FL2VA and REF2VA DiTs, their shared NVFP4 encoder and
-    # video VAE, plus the audio VAE REF2VA uses for conditioning. The NVFP4
-    # encoder is explicitly documented by Comfy-Org as usable without
-    # Blackwell. The lawful local receipts are 124 model / 129 canvas frames;
-    # they do not qualify a physical 8 GB card. This lane is explicit only and
-    # is never selected by a public profile or machine bundle.
-    "minimax_h3": [
-        WeightSpec(
-            "Comfy-Org/MiniMax-H3",
-            "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
-            "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
-            "4cc1d817b6184899b41293954329f576cb5ae86b",
-            20_970_379_616,
-            "e889202c41dafb67b10d67b97f0d8541508036a6090af23425a5c2615d03c47a",
-        ),
-        WeightSpec(
-            "Comfy-Org/MiniMax-H3",
-            "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
-            "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
-            "4cc1d817b6184899b41293954329f576cb5ae86b",
-            20_970_379_616,
-            "9255f52b6677845ad238f20dfaafa94727053694127ab7f255c048f0f9365779",
-        ),
-        WeightSpec(
-            "Comfy-Org/MiniMax-H3",
-            "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
-            "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
-            "4cc1d817b6184899b41293954329f576cb5ae86b",
-            15_687_142_551,
-            "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6",
-        ),
-        WeightSpec(
-            "Comfy-Org/MiniMax-H3",
-            "vae/minimax_h3_video_vae_fp16.safetensors",
-            "vae/minimax_h3_video_vae_fp16.safetensors",
-            "4cc1d817b6184899b41293954329f576cb5ae86b",
-            5_207_808_496,
-            "7c1f131492e7eddacaac9069a61b81bdd39de5cc96561e677c5eab1cdce5e522",
-        ),
-        WeightSpec(
-            "Comfy-Org/MiniMax-H3",
-            "vae/minimax_h3_audio_vae_fp32.safetensors",
-            "vae/minimax_h3_audio_vae_fp32.safetensors",
-            "4cc1d817b6184899b41293954329f576cb5ae86b",
-            605_254_808,
-            "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48",
-        ),
+    # THE MINIMAX H3 STACK, one lane per DiT like LTX 2.5 below. FL2VA
+    # (h3_low_video) loads its DiT, the NVFP4 Qwen3-VL encoder and the video
+    # VAE; REF2VA (h3_low_audio_in) loads its own DiT, the same two, and the
+    # audio VAE it uses to ENCODE reference audio. The `minimax_h3` bundle
+    # fetches both: 63,440,965,087 bytes (59.084 GiB) for all five files.
+    #
+    # THE ROWS ARE NOT WRITTEN HERE. Their repo, revision, bytes and SHA-256
+    # are `_PINNED_SOURCES` in nodes/_otr_visual_assets.py -- the table the
+    # canonical graph fetches from at queue time -- so a registry install and
+    # this script land the same bytes. The NVFP4 encoder is documented by
+    # Comfy-Org as usable without Blackwell. The local receipts are 124 model /
+    # 129 canvas frames on a 16 GB card; they do not qualify a physical 8 GB
+    # card. No shipped workflow selects either lane.
+    "minimax_h3_video": [
+        _PINNED["minimax_h3_fl2va_pruned_int8_convrot.safetensors"],
+        _PINNED["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"],
+        _PINNED["minimax_h3_video_vae_fp16.safetensors"],
+    ],
+    "minimax_h3_audio_in": [
+        _PINNED["minimax_h3_ref2va_pruned_int8_convrot.safetensors"],
+        _PINNED["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"],
+        _PINNED["minimax_h3_video_vae_fp16.safetensors"],
+        _PINNED["minimax_h3_audio_vae_fp32.safetensors"],
     ],
     # THE NATIVE LTX 2.5 STACK, one lane per DiT. Every lane of a card class
     # loads the same five files -- the 16 GB foley lane's mix4x8 DiT is also
@@ -551,9 +556,11 @@ LANES = {
 }
 
 #: Convenience bundles: everything a named profile needs that is not already
-#: auto-fetched by transformers (writer, musicgen) on first use.
+#: auto-fetched by transformers (writer, musicgen) on first use, plus
+#: `minimax_h3`, the complete five-file H3 stack both H3 lanes load.
 BUNDLES = {
     "otr_8gb_animatediff": ["haunted"],
+    "minimax_h3": ["minimax_h3_video", "minimax_h3_audio_in"],
 }
 
 
@@ -772,7 +779,7 @@ def main() -> int:
         print("")
         print("  minimum for one episode: %s" % MINIMUM_HINT)
         print("")
-        print("profile bundles (fetch everything a profile needs):")
+        print("bundles (several lanes under one name):")
         for b, lanes in BUNDLES.items():
             print("  %-24s = %s" % (b, " + ".join(lanes)))
         return 0
@@ -789,8 +796,15 @@ def main() -> int:
     print("models root: %s" % root)
     print("target: %s -> %s" % (args.lane, ", ".join(lanes)))
     ok = True
+    # Lanes in one bundle can share files (both H3 lanes load the same
+    # encoder and video VAE), so each destination is fetched and hashed once.
+    seen = set()
     for lane in lanes:
         for entry in LANES[lane]:
+            dest = destination_path(root, entry)
+            if dest in seen:
+                continue
+            seen.add(dest)
             ok = fetch(entry, root, args.dry_run) and ok
     print("DONE" if ok else "INCOMPLETE -- see failures above")
     return 0 if ok else 1

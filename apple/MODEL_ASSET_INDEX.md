@@ -35,17 +35,13 @@ python scripts/otr_fetch_lane_weights.py ltx25_16gb
 python scripts/otr_fetch_lane_weights.py ltx25_24gb
 python scripts/otr_fetch_lane_weights.py ltx25_blackwell
 python scripts/otr_fetch_lane_weights.py ltx_8gb
+python scripts/otr_fetch_lane_weights.py minimax_h3_audio_in
+python scripts/otr_fetch_lane_weights.py minimax_h3_video
 python scripts/otr_fetch_lane_weights.py sd15
 python scripts/otr_fetch_lane_weights.py stable_audio_3
 python scripts/otr_fetch_lane_weights.py z_image
 python scripts/otr_fetch_lane_weights.py z_image_blackwell
 python scripts/otr_fetch_lane_weights.py z_image_int8
-```
-
-The complete H3 manifest is deliberately explicit and operator-local; it is never selected by a public profile or machine bundle:
-
-```
-python scripts/otr_fetch_lane_weights.py minimax_h3
 ```
 
 Anything not listed there is a manual install -- see its row below.
@@ -65,7 +61,7 @@ Anything not listed there is a manual install -- see its row below.
 | `ltx25` | 4 weight file(s) | auto at queue time; or `otr_fetch_lane_weights.py ltx25_16gb` / `ltx25_24gb` / `ltx25_blackwell` | - |
 | `ltx_8gb` | 2 weight file(s) | `otr_fetch_lane_weights.py ltx_8gb` | 2 profile(s) |
 | `mesh_stage` | 3 weight file(s) | manual download | - |
-| `minimax_h3` | 5 weight file(s) | explicit operator-local `otr_fetch_lane_weights.py minimax_h3` | - |
+| `minimax_h3` | 5 weight file(s) | auto at queue time; or `otr_fetch_lane_weights.py minimax_h3_video` / `minimax_h3_audio_in` | - |
 | `razzle_ltx_8gb` | **not declared in code -- verify** | - | - |
 | `visualizer` | nothing on disk | - | - |
 | `viz_camera` | nothing on disk | - | 3 profile(s) |

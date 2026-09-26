@@ -137,11 +137,15 @@ and moves the mouth to it. Every HuMo lane is a large download and wants a
 
 | Dropdown | What it makes | Needs |
 |---|---|---|
-| `h3_low_video` | a 33B model with a still pinned as the first frame. No audio anywhere in its graph | manual weights |
-| `h3_low_audio_in` | the same stack conditioned on a reference portrait plus the beat's own audio | manual weights |
+| `h3_low_video` | a 33B model with a still pinned as the first frame. No audio anywhere in its graph | automatic, about 39 GB |
+| `h3_low_audio_in` | the same stack conditioned on a reference portrait plus the beat's own audio | automatic, about 40 GB |
 
 The two largest downloads on this page, both 16 GB territory, and the slowest
-local lanes in the pack by a wide margin. Neither emits audio.
+local lanes in the pack by a wide margin. Neither emits audio. Both download
+their own weights from Comfy-Org's public MiniMax H3 repack the first time you
+queue them. They share the text encoder and video VAE, so picking the second
+one costs only its own 21 GB model (plus a 0.6 GB audio VAE for
+`h3_low_audio_in`).
 
 ### The odd one
 
@@ -262,8 +266,8 @@ causes look the same on screen, and the error text is what tells them apart:
   naming anything to install. Update ComfyUI, restart, queue again.
 
 **The render stops naming a missing file.** The lane needs weights that do not
-fetch themselves. The LTX lanes and the hosted ones fetch their own; the HuMo
-and H3 lanes and a few image engines do not. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from) says which
+fetch themselves. The LTX and H3 lanes and the hosted ones fetch their own; the
+HuMo lanes and a few image engines do not. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from) says which
 repository and which folder. The error names the file and never quietly
 substitutes another one.
 

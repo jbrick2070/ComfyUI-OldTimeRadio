@@ -64,8 +64,8 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 | `ltx25_audio_in_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_foley_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_mime_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
-| `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `h3_low_audio_in` | manual | 42.5 GiB | **OOM** | fits | not offered | ? | not offered |
+| `h3_low_video` | **auto** | 39.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `h3_low_audio_in` | **auto** | 39.5 GiB | **OOM** | fits | not offered | ? | not offered |
 
 **Image -- local**
 

@@ -1,10 +1,11 @@
 """Pre-writer native visual-weight readiness for the shipped canonical graph.
 
-No model imports or network at module import. Only the TWENTY-TWO allowlisted
+No model imports or network at module import. Only the TWENTY-SEVEN allowlisted
 files below can be fetched (three z_image_turbo, two ltx_8gb, three
 stable_audio_3, one sd15, two lumina_image -- the Flux ae VAE is already the
-z_image row -- seven for the native LTX 2.5 lanes, and four for the
-AnimateDiff lanes, whose SD 1.5 checkpoint is the sd15 row).
+z_image row -- seven for the native LTX 2.5 lanes, four for the
+AnimateDiff lanes, whose SD 1.5 checkpoint is the sd15 row, and five for the
+two MiniMax H3 lanes, which are fetched at an exact pinned revision).
 Existing native loader choices are preserved, not rehash-qualified, and
 readiness is NOT a claim of GPU/render compatibility. Other engines keep
 their existing adapter checks with explicit uncovered logs.
@@ -18,6 +19,46 @@ import re
 import time
 
 log = logging.getLogger(__name__)
+
+#: SOURCES FETCHED AT AN EXACT PIN: ``(category, repo, filename, revision,
+#: bytes, sha256)``. Every other row in ``_SOURCES`` pins whatever commit the
+#: Hub serves at queue time and verifies against that commit's own LFS SHA-256;
+#: a row here is requested at THIS revision and refused unless the Hub still
+#: serves exactly these bytes (``_pin_metadata``). The rows are appended to
+#: ``_SOURCES`` below, so this table is the only place their names live.
+#: ``scripts/otr_fetch_lane_weights.py`` builds its H3 lanes from it, so the
+#: dev-tree fetcher and the queue-time preflight cannot pin different bytes.
+#:
+#: MINIMAX H3, added 2026-09-26 (operator: "keep them as long as they are auto
+#: download"; "MiniMax 3 is popular, so people have it"). The five files the two
+#: H3 lanes load: FL2VA and REF2VA DiTs, the NVFP4 Qwen3-VL encoder and video
+#: VAE they share, and the audio VAE only REF2VA loads. Comfy-Org/MiniMax-H3 is
+#: public and ungated (anonymous 302 on this revision, measured 2026-09-25).
+#: Revision, sizes and hashes are the ones the lane-19/20 receipts were
+#: measured on. Each lane asks for its own files through ``_weight_rows()``, so
+#: h3_low_video never pulls the REF2VA DiT or the audio VAE.
+_PINNED_SOURCES = (
+    ("diffusion_models", "Comfy-Org/MiniMax-H3",
+     "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+     "4cc1d817b6184899b41293954329f576cb5ae86b", 20_970_379_616,
+     "e889202c41dafb67b10d67b97f0d8541508036a6090af23425a5c2615d03c47a"),
+    ("diffusion_models", "Comfy-Org/MiniMax-H3",
+     "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+     "4cc1d817b6184899b41293954329f576cb5ae86b", 20_970_379_616,
+     "9255f52b6677845ad238f20dfaafa94727053694127ab7f255c048f0f9365779"),
+    ("text_encoders", "Comfy-Org/MiniMax-H3",
+     "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+     "4cc1d817b6184899b41293954329f576cb5ae86b", 15_687_142_551,
+     "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6"),
+    ("vae", "Comfy-Org/MiniMax-H3",
+     "vae/minimax_h3_video_vae_fp16.safetensors",
+     "4cc1d817b6184899b41293954329f576cb5ae86b", 5_207_808_496,
+     "7c1f131492e7eddacaac9069a61b81bdd39de5cc96561e677c5eab1cdce5e522"),
+    ("vae", "Comfy-Org/MiniMax-H3",
+     "vae/minimax_h3_audio_vae_fp32.safetensors",
+     "4cc1d817b6184899b41293954329f576cb5ae86b", 605_254_808,
+     "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48"),
+)
 
 _SOURCES = (
     ("diffusion_models", "Comfy-Org/z_image_turbo",
@@ -134,14 +175,23 @@ _SOURCES = (
      "animatediff_lightning_8step_comfyui.safetensors"),              #   908,929,664 B
     ("vae", "stabilityai/sd-vae-ft-mse-original",
      "vae-ft-mse-840000-ema-pruned.safetensors"),                     #   334,641,190 B
-)
+    # THE MINIMAX H3 LANES: the rows of `_PINNED_SOURCES` above, which carry
+    # their exact revision, size and SHA-256.
+) + tuple(row[:3] for row in _PINNED_SOURCES)
 #: Windows MAX_PATH is 260 including the terminating NUL, so 259 is what a
 #: path may actually occupy. Named here because _scrub_transfer_error reports
 #: against it and prestartup_script.py decides the HF_HOME pin by it.
 _WINDOWS_PATH_BUDGET = 259
 
+#: ``(repo, filename) -> {"revision", "size", "sha256"}`` for the pinned rows.
+_PINS = {(repo, filename): {"revision": revision, "size": size, "sha256": sha256}
+         for _category, repo, filename, revision, size, sha256 in _PINNED_SOURCES}
+
+#: ``(category, basename) -> spec``. A pinned row's spec also carries its
+#: ``revision``, ``size`` and ``sha256``, which ``_pin_metadata`` enforces.
 MANIFEST = {(category, filename.rsplit("/", 1)[-1]):
-            {"repo_id": repo, "filename": filename}
+            dict({"repo_id": repo, "filename": filename},
+                 **_PINS.get((repo, filename), {}))
             for category, repo, filename in _SOURCES}
 _VIDEO_SLOTS = ("announcer_video_model", "music_video_model", "character_video_model")
 _IMAGE_SLOTS = ("announcer_image_model", "music_image_model", "character_image_model")
@@ -163,9 +213,15 @@ _ANIMATEDIFF_WEIGHT_ENGINES = frozenset({
     "animatediff15_v3_haunted_video",
     "animatediff15_v3_stillin_lab_video",
 })
+#: Every registered MiniMax H3 lane. Each one is asked for its own rows through
+#: ``_weight_rows()``, the table its assert_usable, byte floors and graph read.
+_MINIMAX_H3_WEIGHT_ENGINES = frozenset({
+    "minimax_h3_video",
+    "minimax_h3_audio_in",
+})
 _COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image"}
                      | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES
-                     | _ANIMATEDIFF_WEIGHT_ENGINES)
+                     | _ANIMATEDIFF_WEIGHT_ENGINES | _MINIMAX_H3_WEIGHT_ENGINES)
 #: The music node is scanned alongside OTR_VideoDirector. It is a DIFFERENT
 #: class with a single ``engine`` widget rather than per-role slots, so it gets
 #: its own pass; an absent node is a skip, not a refusal, because a graph
@@ -459,7 +515,8 @@ def _same_file(left, right):
 
 
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
-                    sd15=None, lumina=None, ltx25=None, animatediff=None, env=None):
+                    sd15=None, lumina=None, ltx25=None, animatediff=None,
+                    minimax_h3=None, env=None):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
     A missing nondefault choice is a refusal, never a default-weight fallback.
@@ -625,6 +682,24 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
             if lane._ingraph_upscale:
                 add("latent_upscale_models", lane._upscaler_name(),
                     explicit=str(env.get("OTR_LTX25_UPSCALER") or ""))
+    selected_h3 = sorted(engines & _MINIMAX_H3_WEIGHT_ENGINES)
+    if selected_h3:
+        # ASK EACH LANE: `_weight_rows()` is the one table the lane's own
+        # assert_usable, byte floors, session identity and graph read, and
+        # `_token_for` applies the same OTR_MINIMAX_H3_*_NAME override the
+        # loader node is handed. A row's FIRST category is the folder its
+        # loader reads (UNETLoader diffusion_models, CLIPLoader text_encoders,
+        # VAELoader vae). Both lanes load the encoder and the video VAE, and
+        # `add` requests each once.
+        if not minimax_h3:
+            raise VisualAssetError("MiniMax H3 adapter resolution is unavailable")
+        for eid in selected_h3:
+            lane = minimax_h3.get(eid)
+            if lane is None:
+                raise VisualAssetError("MiniMax H3 adapter for %s is unavailable" % eid)
+            for label, categories, default, _floor in lane._weight_rows():
+                add(categories[0], lane._token_for(label, default),
+                    explicit=str(env.get("OTR_MINIMAX_H3_%s_NAME" % label) or ""))
     return requests
 
 
@@ -635,9 +710,30 @@ def _pin_metadata(spec, *, hf_hub_url, get_hf_file_metadata):
     etag, missing size, gated source or changing metadata is a hard refusal.
     No credential is requested/read. The GET uses the pinned Hub URL so a CDN
     URL obtained before other large transfers cannot expire in our queue.
+
+    A spec from ``_PINNED_SOURCES`` carries its own ``revision``, ``size`` and
+    ``sha256``: HEAD is never asked, one metadata call is made at that
+    revision, and anything but the recorded commit, size and LFS SHA-256 is a
+    refusal -- never a fall back to another revision.
     """
     if spec not in MANIFEST.values():
         raise VisualAssetError("visual weight source is not allowlisted")
+    revision = spec.get("revision")
+    if revision:
+        pinned_url = hf_hub_url(spec["repo_id"], spec["filename"], revision=revision,
+                                endpoint="https://huggingface.co")
+        pinned = get_hf_file_metadata(pinned_url, token=False, timeout=30)
+        size = getattr(pinned, "size", None)
+        if (str(getattr(pinned, "commit_hash", None) or "").lower() != revision.lower()
+                or str(getattr(pinned, "etag", None) or "").lower() != spec["sha256"].lower()
+                or type(size) is not int or size != spec["size"]):
+            raise VisualAssetError(
+                "visual weight source no longer serves the pinned revision %s of %s/%s "
+                "(expected %d bytes, sha256 %s); no fallback to another revision"
+                % (revision, spec["repo_id"], spec["filename"], spec["size"],
+                   spec["sha256"]))
+        return {"commit": revision.lower(), "sha256": spec["sha256"].lower(),
+                "size": spec["size"], "url": pinned_url}
     url = hf_hub_url(spec["repo_id"], spec["filename"], endpoint="https://huggingface.co")
     first = get_hf_file_metadata(url, token=False, timeout=30)
     commit = first.commit_hash
@@ -876,7 +972,8 @@ def _load_adapters(engines):
     """The adapter objects :func:`native_requests` asks, loaded for exactly
     ``engines`` -- no adapter module is imported for a lane nobody selected."""
     adapters = dict.fromkeys(
-        ("zimage", "ltx", "sa3", "sd15", "lumina", "ltx25", "animatediff"))
+        ("zimage", "ltx", "sa3", "sd15", "lumina", "ltx25", "animatediff",
+         "minimax_h3"))
     if "z_image_turbo" in engines:
         from ._otr_image_engines import z_image_turbo
         adapters["zimage"] = z_image_turbo
@@ -893,7 +990,8 @@ def _load_adapters(engines):
         from ._otr_image_engines import lumina_image
         adapters["lumina"] = lumina_image
     for key, family in (("animatediff", _ANIMATEDIFF_WEIGHT_ENGINES),
-                        ("ltx25", _LTX25_WEIGHT_ENGINES)):
+                        ("ltx25", _LTX25_WEIGHT_ENGINES),
+                        ("minimax_h3", _MINIMAX_H3_WEIGHT_ENGINES)):
         if engines & family:
             from . import _otr_video_engines  # noqa: F401 -- registers built-ins
             from ._otr_video_engines import registry as _vreg
@@ -1055,7 +1153,72 @@ def _refuse_missing_node_packs(engines):
                             % (hint, name, ", ".join(absent)))
     if problems:
         raise VisualAssetError(
-            "%s. Nothing was downloaded or rendered; fix this and press Queue "
+            "%s. Nothing was downloaded or rendered; fix this and press Run "
+            "again." % "; ".join(problems))
+
+
+def _refuse_unmet_boot_contracts(engines, state=None):
+    """Refuse at QUEUE time a video engine this server was not BOOTED for --
+    before any weight download, writer pass or render.
+
+    THE SECOND HALF OF THE SAME LESSON (PBUG-20260925-02, and the 2026-09-25
+    rule: a check the render asks that is knowable at t=0 is asked at t=0).
+    An engine that declares boot contracts WITHOUT ``default`` -- MiniMax H3
+    today: ``--reserve-vram 12 --disable-pinned-memory`` and no SageAttention
+    -- cannot run on a stock boot, and its own ``assert_usable`` says so only
+    at the first video beat. Once its weights auto-download (2026-09-26) that
+    would be ~39 GB fetched, a script written and every voice rendered before
+    the refusal.
+
+    ONE SOURCE OF TRUTH: the same ``boot_contracts`` checks the adapter's
+    render-time ``_assert_boot_contract`` runs. A production policy carries no
+    ``launch``, so -- as at render time -- the boot is matched against the
+    engine's OWN compatible contracts: met if any one of them is satisfied,
+    otherwise refused naming the engine's FIRST declared contract, whose argv
+    is the fix. An engine that runs on ``default`` passes untouched, and an
+    unreadable boot state (no ComfyUI -- tests, CLI) skips this gate: the
+    render-time check still stands behind it.
+    """
+    try:
+        try:
+            from ._otr_video_engines import registry as _vreg
+            from ._otr_shared import boot_contracts as _bc
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_video_engines import registry as _vreg  # type: ignore
+            from _otr_shared import boot_contracts as _bc  # type: ignore
+    except ImportError as exc:
+        log.warning("[OTR.assets] boot-contract check skipped (no engine registry): %s", exc)
+        return
+    state = _bc.running_server_boot_state() if state is None else dict(state)
+    if not state.get("available"):
+        log.warning("[OTR.assets] boot-contract check skipped: %s",
+                    state.get("error") or "boot state unavailable")
+        return
+    problems = []
+    for name in sorted(engines):
+        try:
+            eng = _vreg.get_engine(name)
+            eng = eng() if isinstance(eng, type) else eng
+            allowed = tuple(_bc.compatible_contracts_for_engine(eng))
+        except Exception:  # noqa: BLE001 -- an unregistered id is the registry's refusal
+            continue
+        if not allowed or _bc.DEFAULT in allowed:
+            continue
+        # Met when ANY contract the engine allows is satisfied by this boot --
+        # the render-time identification among the engine's own candidates.
+        if any(not _bc.check_running_server(c, state=state) for c in allowed):
+            continue
+        contract = allowed[0]
+        unmet = _bc.check_running_server(contract, state=state)
+        if unmet:
+            argv = " ".join(_bc.launch_args_for(contract))
+            problems.append(
+                "Restart ComfyUI with %s -- the video engine '%s' needs its %r "
+                "boot, and this server was not started that way: %s"
+                % (argv or "the settings below", name, contract, "; ".join(unmet)))
+    if problems:
+        raise VisualAssetError(
+            "%s. Nothing was downloaded or rendered; fix this and press Run "
             "again." % "; ".join(problems))
 
 
@@ -1079,9 +1242,10 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                        role_video_slots=role_video_slots)
     for note in plan["skipped"]:
         log.warning("[OTR.assets] %s", note)
-    # The node-pack check comes FIRST: a graph that cannot run must not cost
-    # a download (PBUG-20260925-02).
+    # The node-pack and boot checks come FIRST: a graph that cannot run must
+    # not cost a download (PBUG-20260925-02).
     _refuse_missing_node_packs(plan["engines"])
+    _refuse_unmet_boot_contracts(plan["engines"])
     engines = plan["engines"] & _COVERED
     if not engines:
         return {"status": "not-covered", "notes": plan["skipped"], "receipts": []}

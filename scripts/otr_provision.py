@@ -106,23 +106,6 @@ MANUAL_DOWNLOADS = {
     ],
 }
 
-OPERATOR_ONLY_DOWNLOADS = {
-    "h3_operator_only": (
-        "H3 is operator-local/offline and is never auto-selected by public "
-        "provisioning. After reviewing the H3 operating contract, fetch the "
-        "complete pinned lane explicitly with: python "
-        "scripts/otr_fetch_lane_weights.py minimax_h3"
-    ),
-}
-
-# Operator-only means "never selected or downloaded automatically", not
-# "permanently unverifiable". The exact artifacts stay owned by the fetcher;
-# this map lets the provisioner verify a completed explicit fetch without
-# copying its manifest or weakening the opt-in boundary.
-OPERATOR_ONLY_FETCH_LANES = {
-    "h3_operator_only": "minimax_h3",
-}
-
 #: Every step appends here; the receipt is printed from it at the end.
 _LOG: list = []
 
@@ -465,58 +448,8 @@ def _load_fetcher_manifest():
     return module
 
 
-def _verify_operator_fetch_download(root: str, download_id: str) -> bool:
-    """Verify a lane that only the operator may explicitly fetch.
-
-    The fetcher remains the sole artifact authority. This path never downloads
-    anything; it only proves that the exact receipt-bearing final files exist.
-    """
-    lane = OPERATOR_ONLY_FETCH_LANES[download_id]
-    fetcher = _load_fetcher_manifest()
-    entries = fetcher.LANES.get(lane)
-    if not entries:
-        raise ProvisionFailure(
-            "operator download %r maps to missing fetch lane %r" % (download_id, lane))
-
-    complete = True
-    for entry in entries:
-        artifact = fetcher.weight_spec(entry)
-        if artifact.expected_bytes is None or not artifact.expected_sha256:
-            raise ProvisionFailure(
-                "operator lane %r has an unpinned artifact %r" %
-                (lane, artifact.path_in_repo))
-        path = fetcher.destination_path(root, artifact)
-        label = "%s: %s" % (download_id, os.path.basename(path))
-        if not os.path.isfile(path):
-            part_note = " (.part exists but is not a completed file)" \
-                if os.path.isfile(path + ".part") else ""
-            say("MISSING", label, artifact.destination + part_note + "; " +
-                OPERATOR_ONLY_DOWNLOADS[download_id])
-            complete = False
-            continue
-        actual_size = os.path.getsize(path)
-        if actual_size != artifact.expected_bytes:
-            say("MISSING", label, "wrong bytes %d != %d" %
-                (actual_size, artifact.expected_bytes))
-            complete = False
-            continue
-        actual_sha = _sha256_file(path)
-        if actual_sha.lower() != artifact.expected_sha256.lower():
-            say("MISSING", label, "SHA-256 %s != %s" %
-                (actual_sha, artifact.expected_sha256))
-            complete = False
-            continue
-        say("PRESENT", label, "%d bytes, SHA-256 verified" % actual_size)
-    return complete
-
-
 def verify_manual_download(root: str, download_id: str) -> bool:
     """Verify every final manual artifact; `.part` files never count."""
-    if download_id in OPERATOR_ONLY_FETCH_LANES:
-        return _verify_operator_fetch_download(root, download_id)
-    if download_id in OPERATOR_ONLY_DOWNLOADS:
-        say("MISSING", "manual download: %s" % download_id, OPERATOR_ONLY_DOWNLOADS[download_id])
-        return False
     artifacts = MANUAL_DOWNLOADS.get(download_id)
     if artifacts is None:
         raise ProvisionFailure("unknown manual download %r" % download_id)
@@ -1246,7 +1179,13 @@ _LTX25_NATIVE_LANES = {
 }
 _HUMO14_ENGINES = {"humo", "humo_14B_169"}
 _HUMO17_ENGINES = {"humo_1.7B", "humo_1.7B_169"}
-_H3_ENGINES = {"minimax_h3_video", "minimax_h3_audio_in", "minimax_h3_music"}
+#: MiniMax H3 engine -> the fetcher lane holding the exact files it loads.
+#: Automatic, like LTX 2.5: Comfy-Org/MiniMax-H3 is public and ungated, and the
+#: canonical graph fetches the same pinned files itself at queue time.
+_H3_LANES = {
+    "minimax_h3_video": "minimax_h3_video",
+    "minimax_h3_audio_in": "minimax_h3_audio_in",
+}
 _ANIMATEDIFF_ENGINES = {
     "animatediff15_v3_haunted_video",
     # The still-in LAB PEER (2026-09-02) mints its own plate in-graph and
@@ -1447,8 +1386,8 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
     """
     engine = _PUBLIC_VIDEO_IDS.get(engine, engine) if kind == "video" else engine
     if kind == "video":
-        if engine in _H3_ENGINES:
-            return Lane("h3_operator_only", True)
+        if engine in _H3_LANES:
+            return Lane(_H3_LANES[engine], False)
         if engine in _HUMO14_ENGINES:
             return Lane("humo", False)
         if engine in _HUMO17_ENGINES:
@@ -1678,9 +1617,6 @@ def main(argv=None) -> int:
             issue = profile_python_issue(profile)
             print("  Python       : %s" % (issue or "compatible"))
             for download_id in routes["manual"]:
-                if download_id in OPERATOR_ONLY_DOWNLOADS:
-                    print("\n  %s: %s" % (download_id, OPERATOR_ONLY_DOWNLOADS[download_id]))
-                    continue
                 artifacts = MANUAL_DOWNLOADS[download_id]
                 print("\n  %s (%d bytes total):" %
                       (download_id, sum(item["bytes"] for item in artifacts)))

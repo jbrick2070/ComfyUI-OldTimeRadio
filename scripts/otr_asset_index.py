@@ -53,7 +53,6 @@ _GATED_RE = re.compile(r'requires_hf_token\s*=\s*True|HF_TOKEN')
 #: none. Cloud and procedural lanes genuinely need nothing; anything else with
 #: an empty list is a GAP in what the code declares, and must say so.
 _NO_ASSET_PREFIXES = ("cloud_", "google_", "viz_", "visualizer")
-_OPERATOR_ONLY_FETCH_LANES = {"minimax_h3"}
 
 
 def _public_engine_resolver():
@@ -262,11 +261,8 @@ def render() -> str:
           "no account and no manual step:\n")
         A("```\n" + "\n".join(
             "python scripts/otr_fetch_lane_weights.py %s" % k
-            for k in sorted(set(fetchable) - _OPERATOR_ONLY_FETCH_LANES))
+            for k in sorted(fetchable))
           + "\n```\n")
-    A("The complete H3 manifest is deliberately explicit and operator-local; "
-      "it is never selected by a public profile or machine bundle:\n\n"
-      "```\npython scripts/otr_fetch_lane_weights.py minimax_h3\n```\n")
     A("Anything not listed there is a manual install -- see its row below.\n")
 
     # IMAGE IS LISTED LAST AND IS NOT OPTIONAL (2026-09-12). Every shipped
@@ -304,7 +300,11 @@ def render() -> str:
             elif row["engine"].startswith("humo"):
                 how = "[exact manual download](RUNPOD_INSTALL.md)"
             elif row["engine"] == "minimax_h3":
-                how = "explicit operator-local `otr_fetch_lane_weights.py minimax_h3`"
+                # One module, two DiTs: each lane has its own complete fetch
+                # lane, and the canonical graph fetches the selected lane's
+                # pinned files itself at queue time.
+                how = ("auto at queue time; or `otr_fetch_lane_weights.py "
+                       "minimax_h3_video` / `minimax_h3_audio_in`")
             elif row["engine"] == "ltx25":
                 # One module, three DiTs: each card class has its own complete
                 # lane, and the canonical graph fetches the selected lane's

@@ -58,6 +58,9 @@ STANDALONE_LOADED = {
         "prestartup_script.py (which inserts nodes/ itself, so boot was safe)",
     "nodes/otr_post_upscale_procgen_blend.py":
         "its own documented FLAT load by ComfyUI's custom-node loader",
+    "nodes/_otr_visual_assets.py":
+        "scripts/otr_fetch_lane_weights.py::_queue_time_pinned_specs (the H3 "
+        "lanes) + scripts/otr_dropdown_matrix.py::graph_fetched_engines",
 }
 
 _PROBE = textwrap.dedent(

@@ -297,9 +297,7 @@ def load_profiles() -> list:
             install_recipe = "missing exact owner"
         else:
             manual = set(routes.get("manual") or [])
-            if "h3_operator_only" in manual:
-                install_recipe = "operator-only files"
-            elif manual:
+            if manual:
                 install_recipe = "complete; manual download"
             else:
                 install_recipe = "complete"

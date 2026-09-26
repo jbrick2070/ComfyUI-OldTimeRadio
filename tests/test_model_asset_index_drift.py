@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
+import re
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -38,21 +39,34 @@ def test_bundle_and_unresolved_names_never_become_fake_commands():
     fetcher = _load("scripts/otr_fetch_lane_weights.py", "_otr_fetcher_commands_test")
     rendered = index.render()
 
+    def names_a_command(name):
+        # A whole lane name, not a prefix: the `minimax_h3` bundle must not
+        # match the real `minimax_h3_video` lane's command.
+        return re.search(r"python scripts/otr_fetch_lane_weights\.py %s(?!\w)"
+                         % re.escape(name), rendered) is not None
+
     for name in fetcher.BUNDLES:
         if name not in fetcher.LANES:
-            assert "python scripts/otr_fetch_lane_weights.py %s" % name not in rendered
+            assert not names_a_command(name), name
     for name in getattr(fetcher, "UNRESOLVED", {}):
-        assert "python scripts/otr_fetch_lane_weights.py %s" % name not in rendered
+        assert not names_a_command(name), name
 
 
-def test_h3_command_is_segregated_as_explicit_operator_local():
+def test_h3_row_says_auto_at_queue_time_and_names_both_lanes():
+    """H3 downloads its own weights at queue time (operator 2026-09-25), so
+    its row reads like LTX 2.5's and its two per-DiT lanes are public
+    commands like every other lane."""
     index = _load("scripts/otr_asset_index.py", "_otr_asset_index_h3_test")
     rendered = index.render()
 
-    assert "The complete H3 manifest is deliberately explicit and operator-local" in rendered
-    assert "python scripts/otr_fetch_lane_weights.py minimax_h3" in rendered
-    public_block = rendered.split("The complete H3 manifest", 1)[0]
-    assert "python scripts/otr_fetch_lane_weights.py minimax_h3" not in public_block
+    row = next(line for line in rendered.splitlines()
+               if line.startswith("| `minimax_h3` |"))
+    assert "auto at queue time" in row
+    assert "`otr_fetch_lane_weights.py minimax_h3_video`" in row
+    assert "`minimax_h3_audio_in`" in row
+    for lane in ("minimax_h3_video", "minimax_h3_audio_in"):
+        assert "python scripts/otr_fetch_lane_weights.py %s\n" % lane in rendered
+    assert "operator-local" not in rendered
 
 
 def test_profile_usage_counts_resolve_public_video_ids_to_internal_owners():

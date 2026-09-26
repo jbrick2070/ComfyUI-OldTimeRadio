@@ -877,7 +877,7 @@ def _variant_for(profile_id: str) -> str:
 def manual_artifacts(lane: str, provision, fetcher) -> list:
     """Every artifact a manual lane needs, from whichever manifest owns it.
 
-    THREE MANIFESTS, NOT ONE, and reading only the first is what made the
+    TWO MANIFESTS, NOT ONE, and reading only the first is what made the
     first cut of section 3 silently omit six of nine manual lanes:
 
     * ``MANUAL_DOWNLOADS`` in the provisioner -- dicts, receipts complete.
@@ -885,10 +885,6 @@ def manual_artifacts(lane: str, provision, fetcher) -> list:
       that predate receipts, which are still bare 3-tuples of
       ``(repo, path_in_repo, destination)``. Both shapes are read; a legacy
       tuple simply has no size to report.
-    * The OPERATOR-ONLY ALIAS: ``h3_operator_only`` is the provisioner's name
-      for artifacts the fetcher keeps under ``minimax_h3``. The mapping is
-      declared in ``OPERATOR_ONLY_FETCH_LANES`` and is read from there, so a
-      future alias needs no change here.
 
     Returns ``[]`` when no manifest owns the lane -- the caller must SAY so
     rather than print nothing.
@@ -896,9 +892,8 @@ def manual_artifacts(lane: str, provision, fetcher) -> list:
     downloads = getattr(provision, "MANUAL_DOWNLOADS", {})
     if lane in downloads:
         return [dict(spec) for spec in downloads[lane]]
-    alias = getattr(provision, "OPERATOR_ONLY_FETCH_LANES", {}).get(lane, lane)
     out = []
-    for spec in getattr(fetcher, "LANES", {}).get(alias, []) or []:
+    for spec in getattr(fetcher, "LANES", {}).get(lane, []) or []:
         if hasattr(spec, "repo"):                 # a WeightSpec
             out.append({"repo": spec.repo, "path": spec.path_in_repo,
                         "destination": spec.destination,
