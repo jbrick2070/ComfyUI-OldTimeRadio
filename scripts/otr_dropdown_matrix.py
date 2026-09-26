@@ -1264,7 +1264,7 @@ def inject_readme(block: str, write: bool) -> bool:
     if fresh == text:
         return True
     if write:
-        io.open(_README, "w", encoding="utf-8").write(fresh)
+        io.open(_README, "w", encoding="utf-8", newline="\n").write(fresh)
     return False
 
 
@@ -1303,9 +1303,11 @@ def main(argv=None) -> int:
         print("dropdown matrix is in sync (%d engines)" % len(rows))
         return 0
 
-    io.open(_DOC, "w", encoding="utf-8").write(doc)
+    # LF on every platform: Windows text mode would write CRLF, which reads
+    # as a modified file after every regeneration (the repo is LF).
+    io.open(_DOC, "w", encoding="utf-8", newline="\n").write(doc)
     os.makedirs(os.path.dirname(_APPLE), exist_ok=True)
-    io.open(_APPLE, "w", encoding="utf-8").write(apple)
+    io.open(_APPLE, "w", encoding="utf-8", newline="\n").write(apple)
     inject_readme(block, write=True)
     print("wrote %s (%d bytes) and %s (%d bytes), README carries no copy; "
           "%d engines" % (os.path.relpath(_DOC, _REPO), len(doc),
