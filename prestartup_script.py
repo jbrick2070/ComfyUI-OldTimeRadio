@@ -209,17 +209,22 @@ except Exception as _otr_exc:  # noqa: BLE001 -- a voice is never worth a boot
 # model_management is first imported, which is AFTER custom-node prestartup
 # scripts run, so this is the last moment a node pack can influence it.
 #
-# Scoped to MPS. On CUDA/CPU the block does nothing at all, so nothing about the
-# 5080's behaviour or its byte-identical goldens changes. An operator who passes
-# --use-split-cross-attention or --use-quad-cross-attention explicitly is
-# respected and not overridden.
+# Scoped to macOS, and asked WITHOUT IMPORTING TORCH (2026-09-26). This block
+# used to `import torch` on every platform just to ask whether MPS exists, and
+# ComfyUI prints "Torch already imported, torch should never be imported before
+# this point" whenever a prestartup script does that -- seen on every NVIDIA
+# boot. The platform answers the question: the sub-quadratic default is wrong
+# only on Metal, and on a Mac without a Metal device (CPU mode) PyTorch
+# attention is correct as well (the CPU row above: music with any attention),
+# so forcing it on darwin costs nothing there. Windows and Linux never enter the
+# block, so nothing about the 5080's behaviour or its byte-identical goldens
+# changes. An operator who passes --use-split-cross-attention or
+# --use-quad-cross-attention explicitly is respected and not overridden.
 class _OTRAttentionOptOut(Exception):
     """Internal: the operator opted out via OTR_MPS_PYTORCH_ATTENTION=0."""
 
 try:
-    import torch as _otr_torch
-
-    if _otr_torch.backends.mps.is_available():
+    if sys.platform == "darwin":
         from comfy.cli_args import args as _otr_comfy_args
 
         # Escape hatch, and it exists so this fix stays FALSIFIABLE: setting
@@ -243,7 +248,7 @@ try:
         elif not getattr(_otr_comfy_args, "use_pytorch_cross_attention", False):
             _otr_comfy_args.use_pytorch_cross_attention = True
             logging.getLogger("OTR").info(
-                "[OldTimeRadio] mps detected: forcing PyTorch (SDPA) attention. "
+                "[OldTimeRadio] macOS: forcing PyTorch (SDPA) attention. "
                 "ComfyUI's sub-quadratic default produces structurally wrong "
                 "output on Metal -- measured on Stable Audio 3, spectral flatness "
                 "0.43 (noise) vs 0.16 (music) with every other input identical.")
