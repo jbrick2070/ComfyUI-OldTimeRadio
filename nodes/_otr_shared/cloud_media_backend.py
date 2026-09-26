@@ -612,9 +612,10 @@ class CloudMediaSession:
     def ledger_path(self) -> Path:
         """The cloud-media billing ledger -- an append-only record of real money.
 
-        MOVED OUT OF THE PACK DIRECTORY 2026-09-11. It used to live under
-        ``cache_root``, which resolves to ``<repo>/otr/cache/cloud_media`` --
-        INSIDE the installed pack. A registry update or a reinstall wipes that
+        MOVED OUT OF THE PACK DIRECTORY 2026-09-11. It used to live under the
+        old default ``cache_root`` inside the installed pack; ``cache_root``
+        now defaults to ``otr_shared_cache_dir()/cloud_media`` under the output
+        tree (see :func:`resolve_cache_root`). A registry update or reinstall
         tree, and this file is the ONLY copy of that spend history anywhere on
         disk (verified: nothing reads it back, so nothing could rebuild it).
 

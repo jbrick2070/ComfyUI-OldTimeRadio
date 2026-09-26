@@ -686,15 +686,23 @@ def legacy_pack_runtime_log_path() -> Path:
     return Path(__file__).resolve().parents[1] / "otr_runtime.log"
 
 
-def otr_runtime_log_read_path() -> Path:
-    """Path telemetry readers should open: primary when present, else legacy."""
+def otr_runtime_log_read_paths() -> list[Path]:
+    """Paths telemetry readers should scan: legacy pack log (if any) then primary.
+
+    Writers only append to :func:`otr_runtime_log_path`; the legacy file is
+    read-only, like the writer-LLM hub-cache precedent -- never migrated."""
     primary = otr_runtime_log_path()
-    if primary.is_file():
-        return primary
     legacy = legacy_pack_runtime_log_path()
+    paths: list[Path] = []
     if legacy.is_file():
-        return legacy
-    return primary
+        paths.append(legacy)
+    paths.append(primary)
+    return paths
+
+
+def otr_runtime_log_read_path() -> Path:
+    """Single-path helper: the primary write target (may not exist yet)."""
+    return otr_runtime_log_path()
 
 
 def otr_sidecar_stderr_path(basename: str) -> Path:
@@ -869,6 +877,7 @@ __all__ = [
     "otr_runtime_log_path",
     "legacy_pack_runtime_log_path",
     "otr_runtime_log_read_path",
+    "otr_runtime_log_read_paths",
     "otr_sidecar_stderr_path",
     # director_raw_dump_dir entry removed in voice-path-cleanbreak S23.1
     "comfyui_log_path",

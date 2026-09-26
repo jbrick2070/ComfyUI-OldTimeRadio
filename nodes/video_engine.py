@@ -1603,29 +1603,32 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
 
 def _get_latest_telemetry():
     """Parse the otr_runtime.log for the most recent VRAM and Speed stats."""
-    from ._otr_paths import otr_runtime_log_read_path
-    log_path = str(otr_runtime_log_read_path())
-    
+    from ._otr_paths import otr_runtime_log_read_paths
+
     # Defaults
     peak_gb = "???"
     speed = "???"
     model = "UNKNOWN CORE"
-    
-    if not os.path.exists(log_path):
+
+    log_paths = [str(p) for p in otr_runtime_log_read_paths()]
+    if not any(os.path.exists(p) for p in log_paths):
         return peak_gb, speed, model
-        
+
     try:
         import re
         re_vram = re.compile(r"VRAM_SNAPSHOT.*?peak_gb=([0-9.]+)")
         re_speed = re.compile(r"DONE:\s+.*?([0-9.]+)\s+tok/s")
         re_llm = re.compile(r"LLM loaded:\s+([^\s]+)")
-        
-        # Read last ~200 lines (enough for one generation cycle)
-        with open(log_path, "r", encoding="utf-8") as f:
-            f.seek(0, 2)
-            end_pos = f.tell()
-            f.seek(max(0, end_pos - 15000))
-            lines = f.readlines()
+
+        lines = []
+        for log_path in log_paths:
+            if not os.path.exists(log_path):
+                continue
+            with open(log_path, "r", encoding="utf-8") as f:
+                f.seek(0, 2)
+                end_pos = f.tell()
+                f.seek(max(0, end_pos - 15000))
+                lines.extend(f.readlines())
             
         for line in lines:
             m_vram = re_vram.search(line)

@@ -24,12 +24,31 @@ import re
 import sys
 import urllib.request
 
+def _otr_phase_logs():
+    """Resolve OTR runtime log paths via the same helper the nodes use."""
+    try:
+        import os
+        import sys
+
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if repo not in sys.path:
+            sys.path.insert(0, repo)
+        from nodes._otr_paths import otr_runtime_log_read_paths
+
+        return [
+            (str(p), "OTR phase log (%s)" % p.name) for p in otr_runtime_log_read_paths()
+        ]
+    except Exception:
+        return [
+            (r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\otr_runtime.log",
+             "OTR phase log (legacy fallback)"),
+        ]
+
+
 LOGS = [
     (r"C:\Users\jeffr\AppData\Roaming\ComfyUI\logs\comfyui.log",
      "ComfyUI console (s/it, VRAM, FFmpeg)"),
-    (r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\otr_runtime.log",
-     "OTR phase log"),
-]
+] + _otr_phase_logs()
 API = "http://127.0.0.1:8000"
 
 # Signals worth surfacing from a wider window than the raw tail.
