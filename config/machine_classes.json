@@ -216,10 +216,10 @@
       "video": "animatediff15_v3_haunted_video",
       "image": "z_image_turbo",
       "char_voice": "kokoro",
-      "writer": "gemma-4-E2B",
-      "writer_model": "google/gemma-4-E2B-it",
+      "writer": "Qwen3.5-4B",
+      "writer_model": "Qwen/Qwen3.5-4B",
       "writer_ceiling_gb": 10.0,
-      "quant_policy": "none",
+      "quant_policy": "bnb_nf4",
       "status": "draft",
       "note": "UNTESTED. Sized between the two proven bands rather than absorbed into 16 GB+, which would hand a 12 GB card a 14.5 GB writer ceiling. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package."
     },
