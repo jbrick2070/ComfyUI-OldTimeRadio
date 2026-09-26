@@ -225,9 +225,13 @@ should now route character beats to the audio-in lane too.
   `otr_24gb_native_foley.json`. Plain rename: no alias, no "renamed to"
   message, no back-compat of any kind (operator: "don't worry about back
   compat"). Shortcodes, tests, docs, preflight tables and the matrix follow.
-- Open: keep or remove the four engines no workflow selects
+- DECIDED (operator 2026-09-25: "let's try keeping the engines if they
+  work, and we can test them"): KEEP the four engines no workflow selects
   (`ltx25_native_foley_blackwell`, `ltx25_native_mime_24gb`,
-  `ltx25_native_audio_in_24gb`, `minimax_h3_audio_in`).
+  `ltx25_native_audio_in_24gb`, `minimax_h3_audio_in`) and PROVE each one:
+  a 1-act leg per engine, hand-picked on the canonical, on hardware that
+  fits it (the 24gb tiers need the 24 GB pod). One that fails is fixed or
+  removed in the commit that says which.
 - Generated docs should show a music column if they do not already.
 
 ### 0c. Portability fixes (Composer audit 2026-09-25, each claim grounded)
@@ -378,7 +382,17 @@ order:
    OTR_STANDING_RULINGS 2026-09-25: `workflows/` stays).
 5. Maybe: a GitHub Actions job running the CPU suite on push/PR (torch
    makes it heavy).
-6. Small: `Banner` in `[tool.comfy]`.
+6. `Banner` in `[tool.comfy]`: the ART IS IN THE REPO (operator's own,
+   2026-09-25): `assets/otr_banner.jpg`, a 21:9 crop (the registry spec)
+   of `assets/otr_banner_master.webp`. Add
+   `Banner = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_banner.jpg"`
+   in the SAME commit as the next version bump -- editing pyproject.toml
+   auto-publishes, so it never goes in on its own. Served live from `main`
+   like the Icon. The Icon stays the animated GIF (his call), though the
+   spec asks for square and at most 400x400; it has been accepted as is.
+   GitHub social preview: `assets/github-social-preview.jpg` is refreshed
+   to the same art at 2:1 (1280x640); GitHub has no API for it, so HE
+   uploads it in Settings -> General -> Social preview.
 Parked, large: loading models through `comfy.model_management` so ComfyUI
 can evict them for other packs (touches every model load; multi-box proof),
 and the V3 `comfy_api` node schema (24 classes, workflow-adjacent).
