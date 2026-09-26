@@ -12,12 +12,40 @@ this file does not restate them, and does not restate the review or push rules.
 **For what already happened -- commits, measurements, receipts -- read
 [HANDOFF_LOG](HANDOFF_LOG.md), newest entry first.**
 
-## Live box -- 5080 (2026-09-25, afternoon)
+## Live box -- 5080 (2026-09-25, night)
 
 ComfyUI is resident on port 8000 (`scripts/_otr_soak_server_launch.cmd`).
 Before any headless run, check `/queue`: if a prompt is running, it is someone's
 leg -- do not reset. When the queue is empty, reset per CLAUDE.md section 4. The
 tree stays clean: no unpushed patches.
+
+## The finish line -- three sprints (operator asked 2026-09-25 night)
+
+Estimate, not a promise; anything a live leg breaks adds work. Each sprint's
+detail is its row below.
+
+1. **TONIGHT (2026-09-25 night, the 5080 window driving, the 4060 by SSH).**
+   0e app mode, BOTH shapes (operator: "Both"): story-only on every
+   per-machine card, plus ONE advanced app with the pickers in his order --
+   design check first (it is canonical-adjacent), then build, suite, push;
+   he opens it from the gallery in the morning. Finish the live legs: the
+   5080's `otr_8gb_ltx25_audio_in` 1-act; TEST_WAVE Part B on the 4060 at
+   commit `1585d38a` (B3a PASSED; B3, B4, B1, B7, then B5/B6). Pull and
+   test the Cursor portability commits (`a70d22b4` `3e1fd8be` `ed4cd47b`,
+   Sonnet review running); fix what it finds. Receipts to HANDOFF_LOG.
+2. **NEXT CODING SPRINT.** 0k (the V3 credential node -- the largest item
+   left, a canonical-workflow change with a design round first); the 0d
+   visual items (palette, Story Writer collapsed, the Start-here note);
+   0c item 5 (Kokoro under a registered `TTS` model folder). Optional,
+   only if wanted: progress bars for `google_image` / `google_lyria`
+   (0f item 2 note).
+3. **TEST AND RELEASE SPRINT.** TEST_WAVE Part C (the Bug Bible regression);
+   any owed legs left over; the progress bar and the gallery category label
+   seen live in the app; 2.3.7 to the registry ON HIS WORD ONLY (0f item 6's
+   Banner line rides that bump).
+
+NOT COUNTED, needs his yes to spend: the RunPod proofs of
+`ltx25_foley_blackwell`, `ltx25_mime_24gb` and `ltx25_audio_in_24gb`.
 
 ## Operating order (hard)
 
