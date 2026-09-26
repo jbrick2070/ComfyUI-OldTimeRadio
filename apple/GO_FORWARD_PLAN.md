@@ -36,7 +36,12 @@ detail is its row below.
 2. **NEXT CODING SPRINT.** 0k (the V3 credential node -- the largest item
    left, a canonical-workflow change with a design round first); the 0d
    visual items (palette, Story Writer collapsed, the Start-here note);
-   0c item 5 (Kokoro under a registered `TTS` model folder). Optional,
+   0c item 5 (Kokoro under a registered `TTS` model folder); and the B4
+   RAM finding: `ltx_8gb` reloads its 9 GB T5 (`t5xxl_fp16`, pinned to the
+   CPU) into system RAM for EVERY clip segment -- free RAM saw-toothed
+   between ~0.4 and ~20 GB on the 32 GB 4060 (2026-09-26); a 16 GB-RAM box
+   would page. Keep the encoder (or its conditioning) resident across an
+   episode's segments -- a residency fix, never a recipe change. Optional,
    only if wanted: progress bars for `google_image` / `google_lyria`
    (0f item 2 note).
 3. **TEST AND RELEASE SPRINT.** TEST_WAVE Part C (the Bug Bible regression);
