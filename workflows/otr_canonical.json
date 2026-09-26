@@ -92,7 +92,8 @@
       ],
       "properties": {
         "Node name for S&R": "OTR_WorkflowValidator",
-        "cnr_id": "comfyui-old-time-radio"
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         "",
@@ -519,7 +520,9 @@
       ],
       "title": "1 - Story Writer",
       "properties": {
-        "Node name for S&R": "OTR_LedgerScriptWriter"
+        "Node name for S&R": "OTR_LedgerScriptWriter",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         "roll (any eligible bank)",
@@ -660,7 +663,9 @@
       ],
       "title": "5 - Scene Sequencer",
       "properties": {
-        "Node name for S&R": "OTR_SceneSequencer"
+        "Node name for S&R": "OTR_SceneSequencer",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         "[]",
@@ -767,7 +772,9 @@
       ],
       "title": "6 - Audio Enhance",
       "properties": {
-        "Node name for S&R": "OTR_AudioEnhance"
+        "Node name for S&R": "OTR_AudioEnhance",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         48000,
@@ -915,7 +922,9 @@
       ],
       "title": "7 - Audio Master",
       "properties": {
-        "Node name for S&R": "OTR_EpisodeAssembler"
+        "Node name for S&R": "OTR_EpisodeAssembler",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         10,
@@ -1018,7 +1027,9 @@
       ],
       "title": "8 - CRT Base Video",
       "properties": {
-        "Node name for S&R": "OTR_SignalLostVideo"
+        "Node name for S&R": "OTR_SignalLostVideo",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         "[]",
@@ -1164,7 +1175,9 @@
       ],
       "title": "2 - Ledger Freeze",
       "properties": {
-        "Node name for S&R": "OTR_LedgerFreezeCascade"
+        "Node name for S&R": "OTR_LedgerFreezeCascade",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         true,
@@ -1289,7 +1302,9 @@
       ],
       "title": "3 - Cast Lock",
       "properties": {
-        "Node name for S&R": "OTR_CastLock"
+        "Node name for S&R": "OTR_CastLock",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         "auto_registry",
@@ -1366,7 +1381,9 @@
       ],
       "title": "4a - Character Voices",
       "properties": {
-        "Node name for S&R": "OTR_BatchCharacterVoices"
+        "Node name for S&R": "OTR_BatchCharacterVoices",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [],
       "color": "#173220",
@@ -1437,7 +1454,9 @@
       ],
       "title": "4b - Announcer Voice",
       "properties": {
-        "Node name for S&R": "OTR_AnnouncerVoice"
+        "Node name for S&R": "OTR_AnnouncerVoice",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [],
       "color": "#173220",
@@ -1533,7 +1552,9 @@
       ],
       "title": "4c - Theme Music",
       "properties": {
-        "Node name for S&R": "OTR_StableAudioTheme"
+        "Node name for S&R": "OTR_StableAudioTheme",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         "stable_audio_3",
@@ -1658,7 +1679,9 @@
       ],
       "title": "10 - Silent Composite",
       "properties": {
-        "Node name for S&R": "OTR_SilentComposite"
+        "Node name for S&R": "OTR_SilentComposite",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         1920,
@@ -1777,7 +1800,9 @@
       ],
       "title": "14 - Mux and Publish",
       "properties": {
-        "Node name for S&R": "OTR_MasterAudioMux"
+        "Node name for S&R": "OTR_MasterAudioMux",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         25,
@@ -1892,7 +1917,9 @@
       ],
       "title": "12 - Caption Burn",
       "properties": {
-        "Node name for S&R": "OTR_CaptionBurn"
+        "Node name for S&R": "OTR_CaptionBurn",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         true,
@@ -2064,7 +2091,9 @@
       ],
       "title": "Video Director / Settings",
       "properties": {
-        "Node name for S&R": "OTR_VideoDirector"
+        "Node name for S&R": "OTR_VideoDirector",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         "viz_mxc_cpu (16:9) (audio-reactive, no scene image)",
@@ -2201,7 +2230,9 @@
       ],
       "title": "Image Director / Settings",
       "properties": {
-        "Node name for S&R": "OTR_ImageDirector"
+        "Node name for S&R": "OTR_ImageDirector",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [
         "per_object",
@@ -2272,7 +2303,9 @@
       ],
       "title": "9b - Image Prompts",
       "properties": {
-        "Node name for S&R": "OTR_MetaBriefImagePromptGen"
+        "Node name for S&R": "OTR_MetaBriefImagePromptGen",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [],
       "color": "#102F35",
@@ -2363,7 +2396,9 @@
       ],
       "title": "9a - Shot Lock",
       "properties": {
-        "Node name for S&R": "OTR_ShotLock"
+        "Node name for S&R": "OTR_ShotLock",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [],
       "color": "#102F35",
@@ -2446,7 +2481,9 @@
       ],
       "title": "9c - Image Generator",
       "properties": {
-        "Node name for S&R": "OTR_ImageGenDispatcher"
+        "Node name for S&R": "OTR_ImageGenDispatcher",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [],
       "color": "#102F35",
@@ -2512,7 +2549,9 @@
       ],
       "title": "9d - Video Render",
       "properties": {
-        "Node name for S&R": "OTR_VideoRenderBatch"
+        "Node name for S&R": "OTR_VideoRenderBatch",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [],
       "color": "#102F35",
@@ -2574,7 +2613,9 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "OTR_CreditsRoll"
+        "Node name for S&R": "OTR_CreditsRoll",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
       },
       "widgets_values": [],
       "color": "#382712",
@@ -3136,12 +3177,6 @@
         28.0,
         16.0
       ]
-    },
-    "info": {
-      "name": "Old-Time Radio Sci-Fi Anthology",
-      "author": "Jeffrey Brick",
-      "description": "Full pipeline: LLM scripts + TTS + clean stereo audio + dropdown-routed image/video model selection.",
-      "version": "2.0-alpha"
     }
   },
   "version": 0.4

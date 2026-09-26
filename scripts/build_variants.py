@@ -61,6 +61,68 @@ VARIANTS_DIR = REPO / "workflows"
 #: The retired subfolder. `--check` fails if it reappears with a graph in it.
 RETIRED_VARIANTS_DIR = REPO / "workflows" / "variants"
 GENERATED_BY = "scripts/build_variants.py"
+#: THE PACK'S REGISTRY ID, stamped into every node's `properties.cnr_id`
+#: (0d, 2026-09-25). The frontend's getCnrIdFromNode reads it (falling back
+#: to aux_id) and it is how "Install Missing Nodes" finds this pack; the
+#: official templates carry it on most nodes, ours carried it on one.
+PACK_CNR_ID = "comfyui-old-time-radio"
+PYPROJECT = REPO / "pyproject.toml"
+
+
+def live_pack_version() -> str:
+    """The `[project]` version in pyproject.toml, read at build time.
+
+    Never a hardcoded copy: a copy drifts on the next bump and stamps 25
+    workflows with a version that is no longer the one the registry serves
+    (the DEPENDENCIES.md generator lesson). Fails loud rather than
+    defaulting, for the same reason."""
+    import re
+    text = PYPROJECT.read_text(encoding="utf-8")
+    m = re.search(r"^\[project\]\s*$(.*?)(?=^\[|\Z)", text,
+                  re.MULTILINE | re.DOTALL)
+    if not m:
+        raise RuntimeError(f"{PYPROJECT.name}: no [project] table")
+    v = re.search(r'^version\s*=\s*"([^"]+)"', m.group(1), re.MULTILINE)
+    if not v:
+        raise RuntimeError(f"{PYPROJECT.name}: no version = \"...\" in [project]")
+    return v.group(1)
+
+
+def stamp_pack_identity(workflow: dict, version: str) -> dict:
+    """Set `properties.cnr_id` / `properties.ver` on EVERY node, in place.
+
+    Every node in the canonical is one of this pack's, so every node gets
+    the stamp. Idempotent. `properties` is outside semantic_master_hash by
+    construction, so this never moves a variant's hash."""
+    for node in workflow.get("nodes", []):
+        props = node.setdefault("properties", {})
+        props["cnr_id"] = PACK_CNR_ID
+        props["ver"] = version
+    return workflow
+
+
+def _pack_identity_failures(paths, version: str) -> list[str]:
+    """Every node in every committed workflow carries the live stamp."""
+    out = []
+    for path in paths:
+        try:
+            wf = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            out.append(f"{path.name}: unreadable ({e})")
+            continue
+        bad = []
+        for node in wf.get("nodes", []):
+            props = node.get("properties") or {}
+            if props.get("cnr_id") != PACK_CNR_ID or props.get("ver") != version:
+                bad.append(f"{node.get('id')}:{node.get('type')}")
+        if bad:
+            out.append(
+                f"{path.name}: {len(bad)} node(s) missing cnr_id="
+                f"{PACK_CNR_ID!r} / ver={version!r} ({bad[0]} ...)")
+        if "info" in (wf.get("extra") or {}):
+            out.append(f"{path.name}: extra.info is back (pyproject is the "
+                       "version authority; nothing reads extra.info)")
+    return out
 #: EVERY LAUNCH RECIPE IN ONE GENERATED DOC (2026-09-25). They used to sit
 #: beside each graph as workflows/<variant>.launch.md: 24 near-identical files in
 #: the folder ComfyUI's template gallery reads, which is a folder for loadable
@@ -193,6 +255,7 @@ def build_variant(profile_id: str, *, schemas=None, mapping=None,
 
     applied = apply_profile(canonical, profile, mapping=mapping,
                             schemas=schemas)
+    stamp_pack_identity(applied, live_pack_version())
     master_hash = semantic_master_hash(applied, mapping=mapping,
                                        schemas=schemas)
     variant_rel = f"workflows/{_variant_stem(profile_id)}.json"
@@ -551,6 +614,7 @@ def cmd_check() -> int:
         # The canonical's own gallery thumbnail is checked even with no
         # variants (Sonnet QA on 7cf82cda: this early return skipped it).
         failures.extend(_thumbnail_failures())
+        failures.extend(_pack_identity_failures([CANONICAL], live_pack_version()))
         for f in failures:
             print("CHECK FAIL:", f)
         print("check: no committed variants yet (nothing to diff); "
@@ -601,6 +665,8 @@ def cmd_check() -> int:
         failures.append(f"{LAUNCH_RECIPES.name}: DRIFT vs regeneration "
                         "(generated, never hand-edited)")
     failures.extend(_thumbnail_failures())
+    failures.extend(_pack_identity_failures([CANONICAL] + committed,
+                                            live_pack_version()))
     for f in failures:
         print("CHECK FAIL:", f)
     print(f"check: {len(committed)} variants, {len(failures)} failures")
