@@ -516,10 +516,41 @@ top choice, not a new switch.
 THE SCROLL WORRY (operator: "worried people won't see the other
 dropdowns"): about 26 dropdowns then 7 My Story text fields. My Story
 LAST keeps every dropdown above the fold; the cost is that a My Story user
-must scroll to the bottom, so the `source_bank` tooltip should say "My
-Story: fill in the fields at the bottom of this form." Whether app mode can
-group or collapse inputs is unverified -- check frontend 1.52.7 at design
-time before assuming it can.
+must scroll to the bottom. App mode CANNOT group or collapse inputs
+(verified: frontend 1.52.7 `InputWidgetConfig` is `{height?, description?}`
+on a flat list), so there is no fold to put anything above -- design for
+scroll. The "My Story: fill in the fields at the bottom" hint belongs in
+that app-only `description`, not the node tooltip, which also shows on
+the canvas.
+DECIDE BEFORE ANY CODE (contrarian review 2026-09-25, each claim checked
+against the files):
+- HOST. `apply_profile` deep-copies the whole canonical, `extra` included,
+  so `extra.linearMode: true` on `otr_canonical.json` would open EVERY
+  gallery card as an app (the frontend maps that boolean to its initial
+  mode). Put it on the generated cards only, or on a separate
+  `otr_app.json` -- never on the canonical the operator edits on the canvas.
+- CARD OR FORM (a product call, the operator's). The list above exposes the
+  video, image, voice, music and writer pickers, while the per-machine
+  tuning (quant, VRAM ceiling, canvas, device) stays hidden and tuned for
+  the card's own lane. So an 8 GB user can pick a lane the card cannot run
+  and meet an out-of-memory -- the same outcome as changing that dropdown on
+  the canvas today, but now on the stranger-facing surface. Either the card
+  is the lane (the app shows story choices only) or the form is (pickers
+  shown, and the out-of-memory accepted and said so).
+- THE INPUT LIST IS HAND-ORDERED, NOT GENERATED. `key_indicators` in the
+  matrix omits the six cloud slots and includes the hidden tuning keys, so
+  "generate from the matrix plus extras" both drops what the operator named
+  and adds what should hide. An explicit allow-list in the operator's order;
+  a test can still check that no NEW matrix user-choice key is missing.
+- `source_ref` MUST NOT SIT UNDER A BANK LEFT ON THE ROLL. The shipped
+  default is `roll (any eligible bank)`, and a pinned `source_ref` with the
+  roll is refused by name (`OTR_LedgerScriptWriter.py` ~2206). The frontend
+  has no conditional fields, so either leave `source_ref` out of the app or
+  place it where the pairing is obvious and describe it.
+- UNIQUE WORKFLOW IDS become a dependency. All 25 shipped files carry the
+  same `id` (09a7142b-...), and the frontend treats a same-id load as the
+  same active workflow. 0d rejected unique ids ("no consumer needs it");
+  app mode may be that consumer -- prove or fix before shipping apps.
 THE RULE (operator: "basically almost everything in our workflow matrix"):
 the app shows the matrix's USER-CHOICE deltas -- `features.act_count`,
 `features.num_characters`, the `llm.*_model` and cloud slot picks,
@@ -531,9 +562,10 @@ It HIDES the matrix's machine-tuning deltas (`llm.device`,
 `render.canvas_*`, `seed_policy.*`): the per-machine workflow already set them
 for that card. Generate the app's input list from the matrix plus that
 extras list in `build_variants.py`, so a new matrix knob cannot be missing
-from the app. Output: node 85 (`OTR_MasterAudioMux`) -- the only node in
-the canonical with no outgoing link; an earlier draft here said "node 14",
-which does not exist. Open questions for one design
+from the app. Output: node 85 (`OTR_MasterAudioMux`, titled "14 - Mux and
+Publish", which is where "node 14" came from). It returns STRINGs, and
+whether the app pane plays the episode from it is UNPROVEN -- check live.
+Open questions for one design
 round before code: canonical itself or a separate `otr_app.json`; whether
 the premise/title text belongs; how the per-machine workflows inherit it; whether an older
 frontend ignores the metadata harmlessly.
