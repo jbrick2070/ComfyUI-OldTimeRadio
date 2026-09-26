@@ -229,13 +229,13 @@ BOOKEND_SCENE_PROMPT_KNOWN_RED = {
                         "not an LTX-shaped lane. See the note below on the "
                         "stored-not-wired per-engine style overlays -- that "
                         "gate applies to every entry in this dict.",
-    "minimax_h3_audio_in": "DO NOT simply add this one. It requires audio_ref "
-                           "AND init_image, is intentionally excluded from "
-                           "scene-init attachment, and has an open production "
-                           "bug where music-bookend routing cannot supply the "
-                           "required portrait. OWED: mark it unsupported for "
-                           "bookends and fix its routing separately -- giving "
-                           "it a prompt does not give it a portrait.",
+    "minimax_h3_audio_in": "Takes the bookend's scene still as <Picture 1> "
+                           "since 2026-09-26 (operator: the audio-in lane with "
+                           "a picture, like the LTX audio-in lanes). Its own "
+                           "prompt still asks for a face speaking to camera. "
+                           "OWED: judge the bookend clips on a live render "
+                           "before writing an engine-appropriate bookend "
+                           "formatter -- do not add it here unseen.",
     "humo": "audio-driven face lane. Its bookends keep the static radio seed by "
             "a policy commented in the audio_driven_face branch below "
             "('radio-styled by design') -- but that 'policy' resolves to "
@@ -1160,11 +1160,10 @@ def _still_spine_requires_scene(shot, engine_id, family):
     # `init_image` (and for the whole `audio_conditioned_video` family), so the
     # H3 audio-in lane takes the scene SPINE like every other audio-in lane.
     #
-    # That is fine and intended -- the spine decides which stills get MINTED,
-    # and a per-beat scene still is useful to have. The thing that had to be
-    # fixed is one level up, where `_engine_scene_init_required` OVERWRITES
-    # init_image with that scene still; both audio-in lanes are excluded there
-    # so the reference the model lip-syncs stays a face.
+    # That is fine and intended -- the spine decides which stills get MINTED.
+    # One level up, `_engine_scene_init_required` makes that per-beat still the
+    # lane's init_image, and since 2026-09-26 that includes this lane: the
+    # character still on a character beat, the scene still on a bookend.
     if str(engine_id or "") in ("still_pan", "still_flat", "still_word"):
         return True
     if family in _SCENE_INIT_FAMILIES:
@@ -2567,25 +2566,19 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # scene beat would then show the wrong image). audio_driven_face keeps the
     # portrait by design (not in _SCENE_INIT_FAMILIES); fodder engines are excluded
     # by the guard; text engines are unchanged (LTX text-only by design).
-    # `minimax_h3_audio_in` is EXCLUDED (lane 20, 2026-08-12), and it is a
-    # CORRECTNESS fix rather than a preference. This
-    # branch OVERWRITES init_image with the beat's wide scene still. On that
-    # lane init_image is the reference the model is asked to lip-sync -- it is
-    # presented to the tokenizer as `<Picture 1>` and its own prompt says
-    # "a medium close shot of <Picture 1> speaking directly to camera" -- so
-    # handing it an establishing shot with no face in it does not fail, it
-    # renders the wrong identity, silently, on every beat.
-    #
-    # Caught by the post-coding QA pass: the lane's comment on
-    # `_still_spine_requires_scene` claimed it kept the portrait while this
-    # generic rule took it anyway, and the test that was meant to prove it was
-    # LEXICAL (it grepped the source instead of calling the function) so it
-    # passed against the wrong behaviour.
-    #
+    # `minimax_h3_audio_in` TAKES THE BEAT'S STILL LIKE EVERY OTHER AUDIO-IN
+    # LANE (operator, 2026-09-26). Lane 20 had excluded it so that init_image,
+    # the `<Picture 1>` the model lip-syncs, would stay a character portrait.
+    # But nothing ever supplied that portrait: `_portrait_index` reads only
+    # kind=portrait rows, the still spine mints scene_character and scene_beat
+    # rows, and an episode can mint no portraits at all. So the exclusion left
+    # every beat without a reference, and the first clean-box run refused its
+    # first bookend with FamilyInputGap (2026-09-26). The per-beat still is the
+    # reference now: the character still on a character beat, which shows the
+    # speaker, and the scene still on a bookend.
     _engine_scene_init_required = (
         "init_image" in _required_inputs_for_engine(_eng_id, _family)
         and _family != "audio_driven_face"
-        and _eng_id != "minimax_h3_audio_in"
     )
     _engine_scene_init_optional = bool(
         _eng_id and _vreg.is_registered(_eng_id)

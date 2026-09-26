@@ -1,9 +1,7 @@
 """Cloud LTX 2.5 A2V still routing (CPU).
 
 ``cloud_ltx25_audio_in`` is the Comfy partner audio-in lane: its first frame
-is the beat's wide scene still. It must NOT join the H3 exclusion from
-``_engine_scene_init_required`` (that exclusion exists so a lip-sync
-tokenizer keeps a FACE).
+is the beat's wide scene still, on character beats and bookends alike.
 """
 from __future__ import annotations
 
@@ -43,16 +41,6 @@ def _shot(role, **over):
     }
     s.update(over)
     return s
-
-
-def test_cloud_a2v_stays_on_generic_scene_init_overwrite():
-    """Opposite of H3: A2V first-frame IS the scene still."""
-    required = (
-        "init_image" in rd._required_inputs_for_engine(
-            ENGINE, "audio_conditioned_video")
-        and ENGINE != "minimax_h3_audio_in"
-    )
-    assert required is True
 
 
 def test_character_beat_takes_the_wide_scene_still_not_the_portrait():

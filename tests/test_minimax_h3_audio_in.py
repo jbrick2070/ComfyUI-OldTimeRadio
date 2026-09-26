@@ -19,8 +19,6 @@ CPU-safe: no CUDA, no server, no weights, no render.
 """
 from __future__ import annotations
 
-import inspect
-
 import pytest
 
 import nodes._otr_video_engines  # noqa: F401 -- populate the registry
@@ -252,45 +250,65 @@ def test_the_family_is_an_EXISTING_motion_family_not_a_new_one(engine):
                              "image_to_video", "text_to_video"}
 
 
-def test_the_scene_still_never_OVERWRITES_the_reference_this_lane_lip_syncs():
-    """THE DEFECT THE FIRST DRAFT OF THIS TEST MISSED, and how it missed it.
+_CHARACTER_STILL = "C:/x/otr/episodes/ep/stills/b003_scene_character.png"
+_BOOKEND_STILL = "C:/x/otr/episodes/ep/stills/b000_scene_beat.png"
+_PORTRAIT = "C:/x/otr/episodes/ep/stills/c1_portrait.png"
 
-    `_engine_scene_init_required` overwrites `init_image` with the beat's wide
-    scene still for any non-face engine that declares `init_image`. The first
-    draft of this lane was not excluded from it. On a lane whose `init_image`
-    IS the reference the model lip-syncs -- presented to the tokenizer as
-    `<Picture 1>` -- that does not fail, it renders the wrong identity
-    silently on every beat.
 
-    The first draft asserted this with `inspect.getsource` string surgery and
-    passed while the behaviour was wrong. It is now a BEHAVIOURAL check: this
-    lane must be excluded, and a lane that legitimately wants the scene still
-    must still get it.
-    """
-    def scene_init_required(engine_id, family):
-        """The branch's own condition, evaluated the way the driver does."""
-        return (
-            "init_image" in rd._required_inputs_for_engine(engine_id, family)
-            and family != "audio_driven_face"  # (character_3d token retired 2026-08-23)
-            and engine_id != "minimax_h3_audio_in")
+def _still_ledger(images):
+    return {"meta": {}, "cast": [{"char_id": "c1", "name": "Ann"}],
+            "lines": [], "images": {"images": images},
+            "video": {"shots": []}}
 
-    # This lane may not have its reference overwritten ...
-    assert scene_init_required(LANE, "audio_conditioned_video") is False
-    # ... and the exclusion must be exactly this one, read off the SOURCE of
-    # the real branch so this cannot drift from the driver silently.
-    src = inspect.getsource(rd.build_request_from_shot)
-    assert 'and _eng_id != "minimax_h3_audio_in"' in src
+
+def _lane_shot(role, beat_id, char_id="c1"):
+    return {"shot_id": "shot_%s" % beat_id, "engine_id": LANE, "role": role,
+            "char_id": char_id, "target_frame_count": 120,
+            "render_request_hash": "deadbeef",
+            "creative": {"text_prompt": "a slow push in"},
+            "source_line_ids": [beat_id]}
+
+
+def test_a_character_beat_presents_the_beats_character_still():
+    """Operator, 2026-09-26: "Use the beat's character still". The character
+    still shows the speaker in the scene, so it is the `<Picture 1>` the model
+    lip-syncs -- never a portrait the spine may not have minted."""
+    led = _still_ledger([
+        {"kind": "portrait", "object_id": "c1", "path": _PORTRAIT},
+        {"kind": "scene_character", "beat_id": "b003", "path": _CHARACTER_STILL},
+    ])
+    req = rd.build_request_from_shot(_lane_shot("character_video", "b003"), led)
+    assert req["asset_refs"]["init_image"] == _CHARACTER_STILL
+    assert req["observability"]["init_source"] == "scene_still"
+
+
+@pytest.mark.parametrize("role", ["music_visual", "announcer_visual"])
+def test_a_bookend_presents_its_scene_still(role):
+    """THE CLEAN-BOX DEFECT (2026-09-26). The lane was excluded from the
+    scene-still attachment on every beat, so a music or announcer bookend had
+    no reference at all and the run refused at FamilyInputGap. A bookend now
+    takes its scene still, as the LTX audio-in lanes always have."""
+    led = _still_ledger([
+        {"kind": "scene_beat", "beat_id": "b000_music_open", "path": _BOOKEND_STILL},
+    ])
+    req = rd.build_request_from_shot(
+        _lane_shot(role, "b000_music_open", char_id=""), led)
+    assert req["asset_refs"]["init_image"] == _BOOKEND_STILL
+
+
+def test_a_beat_with_no_still_is_refused_loud():
+    """No silent fallback to a portrait or to nothing: a missing per-beat still
+    is an image-phase defect and is named as one."""
+    from nodes._otr_video_engines.render_errors import DeferredImageGapError
+    led = _still_ledger([{"kind": "portrait", "object_id": "c1", "path": _PORTRAIT}])
+    with pytest.raises(DeferredImageGapError, match="NO scene still"):
+        rd.build_request_from_shot(_lane_shot("character_video", "b003"), led)
 
 
 def test_this_lane_DOES_take_the_scene_still_SPINE_like_its_siblings(engine):
-    """Stated correctly, because the first draft stated it backwards.
-
-    The SPINE decides which stills get MINTED, and this lane takes it exactly
-    like the other audio-in lanes -- a per-beat scene still is useful to have.
-    What must not happen is that still replacing the portrait, which is the
-    assertion above. Kept as a pair so the two questions cannot be confused
-    again.
-    """
+    """The SPINE decides which stills get MINTED; the tests above decide which
+    one becomes init_image. Two questions, kept apart because an earlier
+    comment here conflated them into one wrong sentence."""
     for sibling_lane in SIBLING_AUDIO_IN_LANES:
         assert rd._still_spine_requires_scene(
             {"engine_id": sibling_lane}, sibling_lane,

@@ -1468,10 +1468,14 @@ code below it does is a claim that needs the same proof as the code. When you
 write "this lane is deliberately NOT in this list, so it gets X", run it.
 
 **Twin assertion:** `tests/test_minimax_h3_audio_in.py::
-test_the_scene_still_never_OVERWRITES_the_reference_this_lane_lip_syncs`, paired
-with `::test_this_lane_DOES_take_the_scene_still_SPINE_like_its_incumbent` --
-kept as a PAIR because the original error was conflating two questions (which
+test_a_character_beat_presents_the_beats_character_still` (and its bookend
+twin), paired with `::test_this_lane_DOES_take_the_scene_still_SPINE_like_its_siblings`
+-- kept as a PAIR because the original error was conflating two questions (which
 stills get minted, and which one becomes `init_image`) into one wrong sentence.
+**Superseded 2026-09-26:** the exclusion this lesson guarded is gone. It kept a
+portrait that nothing ever minted, so the lane had no reference at all, and the
+operator ruled that the lane takes the beat's own still like the LTX audio-in
+lanes. The lesson about lexical tests stands.
 
 ---
 

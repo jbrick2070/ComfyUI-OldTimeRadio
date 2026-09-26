@@ -1104,8 +1104,10 @@ class MiniMaxH3AudioInEngine(_MiniMaxH3Base):
     _UNET_DEFAULT = _H3_DEFAULT_UNET_REF2VA
     _RECIPE_RECEIPT = "minimax_h3_ref2va_int8_res_multistep_20step_v1"
 
-    #: HARD-requires both: the reference node takes a portrait AND the audio it
-    #: is meant to move to. A beat missing either is refused before staging.
+    #: HARD-requires both: the reference node takes the beat's still (the
+    #: character still on a character beat, the scene still on a bookend) AND
+    #: the audio it is meant to move to. A beat missing either is refused
+    #: before staging.
     required_inputs = ("audio_ref", "init_image")
 
     _EXTRA_NODE_CANDIDATES = {
@@ -1158,8 +1160,8 @@ class MiniMaxH3AudioInEngine(_MiniMaxH3Base):
         from . import wrapper_bridge as _wb
         if not plan.get("init_image"):
             raise _wb.GraphExecutionError(
-                "%s requires init_image -- the reference node needs a portrait "
-                "to present as <Picture 1> (got %r)"
+                "%s requires init_image -- the reference node needs the "
+                "beat's still to present as <Picture 1> (got %r)"
                 % (self.name, plan.get("init_image")))
         if not plan.get("audio_path"):
             raise _wb.GraphExecutionError(
