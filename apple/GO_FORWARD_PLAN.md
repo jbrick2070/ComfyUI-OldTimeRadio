@@ -347,6 +347,35 @@ credit-spending workflow with a deliberately failing host and read
 `/history`: the key must not appear. Until it lands, a pod run that spends
 Comfy credits is treated as sharing its key with the proxy's audience.
 
+### 0l. Official language sweep: just "workflow" (operator 2026-09-25: "no graph, no profile, no variant, just workflow"; "I want to use official language")
+
+In everything a person reads, the 25 shipped JSON files are workflows: "the
+canonical workflow" and the "per-machine workflows"; the script-submitted
+form is the "API-format workflow" (ComfyUI's code calls it an API prompt).
+Measured 2026-09-25 (case-insensitive word counts: variant / profile / graph):
+`README.md` 1/4/28, `apple/RUN.md` 0/0/4, `apple/INSTALL.md` 0/2/7,
+`apple/MACHINES.md` 0/2/6, `apple/MACHINE_MATRIX.md` 0/21/4,
+`apple/DROPDOWN_MATRIX.md` 0/5/6, `apple/LAUNCH_RECIPES.md` 1/1/29,
+`apple/EXTENDING.md` 4/0/20, `apple/WRITERS.md` 2/0/17, `__init__.py`
+(the boot banner and its comments) 3/0/11. Rules for the sweep:
+- Generated docs (`MACHINES.md`, `MACHINE_MATRIX.md`, `DROPDOWN_MATRIX.md`,
+  `LAUNCH_RECIPES.md`, `ENGINE_MATRIX.md`) are fixed IN THEIR GENERATORS
+  (`scripts/otr_dropdown_matrix.py`, `scripts/otr_machine_matrix.py` --
+  `:510` and `:531` print "profile(s)" -- and `scripts/build_variants.py`'s
+  recipe/doc strings), then regenerated. Never hand-edit a generated doc.
+- Hand-written docs and the boot banner are edited directly.
+- "graph" stays only where it means the canvas itself (subgraph, "graph
+  screenshot", litegraph); every hit that means a shipped file becomes
+  "workflow". Read each hit; do not blanket-replace.
+- Code identifiers and file names are plumbing and stay (`build_variants.py`,
+  `VARIANTS_DIR`, `role_overrides`, matrix key names). Only strings a person
+  reads change.
+- Tests that pin doc wording follow in the same commit (a generator parity
+  test will fail until the generator and doc agree -- that is the check).
+Done when the same grep over those ten files finds no retired word meaning a
+shipped file, the suite is green, and `build_variants.py --check` is clean.
+Sonnet-safe: mechanical, one commit.
+
 ### 0c. Portability fixes (Composer audit 2026-09-25, each claim grounded)
 
 Found by asking "what assumes the developer's machine?" after the models
