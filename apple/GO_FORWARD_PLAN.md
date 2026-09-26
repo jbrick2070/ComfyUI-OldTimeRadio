@@ -21,36 +21,25 @@ tree stays clean: no unpushed patches.
 
 ## The finish line -- three sprints (operator asked 2026-09-25 night)
 
-Estimate, not a promise; anything a live leg breaks adds work. Each sprint's
-detail is its row below.
-
-1. **TONIGHT (2026-09-25 night, the 5080 window driving, the 4060 by SSH).**
-   0e app mode, BOTH shapes (operator: "Both"): story-only on every
-   per-machine card, plus ONE advanced app with the pickers in his order --
-   design check first (it is canonical-adjacent), then build, suite, push;
-   he opens it from the gallery in the morning. Finish the live legs: the
-   5080's `otr_8gb_ltx25_audio_in` 1-act; TEST_WAVE Part B on the 4060 at
-   commit `1585d38a` (B3a PASSED; B3, B4, B1, B7, then B5/B6). Pull and
-   test the Cursor portability commits (`a70d22b4` `3e1fd8be` `ed4cd47b`,
-   Sonnet review running); fix what it finds. Receipts to HANDOFF_LOG.
-2. **NEXT CODING SPRINT.** 0k (the V3 credential node -- the largest item
-   left, a canonical-workflow change with a design round first); the 0d
-   visual items (palette, Story Writer collapsed, the Start-here note);
-   0c item 5 (PARKED 2026-09-26 -- see the row); and the B4
-   RAM finding -- CODE DONE 2026-09-26 (`f011bb79`, PBUG-20260926-01: a
-   conditioning cache, one T5 load per beat instead of per segment; 5080
-   proof leg 6 loads of 13, PASS 12:52; the 4060 free-RAM re-measure is
-   owed). Was: `ltx_8gb` reloads its 9 GB T5 (`t5xxl_fp16`, pinned to the
-   CPU) into system RAM for EVERY clip segment -- free RAM saw-toothed
-   between ~0.4 and ~20 GB on the 32 GB 4060 (2026-09-26); a 16 GB-RAM box
-   would page. Keep the encoder (or its conditioning) resident across an
-   episode's segments -- a residency fix, never a recipe change. Optional,
-   only if wanted: progress bars for `google_image` / `google_lyria`
-   (0f item 2 note).
-3. **TEST AND RELEASE SPRINT.** TEST_WAVE Part C (the Bug Bible regression);
-   any owed legs left over; the progress bar and the gallery category label
-   seen live in the app; 2.3.7 to the registry ON HIS WORD ONLY (0f item 6's
-   Banner line rides that bump).
+1. **DONE 2026-09-25/26 night.** 0e app mode, both shapes, proven live
+   (`fad90bf7` `a2c36590` `0d6aea68`); the 5080's `otr_8gb_ltx25_audio_in`
+   1-act PASSED (`stone_key_20260925_230558`; whether the lips follow the
+   lines is his eye); TEST_WAVE Part B B3a/B3/B4/B1 PASSED on the 4060; the
+   Cursor portability commits pulled and reviewed (all HOLD).
+2. **DONE 2026-09-26 early morning -- Sprint 2's code is complete.** The B4
+   RAM fix (`f011bb79`, PBUG-20260926-01, one T5 load per beat, 5080 proof
+   leg 6 loads of 13); 0k (`2e78e2b6` `9d50e7fe`, proven live -- see the
+   row); 0d's Start-here note (`f9552204`) and palette (`af526cd7`, stock
+   purple and gold, his call); the app form's premise row (`47e0ab05`);
+   the UI wording (`2b3c0ec8`). 0c item 5 PARKED with the reason. Optional,
+   only if wanted: progress bars for `google_image` / `google_lyria` (0f
+   item 2 note).
+3. **TEST AND RELEASE SPRINT -- NEXT, the final regression.** TEST_WAVE Part
+   C is DONE (Bug Bible 46 passed / 0 failed against OTR). Left: the 4060's
+   B5/B6/B7 at `0d44385c` (running at write time); the 4060 B4 free-RAM
+   re-measure on `f011bb79` or later; a full suite on the final HEAD; 2.3.7
+   to the registry ON HIS WORD ONLY (0f item 6's Banner line rides that
+   bump).
 
 NOT COUNTED, needs his yes to spend: the RunPod proofs of
 `ltx25_foley_blackwell`, `ltx25_mime_24gb` and `ltx25_audio_in_24gb`.
@@ -70,10 +59,9 @@ code row (operator 2026-09-12 / 2026-09-17).
 **Operator 2026-09-25: "the only thing is to regress test."** The regression
 wave is open and is [TEST_WAVE](TEST_WAVE.md). The section 1 forks are his words
 and do not hold it; the section 2 rows land on their own and each wave receipt
-records the HEAD it ran. **Active now:** TEST_WAVE Part B on the 4060, run
-against ONE pinned commit the 5080 names (the operator's rule of 2026-09-25: no
-moving target), and Part C's Bug Bible run. Everything else here is open and not
-this wave's.
+records the HEAD it ran. **Active now:** the rest of TEST_WAVE Part B on the
+4060 (B5/B6/B7), run against ONE pinned commit the 5080 names (the operator's
+rule of 2026-09-25: no moving target). Part C's Bug Bible run is DONE.
 
 ## 0. The bar
 
@@ -96,13 +84,12 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 
 ### The registry -- his clicks and his word
 
-* **2.3.5 published 2026-09-25** on his word (the 4060 reinstalls from the
-  registry): the writer LLM folder, the queue-time node-pack gate, the
-  dependency-doc fix, and everything in 2.3.4. 2.3.4 came back **Flagged**, as
-  the scan replica predicted (an internal doc shipped in it); 2.3.5's tree reads
-  clean, and `tests/test_registry_scan_oracle_clean.py` keeps it that way.
-  Pending until Comfy-Org's scan; the 4060 installs it by picking 2.3.5 in the
-  Manager's version picker.
+* **2.3.6 is the latest published version** (`96ea436a`, 2026-09-25, after
+  2.3.5); Pending Comfy-Org's scan at last read, with 2.3.3 the Manager's
+  Active default. `pyproject.toml` stays 2.3.6 until 2.3.7, on his word.
+  2.3.4 came back **Flagged**, as the scan replica predicted (an internal doc
+  shipped in it); `tests/test_registry_scan_oracle_clean.py` keeps the tree
+  clean.
 * **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active, the registry icon points
   at `/main/`, and the last live pin -- the RunPod bootstrap `curl` in
   RUNPOD_INSTALL -- moved to `/main/` on 2026-09-25. One click, his.
@@ -122,57 +109,21 @@ fields that only compile if it exists. Spec:
 [ROUTE_DELETION_PLAN](ROUTE_DELETION_PLAN.md) (re-grounded 2026-09-25).
 Do not start from the 51b6c146 draft. Do not re-rip `91ad5961`.
 
-### 0a. Windows HF_HOME -- always pin a short root (decided 2026-09-23)
+### 0a. Windows HF_HOME -- DONE 2026-09-25 (`a0875708`, `89a95212`)
 
-When the models-adjacent pin cannot fit MAX_PATH, do not decline.
-Choose a short root (registry if it fits, then models-adjacent if it
-fits, then `C:\ComfyUI-Models\huggingface` if that tree exists, else
-the huggingface_hub-shaped user cache). Spec:
-[HF_HOME_WINDOWS_PIN](HF_HOME_WINDOWS_PIN.md) (re-grounded 2026-09-25).
-`47703d7a`'s error-message half stays; its decline-to-pin does not. The
-writer no longer downloads into this cache (`8f8ccebb`, the `LLM` folder);
-the pin still governs Bark, MusicGen, the visual assets and the provisioner,
-and the 162-character tail it sizes for was always the visual one.
+One chooser pins a short root when the models-adjacent pin cannot fit
+MAX_PATH ([HF_HOME_WINDOWS_PIN](HF_HOME_WINDOWS_PIN.md)); the prestartup
+interaction followed in `89a95212`. Reviewed: Spark for Composer, plus
+Sonnet, HOLD. 0c item 4 folded in and is resolved with it.
 
-### 0b. Wire the talking-face still to the audio-driven lanes (not a rip)
+### 0b. The talking-face still mode -- RIPPED 2026-09-25 (`b118c377`)
 
-With Kling Avatar removed (a1e5548f) no engine implements
-`wants_talking_prompt()`, so the talking still mode -- the director's
-`_role_talking`, MetaBrief's `_engine_wants_talking_prompt`, the
-`when_engine_talking` still-plan token, `TALKING_PORTRAIT_GEOMETRY` ("face-
-forward frontal close-up bust ... the whole face and mouth clearly visible")
-and the packs' `portrait_look_talking` -- is always off. The operator: "I
-think it uses stills that include a face and lips; most audio-in models do."
-MEASURED from the registry, and it narrows the question:
-- The LTX 2.5 / MiniMax H3 / cloud LTX 2.5 "audio-in" lanes are
-  `audio_conditioned_video`: the picture reacts to the sound, they do NOT
-  lip-sync. Their stills are scene stills (macro open, three-quarter beat,
-  medium-shot character in a wide 16:9 environment) and their portrait row
-  is `never`. The matrix keeps character beats OFF the LTX audio-in lane on
-  purpose (a face there would lip-sync to the ambient mix). Talking stills
-  would be WRONG for them. Leave them alone.
-- HuMo (all four) is the one `audio_driven_face` (true lip-sync) engine. Its
-  portrait row is `always`: "three-quarter portrait, full head and face"
-  (portrait) or "medium shot, head and shoulders" (16:9) -- not the frontal
-  mouth-visible close-up, although its own motion prompt says "keep the
-  mouth visible and the head toward camera". HuMo is in NO shipped workflow.
-DECIDED (operator, same day): RIP the talking mode. "I don't want just a
-talking face; LTX 2.5 audio-in can handle talking faces that move and have
-action; I don't want to bring it to the brand level of talking face." Remove
-`wants_talking_prompt` lookups (director `_role_talking`, MetaBrief
-`_engine_wants_talking_prompt` / `_effective_talking_roles`), the
-`when_engine_talking` still-plan token, `TALKING_PORTRAIT_GEOMETRY` and the
-talking look segment, and the packs' `portrait_look_talking` -- the packs
-carry sha256 receipts, so regenerate/re-pin them and grep tests for the
-hashes first. HuMo keeps its current portrait framing. Scene stills with
-action stay the path for every audio lane.
-CORRECTION (operator: "audio-in, we do feed clean audio"): the audio-in lane
-already gets each character's CLEAN own voice on a character beat;
-`render_driver._uses_ambient_master_audio` excludes character-face beats from
-the master slice (2026-06-26), and only lineless announcer/music bookends use
-the mix. RESOLVED via 0b2 Step 1 (2026-09-25): the stale `otr_8gb_ltx25_audio_in`
-display text was corrected and the row now routes character beats to the
-audio-in lane, same as announcer and music.
+Operator: "I don't want to bring it to the brand level of talking face."
+Every `wants_talking_prompt` lookup, the `when_engine_talking` token,
+`TALKING_PORTRAIT_GEOMETRY` and the packs' `portrait_look_talking` are gone
+(`a0341900`: frozen ledgers from before the rip replay again). HuMo keeps its
+own portrait framing; the audio-in lanes already get each character's clean
+own voice (0b2 Step 1).
 
 ### 0b2. One lane per workflow, and drop "native" from the names (operator 2026-09-25, HARDENED)
 
@@ -245,7 +196,7 @@ clean, full suite green.
   columns: e.g. `otr_mac16_low | viz_camera | kokoro | stable_audio_3 |
   sd15 | shipping`. An earlier draft of this row proposed a second such
   table in `MACHINES.md`; cut, one source is enough. Two small items it
-  surfaced, one commit: (1) `MACHINES.md`'s "Which graph do I open?" heading
+  surfaced, one commit -- BOTH DONE in `66272d49`: (1) `MACHINES.md`'s "Which graph do I open?" heading
   becomes "Which workflow do I open?" (official language; the string lives in
   `scripts/otr_dropdown_matrix.py`, the MACHINES.md writer) and gets
   one sentence pointing at that table for "what each workflow uses"; (2) the
@@ -263,7 +214,7 @@ clean, full suite green.
   is still `?`: `otr_amd_still` selects SA3 unproven, which is the
   experimental-AMD position already on record.
 
-### 0h / 0i / 0j. The Google lane -- code DONE 2026-09-25, live legs owed
+### 0h / 0i / 0j. The Google lane -- DONE 2026-09-25, proven live
 
 - **0h** ("yes we should have a Google JSON with stills"): row
   `otr_google_still` ships -- Gemini image stills composited by
@@ -284,31 +235,23 @@ clean, full suite green.
   on row c04 (prompt cd9e589e); the fix re-ran and published.
 
 LIVE 2026-09-25 on the 5080: English PASSED (`refined_metal_20260925_223823`,
-219 s, after 610bda1e). OWED: one non-English language (0i); a `my_story`
-cast with an unstated gender (0j).
+219 s, after 610bda1e). Spanish PASSED (`canvas_firewood_es_20260925_224243`)
+and a `my_story` cast with unstated genders PASSED (`grey_reef_20260925_224927`,
+Sam and Robin -> `gender_unspecified`). Nothing owed.
 
-### 0k. The Comfy credential rides the V3 channel: one small credential node (operator: "I dunno what is best practice" -- this is it)
+### 0k. The Comfy credential -- DONE 2026-09-26, proven live (`2e78e2b6`, `9d50e7fe`)
 
-Best practice, stated plainly: in the app, the user's ComfyUI login IS the
-credential and nothing in the workflow or the environment should carry a key;
-headless (a pod, `scripts/otr_api.py`) there is no login, so the key
-travels per prompt as `extra_data.api_key_comfy_org`, which the submitter
-already does. The defect is only how our nine credit-spending hosts RECEIVE
-it: a V1 `"hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"}` input,
-which `execution.py:630-653` serializes into `/history` when a node raises
--- on a pod bound to `0.0.0.0` that is anyone the proxy admits. Comfy's own
-partner nodes avoid it as V3 `io.ComfyNode` classes, whose `v3_data` the
-error path never serializes. Work (the smaller of the two shapes): one V3
-credential node, `OTR_ComfyCredential`, that reads the key from `v3_data`,
-stashes it per prompt in a process-local map keyed by prompt id, and
-returns a token the nine hosts take on `gate_in`; the hosts drop their V1
-hidden input and fetch the key from the map by their prompt id. It returns
-NaN from `IS_CHANGED` so a cache hit never serves a stale key. This is a
-canonical-workflow change (one node, nine links) plus all 25 workflows
-regenerated -- the section 0 three-part rule applies. Prove: queue a
-credit-spending workflow with a deliberately failing host and read
-`/history`: the key must not appear. Until it lands, a pod run that spends
-Comfy credits is treated as sharing its key with the proxy's audience.
+`OTR_ComfyCredential` ("0 - Comfy Credential") is the only node that declares
+the hidden Comfy key, and it cannot raise; the nine hosts dropped it (a V1
+node that declares it has the key written into /history when it raises). One
+link into the Workflow Validator -- the only root of every shipped workflow --
+orders it first. The writer's auth is bound to its prompt id; the per-prompt
+stash is never swept while its prompt runs. Built as a V1 node that cannot
+raise, not the V3 shape first sketched: the pack's tests and offline tools run
+outside ComfyUI. Reviews: Opus and agy Pro on the design; Cursor, agy Pro and
+Sonnet HOLD on the diff. LIVE on a fresh server (ComfyUI 0.37.4): a fake probe
+key and a forced validator refusal -- the key is absent from the error record,
+/history, /api/jobs and the server log.
 
 ### 0l. Official language sweep -- DONE 2026-09-25 (66272d49, 388ce6bc)
 
@@ -331,8 +274,7 @@ device, Bark's first load no longer calls CUDA on a Mac or CPU-only torch,
 and the platform quant bakes NF4 only when the vendor is NVIDIA.
 
 **Backlog, 4-8 (grounded, not yet hardened into steps):**
-4. `prestartup_script.py:126-144` pins HF_HOME to `<comfy>/models/huggingface`
-   by file depth before `_otr_hf_env` runs. Folds into item 0a above.
+4. DONE with 0a (`a0875708`, `89a95212`).
 5. PARKED 2026-09-26, with the reason -- no user has hit it. Kokoro
    (`eng_kokoro.py:72-77`, `_otr_kokoro_voice_prefetch.py`) joins
    `TTS/KokoroTTS` onto `models_dir`, so an `extra_model_paths.yaml` that
@@ -356,7 +298,8 @@ and the platform quant bakes NF4 only when the vendor is NVIDIA.
    item 1 turned a second-GPU pick from a crash into a writer silently
    loaded on GPU 0, so load_llm now probes and places on the policy's CUDA
    ordinal; c4fcae80 makes that GPU the CURRENT device for the load and
-   the teardown wash. The 64 GiB CPU-lane half is still open. Known
+   the teardown wash. The 64 GiB CPU-lane half is DONE too (`a70d22b4`:
+   the CPU lane is sized from the RAM actually available). Known
    telemetry-only gap (Sonnet review): the VRAM_RESET / VRAM_SNAPSHOT
    lines `_run_with_timeout` writes during generation still read GPU 0's
    counters for a `cuda:N` writer. Generation itself is correct (inputs
@@ -367,9 +310,8 @@ and the platform quant bakes NF4 only when the vendor is NVIDIA.
    episode's telemetry line reads the live log only -- the frozen
    pack-folder log is shown by `otr_tail_logs` as history, never read as
    current (a Sonnet review reproduced a stale model name leaking in).
-8. Lower: Chatterbox/Dia default venv path is Windows-only (`Scripts/`);
-   `video_engine.py:2342-2346` falls back to `~/Documents/ComfyUI/output`;
-   NVFP4 is preferred among installed files without a hardware check;
+8. Lower. DONE: the Chatterbox/Dia default venv path (`3e1fd8be`) and the
+   video no-ledger output fallback (`ed4cd47b`). Still open: NVFP4 is preferred among installed files without a hardware check;
    `config/otr_windows_extra_model_paths.yaml` names `C:/ComfyUI-Models`.
 LOW PRIORITY, operator ruling 2026-09-25 ("no biggie" / "doesn't matter
 much") -- both are off-default picks only; do not re-raise:
@@ -384,27 +326,20 @@ touch shared code with a fallback branch that never fires today on a
 single-GPU NVIDIA box -- print the resolved value before/after in the
 commit message, same as the models-root and per-type work earlier today.
 
-### 0d. Gallery and JSON hygiene -- what is left is what a stranger SEES
+### 0d. Gallery and JSON hygiene -- DONE 2026-09-26 but for the viewport retune
 
 Done 2026-09-25 and out of this row: every node stamped `cnr_id` + `ver`
 from the live pyproject (`--check` enforces it), `extra.info` dropped, the
 gallery category reads "Old-Time Radio" through `locales/en/main.json`,
 and (by 0e) every generated workflow has its own id. Left, in order:
-- **Standard palette pass (cosmetic, HIS EYE).** 1,421 of 4,635 official
-  nodes are coloured, almost all from five short pairs (`#222/#000`,
-  `#432/#653`, `#232/#353`, `#322/#533`, `#223/#335`); 587 groups use
-  `#3f789e`. Ours are custom hexes on a shared `#3B3D42`. Map the five
-  stage colours onto standard pairs, keeping the stages distinct.
-- **Story Writer collapsed on load (HIS EYE).** 520x1760 with 35 widgets is
-  a wall; `flags.collapsed` keeps every value and position. Never split it.
-- **The "Start here" note.** One Markdown note in the SCRIPT / START HERE
-  group: type a premise or pick a bank, press Queue, where the episode
-  lands, where to report problems. PREREQUISITES found 2026-09-25 night:
-  `scripts/otr_api.py::workflow_to_api_prompt` emits EVERY node, and a
-  frontend-only `MarkdownNote` would be refused by /prompt -- the converters
-  (otr_api and the canonical runner) must skip frontend-only nodes, and
-  `stamp_pack_identity` must not stamp a core node with this pack's
-  `cnr_id`. Lower urgency since 0e: every card now opens as an app form.
+- DONE `af526cd7`: the palette, his call ("compliant standard ... Lakers
+  purple and gold") -- ComfyUI's stock purple and yellow pairs alternating by
+  stage. The Story Writer stays EXPANDED ("whatever is most standard":
+  official templates do not ship collapsed nodes, and app view hides the
+  widget wall).
+- DONE `f9552204` (text `2b3c0ec8`): the Start-here MarkdownNote, with
+  NOTE_NODE_TYPES skipped by both converters, the identity stamp and the
+  parity checks.
 - **Retune `extra.ds`** (saved viewport) once the layout settles.
 - **Rejected, with the reason:** an `index.json` in workflows/ (the glob
   would list it as a template named "index"); renaming files for prettier
@@ -508,9 +443,10 @@ log the t=0 refusal (the live verify), install the pack, B3, B4. Measured
 Evolved is the ONLY third-party node pack any shipped engine needs; every
 class LTX 2.5, LTX 8 GB, HuMo, MiniMax H3 and the mesh stage ask for is
 ComfyUI core, so a missing one of those means an old ComfyUI, and the gate
-now says "Update ComfyUI" for them. Part C: the
-suite has run at every push today (12 inherited reds); the Bug Bible
-regression against the pack has not.
+now says "Update ComfyUI" for them. Since then: B3a/B3/B4/B1 PASSED on the
+fresh 4060 (TEST_WAVE Part B); B5/B6/B7 re-run at `0d44385c`. Part C DONE
+2026-09-26: the suite is green (16928 passed at `f011bb79`) and the Bug Bible
+regression reads 46 passed / 0 failed against the pack.
 
 ## Parked
 

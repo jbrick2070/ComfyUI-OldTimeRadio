@@ -1,3 +1,66 @@
+## 2026-09-26 -- HEAD 9d50e7fe (main) -- EARLY MORNING: Sprint 2 code complete
+
+Driver: the 5080 Claude window (Opus), 01:30-05:00. Operator answered the
+three questions ("RAM fix first", Bible fixes yes, clean-up yes), then ran
+Cursor, agy Pro and agy Flash lanes from his own windows until ~04:35; the
+last three wrote their reports to Documents\ComfyUI\otr_reviews\.
+
+CODE (each pushed green, then reviewed by another family):
+  f011bb79 RAM FIX (PBUG-20260926-01): ltx_8gb caches the T5 CONDITIONING
+    (key = T5 file identity + exact text), so a beat loads the 9.8 GB T5 once
+    instead of once per segment. The first design -- keep the T5 resident for
+    the episode, the eng_ltx25 pattern -- was refuted by an Opus contrarian
+    (on a Mac `cpu` IS GPU memory; on CUDA it competes with mapped weights).
+    Reviews: Sonnet HOLD, Cursor HOLD. LIVE (5080, 1-act otr_8gb_video):
+    PASS 12:52, unstable_ink_20260926_034958, 13 segments / 6 T5 loads.
+  47e0ab05 app form: the premise row is "Story idea" / "Optional; every bank
+    uses it" -- it said "My Story only", false on every bank (found by the
+    Start-here contrarian). Cursor noted snapshot replay ignores the premise:
+    a harness-only env path, left.
+  f9552204 0d Start-here note (MarkdownNote id 96) + NOTE_NODE_TYPES skipped by
+    both converters, the test baseline, the identity stamp and the parity
+    checks. 2b3c0ec8 note text names Extensions (Cursor).
+  2e78e2b6 + 9d50e7fe 0k CREDENTIAL: OTR_ComfyCredential (id 97, "0 - Comfy
+    Credential") is the only node declaring the hidden Comfy key and cannot
+    raise; nine hosts dropped it; one link into the validator (the only root)
+    orders it first; the writer auth is bound to its prompt id; the stash is
+    never swept while its prompt runs. V1-that-cannot-raise, not V3: the
+    pack's tests run outside ComfyUI. Design: Opus contrarian (CHANGE, taken),
+    agy Pro (REFUTE -- both MUSTs refuted on the files). Reviews: Cursor HOLD,
+    agy Pro HOLD, Sonnet HOLD. LIVE on a fresh server, ComfyUI 0.37.4, "All 25
+    nodes loaded": canonical queued with a fake probe key, validator forced to
+    refuse -- the key is absent from current_inputs, /history, /api/jobs and
+    the server log.
+  2b3c0ec8 docs: "Run", and "Browse Templates > Extensions > Old-Time Radio"
+    (agy Flash audit, each claim checked live). Its Manager renames were NOT
+    taken -- this box shows a Manager button; a fresh Desktop needs a look.
+  af526cd7 0d palette, the operator's call ("standard ... Lakers purple and
+    gold"): ComfyUI's stock purple and yellow pairs alternating by stage;
+    Story Writer stays expanded ("whatever is most standard").
+  Plan: 0l was already done (3451eb7b); 0c item 5 Kokoro PARKED with the
+    grounded reason (3be8ff0f).
+  Tests restored, not code: 267e9f48 the portrait identity-seed tests the
+    09-04 rip deleted while the mechanism stayed live.
+BUG BIBLE (separate repo): 85cb0de2 729cf9c7 9eaab8a5 -- the regression is
+  46 passed / 0 failed against OTR; two Sonnet passes found real holes in my
+  first two cuts (aliases, prose matches, subscript calls, a broken helper);
+  final HOLD. 61b44d9d promotes 12.175 (PBUG-20260925-03) and 12.176
+  (PBUG-20260926-01), drafted by agy Flash and rewritten.
+Suite: 16928 passed, 0 failed at f011bb79 (full); every later chunk ran its
+  affected tests (up to 5064 at once) and --check 25/0.
+
+STILL RUNNING: the 4060 re-run of B7/B5/B6 at 0d44385c (background agent).
+OWED (Sprint 3, the final regression): the 4060 B4 free-RAM re-measure on
+  f011bb79+; a full suite on the final HEAD; B5/B6/B7 results; 2.3.7 on his
+  word (the registry Banner line rides it).
+
+FOR HIM:
+  - Look at the canvas in purple and gold (any workflow, graph view).
+  - Desktop instances: keep "ComfyUI" (it holds the junctions to this repo);
+    "ComfyUI (1)" is the 09-14 registry test bed -- safe to delete after 2.3.7
+    is checked from the registry.
+  - Still his eye: stone_key_20260925_230558 lip sync.
+
 ## 2026-09-26 -- HEAD 09fea0ed (main) -- NIGHT: app mode, Google lane live, 4060 fresh-start regression
 
 Driver: the 5080 Claude window (Opus). Operator asleep from ~22:00; standing
