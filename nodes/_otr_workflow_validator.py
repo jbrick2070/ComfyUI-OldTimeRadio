@@ -737,6 +737,14 @@ class WorkflowValidator:
                  master_hash: str = "",
                  generated_by: str = "", credential: str = "",
                  prompt=None, unique_id=None):
+        # UNLOAD AFTER USE (operator, 2026-09-26). Asked at the FIRST node so it
+        # holds however the episode ends -- a refusal below, a failed beat, or
+        # success: ComfyUI unloads every model when this prompt finishes.
+        try:
+            from ._otr_vram_levers import release_models_after_this_prompt
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_vram_levers import release_models_after_this_prompt  # type: ignore
+        release_models_after_this_prompt()
         # The stamp assertion + env export run FIRST whenever profile_id is
         # non-empty -- validate_anyway only skips the CONTRACT check below,
         # never this (decision doc section 4; CI rejects snapshots shipping

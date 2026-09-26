@@ -297,4 +297,34 @@ def free_otr_pipeline_residue(*, reason: str = "") -> dict:
     return report
 
 
-__all__ = ["free_otr_pipeline_residue"]
+def release_models_after_this_prompt() -> bool:
+    """Ask ComfyUI to unload every model once the running prompt ends.
+
+    The operator's rule, 2026-09-26: "we need to unload models after they are
+    used". This is ComfyUI's OWN mechanism -- the one its "unload models"
+    control and ``POST /free`` use. The prompt worker reads the queue's flags
+    after EVERY prompt, success or failure; ``free_memory`` makes it call
+    ``unload_all_models()`` and reset the executor cache, whose cached node
+    outputs are what otherwise keep weights referenced. It fires after the
+    LAST node, so nothing mid-episode is touched, and ComfyUI runs one prompt
+    at a time, so there is no other episode to disturb.
+
+    Before this, a finished render left the server holding ~9-10 GB until the
+    next episode's pre-render cleanup. The out-of-band caches ComfyUI cannot
+    see (writer LLM, Bark) are already released after the script phase and at
+    the pre-render and inter-beat seams by :func:`free_otr_pipeline_residue`.
+
+    Returns True when the request was recorded. Never raises: with no running
+    ComfyUI (tests, CLI) there is nothing to release.
+    """
+    try:
+        from server import PromptServer  # ComfyUI runtime only
+        PromptServer.instance.prompt_queue.set_flag("free_memory", True)
+    except Exception as exc:  # noqa: BLE001 -- tests, CLI, server not up
+        log.debug("[VRAMLevers] post-prompt release not requested: %s", exc)
+        return False
+    log.info("[VRAMLevers] models will be unloaded when this prompt ends")
+    return True
+
+
+__all__ = ["free_otr_pipeline_residue", "release_models_after_this_prompt"]
