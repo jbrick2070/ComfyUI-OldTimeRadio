@@ -104,6 +104,10 @@ def main() -> int:
         raise SystemExit("FATAL: this NF4 doctor requires a CUDA GPU")
 
     hf_home = hf_env.ensure_hf_home()
+    if not hf_home:
+        raise SystemExit(
+            "FATAL: HF_HOME is unset; no cache root fits the Windows path budget"
+        )
     snapshot = hf_env.resolve_snapshot_dir(args.repo, hf_home=hf_home)
     if snapshot is None:
         raise SystemExit(

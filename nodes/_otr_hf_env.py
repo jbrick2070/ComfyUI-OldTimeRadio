@@ -62,6 +62,22 @@ _REG_HF_HOME = "HF_HOME"
 #: duplicated in prestartup (``otr_hf_home_pin``); prestartup must not import
 #: this module to decide.
 _DEFAULT_HF_HOME_WINDOWS = r"C:\ComfyUI-Models\huggingface"
+#: Same room as prestartup_script.py. A second copy, locked by
+#: tests/test_hf_home_fits_max_path.py, so this resolver cannot re-pin a
+#: path prestartup already refused.
+_HF_WINDOWS_PATH_BUDGET = 259
+_HF_LONGEST_TAIL = 162
+_HF_ROOM = _HF_WINDOWS_PATH_BUDGET - _HF_LONGEST_TAIL - 1
+
+
+def _within_hf_room(path: str) -> bool:
+    """True when ``path`` can hold the longest cache tail on this platform.
+
+    The budget is a Windows MAX_PATH limit. Off Windows every path qualifies.
+    """
+    if sys.platform != "win32":
+        return True
+    return len(path) <= _HF_ROOM
 
 
 def _user_hf_cache() -> str:
@@ -149,31 +165,52 @@ def ensure_hf_home() -> str:
            Windows when that models root exists, otherwise the user cache
            ('~/.cache/huggingface', or '$XDG_CACHE_HOME/huggingface')
 
+    A registry value or default longer than the Windows path room is
+    refused and not exported. An empty return means HF_HOME stays unset.
+    A value already in the process environment is kept.
+
     Result is cached for the lifetime of the process. Idempotent --
     safe to call from multiple module init paths.
 
-    Returns the absolute HF_HOME path. Also writes:
+    Returns the absolute HF_HOME path, or '' when nothing short enough
+    remains. Also writes, when a path is chosen:
         os.environ['HF_HOME']      = resolved value
         os.environ['HF_HUB_CACHE'] = <resolved value> / 'hub'
     """
-    if _CACHE["resolved"] and _CACHE["hf_home"]:
-        return _CACHE["hf_home"]
+    if _CACHE["resolved"]:
+        return _CACHE["hf_home"] or ""
 
-    # 1. Already in process env?
+    # 1. Already in process env? Prestartup owns that choice.
     env_val = (otr_env.get("HF_HOME") or "").strip()
     if env_val:
         resolved = env_val
         source = "os.environ"
     else:
-        # 2. Windows registry?
+        # 2. Windows registry, only when it fits the same room.
         reg_val = _read_hf_home_from_winreg()
+        if reg_val and not _within_hf_room(reg_val):
+            log.warning(
+                "OldTimeRadio: refused HKCU HF_HOME %s (%d characters); "
+                "longer than the %d-character room",
+                reg_val, len(reg_val), _HF_ROOM,
+            )
+            reg_val = None
         if reg_val:
             resolved = reg_val
             source = "HKCU\\Environment"
         else:
-            # 3. Default
+            # 3. Default, same room. A miss leaves HF_HOME unset.
             resolved = _default_hf_home()
             source = "default"
+            if not _within_hf_room(resolved):
+                log.warning(
+                    "OldTimeRadio: refused default HF_HOME %s "
+                    "(%d characters); leaving HF_HOME unset",
+                    resolved, len(resolved),
+                )
+                _CACHE["hf_home"] = ""
+                _CACHE["resolved"] = True
+                return ""
 
     # Export so downstream HF tooling picks it up automatically.
     otr_env.pin("HF_HOME", resolved)
@@ -307,6 +344,8 @@ def resolve_snapshot_dir(model_id: str, hf_home: str | None = None) -> str | Non
         log.info("[OTR_HF_ENV] model folder resolved %s -> %s", model_id, plain)
         return str(plain)
     home = hf_home or ensure_hf_home()
+    if not home:
+        return None
     candidates = _snapshot_candidates(model_id, home)
     if not candidates:
         log.debug(
@@ -355,6 +394,8 @@ def resolve_snapshot_file(
                  model_id, name, plain)
         return str(plain)
     home = hf_home or ensure_hf_home()
+    if not home:
+        return None
     for snapshot in _snapshot_candidates(model_id, home):
         candidate = snapshot / name
         try:

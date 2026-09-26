@@ -109,6 +109,21 @@ def test_the_declared_longest_tail_still_covers_every_real_spec():
         % (declared, worst, repo, filename, worst, _BUDGET - worst - 1))
 
 
+def _source_int(relative, name):
+    text = (_ROOT / relative).read_text(encoding="utf-8")
+    match = re.search(r"^%s\s*=\s*(\d+)\s*$" % re.escape(name), text, re.M)
+    assert match, "%s is not a plain int literal in %s" % (name, relative)
+    return int(match.group(1))
+
+
+def test_the_env_resolver_uses_the_same_room_literals():
+    """ensure_hf_home refuses with the same 259 and 162 prestartup uses."""
+    assert _source_int("nodes/_otr_hf_env.py", "_HF_WINDOWS_PATH_BUDGET") == (
+        _prestartup_constant("_OTR_WINDOWS_PATH_BUDGET"))
+    assert _source_int("nodes/_otr_hf_env.py", "_HF_LONGEST_TAIL") == (
+        _prestartup_constant("_OTR_LONGEST_HF_TAIL"))
+
+
 def test_the_budget_constant_is_259_in_both_places_that_use_it():
     """259, not 260. The off-by-one is the difference between pass and fail.
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -47,6 +48,33 @@ def _snapshot(home: Path, revision: str) -> Path:
     path.mkdir(parents=True)
     (path / "config.json").write_text("{}", encoding="utf-8")
     return path
+
+
+def test_a_too_long_registry_value_falls_through_to_the_default(monkeypatch):
+    """Prestartup refuses this pin. ensure_hf_home must not put it back."""
+    _reset_hf_cache()
+    monkeypatch.delenv("HF_HOME", raising=False)
+    monkeypatch.setattr(sys, "platform", "win32")
+    too_long = "R:\\" + ("r" * 120)
+    short = r"C:\ComfyUI-Models\huggingface"
+    monkeypatch.setattr(hf_env, "_read_hf_home_from_winreg", lambda: too_long)
+    monkeypatch.setattr(hf_env, "_default_hf_home", lambda: short)
+
+    assert hf_env.ensure_hf_home() == short
+    assert os.environ["HF_HOME"] == short
+    assert too_long not in os.environ["HF_HOME"]
+
+
+def test_a_too_long_default_leaves_hf_home_unset(monkeypatch):
+    _reset_hf_cache()
+    monkeypatch.delenv("HF_HOME", raising=False)
+    monkeypatch.setattr(sys, "platform", "win32")
+    too_long = "U:\\" + ("u" * 120)
+    monkeypatch.setattr(hf_env, "_read_hf_home_from_winreg", lambda: None)
+    monkeypatch.setattr(hf_env, "_default_hf_home", lambda: too_long)
+
+    assert hf_env.ensure_hf_home() == ""
+    assert os.environ.get("HF_HOME", "") != too_long
 
 
 def test_ensure_hf_home_exports_the_hub_subdirectory(monkeypatch, tmp_path):

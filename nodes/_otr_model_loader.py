@@ -1092,6 +1092,10 @@ def load_llm(
         # them here. An estimate is never forwarded as an explicit user setting.
         _hub_root = (Path(hub_root) if hub_root is not None
                      else Path(_OTR_HF.ensure_hf_home()) / "hub")
+        if hub_root is None and _hub_root.parent == Path("."):
+            raise ModelLoaderError(
+                "HF_HOME is unset; no cache root fits the Windows path budget"
+            )
         _hf_home_resolved = str(_hub_root.parent)
         _resolved_id = str(model_id_full).split(" ", 1)[0].strip()
         if context_verdict is not None:
@@ -2189,7 +2193,12 @@ def request_slot(
         _hub_root = None
     else:
         from . import _otr_hf_env as _otr_hf
-        _hub_root = Path(_otr_hf.ensure_hf_home()) / "hub"
+        _resolved_home = _otr_hf.ensure_hf_home()
+        if not _resolved_home:
+            raise ModelLoaderError(
+                "HF_HOME is unset; no cache root fits the Windows path budget"
+            )
+        _hub_root = Path(_resolved_home) / "hub"
         normalized = _otr_catalog.validate_model_id(model_id, hub_root=_hub_root)
 
     _policy = _policy_with_baked_quant(_policy, normalized)
