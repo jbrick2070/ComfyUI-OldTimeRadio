@@ -283,7 +283,7 @@ _NODE_MODULES = {
     # silent, no audio) -> OTR_MasterAudioMux (terminal, -c:a copy, NO
     # -shortest, byte-identical master). The type is tombstoned in the
     # workflow validator's DELETED_NODE_TYPES so any stale workflow JSON
-    # naming it fails loudly at validation; such graphs must be re-saved.
+    # naming it fails loudly at validation; such workflows must be re-saved.
     # Queue item 8 (2026-08-08): the NVIDIA-only RTX VSR upscaler
     # (nodes/rtx_upscale.py) was RIPPED and REPLACED by the device-
     # selectable upscale namespace at nodes/_otr_upscale_engines/. The new
@@ -444,7 +444,7 @@ if _otr_dup is None:
         print(f"[OldTimeRadio] OK - All {_total} nodes loaded successfully")
     else:
         print(f"[OldTimeRadio] Loaded {_loaded}/{_total} nodes ({_total - _loaded} failed)")
-# A first-time user has a menu full of nodes and no idea the episode graph
+# A first-time user has a menu full of nodes and no idea the episode workflow
 # exists. Registering
 # nodes is not the deliverable -- the workflow is. Point at it from the one place
 # they are already looking on first boot.
@@ -462,9 +462,9 @@ if _otr_dup is None:
 # prevent. Verified against the PUBLISHED bundle rather than the repo, because
 # .comfyignore decides what ships. The otr_canonical.jpg gallery thumbnail was
 # deleted 2026-09-11 (operator call): the still was an 8/22-era frame grab,
-# three weeks older than the graph it advertised. otr_story_only.json was
+# three weeks older than the workflow it advertised. otr_story_only.json was
 # deleted 2026-09-07. The gallery lists only the directory level
-# (`*/workflows/*.json`), so on 2026-09-25 the 24 machine variants moved up
+# (`*/workflows/*.json`), so on 2026-09-25 the 24 per-machine workflows moved up
 # from workflows/variants/ into workflows/ beside the canonical (operator: "we
 # can't store the variants in a subfolder") and the gallery now lists all 25.
 # The banner names the canonical, which runs on any machine, and points at
@@ -689,17 +689,17 @@ if _otr_dup is None:
         print(f"[OldTimeRadio] LLM folder registration skipped: {_otr_llm_err}")
 
 # =====================================================================
-# WEB_DIRECTORY -- the saved-graph schema boundary (js/workflow_schema.js).
+# WEB_DIRECTORY -- the saved-workflow schema boundary (js/workflow_schema.js).
 #
 # LiteGraph restores widget values POSITIONALLY, so a node that drops a widget
-# shifts every later value up by one on load: no error, no warning, a graph that
+# shifts every later value up by one on load: no error, no warning, a workflow that
 # looks fine and renders something else. That extension reconciles an older
-# saved graph against the schema this build declares, BY NAME, before the loader
+# saved workflow against the schema this build declares, BY NAME, before the loader
 # sees it -- or refuses and leaves the open canvas untouched.
 #
 # It has to own the loader call rather than hook `beforeConfigureGraph`: the
 # frontend runs those hooks through `invokeExtensionsAsync`, which catches and
-# merely logs whatever they throw, so throwing there cannot stop a stale graph.
+# merely logs whatever they throw, so throwing there cannot stop a stale workflow.
 #
 # ComfyUI serves this directory automatically when the module exports the name.
 # =====================================================================

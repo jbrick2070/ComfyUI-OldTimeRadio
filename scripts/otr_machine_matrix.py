@@ -385,7 +385,7 @@ def render() -> str:
       "`config/machine_classes.json` (the receipts) and `config/workflow_matrix.json` (the workflows). "
       "Do not hand-edit; regenerate.**\n")
     A("Find your listed machine in **What works on what machine**. Apple "
-      "Silicon and CPU-only systems still have experimental profiles rather "
+      "Silicon and CPU-only systems still have experimental rows rather "
       "than a stranger-facing machine key; find those in the tier details.\n")
 
     # ---- evidence first, then the front-door machine answer ----------------
@@ -394,7 +394,7 @@ def render() -> str:
     A("Only receipt-backed rows appear here. **PROVEN** means a full OTR "
       "episode published on the named hardware. **LAB-PROVEN** means an "
       "isolated recipe produced valid media there; it does not promote the "
-      "full OTR profile. A setup, model load, queued prompt, reserve clamp, or "
+      "full OTR workflow. A setup, model load, queued prompt, reserve clamp, or "
       "run still in progress is unqualified and does not appear.\n")
     A("| engine | proof | hardware | exact scope | receipt |")
     A("|---|---|---|---|---|")
@@ -441,7 +441,7 @@ def render() -> str:
             cells.get("char_voice", "--"), cells.get("music", "--"),
             cells.get("image", "--"), extra_install_for(cells), conf))
     A("")
-    A("**Use the machine key, not an experimental profile name.** Run these "
+    A("**Use the machine key, not an experimental row's id.** Run these "
       "with the exact Python executable that launches ComfyUI (shown as "
       "`<ComfyUI Python>`). Preview the install plan first, then run the same "
       "command without `--list` to install it.\n")
@@ -454,8 +454,9 @@ def render() -> str:
       "otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 "
       "--machine 8gb --act-count 1 --source-bank original --visual-style "
       "sci_fi_radio --timeout 0`, replacing only the exact machine key. To use "
-      "an explicit profile instead, replace `--machine 8gb` with `--profile "
-      "<exact-profile-id>`; the two selectors are intentionally exclusive. "
+      "an explicit workflow row instead, replace `--machine 8gb` with `--profile "
+      "<exact-profile-id>`; the two selectors are intentionally exclusive "
+      "(`--profile` is the flag name on both scripts; it selects a row by id). "
       "Every machine row selects the Kokoro voice. On the Python 3.13 that "
       "ComfyUI Desktop and the portable build ship it runs through kokoro-onnx "
       "on the CPU (the same voices, about six times faster than realtime); on "
@@ -471,7 +472,7 @@ def render() -> str:
       "Read `apple/MAC.md` before starting -- it ships with the pack, unlike "
       "`docs/`. CPU-ONLY IS PROVEN ON THE CANONICAL ITSELF, 2026-09-13: "
       "ComfyUI launched with `--cpu` on an x86 laptop, the GPU present and "
-      "unused, ran `otr_canonical` with no profile and no overrides -- "
+      "unused, ran `otr_canonical` with no row override and no other overrides -- "
       "exactly what the quickstart tells a stranger to open -- and published "
       "a 2m07s episode to `otr/obs/` in 19 minutes 54 seconds. The writer is "
       "nearly all of that: Qwen3.5-4B generates at about 3 tokens a second "
@@ -492,7 +493,7 @@ def render() -> str:
     A("| **LAB-PROVEN** | an isolated recipe produced receipt-bearing media on named physical hardware; not a full OTR episode. |")
     A("| **EPISODE PATH PROVEN** | the components actually invoked by the named episode path published; an unused configured lane is not included. |")
     A("| **COMPONENTS PROVEN** | named components published on named hardware, but this exact row as one tuple is not certified. |")
-    A("| `shipping` | the profile is considered runtime-ready on a preloaded machine. It is neither hardware proof nor a complete clean-install claim. |")
+    A("| `shipping` | the workflow is considered runtime-ready on a preloaded machine. It is neither hardware proof nor a complete clean-install claim. |")
     A("| `draft` | exists, not vouched for. Try it; expect to debug. |")
     A("")
     A("Nothing here is inferred from \"it looks like it should fit\". A blank is "
@@ -507,7 +508,7 @@ def render() -> str:
         if not rows:
             continue
         ship = sum(1 for r in rows if r["status"] == "shipping")
-        A("## %s  --  %d experimental profile(s), %d shipping\n"
+        A("## %s  --  %d experimental workflow(s), %d shipping\n"
           % (tier, len(rows), ship))
         # Only PROVEN and shipping rows are tabled. A tier holding 76 drafts is
         # a dump, not a guide: a reader picking a row cannot tell which of 76 to
@@ -516,7 +517,7 @@ def render() -> str:
         headline = [r for r in rows if r["status"] == "shipping"]
         drafts = [r for r in rows if r not in headline]
         if headline:
-            A("| profile | video | voice | music | image | confidence | install recipe |")
+            A("| row | video | voice | music | image | confidence | install recipe |")
             A("|---|---|---|---|---|---|---|")
             for r in sorted(headline, key=lambda x: x["id"]):
                 conf = "`%s`" % r["status"]
@@ -525,14 +526,14 @@ def render() -> str:
                     conf, r["install_recipe"]))
             A("")
         else:
-            A("**No shipping experimental profile at this tier.**\n")
+            A("**No shipping row at this tier.**\n")
         if drafts:
             eng = sorted({r["video"] for r in drafts})
-            A("<details><summary>%d draft profile(s) here -- not vouched for"
+            A("<details><summary>%d draft workflow(s) here -- not vouched for"
               "</summary>\n" % len(drafts))
             A("Video engines they select: %s\n"
               % ", ".join("`%s`" % e for e in eng))
-            A("| profile | video | voice |")
+            A("| row | video | voice |")
             A("|---|---|---|")
             for r in sorted(drafts, key=lambda x: x["id"]):
                 A("| `%s` | %s | %s |" % (r["id"], r["video"], r["voice"]))

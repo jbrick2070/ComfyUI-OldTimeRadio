@@ -72,7 +72,7 @@ def _resolution(engine, name):
     """What the engine promises about output size.
 
     Local adapters do NOT have a static resolution: ``_aspect_plan`` /
-    ``_aspect_policy`` negotiate it per render from the canvas and the profile.
+    ``_aspect_policy`` negotiate it per render from the canvas and the workflow.
     Recording a number for them would be recording a number the code never
     promised, so they record the mechanism instead.
     """
@@ -412,7 +412,7 @@ without that map would play ~4% short.
   This omission was itself the defect. Refusing to print a local resolution
   "because the code never promised one" is exactly how `wan_i2v` came to sit on
   the shared 1472x832 landscape default with no opinion of its own, and how a
-  profile asking for 832x480 could fail to reach the render. The number IS
+  workflow asking for 832x480 could fail to reach the render. The number IS
   resolvable -- it is just resolved in three different places -- so the
   **effective canvas** column now walks the same precedence the driver walks and
   names which authority won.

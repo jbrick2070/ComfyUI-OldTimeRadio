@@ -11,16 +11,16 @@ shows.
 
 **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio** (named
 after the pack's folder, so a git clone lists it as **ComfyUI-OldTimeRadio**).
-Start with **`otr_canonical`**. That is the authored graph, and it is the
+Start with **`otr_canonical`**. That is the canonical workflow, and it is the
 one to start with on any machine: it names no vendor anywhere and resolves your
 GPU at run time, so the same file is correct on NVIDIA, on Apple Silicon and on
 CPU. (Dragging `workflows/otr_canonical.json` onto the canvas loads the same
 file.)
 
-If you would rather have a graph pre-set for your hardware, the other entries in
+If you would rather have a workflow pre-set for your hardware, the other entries in
 the same list are exactly that -- the canonical with its dropdowns set for one
 machine (`otr_8gb_still`, `otr_16gb_video`, `otr_mac16_low`, ...).
-[MACHINES.md](MACHINES.md#which-graph-do-i-open) names the one for your machine.
+[MACHINES.md](MACHINES.md#which-workflow-do-i-open) names the one for your machine.
 
 ## Press Queue
 
@@ -145,7 +145,7 @@ download is, and whether it needs another node pack.
 
 **The render stops naming a missing class.** The lane you picked needs a
 third-party node pack. The error names the pack and its URL; install it into
-`custom_nodes/`, restart, try again. [MACHINES.md](MACHINES.md#which-graph-do-i-open) lists
+`custom_nodes/`, restart, try again. [MACHINES.md](MACHINES.md#which-workflow-do-i-open) lists
 which lanes these are.
 
 **The render stops naming a missing file.** The lane you picked needs weights

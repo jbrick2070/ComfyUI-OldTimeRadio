@@ -14,8 +14,8 @@ This is the largest download in the pack and usually the longest part of a run.
 It is also the one choice where picking a model your machine cannot hold costs
 you the whole episode.
 
-You do not have to choose -- every pre-set graph already ships a writer that
-fits its own tier. Which one depends on which graph you opened:
+You do not have to choose -- every pre-set workflow already ships a writer that
+fits its own tier. Which one depends on which workflow you opened:
 
 | Graph | Both slots ship |
 |---|---|
@@ -25,25 +25,25 @@ fits its own tier. Which one depends on which graph you opened:
 | Comfy Cloud cheap (`otr_cloud_low*`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
 | Comfy Cloud deluxe (`otr_cloud_deluxe_3act`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
 
-The Comfy Cloud graphs and the shipping CPU graph use the same cheap pair
+The Comfy Cloud workflows and the shipping CPU workflow use the same cheap pair
 -- Sonnet 5 to write, Luna for JSON -- and bill Credits rather than VRAM.
 Leaving those two dropdowns alone is still the right answer there.
 
 **Qwen3.5-4B** is the only writer here with a finished episode to its name on
 an 8 GB NVIDIA card, a 16 GB NVIDIA card and a 16 GB Mac, and it
-downloads itself. It is also what the AMD graph ships, and the Radeon episode of
-2026-09-14 ran that graph unedited -- but [MACHINES.md](MACHINES.md) still marks
+downloads itself. It is also what the AMD workflow ships, and the Radeon episode of
+2026-09-14 ran that workflow unedited -- but [MACHINES.md](MACHINES.md) still marks
 this writer's AMD cell `?`, because the tester's artifacts attest the engines
 that emit their own ids (`still_motion`, `kokoro`, `z_image_turbo`,
 `viz_mxc_cpu`), not the model that wrote the script. Leaving both slots alone
 is a good answer on every one of those machines, AMD included.
 The 16 GB+
-NVIDIA graphs -- the pack's flagship tier -- ship the bigger `gemma-4-12b-it`
+NVIDIA workflows -- the pack's flagship tier -- ship the bigger `gemma-4-12b-it`
 instead; leaving those two slots alone is still a good answer there, but it
 means a roughly 24 GB download the first time you Queue, not the 8.7 GB one
 described below. That 12B identity is NF4 baked into `google/gemma-4-12b-it`
 -- there is no other 12B variant and no second Quant knob. It is the only
-Gemma 4 12B in the catalog and in every shipping graph that uses it. Mac and
+Gemma 4 12B in the catalog and in every shipping workflow that uses it. Mac and
 AMD stay on Qwen.
 
 ---
@@ -71,17 +71,17 @@ headroom for a larger creative one.
 
 This is the advertised list, exactly as the dropdown spells it. You can still
 pick any of them -- Qwen 3.5 4B is what the pack *ships* on 8 GB, and
-`google/gemma-4-12b-it` is what the 16 GB NVIDIA graphs *ship*.
+`google/gemma-4-12b-it` is what the 16 GB NVIDIA workflows *ship*.
 
 | What the dropdown says | Download | Licence | Worth knowing |
 |---|---|---|---|
 | `Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)` | 8.7 GB | Apache 2.0 | **The one Qwen.** NVIDIA loads NF4 (`nv8-nf4`). Mac / CPU load full (`mac16-tight`). There is no second Qwen row. |
 | `unsloth/Llama-3.2-3B-Instruct (6.4 GB download, mac16 nv8 nv16 nv24)` | 6.4 GB | Llama 3.2 Community | **The no-quantization row.** It is the one to pick if your machine has no `bitsandbytes` -- AMD above all. Nobody has published an episode with it yet. |
-| `mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB download, nv16-nf4 nv24-nf4)` | 24.0 GB | Apache 2.0 | Not what the 16 GB NVIDIA graphs ship (that is `gemma-4-12b-it`, below) -- an earlier writer, still proven on 16 GB+ NVIDIA, and the pack's audio regression baseline. |
+| `mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB download, nv16-nf4 nv24-nf4)` | 24.0 GB | Apache 2.0 | Not what the 16 GB NVIDIA workflows ship (that is `gemma-4-12b-it`, below) -- an earlier writer, still proven on 16 GB+ NVIDIA, and the pack's audio regression baseline. |
 | `google/gemma-4-E2B-it (6.0 GB download, mac16-tight nv8 nv16 nv24)` | 6.0 GB | Apache 2.0 | Compact technical-slot option. Loads the native text decoder (PBUG-20260906-07). OOM on a 16 GB Mac -- do not pick it there. |
 | `google/gemma-4-E4B-it (9.0 GB download, mac16-tight nv8-nf4 nv16 nv24)` | 9.0 GB | Apache 2.0 | Same family, a size up. Proven on 16 GB NVIDIA. |
-| `google/gemma-4-12b-it (23.9 GB download, nv16-nf4 nv24-nf4)` | 23.9 GB | Apache 2.0 | What the ordinary 16 GB NVIDIA graphs ship with. NF4 is baked into the pick -- there is no other 12B variant, so you do not also change Quant. Canonical stays Qwen; switch this row and it loads NF4 even if Quant still says `none`. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |
-| `Qwen/Qwen3.8-27B (51.8 GB download, nv24-nf4)` | 51.8 GB | Apache 2.0 | **The big-card writer**, and the only row here that asks for more than 24 GB of card. Same architecture as the Qwen above it, six times the parameters, and prose quality is the only thing it buys -- it is about a quarter slower than `gemma-4-12b-it`. NF4 is baked into the pick. Measured on an RTX 5090: 17.7 GB resident, coherent prose, and constrained JSON that parsed. No graph ships it and nobody has published an episode with it yet -- pick it deliberately, and mind that the download is over 50 GB. |
+| `google/gemma-4-12b-it (23.9 GB download, nv16-nf4 nv24-nf4)` | 23.9 GB | Apache 2.0 | What the ordinary 16 GB NVIDIA workflows ship with. NF4 is baked into the pick -- there is no other 12B variant, so you do not also change Quant. Canonical stays Qwen; switch this row and it loads NF4 even if Quant still says `none`. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |
+| `Qwen/Qwen3.8-27B (51.8 GB download, nv24-nf4)` | 51.8 GB | Apache 2.0 | **The big-card writer**, and the only row here that asks for more than 24 GB of card. Same architecture as the Qwen above it, six times the parameters, and prose quality is the only thing it buys -- it is about a quarter slower than `gemma-4-12b-it`. NF4 is baked into the pick. Measured on an RTX 5090: 17.7 GB resident, coherent prose, and constrained JSON that parsed. No workflow ships it and nobody has published an episode with it yet -- pick it deliberately, and mind that the download is over 50 GB. |
 | `google/gemma-2-2b-it (5.2 GB download, gated mac16 nv8 nv16 nv24)` | 5.2 GB | Gemma Terms of Use | The smallest of all, and **the only one that needs a Hugging Face login**. Intended as a `technical_model`, not a creative one. |
 
 The local rows download themselves except the gated Gemma 2 pick, which still needs a Hugging Face login.
@@ -117,9 +117,9 @@ tags instead of one number.
 
 The recorded result of running `google/gemma-4-E2B-it` on a 16 GB Mac is out of
 memory. On a Mac that is a hard reboot, not a failed render. Leave it off a
-Mac graph even though the dropdown still lists it.
+Mac workflow even though the dropdown still lists it.
 
-**On a Mac, use the default.** `Qwen/Qwen3.5-4B` is what the Mac graphs ship
+**On a Mac, use the default.** `Qwen/Qwen3.5-4B` is what the Mac workflows ship
 with and what every episode published on an M4 used.
 
 ---
@@ -206,8 +206,8 @@ matter which row you choose. Once the policy is `none` the model loads at full
 size, so pick one your machine can hold unquantized -- roughly four times its
 4-bit size.
 
-The pre-set AMD, Mac and CPU graphs already ship with that policy set to `none`,
-so this only comes up if you changed it or built a graph yourself.
+The pre-set AMD, Mac and CPU workflows already ship with that policy set to `none`,
+so this only comes up if you changed it or built a workflow yourself.
 
 **"InsufficientDiskSpaceError".** Exactly what it says, with the arithmetic
 shown. Free up space and Queue again.
@@ -221,7 +221,7 @@ swaps them in and out of memory throughout the run. Set them the same.
 
 **Nothing substitutes itself, ever.** If the model you chose cannot load, the
 run stops and says so. It will never quietly write your episode with a different
-model than the one the graph names.
+model than the one the workflow names.
 
 ---
 

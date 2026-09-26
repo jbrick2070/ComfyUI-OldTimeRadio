@@ -244,7 +244,7 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
     lines = [
         f"## {profile_id}",
         "",
-        f"- graph: `{variant_rel}`",
+        f"- file: `{variant_rel}`",
         f"- workflow: `{profile_id}` ({profile.get('display_name')})",
         f"- status: {profile.get('status')}",
         f"- platform/backend/vendor: {profile.get('platform')}/"
@@ -325,7 +325,7 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
         # including profiles pinned to the cairo-free viz_mxc_cpu -- an
         # install step a tester would have paid for nothing.
         *(["- minimal Linux: libcairo2-dev + pkg-config, then `pip install "
-           "pycairo` (this graph selects `viz_mxc_mandala`)."]
+           "pycairo` (this workflow selects `viz_mxc_mandala`)."]
           if "viz_mxc_mandala" in json.dumps(profile.get("role_overrides") or {})
           else []),
         "",
@@ -351,11 +351,11 @@ def render_launch_recipes(recipes: list[tuple[str, str]]) -> str:
         "not hand-edit. Run `python scripts/build_variants.py --all` to rebuild "
         "it; `--check` fails when it drifts.",
         "",
-        "One section per per-machine graph in `workflows/`: the ComfyUI launch "
+        "One section per per-machine workflow in `workflows/`: the ComfyUI launch "
         "arguments, environment, music per bank, required key NAMES and install "
-        "pointers for running that graph headless from the git clone. "
+        "pointers for running that workflow headless from the git clone. "
         "`workflows/otr_canonical.json` runs on any machine and needs none of "
-        "this; `apple/MACHINES.md` says which graph fits which card.",
+        "this; `apple/MACHINES.md` says which workflow fits which card.",
         "",
         "## Contents",
         "",
@@ -541,12 +541,12 @@ def cmd_check() -> int:
             f"{len(stray)} .launch.md file(s) are back in workflows/ "
             f"({stray[0]} ...); the recipes live in "
             "apple/LAUNCH_RECIPES.md since 2026-09-25 and workflows/ holds "
-            "only graphs")
+            "only workflows")
     if RETIRED_VARIANTS_DIR.is_dir() and any(RETIRED_VARIANTS_DIR.iterdir()):
         failures.append(
-            "workflows/variants/ is back with files in it; the variants live "
-            "in workflows/ since 2026-09-25, and a graph in the subfolder is "
-            "invisible to the template gallery")
+            "workflows/variants/ is back with files in it; the per-machine "
+            "workflows live in workflows/ since 2026-09-25, and a workflow in "
+            "the subfolder is invisible to the template gallery")
     if not committed:
         # The canonical's own gallery thumbnail is checked even with no
         # variants (Sonnet QA on 7cf82cda: this early return skipped it).

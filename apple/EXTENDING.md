@@ -4,13 +4,13 @@ What you can add: an **engine** (a way of rendering video, images, speech,
 music or an upscale), a **source bank** (a place stories come from), a
 **writer LLM** (the model that writes the script), an **episode language**
 (a registry row that binds writing, voices, captions and credits), and a
-**shipped workflow** (a saved graph for a machine or a Comfy Cloud stack). They are
+**shipped workflow** (a saved workflow for a machine or a Comfy Cloud stack). They are
 different jobs.
 Engines are a Python file in this repo. A source bank can be a folder of your
 own that this repo never sees. A writer LLM is either a snapshot in your
 Hugging Face cache, or a curated row in the catalog. A language is data only
 when Kokoro already has a real code and voice set for it. A shipped workflow
-is a row in a JSON matrix, not a graph you type.
+is a row in a JSON matrix, not a workflow you type.
 
 Read the one page first. Then [PREFLIGHT.md](PREFLIGHT.md) is the checklist that
 says whether what you built will actually work. The writer page is
@@ -64,7 +64,7 @@ says whether what you built will actually work. The writer page is
 - **A shipped workflow is a matrix row, not a JSON you write.** Edit
   `config/workflow_matrix.json`, then `python scripts/build_variants.py --all`.
   Every `workflows/otr_*.json` except the canonical is generated. The canonical
-  is the one graph you may author.
+  is the one workflow you may author.
 
 - **Removing is the same job as adding, done atomically** — registry row, module,
   pipeline entries, tests, and a grep that returns exactly the survivors you
@@ -118,9 +118,9 @@ needs it.
 ## Adding a video lane that is just new weights
 
 This is the common case and the short one. A **lane** is a value in the video
-engine dropdown, so adding one gives every graph a new option -- the canonical
+engine dropdown, so adding one gives every workflow a new option -- the canonical
 included -- without adding a single JSON file. Somebody with a bigger card
-picks it and renders; nobody has to find a special graph.
+picks it and renders; nobody has to find a special workflow.
 
 If your lane is the same recipe on a different build of the same model, it is
 a subclass that changes one thing. The LTX 2.5 tiers are already built this
@@ -154,7 +154,7 @@ Then four things, none of them long:
    are regenerated, not hand-edited, and [PREFLIGHT.md](PREFLIGHT.md) has the
    commands.
 
-**Do not reach for a new matrix row and a new variant JSON to do this.** When
+**Do not reach for a new matrix row and a new workflow JSON to do this.** When
 the difference is which weights load, it is a lane, and a lane costs the user
 one dropdown instead of one download. When the saved pins themselves should
 differ -- a smaller writer on 8 GB, a cloud partner stack -- that is
@@ -164,29 +164,29 @@ differ -- a smaller writer on 8 GB, a cloud partner stack -- that is
 
 ## Adding or changing a shipped workflow
 
-A **shipped workflow** is a saved graph a person can open from Browse Templates:
-the canonical, or one of the per-machine graphs listed beside it.
+A **shipped workflow** is a saved workflow a person can open from Browse Templates:
+the canonical, or one of the per-machine workflows listed beside it.
 It is not an engine and it is not a lane. A lane is a dropdown value every
-graph already has; the section above is that job. Reach for a new graph only
+workflow already has; the section above is that job. Reach for a new workflow only
 when the *saved pins* should differ -- a smaller writer on 8 GB, a cloud
 partner stack, a Mac device policy.
 
 **The source of truth is one file: `config/workflow_matrix.json`.** Each row is
 one workflow. Edit that file. Do not hand-edit any `workflows/otr_*.json`
 other than the canonical -- those JSON files and their launch recipes in
-`apple/LAUNCH_RECIPES.md` are generated, and the next rebuild silently undoes you. A new shipping graph is a
+`apple/LAUNCH_RECIPES.md` are generated, and the next rebuild silently undoes you. A new shipping workflow is a
 matrix row only -- there is no second place a workflow can be defined.
 
 This wants the git clone. `scripts/` is not in a registry install.
 
 ### Two jobs, two files
 
-**Changing the authored graph** -- a new node, a new socket, a new widget -- is
+**Changing the authored workflow** -- a new node, a new socket, a new widget -- is
 an edit to `workflows/otr_canonical.json`, in the same change as the node
 code. Unwired code is dead. Do not add an `example_workflows/` folder --
 ComfyUI mounts both at the same URL and the gallery 404s. Do not drop a
 hand-written JSON next to the canonical either: every other `workflows/*.json`
-is a generated per-machine graph, the gallery lists them all, and
+is a generated per-machine workflow, the gallery lists them all, and
 `tests/test_workflow_templates_single_folder.py` holds that set to the
 canonical plus exactly the matrix's shipping rows. (They lived in
 `workflows/variants/` until 2026-09-25, where the gallery never saw them.)
@@ -197,10 +197,10 @@ that is not last is three edits, not one: drop the value, drop the `inputs`
 descriptor, and repair every later link's `dst_slot` (it is an index into that
 same array). Trailing widgets are cheap; mid-list ones are not.
 
-If the new widget is something a machine graph should pin, add it to
+If the new widget is something a machine workflow should pin, add it to
 `config/widget_map.json` as well, or the matrix cannot reach it.
 
-**Changing what a machine graph pins** -- writer, lanes, voices, ceiling,
+**Changing what a machine workflow pins** -- writer, lanes, voices, ceiling,
 device -- is an edit to that row's `deltas` in the matrix. The canonical is
 left alone.
 
@@ -209,7 +209,7 @@ left alone.
 Copy the closest sibling. Then:
 
 1. **Give it an id** (`otr_8gb_video` style) and a `display_name` a person can
-   read. Set `"ships": true` or it will not emit a graph -- a new row defaults
+   read. Set `"ships": true` or it will not emit a workflow -- a new row defaults
    to *not* shipping, which is the safe direction.
 2. **State every key in `key_indicators`.** The list is at the top of the
    matrix. Writer, ceiling, visual lanes, video engine, voices, act shape,
@@ -227,8 +227,8 @@ Copy the closest sibling. Then:
    (`nvidia`, `amd`, `apple`, `none`). It is not in `defaults`. Every shipping
    row states it. Omit it and an AMD/cuda row gets the NVIDIA launch recipe,
    and a pinned engine that `requires_vendor` is refused at emit. `allow_sidecars`
-   defaults false; set it true only if this graph should offer engines that
-   declare `requires_sidecar`. `preflight.required_keys` is the cloud graphs.
+   defaults false; set it true only if this workflow should offer engines that
+   declare `requires_sidecar`. `preflight.required_keys` is the cloud workflows.
 
 Do not put a JSON in `workflows/` for the new row. Browse Templates stays one
 card.
@@ -240,10 +240,10 @@ python scripts/build_variants.py --all
 python scripts/build_variants.py --check
 ```
 
-`--all` writes the variant JSON, the launch recipes
-(`apple/LAUNCH_RECIPES.md`, one section per graph), and the generated docs
+`--all` writes the per-machine workflow JSON, the launch recipes
+(`apple/LAUNCH_RECIPES.md`, one section per workflow), and the generated docs
 (`apple/MACHINES.md`, `apple/DROPDOWN_MATRIX.md`, `apple/MACHINE_MATRIX.md`)
-from the same matrix. `--check` diffs the committed variants against a fresh
+from the same matrix. `--check` diffs the committed workflows against a fresh
 regeneration and fails on drift.
 
 A wiring or widget change also wants these four green:
@@ -256,7 +256,7 @@ A wiring or widget change also wants these four green:
 The first three can all pass while the links are broken. The fourth is the one
 that catches a mid-list widget removal.
 
-Other apple pages that name a specific graph -- [WRITERS.md](WRITERS.md),
+Other apple pages that name a specific workflow -- [WRITERS.md](WRITERS.md),
 [VIDEO_MODELS.md](VIDEO_MODELS.md), [MAC.md](MAC.md) -- are hand-kept. Update
 the one that would otherwise lie.
 
@@ -266,11 +266,11 @@ Set `"ships"` false (or delete the row), **and delete** the matching
 `workflows/<id>.json` that `--all` emitted, then re-run `--all` so its section
 leaves `apple/LAUNCH_RECIPES.md`. Leaving the files is not enough to fail `--check`: a row that still
 exists -- even with `"ships"` false -- is what `load_profile` reads, so the
-leftover graph regenerates cleanly.
+leftover workflow regenerates cleanly.
 
 ### The proof
 
-One real run of that graph that lands a file in `otr/obs/`. Green `--check`
+One real run of that workflow that lands a file in `otr/obs/`. Green `--check`
 proves the generator, not the episode.
 
 ---

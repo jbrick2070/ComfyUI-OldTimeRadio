@@ -63,7 +63,7 @@ The floor is 6.1, where FFmpeg's MP4 muxer gained PCM. Measured on
 machines: 4.4.2 fails; 7.0.2-static, 8.0.1 and 9.0 pass. No 6.x build has
 been run, so the floor is documented rather than measured.
 **You do not have to work this out.** Nothing reads the version number --
-`OTR_WorkflowValidator` muxes a fifth of a second of silence when a graph
+`OTR_WorkflowValidator` muxes a fifth of a second of silence when a workflow
 containing the mux is queued, and refuses in about a second if the build
 cannot do it.
 
@@ -192,13 +192,13 @@ hf auth login
 ```
 
 That stores a token in your Hugging Face config. **Do not paste a token into a
-workflow widget** — no node here asks for one, and a token saved in a graph
-travels with the graph.
+workflow widget** — no node here asks for one, and a token saved in a
+workflow travels with it.
 
 **Everything lands inside your ComfyUI models tree**, not in your home
 directory, in two places:
 
-- **The writer** (`Qwen/Qwen3.5-4B` on most graphs, ~8.7 GB) goes to
+- **The writer** (`Qwen/Qwen3.5-4B` on most workflows, ~8.7 GB) goes to
   `models/LLM/Qwen--Qwen3.5-4B/` as ordinary files -- a normal ComfyUI model
   folder, relocatable with an `LLM:` entry in `extra_model_paths.yaml`. No
   symlinks, so Windows never asks for Developer Mode. If you already have the
@@ -214,10 +214,10 @@ you end up with two copies of everything.
 
 ## Node packs, only for some lanes
 
-Most lanes need nothing beyond this pack. A few build their graph out of classes
+Most lanes need nothing beyond this pack. A few build their picture out of classes
 that belong to someone else's pack, and those are listed per engine in
-[MACHINES.md](MACHINES.md#which-graph-do-i-open) -- with which of the shipped machine
-graphs needs which. If you pick one of those lanes without its pack, the render
+[MACHINES.md](MACHINES.md#which-workflow-do-i-open) -- with which of the shipped
+workflows needs which. If you pick one of those lanes without its pack, the render
 stops with an error naming the pack and its URL.
 
 ---

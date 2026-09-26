@@ -513,9 +513,9 @@ can fetch them itself.
 A few engines build their graph out of another pack's nodes. Those are ComfyUI
 node packs, not Python packages, so `pip` cannot supply them. Install them into
 `custom_nodes/` and restart. Nothing the canonical selects needs any of these.
-The AnimateDiff lanes -- the graphs `otr_8gb_animatediff.json`,
-`otr_16gb_animatediff.json` and `otr_mac16_animatediff.json`, each resolving
-the profile of the same name -- want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
+The AnimateDiff lanes -- the workflows `otr_8gb_animatediff.json`,
+`otr_16gb_animatediff.json` and `otr_mac16_animatediff.json`, each built from
+the matrix row of the same name -- want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
 `ltx098_low_video` wants [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo)
 plus the one-file patch described in [patches/README.md](patches/README.md). The
 LTX 2.5 lanes use nodes that ship with ComfyUI itself.
@@ -701,10 +701,10 @@ holds, so it ships off; on a much larger model the switch is
 `otr_amd_still.json` end to end on a Radeon AI PRO R9700
 (RDNA4) under ROCm 7.2 on Ubuntu 24.04, 2026-09-14, with no edits to the graph,
 and published a finished episode. Nobody on the project owns a Radeon, so what
-is proven is the still tier on that one card: RDNA3, Windows and the 8 GB AMD
-profile are still unmeasured. The profile ships `draft` because `status`
+is proven is the still tier on that one card: RDNA3, Windows and an 8 GB AMD
+workflow are still unmeasured. `otr_amd_still` ships `draft` because `status`
 records promotion, not proof.
-[apple/ROCM.md](apple/ROCM.md) has the graph, the lab profiles, a five-minute
+[apple/ROCM.md](apple/ROCM.md) has the workflow, the lab notes, a five-minute
 probe that downloads nothing, and the open questions. The first episode off a
 Radeon earns its author the AMD column in
 [apple/MACHINES.md](apple/MACHINES.md).
@@ -776,7 +776,7 @@ canonical ships:
 
 - **Cloud-lane fixtures.** The Google video adapters and a cloud LTX receipt
   test fail on a partner-result contract the fixture no longer satisfies, and
-  the cloud variant graphs drift from their expected-widget list.
+  the cloud workflows drift from their expected-widget list.
 - **Artifacts that are not on this machine.** Some receipts cite audition
   wavs under `otr/episodes/lemmy_cross_engine/` by hash. The files were
   removed from the maintainer's output tree and the receipts still name them.
@@ -790,7 +790,7 @@ canonical ships:
   `reserved_for` field names him outranks the shared catalogue entry --
   his own recordings on indextts2/chatterbox/dia, a shared voice from
   `RECURRING_CHARACTER_VOICES` on kokoro/cloud_elevenlabs/google_tts.
-- **Profile and sweep checks.** A few 8 GB video profiles declare a canvas
+- **Workflow and sweep checks.** A few 8 GB video workflows declare a canvas
   their engine overrules, a static sweep finds LLM call sites without a slot
   tag, and the auto-download disk-space precheck reads this machine's free
   space.

@@ -17,7 +17,7 @@ see.** The three video lanes the canonical selects -- `viz_mxc_cpu`,
 no image and write no prompt, so there is nothing for a style to dress. Switch
 a video lane to one that draws a picture and this becomes one of the strongest
 controls on the graph. [Where you actually see it](#where-you-actually-see-it)
-says which shipped graph is which.
+says which shipped workflow is which.
 
 ---
 
@@ -46,13 +46,13 @@ it.
 
 ## roll (any style)
 
-`roll (any style)` sits at the top of the dropdown, and every graph that ships
-with this pack -- the canonical and every variant -- is saved on it. It
+`roll (any style)` sits at the top of the dropdown, and every workflow that ships
+with this pack -- the canonical and every per-machine workflow -- is saved on it. It
 is a command, not a style: at run time it draws one of the ids above at
 equal odds, and the episode uses that.
 
 Drop a fresh **OTR_LedgerScriptWriter** on the canvas yourself and it starts on
-`sci_fi_radio` instead. Only the saved graphs ship on the roll.
+`sci_fi_radio` instead. Only the shipped workflows ship on the roll.
 
 Two consequences worth knowing:
 
@@ -68,7 +68,7 @@ Two consequences worth knowing:
 A style is carried by a *prompt*. Lanes that write a prompt wear it; lanes that
 draw their own frames from the audio do not.
 
-| Shipped graph | Its video lanes | Does the style show? |
+| Shipped workflow | Its video lanes | Does the style show? |
 |---|---|---|
 | `otr_canonical`, `otr_16gb_low`, `otr_8gb_low`, `otr_mac16_low` | `viz_mxc_cpu`, `viz_mxc_mandala`, `viz_green`, `viz_camera` | **No.** Audio-reactive; no image, no prompt. |
 | `otr_16gb_still`, `otr_amd_still` | two audio-reactive plus `still_motion` | **On the character beats only.** |
@@ -77,7 +77,7 @@ draw their own frames from the audio do not.
 | `otr_16gb_video`, `otr_8gb_video`, `otr_mac16_video`, `otr_16gb_foley`, `otr_16gb_mime` | the LTX lanes | **Yes, everywhere.** |
 | `otr_16gb_animatediff`, `otr_8gb_animatediff`, `otr_mac16_animatediff` | the AnimateDiff lanes | **Yes, everywhere.** These mint no still but write their own styled prompt and their own negative. |
 
-[MACHINES.md](MACHINES.md#which-graph-do-i-open) names the variant file for your machine.
+[MACHINES.md](MACHINES.md#which-workflow-do-i-open) names the workflow file for your machine.
 If you are on the canonical and want to see a style, the change you want is on
 **OTR_VideoDirector**: switch `announcer_video_model`, `music_video_model` and
 `character_video_model` off the `viz_` lanes. Check the lane against your
@@ -173,7 +173,7 @@ Nearly always one of these, in this order:
 - **You picked a style and the picture did not change.** Your video lanes are
   audio-reactive. See [Where you actually see it](#where-you-actually-see-it).
   This is the answer far more often than anything else on this page.
-- **You were on the roll and did not notice.** Every shipped graph is. Read
+- **You were on the roll and did not notice.** Every shipped workflow is. Read
   the code in the filename.
 - **The look changes between two runs on the same setting.** You are on
   `visual_storybased`, which is written fresh each episode by design.
