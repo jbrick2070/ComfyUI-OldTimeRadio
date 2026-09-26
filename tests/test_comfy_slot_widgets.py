@@ -541,8 +541,10 @@ def test_writer_appends_comfy_slots_after_openrouter():
         "openrouter_slot_a_model", "openrouter_slot_b_model",
         "comfy_slot_a_model", "comfy_slot_b_model",
     ])
-    # The hidden auth input is declared but is NOT a widget (absent from order).
-    assert "api_key_comfy_org" in spec.get("hidden", {})
+    # Plan 0k: the writer no longer declares the hidden Comfy key at all --
+    # OTR_ComfyCredential receives it (a V1 node that declares it leaks it
+    # into /history when it raises). Never a widget either.
+    assert "api_key_comfy_org" not in spec.get("hidden", {})
     assert "api_key_comfy_org" not in order
     # PBUG-20260902-04: the session-bearer hidden input is a Comfy Registry
     # prohibited string (critical, credential-access). It must never return.

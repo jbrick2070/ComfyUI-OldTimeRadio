@@ -103,10 +103,11 @@ def bind_prompt_id(prompt_id: str):
 
 
 def stash_comfy_api_key(api_key) -> bool:
-    """Called by every OTR host node that can run a partner engine, at the
-    top of its execute, with its `api_key_comfy_org` hidden input. Binds
-    the key to THIS prompt so the partner calls below (including fan-out
-    workers, which re-attach the prompt id) open their session with it.
+    """Called once per queue by OTR_ComfyCredential -- the one node that
+    receives the `api_key_comfy_org` hidden input (plan 0k: a V1 node that
+    declares it leaks it into /history when it raises). Binds the key to
+    THIS prompt so every partner call under it (including fan-out workers,
+    which re-attach the prompt id) opens its session with it.
     Best-effort: no key or no Comfy context stores nothing, and the lane
     then fails closed at resolve_auth -- never here, never for a graph
     that runs no partner engine."""

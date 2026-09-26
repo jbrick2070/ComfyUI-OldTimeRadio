@@ -374,8 +374,10 @@ class CloudAuth:
 
 
 NO_CREDENTIAL_HINT = (
-    "no Comfy API key on this queue (hidden input api_key_comfy_org is "
-    "empty). Sign into Comfy in the app WITH A COMFY API KEY (a plain "
+    "no Comfy API key reached this queue (api_key_comfy_org is empty). The "
+    "workflow needs its '0 - Comfy Credential' node wired into the Workflow "
+    "Validator -- every shipped OTR workflow has one -- and ComfyUI needs a "
+    "key: sign into Comfy in the app WITH A COMFY API KEY (a plain "
     "email/Google login injects nothing), or submit headless through "
     "scripts/otr_api.py with OTR_COMFY_API_KEY in the SUBMITTER's "
     "environment (sent as extra_data.api_key_comfy_org). No request was sent."
@@ -711,10 +713,11 @@ SESSION_SWEEP_MAX_AGE_S = 6 * 3600
 
 _TABLE_LOCK = threading.Lock()
 _SESSIONS: dict = {}
-# prompt_id -> (api_key, stashed_at). Every OTR host node that can run a
-# partner engine stashes its api_key_comfy_org hidden input here at the top
-# of its execute (cloud_media_invoke.stash_comfy_api_key); the first partner
-# call under that prompt opens the session with it. Swept with the sessions.
+# prompt_id -> (api_key, stashed_at). OTR_ComfyCredential -- the one node
+# that receives the queue's api_key_comfy_org hidden input -- stashes it here
+# once per queue (cloud_media_invoke.stash_comfy_api_key); every partner call
+# under that prompt opens its session with it. Swept with the sessions, but
+# never while its prompt is still executing (see _sweep_locked).
 _PROMPT_API_KEYS: dict = {}
 _LEAK_LOG: Callable[[str], None] = lambda msg: print(f"[cloud_media] {msg}")
 
@@ -733,13 +736,41 @@ def stash_prompt_api_key(prompt_id: str, api_key: Optional[str]) -> bool:
     return True
 
 
+def live_prompt_id() -> Optional[str]:
+    """The prompt ComfyUI is executing now, or None outside a running ComfyUI.
+
+    ``PromptServer.last_prompt_id`` is set by the prompt worker before a
+    prompt runs (main.py) and is readable from any thread, which the
+    executing-context variable is not -- the writer's generation runs in a
+    worker thread. Never raises."""
+    try:
+        from server import PromptServer  # ComfyUI runtime only
+        return getattr(PromptServer.instance, "last_prompt_id", None) or None
+    except Exception:  # noqa: BLE001 -- tests, CLI, a server not yet up
+        return None
+
+
+def prompt_api_key(prompt_id: str) -> Optional[str]:
+    """The key OTR_ComfyCredential stashed for ``prompt_id``, or None."""
+    if not prompt_id:
+        return None
+    with _TABLE_LOCK:
+        stashed = _PROMPT_API_KEYS.get(prompt_id)
+    return stashed[0] if stashed else None
+
+
 def _sweep_locked(now: float) -> None:
+    # THE EXECUTING PROMPT IS NEVER SWEPT. The key is stashed ONCE, when the
+    # credential node runs at the start of the queue (every host used to
+    # re-stash at its own start), and a render can outlast the six-hour age
+    # (the longest logged run is 4:48:18). Everything else ages out as before.
+    live = live_prompt_id()
     stale_keys = [pid for pid, (_key, at) in _PROMPT_API_KEYS.items()
-                  if now - at > SESSION_SWEEP_MAX_AGE_S]
+                  if now - at > SESSION_SWEEP_MAX_AGE_S and pid != live]
     for pid in stale_keys:
         _PROMPT_API_KEYS.pop(pid, None)
     stale = [pid for pid, s in _SESSIONS.items()
-             if now - s.created_at > SESSION_SWEEP_MAX_AGE_S]
+             if now - s.created_at > SESSION_SWEEP_MAX_AGE_S and pid != live]
     for pid in stale:
         sess = _SESSIONS.pop(pid)
         open_res = sess.open_reservations()

@@ -517,16 +517,12 @@ class OTRVideoRenderBatch:
                     ),
                 }),
             },
-            # The queue's Comfy API key (app sign-in, or a headless
-            # submitter's extra_data) -- the only credential the cloud_*
-            # video rows can spend with (rip 2026-09-19).
-            "hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"},
+            # The cloud_* video rows spend with the key OTR_ComfyCredential
+            # stashed for this prompt (plan 0k: no V1 hidden key here).
         }
 
     def render(self, patched_ledger_json="{}", master_audio_path="",
-               image_done="", api_key_comfy_org=None):
-        from ._otr_shared.cloud_media_invoke import stash_comfy_api_key
-        stash_comfy_api_key(api_key_comfy_org)
+               image_done=""):
         # ``image_done`` is the W4 ordering gate (opaque STRING token from
         # OTR_ImageGenDispatcher): consuming it forces ComfyUI to finish the
         # image phase -- every episode still on disk -- before this node runs.

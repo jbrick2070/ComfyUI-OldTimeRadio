@@ -59,12 +59,27 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_WORKFLOW_PATH = _REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
+def _queue_api_key():
+    """The key OTR_ComfyCredential bound for the prompt now executing, or None.
+
+    The credential node is wired into this validator's ``credential`` input,
+    so it has always run first. Never raises: no executing prompt (tests, a
+    bare call) or no key is simply "no key"."""
+    try:
+        from ._otr_shared.cloud_media_invoke import current_prompt_id
+        from ._otr_shared.cloud_media_backend import prompt_api_key
+        return prompt_api_key(current_prompt_id())
+    except Exception:  # noqa: BLE001 -- no prompt context
+        return None
+
+
 def _queue_time_readiness_gates(prompt, unique_id, comfy_api_key=None):
     """$0 cloud-slug refusal, then wallet vs estimate, then weight downloads.
 
-    ``comfy_api_key`` is this queue's own api_key_comfy_org hidden input --
-    the only Comfy credential since the 2026-09-19 rip -- so the balance
-    check measures the wallet the run will actually spend from."""
+    ``comfy_api_key`` is this queue's own key -- the one OTR_ComfyCredential
+    bound for this prompt, the only Comfy credential since the 2026-09-19
+    rip -- so the balance check measures the wallet the run will actually
+    spend from."""
     from ._otr_shared.cloud_slug_preflight import ensure_prompt_cloud_slugs
     from ._otr_shared.cloud_balance_preflight import ensure_prompt_cloud_balance
     from ._otr_visual_assets import ensure_prompt_visual_assets
@@ -375,14 +390,24 @@ class WorkflowValidator:
                                "this variant. Empty on the canonical master; "
                                "informational in the validation report.",
                 }),
+                # ORDERING, NOT DATA (plan 0k). The '0 - Comfy Credential'
+                # node's token arrives here so it runs before this node --
+                # the only root of every shipped workflow -- and so before
+                # every node that could spend. A socket, never a widget:
+                # appended last, it moves no saved value and no link.
+                "credential": ("STRING", {
+                    "forceInput": True,
+                    "tooltip": "Wire the '0 - Comfy Credential' node here. It "
+                               "carries no key -- only the order.",
+                }),
             },
             # Hidden runtime context adds no serialized widget slots or links.
+            # NO Comfy key (plan 0k): this node refuses ON PURPOSE -- balance,
+            # assets, story admission -- and a V1 hidden key is written into
+            # /history whenever its node raises. The balance preflight reads
+            # the key OTR_ComfyCredential bound for this prompt instead.
             "hidden": {
                 "prompt": "PROMPT", "unique_id": "UNIQUE_ID",
-                # The queue's Comfy API key (app sign-in or a headless
-                # submitter's extra_data) -- threaded into the balance
-                # preflight so it measures the wallet this run spends from.
-                "api_key_comfy_org": "API_KEY_COMFY_ORG",
             },
         }
 
@@ -390,8 +415,8 @@ class WorkflowValidator:
     def IS_CHANGED(cls, workflow_json_path: str, validate_anyway: bool,
                    strict_unknown_types: bool, profile_id: str = "",
                    master_hash: str = "", generated_by: str = "",
-                   prompt=None, unique_id=None,
-                   api_key_comfy_org=None) -> str | float:
+                   credential: str = "",
+                   prompt=None, unique_id=None) -> str | float:
         """Re-run on any change to the inputs OR to the workflow JSON
         on disk. mtime + path is the canonical change signal. Uses the
         SAME repo-root resolution as `_load_workflow` (GATE B S2 defect
@@ -710,8 +735,8 @@ class WorkflowValidator:
                  strict_unknown_types: bool,
                  profile_id: str = "",
                  master_hash: str = "",
-                 generated_by: str = "", prompt=None, unique_id=None,
-                 api_key_comfy_org=None):
+                 generated_by: str = "", credential: str = "",
+                 prompt=None, unique_id=None):
         # The stamp assertion + env export run FIRST whenever profile_id is
         # non-empty -- validate_anyway only skips the CONTRACT check below,
         # never this (decision doc section 4; CI rejects snapshots shipping
@@ -742,7 +767,7 @@ class WorkflowValidator:
             msg = ("OTR_WorkflowValidator: validate_anyway=False -- contract "
                    "check skipped." + (f" {stamp_msg}" if stamp_msg else ""))
             log.info(msg)
-            _queue_time_readiness_gates(prompt, unique_id, api_key_comfy_org)
+            _queue_time_readiness_gates(prompt, unique_id, _queue_api_key())
             return (msg,)
 
         from ._workflow_validation import validate_workflow_contract
@@ -810,7 +835,7 @@ class WorkflowValidator:
             + (f" | {stamp_msg}" if stamp_msg else "")
         )
         log.info(msg)
-        _queue_time_readiness_gates(prompt, unique_id, api_key_comfy_org)
+        _queue_time_readiness_gates(prompt, unique_id, _queue_api_key())
         return (msg,)
 
 

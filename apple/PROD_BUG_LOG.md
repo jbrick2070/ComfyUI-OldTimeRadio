@@ -15454,9 +15454,9 @@ not promote it to the Bug Bible on this evidence alone.
   /internal/folder_paths resolve C:\ComfyUI-Models before and after.
   Coverage: tests/test_models_root_is_one_owner.py
   TestAConfiguredTreeBeatsAFolderThatMerelyExists (5 tests).
-- promotion: candidate ("a directory existing is not a configuration: ask
-  the host's model-path registry before a hardcoded path"), not yet checked
-  against otr_coverage_index.yaml / BUG_BIBLE.yaml.
+- promotion: PROMOTED 2026-09-26 as Bible 12.175 ("a directory existing is
+  not a configuration: ask the host's model-path registry, per type, before a
+  hardcoded path"), with its otr_coverage_index.yaml row.
 - follow-up (2026-09-25, 5080): per-type lookup. `_otr_models_root.model_type_dir(category)`
   answers with the folder ComfyUI reads first for that type (an env pin selects among
   the registered folders; outside ComfyUI it is `_models_root()/category`), because
@@ -15501,7 +15501,6 @@ not promote it to the Bug Bible on this evidence alone.
   at all; the shared negative hit on 12 of 13. The 5080 is not RAM-bound
   (free RAM stayed above 26 GB), so the free-RAM low on the 8 GB box is
   re-measured on the 4060's next B4 run.
-- promotion: candidate ("a per-segment graph must not reload a heavy text
-  encoder for text it has already encoded -- cache the conditioning, keyed on
-  the encoder file's identity and the exact text"), not yet checked against
-  otr_coverage_index.yaml / BUG_BIBLE.yaml.
+- promotion: PROMOTED 2026-09-26 as Bible 12.176 ("cache the conditioning,
+  not the encoder: key it on the encoder file's identity and the exact text"),
+  with its otr_coverage_index.yaml row.

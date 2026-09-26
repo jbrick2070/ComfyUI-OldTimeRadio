@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 96,
-  "last_link_id": 292,
+  "last_node_id": 97,
+  "last_link_id": 293,
   "nodes": [
     {
       "id": 63,
@@ -75,6 +75,13 @@
             "name": "generated_by"
           },
           "link": null
+        },
+        {
+          "localized_name": "credential",
+          "name": "credential",
+          "shape": 7,
+          "type": "STRING",
+          "link": 293
         }
       ],
       "outputs": [
@@ -2644,6 +2651,40 @@
       ],
       "color": "#432",
       "bgcolor": "#653"
+    },
+    {
+      "id": 97,
+      "type": "OTR_ComfyCredential",
+      "pos": [
+        680,
+        1380
+      ],
+      "size": [
+        480,
+        70
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "localized_name": "credential",
+          "name": "credential",
+          "type": "STRING",
+          "slot_index": 0,
+          "links": [
+            293
+          ]
+        }
+      ],
+      "title": "0 - Comfy Credential",
+      "properties": {
+        "Node name for S&R": "OTR_ComfyCredential",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.6"
+      },
+      "widgets_values": []
     }
   ],
   "links": [
@@ -3109,6 +3150,14 @@
       0,
       86,
       0,
+      "STRING"
+    ],
+    [
+      293,
+      97,
+      0,
+      63,
+      6,
       "STRING"
     ]
   ],

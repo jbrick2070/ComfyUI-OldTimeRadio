@@ -271,6 +271,10 @@ _NODE_MODULES = {
     # as the first node in a workflow to catch contract drift at queue
     # time.
     "OTR_WorkflowValidator":       (".nodes._otr_workflow_validator", "WorkflowValidator", " Workflow Validator (opt-in, S14.2)"),
+    # Plan 0k (2026-09-26): the ONE node that receives the queue's Comfy API
+    # key. A V1 node declaring the hidden key writes it into /history when it
+    # raises; this one cannot raise. Wired into the validator, the root.
+    "OTR_ComfyCredential":         (".nodes.otr_comfy_credential", "OTR_ComfyCredential", "0 - Comfy Credential"),
     # OTR_HuMoTierLoader -- DELETED in the CW cleanbreak (2026-06-08): it only
     # fed the now-removed OTR_BatchHumoRender; the in-process HuMo adapter
     # (nodes/_otr_video_engines/eng_humo.py) loads its own stack. Tombstoned in

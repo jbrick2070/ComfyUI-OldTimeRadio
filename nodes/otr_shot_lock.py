@@ -3424,9 +3424,8 @@ class OTRShotLock:
             },
             # ShotLock re-binds the writer's technical model to derive its
             # creative directives, so on a comfy:slot-* ledger it spends
-            # Comfy credits too. The queue's key (app sign-in, or a headless
-            # submitter's extra_data) is the only credential (rip 2026-09-19).
-            "hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"},
+            # Comfy credits too -- with the key OTR_ComfyCredential bound for
+            # this prompt (plan 0k: no V1 hidden key on a node that raises).
         }
 
     @classmethod
@@ -3448,14 +3447,7 @@ class OTRShotLock:
 
     # ------------------------------------------------------------------ #
     def lock(self, script_json, audio_done="", video_policy_json="{}",
-             gate_in="", api_key_comfy_org=None):
-        # Same capture the writer does: this queue's Comfy API key, for the
-        # writer-model re-binding below. An empty value clears a stale one.
-        try:
-            from . import _otr_comfy_backend as _occ_auth
-            _occ_auth.set_auth(api_key=api_key_comfy_org)
-        except Exception:  # noqa: BLE001 -- the lane fails closed at call time
-            pass
+             gate_in=""):
         from . import _otr_ledger_consumers as _OTRLC
         try:
             from .production_ledger import stamp_durable as _stamp_durable

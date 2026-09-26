@@ -214,10 +214,15 @@ NV16 = "otr_16gb_low"
 class TestStampAssertion:
     def test_input_types_carries_exactly_three_optional_stamp_widgets(self):
         it = WorkflowValidator.INPUT_TYPES()
-        assert list(it["optional"]) == ["profile_id", "master_hash",
-                                        "generated_by"], (
-            "the three stamp widgets are the ONLY optional fields allowed "
+        widgets = [k for k, (_t, meta) in it["optional"].items()
+                   if not meta.get("forceInput")]
+        assert widgets == ["profile_id", "master_hash", "generated_by"], (
+            "the three stamp widgets are the ONLY optional WIDGETS allowed "
             "on node 63 (decision doc section 4)")
+        # Plan 0k: one ordering SOCKET follows them -- the credential node's
+        # token. forceInput, so it is never a widget and moves no saved value.
+        assert list(it["optional"])[-1] == "credential"
+        assert it["optional"]["credential"][1]["forceInput"] is True
 
     def test_master_ships_unstamped_with_padded_vector(self):
         wf = json.loads(_DEFAULT_WORKFLOW_PATH.read_text(encoding="utf-8"))

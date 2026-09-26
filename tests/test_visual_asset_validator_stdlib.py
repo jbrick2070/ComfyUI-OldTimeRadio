@@ -83,12 +83,15 @@ class VisualAssetValidatorTests(unittest.TestCase):
                    and node.name in {"INPUT_TYPES", "IS_CHANGED", "validate"}]
         isolated_class = ast.ClassDef(name="OTR_WorkflowValidator", bases=[],
                                      keywords=[], body=methods, decorator_list=[])
-        helper = next(
+        # Plan 0k: `validate` reads the queue's key through `_queue_api_key`
+        # (the credential node's stash). Its imports are relative and fail
+        # inside this seam, which it answers with None -- exactly "no key".
+        helpers = [
             node for node in TREE.body
             if isinstance(node, ast.FunctionDef)
-            and node.name == "_queue_time_readiness_gates")
+            and node.name in {"_queue_time_readiness_gates", "_queue_api_key"}]
         module = ast.fix_missing_locations(ast.Module(
-            body=[helper, isolated_class], type_ignores=[]))
+            body=helpers + [isolated_class], type_ignores=[]))
         namespace = {
             "__package__": "_asset_validator_seam.nodes",
             "_DEFAULT_WORKFLOW_PATH": ROOT / "workflows" / "otr_canonical.json",
@@ -119,14 +122,16 @@ class VisualAssetValidatorTests(unittest.TestCase):
 
     def test_hidden_context_adds_no_widgets(self):
         inputs = self.cls.INPUT_TYPES()
-        # api_key_comfy_org joined 2026-09-19: the queue's Comfy key, threaded
-        # into the balance preflight. Hidden inputs are never widgets.
+        # Plan 0k: the Comfy key LEFT this node (it refuses on purpose, and a
+        # V1 hidden key is written into /history when its node raises). The
+        # balance gate reads the credential node's stash instead.
         self.assertEqual(inputs["hidden"], {
-            "prompt": "PROMPT", "unique_id": "UNIQUE_ID",
-            "api_key_comfy_org": "API_KEY_COMFY_ORG"})
+            "prompt": "PROMPT", "unique_id": "UNIQUE_ID"})
         self.assertEqual(list(inputs["required"]),
                          ["workflow_json_path", "validate_anyway", "strict_unknown_types"])
-        self.assertEqual(list(inputs["optional"]), ["profile_id", "master_hash", "generated_by"])
+        self.assertEqual(list(inputs["optional"]),
+                         ["profile_id", "master_hash", "generated_by", "credential"])
+        self.assertTrue(inputs["optional"]["credential"][1]["forceInput"])
 
     def test_live_cache_rechecks_even_when_hidden_prompt_is_empty(self):
         for unique_id in ("63", 63, "0"):

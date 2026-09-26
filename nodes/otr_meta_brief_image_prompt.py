@@ -2541,25 +2541,16 @@ class OTRMetaBriefImagePromptGen:
                 }),
             },
             # This node re-binds the writer's technical model for its prompt
-            # pass, so on a comfy:slot-* ledger it spends Comfy credits. The
-            # queue's key (app sign-in, or a headless submitter's extra_data)
-            # is the only credential (rip 2026-09-19, codex r2).
-            "hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"},
+            # pass, so on a comfy:slot-* ledger it spends Comfy credits -- with
+            # the key OTR_ComfyCredential bound for this prompt (plan 0k; a V1
+            # hidden key here would reach /history when this node raises).
         }
 
     @classmethod
     def VALIDATE_INPUTS(cls, **kwargs):
         return True
 
-    def generate(self, script_json, image_policy_json="{}",
-                 gate_in="", api_key_comfy_org=None):
-        # Same capture the writer does: this queue's Comfy API key, for the
-        # writer-model re-binding below. An empty value clears a stale one.
-        try:
-            from . import _otr_comfy_backend as _occ_auth
-            _occ_auth.set_auth(api_key=api_key_comfy_org)
-        except Exception:  # noqa: BLE001 -- the lane fails closed at call time
-            pass
+    def generate(self, script_json, image_policy_json="{}", gate_in=""):
         # CANONICAL REPLAY (campaign item 0): the imported rows already carry
         # their prompts; no writer LLM resolves here.
         try:

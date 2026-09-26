@@ -11,11 +11,12 @@ Qwen / Mistral / GLM / Kimi / Perplexity). So this backend is, in shape,
   * Catalog: a PINNED constant (`COMFY_LLM_MODELS`) -- the partner node's
     curated model list. No disk cache / refresh script (unlike the
     own-key OpenRouter lane, whose catalog is fetched).
-  * Auth: ComfyUI injects the configured Comfy API key into the writer
-    via the hidden input `api_key_comfy_org` -- from the signed-in app
-    session, or from `extra_data.api_key_comfy_org` on a headless
-    POST /prompt (scripts/otr_api.py sends it). The writer captures it
-    at run() via `set_auth(...)`; `_bearer()` reads ONLY that. There is
+  * Auth: ComfyUI injects the configured Comfy API key into
+    OTR_ComfyCredential's hidden input `api_key_comfy_org` -- from the
+    signed-in app session, or from `extra_data.api_key_comfy_org` on a
+    headless POST /prompt (scripts/otr_api.py sends it). That node binds it
+    here once per queue via `set_auth(...)`, tied to the prompt id;
+    `_bearer()` reads ONLY that. There is
     no env var, no pack key file and no second resolver (rip
     2026-09-19: the pack had three credential sources in two orders,
     and the lane flag alone satisfied the gate). The logged-in
@@ -427,24 +428,31 @@ def resolve_slug(repo_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Auth (module-global, fed from the writer's hidden ComfyUI inputs)
+# Auth (module-global, fed by OTR_ComfyCredential, bound to its prompt)
 # ---------------------------------------------------------------------------
 
 _auth: dict[str, str] = {}
 
 
-def set_auth(*, api_key: Any = None) -> None:
-    """Record the ComfyUI-injected credential for the credit-billed call.
+def set_auth(*, api_key: Any = None, prompt_id: Any = None) -> None:
+    """Record the queue's Comfy API key for the credit-billed call.
 
-    ComfyUI fills the host node's hidden input `api_key_comfy_org` (a
-    configured Comfy API key) at execution time; the writer and ShotLock
-    thread it here. This is THE queue's credential, so an empty / non-string
-    value CLEARS the previous queue's key rather than keeping it -- a
-    credential-free queue must never spend a stale one (codex finding,
-    2026-09-19). The key is never logged or stamped into run meta."""
+    ComfyUI fills OTR_ComfyCredential's hidden input `api_key_comfy_org` at
+    execution time and that node hands it here, once per queue. This is THE
+    queue's credential, so an empty / non-string value CLEARS the previous
+    queue's key rather than keeping it -- a credential-free queue must never
+    spend a stale one (codex finding, 2026-09-19).
+
+    ``prompt_id`` BINDS the key to the queue that supplied it (plan 0k, M1).
+    Only the credential node sets auth now, so a later graph that lacks the
+    node would otherwise find the previous queue's key still here;
+    `_bearer()` refuses a key bound to a prompt that is no longer the one
+    executing. The key is never logged or stamped into run meta."""
     _auth.clear()
     if isinstance(api_key, str) and api_key.strip():
         _auth["api_key"] = api_key.strip()
+        if prompt_id:
+            _auth["prompt_id"] = str(prompt_id)
 
 
 def clear_auth() -> None:
@@ -452,9 +460,17 @@ def clear_auth() -> None:
 
 
 def _bearer() -> str | None:
-    """The credential to send: the Comfy API key ComfyUI injected into the
-    writer's `api_key_comfy_org` hidden input this run. Nothing else."""
-    return _auth.get("api_key") or None
+    """The credential to send: the Comfy API key OTR_ComfyCredential bound
+    for the prompt now executing. Nothing else -- and not a key bound to an
+    earlier prompt, which is a stale key even though it is still held."""
+    key = _auth.get("api_key") or None
+    bound = _auth.get("prompt_id")
+    if key and bound:
+        from ._otr_shared.cloud_media_backend import live_prompt_id
+        live = live_prompt_id()
+        if live and live != bound:
+            return None
+    return key
 
 
 # ---------------------------------------------------------------------------
@@ -584,7 +600,9 @@ class ComfyCreditsBackend:
         if not _bearer():
             raise ComfyCreditsConfigError(
                 f"{repo_id} selected but this queue carries no Comfy API key. "
-                f"Sign into Comfy in the app WITH A COMFY API KEY (a plain "
+                f"The workflow needs its '0 - Comfy Credential' node wired "
+                f"into the Workflow Validator (every shipped OTR workflow has "
+                f"one). Sign into Comfy in the app WITH A COMFY API KEY (a plain "
                 f"email/Google login injects no api_key_comfy_org), or submit "
                 f"headless through "
                 f"scripts/otr_api.py with OTR_COMFY_API_KEY in the SUBMITTER's "

@@ -185,7 +185,11 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # link 292 touches neither node 85 nor node 92, and link 278 and its audio
     # fanout below are byte-identical. Read the tuple above -- src 84, dst 86 --
     # and neither id appears in any assertion in this function.
-    assert wf["last_link_id"] == 292
+    # EIGHTH bump, 293 (plan 0k, 2026-09-26): [293, 97, 0, 63, 6, "STRING"],
+    # the new OTR_ComfyCredential node's token into the Workflow Validator's
+    # appended `credential` socket. Neither node 85 nor node 92 is touched,
+    # and link 278 and its fanout below are byte-identical.
+    assert wf["last_link_id"] == 293
     # `ffmpeg` left node 85's inputs on 2026-09-13 (the widget was discarded at
     # the method boundary since 2026-09-04 and had no live effect; the
     # declaration closed the channel rather than keep sanitising it). It sat

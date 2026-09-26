@@ -300,15 +300,16 @@ def parse_comfy_balance(payload) -> Optional[float]:
 
 
 def _comfy_bearer_from(api_key) -> Callable[[], str]:
-    """The queue's own credential: the api_key_comfy_org hidden input the
-    validator received (the only Comfy credential since the 2026-09-19
-    rip). Empty raises, which comfy_balance reports as a warn -- a
-    local-only graph never carries one."""
+    """The queue's own credential: the api_key_comfy_org that
+    OTR_ComfyCredential bound for this prompt (the only Comfy credential
+    since the 2026-09-19 rip). Empty raises, which comfy_balance reports as
+    a warn -- a local-only graph never carries one."""
     def bearer() -> str:
         key = str(api_key or "").strip()
         if not key:
             raise RuntimeError(
-                "hidden input api_key_comfy_org is empty on this queue")
+                "no api_key_comfy_org reached this queue (the '0 - Comfy "
+                "Credential' node binds it)")
         return key
     return bearer
 

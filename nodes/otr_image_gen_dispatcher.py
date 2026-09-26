@@ -2595,10 +2595,8 @@ class OTRImageGenDispatcher:
                     ),
                 }),
             },
-            # The queue's Comfy API key (app sign-in, or a headless
-            # submitter's extra_data) -- the only credential the cloud_*
-            # image rows can spend with (rip 2026-09-19).
-            "hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"},
+            # The cloud_* image rows spend with the key OTR_ComfyCredential
+            # stashed for this prompt (plan 0k: no V1 hidden key here).
         }
 
     @classmethod
@@ -2606,9 +2604,7 @@ class OTRImageGenDispatcher:
         return True
 
     def dispatch(self, script_json, image_policy_json="{}", image_prompts_json="{}",
-                 gate_in="", episode_id="", api_key_comfy_org=None):
-        from ._otr_shared.cloud_media_invoke import stash_comfy_api_key
-        stash_comfy_api_key(api_key_comfy_org)
+                 gate_in="", episode_id=""):
         led = self._loads(script_json, {})
         policy = self._loads(image_policy_json, {})
         prompts = self._loads(image_prompts_json, {})

@@ -38,7 +38,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_16gb_animatediff` (16 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `864179fd03252a6db35ab6a77230f816f418fe5efbf7ceb5329156568db27973`
+- master_hash: `18e95d3b758d72c227eb317168f3fee7b317a74cb2f2657a27fb948949e995ca`
 
 ### ComfyUI launch
 
@@ -80,7 +80,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_16gb_foley` (16 GB NVIDIA -- video that generates its own sound, mixed under the voices. Lane ltx25_foley_16gb (mix4x8-13.8GB) through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. MEASURED on an RTX 5080 Laptop 2026-09-23: one 97-frame 1664x960 clip with foley in 205.3 s.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `3b25f393ef343ceddb8bf47024f5a41c6da8807e25e81683c93a597338ebd9df`
+- master_hash: `aaf0b9a17d561c11faa6a5c540b07f9a4bbb98f72ee46589ab40e6de4dabc185`
 
 ### ComfyUI launch
 
@@ -124,7 +124,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_16gb_low` (16 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `2702d403a404d6254ae4fbf02d939d073d2150363ecb0127a1fa6a9b03a876df`
+- master_hash: `3361911d5778bcbd4714e04da46377e6a4bbc3ef53ec73342ae7f318173f6573`
 
 ### ComfyUI launch
 
@@ -165,7 +165,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_16gb_mime` (16 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_mime_16gb on the same mix4x8-13.8GB DiT as the 16 GB foley lane, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `9401c9544e83200f1525487665e0b6e26a43a8507454850d91f6f42e6b000c93`
+- master_hash: `628a5aa77f2706990270011ea3ddb2e65135769fb3e3d763966aaff814e22669`
 
 ### ComfyUI launch
 
@@ -209,7 +209,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_16gb_still` (16 GB NVIDIA -- a still image with motion, minted by Z-Image Turbo. Lane still_motion, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `5cd1fd1faa63ea3791eece04200564ba4d9a1c8684457677ed0207e7aa6bdf95`
+- master_hash: `7dbf22dd7b3e01347a09e5286ce97af23f505cb5c88b3a126a4350005ff5cea3`
 
 ### ComfyUI launch
 
@@ -249,7 +249,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_16gb_video` (16 GB NVIDIA -- real video diffusion, silent picture under the voices. Lane ltx25_high_video on the same mix4x8-13.8GB DiT the 16 GB foley and mime lanes load, through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `d98095b9e33a04c7876fd0b66187c33f84a7c52b31e7dc4d4bc93dcd5cf56f39`
+- master_hash: `e151320c1419ae0d3a69782bfb00bb5c64b8dec521319bebb2bdd84f98bd6e74`
 
 ### ComfyUI launch
 
@@ -293,7 +293,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_24gb_foley` (24 GB AND UP, ANY modern NVIDIA (Ada, Ampere or Blackwell) -- video that generates its own sound. Lane ltx25_foley_24gb (int8, stock ComfyUI loaders), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Qwen3.8-27B at a 22 GB ceiling. Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.)
 - status: draft
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `fbd00f6f9f58678d09896c11e9168c4938520a15ee3b2a89c735561b58709370`
+- master_hash: `62747e35700b243ef8be49861542ac522c7e86b89aaf35f3f195fb69dfda2989`
 
 ### ComfyUI launch
 
@@ -337,7 +337,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_8gb_animatediff` (8 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, which consumes no still, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `389cd9cf09a4c422bdd69e44300e3e0cfbccae9eaa5311f74eef01f1d89b3f5b`
+- master_hash: `6a79af2d199a665625233192c0030a15958e14d3f454c4732bd8ed8cd78d2d70`
 
 ### ComfyUI launch
 
@@ -379,7 +379,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_8gb_low` (8 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, which consumes no still, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `6bbd0c93cf81861672efd861364b162a344b6e8e740e962d57aa595252c265aa`
+- master_hash: `36d92668cc6226b0f8c441a0c5cf99ebd074bc7caab8cdc1ae52d5695df0b24c`
 
 ### ComfyUI launch
 
@@ -419,7 +419,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_8gb_ltx25_audio_in` (8 GB NVIDIA (Ada or newer) -- AUDIO-IN: every beat -- announcer, character, and music -- is conditioned on its own real waveform, so the picture follows the sound instead of inventing it. A character beat is conditioned on that character's own clean voice, never the ambient master mix, so this lane is safe for character faces -- an earlier note here claimed otherwise and was wrong. On the same mix4x8 weights the proven 8 GB foley lane already downloads, so this lane costs no new files. Modality guidance rises from 1.0 -- where it is a documented no-op -- to 3.0, which strengthens the cross-modal coupling and costs one extra forward pass per step while it is active, so this lane is slower than the foley lane's. mix4x8 measured 707.0 s for a 97-frame clip on a 4060. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The 12.86 GB transformer exceeds 8 GB and therefore streams, and the Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately, so its 9.88 GB lands in host RAM rather than VRAM. Measured on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". NOT PROVEN ON A LEG ANYWHERE, AND THAT IS A WARNING RATHER THAN A FORMALITY: the audio-in engine has never completed an episode at any tier, it asks for a third required input (audio_ref) that no other lane needs, and the 24 GB engine it is modelled on carries the same caveat. Expect to debug it. Run otr_8gb_ltx25_foley if you want a lane that works today.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `2371f516b5f6238e3011b116bd48e32c2b642c0f5c77562dd8b96952c76c1180`
+- master_hash: `0efc35e53447f98e8f5323e0395c2ee3725844e5b1033719edac8a33d17f868d`
 
 ### ComfyUI launch
 
@@ -463,7 +463,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_8gb_ltx25_foley` (8 GB NVIDIA (Ada or newer) -- video that generates its own sound: lane ltx25_foley_16gb (mix4x8, stock ComfyUI loaders), gemma4-12b-ltx25-comfy-w4a8 text encoder. Qwen3.5-4B writer at a 6.8 GB ceiling, z_image_turbo stills, Kokoro voices, Stable Audio 3. Every weight here is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). The 12.86 GB transformer exceeds 8 GB and therefore streams; that is expected and is the trade this tier makes. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately -- a GPU-side encode of it tips even a 16 GB card -- so its 9.88 GB lands in host RAM, not VRAM. MEASURED on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in, ComfyUI RSS 12.95 GB. It passed, with under a gigabyte to spare. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". VRAM itself was never close: peak 7441 of 8188 MiB with 232 MiB max reserved and no driver spill.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `19e8ce33ef58d346cfb0660b4c957268fce85b01cc1c3736a96e503c1c9839ea`
+- master_hash: `5cfa78f0fdc8b28bf7d66a646539de4c25023446a427d36c47424050501f2ec6`
 
 ### ComfyUI launch
 
@@ -507,7 +507,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_8gb_ltx25_mime` (8 GB NVIDIA (Ada or newer) -- MIME: a silent performance carrying its own score. On the same mix4x8 weights the proven 8 GB foley lane already downloads, so this lane costs no new files. It differs from otr_8gb_ltx25_foley at ONE place only -- the mux, where the model's own generated bed plays at full level and the voice and music master is mixed to zero (1.00 foley / 0.00 master instead of 0.50 / 0.50). The TTS and music are still generated and then mixed out; that waste is deliberate and is what lets the mime engine be a four-line subclass instead of a second pipeline. mix4x8 measured 707.0 s for a 97-frame clip on a 4060. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The 12.86 GB transformer exceeds 8 GB and therefore streams, and the Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately, so its 9.88 GB lands in host RAM rather than VRAM. Measured on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like "LTX 2.5 is slow on 8 GB" when it is really "we ran out of RAM". NOT YET PROVEN ON A LEG AT THIS TIER: the engine is proven at 16 and 24 GB and the weights are proven at 8 GB, but this combination has not rendered an episode.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `3607b5eecb271d2289b0c108eed762907709dccaddc58b353f04194a02fbe93b`
+- master_hash: `f25879e9a579e9b1e1be8c8527fd619eff897db5d9bb32ced9017204a0e6872e`
 
 ### ComfyUI launch
 
@@ -551,7 +551,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_8gb_still` (8 GB NVIDIA -- a still image with motion, minted by Z-Image Turbo. Lane still_motion, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `7509972764769d01a8e9dd8bbc87949ffff2b31509ac7531a2143a3ad8c0c1b9`
+- master_hash: `2a4da9786ff2adb7f4d88f72a1722401578689c7d765c577426cd8c90ff332d1`
 
 ### ComfyUI launch
 
@@ -591,7 +591,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_8gb_video` (8 GB NVIDIA -- real video diffusion on LTX 0.9.8, which downloads itself (16.1 GB at queue time, no account, no licence click) and is the only video engine proven on 8 GB, 16 GB and Mac alike. z_image_turbo stills, Kokoro voices, Stable Audio 3.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `e61903174ae55e70bbedf0d0108656c6cc9cfc3724902f63d43e90c53f72a896`
+- master_hash: `3867685082c1e0432986f83b9c3d307fdf381574fd6537a70a0d6cda8c8eddb8`
 
 ### ComfyUI launch
 
@@ -632,7 +632,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_amd_still` (AMD ROCm (an outside tester published an episode from this workflow on a Radeon AI PRO R9700 under ROCm 7.2, 2026-09-14, no edits). A still image with motion, Kokoro voices, Stable Audio 3. quant_policy is 'none' because bitsandbytes on ROCm is unmeasured -- see apple/ROCM.md.)
 - status: draft
 - platform/backend/vendor: any/cuda/amd
-- master_hash: `483cbf565d5f08effe5434f8121db7f068bd75c5bcda096a65bf4f46682d5873`
+- master_hash: `0c9c43f71495c6864d59e6286d570daa5705dd857fd369f8b9e2583eee01d9ef`
 
 ### ComfyUI launch
 
@@ -672,7 +672,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_cloud_deluxe_3act` (Comfy Cloud 3-act deluxe FOLEY -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), LTX 2.5 I2V generates its own bed and mixes 0.50 under the voices. Flux Pro stills. OpenRouter stays on the picker. Needs OTR_COMFY_API_KEY.)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
-- master_hash: `f79864111c6783dd82181d300d4d40520efcf000568540a17e3ecf1e607e281d`
+- master_hash: `546fdf3577b2759cd4a9c398290abc97ec872e0683ceb44b30da8bcd63fb4f88`
 
 ### ComfyUI launch
 
@@ -714,7 +714,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_cloud_deluxe_audio_in_3act` (Comfy Cloud 3-act deluxe AUDIO-IN -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), LTX 2.5 Audio-to-Video driven by the episode mix. Flux Pro stills. OpenRouter stays on the picker. Needs OTR_COMFY_API_KEY.)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
-- master_hash: `c5db15b53ae38125762d05c5027047c39cb73463d57e492f27fcbc2d62dbc2bf`
+- master_hash: `04a483d2d260db4a617c1385b119fd9d7308a0cd0fd9bbf1188cdf732fb1443a`
 
 ### ComfyUI launch
 
@@ -756,7 +756,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_cloud_low` (Comfy Cloud 3-act -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), cheapest partners (ElevenLabs, Sonilo, Luma Flash, Vidu Q2 Pro Fast I2V). Length is what credits buy. Needs OTR_COMFY_API_KEY.)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
-- master_hash: `80ae9afd5dc353183c79ce1c767834720a11170fbed4b2c36cc35ca92d2234f1`
+- master_hash: `94bf86aa3b9b1f5db3e0d2282b61a9626ebde39900882c42a3e4b047ab085fe8`
 
 ### ComfyUI launch
 
@@ -798,7 +798,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_cloud_low_1act` (Comfy Cloud 1-act trial -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), same cheapest partners as the 3-act and 5-act workflows (Vidu Q2 Pro Fast I2V). Short paid-length smoke. Needs OTR_COMFY_API_KEY.)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
-- master_hash: `46633db97dd7c08cd3e59f676442f519b6463d67e323b4123ef8059a6493212f`
+- master_hash: `4e0fa76f25b23b1f2db26a0ed86442bce96766ce825fd79fb0568c3b992f13fd`
 
 ### ComfyUI launch
 
@@ -840,7 +840,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_cloud_low_5act` (Comfy Cloud 5-act -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), same cheapest partners as the 1-act trial and 3-act workflows (Vidu Q2 Pro Fast I2V). Long paid-length episode. Needs OTR_COMFY_API_KEY.)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
-- master_hash: `3502195e7ced72be41066efbf521e3daed8657dbad1162926007ce0ce63bc354`
+- master_hash: `74acae6ae900875d50bb9401faf639a3a95662b17879b5276283943425846a46`
 
 ### ComfyUI launch
 
@@ -882,7 +882,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_google_still` (Google, your own Gemini API key -- stills only: Gemini image stills composited on the CPU (still_flat), Google TTS voices, Lyria music, and Gemini Flash (creative) + Flash-Lite (technical) writers. No video model: at Tier 1 every Veo model allows 2 requests a minute and 10 a day, and an episode needs more clips than that. Nothing downloads and no GPU is needed. The same lanes published a 1-act English Hamlet in 218 s on 2026-09-19; this workflow opens at 3 acts, so expect roughly three times that. Needs OTR_GOOGLE_API_KEY (or GEMINI_API_KEY, or the pack's google.secret file).)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
-- master_hash: `7b1bb95f6364b1ab782d8aa150a30c019f14c9131022aa307097df0c018918c8`
+- master_hash: `d44a3836d41bcfe41e85dbc06531114bd02ba776b10eb1464e39a72d6e372ce0`
 
 ### ComfyUI launch
 
@@ -923,7 +923,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_mac16_animatediff` (Apple Silicon -- AnimateDiff Lightning, the variant proven on Apple Silicon (the haunted lane is OOM here). SD 1.5 stills, Kokoro voices, Stable Audio 3, no upscaler. Proven on a 16 GB M4.)
 - status: shipping
 - platform/backend/vendor: mac/mps/apple
-- master_hash: `7747180bf5ed48197e80f7c52485c3cb49a2094f506749448542bd6651e9ab0a`
+- master_hash: `4c97d3273ea438f8edbca2561cf968aeaaaae0cd3b24361430d9753e9cfb19a1`
 
 ### ComfyUI launch
 
@@ -963,7 +963,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_mac16_low` (Apple Silicon -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, sd15 stills, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 10.0 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: mac/mps/apple
-- master_hash: `f4020729863dc19c2f218cc90e4bb6a19029573c46f0f27493b44e20ac77780e`
+- master_hash: `25a23f17130520449a754bd85a1550d6df63f8eeb48e736566b22088284f6cb5`
 
 ### ComfyUI launch
 
@@ -1003,7 +1003,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_mac16_still` (Apple Silicon -- a still image with motion, minted by SD 1.5. SD 1.5 stills, Kokoro voices, Stable Audio 3, no upscaler. Proven on a 16 GB M4.)
 - status: shipping
 - platform/backend/vendor: mac/mps/apple
-- master_hash: `df37cb96448c91d0013c92580869e02faf4ed2b0416d539313fc2b97655b266d`
+- master_hash: `e524c3a0d9a2f0fb200c5e617ccce11087cd0419d3fad4788f6155a6e91b9f67`
 
 ### ComfyUI launch
 
@@ -1043,7 +1043,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_mac16_video` (Apple Silicon -- real video diffusion on LTX 0.9.8 -- the only video engine that downloads itself. SD 1.5 stills, Kokoro voices, Stable Audio 3, no upscaler. Proven on a 16 GB M4.)
 - status: shipping
 - platform/backend/vendor: mac/mps/apple
-- master_hash: `825562a2f2d177ececb2443212e545b87bb2c47db41a644505ae718d21e5c130`
+- master_hash: `3e17168e12b0d6abb7aa32c56a0751fc24a0c6bc47fd8b1f393c76de47b973f8`
 
 ### ComfyUI launch
 

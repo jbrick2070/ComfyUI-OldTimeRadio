@@ -41,7 +41,7 @@ def _clean(monkeypatch):
         cmb._PROMPT_API_KEYS.clear()
 
 
-# --- every host node that can spend Comfy credits declares the hidden input
+# --- plan 0k: ONE node declares the hidden key, and it cannot raise
 
 def _host_classes():
     from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter
@@ -58,38 +58,118 @@ def _host_classes():
             WorkflowValidator, OTRShotLock, OTRMetaBriefImagePromptGen]
 
 
-def test_every_credit_spending_host_declares_the_hidden_key():
+def test_no_credit_spending_host_declares_the_hidden_key():
+    """A V1 node that declares API_KEY_COMFY_ORG has the key formatted into
+    /history's error record whenever it raises (ComfyUI v0.36.0
+    execution.py: get_input_data -> format_value -> current_inputs). The nine
+    hosts used to; several refuse on purpose."""
     for cls in _host_classes():
         hidden = cls.INPUT_TYPES().get("hidden") or {}
-        assert hidden.get(HIDDEN_NAME) == HIDDEN_TYPE, cls.__name__
+        assert HIDDEN_NAME not in hidden, cls.__name__
         fn = getattr(cls, cls.FUNCTION)
-        assert HIDDEN_NAME in inspect.signature(fn).parameters, cls.__name__
+        assert HIDDEN_NAME not in inspect.signature(fn).parameters, cls.__name__
 
 
-def test_media_hosts_stash_the_key_at_the_top_of_execute():
-    """The wiring, at its real site: each media host's execute calls
-    stash_comfy_api_key(api_key_comfy_org) before anything can invoke a
-    partner node."""
-    from nodes.otr_image_gen_dispatcher import OTRImageGenDispatcher
-    from nodes.otr_video_render_batch import OTRVideoRenderBatch
-    from nodes.stable_audio_theme import StableAudioTheme
-    from nodes._otr_voice_node_common import OTRVoiceNodeBase
-    for cls in (OTRImageGenDispatcher, OTRVideoRenderBatch, StableAudioTheme,
-                OTRVoiceNodeBase):
-        src = inspect.getsource(getattr(cls, "generate", None)
-                                or getattr(cls, cls.FUNCTION))
-        assert "stash_comfy_api_key(api_key_comfy_org)" in src, cls.__name__
+def test_exactly_one_registered_node_receives_the_key():
+    """Every class the pack registers, not just the nine it used to be: the
+    credential node is the only receiver, whatever gets added later."""
+    from nodes.otr_comfy_credential import OTR_ComfyCredential
+    receivers = []
+    for path in sorted((REPO / "nodes").rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        if '"' + HIDDEN_TYPE + '"' in text and '"hidden"' in text:
+            receivers.append(path.relative_to(REPO).as_posix())
+    assert receivers == ["nodes/otr_comfy_credential.py"], receivers
+    assert (OTR_ComfyCredential.INPUT_TYPES()["hidden"]
+            == {HIDDEN_NAME: HIDDEN_TYPE})
 
 
-def test_llm_hosts_capture_the_key_through_set_auth():
-    """The writer and ShotLock spend through the LLM backend, not the media
-    session: each hands its hidden input to set_auth at the top of execute."""
-    from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter
-    from nodes.otr_shot_lock import OTRShotLock
-    from nodes.otr_meta_brief_image_prompt import OTRMetaBriefImagePromptGen
-    for cls in (OTR_LedgerScriptWriter, OTRShotLock, OTRMetaBriefImagePromptGen):
-        src = inspect.getsource(getattr(cls, cls.FUNCTION))
-        assert "set_auth(api_key=api_key_comfy_org)" in src, cls.__name__
+def test_the_credential_node_never_raises(monkeypatch):
+    """The whole point: a node that cannot raise never has its inputs written
+    into an error record. Every failure below its surface is swallowed."""
+    from nodes import otr_comfy_credential as cred
+    node = cred.OTR_ComfyCredential()
+    assert node.bind("queue-key") == (cred.KEY_PRESENT,)
+    assert node.bind(None) == (cred.KEY_ABSENT,)
+    assert node.bind("   ") == (cred.KEY_ABSENT,)
+    assert node.bind(12345) == (cred.KEY_ABSENT,)
+
+    def _boom(**_kw):
+        raise RuntimeError("queue-key would be in this message")
+    monkeypatch.setattr(occ, "set_auth", _boom)
+    assert node.bind("queue-key") == (cred.KEY_PRESENT,)
+    import math
+    assert math.isnan(cred.OTR_ComfyCredential.IS_CHANGED())
+
+
+def test_the_credential_node_output_never_carries_the_key():
+    from nodes import otr_comfy_credential as cred
+    (token,) = cred.OTR_ComfyCredential().bind("sk-secret-queue-key")
+    assert "sk-secret" not in token
+    assert token in (cred.KEY_PRESENT, cred.KEY_ABSENT)
+
+
+def test_the_credential_node_binds_both_spend_paths():
+    """One call feeds the media sessions (the per-prompt stash) and the
+    Comfy Credits writer backend (set_auth, bound to the same prompt)."""
+    from nodes import otr_comfy_credential as cred
+    with invoke.bind_prompt_id("prompt-0k"):
+        cred.OTR_ComfyCredential().bind("queue-key")
+    assert cmb.prompt_api_key("prompt-0k") == "queue-key"
+    assert occ._auth == {"api_key": "queue-key", "prompt_id": "prompt-0k"}
+
+
+def test_every_host_runs_after_the_credential_node_in_every_shipped_workflow():
+    """ORDER IS THE MECHANISM: the hosts read what the credential node bound,
+    so each must descend from it. One link into the Workflow Validator -- the
+    only root -- is what does that; a rewire that breaks it fails here."""
+    from tests._support.shipped_graphs import shipped_graphs
+    host_types = {"OTR_LedgerScriptWriter", "OTR_WorkflowValidator",
+                  "OTR_ImageGenDispatcher", "OTR_MetaBriefImagePromptGen",
+                  "OTR_ShotLock", "OTR_VideoRenderBatch", "OTR_StableAudioTheme",
+                  "OTR_BatchCharacterVoices", "OTR_AnnouncerVoice"}
+    for path in shipped_graphs():
+        wf = json.loads(Path(path).read_text(encoding="utf-8"))
+        creds = [n["id"] for n in wf["nodes"] if n["type"] == "OTR_ComfyCredential"]
+        assert len(creds) == 1, path.name
+        down = {}
+        for link in wf["links"]:
+            down.setdefault(link[1], set()).add(link[3])
+        seen, todo = set(), [creds[0]]
+        while todo:
+            for nxt in down.get(todo.pop(), ()):
+                if nxt not in seen:
+                    seen.add(nxt)
+                    todo.append(nxt)
+        hosts = {n["id"] for n in wf["nodes"] if n["type"] in host_types}
+        assert hosts and hosts <= seen, (path.name, sorted(hosts - seen))
+
+
+def test_a_key_bound_to_an_earlier_prompt_is_never_spent(monkeypatch):
+    """M1 (plan 0k): only the credential node sets auth now, so a later graph
+    that lacks the node would still find the previous queue's key here. The
+    binding refuses it once another prompt is executing."""
+    occ.set_auth(api_key="queue-a-key", prompt_id="prompt-a")
+    monkeypatch.setattr(cmb, "live_prompt_id", lambda: "prompt-a")
+    assert occ._bearer() == "queue-a-key"
+    monkeypatch.setattr(cmb, "live_prompt_id", lambda: "prompt-b")
+    assert occ._bearer() is None
+    monkeypatch.setattr(cmb, "live_prompt_id", lambda: None)
+    assert occ._bearer() == "queue-a-key"      # outside a running ComfyUI
+
+
+def test_the_executing_prompt_is_never_swept(monkeypatch):
+    """S1 (plan 0k): the key is stashed ONCE, at the start of the queue; a
+    render longer than the six-hour sweep must not lose it."""
+    now = 1_000_000.0
+    with cmb._TABLE_LOCK:
+        cmb._PROMPT_API_KEYS["running"] = ("k1", now - cmb.SESSION_SWEEP_MAX_AGE_S - 10)
+        cmb._PROMPT_API_KEYS["finished"] = ("k2", now - cmb.SESSION_SWEEP_MAX_AGE_S - 10)
+    monkeypatch.setattr(cmb, "live_prompt_id", lambda: "running")
+    with cmb._TABLE_LOCK:
+        cmb._sweep_locked(now)
+    assert cmb.prompt_api_key("running") == "k1"
+    assert cmb.prompt_api_key("finished") is None
 
 
 def test_set_auth_replaces_so_a_bare_queue_cannot_spend_a_stale_key():
@@ -146,12 +226,16 @@ def test_key_files_have_no_comfy_lane():
 
 # --- the balance preflight measures the queue's own wallet
 
-def test_validator_threads_the_hidden_key_into_the_balance_gate():
+def test_validator_threads_the_bound_key_into_the_balance_gate():
     from nodes import _otr_workflow_validator as v
     src = inspect.getsource(v._queue_time_readiness_gates)
     assert "ensure_prompt_cloud_balance(prompt, unique_id, comfy_api_key=comfy_api_key)" in src
     validate_src = inspect.getsource(v.WorkflowValidator.validate)
-    assert validate_src.count("_queue_time_readiness_gates(prompt, unique_id, api_key_comfy_org)") == 2
+    assert validate_src.count("_queue_time_readiness_gates(prompt, unique_id, _queue_api_key())") == 2
+    with invoke.bind_prompt_id("prompt-v"):
+        cmb.stash_prompt_api_key("prompt-v", "queue-key")
+        assert v._queue_api_key() == "queue-key"
+    assert v._queue_api_key() is None           # no executing prompt
 
 
 def test_comfy_balance_uses_the_queue_key_and_warns_without_one():

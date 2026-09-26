@@ -2987,22 +2987,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # value keeps its index (BUG-LOCAL-097); it also sits after
                 # gate_in so the canonical's inputs descriptor order matches.
             },
-            # ComfyUI injects the configured Comfy API key into this hidden
-            # input at execution time (the API-nodes auth convention). The
-            # writer threads it to _otr_comfy_backend.set_auth() so the Comfy
-            # Credits lane can make the credit-billed call. It is NOT a widget
-            # (absent from widgets_values) and is never logged.
-            #
-            # The logged-in account's SESSION BEARER is deliberately not
-            # requested here. The Comfy Registry security scan treats a
-            # third-party pack that declares that hidden input as credential
-            # access and marks the version critical / Flagged: alpha.13
-            # through alpha.15 all carried exactly that finding on this dict
-            # (PBUG-20260902-04). The API key is the credential ComfyUI
-            # provides for this use, and the backend already preferred it.
-            "hidden": {
-                "api_key_comfy_org": "API_KEY_COMFY_ORG",
-            },
+            # NO hidden Comfy key here (plan 0k, 2026-09-26): a V1 node that
+            # declares one writes it into /history when it raises. The Comfy
+            # Credits lane's key is bound by OTR_ComfyCredential, which runs
+            # before this node and cannot raise.
         }
 
     CATEGORY = "OldTimeRadio"
@@ -3078,10 +3066,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # OpenRouter pair. Default "" => unset (resolves to recommended).
         comfy_slot_a_model="",
         comfy_slot_b_model="",
-        # ComfyUI-injected hidden auth (API-nodes convention): the configured
-        # Comfy API key. None when no key is configured / the Comfy Credits
-        # lane is unused.
-        api_key_comfy_org=None,
         # Story-scaffold UI toggle (2026-06-24): auto/on/off. Governs the whole
         # bundled scaffold via OTR_ENABLE_STYLE_GRAMMAR (see the resolver at the
         # top of the body). Default "auto" => env/default => byte-identical.
@@ -3445,9 +3429,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 slot_a=openrouter_slot_a_model,
                 slot_b=openrouter_slot_b_model,
             )
-            # Comfy Credits sibling (2026-06-01): reset its per-run budget,
-            # bind the slot pickers, and capture the ComfyUI-injected hidden
-            # auth so the credit-billed call has a credential. Best-effort:
+            # Comfy Credits sibling (2026-06-01): reset its per-run budget
+            # and bind the slot pickers. The credential is NOT set here: it
+            # was bound for this prompt by OTR_ComfyCredential. Best-effort:
             # any hiccup leaves the lane to fail closed at call time, never
             # blocking the run (PD1).
             from . import _otr_comfy_backend as _occ_budget
@@ -3456,7 +3440,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 slot_a=comfy_slot_a_model,
                 slot_b=comfy_slot_b_model,
             )
-            _occ_budget.set_auth(api_key=api_key_comfy_org)
         except Exception:  # noqa: BLE001 -- budget/binding setup is best-effort
             pass
 
