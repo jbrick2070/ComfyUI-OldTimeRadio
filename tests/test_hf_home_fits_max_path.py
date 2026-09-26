@@ -142,8 +142,13 @@ def test_a_comfy_desktop_install_is_what_made_this_bite():
         % (len(desktop_root("a" * 8)), room))
 
 
+def test_the_short_models_root_is_29_characters():
+    """29, not 27. The off-by-two is a miscount of ``huggingface``."""
+    assert len(r"C:\ComfyUI-Models\huggingface") == 29
+
+
 def test_the_short_roots_all_fit_so_the_fallback_is_worth_taking():
-    """Declining to pin is only a fix if what we fall back to actually fits."""
+    """A fallback root is only a fix if it fits in the same room."""
     worst = _prestartup_constant("_OTR_LONGEST_HF_TAIL")
     room = _BUDGET - worst - 1
     for root in (r"C:\Users\christopher\.cache\huggingface",   # HF's own default
@@ -248,39 +253,200 @@ class TestTheErrorNowNamesItsCause:
         assert scrub(Unprintable()) == "Unprintable"
 
 
-def test_the_pin_is_actually_inside_the_guard():
-    """The arithmetic is worthless if the assignment is not gated by it.
+def test_the_pin_is_one_assignment_after_the_choice():
+    """One call to ``_choose_hf_home``, then one assignment of its result.
 
-    THIS IS A SOURCE-INSPECTION TEST ON PURPOSE, and it is the one job source
-    inspection is right for: proving a statement sits at its real site. The
-    decline branch cannot be OBSERVED on a box where ``LongPathsEnabled=1``,
-    because the guard correctly keeps the pin there -- so a behavioural test on
-    the dev machine would exercise only the happy path and report success either
-    way. The live decline is proven on a box with the key off.
-
-    What this asserts is narrow and durable: the one ``environ["HF_HOME"] =``
-    assignment in the file is reached through the length comparison, not before
-    it. If someone moves the assignment back above the guard, the seven-character
-    cliff returns silently and every other test here still passes.
+    THIS IS A SOURCE-INSPECTION TEST ON PURPOSE. The length comparison lives
+    inside the chooser, which the behavioural tests call directly. What source
+    inspection is for is proving prestartup has a single assignment site and
+    does not import ``nodes/`` to make the choice.
     """
     text = (_ROOT / "prestartup_script.py").read_text(encoding="utf-8")
     assignments = re.findall(r'^\s*environ\["HF_HOME"\]\s*=', text, re.M)
     assert len(assignments) == 1, (
         "expected exactly one HF_HOME assignment in prestartup, found %d -- a "
-        "second one may bypass the MAX_PATH guard" % len(assignments))
+        "second one may bypass the chooser" % len(assignments))
 
-    guard = text.index("_otr_room = _OTR_WINDOWS_PATH_BUDGET")
-    comparison = text.index("len(_otr_hf_home) > _otr_room")
+    room = text.index(
+        "_otr_room = _OTR_WINDOWS_PATH_BUDGET - _OTR_LONGEST_HF_TAIL - 1")
+    call = text.index("_otr_pin._choose_hf_home(_otr_adjacent, _otr_room)")
     assignment = text.index('environ["HF_HOME"] = _otr_hf_home')
-    assert guard < comparison < assignment, (
-        "the HF_HOME assignment must come AFTER the length comparison; got "
-        "guard=%d comparison=%d assignment=%d" % (guard, comparison, assignment))
+    assert room < call < assignment, (
+        "room, then the chooser, then the one assignment; got room=%d call=%d "
+        "assignment=%d" % (room, call, assignment))
+    between = text[call:assignment]
+    assert "if _otr_hf_home:" in between, (
+        "an empty choice must not be assigned; text was:\n%s" % between)
 
-    # And it must be the else-branch, i.e. more indented than the `if`.
-    tail = text[comparison:assignment]
-    assert "\n    else:\n" in tail, (
-        "the assignment should sit in the else-branch of the length check; the "
-        "text between them was:\n%s" % tail[-400:])
+    assert "NOT pinning" not in text
+    assert "set HF_HOME yourself" not in text
+    assert "enable Windows long paths" not in text
+
+    pin = (_ROOT / "otr_hf_home_pin.py").read_text(encoding="utf-8")
+    assert "import nodes" not in pin
+    assert "_otr_hf_env" not in pin
+    assert "_choose_hf_home" in pin
+
+
+def _room():
+    return (_prestartup_constant("_OTR_WINDOWS_PATH_BUDGET")
+            - _prestartup_constant("_OTR_LONGEST_HF_TAIL") - 1)
+
+
+def _desktop_root(username):
+    return (r"C:\Users\%s\AppData\Local\Comfy-Desktop\ComfyUI-Installs"
+            r"\ComfyUI\ComfyUI\models\huggingface" % username)
+
+
+def _decide(log, **overrides):
+    """Call the chooser with every live dependency replaced."""
+    pin = _load("otr_hf_home_pin_choose", "otr_hf_home_pin.py")
+    args = {
+        "platform": "win32",
+        "registry_value": None,
+        "hub_cache": None,
+        "legacy_hub_cache": None,
+        "long_paths_enabled": False,
+        "models_root": r"C:\ComfyUI-Models\huggingface",
+        "models_root_exists": False,
+        "user_cache": r"C:\Users\chris\.cache\huggingface",
+        "write_probe": lambda _path: True,
+        "log": log.append,
+    }
+    args.update(overrides)
+    adjacent = args.pop("models_adjacent", r"C:\short\models\huggingface")
+    return pin._choose_hf_home(adjacent, _room(), **args)
+
+
+def test_a_short_registry_value_wins():
+    log = []
+    chosen = _decide(
+        log,
+        registry_value=r"C:\ComfyUI-Models\huggingface",
+        hub_cache=r"C:\somewhere\else\huggingface",
+        models_adjacent=_desktop_root("a" * 8),
+        models_root_exists=True,
+        long_paths_enabled=True,
+    )
+    assert chosen == r"C:\ComfyUI-Models\huggingface"
+    assert log == []
+
+
+def test_a_too_long_registry_value_is_not_kept():
+    log = []
+    registry = "R:\\" + ("r" * 120)
+    chosen = _decide(
+        log,
+        registry_value=registry,
+        models_adjacent=r"C:\short\models\huggingface",
+    )
+    assert chosen == r"C:\short\models\huggingface"
+    assert registry not in (chosen or "")
+    assert any(str(len(registry)) in line and registry in line for line in log)
+
+
+def test_a_short_hub_cache_wins_and_a_long_one_does_not():
+    log = []
+    short = r"C:\ComfyUI-Models\huggingface"
+    chosen = _decide(log, hub_cache=short,
+                     models_adjacent=_desktop_root("a" * 8))
+    assert chosen == short
+
+    log.clear()
+    long_cache = "H:\\" + ("h" * 120)
+    legacy = r"C:\legacy\huggingface"
+    chosen = _decide(
+        log,
+        hub_cache=long_cache,
+        legacy_hub_cache=legacy,
+        models_adjacent=_desktop_root("a" * 8),
+        models_root_exists=True,
+    )
+    assert chosen == legacy
+    assert any(str(len(long_cache)) in line for line in log)
+
+
+def test_too_long_adjacent_uses_comfyui_models_when_present():
+    log = []
+    probed = []
+    adjacent = _desktop_root("a" * 8)
+    assert len(adjacent) > _room()
+
+    def probe(path):
+        probed.append(path)
+        return True
+
+    chosen = _decide(
+        log,
+        models_adjacent=adjacent,
+        models_root_exists=True,
+        long_paths_enabled=False,
+        write_probe=probe,
+    )
+    assert chosen == r"C:\ComfyUI-Models\huggingface"
+    assert probed == [r"C:\ComfyUI-Models\huggingface"]
+    assert any(
+        adjacent in line and str(len(adjacent)) in line for line in log
+    ), log
+
+
+def test_neither_adjacent_nor_models_root_uses_the_user_cache():
+    log = []
+    user = r"C:\Users\christopher\.cache\huggingface"
+    adjacent = _desktop_root("a" * 8)
+    chosen = _decide(
+        log,
+        models_adjacent=adjacent,
+        models_root_exists=False,
+        long_paths_enabled=False,
+        user_cache=user,
+    )
+    assert chosen == user
+    assert any("does not exist" in line and "(29 characters)" in line
+               for line in log), log
+
+
+def test_nothing_that_fits_leaves_hf_home_unset():
+    log = []
+    adjacent = _desktop_root("a" * 8)
+    user = "C:\\Users\\" + ("n" * 90) + "\\.cache\\huggingface"
+    assert len(user) > _room()
+    chosen = _decide(
+        log,
+        models_adjacent=adjacent,
+        models_root_exists=False,
+        long_paths_enabled=False,
+        user_cache=user,
+        write_probe=lambda _path: (_ for _ in ()).throw(AssertionError("probe")),
+    )
+    assert chosen is None
+    assert any(str(len(adjacent)) in line for line in log), log
+    assert any(str(len(user)) in line for line in log), log
+    assert any("leaving HF_HOME unset" in line for line in log), log
+
+
+def test_long_paths_keep_a_too_long_adjacent_root():
+    """LongPathsEnabled=1 still pins the models-adjacent root."""
+    adjacent = _desktop_root("a" * 8)
+    chosen = _decide(
+        [],
+        models_adjacent=adjacent,
+        long_paths_enabled=True,
+        models_root_exists=True,
+    )
+    assert chosen == adjacent
+
+
+def test_off_windows_the_adjacent_root_wins_even_when_long():
+    adjacent = "/home/" + ("u" * 80) + "/ComfyUI/models/huggingface"
+    chosen = _decide(
+        [],
+        platform="linux",
+        registry_value=r"C:\ComfyUI-Models\huggingface",
+        models_adjacent=adjacent,
+        long_paths_enabled=False,
+    )
+    assert chosen == adjacent
 
 
 def test_prestartup_stays_ascii_only():

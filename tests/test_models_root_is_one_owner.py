@@ -274,14 +274,16 @@ def test_every_caller_imports_the_owner_at_its_real_site():
     clean, so there is no module attribute to compare. Source inspection is the
     right tool for "is the import at its real site naming the right function",
     which is the one question here. Per-type readers and writers ask
-    ``model_type_dir``; the two that want the tree itself ask ``_models_root``.
+    ``model_type_dir``; the audio base wants the tree itself and asks
+    ``_models_root``. The HF cache default does not: on Windows it is
+    ``C:\\ComfyUI-Models\\huggingface`` only when that directory exists,
+    duplicated in prestartup, which must not import this package.
     """
     import importlib
     import inspect
 
     expected = {
         "nodes._otr_audio_engines.base": "_otr_models_root import _models_root",
-        "nodes._otr_hf_env": "_otr_models_root import _models_root",
         "nodes._otr_video_engines.wan_shared": "_otr_models_root import model_type_dir",
         "nodes._otr_video_engines.eng_humo": "_otr_models_root import model_type_dir",
         "nodes._otr_video_engines.eng_mesh_stage": "_otr_models_root import model_type_dir",

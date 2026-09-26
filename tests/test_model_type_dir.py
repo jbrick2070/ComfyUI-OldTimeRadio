@@ -173,22 +173,36 @@ class TestTheRealSitesUseIt:
 
 
 class TestTheHfCacheDefault:
-    def test_on_windows_it_is_the_models_root(self, clean_env, monkeypatch):
+    def test_on_windows_a_present_models_root_is_the_default(
+            self, monkeypatch, tmp_path):
+        """The huggingface folder itself need not exist yet. The parent does."""
+        from nodes import _otr_hf_env as hf
+
+        root = tmp_path / "huggingface"
+        monkeypatch.setattr(sys, "platform", "win32")
+        monkeypatch.setattr(hf, "_DEFAULT_HF_HOME_WINDOWS", str(root))
+        assert not root.exists()
+        assert hf._default_hf_home() == str(root)
+
+    def test_on_windows_without_that_root_it_is_the_user_cache(self, monkeypatch):
         from nodes import _otr_hf_env as hf
 
         monkeypatch.setattr(sys, "platform", "win32")
         monkeypatch.setattr(hf, "_DEFAULT_HF_HOME_WINDOWS",
-                            str(pathlib.Path("Z:/no/such/huggingface")))
-        assert hf._default_hf_home() == str(mr._models_root() / "huggingface")
+                            r"Z:\no\such\huggingface")
+        monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+        got = hf._default_hf_home()
+        assert got == os.path.join(os.path.expanduser("~"), ".cache", "huggingface")
+        assert "ComfyUI-Models" not in got
 
-    def test_an_existing_populated_cache_keeps_its_place(self, monkeypatch, tmp_path):
+    def test_off_windows_it_stays_the_user_cache(self, monkeypatch, tmp_path):
         from nodes import _otr_hf_env as hf
 
-        old = tmp_path / "huggingface"
-        (old / "hub").mkdir(parents=True)
-        monkeypatch.setattr(sys, "platform", "win32")
-        monkeypatch.setattr(hf, "_DEFAULT_HF_HOME_WINDOWS", str(old))
-        assert hf._default_hf_home() == str(old)
+        monkeypatch.setattr(sys, "platform", "linux")
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        got = hf._default_hf_home()
+        assert got == os.path.join(str(tmp_path), "huggingface")
+        assert "ComfyUI-Models" not in got
 
 
 class TestIndexTts2Refs:

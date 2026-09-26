@@ -58,10 +58,17 @@ log = logging.getLogger("OTR._otr_hf_env")
 
 _REG_KEY = "Environment"
 _REG_HF_HOME = "HF_HOME"
-#: The HF cache the reference machine already holds. Kept only while it is
-#: populated (it has a ``hub/`` folder), so an existing cache is never abandoned;
-#: every other Windows box gets ``<models root>\huggingface``.
+#: Windows fallback when ``C:\ComfyUI-Models`` exists. The existence check is
+#: duplicated in prestartup (``otr_hf_home_pin``); prestartup must not import
+#: this module to decide.
 _DEFAULT_HF_HOME_WINDOWS = r"C:\ComfyUI-Models\huggingface"
+
+
+def _user_hf_cache() -> str:
+    """huggingface_hub's own cache root: XDG_CACHE_HOME or ~/.cache."""
+    base = (otr_env.get("XDG_CACHE_HOME") or "").strip() or str(
+        Path.home() / ".cache")
+    return str(Path(base) / "huggingface")
 
 
 def _default_hf_home() -> str:
@@ -81,25 +88,18 @@ def _default_hf_home() -> str:
     warned, and `git status` was the only symptom.
 
     Off Windows the answer is Hugging Face's OWN default, ``~/.cache/huggingface``
-    -- the same root every other tool on the machine already uses, so a model
-    fetched by any of them is a model this pack does not fetch again.
+    (or ``$XDG_CACHE_HOME/huggingface``) -- the same root every other tool on
+    the machine already uses, so a model fetched by any of them is a model this
+    pack does not fetch again.
 
-    ON WINDOWS (2026-09-25) it is ``_models_root() / "huggingface"``, the tree
-    the user configured, not a hardcoded ``C:\ComfyUI-Models`` other installs
-    do not have -- unless that old cache exists and holds a ``hub/`` folder,
-    which keeps the reference machine's existing cache where it is (on that
-    machine the two answers are the same folder anyway). The owner is imported
-    here, lazily, because this module must import before the model catalog.
+    ON WINDOWS it is ``C:\ComfyUI-Models\huggingface`` only when
+    ``C:\ComfyUI-Models`` exists. Otherwise the same user cache. Creating
+    ``C:\`` for a stranger is not this function's job. The check is duplicated
+    in prestartup because that script must not import ``nodes/``.
     """
-    if sys.platform == "win32":
-        if (Path(_DEFAULT_HF_HOME_WINDOWS) / "hub").is_dir():
-            return _DEFAULT_HF_HOME_WINDOWS
-        try:
-            from ._otr_models_root import _models_root
-        except ImportError:  # pragma: no cover -- flat test imports
-            from _otr_models_root import _models_root  # type: ignore
-        return str(_models_root() / "huggingface")
-    return str(Path.home() / ".cache" / "huggingface")
+    if sys.platform == "win32" and Path(_DEFAULT_HF_HOME_WINDOWS).parent.is_dir():
+        return _DEFAULT_HF_HOME_WINDOWS
+    return _user_hf_cache()
 _WEIGHT_SUFFIXES = (".safetensors", ".bin")
 # Twin of _otr_model_catalog._WEIGHT_INDEX_NAMES -- keep the two in step.
 _WEIGHT_INDEX_NAMES = (
@@ -146,8 +146,8 @@ def ensure_hf_home() -> str:
         1. os.environ['HF_HOME']  (already in process env)
         2. HKCU\\Environment\\HF_HOME  (Windows User-scope)
         3. :func:`_default_hf_home` -- 'C:\\ComfyUI-Models\\huggingface' on
-           Windows, '~/.cache/huggingface' (Hugging Face's own default)
-           everywhere else
+           Windows when that models root exists, otherwise the user cache
+           ('~/.cache/huggingface', or '$XDG_CACHE_HOME/huggingface')
 
     Result is cached for the lifetime of the process. Idempotent --
     safe to call from multiple module init paths.

@@ -74,15 +74,15 @@ if environ.get("OTR_TEST_MODE") == "1" and "PYTEST_CURRENT_TEST" not in environ:
 # capability is wanted for future models; the mock above already kills the
 # offending background check.
 
-# Keep the HF cache next to ComfyUI's models/ -- BUT ONLY IF THE RESULTING ROOT
-# IS SHORT ENOUGH THAT THE FILES CAN ACTUALLY BE WRITTEN.
+# Choose one HF cache root before huggingface_hub is imported, then assign
+# it once. When HF_HOME is already in the process environment it is left alone.
 #
 # THE LONGEST CACHE TAIL THIS PACK ASKS FOR IS 162 CHARACTERS:
 #   hub\models--Comfy-Org--Lumina_Image_2.0_Repackaged\snapshots\<40-char sha>
 #       \split_files\diffusion_models\lumina_2_model_bf16.safetensors
-# Windows' usable path budget is 259, so the root may be at most 96 characters.
-# A ComfyUI Desktop root is 89 + len(username), which makes SEVEN CHARACTERS the
-# longest safe Windows username on a stock install. An eighth breaks it.
+# Windows' usable path budget is 259, so room = 259 - 162 - 1 (the +1 is the
+# separator between the root and the tail). A ComfyUI Desktop root is
+# 89 + len(username). Seven characters fit; an eighth does not.
 #
 # HOW IT BREAKS, because it is not recognisable from the error. huggingface_hub
 # 1.30.0 (file_download.py) adds the \\?\ extended-length prefix to lock_path
@@ -94,11 +94,20 @@ if environ.get("OTR_TEST_MODE") == "1" and "PYTEST_CURRENT_TEST" not in environ:
 # prefix. That cache held 86 materialised files, the longest at 238, and the one
 # missing pointer was the 261-character Lumina one.
 #
-# SO WHEN THE PIN WOULD NOT FIT, DO NOT PIN. huggingface_hub then uses its own
-# ~/.cache/huggingface, which is short, standard and always writable. This also
-# un-deads nodes/_otr_hf_env.py's own default: resolve() reads os.environ first,
-# so pinning here made its C:\ComfyUI-Models\huggingface branch unreachable on
-# every live boot.
+# THE FIRST CANDIDATE THAT QUALIFIES WINS. A too-long path is logged with its
+# length and is never assigned.
+#   1. HKCU\Environment\HF_HOME, Windows only, when it fits room.
+#   2. An already-set HF_HUB_CACHE or HUGGINGFACE_HUB_CACHE that fits room.
+#   3. <comfy>/models/huggingface when this is not Windows, or it fits room,
+#      or LongPathsEnabled=1.
+#   4. C:\ComfyUI-Models\huggingface when C:\ComfyUI-Models exists, the
+#      candidate fits room, and a write probe succeeds.
+#   5. The user cache (XDG_CACHE_HOME or ~/.cache, plus huggingface) when it
+#      fits room and the write probe succeeds.
+#   6. Otherwise leave HF_HOME unset and log every refused candidate.
+#
+# The C:\ComfyUI-Models existence check is duplicated in nodes/_otr_hf_env.py.
+# This file must not import nodes/ to make the choice.
 #
 # tests/test_hf_home_fits_max_path.py re-derives the 162 from the real
 # _SOURCES tuples and fails if a new model outgrows this constant. Do not edit
@@ -107,40 +116,26 @@ _OTR_LONGEST_HF_TAIL = 162
 _OTR_WINDOWS_PATH_BUDGET = 259
 
 
-def _otr_long_paths_enabled():
-    """True when Windows' 260-char limit is lifted registry-wide.
+def _otr_load_hf_home_pin():
+    """Load the chooser by path. The pack root is not on sys.path yet."""
+    import importlib.util
 
-    Both the manifest and the registry key are required, and python.exe already
-    ships longPathAware, so this key is the deciding half. Never raises: a
-    prestartup that dies takes the whole boot with it.
-    """
-    try:
-        import winreg
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                            r"SYSTEM\CurrentControlSet\Control\FileSystem") as k:
-            return int(winreg.QueryValueEx(k, "LongPathsEnabled")[0]) == 1
-    except Exception:                        # noqa: BLE001 -- absent key = off
-        return False
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "otr_hf_home_pin.py")
+    spec = importlib.util.spec_from_file_location("otr_hf_home_pin", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 if "HF_HOME" not in environ:
     comfy_base = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    _otr_hf_home = os.path.join(comfy_base, "models", "huggingface")
-    # The +1 is the separator between the root and the tail.
+    _otr_adjacent = os.path.join(comfy_base, "models", "huggingface")
     _otr_room = _OTR_WINDOWS_PATH_BUDGET - _OTR_LONGEST_HF_TAIL - 1
-    if (sys.platform == "win32" and len(_otr_hf_home) > _otr_room
-            and not _otr_long_paths_enabled()):
-        logging.getLogger("OTR").warning(
-            "OldTimeRadio prestartup: NOT pinning HF_HOME to %s -- it is %d "
-            "characters and Windows MAX_PATH leaves room for %d, so the longest "
-            "model this pack fetches could download in full and then fail to "
-            "materialise with a bare FileNotFoundError. Falling back to "
-            "huggingface_hub's own cache. To keep the cache beside ComfyUI's "
-            "models instead, either enable Windows long paths "
-            "(LongPathsEnabled=1) or set HF_HOME yourself to something shorter.",
-            _otr_hf_home, len(_otr_hf_home), _otr_room)
-    else:
+    _otr_pin = _otr_load_hf_home_pin()
+    _otr_hf_home = _otr_pin._choose_hf_home(_otr_adjacent, _otr_room)
+    if _otr_hf_home:
         environ["HF_HOME"] = _otr_hf_home
 
 logging.getLogger("OTR").info(

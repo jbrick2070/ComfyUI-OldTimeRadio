@@ -137,10 +137,12 @@ Two environment variables decide where everything lands:
 
 ```
 OTR_COMFYUI_MODELS_ROOT   the models root
-HF_HOME                   MUST be <models_root>/huggingface
+HF_HOME                   <models_root>/huggingface when that root fits
 ```
 
-Setting `HF_HOME` anywhere else does not relocate the cache, it ADDS one. That mistake cost 84 GB of duplicate weights and surfaced only as a disk-quota error on a half-empty volume.
+`HF_HOME` is `<models_root>/huggingface` when that root fits under the Windows path budget. On Windows, when it cannot, the short fallback is `C:\ComfyUI-Models\huggingface` if `C:\ComfyUI-Models` exists, the path fits, and a write probe succeeds; otherwise the user cache (`XDG_CACHE_HOME/huggingface`, or `~/.cache/huggingface`). That exception is deliberate. Pinning a too-long Desktop models root again is the MAX_PATH failure, and always creating `C:\ComfyUI-Models` asks a stranger's install for a directory at the drive root.
+
+Setting `HF_HOME` to a second root besides the one already chosen does not relocate the cache, it ADDS one. That mistake cost 84 GB of duplicate weights and surfaced only as a disk-quota error on a half-empty volume.
 
 ## 5. Verify
 
