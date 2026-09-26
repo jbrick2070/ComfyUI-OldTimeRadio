@@ -548,6 +548,11 @@ def cmd_check() -> int:
             "in workflows/ since 2026-09-25, and a graph in the subfolder is "
             "invisible to the template gallery")
     if not committed:
+        # The canonical's own gallery thumbnail is checked even with no
+        # variants (Sonnet QA on 7cf82cda: this early return skipped it).
+        failures.extend(_thumbnail_failures())
+        for f in failures:
+            print("CHECK FAIL:", f)
         print("check: no committed variants yet (nothing to diff); "
               "soft-skip guard " +
               ("FAILED" if failures else "OK"))

@@ -310,6 +310,22 @@ def test_otr_api_widget_vector_mismatch_hard_fails(schemas):
 # --check mode
 # ---------------------------------------------------------------------------
 
+def test_check_still_checks_the_canonical_thumbnail_with_no_variants(
+        tmp_path, monkeypatch):
+    """Sonnet QA on 7cf82cda: `cmd_check` returned early when no variant was
+    committed, before the thumbnail check, so a missing canonical thumbnail
+    passed. An empty variants folder must still fail on it."""
+    empty = tmp_path / "workflows"
+    empty.mkdir()
+    master = tmp_path / "otr_gallery_thumb.jpg"
+    master.write_bytes(b"\xff\xd8 gallery art \xff\xd9")
+    monkeypatch.setattr(bv, "VARIANTS_DIR", empty)
+    monkeypatch.setattr(bv, "GALLERY_THUMB", master)
+    assert bv.cmd_check() == 1
+    (empty / (bv.CANONICAL.stem + ".jpg")).write_bytes(master.read_bytes())
+    assert bv.cmd_check() == 0
+
+
 def test_check_detects_variant_drift(tmp_path, monkeypatch, canonical,
                                      schemas, mapping):
     variant, rel, recipe = bv.build_variant(
