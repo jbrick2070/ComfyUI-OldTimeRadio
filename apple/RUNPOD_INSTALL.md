@@ -571,7 +571,7 @@ RunPod billing; after the logs settle, stop the pod in the RunPod console.
 | Provision refuses Kokoro before downloading | Selected machine row is running under Python 3.13 | Use a Python 3.12 ComfyUI image; on NVIDIA, explicitly select `otr_4060_floor` for the Bark procedural route |
 | `torch` imports, but CUDA says driver capability 12.8 for a cu130 wheel | CUDA 13 template on driver 570-579 | Rerun the owner; require its real CUDA matmul and final `torch verified` line |
 | Provision says a manual tier is incomplete | Exact gated/private files are absent or wrong | Follow section 4; `.part` never counts; rerun until every size/SHA verifies |
-| LTX reports `WrapperNodeMissing` with weights present | Required pinned/patch-owned pack is absent or drifted | Rerun provisioning; do not install an arbitrary latest pack or downgrade Kornia |
+| LTX reports `WrapperNodeMissing` with weights present | The pod's ComfyUI predates the LTX classes (they are core, not a node pack) | Update ComfyUI; no LTX node pack is needed |
 | HuMo downloads ~16 GB and still says not installed | Wrong `humo_17B` lookalike | Fetch the pinned `humo` lane; verify the Kijai `Wan2_1-HuMo-14B...KJ` file |
 | H3 has weights but no usable nodes | Authorization/source boundary or wrong graph provider | Keep OTR H3 local; `quibble-h3` is not the node-pack owner |
 | First render pauses on an LLM timeout | Writer weights were left for first Queue | Rerun current provisioning; writer warm must be `OK` in its receipt |

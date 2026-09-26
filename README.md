@@ -524,10 +524,9 @@ node packs, not Python packages, so `pip` cannot supply them. Install them into
 `custom_nodes/` and restart. Nothing the canonical selects needs any of these.
 The AnimateDiff lanes -- the workflows `otr_8gb_animatediff.json`,
 `otr_16gb_animatediff.json` and `otr_mac16_animatediff.json`, each built from
-the matrix row of the same name -- want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
-`ltx098_low_video` wants [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo)
-plus the one-file patch described in [patches/README.md](patches/README.md). The
-LTX 2.5 lanes use nodes that ship with ComfyUI itself.
+the matrix row of the same name -- want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved).
+That is the only one: every LTX lane, `ltx098_low_video` included, uses nodes
+that ship with ComfyUI itself (update ComfyUI if one is reported missing).
 If you pick one of these lanes without its pack, the render stops with an error
 that names the pack and its URL.
 

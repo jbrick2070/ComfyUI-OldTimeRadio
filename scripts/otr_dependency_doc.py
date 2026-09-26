@@ -174,23 +174,13 @@ def render() -> str:
     A("| pack | who needs it | what breaks without it |")
     A("|---|---|---|")
     A("| [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | the animatediff lane | that lane only |")
-    A("| [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) "
-      "| `ltx_8gb` (the 0.9.x lane), per [patches/README.md]"
-      "(../patches/README.md) and its kornia pad patch | NOT `ltx25`: every "
-      "class the LTX 2.5 lanes ask for (ImgToVideoInplace, LatentUpsampler, "
-      "DualCFGGuider, Concat/SeparateAVLatent, AudioVAEDecode, "
-      "EmptyLatentAudio, ModalityGuidance) is ComfyUI core since v0.32.0 "
-      "(section 0). Measured 2026-09-25 from the live server's "
-      "`/object_info` `python_module`: `comfy_extras.nodes_lt*`, not the "
-      "pack. And the pack's own registry (77 node ids) contains NONE of the "
-      "classes any OTR engine asks for, while no OTR module imports its "
-      "Python -- so on a current ComfyUI it is a dependency of nothing "
-      "shipped. The 4060's B4 leg on a wiped box without it is the live "
-      "confirmation; after that the provisioner stops cloning and patching "
-      "it (plan row 0b). |")
-    A("\n`scripts/otr_provision.py` clones both. If you install by hand, "
-      "clone into `<comfy>/custom_nodes/` and restart ComfyUI -- node "
-      "classes are registered at startup.\n")
+    A("\nComfyUI-LTXVideo is NOT needed: every class the LTX lanes ask for "
+      "(`ltx_8gb` and the `ltx25_*` lanes) ships with ComfyUI itself, and "
+      "`otr_8gb_video` published on a wiped 8 GB box without it "
+      "(2026-09-26). A missing LTX class means an old ComfyUI -- update it.\n")
+    A("\n`scripts/otr_provision.py` clones AnimateDiff-Evolved at its pin. If "
+      "you install by hand, clone into `<comfy>/custom_nodes/` and restart "
+      "ComfyUI -- node classes are registered at startup.\n")
     A("## 4. Model weights\n")
     A("See [MODEL_ASSET_INDEX.md](MODEL_ASSET_INDEX.md) -- generated from the "
       "engine code, and the only place file names, repo ids and sizes are "

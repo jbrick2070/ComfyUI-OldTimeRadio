@@ -44,16 +44,6 @@ from typing import NamedTuple
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 
-LTXVIDEO_PACK_NAME = "ComfyUI-LTXVideo"
-LTXVIDEO_URL = "https://github.com/Lightricks/ComfyUI-LTXVideo"
-LTXVIDEO_PIN = "3b9c5cde4700917074823d45e25401d81049f8fc"
-LTXVIDEO_CLEAN_SHA256 = "08d2b18cfd325a3610683abc574e058fd209ddc7453c19b47cc108a8882a7dc1"
-LTXVIDEO_PATCHED_SHA256 = "19ac341bad75f8ea03988aef664924896fc24960accd2a79f415536c2833997e"
-LTXVIDEO_PATCH_SHA256 = "109fbe2927b9c07d95d431470f7449942094fc6047dcbc9ad4a519a57ac0c993"
-LTXVIDEO_PATCH_PATH = os.path.join(
-    _REPO, "patches", "ComfyUI-LTXVideo-kornia-pad.patch"
-)
-
 ANIMATEDIFF_PACK_NAME = "ComfyUI-AnimateDiff-Evolved"
 ANIMATEDIFF_URL = "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved"
 # Release 1.6.0 (2026-07-28): the checkout on the RTX 5080 behind every published
@@ -234,13 +224,6 @@ def ensure_hf_home(root: str) -> str:
 # --------------------------------------------------------------------------- #
 # Steps.
 # --------------------------------------------------------------------------- #
-def _normalized_sha256(path: str) -> str:
-    """Hash text after CRLF and lone-CR normalization to LF."""
-    with open(path, "rb") as fh:
-        data = fh.read().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
-    return hashlib.sha256(data).hexdigest()
-
-
 def _git(dest: str, *args: str) -> str:
     r = run(["git", "-C", dest] + list(args))
     if r.returncode != 0:
@@ -281,103 +264,14 @@ def _fetch_exact_repo(url: str, pin: str, dest: str) -> None:
         raise ProvisionFailure("checkout verification failed for %s at %s" % (dest, pin))
 
 
-def _apply_ltxvideo_patch(dest: str) -> None:
-    target = os.path.join(dest, "pyramid_blending.py")
-    if not os.path.isfile(LTXVIDEO_PATCH_PATH):
-        raise ProvisionFailure(
-            "required LTXVideo patch is missing: %s" % LTXVIDEO_PATCH_PATH
-        )
-    if _normalized_sha256(LTXVIDEO_PATCH_PATH) != LTXVIDEO_PATCH_SHA256:
-        raise ProvisionFailure(
-            "LTXVideo patch identity does not match the pinned SHA-256"
-        )
-    if _normalized_sha256(target) != LTXVIDEO_CLEAN_SHA256:
-        raise ProvisionFailure(
-            "LTXVideo pyramid_blending.py preimage is not the pinned clean file"
-        )
-    r = run([
-        "git", "-C", dest, "apply", "--ignore-space-change",
-        "--ignore-whitespace", os.path.abspath(LTXVIDEO_PATCH_PATH),
-    ])
-    if r.returncode != 0:
-        raise ProvisionFailure(
-            "LTXVideo Kornia pad patch failed: %s"
-            % ((r.stderr or r.stdout or "unknown error").strip()[:300])
-        )
-
-
-def _verify_patched_ltxvideo_git(dest: str) -> None:
-    target = os.path.join(dest, "pyramid_blending.py")
-    if _normalized_sha256(target) != LTXVIDEO_PATCHED_SHA256:
-        raise ProvisionFailure(
-            "LTXVideo patched pyramid_blending.py does not match the pinned SHA-256"
-        )
-    changed = _git_changed_paths(dest)
-    untracked = _git_untracked_paths(dest)
-    if changed != ["pyramid_blending.py"] or untracked:
-        raise ProvisionFailure(
-            "LTXVideo checkout drift: expected only pyramid_blending.py changed; "
-            "changed=%s untracked=%s" % (changed, untracked)
-        )
-
-
-def ensure_ltxvideo_pack(comfy: str) -> None:
-    """Install the exact LTXVideo commit plus its Kornia 0.8.3 API repair."""
-    dest = os.path.join(comfy, "custom_nodes", LTXVIDEO_PACK_NAME)
-    fresh = not os.path.isdir(dest) or not os.listdir(dest)
-    if fresh:
-        _fetch_exact_repo(LTXVIDEO_URL, LTXVIDEO_PIN, dest)
-    if not os.path.isdir(os.path.join(dest, ".git")):
-        raise ProvisionFailure(
-            "ComfyUI-LTXVideo is not a verifiable git checkout; move it aside and rerun --packs-only")
-    head = _git_head(dest)
-    if head != LTXVIDEO_PIN:
-        raise ProvisionFailure(
-            "ComfyUI-LTXVideo is at %s, required %s; move it aside and rerun --packs-only"
-            % (head, LTXVIDEO_PIN)
-        )
-    target = os.path.join(dest, "pyramid_blending.py")
-    if not os.path.isfile(target):
-        raise ProvisionFailure(
-            "ComfyUI-LTXVideo is missing pyramid_blending.py"
-        )
-    target_sha = _normalized_sha256(target)
-    changed = _git_changed_paths(dest)
-    untracked = _git_untracked_paths(dest)
-    if target_sha == LTXVIDEO_CLEAN_SHA256:
-        if changed or untracked:
-            raise ProvisionFailure(
-                "LTXVideo clean pyramid_blending.py sits in a dirty checkout; "
-                "refusing to overwrite drift"
-            )
-        _apply_ltxvideo_patch(dest)
-        _verify_patched_ltxvideo_git(dest)
-        state = "PATCHED"
-    elif target_sha == LTXVIDEO_PATCHED_SHA256:
-        _verify_patched_ltxvideo_git(dest)
-        state = "PRESENT"
-    else:
-        raise ProvisionFailure(
-            "LTXVideo pyramid_blending.py is neither the pinned clean nor "
-            "pinned patched file; refusing partial drift"
-        )
-    install_pack_requirements(LTXVIDEO_PACK_NAME, dest, required=True)
-    say(
-        state,
-        LTXVIDEO_PACK_NAME,
-        "%s + Kornia 0.8.3 pad patch" % LTXVIDEO_PIN[:12],
-    )
-
-
 def ensure_animatediff_pack(comfy: str) -> None:
     """Install or verify the AnimateDiff pack at its pinned commit.
 
-    Same wrong-commit discipline as the LTXVideo pack: a fresh install
-    is an exact detached checkout of ANIMATEDIFF_PIN, and an existing git checkout
-    must be AT that commit (a different commit is named and refused, never reset).
-    A Manager install has no .git and cannot be verified, so it is accepted as
-    PRESENT and said so (LTXVideo refuses any). This pack carries no patch to
-    hash, and calling
+    Wrong-commit discipline: a fresh install is an exact detached checkout of
+    ANIMATEDIFF_PIN, and an existing git checkout must be AT that commit (a
+    different commit is named and refused, never reset). A Manager install has
+    no .git and cannot be verified, so it is accepted as PRESENT and said so.
+    This pack carries no patch to hash, and calling
     a working Manager install absent used to make the provisioner clone into a
     non-empty directory and report FAILED for it.
     """
@@ -404,18 +298,18 @@ def ensure_animatediff_pack(comfy: str) -> None:
 def install_node_packs(comfy: str) -> None:
     cn = os.path.join(comfy, "custom_nodes")
     os.makedirs(cn, exist_ok=True)
-    # WITHOUT THESE THE MEATY VIDEO LANES DO NOT RUN. Only AnimateDiff was
-    # listed here once, so a provisioned machine could render the AnimateDiff
-    # lane and nothing else: a video lane died 17 minutes in with
-    # WrapperNodeMissing, after writing, casting, voices and stills had all
-    # completed. The engines resolve these node CLASSES by name at render time,
-    # which is why the failure arrives late and looks nothing like a missing
-    # install.
-    ensure_ltxvideo_pack(comfy)
+    # ONE PACK. Every class the LTX lanes ask for -- ltx_8gb and ltx25_* --
+    # ships with ComfyUI itself (measured from /object_info python_module
+    # 2026-09-25), and the 4060 published otr_8gb_video on a wiped box WITHOUT
+    # ComfyUI-LTXVideo on 2026-09-26 (TEST_WAVE B4). So the LTXVideo clone and
+    # its kornia pad patch are gone; a missing LTX class now means an old
+    # ComfyUI, and the engine says "update ComfyUI". AnimateDiff-Evolved stays:
+    # the animatediff lanes need its classes, and a lane without them used to
+    # die mid-episode with WrapperNodeMissing (PBUG-20260925-02).
     ensure_animatediff_pack(comfy)
 
 
-def install_pack_requirements(name: str, dest: str, required: bool = False) -> None:
+def install_pack_requirements(name: str, dest: str) -> None:
     """A cloned pack whose own dependencies are missing does not load.
 
     Cloning was treated as installing, and it is not: a pack whose own wheels
@@ -429,8 +323,6 @@ def install_pack_requirements(name: str, dest: str, required: bool = False) -> N
     """
     req = os.path.join(dest, "requirements.txt")
     if not os.path.isfile(req):
-        if required:
-            raise ProvisionFailure("%s is missing required requirements.txt" % name)
         say("SKIP", "%s deps" % name, "requirements.txt not present")
         return
     r = run([sys.executable, "-m", "pip", "install", "-q", "-r", req])

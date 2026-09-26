@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import hashlib
 from pathlib import Path
 import subprocess
 
@@ -73,123 +72,6 @@ def test_runpod_manual_recipes_carry_every_authoritative_manifest():
     assert 'rm -f "$part"' in playbook
 
 
-def _ltxvideo_pyramid_fixture() -> bytes:
-    return (
-        b"""import math
-
-import torch
-import torch.nn.functional as F
-from kornia.geometry.transform.pyramid import (
-    PyrUp,
-    build_laplacian_pyramid,
-    build_pyramid,
-    find_next_powerof_two,
-    is_powerof_two,
-    pad,
-)
-from torch import Tensor
-
-
-def _pad_for_laplacian(image: torch.Tensor) -> tuple[torch.Tensor, tuple[int, int]]:
-    h, w = image.shape[2], image.shape[3]
-    pad_right = 0
-    pad_down = 0
-    if not (is_powerof_two(h) and is_powerof_two(w)):
-        pad_right = find_next_powerof_two(w) - w
-        pad_down = find_next_powerof_two(h) - h
-        image = pad(image, (0, pad_right, 0, pad_down), "reflect")
-    return image, (pad_right, pad_down)
-
-
-def _gaussian_pyramid(images, max_level, border_type="reflect", align_corners=False):
-    h, w = images.shape[2], images.shape[3]
-    if not (is_powerof_two(w) and is_powerof_two(h)):
-        padding = (0, find_next_powerof_two(w) - w, 0, find_next_powerof_two(h) - h)
-        images = pad(images, padding, border_type)
-    return build_pyramid(images, max_level, border_type, align_corners)
-
-
-"""
-        + (b"# fixture line alignment\n" * 105)
-        + b"""def _pyramid_blend(mask, max_level, padded_min, padding):
-    max_level = min(max_level, int(math.log2(padded_min)))
-
-    if any(padding):
-        mask = torch.nn.functional.pad(
-            mask, (0, padding[0], 0, padding[1]), mode="reflect"
-        )
-
-    return mask
-"""
-    )
-
-
-def test_ltxvideo_patch_file_identity_and_runtime_repair_are_pinned():
-    provision = _load_provision()
-    patch = Path(provision.LTXVIDEO_PATCH_PATH)
-    assert provision._normalized_sha256(str(patch)) == provision.LTXVIDEO_PATCH_SHA256
-    text = patch.read_text(encoding="utf-8")
-    assert "-    pad," in text
-    assert text.count("+        image = F.pad(") == 1
-    assert text.count("+        images = F.pad(") == 1
-    assert text.count("+        mask = F.pad(") == 1
-    assert provision.LTXVIDEO_CLEAN_SHA256 != provision.LTXVIDEO_PATCHED_SHA256
-
-
-def test_ltxvideo_fresh_exact_checkout_and_drift_refusal(tmp_path, monkeypatch):
-    provision = _load_provision()
-    comfy = _comfy(tmp_path)
-    upstream = tmp_path / "ltx-upstream"
-    clean = _ltxvideo_pyramid_fixture()
-    patched = clean.replace(b"    pad,\n", b"")
-    patched = patched.replace(b"image = pad(image,", b"image = F.pad(image,")
-    patched = patched.replace(b"images = pad(images,", b"images = F.pad(images,")
-    patched = patched.replace(
-        b"mask = torch.nn.functional.pad(", b"mask = F.pad("
-    )
-    pin = _make_repo(
-        upstream,
-        {
-            "requirements.txt": b"torch\n",
-            "node.py": b"VALUE = 1\n",
-            "pyramid_blending.py": clean,
-        },
-    )
-    installed = []
-    monkeypatch.setattr(provision, "LTXVIDEO_URL", str(upstream))
-    monkeypatch.setattr(provision, "LTXVIDEO_PIN", pin)
-    monkeypatch.setattr(
-        provision, "LTXVIDEO_CLEAN_SHA256", hashlib.sha256(clean).hexdigest()
-    )
-    monkeypatch.setattr(
-        provision, "LTXVIDEO_PATCHED_SHA256", hashlib.sha256(patched).hexdigest()
-    )
-    monkeypatch.setattr(
-        provision,
-        "install_pack_requirements",
-        lambda name, root, required=False: installed.append((name, required)),
-    )
-
-    provision.ensure_ltxvideo_pack(str(comfy))
-    dest = comfy / "custom_nodes" / provision.LTXVIDEO_PACK_NAME
-    assert _git(dest, "rev-parse", "HEAD") == pin
-    assert installed == [(provision.LTXVIDEO_PACK_NAME, True)]
-    landed = (dest / "pyramid_blending.py").read_bytes()
-    landed = landed.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
-    assert landed == patched
-    assert provision._git_changed_paths(str(dest)) == ["pyramid_blending.py"]
-
-    provision.ensure_ltxvideo_pack(str(comfy))
-    assert installed == [
-        (provision.LTXVIDEO_PACK_NAME, True),
-        (provision.LTXVIDEO_PACK_NAME, True),
-    ]
-
-    (dest / "node.py").write_text("VALUE = 2\n", encoding="utf-8")
-    with pytest.raises(provision.ProvisionFailure, match="drift"):
-        provision.ensure_ltxvideo_pack(str(comfy))
-
-
 def test_animatediff_pin_is_a_full_sha():
     provision = _load_provision()
     assert len(provision.ANIMATEDIFF_PIN) == 40
@@ -207,13 +89,13 @@ def test_animatediff_fresh_exact_checkout_and_wrong_commit_refusal(tmp_path, mon
     monkeypatch.setattr(
         provision,
         "install_pack_requirements",
-        lambda name, root, required=False: installed.append((name, required)),
+        lambda name, root: installed.append(name),
     )
 
     provision.ensure_animatediff_pack(str(comfy))
     dest = comfy / "custom_nodes" / provision.ANIMATEDIFF_PACK_NAME
     assert _git(dest, "rev-parse", "HEAD") == pin           # exact detached checkout
-    assert installed == [(provision.ANIMATEDIFF_PACK_NAME, False)]
+    assert installed == [provision.ANIMATEDIFF_PACK_NAME]
 
     provision.ensure_animatediff_pack(str(comfy))          # PRESENT at the pin: idempotent
     assert len(installed) == 2
@@ -233,7 +115,7 @@ def test_animatediff_manager_install_is_present_but_unverifiable(tmp_path, monke
     monkeypatch.setattr(
         provision,
         "install_pack_requirements",
-        lambda name, root, required=False: installed.append(name),
+        lambda name, root: installed.append(name),
     )
     provision.ensure_animatediff_pack(str(comfy))
     assert installed == [provision.ANIMATEDIFF_PACK_NAME]
@@ -271,3 +153,15 @@ def test_packs_only_failure_is_nonzero_and_clears_old_receipt(tmp_path, monkeypa
 
     assert provision.main(["--packs-only"]) == 1
     assert all(row[1] != "stale" for row in provision._LOG)
+
+
+def test_ltxvideo_is_no_longer_installed():
+    """TEST_WAVE B4 (2026-09-26): otr_8gb_video published on a wiped 4060
+    WITHOUT ComfyUI-LTXVideo; every LTX class is ComfyUI core. The provisioner
+    installs AnimateDiff-Evolved and nothing else, and the patch is gone."""
+    provision = _load_provision()
+    assert not hasattr(provision, "ensure_ltxvideo_pack")
+    assert not (REPO / "patches" / "ComfyUI-LTXVideo-kornia-pad.patch").exists()
+    import inspect
+    body = inspect.getsource(provision.install_node_packs)
+    assert "ensure_animatediff_pack(comfy)" in body and "ensure_ltxvideo_pack(" not in body

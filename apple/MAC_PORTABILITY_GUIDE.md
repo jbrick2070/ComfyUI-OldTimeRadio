@@ -466,9 +466,8 @@ swapping.
 T5 encoder to CPU by design. The row was untested policy, not a measurement. See
 the 30-second grep test in `ADDING_IMAGE_AND_VIDEO_LANES.md`.
 
-`ltx_8gb` does NOT need the ComfyUI-LTXVideo node pack -- it drives stock
-ComfyUI nodes. Only the three `ltx25_*` lanes need that pack, and they cannot run
-on 16 GB anyway (section 11.1).
+No LTX lane needs a node pack: `ltx_8gb` and the `ltx25_*` lanes drive nodes
+that ship with ComfyUI itself (section 11).
 
 ---
 
@@ -643,9 +642,8 @@ file is on disk, and the gate fails with `missing_model` naming
 
 **1. The node pack, at the PINNED commit.** `main` is the version that
 AnimateDiff-Evolved issue #576 reports producing colored noise (section 13).
-`scripts/otr_provision.py` pins `ANIMATEDIFF_PIN`; call the function directly
-so the `--packs-only` run cannot stall on ComfyUI-LTXVideo's git-lfs
-requirement (section 11.1):
+`scripts/otr_provision.py` pins `ANIMATEDIFF_PIN` and `--packs-only` installs
+it (section 11); calling the function directly does the same:
 
 ```bash
 OTR_COMFY_ROOT=/path/to/ComfyUI \
@@ -985,9 +983,9 @@ ships ffmpeg 9.0, which removed `-vsync`; the pack probes the binary and uses
 
 Node pack at the pinned commit, weights by hand, and the Comfy Desktop mapping.
 
-### ComfyUI-LTXVideo -- section 11
+### Node packs -- section 11
 
-The git-lfs trap, and the pack every `ltx25_*` lane needs for its upscaler.
+AnimateDiff-Evolved is the only one; ComfyUI-LTXVideo is no longer needed.
 
 ### Upscale -- nothing manual, and one receipt
 
@@ -1112,63 +1110,36 @@ font-resolver design remains in GO_FORWARD row 3.8.
 
 ---
 
-## 11. ComfyUI-LTXVideo: the node pack every LTX lane needs
+## 11. Node packs: AnimateDiff-Evolved is the only one
 
-`scripts/otr_provision.py --packs-only` installs and pins two node packs,
-`ComfyUI-LTXVideo` and `ComfyUI-AnimateDiff-Evolved`:
+`scripts/otr_provision.py --packs-only` installs and pins ONE node pack,
+`ComfyUI-AnimateDiff-Evolved` (section 7.3):
 
 ```bash
 OTR_COMFY_ROOT=/path/to/ComfyUI \
   <ComfyUI Python> scripts/otr_provision.py --packs-only
 ```
 
+**ComfyUI-LTXVideo is no longer installed.** Every class the LTX lanes ask for
+-- `ltx_8gb` and the `ltx25_*` lanes -- ships with ComfyUI itself (measured from
+`/object_info` `python_module` on 2026-09-25), and the 4060 published
+`otr_8gb_video` on a wiped box without the pack on 2026-09-26. The git-lfs trap
+this section used to describe was that pack's, and it went with it. A missing
+LTX class now means an old ComfyUI: update it. A `custom_nodes/ComfyUI-LTXVideo`
+left by an earlier provision is harmless and safe to delete.
+
 **Two traps in that one command.**
 
 * **`OTR_COMFY_ROOT` is not optional in practice.** Without it the script
   guessed `/Users/<me>/Documents` here and created a `custom_nodes/` folder
   there, cloning a pack into a directory ComfyUI has never heard of. Nothing
-  warned; the receipt said `PATCHED`. Check the `comfy root :` line it prints
-  BEFORE walking away, and delete any stray `custom_nodes/` it made elsewhere.
+  warned. Check the `comfy root :` line it prints BEFORE walking away, and
+  delete any stray `custom_nodes/` it made elsewhere.
 * **`--list` does not dry-run for packs.** The flag is documented as "show what
   would be installed, install nothing". Combined with `--packs-only` it clones
   and installs anyway. Treat `--packs-only` as always live.
 
-### 11.1 `git-lfs` -- the step that stops a clean Mac dead
-
-```
-FAILED  required pack/dependency -- git checkout -q --detach FETCH_HEAD failed
-in .../custom_nodes/ComfyUI-LTXVideo: git-lfs filter-process: git-lfs: command
-not found
-fatal: the remote end hung up unexpectedly
-```
-
-macOS ships neither `git-lfs` nor Homebrew. `GIT_LFS_SKIP_SMUDGE=1` does **not**
-rescue it -- the checkout still fails. Install git-lfs first
-(`brew install git-lfs && git lfs install`, which means installing Homebrew
-first).
-
-**There is no skip flag, and this matters if you rerun.** `install_node_packs`
-requires ComfyUI-LTXVideo unconditionally, so the provisioner will report
-INCOMPLETE every time until git-lfs exists -- and moving the broken clone aside
-does not settle it, because the next run re-clones and fails again the same way.
-What you get by moving it aside is a ComfyUI that boots cleanly in the meantime,
-not a finished provision.
-
-**And clean up after the failure, because it does not.** A failed checkout
-leaves a directory full of files with NO COMMITS -- `git log` says *"your current
-branch 'main' does not have any commits yet"* and every file is untracked. That
-is an unpinned pack sitting in `custom_nodes/`, which ComfyUI will import at
-boot, next to lanes that currently work without it. Move it aside:
-
-```bash
-mv custom_nodes/ComfyUI-LTXVideo custom_nodes/.disabled/ComfyUI-LTXVideo-unpinned
-```
-
-`ltx_8gb` does NOT need this pack -- it drives stock ComfyUI nodes. The
-`ltx25_*` lanes need it for `LTXVLatentUpsampler` alone; the DiT, text encoder
-and VAE load through stock `UNETLoader`/`CLIPLoader`/`VAELoader`.
-
-### 11.2 Verify the pack actually registered
+### 11.1 Verify the pack actually registered
 
 A cloned pack that failed to install its wheel registers NOTHING, and the
 failure arrives much later as `WrapperNodeMissing` in the middle of a render.
@@ -1177,12 +1148,12 @@ Check at the API instead of at the filesystem:
 ```bash
 curl -s http://127.0.0.1:8188/object_info | python3 -c "
 import json,sys; d=json.load(sys.stdin)
-print('LTXVLatentUpsampler' in d)"
+print('ADE_AnimateDiffLoaderGen1' in d)"
 ```
 
 `False` means the pack is present on disk but its wheel did not install.
 
-### 11.3 Watch the venv, because this is how a boot gets bricked
+### 11.2 Watch the venv, because this is how a boot gets bricked
 
 Installing a pack's requirements runs `pip` into the SAME environment ComfyUI
 boots from. That is exactly how the `tokenizers` pin bricked this install on

@@ -1162,8 +1162,8 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if missing:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "%s missing required ComfyUI node class(es): %s (install/update "
-                "ComfyUI-LTXVideo)" % (self.name, ", ".join(missing)),
+                "%s missing required ComfyUI node class(es): %s (these ship "
+                "with ComfyUI itself -- update ComfyUI)" % (self.name, ", ".join(missing)),
                 kind="video")
         return self.name
 
