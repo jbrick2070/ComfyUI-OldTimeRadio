@@ -48,3 +48,28 @@ def test_every_node_class_has_non_empty_description(node_name, cls):
     assert "dummy" not in stripped.lower(), (
         f"Node {node_name} ({cls.__name__}) DESCRIPTION contains forbidden word 'dummy'"
     )
+
+
+def _declared_inputs(cls):
+    """(section, name, declaration) for every required and optional input.
+
+    Hidden inputs are excluded: ComfyUI never draws them, so the "?" panel
+    has nothing to show for them."""
+    spec = cls.INPUT_TYPES()
+    for section in ("required", "optional"):
+        for name, decl in (spec.get(section) or {}).items():
+            yield section, name, decl
+
+
+@pytest.mark.parametrize("node_name,cls", sorted(NODE_CLASS_MAPPINGS.items()))
+def test_every_input_carries_a_tooltip(node_name, cls):
+    """The other half of plan 0f item 1: every widget AND every socket the
+    "?" panel lists explains itself. 184 of 184 carried one on 2026-09-25."""
+    missing = []
+    for section, name, decl in _declared_inputs(cls):
+        opts = decl[1] if len(decl) > 1 and isinstance(decl[1], dict) else {}
+        tip = str(opts.get("tooltip") or "").strip()
+        if not tip:
+            missing.append(f"{section}.{name}")
+        assert "dummy" not in tip.lower(), f"{node_name}.{name}"
+    assert not missing, f"{node_name} inputs without a tooltip: {missing}"

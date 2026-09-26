@@ -530,13 +530,14 @@ interrupt checks on the heavy nodes, a static dependency list, no
 eval/exec/runtime pip, and `.comfyignore` stripping dev files. Gaps, in
 order:
 
-1. `DESCRIPTION` on every registered node (1 of 24 today) and tooltips on
-   every widget, so ComfyUI's "?" panel is not blank.
+1. DONE 2026-09-25 (cf75a95e, Cursor): `DESCRIPTION` on all 24 nodes and a
+   tooltip on all 184 inputs; `tests/test_node_descriptions.py` pins both.
 2. Live UI status from the long nodes (`PromptServer.instance.send_sync` or
    ProgressBar) so a minutes-long render does not look stalled.
 3. `requires-comfyui` in `[tool.comfy]`, set to the oldest core that runs
    the canonical workflow -- measured, never guessed; too high blocks installs.
-4. A thumbnail for `workflows/otr_canonical.json` in the gallery. The
+4. DONE: `build_variants.py --all` writes a gallery thumbnail beside the
+   canonical and every workflow, and `--check` fails on a missing one. The
    audit's "rename to example_workflows/" half is rejected (Fable's call,
    OTR_STANDING_RULINGS 2026-09-25: `workflows/` stays).
 5. Maybe: a GitHub Actions job running the CPU suite on push/PR (torch
