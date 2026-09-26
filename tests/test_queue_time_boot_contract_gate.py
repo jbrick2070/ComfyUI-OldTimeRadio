@@ -36,6 +36,18 @@ def test_sage_alone_is_refused_with_the_sage_fix_first():
     assert "--reserve-vram" not in msg and "Nothing was downloaded" in msg
 
 
+def test_an_unreadable_sage_state_is_not_blamed_on_sage():
+    """A failed Sage probe must not tell a user whose Sage is already off to
+    turn it off: the lead says the state could not be confirmed, and the
+    probe's own reason follows (Sonnet review of 84c98900)."""
+    state = dict(STOCK, sage_attention=None, sage_probe_error="probe raised")
+    with pytest.raises(va.VisualAssetError) as info:
+        va._refuse_unmet_boot_contracts({"minimax_h3_video"}, state=state)
+    msg = str(info.value)
+    assert msg.startswith("Could not confirm ComfyUI is running without SageAttention")
+    assert "probe raised" in msg
+
+
 def test_h3_on_its_own_boot_passes():
     va._refuse_unmet_boot_contracts({"minimax_h3_video", "minimax_h3_audio_in"},
                                     state=H3_BOOT)

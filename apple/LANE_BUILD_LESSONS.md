@@ -1346,10 +1346,13 @@ model loading is what forces a 21 GB DiT to stream rather than attempt residency
 hypothesis. The passing runs are the evidence, and the difference between them
 and the failing run is the contract. Read the receipts, not the prose.
 
-**Twin assertion:**
-`tests/test_minimax_h3_video.py::test_the_h3_contract_carries_the_MEASURED_reserve_clamp`
-and `::test_the_reserve_clamp_REACHES_the_launcher_and_the_profile_carries_it`
-(the second is L6's rule: a boot pin no launcher turns into argv clamps nothing).
+**Twin assertion:** the two reserve-clamp tests in
+`tests/test_minimax_h3_video.py` were deleted with the feature on 2026-09-26.
+**Reversed that day by the operator's rule** -- models unload after use, and
+an out-of-memory is recorded as a bug, not pre-empted with a reserve -- so the
+`h3` contract now asks only for SageAttention off
+(`::test_the_h3_contract_asks_only_that_sage_be_off`). The lesson about
+reading receipts over prose stands; the reserve it produced does not.
 
 ---
 

@@ -658,9 +658,9 @@ ideogram4_local), `otr_rot_ltx25_video_lumina` (ltx25_high_video + lumina_image)
 
 **Lanes that need their own boot cannot share a sweep.** A profile's `launch.env`
 is a BOOT contract, so these get a separate ComfyUI start and their own group:
-HuMo (`OTR_HEADLESS_RESERVE_VRAM_GB` + `OTR_HEADLESS_DISABLE_PINNED=1`) and
-the MiniMax H3 lanes, which
-the engine itself refuses on a stock boot.
+HuMo (`OTR_HEADLESS_RESERVE_VRAM_GB` + `OTR_HEADLESS_DISABLE_PINNED=1`). The
+MiniMax H3 lanes need only SageAttention off since 2026-09-26 (no reserve), so
+they share any Sage-free sweep; the engine refuses a Sage boot.
 
 ## 7B. Running a pod UNATTENDED, and ending it (2026-09-04)
 

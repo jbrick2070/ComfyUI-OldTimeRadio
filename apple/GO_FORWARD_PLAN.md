@@ -197,7 +197,8 @@ clean, full suite green.
   * DONE 2026-09-26 (`32c1d7f9`): both now auto-download at queue time from
     pinned specs, and a queue-time gate refuses a boot H3 cannot run on --
     LIVE on a stock 5080 boot: refused in 2 s, restart flags first, nothing
-    downloaded. Owed: a leg on a box WITHOUT the weights, proving the fetch.
+    downloaded. (Superseded by 0m, `84c98900`: a stock Sage-free boot now
+    passes and only a Sage boot is refused.) Owed: a leg on a box WITHOUT the weights, proving the fetch.
     Was: `minimax_h3_video` and `minimax_h3_audio_in` (dropdown names
     `h3_low_video`, `h3_low_audio_in`; no workflow selects either) -- KEEP
     and MAKE THEM AUTO-DOWNLOAD (operator: "keep them as long as they are

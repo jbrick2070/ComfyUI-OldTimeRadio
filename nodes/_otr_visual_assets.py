@@ -1216,14 +1216,19 @@ def _refuse_unmet_boot_contracts(engines, state=None):
             continue
         if any(not _bc.check_running_server(c, state=state) for c in known):
             continue
-        # EVERY boot the engine accepts, not only the first (Cursor review,
-        # 2026-09-26): one engine may accept several boots, and naming only the
-        # first can hand a card the wrong fix.
         unmet = _bc.check_running_server(known[0], state=state)
         if unmet and all("SageAttention" in u for u in unmet):
-            # The only thing wrong is Sage -- no launch flag fixes that.
-            fix = "Start ComfyUI without SageAttention"
+            # Sage is the only thing between this boot and the engine's first
+            # contract, so Sage off is the whole fix on any card -- no launch
+            # flag, and no other boot needs naming. When the probe could not
+            # read Sage at all, say that rather than blame a Sage that may
+            # already be off; the probe's own reason follows below.
+            fix = ("Start ComfyUI without SageAttention"
+                   if state.get("sage_attention") else
+                   "Could not confirm ComfyUI is running without SageAttention")
         else:
+            # EVERY boot the engine accepts, not only the first (Cursor review,
+            # 2026-09-26): naming only the first can hand a card the wrong fix.
             ways = []
             for c in known:
                 argv = " ".join(_bc.launch_args_for(c)) or "its default settings"

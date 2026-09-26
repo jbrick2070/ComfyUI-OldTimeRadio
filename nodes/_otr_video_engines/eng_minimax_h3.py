@@ -466,8 +466,9 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: BOTH lanes REQUIRE a named H3 boot contract, which they are allowed to do
     #: because neither has ever shipped under ``default`` (boot_contracts' own
     #: rule -- requiring a contract on a lane that already ships would regress
-    #: it). ``h3`` is the measured 16 GB streaming boot; ``h3_8gb_lab`` is the
-    #: physical-8-GB lab launch that emits no reserve. Sage-free is non-negotiable in both:
+    #: it). ``h3`` is a stock boot with SageAttention off (no reserve since
+    #: 2026-09-26, the operator's rule); ``h3_8gb_lab`` is the physical-8-GB
+    #: lab launch, which also turns pinned memory off. Sage-free is non-negotiable in both:
     #: Sage does not degrade H3, it replaces the output with noise and reports
     #: success.
     compatible_boot_contracts = ("h3", "h3_8gb_lab")
