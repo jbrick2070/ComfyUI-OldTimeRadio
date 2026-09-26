@@ -30,8 +30,9 @@ Did (5080, the only window; the 4060 is wiped and holding):
   stills workflow, Google TTS wherever Kokoro is, my_story seeded gender,
   the V3 credential node); the pre-push hook is cut.
   Official language, his rule: the 25 shipped JSONs are WORKFLOWS -- one
-  canonical workflow and 24 workflow variants. Never "profile" or "tier" in
-  prose; "graph" only for the canvas.
+  canonical workflow and 24 per-machine workflows ("no graph, no profile, no
+  variant, just workflow"); the script-submitted form is the "API-format
+  workflow". "graph" only where it means the canvas itself.
 Suite: full run green (0 failures) at 7cf82cda and again after every code
   commit since a1e5548f.
 4060: wiped (pack and models) and holding. Briefed to wait through the code

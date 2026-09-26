@@ -471,8 +471,8 @@ In order:
   (the deterministic request hash is a feature); a blanket `shape: 7` sweep;
   moving validator stamps out of widgets (readers and writers would all
   move); `properties.models` links; subgraphs; `widgets_values_named` (a
-  second copy to keep in sync); unique UUIDs per variant (no consumer needs
-  it); `localized_name` cleanup; pretty-printing variants (dev polish only);
+  second copy to keep in sync); unique UUIDs per workflow (no consumer needs
+  it); `localized_name` cleanup; pretty-printing the per-machine workflows (dev polish only);
   hand-stamping `extra.frontendVersion` (553 of 555 carry it, nothing loads
   on it, and a fixed value goes stale at once).
 
@@ -481,7 +481,7 @@ In order:
 Comfy's official templates all carry an on-canvas Markdown note; ours has
 none, so a stranger sees 21 boxes and no instructions. One note in the
 SCRIPT / START HERE group: type a premise or pick a bank, press Queue,
-where the episode lands, where to report problems. Canonical + variants
+where the episode lands, where to report problems. Canonical + per-machine workflows
 regenerated; widget/link audits as usual.
 
 ### 0e. OTR app mode -- design first (operator 2026-09-25)
@@ -512,7 +512,7 @@ model picker; and AT THE BOTTOM the My Story fields, which only the My
 Story bank reads -- `episode_title`, `custom_premise`, `story_characters`,
 `story_plot`, `story_setting`, `story_author`, and Theme Music's
 `music_style`.
-THE RULE (operator: "basically almost everything in our variant matrix"):
+THE RULE (operator: "basically almost everything in our workflow matrix"):
 the app shows the matrix's USER-CHOICE deltas -- `features.act_count`,
 `features.num_characters`, the `llm.*_model` and cloud slot picks,
 `role_overrides.*`, `slot_overrides.*` -- plus the story knobs the matrix
@@ -525,7 +525,7 @@ for that card. Generate the app's input list from the matrix plus that
 extras list in `build_variants.py`, so a new matrix knob cannot be missing
 from the app. Output: node 14 (Mux and Publish). Open questions for one design
 round before code: canonical itself or a separate `otr_app.json`; whether
-the premise/title text belongs; how variants inherit it; whether an older
+the premise/title text belongs; how the per-machine workflows inherit it; whether an older
 frontend ignores the metadata harmlessly.
 
 ### 0f. Custom-node best practice gaps (audit 2026-09-25, docs.comfy.org + core)
