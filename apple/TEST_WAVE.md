@@ -112,15 +112,15 @@ merged to main) or B3 cannot prove it. Boot the headless server with the UTF-8
 launcher (CLAUDE.md section 5). One leg at a time, in this order -- cheapest
 weights first, so an early failure costs the least:
 
-| leg | row | video lane | what it proves | status 2026-09-25 |
+| leg | row | video lane | what it proves | status (4060, fresh start at `1585d38a`, 2026-09-25/26 night) |
 |---|---|---|---|---|
-| B1 | `otr_8gb_low` | `viz_camera` (no video weights) | Qwen3.5-4B writer at the 6.8 GB ceiling, Kokoro, Stable Audio 3, publish | owed |
+| B1 | `otr_8gb_low` | `viz_camera` (no video weights) | Qwen3.5-4B writer at the 6.8 GB ceiling, Kokoro, Stable Audio 3, publish | PASSED -- 10:57, peak 4379 MiB, `foam_drowning_20260926_002211` |
 | B2 | `otr_8gb_still` | `still_motion` | Z-Image Turbo stills on 8 GB | PASSED through the GUI on a wiped 2.3.4 install (`c2f14301`, 32:09) |
-| B3 | `otr_8gb_animatediff` | `animatediff15_v3_haunted_video` | SD 1.5 checkpoint, v3 motion module and v3 adapter all download at queue time; no `PREFLIGHT FAIL` | the download half PASSED (`297f65ef`); the leg FAILED at render on the missing AnimateDiff-Evolved pack (PBUG-20260925-02, gate fixed `02758478`); retry owed on the fresh start |
-| B4 | `otr_8gb_video` | `ltx_8gb` | LTX 0.9.8 2B plus T5 fetched at queue time | owed on the fresh start, WITHOUT ComfyUI-LTXVideo installed (see below) |
-| B5 | `otr_8gb_ltx25_foley` | `ltx25_foley_16gb` | the ~25 GB LTX 2.5 stack on 8 GB; measured 707 s per 97-frame clip on this card | owed |
-| B6 | `otr_8gb_ltx25_mime` | `ltx25_mime_16gb` | same weights, `EXISTING` | owed |
-| B7 | `otr_8gb_ltx25_audio_in` | `ltx25_audio_in_16gb` | same weights, `EXISTING` | owed |
+| B3 | `otr_8gb_animatediff` | `animatediff15_v3_haunted_video` | SD 1.5 checkpoint, v3 motion module and v3 adapter all download at queue time; no `PREFLIGHT FAIL` | PASSED -- WITHOUT the pack it was refused in 7 s leading with "Install ComfyUI-AnimateDiff-Evolved", nothing downloaded (PBUG-20260925-02 live verify); with the pack: 3.9 GB fetched at queue time, 60:07, peak 6041 MiB, `split_ridge_20260925_225242` |
+| B4 | `otr_8gb_video` | `ltx_8gb` | LTX 0.9.8 2B plus T5 fetched at queue time | PASSED WITHOUT ComfyUI-LTXVideo -- 16.1 GB fetched, 33:39, peak 7300 MiB, free RAM low 0.42 GB (the T5 reloads per segment), `broken_horsehair_20260925_235312`. Verdict below. |
+| B5 | `otr_8gb_ltx25_foley` | `ltx25_foley_16gb` | the ~25 GB LTX 2.5 stack on 8 GB; measured 707 s per 97-frame clip on this card | refused by the runner preflight at `1585d38a` (pinned Stable Audio 3 base file; fixed `0d44385c`); re-run at `0d44385c` running |
+| B6 | `otr_8gb_ltx25_mime` | `ltx25_mime_16gb` | same weights, `EXISTING` | same as B5 |
+| B7 | `otr_8gb_ltx25_audio_in` | `ltx25_audio_in_16gb` | same weights, `EXISTING` | same as B5 (first in the re-run). The same row PASSED on the 5080 (1 act, 2:00:29, `stone_key_20260925_230558`) |
 
 **The fresh-start order (operator 2026-09-25: wipe the 4060's OTR install and
 models root first).** Test ONE commit the 5080 names, not a moving `main`.
@@ -130,7 +130,9 @@ arrive in seconds, lead with "Install ComfyUI-AnimateDiff-Evolved", and download
 nothing (PBUG-20260925-02's live verify). Then install the pack via Manager, B3,
 B4, then B1 and B5-B7.
 
-**B4 decides the ComfyUI-LTXVideo dependency.** Measured 2026-09-25: every class
+**B4 DECIDED IT (2026-09-26): ComfyUI-LTXVideo is gone** -- `f111293b` removed the
+clone, the kornia patch, their checks and tests and the doc mentions, as ruled below.
+The original rule, kept for the record: **B4 decides the ComfyUI-LTXVideo dependency.** Measured 2026-09-25: every class
 the LTX engines ask for is ComfyUI core, the pack's own registry (77 node ids)
 holds none of them, and no OTR module imports its Python. If B4 publishes on a
 box WITHOUT the pack, the provisioner's clone, its kornia pad patch and their
@@ -157,6 +159,20 @@ wave's code: `tests/test_lane_preflight_matrix.py::test_g2_canvas_truth` and
 `::test_g4_admission_honesty` (LTX 2.5 lanes missing from the canvas pins and
 the cost rows). The 5080's dirty partial patch is aimed at that class. Explain
 every other red.
+
+**Result 2026-09-26 night (5080, HEAD `a2c36590`):** the suite is fully green --
+16906 passed, 0 failed. The Bug Bible regression: 11 red, 38 green, and a
+Sonnet triage against git history found **0 real OTR regressions**: 4 are
+heuristic false positives (a prose match on `unload_all_models` in comments;
+`proc.py` is the single spawn owner by design; output nodes route through
+`_otr_paths`, which OTR's own ratchet REQUIRES; guarded depth-pinned dirname
+fallbacks) and 7 are stale Bible pins on mechanisms OTR ripped on purpose (the
+word-fit apparatus `314dd481`, deleted harness scripts `96a6bae8`, a retired
+engine id, ShotLock's gate link now at slot 3 with the gate intact). The fixes
+belong in the Bible repo (exclude `.claude/` from its scans -- a stale nested
+agent worktree doubled four of the file lists -- and update or retire those
+pins); that is a cross-pack contract, so it waits for the operator's word.
+
 
 ## Owed, not in this wave
 

@@ -1,3 +1,67 @@
+## 2026-09-26 -- HEAD 09fea0ed (main) -- NIGHT: app mode, Google lane live, 4060 fresh-start regression
+
+Driver: the 5080 Claude window (Opus). Operator asleep from ~22:00; standing
+orders "code everything we can, then test GPU", "use the 4060 strategically",
+2.3.7 only on his word. Workers he ran in parallel: Cursor windows (0a HF_HOME,
+0c items 6/8, 0c-7 pack writes, Gemma-on-Mac) and agy (0f-1 descriptions).
+
+CODE (every chunk suite-green and pushed, then reviewed by another family):
+  0e APP MODE (operator: "Both") -- fad90bf7 2d5af945 63ba1f16 a2c36590:
+    every per-machine workflow opens as a story-only app form; NEW generated
+    workflows/otr_app.json opens with every picker in his order; plain-English
+    labels (Acts, Story bank, Space saver) on the generated files only; notes
+    under source_ref / premise / title / video picker; each generated workflow
+    has its own uuid5 id; the mux returns the published mp4 as ui.video so the
+    app pane plays it. Design: one Sonnet contrarian round (CHANGE x3, taken).
+    Reviews: Cursor x3 (HOLD). SEEN LIVE in the browser pane: gallery category
+    "Old-Time Radio", otr_app and otr_8gb_low open straight into app view.
+  0h Google stills workflow otr_google_still -- c69687e3; 1585d38a dropped the
+    copied `cpu` boot contract (it refused every GPU-booted ComfyUI); the
+    writer's Google rows are listed with or without a key (Queue stops on the
+    named missing-key message).
+  0j follow-up 610bda1e + 37b39dc2: a writer-rolled `other` (or neutral /
+    non-binary) takes the seeded draw on google_tts -- FOUND LIVE, the first
+    English leg died on it.
+  0f-2 progress bars f3d4f4e5 + 9e8d29f5 (Google TTS fan-out too, Cursor catch).
+  0c-1 third pass c4fcae80 (second-GPU writer current device; Sonnet HOLD).
+  0c-7 follow-up 969241d1 (telemetry reads the live log only; Sonnet catch on
+    Cursor's 2c952de1). 0f-1 follow-up 594a6652 (tooltip guard test).
+  pathbudget 96466ef4 (the one invalid escape, seen on the 4060's Python 3.13).
+  f111293b + 09fea0ed: ComfyUI-LTXVideo RIPPED per TEST_WAVE's B4 rule.
+  0d44385c: the 8 GB LTX 2.5 rows stop pinning Stable Audio 3's files in
+    preflight (the runner refused them on a box with the post-trained file).
+  Worker commits reviewed (Sonnet unless noted), all HOLD: a0875708 89a95212
+    (HF_HOME; Spark stood in for Composer, plus Sonnet), a70d22b4 3e1fd8be
+    ed4cd47b e1ed8798 (Cursor portability), c04aad46 2c952de1 (pack writes),
+    cf75a95e (agy descriptions), a06ee44d (Gemma on Mac; bnb gfx1201 confirmed).
+Suite: 16906 passed, 0 failed at a2c36590 (full run, 11:09).
+
+LIVE LEGS -- 5080 (HEAD at boot noted; obs is <output>/otr/obs):
+  otr_google_still 1-act EN  FAIL at 1585d38a, 52 s, CastLock `other` (c04)
+  otr_google_still 1-act EN  PASS 3:45  refined_metal_20260925_223823 (after 610bda1e; SEAN BOUVIER `other` -> gt_alnilam gender_unservable)
+  otr_google_still 1-act ES  PASS 4:00  canvas_firewood_es_20260925_224243 ("La lona bajo la lena")
+  otr_google_still my_story  PASS 11:39 grey_reef_20260925_224927 (Sam, Robin unstated -> gender_unspecified)
+  otr_8gb_ltx25_audio_in 1-act PASS 2:00:29 stone_key_20260925_230558 (server booted 37b39dc2; the checkout moved to 84640918 mid-leg -- already-imported modules, no effect). LIPS vs LINES: his eye.
+  App mode: RUN pressed in the browser pane on otr_app (09fea0ed) at ~01:05; result recorded in the next entry.
+LIVE LEGS -- 4060 (TEST_WAVE Part B, fresh start at 1585d38a; receipts in the
+  4060 driver's log, every PASS published on the 4060's own obs):
+  B3a refusal PASS 7 s; B3 animatediff PASS 60:07; B4 ltx_8gb WITHOUT
+  LTXVideo PASS 33:39; B1 low PASS 10:57; B5/B6/B7 refused by the runner
+  preflight (fixed 0d44385c) -- re-run at 0d44385c in progress at write time.
+BUG BIBLE (Part C): 11 red / 38 green; Sonnet triage: 0 real OTR regressions
+  (4 heuristic false positives, 7 stale pins on ripped mechanisms). The fixes
+  are in the Bible repo -- his word first (cross-pack contract).
+
+FOR HIM IN THE MORNING:
+  - Open otr_app from Browse Templates -> Old-Time Radio; press Run.
+  - Watch stone_key_20260925_230558: do the character lips follow their lines?
+  - Say whether to clean up: the worktrees -tooltips, otr-pack-writes,
+    -worktree (bark-fix), otr-hf-home, otr-portability, the nested
+    .claude/worktrees/agent-a13be... (its commit is already on main), and the
+    stale branch worktree-agent-aaf3612b6248a9d9e (a 09-24 WIP made obsolete).
+  - Bible repo fixes: go / not.
+  - 2.3.7: on his word.
+
 ## 2026-09-25 -- HEAD e6e396b1 (main) -- CODE + PLAN HARDENED (evening)
 
 Did (5080, the only window; the 4060 is wiped and holding):
