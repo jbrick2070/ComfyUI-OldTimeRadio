@@ -15504,3 +15504,45 @@ not promote it to the Bug Bible on this evidence alone.
 - promotion: PROMOTED 2026-09-26 as Bible 12.176 ("cache the conditioning,
   not the encoder: key it on the encoder file's identity and the exact text"),
   with its otr_coverage_index.yaml row.
+
+## PBUG-20260926-02 -- an auto-downloaded model is published as a broken link on a Windows box that allows symlinks
+- surfaced: the operator's clean-box test, 2026-09-26, 5080. The MiniMax H3
+  ref2va weights were moved off the box (no copy in the models folders or
+  either Hugging Face cache), then `--profile otr_16gb_video --video-lane
+  h3_low_audio_in --act-count 1` at 1f4eea8b. The queue-time gate planned
+  exactly the one missing file, fetched all 20,970,379,616 bytes (~13 min)
+  and passed the pinned SHA-256, then refused: "download completed but
+  native loader does not resolve the destination; no path repair". Nothing
+  rendered; the prompt ended at 12:59.
+- symptom: `C:\ComfyUI-Models\unet\minimax_h3_ref2va_pruned_int8_convrot.safetensors`
+  was a SYMLINK whose target read `../../../blobs/9255f52b...` -- a path
+  that means something only inside the Hugging Face cache tree. From the
+  model folder it resolved to a nonexistent `C:\blobs\...`.
+- root cause: `_otr_visual_asset_download.fetch_verified` published the
+  path `hf_hub_download` returned with `os.link`. Where the OS allows
+  symlinks, that path is the cache's RELATIVE snapshot symlink (on this
+  box a chain: snapshot -> `blobs/<sha256>` -> `huggingface/blobs/06/<hash>`).
+  Windows `os.link` does not follow symlinks; it hard-linked the symlink
+  itself. Mac and Linux follow the link, and a Windows box without symlink
+  rights gets a real file in the cache, so neither was affected. Every
+  queue-time download (Z-Image, LTX, AnimateDiff, Stable Audio, H3, SD 1.5,
+  Lumina) goes through this one publish, so all were exposed on such a box.
+- fix (2026-09-26, 5080, 173c9073): resolve the fetched path with
+  `os.path.realpath` before hashing and publishing, so the model folder gets
+  a hard link to the real blob. Coverage:
+  tests/test_visual_asset_download_stdlib.py::FetchVerifiedTests::
+  test_a_fetch_that_returns_the_caches_symlink_publishes_the_real_file --
+  the Hugging Face layout (blob plus relative snapshot symlink); it fails on
+  the previous code and passes with the fix (checked both ways), and skips
+  on a machine that cannot create symlinks. The other download paths were
+  checked and are not affected: the writer LLM uses
+  `snapshot_download(local_dir=...)` (real files); Kokoro uses `local_dir`
+  plus `shutil.copyfile`, which follows links.
+- live verify (5080, 7d8cb8be, fresh boot, the same leg): `DOWNLOADED
+  minimax_h3_ref2va_pruned_int8_convrot.safetensors bytes_verified=20970379616
+  elapsed_s=11.3 native=C:\ComfyUI-Models\unet\...` -- the blob was
+  already in the cache, so this run proved the publish and the native
+  resolution; the network transfer and hash had passed in the failing run.
+  The published file is a regular file (link count 2: the cache blob).
+- promotion: PENDING -- the portable rule is "resolve a library-returned
+  cache path before hard-linking or copying it into another folder".
