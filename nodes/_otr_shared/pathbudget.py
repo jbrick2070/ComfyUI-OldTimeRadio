@@ -35,7 +35,7 @@ THE THREE WAYS TO SOLVE THIS, and why this module picks the ones it picks:
    top buys nothing. :func:`compact_artifact` drops the STAGE suffixes -- never
    the identity -- which is the rule ``otr_credits_roll._credits_artifact_paths``
    already stated for its own scratch and which the other nodes never adopted.
-2. THE ``\\?\`` EXTENDED-LENGTH PREFIX (:func:`long_path`) is the canonical
+2. THE ``\\\\?\\`` EXTENDED-LENGTH PREFIX (:func:`long_path`) is the canonical
    Win32 answer and needs no machine configuration. It is applied at the SYSCALL
    BOUNDARY only and never stored, because a prefixed string would leak into
    ledgers, logs and equality checks. Note the two places it must NOT go: an
