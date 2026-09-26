@@ -1,3 +1,49 @@
+## 2026-09-25 -- HEAD e6e396b1 (main) -- CODE + PLAN HARDENED (evening)
+
+Did (5080, the only window; the 4060 is wiped and holding):
+  Published 2.3.5 (7646ae36) and 2.3.6 (96ea436a); 2.3.6 is Pending, 2.3.3
+  still the Manager's Active default. pyproject stays 2.3.6 until the next
+  bump, which carries the registry Banner line (plan 0f item 6).
+  Code, each pushed green and Sonnet-QA'd (all HOLD after their follow-ups):
+    2cb05851 models root asks ComfyUI's configured tree before a folder that
+      merely exists (PBUG-20260925-03); e4d0ec19 per-type model_type_dir.
+    1af4acee dc93ff05 5952c678 2ec73ef5 -- 11 inherited reds fixed at the
+      root; the suite has been fully green since a1e5548f.
+    a1e5548f Kling Avatar engine removed.
+    ba0a0e87 creativity dial ripped: each writer model samples at its
+      maker's own baseline (_otr_model_catalog.SAMPLING_BASELINES; cloud
+      slots send no sampling keys). a898360a: the title step's float(None)
+      for a cloud writer (QA catch).
+    b118c377 talking-face still mode ripped; a0341900: frozen ledgers from
+      before the rip replay again (the retired pack key stays known).
+    7cf82cda b8edeeef gallery thumbnails: the operator's art copied beside
+      all 25 workflows by build_variants, --check guards it.
+    021b7c0c registry banner (21:9) and GitHub social preview (uploaded by
+      him, confirmed live) from his art; tools/make_registry_icon.py now
+      refuses to overwrite the hand-finished registry GIF without
+      --registry-gif (an unguarded run overwrote it once; restored from git
+      before any commit).
+  Plan hardened for a Sonnet window (628afe20 .. e6e396b1): 0b2 has the exact
+  64-file "native" rename table and order; 0c's three crash fixes are
+  file:line specs with their tests; 0d's cnr_id/ver stamp is a 4-step spec;
+  the five section-1 forks are closed by his word into rows 0h-0k (Google
+  stills workflow, Google TTS wherever Kokoro is, my_story seeded gender,
+  the V3 credential node); the pre-push hook is cut.
+  Official language, his rule: the 25 shipped JSONs are WORKFLOWS -- one
+  canonical workflow and 24 workflow variants. Never "profile" or "tier" in
+  prose; "graph" only for the canvas.
+Suite: full run green (0 failures) at 7cf82cda and again after every code
+  commit since a1e5548f.
+4060: wiped (pack and models) and holding. Briefed to wait through the code
+  cycle, then run the fresh-start regression with the clean break on the
+  exact registry version the 5080 names (sequence in TEST_WAVE Part B).
+Server: the 5080 server on :8000 is resident and idle; nothing queued.
+Next, in plan order: 0b2 step 1 (the audio-in workflow's character lane),
+  then the rename; 0c items 1-3; 0h-0k; 0d; then publish 2.3.7 on his word.
+  Proving legs owed: the audio-in workflow's character lip-sync, the three
+  kept LTX 2.5 engines on RunPod (Blackwell and 24 GB), and MiniMax H3 after
+  its auto-download move.
+
 ## 2026-09-25 -- HEAD a841b98d (main) -- LIVE PROOF + GALLERY + PUBLISH 2.3.4
 
 Did (5080, the only window; the 4060 runs the fresh-user walk):
