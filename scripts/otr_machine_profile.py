@@ -22,7 +22,7 @@ maintains and nobody can see. This project already shipped a README claiming an
 because the claim lived somewhere nobody re-read. Values in data are values a
 reader can check.
 
-The 24 shipped workflows are rows of `config/workflow_matrix.json`; this file
+The shipped per-machine workflows are rows of `config/workflow_matrix.json`; this file
 answers only "which machine am I on".
 """
 from __future__ import annotations

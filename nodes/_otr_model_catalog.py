@@ -554,14 +554,19 @@ def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
 
 
 def _google_api_virtual_rows() -> tuple[CuratedModel, ...]:
-    """The two virtual Google API rows -- present only when a Gemini API key
-    is configured. They target the Gemini API / Interactions surface. API keys
-    are read from environment at call time and never at import time."""
+    """The two virtual Google API rows -- always in the writer dropdown.
+
+    They were listed only when a key was configured until 2026-09-25, when
+    the Google lane began shipping as a workflow (`otr_google_still`): a
+    saved graph that stores ``google_api:slot-a|b`` must load on a machine
+    with no key, exactly as the OpenRouter and Comfy Credits handles do.
+    The pick is the enable; the call still fails closed without a key
+    (`client.resolve_api_key` raises GoogleAPIKeyMissingError naming where
+    a key goes). They target the Gemini API / Interactions surface; the key
+    is read at call time, never at import time."""
     try:
         from ._otr_google_api import models as _gai
     except Exception:  # noqa: BLE001 -- catalog import must stay robust
-        return ()
-    if not _gai.google_api_enabled():
         return ()
     common = dict(
         requires_auth=False,
@@ -594,8 +599,8 @@ def _google_api_virtual_rows() -> tuple[CuratedModel, ...]:
 
 def _active_curated_models() -> tuple[CuratedModel, ...]:
     """CURATED_LLM_MODELS plus HTTP virtual rows that the writer dropdown
-    should list. Comfy Credits and OpenRouter handles are always present
-    so a saved cloud graph loads; Google API rows stay enable-gated.
+    should list. Comfy Credits, OpenRouter and Google API handles are
+    always present so a saved cloud graph loads without its key.
 
     Consumers that should surface HTTP lanes when enabled (the dropdown
     builder + validate_model_id Path 1 via _by_repo_id) read THIS.
@@ -1628,9 +1633,9 @@ def comfy_catalog_dropdown_choices(slot: str) -> list[str]:
 def google_api_catalog_dropdown_choices(slot: str) -> list[str]:
     """Concrete Gemini model choices for google_api_slot_<slot>_model.
 
-    Network-free at INPUT_TYPES time: the list is the sentinel, then static
-    official text seeds when a key is present, plus any valid on-disk cache
-    entries. The actual key is read only by the backend at call time.
+    Network-free at INPUT_TYPES time: the list is the sentinel, then the
+    static official text seeds, plus any valid on-disk cache entries. The
+    actual key is read only by the backend at call time.
     """
     try:
         from ._otr_google_api import models as _gai

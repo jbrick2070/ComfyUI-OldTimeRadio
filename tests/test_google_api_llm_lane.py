@@ -36,10 +36,14 @@ def test_key_precedence(monkeypatch):
     assert gclient.resolve_api_key() == "otr"
 
 
-def test_no_key_slot_choices_sentinel_only():
-    assert cat.google_api_catalog_dropdown_choices("a") == [
-        gmodels.GOOGLE_API_MODEL_UNSELECTED
-    ]
+def test_no_key_slot_choices_still_hold_the_shipped_picks():
+    """otr_google_still saves these two; a keyless machine must load it."""
+    for slot, lead in (("a", gmodels.GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT),
+                       ("b", gmodels.GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT)):
+        choices = cat.google_api_catalog_dropdown_choices(slot)
+        assert choices[:2] == [gmodels.GOOGLE_API_MODEL_UNSELECTED, lead]
+        assert gmodels.GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT in choices
+        assert gmodels.GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT in choices
 
 
 def test_key_slot_choices_include_static_text_models(monkeypatch):
@@ -61,12 +65,19 @@ def test_key_slot_choices_include_static_text_models(monkeypatch):
             "%r is a version pin and this lane is evergreen-only" % pin)
 
 
-def test_virtual_rows_present_only_with_key(monkeypatch):
-    assert gmodels.GOOGLE_API_SLOT_A_ID not in cat.dropdown_choices()
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+def test_virtual_rows_present_without_a_key():
+    """Like OpenRouter's and Comfy Credits': the pick is the enable, and the
+    call fails closed without a key (test below)."""
+    assert not gmodels.google_api_enabled()
     labels = cat.dropdown_choices()
     assert gmodels.GOOGLE_API_SLOT_A_ID in labels
     assert gmodels.GOOGLE_API_SLOT_B_ID in labels
+
+
+def test_a_keyless_call_names_where_the_key_goes():
+    with pytest.raises(gclient.GoogleAPIKeyMissingError) as exc:
+        gclient.resolve_api_key()
+    assert "OTR_GOOGLE_API_KEY" in str(exc.value)
 
 
 def test_runtime_and_loader_register_google(monkeypatch):

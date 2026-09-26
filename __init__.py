@@ -466,7 +466,7 @@ if _otr_dup is None:
 # deleted 2026-09-07. The gallery lists only the directory level
 # (`*/workflows/*.json`), so on 2026-09-25 the 24 per-machine workflows moved up
 # from workflows/variants/ into workflows/ beside the canonical (operator: "we
-# can't store the variants in a subfolder") and the gallery now lists all 25.
+# can't store the variants in a subfolder") and the gallery lists every one.
 # The banner names the canonical, which runs on any machine, and points at
 # apple/MACHINES.md for the per-card pick. `otr_4060_floor` is gone altogether:
 # every machine configuration is a row in config/workflow_matrix.json since

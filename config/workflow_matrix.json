@@ -1,5 +1,5 @@
 {
-  "_comment": "THE WORKFLOW MATRIX. One row per shipped workflow. A row STATES every key indicator in `key_indicators` -- the writer, its ceiling, the visual lanes, the video engine, the voices, the act shape, the device -- even where the value matches the canonical, because those are decisions and because a machine can REQUIRE one: an 8 GB card needs the small writer whatever the canonical picks, so inheriting it would follow the canonical upward into something that will not fit. Every OTHER key is omitted and inherits from the canonical workflow, which is what keeps fps, composite size and caption style out of a reader's way. Pinning is safe here because all 25 rows sit in one column of one file; the drift that once left 82 configs on a retired voice engine was invisible because it was spread over 82 files. Edit this file, run `python scripts/build_variants.py --all`, and the per-machine workflows and the generated docs are rebuilt together. The per-machine workflows are GENERATED and are never hand-edited.",
+  "_comment": "THE WORKFLOW MATRIX. One row per shipped workflow. A row STATES every key indicator in `key_indicators` -- the writer, its ceiling, the visual lanes, the video engine, the voices, the act shape, the device -- even where the value matches the canonical, because those are decisions and because a machine can REQUIRE one: an 8 GB card needs the small writer whatever the canonical picks, so inheriting it would follow the canonical upward into something that will not fit. Every OTHER key is omitted and inherits from the canonical workflow, which is what keeps fps, composite size and caption style out of a reader's way. Pinning is safe here because every row sits in one column of one file; the drift that once left 82 configs on a retired voice engine was invisible because it was spread over 82 files. Edit this file, run `python scripts/build_variants.py --all`, and the per-machine workflows and the generated docs are rebuilt together. The per-machine workflows are GENERATED and are never hand-edited.",
   "version": 1,
   "key_indicators": [
     "features.act_count",
@@ -753,6 +753,45 @@
       "preflight": {
         "required_keys": [
           "OTR_COMFY_API_KEY"
+        ]
+      }
+    },
+    {
+      "id": "otr_google_still",
+      "display_name": "Google, your own Gemini API key -- stills only: Gemini image stills composited on the CPU (still_flat), Google TTS voices, Lyria music, and Gemini Flash (creative) + Flash-Lite (technical) writers. No video model: at Tier 1 every Veo model allows 2 requests a minute and 10 a day, and an episode needs more clips than that. Nothing downloads and no GPU is needed. The same lanes published a 1-act English Hamlet in 218 s on 2026-09-19; this workflow opens at 3 acts, so expect roughly three times that. Needs OTR_GOOGLE_API_KEY (or GEMINI_API_KEY, or the pack's google.secret file).",
+      "device_backend": "cpu",
+      "gpu_vendor": "none",
+      "ships": true,
+      "deltas": {
+        "audio.voice_device": "cpu",
+        "features.act_count": "3",
+        "features.num_characters": 3,
+        "image.dtype_policy": "no_fp8_no_fp4",
+        "llm.creative_model": "google_api:slot-a",
+        "llm.device": "cpu",
+        "llm.google_api_slot_a_model": "gemini-flash-latest",
+        "llm.google_api_slot_b_model": "gemini-flash-lite-latest",
+        "llm.quant_policy": "none",
+        "llm.technical_model": "google_api:slot-b",
+        "llm.vram_ceiling_gb": 0,
+        "role_overrides.announcer_image": "google_image",
+        "role_overrides.announcer_visual": "still_flat",
+        "role_overrides.character_image": "google_image",
+        "role_overrides.character_visual": "still_flat",
+        "role_overrides.music_image": "google_image",
+        "role_overrides.music_visual": "still_flat",
+        "slot_overrides.announcer_voice_engine": "google_tts",
+        "slot_overrides.char_voice_engine": "google_tts",
+        "slot_overrides.music_engine": "google_lyria",
+        "video.device_policy": "cpu"
+      },
+      "launch": {
+        "boot_contract": "cpu",
+        "env": {}
+      },
+      "preflight": {
+        "required_keys": [
+          "OTR_GOOGLE_API_KEY"
         ]
       }
     },

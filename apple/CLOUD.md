@@ -26,7 +26,7 @@ setting it.
 | Lane | Who bills you | How it turns on |
 |---|---|---|
 | **OpenRouter** | OpenRouter, per token | `openrouter.secret`, or a path in `openrouter_api_key.location`, or `OPENROUTER_API_KEY`. |
-| **Google** | Google, per token / per image / per second of video | `google.secret`, or a path in `google_api_key.location`, or `OTR_GOOGLE_API_KEY` / `GEMINI_API_KEY` / `GOOGLE_API_KEY`. Writer, voices, music and stills have generous limits; **Veo allows only 2 requests a minute and 10 a day per model on paid Tier 1**, against ~16 clips per episode, so the `google_still_*` presets composite stills instead. Switch to `google_veo_low_*` on a higher tier. |
+| **Google** | Google, per token / per image / per second of video | `google.secret`, or a path in `google_api_key.location`, or `OTR_GOOGLE_API_KEY` / `GEMINI_API_KEY` / `GOOGLE_API_KEY`. Writer, voices, music and stills have generous limits; **Veo allows only 2 requests a minute and 10 a day per model on paid Tier 1**, against ~16 clips per episode, so the shipped `otr_google_still` workflow composites stills instead. On a higher tier, switch its three visual dropdowns to `google_veo_video`. |
 | **Comfy Credits** | Your Comfy account's credits | Sign into the Comfy app -- that sign-in is the only credential the pack reads (no key file, no server-side env var). Headless only: `OTR_COMFY_API_KEY` on the *submitting* machine, sent by `scripts/otr_api.py` as `extra_data.api_key_comfy_org`. There is no enable flag: the pick plus the key is the whole switch. |
 
 They are not symmetric, and older notes in `docs/` claim they "differ only in who

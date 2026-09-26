@@ -113,7 +113,7 @@ Video engines they select: `ltx25_foley_24gb`
 
 </details>
 
-## unstated  --  5 experimental workflow(s), 5 shipping
+## unstated  --  6 experimental workflow(s), 6 shipping
 
 | row | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -122,6 +122,7 @@ Video engines they select: `ltx25_foley_24gb`
 | `otr_cloud_low` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | complete |
 | `otr_cloud_low_1act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | complete |
 | `otr_cloud_low_5act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | complete |
+| `otr_google_still` | still_flat | google_tts | google_lyria | google_image | `shipping` | complete |
 
 ## Voice engines
 

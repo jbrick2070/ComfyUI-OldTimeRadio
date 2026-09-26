@@ -110,15 +110,15 @@ by default is generate video, and the reason is worth knowing before you go
 looking for the switch: on Google's paid **Tier 1**, every Veo model allows
 **2 requests a minute and 10 a day**, while a single episode's video needs
 run well past that ceiling. No arrangement of a Tier 1 key finishes a Veo episode, so the
-shipped Google presets composite the stills instead (`still_flat`) and never
-call Veo.
+shipped Google workflow, `otr_google_still`, composites the stills instead
+(`still_flat`) and never calls Veo.
 
 **If your Google account is on a higher tier, turn video on yourself** -- the
 engines are built, tested and waiting:
 
-* Pick `google_veo_video` (or `google_omni_video`) in the VideoDirector
-  dropdowns, or run the `google_veo_low_1act` / `google_veo_low_3act` lane
-  presets instead of the `google_still_*` pair.
+* Open `otr_google_still` and pick `google_veo_video` (or
+  `google_omni_video`) in the three VideoDirector visual dropdowns in place
+  of `still_flat`.
 * `OTR_GOOGLE_VEO_MODEL_ID` chooses the model -- `veo-3.1-lite-generate-preview`
   (cheapest), `veo-3.1-fast-generate-preview`, `veo-3.1-generate-preview`.
   Each has its **own** daily allowance, so they run out separately.

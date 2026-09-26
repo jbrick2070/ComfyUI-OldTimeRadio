@@ -174,29 +174,30 @@ and 10 a day**, counted separately per model
 episode asks for roughly **sixteen** clips -- two jump segments per beat -- so
 a Tier 1 key runs out part-way through and the remaining beats floor to their
 stills. The run still publishes; it is a quota wall, not a failure. That is
-why the shipped Google lane presets (`google_still_1act`,
-`google_still_3act`) use `still_flat` and never call Veo: stills have no
-daily cap, so that shape runs every day. On a higher tier, or after Google
-grants an increase on the *Increase Requests* tab, switch to
-`google_veo_low_1act` / `google_veo_low_3act` -- the Veo engines are built
-and proven, they are simply rationed.
+why the shipped Google workflow, `otr_google_still`, uses `still_flat` and
+never calls Veo: stills have no daily cap, so that shape runs every day. On
+a higher tier, or after Google grants an increase on the *Increase
+Requests* tab, switch its three visual dropdowns to `google_veo_video` --
+the Veo engines are built and proven, they are simply rationed.
 
 ---
 
 ## Which one suits your machine
 
-The shipped graphs already answer this, and opening one is easier than setting
-six dropdowns by hand:
+The shipped workflows already answer this, and opening one is easier than
+setting six dropdowns by hand. Every one sits in the pack's `workflows/`
+folder and in the template gallery:
 
-| Machine | Graph | The video lane it sets |
+| Machine | Workflow | The video lane it sets |
 |---|---|---|
 | Anything, first run | `otr_canonical.json` | the three procedural visualizers |
-| 8 GB NVIDIA | `variants/otr_8gb_video.json` | `ltx098_low_video` |
-| 16 GB+ NVIDIA | `variants/otr_16gb_video.json` | `ltx25_high_video` |
-| Mac 16 GB | `variants/otr_mac16_video.json` | `ltx098_low_video` |
-| Comfy Cloud (cheap, 1/3/5-act) | `variants/otr_cloud_low*.json` | `cloud_vidu_q2_pro_fast_720p` |
-| Comfy Cloud (deluxe Foley) | `variants/otr_cloud_deluxe_3act.json` | `cloud_ltx25_foley_plus` |
-| Comfy Cloud (deluxe audio-in) | `variants/otr_cloud_deluxe_audio_in_3act.json` | `cloud_ltx25_audio_in` |
+| 8 GB NVIDIA | `otr_8gb_video.json` | `ltx098_low_video` |
+| 16 GB+ NVIDIA | `otr_16gb_video.json` | `ltx25_high_video` |
+| Mac 16 GB | `otr_mac16_video.json` | `ltx098_low_video` |
+| Comfy Cloud (cheap, 1/3/5-act) | `otr_cloud_low*.json` | `cloud_vidu_q2_pro_fast_720p` |
+| Comfy Cloud (deluxe Foley) | `otr_cloud_deluxe_3act.json` | `cloud_ltx25_foley_plus` |
+| Comfy Cloud (deluxe audio-in) | `otr_cloud_deluxe_audio_in_3act.json` | `cloud_ltx25_audio_in` |
+| Google, your own key | `otr_google_still.json` | `still_flat` over Gemini stills (no Veo) |
 
 **The pack default is the three viz lanes on `otr_canonical.json`.** That is the GPU-friendly first run: no video weights, no Comfy credits. Local machine graphs keep the local lane in the table above.
 

@@ -81,8 +81,8 @@ Anything not listed there is a manual install -- see its row below.
 | `cloud_elevenlabs` | nothing on disk | - | 5 profile(s) |
 | `cloud_sonilo` | nothing on disk | - | - |
 | `dia` | **a SEPARATE project + its own venv**; `nari-labs/Dia-1.6B-0626` | manual, see below | - |
-| `google_lyria` | nothing on disk | - | - |
-| `google_tts` | nothing on disk | - | - |
+| `google_lyria` | nothing on disk | - | 1 profile(s) |
+| `google_tts` | nothing on disk | - | 1 profile(s) |
 | `indextts2` | **a SEPARATE project + its own venv** | manual, see below | - |
 | `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 19 profile(s) |
 | `musicgen` | `facebook/musicgen-small` | auto (HF cache) | - |

@@ -197,19 +197,19 @@ def google_api_model_choices(slot: str) -> list[str]:
     s = slot.strip().lower()
     if s not in ("a", "b"):
         raise ValueError(f"slot must be 'a' or 'b', got {slot!r}")
+    # Listed with or without a key (2026-09-25): the shipped
+    # otr_google_still workflow saves gemini-flash-latest /
+    # gemini-flash-lite-latest here and must load on a keyless machine.
+    # The seeds are the three evergreen pointers Google publishes, so the
+    # list carries no pin that can expire.
     choices = [GOOGLE_API_MODEL_UNSELECTED]
-    if google_api_enabled():
-        lead = (
-            GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT if s == "a"
-            else GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT
-        )
-        for mid in (lead, *GOOGLE_API_STATIC_TEXT_MODELS, *_cached_text_models()):
-            if mid and mid not in choices:
-                choices.append(mid)
-    else:
-        for mid in _cached_text_models():
-            if mid and mid not in choices:
-                choices.append(mid)
+    lead = (
+        GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT if s == "a"
+        else GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT
+    )
+    for mid in (lead, *GOOGLE_API_STATIC_TEXT_MODELS, *_cached_text_models()):
+        if mid and mid not in choices:
+            choices.append(mid)
     return choices
 
 

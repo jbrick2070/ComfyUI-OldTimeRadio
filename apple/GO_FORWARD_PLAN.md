@@ -227,44 +227,27 @@ clean, full suite green.
   is still `?`: `otr_amd_still` selects SA3 unproven, which is the
   experimental-AMD position already on record.
 
-### 0h. Google lane ships as a workflow, stills only (operator 2026-09-25: "yes we should have a Google JSON with stills")
+### 0h / 0i / 0j. The Google lane -- code DONE 2026-09-25, live legs owed
 
-The stills shape (Gemini image, `still_flat`, Google TTS, Lyria, Flash /
-Flash-Lite writers) published English Hamlet 1.1 in 218 s on 2026-09-19
-with no 429s; it has been a hand-applied lane preset since. Work: one new
-row in `config/workflow_matrix.json` (id `otr_google_still`; deltas copied
-from the proven preset -- the image, visual, voice, music and writer picks
-above; `google_api_slot_a/b_model` set to the Flash / Flash-Lite ids), so
-`build_variants.py --all` emits `workflows/otr_google_still.json`, its
-recipe section, its thumbnail, and every generated doc row; add it to the
-matrix's shipping set so the gallery lists 26. Video stays OFF this workflow
-(Veo's 2/min, 10/day quota cannot carry an episode's 16 calls; override
-remains `OTR_GOOGLE_VEO_MODEL_ID`). Prove with one 1-act leg on the 5080
-that downloads nothing and publishes.
+- **0h** ("yes we should have a Google JSON with stills"): row
+  `otr_google_still` ships -- Gemini image stills composited by
+  `still_flat`, Google TTS, Lyria, Flash / Flash-Lite writers, CPU, no
+  download, key `OTR_GOOGLE_API_KEY`. Copied from the preset that
+  published English Hamlet 1.1 in 218 s on 2026-09-19. README,
+  CLOUD.md, VIDEO_MODELS.md and WRITERS.md name it instead of the deleted
+  `google_still_*` / `google_veo_low_*` presets. The writer's Google rows
+  and slot models are now listed with or without a key (as OpenRouter's
+  and Comfy's always were), so the workflow opens clean on a keyless
+  machine and Queue stops on the named missing-key message.
+- **0i** (b2cf4251): every language row admits `google_tts` after
+  `kokoro`; the 30 Gemini voices are tagged with all eight languages.
+- **0j** (dca81735): a character with no stated gender is cast on
+  `google_tts` by the episode seed; a stated gender it cannot serve still
+  refuses by name.
 
-### 0i. Google TTS is admitted on every language Kokoro is (operator: "all supported as Kokoro, just shove it Kokoro's stuff")
-
-`config/episode_languages.json` rows list the admitted voice engines;
-non-English rows admit only `kokoro`, so a non-English episode on the
-Google lane stops at `cast_lock.py:62-65`. Work: for every language row
-whose engines list contains `kokoro`, append `google_tts`; English already
-admits everything. Test: parametrize over the rows and assert
-`google_tts in engines` wherever `kokoro in engines`. His ear on any
-language stays his (the French `ff_siwis` day), but admission is now a
-config fact, not a per-language wait.
-
-### 0j. `my_story` on Google TTS: the seeded draw, gender left unstated (operator: "random genders and leave it nebulous")
-
-`cast_lock.py:1332-1336` raises `VoiceCastingError ... NO FALLBACK` for
-`google_tts` when a cast row carries `gender: None`; the Kokoro path takes
-the seeded gender-agnostic draw instead. `_otr_my_story.py:26` leaves an
-unstated gender empty on purpose and keeps doing so. Work: give
-`google_tts` the same seeded draw Kokoro takes at that site (provider
-voices are gendered, so the pick is a coin the episode seed flips --
-deterministic, and the report line names it "gender drawn by seed"), and
-delete the refusal branch. Test: a `my_story` cast with `gender: None` on
-`google_tts` casts without raising and the same seed picks the same voice
-twice; a stated gender is honoured unchanged.
+OWED, one leg each on the 5080 (1 act, `otr_google_still`): English
+(downloads nothing, publishes); one non-English language (0i); a
+`my_story` cast with an unstated gender (0j).
 
 ### 0k. The Comfy credential rides the V3 channel: one small credential node (operator: "I dunno what is best practice" -- this is it)
 
@@ -324,46 +307,9 @@ Found by asking "what assumes the developer's machine?" after the models
 root defect (PBUG-20260925-03). Ranked by what a stranger would hit. The
 top 3 are HARDENED below; 4-8 stay a reviewed backlog, one commit each.
 
-**1. Second-GPU pick crashes the writer build.**
-`nodes/_otr_shared/llm_policy.py:51`: `_DEVICES = ("cuda", "cpu", "mps")`.
-The writer's `llm_device` widget offers `gpu:1`, `gpu:2`... on a multi-GPU
-host (`device_options.py:69-89`); `resolve_device` (`device_options.py:91-
-134`) turns `gpu:1` into `"cuda:1"` via `_name()` (`:136-144`, which appends
-`:%d` for any nonzero index). `LLMRuntimePolicy.__post_init__`
-(`llm_policy.py:75-78`) then does `if self.device not in _DEVICES: raise
-LLMPolicyError`, and `"cuda:1"` is not `"cuda"`. Fix: replace the exact-match
-check with `self.device == "cuda" or self.device.startswith("cuda:") or
-self.device in ("cpu", "mps")`. Single-GPU boxes (5080, 4060) always
-resolve to bare `"cuda"`, so this is additive. Test: construct
-`LLMRuntimePolicy(device="cuda:1", ...)` and assert no raise; keep the
-existing bad-value test (`"tpu"` still raises).
-
-**2. Bark crashes on first load on a Mac or CPU-only torch.**
-`nodes/_otr_bark_lib.py:201` calls `torch.cuda.empty_cache()`
-unconditionally inside `if _BARK_CACHE["model"] is None:`, a few lines
-after the device is resolved to `"mps"`/`"cpu"` for exactly that host. Fix:
-guard it, matching the ALREADY-guarded call at `:331` in the same file --
-read that guard and mirror its shape (do not invent a new one). Test:
-monkeypatch `torch.cuda.is_available` False (or stub `torch.cuda` absent
-entirely) and drive the real load path; assert no `AssertionError`.
-
-**3. AMD/ROCm quantisation.**
-`nodes/_otr_model_catalog.py:713-733` `effective_quant_policy`: the
-`implied == "platform"` branch does
-`"bnb_nf4" if str(device or "").lower().startswith("cuda") else "none"`.
-ROCm reports `"cuda"` to torch too (that is `device_options.vendor()`'s
-whole reason for existing, per its own docstring at `device_options.py:148-
-158`), so an AMD box's Qwen pick silently bakes NF4, which bitsandbytes
-cannot run on ROCm. Fix: change the condition to
-`device_options.vendor() == "nvidia"` (import already available at every
-call site: `OTR_LedgerScriptWriter.py:519,523`, `_otr_writer_inputs.py:
-595,599`, `_otr_model_loader.py:906` all call `effective_quant_policy`
-today WITHOUT reading vendor first -- thread `device_options.vendor()` as
-a new keyword, default `""`, so a caller that cannot supply it degrades to
-today's `device`-string heuristic rather than crashing on a missing arg).
-No AMD hardware on the 5080 to reproduce live: test with a stubbed
-`device_options.vendor` returning `"amd"` and `device="cuda"`, assert the
-Qwen row returns `"none"`, not `"bnb_nf4"`.
+**Items 1-3 DONE 2026-09-25** (92388af7): `cuda:N` is an admitted writer
+device, Bark's first load no longer calls CUDA on a Mac or CPU-only torch,
+and the platform quant bakes NF4 only when the vendor is NVIDIA.
 
 **Backlog, 4-8 (grounded, not yet hardened into steps):**
 4. `prestartup_script.py:126-144` pins HF_HOME to `<comfy>/models/huggingface`
@@ -376,12 +322,15 @@ Qwen row returns `"none"`, not `"bnb_nf4"`.
    the CPU lane from available RAM. DEVICE HALF DONE 2026-09-25 (1c0b1dd4):
    item 1 turned a second-GPU pick from a crash into a writer silently
    loaded on GPU 0, so load_llm now probes and places on the policy's CUDA
-   ordinal. The 64 GiB CPU-lane half is still open.
-7. Writes inside the pack folder: cloud cache
-   (`cloud_media_backend.py:446-450`), Chatterbox/Dia stderr
-   (`eng_chatterbox.py:109`, `eng_dia.py:114`, outside any try), and
-   `otr_runtime.log` (`_vram_log.py`, `story_orchestrator.py`,
-   `video_engine.py`). Move to the output-tree state/tmp dirs.
+   ordinal; c4fcae80 makes that GPU the CURRENT device for the load and
+   the teardown wash. The 64 GiB CPU-lane half is still open. Known
+   telemetry-only gap (Sonnet review): the VRAM_RESET / VRAM_SNAPSHOT
+   lines `_run_with_timeout` writes during generation still read GPU 0's
+   counters for a `cuda:N` writer. Generation itself is correct (inputs
+   go to `model.device`); fix only if a two-GPU user reports it.
+7. DONE 2026-09-25 (c04aad46 + 2c952de1, Cursor): the cloud media cache,
+   the sidecar stderr files and `otr_runtime.log` write under the output
+   tree; the old pack-folder billing ledger is copied forward once.
 8. Lower: Chatterbox/Dia default venv path is Windows-only (`Scripts/`);
    `video_engine.py:2342-2346` falls back to `~/Documents/ComfyUI/output`;
    NVFP4 is preferred among installed files without a hardware check;

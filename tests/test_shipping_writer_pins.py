@@ -1,4 +1,5 @@
-"""Shipping writer pins: small Qwen locally, 12B on 16 GB NVIDIA, cloud on CPU.
+"""Shipping writer pins: small Qwen locally, 12B on 16 GB NVIDIA, cloud on CPU
+(Comfy Credits on the Comfy Cloud workflows, Gemini on the Google one).
 
 Stops a stale Qwen2.5 id from returning, and keeps the
 shipping CPU graph on Sonnet 5 + Luna instead of a local 4B.
@@ -98,6 +99,9 @@ def test_shipping_writer_split_is_4b_except_16gb_nvidia():
         elif pid.startswith("otr_cloud_"):
             assert creative == "comfy:slot-a", pid
             assert technical == "comfy:slot-b", pid
+        elif pid.startswith("otr_google_"):
+            assert creative == "google_api:slot-a", pid
+            assert technical == "google_api:slot-b", pid
         else:
             assert creative == SMALL, pid
             assert technical == SMALL, pid
@@ -115,6 +119,11 @@ def test_shipping_variant_widgets_carry_the_live_label():
             assert "comfy:slot-a" in text, pid
             assert "anthropic/claude-sonnet-5" in text, pid
             assert "openai/gpt-5.6-luna" in text, pid
+            assert SMALL not in text, pid
+        elif pid.startswith("otr_google_"):
+            assert "google_api:slot-a" in text, pid
+            assert "gemini-flash-latest" in text, pid
+            assert "gemini-flash-lite-latest" in text, pid
             assert SMALL not in text, pid
         elif pid.startswith("otr_16gb_"):
             assert BIG in text, pid

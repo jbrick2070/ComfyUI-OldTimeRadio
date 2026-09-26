@@ -24,10 +24,12 @@ fits its own tier. Which one depends on which workflow you opened:
 | 16 GB+ NVIDIA (`otr_16gb_*`) | **gemma-4-12b-it** (23.9 GB download) -- NF4 is baked into the pick |
 | Comfy Cloud cheap (`otr_cloud_low*`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
 | Comfy Cloud deluxe (`otr_cloud_deluxe_3act`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
+| Google, your own key (`otr_google_still`) | creative **Gemini Flash** (`gemini-flash-latest`), tech **Gemini Flash-Lite** (`gemini-flash-lite-latest`) |
 
-The Comfy Cloud workflows and the shipping CPU workflow use the same cheap pair
--- Sonnet 5 to write, Luna for JSON -- and bill Credits rather than VRAM.
-Leaving those two dropdowns alone is still the right answer there.
+The Comfy Cloud workflows (`otr_cloud_low` is also the CPU pick) use the same
+cheap pair -- Sonnet 5 to write, Luna for JSON -- and bill Credits rather than
+VRAM. The Google workflow bills your own Google key instead. Leaving those
+dropdowns alone is still the right answer there.
 
 **Qwen3.5-4B** is the only writer here with a finished episode to its name on
 an 8 GB NVIDIA card, a 16 GB NVIDIA card and a 16 GB Mac, and it

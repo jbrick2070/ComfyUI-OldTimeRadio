@@ -26,6 +26,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - [otr_cloud_low](#otr_cloud_low)
 - [otr_cloud_low_1act](#otr_cloud_low_1act)
 - [otr_cloud_low_5act](#otr_cloud_low_5act)
+- [otr_google_still](#otr_google_still)
 - [otr_mac16_animatediff](#otr_mac16_animatediff)
 - [otr_mac16_low](#otr_mac16_low)
 - [otr_mac16_still](#otr_mac16_still)
@@ -871,6 +872,47 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 - `OTR_COMFY_API_KEY`
 - `OTR_COMFY_API_KEY` is read by the headless SUBMITTER (`scripts/otr_api.py`) and sent as `extra_data.api_key_comfy_org`; the ComfyUI server never reads it. In the app, sign into Comfy instead.
+
+### Install pointers
+
+- CPU torch wheels (--index-url .../cpu)
+- ffmpeg on PATH (mac: ensure libx264 + aac encoders are in the build).
+
+### Preflight models
+
+- (registry-driven; see the engine rows for the selected lanes)
+
+## otr_google_still
+
+- file: `workflows/otr_google_still.json`
+- workflow: `otr_google_still` (Google, your own Gemini API key -- stills only: Gemini image stills composited on the CPU (still_flat), Google TTS voices, Lyria music, and Gemini Flash (creative) + Flash-Lite (technical) writers. No video model: at Tier 1 every Veo model allows 2 requests a minute and 10 a day, and an episode needs more clips than that. Nothing downloads and no GPU is needed. The same lanes published a 1-act English Hamlet in 218 s on 2026-09-19; this workflow opens at 3 acts, so expect roughly three times that. Needs OTR_GOOGLE_API_KEY (or GEMINI_API_KEY, or the pack's google.secret file).)
+- status: shipping
+- platform/backend/vendor: any/cpu/none
+- master_hash: `2dd0a1023996f819a8e1f56259de0f843e4f25e035c5e4840e17ccbc1a8b733e`
+
+### ComfyUI launch
+
+- args: `--cpu`
+- sage_attention: False
+
+### Environment
+
+- Windows hosts: set `PYTHONUTF8=1` (cp1252 consoles crash the prestartup banner otherwise).
+- Models root override: `OTR_COMFYUI_MODELS_ROOT` (the `C:\ComfyUI-Models` default in _otr_hf_env/_otr_models_root is a Windows-only convenience).
+
+### Music (per bank; only My Story takes its own)
+
+- `media_archive`: small-group jazz quartet, relaxed swing (fixed)
+- `original`: salsa conjunto at 100 BPM, clave-driven (fixed)
+- `public_domain`: Chicago house at 122 BPM, soulful and steady (fixed)
+- `scifi_news_pro`: Detroit techno at 128 BPM, hypnotic machine funk (fixed)
+- `shakespeare`: chosen by the source's year; its own default is Elizabethan consort music
+- `my_story`: the `music_style` widget on `OTR_StableAudioTheme` (blank = the house radio orchestra). Every other bank keeps its genre whatever is typed.
+
+### Required key NAMES (values are NEVER stored here)
+
+- `OTR_GOOGLE_API_KEY`
+- Google key aliases accepted by existing clients: `GEMINI_API_KEY`, `GOOGLE_API_KEY` (preferred name: `OTR_GOOGLE_API_KEY`).
 
 ### Install pointers
 
