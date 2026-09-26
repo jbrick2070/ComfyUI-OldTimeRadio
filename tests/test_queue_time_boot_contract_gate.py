@@ -59,3 +59,18 @@ def test_the_gate_runs_before_any_download():
     boot = src.index("_refuse_unmet_boot_contracts(plan[\"engines\"])")
     assert src.index("_refuse_missing_node_packs(plan[\"engines\"])") < boot
     assert boot < src.index("native_requests(")
+
+
+def test_an_unknown_contract_name_refuses_by_name(monkeypatch):
+    """An engine declaring a contract the table does not know is refused with
+    the gate's own message, not a stray BootContractError."""
+    from nodes._otr_video_engines import registry as vreg
+    real = vreg.get_engine("minimax_h3_video")
+
+    class _Odd:
+        compatible_boot_contracts = ("no_such_contract",)
+        name = real.name
+
+    monkeypatch.setattr(vreg, "get_engine", lambda eid: _Odd())
+    with pytest.raises(va.VisualAssetError, match="cannot check"):
+        va._refuse_unmet_boot_contracts({"minimax_h3_video"}, state=STOCK)

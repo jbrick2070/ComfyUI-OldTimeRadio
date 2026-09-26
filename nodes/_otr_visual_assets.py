@@ -1206,10 +1206,17 @@ def _refuse_unmet_boot_contracts(engines, state=None):
             continue
         # Met when ANY contract the engine allows is satisfied by this boot --
         # the render-time identification among the engine's own candidates.
-        if any(not _bc.check_running_server(c, state=state) for c in allowed):
+        # A contract name the table does not know is an engine bug; it refuses
+        # here by name rather than escaping as a different exception type.
+        try:
+            if any(not _bc.check_running_server(c, state=state) for c in allowed):
+                continue
+            contract = allowed[0]
+            unmet = _bc.check_running_server(contract, state=state)
+        except Exception as exc:  # noqa: BLE001 -- fail closed, named
+            problems.append("the video engine '%s' declares a boot contract this "
+                            "pack cannot check (%s)" % (name, exc))
             continue
-        contract = allowed[0]
-        unmet = _bc.check_running_server(contract, state=state)
         if unmet:
             argv = " ".join(_bc.launch_args_for(contract))
             problems.append(
