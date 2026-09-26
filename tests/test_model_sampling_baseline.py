@@ -102,3 +102,33 @@ def test_a_cooler_model_still_warms_on_retry_up_to_one():
 
 def test_a_cloud_slot_sends_no_temperature_on_any_attempt():
     assert _temperatures_seen(None) == [None, None, None]
+
+
+def _title_call(temperature):
+    """Drive the real title-regeneration step and report the temperature it
+    handed the model."""
+    from nodes._otr_writer_tail import _generate_title_from_script
+
+    seen = {}
+
+    def generate_fn(messages, *, temperature, max_new_tokens, stop=None, **_kw):
+        seen["temperature"] = temperature
+        return "TITLE: The Relay Is Still Warm"
+
+    result = _generate_title_from_script(
+        generate_fn, "ALICE VALE: The relay is still warm.", temperature=temperature)
+    assert isinstance(result, str)
+    return seen["temperature"]
+
+
+def test_the_title_step_sends_no_temperature_for_a_cloud_writer():
+    """Sonnet QA on ba0a0e87: the title step clamped float(temperature) before
+    its own try block, so a cloud creative slot (baseline None) with a blank
+    episode_title -- the normal path -- crashed every episode at the last
+    step. Dialogue had the None rule; the title step did not."""
+    assert _title_call(None) is None
+
+
+def test_the_title_step_still_clamps_a_local_baseline():
+    assert _title_call(1.3) == pytest.approx(1.0)
+    assert _title_call(0.7) == pytest.approx(0.7)

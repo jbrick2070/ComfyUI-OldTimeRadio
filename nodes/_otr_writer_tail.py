@@ -262,7 +262,7 @@ def _generate_title_from_script(
     generate_fn,
     assembled_script: str,
     *,
-    temperature: float = 0.85,
+    temperature: float | None = 0.85,
     premise: str = "",
     arc_verdict: str = "",
     # QA F1 (2026-07-09): bank-aware title framing. The system prompt used to
@@ -432,7 +432,13 @@ def _generate_title_from_script(
         "and nothing else."
     )
 
-    clamped_temp = max(0.4, min(1.0, float(temperature)))
+    # A cloud creative slot carries no baseline (None): send no temperature
+    # and let the provider apply the model's own default, exactly as
+    # compose_line does. Found by Sonnet QA on ba0a0e87: `float(None)` here,
+    # BEFORE the try below, killed every cloud-writer episode whose title was
+    # left blank -- which is the normal path, the title is minted at the end.
+    clamped_temp = (None if temperature is None
+                    else max(0.4, min(1.0, float(temperature))))
 
     try:
         raw = generate_fn(
