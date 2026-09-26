@@ -429,10 +429,10 @@ class TestWorkflowJSONFull:
         # The HuMo in-graph loader chain (BUG-078) needs UNETLoader / CLIPLoader
         # / VAELoader / AudioEncoderLoader / LoraLoaderModelOnly / ModelSamplingSD3
         # plus the KJNodes SageAttention patcher.
-        # Sprint 3 (2026-05-02): the LTX 2B v0.9 stage uses ComfyUI-LTXVideo's
-        # LowVRAMCheckpointLoader (a CheckpointLoaderSimple subclass with a
-        # `dependencies` input for sequential model load -- ensures HuMo unloads
-        # before LTX claims VRAM, satisfying the C2 sequencing intent).
+        # (The Sprint-3 LowVRAMCheckpointLoader and the LTX 2.3
+        # LTXAVTextEncoderLoader entries came from ComfyUI-LTXVideo; no shipped
+        # workflow carries either node, and the pack itself is no longer a
+        # dependency since 2026-09-26, so neither type is known here any more.)
         known = {
             "PreviewAudio", "PreviewImage", "Note",
             "CheckpointLoaderSimple", "SaveImage",
@@ -440,17 +440,6 @@ class TestWorkflowJSONFull:
             "UNETLoader", "CLIPLoader", "VAELoader",
             "AudioEncoderLoader", "LoraLoaderModelOnly",
             "ModelSamplingSD3", "PathchSageAttentionKJ",
-            # LTX loader chain (Sprint 3)
-            "LowVRAMCheckpointLoader",
-            # LTX 2.3 loader chain (BUG-LOCAL-117 cutover 2026-05-06):
-            # Gemma encoder loader from ComfyUI-LTXVideo replaces the prior
-            # CLIPLoader+t5xxl chain. Required by OTR_BatchLTXRender when
-            # OTR_LTX_ENGINE=v2_3 (default). RES4LYF nodes (ClownSampler_Beta,
-            # MultimodalGuider, GuiderParameters, LTXVTiledVAEDecode) are
-            # called inside batch_ltx_render.py via _call() and never appear
-            # in the workflow JSON node list, so they don't need to be in
-            # this whitelist.
-            "LTXAVTextEncoderLoader",
         }
         for n in wf["nodes"]:
             assert n["type"].startswith("OTR_") or n["type"] in known

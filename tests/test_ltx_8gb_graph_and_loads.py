@@ -1235,3 +1235,26 @@ def test_the_shared_extender_is_GONE_from_every_lane():
     made it unnecessary.
     """
     assert not hasattr(wb, "extend_frames_to_target")
+
+
+def test_a_missing_node_class_says_update_comfyui_not_install_a_pack(monkeypatch):
+    """ComfyUI-LTXVideo is not a dependency (TEST_WAVE B4, 2026-09-26: the
+    lane published on a box without it); every class ltx_8gb asks for is
+    ComfyUI core, so a missing one means an old ComfyUI. The message must say
+    so -- the LTX 2.5 lanes' twin is pinned in test_ltx25_lane_contract."""
+    from nodes._otr_video_engines import eng_ltx_8gb as E
+    from nodes._otr_video_engines import motion_common as _MC
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+
+    eng = E.Ltx8gbEngine()
+    monkeypatch.setattr(_MC, "assert_sage_not_patched", lambda *a, **k: None)
+    monkeypatch.setattr(eng, "_resolve_render_config", lambda: None)
+    monkeypatch.setattr(eng, "_ckpt_path", lambda: "ltxv.safetensors")
+    monkeypatch.setattr(eng, "_assert_checkpoint_integrity", lambda path: None)
+    monkeypatch.setattr(eng, "_t5_path", lambda: "t5xxl_fp16.safetensors")
+    monkeypatch.setattr(_wb, "node_class_mappings", lambda: {})
+    with pytest.raises(EngineUnusable) as info:
+        eng.assert_usable({}, {})
+    msg = str(info.value)
+    assert "update ComfyUI" in msg
+    assert "LTXVideo" not in msg

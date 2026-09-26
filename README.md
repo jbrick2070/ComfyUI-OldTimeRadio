@@ -527,8 +527,8 @@ The AnimateDiff lanes -- the workflows `otr_8gb_animatediff.json`,
 the matrix row of the same name -- want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved).
 That is the only one: every LTX lane, `ltx098_low_video` included, uses nodes
 that ship with ComfyUI itself (update ComfyUI if one is reported missing).
-If you pick one of these lanes without its pack, the render stops with an error
-that names the pack and its URL.
+If you pick an AnimateDiff lane without its pack, the render stops before
+anything downloads, with an error that names the pack and its URL.
 
 ---
 

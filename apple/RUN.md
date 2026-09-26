@@ -143,10 +143,12 @@ download is, and whether it needs another node pack.
 
 ## When something goes wrong
 
-**The render stops naming a missing class.** The lane you picked needs a
-third-party node pack. The error names the pack and its URL; install it into
-`custom_nodes/`, restart, try again. [MACHINES.md](MACHINES.md#which-workflow-do-i-open) lists
-which lanes these are.
+**The render stops naming a missing class.** Read what the error asks for.
+If it names a node pack -- the AnimateDiff lanes need ComfyUI-AnimateDiff-Evolved
+-- install it into `custom_nodes/`, restart, try again. If it says to update
+ComfyUI -- every LTX lane uses nodes that ship with ComfyUI itself -- your
+ComfyUI is older than those nodes: update it. [MACHINES.md](MACHINES.md#which-workflow-do-i-open)
+lists which lanes are which.
 
 **The render stops naming a missing file.** The lane you picked needs weights
 that do not download themselves. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from) says which

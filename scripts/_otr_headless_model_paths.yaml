@@ -3,7 +3,7 @@
 # v1 install (AppData\Local\Programs\ComfyUI\...) which no longer exists --
 # headless main.py crashes in execute_prestartup_script (FileNotFoundError).
 # This copy keeps the model dirs + the Documents custom_nodes mapping (the
-# wrapper packs: ComfyUI-LTXVideo, KJNodes, VideoHelperSuite, kokorotts, ...)
+# wrapper packs: ComfyUI-AnimateDiff-Evolved, KJNodes, VideoHelperSuite, ...)
 # and drops the dead desktop_extensions section. If the Desktop app moves
 # again, refresh this file from the Desktop yaml.
 comfyui_desktop:
