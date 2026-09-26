@@ -279,19 +279,6 @@ In order:
   on the 4060 whether `ver` 2.3.6 makes Manager fetch the Pending version.
 - **Drop `extra.info`.** It says `version: "2.0-alpha"`; nothing in nodes/,
   scripts/, tests/ or js/ reads it. pyproject is the version authority.
-- **A `.jpg` thumbnail for EVERY stem, all 25.** Frontend 1.52.7 builds each
-  custom-pack card with `mediaSubtype: "jpg"` hardcoded and requests
-  `/api/workflow_templates/<pack>/<stem>.jpg`; one thumbnail for the canonical
-  alone leaves 24 blank cards. `build_variants.py --all` copies one master
-  image under every variant's name; `--check` fails on a missing one.
-  STYLE (operator 2026-09-25, "let's use LTX style", then "I like it more
-  functional than literal"): square like Comfy's own cards, but the
-  registry card's schematic, not an episode frame. Drafted as
-  `assets/otr_gallery_thumb.jpg` (400x400, the four stages as a 2x2 grid,
-  no counts) by `tools/make_registry_icon.py` (1ad41a12). AWAITING HIS EYE on
-  the draft; once approved, `build_variants.py --all` copies it to
-  `workflows/<stem>.jpg` for all 25 stems (NO `-1` suffix -- that is
-  core-only) and `--check` fails on a missing one.
 - **A friendly category name through `/i18n`.** Core serves each custom
   node's `locales/<lang>/main.json`; the frontend localizes the pack category
   from `templateWorkflows.category.<folder name>`. Ship `locales/en/main.json`

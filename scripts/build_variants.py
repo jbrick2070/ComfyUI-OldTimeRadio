@@ -67,6 +67,14 @@ GENERATED_BY = "scripts/build_variants.py"
 #: graphs. The doc lives with the rest of the docs, and `--check` fails if a
 #: `.launch.md` comes back into workflows/.
 LAUNCH_RECIPES = REPO / "apple" / "LAUNCH_RECIPES.md"
+#: THE GALLERY THUMBNAIL (2026-09-25). ComfyUI's template gallery builds each
+#: custom-pack card with `mediaSubtype: "jpg"` hardcoded and requests
+#: /api/workflow_templates/<pack>/<stem>.jpg, so every shipped graph needs its
+#: own same-stem JPEG or its card is blank. One image, the operator's own art
+#: (assets/otr_gallery_thumb_master.webp, reduced to this 400x400 JPEG), is
+#: copied beside every graph; `--check` fails on a missing, stale or orphaned
+#: copy. assets/ does not ship; the copies in workflows/ do.
+GALLERY_THUMB = REPO / "assets" / "otr_gallery_thumb.jpg"
 
 #: THE SHIPPING SET, DERIVED FROM THE MATRIX (2026-09-24). The rows in
 #: `config/workflow_matrix.json` that say `ships` are the only configs that emit a
@@ -383,6 +391,39 @@ def _committed_recipes(schemas, mapping, canonical) -> list[tuple[str, str]]:
     return out
 
 
+def _thumbnail_targets() -> list[Path]:
+    """`<stem>.jpg` beside the canonical and every committed variant."""
+    return ([VARIANTS_DIR / (CANONICAL.stem + ".jpg")]
+            + [path.with_suffix(".jpg") for path in _committed_variant_paths()])
+
+
+def _write_thumbnails() -> None:
+    data = GALLERY_THUMB.read_bytes()
+    for target in _thumbnail_targets():
+        target.write_bytes(data)
+    print(f"WROTE {len(_thumbnail_targets())} gallery thumbnails")
+
+
+def _thumbnail_failures() -> list[str]:
+    if not GALLERY_THUMB.is_file():
+        return [f"{GALLERY_THUMB.name}: the gallery thumbnail master is missing"]
+    master = GALLERY_THUMB.read_bytes()
+    failures = []
+    targets = _thumbnail_targets()
+    for target in targets:
+        if not target.is_file():
+            failures.append(f"{target.name}: gallery thumbnail missing (run --all)")
+        elif target.read_bytes() != master:
+            failures.append(f"{target.name}: gallery thumbnail differs from "
+                            f"{GALLERY_THUMB.name} (run --all)")
+    wanted = {t.name for t in targets}
+    for stray in sorted(VARIANTS_DIR.glob("*.jpg")):
+        if stray.name not in wanted:
+            failures.append(f"{stray.name}: a gallery thumbnail with no graph "
+                            "of that name (delete it)")
+    return failures
+
+
 def _write_launch_recipes(schemas, mapping, canonical) -> None:
     # newline="\n": platform-safe by construction (Windows universal newlines
     # otherwise bake CRLF into a locally regenerated doc).
@@ -412,6 +453,7 @@ def cmd_emit(profile_ids: list[str], explicit: bool) -> int:
         print(f"REFUSED {pid}:\n{why}\n")
     if emitted:
         _write_launch_recipes(schemas, mapping, canonical)
+        _write_thumbnails()
     print(f"done: {len(emitted)} emitted, {len(refused)} refused")
     # Explicitly requesting a refused profile is an error; --all treats
     # refusals as the expected pre-ratification state.
@@ -553,6 +595,7 @@ def cmd_check() -> int:
             render_launch_recipes(recipes):
         failures.append(f"{LAUNCH_RECIPES.name}: DRIFT vs regeneration "
                         "(generated, never hand-edited)")
+    failures.extend(_thumbnail_failures())
     for f in failures:
         print("CHECK FAIL:", f)
     print(f"check: {len(committed)} variants, {len(failures)} failures")

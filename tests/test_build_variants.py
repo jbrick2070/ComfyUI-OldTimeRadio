@@ -323,6 +323,26 @@ def test_check_detects_variant_drift(tmp_path, monkeypatch, canonical,
                            encoding="utf-8", newline="\n")
     monkeypatch.setattr(bv, "VARIANTS_DIR", vdir)
     monkeypatch.setattr(bv, "LAUNCH_RECIPES", recipes_doc)
+    # The gallery thumbnail: one copy beside the canonical and each variant,
+    # byte-identical to the master (2026-09-25).
+    master = tmp_path / "otr_gallery_thumb.jpg"
+    master.write_bytes(b"\xff\xd8 gallery art \xff\xd9")
+    monkeypatch.setattr(bv, "GALLERY_THUMB", master)
+    for target in bv._thumbnail_targets():
+        target.write_bytes(master.read_bytes())
+    assert bv.cmd_check() == 0
+
+    # A missing, stale or orphaned gallery thumbnail each fail the check.
+    thumb = vdir / "otr_cloud_low.jpg"
+    thumb.unlink()
+    assert bv.cmd_check() == 1
+    thumb.write_bytes(b"an older picture")
+    assert bv.cmd_check() == 1
+    thumb.write_bytes(master.read_bytes())
+    orphan = vdir / "otr_retired_graph.jpg"
+    orphan.write_bytes(master.read_bytes())
+    assert bv.cmd_check() == 1
+    orphan.unlink()
     assert bv.cmd_check() == 0
 
     # A hand-edited recipes doc is drift.
