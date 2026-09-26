@@ -1,3 +1,69 @@
+## 2026-09-26 -- HEAD 5df92ba4 (main) -- MORNING: no VRAM reserves, unload after use, --video-lane
+
+Driver: the 5080 Claude window (Opus), 09:00-11:00, the operator napping from
+~10:15 ("go boldly"). The rulings that drove it, his words:
+  "I don't like messing with reserves"; "we need to unload models after they
+  are used and if it OOMs we record it, not artificially create a scenario";
+  "there is no profiles -- video lanes and workflows"; hand-roll the video
+  dropdown for a headless run rather than add a workflow.
+
+CODE (each pushed green, then a Sonnet contrarian; findings became the next
+commit):
+  84c98900 + 6f4cdd95 H3's contract asks only for Sage off (and not CPU): the
+    12 GiB reserve and pinned-memory switch are gone. Sonnet REFUTED the
+    first cut on stale docs and a Sage-probe message; folded.
+  9e677825 + c5111ff2 scripts/otr_canonical_api_run.py --video-lane <lane>:
+    sets the announcer/character/music video dropdowns after the workflow
+    row, through the dropdown's own label lookup -- what picking it in the
+    app does, and ComfyUI's own headless practice (set the widget, POST
+    /prompt). Sonnet: the runner now says plainly when nothing checks a
+    lane's weights before the run (HuMo), and the test pins the literal
+    label. Cursor agreed with the shape in the operator's window.
+  205e96ad + 7c6e9cb2 CHUNK A of Cursor's remove-VRAM-gates plan, with the
+    Opus review's amendment: the reserve knob is gone from boot_contracts
+    (every contract, argv, env, live check, identification); humo_diet is
+    DELETED (no workflow row selected it) rather than kept as an alias; HuMo
+    declares no contract; the headless launcher passes no --reserve-vram;
+    the queue-time refusal names the exact fix from the cheapest accepted
+    boot (Sage, --cpu, both, pinned for a lab-only engine, or "could not
+    confirm" Sage). Sonnet: one real gap (unread Sage beside --cpu) folded;
+    "HuMo is now accepted on h3 boots" REJECTED -- those are plain Sage-free
+    GPU boots now, and every undeclared lane already accepts them.
+  64d1b256 + 5df92ba4 CHUNK B, one call instead of Cursor's counter/lock/
+    lease coordinator (ComfyUI runs one prompt at a time; render code starts
+    no threads). The validator, first node of every episode, sets ComfyUI's
+    own free_memory queue flag -- the mechanism behind its unload-models
+    control and POST /free -- so ComfyUI unloads every model and resets its
+    node cache after the prompt, success or failure. Sonnet verified the
+    flag is read only after the prompt returns; its real finding (the writer
+    LLM and Bark sit outside ComfyUI's manager and can outlive a FAILED
+    prompt) is folded as a prompt-start free_otr_pipeline_residue. Its LTX
+    2.5 claim was refuted: that encoder cache is episode-scoped.
+
+REVIEWS: Sonnet on every commit (above). The operator pasted Cursor
+  (otr_reviews/cursor_vram_gates_review.md) and agy
+  (otr_reviews/agy_vram_unload_review.md) prompts before his nap.
+SUITE: 17006 passed / 0 failed at 6f4cdd95 (full, 13:24). Scoped at each
+  later chunk: 1809 (boot contracts, HuMo, launcher, gate), 863 (validator,
+  levers), 43 (runner); build_variants --check 25/0; Bug Bible 46.
+APP FORM: all 26 shipped workflows carry the 33 rows, every row resolves to a
+  live input on the running server (the frontend drops a row that does not),
+  only otr_app opens as the app. The visual look still wants his eye.
+
+OWED, in order:
+  1. The 16 GB 1-act video leg at a676fa33 finishing and publishing.
+  2. A fresh STOCK boot (no reserve exists; the launcher is Sage-free), then
+     `otr_canonical_api_run.py --profile otr_16gb_video --video-lane
+     h3_low_video --act-count 1`, VRAM sampled throughout. An out-of-memory
+     is recorded as a PBUG, not answered with a reserve.
+  3. After it ends: nvidia-smi should fall to the desktop baseline instead of
+     the ~9-10 GB a finished render used to leave resident -- the live proof
+     of chunk B.
+  4. The 4060: B5/B6 from the background agent, then the B4 free-RAM
+     re-measure.
+2.3.7 note: "a server booted wrong for H3 is refused at once" in the list
+  below is now "H3 runs on a stock boot; only a Sage boot is refused".
+
 ## 2026-09-26 -- HEAD 9d50e7fe (main) -- EARLY MORNING: Sprint 2 code complete
 
 Driver: the 5080 Claude window (Opus), 01:30-05:00. Operator answered the
