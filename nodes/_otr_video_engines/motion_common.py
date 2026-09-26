@@ -717,6 +717,42 @@ def _unified_memory_backend():
         return False
 
 
+def copy_conditioning(out):
+    """Hand out a PRIVATE outer list and metadata dicts; share the tensor.
+
+    For a lane that reuses a CONDITIONING output across renders (the LTX 2.5
+    episode encoder cache; the 8 GB LTX lane's conditioning cache). Moved here
+    from ``eng_ltx25`` on 2026-09-26 so both hand out the same copy.
+
+    Verified during the 2026-08-20 arc: nothing on the LTX graphs mutates a
+    conditioning in place -- ``LTXVConditioning`` goes through
+    ``node_helpers.conditioning_set_values`` (``node_helpers.py:9-23``,
+    ``n = [t[0], t[1].copy()]``), ``LTXVImgToVideo`` passes both through
+    untouched, ``process_conds`` re-lists with ``conds[k][:]``
+    (``samplers.py:1040``), and both ``calculate_start_end_timesteps`` and
+    ``resolve_areas_and_cond_masks_multidim`` are copy-on-write.
+
+    So this is INSURANCE, not a fix, and it is taken anyway: the guarantee
+    depends on upstream ComfyUI internals nobody here controls, the copy is a
+    handful of dicts, and the failure it insures against is a silently wrong
+    render on every beat after the first rather than a crash.
+    """
+    if not (isinstance(out, (tuple, list)) and out):
+        return out
+    cond = out[0]
+    # ACCEPT A TUPLE HERE, NOT JUST A LIST. ComfyUI hands back a list today, but
+    # a narrower check would SILENTLY SKIP THE COPY if any upstream wrapper ever
+    # returned a tuple -- and a guard that quietly stops guarding is worse than
+    # no guard, because the receipts still say it is on.
+    if not isinstance(cond, (list, tuple)):
+        return out
+    cloned = [[e[0], dict(e[1])]
+              if isinstance(e, (list, tuple)) and len(e) >= 2
+              and isinstance(e[1], dict) else e
+              for e in cond]
+    return (type(cond)(cloned),) + tuple(out[1:])
+
+
 #: folder_paths categories searched when resolving a declared artifact, in
 #: order. The first two entries are the TEXT ENCODER categories and the split
 #: matters -- see :func:`resolved_weight_mb`.

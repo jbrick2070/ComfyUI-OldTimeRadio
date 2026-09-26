@@ -60,7 +60,7 @@ _ENVS = (
     "OTR_LTX_8GB_TERMINAL", "OTR_LTX_8GB_MAX_FRAMES", "OTR_LTX_8GB_NEGATIVE",
     "OTR_LTX_8GB_VAE_TILE", "OTR_LTX_8GB_VAE_OVERLAP",
     "OTR_LTX_8GB_VAE_TEMPORAL", "OTR_LTX_8GB_VAE_TEMPORAL_OVERLAP",
-    m.PREQUALIFICATION_ENV,
+    m.PREQUALIFICATION_ENV, m._CONDITIONING_CACHE_ENV,
 )
 
 
@@ -624,7 +624,8 @@ def test_the_harvest_registers_a_REUSED_handle_exactly_once(staged):
 
 
 @pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_THE_LOAD_COUNT_every_render_reloads_the_checkpoint_today(staged):
+def test_THE_LOAD_COUNT_every_render_reloads_the_checkpoint_today(staged,
+                                                                 monkeypatch):
     """The defect, stated as a number -- and a CONTROL on B1b, not an observer
     of it. An earlier draft of this docstring said the 3 would become a 1. It
     will not, and two independent reviewers caught that before the hoist.
@@ -643,7 +644,13 @@ def test_THE_LOAD_COUNT_every_render_reloads_the_checkpoint_today(staged):
 
     A count of 3 for `decode` is what makes any future 1 meaningful. Without
     it, a hoist that accidentally rendered once would also "pass".
+
+    THE CONDITIONING CACHE IS SWITCHED OFF HERE (2026-09-26) so the T5 count
+    stays a control as well: with it on, the same text three times loads the
+    T5 once -- pinned where that is the point, in the conditioning-cache tests
+    at the end of this file.
     """
+    monkeypatch.setenv(m._CONDITIONING_CACHE_ENV, "0")
     np = pytest.importorskip("numpy")
     counter = _Counter()
     eng = Ltx8gbEngine()
@@ -794,10 +801,16 @@ def test_prepare_loads_the_checkpoint_ONCE_for_the_whole_beat(hoistable, staged)
     beat instead of three, which at 6.34 GiB is the difference the whole chunk
     exists for.
 
-    The other counts are what make the 1 mean something. `clip` stays at 3
-    because the T5 is deliberately NOT hoisted; `decode` and `sample` stay at 3
-    because three segments really rendered. A hoist that accidentally rendered
-    once would show 1 everywhere and would be caught here, not on the GPU.
+    The other counts are what make the 1 mean something: `decode` and `sample`
+    stay at 3 because three segments really rendered, so a hoist that
+    accidentally rendered once would be caught here, not on the GPU.
+
+    `clip` is ALSO 1 now, for a different reason (2026-09-26). The T5 is still
+    NOT hoisted -- `prepare()` loads only the checkpoint -- but three segments
+    of one beat encode the same two texts, so the conditioning cache lets the
+    first segment run the loader and hands the encodes to the other two. That
+    is the TEST_WAVE B4 RAM saw-tooth, one 9.8 GB tooth per beat instead of
+    one per segment, and `pos`/`neg` at 1 say the encodes really were reused.
     """
     rig = hoistable
     prepared = rig.eng.prepare({}, {}, {})
@@ -807,7 +820,9 @@ def test_prepare_loads_the_checkpoint_ONCE_for_the_whole_beat(hoistable, staged)
             made.append(pathlib.Path(
                 rig.eng.render_clip(_request(staged), prepared)["out_path"]))
         assert rig.counter.calls["ckpt"] == 1            # the whole point
-        assert rig.counter.calls["clip"] == 3            # T5 NOT hoisted
+        assert rig.counter.calls["clip"] == 1            # conditioning cache
+        assert rig.counter.calls["pos"] == 1             # ...its encodes,
+        assert rig.counter.calls["neg"] == 1             # reused twice
         assert rig.counter.calls["modelsampling"] == 3   # a cheap clone
         assert rig.counter.calls["decode"] == 3          # three real renders
         assert rig.counter.calls["sample"] == 3
@@ -1258,3 +1273,196 @@ def test_a_missing_node_class_says_update_comfyui_not_install_a_pack(monkeypatch
     msg = str(info.value)
     assert "update ComfyUI" in msg
     assert "LTXVideo" not in msg
+
+
+# --- the conditioning cache (2026-09-26: the TEST_WAVE B4 RAM saw-tooth) --- #
+#: A stand-in T5 identity. The real key stats the T5 file, which a unit test
+#: must not depend on: on a box that has the weight the cache would engage,
+#: and on one that does not it would not.
+_T5_KEY = ("t5xxl_fp16.safetensors", 1, 2, 3, 4, m._LTX8_DEFAULT_T5, "ltxv",
+           "cpu")
+
+
+def _graph(eng, text="a rain-slicked street at night", external=None):
+    plan = eng._build_render_request(
+        {"asset_refs": {"init_image": "p"},
+         "timing": {"target_frame_count": 9}, "seed_bundle": {"request_seed": 1}})
+    return eng._build_graph({"text_prompt": text}, "p.png", plan, 9, 512, 288,
+                            external_results=external)
+
+
+def _seeded(monkeypatch, key=_T5_KEY):
+    """An engine whose cache holds the encodes of the default text."""
+    eng = Ltx8gbEngine()
+    monkeypatch.setattr(eng, "_conditioning_cache_key", lambda: key)
+    g = _graph(eng)
+    _, k, texts = eng._apply_conditioning_cache(g, None)
+    pos_out, neg_out = ([["P", {"k": 1}]],), ([["N", {"k": 2}]],)
+    eng._publish_conditioning(k, texts, {"pos": pos_out, "neg": neg_out})
+    return eng, pos_out, neg_out
+
+
+def test_a_MISS_leaves_the_graph_and_the_executor_call_as_they_were(
+        monkeypatch):
+    """An empty cache changes nothing: the loader and both encodes stay, and
+    the executor still gets `external_results=None` from an unprepared call --
+    the exact call `test_the_executor_is_called_with_the_current_keep_contract`
+    pins."""
+    eng = Ltx8gbEngine()
+    monkeypatch.setattr(eng, "_conditioning_cache_key", lambda: _T5_KEY)
+    g = _graph(eng)
+    before = set(g)
+    ext, key, texts = eng._apply_conditioning_cache(g, None)
+    assert ext is None and key == _T5_KEY
+    assert set(g) == before
+    assert texts == {"pos": g["pos"]["inputs"]["text"],
+                     "neg": g["neg"]["inputs"]["text"]}
+
+
+def test_a_full_HIT_drops_both_encodes_AND_the_T5_loader(monkeypatch):
+    """The load this change exists to skip. With both texts cached nothing
+    reads the CLIPLoader any more, so it leaves the graph -- and the
+    beat-scoped checkpoint handed in by `prepare()` rides along untouched."""
+    eng, pos_out, _ = _seeded(monkeypatch)
+    prepared_ext = {"ckpt": ("model", "clip", "vae")}
+    g = _graph(eng, external=prepared_ext)
+    ext, _, _ = eng._apply_conditioning_cache(g, prepared_ext)
+    assert not {"clip", "pos", "neg", "ckpt"} & set(g)
+    assert set(ext) == {"ckpt", "pos", "neg"}
+    assert prepared_ext == {"ckpt": ("model", "clip", "vae")}
+    # A PRIVATE copy of the conditioning: new outer list and metadata dict,
+    # the same tensor.
+    assert ext["pos"] is not pos_out and ext["pos"][0] is not pos_out[0]
+    assert ext["pos"][0][0][0] is pos_out[0][0][0]
+    assert ext["pos"][0][0][1] == {"k": 1}
+    assert ext["pos"][0][0][1] is not pos_out[0][0][1]
+
+
+def test_a_new_POSITIVE_still_loads_the_T5_and_keeps_the_negative(
+        monkeypatch):
+    """The next beat is a new positive: its first segment must encode it, so
+    the loader stays -- while the shared negative is still a hit."""
+    eng, _, neg_out = _seeded(monkeypatch)
+    g = _graph(eng, text="a lighthouse keeper counts the ships")
+    ext, _, _ = eng._apply_conditioning_cache(g, None)
+    assert "pos" in g and "clip" in g and "neg" not in g
+    assert set(ext) == {"neg"}
+    assert ext["neg"][0][0][0] is neg_out[0][0][0]
+
+
+def test_the_kill_switch_DROPS_what_the_cache_holds(monkeypatch):
+    """Off means the memory goes, not only that reads stop."""
+    eng, _, _ = _seeded(monkeypatch)
+    monkeypatch.setenv(m._CONDITIONING_CACHE_ENV, "off")
+    g = _graph(eng)
+    ext, key, _ = eng._apply_conditioning_cache(g, None)
+    assert ext is None and key is None
+    assert {"clip", "pos", "neg"} <= set(g)
+    assert eng._conditioning_cache is None
+
+
+@pytest.mark.parametrize("raw,enabled", [
+    (None, True), ("", True), ("1", True), ("on", True),
+    ("0", False), ("false", False), ("no", False), ("off", False),
+    (" OFF ", False)])
+def test_the_kill_switch_parse(monkeypatch, raw, enabled):
+    if raw is None:
+        monkeypatch.delenv(m._CONDITIONING_CACHE_ENV, raising=False)
+    else:
+        monkeypatch.setenv(m._CONDITIONING_CACHE_ENV, raw)
+    assert m._conditioning_cache_enabled() is enabled
+
+
+def test_a_different_T5_is_a_MISS_and_its_old_entries_go(monkeypatch):
+    """The key is the T5's identity. A rebuilt or swapped file must not be
+    answered with encodes the old one made, and those encodes are dropped on
+    the next publish rather than left to age out."""
+    eng, _, _ = _seeded(monkeypatch)
+    moved = _T5_KEY[:4] + (5,) + _T5_KEY[5:]
+    monkeypatch.setattr(eng, "_conditioning_cache_key", lambda: moved)
+    g = _graph(eng)
+    ext, key, texts = eng._apply_conditioning_cache(g, None)
+    assert ext is None and {"clip", "pos", "neg"} <= set(g)
+    eng._publish_conditioning(key, texts, {"pos": ([["P2", {}]],)})
+    assert {k[0] for k in eng._conditioning_cache} == {moved}
+
+
+def test_the_cache_is_BOUNDED_least_recently_used_first(monkeypatch):
+    eng = Ltx8gbEngine()
+    for i in range(m._CONDITIONING_CACHE_MAX + 3):
+        eng._publish_conditioning(
+            _T5_KEY, {"pos": "text %d" % i}, {"pos": ([["P", {}]],)})
+    assert len(eng._conditioning_cache) == m._CONDITIONING_CACHE_MAX
+    kept = [text for _, text in eng._conditioning_cache]
+    assert kept[-1] == "text %d" % (m._CONDITIONING_CACHE_MAX + 2)
+    assert "text 0" not in kept
+
+
+def test_instances_never_share_a_cache(monkeypatch):
+    """The razzle lane is its own engine instance with its own positive; one
+    instance's encodes must never appear in another's cache."""
+    _seeded(monkeypatch)
+    assert Ltx8gbEngine()._conditioning_cache is None
+
+
+def test_the_KEY_is_the_T5_file_and_never_raises(tmp_path, monkeypatch):
+    eng = Ltx8gbEngine()
+    t5 = tmp_path / "t5xxl_fp16.safetensors"
+    t5.write_bytes(b"t" * 64)
+    monkeypatch.setattr(eng, "_t5_path", lambda: str(t5))
+    key = eng._conditioning_cache_key()
+    assert key[0] == str(t5.resolve()) or key[0] == str(t5)
+    assert key[3] == 64 and key[-2:] == ("ltxv", "cpu")
+
+    monkeypatch.setattr(eng, "_t5_path", lambda: str(tmp_path / "missing"))
+    assert eng._conditioning_cache_key() is None
+    monkeypatch.setattr(eng, "_t5_path", lambda: None)
+    assert eng._conditioning_cache_key() is None
+
+    def _refuse():
+        raise RuntimeError("the usability checks own this")
+    monkeypatch.setattr(eng, "_t5_path", _refuse)
+    assert eng._conditioning_cache_key() is None
+
+
+def test_a_graph_that_DIES_publishes_nothing(staged, monkeypatch):
+    """Encodes are kept only after the graph RAN. A render that died
+    mid-graph must leave the next segment to encode for itself."""
+    np = pytest.importorskip("numpy")
+    eng = Ltx8gbEngine()
+    fakes = _ltx8_fakes(np, _Counter(), n=9)
+
+    def _die(self, **kwargs):
+        raise RuntimeError("decode failed")
+    fakes["decode"] = _mk(_die)
+    eng._classes = fakes
+    monkeypatch.setattr(eng, "_conditioning_cache_key", lambda: _T5_KEY)
+    with pytest.raises(Exception):
+        eng.render_clip(_request(staged), {"patchers": []})
+    assert not eng._conditioning_cache
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
+def test_three_segments_of_one_beat_load_the_T5_ONCE(staged, monkeypatch):
+    """THE FIX, as a number, through the real `render_clip`: three segments of
+    one beat, one T5 load and one encode each for the positive and negative,
+    three real renders. This is the wiring proof too -- it goes red if
+    `render_clip` stops asking the cache or stops handing it what it
+    encoded."""
+    np = pytest.importorskip("numpy")
+    counter = _Counter()
+    eng = Ltx8gbEngine()
+    eng._classes = _ltx8_fakes(np, counter, n=9)
+    monkeypatch.setattr(eng, "_conditioning_cache_key", lambda: _T5_KEY)
+    prepared = {"patchers": []}
+    made = []
+    try:
+        for _ in range(3):
+            made.append(pathlib.Path(
+                eng.render_clip(_request(staged), prepared)["out_path"]))
+        assert counter.calls["clip"] == 1
+        assert counter.calls["pos"] == 1 and counter.calls["neg"] == 1
+        assert counter.calls["decode"] == 3 and counter.calls["sample"] == 3
+    finally:
+        for p in made:
+            p.unlink(missing_ok=True)

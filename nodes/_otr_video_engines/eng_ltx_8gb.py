@@ -54,6 +54,9 @@ on a production leg:
   (see the paragraph below before reaching for either); and
   ``OTR_LTX_8GB_MAX_FRAMES`` (render-length ceiling; 8n+1) -- a CEILING, not a
   recipe value, so it keeps its channel and its fail-closed range check.
+* RESIDENCY, not recipe: ``OTR_LTX_8GB_CONDITIONING_CACHE`` (opt-out; ``0``,
+  ``false``, ``no`` or ``off`` disables it and drops what it holds). See the
+  conditioning cache above ``render_clip``.
 * FROZEN IN CODE as ``LTX8_RECIPE`` (v2, measured), ignored-with-a-warning:
   ``OTR_LTX_8GB_STEPS`` / ``_CFG`` / ``_SAMPLER`` / ``_MAX_SHIFT`` /
   ``_BASE_SHIFT`` / ``_TERMINAL`` / ``_T5_DEVICE`` / ``_TILED_VAE`` /
@@ -81,7 +84,8 @@ from __future__ import annotations
 
 import logging
 import os
-from collections import namedtuple
+import threading
+from collections import OrderedDict, namedtuple
 
 from . import motion_common as _MC
 from . import recipe_departures as _RD
@@ -341,6 +345,22 @@ _FALSY = ("0", "false", "no", "off")
 #: The devices the T5 CLIPLoader may be pointed at. Anything else is a typo,
 #: and under the consent act a typo stops the sweep rather than clamping.
 _T5_DEVICES = ("cpu", "default")
+
+#: Kill switch for the conditioning cache (see the section above
+#: ``render_clip``). Opt-OUT, parsed like ``OTR_LTX25_ENCODER_CACHE``: unset or
+#: empty keeps it on, and only an explicit ``_FALSY`` spelling turns it off.
+_CONDITIONING_CACHE_ENV = "OTR_LTX_8GB_CONDITIONING_CACHE"
+#: Encoded texts one engine keeps. A beat needs two (its positive and its
+#: negative); the headroom lets a negative shared across beats outlive the
+#: next beat's new positive. One entry is one T5 conditioning -- a few MB on
+#: the CPU -- so the bound is about staleness, not memory.
+_CONDITIONING_CACHE_MAX = 4
+
+
+def _conditioning_cache_enabled():
+    """ON unless explicitly disabled. Unset and empty both keep the default."""
+    return (otr_env.get(_CONDITIONING_CACHE_ENV, "") or "").strip().lower() \
+        not in _FALSY
 
 
 def _prequalification_active():
@@ -1291,7 +1311,9 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         """Fail CLOSED until installed, then resolve the installed ComfyUI node
         classes (0.9.8 core LTX nodes). Resolves CLASSES only -- no weights. The
         checkpoint's weights load in :meth:`prepare` (once per beat); the T5's
-        load when its ``CLIPLoader`` executes inside each segment's graph."""
+        load when its ``CLIPLoader`` executes inside a segment's graph, which
+        since 2026-09-26 happens only when that segment's text is not already
+        encoded (the conditioning cache above :meth:`render_clip`)."""
         if not self._installed():
             raise RuntimeError(
                 "ltx_8gb not installed: checkpoint %r missing -- fetch "
@@ -1315,12 +1337,16 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         ``_build_graph`` omits the definition for.
 
         THE CHECKPOINT ONLY. The T5 ``CLIPLoader`` is deliberately left in the
-        segment graph: the pos/neg encodes happen per segment either way, so
-        hoisting the loader would buy wall-clock while pinning ~9 GB of
-        ``t5xxl_fp16`` resident for the whole beat -- a guaranteed OOM on an
-        8 GB tier under ``OTR_LTX_8GB_T5_DEVICE=default``. ``ModelSamplingLTXV``
-        stays per segment too: it is a cheap clone+patch of an already-resident
-        MODEL, and it is correctly per-render.
+        segment graph: hoisting it would pin ~9 GB of ``t5xxl_fp16`` for the
+        whole beat -- a guaranteed OOM on an 8 GB tier under
+        ``OTR_LTX_8GB_T5_DEVICE=default``, and on a Mac, where CPU memory IS
+        the GPU's, the same 9 GB beside the checkpoint through every sampler
+        step. The T5's reload is answered by the conditioning cache instead
+        (2026-09-26): every segment of a beat encodes the same two texts, so
+        only the first segment runs the loader and later ones take the
+        encodes. ``ModelSamplingLTXV`` stays per segment: it is a cheap
+        clone+patch of an already-resident MODEL, and it is correctly
+        per-render.
 
         ORDER MATTERS, and each step is here because of a specific defect:
 
@@ -1413,6 +1439,144 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             prepared.pop("external_results", None)
         return super().teardown(prepared)
 
+    # ---- the conditioning cache (2026-09-26) ----
+    #
+    # THE DEFECT, MEASURED LIVE (TEST_WAVE B4, the 4060, 2026-09-26): the
+    # segment graph loads ``t5xxl_fp16`` (~9.8 GB, CPU) through its own
+    # ``CLIPLoader`` on EVERY segment, and ``free_after_use`` drops it once the
+    # two encodes have run. Free RAM saw-toothed between ~0.4 and ~20 GB on a
+    # 32 GB box, one tooth per segment; a 16 GB-RAM box would page.
+    #
+    # WHY THE ENCODES AND NOT THE ENCODER. Every segment of a beat is built
+    # from the same shot, and nothing segment-specific enters either prompt
+    # text (``render_driver``: ``segment_index`` moves the audio window, the
+    # still, the frame count and the seed -- never the text). So the second
+    # and later segments of a beat ask for conditioning this engine already
+    # made. Keeping the T5 itself resident was the other answer and a design
+    # contrarian refuted it: on a Mac the frozen ``cpu`` device IS the GPU's
+    # memory, so the T5 would sit beside the checkpoint through every sampler
+    # step, and on a CUDA box it is 9.8 GB the sampler's memory-mapped weights
+    # then compete with. Cached conditioning is a few MB, and the T5 still
+    # leaves before the sampler runs, exactly as before.
+    #
+    # WHAT IS STILL LOADED PER BEAT: a new beat is a new positive, so its first
+    # segment loads the T5 once. The saw-tooth goes from one tooth per segment
+    # to one per beat.
+    #
+    # NOT A RECIPE CHANGE: the same loader, text, device and encode produce
+    # the conditioning; a HIT hands out the encode an earlier segment made
+    # from the identical text with the identical T5 file.
+    #: Per-instance ``OrderedDict`` of ``(t5 key, text) -> CLIPTextEncode
+    #: output``, created on the first publish. Class-level ``None`` so the
+    #: registry's zero-arg construction stays cheap; every write assigns on the
+    #: INSTANCE, so the razzle subclass keeps a cache of its own.
+    _conditioning_cache = None
+    #: The shipped ``/otr/video_render_*`` routes run in daemon threads, so the
+    #: read-modify-write below is locked. Class-level: one engine instance each.
+    _conditioning_lock = threading.Lock()
+
+    def _conditioning_cache_key(self):
+        """Identity of the T5 that WOULD encode, or ``None`` to force a miss.
+
+        The same shape as ``eng_ltx25._encoder_cache_key``: real path, device
+        and inode, size and mtime, the loader token, the clip type and the T5
+        device -- so a swapped symlink, a rebuilt file or a device flip under
+        ``OTR_LTX_8GB_T5_DEVICE`` is a miss. NEVER RAISES: ``_t5_path`` and
+        ``_t5_device`` can refuse (``EngineUnusable``), and those verdicts
+        belong to ``assert_usable`` / ``resolve_session_config``. Here an
+        unresolvable T5 is the absence of an identity, answered with a miss.
+        """
+        try:
+            path = self._t5_path()
+            device = self._t5_device()
+        except Exception:  # noqa: BLE001 -- the usability checks own the refusal
+            return None
+        if not path:
+            return None
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        return (os.path.realpath(path), st.st_dev, st.st_ino, st.st_size,
+                st.st_mtime_ns, self._t5_name(), "ltxv", device)
+
+    def _apply_conditioning_cache(self, graph, external):
+        """Swap cached encodes into ``graph``; return ``(external, key, texts)``.
+
+        ``texts`` are read OFF THE GRAPH (the literal strings the encode nodes
+        would receive), so the cache can never key on a text the graph did not
+        ask for -- including the razzle subclass's own positive. A HIT removes
+        that encode node and hands its output in as an external; when no node
+        still reads the T5 loader, the loader node goes too, and that is the
+        load this cache exists to skip. The caller's ``external`` dict (the
+        beat-scoped checkpoint from :meth:`prepare`) is never mutated; the
+        merged dict is new, and ``None`` when empty so an unprepared miss calls
+        the executor exactly as before.
+        """
+        texts = {role: graph[role]["inputs"].get("text")
+                 for role in ("pos", "neg") if role in graph}
+        hits = set()
+        key = None
+        if not _conditioning_cache_enabled():
+            # OFF MEANS THE MEMORY GOES, not that reads stop: a switch flipped
+            # in a long-running server must not leave encodes held from before.
+            with type(self)._conditioning_lock:
+                self._conditioning_cache = None
+        else:
+            key = self._conditioning_cache_key()
+        merged = dict(external or {})
+        if key is not None:
+            with type(self)._conditioning_lock:
+                cache = self._conditioning_cache
+                for role, text in texts.items():
+                    hit = cache.get((key, text)) if cache else None
+                    if hit is not None:
+                        cache.move_to_end((key, text))
+                        merged[role] = _MC.copy_conditioning(hit)
+                        graph.pop(role, None)
+                        hits.add(role)
+        if hits:
+            from . import wrapper_bridge as _wb
+            # ``_iter_wires`` is the executor's own walk (it recurses into
+            # list / dict inputs), so "nothing reads the loader" means what
+            # the executor would mean by it.
+            if not any(wire.src == "clip"
+                       for node in graph.values()
+                       for value in (node.get("inputs") or {}).values()
+                       for wire in _wb._iter_wires(value)):
+                graph.pop("clip", None)
+        _LOG.info(
+            "[OTR video] ltx_8gb conditioning cache: positive %s, negative %s; "
+            "T5 %s", "HIT" if "pos" in hits else "MISS",
+            "HIT" if "neg" in hits else "MISS",
+            "loads this segment" if "clip" in graph else "NOT loaded")
+        return (merged or None), key, texts
+
+    def _publish_conditioning(self, key, texts, harvested):
+        """Keep what this segment encoded. Called only after the graph RAN.
+
+        Not from inside ``on_result``: that would commit encodes from a graph
+        that then died. Entries made by a different T5 (the key moved) are
+        dropped here rather than left to age out, and the cache is bounded by
+        ``_CONDITIONING_CACHE_MAX``, least recently used first.
+        """
+        if key is None or not harvested:
+            return
+        with type(self)._conditioning_lock:
+            cache = self._conditioning_cache
+            if cache is None:
+                cache = self._conditioning_cache = OrderedDict()
+            for stale in [k for k in cache if k[0] != key]:
+                del cache[stale]
+            for role, out in harvested.items():
+                text = texts.get(role)
+                if text is None or out is None:
+                    continue
+                cache[(key, text)] = out
+                cache.move_to_end((key, text))
+            while len(cache) > _CONDITIONING_CACHE_MAX:
+                cache.popitem(last=False)
+
     def render_clip(self, request, prepared):
         """Drive ONE image->video clip via the in-process LTX 0.9.8 graph: stage the
         init image (no silent stretch, N9), execute the graph, encode the decoded
@@ -1471,19 +1635,32 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             if isinstance(prepared, dict) else None
         graph = self._build_graph(request, image_name, plan, length, width, height,
                                   external_results=ext)
-        # free_after_use: the T5 text-encode frees before the sampler; the checkpoint
-        # (MODEL + embedded VAE) + the model-sampling patch + the terminal are kept.
-        # The NVML peak probe spans the whole render window (telemetry only -- no
-        # ceiling enforcement; the operator's tier JSON owns the OOM budget).
+        ext, cond_key, cond_texts = self._apply_conditioning_cache(graph, ext)
+        #: The encodes this segment actually made, caught as they land:
+        #: ``free_after_use`` drops ``pos``/``neg`` once ``img2vid`` has read
+        #: them, so this is the only moment to hold them.
+        harvested = {}
+
+        def _harvest(node_id, out):
+            if node_id in ("pos", "neg"):
+                harvested[node_id] = out
+
+        # free_after_use: the T5 text-encode frees before the sampler (and on a
+        # conditioning HIT the T5 loader is not in the graph at all); the
+        # checkpoint (MODEL + embedded VAE) + the model-sampling patch + the
+        # terminal are kept. The NVML peak probe spans the whole render window
+        # (telemetry only -- no ceiling enforcement; the operator's tier JSON
+        # owns the OOM budget).
         probe = _MC.VramPeakProbe(interval_s=0.1).start()
         try:
             results = _wb.run_graph(
                 graph, classes, free_after_use=True,
-                external_results=ext,
+                external_results=ext, on_result=_harvest,
                 keep={"ckpt", "modelsampling", self._TERMINAL})
             images = results[self._TERMINAL][0]               # VAEDecode IMAGE batch
         finally:
             render_peak = probe.stop()
+        self._publish_conditioning(cond_key, cond_texts, harvested)
         bucket = prepared.setdefault("patchers", self._patchers) \
             if isinstance(prepared, dict) else self._patchers
         seen = {id(p) for p in bucket}
