@@ -35,14 +35,47 @@ def test_cuda_index_reads_the_ordinal(device, index):
     assert loader._cuda_index(device) == index
 
 
-def test_overflow_map_is_unchanged_on_gpu_zero():
-    """The 5080/4060 value, byte for byte, before and after."""
+def _stub_ram(monkeypatch, *, available_gib, total_gib):
+    """Deterministic psutil RAM: the CPU lane is sized from the live box."""
+    import types
+
+    import psutil
+    vm = types.SimpleNamespace(available=available_gib * (1024.0 ** 3),
+                               total=total_gib * (1024.0 ** 3))
+    monkeypatch.setattr(psutil, "virtual_memory", lambda: vm)
+
+
+def test_overflow_map_is_unchanged_on_gpu_zero(monkeypatch):
+    """The 5080/4060 GPU lane, byte for byte; the CPU lane is sized from RAM.
+
+    2026-09-25: the CPU lane used to pin "64GiB" here ON PURPOSE. It now reads
+    psutil available RAM minus a 2 GiB headroom, so the pin stubs psutil for a
+    deterministic 10-of-16 GB box and asserts the sized lane (8.00GiB)."""
+    _stub_ram(monkeypatch, available_gib=10.0, total_gib=16.0)
+    assert loader._cpu_overflow_max_memory(8.0) == {0: "8.00GiB", "cpu": "8.00GiB"}
+    assert loader._cpu_overflow_max_memory(8.0, gpu_index=0) == {0: "8.00GiB", "cpu": "8.00GiB"}
+
+
+def test_overflow_map_names_the_chosen_gpu(monkeypatch):
+    _stub_ram(monkeypatch, available_gib=10.0, total_gib=16.0)
+    assert loader._cpu_overflow_max_memory(8.0, gpu_index=1) == {1: "8.00GiB", "cpu": "8.00GiB"}
+
+
+def test_overflow_cpu_lane_is_available_minus_headroom_capped_and_floored(monkeypatch):
+    """Headroom math, the never-above-total cap, and the 1 GiB floor."""
+    _stub_ram(monkeypatch, available_gib=12.5, total_gib=32.0)
+    assert loader._cpu_overflow_max_memory(8.0)["cpu"] == "10.50GiB"
+    _stub_ram(monkeypatch, available_gib=70.0, total_gib=64.0)
+    assert loader._cpu_overflow_max_memory(8.0)["cpu"] == "62.00GiB"
+    _stub_ram(monkeypatch, available_gib=1.5, total_gib=16.0)
+    assert loader._cpu_overflow_max_memory(8.0)["cpu"] == "1.00GiB"
+
+
+def test_overflow_cpu_lane_degrades_open_without_psutil(monkeypatch):
+    """psutil missing: the pre-fix value, not a new failure mode."""
+    import sys
+    monkeypatch.setitem(sys.modules, "psutil", None)
     assert loader._cpu_overflow_max_memory(8.0) == {0: "8.00GiB", "cpu": "64GiB"}
-    assert loader._cpu_overflow_max_memory(8.0, gpu_index=0) == {0: "8.00GiB", "cpu": "64GiB"}
-
-
-def test_overflow_map_names_the_chosen_gpu():
-    assert loader._cpu_overflow_max_memory(8.0, gpu_index=1) == {1: "8.00GiB", "cpu": "64GiB"}
 
 
 def test_every_policy_admitted_cuda_device_parses():

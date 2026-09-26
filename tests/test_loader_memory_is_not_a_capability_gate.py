@@ -55,10 +55,16 @@ def test_first_try_plan_stays_none_on_8gb_and_16gb():
     ) is None
 
 
-def test_cpu_overflow_budget_is_physical_vram_plus_ram_not_a_name_tag():
+def test_cpu_overflow_budget_is_physical_vram_plus_ram_not_a_name_tag(monkeypatch):
+    import types
+
+    import psutil
+    vm = types.SimpleNamespace(available=10.0 * (1024.0 ** 3),
+                               total=16.0 * (1024.0 ** 3))
+    monkeypatch.setattr(psutil, "virtual_memory", lambda: vm)
     eight = _cpu_overflow_max_memory(8.0)
-    assert eight == {0: "8.00GiB", "cpu": "64GiB"}
-    assert _cpu_overflow_max_memory(15.99) == {0: "15.99GiB", "cpu": "64GiB"}
+    assert eight == {0: "8.00GiB", "cpu": "8.00GiB"}
+    assert _cpu_overflow_max_memory(15.99) == {0: "15.99GiB", "cpu": "8.00GiB"}
     assert "2b-it" not in str(eight)
 
 

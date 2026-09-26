@@ -214,10 +214,15 @@ class ExplicitOffloadTests(unittest.TestCase):
             return token_model
 
         ns["AutoModelForCausalLM"] = SimpleNamespace(from_pretrained=oom_then_ok)
-        run()
+        # The retry sizes its CPU lane from live RAM; stub psutil for a
+        # deterministic 10-of-16 GB box (10 - 2 headroom = 8.00GiB).
+        fake_vm = SimpleNamespace(available=10.0 * (1024 ** 3),
+                                  total=16.0 * (1024 ** 3))
+        with patch("psutil.virtual_memory", return_value=fake_vm):
+            run()
         self.assertEqual(len(calls), 2)
         self.assertEqual(calls[1]["device_map"], self.placement)
-        self.assertEqual(calls[1]["max_memory"], {0: "8.00GiB", "cpu": "64GiB"})
+        self.assertEqual(calls[1]["max_memory"], {0: "8.00GiB", "cpu": "8.00GiB"})
         self.assertTrue(calls[1]["quantization_config"]["llm_int8_enable_fp32_cpu_offload"])
         self.assertEqual(len(plans), 1)
 

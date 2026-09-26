@@ -596,9 +596,49 @@ def _cpu_overflow_max_memory(total_vram: float, gpu_index: int = 0) -> dict:
 
     Used only after the underlying loader failed to place on the accelerator.
     Disk is omitted: OTR does not support disk offload.
+
+    THE CPU LANE IS SIZED FROM THIS MACHINE, not a constant. It used to say
+    "64GiB" on every box -- this developer's own 64 GB workstation made that
+    look true here, while a 16 GB-RAM box overcommitted and paged instead of
+    refusing cleanly (the 8 GB tier's real limit is system RAM -- see the
+    otr_8gb_ltx25_foley note in apple/LAUNCH_RECIPES.md). Now it is
+    min(available, total) RAM minus a headroom, so Accelerate plans against
+    what the box actually has and refuses a placement that cannot fit.
+
+    HEADROOM IS 2.0 GiB. psutil.available already excludes kernel reserves,
+    so this only covers what moves during a minutes-long load -- the OS
+    working set, the ComfyUI server, a browser -- plus Accelerate's own
+    rounding. Measured against the 4060 leg that passed with 0.92 GB free:
+    2 GB keeps the box off swap with margin, while leaving a 16 GB box a
+    usable lane instead of a fantasy 64 GB one. dram_canary's 6 GB is an
+    abort threshold, not a placement reserve -- a different job, so it is
+    not reused here. The 1.0 GiB floor is the same margin at the bottom:
+    under 1 GB free the box is already thrashing and the load refuses or
+    fails fast either way; the floor keeps Accelerate's parser on a sane
+    value instead of a near-zero or negative lane.
+
+    SELF-CONTAINED ON PURPOSE: tests exec this function from the AST in an
+    empty namespace (test_nf4_explicit_cpu_offload), so the headroom lives
+    in a local and psutil is imported inside -- no module-level names. When
+    psutil is missing or fails, the pre-fix "64GiB" returns: degraded open,
+    the old behavior, which never fires inside the ComfyUI venv that ships
+    psutil as a dependency.
     """
     gpu = max(1.0, float(total_vram) if total_vram else 1.0)
-    return {int(gpu_index): f"{gpu:.2f}GiB", "cpu": "64GiB"}
+    _gpu_entry = {int(gpu_index): f"{gpu:.2f}GiB"}
+    _HEADROOM_GIB = 2.0
+    try:
+        import psutil  # type: ignore
+        _vm = psutil.virtual_memory()
+        _avail_gib = float(_vm.available) / (1024.0 ** 3)
+        _total_gib = float(_vm.total) / (1024.0 ** 3)
+        _cpu_gib = max(1.0, min(min(_avail_gib, _total_gib) - _HEADROOM_GIB,
+                                _total_gib))
+    except Exception:  # noqa: BLE001 -- degraded open, see docstring
+        _gpu_entry["cpu"] = "64GiB"
+        return _gpu_entry
+    _gpu_entry["cpu"] = f"{_cpu_gib:.2f}GiB"
+    return _gpu_entry
 
 
 def _is_memory_placement_failure(exc: BaseException) -> bool:
