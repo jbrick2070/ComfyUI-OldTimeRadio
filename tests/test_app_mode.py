@@ -82,7 +82,7 @@ def test_the_form_reads_story_then_models_then_my_story():
                 "story_author", "music_style"]
     assert names[-6:-1] == my_story
     story_end = names.index("custom_premise")
-    first_model = names.index("announcer_video_model")
+    first_model = names.index("creative_writing_model")
     assert story_end < first_model
     for w in ("episode_language", "act_count", "source_bank", "episode_title"):
         assert names.index(w) < first_model, w
@@ -193,7 +193,7 @@ def test_a_row_without_a_label_is_refused():
         bv.app_linear_data(wf, "form", bad)
 
 
-NOTE_KEYS = ("premise_note", "title_note", "source_ref_note", "pickers_note")
+NOTE_KEYS = tuple(k for k in CONFIG if k.endswith("_note"))
 
 
 def test_every_note_fits_the_one_line_the_form_draws():
@@ -222,3 +222,20 @@ def test_the_notes_reach_the_form_as_descriptions():
     rows = {r[1]: r for r in _load(APP)["extra"]["linearData"]["inputs"]}
     assert rows["source_ref"][2] == {"description": CONFIG["source_ref_note"]}
     assert rows["custom_premise"][2] == {"description": CONFIG["premise_note"]}
+
+
+def test_the_bank_leads_and_each_role_groups_voice_video_still():
+    """Fable's layout inside his order: the story bank first (every other
+    story row depends on it), and each role's model rows adjacent -- the still
+    directly under its video, since it only matters for that video."""
+    names = [w for _t, w in (tuple(e[:2]) for e in CONFIG["form"])]
+    assert names[0] == "source_bank"
+    for video, still in (("announcer_video_model", "announcer_image_model"),
+                         ("character_video_model", "character_image_model"),
+                         ("music_video_model", "music_image_model")):
+        assert names.index(still) == names.index(video) + 1, still
+
+
+def test_every_note_key_is_used_by_a_row():
+    used = {e[2] for e in CONFIG["form"] if len(e) > 2}
+    assert used == set(NOTE_KEYS)
