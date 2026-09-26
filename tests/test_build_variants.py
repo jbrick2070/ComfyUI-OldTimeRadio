@@ -237,7 +237,6 @@ def test_validator_asserts_master_hash(tmp_path, canonical, schemas,
 
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
         "available": True,
-        "reserve_vram_gb": None,
         "disable_pinned_memory": False,
         "sage_attention": False,
         "cpu": True,
@@ -279,7 +278,6 @@ def test_validator_refuses_cpu_snapshot_on_a_non_cpu_server(
     path.write_text(bv._dump(variant), encoding="utf-8")
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
         "available": True,
-        "reserve_vram_gb": None,
         "disable_pinned_memory": False,
         "sage_attention": False,
         "cpu": False,

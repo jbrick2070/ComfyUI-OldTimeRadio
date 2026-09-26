@@ -330,11 +330,6 @@ class HuMoEngine(_MC.MotionEngineBase):
     #: /32-legal (15 x 26). A contradicting OTR_HUMO_WIDTH/HEIGHT is a named
     #: refusal; see :meth:`HuMoEngine._native_dims`.
     render_canvas = (480, 832)
-    #: BOOT CONTRACTS. Both, for the same reason as every other HuMo tier: it
-    #: has shipped under `default`, so requiring the diet would retire a
-    #: shipping lane. What `default` COSTS is stated rather than hidden --
-    #: 14.98 GiB, over the 14.5 GiB gate.
-    compatible_boot_contracts = ("default", "humo_diet")
     #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` above -- audio-
     #: driven-face with portrait REQUIRED).
     still_plan = _HUMO_STILL_PLAN
@@ -1346,11 +1341,6 @@ class HuMo17BEngine(HuMoEngine):
     #: /32-legal (15 x 26). A contradicting OTR_HUMO_WIDTH/HEIGHT is now a
     #: named refusal; see :meth:`HuMoEngine._native_dims`.
     render_canvas = (480, 832)
-    #: BOOT CONTRACTS (S8, lane 3). This tier declares BOTH, deliberately: it
-    #: is the LONG-BEAT lane and the auto-downgrade target, so requiring the
-    #: diet would regress a shipping lane and remove the floor a heavy episode
-    #: falls to. The diet is how a PROFILE casts it, not a demand it may make.
-    compatible_boot_contracts = ("default", "humo_diet")
     #: ITS OWN LADDER AND ITS OWN CAP, because it is its own MODEL (2026-08-02).
     #: The 14B base now carries a 14B-sized cap, and this tier must not inherit
     #: a memory bound measured on a checkpoint roughly eight times its size --
@@ -1422,9 +1412,6 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
     #: so -- so this declaration fixes the request-vs-render channel and does
     #: NOT claim an envelope. Both axes /32-legal (26 x 15).
     render_canvas = (832, 480)
-    #: Same reasoning as its portrait twin: BOTH contracts, because this tier
-    #: has shipped under `default`.
-    compatible_boot_contracts = ("default", "humo_diet")
     #: S1b per-model still plan (see ``_HUMO_169_STILL_PLAN`` -- the LANDSCAPE
     #: HuMo plan). ``render_aspect="wide"`` drives ``resolve_row_aspect`` to
     #: size portraits WIDE, and the plan's portrait row carries the WIDE
@@ -1463,23 +1450,19 @@ class HuMo14BLandscapeEngine(HuMoEngine):
     #: trusts ``request.canvas``, and S2's admission work is exactly that.
     #:
     #: 832x480 is not a preference, it is where the hero cast was MEASURED:
-    #: 13.06 GiB warm / 13.17 cold at 832x480x97 under the ``humo_diet`` boot
-    #: (ENVELOPE_LADDERS job A, indexed in
+    #: 13.06 GiB warm / 13.17 cold at 832x480x97 with a 2.9 GiB reserve, since
+    #: retired (ENVELOPE_LADDERS job A, indexed in
     #: apple/evidence/video_evidence_manifest.json), 1.44 GiB under the gate,
     #: against 14.98 GiB unclamped. Declaring it makes the request match the
     #: render the number was taken from. Both axes /32-legal (26 x 15).
     #: See :meth:`HuMoEngine._native_dims` for why OTR_HUMO_WIDTH/HEIGHT now
     #: refuse rather than silently win on a declaring tier.
     render_canvas = (832, 480)
-    #: BOOT CONTRACTS THIS TIER IS PROVEN ON (S8, lane 2). ``default`` stays in
-    #: the list because this tier HAS shipped under it -- only a lane that never
-    #: did may REQUIRE a contract, and dropping default here would retire a
-    #: shipping lane by side effect. What ``default`` costs is stated rather
-    #: than hidden: 14.98 GiB, which is OVER the 14.5 GiB gate. The hero cast is
-    #: therefore expressed where casting belongs, in the PROFILE
-    #: (`otr_w45_humo_14b_169.json` selects `humo_diet`), not by an engine
-    #: refusing a boot it can technically run.
-    compatible_boot_contracts = ("default", "humo_diet")
+    #: No boot contract (2026-09-26). HuMo runs on any GPU boot, as it always
+    #: shipped; the measured 2.9 GiB reserve contract it could also run under
+    #: was retired by the operator's no-reserve rule. On a stock boot this lane
+    #: measured 14.98 GiB at 832x480x97; an out-of-memory is recorded, not
+    #: pre-empted.
     #: S1b per-model still plan (see ``_HUMO_169_STILL_PLAN`` -- the LANDSCAPE
     #: HuMo plan). ``render_aspect="wide"`` drives portraits WIDE via
     #: ``resolve_row_aspect``, and the plan's portrait row carries the WIDE

@@ -3,10 +3,10 @@
 Every test here pins a defect that failed LATE -- after a boot, or after an
 expensive render -- which is exactly why a cheap CPU test is worth having.
 
-The boot half: `contract_from_running_server` used to match reserve-VRAM by
-EQUALITY while `check_running_server` has always used a FLOOR, and it ignored
-Sage entirely. A server booted with more reserve than H3 asks for therefore
-failed to identify as H3, and H3 refused its own valid boot.
+The boot half: `contract_from_running_server` ignored Sage entirely, and it
+used to match a reserve by EQUALITY (that knob is gone since 2026-09-26, and
+its floor rule with it). Identification now consults Sage and prefers the
+most specific boot a server satisfies.
 
 The ffmpeg half: OTR ships an install shape where ffmpeg may be reachable ONLY
 through `OTR_FFMPEG`. Four resolvers ignored it -- the mux's own identity
@@ -21,41 +21,30 @@ import pytest
 from nodes._otr_shared import boot_contracts as bc
 
 
-def _state(reserve, pinned, sage):
-    return {"available": True, "reserve_vram_gb": reserve,
-            "disable_pinned_memory": pinned, "sage_attention": sage}
+def _state(pinned, sage):
+    return {"available": True, "disable_pinned_memory": pinned,
+            "sage_attention": sage}
 
 
 # --------------------------------------------------------------------------- #
 # boot-contract identification
 # --------------------------------------------------------------------------- #
-def test_reserving_MORE_than_a_contract_asks_still_identifies_as_it(monkeypatch):
-    """THE REFUSAL THIS FIXES. A reserve is a FLOOR: `--reserve-vram 16` is
-    inside the envelope the humo diet was measured in (2.921), and the
-    satisfaction check has always agreed. Only IDENTIFICATION disagreed, so a
-    lane rejected a boot that honoured it. (H3 was the lane it bit; H3 carries
-    no reserve since 2026-09-26, so the rule is pinned on the diet.)"""
-    monkeypatch.setattr(bc, "running_server_boot_state",
-                        lambda: _state(16.0, True, None))
-    assert bc.contract_from_running_server() == bc.HUMO_DIET
-
-
 def test_a_server_that_satisfies_two_contracts_reports_the_most_specific(
         monkeypatch):
     """Pinned-off + Sage-free satisfies both `h3` (Sage off) and `h3_8gb_lab`
     (Sage off AND pinned off). The answer must be the MOST constrained boot the
     server can be, not whichever contract name happened to sort first."""
     monkeypatch.setattr(bc, "running_server_boot_state",
-                        lambda: _state(None, True, False))
+                        lambda: _state(True, False))
     assert bc.contract_from_running_server() == bc.H3_8GB_LAB
 
 
 def test_sage_known_ACTIVE_disqualifies_the_sage_free_contract(monkeypatch):
     """H3 pins `sage_attention: False` because its recorded sm_120 behaviour
     under active Sage is CORRUPT OUTPUT. A server with Sage known on is not an
-    H3 boot, however its VRAM knobs look."""
+    H3 boot, however its other knobs look."""
     monkeypatch.setattr(bc, "running_server_boot_state",
-                        lambda: _state(12.0, True, True))
+                        lambda: _state(True, True))
     assert bc.contract_from_running_server() != bc.H3
 
 
@@ -65,7 +54,7 @@ def test_sage_UNKNOWN_stays_a_candidate_so_the_named_check_can_speak(
     reach `assert_running_server`, whose refusal names the real reason -- an
     unverifiable clamp may not be assumed on a lane Sage silently corrupts."""
     monkeypatch.setattr(bc, "running_server_boot_state",
-                        lambda: _state(None, False, None))
+                        lambda: _state(False, None))
     assert bc.contract_from_running_server() == bc.H3
     with pytest.raises(bc.BootContractError):
         bc.assert_running_server(bc.H3)
@@ -74,7 +63,7 @@ def test_sage_UNKNOWN_stays_a_candidate_so_the_named_check_can_speak(
 def test_a_stock_server_with_sage_on_is_not_an_h3_boot(monkeypatch):
     """The guard doing its job: Sage known on -> default, never h3."""
     monkeypatch.setattr(bc, "running_server_boot_state",
-                        lambda: _state(None, False, True))
+                        lambda: _state(False, True))
     assert bc.contract_from_running_server() == bc.DEFAULT
 
 
@@ -83,7 +72,7 @@ def test_h3_asserts_the_matching_8gb_contract_not_the_stripped_policy(monkeypatc
     `video` section and carries no `launch`, so `contract_for_profile` answers
     `default` -- which constrains nothing. Asserting THAT verified nothing while
     reading like a defense. The engine must resolve the physical 8 GB server to
-    its no-reserve contract and assert that exact state."""
+    its 8 GB lab contract and assert that exact state."""
     from nodes._otr_video_engines.eng_minimax_h3 import MiniMaxH3VideoEngine
 
     engine = MiniMaxH3VideoEngine()
@@ -91,7 +80,7 @@ def test_h3_asserts_the_matching_8gb_contract_not_the_stripped_policy(monkeypatc
 
     seen = []
     monkeypatch.setattr(bc, "running_server_boot_state",
-                        lambda: _state(None, True, False))
+                        lambda: _state(True, False))
     monkeypatch.setattr(bc, "assert_running_server",
                         lambda name, state=None: seen.append(name))
     engine._assert_boot_contract({})  # a stripped, launch-less production policy

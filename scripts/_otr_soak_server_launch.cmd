@@ -121,23 +121,15 @@ rem logs at DEBUG show per-model partial load/unload sizes -- the residency
 rem attribution evidence. Same recipe otherwise.
 set _OTR_VERBOSE=
 if /i "%3"=="DEBUG" set _OTR_VERBOSE=--verbose DEBUG
-rem Optional VRAM clamp (2026-06-27): set
-rem OTR_HEADLESS_RESERVE_VRAM_GB to reserve that many GB away from model loading,
-rem so a 16GB card simulates an 8GB/6GB card and ComfyUI's allocator forces the
-rem same aggressive offload / sysmem spill a low-VRAM user hits. Default UNSET =
-rem no clamp = byte-identical to every prior boot (no other lane sets it).
-set _OTR_RESERVE=
-if defined OTR_HEADLESS_RESERVE_VRAM_GB set _OTR_RESERVE=--reserve-vram %OTR_HEADLESS_RESERVE_VRAM_GB%
-rem Pinned-host-memory clamp (S8 boot contracts, 2026-08-11). The OTHER half of
-rem the HuMo diet: --reserve-vram alone does not reproduce the measured 13.06
-rem GiB envelope. Until this line existed, --disable-pinned-memory appeared in
-rem ZERO non-doc files repo-wide, so a profile that "configured" the diet
-rem clamped exactly one of its two knobs and the other was documentation. See
-rem nodes/_otr_shared/boot_contracts.py, which names the contracts, and which
-rem PROVES them against comfy.cli_args on the running server rather than
-rem against the profile text -- a check that reads the same config the launcher
-rem was meant to honour cannot tell "applied" from "written down". Default
-rem UNSET = no clamp = byte-identical to every prior boot.
+rem No VRAM reserve is ever passed (operator, 2026-09-26: "we need to unload
+rem models after they are used, and if it OOMs we record it, not artificially
+rem create a scenario"). The OTR_HEADLESS_RESERVE_VRAM_GB channel that used to
+rem emit --reserve-vram -- for the HuMo diet, and to make a 16 GB card imitate
+rem a smaller one -- is gone.
+rem Pinned-host-memory switch (S8 boot contracts, 2026-08-11), still used by
+rem the 8 GB H3 lab boot. nodes/_otr_shared/boot_contracts.py names the
+rem contracts and PROVES them against comfy.cli_args on the running server.
+rem Default UNSET = byte-identical to every prior boot.
 set _OTR_PINNED=
 if defined OTR_HEADLESS_DISABLE_PINNED set _OTR_PINNED=--disable-pinned-memory
 rem CUSTOM NODES (2026-06-12, Desktop-v2 install move): the install root's
@@ -183,7 +175,6 @@ C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
   --output-directory %OTR_REAL_OUTPUT% ^
   --extra-model-paths-config "%~dp0_otr_headless_model_paths.yaml" ^
   --disable-metadata ^
-  %_OTR_RESERVE% ^
   %_OTR_PINNED% ^
   %_OTR_VERBOSE% ^
   >> "%~1" 2>&1

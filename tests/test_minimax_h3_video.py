@@ -11,10 +11,9 @@ The two things this lane owns that nothing before it had, and one correction:
   never resample, so this is the one lane where a frame-batch index map stands
   between the render and an honest duration. 192 model frames must deliver 200
   canvas frames at exactly 8.000 s.
-* **The boot contract's reserve clamp.** Lane 19 moved ``h3``'s
-  ``reserve_vram_gb`` from None to 12.0 on the lab receipts; it is pinned here
-  so a later tidy-up cannot quietly drop the knob that decides whether this lane
-  fits at all.
+* **The boot contract.** ``h3`` asks only for SageAttention off (and not
+  CPU-only). Lane 19's 12 GiB reserve was retired on 2026-09-26 by the
+  operator's rule: an out-of-memory is recorded, never pre-empted.
 
 CPU-safe: no CUDA, no ComfyUI server, no weights, no render.
 """
@@ -47,8 +46,8 @@ H3_PROFILE = {"launch": {"boot_contract": "h3"}}
 
 #: The server state the `h3` contract is satisfied by, injected rather than
 #: probed (there is no ComfyUI in the CPU suite).
-H3_SERVER_STATE = {"available": True, "reserve_vram_gb": 12.0,
-                   "disable_pinned_memory": True, "sage_attention": False}
+H3_SERVER_STATE = {"available": True, "disable_pinned_memory": False,
+                   "sage_attention": False}
 
 
 @pytest.fixture()
@@ -374,7 +373,6 @@ def test_the_8gb_lab_contract_still_fails_closed_when_sage_is_unknown(
         engine, monkeypatch):
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
         "available": True,
-        "reserve_vram_gb": None,
         "disable_pinned_memory": True,
         "sage_attention": None,
         "sage_probe_error": "fixture unknown",
@@ -389,7 +387,7 @@ def test_a_wrong_boot_is_refused_at_PREFLIGHT_by_name(engine, monkeypatch):
     monkeypatch.setattr(mc, "assert_sage_not_patched", lambda *a, **k: None)
     monkeypatch.setattr(
         bc, "running_server_boot_state",
-        lambda: {"available": True, "reserve_vram_gb": None,
+        lambda: {"available": True,
                  "disable_pinned_memory": False, "sage_attention": True})
     with pytest.raises(bc.BootContractError) as excinfo:
         engine.assert_usable({}, H3_PROFILE)
@@ -406,7 +404,7 @@ def test_the_h3_contract_asks_only_that_sage_be_off():
     are gone; what stays is SageAttention off, which is a correctness defect
     (noise reported as success), and CPU-only off."""
     spec = bc.contract_spec("h3")
-    assert spec["reserve_vram_gb"] is None
+    assert "reserve_vram_gb" not in spec
     assert spec["disable_pinned_memory"] is None
     assert spec["sage_attention"] is False
     assert spec["cpu"] is False
@@ -420,7 +418,7 @@ def test_selecting_a_contract_does_not_weaken_the_proof_against_the_server():
     smoke is for.
     """
     problems = bc.check_running_server(
-        "h3", state={"available": True, "reserve_vram_gb": None,
+        "h3", state={"available": True,
                      "disable_pinned_memory": True, "sage_attention": True})
     assert problems and "SageAttention" in problems[0]
 

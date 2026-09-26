@@ -1,11 +1,11 @@
 """LANE 2 -- named boot contracts, and their first real consumer.
 
-Spec S8. Some lanes only fit under the 14.5 GiB gate if the SERVER was started
-with particular allocator flags: HuMo 14B measures 14.98 GiB unclamped and
-13.06 GiB under reserve-VRAM + no pinned memory, same graph, same weights,
-1.9 GiB apart. By the time a beat renders the server has been up for an hour,
-so that is not fixable at render time -- it has to be declared, applied at
-launch, and PROVED.
+Spec S8. Some lanes can only run correctly on a SERVER started a particular
+way. By the time a beat renders the server has been up for an hour, so that is
+not fixable at render time -- it has to be declared, applied at launch, and
+PROVED. Since 2026-09-26 no contract reserves VRAM (operator: unload after use,
+record an out-of-memory, never pre-empt it); what a contract pins is Sage, the
+device, and the 8 GB H3 lab's pinned-memory switch.
 
 The mechanism ships WITH its consumer on purpose. Unused infrastructure is how
 you get a "configured" knob that reaches nothing, which is the exact defect this
@@ -48,17 +48,16 @@ def engine():
 
 @pytest.fixture()
 def profile(tmp_path):
-    """The hero tier's cast on the HuMo diet, built from a live matrix row and
-    read back through ``load_profile`` so the shape validator still runs."""
+    """The hero lane's cast, built from a live matrix row and read back
+    through ``load_profile`` so the shape validator still runs."""
     prof = copy.deepcopy(load_profile(BASE_ROW))
     prof["id"] = "humo_hero_cast"
     for role in ("announcer_visual", "music_visual", "character_visual"):
         prof["role_overrides"][role] = LANE
     prof["render"] = dict(prof.get("render") or {},
                           canvas_w=DECLARED_CANVAS[0], canvas_h=DECLARED_CANVAS[1])
-    prof["launch"]["env"] = {"OTR_HEADLESS_RESERVE_VRAM_GB": "2.921",
-                             "OTR_HEADLESS_DISABLE_PINNED": "1"}
-    prof["launch"]["boot_contract"] = bc.HUMO_DIET
+    prof["launch"]["env"] = {}
+    prof["launch"]["boot_contract"] = bc.DEFAULT
     (tmp_path / "humo_hero_cast.json").write_text(
         json.dumps(prof), encoding="utf-8")
     return load_profile("humo_hero_cast", profile_dir=str(tmp_path))
@@ -92,7 +91,6 @@ def test_cpu_contract_owns_the_real_comfyui_argv():
 def test_cpu_contract_is_identified_from_the_running_server(monkeypatch):
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
         "available": True,
-        "reserve_vram_gb": None,
         "disable_pinned_memory": False,
         "sage_attention": False,
         "cpu": True,
@@ -100,12 +98,10 @@ def test_cpu_contract_is_identified_from_the_running_server(monkeypatch):
     assert bc.contract_from_running_server() == bc.CPU
 
 
-@pytest.mark.parametrize(
-    "contract", [bc.HUMO_DIET, bc.H3, bc.H3_8GB_LAB])
-def test_gpu_diet_contracts_reject_a_conflicting_cpu_only_boot(contract):
+@pytest.mark.parametrize("contract", [bc.H3, bc.H3_8GB_LAB])
+def test_gpu_contracts_reject_a_conflicting_cpu_only_boot(contract):
     state = {
         "available": True,
-        "reserve_vram_gb": 12.0,
         "disable_pinned_memory": True,
         "sage_attention": False,
         "cpu": True,
@@ -119,23 +115,26 @@ def test_dont_care_is_distinct_from_required_off():
     """`None` means the contract does not constrain that knob; `False` would
     mean it REQUIRES it off. Collapsing the two would let a contract silently
     forbid an unrelated flag."""
-    assert bc.BOOT_CONTRACTS[bc.HUMO_DIET]["sage_attention"] is None
+    assert bc.BOOT_CONTRACTS[bc.DEFAULT]["sage_attention"] is None
+    assert bc.BOOT_CONTRACTS[bc.H3]["disable_pinned_memory"] is None
     assert bc.BOOT_CONTRACTS[bc.H3]["sage_attention"] is False
     assert bc.BOOT_CONTRACTS[bc.H3_8GB_LAB]["sage_attention"] is False
 
 
-def test_the_humo_diet_is_the_measured_pair_not_a_round_number():
-    """2.921 is a measurement, not a preference, and the diet is BOTH knobs --
-    reserve-vram alone does not reproduce the 13.06 GiB envelope."""
-    spec = bc.contract_spec(bc.HUMO_DIET)
-    assert spec["reserve_vram_gb"] == 2.921
-    assert spec["disable_pinned_memory"] is True
+def test_no_contract_reserves_vram():
+    """The operator's rule, 2026-09-26: models unload after use, and an
+    out-of-memory is recorded, never pre-empted. No contract carries a reserve
+    knob, and no launch argv or env row can emit one."""
+    assert "reserve_vram_gb" not in bc.CONTRACT_ENV
+    assert not hasattr(bc, "HUMO_DIET")
+    for name, spec in bc.BOOT_CONTRACTS.items():
+        assert "reserve_vram_gb" not in spec, name
+        assert "--reserve-vram" not in bc.launch_args_for(name), name
+        assert not any("RESERVE" in k for k in bc.launch_env_for(name)), name
 
 
-def test_the_physical_8gb_h3_lab_launch_emits_no_reserve_clamp():
-    """A 12 GiB reserve on an 8 GiB card is impossible, not conservative."""
+def test_the_physical_8gb_h3_lab_launch_turns_pinned_memory_off():
     spec = bc.contract_spec(bc.H3_8GB_LAB)
-    assert spec["reserve_vram_gb"] is None
     assert spec["disable_pinned_memory"] is True
     assert spec["sage_attention"] is False
     assert bc.launch_args_for(bc.H3_8GB_LAB) == ["--disable-pinned-memory"]
@@ -154,16 +153,11 @@ def test_the_env_mapping_only_emits_knobs_a_launcher_actually_reads():
     """Lesson L6. `sage_attention` gets NO env row because no launcher passes
     an attention flag -- emitting one would be another configured knob that
     reaches nothing. Sage-sensitive lanes refuse at assert_usable instead,
-    which is enforcement that runs.
-
-    The reserve row joined this expectation in LANE 19 (2026-08-12), when the
-    H3 contract's `reserve_vram_gb` moved None -> 12.0 on the lab receipts. The
-    subject of this test is the knob that gets NO row, so both halves are
-    asserted: the two knobs a launcher reads DO emit, and Sage still does not.
+    which is enforcement that runs. Both halves are asserted: the knob a
+    launcher reads DOES emit, and Sage still does not.
     """
-    env = bc.launch_env_for(bc.HUMO_DIET)
-    assert env == {"OTR_HEADLESS_DISABLE_PINNED": "1",
-                   "OTR_HEADLESS_RESERVE_VRAM_GB": "2.921"}
+    env = bc.launch_env_for(bc.H3_8GB_LAB)
+    assert env == {"OTR_HEADLESS_DISABLE_PINNED": "1"}
     assert not any("SAGE" in k.upper() for k in env)
     # H3 constrains ONLY Sage since 2026-09-26 (operator: no artificial
     # reserve) -- and Sage has no launcher row, so H3 emits nothing at all.
@@ -175,19 +169,18 @@ def test_the_env_mapping_only_emits_knobs_a_launcher_actually_reads():
 # The channel: launch.env is live, launch.extra_args is documentation
 # ---------------------------------------------------------------------------
 
-def test_the_launcher_turns_both_diet_knobs_into_argv():
-    """THE POINT OF THE WHOLE LANE. Until this commit the cmd had a hook for
-    --reserve-vram and none for --disable-pinned-memory, so a profile that
-    'configured' the diet clamped exactly one of its two knobs and the other
-    was documentation."""
+def test_the_launcher_applies_the_pinned_switch_and_passes_no_reserve():
+    """THE POINT OF THE WHOLE LANE (lesson L6): a knob a launcher never turns
+    into argv is documentation. The pinned-memory switch must reach the command
+    line; the reserve channel is gone (operator, 2026-09-26)."""
     cmd = (REPO / "scripts" / "_otr_soak_server_launch.cmd").read_text(
         encoding="utf-8", errors="replace")
-    assert "OTR_HEADLESS_RESERVE_VRAM_GB set _OTR_RESERVE=--reserve-vram" in cmd
     assert ("if defined OTR_HEADLESS_DISABLE_PINNED set "
             "_OTR_PINNED=--disable-pinned-memory") in cmd
     # Declared is not applied: the variable must also reach the command line.
     assembly = cmd.split("main.py", 1)[1]
-    assert "%_OTR_RESERVE%" in assembly and "%_OTR_PINNED%" in assembly
+    assert "%_OTR_PINNED%" in assembly
+    assert "_OTR_RESERVE" not in cmd
 
 
 def test_every_shipped_profile_still_validates_with_the_new_optional_key():
@@ -242,11 +235,11 @@ def test_unknowable_is_not_the_same_as_satisfied():
     something is not satisfied by a server we cannot read. A contract that
     constrains nothing still is -- there is nothing to violate.
     """
-    problems = bc.check_running_server(bc.HUMO_DIET, state={"available": False})
+    problems = bc.check_running_server(bc.H3_8GB_LAB, state={"available": False})
     assert problems, "a constrained contract may not pass on an unreadable server"
     assert "UNKNOWN is not satisfied" in problems[0]
     with pytest.raises(bc.BootContractError):
-        bc.assert_running_server(bc.HUMO_DIET, state={"available": False})
+        bc.assert_running_server(bc.H3_8GB_LAB, state={"available": False})
     # ...and the stock contract constrains nothing, so it is genuinely met.
     assert bc.check_running_server(bc.DEFAULT, state={"available": False}) == []
 
@@ -258,56 +251,43 @@ def test_a_failed_sage_probe_is_not_a_pass():
     Sage silently corrupts. Recording an error nobody reads is swallowing it.
 
     The state SATISFIES every other H3 knob on purpose, so the only thing this
-    can fail on is its subject. It gained `reserve_vram_gb` in lane 19 when the
-    contract did; without that the reserve complaint sorts first and
-    `problems[0]` stops being about Sage at all -- the test would still pass or
-    fail for reasons unrelated to the probe.
+    can fail on is its subject.
     """
-    state = {"available": True, "reserve_vram_gb": 12.0,
-             "disable_pinned_memory": True,
+    state = {"available": True, "disable_pinned_memory": True,
              "sage_attention": None, "sage_probe_error": "ImportError"}
     problems = bc.check_running_server(bc.H3, state=state)
     assert problems and "ImportError" in problems[0]
     assert "not a pass" in problems[0]
 
 
+_LAB_OK = {"available": True, "disable_pinned_memory": True,
+           "sage_attention": False, "cpu": False}
+
+
 @pytest.mark.parametrize("state,needle", [
-    ({"available": True, "reserve_vram_gb": None,
-      "disable_pinned_memory": True}, "--reserve-vram"),
-    ({"available": True, "reserve_vram_gb": 1.0,
-      "disable_pinned_memory": True}, "--reserve-vram"),
-    ({"available": True, "reserve_vram_gb": 2.921,
-      "disable_pinned_memory": False}, "--disable-pinned-memory"),
+    (dict(_LAB_OK, disable_pinned_memory=False), "--disable-pinned-memory"),
+    (dict(_LAB_OK, sage_attention=True), "SageAttention"),
+    (dict(_LAB_OK, cpu=True), "CPU-only"),
 ])
-def test_a_server_started_without_the_diet_is_named_knob_by_knob(state, needle):
-    problems = bc.check_running_server(bc.HUMO_DIET, state=state)
+def test_a_server_started_without_the_lab_boot_is_named_knob_by_knob(state, needle):
+    problems = bc.check_running_server(bc.H3_8GB_LAB, state=state)
     assert problems and any(needle in p for p in problems)
     with pytest.raises(bc.BootContractError) as exc:
-        bc.assert_running_server(bc.HUMO_DIET, state=state)
+        bc.assert_running_server(bc.H3_8GB_LAB, state=state)
     assert "restarted" in str(exc.value), (
         "the message must say what the operator has to DO -- this is not "
         "fixable at render time")
 
 
-def test_reserving_MORE_than_the_contract_asks_is_still_inside_the_envelope():
-    """A >= comparison, deliberately: the contract's number is the floor the
-    measurement was taken at, and clamping harder stays inside it."""
-    assert bc.check_running_server(bc.HUMO_DIET, state={
-        "available": True, "reserve_vram_gb": 4.0,
-        "disable_pinned_memory": True}) == []
-
-
 def test_sage_is_checked_only_when_the_contract_names_it():
-    assert bc.check_running_server(bc.HUMO_DIET, state={
-        "available": True, "reserve_vram_gb": 2.921,
-        "disable_pinned_memory": True, "sage_attention": True}) == []
+    assert bc.check_running_server(bc.DEFAULT, state={
+        "available": True, "disable_pinned_memory": True,
+        "sage_attention": True}) == []
     # Every OTHER H3 knob is satisfied here on purpose, so Sage is the only
-    # thing left to complain about. `reserve_vram_gb` was added in lane 19 with
-    # the contract itself: without it the reserve complaint sorts first and this
-    # assertion would be reading a message about the wrong knob.
+    # thing left to complain about.
     problems = bc.check_running_server(bc.H3, state={
-        "available": True, "reserve_vram_gb": 12.0,
-        "disable_pinned_memory": True, "sage_attention": True})
+        "available": True, "disable_pinned_memory": True,
+        "sage_attention": True})
     assert problems and "SageAttention" in problems[0]
 
 
@@ -320,14 +300,6 @@ def test_an_engine_that_declares_nothing_keeps_legacy_boots_not_cpu():
     """Legacy tuning remains compatible; a device change is never implied."""
     assert set(bc.compatible_contracts_for_engine(
         vreg.get_engine("ltx_8gb"))) == set(bc.BOOT_CONTRACTS) - {bc.CPU}
-
-
-def test_the_hero_tier_keeps_default_because_it_has_shipped_under_it(engine):
-    """Requiring the diet would retire a shipping lane by side effect. What
-    `default` COSTS is stated in the declaration's comment -- 14.98 GiB, over
-    the gate -- rather than hidden behind a refusal."""
-    assert bc.compatible_contracts_for_engine(engine) == (
-        "default", "humo_diet")
 
 
 def test_the_cast_is_expressed_in_the_profile_not_by_an_engine_refusal(
@@ -345,21 +317,10 @@ def test_the_cast_is_expressed_in_the_profile_not_by_an_engine_refusal(
     refusal); what changed is that the test no longer depends on the bug.
     """
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
-        "available": True, "reserve_vram_gb": 2.921,
-        "disable_pinned_memory": True, "sage_attention": None})
+        "available": True, "disable_pinned_memory": False,
+        "sage_attention": None})
     assert bc.check_engine_against_profile(engine, profile) == []
     assert engine.assert_usable(host_caps={}, profile=profile) == LANE
-
-
-def test_a_contract_the_tier_is_not_proven_on_is_refused_by_name(engine,
-                                                                profile):
-    hostile = dict(profile)
-    hostile["launch"] = dict(profile["launch"])
-    hostile["launch"]["boot_contract"] = bc.H3
-    from nodes._otr_video_engines.registry import EngineUnusable
-    with pytest.raises(EngineUnusable) as exc:
-        engine.assert_usable(host_caps={}, profile=hostile)
-    assert "proven on boot contract" in str(exc.value)
 
 
 # ---------------------------------------------------------------------------
@@ -491,14 +452,6 @@ def test_the_1p7b_pair_declares_its_canvas(tier, canvas):
     assert canvas[0] % 32 == 0 and canvas[1] % 32 == 0
 
 
-@pytest.mark.parametrize("tier", ["humo_1.7B", "humo_1.7B_169"])
-def test_the_longbeat_tier_keeps_BOTH_boot_contracts(tier):
-    """It is the auto-downgrade target -- the floor a heavy episode falls to --
-    so requiring the diet would remove the floor as a side effect."""
-    assert bc.compatible_contracts_for_engine(vreg.get_engine(tier)) == (
-        "default", "humo_diet")
-
-
 def test_the_exact_fit_guard_no_longer_hangs_off_a_VRAM_KNOB():
     """S8b item 3. The honesty check read `if cap is not None and
     target_fc > 0`, so an UNCAPPED tier skipped it entirely: a beat asking for
@@ -543,10 +496,11 @@ def test_the_last_humo_tier_declares_its_canvas():
     assert rd.declared_render_canvas("humo") == (480, 832)
 
 
-def test_every_humo_tier_now_declares_a_canvas_and_a_contract():
-    """The family is closed. Four tiers, four declarations, four contract
-    lists -- and the aspect each one renders is now readable without loading
-    anything."""
+def test_every_humo_lane_declares_a_canvas_and_runs_on_any_gpu_boot():
+    """The family is closed: four lanes, four canvases, readable without
+    loading anything. No HuMo lane declares a boot contract since 2026-09-26 -- the
+    reserve diet they could also run under was retired -- so each runs on
+    every GPU boot, as HuMo always shipped."""
     expected = {
         "humo": (480, 832), "humo_1.7B": (480, 832),
         "humo_1.7B_169": (832, 480), "humo_14B_169": (832, 480),
@@ -554,8 +508,8 @@ def test_every_humo_tier_now_declares_a_canvas_and_a_contract():
     for tier, canvas in expected.items():
         engine = vreg.get_engine(tier)
         assert tuple(engine.render_canvas) == canvas, tier
-        assert bc.compatible_contracts_for_engine(engine) == (
-            "default", "humo_diet"), tier
+        assert set(bc.compatible_contracts_for_engine(engine)) == (
+            set(bc.BOOT_CONTRACTS) - {bc.CPU}), tier
 
 
 @pytest.mark.parametrize("tier", ["humo", "humo_1.7B", "humo_1.7B_169",
@@ -643,8 +597,8 @@ def test_h3_stops_refusing_itself_when_the_server_really_is_booted_for_h3(monkey
     """
     from nodes._otr_video_engines import registry as vreg
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
-        "available": True, "reserve_vram_gb": None,
-        "disable_pinned_memory": False, "sage_attention": False})
+        "available": True, "disable_pinned_memory": False,
+        "sage_attention": False})
     assert bc.contract_from_running_server() == bc.H3
     h3 = vreg.get_engine("minimax_h3_video")
     assert bc.check_engine_against_profile(h3, _stripped_policy()) == []
@@ -656,8 +610,8 @@ def test_h3_still_refuses_on_a_sage_boot(monkeypatch):
     Sage boot is exactly the case the contract exists to catch."""
     from nodes._otr_video_engines import registry as vreg
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
-        "available": True, "reserve_vram_gb": None,
-        "disable_pinned_memory": False, "sage_attention": True})
+        "available": True, "disable_pinned_memory": False,
+        "sage_attention": True})
     assert bc.contract_from_running_server() == bc.DEFAULT
     h3 = vreg.get_engine("minimax_h3_video")
     assert bc.check_engine_against_profile(h3, _stripped_policy()) != []
@@ -669,8 +623,8 @@ def test_an_explicit_declaration_always_wins_over_the_probe(monkeypatch):
     by whatever the box happened to be booted with."""
     from nodes._otr_video_engines import registry as vreg
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
-        "available": True, "reserve_vram_gb": 12.0,
-        "disable_pinned_memory": True})
+        "available": True, "disable_pinned_memory": True,
+        "sage_attention": False})
     h3 = vreg.get_engine("minimax_h3_video")
     assert bc.check_engine_against_profile(
         h3, {"launch": {"boot_contract": "default"}}) != []
@@ -685,8 +639,8 @@ def test_a_lane_that_already_passed_on_default_is_untouched(monkeypatch):
     humo = vreg.get_engine("humo")
     assert bc.check_engine_against_profile(humo, _stripped_policy()) == []
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
-        "available": True, "reserve_vram_gb": 12.0,
-        "disable_pinned_memory": True})
+        "available": True, "disable_pinned_memory": True,
+        "sage_attention": False})
     assert bc.check_engine_against_profile(humo, _stripped_policy()) == []
 
 
@@ -697,11 +651,11 @@ def test_the_probe_is_silent_off_a_comfy_server():
     assert bc.contract_from_running_server() is None
 
 
-def test_default_never_shadows_a_real_diet_boot(monkeypatch):
+def test_default_never_shadows_a_real_named_boot(monkeypatch):
     """`default` constrains nothing, so it matches EVERY server. It is checked
-    last on purpose -- tried first it would claim an h3 or humo_diet boot as
+    last on purpose -- tried first it would claim an h3 or h3_8gb_lab boot as
     `default` and the fix would silently do nothing."""
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
-        "available": True, "reserve_vram_gb": 2.921,
-        "disable_pinned_memory": True})
-    assert bc.contract_from_running_server() == bc.HUMO_DIET
+        "available": True, "disable_pinned_memory": True,
+        "sage_attention": False})
+    assert bc.contract_from_running_server() == bc.H3_8GB_LAB

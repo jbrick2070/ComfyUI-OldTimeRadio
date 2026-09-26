@@ -286,8 +286,9 @@ Comfy-Org `humo_17B` lookalike. To inspect or fetch it directly:
 ```
 
 The physical RTX 5080 canonical receipt measured 13.06 GiB VRAM and 27.53 GiB
-host RAM at 832x480x97. The profile's `humo_diet` boot contract is part of that
-real recipe, not an artificial smaller-card simulation.
+host RAM at 832x480x97, on the since-retired 2.9 GiB reserve boot. OTR no
+longer passes a reserve (2026-09-26); on a stock boot the same leg measured
+14.98 GiB, and an out-of-memory there is recorded as a bug.
 
 ### HuMo 1.7B: manual public files
 
@@ -656,11 +657,10 @@ ideogram4_local), `otr_rot_ltx25_video_lumina` (ltx25_high_video + lumina_image)
 `otr_rot_ltx25_foley_fluxgen1` (ltx25_high_foley_plus + flux_gen1). A profile's
 `status` is not gated by the applier, so `draft` rows are runnable.
 
-**Lanes that need their own boot cannot share a sweep.** A profile's `launch.env`
-is a BOOT contract, so these get a separate ComfyUI start and their own group:
-HuMo (`OTR_HEADLESS_RESERVE_VRAM_GB` + `OTR_HEADLESS_DISABLE_PINNED=1`). The
-MiniMax H3 lanes need only SageAttention off since 2026-09-26 (no reserve), so
-they share any Sage-free sweep; the engine refuses a Sage boot.
+**No lane needs its own boot for memory any more (2026-09-26).** OTR passes
+no VRAM reserve: HuMo runs on a stock boot, and the MiniMax H3 lanes need only
+SageAttention off, so they share any Sage-free sweep; the engine refuses a Sage
+boot. A lane that runs out of memory on a stock boot is recorded as a bug.
 
 ## 7B. Running a pod UNATTENDED, and ending it (2026-09-04)
 

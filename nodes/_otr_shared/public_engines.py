@@ -39,7 +39,7 @@ _PUBLIC_ENGINES = {
     # audio-driven and now says so), and the aspect is in the id rather than
     # only in the label suffix -- the bare `humo14_high_face` hid that its
     # sibling renders 480x832. `high` comes from a measurement receipt: 13.06
-    # GiB warm at 832x480x97 under the humo_diet boot.
+    # GiB warm at 832x480x97 with a since-retired 2.9 GiB reserve.
     "humo14_high_audio_in_wide": "humo_14B_169",
     # Lane 3, 2026-08-11. The LONG-BEAT lane (the 1.7B renders to 177 frames,
     # 7.08 s, where the 14B stops at 97) and the auto-downgrade target. Its
@@ -124,16 +124,18 @@ _PUBLIC_LABEL = {
         "the cheapest local video lane, ~22 s a beat)"),
     "humo14_high_audio_in_wide": (
         "HuMo 14B fp8 16:9 - audio-driven face, high VRAM "
-        "(13.06 GiB warm at 832x480x97 on the humo_diet boot)"),
+        "(13.06 GiB warm at 832x480x97 with a since-retired reserve; "
+        "14.98 GiB without)"),
     "humo17_high_audio_in_portrait": (
         "HuMo 1.7B portrait - audio-driven face, high VRAM, LONG beats "
-        "(12.84 GiB warm at 480x832x129 on the humo_diet boot; 177 frames)"),
+        "(12.84 GiB warm at 480x832x129 with a since-retired reserve; "
+        "177 frames)"),
     "humo17_high_audio_in_wide": (
         "HuMo 1.7B 16:9 - audio-driven face, high VRAM, LONG beats "
         "(same checkpoint as the portrait tier; UNMEASURED at this aspect)"),
     "humo14_high_audio_in_portrait": (
         "HuMo 14B fp8 portrait - audio-driven face, high VRAM "
-        "(13.22 GiB warm at 480x832x97 on the humo_diet boot)"),
+        "(13.22 GiB warm at 480x832x97 with a since-retired reserve)"),
     # "low" is the measured bucket and the label names the leg it came from, per
     # the lane-1 convention. It also states the two things a user has to know
     # before picking this lane: it needs its own boot, and it is SLOW -- a 5 s

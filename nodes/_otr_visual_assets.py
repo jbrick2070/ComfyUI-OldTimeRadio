@@ -1157,6 +1157,35 @@ def _refuse_missing_node_packs(engines):
             "again." % "; ".join(problems))
 
 
+def _boot_fix(bc, known, state):
+    """The exact change that makes this boot acceptable, and what is unmet.
+
+    Judged against the CHEAPEST accepted contract -- the one this boot misses
+    by the fewest knobs -- so a card is never sent to a boot it does not need
+    (Cursor review, 2026-09-26). Each knob names its own correction: Sage on,
+    ``--cpu`` on, or pinned memory left on for a contract that needs it off.
+    A Sage state the probe could not read is reported as exactly that, never
+    blamed on a Sage that may already be off; the probe's reason follows in
+    ``unmet``.
+    """
+    best = min(known, key=lambda c: len(bc.check_running_server(c, state=state)))
+    unmet = bc.check_running_server(best, state=state)
+    spec = bc.contract_spec(best)
+    clauses = []
+    if spec["sage_attention"] is False and state.get("sage_attention"):
+        clauses.append("without SageAttention")
+    if spec["cpu"] is False and state.get("cpu"):
+        clauses.append("without --cpu")
+    if spec["disable_pinned_memory"] and not state.get("disable_pinned_memory"):
+        clauses.append("with --disable-pinned-memory")
+    if clauses:
+        return "Restart ComfyUI " + " and ".join(clauses), unmet
+    if spec["sage_attention"] is False and state.get("sage_attention") is None:
+        return ("Could not confirm ComfyUI is running without SageAttention",
+                unmet)
+    return "Restart ComfyUI to match the %r boot" % best, unmet
+
+
 def _refuse_unmet_boot_contracts(engines, state=None):
     """Refuse at QUEUE time a video engine this server was not BOOTED for --
     before any weight download, writer pass or render.
@@ -1216,24 +1245,7 @@ def _refuse_unmet_boot_contracts(engines, state=None):
             continue
         if any(not _bc.check_running_server(c, state=state) for c in known):
             continue
-        unmet = _bc.check_running_server(known[0], state=state)
-        if unmet and all("SageAttention" in u for u in unmet):
-            # Sage is the only thing between this boot and the engine's first
-            # contract, so Sage off is the whole fix on any card -- no launch
-            # flag, and no other boot needs naming. When the probe could not
-            # read Sage at all, say that rather than blame a Sage that may
-            # already be off; the probe's own reason follows below.
-            fix = ("Start ComfyUI without SageAttention"
-                   if state.get("sage_attention") else
-                   "Could not confirm ComfyUI is running without SageAttention")
-        else:
-            # EVERY boot the engine accepts, not only the first (Cursor review,
-            # 2026-09-26): naming only the first can hand a card the wrong fix.
-            ways = []
-            for c in known:
-                argv = " ".join(_bc.launch_args_for(c)) or "its default settings"
-                ways.append("%s (the %r boot)" % (argv, c))
-            fix = "Restart ComfyUI with %s" % " or ".join(ways)
+        fix, unmet = _boot_fix(_bc, known, state)
         problems.append(
             "%s -- the video engine '%s' cannot run on the boot this server "
             "has: %s" % (fix, name, "; ".join(unmet) or "no accepted boot matches"))

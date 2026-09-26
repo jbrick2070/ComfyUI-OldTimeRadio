@@ -1,14 +1,21 @@
 """NAMED BOOT CONTRACTS -- what a lane needs the SERVER to have been started with.
 
-Spec S8 (2026-08-09, folding the lab findings into OTR). Some lanes only fit
-under the 14.5 GiB gate if the server was launched with particular allocator
-flags. HuMo 14B measures 14.98 GiB unclamped and 13.06 GiB under a reserve-VRAM
-clamp with pinned memory disabled -- same graph, same weights, 1.9 GiB apart.
-That is a BOOT fact, and boot facts cannot be fixed at render time: by the time
-a beat renders, the server has been up for an hour.
+Spec S8 (2026-08-09). Some lanes can only run correctly on a server that was
+started a particular way. That is a BOOT fact, and boot facts cannot be fixed at
+render time: by the time a beat renders, the server has been up for an hour.
 
-So a contract is NAMED here, a profile SELECTS one, a launcher APPLIES it, and
-preflight PROVES it -- against the running server, never against the config.
+**No contract reserves VRAM (operator, 2026-09-26).** "We need to unload models
+after they are used, and if it OOMs we record it, not artificially create a
+scenario"; "I don't like messing with reserves." The measured reserves this
+module used to carry -- HuMo's 2.921 GiB diet and H3's 12 GiB -- were boot flags
+a user had to set to steer one lane around one measured peak. Both are gone,
+and with them the ``humo_diet`` contract and the reserve knob itself. What a
+contract may still pin is a CORRECTNESS fact (SageAttention silently corrupting
+H3), the device (CPU-only), and the 8 GB H3 lab's pinned-memory switch.
+
+So a contract is NAMED here, a workflow row SELECTS one, a launcher APPLIES it,
+and preflight PROVES it -- against the running server, never against the
+config.
 
 Three rules this module exists to enforce, each of them a defect that already
 happened:
@@ -32,10 +39,9 @@ for. A wrong-boot refusal that arrives there costs an episode's work to learn
 something knowable before the first token. The ShotLock preflight is the right
 seam; the render-time check stays as defence in depth.
 
-Only a lane that has NEVER shipped under `default` may REQUIRE a contract.
-`humo_1.7B` declares `default` AND `humo_diet` compatible, so requiring the diet
-would regress a shipping lane -- the diet is how a PROFILE casts it, not a
-property the engine may demand.
+Only a lane that has NEVER shipped under `default` may REQUIRE a contract:
+requiring one of a lane that already ships would regress it. MiniMax H3 is the
+only lane that does.
 
 stdlib-only, cold-import clean (V-12): importing this pulls in nothing. The one
 ComfyUI touch is inside a function, guarded, and reports UNKNOWN rather than
@@ -45,56 +51,18 @@ UTF-8, no BOM, ASCII-only.
 from __future__ import annotations
 
 #: The stock boot: no clamps. Every lane that shipped before this build is
-#: compatible with it, and a profile that names no contract means this one.
+#: compatible with it, and a workflow row that names no contract means this one.
 DEFAULT = "default"
 
-#: The HuMo diet (lab HUMO_DIET + ENVELOPE_LADDERS job A). Reserve VRAM away
-#: from model loading and disable pinned host memory; measured to take 14B FP8
-#: from 14.98 GiB to 13.06 GiB warm at 832x480x97 with the graph UNCHANGED, and
-#: to take host RAM from 61.3 to roughly 26 GiB. 2.921 is not a round number
-#: because it is a measurement, not a preference.
-HUMO_DIET = "humo_diet"
-
-#: The MiniMax H3 boot: sage-free (Sage silently turns H3 output to noise --
+#: The MiniMax H3 boot: Sage-free (Sage silently turns H3 output to noise --
 #: Comfy-Org/ComfyUI#15263, and the per-model KJ probe FAILED on sm_120) and
-#: not CPU-only. That is all it asks since 2026-09-26 (see the reversal at the
-#: end of this note); the history below is why it once asked for more.
-#:
-#: **`reserve_vram_gb` MOVED None -> 12.0 in lane 19 (2026-08-12), on the lab
-#: receipts, and it is the difference between this lane fitting and not.** The
-#: contract was drafted from the spec's prose before any H3 measurement was read
-#: back. Every MiniMax H3 leg on this box that PASSED the 14.5 GiB gate was
-#: booted with `--reserve-vram 12`, including the trained 1344x768 canvas at
-#: model f124 (9.15 GiB absolute). The one I2V leg booted WITHOUT it --
-#: `h3_i2v_canonical_832x480_f107` -- peaked at **15.39 GiB and FAILED**, on a
-#: canvas 2.6x SMALLER and a length SHORTER than the leg that passed at 9.15.
-#: A smaller, shorter render peaking 70% higher is not a canvas effect; the boot
-#: is the only structural difference, and the mechanism is plain -- reserving 12
-#: GiB away from model loading is what forces the 21 GB DiT to stream instead of
-#: attempting residency on a 16 GB card.
-#:
-#: Left at None this contract would have named the sage and pinned-memory knobs,
-#: passed its own check, and still let the lane load its way over the ceiling --
-#: a contract that constrains the two knobs that were easy to write down and not
-#: the one that decides the outcome.
-#:
-#: **REVERSED 2026-09-26, the operator's rule:** "we need to unload models after
-#: they are used, and if it OOMs we record it, not artificially create a
-#: scenario" -- and "I don't like messing with reserves". The 12 GiB reserve and
-#: the pinned-memory switch were exactly that: boot flags a user had to set to
-#: steer one lane around a measured peak. They are gone from this contract. It
-#: keeps the one knob that is a CORRECTNESS defect rather than a memory
-#: preference -- SageAttention, which turns H3's output to noise with no error
-#: -- and CPU-only off. A stock, Sage-free boot now satisfies it; H3 on a stock
-#: boot is re-measured live, and an out-of-memory there is recorded as a bug.
+#: not CPU-only. Until 2026-09-26 it also held a measured 12 GiB reserve and
+#: pinned memory off (lane 19's receipts); the operator's rule removed both --
+#: an out-of-memory on a stock boot is recorded as a bug, not pre-empted.
 H3 = "h3"
 
-#: Physical 8 GB MiniMax H3 lab launch shape. It emits NO
-#: ``--reserve-vram``: the physical-lab contract forbids that flag, and asking
-#: for the 16 GB recipe's 12 GiB reserve on an 8 GiB card is not conservative.
-#: ``None`` deliberately means "do not constrain" at preflight rather than a
-#: new manual-launch gate. Pinned host memory remains disabled and Sage remains
-#: forbidden. This names a lab candidate, not a published OTR H3 episode.
+#: Physical 8 GB MiniMax H3 lab launch shape: pinned host memory disabled and
+#: Sage forbidden. This names a lab candidate, not a published OTR H3 episode.
 H3_8GB_LAB = "h3_8gb_lab"
 
 #: CPU-only ComfyUI. Several CPU/cloud profiles used to put ``--cpu`` only in
@@ -109,31 +77,21 @@ CPU = "cpu"
 #: forbidding an unrelated flag.
 BOOT_CONTRACTS = {
     DEFAULT: {
-        "reserve_vram_gb": None,
         "disable_pinned_memory": None,
         "sage_attention": None,
         "cpu": None,
     },
-    HUMO_DIET: {
-        "reserve_vram_gb": 2.921,
-        "disable_pinned_memory": True,
-        "sage_attention": None,
-        "cpu": False,
-    },
     H3: {
-        "reserve_vram_gb": None,     # no artificial reserve (operator 2026-09-26)
         "disable_pinned_memory": None,
         "sage_attention": False,     # a correctness defect, not a preference
         "cpu": False,
     },
     H3_8GB_LAB: {
-        "reserve_vram_gb": None,     # generated lab launch emits no reserve
         "disable_pinned_memory": True,
         "sage_attention": False,
         "cpu": False,
     },
     CPU: {
-        "reserve_vram_gb": None,
         "disable_pinned_memory": None,
         "sage_attention": None,
         "cpu": True,
@@ -145,7 +103,6 @@ BOOT_CONTRACTS = {
 #: CPU therefore needs no env alias. Keeping the legacy mapping visible still
 #: prevents a clamp profile from claiming an env row no launcher consumes.
 CONTRACT_ENV = {
-    "reserve_vram_gb": "OTR_HEADLESS_RESERVE_VRAM_GB",
     "disable_pinned_memory": "OTR_HEADLESS_DISABLE_PINNED",
 }
 
@@ -187,8 +144,6 @@ def launch_env_for(name) -> dict:
     """
     spec = contract_spec(name)
     env = {}
-    if spec["reserve_vram_gb"] is not None:
-        env[CONTRACT_ENV["reserve_vram_gb"]] = "%g" % spec["reserve_vram_gb"]
     if spec["disable_pinned_memory"]:
         env[CONTRACT_ENV["disable_pinned_memory"]] = "1"
     return env
@@ -202,8 +157,6 @@ def launch_args_for(name) -> list:
     """
     spec = contract_spec(name)
     argv = []
-    if spec["reserve_vram_gb"] is not None:
-        argv.extend(("--reserve-vram", "%g" % spec["reserve_vram_gb"]))
     if spec["disable_pinned_memory"]:
         argv.append("--disable-pinned-memory")
     if spec["cpu"]:
@@ -225,8 +178,6 @@ def running_server_boot_state() -> dict:
         return {"available": False,
                 "error": "comfy.cli_args unavailable (%s)" % type(exc).__name__}
     state = {"available": True}
-    reserve = getattr(args, "reserve_vram", None)
-    state["reserve_vram_gb"] = None if reserve is None else float(reserve)
     state["disable_pinned_memory"] = bool(
         getattr(args, "disable_pinned_memory", False))
     state["cpu"] = bool(getattr(args, "cpu", False))
@@ -242,8 +193,8 @@ def running_server_boot_state() -> dict:
         #
         # The failure was silent until this lane because the probe's error is
         # only CONSULTED when a contract constrains Sage, and `h3` is the first
-        # one that does -- so the bug shipped dormant behind a `default` and a
-        # `humo_diet` that both say "don't care" about Sage. It then presented
+        # one that does -- so the bug shipped dormant behind contracts that
+        # all said "don't care" about Sage. It then presented
         # as an unrenderable lane: UNKNOWN is correctly not a pass, so the H3
         # lane refused on every server, for a reason that was about the import
         # and not about Sage.
@@ -263,14 +214,11 @@ def check_running_server(name, state=None) -> list:
 
     Returns rather than raises so a caller can report several lanes at once,
     and so the "no server" case is a decision the caller makes rather than an
-    exception it has to catch. A reserve-VRAM comparison is a >= : reserving
-    MORE than the contract asks for is still inside the envelope the contract
-    was measured in, while reserving less is not.
+    exception it has to catch.
     """
     spec = contract_spec(name)
     state = running_server_boot_state() if state is None else dict(state)
-    constrained = [k for k in ("reserve_vram_gb", "disable_pinned_memory",
-                               "sage_attention", "cpu")
+    constrained = [k for k in ("disable_pinned_memory", "sage_attention", "cpu")
                    if spec.get(k) is not None]
     if not state.get("available"):
         # UNKNOWN IS NOT SATISFIED (retro bug hunt r1, 2026-08-11 -- both
@@ -293,14 +241,6 @@ def check_running_server(name, state=None) -> list:
                    state.get("unavailable_reason") or "comfy.cli_args "
                    "unavailable")]
     problems = []
-    want = spec["reserve_vram_gb"]
-    if want is not None:
-        got = state.get("reserve_vram_gb")
-        if got is None or float(got) + 1e-6 < float(want):
-            problems.append(
-                "boot contract %r needs --reserve-vram >= %g GiB (via %s); the "
-                "server was started with %r"
-                % (name, want, CONTRACT_ENV["reserve_vram_gb"], got))
     want = spec["disable_pinned_memory"]
     if want is not None and bool(state.get("disable_pinned_memory")) != bool(want):
         problems.append(
@@ -390,38 +330,30 @@ def contract_from_running_server(candidates=None):
     ``DEFAULT`` is checked LAST. It constrains nothing, so it matches every
     server and would shadow a real diet boot if it were tried first.
 
-    THREE RULES, and each one was a real defect before it was written down:
+    TWO RULES, and each one was a real defect before it was written down:
 
-    * **Reserve is a FLOOR, not an equality.** ``check_running_server`` has
-      always compared ``>=`` -- reserving MORE than a contract asks for is
-      still inside the envelope it was measured in. This matched ``==``, so a
-      server booted with ``--reserve-vram 16`` did not identify as ``h3`` (12)
-      and H3 REFUSED ITS OWN VALID BOOT.
     * **Sage is consulted.** A Sage-constrained contract may not be named on a
       server where Sage is KNOWN to disagree. An UNKNOWN Sage state stays a
       candidate on purpose: identification is not the gate, and the named
       ``assert_running_server`` check that follows is what issues the
       fail-closed "unverifiable Sage" reason in the operator's language.
-    * **Most-constrained wins, deterministically.** With floors, one server can
-      satisfy several contracts (pinned-off + Sage-free satisfies both ``h3``
-      and ``h3_8gb_lab``). Ordering by reserve floor, then by how many knobs the
-      contract pins, makes the answer the MOST specific boot the server can be
-      -- not whichever name happened to sort first.
+    * **Most-constrained wins, deterministically.** One server can satisfy
+      several contracts (pinned-off + Sage-free satisfies both ``h3`` and
+      ``h3_8gb_lab``). Ordering by how many knobs the contract pins makes the
+      answer the MOST specific boot the server can be -- not whichever name
+      happened to sort first.
+
+    (A third rule, "a reserve is a floor, not an equality", went with the
+    reserve knob on 2026-09-26.)
     """
     state = running_server_boot_state()
     if not state.get("available"):
         return None
-    got_reserve = state.get("reserve_vram_gb")
     got_pinned = state.get("disable_pinned_memory")
     got_sage = state.get("sage_attention")
     got_cpu = state.get("cpu")
 
     def _is_candidate(spec) -> bool:
-        want = spec["reserve_vram_gb"]
-        if want is not None and (
-                got_reserve is None
-                or float(got_reserve) + 1e-6 < float(want)):
-            return False
         want = spec["disable_pinned_memory"]
         if want is not None and bool(got_pinned) != bool(want):
             return False
@@ -436,10 +368,9 @@ def contract_from_running_server(candidates=None):
     def _specificity(name):
         spec = BOOT_CONTRACTS[name]
         pinned_knobs = sum(
-            1 for k in ("reserve_vram_gb", "disable_pinned_memory",
-                        "sage_attention", "cpu") if spec[k] is not None)
-        floor = spec["reserve_vram_gb"] or 0.0
-        return (name == DEFAULT, -float(floor), -pinned_knobs, name)
+            1 for k in ("disable_pinned_memory", "sage_attention", "cpu")
+            if spec[k] is not None)
+        return (name == DEFAULT, -pinned_knobs, name)
 
     names = BOOT_CONTRACTS if candidates is None else tuple(
         name for name in candidates if name in BOOT_CONTRACTS)
@@ -482,8 +413,8 @@ def check_engine_against_profile(engine, profile) -> list:
     actually started.
 
     That silently bricked every lane declaring a non-default contract: the
-    2026-08-26 soak booted MiniMax H3 correctly with ``--reserve-vram 12
-    --disable-pinned-memory`` and the adapter still rejected itself as
+    2026-08-26 soak booted MiniMax H3 correctly and the adapter still rejected
+    itself as
     INCOMPATIBLE_PROFILE, 9.6 minutes in, having never reached H3 sampling. The
     weights, the graph and the VRAM envelope were never the problem; the
     contract identity was dropped in transport.
@@ -514,7 +445,7 @@ def check_engine_against_profile(engine, profile) -> list:
 
 
 __all__ = [
-    "DEFAULT", "HUMO_DIET", "H3", "H3_8GB_LAB", "CPU",
+    "DEFAULT", "H3", "H3_8GB_LAB", "CPU",
     "BOOT_CONTRACTS", "CONTRACT_ENV",
     "BootContractError", "known_contract", "contract_spec", "launch_env_for",
     "launch_args_for",

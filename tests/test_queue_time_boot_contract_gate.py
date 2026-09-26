@@ -15,10 +15,10 @@ import pytest
 
 from nodes import _otr_visual_assets as va
 
-STOCK = {"available": True, "reserve_vram_gb": None,
-         "disable_pinned_memory": False, "cpu": False, "sage_attention": False}
-H3_BOOT = {"available": True, "reserve_vram_gb": 12.0,
-           "disable_pinned_memory": True, "cpu": False, "sage_attention": False}
+STOCK = {"available": True, "disable_pinned_memory": False, "cpu": False,
+         "sage_attention": False}
+LAB_BOOT = {"available": True, "disable_pinned_memory": True, "cpu": False,
+            "sage_attention": False}
 
 
 def test_h3_runs_on_a_stock_sage_free_boot():
@@ -32,8 +32,38 @@ def test_sage_alone_is_refused_with_the_sage_fix_first():
         va._refuse_unmet_boot_contracts(
             {"minimax_h3_video"}, state=dict(STOCK, sage_attention=True))
     msg = str(info.value)
-    assert msg.startswith("Start ComfyUI without SageAttention")
+    assert msg.startswith("Restart ComfyUI without SageAttention --")
     assert "--reserve-vram" not in msg and "Nothing was downloaded" in msg
+
+
+def test_a_cpu_only_boot_is_told_to_drop_cpu():
+    with pytest.raises(va.VisualAssetError) as info:
+        va._refuse_unmet_boot_contracts(
+            {"minimax_h3_video"}, state=dict(STOCK, cpu=True))
+    assert str(info.value).startswith("Restart ComfyUI without --cpu --")
+
+
+def test_sage_and_cpu_together_name_both():
+    with pytest.raises(va.VisualAssetError) as info:
+        va._refuse_unmet_boot_contracts(
+            {"minimax_h3_video"}, state=dict(STOCK, cpu=True, sage_attention=True))
+    assert str(info.value).startswith(
+        "Restart ComfyUI without SageAttention and without --cpu --")
+
+
+def test_a_lab_only_engine_is_told_to_turn_pinned_memory_off(monkeypatch):
+    """h3_8gb_lab still needs pinned memory off; an engine that accepts ONLY
+    that boot is told so."""
+    from nodes._otr_video_engines import registry as vreg
+
+    class _LabOnly:
+        compatible_boot_contracts = ("h3_8gb_lab",)
+
+    monkeypatch.setattr(vreg, "get_engine", lambda eid: _LabOnly())
+    with pytest.raises(va.VisualAssetError) as info:
+        va._refuse_unmet_boot_contracts({"minimax_h3_video"}, state=STOCK)
+    assert str(info.value).startswith(
+        "Restart ComfyUI with --disable-pinned-memory --")
 
 
 def test_an_unreadable_sage_state_is_not_blamed_on_sage():
@@ -48,16 +78,16 @@ def test_an_unreadable_sage_state_is_not_blamed_on_sage():
     assert "probe raised" in msg
 
 
-def test_h3_on_its_own_boot_passes():
+def test_h3_on_the_8gb_lab_boot_passes():
     va._refuse_unmet_boot_contracts({"minimax_h3_video", "minimax_h3_audio_in"},
-                                    state=H3_BOOT)
+                                    state=LAB_BOOT)
 
 
-def test_sage_on_an_h3_boot_is_still_refused():
-    """Sage turns H3 into noise with no error; the flags alone are not enough."""
+def test_sage_on_the_lab_boot_is_still_refused():
+    """Sage turns H3 into noise with no error; the other flags do not help."""
     with pytest.raises(va.VisualAssetError, match="SageAttention"):
         va._refuse_unmet_boot_contracts({"minimax_h3_video"},
-                                        state=dict(H3_BOOT, sage_attention=True))
+                                        state=dict(LAB_BOOT, sage_attention=True))
 
 
 def test_an_engine_that_runs_on_a_stock_boot_is_untouched():
@@ -104,6 +134,4 @@ def test_an_unknown_name_beside_a_known_one_is_skipped_like_render_time(monkeypa
         compatible_boot_contracts = ("no_such_contract", "h3_8gb_lab")
 
     monkeypatch.setattr(vreg, "get_engine", lambda eid: _Mixed())
-    lab = {"available": True, "reserve_vram_gb": None,
-           "disable_pinned_memory": True, "sage_attention": False, "cpu": False}
-    va._refuse_unmet_boot_contracts({"minimax_h3_video"}, state=lab)
+    va._refuse_unmet_boot_contracts({"minimax_h3_video"}, state=LAB_BOOT)
