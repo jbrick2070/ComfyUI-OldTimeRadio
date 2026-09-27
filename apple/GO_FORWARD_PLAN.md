@@ -129,49 +129,55 @@ STILL OWED, not blocking: the clean H3 auto-download proof -- ref2va was moved
 off the box to `C:\OTR-H3-moved-aside\`; `--video-lane h3_low_audio_in` on a
 fresh boot must fetch it (21 GB) and render.
 
-### 0n. A Comfy-native Gemma 4 writer -- WIRED AND LIVE-PROVEN 2026-09-26; the default switch is the operator's call
+### 0n. The Comfy-native Gemma 4 writers -- SHIPPED 2026-09-26
 
 ComfyUI ships an official `llm_gemma4_text_gen` template: the stock CLIPLoader
 plus the built-in TextGenerate node, running Gemma 4 inside ComfyUI's own model
-management. OTR now offers the same model as a writer dropdown row,
-`comfy_native:gemma4-e2b-it-int8-convrot` (Comfy-Org's 5.2 GB int8 file,
-pinned by revision, size and sha256). No workflow selects it yet.
+management. OTR now writes with the same models. **What ships (c1d071c4,
+79923170):** the 16 and 24 GB NVIDIA workflows select
+`comfy_native:gemma4-12b-int8-convrot`; the 8 GB NVIDIA workflows and the
+canonical select `comfy_native:gemma4-e2b-it-int8-convrot` (`DEFAULT_LLM`); Mac
+and AMD keep `Qwen/Qwen3.5-4B` (`QWEN_LLM`) until the native path is proven
+there, and a fresh or emptied writer on those machines falls back to Qwen
+(`default_writer_for_host`). Operator: "12x speed up is too hard to ignore";
+"I want 12b fast where it fits because I think it tells better stories".
 
 **Design** (kibitz-runs/2026-09-26-comfy-gemma-writer, r1-r3): an adapter that
 speaks the transformers `generate()` subset over ComfyUI's `CLIP.generate`, so
 the writer's four generation factories, halt rules, grammar and stop trimming
-run unchanged; the weight comes through the queue-time preflight's pinned
-fetch; `request_slot` gives it the same residency rules as a transformers
-writer; teardown hands it back through ComfyUI's `unload_model_and_clones`.
-Row is WARN with an 8192 working cap, because ComfyUI allocates the KV cache for
-prompt + budget up front.
-Commits: 3687e592 (A2 pin + planner), 34e5e3a2 + 5699e232 (A1 adapter),
-810d3a26 (A3 dropdown row + request_slot), 576103d3 (Composer follow-ups),
-3b1aced6 (runs on ComfyUI 0.34 too), f488f4d7 + 67da20b9 (per-call graph
-close-out, PBUG-20260926-04), 44877ade (filename code cg4e2).
+run unchanged; weights come through the queue-time preflight's pinned fetch;
+`request_slot` gives them the same residency rules as a transformers writer;
+teardown hands them back through ComfyUI's `unload_model_and_clones`. Each row
+carries an 8192 working cap, because ComfyUI allocates the KV cache for
+prompt + budget up front. The adapter closes ComfyUI's graph scope after every
+call (PBUG-20260926-04, Bible 12.178) and primes the 12B's empty thought block
+the way ComfyUI does.
+Commits: 3687e592, 34e5e3a2, 5699e232, 810d3a26, 576103d3, 3b1aced6, f488f4d7,
+67da20b9, 44877ade, 2b921bc5, 40b998e2 (E4B/12B rows), 1e7ef149 (12B thought
+block), c1d071c4 (the switch), 79923170 (12B where it fits), a05b2cc8.
 
-**Measured, 1-act canonical episodes, both writer slots on the native row:**
-| writer | 4060 8 GB steady / overall | 5080 16 GB steady / overall | episode |
-|---|---:|---:|---|
-| Comfy-native Gemma 4 E2B (int8) | 63 / 45 tok/s | 124 / 63 tok/s | 4060 clink_bone_20260926_175812 (otr_8gb_video, 15:24); 5080 knot_midnight_20260926_180140 (otr_16gb_low, 217 s) |
-| Qwen3.5-4B NF4 (8 GB default) | 13 / 12 tok/s | 14-17 / 14-16 tok/s | 4060 cold drill full leg; 5080 t5cache + appcheck legs |
-| Gemma 4 12B NF4 (16 GB default) | does not fit | 10 / 9-10 tok/s | 5080 h3_stock legs, 2026-09-26 |
+**Measured, 1-act canonical episodes, both writer slots on the row:**
+| writer | 4060 8 GB steady / overall | 5080 16 GB steady / overall | peak | episode |
+|---|---:|---:|---:|---|
+| native Gemma 4 12B (16/24 GB) | does not fit | 41 / 36 tok/s | ~13.5 GB | 5080 dead_wire_20260926_184325 |
+| native Gemma 4 E4B (no workflow) | -- | 84 / 46 tok/s | ~8.8 GB | 5080 tar_line_20260926_183241 |
+| native Gemma 4 E2B (8 GB, canonical) | 63 / 45 tok/s | 124 / 63 tok/s | ~5.1 GB | 4060 clink_bone_20260926_175812, ink_secrets_20260926_190737 (shipped otr_8gb_video as-is, 11:30); 5080 knot_midnight_20260926_180140 |
+| Qwen3.5-4B NF4 (8 GB before) | 13 / 12 tok/s | 14-17 / 14-16 tok/s | ~4.3 GB | 4060 cold drill full leg; 5080 t5cache + appcheck legs |
+| Gemma 4 12B NF4 (16 GB before) | does not fit | 10 / 9-10 tok/s | ~7.3 GB | 5080 h3_stock legs |
 "Steady" is the median over writer calls of 256+ tokens; "overall" includes
-prefill and per-call overhead across the whole script. Writer span on the
-4060: 1.9 min native against 6.5 min Qwen. The 12B's older "16-18 tok/s"
-figure did not hold in today's episode logs. Grammar-bound JSON held: two
-typed repairs in the whole 4060 script, none on the 5080. The weight
-auto-downloaded on the 4060 from an empty folder, token-less, at ~55 MB/s.
+prefill and per-call overhead. Peaks are machine-wide nvidia-smi on the 5080,
+the 4060 figure from its probe. Grammar-bound JSON held throughout (two typed
+repairs in one 4060 script, none elsewhere). Every native weight fetched
+itself, token-less.
 
-**OWED, in order:**
-1. **Slice B -- the operator's call:** make it the 8 GB default. The r1 gate was an episode
-   in `otr/obs/` on both boxes, which is now met. If yes: the canonical writer
-   `widgets_values` stay (the canonical is 16 GB), `config/workflow_matrix.json`
-   and `config/machine_classes.json` 8 GB rows move together, then
-   `build_variants.py --all` and `--check`.
-2. The working cap: a 4060 probe at a 14k-token prompt decides whether 8192 can
-   rise. No writer pass overflowed it in either episode above.
-3. `scripts/otr_dropdown_matrix.py` lists the row, with fit tags, once 1 lands.
+**OWED:**
+1. Mac and AMD: prove the native writer on that hardware (the Mac box; the
+   Radeon tester), then move those rows.
+2. The working cap: a 14k-token prompt probe decides whether 8192 can rise. No
+   writer pass overflowed it in any episode above.
+3. `scripts/otr_dropdown_matrix.py` still skips `comfy_native` rows and their
+   badges carry no fit tags; list them with the proven classes (nv8 for E2B,
+   nv16 for 12B).
 
 ### 0a. Windows HF_HOME -- DONE 2026-09-25 (`a0875708`, `89a95212`)
 

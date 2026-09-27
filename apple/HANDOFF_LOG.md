@@ -1,3 +1,33 @@
+## 2026-09-26 -- HEAD (main) -- LATE EVENING: native Gemma everywhere it is proven, T5 on the GPU
+
+Driver: the 5080 Claude window (Opus), the operator on and off the phone.
+
+WRITERS SHIPPED (plan row 0n has the table): c1d071c4 then 79923170 -- native
+  Gemma 4 12B on 16/24 GB NVIDIA, native E2B on 8 GB NVIDIA and the canonical,
+  Qwen on Mac and AMD (QWEN_LLM split out of DEFAULT_LLM; default_writer_for_host
+  keeps a fresh node on Apple/AMD on Qwen -- Composer's blocker on c1d071c4).
+  40b998e2 added the E4B/12B rows; 1e7ef149 primes the 12B's closed thought
+  block the way ComfyUI does (Composer's find on 40b998e2). Full suite 17085
+  passed, 0 failed at 79923170.
+LTX 0.9.8 RECIPE v3 (0f588cf0): the T5 encodes on the GPU; Apple keeps the CPU.
+  4060 A/B on the same replay: T5 stage ~3.6 s vs ~40 s, no OOM, frames
+  approved by eye (output/otr/ab_ltx8_t5/).
+PROOF, shipped as-is: the 4060 ran otr_8gb_video untouched at 0f588cf0 --
+  ink_secrets_20260926_190737 in obs, 11:30 whole prompt (native E2B writer +
+  v3 T5). The 5080 published E4B (tar_line_20260926_183241) and 12B
+  (dead_wire_20260926_184325) episodes.
+SPEED HUNT (Cursor Composer, read-only, grounded by measurement): the encode
+  findings are real and small -- libx264 vs NVENC 1.1 s vs 0.84 s a clip, 7.7 s
+  vs 5.5 s for a whole 81 s episode burn -- not worth a quality change; the
+  master-audio hash decode is about a second. One real waste: LTX 2.5's
+  post-evict settle spends 3 s every clip ("never moved", both boxes) on a log
+  line; trimming it is the operator's call (the 4060 asked for that telemetry).
+  No wrong-device or slow-library case left on a shipped path.
+QA: Composer on every code push (A3, fixes, family rows, shortcodes, switch +
+  v3); findings folded as the next commits.
+OWED: Mac/AMD native proof; the 14k-prompt cap probe; dropdown-matrix and fit
+  tags for the native rows; receipts for 0n in TEST_WAVE if a wave is opened.
+
 ## 2026-09-26 -- HEAD (main) -- EVENING: the Comfy-native Gemma 4 writer is wired and live on both boxes
 
 Driver: the 5080 Claude window (Opus), both boxes, the operator mostly away
