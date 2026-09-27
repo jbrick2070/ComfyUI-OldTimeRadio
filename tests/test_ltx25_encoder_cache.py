@@ -127,7 +127,8 @@ def test_the_key_carries_inode_identity_not_just_size_and_mtime(eng, tmp_path):
     assert key is not None
     st = os.stat(str(real))
     assert st.st_dev in key and st.st_ino in key and st.st_size in key
-    assert ("cpu", "cpu") in key, "placement belongs to the identity"
+    assert ("device", eng._native_te_device) in key, (
+        "the lane's requested placement belongs to the identity")
 
 
 # --- the conditioning SHAPE, pinned because a near-miss depended on it ----- #

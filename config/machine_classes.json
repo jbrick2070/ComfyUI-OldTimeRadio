@@ -170,7 +170,7 @@
       "platform": "any",
       "writer": "gemma-4-12b",
       "writer_model": "google/gemma-4-12b-it",
-      "note": "One 16 GB+ class. The recommended video is LTX 2.5 on the mix4x8 DiT, the same weight the 16 GB foley lane loads (stock ComfyUI loaders, text encoder pinned to the CPU); that weight has rendered clips on the RTX 5080, which is a measurement, not a published episode on this exact row. RTX 3090/4090 remain candidates until they have named receipts. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package.",
+      "note": "One 16 GB+ class. The recommended video is LTX 2.5 on the mix4x8 DiT, the same weight the 16 GB foley lane loads (stock ComfyUI loaders, text encoder on the GPU since 2026-09-26); that weight has rendered clips on the RTX 5080, which is a measurement, not a published episode on this exact row. RTX 3090/4090 remain candidates until they have named receipts. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package.",
       "proof_summary": "**COMPONENTS MEASURED** -- LTX 2.5 mix4x8 clips on the RTX 5080; exact row tuple and unlisted cards unproven",
       "key": "16gb",
       "video": "ltx25_high_video",

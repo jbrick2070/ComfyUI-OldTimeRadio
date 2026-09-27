@@ -882,8 +882,10 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             st = os.stat(path)
         except OSError:
             return None
+        # Placement belongs to the identity: the lane's REQUESTED device, so a
+        # lane that changes placement never reuses an entry built the other way.
         return (os.path.realpath(path), st.st_dev, st.st_ino, st.st_size,
-                st.st_mtime_ns, name, "ltxv", ("cpu", "cpu"))
+                st.st_mtime_ns, name, "ltxv", ("device", self._native_te_device))
 
     @staticmethod
     def _cached_clip_is_live(out, expect_cpu=True):
@@ -966,12 +968,12 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         per shot. On a HIT the handle arrives as an ``external_results`` entry
         and no loader node exists in the graph at all.
 
-        **What did NOT change is the VRAM story**, which is the part worth not
-        re-deriving: the encoder is pinned to CPU and the lab's own peak
-        decomposition puts it at 0.0 GiB at the sampling peak, so keeping it
-        resident costs system RAM (mmap-backed page cache), never headroom on
-        the card. This lane fits because the DiT is 9.80 GiB of a 14.48 GiB
-        peak, not because the encoder is evicted.
+        **The VRAM story, updated 2026-09-26:** the encoder now asks for the
+        accelerator (see ``_native_te_device``), and ComfyUI unloads it before
+        the DiT samples, so the sampling peak is still the DiT's -- measured
+        16,080 MB on the RTX 5080 against 16,065 MB with the old CPU pin. The
+        lab's decomposition still holds for the sampler: this lane fits because
+        the DiT is 9.80 GiB of a 14.48 GiB peak, not because of the encoder.
         """
         from . import wrapper_bridge as _wb
         self._classes = _wb.resolve_graph_classes(self._node_candidates())
@@ -1061,9 +1063,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 "weight_dtype": "default"}},
             "te": {"class": "te", "inputs": {
                 "clip_name": self._text_encoder_name(), "type": "ltxv",
-                # Stock CLIPLoader takes a placement widget, so the pin is
-                # an ordinary value. Per tier: small cards pin, big cards
-                # do not.
+                # Stock CLIPLoader takes a placement widget, so placement is
+                # an ordinary value. Every tier asks for the accelerator since
+                # 2026-09-26 (see _native_te_device).
                 "device": self._native_te_device}},
             "videovae": {"class": "videovae",
                          "inputs": {"vae_name": self._video_vae_name()}},
@@ -1389,7 +1391,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 stale = "the encoder weight changed under the episode"
             elif not self._cached_clip_is_live(
                     scope.get("clip"), expect_cpu=self._encoder_cache_expects_cpu):
-                stale = "the cached encoder failed its CPU-placement check"
+                stale = ("the cached encoder failed its liveness check"
+                         + (" (CPU placement)" if self._encoder_cache_expects_cpu
+                            else ""))
             if stale and scope.get("clip") is not None:
                 _LOG.warning("[%s] dropping the cached text encoder -- %s",
                              self.name, stale)
