@@ -363,7 +363,12 @@ def writer_rows() -> list:
     curated = load_curated().get("writers", {})
     rows = []
     for m in cat._active_curated_models():
-        if getattr(m, "provider", "local") != "local":
+        provider = getattr(m, "provider", "local")
+        if provider == "comfy_native":
+            # Plan row 0n: listed here once an episode qualifies it on a
+            # machine class; until then its badge claims none either.
+            continue
+        if provider != "local":
             continue          # hosted lanes: a credential, not a download
         repo = m.repo_id
         tags = cat.fit_tags_for(repo)

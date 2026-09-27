@@ -90,8 +90,11 @@ class ComfyTextgenBackend:
     def load(self, repo_id: str, row: Any, policy: Any = None) -> dict[str, Any]:
         from . import _otr_model_catalog as catalog
         from . import _otr_comfy_textgen_backend as native
+        from ._otr_visual_assets import ensure_writer_weights
         verdict = catalog.resolve_context_cap(
             repo_id, context_pin=catalog._hard_vram_context_limit())
+        # The same pinned fetch request_slot runs; a present file costs a lookup.
+        ensure_writer_weights(repo_id)
         return native.load_native_writer(repo_id, policy=policy,
                                          context_verdict=verdict)
 

@@ -396,6 +396,13 @@ def warm_profile_writer_models(profile: dict, _snapshot_download=None) -> None:
                 "not a static local Transformers catalog row")
             continue
         provider = getattr(row, "provider", "local")
+        if provider == "comfy_native":
+            # One ComfyUI text-encoder file, not a Hub snapshot: the queue-time
+            # preflight fetches it (pinned and verified) exactly as it fetches
+            # the engine weights, which this script does not warm either.
+            say("SKIP", "writer: %s" % model_id,
+                "a ComfyUI model file; fetched at first Queue by the preflight")
+            continue
         if provider != "local":
             say("SKIP", "writer: %s" % model_id,
                 "provider %s has no local Hub payload" % provider)
