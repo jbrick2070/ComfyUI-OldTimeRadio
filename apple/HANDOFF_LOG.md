@@ -721,3 +721,52 @@ zero new failures against the 8ffb09d baseline (289 baseline reds, 225 now).
 pushed diffs; findings folded in. NOT yet proven on hardware: the LTX 2.5
 queue-time download and the 16 GB silent lane on its new weights. Bug Bible not
 run from here -- its repo is not reachable in the cloud session.
+
+## 2026-09-27 -- Overnight: rolls, the foley speech duck, Gemini 3.8 TTS, 2.3.8 to 2.3.11
+
+Branch `main` (built in the `_worktrees/otr-rolls` worktree, pushed with
+`git push origin HEAD:main`). About 80 commits since 2026-09-26 noon.
+
+Shipped:
+- Selective rolls. Style and language rolls take a typed pool
+  (`style_roll_pool`, `language_roll_pool`, STRING widgets appended after
+  `gate_in`; empty = all). A multi-select COMBO drew as a blank box in the app
+  view (2.3.8), so 2.3.9 made them typed lists. `parse_roll_pool` also reads the
+  saved-list repr that core's `str()` produces. The language dropdown gained
+  "roll (any language)"; the pick is stamped in `meta["language_roll"]`.
+- The foley speech duck (`_otr_video_engines/foley_speech.py`): voice gate,
+  faster-whisper base, one batched judge call on the writer's technical model,
+  then the foley stem is halved on a beat with words. Operator rule: any words
+  duck, unsure ducks, a failed judge ducks every beat with a transcript.
+- Gemini 3.8 Flash TTS is the Google TTS default (retry on the Flash Lite TTS).
+- Registry: 2.3.8, 2.3.9, 2.3.10 published (2.3.9 Active, 2.3.10 Pending when
+  this was written), then 2.3.11 carrying the judge fix and the structured-call
+  alias contract fix.
+
+Live proof (RunPod RTX PRO 4000, 24 GB):
+- Episodes delivered to the 5080's obs: `crown_ass_20260927_040716`,
+  `dying_breaths_20260927_081511`, and the duck test
+  `crown_ass_20260927_123721`.
+- Whisper test: ten hard-coded LTX 2.5 foley prompts in a replayed ledger.
+  Detection 10 of 10 -- every scripted line word for word, nothing invented on
+  music, clapping, applause, crying, laughing or the silent mime. The duck
+  itself did not fire on that run (judge JSONDecodeError rolled it back); fixed
+  in 0df248d5 / cd0ff845 / 0d46b48d. Receipt:
+  `C:\Users\jeffr\OTR-pod\duck_test\results_20260927\WHISPER_RESULTS.md`.
+- PBUG-20260927-01 (replay paths with backslashes on Linux) and -02 (Whisper
+  dead on CUDA 13 stacks) both fixed and live-verified on the pod. Bug Bible
+  promotion for both is still owed.
+
+Open:
+- 4060 human-install check: the official ComfyUI portable is unpacked at
+  `C:\OTR-Human-2.3.10\ComfyUI_windows_portable` on the 4060, served on port
+  8190 with `--enable-manager` (the portable needs it for Node Manager; noted in
+  the README), reached from the 5080 through an SSH tunnel. Next: install
+  "old time radio" from Node Manager once 2.3.11 is Active, then run each 8 GB
+  workflow from Browse Templates one at a time and check obs after each.
+- The duck needs one more live leg on the fixed judge to prove a halved stem.
+- Astra's Whisper harness collector fails on its ledger lookup ("Need exactly
+  one replay ledger carrying this test id"); the numbers above come from the
+  episode's own ledger receipt.
+Models: DeepSeek, Sonnet and Composer QA on the pushed diffs, as each commit
+  names.
