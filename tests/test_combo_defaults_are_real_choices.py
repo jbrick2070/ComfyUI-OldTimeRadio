@@ -55,7 +55,8 @@ NODE_CLASS_MAPPINGS = _mappings()
 
 
 def _combo_widgets(cls):
-    """`(section, name, choices, default)` for every COMBO this class declares."""
+    """`(section, name, choices, default, multiselect)` for every COMBO this
+    class declares."""
     spec = cls.INPUT_TYPES()
     out = []
     for section in ("required", "optional"):
@@ -71,7 +72,8 @@ def _combo_widgets(cls):
             opts = decl[1] if len(decl) > 1 and isinstance(decl[1], dict) else {}
             if "default" not in opts:
                 continue                      # no default -> index 0 on purpose
-            out.append((section, name, list(choices), opts["default"]))
+            out.append((section, name, list(choices), opts["default"],
+                        bool(opts.get("multiselect"))))
     return out
 
 
@@ -89,8 +91,15 @@ def test_every_combo_default_is_one_of_its_own_choices(node_name):
         pytest.skip("%s declares no INPUT_TYPES" % node_name)
 
     problems = []
-    for section, name, choices, default in _combo_widgets(cls):
-        if default in choices:
+    for section, name, choices, default, multiselect in _combo_widgets(cls):
+        # A native multi-select (2026-09-26) holds a LIST; its default is a
+        # list whose every member must be a choice -- empty is "none picked".
+        # Only a declared multi-select may do this: a list default on an
+        # ordinary COMBO is still the defect this guard exists for.
+        if (multiselect and isinstance(default, list)
+                and all(d in choices for d in default)):
+            continue
+        if not isinstance(default, list) and default in choices:
             continue
         near = [c for c in choices if isinstance(c, str)
                 and isinstance(default, str) and c.startswith(default)]

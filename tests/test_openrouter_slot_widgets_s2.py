@@ -83,6 +83,10 @@ _EXPECTED_INPUT_ORDER = [
     # after episode_language, before the socket, so it is the trailing value.
     "asset_cleanup",
     "gate_in",                      # SOCKET -- no widgets_values slot
+    # SELECTIVE ROLLS (2026-09-26): two native multi-selects appended after
+    # the socket, so they are the trailing values and nothing moved.
+    "style_roll_pool",
+    "language_roll_pool",
 ]
 
 
@@ -139,8 +143,9 @@ def test_widget_order_appends_slots_at_end():
     # The socket, called out separately because it is the one entry here that
     # is NOT a widget and does NOT consume a saved value slot.
     widgets = [n for n in order if n != "gate_in"]
-    assert len(widgets) == 35, (
-        "the writer should declare 35 widgets plus the gate_in socket; got %d"
+    # 37 since 2026-09-26: the two selective-roll pools were appended.
+    assert len(widgets) == 37, (
+        "the writer should declare 37 widgets plus the gate_in socket; got %d"
         % len(widgets))
 
 

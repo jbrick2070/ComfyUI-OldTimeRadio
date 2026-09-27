@@ -208,6 +208,12 @@ class TestWorkflowJson:
                 f"{type(wv).__name__}"
             )
             for idx, val in enumerate(wv):
+                if isinstance(val, list) and all(isinstance(v, str) for v in val):
+                    # A native multi-select COMBO value (2026-09-26): a list
+                    # of choice strings, empty when nothing is picked. A
+                    # link-ref always carries an integer slot, so the two
+                    # cannot be confused.
+                    continue
                 if isinstance(val, list):
                     # Two-element [node_id, slot] reference
                     assert len(val) == 2, (
@@ -717,9 +723,13 @@ class TestWriterB2aSurface:
         # own baseline now (_otr_model_catalog.sampling_baseline). Every
         # descriptor after it moved up one, so `gate_in` went 30 -> 29 and the
         # one link past it followed by identity.
-        assert len(wv) == 35, (
-            f"writer widgets_values length drift: {len(wv)} (expected 35 "
-            f"after the 2026-09-25 removal of creativity; every earlier "
+        #
+        # 2026-09-26: the two selective-roll pools (style_roll_pool,
+        # language_roll_pool) APPENDED after the gate_in socket, 35 -> 37;
+        # no earlier slot and no link moved.
+        assert len(wv) == 37, (
+            f"writer widgets_values length drift: {len(wv)} (expected 37 "
+            f"after the 2026-09-26 selective-roll pools; every earlier "
             f"count is recorded in the history above)"
         )
         assert wv[slot('asset_cleanup')] == "off (keep everything)", (
