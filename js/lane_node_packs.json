@@ -1,0 +1,20 @@
+{
+  "_note": "Video lanes whose ComfyUI node classes come from another node pack. Read by js/workflow_schema.js to name a missing pack when a workflow LOADS. Pinned to each engine's _node_candidates and wrapper_bridge._PACK_FOR_PREFIX by tests/test_lane_node_packs.py; change the engines, then this file.",
+  "packs": {
+    "ComfyUI-AnimateDiff-Evolved": "comfyui-animatediff-evolved"
+  },
+  "lanes": {
+    "animatediff15_lightning_video": {
+      "pack": "ComfyUI-AnimateDiff-Evolved",
+      "node_types": ["ADE_AnimateDiffLoaderGen1", "ADE_StandardStaticContextOptions"]
+    },
+    "animatediff15_v3_haunted_video": {
+      "pack": "ComfyUI-AnimateDiff-Evolved",
+      "node_types": ["ADE_AnimateDiffLoaderGen1", "ADE_StandardStaticContextOptions"]
+    },
+    "animatediff15_v3_stillin_lab_video": {
+      "pack": "ComfyUI-AnimateDiff-Evolved",
+      "node_types": ["ADE_AnimateDiffLoaderGen1", "ADE_StandardStaticContextOptions"]
+    }
+  }
+}

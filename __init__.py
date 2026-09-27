@@ -495,6 +495,18 @@ if _otr_dup is None:
           "apple/MACHINES.md) -- or drag workflows/otr_canonical.json onto the "
           "canvas. Nothing needs changing: it resolves your device at run "
           "time. The finished episode lands in <output>/otr/obs/.")
+    # AnimateDiff-Evolved's red "No motion models found" at every boot until
+    # the first AnimateDiff run is expected; say so (2026-09-27). A note only:
+    # any failure here is silent, and nothing is downloaded at boot.
+    try:
+        import folder_paths as _otr_fp  # type: ignore
+        from .nodes._otr_boot_notes import ade_motion_module_note as _otr_ade_note
+        _otr_note = _otr_ade_note(_otr_fp.get_folder_paths("custom_nodes"),
+                                  _otr_fp.models_dir)
+        if _otr_note:
+            print(_otr_note)
+    except Exception:  # noqa: BLE001 -- a boot note never affects loading
+        pass
 
 # =====================================================================
 # HTTP route: GET /otr/latest_ledger
