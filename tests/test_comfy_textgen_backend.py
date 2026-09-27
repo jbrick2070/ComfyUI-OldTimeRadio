@@ -140,6 +140,8 @@ class _Decoder:
         self.script = script            # step -> token id the logits favour
         self.vocab = vocab
         self.stop_tokens = set(stop_tokens)
+        # ComfyUI's decoder exposes its stop ids here (gemma4.py stop_tokens).
+        self.model = SimpleNamespace(config=SimpleNamespace(stop_tokens=list(stop_tokens)))
         self.histories = []
         self.finished = False
         self.seeds = []
@@ -282,6 +284,17 @@ def test_a_stopping_criterion_latches_and_the_stop_is_not_reported_as_eos():
     assert out.tolist() == [[2, 11, 11, 11]]
     assert decoder.finished, "the stock loop must close itself"
     assert seen[0] == (1, 2), "criteria see a [1, n] view of prompt + generated"
+
+
+def test_an_extra_eos_the_loop_does_not_know_still_ends_the_loop():
+    """Composer QA on 34e5e3a2: a caller's extra eos id (here 0) is not in the
+    decoder's own stop list. The hook must halt on it AND hand the loop an id
+    the loop stops on, or the loop runs forward passes to the budget."""
+    adapter, _, decoder = _adapter(lambda step: [7, 0, 9][min(step, 2)])
+    out = adapter.generate(input_ids=_ids(2), do_sample=False, max_new_tokens=50,
+                           eos_token_id=[0])
+    assert out.tolist() == [[2, 7, 0]]
+    assert len(decoder.histories) == 2, "the loop ended on the halting step itself"
 
 
 def test_a_callback_error_is_reraised_after_the_loop_closes_and_the_hook_is_gone():

@@ -189,7 +189,7 @@ class _Run:
     grammar mask buffers and the criteria. Never outlives its call."""
 
     def __init__(self, prompt, max_new_tokens, stop_ids, allowed_fn, criteria,
-                 streamer):
+                 streamer, loop_stop_id):
         import torch
 
         self.prompt_len = len(prompt)
@@ -205,6 +205,10 @@ class _Run:
         self.halted_by_criteria = False
         self.error: "BaseException | None" = None
         self.stop_tensor = None
+        #: The id handed back to end ComfyUI's loop. It MUST be one the loop
+        #: itself stops on (its own ``stop_tokens``), or the loop would keep
+        #: running forward passes to the budget after a latched halt.
+        self.loop_stop_id = int(loop_stop_id)
         self.cpu_mask = None
         self.dev_mask = None
 
@@ -213,8 +217,7 @@ class _Run:
         begins -- so decode steps never allocate a new device tensor here."""
         import torch
 
-        stop_id = min(self.stop_ids)
-        self.stop_tensor = torch.full((logits.shape[0], 1), stop_id,
+        self.stop_tensor = torch.full((logits.shape[0], 1), self.loop_stop_id,
                                       dtype=torch.long, device=logits.device)
         if self.allowed_fn is not None:
             vocab = int(logits.shape[-1])
@@ -355,10 +358,13 @@ class ComfyGemmaGenerateAdapter:
         prompt = [int(t) for t in ids[0].tolist()]
         extra_stops = eos_token_id if isinstance(eos_token_id, (list, tuple, set)) else (
             () if eos_token_id is None else (eos_token_id,))
-        run = _Run(prompt, budget, set(self.stop_token_ids) | {int(t) for t in extra_stops},
-                   prefix_allowed_tokens_fn, stopping_criteria, streamer)
-        sampling = bool(do_sample) and float(temperature or 0.0) > 0.0
         owner = sampling_owner(self.clip)
+        loop_stops = list(getattr(getattr(getattr(owner, "model", None), "config", None),
+                                  "stop_tokens", None) or self.stop_token_ids)
+        run = _Run(prompt, budget, set(self.stop_token_ids) | {int(t) for t in extra_stops},
+                   prefix_allowed_tokens_fn, stopping_criteria, streamer,
+                   loop_stop_id=loop_stops[0])
+        sampling = bool(do_sample) and float(temperature or 0.0) > 0.0
         if "sample_token" in owner.__dict__:
             raise RuntimeError("this Gemma decoder is already generating (its "
                                "sample_token is wrapped); calls must not overlap")
