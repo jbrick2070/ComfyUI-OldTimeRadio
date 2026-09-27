@@ -9,12 +9,13 @@ graph was captured from a LIVE `/object_info` + a functional in-process smoke on
 
 The 0.9.8 all-in-one checkpoint carries MODEL + the video VAE **embedded** (no
 separate VAE fetch); it has **no text encoder**, so the T5 is the shared
-`t5xxl_fp16.safetensors` loaded through a separate `CLIPLoader` (type `ltxv`), which
-for the 8GB tier defaults to `device='cpu'` (encode first on CPU, diffuse on GPU).
+`t5xxl_fp16.safetensors` loaded through a separate `CLIPLoader` (type `ltxv`). Since
+recipe v3 (2026-09-26) it runs on the GPU (`device='default'`), which ComfyUI's dynamic
+VRAM stages it onto; Apple Silicon keeps the CPU until the lane is proven there.
 The graph (discovery-verified):
 
   CheckpointLoaderSimple(0.9.8) -> MODEL(+embedded VAE)
-  CLIPLoader(t5xxl_fp16, type=ltxv, device=cpu) -> CLIPTextEncode x2 (pos/neg)
+  CLIPLoader(t5xxl_fp16, type=ltxv, device=default; cpu on Apple) -> CLIPTextEncode x2 (pos/neg)
   ModelSamplingLTXV(max_shift, base_shift) -> MODEL
   LTXVImgToVideo(pos,neg,vae,image,w,h,length,strength) -> pos,neg,latent
   LTXVConditioning(frame_rate) -> pos,neg
