@@ -248,6 +248,7 @@ def _writer_schemas_s5() -> dict:
     # 2.3.8 multi-select).
     required["style_roll_pool"] = ("STRING", {"default": ""})
     required["language_roll_pool"] = ("STRING", {"default": ""})
+    required["bank_roll_pool"] = ("STRING", {"default": ""})
     return schemas
 
 
@@ -577,7 +578,8 @@ def test_round_trip_canonical_node1_inputs_correct():
     # widget, after episode_language and before the gate_in socket.
     # 37 since 2026-09-26: the two selective-roll pools appended after the
     # gate_in socket, one slot each, so nothing earlier moved.
-    assert len(dump) == 37, f"node 1 widgets_values length drift: {len(dump)}"
+    # 38 since 2026-09-27: the story bank's pool appended after them.
+    assert len(dump) == 38, f"node 1 widgets_values length drift: {len(dump)}"
     # creative/technical shifted 3/4 -> 2/3 when slot 1 was removed.
     expected_creative = dump[2]
     expected_technical = dump[3]

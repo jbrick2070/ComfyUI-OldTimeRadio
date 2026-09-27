@@ -42,7 +42,8 @@ def test_the_widget_is_declared_after_replay_from_and_before_gate_in():
     assert order.index("replay_from") + 1 == order.index("episode_language")
     assert order.index("episode_language") + 1 == order.index("asset_cleanup")
     assert order.index("asset_cleanup") + 1 == order.index("gate_in")
-    assert order[-3:] == ["gate_in", "style_roll_pool", "language_roll_pool"]
+    assert order[-4:] == ["gate_in", "style_roll_pool", "language_roll_pool",
+                          "bank_roll_pool"]
 
 
 def test_the_widget_offers_off_plus_every_admitted_row():

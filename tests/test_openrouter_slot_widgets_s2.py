@@ -32,7 +32,7 @@ from nodes.OTR_LedgerScriptWriter import _resolve_inputs
 #
 # `gate_in` is in this list because it is a declared INPUT, but it is a
 # forceInput SOCKET: it consumes no widgets_values slot, which is why the
-# saved widget vector is 37 while this list is 38 long.
+# saved widget vector is 38 while this list is 39 long.
 #
 # Departures, so a reader knows why the numbering here will not match older
 # comments elsewhere in the repo:
@@ -87,6 +87,8 @@ _EXPECTED_INPUT_ORDER = [
     # the socket, so they are the trailing values and nothing moved.
     "style_roll_pool",
     "language_roll_pool",
+    # The story bank's pool (2026-09-27), appended after the two above.
+    "bank_roll_pool",
 ]
 
 
@@ -144,8 +146,9 @@ def test_widget_order_appends_slots_at_end():
     # is NOT a widget and does NOT consume a saved value slot.
     widgets = [n for n in order if n != "gate_in"]
     # 37 since 2026-09-26: the two selective-roll pools were appended.
-    assert len(widgets) == 37, (
-        "the writer should declare 37 widgets plus the gate_in socket; got %d"
+    # 38 since 2026-09-27: the story bank's pool was appended.
+    assert len(widgets) == 38, (
+        "the writer should declare 38 widgets plus the gate_in socket; got %d"
         % len(widgets))
 
 

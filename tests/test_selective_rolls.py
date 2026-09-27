@@ -197,11 +197,58 @@ def test_the_language_roll_never_mutates_process_env():
 
 
 # ---------------------------------------------------------------------------
-# the writer surface: two trailing native multi-select COMBOs
+# the story bank's pool (2026-09-27)
+# ---------------------------------------------------------------------------
+def test_a_pool_beside_a_manual_bank_is_ignored():
+    assert ROLLS.resolve_bank_selection(
+        "original", pool="shakespeare, my_story", env={}) == ("original", None)
+
+
+def test_an_empty_bank_pool_is_the_whole_eligible_roll():
+    _sel, rec = ROLLS.resolve_bank_selection(ROLLS.BANK_SENTINEL, pool="", env={})
+    assert rec.eligible_order == ROLLS.eligible_bank_ids()
+
+
+def test_a_bank_pool_of_one_is_a_pick_and_may_keep_a_pinned_source():
+    """One name is the manual path, so a pinned source_ref is coherent."""
+    assert ROLLS.resolve_bank_selection(
+        ROLLS.BANK_SENTINEL, pool="shakespeare", source_ref="macbeth",
+        env={}) == ("shakespeare", None)
+
+
+def test_a_bank_pool_rolls_among_exactly_those_and_says_so():
+    pool = "original, public_domain, shakespeare"
+    seen = set()
+    for seed in range(40):
+        sel, rec = ROLLS.resolve_bank_selection(
+            ROLLS.BANK_SENTINEL, pool=pool,
+            env={ROLLS.BANK_SEED_ENV: str(seed)})
+        assert rec.eligible_order == ("original", "public_domain", "shakespeare")
+        assert rec.surface == "source_bank" and sel == rec.selected
+        seen.add(sel)
+    assert seen == {"original", "public_domain", "shakespeare"}
+
+
+def test_a_bank_pool_roll_still_refuses_a_pinned_source():
+    with pytest.raises(ROLLS.RollError):
+        ROLLS.resolve_bank_selection(
+            ROLLS.BANK_SENTINEL, pool="original, shakespeare",
+            source_ref="macbeth", env={})
+
+
+def test_an_unknown_bank_in_the_pool_is_refused_loud():
+    with pytest.raises(ROLLS.RollError):
+        ROLLS.resolve_bank_selection(
+            ROLLS.BANK_SENTINEL, pool="original, not_a_bank", env={})
+
+
+# ---------------------------------------------------------------------------
+# the writer surface: trailing typed-list pools
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("name,names", [
     ("style_roll_pool", list(ROLLS.eligible_style_ids())),
     ("language_roll_pool", list(LANGUAGES)),
+    ("bank_roll_pool", list(ROLLS.eligible_bank_ids())),
 ])
 def test_each_pool_is_a_typed_list_the_app_view_can_draw(name, names):
     """A STRING, not a multi-select: the app view (frontend 1.52.7) drew the
@@ -244,14 +291,26 @@ def test_a_typed_pool_and_a_saved_list_parse_the_same():
     assert typed == saved == ("video_art", "anime", "cartoon")
 
 
-def test_the_canonical_saves_both_pools_as_trailing_empty_slots():
+def test_the_canonical_saves_every_pool_as_a_trailing_empty_slot():
     wf = json.loads(CANONICAL.read_text(encoding="utf-8"))
     node = next(n for n in wf["nodes"] if n["type"] == "OTR_LedgerScriptWriter")
-    assert node["widgets_values"][-2:] == ["", ""]
-    assert [i["name"] for i in node["inputs"][-2:]] == [
-        "style_roll_pool", "language_roll_pool"]
+    assert node["widgets_values"][-3:] == ["", "", ""]
+    assert [i["name"] for i in node["inputs"][-3:]] == [
+        "style_roll_pool", "language_roll_pool", "bank_roll_pool"]
     assert all(i["link"] is None and i["widget"]["name"] == i["name"]
-               for i in node["inputs"][-2:])
+               for i in node["inputs"][-3:])
+
+
+def test_every_roll_in_the_app_form_has_its_pool_right_under_it():
+    """Operator, 2026-09-27: the three rolls must look alike in the app
+    view -- the dropdown with its roll row, then its typed pool."""
+    form = json.loads((REPO / "config" / "app_mode.json").read_text(
+        encoding="utf-8"))["form"]
+    names = [row[1] for row in form if row[0] == "OTR_LedgerScriptWriter"]
+    for dropdown, pool in (("episode_language", "language_roll_pool"),
+                           ("source_bank", "bank_roll_pool"),
+                           ("visual_style", "style_roll_pool")):
+        assert names[names.index(dropdown) + 1] == pool
 
 
 def test_the_writer_wires_both_pools_and_the_language_roll_at_their_real_sites():
@@ -267,6 +326,8 @@ def test_the_writer_wires_both_pools_and_the_language_roll_at_their_real_sites()
     assert style < bank_bound < language < gate
     assert "pool=language_roll_pool" in body[language:gate]
     assert 'meta["language_roll"] = _language_roll.to_meta()' in body
+    bank = body.index("_ROLLS.resolve_bank_selection(")
+    assert "pool=bank_roll_pool" in body[bank:style]
 
 
 def test_the_floor_fallback_reads_the_rolls_own_pool():
@@ -291,7 +352,7 @@ def test_a_list_widget_value_goes_out_wrapped(which):
         schemas = conv.build_offline_schemas()
     wf = json.loads(CANONICAL.read_text(encoding="utf-8"))
     node = next(n for n in wf["nodes"] if n["type"] == "OTR_LedgerScriptWriter")
-    node["widgets_values"][-2] = ["anime", "cartoon"]
+    node["widgets_values"][-3] = ["anime", "cartoon"]
     prompt = conv.workflow_to_api_prompt(wf, schemas)
     inputs = prompt[str(node["id"])]["inputs"]
     assert inputs["style_roll_pool"] == {"__value__": ["anime", "cartoon"]}
@@ -312,7 +373,9 @@ def test_both_patchers_take_a_typed_pool(which):
     else:
         mod = WA
     mod.patch_creative(wf, node["id"], "style_roll_pool", "anime, cartoon", schemas)
-    assert node["widgets_values"][-2] == "anime, cartoon"
+    assert node["widgets_values"][-3] == "anime, cartoon"
+    mod.patch_creative(wf, node["id"], "bank_roll_pool", "original", schemas)
+    assert node["widgets_values"][-1] == "original"
 
 
 def test_set_carries_a_pool_through_the_headless_runner(tmp_path):

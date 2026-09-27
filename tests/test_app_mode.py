@@ -84,7 +84,7 @@ def test_the_form_follows_his_order():
     assert names == [
         "episode_language", "language_roll_pool",
         "num_characters", "act_count",
-        "source_bank", "source_ref",
+        "source_bank", "bank_roll_pool", "source_ref",
         "visual_style", "style_roll_pool",
         "announcer_video_model", "announcer_image_model",
         "character_video_model", "character_image_model",

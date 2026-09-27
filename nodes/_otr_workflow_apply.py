@@ -919,7 +919,7 @@ CREATIVE_WHITELIST = frozenset({
     "lemmy_cameo",
     # The selective-roll pools (2026-09-26): which styles / languages a
     # roll may land on. Creative dials, never managed by a workflow row.
-    "style_roll_pool", "language_roll_pool",
+    "style_roll_pool", "language_roll_pool", "bank_roll_pool",
     # asset_cleanup (the Space saver, row 0b) is the writer's housekeeping
     # dial: what stays on disk after the episode publishes. It never picks an
     # engine, a route or a model, and no workflow row manages it, so a

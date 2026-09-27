@@ -307,6 +307,7 @@ def resolve_bank_selection(
     requested: str,
     *,
     source_ref: str = "",
+    pool: Any = None,
     env: "Mapping[str, str] | None" = None,
     rng_factory: "Callable[[int], Any]" = random.Random,
 ) -> "tuple[str, RollReceipt | None]":
@@ -314,7 +315,13 @@ def resolve_bank_selection(
 
     A non-sentinel value returns byte-identically with NO receipt.
 
-    A nonblank `source_ref` alongside the sentinel is REFUSED, loudly. A
+    ``pool`` is the SELECTIVE roll (2026-09-27), the same shape as the
+    style and language pools: read only when the bank is the roll. Empty is
+    every eligible bank; one id is a pick (no receipt, the manual path, so a
+    pinned `source_ref` is coherent with it); two or more roll among exactly
+    those. A name outside the eligible banks fails LOUD.
+
+    A nonblank `source_ref` alongside a real roll is REFUSED, loudly. A
     pinned source belongs to one specific bank (a Folger scene ref means
     nothing to the archive lane), so "roll the bank but keep my pinned
     source" has no coherent answer -- and silently rolling anyway would hand
@@ -322,6 +329,10 @@ def resolve_bank_selection(
     """
     if not is_bank_sentinel(requested):
         return str(requested), None
+    order = eligible_bank_ids()
+    chosen = parse_roll_pool(pool, valid_ids=order, surface="source_bank")
+    if len(chosen) == 1:
+        return chosen[0], None
     pinned = str(source_ref or "").strip()
     if pinned:
         raise RollError(
@@ -329,7 +340,8 @@ def resolve_bank_selection(
             f"pins a specific source. A pinned reference belongs to ONE "
             f"bank: pick that bank directly, or clear source_ref to roll."
         )
-    order = eligible_bank_ids()
+    if chosen:
+        order = tuple(sorted(chosen))
     if not order:
         raise RollError(
             f"the source_bank roll has no eligible bank. "

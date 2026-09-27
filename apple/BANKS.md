@@ -107,6 +107,18 @@ invents the whole thing, with no premise scaffold at all -- pure radio drama.
 In the writer node, set `source_bank` to the bank you want instead of leaving it
 on **roll (any eligible bank)**.
 
+Or keep the roll and narrow it. Under Story bank sits **Banks to roll**
+(`bank_roll_pool`), a text box: type bank ids separated by commas (for example
+`original, shakespeare`). It only matters while Story bank is on the roll:
+
+- empty -- the roll draws from every eligible bank;
+- one name -- that bank, every time (a pick, not a roll);
+- two or more -- the roll draws from just those, at equal odds.
+
+A name that is not an eligible bank stops the run with a message naming it.
+The ledger's `meta.bank_roll.eligible_order` names the banks the roll drew from.
+The same box sits under Language and under Visual style.
+
 Worth knowing if you are comparing episodes: a roll is not a fair comparison.
 If you are judging a change -- a new voice, a different writer model, a prompt
 edit -- pin the SAME bank on both runs, or you are hearing two different shows

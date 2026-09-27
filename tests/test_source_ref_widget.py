@@ -79,7 +79,8 @@ def test_source_ref_slot_pinned_after_source_bank():
     # `gate_in` (the forceInput validator socket) is followed only by the two
     # selective-roll pools appended on 2026-09-26 -- not `story_author`, which
     # the reorder moved up next to `source_ref` (see the chain above).
-    assert order[-3:] == ["gate_in", "style_roll_pool", "language_roll_pool"]
+    assert order[-4:] == ["gate_in", "style_roll_pool", "language_roll_pool",
+                          "bank_roll_pool"]
     # A COUNT, not a position -- this one is a literal on purpose. 36 declared
     # inputs carry a 35-wide saved vector because gate_in is a forceInput
     # socket and consumes no widgets_values slot (asserted just below).
@@ -88,7 +89,8 @@ def test_source_ref_slot_pinned_after_source_bank():
     # 36 again since 2026-09-25 evening, when `creativity` (a mid-list COMBO)
     # came out -- each writer model samples at its maker's own baseline now.
     # 38 since 2026-09-26: the two selective-roll pools, appended (37 saved).
-    assert len(order) == 38
+    # 39 since 2026-09-27: the story bank's pool, appended (38 saved).
+    assert len(order) == 39
 
     source_ref_type, meta = spec["optional"]["source_ref"]
     assert source_ref_type == "STRING"
@@ -155,7 +157,7 @@ def test_patch_widget_by_name_lands_on_source_ref():
     # `asset_cleanup` was appended. Patching must not change the width -- a patch
     # that grew or shrank the vector would be corrupting every later widget in
     # the graph.
-    assert len(node1["widgets_values"]) == 37
+    assert len(node1["widgets_values"]) == 38
 
     # Neighbour checks. They exist to prove the patch landed on source_ref
     # ALONE and left the widgets on either side of it holding canonical's own

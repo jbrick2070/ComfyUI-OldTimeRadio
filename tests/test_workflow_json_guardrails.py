@@ -727,9 +727,12 @@ class TestWriterB2aSurface:
         # 2026-09-26: the two selective-roll pools (style_roll_pool,
         # language_roll_pool) APPENDED after the gate_in socket, 35 -> 37;
         # no earlier slot and no link moved.
-        assert len(wv) == 37, (
-            f"writer widgets_values length drift: {len(wv)} (expected 37 "
-            f"after the 2026-09-26 selective-roll pools; every earlier "
+        #
+        # 2026-09-27: the story bank's pool (bank_roll_pool) APPENDED after
+        # them, 37 -> 38; no earlier slot and no link moved.
+        assert len(wv) == 38, (
+            f"writer widgets_values length drift: {len(wv)} (expected 38 "
+            f"after the 2026-09-27 bank roll pool; every earlier "
             f"count is recorded in the history above)"
         )
         assert wv[slot('asset_cleanup')] == "off (keep everything)", (

@@ -3038,6 +3038,25 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         ),
                     },
                 ),
+                # The story bank's pool (2026-09-27), APPENDED after the two
+                # above (BUG-LOCAL-097) so every roll in the app view has the
+                # same shape: the dropdown's roll row, then its typed pool.
+                "bank_roll_pool": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": False,
+                        "tooltip": (
+                            "Read only when Story bank is 'roll (any "
+                            "eligible bank)'. Type the banks to roll among, "
+                            "separated by commas; empty rolls among every "
+                            "eligible bank, one name is simply that bank. "
+                            "Choose from: "
+                            + ", ".join(_ROLLS.eligible_bank_ids())
+                            + ". Recorded at meta.bank_roll."
+                        ),
+                    },
+                ),
             },
             # NO hidden Comfy key here (plan 0k, 2026-09-26): a V1 node that
             # declares one writes it into /history when it raises. The Comfy
@@ -3165,6 +3184,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # the legacy-missing state of a graph saved before them: no pool.
         style_roll_pool=None,
         language_roll_pool=None,
+        bank_roll_pool=None,
     ):
         """Generate one accepted v2.0 LPL story artifact."""
         # ------------------------------------------------------------------ #
@@ -3345,6 +3365,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         source_bank, _bank_roll = _ROLLS.resolve_bank_selection(
             source_bank,
             source_ref=source_ref,
+            pool=bank_roll_pool,
         )
         visual_style, _style_roll = _ROLLS.resolve_style_selection(
             visual_style, pool=style_roll_pool)
