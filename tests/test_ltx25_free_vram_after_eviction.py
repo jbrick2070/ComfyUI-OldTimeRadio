@@ -7,11 +7,11 @@ every settle line on both boxes read "never moved" -- four identical readings
 from 0.0 s -- so the loop cost 3 s a clip for a figure that reaches a log line
 and nothing else. The loop's own tests died with it.
 
-WHAT THIS VALUE IS FOR, because it bounds what is worth asserting: it reaches a
-LOG LINE and nothing else. `_make_room_for_decode` logs it and returns; no
-branch shortens, skips or refuses the decode on it. Do not add a test here that
-asserts a gate -- there isn't one, by operator ruling ("never refuse on a
-number, only an OOM decides").
+WHAT THIS VALUE IS FOR, because it bounds what is worth asserting: it decides
+only what gets LOGGED -- an info line, or which warning follows it.
+`_make_room_for_decode` logs and returns; nothing shortens, skips or refuses the
+decode on it. Do not add a test here that asserts a gate -- there isn't one, by
+operator ruling ("never refuse on a number, only an OOM decides").
 """
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ def test_an_unreadable_card_reports_the_floor_not_none(read_once):
     assert value == 4940.0 and mc.calls == 1
 
 
-def test_it_reaches_a_log_line_and_nothing_branches_on_it():
+def test_it_decides_only_what_is_logged_never_the_decode():
     """Guard the operator ruling structurally: no refusal may grow back here.
 
     `_make_room_for_decode` may log, may warn, and must return. If a future

@@ -1722,10 +1722,12 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         2026-09-26 every settle line on both boxes read "never moved": four
         identical readings from 0.0 s (the 4060's ltx25_foley_16gb A/B, the
         5080's ltx25_video legs). The release lands before the first read, so
-        the loop spent 3 s a clip waiting on a figure that reaches a log line
-        and nothing else -- no branch shortens, skips or refuses the decode on
-        it (operator ruling: only an OOM decides). An early reading can only
-        under-report in that log line.
+        the loop spent 3 s a clip waiting on a figure that only decides what
+        gets LOGGED -- the info line, or one of the warnings after it. Nothing
+        shortens, skips or refuses the decode on it (operator ruling: only an
+        OOM decides). An early reading can only under-report there, which at
+        worst logs a "decode starts short" warning a settled reading would not
+        have (Composer QA on 6b112bf9).
 
         An unreadable card reports ``floor_mb``, the pre-eviction reading,
         rather than None."""
