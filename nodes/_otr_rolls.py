@@ -43,6 +43,7 @@ Import direction stays one-way:
 
 from __future__ import annotations
 
+import json
 import random
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
@@ -68,9 +69,13 @@ RECEIPT_VERSION = 1
 BANK_SENTINEL = "roll (any eligible bank)"
 #: The `visual_style` dropdown's roll command.
 STYLE_SENTINEL = "roll (any style)"
+#: The episode_language roll (2026-09-26). Draws from the admitted language
+#: rows -- never Off, which is not a language -- or from the chosen pool.
+LANGUAGE_SENTINEL = "roll (any language)"
 
 BANK_SEED_ENV = "OTR_BANK_SEED"
 STYLE_SEED_ENV = "OTR_VISUAL_STYLE_SEED"
+LANGUAGE_SEED_ENV = "OTR_LANGUAGE_SEED"
 
 _SEED_BITS = 32
 _SEED_CEILING = 2 ** _SEED_BITS
@@ -117,6 +122,66 @@ class RollReceipt:
 
 def is_bank_sentinel(value: Any) -> bool:
     return str(value or "").strip() == BANK_SENTINEL
+
+
+def is_language_sentinel(value: Any) -> bool:
+    return value == LANGUAGE_SENTINEL
+
+
+def parse_roll_pool(
+    raw: Any,
+    *,
+    valid_ids: "Sequence[str]",
+    surface: str,
+    refused: "Sequence[str]" = (),
+) -> "tuple[str, ...]":
+    """The ids a SELECTIVE roll may draw from, first-seen order, no repeats.
+
+    The pool widgets are native multi-select COMBOs, so the node normally
+    receives a ``list[str]``. A headless ``--set`` may hand a JSON list
+    string or a comma-separated string instead; both parse to the same
+    tuple. Empty (None, "", []) is ``()`` -- "no pool chosen", which the
+    callers read as the whole list. An id outside ``valid_ids``, or one in
+    ``refused``, fails LOUD: a pool that quietly drops a typo rolls from a
+    set nobody chose.
+    """
+    if raw is None:
+        return ()
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return ()
+        if text.startswith("["):
+            try:
+                raw = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise RollError(
+                    f"the {surface} roll pool {text!r} is not a JSON list"
+                ) from exc
+        else:
+            raw = [part for part in (p.strip() for p in text.split(",")) if part]
+    if not isinstance(raw, (list, tuple)):
+        raise RollError(
+            f"the {surface} roll pool must be a list of ids, got "
+            f"{type(raw).__name__}"
+        )
+    valid = set(valid_ids)
+    chosen: "list[str]" = []
+    for item in raw:
+        value = str(item).strip()
+        if value in refused:
+            raise RollError(
+                f"{value!r} cannot be rolled for {surface}; take it out of "
+                f"the pool, or pick it directly."
+            )
+        if value not in valid:
+            raise RollError(
+                f"the {surface} roll pool names {value!r}, which is not one "
+                f"of {sorted(valid)!r}"
+            )
+        if value not in chosen:
+            chosen.append(value)
+    return tuple(chosen)
 
 
 def is_style_sentinel(value: Any) -> bool:
@@ -295,9 +360,27 @@ def floor_style_ids() -> "tuple[str, ...]":
     return tuple(sorted(_STYLES.list_style_ids()))
 
 
+def floor_style_order(style_roll: "RollReceipt | None" = None) -> "tuple[str, ...]":
+    """The pool the dynamic lane's FLOOR draws from when it fails.
+
+    The roll's own pool minus the dynamic lane, when that leaves anything --
+    so a chosen pool of "visual_storybased, anime, cartoon" falls back to
+    anime or cartoon, never to a style nobody chose. Otherwise every disk
+    style. For the whole-list roll the two are the same tuple, so today's
+    floor is unchanged byte for byte.
+    """
+    if style_roll is not None:
+        own = tuple(s for s in style_roll.eligible_order
+                    if s != DYNAMIC_STYLE_ID)
+        if own:
+            return own
+    return floor_style_ids()
+
+
 def resolve_style_selection(
     requested: str,
     *,
+    pool: Any = None,
     env: "Mapping[str, str] | None" = None,
     rng_factory: "Callable[[int], Any]" = random.Random,
 ) -> "tuple[str, RollReceipt | None]":
@@ -305,6 +388,11 @@ def resolve_style_selection(
 
     Independent of the bank roll in every respect: its own sentinel, its own
     seed env, its own receipt. Rolling one surface never implies the other.
+
+    ``pool`` is the SELECTIVE roll (2026-09-26): read only when the style is
+    the roll. Empty is the whole list; one id is a pick (no receipt, the
+    manual path); two or more roll among exactly those, and the receipt's
+    ``eligible_order`` names them.
     """
     if not is_style_sentinel(requested):
         return str(requested), None
@@ -315,11 +403,69 @@ def resolve_style_selection(
             "registry is empty. Pick a style directly, or repair the pack "
             "directory."
         )
+    chosen = parse_roll_pool(pool, valid_ids=order, surface="visual_style")
+    if len(chosen) == 1:
+        return chosen[0], None
+    if chosen:
+        order = tuple(sorted(chosen))
     seed, seed_source = resolve_seed(STYLE_SEED_ENV, env)
     selected = draw(order, seed, rng_factory)
     return selected, RollReceipt(
         surface="visual_style",
         requested=STYLE_SENTINEL,
+        selected=selected,
+        seed=seed,
+        seed_source=seed_source,
+        eligible_order=order,
+    )
+
+
+def resolve_language_selection(
+    requested: str,
+    *,
+    pool: Any = None,
+    source_bank_id: str = "",
+    env: "Mapping[str, str] | None" = None,
+    rng_factory: "Callable[[int], Any]" = random.Random,
+) -> "tuple[str, RollReceipt | None]":
+    """(concrete language LABEL, receipt-or-None). The ONE writer of
+    ``language_roll``.
+
+    Resolved AFTER the bank, because a language row may list a bank under
+    ``source_bank_exclusions`` (empty on every shipped row -- every lane is
+    eligible for every language since 2026-09-18 -- but it is the gate, so
+    the roll honours it rather than landing on a refusal). The pool is the
+    admitted rows, never Off; a chosen pool of one is a pick; a pool the
+    bank excludes entirely fails LOUD instead of rolling again.
+    """
+    if not is_language_sentinel(requested):
+        return str(requested), None
+    try:
+        from . import _otr_episode_languages as _LANG
+    except ImportError:  # pragma: no cover - standalone / test load
+        import _otr_episode_languages as _LANG  # type: ignore
+    labels = tuple(c for c in _LANG.dropdown_choices() if c != _LANG.OFF_LABEL)
+    chosen = parse_roll_pool(pool, valid_ids=labels, surface="episode_language",
+                             refused=(_LANG.OFF_LABEL,))
+    if len(chosen) == 1:
+        return chosen[0], None
+    bank = str(source_bank_id or "").strip()
+    order = tuple(sorted(
+        label for label in (chosen or labels)
+        if bank not in (_LANG.row_by_label(label).admission.get(
+            "source_bank_exclusions") or [])
+    ))
+    if not order:
+        raise RollError(
+            f"the episode_language roll has nothing to draw from: every "
+            f"language in the pool excludes source bank {bank!r}. Pick a "
+            f"language directly, or widen the pool."
+        )
+    seed, seed_source = resolve_seed(LANGUAGE_SEED_ENV, env)
+    selected = draw(order, seed, rng_factory)
+    return selected, RollReceipt(
+        surface="episode_language",
+        requested=LANGUAGE_SENTINEL,
         selected=selected,
         seed=seed,
         seed_source=seed_source,
@@ -341,7 +487,13 @@ __all__ = [
     "eligible_style_ids",
     "floor_style_ids",
     "is_bank_sentinel",
+    "floor_style_order",
+    "is_language_sentinel",
     "is_style_sentinel",
+    "LANGUAGE_SEED_ENV",
+    "LANGUAGE_SENTINEL",
+    "parse_roll_pool",
+    "resolve_language_selection",
     "resolve_bank_selection",
     "resolve_seed",
     "resolve_style_selection",

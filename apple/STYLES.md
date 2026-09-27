@@ -61,6 +61,21 @@ Two consequences worth knowing:
 - **The roll can land on `visual_storybased`**, which behaves differently from
   a pack loaded from disk.
 
+### Rolling among a few styles you choose
+
+Under Visual style sits **Styles to roll** (`style_roll_pool`), a checklist of
+every style. It only matters while Visual style is `roll (any style)`:
+
+- nothing checked -- the roll draws from every style, as above;
+- one checked -- that style, every time (a pick, not a roll);
+- two or more checked -- the roll draws from just those, at equal odds.
+
+The ledger's `meta.style_roll.eligible_order` names the exact styles the roll
+drew from, and `OTR_VISUAL_STYLE_SEED` replays it. If the roll lands on
+`visual_storybased` and that lane fails, its fallback also stays inside your
+checked styles. Headless: `--set
+OTR_LedgerScriptWriter.style_roll_pool='["anime","video_art"]'`.
+
 ---
 
 ## Where you actually see it

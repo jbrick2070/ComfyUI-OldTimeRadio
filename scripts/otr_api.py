@@ -201,6 +201,19 @@ def _validate_widget_value(
 
     # Dropdown / COMBO -- type_def is the list of choices.
     if isinstance(type_def, list):
+        opts = spec[1] if (isinstance(spec, (list, tuple)) and len(spec) > 1
+                           and isinstance(spec[1], dict)) else {}
+        if opts.get("multiselect") and isinstance(value, list):
+            # A native multi-select holds a LIST; each member must be a
+            # choice, which is exactly how core validates it.
+            stray = [v for v in value if v not in type_def]
+            if stray:
+                raise ValueError(
+                    f"widget {widget_name!r} on node_type {node_type!r} is a "
+                    f"multi-select COMBO with choices {type_def!r}; got "
+                    f"{stray!r}, which are not in the choice list."
+                )
+            return
         if value not in type_def:
             # [OpenRouter S3] Admit-path past the static choice-list check.
             # A saved OpenRouter slot slug can be legitimately out-of-list
@@ -657,7 +670,13 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
                     continue
 
                 if wv_idx < len(wv):
-                    inputs[slot_name] = wv[wv_idx]
+                    value = wv[wv_idx]
+                    # A LIST widget value (the multi-select pools) goes
+                    # out wrapped, exactly as the frontend's graphToPrompt
+                    # sends it: a bare list in an API prompt is read as a
+                    # LINK. Core unwraps `__value__` before validation.
+                    inputs[slot_name] = ({"__value__": value}
+                                         if isinstance(value, list) else value)
                     wv_idx += 1
 
         prompt[nid] = {"class_type": ntype, "inputs": inputs}
@@ -1000,6 +1019,9 @@ CREATIVE_WHITELIST = frozenset({
     # qualification run force the cameo deterministically instead of waiting on
     # an 11% roll; source-fidelity exclusion still overrides it.
     "lemmy_cameo",
+    # The selective-roll pools (2026-09-26): which styles / languages a
+    # roll may land on. Creative dials, never managed by a workflow row.
+    "style_roll_pool", "language_roll_pool",
     # asset_cleanup -- the Space saver housekeeping dial; mirror of the
     # package whitelist. Decides what stays on disk after publishing, never
     # an engine or route; the mux still refuses any unproven deletion.

@@ -243,6 +243,15 @@ def _writer_schemas_s5() -> dict:
          "full (keep only the published video)"],
         {"default": "off (keep everything)"},
     )
+    # SELECTIVE ROLLS (2026-09-26): the two trailing native multi-selects.
+    required["style_roll_pool"] = (
+        ["anime", "cartoon"], {"multiselect": True, "multi_select": {},
+                               "default": []},
+    )
+    required["language_roll_pool"] = (
+        ["English", "French"], {"multiselect": True, "multi_select": {},
+                                "default": []},
+    )
     return schemas
 
 
@@ -570,7 +579,9 @@ def test_round_trip_canonical_node1_inputs_correct():
     # moved 31 -> 30 with the gate_in socket.
     # 36 since 2026-09-25: `asset_cleanup` (row 0b) appended as the trailing
     # widget, after episode_language and before the gate_in socket.
-    assert len(dump) == 35, f"node 1 widgets_values length drift: {len(dump)}"
+    # 37 since 2026-09-26: the two selective-roll pools appended after the
+    # gate_in socket, one slot each, so nothing earlier moved.
+    assert len(dump) == 37, f"node 1 widgets_values length drift: {len(dump)}"
     # creative/technical shifted 3/4 -> 2/3 when slot 1 was removed.
     expected_creative = dump[2]
     expected_technical = dump[3]

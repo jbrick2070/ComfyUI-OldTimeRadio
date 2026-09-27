@@ -35,20 +35,24 @@ def test_the_widget_is_declared_after_replay_from_and_before_gate_in():
     """BUG-LOCAL-097: gate_in is a forceInput socket and holds no saved slot,
     so a widget declared just before it is the TRAILING value. That was
     episode_language until 2026-09-25, when asset_cleanup (row 0b) was
-    appended after it the same way."""
+    appended after it the same way. Since 2026-09-26 the two selective-roll
+    pools follow the socket as the trailing widgets."""
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
     assert order.index("replay_from") + 1 == order.index("episode_language")
     assert order.index("episode_language") + 1 == order.index("asset_cleanup")
     assert order.index("asset_cleanup") + 1 == order.index("gate_in")
-    assert order[-1] == "gate_in"
+    assert order[-3:] == ["gate_in", "style_roll_pool", "language_roll_pool"]
 
 
 def test_the_widget_offers_off_plus_every_admitted_row():
+    """The roll leads, as on the bank and style dropdowns (2026-09-26);
+    then Off and every admitted row."""
+    from nodes import _otr_rolls as ROLLS
     choices, meta = W.INPUT_TYPES()["optional"]["episode_language"]
-    assert list(choices) == el.dropdown_choices()
-    assert choices[0] == el.OFF_LABEL
-    assert len(choices) == 9
+    assert list(choices) == [ROLLS.LANGUAGE_SENTINEL] + el.dropdown_choices()
+    assert choices[1] == el.OFF_LABEL
+    assert len(choices) == 10
     # A COMBO whose default is out-of-list is a load-time hazard.
     assert meta["default"] == "English" and meta["default"] in choices
 

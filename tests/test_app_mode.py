@@ -78,12 +78,14 @@ def test_the_form_follows_his_order():
     writing models including cloud sub options, upscaler, my story fields".
     Rows he did not name sit next to their nearest relative: the source row
     under its bank, each still under its video, and story idea / title /
-    Lemmy just above My Story. Space saver closes the form."""
+    Lemmy just above My Story. Space saver closes the form. Each roll pool
+    (2026-09-26) sits under the dropdown it narrows."""
     names = [w for _t, w in (tuple(e[:2]) for e in CONFIG["form"])]
     assert names == [
-        "episode_language", "num_characters", "act_count",
+        "episode_language", "language_roll_pool",
+        "num_characters", "act_count",
         "source_bank", "source_ref",
-        "visual_style",
+        "visual_style", "style_roll_pool",
         "announcer_video_model", "announcer_image_model",
         "character_video_model", "character_image_model",
         "music_video_model", "music_image_model",

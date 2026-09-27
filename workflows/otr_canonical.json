@@ -475,6 +475,26 @@
             "name": "asset_cleanup"
           },
           "link": null
+        },
+        {
+          "localized_name": "style_roll_pool",
+          "name": "style_roll_pool",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "style_roll_pool"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "language_roll_pool",
+          "name": "language_roll_pool",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "language_roll_pool"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -566,7 +586,9 @@
         true,
         "",
         "English",
-        "off (keep everything)"
+        "off (keep everything)",
+        [],
+        []
       ],
       "color": "#323",
       "bgcolor": "#535"

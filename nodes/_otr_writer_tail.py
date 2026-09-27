@@ -1460,7 +1460,7 @@ class WriterTailMixin:
                     # override or OS entropy), matching the rolled path.
                     _f_seed, _f_source = _ROLLS.resolve_seed(_ROLLS.STYLE_SEED_ENV)
 
-                _f_order = _ROLLS.floor_style_ids()
+                _f_order = _ROLLS.floor_style_order(ctx.style_roll)
                 _f_selected = _ROLLS.draw(_f_order, _f_seed, random.Random)
                 _f_roll_dict = {
                     "surface": "visual_style_floor",

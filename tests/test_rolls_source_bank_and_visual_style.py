@@ -415,6 +415,12 @@ def test_the_roll_module_imports_nothing_that_could_call_a_model():
         # If env.py ever grows a non-stdlib import, THAT is the thing to refuse,
         # and this entry is where to come back to.
         "_otr_shared", "env", "otr_env",
+        # THE LANGUAGE ROLL (2026-09-26): `json` parses a headless pool
+        # value, and the language registry is read for its labels and its
+        # admission data. _otr_episode_languages imports exactly
+        # __future__, hashlib, json, logging, os and typing -- stdlib only,
+        # the same leaf-closure test env.py passed.
+        "json", "_otr_episode_languages", "_LANG",
     }
     assert imported <= allowed, f"unexpected imports: {imported - allowed}"
 

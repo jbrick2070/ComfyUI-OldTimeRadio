@@ -593,7 +593,13 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
                         wv_idx += 1
                     continue
                 if wv_idx < len(wv):
-                    inputs[slot_name] = wv[wv_idx]
+                    value = wv[wv_idx]
+                    # A LIST widget value (the multi-select pools) goes
+                    # out wrapped, exactly as the frontend's graphToPrompt
+                    # sends it: a bare list in an API prompt is read as a
+                    # LINK. Core unwraps `__value__` before validation.
+                    inputs[slot_name] = ({"__value__": value}
+                                         if isinstance(value, list) else value)
                     wv_idx += 1
         prompt[nid] = {"class_type": ntype, "inputs": inputs}
     return prompt
@@ -897,6 +903,9 @@ CREATIVE_WHITELIST = frozenset({
     # `lemmy_policy = "source_fidelity_exclusion"`. This entry adds a creative
     # dial, never a route, engine, reference or other managed/runtime field.
     "lemmy_cameo",
+    # The selective-roll pools (2026-09-26): which styles / languages a
+    # roll may land on. Creative dials, never managed by a workflow row.
+    "style_roll_pool", "language_roll_pool",
     # asset_cleanup (the Space saver, row 0b) is the writer's housekeeping
     # dial: what stays on disk after the episode publishes. It never picks an
     # engine, a route or a model, and no workflow row manages it, so a

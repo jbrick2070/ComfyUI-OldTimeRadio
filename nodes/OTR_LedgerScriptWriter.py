@@ -2926,7 +2926,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # broken registry raises at INPUT_TYPES rather than serving a
                 # silently English dropdown.
                 "episode_language": (
-                    _EPLANG.dropdown_choices(),
+                    # The roll sentinel first, as on the bank and style
+                    # dropdowns; the default stays English.
+                    [_ROLLS.LANGUAGE_SENTINEL] + _EPLANG.dropdown_choices(),
                     {
                         "default": _EPLANG.ENGLISH_LABEL,
                         "tooltip": (
@@ -2992,6 +2994,49 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # widgets_values slot is appended and every earlier saved
                 # value keeps its index (BUG-LOCAL-097); it also sits after
                 # gate_in so the canonical's inputs descriptor order matches.
+                #
+                # SELECTIVE ROLLS (2026-09-26), APPENDED as the two trailing
+                # widgets (BUG-LOCAL-097). Native multi-select COMBOs: BOTH
+                # keys are required -- core validates on `multiselect`
+                # (execution.py), the frontend mounts the picker only on the
+                # `multi_select` OBJECT. The value is ONE list[str] in ONE
+                # widgets_values slot; empty is the whole list.
+                "style_roll_pool": (
+                    list(_ROLLS.eligible_style_ids()),
+                    {
+                        "multiselect": True,
+                        "multi_select": {
+                            "placeholder": "All styles",
+                            "chip": True,
+                        },
+                        "default": [],
+                        "tooltip": (
+                            "Read only when Visual style is 'roll (any "
+                            "style)'. Empty rolls among every style; one "
+                            "checked is simply that style; two or more roll "
+                            "among just those, recorded at meta.style_roll."
+                        ),
+                    },
+                ),
+                "language_roll_pool": (
+                    [c for c in _EPLANG.dropdown_choices()
+                     if c != _EPLANG.OFF_LABEL],
+                    {
+                        "multiselect": True,
+                        "multi_select": {
+                            "placeholder": "All languages",
+                            "chip": True,
+                        },
+                        "default": [],
+                        "tooltip": (
+                            "Read only when Language is 'roll (any "
+                            "language)'. Empty rolls among every language; "
+                            "one checked is simply that language; two or "
+                            "more roll among just those, recorded at "
+                            "meta.language_roll. Off is never rolled."
+                        ),
+                    },
+                ),
             },
             # NO hidden Comfy key here (plan 0k, 2026-09-26): a V1 node that
             # declares one writes it into /history when it raises. The Comfy
@@ -3115,6 +3160,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         story_plot="",
         story_setting="",
         story_author="",
+        # SELECTIVE ROLLS (2026-09-26), the two trailing widgets. None is
+        # the legacy-missing state of a graph saved before them: no pool.
+        style_roll_pool=None,
+        language_roll_pool=None,
     ):
         """Generate one accepted v2.0 LPL story artifact."""
         # ------------------------------------------------------------------ #
@@ -3148,8 +3197,15 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # an iso -- they read the LEDGER, which an Off run leaves unstamped and
         # therefore English.
         # ------------------------------------------------------------------ #
-        _language = _EPLANG.resolve_label(episode_language)
+        # THE LANGUAGE ROLL resolves AFTER the bank (a row may exclude a
+        # bank), so until then a roll is held as Off: nothing below reads the
+        # row before the bank is bound, and a REPLAY under the roll asks for
+        # the recorded language, exactly as Off does.
+        _language_rolls = _ROLLS.is_language_sentinel(episode_language)
+        _language = _EPLANG.resolve_label(
+            _EPLANG.OFF_LABEL if _language_rolls else episode_language)
         _language_row = _language.row
+        _language_roll = None
         # THE ASSET-CLEANUP CHOICE, resolved here for the same reason: an
         # unknown value fails at zero cost, and the replay branch below
         # returns from run() and still has to stamp it.
@@ -3288,8 +3344,19 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             source_ref=source_ref,
         )
         visual_style, _style_roll = _ROLLS.resolve_style_selection(
-            visual_style)
+            visual_style, pool=style_roll_pool)
         _source_bank_row = _otr_story_routing.require_runnable_bank(source_bank)
+        if _language_rolls:
+            # REBINDS `episode_language` to a concrete label, like the two
+            # rolls above, so the stamp below and every reader downstream
+            # sees an ordinary pick.
+            episode_language, _language_roll = _ROLLS.resolve_language_selection(
+                episode_language, pool=language_roll_pool,
+                source_bank_id=(getattr(_source_bank_row, "source_bank_id", "")
+                                or source_bank),
+            )
+            _language = _EPLANG.resolve_label(episode_language)
+            _language_row = _language.row
         # ------------------------------------------------------------------ #
         # THE ADMISSION GATE -- the first point the bank id is authoritative,
         # and still BEFORE the LLM preflight, the scaffold env mutation and
@@ -3674,6 +3741,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # without a convention about empty values.
         if _bank_roll is not None:
             meta["bank_roll"] = _bank_roll.to_meta()
+        if _language_roll is not None:
+            meta["language_roll"] = _language_roll.to_meta()
         # v4 campaign (2026-07-17): stamp the resolved VISUAL-STYLE pool class so
         # the style catalog (select_style) picks the right pool WITHOUT a family
         # base-map -- each _v4 bank is fully independent. Default 'generic'. This
