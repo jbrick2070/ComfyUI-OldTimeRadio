@@ -101,6 +101,39 @@ ear on the 50% depth and false positives from effects/music. Mocked tests
 prove wiring and gain arithmetic, not ASR/LLM judgement. No live/GPU work was
 performed in the isolated duck build while the regression chain was running.
 
+### Subgraph blueprint -- MEASURED 2026-09-27, NOT SHIPPED (a user's values do not survive a save)
+
+Asked for the night of 2026-09-26 after a research pass found the one concrete
+new benefit of subgraphs: ComfyUI serves `<pack>/subgraphs/*.json` as reusable
+blueprints (core `app/subgraph_manager.py`, route `/global_subgraphs`), listed
+first in the node library and insertable into ANY workflow. The canonical
+itself stays flat (row 0e: do not re-propose that). Measured on a sandboxed
+CPU-only server (:8001, only this pack, frontend 1.52.7):
+
+* **Proven:** the frontend's own `graph.convertToSubgraph()` wraps the 22
+  pipeline nodes (59 links). A box whose wrapper carries
+  `properties.proxyWidgets` = the app form's 35 `[inner id, widget]` pairs
+  shows all 35 as real controls WHEN LOADED, and on load the frontend turns
+  them into 35 durable subgraph inputs linked from the input node (-10) -- the
+  same shape the core's shipped blueprints use (`blueprints/*.json`). Its
+  queued prompt equals the flat canonical's exactly: 22 nodes, zero input
+  differences, ids namespaced `<box>:<inner>`. Changing a control on the box
+  reaches the queued prompt.
+* **The blocker:** after changing controls and SAVING a workflow that contains
+  the box, a reload restores the controls but NOT their values (act_count 3 ->
+  1, Space saver full -> off). `proxyWidgets` itself is dropped on save (the
+  official Stable Audio blueprint drops it too; its controls survive through
+  its subgraph inputs, like ours now do).
+* **Open, and it decides the fix:** do the OFFICIAL blueprints keep a changed
+  value across save and reload on this frontend? The comparison run the same
+  night was invalid (the load did not replace the graph). If they do, our
+  authoring differs from theirs and the generator must write what they write;
+  if they do not, it is a frontend limit and shipping means documenting it.
+* Next: that one comparison, then a generator in `scripts/build_variants.py`
+  (blueprint written from the canonical, `--check` coverage), then the
+  operator dragging it from the node library into an empty workflow and
+  running it. A design round with one contrarian before the generator.
+
 ### The registry -- his clicks and his word
 
 * **2.3.6 is the latest published version** (`96ea436a`, 2026-09-25, after
