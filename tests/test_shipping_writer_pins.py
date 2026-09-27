@@ -30,6 +30,9 @@ BIG = "google/gemma-4-12b-it"
 #: too hard to ignore"). Mac and AMD keep SMALL until the native path is proven
 #: on that hardware.
 NATIVE = "comfy_native:gemma4-e2b-it-int8-convrot"
+#: The 16 and 24 GB NVIDIA writer since 2026-09-26 (operator: "I want 12b fast
+#: where it fits because I think it tells better stories").
+NATIVE_12B = "comfy_native:gemma4-12b-int8-convrot"
 STALE = (
     "Qwen/Qwen2.5-14B",
     "Qwen/Qwen2.5-14B-Instruct",
@@ -44,6 +47,16 @@ def _profile(name: str) -> dict:
 def test_dropdown_default_is_the_native_writer_and_qwen_stays_curated():
     assert DEFAULT_LLM == NATIVE
     assert default_llm_option().startswith(NATIVE)
+
+
+def test_a_fresh_or_empty_writer_on_apple_and_amd_is_qwen():
+    """The shipped Mac and AMD workflows pin Qwen; a fresh node or an emptied
+    widget on those machines must not fall back to the unproven native writer."""
+    from nodes import _otr_model_catalog as catalog
+    assert catalog.default_writer_for_host("apple") == SMALL
+    assert catalog.default_writer_for_host("amd") == SMALL
+    for vendor in ("nvidia", "cpu", "unknown"):
+        assert catalog.default_writer_for_host(vendor) == NATIVE, vendor
     curated = {m.repo_id for m in CURATED_LLM_MODELS}
     assert SMALL in curated and NATIVE in curated and BIG in curated
     for dead in STALE:
@@ -90,12 +103,15 @@ def _shipped_writer_models(pid):
     return out
 
 
-def test_shipping_writer_split_is_native_on_nvidia_qwen_on_mac_and_amd():
+def test_shipping_writer_split_is_native_12b_where_it_fits_e2b_on_8gb_qwen_on_mac_and_amd():
     for pid in bv.SHIPPING_SET:
         shipped = _shipped_writer_models(pid)
         creative = shipped["creative_writing_model"]
         technical = shipped["technical_model"]
-        if pid.startswith(("otr_8gb_", "otr_16gb_", "otr_24gb_", "otr_32gb_")):
+        if pid.startswith(("otr_16gb_", "otr_24gb_", "otr_32gb_")):
+            assert creative == NATIVE_12B, pid
+            assert technical == NATIVE_12B, pid
+        elif pid.startswith("otr_8gb_"):
             assert creative == NATIVE, pid
             assert technical == NATIVE, pid
         elif pid.startswith(("otr_mac16_", "otr_amd_")):
@@ -131,7 +147,10 @@ def test_shipping_variant_widgets_carry_the_live_label():
             assert "gemini-flash-latest" in text, pid
             assert "gemini-flash-lite-latest" in text, pid
             assert SMALL not in text, pid
-        elif pid.startswith(("otr_8gb_", "otr_16gb_", "otr_24gb_", "otr_32gb_")):
+        elif pid.startswith(("otr_16gb_", "otr_24gb_", "otr_32gb_")):
+            assert NATIVE_12B + vram_badge_for(NATIVE_12B) in text, pid
+            assert SMALL not in text, pid
+        elif pid.startswith("otr_8gb_"):
             assert native_label in text, pid
             assert SMALL not in text, pid
         else:

@@ -282,8 +282,9 @@ This is not an engine. There is no `@register` and no adapter file.
 **You can pick anything the dropdown will take.** Cache a CausalLM, choose
 Gemma, use a cloud slot. That is not the same as what the pack ships.
 
-**What the pack ships:** Gemma 4 E2B run by ComfyUI itself
-(`comfy_native:gemma4-e2b-it-int8-convrot`) on every NVIDIA workflow and the
+**What the pack ships:** Gemma 4 run by ComfyUI itself -- the 12B
+(`comfy_native:gemma4-12b-int8-convrot`) on the 16 and 24 GB NVIDIA workflows,
+the E2B (`comfy_native:gemma4-e2b-it-int8-convrot`) on 8 GB NVIDIA and the
 canonical; Qwen 3.5 as one transformers row on the Mac and AMD workflows.
 
 **A new row reaches every workflow on restart.** The writer dropdowns read

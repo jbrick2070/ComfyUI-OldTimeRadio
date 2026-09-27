@@ -40,7 +40,8 @@ _ORCHESTRATOR_PATH = _REPO_ROOT / "nodes" / "story_orchestrator.py"
 
 
 def test_default_llm_is_pinned_to_the_portable_row():
-    """L-1: DEFAULT_LLM must remain pinned, now to `Qwen/Qwen3.5-4B`.
+    """L-1: DEFAULT_LLM must remain pinned: `Qwen/Qwen3.5-4B` from 2026-09-06, the
+    Comfy-native Gemma 4 E2B since 2026-09-26 (see the reset note below).
 
     RESET PERFORMED 2026-09-06, deliberately, on operator direction -- this
     guard previously required Mistral-Nemo and warned that changing it needed a

@@ -232,16 +232,15 @@ def test_every_curated_local_row_is_pass_tier():
     doing it for them -- and an OOM from picking it anyway is loud, not a
     silent wrong render.
     """
-    # 2026-09-26: the Comfy-native E4B and 12B writers are WARN for the same
-    # reason as the 27B -- no canonical episode on either yet. (The native E2B
-    # was WARN the same way until its 4060 and 5080 episodes; it is PASS now.)
+    # 2026-09-26: the Comfy-native E4B is WARN (an episode, but no workflow
+    # ships it). The native E2B and 12B were WARN until their episodes and are
+    # PASS now.
     allowed_warn = {
         catalog.QWEN_LLM,
         catalog.DEFAULT_LLM_NF4,
         "unsloth/Llama-3.2-3B-Instruct",
         "Qwen/Qwen3.8-27B",
         "comfy_native:gemma4-e4b-it-int8-convrot",
-        "comfy_native:gemma4-12b-int8-convrot",
     }
     offenders = [
         f"{row.repo_id} (tier={row.vram_fit_tier})"

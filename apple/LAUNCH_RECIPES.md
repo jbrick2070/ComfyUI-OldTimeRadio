@@ -35,10 +35,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_animatediff
 
 - file: `workflows/otr_16gb_animatediff.json`
-- workflow: `otr_16gb_animatediff` (16 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 4.8 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
+- workflow: `otr_16gb_animatediff` (16 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `d9f572bfc1975ec05e409e302965f3f17c1ab8f846ddd98722513b15f00a80a3`
+- master_hash: `056f705119bbad4a49cfc8b4c2111438ed352a7c24aa214e4bc456a0cc821ecf`
 
 ### ComfyUI launch
 
@@ -77,10 +77,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_foley
 
 - file: `workflows/otr_16gb_foley.json`
-- workflow: `otr_16gb_foley` (16 GB NVIDIA -- video that generates its own sound, mixed under the voices. Lane ltx25_foley_16gb (mix4x8-13.8GB) through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 4.8 GB int8). MEASURED on an RTX 5080 Laptop 2026-09-23: one 97-frame 1664x960 clip with foley in 205.3 s.)
+- workflow: `otr_16gb_foley` (16 GB NVIDIA -- video that generates its own sound, mixed under the voices. Lane ltx25_foley_16gb (mix4x8-13.8GB) through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8). MEASURED on an RTX 5080 Laptop 2026-09-23: one 97-frame 1664x960 clip with foley in 205.3 s.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `0ae8941b5ce0c8ebb2d30ff2cc39b32a868162062e3aca58270dd22574c0e16a`
+- master_hash: `365c51b74c410869b6d76708f83339c874a92247fd5c778fb44e4c3b3f823961`
 
 ### ComfyUI launch
 
@@ -121,10 +121,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_low
 
 - file: `workflows/otr_16gb_low.json`
-- workflow: `otr_16gb_low` (16 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 4.8 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
+- workflow: `otr_16gb_low` (16 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `bf76bff8068ecd339d584b6a08ad5cebff34f068e2702d1612a3347abcf8d6d3`
+- master_hash: `74b0bbbf62b707bd36a74d69fea181158fc2eac2ba012ff38b73f95afde6c91d`
 
 ### ComfyUI launch
 
@@ -162,10 +162,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_mime
 
 - file: `workflows/otr_16gb_mime.json`
-- workflow: `otr_16gb_mime` (16 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_mime_16gb on the same mix4x8-13.8GB DiT as the 16 GB foley lane, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 4.8 GB int8).)
+- workflow: `otr_16gb_mime` (16 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_mime_16gb on the same mix4x8-13.8GB DiT as the 16 GB foley lane, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8).)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `a53a44dcff5a2378257f5ae071ab0de63e888c367e0c4ef560eb8c4c1d7c160c`
+- master_hash: `c11175c0a16f68bae74f6066a759531199a0b44cf99c884e964acc919e1c44d8`
 
 ### ComfyUI launch
 
@@ -206,10 +206,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_still
 
 - file: `workflows/otr_16gb_still.json`
-- workflow: `otr_16gb_still` (16 GB NVIDIA -- a still image with motion, minted by Z-Image Turbo. Lane still_motion, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 4.8 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
+- workflow: `otr_16gb_still` (16 GB NVIDIA -- a still image with motion, minted by Z-Image Turbo. Lane still_motion, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `3241c08dcff385236a76177962120e076857ea292412559f7f6086eb8df4be49`
+- master_hash: `64c96b9d31c954fc8af68180581dd9ac68aad0aa1e05d1761a61579f2ccbc83c`
 
 ### ComfyUI launch
 
@@ -246,10 +246,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_video
 
 - file: `workflows/otr_16gb_video.json`
-- workflow: `otr_16gb_video` (16 GB NVIDIA -- real video diffusion, silent picture under the voices. Lane ltx25_high_video on the same mix4x8-13.8GB DiT the 16 GB foley and mime lanes load, through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 4.8 GB int8).)
+- workflow: `otr_16gb_video` (16 GB NVIDIA -- real video diffusion, silent picture under the voices. Lane ltx25_high_video on the same mix4x8-13.8GB DiT the 16 GB foley and mime lanes load, through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8).)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `040ba28bc734767d571ffa0b9a14b6c24fbcb24541937d5c010107446fe844eb`
+- master_hash: `235a8c06658bf5ea1d138c833864bcfa9d1f1150c85bbe44412f0dda41fd5477`
 
 ### ComfyUI launch
 
@@ -290,10 +290,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_24gb_foley
 
 - file: `workflows/otr_24gb_foley.json`
-- workflow: `otr_24gb_foley` (24 GB AND UP, ANY modern NVIDIA (Ada, Ampere or Blackwell) -- video that generates its own sound. Lane ltx25_foley_24gb (int8, stock ComfyUI loaders), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 4.8 GB int8). Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.)
+- workflow: `otr_24gb_foley` (24 GB AND UP, ANY modern NVIDIA (Ada, Ampere or Blackwell) -- video that generates its own sound. Lane ltx25_foley_24gb (int8, stock ComfyUI loaders), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8). Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.)
 - status: draft
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `c9531c7dc6e0545a02bcbe880b1b08700e7f28b70af2c75fb4cb5a19586b40f9`
+- master_hash: `3a2d950dd59877ae5990297c99af8cf93295d866ba313ca7fe54de73a1599fae`
 
 ### ComfyUI launch
 

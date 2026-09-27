@@ -201,14 +201,15 @@ def _resolve_inputs(
     # S30 B2a: normalize each model id by stripping the [NOT DOWNLOADED]
     # dropdown suffix. Raw widget values never reach a consumer / meta
     # stamp -- catalog._strip_label_suffix is the single normalization
-    # point. Default both inputs to _otr_model_catalog.DEFAULT_LLM so an empty widget
-    # value (e.g. an old workflow with shorter widgets_values vector)
-    # still produces a usable id.
+    # point. An empty widget value (e.g. an old workflow with a shorter
+    # widgets_values vector) falls back to THIS machine's default writer
+    # (Qwen on Apple/AMD, the ComfyUI-native writer elsewhere).
+    _host_default = _otr_model_catalog.default_writer_for_host()
     creative_writing_model = _otr_model_catalog._canonical_qwen_id(
-        str(creative_writing_model or _otr_model_catalog.DEFAULT_LLM)
+        str(creative_writing_model or _host_default)
     )
     technical_model = _otr_model_catalog._canonical_qwen_id(
-        str(technical_model or _otr_model_catalog.DEFAULT_LLM)
+        str(technical_model or _host_default)
     )
 
     # A REQUEST, not a cap (operator directive 2026-08-12, all banks). The

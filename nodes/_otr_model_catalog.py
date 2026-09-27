@@ -505,7 +505,10 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         repo_id="comfy_native:gemma4-12b-int8-convrot",
         requires_auth=False,
         loader_backend="comfy_textgen",
-        vram_fit_tier="WARN",
+        # PASS on proof: dead_wire_20260926_184325 (otr_16gb_low, RTX 5080),
+        # ~41 tok/s steady, ~13.5 GB machine-wide peak. The 16 and 24 GB NVIDIA
+        # workflows' writer since 2026-09-26.
+        vram_fit_tier="PASS",
         # 12,055,234,634 bytes / 2**30. Disk, not VRAM.
         approx_safetensors_gb=11.23,
         notes="Gemma 4 12B run by ComfyUI itself: Comfy-Org's "
@@ -1329,10 +1332,33 @@ def default_llm_option() -> str:
     return DEFAULT_LLM + vram_badge_for(DEFAULT_LLM)
 
 
+def default_writer_for_host(vendor: str | None = None) -> str:
+    """The writer a fresh node or an empty widget falls back to ON THIS MACHINE.
+
+    :data:`DEFAULT_LLM` everywhere it is proven; :data:`QWEN_LLM` on Apple and
+    AMD, where the ComfyUI-native writer has not run yet (operator 2026-09-26:
+    the Mac does not change until it is confirmed). Composer QA on c1d071c4
+    found a fresh node and an emptied widget on those machines falling back to
+    the native writer while their shipped workflows pin Qwen. ``vendor`` is the
+    pack's device_options.vendor(); "unknown" and "cpu" keep DEFAULT_LLM."""
+    if vendor is None:
+        try:
+            from ._otr_shared.device_options import vendor as _vendor
+        except ImportError:  # pragma: no cover -- flat import
+            from _otr_shared.device_options import vendor as _vendor  # type: ignore
+        try:
+            vendor = _vendor()
+        except Exception:  # noqa: BLE001 -- no ComfyUI core: not Apple/AMD as far as we know
+            vendor = "unknown"
+    return QWEN_LLM if vendor in ("apple", "amd") else DEFAULT_LLM
+
+
 def fresh_llm_option() -> str:
-    """The exact COMBO label a newly dropped writer node should save: the
-    default writer's label, the same one the canonical workflow saves."""
-    return DEFAULT_LLM + vram_badge_for(DEFAULT_LLM)
+    """The exact COMBO label a newly dropped writer node should save on this
+    machine: the default writer's label (the canonical's), or Qwen's on Apple
+    and AMD -- see :func:`default_writer_for_host`."""
+    writer = default_writer_for_host()
+    return writer + vram_badge_for(writer)
 
 
 # ---------------------------------------------------------------------------
@@ -2898,6 +2924,7 @@ __all__ = [
     "dropdown_choices",
     "default_llm_option",
     "fresh_llm_option",
+    "default_writer_for_host",
     "hf_weights_id",
     "resolve_pick_for_quant",
     "effective_quant_policy",

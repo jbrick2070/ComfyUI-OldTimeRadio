@@ -19,7 +19,8 @@ fits its own tier. Which one depends on which workflow you opened:
 
 | Workflow | Both slots ship |
 |---|---|
-| Every NVIDIA workflow (8, 16 and 24 GB) and the canonical | **Gemma 4 E2B run by ComfyUI itself** (`comfy_native:gemma4-e2b-it-int8-convrot`, 4.8 GB download) |
+| 16 GB and 24 GB NVIDIA (`otr_16gb_*`, `otr_24gb_*`) | **Gemma 4 12B run by ComfyUI itself** (`comfy_native:gemma4-12b-int8-convrot`, 11.2 GB download) |
+| 8 GB NVIDIA and the canonical | **Gemma 4 E2B run by ComfyUI itself** (`comfy_native:gemma4-e2b-it-int8-convrot`, 4.8 GB download) |
 | 16 GB Mac, AMD | **one Qwen row** (`Qwen/Qwen3.5-4B`). Mac loads full (`none`). There is no `:nf4` picker entry. |
 | Comfy Cloud cheap (`otr_cloud_low*`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
 | Comfy Cloud deluxe (`otr_cloud_deluxe_3act`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
@@ -30,15 +31,24 @@ cheap pair -- Sonnet 5 to write, Luna for JSON -- and bill Credits rather than
 VRAM. The Google workflow bills your own Google key instead. Leaving those
 dropdowns alone is still the right answer there.
 
-**The NVIDIA default since 2026-09-26 is Gemma 4 E2B run by ComfyUI itself.**
-ComfyUI's own loader opens one 5.2 GB int8 file from Comfy-Org and ComfyUI's
-own generate loop writes the script, so ComfyUI loads and unloads it like any
-other model -- no transformers, no bitsandbytes, no Quant choice. The reason is
-speed, measured in canonical episodes on both boxes: about 63 tokens a second
-on an 8 GB RTX 4060 (Qwen3.5-4B NF4 managed 13 there) and about 124 on an RTX
-5080 (the 12B NF4 managed 10). The whole writing phase of a one-act episode on
-the 4060 went from 6.5 minutes to 1.9. It peaks near 5 GB on the 8 GB card and
-fetches itself the first time you press Run, with no token.
+**Since 2026-09-26 every NVIDIA workflow writes with Gemma 4 run by ComfyUI
+itself** -- the 12B wherever it fits, the E2B on 8 GB. ComfyUI's own loader
+opens one int8 file from Comfy-Org and ComfyUI's own generate loop writes the
+script, so ComfyUI loads and unloads it like any other model -- no
+transformers, no bitsandbytes, no Quant choice. Both fetch themselves the first
+time you press Run, with no token. Measured in canonical episodes:
+
+| writer | RTX 4060 8 GB | RTX 5080 16 GB | peak |
+|---|---|---|---|
+| Gemma 4 12B, ComfyUI-native (16/24 GB workflows) | does not fit | ~41 tok/s | ~13.5 GB |
+| Gemma 4 E2B, ComfyUI-native (8 GB workflows, canonical) | ~63 tok/s | ~124 tok/s | ~5 GB |
+| Gemma 4 12B NF4 through transformers (what 16 GB shipped before) | does not fit | ~10 tok/s | ~7.3 GB |
+| Qwen3.5-4B NF4 through transformers (what 8 GB shipped before) | ~13 tok/s | ~14-17 tok/s | ~4.3 GB |
+
+The 12B is where it fits because it tells the better story (the operator's
+call); the ComfyUI path makes it four times faster than the same 12B under
+bitsandbytes. On an 8 GB card the E2B turned a one-act writing phase from 6.5
+minutes into 1.9.
 
 **Mac and AMD stay on `Qwen/Qwen3.5-4B`** until the ComfyUI-native writer is
 proven on that hardware. Qwen is the writer every Mac episode used, and the AMD
@@ -48,8 +58,8 @@ their own ids, not the model that wrote the script. On a Mac, open an
 `otr_mac16_*` workflow rather than the canonical: the canonical now ships the
 ComfyUI-native writer, which nobody has run on Apple Silicon yet.
 
-The earlier NVIDIA picks -- Qwen3.5-4B on 8 GB, `gemma-4-12b-it` on 16 GB,
-`Qwen/Qwen3.8-27B` on 24 GB -- all stay in the dropdown, unchanged.
+The earlier NVIDIA picks -- Qwen3.5-4B on 8 GB, `gemma-4-12b-it` (NF4) on
+16 GB, `Qwen/Qwen3.8-27B` on 24 GB -- all stay in the dropdown, unchanged.
 
 ---
 
@@ -80,9 +90,9 @@ workflow *ships*, and Qwen 3.5 4B is what the Mac and AMD workflows ship.
 
 | What the dropdown says | Download | Licence | Worth knowing |
 |---|---|---|---|
-| `comfy_native:gemma4-e2b-it-int8-convrot (4.8 GB download)` | 4.8 GB | Apache 2.0 | **The NVIDIA default.** Gemma 4 E2B run by ComfyUI itself (its own loader and generate loop), already int8. About 63 tok/s on an 8 GB RTX 4060, 124 on an RTX 5080; episodes published on both. Works inside ComfyUI only. Unproven on Mac and AMD so far. |
-| `comfy_native:gemma4-e4b-it-int8-convrot (7.5 GB download)` | 7.5 GB | Apache 2.0 | The same path, a size up. Being measured; no workflow ships it. |
-| `comfy_native:gemma4-12b-int8-convrot (11.2 GB download)` | 11.2 GB | Apache 2.0 | The same path at 12B, a native alternative to the NF4 row below. Being measured; no workflow ships it. |
+| `comfy_native:gemma4-e2b-it-int8-convrot (4.8 GB download)` | 4.8 GB | Apache 2.0 | **The 8 GB NVIDIA and canonical writer.** Gemma 4 E2B run by ComfyUI itself (its own loader and generate loop), already int8. About 63 tok/s on an 8 GB RTX 4060, 124 on an RTX 5080; episodes published on both. Works inside ComfyUI only. Unproven on Mac and AMD so far. |
+| `comfy_native:gemma4-e4b-it-int8-convrot (7.5 GB download)` | 7.5 GB | Apache 2.0 | The same path, a size up: ~84 tok/s on an RTX 5080, one episode. No workflow ships it. |
+| `comfy_native:gemma4-12b-int8-convrot (11.2 GB download)` | 11.2 GB | Apache 2.0 | **The 16 and 24 GB NVIDIA writer.** Gemma 4 12B run by ComfyUI itself: ~41 tok/s on an RTX 5080, four times the NF4 row below, ~13.5 GB peak -- too big for an 8 GB card. Works inside ComfyUI only. |
 | `Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)` | 8.7 GB | Apache 2.0 | **The one Qwen**, and the Mac and AMD default. NVIDIA loads NF4 (`nv8-nf4`). Mac / CPU load full (`mac16-tight`). There is no second Qwen row. |
 | `unsloth/Llama-3.2-3B-Instruct (6.4 GB download, mac16 nv8 nv16 nv24)` | 6.4 GB | Llama 3.2 Community | **The no-quantization row.** It is the one to pick if your machine has no `bitsandbytes` -- AMD above all. Nobody has published an episode with it yet. |
 | `mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB download, nv16-nf4 nv24-nf4)` | 24.0 GB | Apache 2.0 | Not what any workflow ships -- an earlier writer, still proven on 16 GB+ NVIDIA, and the pack's audio regression baseline. |

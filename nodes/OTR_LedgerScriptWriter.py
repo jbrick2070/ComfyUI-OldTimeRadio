@@ -3027,11 +3027,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         self,
         episode_title="",
         num_characters=2,
-        # S30 B2a: single model_id widget split into two surface widgets.
-        # Both default to _otr_model_catalog.DEFAULT_LLM so the audio C7 baseline is
-        # unchanged when the user accepts defaults. B2b adds the internal
-        # routing that uses technical_model on structured passes; in B2a
-        # both ids feed the same legacy generation path.
+        # S30 B2a: single model_id widget split into two surface widgets,
+        # both defaulting to _otr_model_catalog.DEFAULT_LLM (a direct call
+        # with no ids; the node's own widgets default per machine through
+        # fresh_llm_option). The audio C7 tests pass Mistral-Nemo as an
+        # explicit literal and do not read this default.
         creative_writing_model=_otr_model_catalog.DEFAULT_LLM,
         technical_model=_otr_model_catalog.DEFAULT_LLM,
         custom_premise="",
