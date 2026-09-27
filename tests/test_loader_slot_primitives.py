@@ -241,6 +241,8 @@ def test_every_curated_local_row_is_pass_tier():
         "unsloth/Llama-3.2-3B-Instruct",
         "Qwen/Qwen3.8-27B",
         "comfy_native:gemma4-e2b-it-int8-convrot",
+        "comfy_native:gemma4-e4b-it-int8-convrot",
+        "comfy_native:gemma4-12b-int8-convrot",
     }
     offenders = [
         f"{row.repo_id} (tier={row.vram_fit_tier})"

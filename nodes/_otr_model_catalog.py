@@ -459,6 +459,52 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         # transformers snapshot: nothing snapshot-downloads it.
         hf_repo_id="Comfy-Org/gemma-4",
     ),
+    # The two larger Comfy-native Gemma 4 writers, from the same Comfy-Org repo
+    # and revision, run by the same adapter. Added 2026-09-26 so the 16 GB and
+    # 24 GB writer choice can be measured; WARN until an episode is proven on
+    # each, and no workflow selects either.
+    CuratedModel(
+        repo_id="comfy_native:gemma4-e4b-it-int8-convrot",
+        requires_auth=False,
+        loader_backend="comfy_textgen",
+        vram_fit_tier="WARN",
+        # 8,090,965,702 bytes / 2**30. Disk, not VRAM.
+        approx_safetensors_gb=7.54,
+        notes="Gemma 4 E4B run by ComfyUI itself: Comfy-Org's "
+        "gemma4_e4b_it_int8_convrot text encoder in the stock CLIP loader, "
+        "generating through ComfyUI's own loop. Already int8, no Quant choice. "
+        "Works inside ComfyUI only.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+        provider="comfy_native",
+        implied_quant_policy="none",
+        hf_repo_id="Comfy-Org/gemma-4",
+    ),
+    CuratedModel(
+        repo_id="comfy_native:gemma4-12b-int8-convrot",
+        requires_auth=False,
+        loader_backend="comfy_textgen",
+        vram_fit_tier="WARN",
+        # 12,055,234,634 bytes / 2**30. Disk, not VRAM.
+        approx_safetensors_gb=11.23,
+        notes="Gemma 4 12B run by ComfyUI itself: Comfy-Org's "
+        "gemma4_12b_int8_convrot text encoder (ComfyUI's Gemma4 Unified "
+        "class) in the stock CLIP loader, generating through ComfyUI's own "
+        "loop. Already int8, no Quant choice. Works inside ComfyUI only.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+        provider="comfy_native",
+        implied_quant_policy="none",
+        hf_repo_id="Comfy-Org/gemma-4",
+    ),
     # 2026-08-25: catalog pruned -- Qwen/Qwen2.5-14B-Instruct removed
     # (operator: "if it doesn't fit nicely or requires Ollama rip it from
     # the dropdown and blast radius"; "I only want easy to load LLMs").
@@ -694,8 +740,10 @@ SAMPLING_BASELINES = {
     # generation_config.json has no sampling keys; the card's own examples use
     # temperature 0.35.
     "mistralai/Mistral-Nemo-Instruct-2407": (0.35, None, None),
-    # The same E2B weights as google/gemma-4-E2B-it, run by ComfyUI.
+    # The same weights families as the google/gemma-4-* rows, run by ComfyUI.
     "comfy_native:gemma4-e2b-it-int8-convrot": (1.0, 0.95, 64),
+    "comfy_native:gemma4-e4b-it-int8-convrot": (1.0, 0.95, 64),
+    "comfy_native:gemma4-12b-int8-convrot": (1.0, 0.95, 64),
 }
 
 #: Providers that run on this machine. Everything else is a cloud slot.

@@ -71,6 +71,16 @@ _PINNED_SOURCES = (
      "text_encoders/gemma4_e2b_it_int8_convrot.safetensors",
      "63d0f7c476756b88910170c1df75e2384ea1af31", 5_199_997_904,
      "efeca0fcad2f863e5ed0a75e3af952b72bc963604c1dda6d20aee87a32b17566"),
+    # The larger native writers (same repo, same revision; the backend's
+    # NATIVE_WRITER_FILES holds the same values).
+    ("text_encoders", "Comfy-Org/gemma-4",
+     "text_encoders/gemma4_e4b_it_int8_convrot.safetensors",
+     "63d0f7c476756b88910170c1df75e2384ea1af31", 8_090_965_702,
+     "974d0c838ef4ac1a989b06ccb4e57691c21b6270dd8e345ffa7531f9388f117c"),
+    ("text_encoders", "Comfy-Org/gemma-4",
+     "text_encoders/gemma4_12b_int8_convrot.safetensors",
+     "63d0f7c476756b88910170c1df75e2384ea1af31", 12_055_234_634,
+     "bf77dc0b435c487a638909d8f2ccf5a7e4c9838e7bc56545ea6e251a603c5793"),
 )
 
 _SOURCES = (

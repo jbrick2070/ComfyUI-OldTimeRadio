@@ -298,12 +298,14 @@ def test_a_forged_pin_is_refused_before_any_metadata_call():
 def test_only_the_pinned_sources_carry_a_pin():
     """Every other row keeps the HEAD-at-queue-time pinning it had. The pinned
     rows are the two H3 lanes' and, since 2026-09-26, the Comfy-native Gemma
-    writer's text encoder (plan row 0n)."""
+    writers' text encoders (plan row 0n: E2B, then E4B and 12B)."""
     from nodes import _otr_comfy_textgen_backend as native
     pinned = {(category, filename.rsplit("/", 1)[-1])
               for category, _repo, filename, *_rest in VA._PINNED_SOURCES}
+    writers = {weight for model_id in native.NATIVE_WRITER_FILES
+               for weight in native.native_writer_weights(model_id)}
     assert pinned == (EXPECTED["minimax_h3_video"] | EXPECTED["minimax_h3_audio_in"]
-                      | {(native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)})
+                      | writers)
     for key, spec in VA.MANIFEST.items():
         if key in pinned:
             assert set(spec) == {"repo_id", "filename", "revision", "size", "sha256"}

@@ -68,6 +68,8 @@ LLM = {
     # as g4e2, a different writer, so a different code. Its first 5080 episode
     # (knot_midnight_20260926_180140) published as ``__unk__``.
     "comfy_native:gemma4-e2b-it-int8-convrot": "cg4e2",
+    "comfy_native:gemma4-e4b-it-int8-convrot": "cg4e4",
+    "comfy_native:gemma4-12b-int8-convrot": "cg412",
     # Virtual cloud handles appear in the live COMBO only when the matching
     # key is configured. They still reach the published filename.
     "openrouter:slot-a": "orsa",

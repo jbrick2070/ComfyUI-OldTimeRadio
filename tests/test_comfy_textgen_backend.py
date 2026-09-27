@@ -39,6 +39,24 @@ def test_the_manifest_row_is_the_backend_pin():
     assert native.WEIGHT_FILENAME.rsplit("/", 1)[-1] == native.WEIGHT_TOKEN
 
 
+def test_every_native_writer_has_its_manifest_pin():
+    """The E4B and 12B rows ride the same table: each backend row must be the
+    fetch table's pin, and every native catalog row must have a backend row."""
+    from nodes import _otr_model_catalog as catalog
+
+    for model_id, (filename, size, sha256) in native.NATIVE_WRITER_FILES.items():
+        token = filename.rsplit("/", 1)[-1]
+        assert native.native_writer_weights(model_id) == ((native.WEIGHT_CATEGORY, token),)
+        assert va.MANIFEST[(native.WEIGHT_CATEGORY, token)] == {
+            "repo_id": native.WEIGHT_REPO, "filename": filename,
+            "revision": native.WEIGHT_REVISION, "size": size, "sha256": sha256}
+        row = catalog._by_repo_id()[model_id]
+        assert row.approx_safetensors_gb == round(size / 2**30, 2)
+    native_rows = {m.repo_id for m in catalog._active_curated_models()
+                   if m.provider == "comfy_native"}
+    assert native_rows == set(native.NATIVE_WRITER_FILES)
+
+
 def test_only_the_exact_native_id_needs_a_weight():
     assert native.native_writer_weights(native.MODEL_ID) == (
         (native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN),)

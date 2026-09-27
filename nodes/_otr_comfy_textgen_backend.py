@@ -53,7 +53,30 @@ WEIGHT_SHA256 = "efeca0fcad2f863e5ed0a75e3af952b72bc963604c1dda6d20aee87a32b1756
 WORKING_CONTEXT_CAP = 8192
 NATIVE_CONTEXT_CAPACITY = 131072
 
-_WEIGHTS_BY_MODEL = {MODEL_ID: ((WEIGHT_CATEGORY, WEIGHT_TOKEN),)}
+#: The larger Gemma 4 files Comfy-Org publishes at the same pinned revision, run by
+#: the same adapter (ComfyUI builds E4B through the same Gemma4Base as E2B; the 12B
+#: is its "Unified" class with the same `gemma4` clip key and tokenizer path). Read
+#: from the Hub tree API on 2026-09-26, token-less. Rows exist so the 16 GB and
+#: 24 GB choice can be MEASURED; no workflow selects either.
+MODEL_ID_E4B = "comfy_native:gemma4-e4b-it-int8-convrot"
+MODEL_ID_12B = "comfy_native:gemma4-12b-int8-convrot"
+
+#: Every Comfy-native writer: dropdown id -> (Hub filename, bytes, sha256), all in
+#: WEIGHT_REPO at WEIGHT_REVISION under WEIGHT_CATEGORY.
+#: ``_otr_visual_assets._PINNED_SOURCES`` carries the same rows; a test holds them
+#: in agreement.
+NATIVE_WRITER_FILES = {
+    MODEL_ID: (WEIGHT_FILENAME, WEIGHT_SIZE, WEIGHT_SHA256),
+    MODEL_ID_E4B: ("text_encoders/gemma4_e4b_it_int8_convrot.safetensors", 8_090_965_702,
+                   "974d0c838ef4ac1a989b06ccb4e57691c21b6270dd8e345ffa7531f9388f117c"),
+    MODEL_ID_12B: ("text_encoders/gemma4_12b_int8_convrot.safetensors", 12_055_234_634,
+                   "bf77dc0b435c487a638909d8f2ccf5a7e4c9838e7bc56545ea6e251a603c5793"),
+}
+
+_WEIGHTS_BY_MODEL = {
+    model_id: ((WEIGHT_CATEGORY, filename.rsplit("/", 1)[-1]),)
+    for model_id, (filename, _size, _sha256) in NATIVE_WRITER_FILES.items()
+}
 
 
 def native_writer_weights(model_id) -> tuple:
