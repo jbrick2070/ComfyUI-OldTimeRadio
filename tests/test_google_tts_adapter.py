@@ -107,7 +107,7 @@ def test_interactions_request_shape_and_pcm_decode(monkeypatch):
 
     assert seen["api_key"] == "KEY"
     payload = seen["payload"]
-    assert payload["model"] == "gemini-2.5-flash-preview-tts"
+    assert payload["model"] == "gemini-3.8-flash-tts"
     assert payload["input"] == "hello"
     assert payload["response_format"] == {"type": "audio"}
     assert payload["generation_config"]["speech_config"] == [{"voice": "Kore"}]
@@ -241,7 +241,7 @@ def test_same_provider_retry_is_disabled_by_default_and_bounded(monkeypatch):
     monkeypatch.setattr(G, "_post_interaction", _post)
     with pytest.raises(G.GoogleTTSError):
         AE.get_engine("google_tts").generate_voice("hello", "Kore", None, 1)
-    assert models == ["gemini-2.5-flash-preview-tts"]
+    assert models == ["gemini-3.8-flash-tts"]
 
     models.clear()
     monkeypatch.setenv("OTR_GOOGLE_TTS_ENABLE_MODEL_RETRY", "1")
@@ -255,8 +255,8 @@ def test_same_provider_retry_is_disabled_by_default_and_bounded(monkeypatch):
     monkeypatch.setattr(G, "_post_interaction", _post_retry)
     AE.get_engine("google_tts").generate_voice("hello", "Kore", None, 1)
     assert models == [
-        "gemini-2.5-flash-preview-tts",
-        "gemini-3.1-flash-tts-preview",
+        "gemini-3.8-flash-tts",
+        "gemini-3.8-flash-lite-tts",
     ]
     assert "gemini-2.5-pro-preview-tts" not in models
 

@@ -105,6 +105,9 @@ _UNSET = ProvenanceRecord("", UNVERIFIED, None)
 #: 52 ids. Only a completed listing may support any verdict, and this one was.
 _GOOGLE_RUN = "2026-08-10"
 
+#: The 2026-09-26 Google model listing (the day the 3.8 TTS pair appeared).
+_GOOGLE_RUN_0926 = "2026-09-26"
+
 #: The 2026-08-07 OpenRouter sweep. A SIGNAL for the Comfy lane, never authority.
 _COMFY_SIGNAL = "2026-08-07"
 
@@ -182,6 +185,8 @@ SLUG_PROVENANCE: Dict[Tuple[str, str], ProvenanceRecord] = {
     ("gemini-2.5-flash-preview-tts", "google_tts"):  _catalog(_GOOGLE_RUN),
     ("gemini-2.5-pro-preview-tts", "google_tts"):    _catalog(_GOOGLE_RUN),
     ("gemini-3.1-flash-tts-preview", "google_tts"):  _catalog(_GOOGLE_RUN),
+    ("gemini-3.8-flash-tts", "google_tts"):          _catalog(_GOOGLE_RUN_0926),
+    ("gemini-3.8-flash-lite-tts", "google_tts"):     _catalog(_GOOGLE_RUN_0926),
 }
 
 # Fill in the lane each record belongs to, from its own key. Written once, here,
@@ -229,6 +234,9 @@ def has_preview_token(provider_id: str) -> bool:
       * suffix -- `lyria-3-clip-preview`
       * infix  -- `gemini-2.5-flash-preview-tts`
       * infix, reversed -- `gemini-3.1-flash-tts-preview`
+
+    And the 3.8 TTS pair (`gemini-3.8-flash-tts`, `gemini-3.8-flash-lite-tts`)
+    carries no preview token at all, which is what the evergreen policy wants.
 
     And a substring match would fire on an id merely CONTAINING the letters, such
     as a hypothetical `previewer-1`, which is a different model.
@@ -282,6 +290,10 @@ EVERGREEN_EXEMPTIONS: Dict[Tuple[str, str], str] = {
         "Google publishes no -latest pointer for speech models (2026-08-10 catalog)",
     ("gemini-3.1-flash-tts-preview", "google_tts"):
         "Google publishes no -latest pointer for speech models (2026-08-10 catalog)",
+    ("gemini-3.8-flash-tts", "google_tts"):
+        "Google publishes no -latest pointer for speech models (2026-09-26 listing)",
+    ("gemini-3.8-flash-lite-tts", "google_tts"):
+        "Google publishes no -latest pointer for speech models (2026-09-26 listing)",
     ("lyria-3-clip-preview", "google_lyria"):
         "Google publishes no -latest pointer for music models (2026-08-10 catalog)",
 

@@ -35,12 +35,18 @@ log = logging.getLogger("OTR")
 #: Path on the shared Google client; the full URL (and its base-URL override)
 #: is owned by ``_otr_google_api.client`` now that transport lives there.
 _INTERACTIONS_PATH = "/v1beta/interactions"
-_DEFAULT_MODEL = "gemini-2.5-flash-preview-tts"
-_LOW_COST_RETRY_MODEL = "gemini-3.1-flash-tts-preview"
+# gemini-3.8-flash-tts is the default since 2026-09-26 (operator: "Flash TTS 3.8
+# is the best, we should use it"); both 3.8 ids were read from the live model
+# list that day and carry no preview token. The 3.1 and 2.5 ids stay selectable
+# for saved graphs and env pins.
+_DEFAULT_MODEL = "gemini-3.8-flash-tts"
+_LOW_COST_RETRY_MODEL = "gemini-3.8-flash-lite-tts"
 _TTS_TIMEOUT_S = 180.0
 _SAMPLE_RATE = 24000
 
 _SUPPORTED_MODELS = (
+    "gemini-3.8-flash-tts",
+    "gemini-3.8-flash-lite-tts",
     "gemini-3.1-flash-tts-preview",
     "gemini-2.5-flash-preview-tts",
     "gemini-2.5-pro-preview-tts",

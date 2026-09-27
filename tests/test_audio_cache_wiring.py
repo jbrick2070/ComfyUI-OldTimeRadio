@@ -580,8 +580,10 @@ def test_end_to_end_google_tts_cache_miss_then_hit(tmp_path, monkeypatch):
     assert len(recorder) == 1
     assert recorder[0]["disable_retry"] is True
     # resolved_model comes from identity_params()["model"] which reads env or
-    # profile default -- the default profile default is gemini-2.5-flash-preview-tts.
+    # profile default -- the default profile default is gemini-3.8-flash-tts.
     assert recorder[0]["resolved_model"] in (
+        "gemini-3.8-flash-tts",
+        "gemini-3.8-flash-lite-tts",
         "gemini-2.5-flash-preview-tts",
         "gemini-3.1-flash-tts-preview",
         "gemini-2.5-pro-preview-tts",

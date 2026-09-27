@@ -272,6 +272,8 @@ def test_is_evergreen_recognises_both_spellings():
     ("gemini-2.5-flash-preview-tts", True),    # infix
     ("gemini-3.1-flash-tts-preview", True),    # infix, reversed
     ("gemini-3.1-flash-image-preview", True),
+    ("gemini-3.8-flash-tts", False),           # no token at all (3.8 pair)
+    ("gemini-3.8-flash-lite-tts", False),
     ("gemini-2.5-flash", False),
     ("previewer-1", False),                    # substring, NOT a token
     ("a-preview-b", True),
