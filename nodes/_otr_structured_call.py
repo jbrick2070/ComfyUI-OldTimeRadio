@@ -397,7 +397,12 @@ def schema_shape_instruction(schema: type[BaseModel]) -> str:
     return (
         f"\n{_SCHEMA_CONTRACT_MARKER}\n"
         "Return exactly one JSON object, with no Markdown, headings, or prose. "
-        f"Its exact top-level keys are: {', '.join(schema.model_fields)}. "
+        # The keys the model must WRITE: a field's alias when it has one. The
+        # duck's judge keys its fields by beat id through aliases, and naming
+        # the internal field names here (beat_0, beat_1) contradicted the
+        # paths below and asked for keys the validator rejects (2026-09-27).
+        f"Its exact top-level keys are: "
+        f"{', '.join((f.alias or n) for n, f in schema.model_fields.items())}. "
         "Do not add undeclared fields. Every required nested path must be present, "
         "including repeated graph references. "
         f"Required paths: {compact}\n"

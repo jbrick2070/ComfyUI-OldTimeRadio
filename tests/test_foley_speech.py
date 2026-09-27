@@ -416,3 +416,23 @@ def test_the_judge_uses_the_shared_json_ladder_not_a_text_parser():
     call = call[:call.index(")\n")]
     code = "\n".join(line.split("#", 1)[0] for line in call.splitlines())
     assert "text_parser=" not in code
+
+
+def test_the_judge_contract_names_the_beat_ids_the_model_must_write():
+    """The judge's fields are aliased by beat id. The shared contract used to
+    say 'exact top-level keys are: beat_0, beat_1' while its paths said b002,
+    ... -- a model obeying the first line wrote keys the validator rejects."""
+    from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr, create_model
+    from nodes._otr_structured_call import schema_shape_instruction
+
+    class Verdict(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        speech: StrictBool
+        reason: StrictStr = Field(min_length=1)
+
+    schema = create_model("FoleySpeechVerdicts", __config__=ConfigDict(extra="forbid"),
+                          beat_0=(Verdict, Field(alias="b002")),
+                          beat_1=(Verdict, Field(alias="music_closing_001")))
+    text = schema_shape_instruction(schema)
+    assert "top-level keys are: b002, music_closing_001." in text
+    assert "beat_0" not in text
