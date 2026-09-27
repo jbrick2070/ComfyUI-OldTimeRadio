@@ -82,6 +82,56 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   tests for every commit, probably not needed"; the suite at every push
   stays the guard).
 
+### Selective rolls: a curated pool for style, and a language roll at all (operator idea 2026-09-26 night)
+
+Operator: *"I should have put in a video style SELECTIVE randomizer for true
+variant autonomy ... and a language randomizer too, maybe selective."*
+Logged for a design round; not decided.
+
+**What exists (grounded 2026-09-26):** `nodes/_otr_rolls.py` rolls two
+surfaces. `visual_style` has "roll (any style)" over the whole registry (10
+ids at equal odds, Operator Ruling R1); `source_bank` has "roll (any eligible
+bank)". Each roll draws from an ordered pool (`draw(eligible_order, seed)`),
+seeds from `OTR_VISUAL_STYLE_SEED` / `OTR_BANK_SEED` or entropy, and writes a
+replayable receipt (`meta.style_roll` / `meta.bank_roll`) that records the
+EXACT pool drawn from. `episode_language` (9 rows: Off + 8 languages) has NO
+roll of any kind. All three are on the app form (`config/app_mode.json`:
+"Story bank", "Visual style", "Language").
+
+**What the idea adds:** a roll over a pool the operator CHOOSES -- "any of
+these three styles", "any of these two languages" -- rather than the whole
+list. The roll machinery already takes an arbitrary `eligible_order` and
+receipts it, so the draw, seed and replay need no change; the receipt already
+answers "what pool was this drawn from". **The whole fork is the widget
+shape**, because a ComfyUI combo is single-select:
+
+* (a) a STRING per surface ("roll from: anime, cartoon, video_art") parsed
+  into the pool -- one trailing widget each, refuses an unknown id LOUD, but
+  a typed list is not a picker;
+* (b) a native multi-select combo if the frontend has one (verify against
+  the current frontend and `comfy_types`; this is the research question);
+* (c) per-id BOOLEAN toggles -- 10 style + 8 language widgets, all
+  positional (`widgets_values` rule, section 0) -- the priciest shape;
+* (d) named pool presets ("roll (my set)") read from a user file -- keeps the
+  combo, moves the curation out of the graph.
+
+**Constraints a design must carry:** "Off is not a language" -- a language
+pool excludes Off; a fidelity bank (shakespeare, public_domain) REFUSES a
+non-English row before any LLM call, so a language roll must resolve after
+the bank and drop non-English when the bank is a fidelity one (or the run
+refuses -- a roll that lands on a refusal every third episode is worse than
+no roll); the receipt (`RollReceipt.surface`) gains "episode_language"; a
+pool of one is a pick, not a roll; both existing rolls stay independent of
+each other and of this. Tests that pin the surfaces:
+`tests/test_visual_style_widget_3c.py`, `tests/test_source_bank_widget_2c.py`,
+`tests/test_episode_language_writer.py`, `tests/test_app_mode.py`, and the
+positional widget suite. A trailing widget is nearly free; anything mid-list
+costs the three-place re-index.
+
+**Decision needed:** the widget shape (a-d) -- a design choice with more
+than one defensible answer, so a design round BEFORE code, per the 08-17
+amendment. Then it is a section 2 row.
+
 ### The registry -- his clicks and his word
 
 * **2.3.6 is the latest published version** (`96ea436a`, 2026-09-25, after
