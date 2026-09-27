@@ -1,9 +1,10 @@
 """Optional, transactional speech detection for the terminal foley mix.
 
-VAD runs on CPU, then Whisper uses available CUDA or CPU int8; the episode's
-technical slot judges all nonempty transcripts in one call. No model survives
-the call. Any failure
-discards ALL duck decisions, without changing the stems or the master.
+VAD runs on CPU, then Whisper uses CUDA when a real encode proves it can,
+else CPU int8; the episode's technical slot judges all nonempty transcripts in
+one call. No model survives the call. A failure before the judge discards ALL
+duck decisions, without changing the stems or the master; a failed judge ducks
+every beat Whisper found words on, because unsure means duck.
 """
 from __future__ import annotations
 
