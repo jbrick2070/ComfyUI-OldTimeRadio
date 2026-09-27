@@ -322,6 +322,29 @@ class TestDualLedgerFix:
         assert Path(led.path) == path1
         assert path1.exists()
 
+    def test_path_rebase_keeps_posix_paths_posix_on_every_python(self):
+        """PBUG-20260927-01: ntpath.isabs("/workspace/x") is True before
+        Python 3.13, so a Linux root was rebased with Windows semantics and
+        every path came back spelled with backslashes -- a replay on a Python
+        3.12 pod could then open none of its stills."""
+        old = "/workspace/runpod-slim/ComfyUI/output/otr/episodes/crown_040716"
+        new = "/workspace/runpod-slim/ComfyUI/output/otr/episodes/crown_080555"
+        payload = {
+            "still": old + "/stills/c01_15cbc7ed6b0d.png",
+            "nested": [old + "/audio/master.wav"],
+            "external": "/workspace/runpod-slim/ComfyUI/models/voice.wav",
+            "prefix_sibling": old + "_other/stills/not_this_run.png",
+        }
+
+        rebased, count = _rebase_episode_local_paths(payload, old, new)
+
+        assert count == 2
+        assert rebased["still"] == new + "/stills/c01_15cbc7ed6b0d.png"
+        assert rebased["nested"] == [new + "/audio/master.wav"]
+        assert "\\" not in json.dumps(rebased)
+        assert rebased["external"] == payload["external"]
+        assert rebased["prefix_sibling"] == payload["prefix_sibling"]
+
     def test_path_rebase_handles_windows_slashes_and_component_boundaries(self):
         old = r"C:\output\otr\episodes\pending_1"
         new = r"C:\output\otr\episodes\signal_lost_final"

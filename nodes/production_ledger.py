@@ -411,7 +411,17 @@ def _rebase_episode_local_paths(
 
     # ``ntpath`` recognizes both C:\\x and C:/x on every host.  Use POSIX
     # semantics only when the root is genuinely POSIX-absolute.
-    pathmod = ntpath if ntpath.isabs(old_root) else posixpath
+    #
+    # Decide by the path's FORM, never by ``ntpath.isabs``: before Python
+    # 3.13 it calls "/workspace/x" absolute (a rooted Windows path), so a
+    # Linux root took Windows semantics and ``normpath`` rewrote every "/" as
+    # "\\" -- a replay on a Python 3.12 pod then looked for
+    # "\\workspace\\...\\stills\\c01.png", which no Linux call can open
+    # (PBUG-20260927-01). A drive (C:\\x, C:/x) or UNC share, or a backslash
+    # spelling not rooted at "/", is Windows; a "/"-rooted path is POSIX.
+    windows_root = bool(ntpath.splitdrive(old_root)[0]) or (
+        "\\" in old_root and not old_root.startswith("/"))
+    pathmod = ntpath if windows_root else posixpath
     old_norm = pathmod.normcase(pathmod.normpath(old_root))
     new_norm = pathmod.normpath(new_root)
 

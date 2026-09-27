@@ -15608,3 +15608,24 @@ not promote it to the Bug Bible on this evidence alone.
   rows (-03 covered by it, -04 promoted) and a static check in
   tests/bug_bible_regression.py that fails on the pre-fix module (3b1aced6)
   and passes on the fix. Bible commit e0bed43.
+
+## PBUG-20260927-01 -- a replay on a Python 3.12 Linux pod rebased every episode path with backslashes and could open none of its stills
+- surfaced: the RunPod foley speech duck test (2026-09-27 08:05 UTC, RTX PRO
+  4000, `.venv-cu128` Python 3.12, OTR 04d23445). The canonical replay of
+  `signal_lost_the_crown_of_the_ass_20260927_040716` failed at
+  OTR_ImageGenDispatcher: "REPLAY: 23 imported image row(s) have no file on
+  disk". The stills were on disk; the ledger rows named
+  `\workspace\runpod-slim\...\stills\c01_15cbc7ed6b0d.png`.
+- root cause: `production_ledger._rebase_episode_local_paths` chose its path
+  module with `ntpath.isabs(old_root)`. Before Python 3.13, ntpath calls a
+  "/"-rooted path absolute, so a Linux episode root took Windows semantics and
+  `ntpath.normpath` rewrote every "/" as "\\". Python 3.13 changed
+  `ntpath.isabs`, which is why a 3.13 box never showed it; every Linux or Mac
+  install on 3.12 or older did.
+- fix (this commit): decide by the path's form -- a drive (C:\x, C:/x) or UNC
+  share, or a backslash spelling not rooted at "/", is Windows; a "/"-rooted
+  path is POSIX. Test: a POSIX root rebases to forward slashes on every Python
+  (`tests/test_production_ledger.py`); the Windows mixed-separator test is
+  unchanged and green.
+- live verify: owed -- the duck test re-runs on the pod after the overnight
+  episode in flight, on this fix.
