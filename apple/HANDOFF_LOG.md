@@ -1,3 +1,48 @@
+## 2026-09-26 -- HEAD (main) -- EVENING: the Comfy-native Gemma 4 writer is wired and live on both boxes
+
+Driver: the 5080 Claude window (Opus), both boxes, the operator mostly away
+("the 4060 is all yours and 5080"; "just wire, focus on getting the new
+Gemma 4 and then loading it all up on the 4060 so you can test everything at
+once").
+
+GEMMA WRITER (plan row 0n; GO_FORWARD_PLAN has the table):
+  A2 3687e592, A1 34e5e3a2 + 5699e232, A3 810d3a26 + 576103d3. The dropdown
+    offers comfy_native:gemma4-e2b-it-int8-convrot on every workflow; no
+    workflow selects it. Composer QA on A1 and A3 (A1 blocker folded as
+    5699e232; A3 follow-ups folded as 576103d3; the 8192-cap finding stays
+    open as 0n item 2).
+  The live legs found two real defects the fakes could not: 3b1aced6 (0.34's
+    CLIP.generate has no mtp, its sample_token no penalty_mask --
+    PBUG-20260926-03) and f488f4d7 + 67da20b9 (a second generate() inside one
+    node replayed ComfyUI's captured decode graph -- device-side assert,
+    server abort -- PBUG-20260926-04, Bible 12.178, e0bed43 in the Bible
+    repo). Composer HOLDS on both.
+  44877ade: filename codes cg4e2 (native writer) and q3827 (Qwen3.8-27B,
+    missing since 09-21), plus an in-process test over every writer row.
+  Episodes in obs: 4060 clink_bone_20260926_175812 (otr_8gb_video, 1 act,
+    15:24), 5080 knot_midnight_20260926_180140 (otr_16gb_low, 1 act, 217 s).
+    4060 writer 44.9 tok/s overall, ~65 steady, vs Qwen3.5-4B NF4 at 12.2 on
+    the same card; writer span 1.9 min vs 6.5 min.
+  OWED: Slice B (8 GB default) is the operator's call; the 14k-prompt cap
+    probe on the 4060.
+
+LTX 2.5 TEXT ENCODER ON THE GPU (67d67fb7, 008fa041, accepted by eye on the
+  5080 A/B: "perfect pencil sketches, I can't tell the difference"): every
+  LTX 2.5 lane inherits it. 4060, ltx25_foley_16gb replay, 97-frame clips:
+  421 s and 479 s against 707 s CPU-pinned; decode peak ~4.46 GB, no OOM.
+  The 8 GB mime and audio-in display names now carry that number; the RAM
+  figures there are still the CPU-pinned measurement.
+  STILL CPU: only LTX 0.9.8's T5 (ltx_8gb, frozen recipe). A GPU-T5 timing
+  on the 4060 is owed; changing the recipe is the operator's call.
+
+4060 COLD AUTO-DOWNLOAD DRILL: done, every leg READY from empty folders with
+  no HF token (full_8gb_video published; the fetch legs stop at READY by
+  design). The Gemma weight later fetched itself the same way.
+
+Suite: full run 17,074 passed, 0 failed at 810d3a26 (before the docs); the
+  scoped suites were green at every later push. Bible regression vs OTR:
+  48 passed.
+
 ## 2026-09-26 -- HEAD 5df92ba4 (main) -- MORNING: no VRAM reserves, unload after use, --video-lane
 
 Driver: the 5080 Claude window (Opus), 09:00-11:00, the operator napping from

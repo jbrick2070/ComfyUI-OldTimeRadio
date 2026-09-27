@@ -15548,3 +15548,63 @@ not promote it to the Bug Bible on this evidence alone.
   library-returned cache path before hard-linking or copying it into another
   folder"), with its otr_coverage_index.yaml row and a static check in
   tests/bug_bible_regression.py.
+
+## PBUG-20260926-03 -- the Comfy-native writer called ComfyUI 0.37's CLIP.generate signature on a 0.34 install
+- surfaced: the 4060's first live leg of the Comfy-native Gemma 4 writer
+  (plan row 0n), 2026-09-26, stock ComfyUI portable 0.34.0, `--profile
+  otr_8gb_video --act-count 1 --source-bank original` with
+  `comfy_native:gemma4-e2b-it-int8-convrot` in both writer slots, at
+  810d3a26. The weight auto-downloaded through the queue-time preflight
+  (5,199,997,904 bytes, pin verified), then the writer's first call raised
+  `TypeError: CLIP.generate() got an unexpected keyword argument 'mtp'`.
+- root cause: the adapter was written against the 5080's ComfyUI 0.37.4,
+  whose `CLIP.generate` takes `mtp` (Gemma4Model.generate accepts it and
+  never reads it). 0.34's does not. The same version gap sits in the
+  per-token hook: 0.37's loop passes `penalty_mask` to `sample_token`, 0.34's
+  sampler has no such parameter, and the hook always forwarded one.
+- fix (3b1aced6): drop `mtp`; the hook forwards the loop's keyword arguments
+  untouched. Test CLIP takes only what 0.34 takes; a parametrized test runs
+  the hook with both loops' argument sets.
+- live verify: the next 4060 leg got past the first call (see -04).
+- promotion: covered by Bible 12.178, whose fix text carries the
+  version-tolerance rule (see -04).
+
+## PBUG-20260926-04 -- a second clip.generate() inside one node replays the first call's CUDA graph and aborts the server
+- surfaced: the same 4060 leg after the -03 fix (3b1aced6). The writer's
+  first call (`original_concept`, 503 tokens, ended on EOS) was clean; the
+  second (`original_select`, temperature 0.3) died on its first decode step
+  with a CUDA device-side assert, "ScatterGatherKernel.cu: scatter gather
+  kernel index out of bounds", and the server aborted (SERVER_EXIT 3).
+- located: rerun with CUDA_LAUNCH_BLOCKING=1 and the original traceback
+  printed: the failing kernel is ComfyUI's own prefetch graph replay,
+  `comfy/model_prefetch.py prefetch_queue_pop -> graph["graph"].replay()`,
+  inside `gemma4.py forward`. (Without blocking launches the assert surfaced
+  one step later in `sample_token`, and the adapter's exception-path
+  `cleanup_prefetch_queues` then touched the dead context and turned the
+  exception into an abort that hid it.)
+- root cause: with dynamic VRAM, ComfyUI captures decode graphs and keeps
+  them until the prompt executor's per-node close-out (execution.py:
+  `cleanup_prefetch_queues`, `reset_cast_buffers`,
+  `vbars_reset_watermark_limits`, when `aimdo_enabled`; same in 0.34 and
+  0.37). The stock TextGenerate node makes one generate() per node. OTR's
+  writer makes dozens inside one node, so call two replayed call one's graph
+  against a new KV cache.
+- fix (f488f4d7, 67da20b9): the adapter runs the executor's close-out after
+  every generate() call, under the executor's own condition; a failure is
+  logged before the close-out runs, and a close-out failure after a failed
+  call never replaces the original error. Composer QA: HOLDS.
+- live verify (4060, f488f4d7, the same leg): 45 writer calls, all clean,
+  4,097 tokens at 44.9 tok/s overall (about 65 tok/s steady decode) against
+  12.2 tok/s for Qwen3.5-4B NF4 on the same card; writer span 1.9 min
+  against 6.5 min. The episode then ran end to end: RESULT SUCCESS, Prompt
+  executed in 00:15:24, obs_publish OK ->
+  `clink_bone_20260926_175812__pori__lx8g__zimg__koko__orig__unk__sa3_final.mp4`
+  (the `unk` writer slot is fixed in 44877ade). ShotLock requested the
+  writer again after the script phase had released it and ran at the same
+  speed. On the 5080 (ComfyUI 0.37.4, 67da20b9): 31 calls clean, 62.9 tok/s
+  overall, `knot_midnight_20260926_180140` in obs, 217 s for the whole prompt.
+- promotion: PROMOTED 2026-09-26 as Bible 12.178 ("close ComfyUI's graph
+  scope after each in-node generate()"), with two otr_coverage_index.yaml
+  rows (-03 covered by it, -04 promoted) and a static check in
+  tests/bug_bible_regression.py that fails on the pre-fix module (3b1aced6)
+  and passes on the fix. Bible commit e0bed43.

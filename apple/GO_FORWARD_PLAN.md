@@ -129,25 +129,46 @@ STILL OWED, not blocking: the clean H3 auto-download proof -- ref2va was moved
 off the box to `C:\OTR-H3-moved-aside\`; `--video-lane h3_low_audio_in` on a
 fresh boot must fetch it (21 GB) and render.
 
-### 0n. A Comfy-native Gemma 4 writer -- MEASURED 2026-09-26, design not started
+### 0n. A Comfy-native Gemma 4 writer -- WIRED AND LIVE-PROVEN 2026-09-26; the default switch is the operator's call
 
 ComfyUI ships an official `llm_gemma4_text_gen` template: the stock CLIPLoader
 plus the built-in TextGenerate node, running Gemma 4 inside ComfyUI's own model
-management (dynamic loading, unload after use). Comfy-Org publishes
-`gemma4_e2b_it_int8_convrot` (5.2 GB), `gemma4_e4b_it_int8_convrot` (8.1 GB),
-`gemma4_e4b_it_fp8_scaled` (9.1 GB), `gemma4_12b_int8_convrot` (12.1 GB) and bf16.
-Measured on the 5080 through that node (raw, one run each):
-| writer path | prompt / output | speed | VRAM above desktop |
-|---|---|---:|---:|
-| Comfy-native E2B int8_convrot | ~70 / 526-580 tok | 77 cold, 125 warm tok/s | ~4.5 GiB |
-| Comfy-native E2B int8_convrot | 14,336 / 983-1,287 tok | 82-92 tok/s incl. prefill | ~7.9 GiB |
-| transformers E2B mobile-QAT | ~70 / 640 tok | 4.3 tok/s | ~9.3 GiB |
-| current 12B NF4 writer (bitsandbytes) | episode | 16-18 tok/s | ~8-9 GB |
-The mobile-QAT transformers path unpacks every layer on every token
-(`transformers/integrations/gemma_quant.py` forward), which is its slowness.
-OWED: the 4060's own numbers (probe queued with the 4060 agent), and a design
-round before any code -- OTR's writer loads through transformers today, so this
-is a writer-backend choice, not a catalog row. His call on whether to open it.
+management. OTR now offers the same model as a writer dropdown row,
+`comfy_native:gemma4-e2b-it-int8-convrot` (Comfy-Org's 5.2 GB int8 file,
+pinned by revision, size and sha256). No workflow selects it yet.
+
+**Design** (kibitz-runs/2026-09-26-comfy-gemma-writer, r1-r3): an adapter that
+speaks the transformers `generate()` subset over ComfyUI's `CLIP.generate`, so
+the writer's four generation factories, halt rules, grammar and stop trimming
+run unchanged; the weight comes through the queue-time preflight's pinned
+fetch; `request_slot` gives it the same residency rules as a transformers
+writer; teardown hands it back through ComfyUI's `unload_model_and_clones`.
+Row is WARN with an 8192 working cap, because ComfyUI allocates the KV cache for
+prompt + budget up front.
+Commits: 3687e592 (A2 pin + planner), 34e5e3a2 + 5699e232 (A1 adapter),
+810d3a26 (A3 dropdown row + request_slot), 576103d3 (Composer follow-ups),
+3b1aced6 (runs on ComfyUI 0.34 too), f488f4d7 + 67da20b9 (per-call graph
+close-out, PBUG-20260926-04), 44877ade (filename code cg4e2).
+
+**Measured, 1-act canonical episodes, both writer slots on the native row:**
+| box | ComfyUI | writer calls | overall | steady decode | writer span | episode |
+|---|---|---:|---:|---:|---:|---|
+| 4060 8 GB, otr_8gb_video | 0.34.0 | 45 | 44.9 tok/s | ~65 tok/s | 1.9 min | clink_bone_20260926_175812 (15:24 whole prompt) |
+| 5080 16 GB, otr_16gb_low | 0.37.4 | 31 | 62.9 tok/s | ~71 tok/s | -- | knot_midnight_20260926_180140 (217 s whole prompt) |
+| 4060, same workflow, Qwen3.5-4B NF4 (cold drill) | 0.34.0 | 42 | 12.2 tok/s | ~12 tok/s | 6.5 min | cold_full_8gb_video |
+Overall includes prefill and per-call overhead. Grammar-bound JSON held: two
+typed repairs in the whole 4060 script, none on the 5080. The weight
+auto-downloaded on the 4060 from an empty folder, token-less, at ~55 MB/s.
+
+**OWED, in order:**
+1. **Slice B -- the operator's call:** make it the 8 GB default. The r1 gate was an episode
+   in `otr/obs/` on both boxes, which is now met. If yes: the canonical writer
+   `widgets_values` stay (the canonical is 16 GB), `config/workflow_matrix.json`
+   and `config/machine_classes.json` 8 GB rows move together, then
+   `build_variants.py --all` and `--check`.
+2. The working cap: a 4060 probe at a 14k-token prompt decides whether 8192 can
+   rise. No writer pass overflowed it in either episode above.
+3. `scripts/otr_dropdown_matrix.py` lists the row, with fit tags, once 1 lands.
 
 ### 0a. Windows HF_HOME -- DONE 2026-09-25 (`a0875708`, `89a95212`)
 
