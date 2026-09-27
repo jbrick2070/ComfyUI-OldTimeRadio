@@ -30,6 +30,7 @@ log = logging.getLogger("OTR")
 
 __all__ = [
     "OFF_LABEL",
+    "ROLL_LABEL",
     "WIDGET_NAME",
     "EpisodeLanguageError",
     "LanguageRow",
@@ -64,6 +65,11 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRY_PATH = os.path.join(_REPO_ROOT, "config", "episode_languages.json")
 
 OFF_LABEL = "Off"
+#: The dropdown's roll command (2026-09-26). Not a language: the writer
+#: resolves it to one, AFTER the source bank, in `_otr_rolls`. Owned here so
+#: the writer can recognise it before the replay shortcut without touching
+#: the roll module (a replay must never reach the rolls).
+ROLL_LABEL = "roll (any language)"
 WIDGET_NAME = "episode_language"
 REGISTRY_ID = "episode_languages"
 _SCHEMA_VERSION = 1

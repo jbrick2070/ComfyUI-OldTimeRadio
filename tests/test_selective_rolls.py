@@ -138,6 +138,10 @@ def test_the_whole_language_roll_never_lands_on_off():
         assert LANG.resolve_label(sel).row is not None   # a real, stampable row
 
 
+def test_the_roll_label_has_one_spelling():
+    assert ROLLS.LANGUAGE_SENTINEL == LANG.ROLL_LABEL
+
+
 def test_off_in_a_language_pool_is_refused():
     with pytest.raises(ROLLS.RollError, match="cannot be rolled"):
         ROLLS.resolve_language_selection(

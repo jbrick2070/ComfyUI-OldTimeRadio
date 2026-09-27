@@ -3201,7 +3201,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # bank), so until then a roll is held as Off: nothing below reads the
         # row before the bank is bound, and a REPLAY under the roll asks for
         # the recorded language, exactly as Off does.
-        _language_rolls = _ROLLS.is_language_sentinel(episode_language)
+        # Compared against the language module's own label, NOT through
+        # _ROLLS: the replay shortcut below must never reach the roll module.
+        _language_rolls = episode_language == _EPLANG.ROLL_LABEL
         _language = _EPLANG.resolve_label(
             _EPLANG.OFF_LABEL if _language_rolls else episode_language)
         _language_row = _language.row

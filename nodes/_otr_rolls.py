@@ -71,6 +71,8 @@ BANK_SENTINEL = "roll (any eligible bank)"
 STYLE_SENTINEL = "roll (any style)"
 #: The episode_language roll (2026-09-26). Draws from the admitted language
 #: rows -- never Off, which is not a language -- or from the chosen pool.
+#: The label itself is owned by the language module (its ROLL_LABEL); a test
+#: pins the two equal.
 LANGUAGE_SENTINEL = "roll (any language)"
 
 BANK_SEED_ENV = "OTR_BANK_SEED"
