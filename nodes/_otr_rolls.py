@@ -43,6 +43,7 @@ Import direction stays one-way:
 
 from __future__ import annotations
 
+import ast
 import json
 import random
 from dataclasses import dataclass
@@ -156,10 +157,18 @@ def parse_roll_pool(
         if text.startswith("["):
             try:
                 raw = json.loads(text)
-            except json.JSONDecodeError as exc:
-                raise RollError(
-                    f"the {surface} roll pool {text!r} is not a JSON list"
-                ) from exc
+            except json.JSONDecodeError:
+                # A graph saved by 2.3.8 holds a real LIST in this slot, and
+                # core coerces every STRING input with str() (execution.py),
+                # so the node receives Python's repr: "['anime', 'cartoon']",
+                # which is not JSON. literal_eval reads literals only -- it
+                # never executes anything.
+                try:
+                    raw = ast.literal_eval(text)
+                except (ValueError, SyntaxError) as exc:
+                    raise RollError(
+                        f"the {surface} roll pool {text!r} is not a list"
+                    ) from exc
         else:
             raw = [part for part in (p.strip() for p in
                    text.replace(";", ",").replace("\n", ",").split(","))

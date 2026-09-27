@@ -215,6 +215,26 @@ def test_each_pool_is_a_typed_list_the_app_view_can_draw(name, names):
     assert "Choose from: Off" not in meta["tooltip"]
 
 
+@pytest.mark.parametrize("saved", [[], ["anime", "cartoon"], ["Español"]])
+def test_a_2_3_8_saved_list_survives_cores_str_coercion(saved):
+    """A graph saved by 2.3.8 holds a LIST here. The frontend wraps it as
+    {"__value__": [...]}, core unwraps it and then runs str() on every STRING
+    input (execution.py) -- so the node receives Python's repr, not JSON."""
+    coerced = str(saved)                  # exactly what core hands run()
+    if saved == ["Español"]:
+        with pytest.raises(ROLLS.RollError):   # still refused: not a style
+            ROLLS.parse_roll_pool(coerced, valid_ids=ROLLS.eligible_style_ids(), surface="s")
+        return
+    got = ROLLS.parse_roll_pool(coerced, valid_ids=ROLLS.eligible_style_ids(), surface="s")
+    assert got == tuple(saved)
+
+
+def test_bracketed_text_that_is_no_list_is_refused_loud():
+    for text in ("[anime, cartoon", "[__import__('os')]", "[1+1]"):
+        with pytest.raises(ROLLS.RollError):
+            ROLLS.parse_roll_pool(text, valid_ids=ROLLS.eligible_style_ids(), surface="s")
+
+
 def test_a_typed_pool_and_a_saved_list_parse_the_same():
     """A graph saved by 2.3.8 holds a LIST in this slot; it still reads."""
     typed = ROLLS.parse_roll_pool("video_art; anime\ncartoon",

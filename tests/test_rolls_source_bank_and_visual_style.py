@@ -421,6 +421,9 @@ def test_the_roll_module_imports_nothing_that_could_call_a_model():
         # __future__, hashlib, json, logging, os and typing -- stdlib only,
         # the same leaf-closure test env.py passed.
         "json", "_otr_episode_languages", "_LANG",
+        # `ast` (2026-09-27): literal_eval reads a list saved by a 2.3.8 graph
+        # after core str()-coerces it. Stdlib; evaluates literals only.
+        "ast",
     }
     assert imported <= allowed, f"unexpected imports: {imported - allowed}"
 
