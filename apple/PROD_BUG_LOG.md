@@ -15627,8 +15627,10 @@ not promote it to the Bug Bible on this evidence alone.
   path is POSIX. Test: a POSIX root rebases to forward slashes on every Python
   (`tests/test_production_ledger.py`); the Windows mixed-separator test is
   unchanged and green.
-- live verify: owed -- the duck test re-runs on the pod after the overnight
-  episode in flight, on this fix.
+- live verify (RunPod RTX PRO 4000, Python 3.12, 1adde69a, 2026-09-27 12:36
+  UTC): the same canonical replay of the same source episode now logs
+  "replay: 23 imported image row(s) verified on disk, nothing minted" and
+  renders -- where 04d23445 stopped at 91 s with all 23 "not on disk".
 
 ## PBUG-20260927-02 -- the foley speech duck's Whisper raised on every CUDA 13 stack, so the duck silently ducked nothing
 - surfaced: 2026-09-27 03:30 on the 5080 (Windows, torch 2.10+cu130), running
