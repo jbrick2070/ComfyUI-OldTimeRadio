@@ -212,20 +212,38 @@ report line in the mux ("foley speech duck: 4 of 17 beats"). Off by default?
 No -- if it ships it is ON for foley lanes, since the vocalisation is the
 accepted defect it exists for; a widget only if he wants to switch it off.
 
-**The one real fork -- the detector:**
-* **Whisper** (his word): transcribes; heavy for this job (openai-whisper +
-  a 75-145 MB model per size, tokeniser, decode) and it can label babble as
-  no-speech or hallucinate words. We only need "is there a voice here".
-* **A VAD** (Silero VAD: ~2 MB, pip `silero-vad`, torch-only, runs on CPU
-  in well under real time): answers exactly "is there voice-like energy in
-  this window", catches babble, no model download of note, portable to Mac
-  and AMD and the pod. Recommended.
-* Either way: a new dependency -> `requirements.txt` AND the static
-  `[project] dependencies` list (registry reads the literal field), the
-  fresh-install path proven on the 4060, and the scan replica run.
-* Not a fork: per-clip flat duck (his words) vs time-windowed sidechain --
-  flat is the ask and matches the per-row mix; windowed is a later
-  refinement if his ear asks.
+**His design (refined the same night):** *"have an LLM look at this
+transcript -- does this seem to be speech that would conflict with the talk
+track, do you see human words or speech -- then flag this with a speech
+indicator."* So the chain is: Whisper transcribes each beat's `foley_path`
+-> ONE batched LLM call reads every transcript and returns, per beat, a
+JSON verdict (`speech: true/false`, one-line reason) under the grammar the
+writer already uses -> a true verdict sets the beat's speech flag ->
+`mix_foley_under_master` reads the flag and halves that stem. The flag is
+the "speech indicator": `meta.foley_speech[beat_id] = {transcript, verdict,
+reason}` in the ledger, and a mux report line. The LLM judgement is what a
+detector cannot do -- it tells a stray "get down!" from a dog bark, a crowd
+murmur or a creak, so the bed is not thinned for nothing.
+
+**Two ways it fails, and the cheap gate that removes the first:**
+* Whisper HALLUCINATES text on silence and noise ("Thank you.", "Subtitles
+  by ...") -- a known defect of the model -- and an LLM reading that
+  transcript sees human words and flags a clip with no voice in it. Gate:
+  run a VAD first (Silero VAD, ~2 MB, torch-only, CPU, well under real
+  time) and transcribe ONLY beats where it finds voice-like energy. Fewer
+  Whisper calls, and the hallucination class never reaches the LLM.
+* Babble without words -- the model vocalising in no language -- comes back
+  as an empty or junk transcript, the LLM says "no words", and the clip still
+  fights the dialogue by ear. Rule: VAD-positive with an empty transcript is
+  scored as vocalisation and ducked; the LLM only rules on transcripts that
+  have words.
+* Cost: two new dependencies (whisper -- `faster-whisper` is the lighter
+  build, `base.en` ~145 MB -- and `silero-vad`), both into `requirements.txt`
+  AND the static `[project] dependencies` list; the fresh-install path proven
+  on the 4060; the scan replica run. One LLM load at mux time (the writer is
+  unloaded by then per the no-reserve rule) -- one batched call, not one per
+  beat; on 8 GB it is the E2B. Per-clip flat duck (his words) -- windowed
+  ducking is a later refinement if his ear asks.
 
 **Verify at build:** one foley episode with a known vocalising clip, the
 receipt naming that beat, and his ear on the result (a duck depth is an ear
@@ -233,8 +251,8 @@ call, like every mix ratio here). Tests: the detector on a synthetic voiced
 vs unvoiced stem, the mix with a ducked row, the receipt, a ledger-hole check
 (the duck reads a row field, never invents one).
 
-**Decision needed:** VAD or Whisper, and on-for-foley or switchable. Then it
-is a section 2 row.
+**Decision needed:** the VAD gate in front of Whisper (recommended), and
+on-for-foley or switchable. Then it is a section 2 row.
 
 ### The registry -- his clicks and his word
 
