@@ -183,12 +183,14 @@ class _Clip:
         self.patcher = SimpleNamespace(load_device="cpu")
         self.calls = []
 
+    # ComfyUI 0.34's CLIP.generate: no ``mtp`` (0.37 added one Gemma 4 ignores).
+    # The adapter must run on both, so the fake takes only what 0.34 takes.
     def generate(self, tokens, do_sample, max_length, temperature, top_k, top_p,
-                 min_p, repetition_penalty, seed, presence_penalty, mtp):
+                 min_p, repetition_penalty, seed, presence_penalty):
         assert isinstance(seed, int), "Comfy's sampler needs an int seed"
         self.calls.append(dict(do_sample=do_sample, max_length=max_length,
                                top_k=top_k, top_p=top_p, min_p=min_p,
-                               repetition_penalty=repetition_penalty, mtp=mtp))
+                               repetition_penalty=repetition_penalty))
         prompt = [t[0] for t in tokens["gemma4"][0]]
         return self.cond_stage_model.gemma4.transformer.loop(prompt, max_length, seed)
 
@@ -262,7 +264,7 @@ def test_generation_returns_prompt_plus_ids_through_a_real_eos():
     assert out.tolist() == [[2, 5, 7, 8, EOS]]
     assert all(h == [] for h in decoder.histories), "the loop passes an empty history"
     assert "sample_token" not in decoder.__dict__ and clip.resets == 1
-    assert clip.calls[0]["max_length"] == 10 and clip.calls[0]["mtp"] is False
+    assert clip.calls[0]["max_length"] == 10
 
 
 def test_the_budget_is_new_tokens_and_is_honoured():
@@ -295,6 +297,26 @@ def test_an_extra_eos_the_loop_does_not_know_still_ends_the_loop():
                            eos_token_id=[0])
     assert out.tolist() == [[2, 7, 0]]
     assert len(decoder.histories) == 2, "the loop ended on the halting step itself"
+
+
+@pytest.mark.parametrize("loop_kwargs", [
+    {"do_sample": True, "presence_penalty": 0.0},                       # ComfyUI 0.34
+    {"do_sample": True, "presence_penalty": 0.0, "penalty_mask": None},  # ComfyUI 0.37
+])
+def test_the_hook_hands_the_sampler_exactly_what_the_installed_loop_passed(loop_kwargs):
+    """Measured on the 4060's stock 0.34 portable: its sample_token has no
+    penalty_mask, so a hook that always forwards one raises TypeError there."""
+    seen = []
+
+    def original(logits, temperature, top_k, top_p, min_p, repetition_penalty,
+                 token_history, generator, **kwargs):
+        seen.append(kwargs)
+        return torch.tensor([[7]])
+
+    run = native._Run([2], 4, {EOS}, None, None, None, loop_stop_id=EOS)
+    token = run.hook(original)(torch.zeros((1, 16)), 1.0, 0, 1.0, 0.0, 1.0, [2], None,
+                               **loop_kwargs)
+    assert seen == [loop_kwargs] and int(token) == 7 and run.error is None
 
 
 def test_a_callback_error_is_reraised_after_the_loop_closes_and_the_hook_is_gone():

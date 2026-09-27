@@ -254,9 +254,12 @@ class _Run:
     def hook(self, original):
         run = self
 
+        # The keyword arguments go through untouched: ComfyUI's loop has
+        # changed what it passes (0.34 sends do_sample and presence_penalty;
+        # 0.37 adds penalty_mask), and the hook must hand the original sampler
+        # exactly what the installed loop gave it -- no more, no less.
         def sample_token(logits, temperature, top_k, top_p, min_p,
-                         repetition_penalty, token_history, generator,
-                         do_sample=True, presence_penalty=0.0, penalty_mask=None):
+                         repetition_penalty, token_history, generator, **loop_kwargs):
             if run.stop_tensor is None:
                 run._prepare(logits)
             if run.halted:
@@ -266,8 +269,7 @@ class _Run:
                     run._mask(logits)
                 token = original(logits, temperature, top_k, top_p, min_p,
                                  repetition_penalty, token_history, generator,
-                                 do_sample=do_sample, presence_penalty=presence_penalty,
-                                 penalty_mask=penalty_mask)
+                                 **loop_kwargs)
                 token_id = int(token.reshape(-1)[0])
                 run._record(token_id)
                 if token_id in run.stop_ids:
@@ -395,8 +397,7 @@ class ComfyGemmaGenerateAdapter:
                 min_p=float(min_p or 0.0),
                 repetition_penalty=float(repetition_penalty or 1.0),
                 presence_penalty=0.0,
-                seed=native_seed(prompt) if sampling else 0,
-                mtp=False)
+                seed=native_seed(prompt) if sampling else 0)
             completed = True
         except BaseException:
             _abandon_allocation_recording()
