@@ -82,7 +82,7 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   tests for every commit, probably not needed"; the suite at every push
   stays the guard).
 
-### Selective rolls: a curated pool for style, and a language roll at all (operator idea 2026-09-26 night)
+### Selective rolls: a curated pool for style, and a language roll at all -- DESIGNED 2026-09-26 night, awaiting his word
 
 Operator: *"I should have put in a video style SELECTIVE randomizer for true
 variant autonomy ... and a language randomizer too, maybe selective."*
@@ -128,9 +128,58 @@ each other and of this. Tests that pin the surfaces:
 positional widget suite. A trailing widget is nearly free; anything mid-list
 costs the three-place re-index.
 
-**Decision needed:** the widget shape (a-d) -- a design choice with more
-than one defensible answer, so a design round BEFORE code, per the 08-17
-amendment. Then it is a section 2 row.
+**DESIGN ROUND DONE 2026-09-26 night (one file-grounded outside reader on
+this box, then every load-bearing claim re-read by the driver against core,
+frontend and the runner). The fork collapsed: current ComfyUI has a NATIVE
+multi-select COMBO, so (b)-(e) above are the pre-2025 answers.**
+* Core `8ff6dc38` (v0.37.4) and frontend package 1.52.7 (multi-select shipped
+  in frontend 1.13.4, Comfy-Org/ComfyUI_frontend#2987). Declared in V1 as
+  `("COMBO", {"options": [...], "multi_select": {"placeholder": ..., "chip":
+  True}, "multiselect": True, "default": []})`. **Both keys, or it breaks:**
+  `execution.py:1052` validates on `extra_info.get("multiselect")` while the
+  frontend mounts the picker only on the `multi_select` OBJECT (a boolean
+  is ignored; ComfyUI#13484). V3 `io.MultiCombo` (`comfy_api/latest/_io.py`,
+  `Type = list[str]`) emits both itself. The node receives ONE `list[str]`;
+  the frontend wraps it `{"__value__": [...]}` on queue and core unwraps at
+  `execution.py:983-989`, so a hand-built API prompt must wrap it too or a
+  bare list is read as list-mapping. `widgets_values` holds ONE slot whose
+  value is a JSON array. No shipping pack on this box declares it (Impact's
+  `multi_select` hit is its wildcard `$$` string syntax); the frontend's own
+  devtools node is the only example. The frontend ignores `default` and
+  starts empty, which is the right default for a pool filter.
+* **Shape decided: APPEND one native multi-select pool widget per surface;
+  the three existing combos are NOT touched.** `style_roll_pool` (options =
+  `eligible_style_ids()`) and `language_roll_pool` (options = the language
+  rows minus `OFF_LABEL`); `bank_roll_pool` only if he asks. Converting a
+  present combo in place would turn a string slot into an array slot and
+  break every saved graph, `--visual-style`, and the alignment suite.
+  Semantics: the existing combo stays the command (a pick, or the roll
+  sentinel); the pool is read ONLY when the command is the roll. Empty pool
+  = today's whole-list roll; one checked = a pick, no receipt; two or more =
+  `draw()` over that exact sorted tuple, receipted as `eligible_order` (no
+  receipt change). `episode_language` gains its own roll sentinel row (it
+  has none), and its roll resolves AFTER the bank and drops non-English when
+  the bank is a fidelity one -- empty after the filter is a LOUD refusal,
+  never a retry loop. The runner's `--set` already `json.loads`, so
+  `--set OTR_LedgerScriptWriter.style_roll_pool=["anime","cartoon"]` works
+  as is; the parser also accepts a comma string for a human. `patch_creative`
+  whitelists both pools (creative dials, unmanaged). App form: both pools go
+  under their combo in `config/app_mode.json`.
+* **Verify at build, first thing:** a live app-mode click of a multi-select
+  COMBO on this frontend -- the graph-side evidence is the same Vue
+  `WidgetRender`, but nobody has clicked the form. If the form shows a JSON
+  dump instead of the PrimeVue picker, the fallback is shape (a), a STRING
+  list, with the same parser. Also verify by reading a saved graph that
+  `widgets_values` really stores the array (inferred from `serializeValue`).
+* **Tests:** the three widget suites named above, `test_app_mode.py`, the
+  positional suite (trailing append = one slot each), a `parse_roll_pool`
+  unit (full / pick / roll / unknown id / Off refused / duplicates), the
+  fidelity filter, and a receipt-replay case with a two-id pool.
+* **Cost:** small. Two trailing widgets, one parser, one sentinel, one
+  fidelity filter, form rows, docs (`apple/WRITERS.md` roll section), a
+  2.3.x bump since saved graphs gain widgets. Composer QA on the diff.
+
+**One word from him makes this a section 2 row.**
 
 ### The registry -- his clicks and his word
 
