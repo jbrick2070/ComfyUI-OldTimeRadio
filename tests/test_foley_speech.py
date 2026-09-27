@@ -174,13 +174,21 @@ def test_one_batched_strict_verdict_after_whisper_release(monkeypatch):
     {"b2": {"speech": True, "reason": "yes", "extra": 3}},
     {"b2": {"speech": True, "reason": ""}}, RuntimeError("slot failed"),
 ])
-def test_bad_batch_rolls_back_even_wordless_ducks(monkeypatch, answer):
+def test_a_bad_or_failed_judge_ducks_every_voiced_beat(monkeypatch, answer):
+    """The operator's rule (2026-09-26): any human words duck, and unsure
+    means duck. A judge that answers garbage -- or raises -- is unsure, and
+    the voice gate and Whisper already found voice on both beats: the words
+    beat and the wordless one duck. (Measured on the pod the same night: the
+    judge failed, the old rule rolled every duck back, and four clearly
+    spoken lines played at full foley level.)"""
     _stub_models(monkeypatch, texts={"b1.wav": "", "b2.wav": "Help"})
     calls, releases = _stub_judge_slot(monkeypatch, answer)
     result = speech.detect_foley_speech([_row("b1"), _row("b2")], {})
-    assert all(not item["ducked"] for item in result.values())
-    assert all("LLM failed" in item["reason"] for item in result.values())
+    assert result["b1"]["ducked"] is True       # VAD-positive wordless
+    assert result["b2"]["ducked"] is True       # words, judge unsure
     assert len(calls) == len(releases) == 1
+    if answer == "not JSON" or isinstance(answer, Exception):
+        assert "unsure means duck" in result["b2"]["reason"]
 
 
 @pytest.mark.parametrize("stage", ["VAD", "Whisper", "transcribe", "unload"])
@@ -395,3 +403,15 @@ assert 'torch' not in sys.modules
     result = subprocess.run([sys.executable, str(probe), str(root)],
                             capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_the_judge_uses_the_shared_json_ladder_not_a_text_parser():
+    """text_parser is structured_call's hook for LABELLED-SECTION replies.
+    Passing json.loads opted the judge out of the schema contract, JSON mode
+    and tolerant extraction; on the pod the 12B's reply failed at its first
+    character and every duck rolled back (2026-09-27)."""
+    import inspect
+    src = inspect.getsource(speech._judge_transcripts)
+    call = src[src.index("structured_call("):]
+    call = call[:call.index(")\n")]
+    assert "text_parser" not in call

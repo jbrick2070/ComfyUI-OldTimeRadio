@@ -195,7 +195,12 @@ def _judge_transcripts(transcripts, meta):
             prompt=messages, schema=schema, slot_fn=slot_fn,
             base_temperature=0.2, structural_retry_temperature=0.1,
             max_new_tokens=max(256, 96 * len(transcripts)), max_attempts=1,
-            helper_name="foley_speech", text_parser=json.loads,
+            # NO text_parser: that hook is for labelled-section replies, and
+            # passing json.loads opted this call out of the ladder's schema
+            # contract, JSON mode and tolerant JSON extraction -- the 12B's
+            # reply then failed at its first character and the duck rolled
+            # back on a real run (2026-09-27, the pod duck test).
+            helper_name="foley_speech",
         )
         return verdicts.model_dump(by_alias=True)
     finally:
@@ -208,8 +213,9 @@ def detect_foley_speech(rows, meta):
     """Return {beat_id: {vad, transcript, verdict, reason, ducked}}.
 
     Input rows are never mutated. Unknown/unavailable evidence is represented
-    by null, not a fabricated negative result. Decisions commit only after all
-    stages succeed; an exception rolls back even an earlier wordless duck.
+    by null, not a fabricated negative result. A failure in the identity, VAD
+    or Whisper stages rolls back every duck (no evidence); a failed JUDGE ducks
+    every beat Whisper found words on, because unsure means duck.
     """
     from .foley_stems import is_speech_duck_lane
     rows = [row for row in rows if row.get("foley_path")
@@ -259,9 +265,23 @@ def detect_foley_speech(rows, meta):
                        if item["transcript"]}
         if transcripts:
             stage = "LLM"
-            verdicts = _judge_transcripts(transcripts, meta)
-            for key, verdict in verdicts.items():
-                receipt[key].update(verdict=verdict["speech"], reason=verdict["reason"])
+            try:
+                verdicts = _judge_transcripts(transcripts, meta)
+                for key, verdict in verdicts.items():
+                    receipt[key].update(verdict=verdict["speech"], reason=verdict["reason"])
+            except Exception as exc:  # noqa: BLE001 -- the judge is the unsure case
+                # THE OPERATOR'S RULE (2026-09-26): any human words duck, and
+                # unsure means duck -- "I don't mind accidentally quiet foley".
+                # A failed judge is the plainest "unsure" there is: the voice
+                # gate and Whisper already found words on these beats. So
+                # they duck, and the receipt says why. (A failure BEFORE this
+                # point -- VAD or Whisper -- still ducks nothing: then there
+                # is no evidence at all.)
+                reason = (f"judge failed ({type(exc).__name__}); "
+                          "words found, and unsure means duck")
+                log.warning("[OTR foley speech] %s: %s", reason, exc)
+                for key in transcripts:
+                    receipt[key].update(verdict=True, reason=reason)
         for item in receipt.values():
             item["ducked"] = item["verdict"] is True
     except Exception as exc:  # optional enrichment must never kill a render
