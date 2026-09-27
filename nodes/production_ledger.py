@@ -425,9 +425,18 @@ def _rebase_episode_local_paths(
     old_norm = pathmod.normcase(pathmod.normpath(old_root))
     new_norm = pathmod.normpath(new_root)
 
+    # A backslash-rooted absolute path met under POSIX semantics is either a
+    # ledger written on Windows or one already mangled by PBUG-20260927-01.
+    # It is left as it is -- guessing which would be worse -- but it is
+    # NAMED, so a later "not on disk" points at the real cause.
+    foreign: List[str] = []
+
     def _walk(current: Any) -> "tuple[Any, int]":
         if isinstance(current, str):
             if not pathmod.isabs(current):
+                if (pathmod is posixpath and "\\" in current
+                        and ntpath.isabs(current)):
+                    foreign.append(current)
                 return current, 0
             candidate_norm = pathmod.normcase(pathmod.normpath(current))
             try:
@@ -465,7 +474,14 @@ def _rebase_episode_local_paths(
             return tuple(rebuilt_tuple), changed
         return current, 0
 
-    return _walk(value)
+    result = _walk(value)
+    if foreign:
+        log.warning(
+            "[OTR ledger] path rebase under %s left %d Windows-spelled "
+            "absolute path(s) untouched (a ledger written on Windows, or one "
+            "mangled by PBUG-20260927-01); first: %s",
+            old_root, len(foreign), foreign[0])
+    return result
 
 
 def _same_durable_run(left: Dict[str, Any], right: Dict[str, Any]) -> bool:

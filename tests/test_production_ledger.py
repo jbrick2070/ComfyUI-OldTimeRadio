@@ -345,6 +345,17 @@ class TestDualLedgerFix:
         assert rebased["external"] == payload["external"]
         assert rebased["prefix_sibling"] == payload["prefix_sibling"]
 
+    def test_a_mangled_backslash_path_under_a_posix_root_is_named_not_guessed(self, caplog):
+        """A ledger already written with backslashes by PBUG-20260927-01 (or on
+        Windows) is left untouched under a POSIX root -- and said so."""
+        old = "/workspace/out/episodes/a"
+        new = "/workspace/out/episodes/b"
+        mangled = r"\workspace\out\episodes\a\stills\c01.png"
+        with caplog.at_level("WARNING", logger="OTR.production_ledger"):
+            rebased, count = _rebase_episode_local_paths({"p": mangled}, old, new)
+        assert count == 0 and rebased["p"] == mangled
+        assert "PBUG-20260927-01" in caplog.text and mangled in caplog.text
+
     def test_path_rebase_handles_windows_slashes_and_component_boundaries(self):
         old = r"C:\output\otr\episodes\pending_1"
         new = r"C:\output\otr\episodes\signal_lost_final"
