@@ -151,12 +151,15 @@ Commits: 3687e592 (A2 pin + planner), 34e5e3a2 + 5699e232 (A1 adapter),
 close-out, PBUG-20260926-04), 44877ade (filename code cg4e2).
 
 **Measured, 1-act canonical episodes, both writer slots on the native row:**
-| box | ComfyUI | writer calls | overall | steady decode | writer span | episode |
-|---|---|---:|---:|---:|---:|---|
-| 4060 8 GB, otr_8gb_video | 0.34.0 | 45 | 44.9 tok/s | ~65 tok/s | 1.9 min | clink_bone_20260926_175812 (15:24 whole prompt) |
-| 5080 16 GB, otr_16gb_low | 0.37.4 | 31 | 62.9 tok/s | ~71 tok/s | -- | knot_midnight_20260926_180140 (217 s whole prompt) |
-| 4060, same workflow, Qwen3.5-4B NF4 (cold drill) | 0.34.0 | 42 | 12.2 tok/s | ~12 tok/s | 6.5 min | cold_full_8gb_video |
-Overall includes prefill and per-call overhead. Grammar-bound JSON held: two
+| writer | 4060 8 GB steady / overall | 5080 16 GB steady / overall | episode |
+|---|---:|---:|---|
+| Comfy-native Gemma 4 E2B (int8) | 63 / 45 tok/s | 124 / 63 tok/s | 4060 clink_bone_20260926_175812 (otr_8gb_video, 15:24); 5080 knot_midnight_20260926_180140 (otr_16gb_low, 217 s) |
+| Qwen3.5-4B NF4 (8 GB default) | 13 / 12 tok/s | 14-17 / 14-16 tok/s | 4060 cold drill full leg; 5080 t5cache + appcheck legs |
+| Gemma 4 12B NF4 (16 GB default) | does not fit | 10 / 9-10 tok/s | 5080 h3_stock legs, 2026-09-26 |
+"Steady" is the median over writer calls of 256+ tokens; "overall" includes
+prefill and per-call overhead across the whole script. Writer span on the
+4060: 1.9 min native against 6.5 min Qwen. The 12B's older "16-18 tok/s"
+figure did not hold in today's episode logs. Grammar-bound JSON held: two
 typed repairs in the whole 4060 script, none on the 5080. The weight
 auto-downloaded on the 4060 from an empty folder, token-less, at ~55 MB/s.
 
