@@ -113,6 +113,7 @@ Each pins torch/transformers versions that would brick ComfyUI's own venv, so th
 
 OTR resolves these node CLASSES by name. Since 2026-09-25 the queue-time gate checks them before any download, so a missing pack refuses the graph in seconds with the install instruction first ("Install ComfyUI-AnimateDiff-Evolved (Kosinkadink) from ComfyUI Manager, then restart ComfyUI"). Before that it failed deep inside an episode, after the script, cast, voices and stills were done -- a video lane died eighteen minutes in with WrapperNodeMissing on a fresh install for exactly this reason (PBUG-20260925-02).
 
+
 Since 2026-09-27 the pack is named even earlier, when the workflow OPENS: an AnimateDiff workflow on a ComfyUI without AnimateDiff-Evolved shows ComfyUI's own missing-node card ("Missing node: ADE_AnimateDiffLoaderGen1"), and its errors panel lists the missing pack `comfyui-animatediff-evolved` with Node Manager's install route. `js/lane_node_packs.js` adds it to the frontend's missing-node list, from the table in `js/lane_node_packs.json` (pinned to the engines by `tests/test_lane_node_packs.py`). No node is added to any workflow. After installing, AnimateDiff-Evolved logs a red "No motion models found" at each boot until the first AnimateDiff run; that is expected, OTR downloads the motion module on that run and says so at boot.
 
 | pack | who needs it | what breaks without it |

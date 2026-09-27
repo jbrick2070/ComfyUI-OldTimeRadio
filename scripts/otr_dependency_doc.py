@@ -168,6 +168,19 @@ def render() -> str:
       "an episode, after the script, cast, voices and stills were done -- a "
       "video lane died eighteen minutes in with WrapperNodeMissing on a fresh "
       "install for exactly this reason (PBUG-20260925-02).\n")
+    A("\nSince 2026-09-27 the pack is named even earlier, when the workflow "
+      "OPENS: an AnimateDiff workflow on a ComfyUI without "
+      "AnimateDiff-Evolved shows ComfyUI's own missing-node card "
+      "(\"Missing node: ADE_AnimateDiffLoaderGen1\"), and its errors panel "
+      "lists the missing pack `comfyui-animatediff-evolved` with Node "
+      "Manager's install route. `js/lane_node_packs.js` adds it to the "
+      "frontend's missing-node list, from the table in "
+      "`js/lane_node_packs.json` (pinned to the engines by "
+      "`tests/test_lane_node_packs.py`). No node is added to any workflow. "
+      "After installing, AnimateDiff-Evolved logs a red \"No motion models "
+      "found\" at each boot until the first AnimateDiff run; that is "
+      "expected, OTR downloads the motion module on that run and says so "
+      "at boot.\n")
     A("| pack | who needs it | what breaks without it |")
     A("|---|---|---|")
     A("| [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | the animatediff lane | that lane only |")
