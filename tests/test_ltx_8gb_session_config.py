@@ -79,7 +79,7 @@ def test_resolves_every_field_the_handles_depend_on(eng):
     assert cfg.ckpt_token == m._LTX8_DEFAULT_CKPT
     assert cfg.t5_token == m._LTX8_DEFAULT_T5
     assert cfg.ckpt_path.endswith(m._LTX8_DEFAULT_CKPT)
-    assert cfg.t5_device == "cpu"          # load-bearing on 8GB, not an option
+    assert cfg.t5_device == "default"      # recipe v3 (2026-09-26): the GPU
     assert cfg.tiled_vae is True           # v2, measured: flat 8.2 GB peak
     assert cfg.steps == 8 and cfg.cfg == 1.0 and cfg.sampler == "euler"
     assert cfg.max_frames == m._LTX8_MAX_FRAMES_DEFAULT

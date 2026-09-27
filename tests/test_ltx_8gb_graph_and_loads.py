@@ -260,7 +260,7 @@ def test_the_graph_carries_ITS_OWN_loader_nodes_today(monkeypatch):
     assert g["ckpt"]["inputs"]["ckpt_name"] == m._LTX8_DEFAULT_CKPT
     assert g["clip"]["inputs"]["clip_name"] == m._LTX8_DEFAULT_T5
     assert g["clip"]["inputs"]["type"] == "ltxv"
-    assert g["clip"]["inputs"]["device"] == "cpu"     # the 8 GB tier default
+    assert g["clip"]["inputs"]["device"] == "default"  # recipe v3: the T5 on the GPU
 
 
 def test_every_wire_that_reads_the_loaders_is_pinned():
@@ -1412,7 +1412,7 @@ def test_the_KEY_is_the_T5_file_and_never_raises(tmp_path, monkeypatch):
     monkeypatch.setattr(eng, "_t5_path", lambda: str(t5))
     key = eng._conditioning_cache_key()
     assert key[0] == str(t5.resolve()) or key[0] == str(t5)
-    assert key[3] == 64 and key[-2:] == ("ltxv", "cpu")
+    assert key[3] == 64 and key[-2:] == ("ltxv", "default")
 
     monkeypatch.setattr(eng, "_t5_path", lambda: str(tmp_path / "missing"))
     assert eng._conditioning_cache_key() is None

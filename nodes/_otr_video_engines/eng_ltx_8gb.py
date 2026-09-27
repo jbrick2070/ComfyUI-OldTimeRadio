@@ -170,7 +170,7 @@ _LTX8_DEFAULT_NEGATIVE = (
 #: leave the recipe invisible to every consumer that matters -- an unowned
 #: ledger field in all but name. It is also `cfg.recipe` in `session_identity`,
 #: so a version bump moves the identity for free.
-RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass_v2"
+RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass_v3"
 
 #: THE CONSENT ACT that re-opens the recipe knobs (B6). One explicit env var,
 #: the same shape as the client-bank build's `--activate`: an operator who
@@ -299,11 +299,37 @@ LTX8_RECIPE_V2 = {
     "vae_temporal_overlap": 8,
 }
 
+#: THE ACTIVE ltx_8gb RECIPE, v3 -- 2026-09-26, operator-approved ("get those
+#: t5 ... on the GPU I approve", after comparing frames by eye).
+#:
+#: ONE CHANGE FROM v2: ``t5_device`` "cpu" -> "default", the accelerator.
+#: v2's reason for the CPU was a 2026-07-27 sweep on a 16 GB card in which the
+#: GPU T5 peaked at 16.0-16.1 GB. That was before ComfyUI's dynamic VRAM
+#: loading, which stages the 9 GB T5 onto the card instead of placing it whole.
+#: Measured 2026-09-26 on the 8 GB RTX 4060 (stock ComfyUI 0.34), a replay of
+#: two beats of the same episode, each arm on a fresh server: no OOM; the T5
+#: stage for a new prompt took ~3.6 s on the GPU against ~40 s on the CPU
+#: (25 s loading 9 GB into RAM + ~16 s encoding; the GPU arm read the file from
+#: a warm OS cache, so the load half is not a fair comparison, the encode half
+#: is). Frames at 20 and 120 of both beats looked the same to the operator
+#: (output/otr/ab_ltx8_t5/). About six encodes an episode, so minutes saved on
+#: the 8 GB tier.
+#:
+#: APPLE KEEPS v2's PLACEMENT, AS PART OF v3. The recorded Mac proof of this
+#: lane (2026-09-08, M4) ran the T5 on the CPU, and the operator's rule is that
+#: the Mac changes only once it is confirmed there. ``_t5_device`` reads this
+#: clause, so a ``_v3`` receipt says exactly where the T5 ran on either kind
+#: of machine.
+LTX8_RECIPE_V3 = dict(LTX8_RECIPE_V2, t5_device="default")
+
+#: The T5 placement v3 keeps on Apple Silicon (see above).
+_LTX8_V3_APPLE_T5_DEVICE = "cpu"
+
 #: THE ONE NAME EVERY CONSUMER READS. Bumping a recipe is repointing this and
 #: the version inside `RECIPE_LTX8_I2V` -- never editing a versioned dict in
-#: place. Kept as a separate binding so `LTX8_RECIPE_V1` stays readable as
-#: history and the diff of a future v3 is one line plus a new dict.
-LTX8_RECIPE = LTX8_RECIPE_V2
+#: place. Kept as a separate binding so `LTX8_RECIPE_V1` and `_V2` stay
+#: readable as history.
+LTX8_RECIPE = LTX8_RECIPE_V3
 
 #: The env var each frozen field was read from, kept so the demotion can NAME
 #: what it is ignoring. Presence is all this map is used for outside
@@ -361,6 +387,16 @@ def _conditioning_cache_enabled():
     """ON unless explicitly disabled. Unset and empty both keep the default."""
     return (otr_env.get(_CONDITIONING_CACHE_ENV, "") or "").strip().lower() \
         not in _FALSY
+
+
+def _host_vendor():
+    """``nvidia`` / ``amd`` / ``apple`` / ``cpu`` / ``unknown``, from the pack's
+    one vendor helper. Lazy, and "unknown" if it cannot be asked."""
+    try:
+        from .._otr_shared.device_options import vendor
+        return vendor()
+    except Exception:  # noqa: BLE001 -- no ComfyUI core here: not Apple as far as we know
+        return "unknown"
 
 
 def _prequalification_active():
@@ -848,11 +884,14 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                ", ".join(_TRUTHY), ", ".join(_FALSY)), kind="video")
 
     def _t5_device(self):
-        """T5 CLIPLoader device: default ``cpu`` for the 8GB tier (t5xxl_fp16 alone
-        is ~9 GB, so it encodes on CPU first, then diffusion runs on the GPU). The
-        offload-on-vs-off VRAM measurement (C3) may flip this via OTR_LTX_8GB_T5_DEVICE."""
+        """T5 CLIPLoader device: the recipe's. v3 is ``default`` (the GPU, which
+        ComfyUI's dynamic VRAM stages the ~9 GB T5 onto), except on Apple
+        Silicon, where v3 keeps v2's CPU placement until the lane is proven
+        there. Prequalification may still set it via OTR_LTX_8GB_T5_DEVICE."""
         frozen = str(LTX8_RECIPE["t5_device"])
         if not _prequalification_active():
+            if frozen == "default" and _host_vendor() == "apple":
+                return _LTX8_V3_APPLE_T5_DEVICE
             return frozen
         dev = (otr_env.get("OTR_LTX_8GB_T5_DEVICE") or frozen).strip().lower()
         if dev in _T5_DEVICES:

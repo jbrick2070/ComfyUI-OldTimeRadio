@@ -70,7 +70,7 @@ def test_identity_names_the_engine_the_recipe_and_both_weights(eng):
     assert m.RECIPE_LTX8_I2V in blob
     assert m._LTX8_DEFAULT_CKPT in blob
     assert m._LTX8_DEFAULT_T5 in blob
-    assert "cpu" in blob                    # the T5 offload is part of identity
+    assert m.LTX8_RECIPE["t5_device"] in blob  # the T5 placement is part of identity
 
 
 # --- stability: it must not move across the load --------------------------- #
@@ -125,11 +125,12 @@ def test_a_model_sampling_shift_moves_the_identity(eng, monkeypatch):
     assert bs.session_identity(eng) != before
 
 
-def test_moving_the_t5_off_cpu_moves_the_identity(eng, monkeypatch):
-    """Same shape: prequalification is how the T5 device moves at all now."""
+def test_moving_the_t5_moves_the_identity(eng, monkeypatch):
+    """Same shape: prequalification is how the T5 device moves at all now.
+    (v3 puts it on the GPU, so the move under test is back to the CPU.)"""
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     before = bs.session_identity(eng)
-    monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "default")
+    monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "cpu")
     assert bs.session_identity(eng) != before
 
 

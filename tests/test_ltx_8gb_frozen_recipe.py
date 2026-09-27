@@ -52,7 +52,7 @@ def test_every_frozen_field_wins_when_no_consent_act_is_present(eng, monkeypatch
     # cannot tell "the recipe won" from "the environment won" -- which is what
     # `tiled_vae: "1"` became the moment v2 froze tiled decode ON.
     for key, env in m._RECIPE_ENV_KEYS.items():
-        monkeypatch.setenv(env, {"sampler": "dpmpp_2m", "t5_device": "default",
+        monkeypatch.setenv(env, {"sampler": "dpmpp_2m", "t5_device": "cpu",
                                  "tiled_vae": "0"}.get(key, "7"))
     assert m.LTX8_RECIPE["tiled_vae"] is True, (
         "this test's tiled_vae override is chosen to oppose the frozen value; "
@@ -66,17 +66,21 @@ def test_every_frozen_field_wins_when_no_consent_act_is_present(eng, monkeypatch
     assert eng._tiled_vae() is m.LTX8_RECIPE["tiled_vae"]
 
 
-def test_the_two_load_bearing_values_are_pinned_BY_VALUE(eng):
-    """These two are not taste, and since v2 both are MEASURED (2026-07-27).
+def test_the_two_load_bearing_values_are_pinned_BY_VALUE(eng, monkeypatch):
+    """Neither is taste; both are MEASURED.
 
-    ``t5xxl_fp16`` alone is ~9 GB: on GPU the sweep peaked at 16.0-16.1 GB of a
-    16.3 GB card, so the T5 encodes on CPU or the 8 GB box does not render at
-    all. Tiled decode is ON because it holds the peak FLAT at 8241-8278 MB
-    across every clip length, where untiled climbs 8662 -> 10859 MB from
-    len=33 to len=161. A silent flip of either is a tier that stops working,
-    so pin the literals, not just the round-trip through the dict."""
-    assert m.LTX8_RECIPE["t5_device"] == "cpu"
+    Tiled decode is ON (v2, 2026-07-27) because it holds the peak FLAT at
+    8241-8278 MB across every clip length, where untiled climbs 8662 -> 10859
+    MB from len=33 to len=161. The T5 is on the GPU since v3 (2026-09-26): the
+    8 GB RTX 4060 rendered the same beats with no OOM and a ~3.6 s T5 stage
+    against ~40 s on the CPU, with ComfyUI's dynamic VRAM staging the 9 GB T5.
+    On Apple Silicon v3 keeps the CPU. A silent flip of any of these changes
+    what renders, so pin the literals, not just the round-trip through the dict."""
+    assert m.LTX8_RECIPE["t5_device"] == "default"
     assert m.LTX8_RECIPE["tiled_vae"] is True
+    monkeypatch.setattr(m, "_host_vendor", lambda: "nvidia")
+    assert eng._t5_device() == "default"
+    monkeypatch.setattr(m, "_host_vendor", lambda: "apple")
     assert eng._t5_device() == "cpu"
     assert eng._tiled_vae() is True
 
@@ -88,10 +92,15 @@ def test_v1_is_preserved_unmutated_so_its_receipts_stay_interpretable():
     a dict rather than mutating one."""
     assert m.LTX8_RECIPE_V1["tiled_vae"] is False   # what v1 actually shipped
     assert m.LTX8_RECIPE_V1["t5_device"] == "cpu"
-    assert m.LTX8_RECIPE is m.LTX8_RECIPE_V2
-    assert m.LTX8_RECIPE_V1 is not m.LTX8_RECIPE_V2
-    # Same key set, or the two are not comparable as recipe versions.
-    assert set(m.LTX8_RECIPE_V1) == set(m.LTX8_RECIPE_V2)
+    assert m.LTX8_RECIPE_V2["t5_device"] == "cpu"   # what v2 actually shipped
+    assert m.LTX8_RECIPE_V2["tiled_vae"] is True
+    assert m.LTX8_RECIPE is m.LTX8_RECIPE_V3
+    assert len({id(m.LTX8_RECIPE_V1), id(m.LTX8_RECIPE_V2), id(m.LTX8_RECIPE_V3)}) == 3
+    # Same key set, or they are not comparable as recipe versions; v3 differs
+    # from v2 in the T5 placement only.
+    assert set(m.LTX8_RECIPE_V1) == set(m.LTX8_RECIPE_V2) == set(m.LTX8_RECIPE_V3)
+    assert {k for k in m.LTX8_RECIPE_V3
+            if m.LTX8_RECIPE_V3[k] != m.LTX8_RECIPE_V2[k]} == {"t5_device"}
 
 
 def test_the_recipe_string_carries_its_own_version_and_rides_the_receipt(eng):
@@ -99,7 +108,7 @@ def test_the_recipe_string_carries_its_own_version_and_rides_the_receipt(eng):
     ``otr_credits_roll`` -> a published episode. A bare version constant that
     never reached that string would be an unowned ledger field in all but
     name -- and it is ``cfg.recipe``, so a bump moves the session identity."""
-    assert m.RECIPE_LTX8_I2V.endswith("_v2")
+    assert m.RECIPE_LTX8_I2V.endswith("_v3")
     assert "ltx098" in m.RECIPE_LTX8_I2V and "distilled" in m.RECIPE_LTX8_I2V
 
 
@@ -576,12 +585,13 @@ def test_TWO_DIFFERENT_CELLS_STAMP_DIFFERENT_RECEIPTS(eng, monkeypatch):
     monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "0")
     cell_a = eng._recipe_receipt()
     monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")
-    monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "default")
+    # v3's T5 is on the GPU, so the departing cell moves it back to the CPU.
+    monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "cpu")
     cell_b = eng._recipe_receipt()
     assert cell_a != cell_b
     assert cell_a.startswith(m.RECIPE_LTX8_I2V)          # still greppable
     assert cell_b.startswith(m.RECIPE_LTX8_I2V)
-    assert "t5_device=default" in cell_b
+    assert "t5_device=cpu" in cell_b
 
 
 def test_a_cell_that_moved_NOTHING_still_marks_itself(eng, monkeypatch):
@@ -736,10 +746,10 @@ def test_the_named_receipt_reaches_the_canonical_clip_dict(eng, monkeypatch):
     # The hop into stamp_durable(meta.render_engines): the ledger is where a
     # sweep artifact has to be identifiable, not just the log.
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
-    monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "default")
+    monkeypatch.setenv("OTR_LTX_8GB_T5_DEVICE", "cpu")      # a departure from v3
     receipt = eng._recipe_receipt()
     clip = eng._clip_from_raw(
         {"out_path": "/x/y.mp4", "frame_count": 25, "recipe": receipt},
         {"shot_id": "b001"})
     assert clip["recipe"] == receipt
-    assert "t5_device=default" in clip["recipe"]
+    assert "t5_device=cpu" in clip["recipe"]
