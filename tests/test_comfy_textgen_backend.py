@@ -346,6 +346,73 @@ def test_a_genuine_loop_exception_restores_the_hook():
     assert "sample_token" not in decoder.__dict__ and clip.resets == 1
 
 
+@pytest.fixture
+def comfy_close(monkeypatch):
+    """Fake comfy.model_prefetch / comfy.model_management recording the
+    executor's per-node close-out."""
+    import sys
+    import types
+
+    calls = []
+    prefetch = types.ModuleType("comfy.model_prefetch")
+    prefetch.cleanup_prefetch_queues = lambda: calls.append("cleanup_prefetch_queues")
+    management = types.ModuleType("comfy.model_management")
+    management.reset_cast_buffers = lambda: calls.append("reset_cast_buffers")
+    pkg = types.ModuleType("comfy")
+    pkg.model_prefetch, pkg.model_management = prefetch, management
+    for name, module in (("comfy", pkg), ("comfy.model_prefetch", prefetch),
+                         ("comfy.model_management", management)):
+        monkeypatch.setitem(sys.modules, name, module)
+    return calls
+
+
+def test_every_call_closes_its_scope_like_a_finished_node(comfy_close):
+    """The 4060 crash (ComfyUI 0.34, 2026-09-26): the second call in one node
+    replayed the first call's captured decode graph. Each call must end with
+    the executor's per-node close-out, on success as well as on failure."""
+    adapter, _, decoder = _adapter(lambda step: [7, EOS][min(step, 1)])
+    for _ in range(2):
+        adapter.generate(input_ids=_ids(2), do_sample=False, max_new_tokens=5)
+    assert comfy_close == ["cleanup_prefetch_queues", "reset_cast_buffers"] * 2
+
+    def boom(prompt, max_length, seed):
+        raise RuntimeError("device-side assert")
+
+    decoder.loop = boom
+    with pytest.raises(RuntimeError, match="device-side assert"):
+        adapter.generate(input_ids=_ids(2), do_sample=False, max_new_tokens=5)
+    assert comfy_close[-2:] == ["cleanup_prefetch_queues", "reset_cast_buffers"]
+
+
+def test_the_real_error_is_logged_before_the_scope_closes(comfy_close, caplog):
+    """After a device-side assert the close-out aborts the process, so the
+    warning must already be written when it starts."""
+    order = []
+    adapter, _, decoder = _adapter(lambda step: 11)
+
+    def boom(prompt, max_length, seed):
+        raise RuntimeError("scatter gather kernel index out of bounds")
+
+    decoder.loop = boom
+    import logging
+
+    class _Order(logging.Handler):
+        def emit(self, record):
+            order.append("logged")
+
+    handler = _Order()
+    native.log.addHandler(handler)
+    try:
+        import sys
+        sys.modules["comfy.model_prefetch"].cleanup_prefetch_queues = (
+            lambda: order.append("closed"))
+        with pytest.raises(RuntimeError):
+            adapter.generate(input_ids=_ids(2), do_sample=False, max_new_tokens=5)
+    finally:
+        native.log.removeHandler(handler)
+    assert order == ["logged", "closed"]
+
+
 def test_sampling_passes_an_int_seed_and_explicit_filters():
     adapter, clip, decoder = _adapter(lambda step: EOS)
     adapter.generate(input_ids=_ids(2), do_sample=True, temperature=0.7,

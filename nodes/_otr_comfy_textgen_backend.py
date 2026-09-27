@@ -19,6 +19,10 @@ ask it questions while building a queue plan; neither may pay for torch or Comfy
 """
 from __future__ import annotations
 
+import logging
+
+log = logging.getLogger(__name__)
+
 #: The dropdown id. Virtual (not a Hugging Face repo id): the weight comes from
 #: Comfy-Org as one ComfyUI text-encoder file, not a transformers snapshot, and the
 #: HF ``google/gemma-4-E2B-it`` row stays a separate, unchanged choice.
@@ -294,20 +298,27 @@ class _Run:
         return sample_token
 
 
-def _abandon_allocation_recording():
-    """After a genuine exception out of ComfyUI's loop, close any allocation
-    recording it left open. The prompt executor does the same in its own
-    finally; doing it here too keeps a caller that catches and continues safe."""
+def _close_generation_scope():
+    """What ComfyUI's executor runs when a NODE finishes -- drop the captured
+    prefetch/decode graphs and reset the cast buffers (execution.py: 0.34 and
+    0.37 both call ``cleanup_prefetch_queues`` and ``reset_cast_buffers``) --
+    run after EVERY generate() call, because OTR's writer makes many calls
+    inside one node.
+
+    Measured on the 4060 (stock ComfyUI 0.34, 2026-09-26): without it the
+    writer's second call replayed the first call's captured decode graph
+    against a new KV cache, and the process died on a device-side assert
+    ("scatter gather kernel index out of bounds"). Each call now starts the
+    way a fresh TextGenerate node does."""
     try:
-        import comfy.memory_management as _mm
-        import comfy.model_prefetch as _mp
-    except Exception:  # noqa: BLE001 -- outside ComfyUI: nothing was recorded
+        import comfy.model_management as model_management
+        import comfy.model_prefetch as model_prefetch
+    except Exception:  # noqa: BLE001 -- outside ComfyUI: nothing was captured
         return
-    if getattr(_mm, "aimdo_enabled", False):
-        try:
-            _mp.cleanup_prefetch_queues()
-        except Exception:  # noqa: BLE001 -- best effort; the original error wins
-            pass
+    for step in (getattr(model_prefetch, "cleanup_prefetch_queues", None),
+                 getattr(model_management, "reset_cast_buffers", None)):
+        if callable(step):
+            step()
 
 
 class ComfyGemmaGenerateAdapter:
@@ -399,8 +410,12 @@ class ComfyGemmaGenerateAdapter:
                 presence_penalty=0.0,
                 seed=native_seed(prompt) if sampling else 0)
             completed = True
-        except BaseException:
-            _abandon_allocation_recording()
+        except BaseException as exc:
+            # Said BEFORE the scope is closed: after a device-side assert the
+            # close below touches CUDA and aborts the process, and this line
+            # is then the only record of what actually failed.
+            log.warning("[OTR native writer] generate() stopped by %s: %s",
+                        type(exc).__name__, exc)
             raise
         finally:
             owner.__dict__.pop("sample_token", None)
@@ -408,6 +423,7 @@ class ComfyGemmaGenerateAdapter:
                             "reset_clip_options", None)
             if callable(reset):
                 reset()
+            _close_generation_scope()
             if completed and streamer is not None:
                 streamer.end()
         if run.error is not None:
