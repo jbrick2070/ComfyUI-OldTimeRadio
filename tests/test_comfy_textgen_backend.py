@@ -1,6 +1,6 @@
-"""The Comfy-native Gemma 4 writer (plan row 0n): identity, pinned weight, planning.
+"""The Comfy-native Gemma 4 writer (plan row 0n): identity, weight, generation, wiring.
 
-Slice A2 of kibitz-runs/2026-09-26-comfy-gemma-writer. CPU only, no network, no
+Slices A1-A3 of kibitz-runs/2026-09-26-comfy-gemma-writer. CPU only, no network, no
 ComfyUI: every assertion calls the real function it is about.
 """
 from __future__ import annotations
@@ -408,3 +408,295 @@ def test_the_writers_real_factory_runs_unchanged_on_a_native_entry(tok, monkeypa
     text = generate_fn([{"role": "user", "content": "say hi"}], temperature=0.0,
                        max_new_tokens=40, stop=[" end"])
     assert text.strip() == "hello"
+
+
+# ---------------------------------------------------------------------------
+# SLICE A3: the dropdown row, request_slot, load and release. Fakes stand in
+# for ComfyUI's CLIP loader and model management; the OTR code under test is
+# the real code.
+# ---------------------------------------------------------------------------
+
+import sys  # noqa: E402
+import types  # noqa: E402
+
+from nodes import _otr_model_catalog as catalog  # noqa: E402
+from nodes import _otr_model_loader as loader  # noqa: E402
+
+
+def _row():
+    return catalog._by_repo_id()[native.MODEL_ID]
+
+
+def test_the_catalog_row_names_this_backend_and_its_pin():
+    row = _row()
+    assert (row.provider, row.loader_backend) == (native.PROVIDER, native.LOADER_BACKEND)
+    assert row.hf_repo_id == native.WEIGHT_REPO
+    assert row.approx_safetensors_gb == round(native.WEIGHT_SIZE / 2**30, 2)
+    assert row.context_window == native.WORKING_CONTEXT_CAP
+    assert row.implied_quant_policy == "none" and row.requires_auth is False
+
+
+def test_the_dropdown_offers_it_with_a_download_badge_and_no_fit_claim():
+    """No machine class is claimed until an episode is proven on it."""
+    label = catalog.dropdown_choices()
+    mine = [choice for choice in label if choice.startswith(native.MODEL_ID)]
+    assert mine == [native.MODEL_ID + " (4.8 GB download)"]
+    assert catalog.validate_model_id(mine[0]) == native.MODEL_ID
+    assert catalog.fit_tags_for(native.MODEL_ID) == ()
+
+
+def test_on_disk_comes_from_comfys_folder_lookup(monkeypatch, tmp_path):
+    weight = tmp_path / native.WEIGHT_TOKEN
+    fake = types.ModuleType("folder_paths")
+    fake.get_full_path = lambda category, token: (
+        str(weight) if (category, token) == (native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)
+        and weight.exists() else None)
+    monkeypatch.setitem(sys.modules, "folder_paths", fake)
+
+    def on_disk():
+        entry, = [e for e in catalog.build_dropdown_choices() if e.repo_id == native.MODEL_ID]
+        return entry.on_disk
+
+    assert on_disk() is False
+    weight.write_bytes(b"x")
+    assert on_disk() is True
+
+
+def test_sampling_is_the_e2b_baseline_not_a_cloud_none():
+    assert catalog.sampling_baseline(native.MODEL_ID) == (1.0, 0.95, 64)
+    assert catalog.sampling_baseline(native.MODEL_ID) == catalog.sampling_baseline(
+        "google/gemma-4-E2B-it")
+
+
+def test_the_context_cap_is_the_rows_working_cap_without_any_hf_scan(monkeypatch):
+    def no_scan(*_a, **_k):
+        raise AssertionError("a native id must not scan an HF config")
+
+    monkeypatch.setattr(catalog, "_read_config_context", no_scan)
+    verdict = catalog.resolve_context_cap(native.MODEL_ID, context_pin=None)
+    assert (verdict.value, verdict.native_capacity, verdict.explicit_pin) == (
+        native.WORKING_CONTEXT_CAP, None, None)
+    tighter = catalog.resolve_context_cap(native.MODEL_ID, context_pin=4096)
+    assert (tighter.value, tighter.explicit_pin) == (4096, 4096)
+    looser = catalog.resolve_context_cap(native.MODEL_ID, context_pin=65536)
+    assert looser.value == native.WORKING_CONTEXT_CAP, "a pin never widens the cap"
+
+
+def test_the_lane_is_the_local_in_process_one_and_a_policy_can_refuse_it():
+    from nodes._otr_shared import llm_policy
+    assert llm_policy.lane_for_row(_row()) == llm_policy.LANE_TRANSFORMERS
+    remote_only = llm_policy.BASELINE_POLICY.__class__(
+        **{**llm_policy.BASELINE_POLICY.__dict__,
+           "lane_allowlist": (llm_policy.LANE_OPENROUTER,)})
+    with pytest.raises(loader.ModelLoaderError, match="NO FALLBACK"):
+        loader.request_slot("creative", native.MODEL_ID, policy=remote_only)
+
+
+def test_the_writer_binds_a_schema_on_a_native_slot():
+    from nodes import OTR_LedgerScriptWriter as writer
+    scheduler = writer._SlotScheduler.__new__(writer._SlotScheduler)
+    scheduler.ids = {"creative": native.MODEL_ID}
+    markers = scheduler._slot_transport_markers("creative")
+    assert markers["_otr_local_schema_binding"] is True
+    assert not any(markers[k] for k in ("_otr_openrouter", "_otr_comfy_credits",
+                                        "_otr_google_api", "_otr_supports_json_object"))
+
+
+# -- request_slot -------------------------------------------------------------
+
+@pytest.fixture
+def slot_env(monkeypatch):
+    """request_slot with the native load and the shared ensure faked, and every
+    transformers-only step wired to fail if the native arm ever reaches it."""
+    monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
+    loader.LLM_CACHE.update({"model_id": None, "slot": None, "cache_entry": None})
+    calls = {"ensure": [], "load": [], "release": []}
+
+    def forbidden(name):
+        def _raise(*_a, **_k):
+            raise AssertionError("the native arm reached " + name)
+        return _raise
+
+    from nodes import _otr_hf_env
+    monkeypatch.setattr(_otr_hf_env, "ensure_hf_home", forbidden("ensure_hf_home"))
+    monkeypatch.setattr(catalog, "auto_download_if_missing", forbidden("auto_download"))
+    monkeypatch.setattr(loader, "load_llm", forbidden("load_llm"))
+    monkeypatch.setattr(loader, "_require_transformers_model_support",
+                        forbidden("the transformers support gate"))
+    monkeypatch.setattr(loader, "_assert_policy_admits_vram",
+                        forbidden("the VRAM estimate"))
+    monkeypatch.setattr(va, "ensure_writer_weights",
+                        lambda mid: calls["ensure"].append(mid) or Path("w.safetensors"))
+
+    def fake_load(model_id, *, policy=None, context_verdict=None):
+        calls["load"].append((model_id, context_verdict.value))
+        return {"provider": "comfy_native", "model": object(), "tokenizer": object(),
+                "model_id": model_id, "device": "cpu",
+                "context_cap": context_verdict.value}
+
+    monkeypatch.setattr(native, "load_native_writer", fake_load)
+    monkeypatch.setattr(native, "release_native_entry",
+                        lambda entry: calls["release"].append(entry["model_id"]))
+    try:
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    except AttributeError:
+        pass
+    yield calls
+    loader.LLM_CACHE.update({"model_id": None, "slot": None, "cache_entry": None})
+
+
+def test_request_slot_loads_the_native_writer_without_any_hf_work(slot_env):
+    entry = loader.request_slot("creative", native.MODEL_ID + " (4.8 GB download)")
+    assert slot_env["ensure"] == [native.MODEL_ID]
+    assert slot_env["load"] == [(native.MODEL_ID, native.WORKING_CONTEXT_CAP)]
+    assert loader.LLM_CACHE["cache_entry"] is entry
+    assert loader.has_local_resident_llm() is True, "native is local, not remote"
+
+
+def test_both_slots_reuse_one_native_entry(slot_env):
+    first = loader.request_slot("creative", native.MODEL_ID)
+    second = loader.request_slot("technical", native.MODEL_ID)
+    assert first is second and len(slot_env["load"]) == 1
+
+
+def test_switching_to_a_transformers_model_releases_the_native_one_first(
+        slot_env, monkeypatch, tmp_path):
+    loader.request_slot("creative", native.MODEL_ID)
+    order = []
+    monkeypatch.setattr(native, "release_native_entry",
+                        lambda entry: order.append(("release", entry["model_id"])))
+    from nodes import _otr_hf_env
+    monkeypatch.setattr(_otr_hf_env, "ensure_hf_home", lambda: str(tmp_path))
+    monkeypatch.setattr(catalog, "auto_download_if_missing", lambda *a, **k: None)
+    monkeypatch.setattr(loader, "_require_transformers_model_support", lambda *_a: None)
+    monkeypatch.setattr(loader, "_assert_policy_admits_vram", lambda *_a, **_k: None)
+
+    def hf_load(model_id, **_kw):
+        order.append(("load", model_id))
+        return {"model": None, "tokenizer": None, "model_id": model_id,
+                "device": "cpu", "context_cap": 8192}
+
+    monkeypatch.setattr(loader, "load_llm", hf_load)
+    loader.request_slot("technical", "google/gemma-4-E2B-it")
+    assert order == [("release", native.MODEL_ID), ("load", "google/gemma-4-E2B-it")]
+
+
+def test_load_llm_refuses_a_native_id_before_any_hf_work(monkeypatch):
+    from nodes import _otr_hf_env
+    monkeypatch.setattr(_otr_hf_env, "ensure_hf_home",
+                        lambda: (_ for _ in ()).throw(AssertionError("HF work")))
+    with pytest.raises(loader.ModelLoaderError, match="request_slot"):
+        loader.load_llm(native.MODEL_ID)
+
+
+# -- load and release -----------------------------------------------------------
+
+class _LoadedClip:
+    """What comfy.sd.load_clip hands back for the Gemma 4 E2B file: a CLIP with
+    a patcher, the Gemma tokenizer chain and the decoder."""
+
+    def __init__(self, load_device, native_window=131072):
+        decoder = _Decoder(lambda step: EOS, 64)
+        decoder.model.config.max_position_embeddings = native_window
+        self.cond_stage_model = SimpleNamespace(gemma4=SimpleNamespace(transformer=decoder))
+        self.tokenizer = SimpleNamespace(gemma4=SimpleNamespace(
+            tokenizer=SimpleNamespace(tokenizer=_raw_tokenizer())))
+        self.patcher = SimpleNamespace(load_device=load_device)
+
+
+@pytest.fixture
+def comfy_env(monkeypatch, tmp_path):
+    """Fake ``folder_paths``, ``comfy.sd`` and ``comfy.model_management``."""
+    weight = tmp_path / native.WEIGHT_TOKEN
+    weight.write_bytes(b"x")
+    state = {"load_clip": [], "unloaded": [], "clip_factory": None}
+    folder = types.ModuleType("folder_paths")
+    folder.get_full_path = lambda c, t: str(weight) if t == native.WEIGHT_TOKEN else None
+    folder.get_full_path_or_raise = lambda c, t: folder.get_full_path(c, t)
+    folder.get_folder_paths = lambda c: [str(tmp_path)]
+    sd = types.ModuleType("comfy.sd")
+    sd.CLIPType = SimpleNamespace(STABLE_DIFFUSION="stable_diffusion")
+
+    def load_clip(*, ckpt_paths, embedding_directory, clip_type, model_options):
+        state["load_clip"].append(dict(ckpt_paths=ckpt_paths, clip_type=clip_type,
+                                       model_options=dict(model_options)))
+        device = model_options.get("load_device", "cuda:0")
+        return (state["clip_factory"] or _LoadedClip)(str(device))
+
+    sd.load_clip = load_clip
+    mm = types.ModuleType("comfy.model_management")
+    mm.unload_model_and_clones = lambda patcher, all_devices=False: state["unloaded"].append(
+        (patcher, all_devices))
+    mm.throw_exception_if_processing_interrupted = lambda: None
+    pkg = types.ModuleType("comfy")
+    pkg.sd, pkg.model_management = sd, mm
+    for name, module in (("folder_paths", folder), ("comfy", pkg), ("comfy.sd", sd),
+                         ("comfy.model_management", mm)):
+        monkeypatch.setitem(sys.modules, name, module)
+    state["weight"] = weight
+    return state
+
+
+def _verdict(value=8192):
+    return catalog.ContextCapVerdict("PASS", value, "comfy-native working cap %d" % value,
+                                     None, None)
+
+
+@pytest.mark.parametrize("device, options", [
+    ("cuda", {}),
+    ("cuda:1", {"load_device": torch.device("cuda:1")}),
+    ("cpu", {"load_device": torch.device("cpu"), "offload_device": torch.device("cpu")}),
+])
+def test_the_load_is_the_stock_clip_loader_with_the_policys_device(comfy_env, device,
+                                                                   options):
+    entry = native.load_native_writer(native.MODEL_ID, policy=SimpleNamespace(device=device),
+                                      context_verdict=_verdict())
+    call, = comfy_env["load_clip"]
+    assert call["ckpt_paths"] == [str(comfy_env["weight"])]
+    assert call["clip_type"] == "stable_diffusion"
+    assert call["model_options"] == options
+    assert isinstance(entry["model"], native.ComfyGemmaGenerateAdapter)
+    assert entry["tokenizer"].chat_template == native.GEMMA4_CHAT_TEMPLATE
+    assert (entry["provider"], entry["model_id"], entry["context_cap"],
+            entry["native_context_capacity"]) == (
+        "comfy_native", native.MODEL_ID, 8192, 131072)
+
+
+def test_the_cap_never_exceeds_the_decoders_native_window(comfy_env):
+    comfy_env["clip_factory"] = lambda device: _LoadedClip(device, native_window=4096)
+    entry = native.load_native_writer(native.MODEL_ID, context_verdict=_verdict(8192))
+    assert entry["context_cap"] == 4096
+    assert "native window 4096" in entry["context_capacity_source"]
+
+
+def test_a_failure_after_the_clip_exists_hands_it_back(comfy_env):
+    class _NotGemma(_LoadedClip):
+        def __init__(self, device):
+            super().__init__(device)
+            self.cond_stage_model = SimpleNamespace()
+
+    comfy_env["clip_factory"] = _NotGemma
+    with pytest.raises(RuntimeError, match="not a ComfyUI Gemma 4 decoder"):
+        native.load_native_writer(native.MODEL_ID, context_verdict=_verdict())
+    (patcher, all_devices), = comfy_env["unloaded"]
+    assert all_devices is True
+
+
+def test_teardown_unloads_through_comfy_and_retires_the_adapter(comfy_env, monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    entry = native.load_native_writer(native.MODEL_ID, context_verdict=_verdict())
+    patcher, adapter = entry["clip"].patcher, entry["model"]
+    loader._teardown_gpu_for_entry(entry)
+    assert comfy_env["unloaded"] == [(patcher, True)]
+    assert entry["clip"] is None and adapter.clip is None
+    with pytest.raises(RuntimeError, match="unloaded"):
+        adapter.generate(input_ids=_ids(2), max_new_tokens=4)
+
+
+def test_the_shared_ensure_finds_a_present_weight_without_a_download(comfy_env, monkeypatch):
+    def no_fetch(*_a, **_k):
+        raise AssertionError("a present weight must not be fetched")
+
+    import huggingface_hub
+    monkeypatch.setattr(huggingface_hub, "get_hf_file_metadata", no_fetch)
+    assert va.ensure_writer_weights(native.MODEL_ID) == comfy_env["weight"]

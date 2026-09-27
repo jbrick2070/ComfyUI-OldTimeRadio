@@ -184,6 +184,7 @@ def test_dispatch_table_routes_loader_backend_literal_to_correct_adapter() -> No
         "transformers_safetensors":          runtime.TransformersSafetensorsBackend,
         "transformers_multimodal_text_only": runtime.TransformersMultimodalTextOnlyBackend,
         "transformers_gptq_int4":            runtime.TransformersGPTQInt4Backend,
+        "comfy_textgen":                     runtime.ComfyTextgenBackend,
     }
     failures: list[str] = []
     for row in catalog.CURATED_LLM_MODELS:

@@ -232,11 +232,15 @@ def test_every_curated_local_row_is_pass_tier():
     doing it for them -- and an OOM from picking it anyway is loud, not a
     silent wrong render.
     """
+    # 2026-09-26: the Comfy-native Gemma 4 E2B writer (plan row 0n) is WARN
+    # for the same reason as the 27B -- no canonical episode on it yet. Its
+    # badge claims no machine class ("4.8 GB download" and nothing else).
     allowed_warn = {
         catalog.DEFAULT_LLM,
         catalog.DEFAULT_LLM_NF4,
         "unsloth/Llama-3.2-3B-Instruct",
         "Qwen/Qwen3.8-27B",
+        "comfy_native:gemma4-e2b-it-int8-convrot",
     }
     offenders = [
         f"{row.repo_id} (tier={row.vram_fit_tier})"

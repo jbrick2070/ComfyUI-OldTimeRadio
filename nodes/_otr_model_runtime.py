@@ -77,6 +77,33 @@ class _LegacyTransformersBackendBase:
         _otr_model_loader.unload_llm()
 
 
+class ComfyTextgenBackend:
+    """The Comfy-native writer (plan row 0n): ComfyUI's own CLIP runs the model.
+
+    ``request_slot`` owns residency and loads the entry itself (it is not a
+    remote lane, so it takes part in the one-resident-writer rules). This
+    adapter serves the protocol for callers holding a row: ``load`` builds a
+    fresh entry, ``generate`` runs the ordinary base factory over it (the entry
+    speaks the transformers generate() subset), ``unload`` is the canonical one.
+    """
+
+    def load(self, repo_id: str, row: Any, policy: Any = None) -> dict[str, Any]:
+        from . import _otr_model_catalog as catalog
+        from . import _otr_comfy_textgen_backend as native
+        verdict = catalog.resolve_context_cap(
+            repo_id, context_pin=catalog._hard_vram_context_limit())
+        return native.load_native_writer(repo_id, policy=policy,
+                                         context_verdict=verdict)
+
+    def generate(
+        self, model: Any, messages: list[dict], **kwargs: Any,
+    ) -> str:
+        return _otr_model_loader.make_generate_fn(model)(messages, **kwargs)
+
+    def unload(self, model: Any) -> None:  # noqa: ARG002
+        _otr_model_loader.unload_llm()
+
+
 class TransformersSafetensorsBackend(_LegacyTransformersBackendBase):
     """Adapter for the `transformers_safetensors` backend literal.
 
@@ -161,6 +188,8 @@ BACKENDS_BY_KEY: dict[str, Any] = {
     # resolves from the writer's google_api_slot_a/b widgets.
     _otr_google_api_models.GOOGLE_API_BACKEND_KEY:
         _otr_google_api_llm.GoogleAPIBackend(),
+    # Local, in-process, ComfyUI's own loader (plan row 0n).
+    "comfy_textgen": ComfyTextgenBackend(),
 }
 
 

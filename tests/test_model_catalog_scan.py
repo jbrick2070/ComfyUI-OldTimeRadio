@@ -112,18 +112,25 @@ def test_curated_set_is_a_tuple_of_curated_model():
     assert len(catalog.CURATED_LLM_MODELS) >= 4
     for entry in catalog.CURATED_LLM_MODELS:
         assert isinstance(entry, catalog.CuratedModel)
-        assert "/" in entry.repo_id
+        # An HF repo id, or a Comfy-native virtual id (plan row 0n) whose one
+        # weight file lives in the HF repo its hf_repo_id names.
+        if entry.provider == "comfy_native":
+            assert entry.repo_id.startswith("comfy_native:")
+            assert entry.loader_backend == "comfy_textgen"
+            assert "/" in entry.hf_repo_id
+        else:
+            assert "/" in entry.repo_id
+            # transformers_gptq_int4 stays in the accepted set even though
+            # no curated row uses it at present -- the GPTQ backend is
+            # parked for a future period model (the talkie row that used
+            # it was removed 2026-05-22).
+            assert entry.loader_backend in (
+                "transformers_safetensors",
+                "transformers_multimodal_text_only",
+                "transformers_gptq_int4",
+            )
         assert entry.vram_fit_tier in ("PASS", "WARN", "UNKNOWN", "FAIL")
-        # transformers_gptq_int4 stays in the accepted set even though
-        # no curated row uses it at present -- the GPTQ backend is
-        # parked for a future period model (the talkie row that used
-        # it was removed 2026-05-22).
-        assert entry.loader_backend in (
-            "transformers_safetensors",
-            "transformers_multimodal_text_only",
-            "transformers_gptq_int4",
-        )
-        if entry.provider == "local":
+        if entry.provider in catalog.LOCAL_PROVIDERS:
             assert entry.approx_safetensors_gb > 0
         else:
             assert entry.approx_safetensors_gb == 0

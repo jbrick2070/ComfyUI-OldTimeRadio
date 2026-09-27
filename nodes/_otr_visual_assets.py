@@ -1364,9 +1364,58 @@ def ensure_prompt_visual_assets(prompt, unique_id):
     adapters = _load_adapters(engines)
     cancel = model_management.throw_exception_if_processing_interrupted
     cancel()
-    requests = native_requests(engines, folder_paths=folder_paths,
+
+    def resolve():
+        return native_requests(engines, folder_paths=folder_paths,
                                env=otr_env.snapshot(), writer_models=writer_models,
                                **adapters)
+
+    requests = resolve()
+    receipts, gui_progress = _acquire(requests, folder_paths=folder_paths,
+                                      cancel=cancel, reresolve=resolve)
+    cancel()
+    if gui_progress is not None:
+        gui_progress.update_absolute(1000)
+    log.info("[OTR.assets] READY engines=%s writers=%s files=%d (availability "
+             "only; render/GPU/publish success not qualified)",
+             ",".join(sorted(engines)) or "-", ",".join(sorted(writer_models)) or "-",
+             len(requests))
+    return {"status": "ready", "engines": sorted(engines), "receipts": receipts,
+            "notes": plan["skipped"]}
+
+
+def ensure_writer_weights(model_id):
+    """A Comfy-native writer's weight on disk before ``request_slot`` loads it.
+
+    The SAME pinned, hash-verified fetch the queue-time preflight runs (one
+    download path, not two), for a caller that reached the writer without that
+    preflight: an isolated writer graph without the validator, or a second
+    writer pick the plan could not see. A file already in place costs a folder
+    lookup and nothing else. Returns the path ComfyUI's loader will open."""
+    import folder_paths
+    from comfy import model_management
+    from ._otr_shared import env as otr_env
+
+    writers = {model_id}
+
+    def resolve():
+        return native_requests(set(), folder_paths=folder_paths,
+                               env=otr_env.snapshot(), writer_models=writers)
+
+    requests = resolve()
+    if len(requests) != 1:
+        raise VisualAssetError("%r names %d Comfy-native writer weights; expected one"
+                               % (model_id, len(requests)))
+    _acquire(requests, folder_paths=folder_paths,
+             cancel=model_management.throw_exception_if_processing_interrupted,
+             reresolve=resolve)
+    return resolve()[0]["path"]
+
+
+def _acquire(requests, *, folder_paths, cancel, reresolve):
+    """Fetch every request whose file is missing, each verified against its pin,
+    then re-resolve and insist nothing moved. Shared by the queue-time preflight
+    and :func:`ensure_writer_weights`. Returns ``(receipts, gui_progress)``."""
     missing = [r for r in requests if r["path"] is None]
     receipts = []
     gui_progress = None
@@ -1445,20 +1494,10 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                      receipt["status"].upper(), item["token"], receipt["bytes_verified"],
                      time.monotonic() - started, native)
         # Re-resolve adapter picks as well as native token identity after writes.
-        after = native_requests(engines, folder_paths=folder_paths,
-                                env=otr_env.snapshot(), writer_models=writer_models,
-                                **adapters)
+        after = reresolve()
         if ([(r["category"], r["token"]) for r in after]
                 != [(r["category"], r["token"]) for r in requests]
                 or any(r["path"] is None for r in after)):
             raise VisualAssetError("visual asset selection changed or remains missing after "
                                    "download; stopping before writer")
-    cancel()
-    if gui_progress is not None:
-        gui_progress.update_absolute(1000)
-    log.info("[OTR.assets] READY engines=%s writers=%s files=%d (availability "
-             "only; render/GPU/publish success not qualified)",
-             ",".join(sorted(engines)) or "-", ",".join(sorted(writer_models)) or "-",
-             len(requests))
-    return {"status": "ready", "engines": sorted(engines), "receipts": receipts,
-            "notes": plan["skipped"]}
+    return receipts, gui_progress

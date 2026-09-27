@@ -47,6 +47,11 @@ LANE_BY_LOADER_BACKEND: dict[str, str] = {
     "openrouter_http": LANE_OPENROUTER,
     "comfy_credits_http": LANE_COMFY_CREDITS,
     "google_api_http": LANE_GOOGLE_API,
+    # The Comfy-native writer (plan row 0n) is admitted through the existing
+    # LOCAL in-process lane token. The token is named for transformers for
+    # history's sake; what it means to a profile's allowlist is "a model this
+    # machine runs itself". Generation does not go through transformers.
+    "comfy_textgen": LANE_TRANSFORMERS,
 }
 
 _DEVICES = ("cuda", "cpu", "mps")

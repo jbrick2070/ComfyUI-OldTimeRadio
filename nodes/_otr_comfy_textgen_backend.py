@@ -8,11 +8,11 @@ it like any other model (operator, 2026-09-26: "unload models after they are use
 Measured the same day: 82-125 tok/s on the RTX 5080 and a 5.1 GB peak on the 8 GB
 RTX 4060, against 16-18 tok/s for today's 12B NF4 transformers writer.
 
-BUILT IN SLICES, and this file grows with them. Slice A2 lands the identity and the
-one weight the writer needs, so the queue-time preflight can fetch that weight before
-the writer runs. Generation (A1) and the ``request_slot`` wiring (A3) follow. Until A3
-lands, no dropdown offers :data:`MODEL_ID`, so nothing reaches this module at runtime
-except the preflight's lookup, which answers "no weights" for every other id.
+BUILT IN SLICES. A2: the identity and the one weight the writer needs, so the
+queue-time preflight fetches it before the writer runs. A1: generation, an adapter
+that speaks the transformers ``generate()`` subset over ComfyUI's own loop. A3: the
+load and release :func:`request_slot <_otr_model_loader.request_slot>` calls, which is
+what puts :data:`MODEL_ID` in the writer dropdown.
 
 IMPORT-LIGHT ON PURPOSE: stdlib only at module scope. The preflight and the catalog
 ask it questions while building a queue plan; neither may pay for torch or ComfyUI.
@@ -23,6 +23,11 @@ from __future__ import annotations
 #: Comfy-Org as one ComfyUI text-encoder file, not a transformers snapshot, and the
 #: HF ``google/gemma-4-E2B-it`` row stays a separate, unchanged choice.
 MODEL_ID = "comfy_native:gemma4-e2b-it-int8-convrot"
+
+#: The catalog row's ``provider`` and ``loader_backend``. Local and in-process,
+#: but not transformers: the cache entry carries a ComfyUI CLIP.
+PROVIDER = "comfy_native"
+LOADER_BACKEND = "comfy_textgen"
 
 #: The ComfyUI model category the stock CLIPLoader reads, and the file in it.
 WEIGHT_CATEGORY = "text_encoders"
@@ -330,6 +335,11 @@ class ComfyGemmaGenerateAdapter:
     def device(self):
         return getattr(getattr(self.clip, "patcher", None), "load_device", "cpu")
 
+    def retire(self):
+        """Drop the CLIP once the writer has been unloaded, so a closure that
+        outlived the cache entry cannot load the weights back on its own."""
+        self.clip = None
+
     def generate(self, input_ids=None, attention_mask=None, *, do_sample=True,
                  temperature=1.0, max_new_tokens=None, top_p=None, top_k=None,
                  min_p=None, repetition_penalty=None, pad_token_id=None,
@@ -340,6 +350,9 @@ class ComfyGemmaGenerateAdapter:
         if unsupported:
             raise TypeError("ComfyGemmaGenerateAdapter.generate() does not support "
                             "%s" % ", ".join(sorted(unsupported)))
+        if self.clip is None:
+            raise RuntimeError("this native Gemma writer was unloaded; request the "
+                               "writer slot again for a fresh one")
         if input_ids is None:
             raise TypeError("input_ids is required")
         ids = torch.as_tensor(input_ids).detach().to("cpu")
@@ -399,3 +412,105 @@ class ComfyGemmaGenerateAdapter:
         if run.error is not None:
             raise run.error
         return torch.tensor([prompt + run.ids], dtype=torch.long)
+
+
+# ---------------------------------------------------------------------------
+# SLICE A3: load and release. request_slot owns residency (one resident writer,
+# reuse keyed on the policy, ownership-checked teardown, epoch-guarded
+# publication); these two own what is specific to a ComfyUI CLIP.
+# ---------------------------------------------------------------------------
+
+def load_native_writer(model_id, *, policy=None, context_verdict=None, weight_path=None):
+    """Load the writer weight through ComfyUI's own CLIP loader and return the
+    cache entry OTR's generation factories consume.
+
+    ``model`` is the :class:`ComfyGemmaGenerateAdapter` and ``tokenizer`` the
+    model's own fast tokenizer, so the four factories run unchanged. The same
+    call the stock CLIPLoader makes (``comfy.sd.load_clip``, type
+    stable_diffusion), with the load device taken from the policy only when it
+    names one: ``cpu`` or ``cuda:N``. A bare ``cuda`` (or ``mps``) leaves the
+    choice to ComfyUI, which is the device it would pick anyway. No
+    bitsandbytes and no VRAM estimate: the weight is already int8, and ComfyUI's
+    model management loads, offloads and evicts it like any other model.
+
+    ``context_cap`` is the row's working cap (the verdict ``request_slot``
+    resolved), never above the decoder's native window. It bounds the budget
+    and so the KV cache ComfyUI allocates up front (prompt + budget)."""
+    weights = native_writer_weights(model_id)
+    if len(weights) != 1:
+        raise ValueError("%r is not a Comfy-native writer id" % (model_id,))
+    import torch
+    import folder_paths
+    import comfy.sd
+
+    (category, token), = weights
+    path = weight_path or folder_paths.get_full_path_or_raise(category, token)
+    device = str(getattr(policy, "device", "") or "").strip()
+    model_options = {}
+    if device == "cpu":
+        model_options["load_device"] = model_options["offload_device"] = torch.device("cpu")
+    elif device.startswith("cuda:"):
+        model_options["load_device"] = torch.device(device)
+    clip = comfy.sd.load_clip(
+        ckpt_paths=[path],
+        embedding_directory=folder_paths.get_folder_paths("embeddings"),
+        clip_type=comfy.sd.CLIPType.STABLE_DIFFUSION,
+        model_options=model_options)
+    try:
+        owner = sampling_owner(clip)
+        tokenizer = build_native_tokenizer(clip.tokenizer.gemma4.tokenizer.tokenizer)
+        adapter = ComfyGemmaGenerateAdapter(clip)
+    except BaseException:
+        release_native_clip(clip)
+        raise
+    native = getattr(getattr(owner, "model", None), "config", None)
+    native = getattr(native, "max_position_embeddings", None)
+    native = int(native) if isinstance(native, int) and native > 0 else None
+    cap = int(getattr(context_verdict, "value", None) or WORKING_CONTEXT_CAP)
+    source = str(getattr(context_verdict, "source", "")
+                 or "comfy-native working cap %d" % WORKING_CONTEXT_CAP)
+    if native is not None and native < cap:
+        cap = native
+        source += "; clamped to the decoder's native window %d" % native
+    return {
+        "provider": PROVIDER,
+        "loader_backend": LOADER_BACKEND,
+        "model": adapter,
+        "tokenizer": tokenizer,
+        "clip": clip,
+        "model_id": model_id,
+        "device": str(getattr(clip.patcher, "load_device", "") or ""),
+        "quantized": True,
+        "quantization": "int8_convrot",
+        "context_cap": cap,
+        "context_capacity_source": source,
+        "native_context_capacity": native,
+        "context_pin": getattr(context_verdict, "explicit_pin", None),
+        "vram_priced_ctx": None,
+        "weight_path": str(path),
+    }
+
+
+def release_native_clip(clip):
+    """Unload a writer CLIP's patcher and its clones on every device. Models
+    ComfyUI holds for other nodes stay where they are."""
+    patcher = getattr(clip, "patcher", None)
+    if patcher is None:
+        return
+    import comfy.model_management as model_management
+
+    model_management.unload_model_and_clones(patcher, all_devices=True)
+
+
+def release_native_entry(entry):
+    """The teardown ``_teardown_gpu_for_entry`` runs for a native entry: give
+    the weights back to ComfyUI, then retire the adapter and drop the entry's
+    CLIP so nothing that still holds the entry can reload them."""
+    model = entry.get("model")
+    clip = entry.get("clip") or getattr(model, "clip", None)
+    try:
+        release_native_clip(clip)
+    finally:
+        if isinstance(model, ComfyGemmaGenerateAdapter):
+            model.retire()
+        entry["clip"] = None

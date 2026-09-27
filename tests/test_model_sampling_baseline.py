@@ -19,7 +19,8 @@ from nodes._otr_line_composer import LineRequest, compose_line_draft
 def test_every_curated_local_model_resolves_and_cloud_slots_send_nothing():
     for row in catalog._by_repo_id().values():
         baseline = catalog.sampling_baseline(row.repo_id)
-        if row.provider == "local":
+        # Local means this machine runs it: transformers or ComfyUI itself.
+        if row.provider in catalog.LOCAL_PROVIDERS:
             assert baseline is not None, row.repo_id
             temperature, top_p, top_k = baseline
             assert 0.0 < temperature <= 1.0, (row.repo_id, temperature)

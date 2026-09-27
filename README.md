@@ -722,7 +722,10 @@ Radeon earns its author the AMD column in
 ## Adding to it
 
 You can add an **engine**, a **source bank**, a **writer LLM**, or an
-**episode language**. [apple/EXTENDING.md](apple/EXTENDING.md) is the recipe,
+**episode language**. A writer LLM is one catalog row, and every workflow's
+writer dropdown offers it after a restart with no workflow edit; a workflow
+changes only when the row becomes the one it selects.
+[apple/EXTENDING.md](apple/EXTENDING.md) is the recipe,
 [apple/LLM_PREFLIGHT.md](apple/LLM_PREFLIGHT.md) is the writer-LLM page,
 and [apple/PREFLIGHT.md](apple/PREFLIGHT.md) is the checklist, and the rule
 underneath both is the same one the rest of the pack lives by: **green tests are

@@ -143,6 +143,7 @@ class CuratedModel:
         "openrouter_http",
         "comfy_credits_http",
         "google_api_http",
+        "comfy_textgen",
     ]
     vram_fit_tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
     approx_safetensors_gb: float  # download size on disk, not VRAM resident
@@ -166,11 +167,14 @@ class CuratedModel:
     # every existing row uses; "openrouter" = a virtual row behind the
     # own-key OpenRouter API (S2); "comfy_credits" = a virtual row behind
     # ComfyUI's credit-billed partner-node proxy (2026-06-01);
-    # "google_api" = a virtual row behind the user's Gemini API key.
+    # "google_api" = a virtual row behind the user's Gemini API key;
+    # "comfy_native" = a LOCAL model ComfyUI itself loads and runs (its own
+    # CLIP and generate loop, not transformers) -- local, but not remote, so a
+    # test for "not local" is not a test for "remote".
     # Default "local" so every pre-existing row and any older fixture that
     # omits the field still constructs unchanged.
     provider: Literal[
-        "local", "openrouter", "comfy_credits", "google_api",
+        "local", "openrouter", "comfy_credits", "google_api", "comfy_native",
     ] = "local"
     # How a MULTIMODAL checkpoint driven text-only is actually loaded.
     #
@@ -418,6 +422,43 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         license="gated_terms",
         license_audit_status="research_lane",
     ),
+    CuratedModel(
+        # Plan row 0n (2026-09-26): Gemma 4 E2B as ComfyUI's own text model --
+        # Comfy-Org's int8_convrot file, loaded by the stock CLIP loader and run
+        # by ComfyUI's generate loop. A virtual id: there is no transformers
+        # snapshot, the weight is one text-encoder file pinned in
+        # _otr_visual_assets._PINNED_SOURCES, and the HF E2B row above stays a
+        # separate, unchanged choice. Nothing selects it by default yet.
+        repo_id="comfy_native:gemma4-e2b-it-int8-convrot",
+        requires_auth=False,
+        loader_backend="comfy_textgen",
+        # WARN until a canonical episode is proven on it (plan row 0n, A4).
+        vram_fit_tier="WARN",
+        # 5,199,997,904 bytes / 2**30. Disk, not VRAM.
+        approx_safetensors_gb=4.84,
+        notes="Gemma 4 E2B run by ComfyUI itself: Comfy-Org's "
+        "gemma4_e2b_it_int8_convrot text encoder in the stock CLIP loader, "
+        "generating through ComfyUI's own loop, so ComfyUI loads and unloads "
+        "it like any other model. Measured 2026-09-26: 82-125 tok/s on the "
+        "RTX 5080 and a 5.1 GB peak on the 8 GB RTX 4060. The weight is "
+        "already int8, so there is no Quant choice. Works inside ComfyUI "
+        "only; a standalone script that loads through transformers cannot "
+        "use it.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        # The working cap. ComfyUI allocates the KV cache up front for
+        # prompt + budget, so this bounds memory, not just length.
+        context_window=8192,
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+        provider="comfy_native",
+        implied_quant_policy="none",
+        # The Hugging Face repo that holds the one file this row loads (its
+        # licence audit is apple/model-license-comfy-org--gemma-4.md). Not a
+        # transformers snapshot: nothing snapshot-downloads it.
+        hf_repo_id="Comfy-Org/gemma-4",
+    ),
     # 2026-08-25: catalog pruned -- Qwen/Qwen2.5-14B-Instruct removed
     # (operator: "if it doesn't fit nicely or requires Ollama rip it from
     # the dropdown and blast radius"; "I only want easy to load LLMs").
@@ -653,7 +694,12 @@ SAMPLING_BASELINES = {
     # generation_config.json has no sampling keys; the card's own examples use
     # temperature 0.35.
     "mistralai/Mistral-Nemo-Instruct-2407": (0.35, None, None),
+    # The same E2B weights as google/gemma-4-E2B-it, run by ComfyUI.
+    "comfy_native:gemma4-e2b-it-int8-convrot": (1.0, 0.95, 64),
 }
+
+#: Providers that run on this machine. Everything else is a cloud slot.
+LOCAL_PROVIDERS = frozenset({"local", "comfy_native"})
 
 #: A local model with no published baseline (google/gemma-2-2b-it, or a model
 #: found in the cache that the catalog does not curate). The old "balanced"
@@ -667,7 +713,7 @@ def sampling_baseline(model_id: str):
     sampling key is sent."""
     bare = _canonical_qwen_id(model_id) if isinstance(model_id, str) else ""
     row = _by_repo_id().get(bare)
-    if row is not None and getattr(row, "provider", "local") != "local":
+    if row is not None and getattr(row, "provider", "local") not in LOCAL_PROVIDERS:
         return None
     return (SAMPLING_BASELINES.get(bare)
             or SAMPLING_BASELINES.get(hf_weights_id(bare))
@@ -1134,7 +1180,12 @@ def build_dropdown_choices(
         provider = getattr(m, "provider", "local")
         if m.repo_id == DEFAULT_LLM_NF4:
             continue
-        if provider != "local":
+        if provider == "comfy_native":
+            # A ComfyUI model file, not an HF snapshot: present when ComfyUI's
+            # own folder lookup finds it. Missing is fine -- the queue-time
+            # preflight fetches it -- and the row is never hidden.
+            on_disk = _native_writer_on_disk(m.repo_id)
+        elif provider != "local":
             # Remote lane (OpenRouter / Comfy Credits / Google API): listed
             # so a saved graph's handle stays a live combo choice. generate()
             # still fails closed without the matching key.
@@ -1161,6 +1212,26 @@ def build_dropdown_choices(
             continue
         entries.append(DropdownEntry(repo_id, repo_id, True, curated=False))
     return entries
+
+
+def _native_writer_on_disk(model_id: str) -> bool:
+    """True when ComfyUI's folder lookup finds every weight a Comfy-native
+    writer needs. Lazy and guarded: the dropdown is built while INPUT_TYPES
+    runs, and outside ComfyUI (tests, scripts) there is no folder table."""
+    try:
+        try:
+            from ._otr_comfy_textgen_backend import native_writer_weights
+        except ImportError:  # pragma: no cover -- flat import
+            from _otr_comfy_textgen_backend import native_writer_weights  # type: ignore
+        import folder_paths
+    except Exception:  # noqa: BLE001 -- no ComfyUI here: say not on disk
+        return False
+    weights = native_writer_weights(model_id)
+    try:
+        return bool(weights) and all(
+            folder_paths.get_full_path(category, token) for category, token in weights)
+    except Exception:  # noqa: BLE001 -- an unregistered folder is "not on disk"
+        return False
 
 
 def dropdown_choices(hub_root: Path | None = None) -> list[str]:
@@ -2119,6 +2190,17 @@ def resolve_context_cap(
     """
     pin = (_hard_vram_context_limit() if context_pin is _CONTEXT_PIN_UNSET
            else normalized_context_pin(context_pin))
+    row = _by_repo_id().get(model_id) if isinstance(model_id, str) else None
+    if getattr(row, "provider", "local") == "comfy_native":
+        # No config.json to scan: the row carries the working cap, because
+        # ComfyUI sizes the KV cache for prompt + budget up front. The loader
+        # clamps it to the decoder's native window once the model is loaded.
+        working = int(row.context_window)
+        value = min(working, pin) if pin is not None else working
+        source = f"comfy-native working cap {working}"
+        if pin is not None:
+            source += f", explicit context pin {pin}"
+        return ContextCapVerdict("PASS", value, source, None, pin)
     weights = hf_weights_id(model_id) if isinstance(model_id, str) else model_id
     native = (read_native_context(config) if config is not None
               else _read_config_context(weights, hub_root=hub_root))

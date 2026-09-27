@@ -9,7 +9,10 @@ slot if you have a key. The picker is open. Nothing here locks you to Qwen.
 **What this pack ships:** Qwen 3.5 4B as one transformers dropdown row.
 NVIDIA bakes NF4; Mac and CPU load full. The 16 GB NVIDIA graphs still
 ship `google/gemma-4-12b-it`. Every row is a safetensors model that downloads
-itself.
+itself. Since 2026-09-26 the dropdown also offers
+`comfy_native:gemma4-e2b-it-int8-convrot`: Gemma 4 E2B run by ComfyUI itself
+rather than by transformers (see "A writer ComfyUI runs itself" below). No
+workflow selects it yet.
 
 This page is the add-your-own checklist. The models that already ship, and
 how to read their badges, are [WRITERS.md](WRITERS.md). The short binding
@@ -71,6 +74,17 @@ snapshot only through `hf_repo_id` plus `implied_quant_policy`. Qwen itself
 is one row (`implied_quant_policy="platform"`). Do not invent a second HF
 repo for the same weights.
 
+### Every workflow gets the row at once
+
+The writer dropdowns on **OTR_LedgerScriptWriter** read `dropdown_choices()`
+when ComfyUI registers the node, so a new row is offered in the canonical
+workflow and in every generated workflow the moment ComfyUI restarts. Adding
+a choice needs no workflow JSON edit and no regenerated workflow; the saved values
+stay exactly what they were. A workflow changes only when a row becomes what
+it SELECTS, which is "If it becomes a shipped default" below. Queue a
+workflow with the new row picked and the queue-time preflight fetches its
+weights before the writer runs.
+
 ### The gates
 
 Run these in order. Each one has caught a real failure in this repo.
@@ -111,11 +125,12 @@ artifact supports, not what a model card claims. KV cache is not free.
 
 | Field | Meaning |
 |---|---|
-| `repo_id` | Dropdown identity. Hugging Face `org/name`. A `:nf4` suffix is a retired alias for validation only -- it is not a COMBO row. |
-| `hf_repo_id` | Real Hugging Face repo when `repo_id` is an alias. Empty means `repo_id` is the HF id. |
+| `repo_id` | Dropdown identity. Hugging Face `org/name`, or a `comfy_native:` id for a writer ComfyUI runs itself. A `:nf4` suffix is a retired alias for validation only -- it is not a COMBO row. |
+| `hf_repo_id` | Real Hugging Face repo when `repo_id` is an alias (and the repo that holds a Comfy-native writer's file). Empty means `repo_id` is the HF id. |
 | `implied_quant_policy` | When set (`none` / `bnb_nf4` / `platform`), the pick owns Quant. `platform` is what Qwen uses (NF4 on NVIDIA, full elsewhere). Empty means the widget still decides. |
 | `requires_auth` | Whether Hugging Face actually gates it. Measure it; do not copy the previous row. |
-| `loader_backend` | Dispatch key. `transformers_safetensors` for an ordinary causal LM. |
+| `loader_backend` | Dispatch key. `transformers_safetensors` for an ordinary causal LM; `comfy_textgen` for a writer ComfyUI runs itself. |
+| `provider` | `local` (transformers), `comfy_native` (ComfyUI's own loader, still local), or a cloud provider. |
 | `vram_fit_tier` | Honesty at choose-time. |
 | `approx_safetensors_gb` | Download size on disk, not VRAM resident. The badge prints this number. |
 
@@ -130,6 +145,41 @@ weights.
 
 `license_audit_status` on anything the canonical graph binds must be
 `mit_equivalent`.
+
+### A writer ComfyUI runs itself
+
+The Comfy-native row is a different kind of writer. ComfyUI's stock CLIP
+loader opens one text-encoder file (Comfy-Org's `gemma4_e2b_it_int8_convrot`,
+5.2 GB, already int8) and ComfyUI's own generate loop writes the script. So
+ComfyUI's model management loads and unloads it like any other model; there is
+no transformers snapshot, no bitsandbytes, and no Quant choice.
+
+How it plugs in, in `nodes/_otr_comfy_textgen_backend.py`:
+`ComfyGemmaGenerateAdapter` speaks the part of transformers' `generate()`
+OTR's four generation factories use, and the cache entry carries the model's
+own tokenizer. The writer's halt rules, budget fitting, grammar and stop
+trimming therefore run unchanged -- one copy, not a parallel native path.
+`request_slot` gives it the same residency rules as a transformers writer.
+
+To add another Comfy-native writer (another Comfy-Org text-encoder file):
+
+1. Pin the file in `_otr_visual_assets._PINNED_SOURCES`: repo, revision, size
+   and sha256 read from the Hub API. The queue-time preflight and
+   `request_slot` both fetch through it.
+2. Map the new id to that file in `_WEIGHTS_BY_MODEL` in the backend module.
+   A decoder family other than Gemma 4 also needs its own chat template, stop
+   ids and tokenizer path; the adapter is written for Gemma 4.
+3. Add the catalog row: `provider="comfy_native"`,
+   `loader_backend="comfy_textgen"`, `implied_quant_policy="none"`,
+   `hf_repo_id` naming the Comfy-Org repo, and `context_window` as the
+   working cap. ComfyUI allocates the KV cache for prompt plus budget up
+   front, so that number bounds memory, not only length.
+4. The licence audit is keyed on `hf_repo_id`
+   (`apple/model-license-comfy-org--gemma-4.md` covers the whole repo).
+5. Same gates as any row, and the same last one: an episode in `otr/obs/`.
+
+It runs inside ComfyUI only. A standalone script that loads through
+`load_llm` gets a clear refusal, not a download.
 
 ### A writer must ship safetensors weights
 

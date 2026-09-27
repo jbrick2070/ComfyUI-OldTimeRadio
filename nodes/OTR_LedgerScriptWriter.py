@@ -733,7 +733,9 @@ class _SlotScheduler:
         except Exception:  # noqa: BLE001 -- capability is a safe false default
             provider = ""
         return {
-            "_otr_local_schema_binding": provider == "local",
+            # Both local providers bind a schema lazily: transformers, and
+            # the Comfy-native writer, whose entry speaks the same generate().
+            "_otr_local_schema_binding": provider in ("local", "comfy_native"),
             "_otr_openrouter": provider == "openrouter",
             "_otr_comfy_credits": provider == "comfy_credits",
             "_otr_google_api": provider == "google_api",

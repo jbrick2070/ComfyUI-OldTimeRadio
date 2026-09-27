@@ -283,11 +283,19 @@ This is not an engine. There is no `@register` and no adapter file.
 Gemma, use a cloud slot. That is not the same as what the pack ships.
 
 **What the pack ships:** Qwen 3.5 as one transformers dropdown row
-(NVIDIA NF4, Mac / CPU full).
+(NVIDIA NF4, Mac / CPU full). The dropdown also offers a Gemma 4 E2B that
+ComfyUI runs itself (`comfy_native:gemma4-e2b-it-int8-convrot`), not yet
+selected by any workflow.
 
-The full checklist -- on-machine cache path, catalog row, the gates -- is
-[LLM_PREFLIGHT.md](LLM_PREFLIGHT.md). Which models already ship, and how to
-read the badge, is [WRITERS.md](WRITERS.md).
+**A new row reaches every workflow on restart.** The writer dropdowns read
+the catalog when ComfyUI registers the node, so the canonical workflow and
+every generated one offer the row without a JSON edit. Only making it the
+SELECTED writer touches a workflow: the canonical's writer
+`widgets_values`, then `scripts/build_variants.py --all`.
+
+The full checklist -- on-machine cache path, catalog row, a writer ComfyUI
+runs itself, the gates -- is [LLM_PREFLIGHT.md](LLM_PREFLIGHT.md). Which
+models already ship, and how to read the badge, is [WRITERS.md](WRITERS.md).
 
 ---
 

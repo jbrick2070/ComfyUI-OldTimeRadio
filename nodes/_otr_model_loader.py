@@ -1056,6 +1056,17 @@ def load_llm(
         # Strip [BETA] or [8-bit] labels used in the UI dropdown
         _stripped_model_id = model_id_full.split(" ")[0]
 
+        # load_llm is the TRANSFORMERS primitive. A Comfy-native writer has no
+        # snapshot to fetch or open; it runs inside ComfyUI through
+        # request_slot, and a direct call is refused before any HF work.
+        from ._otr_comfy_textgen_backend import is_native_writer
+        if is_native_writer(_stripped_model_id):
+            raise ModelLoaderError(
+                f"{_stripped_model_id} is a Comfy-native writer: it loads "
+                "through request_slot inside ComfyUI, not load_llm. Pick a "
+                "transformers model for a standalone script."
+            )
+
         # S1 platform-portability (2026-07-10): resolve the EXPLICIT runtime
         # policy (None = the nv50 16 GB baseline -- identical resolved
         # values to the deleted auto machinery below). policy.device wins
@@ -1840,6 +1851,16 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
     # model was placed on, not the current one.
     placed_on = entry.get("device") if entry is not None else ""
     _memory_log.memory_snapshot("llm_retirement_before", model_id=model_id)
+    if entry is not None and entry.get("provider") == "comfy_native":
+        # ComfyUI owns this model's placement: hand its patcher back through
+        # ComfyUI's own unload (its clones too, every device), then retire the
+        # adapter so a closure that outlived the cache cannot reload it. The
+        # adapter has no .to(), so the transformers step below is a no-op.
+        try:
+            from ._otr_comfy_textgen_backend import release_native_entry
+            release_native_entry(entry)
+        except Exception as exc:  # noqa: BLE001 -- teardown never raises
+            log.warning("[OTR_ModelLoader] native writer release failed: %s", exc)
     if entry is not None:
         model = entry.get("model")
         if model is not None and hasattr(model, "to"):
@@ -2188,7 +2209,10 @@ def request_slot(
                   if isinstance(model_id, str) else model_id)
     _early_row = _otr_catalog._by_repo_id().get(normalized) if isinstance(normalized, str) else None
     _early_backend = getattr(_early_row, "loader_backend", None)
-    if _early_backend in ("openrouter_http", "comfy_credits_http", "google_api_http"):
+    # A Comfy-native writer (plan row 0n) is local but has no HF snapshot, so
+    # it takes the no-HF normalization too; it is NOT remote-dispatched below.
+    if _early_backend in ("openrouter_http", "comfy_credits_http", "google_api_http",
+                          "comfy_textgen"):
         normalized = _otr_catalog.validate_model_id(model_id)
         _hub_root = None
     else:
@@ -2259,6 +2283,15 @@ def request_slot(
             normalized, _virtual_row, policy=_policy,
         )
 
+    # THE COMFY-NATIVE WRITER (plan row 0n) takes the same residency path as
+    # a transformers model -- one resident writer, reuse keyed on the policy,
+    # ownership-checked teardown, epoch-guarded publication -- and swaps only
+    # the transformers-specific steps: no VRAM estimate (ComfyUI's model
+    # management admits and offloads its own models), no transformers support
+    # gate, the pinned ComfyUI file instead of a snapshot, and ComfyUI's own
+    # CLIP loader instead of load_llm.
+    _native = getattr(_virtual_row, "loader_backend", None) == "comfy_textgen"
+
     # Steps 3-5, HOISTED (A1, 2026-07-27): the context cap and THE policy
     # admission calculation, once, before every local-lane cache read and
     # before every local-lane load. They used to sit below both cache-hit
@@ -2270,12 +2303,13 @@ def request_slot(
     ctx_verdict = _otr_catalog.resolve_context_cap(
         normalized, hub_root=_hub_root, context_pin=_context_pin,
     )
-    _assert_policy_admits_vram(normalized, ctx_verdict, _policy)
+    if not _native:
+        _assert_policy_admits_vram(normalized, ctx_verdict, _policy)
 
-    # Capability-gate architecture support before cache/download work. A stale
-    # ComfyUI venv must not spend time resolving a 23.9 GB model only to fail in
-    # AutoConfig with an opaque `gemma4_unified` error.
-    _require_transformers_model_support(normalized)
+        # Capability-gate architecture support before cache/download work. A
+        # stale ComfyUI venv must not spend time resolving a 23.9 GB model only
+        # to fail in AutoConfig with an opaque `gemma4_unified` error.
+        _require_transformers_model_support(normalized)
 
     # Step 2: cache hit on the same model id (regardless of slot) -- policy
     # keyed (S1): a mismatched policy_key is a MISS + teardown, never reuse.
@@ -2299,6 +2333,11 @@ def request_slot(
     # Local-cache short-circuit (B1d) fires inside this helper when the
     # snapshot is already on disk.
     raise_if_processing_interrupted()
+    if _native:
+        # The same pinned, verified fetch the queue-time preflight runs; a file
+        # already in place costs a folder lookup.
+        from ._otr_visual_assets import ensure_writer_weights
+        ensure_writer_weights(normalized)
     # PASS THE PROGRESS BAR. auto_download_if_missing has accepted a
     # progress_pbar since it was written and forwards it into
     # snapshot_download as a tqdm_class, but NO caller ever supplied one --
@@ -2307,17 +2346,18 @@ def request_slot(
     # and is the first thing a new user sees. ComfyUI's own ProgressBar is
     # only importable inside a running server, so a failure to construct one
     # must not touch the download: absent bar, previous behaviour exactly.
-    _pbar = None
-    try:
-        from comfy.utils import ProgressBar as _ComfyProgressBar
-        _pbar = _ComfyProgressBar(100)
-    except Exception:  # noqa: BLE001 -- headless, tests, or a Comfy without it
+    else:
         _pbar = None
-    _otr_catalog.auto_download_if_missing(
-        normalized,
-        hub_root=_hub_root,
-        progress_pbar=_pbar,
-    )
+        try:
+            from comfy.utils import ProgressBar as _ComfyProgressBar
+            _pbar = _ComfyProgressBar(100)
+        except Exception:  # noqa: BLE001 -- headless, tests, or a Comfy without it
+            _pbar = None
+        _otr_catalog.auto_download_if_missing(
+            normalized,
+            hub_root=_hub_root,
+            progress_pbar=_pbar,
+        )
     raise_if_processing_interrupted()
 
     # Step 8: if a different model is resident, unload it. Then load.
@@ -2353,14 +2393,20 @@ def request_slot(
     # through _self_unload makes this a no-op unless _my_cache_epoch is
     # still current, i.e. unless this call still owns whatever is resident.
     try:
-        with _on_cuda_device(getattr(_policy, "device", "")):
-            cache_entry = load_llm(
-                normalized, context_verdict=ctx_verdict, hub_root=_hub_root,
-                policy=_policy,
+        if _native:
+            from ._otr_comfy_textgen_backend import load_native_writer
+            cache_entry = load_native_writer(
+                normalized, policy=_policy, context_verdict=ctx_verdict,
             )
+        else:
+            with _on_cuda_device(getattr(_policy, "device", "")):
+                cache_entry = load_llm(
+                    normalized, context_verdict=ctx_verdict, hub_root=_hub_root,
+                    policy=_policy,
+                )
     except Exception:
         log.warning(
-            "[Selector] load_llm raised for %s; running self-unload "
+            "[Selector] loading %s raised; running self-unload "
             "to drop any orphan VRAM before retry",
             normalized,
         )
