@@ -275,9 +275,26 @@ def _split_mime(mime_type: str) -> tuple[str, dict]:
     return base, params
 
 
+#: WAV container MIMEs. Gemini 3.8 Flash TTS answers `audio/wav` (measured
+#: 2026-09-26: RIFF, 16-bit PCM, mono, 24000 Hz) where every earlier TTS model
+#: answered raw `audio/l16`. The container is unwrapped after base64 decoding
+#: and its header states the rate.
+_WAV_MIMES = ("audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave")
+
+
 def _audio_block(data: str, block: dict) -> dict:
     raw_mime = str(block.get("mime_type") or block.get("mimeType") or "")
     base, params = _split_mime(raw_mime)
+    if base in _WAV_MIMES:
+        # The WAV header is the authority on rate; a rate stated alongside it
+        # (block field or MIME parameter) is carried so the unwrap can refuse
+        # a disagreement instead of guessing.
+        stated = None
+        if "sample_rate" in block or "sampleRate" in block:
+            stated = _sample_rate_from(block)
+        elif "rate" in params:
+            stated = _sample_rate_from({"sample_rate": params["rate"]})
+        return {"data": data, "sample_rate": stated, "mime_type": "audio/wav"}
     if base and base not in ("audio/l16", "audio/pcm"):
         raise GoogleTTSError(
             "Google TTS response audio MIME %r is unsupported; expected audio/l16"
@@ -395,15 +412,55 @@ def _pcm16le_to_audio(pcm: bytes, sample_rate: int = _SAMPLE_RATE) -> dict:
     return {"waveform": torch.from_numpy(wav_np), "sample_rate": sample_rate}
 
 
+def _pcm16le_from_wav(raw: bytes, stated_rate) -> tuple:
+    """(mono 16-bit little-endian PCM, sample rate) out of a WAV container.
+
+    Refuses anything but uncompressed 16-bit PCM, and a rate stated outside
+    the container that disagrees with its header. Stereo is averaged to mono,
+    since every voice line downstream is one channel."""
+    import io
+    import wave
+
+    try:
+        with wave.open(io.BytesIO(raw), "rb") as w:
+            channels = w.getnchannels()
+            width = w.getsampwidth()
+            rate = w.getframerate()
+            frames = w.readframes(w.getnframes())
+    except (wave.Error, EOFError) as exc:
+        raise GoogleTTSError(
+            "Google TTS response audio was labelled WAV but is not a readable "
+            "PCM WAV: %s" % exc) from exc
+    if width != 2:
+        raise GoogleTTSError(
+            "Google TTS response WAV holds %d-byte samples; expected 16-bit PCM"
+            % width)
+    if channels not in (1, 2):
+        raise GoogleTTSError(
+            "Google TTS response WAV has %d channels; expected 1 or 2" % channels)
+    if stated_rate is not None and int(stated_rate) != rate:
+        raise GoogleTTSError(
+            "Google TTS response states two sample rates: %d beside the WAV, "
+            "%d in its header. Refusing to guess." % (int(stated_rate), rate))
+    if channels == 2:
+        import numpy as np
+        pair = np.frombuffer(frames, dtype="<i2").reshape(-1, 2).astype(np.int32)
+        frames = (pair.sum(axis=1) // 2).astype("<i2").tobytes()
+    return frames, rate
+
+
 def _audio_from_response(response: dict) -> dict:
     block = _extract_audio_data(response)
     try:
-        pcm = base64.b64decode(block["data"], validate=True)
+        raw = base64.b64decode(block["data"], validate=True)
     except Exception as exc:  # noqa: BLE001
         raise GoogleTTSError(
             "Google TTS response audio was not valid base64 PCM: %s" % exc
         ) from exc
-    return _pcm16le_to_audio(pcm, int(block["sample_rate"]))
+    if block["mime_type"] == "audio/wav":
+        pcm, rate = _pcm16le_from_wav(raw, block["sample_rate"])
+        return _pcm16le_to_audio(pcm, rate)
+    return _pcm16le_to_audio(raw, int(block["sample_rate"]))
 
 
 def _preserve_stage_tags(text: str) -> tuple[str, dict[str, str]]:

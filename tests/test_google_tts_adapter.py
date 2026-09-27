@@ -197,6 +197,59 @@ def test_response_parser_refuses_a_non_pcm_codec():
     assert G._audio_block("AAAA", {"mime_type": "audio/l16"})["sample_rate"] == G._SAMPLE_RATE
 
 
+def _wav_b64(samples, *, rate=24000, channels=1, width=2):
+    import io
+    import wave
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(channels)
+        w.setsampwidth(width)
+        w.setframerate(rate)
+        w.writeframes(bytes(samples))
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def test_gemini_38_wav_container_is_unwrapped_at_its_header_rate():
+    """Gemini 3.8 Flash TTS answers `audio/wav` (measured live 2026-09-26),
+    where earlier models answered raw `audio/l16`; the old check refused
+    every 3.8 line. The container's header decides the rate."""
+    pcm = (1000).to_bytes(2, "little", signed=True) * 480
+    body = {"output_audio": {"mime_type": "audio/wav", "type": "audio",
+                             "data": _wav_b64(pcm, rate=24000)}}
+    audio = G._audio_from_response(body)
+    assert int(audio["sample_rate"]) == 24000
+    assert tuple(audio["waveform"].shape) == (1, 1, 480)
+    assert abs(float(audio["waveform"][0, 0, 0]) - 1000 / 32768.0) < 1e-6
+    # a header at another rate is read as that rate, not the 24 kHz default
+    assert int(G._audio_from_response({"output_audio": {
+        "mime_type": "audio/wav", "data": _wav_b64(pcm, rate=16000)}})
+        ["sample_rate"]) == 16000
+
+
+def test_gemini_wav_stereo_is_averaged_to_mono():
+    left = (2000).to_bytes(2, "little", signed=True)
+    right = (0).to_bytes(2, "little", signed=True)
+    body = {"output_audio": {"mime_type": "audio/wav",
+                             "data": _wav_b64((left + right) * 10, channels=2)}}
+    audio = G._audio_from_response(body)
+    assert tuple(audio["waveform"].shape) == (1, 1, 10)
+    assert abs(float(audio["waveform"][0, 0, 0]) - 1000 / 32768.0) < 1e-6
+
+
+def test_gemini_wav_refuses_a_disagreeing_rate_and_a_non_pcm16_body():
+    pcm = bytes(16)
+    with pytest.raises(G.GoogleTTSError, match="two sample rates"):
+        G._audio_from_response({"output_audio": {
+            "mime_type": "audio/wav;rate=16000", "data": _wav_b64(pcm, rate=24000)}})
+    with pytest.raises(G.GoogleTTSError, match="16-bit"):
+        G._audio_from_response({"output_audio": {
+            "mime_type": "audio/wav", "data": _wav_b64(bytes(8), width=1)}})
+    with pytest.raises(G.GoogleTTSError, match="not a readable"):
+        G._audio_from_response({"output_audio": {
+            "mime_type": "audio/wav",
+            "data": base64.b64encode(b"not a wav at all").decode("ascii")}})
+
+
 def test_two_stated_sample_rates_must_agree():
     """codex 2026-09-19: a mislabeled rate plays 1.5x fast and still passes
     the cache's mismatch guard, so a block rate and a MIME rate that
