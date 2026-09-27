@@ -87,11 +87,15 @@ def test_whisper_proves_cuda_with_a_real_encode_else_uses_the_cpu(monkeypatch, c
     monkeypatch.setattr(ctranslate2, "get_cuda_device_count", lambda: 1)
     monkeypatch.setattr(ctranslate2, "get_supported_compute_types", lambda d: {"float16", "int8"})
     monkeypatch.setattr(speech, "_models_dir", lambda: Path("unused"))
+    monkeypatch.setattr(speech, "_WHISPER_CUDA_WORKS", None)
     model = speech._load_whisper()
     if cuda_encode_works:
         assert model.device == "cuda" and built == [("cuda", "float16")]
     else:
         assert model.device == "cpu" and built == [("cuda", "float16"), ("cpu", "int8")]
+        # remembered: the next load goes straight to the CPU
+        built.clear()
+        assert speech._load_whisper().device == "cpu" and built == [("cpu", "int8")]
 
 
 def test_vad_negative_never_loads_whisper_or_llm(monkeypatch):

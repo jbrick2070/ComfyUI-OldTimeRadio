@@ -66,6 +66,10 @@ def _vad_positive(path, model, timestamps):
         return bool(timestamps(audio, model, sampling_rate=16000))
 
 
+#: None until proven; then whether Whisper's CUDA build can run on this box.
+_WHISPER_CUDA_WORKS = None
+
+
 def _load_whisper():
     import ctranslate2
     from faster_whisper import WhisperModel
@@ -90,19 +94,34 @@ def _load_whisper():
     # 2026-09-27). So CUDA is proven with one real one-second encode, and the
     # CPU (int8, well under a minute for a whole episode's stems) is used when
     # that proof fails.
+    # The verdict is remembered for the process: a box whose CUDA cannot run
+    # Whisper does not re-pay a failed CUDA load on every episode.
+    global _WHISPER_CUDA_WORKS
+    model = None
     try:
-        if ctranslate2.get_cuda_device_count() > 0 and \
+        if _WHISPER_CUDA_WORKS is not False and \
+                ctranslate2.get_cuda_device_count() > 0 and \
                 "float16" in ctranslate2.get_supported_compute_types("cuda"):
             import numpy as np
             model = build("cuda", "float16")
+            # transcribe() encodes eagerly for language detection -- the
+            # exact call that needs cuBLAS -- so this line is the proof.
             segments, _ = model.transcribe(np.zeros(16000, dtype=np.float32),
                                            beam_size=1, vad_filter=False)
             list(segments)
+            _WHISPER_CUDA_WORKS = True
             log.info("[OTR foley speech] Whisper base on cuda (float16)")
             return model
     except Exception as exc:  # noqa: BLE001 -- any CUDA failure means CPU
+        _WHISPER_CUDA_WORKS = False
+        if model is not None:
+            try:
+                model.model.unload_model()
+            except Exception:  # noqa: BLE001 -- best effort; the CPU build follows
+                pass
+            model = None
         log.warning("[OTR foley speech] Whisper cannot run on CUDA here (%s); "
-                    "using the CPU (int8)", exc)
+                    "using the CPU (int8) for the rest of this session", exc)
     log.info("[OTR foley speech] Whisper base on cpu (int8)")
     return build("cpu", "int8")
 
