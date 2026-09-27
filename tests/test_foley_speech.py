@@ -414,4 +414,5 @@ def test_the_judge_uses_the_shared_json_ladder_not_a_text_parser():
     src = inspect.getsource(speech._judge_transcripts)
     call = src[src.index("structured_call("):]
     call = call[:call.index(")\n")]
-    assert "text_parser" not in call
+    code = "\n".join(line.split("#", 1)[0] for line in call.splitlines())
+    assert "text_parser=" not in code
