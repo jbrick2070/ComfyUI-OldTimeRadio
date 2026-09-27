@@ -221,6 +221,22 @@ class CompletenessTests(unittest.TestCase):
             "code, so their episodes would all be named 'unk':\n  "
             + "\n  ".join(missing))
 
+    def test_every_curated_writer_has_a_code(self):
+        """In-process, so it runs in the suite: the live-dropdown check below
+        needs a ComfyUI on :8188 and skips without one, which is how the
+        Comfy-native writer and Qwen3.8-27B both shipped naming their
+        episodes ``unk`` (found on the 5080's first native episode,
+        2026-09-26)."""
+        from nodes import _otr_model_catalog as cat
+        rows = cat._active_curated_models()
+        self.assertTrue(rows, "the catalog is empty; this check would pass vacuously")
+        missing = [m.repo_id for m in rows
+                   if SC.code_for("llm", m.repo_id + cat.vram_badge_for(m.repo_id)) == "unk"]
+        self.assertFalse(
+            missing,
+            "these writer rows reach the published filename with no code, so "
+            "their episodes would all be named 'unk':\n  " + "\n  ".join(missing))
+
     def _is_uncurated_llm(self, text):
         try:
             from nodes import _otr_model_catalog as cat

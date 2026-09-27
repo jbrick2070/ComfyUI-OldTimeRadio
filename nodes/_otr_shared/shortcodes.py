@@ -55,12 +55,19 @@ SENTINELS = ("+ Add Custom Model",)
 LLM = {
     "Qwen/Qwen3.5-4B": "q354b",
     "Qwen/Qwen3.5-4B:nf4": "q354n",
+    # Absent from the row's first ship (2026-09-21) until 2026-09-26, so a
+    # 27B episode published in that window carries ``__unk__``.
+    "Qwen/Qwen3.8-27B": "q3827",
     "unsloth/Llama-3.2-3B-Instruct": "lla3",
     "mistralai/Mistral-Nemo-Instruct-2407": "nemo",
     "google/gemma-4-E2B-it": "g4e2",
     "google/gemma-4-E4B-it": "g4e4",
     "google/gemma-4-12b-it": "g412",
     "google/gemma-2-2b-it": "g22b",
+    # Gemma 4 E2B run by ComfyUI itself (plan row 0n): the same weights family
+    # as g4e2, a different writer, so a different code. Its first 5080 episode
+    # (knot_midnight_20260926_180140) published as ``__unk__``.
+    "comfy_native:gemma4-e2b-it-int8-convrot": "cg4e2",
     # Virtual cloud handles appear in the live COMBO only when the matching
     # key is configured. They still reach the published filename.
     "openrouter:slot-a": "orsa",
