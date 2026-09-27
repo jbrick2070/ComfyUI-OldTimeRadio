@@ -299,11 +299,12 @@ class _Run:
 
 
 def _close_generation_scope():
-    """What ComfyUI's executor runs when a NODE finishes -- drop the captured
-    prefetch/decode graphs and reset the cast buffers (execution.py: 0.34 and
-    0.37 both call ``cleanup_prefetch_queues`` and ``reset_cast_buffers``) --
-    run after EVERY generate() call, because OTR's writer makes many calls
-    inside one node.
+    """What ComfyUI's executor runs when a NODE finishes, run after EVERY
+    generate() call, because OTR's writer makes many calls inside one node.
+    The same steps under the same condition (execution.py, 0.34 and 0.37):
+    when dynamic VRAM is on, drop the captured prefetch/decode graphs, reset
+    the cast buffers and reset the vbar watermark limits. Without dynamic VRAM
+    the executor does nothing here and neither does this.
 
     Measured on the 4060 (stock ComfyUI 0.34, 2026-09-26): without it the
     writer's second call replayed the first call's captured decode graph
@@ -311,12 +312,20 @@ def _close_generation_scope():
     ("scatter gather kernel index out of bounds"). Each call now starts the
     way a fresh TextGenerate node does."""
     try:
+        import comfy.memory_management as memory_management
         import comfy.model_management as model_management
         import comfy.model_prefetch as model_prefetch
     except Exception:  # noqa: BLE001 -- outside ComfyUI: nothing was captured
         return
+    if not getattr(memory_management, "aimdo_enabled", False):
+        return
+    try:
+        import comfy_aimdo.model_vbar as model_vbar
+    except Exception:  # noqa: BLE001 -- the watermark step is absent, not fatal
+        model_vbar = None
     for step in (getattr(model_prefetch, "cleanup_prefetch_queues", None),
-                 getattr(model_management, "reset_cast_buffers", None)):
+                 getattr(model_management, "reset_cast_buffers", None),
+                 getattr(model_vbar, "vbars_reset_watermark_limits", None)):
         if callable(step):
             step()
 
@@ -423,7 +432,15 @@ class ComfyGemmaGenerateAdapter:
                             "reset_clip_options", None)
             if callable(reset):
                 reset()
-            _close_generation_scope()
+            try:
+                _close_generation_scope()
+            except Exception as close_exc:  # noqa: BLE001 -- see below
+                # A failed close after a successful call is a real error. After
+                # a failed call it must not replace the error that caused it.
+                if completed:
+                    raise
+                log.warning("[OTR native writer] closing ComfyUI's graph scope "
+                            "also failed: %s", close_exc)
             if completed and streamer is not None:
                 streamer.end()
         if run.error is not None:

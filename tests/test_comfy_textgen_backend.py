@@ -358,12 +358,24 @@ def comfy_close(monkeypatch):
     prefetch.cleanup_prefetch_queues = lambda: calls.append("cleanup_prefetch_queues")
     management = types.ModuleType("comfy.model_management")
     management.reset_cast_buffers = lambda: calls.append("reset_cast_buffers")
+    memory = types.ModuleType("comfy.memory_management")
+    memory.aimdo_enabled = True
     pkg = types.ModuleType("comfy")
-    pkg.model_prefetch, pkg.model_management = prefetch, management
+    pkg.model_prefetch, pkg.model_management, pkg.memory_management = (
+        prefetch, management, memory)
+    vbar = types.ModuleType("comfy_aimdo.model_vbar")
+    vbar.vbars_reset_watermark_limits = lambda: calls.append("vbars_reset_watermark_limits")
+    aimdo = types.ModuleType("comfy_aimdo")
+    aimdo.model_vbar = vbar
     for name, module in (("comfy", pkg), ("comfy.model_prefetch", prefetch),
-                         ("comfy.model_management", management)):
+                         ("comfy.model_management", management),
+                         ("comfy.memory_management", memory),
+                         ("comfy_aimdo", aimdo), ("comfy_aimdo.model_vbar", vbar)):
         monkeypatch.setitem(sys.modules, name, module)
     return calls
+
+
+_CLOSE = ["cleanup_prefetch_queues", "reset_cast_buffers", "vbars_reset_watermark_limits"]
 
 
 def test_every_call_closes_its_scope_like_a_finished_node(comfy_close):
@@ -373,7 +385,7 @@ def test_every_call_closes_its_scope_like_a_finished_node(comfy_close):
     adapter, _, decoder = _adapter(lambda step: [7, EOS][min(step, 1)])
     for _ in range(2):
         adapter.generate(input_ids=_ids(2), do_sample=False, max_new_tokens=5)
-    assert comfy_close == ["cleanup_prefetch_queues", "reset_cast_buffers"] * 2
+    assert comfy_close == _CLOSE * 2
 
     def boom(prompt, max_length, seed):
         raise RuntimeError("device-side assert")
@@ -381,7 +393,35 @@ def test_every_call_closes_its_scope_like_a_finished_node(comfy_close):
     decoder.loop = boom
     with pytest.raises(RuntimeError, match="device-side assert"):
         adapter.generate(input_ids=_ids(2), do_sample=False, max_new_tokens=5)
-    assert comfy_close[-2:] == ["cleanup_prefetch_queues", "reset_cast_buffers"]
+    assert comfy_close[-3:] == _CLOSE
+
+
+def test_without_dynamic_vram_the_close_out_does_nothing_like_the_executor(comfy_close):
+    import sys
+    sys.modules["comfy.memory_management"].aimdo_enabled = False
+    adapter, _, _ = _adapter(lambda step: EOS)
+    adapter.generate(input_ids=_ids(2), do_sample=False, max_new_tokens=5)
+    assert comfy_close == []
+
+
+def test_a_failed_close_never_replaces_the_error_that_caused_it(comfy_close):
+    import sys
+
+    def dead_context():
+        raise RuntimeError("CUDA error: device-side assert triggered")
+
+    sys.modules["comfy.model_prefetch"].cleanup_prefetch_queues = dead_context
+    adapter, _, decoder = _adapter(lambda step: 11)
+
+    def boom(prompt, max_length, seed):
+        raise ValueError("the original failure")
+
+    decoder.loop = boom
+    with pytest.raises(ValueError, match="the original failure"):
+        adapter.generate(input_ids=_ids(2), do_sample=False, max_new_tokens=5)
+    decoder.loop = _Decoder(lambda step: EOS, 64).loop
+    with pytest.raises(RuntimeError, match="device-side assert"):
+        adapter.generate(input_ids=_ids(2), do_sample=False, max_new_tokens=5)
 
 
 def test_the_real_error_is_logged_before_the_scope_closes(comfy_close, caplog):
