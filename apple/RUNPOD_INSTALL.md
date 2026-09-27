@@ -72,7 +72,7 @@ different limits. A large network volume does not raise a 62 GB RAM cap.
 ## 2. One provisioning loop
 
 ComfyUI-Manager cannot install this alpha pack reliably. Provision from the
-`v2.0-alpha` branch. The bootstrap below locates the template's real ComfyUI
+`main` branch. The bootstrap below locates the template's real ComfyUI
 tree, pins ComfyUI core and partner packs, repairs the measured CUDA mismatch,
 clones or fast-forwards OTR, downloads automatic lanes, warms the selected
 writer, verifies manual tiers, and prints one receipt. Ordinary installs use
@@ -158,8 +158,9 @@ bash "$OTR_REPO_ROOT/scripts/otr_pod_provision.sh"
 Use the corresponding allowlisted variable for Google or OpenRouter. A logged-in
 ComfyUI Desktop session may instead supply hidden prompt authentication;
 therefore a provider key is a headless RunPod requirement, not a universal
-profile-install gate. `otr_load_runtime` sources the protected file without
-printing values and preserves an explicit caller override.
+profile-install gate. Sourcing the runtime receipt and protected secret file
+(without tracing enabled in the shell) loads credentials without printing values;
+an explicit caller export still wins over the receipt.
 
 An initial nonzero exit can be correct: the receipt names every missing manual
 file or authorized voice reference. Complete that item and rerun the same
@@ -227,8 +228,12 @@ whole file verifies:
 
 ```bash
 source /workspace/otr-config/otr-runtime.env
-source "$OTR_REPO_ROOT/scripts/otr_pod_runtime.sh"
-otr_load_runtime
+# shellcheck disable=SC1090
+source "$OTR_RUNTIME_SECRETS_FILE"
+if [ -z "${HF_TOKEN:-}" ] && [ -s /root/.hf_token ]; then
+  HF_TOKEN=$(tr -d ' \t\r\n' < /root/.hf_token)
+  export HF_TOKEN
+fi
 
 fetch_exact () {
   repo=$1; revision=$2; remote=$3; relative_dest=$4
@@ -361,26 +366,91 @@ node-pack download source. The physical RTX 4060 has isolated 90-frame H3 clip
 receipts, below OTR's 124-model-frame floor; it does not yet have a full
 canonical H3 episode receipt.
 
-## 5. Launch and qualify one matrix row or profile
+## 5. Launch and qualify one matrix row or workflow
 
-Every pod launch uses port 8188 and the runtime receipt. At boot, the shared
-helper stops only exact listeners on the template/selected port, applies the
-selected recipe's boot contract, carries the token into the new ComfyUI
-process without printing it, launches on `0.0.0.0` for the RunPod proxy, and
-verifies nonzero OTR classes plus an idle queue.
+Every pod launch uses port **8188** and the runtime receipt. There is no shipped
+boot helper: you start ComfyUI yourself, point the canonical API runner at that
+port, and keep one GPU leg in flight at a time.
+
+Load the receipt once, then define three small shell helpers for this session
+(stop only exact listeners on the headless port, wait until OTR classes appear,
+boot ComfyUI with the workflow row's boot contract):
 
 ```bash
 source /workspace/otr-config/otr-runtime.env
+# shellcheck disable=SC1090
+source "$OTR_RUNTIME_SECRETS_FILE"
+if [ -z "${HF_TOKEN:-}" ] && [ -s /root/.hf_token ]; then
+  HF_TOKEN=$(tr -d ' \t\r\n' < /root/.hf_token)
+  export HF_TOKEN
+fi
+export PYTHONUNBUFFERED=1 PYTHONUTF8=1 PYTHONIOENCODING=utf-8
+export OTR_OUTPUT_ROOT="${OTR_OUTPUT_ROOT:-$OTR_COMFY_ROOT/output}"
+export OTR_POD_LOG_DIR="${OTR_POD_LOG_DIR:-/workspace/otr-config/logs}"
+mkdir -p "$OTR_POD_LOG_DIR" "$OTR_OUTPUT_ROOT/otr/obs"
+
+stop_port_listeners () {
+  local port="${OTR_HEADLESS_PORT:-8188}" pid
+  for pid in $(ss -lptnH 2>/dev/null | awk -v port="$port" '
+    $1 == "LISTEN" && $4 ~ (":" port "$") {
+      line = $0
+      while (match(line, /pid=[0-9]+/)) {
+        print substr(line, RSTART + 4, RLENGTH - 4)
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }'); do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  sleep 2
+}
+
+wait_comfy_ready () {
+  local url="http://127.0.0.1:${OTR_HEADLESS_PORT:-8188}"
+  for _ in $(seq 1 120); do
+    curl -sf "$url/object_info" 2>/dev/null | grep -q '"OTR_' && return 0
+    sleep 2
+  done
+  return 1
+}
+
+boot_comfy_for_row () {
+  local row="$1"
+  local -a boot_args=()
+  case "$row" in
+    machine:*)
+      ;; # public machine rows use the stock ComfyUI boot (default contract)
+    *)
+      mapfile -t boot_args < <(
+        "$COMFY_PY" - "$OTR_REPO_ROOT" "$row" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from nodes._otr_shared.boot_contracts import contract_for_profile, launch_args_for
+from nodes._otr_shared.capability_profiles import load_profile
+print("\n".join(launch_args_for(contract_for_profile(load_profile(sys.argv[2])))))
+PY
+      )
+      ;;
+  esac
+  stop_port_listeners
+  cd "$OTR_COMFY_ROOT" || return 1
+  nohup "$COMFY_PY" main.py \
+    --listen 0.0.0.0 --port "${OTR_HEADLESS_PORT:-8188}" \
+    --output-directory "$OTR_OUTPUT_ROOT" --enable-cors-header \
+    "${boot_args[@]}" >> "$OTR_SERVER_LOG" 2>&1 &
+  wait_comfy_ready
+}
+```
+
+Qualify the provisioned workflow row (machine keys use `--machine`; named rows
+use `--profile` on the runner -- the flag name is historical):
+
+```bash
 SAFE_SELECTOR="${OTR_PROVISION_SELECTOR//:/-}"
 QUAL_DIR="/workspace/otr-config/qualification/${SAFE_SELECTOR}-$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$QUAL_DIR"
 export OTR_SERVER_LOG="$QUAL_DIR/server.log"
 
-source "$OTR_REPO_ROOT/scripts/otr_pod_runtime.sh"
-otr_load_runtime || exit $?
-otr_acquire_campaign_lock "manual qualification" || exit $?
-trap 'otr_release_campaign_lock' EXIT
-otr_boot_profile "$OTR_PROVISION_SELECTOR" || exit $?
+boot_comfy_for_row "${OTR_PROVISION_SELECTOR}" || exit $?
 
 RUN_SELECTION=()
 case "$OTR_PROVISION_SELECTOR" in
@@ -390,6 +460,7 @@ esac
 
 cd "$OTR_REPO_ROOT"
 "$COMFY_PY" scripts/otr_canonical_api_run.py \
+  --comfyui-url "http://127.0.0.1:${OTR_HEADLESS_PORT:-8188}" \
   "${RUN_SELECTION[@]}" --act-count 1 \
   --source-bank original --visual-style sci_fi_radio --timeout 0 \
   > "$QUAL_DIR/runner.log" 2>&1 &
@@ -403,16 +474,14 @@ while kill -0 "$RUNNER_PID" 2>/dev/null; do
 done
 wait "$RUNNER_PID"; RUNNER_RC=$?
 tail -n 80 "$QUAL_DIR/runner.log"
-otr_release_campaign_lock
-trap - EXIT
 test "$RUNNER_RC" -eq 0
 ```
 
-Omit `--workflow`: the runner itself must load
-`workflows/otr_canonical.json`. A finished render leaves ComfyUI resident and
-holding VRAM. Completion is proved by the logs and artifact, not by low idle
-VRAM. Manual qualification and the unattended sweep/soak are mutually
-exclusive and share the same campaign lock.
+Omit `--workflow` unless you deliberately selected a generated variant file:
+the runner must load `workflows/otr_canonical.json` by default. A finished
+render leaves ComfyUI resident and holding VRAM. Completion is proved by the
+logs and artifact, not by low idle VRAM. Do not start a second leg until the
+first runner exits and the server queue is idle.
 
 A qualification pass requires all of these:
 
@@ -420,7 +489,7 @@ A qualification pass requires all of these:
 - `$QUAL_DIR/server.log` says `obs_publish OK ->`;
 - a new final MP4 exists under `$OTR_OUTPUT_ROOT/otr/obs/`;
 - the newest episode's `audio/*_ledger.json` contains per-clip
-  `delivered_engine` values matching the selected profile rather than a silent
+  `delivered_engine` values matching the selected workflow row rather than a silent
   fallback;
 - no new cgroup OOM event occurred;
 - `$QUAL_DIR` retains identity, server, runner, cgroup-before/after, and
@@ -486,84 +555,53 @@ queue/history, server log, and the final artifact.
 
 ## 6. Unattended sweep and soak
 
-Run these from the repository on the pod. Do not copy a second script into
-`/root`, and do not drive a multi-hour run through a workstation SSH session.
-Both scripts source the same runtime helper as the manual qualification. Run
-exactly one sweep or soak at a time: a persistent nonblocking campaign lock
-refuses a second driver before it can interrupt a paid render. All evidence
-logs default under the persistent `/workspace/otr-config/logs` directory.
+There is no shipped overnight driver. Run a **hand-written loop** on the pod
+(from section 5: load the receipt, define `stop_port_listeners`, `wait_comfy_ready`,
+and `boot_comfy_for_row`). Do not drive a multi-hour campaign through a
+workstation SSH session without `setsid`/`nohup`. Run exactly one driver at a
+time and one GPU leg at a time. Keep evidence under
+`/workspace/otr-config/logs` on the network volume.
 
-Load the receipt once in the launching shell:
+List candidate workflow row ids with the provisioner, then paste the rows you
+want into `WORKFLOW_ROWS` (space-separated). Re-run `boot_comfy_for_row` when
+the boot contract changes; otherwise leave ComfyUI resident between legs.
 
-```bash
-source /workspace/otr-config/otr-runtime.env
-source "$OTR_REPO_ROOT/scripts/otr_pod_runtime.sh"
-otr_load_runtime
-```
-
-One-act every RunPod-provisionable `otr_w45_*` profile, then three acts for
-passers:
+One-act matrix pass, then optional three-act follow-up for rows that published:
 
 ```bash
-setsid nohup bash "$OTR_REPO_ROOT/scripts/otr_pod_overnight_sweep.sh" \
-  > "$OTR_POD_LOG_DIR/overnight-driver.log" 2>&1 < /dev/null &
+WORKFLOW_ROWS='otr_w45_still_flat otr_w45_ltx25_video'   # your roster
+ACT_COUNT=1
+DRIVER_LOG="$OTR_POD_LOG_DIR/manual-sweep-$(date -u +%Y%m%dT%H%M%SZ).log"
+exec >>"$DRIVER_LOG" 2>&1
+
+for row in $WORKFLOW_ROWS; do
+  boot_comfy_for_row "$row" || { echo "boot failed $row"; continue; }
+  LEG_LOG="$OTR_POD_LOG_DIR/${row}-${ACT_COUNT}act-$(date -u +%Y%m%dT%H%M%SZ).log"
+  cd "$OTR_REPO_ROOT"
+  "$COMFY_PY" scripts/otr_canonical_api_run.py \
+    --comfyui-url "http://127.0.0.1:${OTR_HEADLESS_PORT:-8188}" \
+    --profile "$row" --act-count "$ACT_COUNT" \
+    --source-bank original --visual-style sci_fi_radio --timeout 0 \
+    | tee "$LEG_LOG"
+done
 ```
 
-Continuous one-act soak:
+Continuous soak is the same loop with `while true; do ...; done` over one or
+more rows. On Python 3.13 NVIDIA templates, put `otr_4060_floor` in the roster
+for the Bark procedural route.
 
-```bash
-setsid nohup bash "$OTR_REPO_ROOT/scripts/otr_pod_lane_soak.sh" \
-  > "$OTR_POD_LOG_DIR/soak-driver.log" 2>&1 < /dev/null &
-```
+H3 workflows (`h3`, `h3_8gb_lab` boot contracts) are for authorized local
+hardware only -- do not place them on a rented pod roster. Any row that uses
+IndexTTS2 needs the portable bank from section 3 first.
 
-On a Python 3.13 NVIDIA template, run the supported Bark procedural fallback
-unattended with an explicit one-profile roster:
+Read the per-leg logs, `$OTR_SERVER_LOG`, and `$OTR_POD_LOG_DIR/*.log`. They
+survive a pod stop on the network volume, unlike `/root` container storage.
 
-```bash
-export OTR_POD_PROFILES='otr_4060_floor'
-setsid nohup bash "$OTR_REPO_ROOT/scripts/otr_pod_overnight_sweep.sh" \
-  > "$OTR_POD_LOG_DIR/overnight-driver.log" 2>&1 < /dev/null &
-
-# After that campaign finishes, restore ordinary otr_w45_* discovery.
-unset OTR_POD_PROFILES
-```
-
-To qualify a smaller explicit roster:
-
-```bash
-export OTR_POD_PROFILES='otr_w45_still_flat otr_w45_wan_ti2v otr_w45_ltx25_video'
-setsid nohup bash "$OTR_REPO_ROOT/scripts/otr_pod_overnight_sweep.sh" \
-  > "$OTR_POD_LOG_DIR/overnight-driver.log" 2>&1 < /dev/null &
-```
-
-The helper groups identical launch fingerprints, restarts when the full boot
-contract changes, and uses the current profile for recovery. A missing model is
-recorded as a lane result and does not abort the campaign. H3 is excluded by
-the `h3` boot-contract family (including `h3_8gb_lab`); explicitly placing H3
-in a cloud roster is an error.
-Any roster that uses IndexTTS2 must have the portable bank first.
-
-Default discovery also asks the provisioner for a complete install plan and
-excludes four legacy lab profiles that still lack an exact public weight owner:
-`otr_w45_fastwan`, `otr_w45_ltx_audio_in`, `otr_w45_ltx_video`, and
-`otr_w45_mesh_stage`. Naming one explicitly is an error rather than a doomed
-paid leg. Add it back only when its source revision, destinations, byte counts,
-and SHA-256 values have one executable or fully documented owner.
-
-Read `$OTR_SWEEP_RESULTS`, `$OTR_SOAK_RESULTS`, the per-leg and driver logs,
-and `$OTR_SERVER_LOG` under `$OTR_POD_LOG_DIR`. Soak keeps only the latest
-three logs per profile. These survive a pod stop because they are on the
-network volume, unlike `/root` container storage.
-
-To stop the active OTR campaign safely, load the runtime as above and call:
-
-```bash
-otr_stop_campaign
-```
-
-That validates the recorded PID and process group before signaling the driver,
-its current runner, and its managed ComfyUI server. It stops the OTR work, not
-RunPod billing; after the logs settle, stop the pod in the RunPod console.
+To stop an in-flight campaign safely, signal the **driver shell** and any
+`otr_canonical_api_run.py` PID you started -- never `pkill python`. If the
+server queue still shows a running prompt, drain pending, then `POST /interrupt`
+(section 7 atlas) before starting the next leg. Stopping OTR work is not RunPod
+billing; after logs settle, stop the pod in the console or use section 7B.
 
 ## 7. Failure atlas
 
@@ -576,9 +614,9 @@ RunPod billing; after the logs settle, stop the pod in the RunPod console.
 | HuMo downloads ~16 GB and still says not installed | Wrong `humo_17B` lookalike | Fetch the pinned `humo` lane; verify the Kijai `Wan2_1-HuMo-14B...KJ` file |
 | H3 has weights but no usable nodes | Authorization/source boundary or wrong graph provider | Keep OTR H3 local; `quibble-h3` is not the node-pack owner |
 | First render pauses on an LLM timeout | Writer weights were left for first Queue | Rerun current provisioning; writer warm must be `OK` in its receipt |
-| Token works in a shell but gated render fails | Resident ComfyUI never inherited the token | Store `/root/.hf_token`, run `otr_load_runtime`, then force the same recipe through `otr_boot_profile "$OTR_PROVISION_SELECTOR"` |
+| Token works in a shell but gated render fails | Resident ComfyUI never inherited the token | Store `/root/.hf_token`, reload the runtime receipt and secrets, then stop port 8188 listeners and boot ComfyUI again before re-queueing |
 | IndexTTS2 survives a migration but its Python link is broken | Managed interpreter lived on erased container disk | Set persistent `UV_PYTHON_INSTALL_DIR`; install Python 3.10, then rerun provisioning |
-| Port 8188 is ready but a new launch cannot bind | Template server is still resident | Use the shared runtime helper; never `pkill python` or kill every Python process |
+| Port 8188 is ready but a new launch cannot bind | Template server is still resident | Stop only the listener PIDs on 8188 (`stop_port_listeners` in section 5); never `pkill python` or kill every Python process |
 | `/queue` is empty but nothing runs | Empty queue was mistaken for readiness | Require `/object_info` with nonzero `OTR_` classes and an idle queue |
 | Manager reports success but OTR contributes zero nodes | Installed into a different ComfyUI tree or Manager has no installable alpha | Use the provisioner and its resolved `OTR_COMFY_ROOT`; verify `/object_info` |
 | Process is killed while `free` shows RAM | Pod cgroup cap, not host-wide memory | Read `memory.max`/`memory.events` or v1 fail counters; rent more cgroup RAM |
@@ -598,7 +636,7 @@ RunPod billing; after the logs settle, stop the pod in the RunPod console.
 | A leg reports FAIL at EXACTLY the timeout you set | The runner's `--timeout` bounds the WATCHER, not the render | The log says so in as many words: `RESULT TIMEOUT ... BUT THE RENDER IS STILL ALIVE: the server reports 1 running`. The episode usually still publishes. This is a MEASUREMENT ("this lane needs more than N minutes here"), not a defect -- do not file it as one. Hit three times on 2026-09-03/04: wan_ti2v at 40 min (1 act) and 120 min (3 acts), fastwan_8gb at 40 min |
 | Two legs render at once and both crawl | A previous leg's PROMPT is still executing server-side | Killing the leg CLIENT never cancelled it. See the atlas row above on `/queue`; check `nvidia-smi` and load average before blaming the lane |
 | A lane fails instantly with `DEPENDENCY_MISSING` on a fresh pod | Provisioning fetched the lane's weights but not its extra tool | `mesh_stage` wants a pinned portable Blender (`OTR_BLENDER_*`); refuses loudly and correctly -- fetch the dependency or drop the lane from the sweep |
-| Every image lane resolves to `z_image_turbo` no matter which profile you pick | Only z_image is on the pod | 
+| Every image lane resolves to `z_image_turbo` no matter which workflow row you pick | Only z_image is on the pod | 
 
 ## 7A. Driving a pod from a second machine (2026-09-03)
 
@@ -606,8 +644,8 @@ Lessons from running the whole video-lane matrix on a rented RTX 4090 while the
 local 5080 kept rendering. These are about the DRIVER, not about any one lane.
 
 **Staging code is a `git pull` in the pod's own clone.** The pod carries a real
-checkout on `v2.0-alpha` with the GitHub remote, so there is no file copying and
-no risk of a half-synced tree. Prove the baseline afterwards rather than assuming
+checkout on `main` with the GitHub remote, so there is no file copying and no
+risk of a half-synced tree. Prove the baseline afterwards rather than assuming
 it -- CLAUDE.md section 0 requires every headless run to load the real canonical
 workflow:
 
@@ -620,15 +658,13 @@ git rev-parse --short HEAD                  # and match the commit you pushed
 one -- it is the runner's OUTPUT dump, rewritten every run. The runner resolves
 `workflows/otr_canonical.json` and raises if the path is anything else.
 
-**The port does not line up, and the fix is to move the port, not the runner.**
-The pod's ComfyUI listens on **8188** because that is what RunPod exposes as an
-HTTP proxy; every OTR headless script targets **8000**
-(`otr_bank_engine_sweep.COMFY_URL`, and the canonical runner's default).
-`otr_canonical_api_run.py` accepts `--comfyui-url`, but the sweep driver does
-not. Editing a runner to chase a port is how a stale runner is born, so bridge
-instead -- `socat` is not installed on the stock image, and a ~60-line stdlib
-Python TCP forwarder (8000 -> 8188) is enough for a headless driver's handful of
-long-lived HTTP calls.
+**Boot ComfyUI on 8188; point the runner at it.** The pod's ComfyUI listens on
+**8188** because that is what RunPod exposes as an HTTP proxy. Start it with
+`main.py --listen 0.0.0.0 --port 8188` (section 5), then pass
+`--comfyui-url http://127.0.0.1:8188` on every
+`scripts/otr_canonical_api_run.py` leg. The runner's default URL targets local
+soak port 8000; on a pod, always set the URL explicitly rather than bridging
+ports.
 
 **Set both roots before anything else**, or models land in a second cache and the
 volume fills:
@@ -638,24 +674,20 @@ export OTR_COMFYUI_MODELS_ROOT=/workspace/runpod-slim/ComfyUI/models
 export HF_HOME=$OTR_COMFYUI_MODELS_ROOT/huggingface
 ```
 
-**Know which sweep driver you are running.** `otr_bank_engine_sweep.py --lanes
-video` exists to prove the SMALLEST writer survives every bank: it hard-pins
-`gemma-4-E2B-it` in both writer slots and one fixed visual style per bank. That
-is a robustness driver, not a quality driver -- do not judge picture or camera
-work from its output. To exercise quality, drive `otr_canonical_api_run.py` per
-lane with `--creative-model` / `--technical-model` set to the row you want and
+**Every leg is `otr_canonical_api_run.py`.** Drive one workflow row per leg with
+`--creative-model` / `--technical-model` when you want a specific writer, and
 `--visual-style "roll (any style)"` to leave the randomizer on. Never pass
 `--title` to a canonical leg: the harness label becomes the published title card.
 
-**The IMAGE engine is chosen by the PROFILE, not by a runner flag.** There is no
-`--image-model`; `role_overrides.character_image` is the sanctioned lever, which
-is exactly what a human clicking the dropdown would save. So covering the image
-models is a PROFILE-SELECTION problem: pick the profile that pairs the video lane
-you want with the image engine you still owe a test. The `otr_rot_*` profiles
-exist for precisely this rotation -- e.g. `otr_rot_wan_ideogram4` (wan_ti2v +
-ideogram4_local), `otr_rot_ltx25_video_lumina` (ltx25_high_video + lumina_image),
-`otr_rot_ltx25_foley_fluxgen1` (ltx25_high_foley_plus + flux_gen1). A profile's
-`status` is not gated by the applier, so `draft` rows are runnable.
+**The IMAGE engine is chosen by the workflow row, not by a runner flag.** There is
+no `--image-model`; `role_overrides.character_image` is the sanctioned lever,
+which is exactly what a human clicking the dropdown would save. Covering image
+models is a workflow-selection problem: pick the row that pairs the video lane
+you want with the image engine you still owe a test. The `otr_rot_*` rows exist
+for rotation -- e.g. `otr_rot_ltx25_video_lumina` (ltx25_high_video +
+lumina_image), `otr_rot_ltx25_foley_fluxgen1` (ltx25_high_foley_plus +
+flux_gen1). A row's `status` is not gated by the applier, so `draft` rows are
+runnable.
 
 **No lane needs its own boot for memory any more (2026-09-26).** OTR passes
 no VRAM reserve: HuMo runs on a stock boot, and the MiniMax H3 lanes need only
@@ -700,19 +732,20 @@ The stop itself is `mutation { podStop(input: {podId: "..."}) { id desiredStatus
 
 ### Two independent stops, not one
 
-The chain script stops the pod in an **EXIT trap**, so it fires even when the work
-phase crashes or is killed. That is still not enough: **a SIGKILL skips traps.** So a
-second, wholly independent watchdog sleeps to a hard deadline and stops the pod
-unconditionally, whatever the chain did. Both retry (five attempts, backing off) --
-a single transient curl failure is the difference between a stopped pod and one
-billing until morning.
+Your driver script (section 6 loop) should call the RunPod `podStop` mutation in
+an **EXIT trap**, so billing ends even when the leg loop crashes. That is still
+not enough: **a SIGKILL skips traps.** So a second, wholly independent watchdog
+sleeps to a hard deadline and stops the pod unconditionally, whatever the driver
+did. Both should retry (five attempts, backing off) -- a single transient curl
+failure is the difference between a stopped pod and one billing until morning.
 
 ```
-chain:     wait for phase 1 -> run phase 2 until CUTOFF -> trap stops the pod
-watchdog:  sleep until CUTOFF+30min -> stop the pod, unconditionally
+driver:    one-act rows until CUTOFF -> three-act follow-up until CUTOFF -> trap podStop
+watchdog:  sleep until CUTOFF+30min -> podStop, unconditionally
 ```
 
-`scripts/otr_overnight_three_act.py` is the phase-2 runner this was built around.
+Phase 2 is the same `scripts/otr_canonical_api_run.py` with `--act-count 3` on
+rows that passed the one-act gate -- still hand-driven, not a shipped harness.
 
 ### The deadline is a START GATE, not a kill
 

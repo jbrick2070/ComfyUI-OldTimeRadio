@@ -71,8 +71,13 @@ Which files, from which repository, into which folder:
 
 ## Launch and prove it
 
-Start ComfyUI, load `workflows/otr_canonical.json`, set the dropdowns for the
-lane you rented the box for, and queue one episode.
+After provisioning, boot ComfyUI on the pod with
+`main.py --listen 0.0.0.0 --port 8188`, then drive one leg with
+`scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188`
+and the workflow row you provisioned (`--profile` or `--machine`). The full
+boot-and-qualify recipe is in `apple/RUNPOD_INSTALL.md` section 5. You can
+instead load `workflows/otr_canonical.json` in the UI, set the dropdowns for
+the lane you rented the box for, and queue one episode.
 
 **The proof is a file in `otr/obs/`.** Not a green log, not a finished queue — a
 published episode.
@@ -101,5 +106,6 @@ machine.
 ---
 
 `apple/RUNPOD_INSTALL.md` in the GitHub tree carries the rest: the failure atlas,
-the unattended sweep and soak procedure, driving a pod from a second machine, and
-the evidence ledger. It does not ship in a Manager install.
+hand-driven multi-leg sweep and soak loops, driving a pod from a second machine,
+ending an overnight campaign safely (RunPod self-stop), and the evidence ledger.
+It does not ship in a Manager install.
