@@ -310,6 +310,27 @@ def test_set_allows_only_creative_widgets(tmp_path):
     assert _node(prompt, "OTR_LedgerScriptWriter")["inputs"]["num_characters"] == 4
 
 
+def test_set_reaches_the_space_saver_on_a_workflow_row(tmp_path):
+    """An overnight pod run keeps only the published video: --set carries the
+    Space saver onto a workflow row, and the row's own managed widgets do not
+    overwrite it (no workflow row manages asset_cleanup)."""
+    dump = tmp_path / "prompt.json"
+    full = "full (keep only the published video)"
+    rc, _out = _run_main([
+        "--offline-schemas",
+        "--dry-run",
+        "--profile", "otr_24gb_foley",
+        "--act-count", "3",
+        "--set", "OTR_LedgerScriptWriter.asset_cleanup=" + full,
+        "--dump-prompt", str(dump),
+    ])
+    assert rc == 0
+    prompt = json.loads(dump.read_text(encoding="utf-8"))
+    writer = _node(prompt, "OTR_LedgerScriptWriter")
+    assert writer["inputs"]["asset_cleanup"] == full
+    assert writer["inputs"]["act_count"] == "3"   # a dropdown: string choices
+
+
 def test_google_api_llm_slots_are_headless_bindable(tmp_path, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     dump = tmp_path / "prompt.json"

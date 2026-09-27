@@ -1000,6 +1000,10 @@ CREATIVE_WHITELIST = frozenset({
     # qualification run force the cameo deterministically instead of waiting on
     # an 11% roll; source-fidelity exclusion still overrides it.
     "lemmy_cameo",
+    # asset_cleanup -- the Space saver housekeeping dial; mirror of the
+    # package whitelist. Decides what stays on disk after publishing, never
+    # an engine or route; the mux still refuses any unproven deletion.
+    "asset_cleanup",
 })
 
 

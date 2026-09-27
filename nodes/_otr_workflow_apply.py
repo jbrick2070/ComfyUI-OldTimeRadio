@@ -897,6 +897,13 @@ CREATIVE_WHITELIST = frozenset({
     # `lemmy_policy = "source_fidelity_exclusion"`. This entry adds a creative
     # dial, never a route, engine, reference or other managed/runtime field.
     "lemmy_cameo",
+    # asset_cleanup (the Space saver, row 0b) is the writer's housekeeping
+    # dial: what stays on disk after the episode publishes. It never picks an
+    # engine, a route or a model, and no workflow row manages it, so a
+    # headless run may set it -- an overnight pod run keeps only the
+    # published video (operator, 2026-09-26). The mux still refuses any
+    # deletion it cannot prove safe, whoever set the mode.
+    "asset_cleanup",
 })
 
 
