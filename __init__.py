@@ -717,6 +717,11 @@ if _otr_dup is None:
 # frontend runs those hooks through `invokeExtensionsAsync`, which catches and
 # merely logs whatever they throw, so throwing there cannot stop a stale workflow.
 #
+# The same directory also serves `js/lane_node_packs.js` (2026-09-27): an
+# ADVISORY `beforeConfigureGraph` hook that adds a lane's node pack (today
+# AnimateDiff-Evolved) to the frontend's missing-node list when a workflow
+# opens. A hint may live in a hook whose throws are swallowed; a refusal may not.
+#
 # ComfyUI serves this directory automatically when the module exports the name.
 # =====================================================================
 WEB_DIRECTORY = "./js"

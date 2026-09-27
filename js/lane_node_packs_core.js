@@ -2,7 +2,7 @@
  * Which node packs a loaded workflow needs and does not have. PURE: imports
  * nothing from ComfyUI, so `tests/js/lane_node_packs.test.mjs` runs it with
  * plain `node --test`. The glue that feeds the result to the frontend lives in
- * `workflow_schema.js`.
+ * `lane_node_packs.js`.
  *
  * WHY. A video lane such as `animatediff15_v3_haunted_video` builds its
  * AnimateDiff-Evolved nodes inside OTR's Python, so the saved graph holds no
@@ -47,6 +47,9 @@ export function missingPackEntries(graphData, registered, table) {
         if (typeof node?.type !== "string" || !node.type.startsWith("OTR_")) {
             continue;
         }
+        // A muted (2) or bypassed (4) node never runs, so its lane is not a
+        // selection -- the frontend skips such nodes the same way.
+        if (node.mode === 2 || node.mode === 4) continue;
         for (const value of Array.isArray(node.widgets_values) ? node.widgets_values : []) {
             const id = laneIdOf(value);
             const lane = id && Object.prototype.hasOwnProperty.call(lanes, id)

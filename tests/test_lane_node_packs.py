@@ -39,8 +39,12 @@ def _expected_table():
                         needed.setdefault(pack, set()).add(name)
         assert len(needed) <= 1, (internal, needed)   # one pack per lane today
         for pack, types in needed.items():
+            # Every spelling `resolve_engine_id` turns into this lane: the id, a
+            # public menu id, and a legacy alias (to either of those).
             menu_ids = {internal} | {pub for pub, inner in PE._PUBLIC_ENGINES.items()
                                      if inner == internal}
+            menu_ids |= {old for old, new in PE._LEGACY_ENGINE_ALIASES.items()
+                         if new in menu_ids}
             for menu_id in menu_ids:
                 lanes[menu_id] = (pack, sorted(types))
     return lanes

@@ -66,6 +66,14 @@ test("a lane picked on the canonical is found wherever its widget sits", () => {
     assert.ok(entries.every((e) => e.nodeId === String(director.id)));
 });
 
+test("a muted or bypassed OTR node is not a selection", () => {
+    for (const mode of [2, 4]) {
+        const graph = workflow("otr_8gb_animatediff");
+        for (const n of graph.nodes) if (n.type.startsWith("OTR_")) n.mode = mode;
+        assert.deepEqual(missingPackEntries(graph, withoutAde, TABLE), [], `mode ${mode}`);
+    }
+});
+
 test("a lane id in a non-OTR node is not a selection", () => {
     const graph = { nodes: [{ id: 5, type: "Note",
                               widgets_values: ["animatediff15_v3_haunted_video"] }] };
