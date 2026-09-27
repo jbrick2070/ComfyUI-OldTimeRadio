@@ -162,7 +162,7 @@ pressing **Run** is the whole path.
 | NVIDIA, 16 GB or more | Minutes for a one-act show. Every default is proven here, and all but the heaviest video lanes are open to you. |
 | NVIDIA, 10 to 15 GB | Minutes. The defaults are proven both above and below you, so run the canonical as shipped. No pre-set workflow exists for this class yet. |
 | NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
-| Apple Silicon, 16 GB | **It runs.** Every Mac workflow published a finished episode on a 16 GB M4 on 2026-09-13 -- the writer is the same Qwen3.5-4B the canonical ships, unquantized, unchanged. Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first anyway: memory is unified, so an out-of-memory here can reboot the machine, and the fit has no margin for anything else running. |
+| Apple Silicon, 16 GB | **It runs.** Every Mac workflow published a finished episode on a 16 GB M4 on 2026-09-13 -- the writer is Qwen3.5-4B, unquantized. Open an `otr_mac16_*` workflow: the canonical now ships the ComfyUI-native writer, which is not yet proven on a Mac. Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first anyway: memory is unified, so an out-of-memory here can reboot the machine, and the fit has no margin for anything else running. |
 | No GPU at all | About twenty minutes, and it works -- measured, not assumed. Start ComfyUI with `--cpu`. |
 | AMD | **It runs.** First full episode off a Radeon on 2026-09-14 -- RDNA4 (R9700), Ubuntu 24.04, ROCm 7.2, clean pass. Still tier only, and RDNA3 / Windows / 8 GB are untested. [apple/ROCM.md](apple/ROCM.md) has the receipt and what is still open. |
 
@@ -447,7 +447,7 @@ in this workflow: one workflow ships, and its dropdowns decide what it loads.
 | images | `z_image_turbo`, dormant | nothing on a default run; those video lanes consume no still |
 | voices | `kokoro` on both slots | fetches once, about 0.3 GiB |
 | music | `stable_audio_3` | fetches once |
-| writer | `Qwen/Qwen3.5-4B` | fetches once, about 8.7 GiB |
+| writer | `comfy_native:gemma4-e2b-it-int8-convrot` (Gemma 4 E2B, run by ComfyUI itself) | fetches once, about 4.8 GiB |
 
 **The image trap.** With the procedural video lanes the `z_image_turbo` default
 costs nothing. Pick a `still_*` or `ltx098_low_video` lane and it wakes up: a
@@ -456,9 +456,13 @@ spend that, set the three image dropdowns to `sd15` (2 GB, same job) at the
 same time. Both fetch themselves; the only thing that changes is which one
 you spend.
 
-**The writer is the biggest single download** and, on a Mac, the biggest single
-memory user. `Qwen/Qwen3.5-4B` is the default because it is ungated,
-Apache-2.0, and the smallest row proven everywhere.
+**The writer is one of the biggest single downloads.** The canonical ships Gemma 4
+E2B run by ComfyUI's own loader: ungated, Apache-2.0, one 5.2 GB file, and
+measured in episodes at about 63 tokens a second on an 8 GB RTX 4060 and 124 on
+an RTX 5080 -- five to twelve times the writers it replaced. The Mac and AMD
+workflows ship `Qwen/Qwen3.5-4B` until that path is proven there, and a
+CPU-only run with the native writer has not been measured; pick Qwen in both
+writer dropdowns for the measured CPU path.
 [apple/MACHINES.md](apple/MACHINES.md) says which other writers fit
 your machine, and the pack refuses before downloading if you pick one that
 will not.

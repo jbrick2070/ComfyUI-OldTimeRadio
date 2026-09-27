@@ -59,9 +59,23 @@ except ImportError:  # pragma: no cover -- flat / standalone load (nodes/ on sys
 # Any future rename / casing fix happens here, not in scattered string literals.
 # ---------------------------------------------------------------------------
 
-DEFAULT_LLM = "Qwen/Qwen3.5-4B"
-"""The full-precision Qwen 3.5 4B identity -- Hugging Face repo id, canonical
-saved pick, and empty-widget family name.
+QWEN_LLM = "Qwen/Qwen3.5-4B"
+"""The one Qwen 3.5 4B identity: the Hugging Face repo id, the row the retired
+``:nf4`` spelling (:data:`DEFAULT_LLM_NF4`) validates onto, and the Mac and AMD
+workflows' writer. It was also :data:`DEFAULT_LLM` until 2026-09-26; the two
+meanings were split then so moving the default could not move the alias."""
+
+DEFAULT_LLM = "comfy_native:gemma4-e2b-it-int8-convrot"
+"""The writer a freshly dropped node picks and an empty widget falls back to.
+
+2026-09-26 (operator: "12x speed up is too hard to ignore"): Gemma 4 E2B run by
+ComfyUI itself. Measured that day in canonical episodes: ~63 tok/s steady on the
+8 GB RTX 4060 against 13 for Qwen3.5-4B NF4, ~124 on the RTX 5080 against 10 for
+Gemma 4 12B NF4, a 5.1 GB peak on the 8 GB card, and one pinned 5.2 GB file that
+fetches itself with no token. Every NVIDIA workflow selects it. The Mac and AMD
+workflows keep :data:`QWEN_LLM` until it is proven on that hardware.
+
+WHAT IT REPLACED, AND WHY THOSE HELD UNTIL NOW:
 
 WAS ``mistralai/Mistral-Nemo-Instruct-2407`` until 2026-09-06. That row is the
 single highest-friction writer in the catalog and it was the value a
@@ -91,7 +105,7 @@ here is correct; what was wrong was pointing it at a row an 8 GB user cannot run
 """
 
 DEFAULT_LLM_NF4 = "Qwen/Qwen3.5-4B:nf4"
-"""Retired spelling of :data:`DEFAULT_LLM`. Saved 8 GB graphs still carry
+"""Retired spelling of :data:`QWEN_LLM`. Saved 8 GB graphs still carry
 this string; validate remaps it onto the one Qwen row. It is not in the
 COMBO.
 """
@@ -428,12 +442,15 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         # by ComfyUI's generate loop. A virtual id: there is no transformers
         # snapshot, the weight is one text-encoder file pinned in
         # _otr_visual_assets._PINNED_SOURCES, and the HF E2B row above stays a
-        # separate, unchanged choice. Nothing selects it by default yet.
+        # separate, unchanged choice. DEFAULT_LLM since 2026-09-26: every NVIDIA
+        # workflow and the canonical select it.
         repo_id="comfy_native:gemma4-e2b-it-int8-convrot",
         requires_auth=False,
         loader_backend="comfy_textgen",
-        # WARN until a canonical episode is proven on it (plan row 0n, A4).
-        vram_fit_tier="WARN",
+        # PASS on proof: canonical episodes in obs on the 8 GB RTX 4060
+        # (clink_bone_20260926_175812, 5.1 GB peak) and the RTX 5080
+        # (knot_midnight_20260926_180140).
+        vram_fit_tier="PASS",
         # 5,199,997,904 bytes / 2**30. Disk, not VRAM.
         approx_safetensors_gb=4.84,
         notes="Gemma 4 E2B run by ComfyUI itself: Comfy-Org's "
@@ -704,7 +721,7 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
 
 def _by_repo_id() -> dict[str, CuratedModel]:
     mapping = {m.repo_id: m for m in _active_curated_models()}
-    qwen = mapping.get(DEFAULT_LLM)
+    qwen = mapping.get(QWEN_LLM)
     if qwen is not None:
         mapping[DEFAULT_LLM_NF4] = qwen
     return mapping
@@ -714,7 +731,7 @@ def _canonical_qwen_id(model_id: str) -> str:
     """Retired ``:nf4`` spelling maps onto the one Qwen row."""
     bare = _strip_label_suffix(model_id) if isinstance(model_id, str) else ""
     if bare == DEFAULT_LLM_NF4:
-        return DEFAULT_LLM
+        return QWEN_LLM
     return bare
 
 
@@ -1313,11 +1330,8 @@ def default_llm_option() -> str:
 
 
 def fresh_llm_option() -> str:
-    """The exact COMBO label a newly dropped writer node should save.
-
-    Same one Qwen as canonical. NVIDIA bakes NF4; Mac bakes full. There
-    is no second Qwen identity in the picker.
-    """
+    """The exact COMBO label a newly dropped writer node should save: the
+    default writer's label, the same one the canonical workflow saves."""
     return DEFAULT_LLM + vram_badge_for(DEFAULT_LLM)
 
 
@@ -2864,6 +2878,7 @@ __all__ = [
     "text_only_load_mode",
     "GATED_CURATED_MODELS",
     "DEFAULT_LLM",
+    "QWEN_LLM",
     "DEFAULT_LLM_NF4",
     "TEST_TECHNICAL_LLM",
     "TEST_OVERSIZED_LLM",

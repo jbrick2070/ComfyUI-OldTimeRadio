@@ -32,11 +32,11 @@ def test_a_quant_twin_resolves_to_its_base_models_baseline():
     """Quants are separate catalog rows; the baseline comes from the base
     model through the canonical id, never a per-row copy that could drift."""
     assert (catalog.sampling_baseline(catalog.DEFAULT_LLM_NF4)
-            == catalog.sampling_baseline(catalog.DEFAULT_LLM))
+            == catalog.sampling_baseline(catalog.QWEN_LLM))
 
 
 def test_the_default_writer_uses_its_model_card_not_the_old_preset():
-    assert catalog.sampling_baseline(catalog.DEFAULT_LLM) == (0.7, 0.8, 20)
+    assert catalog.sampling_baseline(catalog.QWEN_LLM) == (0.7, 0.8, 20)
 
 
 def test_a_model_that_publishes_nothing_still_samples():
@@ -50,7 +50,7 @@ def test_a_model_that_publishes_nothing_still_samples():
 def test_each_slot_gets_its_own_models_numbers():
     scheduler = writer._SlotScheduler(
         creative_id="google/gemma-4-12b-it",
-        technical_id=catalog.DEFAULT_LLM,
+        technical_id=catalog.QWEN_LLM,
         min_p=0.05, repetition_penalty=1.03)
     creative = scheduler.sampling_for("creative")
     technical = scheduler.sampling_for("technical")
@@ -61,7 +61,7 @@ def test_each_slot_gets_its_own_models_numbers():
 
 def test_a_cloud_slot_sends_no_sampling_keys():
     scheduler = writer._SlotScheduler(
-        creative_id="openrouter:slot-a", technical_id=catalog.DEFAULT_LLM,
+        creative_id="openrouter:slot-a", technical_id=catalog.QWEN_LLM,
         min_p=0.0, repetition_penalty=1.0)
     sampling = scheduler.sampling_for("creative")
     assert sampling["top_p"] is None and sampling["top_k"] is None

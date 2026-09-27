@@ -38,7 +38,13 @@ def test_writer_default_is_pinned_and_runs_on_the_smallest_target():
 
     C7 audio byte-identity is unaffected: the clamp and prompt-routing tests
     pass Mistral-Nemo as an explicit literal and never read DEFAULT_LLM.
+
+    RESET 2026-09-26, on operator direction ("12x speed up is too hard to
+    ignore"): the Comfy-native Gemma 4 E2B, measured in canonical episodes at
+    ~63 tok/s on the 8 GB RTX 4060 (Qwen3.5-4B NF4: 13) with a 5.1 GB peak. Qwen
+    stays the Mac and AMD writer as QWEN_LLM.
     """
     from nodes import _otr_model_catalog
 
-    assert _otr_model_catalog.DEFAULT_LLM == "Qwen/Qwen3.5-4B"
+    assert _otr_model_catalog.DEFAULT_LLM == "comfy_native:gemma4-e2b-it-int8-convrot"
+    assert _otr_model_catalog.QWEN_LLM == "Qwen/Qwen3.5-4B"

@@ -301,9 +301,10 @@ def test_resolve_inputs_builds_baseline_policy_by_default():
     resolved = _resolve_inputs(custom_premise="test premise")
     pol = resolved["llm_policy"]
     assert isinstance(pol, lp.LLMRuntimePolicy)
-    # One Qwen identity: default device is cuda, which bakes NF4. That is
-    # also the LLMRuntimePolicy() baseline, so a fresh node matches it.
-    assert pol == lp.LLMRuntimePolicy()
+    # The default writer (the Comfy-native Gemma 4 E2B since 2026-09-26) is an
+    # int8 file that owns its quant as "none"; everything else is the baseline.
+    import dataclasses
+    assert pol == dataclasses.replace(lp.LLMRuntimePolicy(), quant_policy="none")
 
 
 def test_resolve_inputs_threads_explicit_policy_fields():

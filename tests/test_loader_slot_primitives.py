@@ -232,15 +232,14 @@ def test_every_curated_local_row_is_pass_tier():
     doing it for them -- and an OOM from picking it anyway is loud, not a
     silent wrong render.
     """
-    # 2026-09-26: the Comfy-native Gemma 4 E2B writer (plan row 0n) is WARN
-    # for the same reason as the 27B -- no canonical episode on it yet. Its
-    # badge claims no machine class ("4.8 GB download" and nothing else).
+    # 2026-09-26: the Comfy-native E4B and 12B writers are WARN for the same
+    # reason as the 27B -- no canonical episode on either yet. (The native E2B
+    # was WARN the same way until its 4060 and 5080 episodes; it is PASS now.)
     allowed_warn = {
-        catalog.DEFAULT_LLM,
+        catalog.QWEN_LLM,
         catalog.DEFAULT_LLM_NF4,
         "unsloth/Llama-3.2-3B-Instruct",
         "Qwen/Qwen3.8-27B",
-        "comfy_native:gemma4-e2b-it-int8-convrot",
         "comfy_native:gemma4-e4b-it-int8-convrot",
         "comfy_native:gemma4-12b-int8-convrot",
     }
@@ -360,11 +359,13 @@ def test_request_slot_rejects_unknown_slot_name():
         loader.request_slot("not-a-slot", catalog.DEFAULT_LLM)
 
 
-def test_request_slot_creative_loads_default_llm():
+def test_request_slot_creative_loads_the_retired_qwen_spelling_onto_the_qwen_row():
+    # The transformers path. (The default writer is the Comfy-native row since
+    # 2026-09-26; its request_slot arm is covered in test_comfy_textgen_backend.)
     entry = loader.request_slot("creative", catalog.DEFAULT_LLM_NF4)
-    assert entry["model_id"] == catalog.DEFAULT_LLM
+    assert entry["model_id"] == catalog.QWEN_LLM
     assert loader.LLM_CACHE["slot"] == "creative"
-    assert loader.LLM_CACHE["model_id"] == catalog.DEFAULT_LLM
+    assert loader.LLM_CACHE["model_id"] == catalog.QWEN_LLM
 
 
 def test_request_slot_uses_ported_body():

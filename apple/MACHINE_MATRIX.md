@@ -31,8 +31,8 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 
 | your machine | writer | video | voice | music | image | extra install | status |
 |---|---|---|---|---|---|---|---|
-| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | Qwen3.5-4B | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | z_image_turbo | ComfyUI-AnimateDiff-Evolved | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; shipping-set workflows published 2026-09-13 |
-| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | ltx25_high_video | kokoro | stable_audio_3 | z_image_turbo | none | **COMPONENTS MEASURED** -- LTX 2.5 mix4x8 clips on the RTX 5080; exact row tuple and unlisted cards unproven |
+| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | Gemma 4 E2B (ComfyUI) | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | z_image_turbo | ComfyUI-AnimateDiff-Evolved | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; shipping-set workflows published 2026-09-13 |
+| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | Gemma 4 E2B (ComfyUI) | ltx25_high_video | kokoro | stable_audio_3 | z_image_turbo | none | **COMPONENTS MEASURED** -- LTX 2.5 mix4x8 clips on the RTX 5080; exact row tuple and unlisted cards unproven |
 | **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | Qwen3.5-4B | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | z_image_turbo | ComfyUI-AnimateDiff-Evolved | `draft`, unproven |
 | **AMD / ROCm (Windows or Linux)** | Qwen3.5-4B | still_motion | kokoro | stable_audio_3 | z_image_turbo | none | `draft`, unproven |
 

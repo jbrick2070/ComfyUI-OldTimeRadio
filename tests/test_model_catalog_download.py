@@ -57,7 +57,7 @@ def test_estimate_curated_returns_catalog_value():
     # Qwen/Qwen3.5-4B (approx_safetensors_gb=8.68 in CURATED_LLM_MODELS) --
     # this used to be a 24 GB model (Mistral-Nemo-class) before the default
     # moved to the smaller writer; the pinned value follows the default.
-    out = catalog.estimate_model_size_gb(catalog.DEFAULT_LLM)
+    out = catalog.estimate_model_size_gb(catalog.QWEN_LLM)
     assert out == 8.68
 
 
@@ -89,7 +89,7 @@ def test_auto_download_respects_disabled_env_var(tmp_path, monkeypatch):
     snap = MagicMock()
     with pytest.raises(UnknownModelError) as exc:
         catalog.auto_download_if_missing(
-            catalog.DEFAULT_LLM,
+            catalog.QWEN_LLM,
             hub_root=tmp_path,
             _snapshot_download=snap,
         )
@@ -122,12 +122,12 @@ def test_auto_download_returns_cached_path_without_token(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
     monkeypatch.delenv("HF_TOKEN", raising=False)
     monkeypatch.setattr("nodes._otr_hf_auth.resolve_hf_token", lambda: None)
-    snap_dir = _seed_fake_snapshot(tmp_path, catalog.DEFAULT_LLM)
+    snap_dir = _seed_fake_snapshot(tmp_path, catalog.QWEN_LLM)
 
     snap = MagicMock()
     api = MagicMock()
     out = catalog.auto_download_if_missing(
-        catalog.DEFAULT_LLM,
+        catalog.QWEN_LLM,
         hub_root=tmp_path,
         _snapshot_download=snap,
         _hf_api=api,
@@ -220,13 +220,13 @@ def test_auto_download_gated_with_token_proceeds(tmp_path, monkeypatch):
     monkeypatch.setenv("HF_TOKEN", "fake-token")
     snap = MagicMock(return_value=str(tmp_path / "fake-snapshot"))
     out = catalog.auto_download_if_missing(
-        catalog.DEFAULT_LLM,
+        catalog.QWEN_LLM,
         hub_root=tmp_path,
         _snapshot_download=snap,
     )
     snap.assert_called_once()
     kwargs = snap.call_args.kwargs
-    assert kwargs["repo_id"] == catalog.DEFAULT_LLM
+    assert kwargs["repo_id"] == catalog.QWEN_LLM
     assert kwargs["token"] == "fake-token"
     assert ".safetensors" in " ".join(kwargs["allow_patterns"])
     assert kwargs["cache_dir"] == str(tmp_path)
@@ -289,7 +289,7 @@ def test_auto_download_disk_space_precheck(tmp_path, monkeypatch):
     snap = MagicMock()
     with pytest.raises(InsufficientDiskSpaceError) as exc:
         catalog.auto_download_if_missing(
-            catalog.DEFAULT_LLM,
+            catalog.QWEN_LLM,
             hub_root=tmp_path,
             _snapshot_download=snap,
         )

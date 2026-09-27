@@ -66,9 +66,11 @@ def test_default_llm_is_pinned_to_the_portable_row():
     depends on this constant" is established by reading, not by execution, and
     should be confirmed on a machine that can run the suite.
     """
+    # RESET 2026-09-26 (operator): the Comfy-native Gemma 4 E2B, 5.1 GB peak
+    # on the 8 GB RTX 4060 in a canonical episode. See the constant's docstring.
     catalog = importlib.import_module("nodes._otr_model_catalog")
-    assert catalog.DEFAULT_LLM == "Qwen/Qwen3.5-4B", (
-        f"DEFAULT_LLM drift: expected 'Qwen/Qwen3.5-4B', got "
+    assert catalog.DEFAULT_LLM == "comfy_native:gemma4-e2b-it-int8-convrot", (
+        f"DEFAULT_LLM drift: expected 'comfy_native:gemma4-e2b-it-int8-convrot', got "
         f"{catalog.DEFAULT_LLM!r}. The writer default is pinned to the row "
         "that fits the smallest supported card -- changing it is a deliberate "
         "reset, documented in the constant's docstring, not a casual edit."

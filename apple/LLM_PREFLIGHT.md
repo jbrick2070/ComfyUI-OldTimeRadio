@@ -6,13 +6,12 @@ Two different jobs share this page. Do not mix them up.
 Face causal LM of your own, choose Gemma or Llama from the list, use a cloud
 slot if you have a key. The picker is open. Nothing here locks you to Qwen.
 
-**What this pack ships:** Qwen 3.5 4B as one transformers dropdown row.
-NVIDIA bakes NF4; Mac and CPU load full. The 16 GB NVIDIA graphs still
-ship `google/gemma-4-12b-it`. Every row is a safetensors model that downloads
-itself. Since 2026-09-26 the dropdown also offers
-`comfy_native:gemma4-e2b-it-int8-convrot`: Gemma 4 E2B run by ComfyUI itself
-rather than by transformers (see "A writer ComfyUI runs itself" below). No
-workflow selects it yet.
+**What this pack ships:** since 2026-09-26, every NVIDIA workflow and the
+canonical ship `comfy_native:gemma4-e2b-it-int8-convrot` -- Gemma 4 E2B run by
+ComfyUI itself rather than by transformers (see "A writer ComfyUI runs itself"
+below), chosen for speed: five to twelve times the writers it replaced. The Mac
+and AMD workflows ship Qwen 3.5 4B as one transformers dropdown row (Mac loads
+full) until the native path is proven there. Every row downloads itself.
 
 This page is the add-your-own checklist. The models that already ship, and
 how to read their badges, are [WRITERS.md](WRITERS.md). The short binding

@@ -177,13 +177,12 @@ def test_default_llm_is_not_gated():
 
 
 def test_default_llm_is_pass_tier_for_c7_baseline():
-    """Qwen 3.5 4B is the shipping default and stays WARN (09-06)."""
-    found = False
-    for m in catalog.CURATED_LLM_MODELS:
-        if m.repo_id == catalog.DEFAULT_LLM:
-            assert m.vram_fit_tier == "WARN"
-            found = True
-    assert found, "DEFAULT_LLM not found in curated set"
+    """The default writer is PASS: the Comfy-native Gemma 4 E2B since
+    2026-09-26, proven in canonical episodes on the 4060 and the 5080. The one
+    Qwen (QWEN_LLM, the Mac and AMD writer) stays WARN (09-06)."""
+    rows = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
+    assert rows[catalog.DEFAULT_LLM].vram_fit_tier == "PASS"
+    assert rows[catalog.QWEN_LLM].vram_fit_tier == "WARN"
     nf4 = catalog._by_repo_id().get(catalog.DEFAULT_LLM_NF4)
     assert nf4 is not None and nf4.vram_fit_tier == "WARN"
 

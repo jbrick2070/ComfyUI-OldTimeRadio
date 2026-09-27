@@ -67,7 +67,8 @@ class OneActTemplateTests(unittest.TestCase):
         # one number".
         self.assertRegex(
             creative,
-            r"^\S+/\S+ \(\d+(\.\d+)? GB( download)?(, [\w\- ]+)?\)$",
+            # An HF `org/name` id or a ComfyUI-native `comfy_native:` id.
+            r"^\S+[/:]\S+ \(\d+(\.\d+)? GB( download)?(, [\w\- ]+)?\)$",
             "the size suffix is part of the COMBO value; a bare "
             "repo id matches no choice and can resolve to index 0")
         self.assertEqual(len(widget_names(writer)), WRITER_WIDGET_COUNT)

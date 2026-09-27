@@ -1,5 +1,6 @@
-"""Shipping writer pins: small Qwen locally, 12B on 16 GB NVIDIA, cloud on CPU
-(Comfy Credits on the Comfy Cloud workflows, Gemini on the Google one).
+"""Shipping writer pins: the Comfy-native Gemma 4 E2B on every NVIDIA workflow
+and the canonical, the one Qwen on Mac and AMD, cloud on CPU (Comfy Credits on
+the Comfy Cloud workflows, Gemini on the Google one).
 
 Stops a stale Qwen2.5 id from returning, and keeps the
 shipping CPU graph on Sonnet 5 + Luna instead of a local 4B.
@@ -25,6 +26,10 @@ import build_variants as bv  # noqa: E402
 
 SMALL = "Qwen/Qwen3.5-4B"
 BIG = "google/gemma-4-12b-it"
+#: Every NVIDIA workflow's writer since 2026-09-26 (operator: "12x speed up is
+#: too hard to ignore"). Mac and AMD keep SMALL until the native path is proven
+#: on that hardware.
+NATIVE = "comfy_native:gemma4-e2b-it-int8-convrot"
 STALE = (
     "Qwen/Qwen2.5-14B",
     "Qwen/Qwen2.5-14B-Instruct",
@@ -36,11 +41,11 @@ def _profile(name: str) -> dict:
     return cp.load_profile(name)
 
 
-def test_dropdown_default_is_live_small_qwen():
-    assert DEFAULT_LLM == SMALL
-    assert default_llm_option().startswith(SMALL)
+def test_dropdown_default_is_the_native_writer_and_qwen_stays_curated():
+    assert DEFAULT_LLM == NATIVE
+    assert default_llm_option().startswith(NATIVE)
     curated = {m.repo_id for m in CURATED_LLM_MODELS}
-    assert SMALL in curated
+    assert SMALL in curated and NATIVE in curated and BIG in curated
     for dead in STALE:
         assert dead not in curated, dead
 
@@ -85,17 +90,17 @@ def _shipped_writer_models(pid):
     return out
 
 
-def test_shipping_writer_split_is_4b_except_16gb_nvidia():
+def test_shipping_writer_split_is_native_on_nvidia_qwen_on_mac_and_amd():
     for pid in bv.SHIPPING_SET:
         shipped = _shipped_writer_models(pid)
         creative = shipped["creative_writing_model"]
         technical = shipped["technical_model"]
-        if pid.startswith("otr_16gb_"):
-            assert creative == BIG, pid
-            assert technical == BIG, pid
-        elif pid.startswith(("otr_24gb_", "otr_32gb_")):
-            assert creative == BIGGEST, pid
-            assert technical == BIGGEST, pid
+        if pid.startswith(("otr_8gb_", "otr_16gb_", "otr_24gb_", "otr_32gb_")):
+            assert creative == NATIVE, pid
+            assert technical == NATIVE, pid
+        elif pid.startswith(("otr_mac16_", "otr_amd_")):
+            assert creative == SMALL, pid
+            assert technical == SMALL, pid
         elif pid.startswith("otr_cloud_"):
             assert creative == "comfy:slot-a", pid
             assert technical == "comfy:slot-b", pid
@@ -103,13 +108,14 @@ def test_shipping_writer_split_is_4b_except_16gb_nvidia():
             assert creative == "google_api:slot-a", pid
             assert technical == "google_api:slot-b", pid
         else:
-            assert creative == SMALL, pid
-            assert technical == SMALL, pid
+            raise AssertionError("%s: no writer policy for this workflow" % pid)
 
 
 def test_shipping_variant_widgets_carry_the_live_label():
     """Saved graphs must store the live COMBO label, not a stale bare id."""
-    qwen_label = default_llm_option()
+    native_label = default_llm_option()
+    from nodes._otr_model_catalog import vram_badge_for
+    qwen_label = SMALL + vram_badge_for(SMALL)
     for pid in bv.SHIPPING_SET:
         path = os.path.join(_REPO, "workflows", f"{pid}.json")
         with open(path, encoding="utf-8") as fh:
@@ -125,11 +131,8 @@ def test_shipping_variant_widgets_carry_the_live_label():
             assert "gemini-flash-latest" in text, pid
             assert "gemini-flash-lite-latest" in text, pid
             assert SMALL not in text, pid
-        elif pid.startswith("otr_16gb_"):
-            assert BIG in text, pid
-            assert SMALL not in text, pid
-        elif pid.startswith(("otr_24gb_", "otr_32gb_")):
-            assert BIGGEST in text, pid
+        elif pid.startswith(("otr_8gb_", "otr_16gb_", "otr_24gb_", "otr_32gb_")):
+            assert native_label in text, pid
             assert SMALL not in text, pid
         else:
             assert qwen_label in text, pid
