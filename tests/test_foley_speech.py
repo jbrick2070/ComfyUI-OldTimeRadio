@@ -61,6 +61,39 @@ def _stub_judge_slot(monkeypatch, answer):
     return calls, releases
 
 
+@pytest.mark.parametrize("cuda_encode_works", [True, False])
+def test_whisper_proves_cuda_with_a_real_encode_else_uses_the_cpu(monkeypatch, cuda_encode_works):
+    """ctranslate2 4.x loads cuBLAS 12 only at the FIRST encode, so on a CUDA 13
+    torch stack a CUDA device 'exists' and every transcription raised (the
+    5080 and the pod, 2026-09-27) -- the duck silently ducked nothing. The
+    loader proves CUDA with one real encode and falls back to the CPU."""
+    import ctranslate2
+    import faster_whisper
+    import huggingface_hub
+    built = []
+
+    class FakeWhisper:
+        def __init__(self, path, *, device, compute_type, **kw):
+            self.device = device
+            built.append((device, compute_type))
+
+        def transcribe(self, audio, **kw):
+            if self.device == "cuda" and not cuda_encode_works:
+                raise RuntimeError("Library cublas64_12.dll is not found or cannot be loaded")
+            return iter([]), None
+
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", lambda *a, **k: "unused")
+    monkeypatch.setattr(faster_whisper, "WhisperModel", FakeWhisper)
+    monkeypatch.setattr(ctranslate2, "get_cuda_device_count", lambda: 1)
+    monkeypatch.setattr(ctranslate2, "get_supported_compute_types", lambda d: {"float16", "int8"})
+    monkeypatch.setattr(speech, "_models_dir", lambda: Path("unused"))
+    model = speech._load_whisper()
+    if cuda_encode_works:
+        assert model.device == "cuda" and built == [("cuda", "float16")]
+    else:
+        assert model.device == "cpu" and built == [("cuda", "float16"), ("cpu", "int8")]
+
+
 def test_vad_negative_never_loads_whisper_or_llm(monkeypatch):
     events = _stub_models(monkeypatch, positive=set())
     monkeypatch.setattr(speech, "_judge_transcripts", lambda *_: pytest.fail("LLM called"))

@@ -79,17 +79,32 @@ def _load_whisper():
         allow_patterns=["config.json", "model.bin", "tokenizer.json",
                         "vocabulary.*", "preprocessor_config.json"],
     )
-    device, compute_type = "cpu", "int8"
+    def build(device, compute_type):
+        return WhisperModel(path, device=device, compute_type=compute_type,
+                            cpu_threads=2, num_workers=1, local_files_only=True)
+
+    # "A CUDA device exists" is not "Whisper can run on it": ctranslate2 4.x
+    # is built against CUDA 12 and loads cublas64_12 / libcublas.so.12 only at
+    # the FIRST ENCODE, so on a CUDA 13 torch stack (the 5080, the pod) every
+    # transcription raised and the duck silently ducked nothing (measured
+    # 2026-09-27). So CUDA is proven with one real one-second encode, and the
+    # CPU (int8, well under a minute for a whole episode's stems) is used when
+    # that proof fails.
     try:
-        if ctranslate2.get_cuda_device_count() > 0:
-            supported = ctranslate2.get_supported_compute_types("cuda")
-            if "float16" in supported:
-                device, compute_type = "cuda", "float16"
-    except Exception as exc:
-        log.warning("[OTR foley speech] CUDA unavailable for Whisper; CPU int8: %s", exc)
-    log.info("[OTR foley speech] Whisper base on %s (%s)", device, compute_type)
-    return WhisperModel(path, device=device, compute_type=compute_type,
-                        cpu_threads=2, num_workers=1, local_files_only=True)
+        if ctranslate2.get_cuda_device_count() > 0 and \
+                "float16" in ctranslate2.get_supported_compute_types("cuda"):
+            import numpy as np
+            model = build("cuda", "float16")
+            segments, _ = model.transcribe(np.zeros(16000, dtype=np.float32),
+                                           beam_size=1, vad_filter=False)
+            list(segments)
+            log.info("[OTR foley speech] Whisper base on cuda (float16)")
+            return model
+    except Exception as exc:  # noqa: BLE001 -- any CUDA failure means CPU
+        log.warning("[OTR foley speech] Whisper cannot run on CUDA here (%s); "
+                    "using the CPU (int8)", exc)
+    log.info("[OTR foley speech] Whisper base on cpu (int8)")
+    return build("cpu", "int8")
 
 
 def _transcribe(path, model):
