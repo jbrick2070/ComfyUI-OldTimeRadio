@@ -1338,9 +1338,16 @@ try:                                            # package import
 except ImportError:                              # flat/script import
     import _otr_episode_budget as _OTRB          # type: ignore
 
-#: Set to an integer to make the writer's SAMPLING reproducible. Unset (the
-#: default, and production) leaves generation exactly as it was.
-WRITER_SEED_ENV = "OTR_WRITER_SEED"
+# The seed formula lives in a shared leaf so the Comfy-native Gemma writer
+# derives the SAME number from the same prompt (plan row 0n).
+try:                                            # package import
+    from ._otr_sampling_seed import (
+        WRITER_SEED_ENV, parse_writer_seed, prompt_keyed_seed,
+    )
+except ImportError:                              # flat/script import
+    from _otr_sampling_seed import (  # type: ignore
+        WRITER_SEED_ENV, parse_writer_seed, prompt_keyed_seed,
+    )
 
 
 def _seed_writer_sampling(inputs) -> "int | None":
@@ -1367,21 +1374,16 @@ def _seed_writer_sampling(inputs) -> "int | None":
     raw = otr_env.get(WRITER_SEED_ENV, "").strip()
     if not raw:
         return None
-    try:
-        base = int(raw)
-    except (TypeError, ValueError):
+    base = parse_writer_seed(raw)
+    if base is None:
         log.warning(
             "[OTR_LedgerScriptWriter] %s=%r is not an integer; sampling stays "
             "unseeded for this run", WRITER_SEED_ENV, raw)
         return None
     try:
-        import zlib
-
         import torch as _torch
 
-        ids = inputs["input_ids"]
-        digest = zlib.crc32(str(ids.tolist()).encode("utf-8"))
-        seed = (base * 1_000_003 + digest) & 0x7FFF_FFFF
+        seed = prompt_keyed_seed(base, inputs["input_ids"].tolist())
         _torch.manual_seed(seed)
         if _torch.cuda.is_available():
             _torch.cuda.manual_seed_all(seed)

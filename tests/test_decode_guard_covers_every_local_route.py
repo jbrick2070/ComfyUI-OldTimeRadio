@@ -69,6 +69,12 @@ KNOWN_EXEMPTIONS = {
     ("visual/llm_polish.py", "_generate_single"): (
         "SDXL visual prompt polish; bounded max_new_tokens=100, do_sample=False"
     ),
+    ("nodes/_otr_comfy_textgen_backend.py", "generate"): (
+        "The Comfy-native Gemma writer's HF-generate ADAPTER, not a route: it "
+        "runs, on every token, the stopping_criteria its caller passes -- the "
+        "guarded factories above install the liveness guard there -- and it is "
+        "only ever reached through those factories (plan row 0n, r3)."
+    ),
 }
 
 
