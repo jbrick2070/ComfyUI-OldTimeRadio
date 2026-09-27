@@ -9,9 +9,9 @@ silent composite is already built to the audio-derived frame budget, so a
 duration assertion (within 1/fps) runs BEFORE the mux to catch any drift.
 
 Replaces the legacy ``OTR_VideoComposite`` audio path (which re-encoded to AAC in
-its humo_concat mode and used ``-shortest``). This node does NO model work and
-holds NO CUDA residency -- it is pure ffmpeg, so the BUG-291 patcher-ref / NVML
-guards do not apply here; it only polls the interrupt flag so Cancel is honoured.
+its humo_concat mode and used ``-shortest``). Foley lanes optionally detect
+competing speech before mixing. Their VAD, Whisper and technical-slot models
+load lazily and release sequentially; no model is reserved across stages.
 
 Audio-identity is asserted by decoding both the muxed output's audio and the
 master to canonical PCM and comparing SHA-256 -- container-agnostic proof that
@@ -689,6 +689,60 @@ def _foley_route(video_policy_json: str) -> bool:
     return bool(_fs.is_foley_route(video_policy_json))
 
 
+def _analyse_foley_speech(rows):
+    """Optional analysis, with a transaction boundary outside the detector too."""
+    ledger_path = None
+    receipt = {}
+    try:
+        try:
+            from . import _otr_ledger as _OTRL
+            from ._otr_video_engines.foley_speech import detect_foley_speech
+        except ImportError:  # pragma: no cover -- flat ComfyUI import
+            import _otr_ledger as _OTRL
+            from _otr_video_engines.foley_speech import detect_foley_speech
+        ledger_path = _OTRL.in_flight_ledger_path()
+        ledger = _OTRL.load_ledger_safe(ledger_path) if ledger_path else None
+        meta = (ledger or {}).get("meta", {})
+        # A failing detector cannot partially mutate the rows destined for mix.
+        receipt = detect_foley_speech([dict(row) for row in rows], meta)
+        flags = [receipt.get(str(row.get("beat_id") or ""), {}).get("ducked") is True
+                 for row in rows]
+    except Exception as exc:  # noqa: BLE001 -- never blocks a finished episode
+        reason = f"detector unavailable: {type(exc).__name__}: {exc}"
+        log.warning("[OTR foley speech] %s; no stems ducked", reason)
+        receipt = {str(row.get("beat_id") or ""): {
+            "vad": None, "transcript": "", "verdict": None,
+            "reason": reason, "ducked": False,
+        } for row in rows}
+        flags = [False] * len(rows)
+    for row, flag in zip(rows, flags):
+        # Overwrites stale flags supplied on the manifest, including on failure.
+        row["foley_speech_duck"] = flag
+    return receipt, ledger_path
+
+
+def _stamp_foley_speech(ledger_path, receipt):
+    """Merge only our receipt into the latest durable ledger, best effort."""
+    try:
+        try:
+            from . import _otr_ledger as _OTRL
+        except ImportError:  # pragma: no cover -- flat ComfyUI import
+            import _otr_ledger as _OTRL
+        if ledger_path is None:
+            raise ValueError("no in-flight ledger")
+        ledger = _OTRL.load_ledger_safe(ledger_path)
+        if ledger is None:
+            raise ValueError("could not reload in-flight ledger")
+        ledger.setdefault("meta", {})["foley_speech"] = receipt
+        if not _OTRL.save_ledger_safe(ledger_path, ledger):
+            raise ValueError("save_ledger_safe returned False")
+        return ""
+    except Exception as exc:  # noqa: BLE001 -- receipt cannot veto delivery
+        note = f"foley speech receipt not saved: {type(exc).__name__}: {exc}"
+        log.warning("[OTR_MasterAudioMux] %s", note)
+        return note
+
+
 def _compile_foley_master(master_audio_path: str, receipts_json: str,
                           fps: int, video_policy_json: str = ""):
     """Mix the foley bed under the provisional master and LEVEL the result.
@@ -734,6 +788,12 @@ def _compile_foley_master(master_audio_path: str, receipts_json: str,
                 "un-levelled provisional master would be a quiet 20%% "
                 "loudness error nobody sees until playback" % exc)
     bearing = [r for r in rows if r.get("foley_path")]
+    for row in bearing:
+        row.pop("foley_speech_duck", None)
+    speech_rows = [row for row in bearing
+                   if _fs.is_speech_duck_lane(row.get("engine_id"))]
+    speech_receipt, speech_ledger_path = (
+        _analyse_foley_speech(speech_rows) if speech_rows else ({}, None))
 
     # RE-RAISED IN THIS NODE'S VOCABULARY. FoleyStemError is a RuntimeError,
     # and mux()'s terminal handler catches (ValueError, OSError) -- so an
@@ -761,6 +821,14 @@ def _compile_foley_master(master_audio_path: str, receipts_json: str,
     mixed_path = root + "_foley.wav"
     _fs.write_pcm16_wav(mixed_path, levelled, master_rate)
 
+    # Report actual mixed ducks; an unpositioned/out-of-range stem is not one.
+    ducked = set(stats["speech_ducked_beats"])
+    for beat_id, item in speech_receipt.items():
+        if item["ducked"] and beat_id not in ducked:
+            item.update(ducked=False, reason=item["reason"] + "; stem not placed in master")
+    speech_stamp_note = (_stamp_foley_speech(speech_ledger_path, speech_receipt)
+                         if speech_rows else "")
+
     peak_dbfs = 20.0 * math.log10(max(float(abs(levelled).max()), 1e-9))
     lanes = stats["lanes"]
     report = [
@@ -774,6 +842,14 @@ def _compile_foley_master(master_audio_path: str, receipts_json: str,
            loud.get("target_lufs"), loud.get("gain_db"), peak_dbfs,
            loud.get("limiter_max_reduction_db"), loud.get("delivered_lufs")),
     ]
+    if speech_rows:
+        report.append("foley speech duck: %d of %d beats (vad %d, llm %d)"
+                      % (len(ducked), len(speech_rows),
+                         sum(item["vad"] is True for item in speech_receipt.values()),
+                         sum(bool(item["transcript"]) and item["verdict"] is True
+                             for item in speech_receipt.values())))
+    if speech_stamp_note:
+        report.append(speech_stamp_note)
     if stats["muted_samples"]:
         # MIME MUTES REAL AUDIO ON PURPOSE, and a receipt that did not say how
         # much would make an accidental mute indistinguishable from the

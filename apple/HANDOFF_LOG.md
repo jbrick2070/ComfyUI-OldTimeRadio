@@ -1,3 +1,37 @@
+## 2026-09-26 -- Foley speech duck implementation (Codex, isolated otr-duck)
+
+Settled operator design wired into `_compile_foley_master` before the real
+foley mix, with no new node/widget or workflow change. The existing canonical
+foley receipt connector reaches this call. Only resolved foley video lanes
+participate; mime and audio-in keep their existing audio behaviour.
+
+Silero VAD stays on CPU. Whisper's ungated multilingual base auto-downloads
+tokenless through huggingface_hub into the resolved models root, then runs
+CUDA float16 when available or CPU int8 otherwise. Silero's bundled JIT
+weight is copied to that same root. Imports are lazy. Whisper releases before
+the episode technical slot is acquired; that slot releases in finally.
+
+One strict, complete per-beat JSON batch; empty VAD-positive transcripts duck
+without an LLM. Speech-only transcription suppresses non-speech tokens, and
+the judge is explicitly told effects/music descriptions are not utterances.
+Descriptions are never stripped into empty-transcript babble. Any stage
+failure rolls back every duck; mix/master envelope otherwise unchanged.
+The fresh ledger merge records VAD, transcript, verdict, reason and actually
+mixed duck status; the report counts it. No live claims or new PBUG entries.
+
+Validation before push: baseline 128 scoped tests passed; feature suite and
+Bug Bible counts recorded in the follow-up review receipt. Today used CPU
+mocks only, without loading weights, touching the GPU, booting ComfyUI, or
+editing the main checkout. Required post-push different-family review follows
+on the pushed diff; only grounded findings become subsequent commits.
+
+Registry publish is deliberately deferred: requirements adds
+`silero-vad>=6.0` and `faster-whisper>=1.1.0`; pyproject.toml is untouched.
+The dependency-sync test will flag that known, requested release gap. Live
+proof and the operator's ear remain in GO_FORWARD_PLAN.
+
+---
+
 ## 2026-09-26 -- HEAD (main) -- LATE EVENING: native Gemma everywhere it is proven, T5 on the GPU
 
 Driver: the 5080 Claude window (Opus), the operator on and off the phone.

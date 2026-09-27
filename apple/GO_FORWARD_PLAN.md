@@ -82,78 +82,24 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   tests for every commit, probably not needed"; the suite at every push
   stays the guard).
 
-### Foley speech duck: detect voice in a foley clip, halve that clip's bed (operator idea 2026-09-26 night)
+### Foley speech duck: live ear proof and registry dependencies
 
-Operator: *"install Whisper, have Whisper find any dialogue in the foley, and
-then reduce the foley volume for that clip to 50 percent less than what it
-is."* Logged for a design word; not decided. This is a MIX mitigation for the
-accepted LTX 2.5 behaviour (the model vocalises -- "LTX 2.5 speaks its
-prompt", joint-AV vocalisation accepted, damping WORDS in the prompt ruled a
-defect). It touches no prompt and no recipe.
+The settled detector is implemented in the existing mux: CPU Silero VAD,
+Whisper base (automatic tokenless download, CUDA when available / CPU int8),
+one batch on the episode's technical slot, then x0.5 on flagged foley stems.
+Foley video lanes only; mime and audio-in bypass detection and ducking.
+Any detector failure keeps the old mix and records why in meta.foley_speech.
 
-**What exists (grounded 2026-09-26):** there is NO speech detector in the pack
--- nothing in `requirements.txt` or `pyproject.toml`; the three "whisper"
-hits in `nodes/` are the stage-direction word. The foley mix is
-`nodes/_otr_video_engines/foley_stems.py::mix_foley_under_master`: `master *
-envelope + bed`, fixed per-lane ratios (`FOLEY_LANE_GAINS[lane] =
-(foley_gain, master_gain)`; a foley lane holds the master at 0.50 globally
-per RULING 1 of 2026-08-29), and each beat's stem lands once at
-`bed[:, offset:end] += stem * foley_gain`. Each beat's foley audio already
-exists on disk as `row["foley_path"]` (48 kHz PCM16, harvested by
-`extract_pcm16_wav_from_video` before `canonicalize_video` strips it). So the
-detector's input is already there, and the duck is one factor on one line
-plus a receipt.
+Remaining: on the operator's next registry publish, mirror
+`silero-vad>=6.0` and `faster-whisper>=1.1.0` into the static pyproject
+dependency list. Its dependency-sync check intentionally flags these until
+that authorised release. Do not trigger a registry publish just to clear it.
 
-**Shape (small):** per row, run a detector over `foley_path`; if voice is
-found, multiply that beat's stem by `0.5` (-6 dB) in the mix. The voice/master
-gain is untouched, so RULING 1 ("voice holds its gain") stands -- only the
-bed on that beat drops. Write a per-beat receipt into the ledger
-(`meta.foley_speech_duck`: detector, version, score, ducked beats) and one
-report line in the mux ("foley speech duck: 4 of 17 beats"). Off by default?
-No -- if it ships it is ON for foley lanes, since the vocalisation is the
-accepted defect it exists for; a widget only if he wants to switch it off.
-
-**His design (refined the same night):** *"have an LLM look at this
-transcript -- does this seem to be speech that would conflict with the talk
-track, do you see human words or speech -- then flag this with a speech
-indicator."* So the chain is: Whisper transcribes each beat's `foley_path`
--> ONE batched LLM call reads every transcript and returns, per beat, a
-JSON verdict (`speech: true/false`, one-line reason) under the grammar the
-writer already uses -> a true verdict sets the beat's speech flag ->
-`mix_foley_under_master` reads the flag and halves that stem. The flag is
-the "speech indicator": `meta.foley_speech[beat_id] = {transcript, verdict,
-reason}` in the ledger, and a mux report line. The LLM judgement is what a
-detector cannot do -- it tells a stray "get down!" from a dog bark, a crowd
-murmur or a creak, so the bed is not thinned for nothing.
-
-**Two ways it fails, and the cheap gate that removes the first:**
-* Whisper HALLUCINATES text on silence and noise ("Thank you.", "Subtitles
-  by ...") -- a known defect of the model -- and an LLM reading that
-  transcript sees human words and flags a clip with no voice in it. Gate:
-  run a VAD first (Silero VAD, ~2 MB, torch-only, CPU, well under real
-  time) and transcribe ONLY beats where it finds voice-like energy. Fewer
-  Whisper calls, and the hallucination class never reaches the LLM.
-* Babble without words -- the model vocalising in no language -- comes back
-  as an empty or junk transcript, the LLM says "no words", and the clip still
-  fights the dialogue by ear. Rule: VAD-positive with an empty transcript is
-  scored as vocalisation and ducked; the LLM only rules on transcripts that
-  have words.
-* Cost: two new dependencies (whisper -- `faster-whisper` is the lighter
-  build, `base.en` ~145 MB -- and `silero-vad`), both into `requirements.txt`
-  AND the static `[project] dependencies` list; the fresh-install path proven
-  on the 4060; the scan replica run. One LLM load at mux time (the writer is
-  unloaded by then per the no-reserve rule) -- one batched call, not one per
-  beat; on 8 GB it is the E2B. Per-clip flat duck (his words) -- windowed
-  ducking is a later refinement if his ear asks.
-
-**Verify at build:** one foley episode with a known vocalising clip, the
-receipt naming that beat, and his ear on the result (a duck depth is an ear
-call, like every mix ratio here). Tests: the detector on a synthetic voiced
-vs unvoiced stem, the mix with a ducked row, the receipt, a ledger-hole check
-(the duck reads a row field, never invents one).
-
-**Decision needed:** the VAD gate in front of Whisper (recommended), and
-on-for-foley or switchable. Then it is a section 2 row.
+Live proof needs one canonical foley episode with a known vocalising clip,
+its meta.foley_speech receipt, the final file in otr/obs, and the operator's
+ear on the 50% depth and false positives from effects/music. Mocked tests
+prove wiring and gain arithmetic, not ASR/LLM judgement. No live/GPU work was
+performed in the isolated duck build while the regression chain was running.
 
 ### The registry -- his clicks and his word
 

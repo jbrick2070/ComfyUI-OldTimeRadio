@@ -762,6 +762,15 @@ def conform_to_master(stem, stem_rate, master_rate, master_channels):
     return arr, notes
 
 
+def is_speech_duck_lane(engine_id):
+    """Only foley video lanes duck speech. Mime keeps its native audio at 1.0."""
+    try:
+        from .._otr_shared.public_engines import resolve_engine_id
+    except ImportError:  # pragma: no cover -- flat ComfyUI import
+        from _otr_shared.public_engines import resolve_engine_id
+    return resolve_engine_id(str(engine_id or "")) in GLOBAL_MASTER_GAIN_LANES
+
+
 def mix_foley_under_master(master, master_rate, rows, *, fps,
                            lane_ids=frozenset()):
     """``master * envelope + bed`` -- the operator's fixed ratios, once.
@@ -840,6 +849,7 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
 
     placed, skipped, notes, overrun, unpositioned = 0, 0, [], 0, 0
     lanes_mixed = {}
+    speech_ducked_beats = []
     for row in rows:
         path = str((row or {}).get("foley_path") or "")
         if not path:
@@ -930,6 +940,10 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
                 "up over or under the dialogue it was balanced against"
                 % (os.path.basename(path), lane))
         foley_gain, master_gain = FOLEY_LANE_GAINS[lane]
+        # Per-clip speech mitigation never changes the master's envelope.
+        if lane in GLOBAL_MASTER_GAIN_LANES and row.get("foley_speech_duck") is True:
+            foley_gain *= 0.5
+            speech_ducked_beats.append(str(row.get("beat_id") or ""))
         bed[:, offset:end] += stem[:, :end - offset] * foley_gain
         # A PER-WINDOW LANE PUNCHES ITS OWN WINDOW DOWN. The global lane has
         # already set the floor everywhere and must not re-apply it here.
@@ -957,6 +971,8 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
         "unpositioned": unpositioned,
         "conform_notes": notes,
         "lanes": dict(sorted(lanes_mixed.items())),
+        "speech_ducked": len(speech_ducked_beats),
+        "speech_ducked_beats": speech_ducked_beats,
         "global_master_gain": float(global_master_gain),
         "muted_samples": int((envelope <= 0.0).sum()),
         "bed_peak": float(abs(bed).max()) if bed.size else 0.0,

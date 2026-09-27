@@ -12,6 +12,11 @@ transformers>=5.10.4,<6.0
 soundfile>=0.12
 numpy>=1.24
 
+# Optional foley speech duck: CPU VAD, then CUDA/CPU transcription.
+# Mirror into pyproject.toml only on the operator's next registry publish.
+silero-vad>=6.0
+faster-whisper>=1.1.0
+
 # Science news fetching (REQUIRED — no fallback, pipeline will hard-fail without it)
 feedparser>=6.0
 
