@@ -19,11 +19,37 @@ failure rolls back every duck; mix/master envelope otherwise unchanged.
 The fresh ledger merge records VAD, transcript, verdict, reason and actually
 mixed duck status; the report counts it. No live claims or new PBUG entries.
 
-Validation before push: baseline 128 scoped tests passed; feature suite and
-Bug Bible counts recorded in the follow-up review receipt. Today used CPU
-mocks only, without loading weights, touching the GPU, booting ComfyUI, or
-editing the main checkout. Required post-push different-family review follows
-on the pushed diff; only grounded findings become subsequent commits.
+Code commit: `56dcceb6`, pushed to main after rebasing on origin/main.
+Validation: baseline 128 scoped tests passed; final scoped suite 163 passed
+(35 new speech tests), and the final rerun after merging concurrent main
+updates also passed all 163. Bug Bible: 48 passed, 14 skipped, 3 xfailed.
+Additional schema/policy/registry/dependency checks: 78 passed; the one failing
+dependency-sync assertion names exactly the two deliberately deferred entries
+below (its known-failure guard exits 2). The assertion remains intact.
+Today used CPU mocks only, without loading weights, touching the GPU, booting
+ComfyUI, or editing the main checkout. File integrity checks: touched Python
+parses; all 7 changed files are nonempty, UTF-8 without BOM. Canonical workflow
+and pyproject are byte-unchanged by this commit.
+
+Whisper option provenance: its tokenizer documents non-speech suppression as
+blocking tokens used for speaker labels and non-speech annotations; faster-
+whisper maps `suppress_tokens=[-1]` to that default list. This is explicitly
+enabled and tested. It is not a guarantee against invented ordinary words;
+Whisper's model card documents that limitation. Source references:
+https://github.com/openai/whisper/blob/main/whisper/tokenizer.py
+https://github.com/SYSTRAN/faster-whisper/blob/master/faster_whisper/transcribe.py
+https://github.com/openai/whisper/blob/main/model-card.md
+
+Post-push QA: Composer 2.5 via cursor-agent, then Sonnet (Claude Code alias
+`sonnet`, high effort), two external calls. Both read the actual Windows
+worktree. Driver grounded every finding: no functional code defect survived.
+The wordless branch and deferred dependency entries were already explicit;
+repo text grep cannot prove a git SHA absent; actual counts are 35 new tests.
+Sonnet's test-mode stage-label nit has no production effect and the complete
+reason already says models were disabled. Real-model accuracy, hardware and
+offline-cache replay remain unproven, as requested. No new code patch from
+QA. Full local artifacts: kibitz-runs/2026-09-26-foley-speech/r4 (ignored);
+this is a scoped post-push review, not a four-round design campaign.
 
 Registry publish is deliberately deferred: requirements adds
 `silero-vad>=6.0` and `faster-whisper>=1.1.0`; pyproject.toml is untouched.
