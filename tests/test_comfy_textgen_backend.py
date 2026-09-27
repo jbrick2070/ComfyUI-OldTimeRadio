@@ -261,6 +261,29 @@ def test_the_template_refuses_what_it_does_not_render(tok, messages):
         tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
 
+def test_the_12b_template_primes_a_closed_thought_block_and_e2b_does_not():
+    """ComfyUI primes 12B/31B with an empty thought block in non-thinking mode
+    and must not for E2B/E4B; the adapter follows ComfyUI's own flag."""
+    messages = [{"role": "system", "content": "S"}, {"role": "user", "content": "U"}]
+    plain = native.build_native_tokenizer(_raw_tokenizer())
+    primed = native.build_native_tokenizer(_raw_tokenizer(), prime_empty_thought=True)
+    a = plain.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    b = primed.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    assert a.endswith("<|turn>model\n") and "<|channel>" not in a
+    assert b == a + "<|channel>thought\n<channel|>"
+
+
+def test_the_load_reads_comfys_own_prime_flag(comfy_env):
+    class _Primed(_LoadedClip):
+        def __init__(self, device):
+            super().__init__(device)
+            self.tokenizer.gemma4.prime_empty_thought = True
+
+    comfy_env["clip_factory"] = _Primed
+    entry = native.load_native_writer(native.MODEL_ID_12B, context_verdict=_verdict())
+    assert entry["tokenizer"].chat_template == native.GEMMA4_CHAT_TEMPLATE_PRIMED
+
+
 def test_special_tokens_are_marked_special(tok):
     assert {tok.convert_tokens_to_ids(s) for s in _SPECIALS} <= set(tok.all_special_ids)
 

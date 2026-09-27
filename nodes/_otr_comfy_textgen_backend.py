@@ -146,8 +146,19 @@ GEMMA4_CHAT_TEMPLATE = (
     "{%- if add_generation_prompt -%}{{- '<|turn>model\\n' -}}{%- endif -%}"
 )
 
+#: The closed, empty thought block Gemma 4 12B and 31B expect after the model
+#: turn opens, in non-thinking mode. ComfyUI's own encoder adds it for exactly
+#: those models (gemma4.py: ``prime_empty_thought``, "12B/31B prime a closed
+#: thought block for non-thinking mode, E2B/E4B must not: it cues them into
+#: reasoning inline"). Composer QA on 40b998e2 found the adapter sent every size
+#: the E2B form.
+EMPTY_THOUGHT = "<|channel>thought\\n<channel|>"
+GEMMA4_CHAT_TEMPLATE_PRIMED = GEMMA4_CHAT_TEMPLATE.replace(
+    "{{- '<|turn>model\\n' -}}{%- endif -%}",
+    "{{- '<|turn>model\\n' + '" + EMPTY_THOUGHT + "' -}}{%- endif -%}")
 
-def build_native_tokenizer(raw_tokenizer):
+
+def build_native_tokenizer(raw_tokenizer, *, prime_empty_thought=False):
     """A transformers fast tokenizer over the ``tokenizers.Tokenizer`` ComfyUI
     embeds in the weight file -- the writer's real tokenizer, not a stand-in.
 
@@ -165,7 +176,8 @@ def build_native_tokenizer(raw_tokenizer):
          if added.special and added.content not in (_BOS, _EOS, _PAD)})
     if specials:
         tokenizer.add_special_tokens({"additional_special_tokens": specials})
-    tokenizer.chat_template = GEMMA4_CHAT_TEMPLATE
+    tokenizer.chat_template = (GEMMA4_CHAT_TEMPLATE_PRIMED if prime_empty_thought
+                               else GEMMA4_CHAT_TEMPLATE)
     return tokenizer
 
 
@@ -515,7 +527,11 @@ def load_native_writer(model_id, *, policy=None, context_verdict=None, weight_pa
         model_options=model_options)
     try:
         owner = sampling_owner(clip)
-        tokenizer = build_native_tokenizer(clip.tokenizer.gemma4.tokenizer.tokenizer)
+        sd_tokenizer = clip.tokenizer.gemma4
+        # ComfyUI's own flag for this model size, not a guess from the file name.
+        tokenizer = build_native_tokenizer(
+            sd_tokenizer.tokenizer.tokenizer,
+            prime_empty_thought=bool(getattr(sd_tokenizer, "prime_empty_thought", False)))
         adapter = ComfyGemmaGenerateAdapter(clip)
     except BaseException:
         release_native_clip(clip)
