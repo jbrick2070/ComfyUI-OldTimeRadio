@@ -431,6 +431,18 @@ def _pcm16le_from_wav(raw: bytes, stated_rate) -> tuple:
         raise GoogleTTSError(
             "Google TTS response audio was labelled WAV but is not a readable "
             "PCM WAV: %s" % exc) from exc
+    if not frames:
+        # A streamed WAV can carry a data-chunk size of 0 because the writer
+        # did not know the length up front; `wave` then reads nothing. The
+        # samples are simply the bytes after the data chunk's 8-byte header.
+        at = raw.find(b"data", 12)
+        if at >= 0:
+            frames = raw[at + 8:]
+    # A truncated body can end mid-frame; keep whole frames only, so the
+    # decode below never sees a ragged buffer.
+    frame_bytes = width * channels
+    if frame_bytes > 0:
+        frames = frames[:len(frames) - len(frames) % frame_bytes]
     if width != 2:
         raise GoogleTTSError(
             "Google TTS response WAV holds %d-byte samples; expected 16-bit PCM"

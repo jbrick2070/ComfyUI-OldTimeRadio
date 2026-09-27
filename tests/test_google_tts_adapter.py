@@ -250,6 +250,25 @@ def test_gemini_wav_refuses_a_disagreeing_rate_and_a_non_pcm16_body():
             "data": base64.b64encode(b"not a wav at all").decode("ascii")}})
 
 
+def test_gemini_wav_streamed_header_and_truncated_body():
+    """A streamed WAV may state a data size of 0; a truncated body may end
+    mid-frame. Both decode to whole frames instead of silence or a crash."""
+    import struct
+    pcm = (1000).to_bytes(2, "little", signed=True) * 6
+    raw = base64.b64decode(_wav_b64(pcm, rate=24000))
+    at = raw.find(b"data", 12)
+    streamed = raw[:at + 4] + struct.pack("<I", 0) + raw[at + 8:]
+    audio = G._audio_from_response({"output_audio": {
+        "mime_type": "audio/wav",
+        "data": base64.b64encode(streamed).decode("ascii")}})
+    assert tuple(audio["waveform"].shape) == (1, 1, 6)
+    ragged = raw + b"\x01"
+    audio = G._audio_from_response({"output_audio": {
+        "mime_type": "audio/wav",
+        "data": base64.b64encode(ragged).decode("ascii")}})
+    assert tuple(audio["waveform"].shape) == (1, 1, 6)
+
+
 def test_two_stated_sample_rates_must_agree():
     """codex 2026-09-19: a mislabeled rate plays 1.5x fast and still passes
     the cache's mismatch guard, so a block rate and a MIME rate that
