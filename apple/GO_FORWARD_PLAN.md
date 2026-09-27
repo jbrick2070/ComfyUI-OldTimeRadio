@@ -181,6 +181,61 @@ multi-select COMBO, so (b)-(e) above are the pre-2025 answers.**
 
 **One word from him makes this a section 2 row.**
 
+### Foley speech duck: detect voice in a foley clip, halve that clip's bed (operator idea 2026-09-26 night)
+
+Operator: *"install Whisper, have Whisper find any dialogue in the foley, and
+then reduce the foley volume for that clip to 50 percent less than what it
+is."* Logged for a design word; not decided. This is a MIX mitigation for the
+accepted LTX 2.5 behaviour (the model vocalises -- "LTX 2.5 speaks its
+prompt", joint-AV vocalisation accepted, damping WORDS in the prompt ruled a
+defect). It touches no prompt and no recipe.
+
+**What exists (grounded 2026-09-26):** there is NO speech detector in the pack
+-- nothing in `requirements.txt` or `pyproject.toml`; the three "whisper"
+hits in `nodes/` are the stage-direction word. The foley mix is
+`nodes/_otr_video_engines/foley_stems.py::mix_foley_under_master`: `master *
+envelope + bed`, fixed per-lane ratios (`FOLEY_LANE_GAINS[lane] =
+(foley_gain, master_gain)`; a foley lane holds the master at 0.50 globally
+per RULING 1 of 2026-08-29), and each beat's stem lands once at
+`bed[:, offset:end] += stem * foley_gain`. Each beat's foley audio already
+exists on disk as `row["foley_path"]` (48 kHz PCM16, harvested by
+`extract_pcm16_wav_from_video` before `canonicalize_video` strips it). So the
+detector's input is already there, and the duck is one factor on one line
+plus a receipt.
+
+**Shape (small):** per row, run a detector over `foley_path`; if voice is
+found, multiply that beat's stem by `0.5` (-6 dB) in the mix. The voice/master
+gain is untouched, so RULING 1 ("voice holds its gain") stands -- only the
+bed on that beat drops. Write a per-beat receipt into the ledger
+(`meta.foley_speech_duck`: detector, version, score, ducked beats) and one
+report line in the mux ("foley speech duck: 4 of 17 beats"). Off by default?
+No -- if it ships it is ON for foley lanes, since the vocalisation is the
+accepted defect it exists for; a widget only if he wants to switch it off.
+
+**The one real fork -- the detector:**
+* **Whisper** (his word): transcribes; heavy for this job (openai-whisper +
+  a 75-145 MB model per size, tokeniser, decode) and it can label babble as
+  no-speech or hallucinate words. We only need "is there a voice here".
+* **A VAD** (Silero VAD: ~2 MB, pip `silero-vad`, torch-only, runs on CPU
+  in well under real time): answers exactly "is there voice-like energy in
+  this window", catches babble, no model download of note, portable to Mac
+  and AMD and the pod. Recommended.
+* Either way: a new dependency -> `requirements.txt` AND the static
+  `[project] dependencies` list (registry reads the literal field), the
+  fresh-install path proven on the 4060, and the scan replica run.
+* Not a fork: per-clip flat duck (his words) vs time-windowed sidechain --
+  flat is the ask and matches the per-row mix; windowed is a later
+  refinement if his ear asks.
+
+**Verify at build:** one foley episode with a known vocalising clip, the
+receipt naming that beat, and his ear on the result (a duck depth is an ear
+call, like every mix ratio here). Tests: the detector on a synthetic voiced
+vs unvoiced stem, the mix with a ducked row, the receipt, a ledger-hole check
+(the duck reads a row field, never invents one).
+
+**Decision needed:** VAD or Whisper, and on-for-foley or switchable. Then it
+is a section 2 row.
+
 ### The registry -- his clicks and his word
 
 * **2.3.6 is the latest published version** (`96ea436a`, 2026-09-25, after
