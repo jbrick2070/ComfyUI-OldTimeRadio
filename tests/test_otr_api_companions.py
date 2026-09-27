@@ -244,14 +244,10 @@ def _writer_schemas_s5() -> dict:
         {"default": "off (keep everything)"},
     )
     # SELECTIVE ROLLS (2026-09-26): the two trailing native multi-selects.
-    required["style_roll_pool"] = (
-        ["anime", "cartoon"], {"multiselect": True, "multi_select": {},
-                               "default": []},
-    )
-    required["language_roll_pool"] = (
-        ["English", "French"], {"multiselect": True, "multi_select": {},
-                                "default": []},
-    )
+    # Typed lists since 2026-09-27 (the app view could not draw the
+    # 2.3.8 multi-select).
+    required["style_roll_pool"] = ("STRING", {"default": ""})
+    required["language_roll_pool"] = ("STRING", {"default": ""})
     return schemas
 
 

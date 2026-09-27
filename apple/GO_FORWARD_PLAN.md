@@ -218,6 +218,14 @@ list reads as a link. App form: each pool under its dropdown. Docs:
 plus the pinned widget count 35 -> 37. **Owed:** a live app-view click of
 the picker (the chain holds the 5080 tonight; a CPU-only server on another
 port can do it), then one rolled episode.
+**AMENDED 2026-09-27: the pools are typed lists now.** The owed click was
+done on a CPU-only server (:8001, sandboxed): the app view (frontend 1.52.7)
+drew both multi-selects as a BLANK CANVAS -- zero drawn pixels, no control --
+with Nodes 2.0 off AND on, while STRING rows (source_ref, title) render real
+inputs. That is the fallback this row named: both pools became STRING
+(`anime, video_art`), parsed by the same `parse_roll_pool` (commas,
+semicolons, new lines; a list saved by a 2.3.8 graph still reads). The
+tooltips name every valid entry. Owed: one rolled episode.
 
 ### 0a. Windows HF_HOME -- DONE 2026-09-25 (`a0875708`, `89a95212`)
 

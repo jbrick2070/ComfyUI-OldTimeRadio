@@ -480,7 +480,7 @@
           "localized_name": "style_roll_pool",
           "name": "style_roll_pool",
           "shape": 7,
-          "type": "COMBO",
+          "type": "STRING",
           "widget": {
             "name": "style_roll_pool"
           },
@@ -490,7 +490,7 @@
           "localized_name": "language_roll_pool",
           "name": "language_roll_pool",
           "shape": 7,
-          "type": "COMBO",
+          "type": "STRING",
           "widget": {
             "name": "language_roll_pool"
           },
@@ -587,8 +587,8 @@
         "",
         "English",
         "off (keep everything)",
-        [],
-        []
+        "",
+        ""
       ],
       "color": "#323",
       "bgcolor": "#535"

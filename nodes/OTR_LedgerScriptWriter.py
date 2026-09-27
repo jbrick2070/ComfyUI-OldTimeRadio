@@ -2996,44 +2996,45 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # gate_in so the canonical's inputs descriptor order matches.
                 #
                 # SELECTIVE ROLLS (2026-09-26), APPENDED as the two trailing
-                # widgets (BUG-LOCAL-097). Native multi-select COMBOs: BOTH
-                # keys are required -- core validates on `multiselect`
-                # (execution.py), the frontend mounts the picker only on the
-                # `multi_select` OBJECT. The value is ONE list[str] in ONE
-                # widgets_values slot; empty is the whole list.
+                # widgets (BUG-LOCAL-097). TYPED LISTS, not multi-select
+                # COMBOs: shipped as native multi-selects in 2.3.8, but the
+                # app view (frontend 1.52.7) draws a multi-select as a BLANK
+                # CANVAS -- measured 2026-09-27 with Nodes 2.0 on and off --
+                # so the picker could not be reached from the form the
+                # operator uses. A STRING renders as a real text box
+                # everywhere. `_otr_rolls.parse_roll_pool` reads it (commas,
+                # a JSON list, or a saved list from a 2.3.8 graph) and refuses
+                # an unknown name LOUD; empty is the whole list.
                 "style_roll_pool": (
-                    list(_ROLLS.eligible_style_ids()),
+                    "STRING",
                     {
-                        "multiselect": True,
-                        "multi_select": {
-                            "placeholder": "All styles",
-                            "chip": True,
-                        },
-                        "default": [],
+                        "default": "",
+                        "multiline": False,
                         "tooltip": (
                             "Read only when Visual style is 'roll (any "
-                            "style)'. Empty rolls among every style; one "
-                            "checked is simply that style; two or more roll "
-                            "among just those, recorded at meta.style_roll."
+                            "style)'. Type the styles to roll among, "
+                            "separated by commas; empty rolls among every "
+                            "style, one name is simply that style. Choose "
+                            "from: " + ", ".join(_ROLLS.eligible_style_ids())
+                            + ". Recorded at meta.style_roll."
                         ),
                     },
                 ),
                 "language_roll_pool": (
-                    [c for c in _EPLANG.dropdown_choices()
-                     if c != _EPLANG.OFF_LABEL],
+                    "STRING",
                     {
-                        "multiselect": True,
-                        "multi_select": {
-                            "placeholder": "All languages",
-                            "chip": True,
-                        },
-                        "default": [],
+                        "default": "",
+                        "multiline": False,
                         "tooltip": (
                             "Read only when Language is 'roll (any "
-                            "language)'. Empty rolls among every language; "
-                            "one checked is simply that language; two or "
-                            "more roll among just those, recorded at "
-                            "meta.language_roll. Off is never rolled."
+                            "language)'. Type the languages to roll among, "
+                            "separated by commas; empty rolls among every "
+                            "language, one name is simply that language. "
+                            "Choose from: " + ", ".join(
+                                c for c in _EPLANG.dropdown_choices()
+                                if c != _EPLANG.OFF_LABEL)
+                            + ". Off is never rolled. Recorded at "
+                            "meta.language_roll."
                         ),
                     },
                 ),

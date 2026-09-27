@@ -139,10 +139,10 @@ def parse_roll_pool(
 ) -> "tuple[str, ...]":
     """The ids a SELECTIVE roll may draw from, first-seen order, no repeats.
 
-    The pool widgets are native multi-select COMBOs, so the node normally
-    receives a ``list[str]``. A headless ``--set`` may hand a JSON list
-    string or a comma-separated string instead; both parse to the same
-    tuple. Empty (None, "", []) is ``()`` -- "no pool chosen", which the
+    The pool widgets are typed lists (STRING): "anime, video_art" --
+    commas, semicolons or new lines separate names. A JSON list string,
+    or a real list (a graph saved by 2.3.8, when the pools were
+    multi-selects), parses to the same tuple. Empty (None, "", []) is ``()`` -- "no pool chosen", which the
     callers read as the whole list. An id outside ``valid_ids``, or one in
     ``refused``, fails LOUD: a pool that quietly drops a typo rolls from a
     set nobody chose.
@@ -161,7 +161,9 @@ def parse_roll_pool(
                     f"the {surface} roll pool {text!r} is not a JSON list"
                 ) from exc
         else:
-            raw = [part for part in (p.strip() for p in text.split(",")) if part]
+            raw = [part for part in (p.strip() for p in
+                   text.replace(";", ",").replace("\n", ",").split(","))
+                   if part]
     if not isinstance(raw, (list, tuple)):
         raise RollError(
             f"the {surface} roll pool must be a list of ids, got "

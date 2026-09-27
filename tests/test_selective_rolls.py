@@ -199,26 +199,35 @@ def test_the_language_roll_never_mutates_process_env():
 # ---------------------------------------------------------------------------
 # the writer surface: two trailing native multi-select COMBOs
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("name,options", [
+@pytest.mark.parametrize("name,names", [
     ("style_roll_pool", list(ROLLS.eligible_style_ids())),
     ("language_roll_pool", list(LANGUAGES)),
 ])
-def test_each_pool_is_a_native_multi_select_with_both_keys(name, options):
-    """BOTH keys, or it breaks: core validates a list value only when
-    `multiselect` is true (execution.py), and the frontend mounts the picker
-    only on the `multi_select` OBJECT (a boolean is ignored)."""
-    choices, meta = W.INPUT_TYPES()["optional"][name]
-    assert list(choices) == options
-    assert meta["multiselect"] is True
-    assert isinstance(meta["multi_select"], dict)
-    assert meta["default"] == []
-    assert LANG.OFF_LABEL not in choices
+def test_each_pool_is_a_typed_list_the_app_view_can_draw(name, names):
+    """A STRING, not a multi-select: the app view (frontend 1.52.7) drew the
+    2.3.8 multi-select as a blank canvas, so it could not be used there. The
+    tooltip names every valid entry, and never Off."""
+    kind, meta = W.INPUT_TYPES()["optional"][name]
+    assert kind == "STRING" and meta["default"] == ""
+    assert "multiselect" not in meta and "multi_select" not in meta
+    for entry in names:
+        assert entry in meta["tooltip"]
+    assert "Choose from: Off" not in meta["tooltip"]
+
+
+def test_a_typed_pool_and_a_saved_list_parse_the_same():
+    """A graph saved by 2.3.8 holds a LIST in this slot; it still reads."""
+    typed = ROLLS.parse_roll_pool("video_art; anime\ncartoon",
+                                  valid_ids=ROLLS.eligible_style_ids(), surface="s")
+    saved = ROLLS.parse_roll_pool(["video_art", "anime", "cartoon"],
+                                  valid_ids=ROLLS.eligible_style_ids(), surface="s")
+    assert typed == saved == ("video_art", "anime", "cartoon")
 
 
 def test_the_canonical_saves_both_pools_as_trailing_empty_slots():
     wf = json.loads(CANONICAL.read_text(encoding="utf-8"))
     node = next(n for n in wf["nodes"] if n["type"] == "OTR_LedgerScriptWriter")
-    assert node["widgets_values"][-2:] == [[], []]
+    assert node["widgets_values"][-2:] == ["", ""]
     assert [i["name"] for i in node["inputs"][-2:]] == [
         "style_roll_pool", "language_roll_pool"]
     assert all(i["link"] is None and i["widget"]["name"] == i["name"]
@@ -266,15 +275,14 @@ def test_a_list_widget_value_goes_out_wrapped(which):
     prompt = conv.workflow_to_api_prompt(wf, schemas)
     inputs = prompt[str(node["id"])]["inputs"]
     assert inputs["style_roll_pool"] == {"__value__": ["anime", "cartoon"]}
-    assert inputs["language_roll_pool"] == {"__value__": []}
+    assert inputs["language_roll_pool"] == ""             # a string goes out as-is
     assert isinstance(inputs["episode_language"], str)   # scalars untouched
 
 
 @pytest.mark.parametrize("which", ["script", "package"])
-def test_both_value_checks_take_a_pool_member_by_member(which):
-    """The package's own patcher (patch_creative -> patch_widget_by_name) and
-    the script's must agree: a list is checked member by member, as core
-    checks it, and a stray member is refused by name."""
+def test_both_patchers_take_a_typed_pool(which):
+    """The package's patcher and the script's both accept the typed list; an
+    unknown name is refused at run time by parse_roll_pool (tested above)."""
     from nodes import _otr_workflow_apply as WA
     schemas = WA.build_offline_schemas()
     wf = json.loads(CANONICAL.read_text(encoding="utf-8"))
@@ -283,10 +291,8 @@ def test_both_value_checks_take_a_pool_member_by_member(which):
         import otr_api as mod
     else:
         mod = WA
-    mod.patch_creative(wf, node["id"], "style_roll_pool", ["anime", "cartoon"], schemas)
-    assert node["widgets_values"][-2] == ["anime", "cartoon"]
-    with pytest.raises(ValueError, match="nope"):
-        mod.patch_creative(wf, node["id"], "style_roll_pool", ["anime", "nope"], schemas)
+    mod.patch_creative(wf, node["id"], "style_roll_pool", "anime, cartoon", schemas)
+    assert node["widgets_values"][-2] == "anime, cartoon"
 
 
 def test_set_carries_a_pool_through_the_headless_runner(tmp_path):
@@ -300,12 +306,12 @@ def test_set_carries_a_pool_through_the_headless_runner(tmp_path):
         rc = canonical.main([
             "--offline-schemas", "--dry-run",
             "--set", 'OTR_LedgerScriptWriter.visual_style="roll (any style)"',
-            "--set", 'OTR_LedgerScriptWriter.style_roll_pool=["anime","video_art"]',
+            "--set", "OTR_LedgerScriptWriter.style_roll_pool=anime, video_art",
             "--dump-prompt", str(dump),
         ])
     assert rc == 0
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     writer = next(n for n in prompt.values()
                   if n.get("class_type") == "OTR_LedgerScriptWriter")
-    assert writer["inputs"]["style_roll_pool"] == {"__value__": ["anime", "video_art"]}
+    assert writer["inputs"]["style_roll_pool"] == "anime, video_art"
     assert writer["inputs"]["visual_style"] == ROLLS.STYLE_SENTINEL
