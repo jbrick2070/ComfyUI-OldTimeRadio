@@ -285,6 +285,20 @@ def _validate_widget_value(node_type: str, widget_name: str, spec: Any, value: A
     type_def = spec[0] if isinstance(spec, (list, tuple)) and len(spec) > 0 else spec
 
     if isinstance(type_def, (list, tuple)):
+        opts = spec[1] if (isinstance(spec, (list, tuple)) and len(spec) > 1
+                           and isinstance(spec[1], dict)) else {}
+        if opts.get("multiselect") and isinstance(value, list):
+            # A native multi-select holds a LIST; each member must be a
+            # choice, which is exactly how core validates it (same rule as
+            # scripts/otr_api.py's validator).
+            stray = [v for v in value if v not in type_def]
+            if stray:
+                raise ValueError(
+                    f"widget {widget_name!r} on node_type {node_type!r} is a "
+                    f"multi-select COMBO with choices {list(type_def)!r}; got "
+                    f"{stray!r}, which are not in the choice list."
+                )
+            return
         if value not in type_def:
             if _is_openrouter_admissible(widget_name, value):
                 return

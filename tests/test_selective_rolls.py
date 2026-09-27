@@ -270,6 +270,25 @@ def test_a_list_widget_value_goes_out_wrapped(which):
     assert isinstance(inputs["episode_language"], str)   # scalars untouched
 
 
+@pytest.mark.parametrize("which", ["script", "package"])
+def test_both_value_checks_take_a_pool_member_by_member(which):
+    """The package's own patcher (patch_creative -> patch_widget_by_name) and
+    the script's must agree: a list is checked member by member, as core
+    checks it, and a stray member is refused by name."""
+    from nodes import _otr_workflow_apply as WA
+    schemas = WA.build_offline_schemas()
+    wf = json.loads(CANONICAL.read_text(encoding="utf-8"))
+    node = next(n for n in wf["nodes"] if n["type"] == "OTR_LedgerScriptWriter")
+    if which == "script":
+        import otr_api as mod
+    else:
+        mod = WA
+    mod.patch_creative(wf, node["id"], "style_roll_pool", ["anime", "cartoon"], schemas)
+    assert node["widgets_values"][-2] == ["anime", "cartoon"]
+    with pytest.raises(ValueError, match="nope"):
+        mod.patch_creative(wf, node["id"], "style_roll_pool", ["anime", "nope"], schemas)
+
+
 def test_set_carries_a_pool_through_the_headless_runner(tmp_path):
     import contextlib
     import io
