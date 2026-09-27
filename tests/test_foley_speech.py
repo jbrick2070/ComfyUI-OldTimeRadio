@@ -87,7 +87,11 @@ def test_sound_descriptions_reach_judge_and_never_become_empty_babble(monkeypatc
     result = speech.detect_foley_speech([_row()], {})
     assert result["b1"]["transcript"] == text and result["b1"]["ducked"] is False
     assert json.loads(calls[0][0][-1]["content"]) == {"b1": text}
-    assert "Sound labels and audio/visual descriptions" in calls[0][0][0]["content"]
+    # The judge is told sound labels are not words (the operator's rule,
+    # 2026-09-26: any human words duck, and unsure means duck).
+    system = calls[0][0][0]["content"]
+    assert "sound labels" in system and "are NOT words" in system
+    assert "When you are unsure, answer true" in system
 
 
 def test_missing_whisper_weights_is_no_duck_with_receipt(monkeypatch):

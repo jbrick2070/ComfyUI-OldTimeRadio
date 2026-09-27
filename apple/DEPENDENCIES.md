@@ -53,6 +53,8 @@ From `requirements.txt`, which is the authority -- this list is read from it:
 transformers>=5.10.4,<6.0
 soundfile>=0.12
 numpy>=1.24
+silero-vad>=6.0
+faster-whisper>=1.1.0
 feedparser>=6.0
 beautifulsoup4>=4.12
 tokenizers>=0.22

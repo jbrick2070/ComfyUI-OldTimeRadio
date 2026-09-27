@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.3.7"
+version = "2.3.8"
 description = "Press Queue once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. No account, no API key, nothing paid. Needs an NVIDIA card with 8 GB or more, a 16 GB Apple Silicon Mac, or a CPU (start ComfyUI with --cpu), plus about 25 GB of free disk; the first run fetches roughly 12 GB of models."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -15,6 +15,13 @@ dependencies = [
     "transformers>=5.10.4,<6.0",
     "soundfile>=0.12",
     "numpy>=1.24",
+    # The foley speech duck (2026-09-26): a CPU voice-activity gate, then a
+    # small Whisper. silero-vad asks only torch>=1.12, which every ComfyUI
+    # already has, so pip never replaces ComfyUI's torch; faster-whisper pulls
+    # no torch at all. Both are imported lazily -- a missing one means no duck,
+    # never a failed episode.
+    "silero-vad>=6.0",
+    "faster-whisper>=1.1.0",
     "feedparser>=6.0",
     "beautifulsoup4>=4.12",
     # FLOOR ONLY -- never re-add an upper bound. `<=0.23` EXCLUDES 0.23.1 under
