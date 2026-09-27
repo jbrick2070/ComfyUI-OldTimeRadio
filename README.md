@@ -5,6 +5,12 @@
 ## Install and run it
 
 1. In ComfyUI open **Extensions -> Node Manager**, search **old time radio**, click **Install**.
+   *No Node Manager?* The official Windows portable ships without it. In the
+   portable folder run
+   `python_embeded\python.exe -m pip install -r ComfyUI\manager_requirements.txt`,
+   then add `--enable-manager` to the end of the `main.py` line in
+   `run_nvidia_gpu.bat` and start ComfyUI with that file. ComfyUI Desktop already
+   has it.
 2. Install ffmpeg: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
 3. Restart ComfyUI.
 4. **Workflow -> Browse Templates -> Extensions -> Old-Time Radio**, open `otr_canonical`.
