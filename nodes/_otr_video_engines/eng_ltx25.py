@@ -1712,97 +1712,27 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     #: same day, so it is deleted rather than left looking load-bearing. The
     #: measurement is the part worth keeping.
 
-    def _settled_free_vram_mb(self, floor_mb, tries=12, pause_s=1.0):
-        """Free VRAM once the release has actually landed.
+    def _free_vram_after_eviction_mb(self, floor_mb):
+        """Free VRAM after the eviction: ONE reading (operator 2026-09-26).
 
-        `reset_cast_buffers()` returns before the driver has handed the memory
-        back. MEASURED on the 4060 at 1 s sampling: 6469 -> 4421 -> 2821 -> 821
-        -> 789 MiB, so the figure was still falling three seconds after the
-        call returned. Reading immediately saw 4940 MB when the settled value
-        was ~7399 -- under-reporting a successful eviction by 2.5 GB, which is
-        enough to refuse a card that had in fact freed plenty.
+        This used to poll -- up to twelve 1 s reads until the figure rose and
+        then held -- because on 2026-09-23 the 4060 was still handing memory
+        back for about three seconds after ``reset_cast_buffers()`` returned
+        (6469 -> 4421 -> 2821 -> 821 -> 789 MiB at 1 s sampling). By
+        2026-09-26 every settle line on both boxes read "never moved": four
+        identical readings from 0.0 s (the 4060's ltx25_foley_16gb A/B, the
+        5080's ltx25_video legs). The release lands before the first read, so
+        the loop spent 3 s a clip waiting on a figure that reaches a log line
+        and nothing else -- no branch shortens, skips or refuses the decode on
+        it (operator ruling: only an OOM decides). An early reading can only
+        under-report in that log line.
 
-        Polls until the reading stops rising and STAYS there. Costs about
-        four seconds on any card -- the old version claimed a big card "pays
-        nothing", which was true and was exactly the bug: it exited on the
-        first plateau, and on the 4060 the first plateau was 2.5 GB short.
-        """
-        import time
-        # SAY WHAT IT SAW. Three cuts at the exit condition have all returned
-        # the same 4940 MB on the 4060 -- four runs, three commits, identical
-        # to the megabyte -- while that card's TRUE floor moved more than 2 GB
-        # between legs (789 MiB used on one, 2821 MiB on the next). A reading
-        # that is merely EARLY tracks the floor and varies with it. One that
-        # does not move at all while the underlying quantity swings 2 GB is not
-        # sampling the floor, and a fourth guess at the predicate will not find
-        # out why.
-        #
-        # Nobody has yet seen the sequence this loop observes on that card: an
-        # external nvidia-smi trace cannot see inside the twelve tries. So it
-        # logs every reading with its timestamp, once per call, and the next
-        # leg answers the question instead of extending it. The 4060 box asked
-        # for exactly this, and it is right that four attempts have been
-        # reasoned about and none measured.
-        trace = []
-        t0 = time.monotonic()
-
-        def _done(value, why):
-            _LOG.info("[OTR video] %s: settle %s -> %s | readings: %s",
-                      self.name, why,
-                      "None" if value is None else "%.0f MB" % value,
-                      " ".join(trace) or "(none)")
-            return value
-
-        best = None
-        flat = 0
-        rose = False
-        while True:
-            now = _MC.free_vram_mb()
-            trace.append("%.1fs=%s" % (time.monotonic() - t0,
-                                       "None" if now is None else "%.0f" % now))
-            if now is None:
-                # A failed probe is not an answer: `floor_mb` is the UNSETTLED
-                # pre-eviction reading this function exists to avoid, so one
-                # bad sample must not republish it. Skip and keep waiting.
-                tries = int(tries) - 1
-                if tries <= 0:
-                    return _done(best if best is not None else floor_mb,
-                                 "gave up on unreadable card")
-                time.sleep(float(pause_s))
-                continue
-            if best is None:
-                best = now
-                flat = 0
-            elif now > best + 1.0:
-                best = now
-                flat = 0
-                rose = True                 # the release is demonstrably live
-            elif now >= best - 50.0:
-                # At or near the high-water mark: a genuine plateau. RISE
-                # FIRST, THEN TWO FLATS -- the opening reading is taken while
-                # the release is still in flight, so a plateau never
-                # interrupted by a rise proves only that nothing has happened
-                # yet.
-                best = max(best, now)
-                flat += 1
-                if rose and flat >= 2:
-                    return _done(best, "settled (rise then two flat)")
-                if flat >= 3 and not rose:
-                    # Nothing is coming: three still reads at 1 s is longer
-                    # than the release takes to begin, so this is an eviction
-                    # that freed nothing rather than one still in flight.
-                    return _done(best, "never moved")
-            else:
-                # A big DROP is not a plateau -- something else took memory, or
-                # the release is still moving. Keep waiting.
-                flat = 0
-            tries = int(tries) - 1
-            if tries <= 0:
-                # The cap reports what is free NOW, not the high-water mark: a
-                # peak seen once while a sustained collapse goes unmentioned is
-                # the wrong number to hand a decode that is about to run.
-                return _done(now if now is not None else best, "hit the cap")
-            time.sleep(float(pause_s))
+        An unreadable card reports ``floor_mb``, the pre-eviction reading,
+        rather than None."""
+        now = _MC.free_vram_mb()
+        _LOG.info("[OTR video] %s: free VRAM after eviction %s (one reading)",
+                  self.name, "unreadable" if now is None else "%.0f MB" % now)
+        return floor_mb if now is None else now
 
     def _total_vram_mb(self):
         """Card capacity, or None. `free_vram_mb` reads it and throws it away."""
@@ -1876,9 +1806,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             return
 
         # TELEMETRY MUST NOT KILL THE GRAPH. This call sits outside the
-        # eviction's own try/except, and it sleeps and calls into torch -- a
-        # raise here would escape `_harvest` and take the render with it, over
-        # a number that only reaches a log line.
+        # eviction's own try/except, and it calls into torch -- a raise here
+        # would escape `_harvest` and take the render with it, over a number
+        # that only reaches a log line.
         #
         # `Exception`, NOT `BaseException`, and the distinction is load-bearing
         # rather than stylistic. ComfyUI declares
@@ -1895,15 +1825,14 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         # AND AN EARLIER COMMENT HERE CLAIMED THIS GUARDS A DRIVER WEDGE. It
         # does not and cannot: a wedged `torch.cuda.synchronize()` never
         # returns and never raises, so no `except` clause of any breadth
-        # rescues the thread. The try cap bounds the polling loop; nothing
-        # bounds the synchronize, and that is an accepted risk, not a handled
-        # one.
+        # rescues the thread. Nothing bounds the synchronize, and that is an
+        # accepted risk, not a handled one.
         try:
-            after_mb = self._settled_free_vram_mb(free_mb)
+            after_mb = self._free_vram_after_eviction_mb(free_mb)
         except Exception as exc:            # noqa: BLE001 -- telemetry only
             _LOG.warning(
-                "[OTR video] %s: could not settle the free-VRAM reading (%r); "
-                "reporting the unsettled figure", self.name, exc)
+                "[OTR video] %s: could not read free VRAM after eviction (%r); "
+                "reporting the pre-eviction figure", self.name, exc)
             after_mb = free_mb
         total_mb = self._total_vram_mb()     # already best-effort internally
         _LOG.info(
