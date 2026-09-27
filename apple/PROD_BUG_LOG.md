@@ -15629,3 +15629,23 @@ not promote it to the Bug Bible on this evidence alone.
   unchanged and green.
 - live verify: owed -- the duck test re-runs on the pod after the overnight
   episode in flight, on this fix.
+
+## PBUG-20260927-02 -- the foley speech duck's Whisper raised on every CUDA 13 stack, so the duck silently ducked nothing
+- surfaced: 2026-09-27 03:30 on the 5080 (Windows, torch 2.10+cu130), running
+  the duck's own VAD and Whisper helpers over the 8 foley stems of the
+  regression episode `rustling_secrets_20260927_013743` to answer "did Whisper
+  hear any voice". With the gate bypassed, the first transcription raised
+  "Library cublas64_12.dll is not found or cannot be loaded".
+- root cause: faster-whisper's ctranslate2 4.8.2 is built against CUDA 12 and
+  loads cuBLAS 12 only at the first encode. It reports a CUDA device on a
+  CUDA 13 stack (even with CUDA_VISIBLE_DEVICES empty), so `_load_whisper`
+  chose float16 on CUDA and every transcription raised. The detector's
+  transaction boundary caught it -- no episode failed -- and the duck ducked
+  nothing on every foley episode on the 5080, the 4060 and the cu130 pod.
+- fix (af73b048): `_load_whisper` proves CUDA with one real one-second encode
+  and builds the model on the CPU (int8) when that raises. Test drives both
+  branches.
+- live verify (5080, af73b048): the probe failed on cublas64_12 and fell back;
+  the CPU model transcribed all 8 stems in 16 s. The same run showed why the
+  gate stays: ungated, Whisper wrote "1.5mm 2.5mm 2.5mm ..." and "1.5% 1.5%"
+  on stems the gate correctly called voiceless.
