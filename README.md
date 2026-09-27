@@ -219,9 +219,9 @@ in a row give you two different shows.
 **Or use it as an app.** Every gallery entry carries the same simple form
 (ComfyUI's app view): language, acts, cast, story bank, visual style, then the
 video, image, voice, music and writer models, then the My Story fields and the
-space saver. **`otr_app`** opens straight into it. The per-machine workflows
-below open on the canvas with their machine's models already chosen; press
-**Enter app mode** to switch one to the form. Fill it in and press Run; the
+space saver. **`otr_app`** and the per-machine workflows below open straight
+into it, the per-machine ones with their machine's models already chosen;
+**View graph** shows the canvas behind it. Fill it in and press Run; the
 finished episode plays in the app.
 
 **Wait, then look in `<your ComfyUI output folder>/otr/obs/`.** The first run

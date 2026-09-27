@@ -138,10 +138,11 @@ def _pack_identity_failures(paths, version: str) -> list[str]:
 #: `extra.linearData.inputs` is the form, top to bottom, in list order, and
 #: `extra.linearMode` opens the workflow straight into it. ONE FORM everywhere,
 #: in the operator's order (2026-09-26, after seeing the story-only form live:
-#: "story, models, My Story at the bottom"). The per-machine workflows OPEN ON
-#: THE GRAPH (his call) and reach the form through the Enter app mode
-#: button; one extra
-#: generated file, workflows/otr_app.json, is the canonical opened AS the app.
+#: "story, models, My Story at the bottom"). The per-machine workflows OPEN AS
+#: THE APP (the operator, 2026-09-26 evening: "per machine app view"; they had
+#: opened on the graph since earlier that day) and reach the canvas through
+#: View graph. One extra generated file, workflows/otr_app.json, is the
+#: canonical opened AS the app.
 #: The canonical itself carries neither:
 #: it is the workflow the operator edits on the canvas, and a flag there
 #: would open ITS gallery card as an app too. (The cards would not inherit
@@ -388,7 +389,7 @@ def build_variant(profile_id: str, *, schemas=None, mapping=None,
     stamp_pack_identity(applied, live_pack_version())
     # `extra` and `id` sit outside semantic_master_hash by construction, so
     # neither moves the hash stamped below.
-    stamp_app_mode(applied, "form", open_as_app=False)
+    stamp_app_mode(applied, "form", open_as_app=True)
     applied["id"] = workflow_id_for(_variant_stem(profile_id))
     master_hash = semantic_master_hash(applied, mapping=mapping,
                                        schemas=schemas)

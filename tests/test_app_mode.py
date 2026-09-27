@@ -59,9 +59,10 @@ def test_the_canonical_is_not_an_app():
 
 
 @pytest.mark.parametrize("path", variant_paths(), ids=lambda p: p.stem)
-def test_every_card_opens_on_the_graph_with_the_full_form(path):
+def test_every_card_opens_as_the_app_with_the_full_form(path):
+    """The operator, 2026-09-26 evening: "per machine app view"."""
     wf = _load(path)
-    assert wf["extra"]["linearMode"] is False
+    assert wf["extra"]["linearMode"] is True
     assert _pairs(wf) == [tuple(e[:2]) for e in CONFIG["form"]]
 
 
