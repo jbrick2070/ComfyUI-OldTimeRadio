@@ -37,10 +37,7 @@ def enabled_env(monkeypatch):
         "OPENROUTER_SORT",
         "OPENROUTER_A_ROUTE",
         "OPENROUTER_B_ROUTE",
-        "OPENROUTER_MAX_TOKENS_PER_CALL",
-        "OPENROUTER_MAX_TOKENS_PER_RUN",
         "OPENROUTER_A_TEMP",
-        "OPENROUTER_A_MAXTOK",
     ):
         monkeypatch.delenv(k, raising=False)
 

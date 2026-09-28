@@ -284,8 +284,8 @@ def test_credits_script_pass_does_not_clamp_against_virtual_8192(
     msgs = ProviderCapacityMessages([{"role": "user", "content": "write the act"}])
     out = backend.generate(entry, msgs, max_new_tokens=None)
     assert out == "full script"
-    assert captured["payload"]["max_tokens"] == occ.DEFAULT_OUTPUT_TOKENS_CAP
-    assert captured["payload"]["max_tokens"] == 16384
+    # No output cap (2026-09-28): nothing on the wire can cut the act short.
+    assert "max_tokens" not in captured["payload"]
 
 
 def test_backend_load_rejects_when_disabled_and_no_auth(comfy_off):
@@ -406,7 +406,7 @@ def test_generate_luna_sends_none_reasoning(comfy_on, monkeypatch):
     assert captured["payload"]["temperature"] == 0.7
 
 
-def test_generate_sol_omits_reasoning_effort_and_lifts_output_floor(
+def test_generate_sol_omits_reasoning_effort_and_output_cap(
         comfy_on, monkeypatch):
     captured = {}
 
@@ -429,7 +429,7 @@ def test_generate_sol_omits_reasoning_effort_and_lifts_output_floor(
     )
     assert captured["payload"]["model"] == occ.COMFY_GPT_SOL
     assert "reasoning_effort" not in captured["payload"]
-    assert captured["payload"]["max_tokens"] >= occ.DEFAULT_MIN_OUTPUT_TOKENS_REASONING
+    assert "max_tokens" not in captured["payload"]
     assert captured["payload"]["temperature"] == 0.7
 
 
@@ -460,9 +460,10 @@ def test_backend_generate_requires_auth(comfy_on, monkeypatch):
         backend.generate(entry, [{"role": "user", "content": "hi"}], max_new_tokens=8)
 
 
-def test_min_output_tokens_floored_bug301(comfy_on, monkeypatch):
-    """BUG-LOCAL-301: a small per-call max_new_tokens must be floored to at
-    least DEFAULT_MIN_OUTPUT_TOKENS (1024) on a non-reasoning Credits slug."""
+def test_a_small_request_carries_no_output_cap(comfy_on, monkeypatch):
+    """BUG-LOCAL-301 floored a small per-call budget so a free-form reply was
+    not cut off mid-object. Since 2026-09-28 no output number is sent at all,
+    so a small request cannot cut the reply short."""
     captured = {}
 
     def _fake_post(*, url, bearer, payload, timeout_s):
@@ -477,14 +478,14 @@ def test_min_output_tokens_floored_bug301(comfy_on, monkeypatch):
     backend = occ.ComfyCreditsBackend()
     entry = backend.load(occ.SLOT_B_ID, types.SimpleNamespace(context_window=8192))
     backend.generate(entry, [{"role": "user", "content": "hi"}], max_new_tokens=64)
-    assert occ.DEFAULT_MIN_OUTPUT_TOKENS >= 1024
-    assert captured["payload"]["max_tokens"] >= 1024
+    assert "max_tokens" not in captured["payload"]
     assert "reasoning_effort" not in captured["payload"]
 
 
-def test_sonnet5_technical_uses_reasoning_output_floor(comfy_on, monkeypatch):
-    """Sonnet 5 cannot turn reasoning off; JSON passes need the 4096 floor
-    the OpenRouter lane already uses when effort is not none."""
+def test_sonnet5_technical_keeps_low_effort_and_no_output_cap(comfy_on, monkeypatch):
+    """Sonnet 5 cannot turn reasoning off, so it keeps effort "low". The 4096
+    reasoning floor existed only to lift the output cap; with no cap there is
+    nothing for the reasoning to starve."""
     captured = {}
 
     def _fake_post(*, url, bearer, payload, timeout_s):
@@ -500,7 +501,7 @@ def test_sonnet5_technical_uses_reasoning_output_floor(comfy_on, monkeypatch):
     entry = backend.load(occ.SLOT_B_ID, types.SimpleNamespace(context_window=8192))
     backend.generate(entry, [{"role": "user", "content": "hi"}], max_new_tokens=64)
     assert captured["payload"]["reasoning_effort"] == "low"
-    assert captured["payload"]["max_tokens"] >= occ.DEFAULT_MIN_OUTPUT_TOKENS_REASONING
+    assert "max_tokens" not in captured["payload"]
 
 
 def test_generate_fn_factory_marks_remote(comfy_on):
@@ -582,10 +583,6 @@ def test_resolve_inputs_old_workflow_defaults_comfy_slots_empty():
     assert out["comfy_slot_b_model"] == ""
 
 
-def test_credits_run_cap_is_one_million():
-    assert occ.DEFAULT_MAX_TOKENS_PER_RUN == 1_000_000
-
-
 def test_usage_tokens_prefers_provider_total():
     assert occ._usage_tokens({"usage": {"total_tokens": 412}}) == 412
     assert occ._usage_tokens({
@@ -594,27 +591,23 @@ def test_usage_tokens_prefers_provider_total():
     assert occ._usage_tokens({}) == 0
 
 
-def test_generate_accounts_provider_usage_not_the_output_cap(monkeypatch):
-    """Live 1-act abort: estimate added max_tokens (16384) per call."""
-    occ.reset_run_budget()
-    monkeypatch.setattr(occ, "_bearer", lambda: "test-token")
+def test_generate_accounts_provider_usage_not_the_request(comfy_on, monkeypatch):
+    """Live 1-act abort 2026-09-15: the old tally added each call's 16384
+    output allowance. The tally is the provider's reported usage, added where
+    the reply is read."""
+    def _fake_post(*, url, bearer, payload, timeout_s):
+        return {"status_code": 200,
+                "json": {"choices": [{"message": {"content": "ok"}}],
+                         "usage": {"total_tokens": 350}},
+                "text": ""}
+
+    monkeypatch.setattr(occ, "_post_comfy_chat_completion", _fake_post)
+    occ.set_auth(api_key="key-abc")
+    occ.set_slot_bindings(slot_b=occ.COMFY_GPT_LUNA)
     backend = occ.ComfyCreditsBackend()
-
-    def post(*, bearer, payload, slug, fail_on_output_limit=False):
-        backend._last_usage_tokens = 350
-        return "ok"
-
-    monkeypatch.setattr(backend, "_post_with_retries", post)
-    backend.generate(
-        {
-            "slug": occ.COMFY_GPT_LUNA,
-            "model_id": occ.SLOT_B_ID,
-            "context_cap": 131072,
-            "max_tokens_cap": 16384,
-        },
-        [{"role": "user", "content": "hello"}],
-        max_new_tokens=256,
-    )
+    entry = backend.load(occ.SLOT_B_ID, types.SimpleNamespace(context_window=131072))
+    backend.generate(entry, [{"role": "user", "content": "hello"}],
+                     max_new_tokens=16384)
     assert occ._run_token_total == 350
 
 
@@ -732,18 +725,3 @@ def test_error_snippet_reads_comfy_top_level_message():
         "text": '{"message":"Invalid Comfy API key"}',
     })
     assert snippet == "Invalid Comfy API key"
-
-
-def test_every_cloud_credits_json_raises_the_run_cap():
-    # config/profiles/*.json was retired; workflow_matrix.json is the single
-    # source of truth for every shipping workflow now (see
-    # nodes/_otr_shared/capability_profiles.py).
-    from nodes._otr_shared import capability_profiles as cp
-
-    cloud_ids = [pid for pid in cp.matrix_rows() if pid.startswith("otr_cloud")]
-    assert cloud_ids, "no cloud profiles"
-    for pid in cloud_ids:
-        profile = cp.load_profile(pid)
-        env = ((profile.get("launch") or {}).get("env") or {})
-        cap = int(env.get("OTR_COMFY_MAX_TOKENS_PER_RUN") or 0)
-        assert cap >= 1_000_000, "%s missing Credits run cap" % pid

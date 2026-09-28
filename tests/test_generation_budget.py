@@ -541,8 +541,11 @@ def test_local_structured_transport_adds_prefix_without_losing_sampling(
     assert generate.schema_model is ResultSchema
 
 
-def test_openrouter_transport_subtracts_prompt_from_remote_output_budget(
+def test_openrouter_transport_sends_no_output_cap_after_a_long_prompt(
         monkeypatch):
+    """The prompt used to be subtracted from a remote output budget (1192 here).
+    Since 2026-09-28 no output number is sent (operator: "no caps"); a prompt
+    that still leaves the minimum room simply runs."""
     seen = {}
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     monkeypatch.setattr(
@@ -557,7 +560,6 @@ def test_openrouter_transport_subtracts_prompt_from_remote_output_budget(
     entry = {
         "slug": "test/model",
         "context_cap": 8192,
-        "max_tokens_cap": 8192,
         "base_url": "https://example.invalid",
     }
 
@@ -568,7 +570,7 @@ def test_openrouter_transport_subtracts_prompt_from_remote_output_budget(
         max_new_tokens=9520,
     )
 
-    assert seen["payload"]["max_tokens"] == 1192
+    assert "max_tokens" not in seen["payload"]
 
 
 def test_openrouter_complete_patch_refuses_before_network(monkeypatch):
@@ -582,7 +584,6 @@ def test_openrouter_complete_patch_refuses_before_network(monkeypatch):
     entry = {
         "slug": "test/model",
         "context_cap": 8192,
-        "max_tokens_cap": 8192,
         "base_url": "https://example.invalid",
     }
     with pytest.raises(
@@ -593,36 +594,6 @@ def test_openrouter_complete_patch_refuses_before_network(monkeypatch):
             entry,
             _RequireFullMessages([
                 {"role": "user", "content": "x" * 28000},
-            ]),
-            temperature=.2,
-            max_new_tokens=2000,
-        )
-    assert calls == []
-
-
-def test_openrouter_complete_patch_refuses_provider_cap_before_network(
-    monkeypatch,
-):
-    calls = []
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
-    monkeypatch.setattr(
-        openrouter,
-        "_post_chat_completion",
-        lambda **kwargs: calls.append(kwargs),
-    )
-    with pytest.raises(
-        openrouter.OpenRouterConfigError,
-        match="provider_output_cap=1000",
-    ):
-        openrouter.OpenRouterBackend().generate(
-            {
-                "slug": "test/model",
-                "context_cap": 8192,
-                "max_tokens_cap": 1000,
-                "base_url": "https://example.invalid",
-            },
-            _RequireFullMessages([
-                {"role": "user", "content": "compact"},
             ]),
             temperature=.2,
             max_new_tokens=2000,
@@ -642,7 +613,6 @@ def test_comfy_credits_complete_patch_refuses_before_network(monkeypatch):
     entry = {
         "slug": "test/model",
         "context_cap": 8192,
-        "max_tokens_cap": 8192,
     }
     with pytest.raises(
         comfy.ComfyCreditsConfigError,
@@ -659,7 +629,7 @@ def test_comfy_credits_complete_patch_refuses_before_network(monkeypatch):
     assert calls == []
 
 
-def test_comfy_credits_strict_patch_keeps_exact_requested_budget(monkeypatch):
+def test_comfy_credits_whole_patch_that_fits_is_sent_uncapped(monkeypatch):
     seen = {}
     monkeypatch.setattr(comfy, "_bearer", lambda: "test-token")
     backend = comfy.ComfyCreditsBackend()
@@ -673,8 +643,7 @@ def test_comfy_credits_strict_patch_keeps_exact_requested_budget(monkeypatch):
         {
             "slug": "test/model",
             "context_cap": 8192,
-            "max_tokens_cap": 8192,
-        },
+            },
         _RequireFullMessages([
             {"role": "user", "content": "compact"},
         ]),
@@ -682,4 +651,4 @@ def test_comfy_credits_strict_patch_keeps_exact_requested_budget(monkeypatch):
         max_new_tokens=384,
     )
     assert out == "{}"
-    assert seen["payload"]["max_tokens"] == 384
+    assert "max_tokens" not in seen["payload"]

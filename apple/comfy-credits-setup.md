@@ -68,14 +68,12 @@ stamped).
 
 ## Cost guards
 
-Belt-and-suspenders on top of prepaid credits:
-
-- `OTR_COMFY_MAX_TOKENS_PER_CALL` (default 32768) — per-call ceiling, enforced
-  **before** the network call.
-- `OTR_COMFY_MAX_TOKENS_PER_RUN` (default 1000000) — per-episode ceiling, reset
-  by the writer at the top of every run. Counts returned usage, not the 16384
-  output-cap estimate.
-- `OTR_COMFY_A_MAXTOK` / `OTR_COMFY_B_MAXTOK` — per-slot output caps.
+Prepaid credits cap spend account-side, and before the first credit moves OTR
+checks your Comfy balance against a deliberately high estimate of the episode
+and refuses to start if it cannot cover it. There are no token caps once a run
+starts — no per-call or per-episode ceiling and no output cap — because a
+mid-run cap throws away everything the run had already paid for. Each call logs
+the tokens the provider actually billed, with a running total for the episode.
 
 A failed call **aborts the run** with a clear error — there is no mid-episode
 fall-back to a local model and no silent remote→remote swap.

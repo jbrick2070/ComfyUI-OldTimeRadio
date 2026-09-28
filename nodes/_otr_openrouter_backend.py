@@ -9,19 +9,21 @@ Hard constraints honoured here (see the go-forward plan, C1-C9):
   * offline-first: no remote path is reachable unless an OpenRouter key
     is present (env or the two pack files in the README heading). C6: the
     separate OTR_ENABLE_OPENROUTER opt-in flag gate was removed.
-  * C6 hard cost guard: a conservative per-call AND per-run token
-    ceiling is enforced BEFORE the network call; the call aborts
-    rather than spend unbounded credits. Spend is logged per call.
+  * No token caps (2026-09-28): no per-call or per-run ceiling and no
+    max_tokens on the wire -- the model writes until it stops or reaches
+    its own limit, and the provider bills what it wrote. Money is gated
+    once, at queue time, by the wallet check (cloud_balance_preflight),
+    before any credit moves. Each call logs the provider's own reported
+    tokens and cost.
   * C5 no half-remote: bounded retries on transient failures, then a
     clean abort (`OpenRouterCallFailedError`) -- never a silent
     mid-run fall-back to local.
   * C9 no secrets: the key is read from the environment or the two pack
     files, never logged, and never written back to disk.
 
-This module is import-safe with no network and no torch. The two
-mockable seams the tests drive are module-level functions
-`_estimate_request_tokens` and `_post_chat_completion`; patch them to
-prove the cost-ceiling abort and the retry ladder without a network.
+This module is import-safe with no network and no torch. The mockable
+seam the tests drive is the module-level `_post_chat_completion`; patch
+it to prove the retry ladder and the usage tally without a network.
 
 S3 wires this backend into the live loader path; S1 (this file) only
 builds + registers it and proves it under mocked HTTP.
@@ -197,64 +199,26 @@ DEFAULT_CONTEXT_WINDOW = 8192
 OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT = "openrouter/auto"
 OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT = "openrouter/auto"
 
-# Conservative cost ceilings. Deliberately low so an unconfigured
-# operator cannot accidentally spend a fortune; raise via env when ready.
-# Defect C fix: the COST per-call ceiling must sit ABOVE the OUTPUT cap, or a
-# reply near the output cap (+ the prompt added by the estimate) spuriously
-# trips OpenRouterCostCeilingError. So they are two separate numbers.
-DEFAULT_OUTPUT_TOKENS_CAP = 16384     # ceiling on OUTPUT tokens (max_tokens) per call
-# R3 (2026-06-22): bumped 8192 -> 16384 as the 0-line GUARD for the frontier
-# reasoning-effort default (below). A reasoning model spends part of the output
-# budget on hidden reasoning; at the old 8192 ceiling a low-effort run could
-# starve the story body (finish_reason=length -> empty/truncated -> 0-line).
-# Still well under the per-call cost ceiling. Override per slot via
-# OPENROUTER_<A|B>_MAXTOK.
-DEFAULT_MAX_TOKENS_PER_CALL = 32768   # COST per-call ceiling (prompt+output estimate)
-DEFAULT_MAX_TOKENS_PER_RUN = 300_000
+# NO TOKEN CAPS (operator, 2026-09-28: "no caps ... remove that whole
+# feature"; PBUG-20260928-02). There was a per-run ceiling (300000), a per-call
+# ceiling (32768) and an output cap (16384 max_tokens, with floors to lift it
+# for reasoning models). The run ceiling counted every call as its prompt PLUS
+# its whole output allowance, so a 3-act episode "reached" 300000 while the
+# provider billed a fraction of that, and the abort threw away every credit the
+# run had already spent (live 2026-09-17 and 2026-09-28, both inside
+# ledger_clean). The output cap bought nothing: the provider bills only what the
+# model writes, so a cap can only cut a reply short -- and the floors existed
+# only to stop it doing that to reasoning models. A call now sends no max_tokens
+# (live 2026-09-28: Sonnet 5.5 wrote 37533 tokens and stopped on its own), and
+# money is gated once, at queue time, by the wallet check.
 DEFAULT_TIMEOUT_S = 120
 DEFAULT_MAX_RETRIES = 2  # total attempts = retries + 1
 
-# Minimum output budget for a remote call. The writer's per-call
-# max_new_tokens are sized for the LOCAL grammar-constrained path, where
-# lm-format-enforcer forces a compact bare JSON object that fits in
-# ~150-200 tokens. A free-form remote model (no token grammar) writes a
-# fuller object + a ```json fence and needs more room; at the local
-# budget it truncates mid-object (finish_reason=length) -> unparseable
-# JSON -> fail-closed abort. This floor (max_tokens is a CEILING -- the
-# model still stops at finish_reason=stop and bills only actual tokens)
-# lets the remote model finish. Overridable via OPENROUTER_MIN_OUTPUT_TOKENS.
+# The least room a reply needs after the prompt. The model's context window is
+# a real limit, not ours: a prompt that leaves less than this is refused before
+# it is sent, instead of failing upstream after the credit has moved.
+# Overridable via OPENROUTER_MIN_OUTPUT_TOKENS.
 DEFAULT_MIN_OUTPUT_TOKENS = 1024
-
-# ...and the SAME floor is nowhere near enough when the model REASONS.
-#
-# `max_tokens` bounds reasoning tokens + content tokens TOGETHER, and the hidden
-# reasoning is emitted FIRST. So a reasoning model spends the floor thinking and
-# gets cut before it writes a single content token -> finish_reason=length -> an
-# empty/truncated body -> unparseable JSON -> fail-closed abort. This is not
-# hypothetical: DEFAULT_REASONING_EFFORT is "low", so reasoning is ON for EVERY
-# remote call by default.
-#
-# The OUTPUT CAP already learned this (16384, R3 2026-06-22: "a reasoning model
-# spends part of the output budget on hidden reasoning ... could starve the story
-# body"). That fix protected the BIG calls -- the story body asks for thousands of
-# tokens, so it clears a reasoning preamble on its way past. It never protected
-# the SMALL ones. A short call (the announcer's news-coda bridge asks for ~150
-# tokens, sized for the local grammar-constrained path) is floored to 1024 and
-# dies, because 1024 is a reasoning budget, not a reasoning budget PLUS a bridge
-# line.
-#
-# Live 2026-07-14, 420w `public_domain_story` leg: aion-3.0-mini (mandatory
-# reasoning) hit finish_reason=length on BOTH news-coda bridge attempts and the
-# episode aborted -- correctly, since the no-fallback rip (2026-07-03) refuses to
-# paper a dead LLM over with canned text. The model was never given room to
-# answer.
-#
-# So the floor is reasoning-aware: when reasoning is active, it must cover the
-# preamble AND the answer. max_tokens is a CEILING -- the model still stops at
-# finish_reason=stop and bills only what it actually emits -- so a generous floor
-# costs nothing on a short reply. Overridable via
-# OPENROUTER_MIN_OUTPUT_TOKENS_REASONING.
-DEFAULT_MIN_OUTPUT_TOKENS_REASONING = 4096
 
 
 # ---------------------------------------------------------------------------
@@ -269,11 +233,6 @@ class OpenRouterError(RuntimeError):
 class OpenRouterConfigError(OpenRouterError):
     """Remote was requested but the environment is not configured
     (missing key / disabled gate / unresolved slug)."""
-
-
-class OpenRouterCostCeilingError(OpenRouterError):
-    """A call would exceed the configured token/spend ceiling (C6).
-    Raised BEFORE the network call -- no credits are spent."""
 
 
 class OpenRouterCallFailedError(OpenRouterError):
@@ -660,15 +619,17 @@ def resolve_route(letter: str, slug: str) -> tuple[str, str | None]:
 
 
 def reset_run_budget() -> None:
-    """Zero the per-run token accumulator. Called at the start of an
-    episode so the per-run cost ceiling (C6) measures one run, not the
-    process lifetime. Also clears the per-run resolved-model ledger so the
-    treatment records THIS episode's `~latest` resolutions, not stale ones."""
+    """Zero the per-run usage tally. Called at the start of an episode so
+    the logged run total describes one run, not the process lifetime. Also
+    clears the per-run resolved-model ledger so the treatment records THIS
+    episode's `~latest` resolutions and cost, not stale ones."""
     global _run_token_total
     _run_token_total = 0
     _resolved_models.clear()
 
 
+# Tokens the provider reported billing this run -- a tally for the log, never
+# a limit. Only a response's own usage block adds to it.
 _run_token_total = 0
 
 
@@ -702,6 +663,46 @@ def _record_resolved(requested_slug: str, body: dict) -> None:
         slot["cost_usd"] += cost
     except Exception:  # noqa: BLE001 -- provenance is best-effort
         pass
+
+
+def _usage_tokens(body: dict) -> tuple[int, int, int]:
+    """(prompt, completion, total) tokens the provider reported for one
+    response; zeros when it reported none. Never an estimate."""
+    usage = body.get("usage") if isinstance(body, dict) else None
+    if not isinstance(usage, dict):
+        return 0, 0, 0
+    try:
+        prompt = int(usage.get("prompt_tokens") or 0)
+        completion = int(usage.get("completion_tokens") or 0)
+        total = int(usage.get("total_tokens") or 0) or prompt + completion
+    except (TypeError, ValueError):
+        return 0, 0, 0
+    return max(0, prompt), max(0, completion), max(0, total)
+
+
+def _account_usage(slug: str, body: dict) -> None:
+    """Add one billed response to the run tally and log it with the
+    provider's own numbers. Called where the body is parsed, so a response
+    that later fails validation is still counted -- it was still billed."""
+    global _run_token_total
+    prompt, completion, total = _usage_tokens(body)
+    _run_token_total += total
+    run_cost = sum(v.get("cost_usd", 0.0) for v in _resolved_models.values())
+    try:
+        cost = float(((body or {}).get("usage") or {}).get("cost") or 0.0)
+    except (TypeError, ValueError, AttributeError):
+        cost = 0.0
+    if total:
+        log.info(
+            "[OpenRouter] %s used %d tokens (%d prompt + %d output), $%.4f "
+            "| run so far: %d tokens, $%.4f",
+            slug, total, prompt, completion, cost, _run_token_total, run_cost,
+        )
+    else:
+        log.info(
+            "[OpenRouter] %s reported no usage | run so far: %d tokens, $%.4f",
+            slug, _run_token_total, run_cost,
+        )
 
 
 def resolved_models_snapshot() -> dict:
@@ -1150,15 +1151,6 @@ def refresh_catalog_cache(*, force: bool = False) -> dict:  # noqa: ARG001 -- fo
 # ---------------------------------------------------------------------------
 
 
-def _estimate_request_tokens(messages: list[dict], max_new_tokens: int) -> int:
-    """Conservative pre-call token estimate: ~4 chars per prompt token
-    plus the full output budget. Intentionally rough and ALWAYS an
-    over-estimate bias so the cost guard errs toward aborting early.
-    Tests patch this to force the ceiling."""
-    prompt_chars = sum(len(str(m.get("content", ""))) for m in (messages or []))
-    return prompt_chars // 4 + int(max_new_tokens or 0)
-
-
 def _post_chat_completion(
     *, base_url: str, api_key: str, payload: dict, timeout_s: int,
 ) -> dict:
@@ -1209,8 +1201,9 @@ class OpenRouterBackend:
 
     `load()` builds a provider-tagged cache_entry carrying the resolved
     slug + per-slot config -- no weights, no tokenizer, zero VRAM.
-    `generate()` posts the chat request behind the cost guard + retry
-    ladder. `unload()` is a no-op (nothing is resident)."""
+    `generate()` posts the chat request behind the retry ladder and logs
+    the provider's reported usage. `unload()` is a no-op (nothing is
+    resident)."""
 
     # --- protocol: load -------------------------------------------------
 
@@ -1257,11 +1250,8 @@ class OpenRouterBackend:
             "reasoning": cached_model.get("reasoning"),
             "context_cap": context_window,
             "context_window": context_window,
-            # optional per-slot overrides (FC3) -- None ⇒ caller controls
+            # optional per-slot override (FC3) -- None ⇒ caller controls
             "temperature_override": _float_env(f"OPENROUTER_{letter}_TEMP"),
-            "max_tokens_cap": _int_env(
-                f"OPENROUTER_{letter}_MAXTOK", DEFAULT_OUTPUT_TOKENS_CAP
-            ),
             "base_url": _env("OPENROUTER_BASE_URL") or DEFAULT_BASE_URL,
             # no "model" / "tokenizer" keys: the generate-fn factory
             # branches on provider BEFORE requiring them (S3).
@@ -1290,9 +1280,9 @@ class OpenRouterBackend:
     ) -> str:
         """Run one remote chat completion and return the decoded string.
 
-        `model` is the cache_entry returned by `load()`. Enforces the
-        cost ceiling BEFORE the call (C6), retries transient failures a
-        bounded number of times, then aborts cleanly (C5)."""
+        `model` is the cache_entry returned by `load()`. Sends no
+        max_tokens (no caps), retries transient failures a bounded number
+        of times, then aborts cleanly (C5)."""
         if receipt_out is not None:
             receipt_out.clear()
         require_full_output = bool(getattr(
@@ -1320,91 +1310,38 @@ class OpenRouterBackend:
         base_url = cache_entry.get("base_url") or DEFAULT_BASE_URL
         provider_sort = cache_entry.get("provider_sort")
 
-        # Resolve the output budget. The remote model has NO token grammar,
-        # so it must not inherit the local grammar-era per-call budget (which
-        # truncates a free-form object mid-JSON). Floor at
-        # DEFAULT_MIN_OUTPUT_TOKENS, then clamp to the per-slot cap. max_tokens
-        # is a ceiling only -- the model stops at finish_reason=stop and bills
-        # actual tokens, so a generous floor costs nothing on short replies.
-        cap = int(cache_entry.get("max_tokens_cap") or DEFAULT_OUTPUT_TOKENS_CAP)
-        # The BASE floor is also the HARD minimum: the value below which
-        # fit_output_tokens refuses the call outright (context overflow). It stays
-        # lean on purpose -- see the reasoning floor below.
-        base_floor = _int_env(
-            "OPENROUTER_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS,
-        )
-        floor = base_floor
-
-        # Resolve reasoning BEFORE the budget: `max_tokens` bounds reasoning +
-        # content together, and the reasoning is emitted FIRST. A floor that does
-        # not cover the preamble hands the model a budget it burns before it can
-        # answer (see DEFAULT_MIN_OUTPUT_TOKENS_REASONING). The same value is
-        # reused for the payload below -- resolve it once.
         reasoning_effort = _mandatory_reasoning_effort(
             slug, cache_entry.get("reasoning")
         )
-        if reasoning_effort and reasoning_effort != "none":
-            floor = max(floor, _int_env(
-                "OPENROUTER_MIN_OUTPUT_TOKENS_REASONING",
-                DEFAULT_MIN_OUTPUT_TOKENS_REASONING,
-            ))
 
-        requested_tokens = max(1, int(max_new_tokens or 0))
-        if (require_full_output or bounded_capacity) and requested_tokens > cap:
-            capacity = GenerationContextOverflowError(
-                f"OpenRouter {slug} cannot fit the complete requested output: "
-                f"requested_output={requested_tokens}, provider_output_cap={cap}"
-            )
-            raise OpenRouterConfigError(str(capacity)) from capacity
-        if reserve_remaining:
-            out_tokens = cap
-        elif bool(getattr(messages, "_otr_strict_remote_output_budget", False)):
-            out_tokens = requested_tokens
-        else:
-            out_tokens = max(requested_tokens, floor)
-        if out_tokens > cap:
-            out_tokens = cap
+        # NO OUTPUT CAP: the request carries no max_tokens, so the model writes
+        # until it stops or reaches its own output limit, and the provider bills
+        # what it wrote. The one limit left is the model's context window, which
+        # is the model's and not ours: a prompt that leaves no room to answer,
+        # or too little for an artifact that must arrive whole, is refused here
+        # before any credit moves instead of failing upstream after one has.
+        min_room = _int_env("OPENROUTER_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
+        must_fit_whole = require_full_output or bounded_capacity
         try:
-            fitted_tokens = fit_output_tokens(
-                out_tokens,
+            fit_output_tokens(
+                max(1, int(max_new_tokens or 0)) if must_fit_whole else min_room,
                 context_cap=int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
                 prompt_tokens=estimate_prompt_tokens(messages),
-                # The HARD minimum stays the BASE floor, never the reasoning floor.
-                # The reasoning floor is a DESIRED minimum -- it lifts the budget
-                # when the window can afford it; it must never turn a survivable
-                # call into an abort. On a small-context model a long prompt can
-                # leave less than the reasoning floor (8192 cap - a ~7000-token
-                # prompt = 1192 tokens): that call should still RUN with what is
-                # left, degraded, not refuse to start. Gating the hard minimum on
-                # the reasoning floor would abort it.
-                min_output_tokens=min(base_floor, cap),
+                min_output_tokens=min_room,
                 label=f"OpenRouter {slug}",
-                require_full=require_full_output or bounded_capacity,
+                require_full=must_fit_whole,
             )
         except GenerationContextOverflowError as exc:
             raise OpenRouterConfigError(str(exc)) from exc
-        if fitted_tokens != out_tokens:
-            log.warning(
-                "[OpenRouter] output budget clamped: requested=%d effective=%d "
-                "context_cap=%d",
-                out_tokens, fitted_tokens,
-                int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
-            )
-        out_tokens = fitted_tokens
         temp = (
             cache_entry.get("temperature_override")
             if cache_entry.get("temperature_override") is not None
             else temperature
         )
 
-        # --- C6 cost guard: enforce BEFORE any network call ---
-        est = _estimate_request_tokens(messages, out_tokens)
-        self._enforce_cost_ceiling(est, slug=slug)
-
         payload: dict[str, Any] = {
             "model": slug,
             "messages": messages,
-            "max_tokens": out_tokens,
         }
 
         if stop:
@@ -1439,8 +1376,7 @@ class OpenRouterBackend:
         provider_opts: dict[str, Any] = {}
         if provider_sort:
             # ":nitro"/throughput = fastest provider, ":floor"/price =
-            # cheapest, latency = lowest time-to-first-token (C6: the cost
-            # guard still applies; a faster upstream is not an uncapped one).
+            # cheapest, latency = lowest time-to-first-token.
             provider_opts["sort"] = provider_sort
         if response_format is not None:
             payload["response_format"] = response_format
@@ -1502,8 +1438,6 @@ class OpenRouterBackend:
                 receipt_out=receipt_out,
             )
 
-        # Account actual spend (best-effort; falls back to the estimate).
-        self._account_spend(est)
         return text
 
     # --- protocol: unload ----------------------------------------------
@@ -1515,31 +1449,6 @@ class OpenRouterBackend:
         return None
 
     # --- internals ------------------------------------------------------
-
-    def _enforce_cost_ceiling(self, est_tokens: int, *, slug: str) -> None:
-        per_call = _int_env("OPENROUTER_MAX_TOKENS_PER_CALL", DEFAULT_MAX_TOKENS_PER_CALL)
-        per_run = _int_env("OPENROUTER_MAX_TOKENS_PER_RUN", DEFAULT_MAX_TOKENS_PER_RUN)
-        if est_tokens > per_call:
-            raise OpenRouterCostCeilingError(
-                f"OpenRouter call aborted: estimated {est_tokens} tokens "
-                f"exceeds OPENROUTER_MAX_TOKENS_PER_CALL={per_call} "
-                f"(slug={slug}). No request was sent."
-            )
-        if _run_token_total + est_tokens > per_run:
-            raise OpenRouterCostCeilingError(
-                f"OpenRouter call aborted: this call (~{est_tokens} tokens) "
-                f"would push the run total {_run_token_total} over "
-                f"OPENROUTER_MAX_TOKENS_PER_RUN={per_run}. No request was "
-                f"sent. Raise the ceiling or shorten the episode."
-            )
-
-    def _account_spend(self, est_tokens: int) -> None:
-        global _run_token_total
-        _run_token_total += int(est_tokens)
-        log.info(
-            "[OpenRouter] call accounted ~%d tokens (run total ~%d)",
-            est_tokens, _run_token_total,
-        )
 
     def _post_with_retries(
         self, *, base_url: str, api_key: str, payload: dict, slug: str,
@@ -1672,6 +1581,7 @@ class OpenRouterBackend:
         # Record the concrete model the upstream actually served (a `~latest`
         # alias resolves server-side) + its cost, for the episode credits sheet.
         _record_resolved(slug, body)
+        _account_usage(slug, body)
         choices = body.get("choices") or []
         if not choices:
             raise OpenRouterCallFailedError(
@@ -1709,9 +1619,9 @@ class OpenRouterBackend:
                     ended_with_eos=False,
                 )
             log.warning(
-                "[OpenRouter] %s hit finish_reason=length -- output truncated "
-                "at the token ceiling; a downstream JSON parse may fail. Raise "
-                "OPENROUTER_MIN_OUTPUT_TOKENS or the slot max-tokens cap.",
+                "[OpenRouter] %s hit finish_reason=length -- the reply reached "
+                "the model's own output limit (no cap is sent); a downstream "
+                "JSON parse may fail.",
                 slug,
             )
         if not isinstance(content, str) or not content:
@@ -1856,8 +1766,8 @@ def openrouter_meta_for(creative_id: str, technical_id: str) -> dict[str, Any]:
     """Build run-meta remote-LLM provenance (S5).
 
     For each slot bound to an OpenRouter virtual handle, records the
-    provider, the virtual handle, the RESOLVED slug, and basic params
-    (per-slot max-tokens cap + optional temperature override). Adds a
+    provider, the virtual handle, the RESOLVED slug, the provider route and
+    the optional per-slot temperature override. Adds a
     run-level `llm_remote_provider` and `llm_remote_schema_mode` (schema
     mode = the json_schema response_format path, used when the TECHNICAL
     slot is remote). Returns ``{}`` when neither slot is remote, so a
@@ -1883,9 +1793,6 @@ def openrouter_meta_for(creative_id: str, technical_id: str) -> dict[str, Any]:
         meta[f"llm_{slot_name}_handle"] = model_id
         meta[f"llm_{slot_name}_slug"] = slug
         meta[f"llm_{slot_name}_route"] = sort or "default"
-        meta[f"llm_{slot_name}_max_tokens_cap"] = _int_env(
-            f"OPENROUTER_{letter}_MAXTOK", DEFAULT_MAX_TOKENS_PER_CALL
-        ) if letter != "?" else DEFAULT_MAX_TOKENS_PER_CALL
         meta[f"llm_{slot_name}_temperature_override"] = (
             _float_env(f"OPENROUTER_{letter}_TEMP") if letter != "?" else None
         )
@@ -1925,7 +1832,6 @@ __all__ = [
     "reset_run_budget",
     "OpenRouterError",
     "OpenRouterConfigError",
-    "OpenRouterCostCeilingError",
     "OpenRouterCallFailedError",
     "OpenRouterModelGoneError",
     "is_model_gone_error",

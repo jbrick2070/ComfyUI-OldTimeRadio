@@ -1,14 +1,13 @@
-"""BUG-LOCAL-296 -- the OpenRouter per-RUN cost budget must reset per episode.
+"""BUG-LOCAL-296 -- the OpenRouter per-run tally must reset per episode.
 
 `_otr_openrouter_backend._run_token_total` is a module-level accumulator and
-`reset_run_budget()` was defined + exported but never called in the live path.
-In a persistent headless server (the Scheduled Task launcher) the "per-run"
-cost ceiling therefore accumulated across EVERY remote episode and would
-spuriously fail-closed after a few runs. The fix wires `reset_run_budget()`
-into the single per-episode entry -- `OTR_LedgerScriptWriter.run()` -- at the
-very top, before any remote LLM work (the writer's own passes + the downstream
-cascade share the process global, so one reset scopes the ceiling to one
-episode). No network, no GPU.
+`reset_run_budget()` was defined + exported but never called in the live path,
+so in a persistent headless server the "per-run" numbers accumulated across
+EVERY remote episode. The fix wires `reset_run_budget()` into the single
+per-episode entry -- `OTR_LedgerScriptWriter.run()` -- at the very top, before
+any remote LLM work. (The tally then fed a per-run ceiling; since 2026-09-28
+there is no ceiling, and it is the log's running total of billed tokens.)
+No network, no GPU.
 """
 from __future__ import annotations
 
@@ -19,12 +18,13 @@ import nodes.OTR_LedgerScriptWriter as W
 
 
 def test_reset_run_budget_zeroes_the_accumulator():
-    """Direct contract: the accumulator climbs as calls are accounted and
-    reset_run_budget() returns it to zero."""
+    """Direct contract: the tally climbs by each response's reported usage
+    and reset_run_budget() returns it to zero."""
     orb.reset_run_budget()
-    backend = orb.OpenRouterBackend()
-    backend._account_spend(5000)
-    backend._account_spend(5000)
+    billed = {"usage": {"prompt_tokens": 4000, "completion_tokens": 1000,
+                        "total_tokens": 5000}}
+    orb._account_usage("test/model", billed)
+    orb._account_usage("test/model", billed)
     assert orb._run_token_total == 10000
     orb.reset_run_budget()
     assert orb._run_token_total == 0

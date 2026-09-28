@@ -52,12 +52,10 @@ def enabled_env(monkeypatch):
     monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
     monkeypatch.setenv("OPENROUTER_MODEL_A", "anthropic/claude-3.5-sonnet")
     monkeypatch.setenv("OPENROUTER_MODEL_B", "openai/gpt-4o")
-    # Clear any inherited cost overrides so defaults apply.
+    # Clear any inherited overrides so defaults apply.
     for k in (
-        "OPENROUTER_MAX_TOKENS_PER_CALL",
-        "OPENROUTER_MAX_TOKENS_PER_RUN",
         "OPENROUTER_A_TEMP",
-        "OPENROUTER_A_MAXTOK",
+        "OPENROUTER_MIN_OUTPUT_TOKENS",
         "OPENROUTER_TIMEOUT_S",
         "OPENROUTER_MAX_RETRIES",
         "OPENROUTER_REASONING_EFFORT",
@@ -147,24 +145,22 @@ def test_context_window_falls_back_to_the_row_when_the_cache_is_cold(
     assert entry["context_cap"] == 8192
 
 
-def test_long_artifact_request_survives_intact_on_a_large_window(
+def test_long_artifact_request_reaches_the_wire_uncapped(
     enabled_env, catalog_cache, monkeypatch,
 ):
-    """THE 720-WORD REGRESSION.
+    """THE 720-WORD REGRESSION, and the rule that replaced its fix.
 
     `original_codex56sol` P6 budgets `240 + 160*beats + 4*target_words`. At 720
-    words the beat ceiling is 40, so it asks for 9,520 output tokens. Against
-    the fictitious 8,192 window that request was silently reduced to whatever
-    was left after the prompt, and the performance script came back cut off
-    mid-JSON -- undecodable, three times, blaming the model instead of the
-    budget. Against the model's REAL 131,072-token window it must reach the
-    wire whole.
+    words that asks for 9,520 output tokens, and against a fictitious 8,192
+    window the request was silently reduced and the script came back cut off
+    mid-JSON. Since 2026-09-28 no output number is sent at all (operator: "no
+    caps"), so nothing on our side can shorten it: the model writes until it
+    stops.
     """
     catalog_cache([
         {"id": "aion-labs/aion-3.0-mini", "context_length": 131072},
     ])
     monkeypatch.setenv("OPENROUTER_MODEL_A", "aion-labs/aion-3.0-mini")
-    monkeypatch.setenv("OPENROUTER_A_MAXTOK", "16384")
     seen = {}
     monkeypatch.setattr(
         orb, "_post_chat_completion",
@@ -180,40 +176,41 @@ def test_long_artifact_request_survives_intact_on_a_large_window(
         max_new_tokens=9520,
     )
 
-    assert seen["payload"]["max_tokens"] == 9520
+    assert "max_tokens" not in seen["payload"]
 
 
-def test_long_artifact_request_is_clamped_on_a_small_window(
+def test_whole_artifact_that_cannot_fit_the_window_is_refused_before_the_network(
     enabled_env, catalog_cache, monkeypatch,
 ):
-    """The clamp is still correct when the window really IS small.
+    """The one limit left is the model's own context window.
 
-    This is the honest half of the fix: a genuinely 8k model cannot be handed a
-    9,520-token artifact request, and the reduction must still happen. What was
-    wrong was applying it to a model with 131k.
+    A genuinely 8k model cannot hold a 9,520-token artifact that must arrive
+    whole. That is refused before any credit moves, rather than sent and cut
+    off upstream after the provider has billed it.
     """
     catalog_cache([
         {"id": "tiny/eight-k", "context_length": 8192},
     ])
     monkeypatch.setenv("OPENROUTER_MODEL_A", "tiny/eight-k")
-    monkeypatch.setenv("OPENROUTER_A_MAXTOK", "16384")
-    seen = {}
+    sent = []
     monkeypatch.setattr(
         orb, "_post_chat_completion",
-        lambda **kw: seen.update(kw) or _ok_result('{"ok": true}'),
+        lambda **kw: sent.append(kw) or _ok_result('{"ok": true}'),
     )
+
+    class WholeArtifact(list):
+        _otr_require_full_output_budget = True
 
     backend = orb.OpenRouterBackend()
     entry = backend.load(orb.SLOT_A_ID, _row(context_window=8192))
-    backend.generate(
-        entry,
-        [{"role": "user", "content": "score + manifest + truth map"}],
-        temperature=0.72,
-        max_new_tokens=9520,
-    )
-
-    assert seen["payload"]["max_tokens"] < 9520
-    assert seen["payload"]["max_tokens"] <= 8192
+    with pytest.raises(orb.OpenRouterConfigError):
+        backend.generate(
+            entry,
+            WholeArtifact([{"role": "user", "content": "score + manifest + truth map"}]),
+            temperature=0.72,
+            max_new_tokens=9520,
+        )
+    assert sent == []
 
 
 # ---------------------------------------------------------------------------
@@ -361,17 +358,9 @@ def test_generate_happy_path(enabled_env, monkeypatch):
     )
     assert out == "hello from sonnet"
     assert seen["payload"]["model"] == "anthropic/claude-3.5-sonnet"
-    # 128 is below the remote min-output floor and is bumped up so a free-form
-    # remote reply isn't truncated mid-JSON. max_tokens is a ceiling.
-    #
-    # This asserted 1024 until 2026-07-14, which quietly pinned the BUG:
-    # DEFAULT_REASONING_EFFORT is "low", so reasoning is ON for this call, and
-    # `max_tokens` bounds reasoning + content TOGETHER with the reasoning emitted
-    # FIRST. At 1024 a reasoning model spends the whole budget thinking and is cut
-    # before it writes a content token (finish_reason=length). So the floor is
-    # reasoning-aware and the happy path gets the reasoning floor.
     assert seen["payload"]["reasoning_effort"] == "low"
-    assert seen["payload"]["max_tokens"] == orb.DEFAULT_MIN_OUTPUT_TOKENS_REASONING
+    # No output cap (2026-09-28): the model writes until it stops.
+    assert "max_tokens" not in seen["payload"]
     assert seen["payload"]["temperature"] == 0.6
     assert seen["api_key_present"] is True
 
@@ -446,45 +435,35 @@ def test_make_generate_fn_threads_grammar_and_marker(enabled_env, monkeypatch):
     assert captured["grammar"] == "GBNF-HERE"
 
 
-def test_small_max_new_tokens_is_floored(enabled_env, monkeypatch):
-    """The writer's local grammar-era per-call budget (~200) must be floored
-    for the remote path so a free-form model isn't truncated mid-JSON
-    (the cast-JSON truncation bug, 2026-05-31). max_tokens is a ceiling, so
-    flooring it costs nothing on short replies."""
-    seen = {}
-    monkeypatch.setattr(
-        orb, "_post_chat_completion",
-        lambda **kw: seen.update(kw) or _ok_result(),
-    )
-    backend = orb.OpenRouterBackend()
-    entry = backend.load(orb.SLOT_A_ID, _row())
-    backend.generate(entry, [{"role": "user", "content": "x"}],
-                     temperature=0.5, max_new_tokens=50)
-    assert seen["payload"]["max_tokens"] >= 1024
-
-
-def test_floor_overridable_via_env(enabled_env, monkeypatch):
-    # Reasoning OFF isolates the BASE floor, which is what this test is about.
-    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "none")
-    monkeypatch.setenv("OPENROUTER_MIN_OUTPUT_TOKENS", "1500")
-    seen = {}
-    monkeypatch.setattr(
-        orb, "_post_chat_completion",
-        lambda **kw: seen.update(kw) or _ok_result(),
-    )
-    backend = orb.OpenRouterBackend()
-    entry = backend.load(orb.SLOT_A_ID, _row())
-    backend.generate(entry, [{"role": "user", "content": "x"}],
-                     temperature=0.5, max_new_tokens=50)
-    assert seen["payload"]["max_tokens"] == 1500
-
-
 # ---------------------------------------------------------------------------
-# The reasoning floor -- `max_tokens` bounds reasoning + content TOGETHER
+# No output cap -- no call carries max_tokens (operator 2026-09-28: "no caps")
 # ---------------------------------------------------------------------------
 
 
-def _seen_max_tokens(monkeypatch, *, max_new_tokens=50):
+class _Strict(list):
+    _otr_strict_remote_output_budget = True
+
+
+class _ReserveEverything(list):
+    _otr_reserve_remaining_output_capacity = True
+    _otr_fail_on_output_limit = True
+
+
+@pytest.mark.parametrize("make_messages, max_new_tokens, effort", [
+    (list, 50, None),                 # a budget sized for the local path
+    (list, 50, "none"),               # reasoning off
+    (list, 9999, None),               # a big request
+    (_Strict, 1024, None),            # a strict budget
+    (_ReserveEverything, None, None), # a reserve-everything pass
+])
+def test_no_call_carries_an_output_cap(enabled_env, monkeypatch, make_messages,
+                                       max_new_tokens, effort):
+    """The provider bills only what the model writes, so an output cap could
+    only ever cut a reply short -- and the floors that stopped it doing that to
+    reasoning models went with it. Whatever the caller asked for, the request
+    carries no max_tokens."""
+    if effort:
+        monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", effort)
     seen = {}
     monkeypatch.setattr(
         orb, "_post_chat_completion",
@@ -492,71 +471,18 @@ def _seen_max_tokens(monkeypatch, *, max_new_tokens=50):
     )
     backend = orb.OpenRouterBackend()
     entry = backend.load(orb.SLOT_A_ID, _row(context_window=131072))
-    backend.generate(entry, [{"role": "user", "content": "x"}],
+    backend.generate(entry, make_messages([{"role": "user", "content": "x"}]),
                      temperature=0.5, max_new_tokens=max_new_tokens)
-    return seen["payload"]
+    assert "max_tokens" not in seen["payload"]
 
 
-def test_reasoning_model_gets_room_to_think_AND_answer(enabled_env, monkeypatch):
-    """A reasoning model must not spend its whole budget on the preamble.
-
-    THE BUG (live 2026-07-14, 420w public_domain_story): `max_tokens` bounds
-    reasoning tokens and content tokens TOGETHER, and the hidden reasoning is
-    emitted FIRST. The announcer's news-coda bridge asks for ~150 tokens (a budget
-    sized for the LOCAL grammar-constrained path), the old floor lifted that to
-    1024, and aion-3.0-mini -- a MANDATORY-reasoning model -- burned all 1024
-    thinking and was cut before writing a single content token. Both attempts hit
-    finish_reason=length, the bridge failed, and the no-fallback rip correctly
-    aborted the episode rather than ship canned text.
-
-    The OUTPUT CAP had already learned this (8192 -> 16384, R3 2026-06-22) and it
-    protected the BIG calls. The FLOOR never did, so the SMALL calls kept dying.
-    """
-    payload = _seen_max_tokens(monkeypatch)
-    assert payload["reasoning_effort"] == "low"          # on by default
-    assert payload["max_tokens"] >= orb.DEFAULT_MIN_OUTPUT_TOKENS_REASONING
-    # Room for the preamble AND the answer -- strictly more than a budget the
-    # preamble alone can swallow.
-    assert payload["max_tokens"] > orb.DEFAULT_MIN_OUTPUT_TOKENS
-
-
-def test_reasoning_off_keeps_the_lean_base_floor(enabled_env, monkeypatch):
-    """No preamble to pay for -> no reason to inflate the budget."""
-    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "none")
-    payload = _seen_max_tokens(monkeypatch)
-    assert "reasoning_effort" not in payload or payload["reasoning_effort"] == "none"
-    assert payload["max_tokens"] == orb.DEFAULT_MIN_OUTPUT_TOKENS
-
-
-def test_reasoning_floor_overridable_via_env(enabled_env, monkeypatch):
-    monkeypatch.setenv("OPENROUTER_MIN_OUTPUT_TOKENS_REASONING", "6000")
-    payload = _seen_max_tokens(monkeypatch)
-    assert payload["max_tokens"] == 6000
-
-
-def test_reasoning_floor_never_lowers_a_bigger_request(enabled_env, monkeypatch):
-    """The floor is a FLOOR. A call that already asks for more keeps its budget."""
-    payload = _seen_max_tokens(
-        monkeypatch,
-        max_new_tokens=orb.DEFAULT_MIN_OUTPUT_TOKENS_REASONING + 5000,
-    )
-    assert payload["max_tokens"] == orb.DEFAULT_MIN_OUTPUT_TOKENS_REASONING + 5000
-
-
-def test_reasoning_floor_degrades_it_never_aborts_a_survivable_call(
-        enabled_env, monkeypatch):
-    """The reasoning floor is a DESIRED minimum, not a HARD one.
-
-    A long prompt on a small-context model can leave less room than the reasoning
-    floor (8192 cap minus a ~7000-token prompt = 1192 tokens). That call must still
-    RUN with what is left -- degraded -- not refuse to start. The HARD minimum (the
-    threshold below which fit_output_tokens raises context-overflow) stays the lean
-    BASE floor.
-
-    Caught by the known-fail guard on 2026-07-14: the first cut of the reasoning
-    floor passed it as `min_output_tokens`, which turned this survivable call into
-    an abort.
-    """
+def test_a_long_prompt_that_leaves_room_still_runs(
+        enabled_env, catalog_cache, monkeypatch):
+    """A long prompt on a small-context model that still leaves the minimum
+    room runs; only a prompt that leaves less than that is refused."""
+    catalog_cache([
+        {"id": "anthropic/claude-3.5-sonnet", "context_length": 8192},
+    ])
     seen = {}
     monkeypatch.setattr(
         orb, "_post_chat_completion",
@@ -570,45 +496,30 @@ def test_reasoning_floor_degrades_it_never_aborts_a_survivable_call(
         temperature=0.2,
         max_new_tokens=9520,
     )
-    # It ran, and took the room that was actually left.
-    fitted = seen["payload"]["max_tokens"]
-    assert 0 < fitted < orb.DEFAULT_MIN_OUTPUT_TOKENS_REASONING
+    assert seen["payload"]["messages"]
+    assert "max_tokens" not in seen["payload"]
 
 
-def test_strict_message_budget_bypasses_overridden_floor(enabled_env, monkeypatch):
-    monkeypatch.setenv("OPENROUTER_MIN_OUTPUT_TOKENS", "1500")
-    seen = {}
+def test_a_prompt_that_leaves_no_room_is_refused_before_the_network(
+        enabled_env, catalog_cache, monkeypatch):
+    catalog_cache([
+        {"id": "anthropic/claude-3.5-sonnet", "context_length": 8192},
+    ])
+    sent = []
     monkeypatch.setattr(
         orb, "_post_chat_completion",
-        lambda **kw: seen.update(kw) or _ok_result(),
-    )
-
-    class StrictMessages(list):
-        _otr_strict_remote_output_budget = True
-
-    backend = orb.OpenRouterBackend()
-    entry = backend.load(orb.SLOT_A_ID, _row())
-    backend.generate(
-        entry, StrictMessages([{"role": "user", "content": "x"}]),
-        temperature=0.5, max_new_tokens=1024,
-    )
-    assert seen["payload"]["max_tokens"] == 1024
-
-
-def test_max_tokens_clamped_to_cap(enabled_env, monkeypatch):
-    monkeypatch.setenv("OPENROUTER_A_MAXTOK", "256")
-    seen = {}
-    monkeypatch.setattr(
-        orb, "_post_chat_completion",
-        lambda **kw: seen.update(kw) or _ok_result(),
+        lambda **kw: sent.append(kw) or _ok_result(),
     )
     backend = orb.OpenRouterBackend()
-    entry = backend.load(orb.SLOT_A_ID, _row())
-    backend.generate(
-        entry, [{"role": "user", "content": "x"}],
-        temperature=0.5, max_new_tokens=9999,
-    )
-    assert seen["payload"]["max_tokens"] == 256
+    entry = backend.load(orb.SLOT_A_ID, _row(context_window=8192))
+    with pytest.raises(orb.OpenRouterConfigError):
+        backend.generate(
+            entry,
+            [{"role": "user", "content": "x" * 32000}],   # ~8000 prompt tokens
+            temperature=0.2,
+            max_new_tokens=64,
+        )
+    assert sent == []
 
 
 def test_generate_sends_reasoning_effort_when_env_set(enabled_env, monkeypatch):
@@ -676,54 +587,75 @@ def test_generate_uses_lowest_catalog_effort_when_reasoning_is_mandatory(
 
 
 # ---------------------------------------------------------------------------
-# C6 cost-ceiling abort -- proven with a mocked token counter
+# No token ceilings -- the run tally is the provider's bill, never a limit
 # ---------------------------------------------------------------------------
 
 
-def test_cost_ceiling_per_call_aborts_before_network(enabled_env, monkeypatch):
-    sent = {"called": False}
-    monkeypatch.setattr(
-        orb, "_post_chat_completion",
-        lambda **kw: sent.__setitem__("called", True) or _ok_result(),
-    )
-    # Mocked token counter forces a huge estimate over the per-call cap.
-    monkeypatch.setattr(orb, "_estimate_request_tokens", lambda *_a, **_k: 10_000_000)
+def _billed_result(total, *, cost=0.001, content="ok"):
+    return {
+        "status_code": 200,
+        "json": {
+            "choices": [{"message": {"content": content}}],
+            "usage": {"prompt_tokens": total - 10, "completion_tokens": 10,
+                      "total_tokens": total, "cost": cost},
+        },
+        "text": "",
+    }
+
+
+def test_run_tally_is_the_providers_usage_not_the_request(enabled_env, monkeypatch):
+    """PBUG-20260928-02: the old per-run ceiling counted every call as its
+    prompt plus its whole 16384-token output allowance, so a 3-act episode
+    "reached" 300000 while the provider billed a fraction of it -- and the
+    abort threw away the credits already spent. The tally adds only what the
+    provider reports."""
+    monkeypatch.setattr(orb, "_post_chat_completion",
+                        lambda **kw: _billed_result(150))
     backend = orb.OpenRouterBackend()
     entry = backend.load(orb.SLOT_A_ID, _row())
-    with pytest.raises(orb.OpenRouterCostCeilingError):
-        backend.generate(
-            entry, [{"role": "user", "content": "x"}],
-            temperature=0.5, max_new_tokens=64,
-        )
-    assert sent["called"] is False, "no request may be sent when the ceiling trips"
+    backend.generate(entry, [{"role": "user", "content": "x" * 4000}],
+                     temperature=0.5, max_new_tokens=16384)
+    assert orb._run_token_total == 150
 
 
-def test_cost_ceiling_per_run_accumulates(enabled_env, monkeypatch):
-    monkeypatch.setenv("OPENROUTER_MAX_TOKENS_PER_CALL", "1000")
-    monkeypatch.setenv("OPENROUTER_MAX_TOKENS_PER_RUN", "1500")
-    monkeypatch.setattr(orb, "_estimate_request_tokens", lambda *_a, **_k: 800)
-    monkeypatch.setattr(orb, "_post_chat_completion", lambda **kw: _ok_result())
+def test_a_long_run_is_never_stopped_by_a_token_count(enabled_env, monkeypatch):
+    """The live failure: a 3-act episode died inside ledger_clean on its
+    ~300000th counted token (2026-09-17 and 2026-09-28). Four hundred calls of
+    3,000 billed tokens each -- 1.2 million -- all complete."""
+    monkeypatch.setattr(orb, "_post_chat_completion",
+                        lambda **kw: _billed_result(3000))
     backend = orb.OpenRouterBackend()
     entry = backend.load(orb.SLOT_A_ID, _row())
-    msgs = [{"role": "user", "content": "x"}]
-    # 1st call (800) ok; run total -> 800.
-    backend.generate(entry, msgs, temperature=0.5, max_new_tokens=10)
-    # 2nd call (800) would push run total to 1600 > 1500 -> abort.
-    with pytest.raises(orb.OpenRouterCostCeilingError):
-        backend.generate(entry, msgs, temperature=0.5, max_new_tokens=10)
+    msgs = [{"role": "user", "content": "judge this line"}]
+    for _ in range(400):
+        assert backend.generate(entry, msgs, temperature=0.2,
+                                max_new_tokens=16384) == "ok"
+    assert orb._run_token_total == 1_200_000
 
 
-def test_reset_run_budget_clears_accumulator(enabled_env, monkeypatch):
-    monkeypatch.setenv("OPENROUTER_MAX_TOKENS_PER_RUN", "1500")
-    monkeypatch.setattr(orb, "_estimate_request_tokens", lambda *_a, **_k: 800)
-    monkeypatch.setattr(orb, "_post_chat_completion", lambda **kw: _ok_result())
+def test_reset_run_budget_zeroes_the_tally(enabled_env, monkeypatch):
+    monkeypatch.setattr(orb, "_post_chat_completion",
+                        lambda **kw: _billed_result(800))
     backend = orb.OpenRouterBackend()
     entry = backend.load(orb.SLOT_A_ID, _row())
-    msgs = [{"role": "user", "content": "x"}]
-    backend.generate(entry, msgs, temperature=0.5, max_new_tokens=10)
+    backend.generate(entry, [{"role": "user", "content": "x"}],
+                     temperature=0.5, max_new_tokens=10)
+    assert orb._run_token_total == 800
     orb.reset_run_budget()
-    # After reset the accumulator is 0, so another 800-token call is fine.
-    backend.generate(entry, msgs, temperature=0.5, max_new_tokens=10)
+    assert orb._run_token_total == 0
+
+
+def test_a_billed_reply_that_fails_is_still_counted(enabled_env, monkeypatch):
+    """The provider bills a reply whether or not it is usable, so the tally is
+    added where the body is read, before the text is judged."""
+    monkeypatch.setattr(orb, "_post_chat_completion",
+                        lambda **kw: _billed_result(500, content=""))
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    with pytest.raises(orb.OpenRouterCallFailedError):
+        backend.generate(entry, [{"role": "user", "content": "x"}],
+                         temperature=0.5, max_new_tokens=10)
+    assert orb._run_token_total == 500
 
 
 # ---------------------------------------------------------------------------
@@ -1091,7 +1023,7 @@ def test_provider_capacity_length_is_a_typed_rerollable_capacity_error(
         backend.generate(entry, messages, temperature=0.5, max_new_tokens=None)
 
     error = caught.value
-    assert seen["payload"]["max_tokens"] == orb.DEFAULT_OUTPUT_TOKENS_CAP
+    assert "max_tokens" not in seen["payload"]
     assert error.phase == CAPACITY_PHASE_OUTPUT_LIMIT
     assert error.raw_completion == '{"partial":true}'
     assert error.generated_tokens == 16384

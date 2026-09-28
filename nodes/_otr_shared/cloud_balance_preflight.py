@@ -74,10 +74,14 @@ TTS_CHARS_PER_ACT = 4000
 #: slots, an OpenRouter slug missing from the cache). USD per million tokens;
 #: above every writer slug this pack recommends.
 WRITER_FLOOR_USD_PER_MTOK = 5.0
-#: Per-run token ceilings the backends already enforce (their defaults).
-OPENROUTER_RUN_TOKENS_DEFAULT = 300_000
-COMFY_RUN_TOKENS_DEFAULT = 1_000_000
-GOOGLE_RUN_TOKENS_DEFAULT = 300_000
+#: Writer tokens one episode is priced at, per wallet. Estimates only: since
+#: 2026-09-28 the writer backends carry no token caps, so this check -- made
+#: before any credit moves -- is the one money guard, and it is deliberately
+#: high. (They were the old per-run ceilings, which counted each call's whole
+#: output allowance and so ran well above what the provider billed.)
+OPENROUTER_EPISODE_TOKENS = 300_000
+COMFY_EPISODE_TOKENS = 1_000_000
+GOOGLE_EPISODE_TOKENS = 300_000
 
 _WRITER = "OTR_LedgerScriptWriter"
 _DIRECTOR = "OTR_VideoDirector"
@@ -214,27 +218,13 @@ def default_unit_usd(engine_id: str, engine, duration_s: int = VIDEO_CLIP_SECOND
     return None
 
 
-def _env_int(name: str, default: int) -> int:
-    try:
-        from . import env as otr_env
-    except ImportError:  # pragma: no cover -- flat import
-        import env as otr_env  # type: ignore
-    raw = str(otr_env.get(name, "") or "").strip()
-    if not raw:
-        return int(default)
-    try:
-        return int(raw)
-    except ValueError:
-        return int(default)
-
-
 def default_writer_usd(handle: str, slug: str) -> tuple:
-    """(usd, note) for one writer handle at that backend's per-run ceiling."""
+    """(usd, note) for one writer handle at its wallet's episode estimate."""
     wallet = wallet_for_writer_handle(handle)
     price_per_tok = None
     source = "floor $%.2f/Mtok" % WRITER_FLOOR_USD_PER_MTOK
     if wallet == WALLET_OPENROUTER:
-        tokens = _env_int("OPENROUTER_MAX_TOKENS_PER_RUN", OPENROUTER_RUN_TOKENS_DEFAULT)
+        tokens = OPENROUTER_EPISODE_TOKENS
         try:
             from .._otr_openrouter_backend import _cached_model
             pricing = (_cached_model(slug) or {}).get("pricing") or {}
@@ -249,9 +239,9 @@ def default_writer_usd(handle: str, slug: str) -> tuple:
         except Exception:  # noqa: BLE001 -- cache is advisory
             price_per_tok = None
     elif wallet == WALLET_COMFY:
-        tokens = _env_int("OTR_COMFY_MAX_TOKENS_PER_RUN", COMFY_RUN_TOKENS_DEFAULT)
+        tokens = COMFY_EPISODE_TOKENS
     else:
-        tokens = GOOGLE_RUN_TOKENS_DEFAULT
+        tokens = GOOGLE_EPISODE_TOKENS
     if price_per_tok is None:
         price_per_tok = WRITER_FLOOR_USD_PER_MTOK / 1e6
     return tokens * price_per_tok, "%d tokens x %s" % (tokens, source)

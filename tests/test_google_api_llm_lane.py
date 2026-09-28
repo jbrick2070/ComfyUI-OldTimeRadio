@@ -104,9 +104,8 @@ def test_request_slot_routes_bound_google_without_local_handles(monkeypatch):
 
 
 def test_generate_payload_shape(monkeypatch):
-    # The thinking knobs are operator env overrides; this test pins the
+    # The thinking level is an operator env override; this test pins the
     # shipped defaults, so it must not inherit a box-local setting.
-    monkeypatch.delenv("OTR_GOOGLE_THINKING_HEADROOM", raising=False)
     monkeypatch.delenv("OTR_GOOGLE_THINKING_LEVEL", raising=False)
     captured = {}
 
@@ -140,11 +139,10 @@ def test_generate_payload_shape(monkeypatch):
     assert captured["payload"]["system_instruction"] == "Return only JSON."
     assert captured["payload"]["input"] == "Write a tiny object."
     assert captured["payload"]["response_format"]["mime_type"] == "application/json"
-    # The caller's visible budget plus thinking headroom (2026-09-19: thought
-    # tokens are billed against max_output_tokens and starved a 250-token
-    # description call on the first live Google leg).
-    assert captured["payload"]["generation_config"]["max_output_tokens"] == (
-        64 + gllm.THINKING_HEADROOM_TOKENS)
+    # No output cap (2026-09-28, operator: "no caps"): the reply is not held
+    # to the caller's 64 tokens, so thinking cannot starve it either.
+    assert "max_output_tokens" not in (
+        captured["payload"].get("generation_config") or {})
 
 
 def test_generate_rejects_wrong_message_shape_before_network(monkeypatch):

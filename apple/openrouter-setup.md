@@ -16,7 +16,7 @@ OldTimeRadio runs **100% local with zero API keys by default**, and that never c
 
 - **Free to try:** new accounts get a small free allowance, and OpenRouter has many **free models** (append `:free` to the slug, e.g. a `...:free` model). Free models are rate-limited (~20 requests/min; 50/day until you've purchased ≥10 credits, then 1000/day) and aren't guaranteed to support structured output (see the technical-slot note).
 - **Paid models:** frontier models bill against prepaid **credits** at pass-through provider pricing (no markup). OpenRouter adds a 5.5% fee — $0.80 minimum — when you *buy* credits. You only spend while remote is enabled and selected.
-- **Built-in guard:** OTR enforces a hard per-run spend/token ceiling and aborts before exceeding it, so a runaway loop can't quietly burn credits.
+- **Built-in guard:** before the first credit moves, OTR checks your OpenRouter balance against a deliberately high estimate of the episode and refuses to start if it cannot cover it. There is no token cap once a run starts: a mid-run cap would throw away everything the run had already paid for. Each call logs the tokens and dollars OpenRouter actually billed, with a running total for the episode.
 
 ## Step 1 — Create an OpenRouter account
 
@@ -82,7 +82,7 @@ setx OPENROUTER_SORT throughput   :: both slots, unless a slot/slug overrides it
 - **`latency`** — lowest time-to-first-token.
 - **Unset (default)** — OpenRouter's normal load-balancing; a good neutral choice.
 
-Precedence is most-specific-first: a `:nitro`/`:floor` on the slug wins, then `OPENROUTER_A_ROUTE`/`OPENROUTER_B_ROUTE`, then `OPENROUTER_SORT`. The hard cost ceiling still applies either way — a faster provider is never an uncapped one. The route you used is recorded in the episode's run meta so a run is reproducible.
+Precedence is most-specific-first: a `:nitro`/`:floor` on the slug wins, then `OPENROUTER_A_ROUTE`/`OPENROUTER_B_ROUTE`, then `OPENROUTER_SORT`. The route you used is recorded in the episode's run meta so a run is reproducible.
 
 ## Step 5 — Use it in ComfyUI (the four-dropdown router)
 

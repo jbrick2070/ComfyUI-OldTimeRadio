@@ -29,20 +29,12 @@ _LOG = logging.getLogger("OTR.google_api")
 #   gemini-flash-latest       default -> 861-897 thoughts; "low" -> 0; "minimal" REJECTED (400)
 #   gemini-flash-lite-latest  default -> 0;              "low" -> 241 (turns thinking ON)
 #   gemini-pro-latest         "low"   -> 241 (cannot be switched off)
-# So the level is per MODEL, and headroom is the belt under the braces: the
-# visible budget the caller asked for is what fit_output_tokens sizes; the
-# thinking headroom is added on top (still clamped to the context room) so a
-# model that thinks anyway cannot starve the answer it was asked for.
-THINKING_HEADROOM_TOKENS = 1024
+# So the level is per MODEL. Since 2026-09-28 no max_output_tokens is sent at
+# all (no caps), so thinking can no longer starve the answer; the level still
+# decides how many thought tokens are bought.
 _THINKING_LEVEL_BY_FAMILY = (
     ("flash-lite", None),   # already silent; a level would switch it ON
     ("flash", "low"),       # measured 0 thought tokens at "low"
-)
-# gemini-pro-latest cannot stop thinking and spent 1148 thought tokens on the
-# same prompt at its default level (2048 budget, completed), so its headroom
-# is doubled. Not a shipped pick; a user can select it.
-_THINKING_HEADROOM_BY_FAMILY = (
-    ("pro", 2048),
 )
 
 
@@ -58,22 +50,6 @@ def thinking_level_for(google_model: str) -> str | None:
         if family in name:
             return level
     return None
-
-
-def thinking_headroom_tokens(google_model: str = "") -> int:
-    """Thought-token headroom added on top of the caller's visible budget.
-    `OTR_GOOGLE_THINKING_HEADROOM` overrides for every model."""
-    raw = str(otr_env.get("OTR_GOOGLE_THINKING_HEADROOM") or "").strip()
-    if raw:
-        try:
-            return max(0, int(raw))
-        except ValueError:
-            pass
-    name = str(google_model or "").lower()
-    for family, headroom in _THINKING_HEADROOM_BY_FAMILY:
-        if family in name:
-            return headroom
-    return THINKING_HEADROOM_TOKENS
 
 
 from .models import (
@@ -186,10 +162,10 @@ def _extract_text(
         # so, because a truncated JSON body otherwise surfaces three calls
         # later as a bare "no decodable JSON object" with no cause attached.
         # Blame thinking only when the usage shows thought tokens.
-        cause = ("a thinking model spent the output budget (see "
-                 "thinking_level_for / OTR_GOOGLE_THINKING_HEADROOM)"
+        cause = ("a thinking model spent the model's own output limit (see "
+                 "thinking_level_for)"
                  if isinstance(thought, (int, float)) and thought > 0
-                 else "the output budget was exhausted")
+                 else "the reply reached the model's own output limit")
         _LOG.warning(
             "[OTR.google_api] response truncated (%s): thought_tokens=%s "
             "output_tokens=%s -- returning the partial text; %s",
@@ -283,30 +259,25 @@ class GoogleAPIBackend:
         if level:
             generation_config["thinking_level"] = level
         if max_new_tokens is not None or reserve_remaining:
-            context_cap = int(
-                cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW
-            )
-            prompt_tokens = estimate_prompt_tokens(messages)
-            requested_tokens = (
-                context_cap if reserve_remaining else max(1, int(max_new_tokens))
-            )
+            # NO OUTPUT CAP (operator, 2026-09-28: "no caps"): no
+            # max_output_tokens is sent, so thinking cannot starve the answer
+            # and the model writes until it stops or reaches its own limit.
+            # The context window is the one limit left, and it is the
+            # model's: a prompt that leaves no room, or too little for an
+            # artifact that must arrive whole, is refused before the call.
+            must_fit_whole = require_full_output or bounded_capacity
             try:
-                visible_budget = fit_output_tokens(
-                    requested_tokens,
-                    context_cap=context_cap,
-                    prompt_tokens=prompt_tokens,
+                fit_output_tokens(
+                    max(1, int(max_new_tokens or 0)) if must_fit_whole else 1,
+                    context_cap=int(
+                        cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW
+                    ),
+                    prompt_tokens=estimate_prompt_tokens(messages),
                     label=f"Google API {google_model}",
-                    require_full=require_full_output or bounded_capacity,
+                    require_full=must_fit_whole,
                 )
             except GenerationContextOverflowError as exc:
                 raise GoogleAPIRequestShapeError(str(exc)) from exc
-            # Thought tokens are billed against max_output_tokens, so the
-            # visible budget the caller sized gets thinking headroom on top,
-            # clamped to the room the context leaves (fit_output_tokens has
-            # already guaranteed visible_budget <= that room).
-            room = context_cap - prompt_tokens
-            generation_config["max_output_tokens"] = min(
-                visible_budget + thinking_headroom_tokens(google_model), room)
         if stop:
             generation_config["stop_sequences"] = [str(s) for s in stop if s]
         payload: dict[str, Any] = {

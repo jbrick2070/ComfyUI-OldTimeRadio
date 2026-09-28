@@ -182,35 +182,25 @@ _COMFY_REASONING_OFF = frozenset({
     COMFY_GPT_LUNA_PRO,
 })
 _COMFY_REASONING_LOW_REQUIRED = frozenset({COMFY_CLAUDE_SONNET_5})
-_COMFY_SOL_FAMILY = frozenset({COMFY_GPT_SOL, COMFY_GPT_SOL_PRO})
 _COMFY_NO_TEMPERATURE = frozenset({COMFY_CLAUDE_SONNET_5})
 
-# Cost-guard defaults (mirror the OpenRouter lane). Prepaid credits already
-# cap spend account-side; these are a second belt-and-suspenders ceiling.
-DEFAULT_MAX_TOKENS_PER_CALL = 32768
-# 300000 aborted a live 1-act on 2026-09-15: each call's pre-call estimate
-# added the 16384 output cap, so ledger_clean died around the 50th Credits
-# post. Account actual usage after the call; keep this ceiling as a 7-act
-# envelope, overridable via OTR_COMFY_MAX_TOKENS_PER_RUN on every cloud JSON.
-DEFAULT_MAX_TOKENS_PER_RUN = 1000000
-# Match the OpenRouter lane (R3 2026-06-22): 8192 starved reasoning
-# models -- hidden thinking spends the output budget first, then
-# finish_reason=length cuts the story body. Live 2026-09-15: Sol on
-# Credits hit that exact abort on `_pass_script` after the 8192 context
-# clamp left 5487 tokens. Override per slot via OTR_COMFY_<A|B>_MAXTOK.
-DEFAULT_OUTPUT_TOKENS_CAP = 16384
-# BUG-LOCAL-301: 1024 (was 512). Parity with the OpenRouter lane's BUG-294
-# output-token floor. max_tokens is a CEILING -- a higher floor costs nothing
-# on short replies (the model stops at finish_reason=stop and bills only actual
-# tokens) but stops a verbose / reasoning technical model from being cut off
-# mid-object. Sonnet 5 is the shipping cheap-cloud creative slot and
-# cannot turn reasoning off -- generate() lifts to
-# DEFAULT_MIN_OUTPUT_TOKENS_REASONING (4096, same as the OpenRouter lane)
-# whenever effort is not ``none``, and for Sol/Sol-pro whose effort is
-# omitted so the catalog default can think.
+# NO TOKEN CAPS (operator, 2026-09-28: "no caps ... remove that whole
+# feature"; PBUG-20260928-02), the same as the OpenRouter lane. The per-run
+# ceiling had already killed a live 1-act here on 2026-09-15 by counting each
+# call's 16384 output allowance as spend; the OpenRouter lane then died the same
+# way twice. A request now carries no max_tokens -- ComfyUI's own OpenRouter node
+# posts to this same proxy without one -- so the model writes until it stops or
+# reaches its own limit, and prepaid credits plus the queue-time wallet check
+# are the money guard.
+#
+# The least room a reply needs after the prompt: the model's context window is
+# a real limit, so a prompt that leaves less is refused before it is sent.
 DEFAULT_MIN_OUTPUT_TOKENS = 1024
-DEFAULT_MIN_OUTPUT_TOKENS_REASONING = 4096
-DEFAULT_TIMEOUT_S = 120
+# 600 s, not 120: with no output cap a long reply can take minutes (a 37533-token
+# reply took 160 s on 2026-09-28), and a proxy that must read the whole reply to
+# bill it sends no bytes until it is done. A read timeout below that fails a call
+# the provider has already charged for, and the retry charges it again.
+DEFAULT_TIMEOUT_S = 600
 DEFAULT_MAX_RETRIES = 2
 # Live 2026-09-16: deluxe Foley/audio-in died on a single HTTP 401
 # "Invalid Comfy API key" after many billed Sol/Luna calls. The same
@@ -237,11 +227,6 @@ class ComfyCreditsConfigError(ComfyCreditsError):
     """Comfy Credits was requested but the environment is not configured
     (disabled gate / missing auth token / unresolved slug / unset
     endpoint)."""
-
-
-class ComfyCreditsCostCeilingError(ComfyCreditsError):
-    """A call would exceed the configured token ceiling. Raised BEFORE the
-    network call -- no credits are spent."""
 
 
 class ComfyCreditsCallFailedError(ComfyCreditsError):
@@ -479,7 +464,8 @@ def _bearer() -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Cost guard (per-run accumulator; reset by the writer each episode)
+# Usage tally (per run; reset by the writer each episode). A tally for the
+# log, never a limit -- only a response's own usage block adds to it.
 # ---------------------------------------------------------------------------
 
 _run_token_total = 0
@@ -490,24 +476,11 @@ def reset_run_budget() -> None:
     _run_token_total = 0
 
 
-def _estimate_request_tokens(messages: list[dict], out_tokens: int) -> int:
-    """A cheap ~4-chars-per-token estimate of prompt + output, used only by
-    the pre-call ceiling. Never bills; the real spend is account-side."""
-    chars = 0
-    for m in messages or ():
-        c = m.get("content") if isinstance(m, dict) else None
-        if isinstance(c, str):
-            chars += len(c)
-    return (chars // 4) + int(out_tokens or 0)
-
-
 def _usage_tokens(body: dict) -> int:
-    """Provider-reported tokens for the run accumulator.
-
-    The pre-call estimate adds the full max_tokens cap. Accounting that
-    number after every ledger_clean judge is what burned a 1-act at 300k
-    while the billed usage was a fraction of the estimate.
-    """
+    """Provider-reported tokens for one response; 0 when it reported none.
+    Never an estimate: counting the output allowance instead of the bill is
+    what made the old per-run ceiling kill runs the provider had barely
+    charged for."""
     usage = body.get("usage") if isinstance(body, dict) else None
     if not isinstance(usage, dict):
         return 0
@@ -632,9 +605,6 @@ class ComfyCreditsBackend:
             "context_cap": context_window,
             "context_window": context_window,
             "temperature_override": _float_env(f"OTR_COMFY_{letter}_TEMP"),
-            "max_tokens_cap": _int_env(
-                f"OTR_COMFY_{letter}_MAXTOK", DEFAULT_OUTPUT_TOKENS_CAP
-            ),
             # no "model" / "tokenizer" keys: the generate-fn factory
             # branches on provider BEFORE requiring them.
         }
@@ -657,9 +627,9 @@ class ComfyCreditsBackend:
         **_ignored: Any,
     ) -> str:
         """Run one credit-billed chat completion and return the decoded
-        string. `model` is the cache_entry from load(). Enforces the token
-        ceiling BEFORE the call, retries transient failures a bounded
-        number of times, then aborts cleanly."""
+        string. `model` is the cache_entry from load(). Sends no max_tokens
+        (no caps), retries transient failures a bounded number of times,
+        then aborts cleanly."""
         require_full_output = bool(getattr(
             messages, "_otr_require_full_output_budget", False,
         ))
@@ -683,61 +653,32 @@ class ComfyCreditsBackend:
         slug = cache_entry.get("slug") or resolve_slug(cache_entry["model_id"])
         effort = reasoning_effort_for_slug(slug)
 
-        cap = int(cache_entry.get("max_tokens_cap") or DEFAULT_OUTPUT_TOKENS_CAP)
-        floor = _int_env("OTR_COMFY_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
-        if (effort and effort != "none") or slug in _COMFY_SOL_FAMILY:
-            floor = max(floor, _int_env(
-                "OTR_COMFY_MIN_OUTPUT_TOKENS_REASONING",
-                DEFAULT_MIN_OUTPUT_TOKENS_REASONING,
-            ))
-        requested_tokens = max(1, int(max_new_tokens or 0))
-        if (require_full_output or bounded_capacity) and requested_tokens > cap:
-            capacity = GenerationContextOverflowError(
-                f"Comfy Credits {slug} cannot fit the complete requested "
-                f"output: requested_output={requested_tokens}, "
-                f"provider_output_cap={cap}"
-            )
-            raise ComfyCreditsConfigError(str(capacity)) from capacity
-        if reserve_remaining:
-            out_tokens = cap
-        elif bool(getattr(messages, "_otr_strict_remote_output_budget", False)):
-            out_tokens = requested_tokens
-        else:
-            out_tokens = max(requested_tokens, floor)
-        if out_tokens > cap:
-            out_tokens = cap
+        # NO OUTPUT CAP: no max_tokens on the wire. The model's context window
+        # is the one limit left, and it is the model's: a prompt that leaves no
+        # room to answer, or too little for an artifact that must arrive whole,
+        # is refused here before any credit moves.
+        min_room = _int_env("OTR_COMFY_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
+        must_fit_whole = require_full_output or bounded_capacity
         try:
-            fitted_tokens = fit_output_tokens(
-                out_tokens,
+            fit_output_tokens(
+                max(1, int(max_new_tokens or 0)) if must_fit_whole else min_room,
                 context_cap=int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
                 prompt_tokens=estimate_prompt_tokens(messages),
-                min_output_tokens=min(floor, cap),
+                min_output_tokens=min_room,
                 label=f"Comfy Credits {slug}",
-                require_full=require_full_output or bounded_capacity,
+                require_full=must_fit_whole,
             )
         except GenerationContextOverflowError as exc:
             raise ComfyCreditsConfigError(str(exc)) from exc
-        if fitted_tokens != out_tokens:
-            log.warning(
-                "[ComfyCredits] output budget clamped: requested=%d effective=%d "
-                "context_cap=%d",
-                out_tokens, fitted_tokens,
-                int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
-            )
-        out_tokens = fitted_tokens
         temp = (
             cache_entry.get("temperature_override")
             if cache_entry.get("temperature_override") is not None
             else temperature
         )
 
-        est = _estimate_request_tokens(messages, out_tokens)
-        self._enforce_cost_ceiling(est, slug=slug)
-
         payload: dict[str, Any] = {
             "model": slug,
             "messages": messages,
-            "max_tokens": out_tokens,
         }
         if temp is not None and slug not in _COMFY_NO_TEMPERATURE:
             payload["temperature"] = float(temp)
@@ -748,14 +689,10 @@ class ComfyCreditsBackend:
         if response_format is not None:
             payload["response_format"] = response_format
 
-        self._last_usage_tokens = 0
-        text = self._post_with_retries(
+        return self._post_with_retries(
             bearer=bearer, payload=payload, slug=slug,
             fail_on_output_limit=fail_on_output_limit,
         )
-        used = int(getattr(self, "_last_usage_tokens", 0) or 0)
-        self._account_spend(used if used > 0 else est)
-        return text
 
     def unload(self, model: Any) -> None:  # noqa: ARG002
         """No-op: a credit-billed entry holds no VRAM and no resident
@@ -764,29 +701,24 @@ class ComfyCreditsBackend:
 
     # --- internals ------------------------------------------------------
 
-    def _enforce_cost_ceiling(self, est_tokens: int, *, slug: str) -> None:
-        per_call = _int_env("OTR_COMFY_MAX_TOKENS_PER_CALL", DEFAULT_MAX_TOKENS_PER_CALL)
-        per_run = _int_env("OTR_COMFY_MAX_TOKENS_PER_RUN", DEFAULT_MAX_TOKENS_PER_RUN)
-        if est_tokens > per_call:
-            raise ComfyCreditsCostCeilingError(
-                f"Comfy Credits call aborted: estimated {est_tokens} tokens "
-                f"exceeds OTR_COMFY_MAX_TOKENS_PER_CALL={per_call} "
-                f"(slug={slug}). No request was sent."
-            )
-        if _run_token_total + est_tokens > per_run:
-            raise ComfyCreditsCostCeilingError(
-                f"Comfy Credits call aborted: this call (~{est_tokens} tokens) "
-                f"would push the run total {_run_token_total} over "
-                f"OTR_COMFY_MAX_TOKENS_PER_RUN={per_run}. No request was sent."
-            )
-
-    def _account_spend(self, est_tokens: int) -> None:
+    @staticmethod
+    def _account_usage(slug: str, body: dict) -> None:
+        """Add one billed response to the run tally and log the provider's
+        own number. Called before the text is validated, so a response that
+        then fails is still counted -- it was still billed."""
         global _run_token_total
-        _run_token_total += int(est_tokens)
-        log.info(
-            "[ComfyCredits] call accounted ~%d tokens (run total ~%d)",
-            est_tokens, _run_token_total,
-        )
+        used = _usage_tokens(body)
+        _run_token_total += used
+        if used:
+            log.info(
+                "[ComfyCredits] %s used %d tokens | run so far: %d tokens",
+                slug, used, _run_token_total,
+            )
+        else:
+            log.info(
+                "[ComfyCredits] %s reported no usage | run so far: %d tokens",
+                slug, _run_token_total,
+            )
 
     def _post_with_retries(
         self, *, bearer: str, payload: dict, slug: str,
@@ -821,7 +753,7 @@ class ComfyCreditsBackend:
 
             status = int(result.get("status_code") or 0)
             if status == 200:
-                self._last_usage_tokens = _usage_tokens(result.get("json") or {})
+                self._account_usage(slug, result.get("json") or {})
                 return self._extract_text(
                     result, slug=slug,
                     fail_on_output_limit=fail_on_output_limit,
@@ -882,9 +814,9 @@ class ComfyCreditsBackend:
                     "capacity; the partial artifact is not eligible for reroll"
                 )
             log.warning(
-                "[ComfyCredits] %s hit finish_reason=length -- output "
-                "truncated at the token ceiling; raise "
-                "OTR_COMFY_MIN_OUTPUT_TOKENS or the slot max-tokens cap.",
+                "[ComfyCredits] %s hit finish_reason=length -- the reply "
+                "reached the model's own output limit (no cap is sent); a "
+                "downstream JSON parse may fail.",
                 slug,
             )
         message = choices[0].get("message") or {}
@@ -990,12 +922,9 @@ __all__ = [
     "resolve_context_window",
     "DEFAULT_CONTEXT_WINDOW",
     "DEFAULT_REMOTE_CONTEXT_WINDOW",
-    "DEFAULT_OUTPUT_TOKENS_CAP",
     "DEFAULT_MIN_OUTPUT_TOKENS",
-    "DEFAULT_MIN_OUTPUT_TOKENS_REASONING",
     "ComfyCreditsError",
     "ComfyCreditsConfigError",
-    "ComfyCreditsCostCeilingError",
     "ComfyCreditsCallFailedError",
     "is_comfy_row_id",
     "recommended_slug_for_slot",

@@ -121,7 +121,6 @@ def test_bounded_provider_capacity_fails_before_network(monkeypatch):
             {
                 "slug": "test/model",
                 "context_cap": 8192,
-                "max_tokens_cap": 8192,
                 "base_url": "https://example.invalid",
             },
             BoundedProviderMessages([{"role": "user", "content": "x" * 28000}]),

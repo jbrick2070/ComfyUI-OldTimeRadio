@@ -16,6 +16,12 @@ except ImportError:  # pragma: no cover -- flat test imports
 
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
 DEFAULT_TIMEOUT_S = 120
+# create_interaction's own default, which only the writer relies on (the image,
+# video and Lyria engines pass their own). The writer sends no output cap, so a
+# reply can take minutes, and this API returns it only when it is finished: a
+# 120 s read timeout would fail a call Google has already billed, and the retry
+# would bill it again. OTR_GOOGLE_TIMEOUT_S still overrides.
+DEFAULT_INTERACTION_TIMEOUT_S = 600
 DEFAULT_MAX_RETRIES = 2
 _RETRYABLE_STATUS = frozenset({408, 409, 429, 500, 502, 503, 504})
 
@@ -503,7 +509,8 @@ def create_interaction(
         raise GoogleAPIRequestShapeError("Google payload missing required 'input'.")
 
     key = _api_key or resolve_api_key()
-    timeout = int(timeout_s or otr_env.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
+    timeout = int(timeout_s or otr_env.get("OTR_GOOGLE_TIMEOUT_S")
+                  or DEFAULT_INTERACTION_TIMEOUT_S)
     retries = int(max_retries if max_retries is not None else (
         otr_env.get("OTR_GOOGLE_MAX_RETRIES") or DEFAULT_MAX_RETRIES
     ))
@@ -536,6 +543,7 @@ def create_interaction(
 
 __all__ = [
     "DEFAULT_BASE_URL",
+    "DEFAULT_INTERACTION_TIMEOUT_S",
     "DEFAULT_MAX_RETRIES",
     "DEFAULT_TIMEOUT_S",
     "GoogleAPIBillingOrQuotaError",

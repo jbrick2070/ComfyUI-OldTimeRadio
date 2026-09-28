@@ -4,9 +4,11 @@ leg: gemini-flash-latest spent 242 of a 256-token budget thinking, returned 7
 visible tokens with status "incomplete", and the writer's 250-token
 description call died as "no decodable JSON").
 
-Pins: the per-model thinking level, the headroom added on top of the visible
-budget, the env overrides, and that `status: incomplete` is read as an output
-limit (raised for bounded patches, warned-and-returned otherwise).
+Pins: the per-model thinking level and its env override, that no
+max_output_tokens is sent at all since 2026-09-28 (operator: "no caps") -- so
+thinking can no longer starve the answer -- and that `status: incomplete` is
+read as an output limit (raised for bounded patches, warned-and-returned
+otherwise).
 """
 from __future__ import annotations
 
@@ -36,7 +38,6 @@ def _capture(monkeypatch, body):
 @pytest.fixture(autouse=True)
 def _no_env_override(monkeypatch):
     monkeypatch.delenv("OTR_GOOGLE_THINKING_LEVEL", raising=False)
-    monkeypatch.delenv("OTR_GOOGLE_THINKING_HEADROOM", raising=False)
 
 
 def test_thinking_level_is_per_model_family():
@@ -48,14 +49,6 @@ def test_thinking_level_is_per_model_family():
     assert gllm.thinking_level_for("gemini-pro-latest") is None
 
 
-def test_headroom_is_per_model_family():
-    assert gllm.thinking_headroom_tokens("gemini-flash-latest") == gllm.THINKING_HEADROOM_TOKENS
-    assert gllm.thinking_headroom_tokens("gemini-flash-lite-latest") == gllm.THINKING_HEADROOM_TOKENS
-    # pro cannot stop thinking: 1148 thought tokens measured at its default
-    assert gllm.thinking_headroom_tokens("gemini-pro-latest") == 2048
-    assert gllm.thinking_headroom_tokens("") == gllm.THINKING_HEADROOM_TOKENS
-
-
 def test_env_override_wins_and_default_means_send_nothing(monkeypatch):
     monkeypatch.setenv("OTR_GOOGLE_THINKING_LEVEL", "high")
     assert gllm.thinking_level_for("gemini-flash-lite-latest") == "high"
@@ -63,14 +56,14 @@ def test_env_override_wins_and_default_means_send_nothing(monkeypatch):
     assert gllm.thinking_level_for("gemini-flash-latest") is None
 
 
-def test_flash_payload_carries_low_and_headroom(monkeypatch):
+def test_flash_payload_carries_low_and_no_output_cap(monkeypatch):
     captured = _capture(monkeypatch, {"status": "completed", "steps": [
         {"type": "model_output", "content": [{"type": "text", "text": "{}"}]}]})
     fn = gllm.make_google_api_generate_fn(_entry("gemini-flash-latest"))
     assert fn([{"role": "user", "content": "x"}], max_new_tokens=250) == "{}"
     gc = captured["payload"]["generation_config"]
     assert gc["thinking_level"] == "low"
-    assert gc["max_output_tokens"] == 250 + gllm.THINKING_HEADROOM_TOKENS
+    assert "max_output_tokens" not in gc
 
 
 def test_flash_lite_payload_sends_no_level(monkeypatch):
@@ -78,20 +71,7 @@ def test_flash_lite_payload_sends_no_level(monkeypatch):
         {"type": "model_output", "content": [{"type": "text", "text": "ok"}]}]})
     fn = gllm.make_google_api_generate_fn(_entry("gemini-flash-lite-latest"))
     fn([{"role": "user", "content": "x"}], max_new_tokens=100)
-    assert "thinking_level" not in captured["payload"]["generation_config"]
-
-
-def test_headroom_env_override_and_context_clamp(monkeypatch):
-    monkeypatch.setenv("OTR_GOOGLE_THINKING_HEADROOM", "8")
-    captured = _capture(monkeypatch, {"status": "completed", "steps": [
-        {"type": "model_output", "content": [{"type": "text", "text": "ok"}]}]})
-    fn = gllm.make_google_api_generate_fn(_entry("gemini-flash-latest"))
-    fn([{"role": "user", "content": "x"}], max_new_tokens=100)
-    assert captured["payload"]["generation_config"]["max_output_tokens"] == 108
-    # headroom never exceeds the room the context leaves
-    monkeypatch.setenv("OTR_GOOGLE_THINKING_HEADROOM", "1000000")
-    fn([{"role": "user", "content": "x"}], max_new_tokens=100)
-    assert captured["payload"]["generation_config"]["max_output_tokens"] <= 32768
+    assert "thinking_level" not in (captured["payload"].get("generation_config") or {})
 
 
 def test_incomplete_status_is_an_output_limit():
@@ -138,7 +118,7 @@ def test_truncation_warning_blames_thinking_only_with_thought_tokens(caplog):
     with caplog.at_level(logging.WARNING, logger="OTR.google_api"):
         gllm._extract_text(body)
     msg = "\n".join(r.getMessage() for r in caplog.records)
-    assert "output budget was exhausted" in msg
+    assert "reached the model's own output limit" in msg
     assert "thinking model" not in msg
 
 

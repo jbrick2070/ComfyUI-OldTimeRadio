@@ -63,10 +63,8 @@ def test_both_remote_records_both_and_schema_mode(enabled):
 
 
 def test_basic_params_present(enabled, monkeypatch):
-    monkeypatch.setenv("OPENROUTER_A_MAXTOK", "512")
     monkeypatch.setenv("OPENROUTER_A_TEMP", "0.4")
     meta = orb.openrouter_meta_for(A, LOCAL)
-    assert meta["llm_creative_max_tokens_cap"] == 512
     assert meta["llm_creative_temperature_override"] == 0.4
 
 

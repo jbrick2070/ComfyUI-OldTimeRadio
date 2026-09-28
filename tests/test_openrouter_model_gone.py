@@ -33,8 +33,7 @@ def enabled_env(monkeypatch):
     monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
     monkeypatch.setenv("OPENROUTER_MODEL_A", "anthropic/claude-opus-4.8")
     monkeypatch.setenv("OPENROUTER_MODEL_B", "deepseek/deepseek-v4-pro")
-    for k in ("OPENROUTER_MAX_TOKENS_PER_CALL", "OPENROUTER_MAX_TOKENS_PER_RUN",
-              "OPENROUTER_TIMEOUT_S", "OPENROUTER_MAX_RETRIES",
+    for k in ("OPENROUTER_TIMEOUT_S", "OPENROUTER_MAX_RETRIES",
               "OTR_OPENROUTER_SLOT_A_DEFAULT", "OTR_OPENROUTER_SLOT_B_DEFAULT"):
         monkeypatch.delenv(k, raising=False)
 

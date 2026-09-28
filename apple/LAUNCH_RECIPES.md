@@ -683,7 +683,6 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 - Windows hosts: set `PYTHONUTF8=1` (cp1252 consoles crash the prestartup banner otherwise).
 - Models root override: `OTR_COMFYUI_MODELS_ROOT` (the `C:\ComfyUI-Models` default in _otr_hf_env/_otr_models_root is a Windows-only convenience).
-- `OTR_COMFY_MAX_TOKENS_PER_RUN=1000000`
 
 ### Music (per bank; only My Story takes its own)
 
@@ -725,7 +724,6 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 - Windows hosts: set `PYTHONUTF8=1` (cp1252 consoles crash the prestartup banner otherwise).
 - Models root override: `OTR_COMFYUI_MODELS_ROOT` (the `C:\ComfyUI-Models` default in _otr_hf_env/_otr_models_root is a Windows-only convenience).
-- `OTR_COMFY_MAX_TOKENS_PER_RUN=1000000`
 
 ### Music (per bank; only My Story takes its own)
 
@@ -767,7 +765,6 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 - Windows hosts: set `PYTHONUTF8=1` (cp1252 consoles crash the prestartup banner otherwise).
 - Models root override: `OTR_COMFYUI_MODELS_ROOT` (the `C:\ComfyUI-Models` default in _otr_hf_env/_otr_models_root is a Windows-only convenience).
-- `OTR_COMFY_MAX_TOKENS_PER_RUN=1000000`
 
 ### Music (per bank; only My Story takes its own)
 
@@ -809,7 +806,6 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 - Windows hosts: set `PYTHONUTF8=1` (cp1252 consoles crash the prestartup banner otherwise).
 - Models root override: `OTR_COMFYUI_MODELS_ROOT` (the `C:\ComfyUI-Models` default in _otr_hf_env/_otr_models_root is a Windows-only convenience).
-- `OTR_COMFY_MAX_TOKENS_PER_RUN=1000000`
 
 ### Music (per bank; only My Story takes its own)
 
@@ -851,7 +847,6 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 - Windows hosts: set `PYTHONUTF8=1` (cp1252 consoles crash the prestartup banner otherwise).
 - Models root override: `OTR_COMFYUI_MODELS_ROOT` (the `C:\ComfyUI-Models` default in _otr_hf_env/_otr_models_root is a Windows-only convenience).
-- `OTR_COMFY_MAX_TOKENS_PER_RUN=1000000`
 
 ### Music (per bank; only My Story takes its own)
 

@@ -581,10 +581,7 @@
         "video.device_policy": "cpu"
       },
       "launch": {
-        "boot_contract": "cpu",
-        "env": {
-          "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
-        }
+        "boot_contract": "cpu"
       },
       "preflight": {
         "required_keys": [
@@ -622,10 +619,7 @@
         "video.device_policy": "cpu"
       },
       "launch": {
-        "boot_contract": "cpu",
-        "env": {
-          "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
-        }
+        "boot_contract": "cpu"
       },
       "preflight": {
         "required_keys": [
@@ -663,10 +657,7 @@
         "video.device_policy": "cpu"
       },
       "launch": {
-        "boot_contract": "cpu",
-        "env": {
-          "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
-        }
+        "boot_contract": "cpu"
       },
       "preflight": {
         "required_keys": [
@@ -704,10 +695,7 @@
         "video.device_policy": "cpu"
       },
       "launch": {
-        "boot_contract": "cpu",
-        "env": {
-          "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
-        }
+        "boot_contract": "cpu"
       },
       "preflight": {
         "required_keys": [
@@ -745,10 +733,7 @@
         "video.device_policy": "cpu"
       },
       "launch": {
-        "boot_contract": "cpu",
-        "env": {
-          "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
-        }
+        "boot_contract": "cpu"
       },
       "preflight": {
         "required_keys": [

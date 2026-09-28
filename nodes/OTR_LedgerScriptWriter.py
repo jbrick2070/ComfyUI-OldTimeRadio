@@ -3508,18 +3508,18 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 _scaffold, otr_env.get("OTR_ENABLE_STYLE_GRAMMAR"),
             )
 
-        # BUG-LOCAL-296 (2026-05-31): reset the OpenRouter per-RUN cost
-        # budget at the top of every episode. The budget is a module-level
-        # accumulator in _otr_openrouter_backend; reset_run_budget() was
-        # defined + exported but NEVER wired into the live path, so in a
-        # persistent headless server (the Scheduled Task launcher) the
-        # "per-run" ceiling actually accumulated across EVERY remote episode
-        # and would spuriously fail-closed after a few runs. The writer is
-        # the single per-episode entry that precedes all remote LLM calls
-        # (its own passes + the downstream cascade share the process global),
-        # so ONE reset here scopes the ceiling to one episode. PD1: a budget
-        # reset must never be load-bearing for the writer -- any import/attr
-        # failure is swallowed.
+        # BUG-LOCAL-296 (2026-05-31): reset the OpenRouter per-run tally at
+        # the top of every episode. The tally is a module-level accumulator in
+        # _otr_openrouter_backend; reset_run_budget() was defined + exported
+        # but NEVER wired into the live path, so in a persistent headless
+        # server the "per-run" numbers accumulated across EVERY remote
+        # episode. (Then they fed a per-run ceiling; since 2026-09-28 there is
+        # no ceiling, and the tally is only the log's running total and the
+        # credits' resolved-model record.) The writer is the single
+        # per-episode entry that precedes all remote LLM calls (its own passes
+        # + the downstream cascade share the process global), so ONE reset
+        # here scopes both to one episode. PD1: a reset must never be
+        # load-bearing for the writer -- any import/attr failure is swallowed.
         try:
             from . import _otr_openrouter_backend as _orb_budget
             _orb_budget.reset_run_budget()
