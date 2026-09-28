@@ -652,3 +652,54 @@ def test_comfy_credits_whole_patch_that_fits_is_sent_uncapped(monkeypatch):
     )
     assert out == "{}"
     assert "max_tokens" not in seen["payload"]
+
+
+def _whole_piece_with_room_under_the_minimum():
+    """A 500-token piece that must arrive whole, with 700-1023 tokens of room
+    left after the prompt: it fits, though the room is under the usual 1024."""
+    from nodes._otr_generation_budget import estimate_prompt_tokens
+    messages = _RequireFullMessages([{"role": "user", "content": "x" * 29300}])
+    room = 8192 - estimate_prompt_tokens(messages)
+    assert 500 < room < 1024, room
+    return messages
+
+
+def test_a_small_whole_piece_that_fits_is_sent_on_every_cloud_lane(monkeypatch):
+    """Sonnet QA on 82c007da: the 1024-token minimum room refused a piece that
+    must arrive whole even when the piece itself fitted. The minimum for such a
+    piece is its own size."""
+    from nodes._otr_google_api import llm as google_llm
+    from nodes._otr_google_api import models as google_models
+
+    messages = _whole_piece_with_room_under_the_minimum()
+    sent = []
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setattr(
+        openrouter, "_post_chat_completion",
+        lambda **kwargs: sent.append("openrouter") or {
+            "status_code": 200,
+            "json": {"choices": [{"message": {"content": "{}"}}]},
+            "text": "",
+        },
+    )
+    openrouter.OpenRouterBackend().generate(
+        {"slug": "test/model", "context_cap": 8192,
+         "base_url": "https://example.invalid"},
+        messages, temperature=.2, max_new_tokens=500)
+
+    monkeypatch.setattr(comfy, "_bearer", lambda: "test-token")
+    backend = comfy.ComfyCreditsBackend()
+    monkeypatch.setattr(backend, "_post_with_retries",
+                        lambda **kwargs: sent.append("comfy") or "{}")
+    backend.generate({"slug": "test/model", "context_cap": 8192},
+                     messages, temperature=.2, max_new_tokens=500)
+
+    monkeypatch.setattr(google_llm, "create_interaction",
+                        lambda payload: sent.append("google") or {"output_text": "{}"})
+    google_llm.GoogleAPIBackend().generate(
+        {"provider": "google_api", "model_id": google_models.GOOGLE_API_SLOT_A_ID,
+         "google_model": google_models.GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT,
+         "context_cap": 8192},
+        messages, temperature=.2, max_new_tokens=500)
+
+    assert sent == ["openrouter", "comfy", "google"]

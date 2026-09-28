@@ -1322,12 +1322,15 @@ class OpenRouterBackend:
         # before any credit moves instead of failing upstream after one has.
         min_room = _int_env("OPENROUTER_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
         must_fit_whole = require_full_output or bounded_capacity
+        # A piece that must arrive whole needs room for itself -- even when it
+        # is smaller than the usual minimum (Sonnet QA on 82c007da).
+        needed = max(1, int(max_new_tokens or 0)) if must_fit_whole else min_room
         try:
             fit_output_tokens(
-                max(1, int(max_new_tokens or 0)) if must_fit_whole else min_room,
+                needed,
                 context_cap=int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
                 prompt_tokens=estimate_prompt_tokens(messages),
-                min_output_tokens=min_room,
+                min_output_tokens=min(min_room, needed),
                 label=f"OpenRouter {slug}",
                 require_full=must_fit_whole,
             )

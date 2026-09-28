@@ -660,12 +660,15 @@ class ComfyCreditsBackend:
         # is refused here before any credit moves.
         min_room = _int_env("OTR_COMFY_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
         must_fit_whole = require_full_output or bounded_capacity
+        # A piece that must arrive whole needs room for itself -- even when it
+        # is smaller than the usual minimum.
+        needed = max(1, int(max_new_tokens or 0)) if must_fit_whole else min_room
         try:
             fit_output_tokens(
-                max(1, int(max_new_tokens or 0)) if must_fit_whole else min_room,
+                needed,
                 context_cap=int(cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW),
                 prompt_tokens=estimate_prompt_tokens(messages),
-                min_output_tokens=min_room,
+                min_output_tokens=min(min_room, needed),
                 label=f"Comfy Credits {slug}",
                 require_full=must_fit_whole,
             )

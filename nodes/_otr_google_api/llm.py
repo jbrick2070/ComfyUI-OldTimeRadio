@@ -270,15 +270,18 @@ class GoogleAPIBackend:
         # minimum room, or too little for an artifact that must arrive whole,
         # is refused before the call.
         must_fit_whole = require_full_output or bounded_capacity
+        # A piece that must arrive whole needs room for itself -- even when it
+        # is smaller than the usual minimum.
+        needed = (max(1, int(max_new_tokens or 0)) if must_fit_whole
+                  else MIN_OUTPUT_ROOM)
         try:
             fit_output_tokens(
-                (max(1, int(max_new_tokens or 0)) if must_fit_whole
-                 else MIN_OUTPUT_ROOM),
+                needed,
                 context_cap=int(
                     cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW
                 ),
                 prompt_tokens=estimate_prompt_tokens(messages),
-                min_output_tokens=MIN_OUTPUT_ROOM,
+                min_output_tokens=min(MIN_OUTPUT_ROOM, needed),
                 label=f"Google API {google_model}",
                 require_full=must_fit_whole,
             )
