@@ -837,3 +837,27 @@ Models: Sonnet QA on each pushed diff (bank pool HOLDS; hint HOLDS with one
   unified-memory footprint).
 - Lemmy cameo ships on its ~11% roll in all 27 workflows; the operator was
   asked whether it should stay and did not answer. Unchanged.
+
+## 2026-09-28 00:30 -- 4060 human-install check COMPLETE (8 legs, all published)
+
+Every leg ran from the official ComfyUI portable with the pack installed from
+Node Manager (2.3.11), each workflow opened from Browse Templates > Old-Time
+Radio and started with Run in the app view. Every episode copied to the 5080's
+obs as it published. Operator's Option A: skip otr_8gb_ltx25_mime and
+_audio_in (same LTX 2.5 engine as foley, 6+ h each on this card).
+
+| leg | episode | time | note |
+|---|---|---|---|
+| otr_8gb_low | sugar_light_20260927_130357 | 24:43 | first run, Kokoro fetched at boot |
+| otr_8gb_still | dry_warning_20260927_133513 | 37:21 | 18 stills, includes the Z-Image download |
+| otr_8gb_animatediff | candy_box_20260927_141350 | 1:40:31 | after installing AnimateDiff-Evolved from Node Manager |
+| otr_8gb_video | rhymes_rotten_20260927_155406 | 46:20 | 15 beats / 3420 frames, includes LTX 0.9.8 + T5 downloads |
+| otr_8gb_ltx25_foley | fap_echo_20260927_164552 | 6:26:58 | 21 beats, ~8.5 min per 3.88 s segment; first LTX 2.5 run |
+| otr_canonical | receptor_lock_20260927_230128 | 21:12 | resolves to the low lane on this card |
+| otr_8gb_still (2nd) | rainbow_boxes_20260927_233214 | 57:56 | 47 stills: ~1.2 min/still vs ~2.1 on run 1 |
+| otr_8gb_video (2nd) | misplaced_flicker_20260928_002836 | 41:16 | 17 beats / 3037 frames, no downloads |
+
+Timings are per episode and each story differs in length; compare per still
+or per beat, not per run. No OOM, no traceback, no hang on any leg.
+Portable is left at C:\OTR-Human-2.3.10 on the 4060 (server stopped by the
+next session if wanted; it costs nothing running).
