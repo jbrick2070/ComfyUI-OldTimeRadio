@@ -1377,3 +1377,21 @@ def test_whitespace_only_notice_emits_no_bare_marker():
     texts = _intercepts(lay)
     assert not any(t.strip() == ">>" for t in texts), f"bare marker in {texts!r}"
     assert not any("NON-COMMERCIAL" in t for t in texts)
+
+
+def test_the_recipe_card_names_the_rolled_models_and_skips_the_rest():
+    """The model rolls (2026-09-28): a receipt that SELECTED is named under
+    Rolled; a receipt that only says why nothing was drawn is not."""
+    led = _led()
+    led["meta"].update({
+        "video_lane_roll": {"surface": "video_lane", "selected": "ltx_8gb"},
+        "still_model_roll": {"skipped": "no video lane in this episode uses a still"},
+        "voice_engine_roll": {"surface": "voice_engine", "selected": "kokoro"},
+        "music_engine_roll": {"surface": "music_engine", "selected": "musicgen"}})
+    layout = cr.build_credits_layout(led, w=1920, h=1080, manifest={"clips": []})
+    rows = [row for kind, block in layout["col3_flow"] if kind == "spine"
+            for row in block["rows"]]
+    rolled = dict(rows).get("Rolled:", "")
+    for label in ("video lane", "voices", "music"):
+        assert label in rolled, (label, rolled)
+    assert "stills" not in rolled, rolled

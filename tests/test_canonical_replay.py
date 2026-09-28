@@ -167,6 +167,32 @@ def test_the_manifest_rejects_every_unsafe_shape(frozen, tamper):
 # the import: a new workspace, rebased, cleared, singleton rebound
 # --------------------------------------------------------------------------
 
+def test_a_derived_replay_drops_only_the_video_lane_roll_receipt(tmp_path, monkeypatch):
+    """The model rolls (2026-09-28). A plain replay re-renders the lane the
+    source drew, so its receipt stays true; a replay derived onto another
+    engine does not, so that one receipt goes. Stills, voice and music pass
+    through frozen either way, so theirs stay."""
+    import importlib
+    monkeypatch.setattr(PL, "_default_out_dir",
+                        lambda ep=None: str(tmp_path / "episodes" / (ep or "pending") / "audio"))
+    ep, ledger = _make_episode(tmp_path / "episodes")
+    lp = ep / "audio" / (ep.name + "_ledger.json")
+    rolls = {"video_lane_roll": {"surface": "video_lane", "selected": "ltx_8gb"},
+             "still_model_roll": {"surface": "still_model", "selected": "sd15"},
+             "voice_engine_roll": {"surface": "voice_engine", "selected": "kokoro"}}
+    ledger["meta"].update(rolls)
+    lp.write_text(json.dumps(ledger, indent=2), encoding="utf-8")
+    bundle = _freeze(ep, tmp_path / "bundles")
+    plain = PL.import_replay_bundle(str(bundle)).data["meta"]
+    assert {k: plain[k] for k in rolls} == rolls
+    fz = importlib.import_module("otr_freeze_replay_bundle")
+    derived_bundle = fz.derive_engine_bundle(bundle, "animatediff15_v3_stillin_lab_video")
+    derived = PL.import_replay_bundle(str(derived_bundle)).data["meta"]
+    assert "video_lane_roll" not in derived
+    assert derived["still_model_roll"] == rolls["still_model_roll"]
+    assert derived["voice_engine_roll"] == rolls["voice_engine_roll"]
+
+
 def test_import_replay_bundle_clones_into_a_new_workspace(frozen):
     led = PL.import_replay_bundle(str(frozen["bundle"]))
     data = led.data

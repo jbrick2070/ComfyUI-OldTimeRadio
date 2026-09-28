@@ -792,6 +792,14 @@ def import_replay_bundle(bundle_dir: str, new_episode_id: Optional[str] = None) 
     # rewrites the whole plan atomically before its durable stamp.
     meta["replay_engine_override"] = str(manifest.get("engine_override") or "")
     meta["replay_derived_from"] = str(manifest.get("derived_from") or "")
+    # The source's video-lane ROLL receipt (2026-09-28) names the lane that
+    # episode drew. A derived replay renders on the override instead, so the
+    # receipt would name a lane this run never used -- and the credits would
+    # call the hand-picked override "rolled". A plain replay keeps it: it
+    # re-renders the same lane. The still, voice and music receipts pass
+    # through, because those stages pass through frozen either way.
+    if meta["replay_engine_override"]:
+        meta.pop("video_lane_roll", None)
     meta["replay_master_sha256"] = next(
         (str(r.get("sha256") or "") for r in manifest["files"]
          if _safe_relative(r.get("path")) == manifest["master_audio"]), "")

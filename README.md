@@ -310,9 +310,11 @@ does not allow, or a voice the episode's language does not offer. A lane it
 draws downloads its models the first time, as if you had picked it. What was
 drawn, from which list and with which seed, is recorded in the ledger
 (`video_lane_roll`, `still_model_roll`, `voice_engine_roll`, `music_engine_roll`)
-and named in the credits. To replay a draw, set `OTR_VIDEO_LANE_SEED`,
-`OTR_STILL_MODEL_SEED`, `OTR_VOICE_ENGINE_SEED` or `OTR_MUSIC_ENGINE_SEED` to the
-recorded seed.
+and named in the credits. To replay a draw, start ComfyUI with
+`OTR_VIDEO_LANE_SEED`, `OTR_STILL_MODEL_SEED`, `OTR_VOICE_ENGINE_SEED` or
+`OTR_MUSIC_ENGINE_SEED` set to the recorded seed; the draw is made inside
+ComfyUI, so a variable set anywhere else is not seen. The same seed draws the
+same model only while the same models are available to draw from.
 
 **Your own story:** set `source_bank` to **`my_story`** (the dropdown lists bank
 ids, so that is the value to pick) and put your idea in `custom_premise`. The

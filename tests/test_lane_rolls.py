@@ -344,8 +344,8 @@ def _cast_ledger(meta=None):
 def test_cast_lock_rolls_the_voice_and_stamps_every_receipt(monkeypatch):
     from nodes.cast_lock import CastLock
     monkeypatch.setenv(L.VOICE_SEED_ENV, "11")
-    prompt = _prompt(video=True, audio=True)
-    L.roll_prompt_lanes(prompt, "63", pools=_pools())
+    prompt = _prompt(video=True, still=True, audio=True)
+    L.roll_prompt_lanes(prompt, "63", pools=_pools(), still_check=lambda _i: True)
     out = CastLock().lock(script_json=_cast_ledger(), cast_voice_policy="auto_registry",
                           roll_audio_engines=True, queued_prompt=prompt, node_id="80")
     meta = json.loads(out[0])["meta"]
@@ -359,10 +359,12 @@ def test_cast_lock_rolls_the_voice_and_stamps_every_receipt(monkeypatch):
     # must land there too (the 5080 proof leg of 2026-09-28 found it did not).
     from nodes.production_ledger import get_ledger
     durable = get_ledger().data["meta"]
-    for key in ("voice_engine_roll", "music_engine_roll", "video_lane_roll"):
-        assert durable[key] == meta[key], key
     assert set(L.LEDGER_KEYS) == {"video_lane_roll", "still_model_roll",
                                   "music_engine_roll", "voice_engine_roll"}
+    for key in L.LEDGER_KEYS:
+        assert meta[key].get("selected"), key
+        assert durable[key] == meta[key], key
+
 
 
 def test_cast_lock_refuses_an_audio_switch_the_gate_never_rolled():
