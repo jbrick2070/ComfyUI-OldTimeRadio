@@ -861,3 +861,34 @@ Timings are per episode and each story differs in length; compare per still
 or per beat, not per run. No OOM, no traceback, no hang on any leg.
 Portable is left at C:\OTR-Human-2.3.10 on the 4060 (server stopped by the
 next session if wanted; it costs nothing running).
+
+## 2026-09-28 01:00 -- the 4060 human-install check is complete
+
+Fresh official ComfyUI portable 0.37.0 on the 8 GB RTX 4060, `--enable-manager`,
+the pack installed from Node Manager (2.3.11 via the version picker), every
+workflow opened from Browse Templates > Old-Time Radio and run from the app
+view with its shipped settings. Every episode published on the 4060 and was
+copied to the 5080's obs.
+
+| workflow | time | episode |
+|---|---|---|
+| otr_8gb_low | 24:43 | sugar_light_20260927_130357 |
+| otr_8gb_still | 37:21 | dry_warning_20260927_133513 (18 stills) |
+| otr_8gb_animatediff | 1:40:31 | candy_box_20260927_141350, after installing AnimateDiff-Evolved from Node Manager |
+| otr_8gb_video | 46:20 | rhymes_rotten_20260927_155406 |
+| otr_8gb_ltx25_foley | 6:26:58 | fap_echo_20260927_164552 (19 foley beats, ~15 min a beat; duck: 0 of 19, VAD found no voice) |
+| otr_canonical | 21:12 | receptor_lock_20260927_230128 |
+| otr_8gb_still, second run | 57:56 | rainbow_boxes_20260927_233214 (47 stills, Shakespeare; the story, not the download, set the time) |
+| otr_8gb_video, second run | 41:16 | misplaced_flicker_20260928_002836 |
+
+Skipped on purpose: otr_8gb_ltx25_mime and otr_8gb_ltx25_audio_in (same LTX 2.5
+engine as foley, 6-7 h each on this card). The first-run timings include the
+one-time model downloads; the reruns show the spread between stories is
+larger than the download cost.
+
+Two observations, neither a code change:
+- The app view's Run button queued the job TWICE on each of my emulated clicks
+  (still and video reruns); the duplicate was removed with `POST /queue
+  {"delete": [id]}` both times. Not seen with a real mouse; check before
+  calling it a bug.
+- The 4060's portable server is left resident, idle, on port 8190.
