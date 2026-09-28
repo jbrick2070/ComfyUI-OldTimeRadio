@@ -15723,3 +15723,79 @@ not promote it to the Bug Bible on this evidence alone.
   proof on the operator's Desktop run follows.
 - Bible: 12.182 (a cloud LLM client must not abort a run on an accumulated
   token count).
+
+## PBUG-20260928-03 -- chained video joins opened darker: the terminal frame came out of ffmpeg 1.3 luma dark
+- surfaced: 2026-09-28, the operator's Desktop episode
+  costume_masquerade_20260928_132721 (`otr_8gb_video`, ltx_8gb, 70 beats):
+  "it really skips ... as if the ltx 098 graph isn't quite right", then
+  "much of it is blurry and you can feel it stepping awkwardly". Measured on
+  that episode's clips: at the 28 intra-beat chain joins the frame-to-frame
+  change was 2.4x the change of the four frames either side (median; 11 of
+  them 3x or more), and the signed brightness step across a join, net of the
+  local drift, had a median of -2.08 luma.
+- root cause: a chained successor starts from its predecessor's last frame,
+  pulled out of the H.264 clip by `wrapper_bridge.ffmpeg_terminal_frame_cmd`.
+  With swscale's default flags that yuv420p -> RGB conversion lands about
+  1.3 luma dark with the saturation pushed up (synthetic round trip on the
+  pack's own encoder: -1.31 per hop, -4.8 after four). Each successor was
+  generated from a darker, more saturated still, so the joins stepped darker
+  and the drift compounded down a long beat. `-sws_flags` placed BEFORE `-i`
+  is an input option: the output was byte-identical to passing no flags. The
+  same default conversion sat in the compositor's model-enhanced decode, the
+  credits backdrop still and the canvas poster (-1.83 on the poster).
+- fix: ae7b4515 (terminal frame: `-sws_flags accurate_rnd+full_chroma_int`
+  as an OUTPUT option, +0.06 per hop), 1f457e75 (compositor upscaler decode,
+  on its scale filter; credits backdrop), 625f40de (canvas poster, +0.03).
+  The rgb24 -> yuv420p encode direction measured unbiased (+0.03) and is
+  unchanged.
+- live verify: the costume replay whose server loaded ae7b4515
+  (signal_lost_the_great_costume_masquerade_20260928_153132): median join
+  step -2.08 -> -0.28; joins changing 3x or more against their neighbourhood
+  11 -> 6 of 28. Published to otr/obs.
+- Bible: 12.183.
+
+## PBUG-20260928-04 -- the 8 GB LTX lane's tiled decode blended every 8th frame: a 3 Hz pulse of softness
+- surfaced: the same episode and complaint as -03 ("stepping").
+- root cause: the recipe decoded through VAEDecodeTiled with temporal_size 16,
+  overlap 8. LTX 0.9.8's VAE compresses time 8x, so that tile is two latent
+  frames with one overlapping: every 8th frame is a 50/50 blend of two chunk
+  decodes, and this decoder looks both ways in time (`causal_decoder: false`),
+  so each chunk loses context. Every 8th frame kept 0.54x the detail
+  (variance of the Laplacian) of an untiled decode, 0.72x of its neighbours
+  in the published clips: a ~3 Hz softness pulse at 25 fps.
+- fix: d12f5b61 -- vae_temporal 64 (ComfyUI's own VAEDecodeTiled default):
+  eight latent frames a tile, seams every 56 frames, measured 0.995-1.003x of
+  untiled. Kept by v5 (39bb1f18) when v4's sampling was reverted (-05).
+- live verify: costume replays, every-8th-frame detail against its
+  neighbours 0.72 -> 1.05 and 1.06; on the 8 GB 4060 (clink_against_bone
+  replay on v5, production): 0.88 -> 1.01, clip detail 1.13x, VRAM peak
+  7,579 of 8,188 MiB through 161-frame segments, published and copied to the
+  5080's obs (clink_bone_20260928_154809).
+- Bible: 12.184.
+
+## PBUG-20260928-05 -- recipe v4 made LTX 0.9.8 leave its still within half a second
+- surfaced: the paired replay A/B for -04 (the same stills, prompts and
+  seeds; only the recipe moved). By frame 24, v4 sat further from the beat's
+  still than v3 in 62 of 68 costume beats and 8 of 8 clink beats; 58 of 68
+  costume beats had left the still's composition entirely (mean abs RGB
+  distance above 40), many as a hard cut to a new scene (shot_003_b10: a
+  crowded zoo parade became a young man against a teal wall by frame 12).
+  Caught before any publish; v4 lived on main for 42 minutes.
+- root cause: v4 (d12f5b61) aligned the lane with Lightricks' canonical
+  distilled graph, and both of its sampling changes hurt THIS lane. The
+  2x2 on clink, distance from the still at frame 24: v3 17.0, compression
+  alone 20.5, distilled schedule alone 31.2, both (v4) 30.1 -- the schedule
+  is the cause; the 68-beat costume arm with the schedule alone agreed
+  (54.5 against v4 55.2 and v3 38.0). LTXVPreprocess(38) softened the frames:
+  detail at frames 12/24/48 went 261/257/291 -> 174/184/184 on the distilled
+  schedule and 282/239/255 -> 215/228/222 on LTXVScheduler. The canonical
+  graph assumes a prompt that CAPTIONS the still; this lane's prompt narrates
+  the beat, so the looser the still's grip, the more the text wins.
+- fix: 39bb1f18 (recipe v5: v3's sampling -- LTXVScheduler, the clean PNG --
+  with v4's 64-frame decode tile; graph identical to v3's except
+  temporal_size, diffed node by node), 6c18ba84 (LTXVPreprocess is required
+  only when the graph builds it).
+- live verify: clink v5 on the 4060, production: distance at frame 24 17.6
+  (v3 17.0), detail 1.13x, pulse 1.01, published. The costume v5 replay on
+  the 5080 follows in the handoff entry.
+- Bible: 12.185.
