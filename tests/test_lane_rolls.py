@@ -27,7 +27,8 @@ VIDEO_SLOTS = ("announcer_video_model", "music_video_model", "character_video_mo
 IMAGE_SLOTS = ("announcer_image_model", "music_image_model", "character_image_model")
 
 
-def _prompt(video=False, still=False, audio=False, replay=""):
+def _prompt(video=False, still=False, audio=False, replay="", video_pool="",
+            still_pool=""):
     """A queued prompt wired like the canonical: the validator gates the
     writer and the director; CastLock and the theme sit further down."""
     return {
@@ -47,7 +48,9 @@ def _prompt(video=False, still=False, audio=False, replay=""):
                           "engine": "stable_audio_3"}},
         "87": {"class_type": "OTR_VideoDirector",
                "inputs": dict({"gate_in": ["63", 0], "roll_video_lanes": video,
-                               "roll_still_models": still},
+                               "roll_still_models": still,
+                               "video_roll_pool": video_pool,
+                               "still_roll_pool": still_pool},
                               **{s: "viz_green" for s in VIDEO_SLOTS},
                               **{s: "z_image_turbo" for s in IMAGE_SLOTS})},
     }
@@ -183,6 +186,64 @@ def test_string_switch_values_from_an_api_client_read_as_yes_or_no():
         assert bool(got) is rolled, value
 
 
+# --- the checklists (operator, 2026-09-28) ---------------------------------
+
+def test_the_video_checklist_offers_every_local_lane_but_humo_and_cloud():
+    choices = L.video_roll_choices()
+    for name in ("ltx098_low_video", "h3_low_video", "still_pan", "viz_green",
+                 "ltx25_foley_16gb", "animatediff15_v3_haunted_video"):
+        assert name in choices, name
+    assert not [c for c in choices if c.startswith(("humo", "cloud_", "google_"))], choices
+    assert set(L.still_roll_choices()) == {"flux_gen1", "ideogram4_local",
+                                           "lumina_image", "sd15", "z_image_turbo"}
+
+
+def test_ticked_lanes_narrow_the_draw_and_forgive_how_they_are_typed():
+    prompt = _prompt(video=True, video_pool="Still Pan, viz-camera")
+    pools = _pools(video=("ltx_8gb", "still_pan", "viz_camera"))
+    got = L.roll_prompt_lanes(prompt, "63", pools=pools)["87"]["video_lane"]
+    assert got["ticked"] == ["still_pan", "viz_camera"]
+    assert got["eligible_order"] == ["still_pan", "viz_camera"]
+    assert got["selected"] in ("still_pan", "viz_camera")
+
+
+def test_one_ticked_lane_is_simply_that_lane_by_its_menu_name():
+    from nodes.otr_video_director import exact_menu_option_for
+    prompt = _prompt(video=True, video_pool="ltx098_low_video")
+    got = L.roll_prompt_lanes(prompt, "63", pools=_pools())["87"]["video_lane"]
+    assert got["selected"] == "ltx_8gb" and got["ticked"] == ["ltx_8gb"]
+    assert prompt["87"]["inputs"]["music_video_model"] == exact_menu_option_for("ltx_8gb")
+
+
+def test_ticked_lanes_that_cannot_run_here_stop_the_run_and_say_why():
+    pools = _pools(video=("still_flat",))
+    pools["video_lane"] = (("still_flat",), {"ltx_8gb": "cannot run on this machine's device"})
+    with pytest.raises(L.LaneRollError) as err:
+        L.roll_prompt_lanes(_prompt(video=True, video_pool="ltx098_low_video"), "63",
+                            pools=pools)
+    assert "none of the ticked video lanes" in str(err.value)
+    assert "cannot run on this machine's device" in str(err.value)
+
+
+def test_a_ticked_name_that_is_not_a_choice_stops_the_run():
+    from nodes import _otr_rolls
+    with pytest.raises(_otr_rolls.RollError, match="not_a_lane"):
+        L.roll_prompt_lanes(_prompt(video=True, video_pool="not_a_lane"), "63",
+                            pools=_pools())
+
+
+def test_the_still_checklist_narrows_the_still_draw():
+    prompt = _prompt(still=True, still_pool="sd15")
+    got = L.roll_prompt_lanes(prompt, "63", pools=_pools(), still_check=lambda _i: True)
+    assert got["87"]["still_model"]["selected"] == "sd15"
+    assert [prompt["87"]["inputs"][s] for s in IMAGE_SLOTS] == ["sd15"] * 3
+
+
+def test_a_checklist_is_ignored_while_its_switch_is_off():
+    prompt = _prompt(video_pool="not_a_lane")
+    assert L.roll_prompt_lanes(prompt, "63", pools=_pools()) == {}
+
+
 # --- reading the receipts back ------------------------------------------------
 
 def test_a_switch_nothing_rolled_is_refused_by_name():
@@ -304,7 +365,8 @@ def _optional(cls):
 def test_the_switches_are_appended_last_and_default_off():
     from nodes.otr_video_director import OTRVideoDirector
     from nodes.cast_lock import CastLock
-    assert _optional(OTRVideoDirector)[-2:] == [L.VIDEO_SWITCH, L.STILL_SWITCH]
+    assert _optional(OTRVideoDirector)[-4:] == [L.VIDEO_SWITCH, L.STILL_SWITCH,
+                                                L.VIDEO_POOL, L.STILL_POOL]
     assert _optional(CastLock)[-1] == L.AUDIO_SWITCH
     for cls, name in ((OTRVideoDirector, L.VIDEO_SWITCH), (OTRVideoDirector, L.STILL_SWITCH),
                       (CastLock, L.AUDIO_SWITCH)):
@@ -316,7 +378,7 @@ def test_the_switches_are_appended_last_and_default_off():
 
 
 def test_every_shipped_workflow_ships_the_switches_off():
-    last = {"OTR_VideoDirector": [False, False], "OTR_CastLock": [False]}
+    last = {"OTR_VideoDirector": [False, False, "", ""], "OTR_CastLock": [False]}
     seen = 0
     for path in sorted((_ROOT / "workflows").glob("*.json")):
         for node in json.loads(path.read_text(encoding="utf-8"))["nodes"]:

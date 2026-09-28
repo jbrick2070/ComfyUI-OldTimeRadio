@@ -85,10 +85,10 @@ def test_canonical_director_ships_the_ceiling_unpinned():
     # APPENDED last (BUG-LOCAL-097): the 12 prior slots keep their positions.
     # seed_mode/request_seed left the widget list on 2026-09-13 (write-only,
     # never read back), which is why this was 13, not the old 15. The two
-    # model-roll switches were appended after max_render_frames on
-    # 2026-09-28, which makes it 15 again with slot 12 still the ceiling.
-    assert len(widgets) == 15
-    assert widgets[12] == 0 and widgets[13:] == [False, False], widgets
+    # model-roll switches and their two checklists were appended after
+    # max_render_frames on 2026-09-28: 17, with slot 12 still the ceiling.
+    assert len(widgets) == 17
+    assert widgets[12] == 0 and widgets[13:] == [False, False, "", ""], widgets
     # NOT ["cuda", "fp8_ok"]: the canonical carries the picks for whichever
     # machine is under test (operator ruling 2026-09-07). What this guard is for
     # is POSITION -- slots 10 and 11 are device_policy and dtype_policy -- so

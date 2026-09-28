@@ -926,6 +926,8 @@ CREATIVE_WHITELIST = frozenset({
     # the queue-time gate, from the engines this machine can run. Whitelisted
     # so a proof run can turn one on, as lemmy_cameo is.
     "roll_video_lanes", "roll_still_models", "roll_audio_engines",
+    # ...and the checklists that narrow the video and still draws.
+    "video_roll_pool", "still_roll_pool",
     # asset_cleanup (the Space saver, row 0b) is the writer's housekeeping
     # dial: what stays on disk after the episode publishes. It never picks an
     # engine, a route or a model, and no workflow row manages it, so a

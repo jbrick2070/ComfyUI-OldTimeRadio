@@ -344,16 +344,19 @@ def test_the_canonical_saves_every_pool_as_a_trailing_empty_slot():
                for i in node["inputs"][-3:])
 
 
-def test_every_roll_in_the_app_form_has_its_pool_right_under_it():
-    """Operator, 2026-09-27: the three rolls must look alike in the app
-    view -- the dropdown with its roll row, then its typed pool."""
+def test_every_roll_checklist_sits_together_at_the_foot_of_the_app_form():
+    """Operator, 2026-09-27: the rolls must look alike in the app view.
+    Operator, 2026-09-28: "all the clickbox sections are at the bottom after
+    space saver" -- so every pool now closes the form, right after Space saver,
+    in the order of what it narrows, each with the same note."""
     form = json.loads((REPO / "config" / "app_mode.json").read_text(
         encoding="utf-8"))["form"]
-    names = [row[1] for row in form if row[0] == "OTR_LedgerScriptWriter"]
-    for dropdown, pool in (("episode_language", "language_roll_pool"),
-                           ("source_bank", "bank_roll_pool"),
-                           ("visual_style", "style_roll_pool")):
-        assert names[names.index(dropdown) + 1] == pool
+    names = [row[1] for row in form]
+    pools = ["language_roll_pool", "bank_roll_pool", "style_roll_pool",
+             "video_roll_pool", "still_roll_pool"]
+    assert names[names.index("asset_cleanup") + 1:] == pools
+    notes = {row[1]: (row[2] if len(row) > 2 else None) for row in form}
+    assert {notes[p] for p in pools} == {"roll_pool_note"}
 
 
 def test_the_writer_wires_both_pools_and_the_language_roll_at_their_real_sites():

@@ -2144,6 +2144,26 @@
             "name": "roll_still_models"
           },
           "link": null
+        },
+        {
+          "localized_name": "video_roll_pool",
+          "name": "video_roll_pool",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "video_roll_pool"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "still_roll_pool",
+          "name": "still_roll_pool",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "still_roll_pool"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -2181,7 +2201,9 @@
         "no_fp8_no_fp4",
         0,
         false,
-        false
+        false,
+        "",
+        ""
       ],
       "color": "#432",
       "bgcolor": "#653"

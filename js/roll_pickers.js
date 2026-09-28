@@ -13,16 +13,21 @@
  * form needs no change because the row's widget name never changes.
  *
  * The choices come from the pool's own input spec (`otr_choices`, set by
- * OTR_LedgerScriptWriter.INPUT_TYPES), so the list is exactly what the backend
- * accepts. If this file does not load, the text boxes are simply what people
- * see, and the typed list still works.
+ * OTR_LedgerScriptWriter.INPUT_TYPES and OTR_VideoDirector.INPUT_TYPES), so
+ * the list is exactly what the backend accepts. If this file does not load,
+ * the text boxes are simply what people see, and the typed list still works.
  */
 import { app } from "../../scripts/app.js";
 import { readPool, writePool, choiceLabel } from "./roll_pickers_core.js";
 
 const TAG = "[OldTimeRadio] roll pickers";
-const WRITER = "OTR_LedgerScriptWriter";
-const POOLS = ["language_roll_pool", "bank_roll_pool", "style_roll_pool"];
+// Each node's pools. The video director's pair narrows its Randomize video and
+// Randomize stills switches (2026-09-28); the writer's three narrow its
+// language, bank and style rolls.
+const POOLS_BY_NODE = {
+    OTR_LedgerScriptWriter: ["language_roll_pool", "bank_roll_pool", "style_roll_pool"],
+    OTR_VideoDirector: ["video_roll_pool", "still_roll_pool"],
+};
 
 function choicesFor(node, name) {
     const spec = node.constructor?.nodeData?.input?.optional?.[name];
@@ -76,8 +81,9 @@ function makeChecklist(name, choices, initial) {
 app.registerExtension({
     name: "OldTimeRadio.RollPickers",
     nodeCreated(node) {
-        if (node?.comfyClass !== WRITER || !Array.isArray(node.widgets)) return;
-        for (const name of POOLS) {
+        const pools = POOLS_BY_NODE[node?.comfyClass];
+        if (!pools || !Array.isArray(node.widgets)) return;
+        for (const name of pools) {
             try {
                 const choices = choicesFor(node, name);
                 const index = node.widgets.findIndex((w) => w.name === name);

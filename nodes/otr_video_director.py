@@ -225,6 +225,19 @@ def _image_model_combo() -> list:
     return names + [ADD_CUSTOM]
 
 
+def _lane_roll_choices(kind) -> tuple:
+    """The rolls' checklist choices (``_otr_lane_rolls``). INPUT_TYPES must
+    never crash, so a registry that cannot be read offers an empty list -- the
+    typed pool still works, and the run judges it."""
+    try:
+        from . import _otr_lane_rolls as _lane_rolls
+        return (_lane_rolls.video_roll_choices() if kind == "video"
+                else _lane_rolls.still_roll_choices())
+    except Exception:  # noqa: BLE001 -- INPUT_TYPES must never crash
+        log.warning("[OTR_VideoDirector] %s roll checklist unavailable", kind)
+        return ()
+
+
 def _registry_descriptors() -> list:
     """role_compat descriptors for every registered video engine."""
     descs = []
@@ -409,6 +422,32 @@ class OTRVideoDirector:
                                "no video lane in the episode uses a still. "
                                "Suggested for 16 GB cards and up.",
                 }),
+                # The rolls' checklists (operator, 2026-09-28), appended LAST.
+                # Typed lists underneath, drawn as clickable boxes by
+                # js/roll_pickers.js from `otr_choices`.
+                "video_roll_pool": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "Read only when Randomize video is on. Tick the "
+                               "lanes to roll among (or type them, separated "
+                               "by commas); none rolls among every local lane "
+                               "that can run on this machine, one is simply "
+                               "that lane. A ticked lane this machine cannot "
+                               "run is left out. Recorded at "
+                               "meta.video_lane_roll.",
+                    "otr_choices": list(_lane_roll_choices("video")),
+                }),
+                "still_roll_pool": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "Read only when Randomize stills is on. Tick "
+                               "the image models to roll among (or type them, "
+                               "separated by commas); none rolls among every "
+                               "local model that can run on this machine, one "
+                               "is simply that model. Recorded at "
+                               "meta.still_model_roll.",
+                    "otr_choices": list(_lane_roll_choices("still")),
+                }),
             },
             # This run's prompt and this node's id: where the gate left the
             # roll's receipt. Hidden inputs add no widget and no link.
@@ -446,6 +485,7 @@ class OTRVideoDirector:
                device_policy="cuda", dtype_policy="fp8_ok",
                max_render_frames=0,
                roll_video_lanes=False, roll_still_models=False,
+               video_roll_pool="", still_roll_pool="",
                queued_prompt=None, node_id=None):
         # A switch that is on must have been rolled at the gate, or the pickers
         # below are the saved ones while the switch says otherwise.

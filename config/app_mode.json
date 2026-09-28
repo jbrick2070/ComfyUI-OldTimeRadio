@@ -1,5 +1,5 @@
 {
-  "_comment": "APP MODE (plan row 0e). ComfyUI's app view shows a workflow as a form: extra.linearData.inputs is the form, top to bottom, in exactly this order (the frontend does not sort it), and extra.linearMode opens the workflow straight into it. ONE FORM FOR EVERY GENERATED WORKFLOW, in the operator's order (the operator, 2026-09-26, after using the form: \"language, size, acts, story bank, visual style, video model, TTS model, music model, story writing models including cloud sub options, upscaler, my story fields\"): language, cast size, acts, the story bank with its source-to-adapt row, visual style, the three video pickers each with its still under it, the two voice pickers, the music composer, the two writers and the six cloud writer slots, the upscaler; then the rows he did not list (story idea, episode title, Lemmy cameo); then the My Story rows, and Space saver last. Wording and grouping from a Fable design pass the operator asked for; the form has no section headers, so the role prefixes in `labels` do that job. Per-machine workflows OPEN ON THE GRAPH (operator: graph view) and switch to the form with the App button; workflows/otr_app.json opens as the app. scripts/build_variants.py resolves each entry's node TYPE and widget against the workflow's own node ids and refuses a type that is missing or not unique, or a widget that node does not have. The canonical carries neither: it is the workflow the operator edits on the canvas. HAND-ORDERED ON PURPOSE -- the matrix's key_indicators omit the cloud slots and include machine tuning; tests/test_app_mode.py checks no matrix user-choice key is missing. `labels` gives each row a plain-English name, written as the widget input's `label` on the generated workflows only.",
+  "_comment": "APP MODE (plan row 0e). ComfyUI's app view shows a workflow as a form: extra.linearData.inputs is the form, top to bottom, in exactly this order (the frontend does not sort it), and extra.linearMode opens the workflow straight into it. ONE FORM FOR EVERY GENERATED WORKFLOW, in the operator's order (the operator, 2026-09-26, after using the form: \"language, size, acts, story bank, visual style, video model, TTS model, music model, story writing models including cloud sub options, upscaler, my story fields\"): language, cast size, acts, the story bank with its source-to-adapt row, visual style, the three video pickers each with its still under it, the two voice pickers, the music composer, the two writers and the six cloud writer slots, the upscaler; then the rows he did not list (story idea, episode title, Lemmy cameo); then the My Story rows and Space saver; then every checklist -- the language, bank, style, video-lane and still-model pools -- at the foot (operator, 2026-09-28: the clickbox sections go at the bottom after Space saver), with the Yes/No model-roll switches above the pickers they replace. Wording and grouping from a Fable design pass the operator asked for; the form has no section headers, so the role prefixes in `labels` do that job. Per-machine workflows OPEN ON THE GRAPH (operator: graph view) and switch to the form with the App button; workflows/otr_app.json opens as the app. scripts/build_variants.py resolves each entry's node TYPE and widget against the workflow's own node ids and refuses a type that is missing or not unique, or a widget that node does not have. The canonical carries neither: it is the workflow the operator edits on the canvas. HAND-ORDERED ON PURPOSE -- the matrix's key_indicators omit the cloud slots and include machine tuning; tests/test_app_mode.py checks no matrix user-choice key is missing. `labels` gives each row a plain-English name, written as the widget input's `label` on the generated workflows only.",
   "version": 1,
   "output_node_type": "OTR_MasterAudioMux",
   "source_ref_note": "Optional; needs a named bank",
@@ -18,14 +18,11 @@
   "lane_roll_note": "Suggested for 16 GB+",
   "form": [
     ["OTR_LedgerScriptWriter", "episode_language"],
-    ["OTR_LedgerScriptWriter", "language_roll_pool", "roll_pool_note"],
     ["OTR_LedgerScriptWriter", "num_characters", "cast_note"],
     ["OTR_LedgerScriptWriter", "act_count", "acts_note"],
     ["OTR_LedgerScriptWriter", "source_bank"],
-    ["OTR_LedgerScriptWriter", "bank_roll_pool", "roll_pool_note"],
     ["OTR_LedgerScriptWriter", "source_ref", "source_ref_note"],
     ["OTR_LedgerScriptWriter", "visual_style"],
-    ["OTR_LedgerScriptWriter", "style_roll_pool", "roll_pool_note"],
     ["OTR_VideoDirector", "roll_video_lanes", "lane_roll_note"],
     ["OTR_VideoDirector", "roll_still_models", "lane_roll_note"],
     ["OTR_VideoDirector", "announcer_video_model", "pickers_note"],
@@ -55,7 +52,12 @@
     ["OTR_LedgerScriptWriter", "story_setting"],
     ["OTR_LedgerScriptWriter", "story_author"],
     ["OTR_StableAudioTheme", "music_style"],
-    ["OTR_LedgerScriptWriter", "asset_cleanup"]
+    ["OTR_LedgerScriptWriter", "asset_cleanup"],
+    ["OTR_LedgerScriptWriter", "language_roll_pool", "roll_pool_note"],
+    ["OTR_LedgerScriptWriter", "bank_roll_pool", "roll_pool_note"],
+    ["OTR_LedgerScriptWriter", "style_roll_pool", "roll_pool_note"],
+    ["OTR_VideoDirector", "video_roll_pool", "roll_pool_note"],
+    ["OTR_VideoDirector", "still_roll_pool", "roll_pool_note"]
   ],
   "labels": {
     "OTR_LedgerScriptWriter.source_bank": "Story bank",
@@ -69,6 +71,8 @@
     "OTR_LedgerScriptWriter.language_roll_pool": "Languages to roll",
     "OTR_LedgerScriptWriter.style_roll_pool": "Styles to roll",
     "OTR_LedgerScriptWriter.bank_roll_pool": "Banks to roll",
+    "OTR_VideoDirector.video_roll_pool": "Video lanes to roll",
+    "OTR_VideoDirector.still_roll_pool": "Still models to roll",
     "OTR_LedgerScriptWriter.lemmy_cameo": "Lemmy cameo",
     "OTR_LedgerScriptWriter.creative_writing_model": "Writer - story",
     "OTR_LedgerScriptWriter.technical_model": "Writer - structure",

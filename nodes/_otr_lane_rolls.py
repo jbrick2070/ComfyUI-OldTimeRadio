@@ -11,6 +11,11 @@ marked "Suggested for 16 GB+" in the app form:
   cast, announcer included, and one local music engine for the theme
   (OTR_StableAudioTheme).
 
+The video and still switches each have a checklist (``video_roll_pool``,
+``still_roll_pool``; operator, 2026-09-28) drawn as clickable boxes at the foot
+of the app form: tick models to narrow the draw, or tick none to draw from every
+local model that can run here, exactly like the language, bank and style pools.
+
 WHY SWITCHES, NOT ROLL ROWS. The story-bank, visual-style and language rolls
 (``_otr_rolls``) are a roll row inside one dropdown. One lane for the whole
 episode spans three dropdowns, and three roll rows could disagree, so each of
@@ -84,6 +89,13 @@ log = logging.getLogger(__name__)
 VIDEO_SWITCH = "roll_video_lanes"
 STILL_SWITCH = "roll_still_models"
 AUDIO_SWITCH = "roll_audio_engines"
+
+#: The checklists that narrow the video and still rolls (operator, 2026-09-28:
+#: "make a video and still randomizer using the clickboxes"). Typed lists
+#: underneath, like the language, bank and style pools; none ticked means every
+#: local model that can run here.
+VIDEO_POOL = "video_roll_pool"
+STILL_POOL = "still_roll_pool"
 
 VIDEO_SEED_ENV = "OTR_VIDEO_LANE_SEED"
 STILL_SEED_ENV = "OTR_STILL_MODEL_SEED"
@@ -431,6 +443,72 @@ _POOLS = {"video_lane": video_pool, "still_model": still_pool,
 
 
 # ---------------------------------------------------------------------------
+# What a person can tick
+# ---------------------------------------------------------------------------
+
+def video_roll_choices() -> "tuple[str, ...]":
+    """The video lanes the checklist offers, named as the dropdown names them.
+
+    Every registered local lane that can take all three roles. Whether it runs
+    on THIS machine is decided at run time, so the list is the same on every
+    machine. HuMo is not offered: it voices a face from speech, and the route
+    freeze moves it off the announcer and music roles (the redirect keys on the
+    same ``audio_driven_face`` family), so it could never be drawn.
+    """
+    try:
+        from . import _otr_video_engines  # noqa: F401 -- registers built-ins
+        from ._otr_video_engines import registry as vreg
+        from ._otr_shared import role_slots
+        from ._otr_shared.public_engines import _INTERNAL_TO_PUBLIC
+    except ImportError:  # pragma: no cover -- flat test imports
+        import _otr_video_engines  # type: ignore  # noqa: F401
+        from _otr_video_engines import registry as vreg  # type: ignore
+        from _otr_shared import role_slots  # type: ignore
+        from _otr_shared.public_engines import _INTERNAL_TO_PUBLIC  # type: ignore
+    out = []
+    for name in vreg.all_engine_names():
+        engine = vreg.get_engine(name)
+        if is_cloud_engine(engine) or getattr(engine, "family", "") == "audio_driven_face":
+            continue
+        try:
+            for role in role_slots.ROLE_TO_VIDEO_SLOT:
+                vreg.assert_usable(name, role)
+        except Exception:  # noqa: BLE001 -- a lane that cannot take every role
+            continue
+        out.append(_INTERNAL_TO_PUBLIC.get(name, name))
+    return tuple(out)
+
+
+def still_roll_choices() -> "tuple[str, ...]":
+    """The image models the checklist offers: every registered local one."""
+    try:
+        from . import _otr_image_engines  # noqa: F401 -- registers built-ins
+        from ._otr_image_engines import registry as ireg
+    except ImportError:  # pragma: no cover -- flat test imports
+        import _otr_image_engines  # type: ignore  # noqa: F401
+        from _otr_image_engines import registry as ireg  # type: ignore
+    return tuple(n for n in ireg.all_engine_names()
+                 if not is_cloud_engine(ireg.get_engine(n)))
+
+
+def _ticked(inputs, pool_name, where) -> "tuple[str, ...]":
+    """The internal ids ticked in one checklist; ``()`` when none is ticked.
+    Forgiving about case and separators, strict about names, like the other
+    pools (``_otr_rolls.parse_roll_pool``)."""
+    value = inputs.get(pool_name, "")
+    if isinstance(value, (list, tuple)) and len(value) == 2 and not isinstance(value[1], str):
+        raise LaneRollError("%s: %s is wired to another node; tick the "
+                            "choices instead" % (where, pool_name))
+    try:
+        from ._otr_shared.public_engines import resolve_engine_id
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared.public_engines import resolve_engine_id  # type: ignore
+    choices = video_roll_choices() if pool_name == VIDEO_POOL else still_roll_choices()
+    picked = _ROLLS.parse_roll_pool(value, valid_ids=choices, surface=pool_name)
+    return tuple(resolve_engine_id(p) for p in picked)
+
+
+# ---------------------------------------------------------------------------
 # One draw
 # ---------------------------------------------------------------------------
 
@@ -442,11 +520,23 @@ def _left_out_words(left_out, limit=6) -> str:
     return text
 
 
-def _draw(surface, pool, env, rng_factory) -> dict:
+def _draw(surface, pool, env, rng_factory, ticked=()) -> dict:
+    """One draw. ``ticked`` narrows the pool to the checked models; a ticked
+    model this machine cannot run stays out, with its reason."""
     switch, seed_env, _ledger_key, noun = SURFACES[surface]
     eligible, left_out = pool
+    if ticked:
+        left_out = {k: v for k, v in left_out.items() if k in ticked}
+        eligible = [e for e in eligible if e in ticked]
     order = tuple(sorted(set(eligible)))
     if not order:
+        if ticked:
+            raise LaneRollError(
+                "%s is on, but none of the ticked %ss can run on this machine%s. "
+                "Tick others, or clear the list to roll among every local %s "
+                "that can." % (
+                    switch, noun,
+                    (" (%s)" % _left_out_words(left_out)) if left_out else "", noun))
         raise LaneRollError(
             "%s is on, but no local %s can run on this machine%s. Turn the "
             "switch off and pick one by hand." % (
@@ -457,6 +547,8 @@ def _draw(surface, pool, env, rng_factory) -> dict:
     receipt = _ROLLS.RollReceipt(
         surface=surface, requested=switch, selected=selected, seed=seed,
         seed_source=seed_source, eligible_order=order).to_meta()
+    if ticked:
+        receipt["ticked"] = list(ticked)
     if left_out:
         receipt["left_out"] = dict(sorted(left_out.items()))
     log.info("[OTR.rolls] %s: %s, drawn from %d local %ss (seed %d, %s)%s",
@@ -587,22 +679,25 @@ def roll_prompt_lanes(prompt, unique_id, *, env: "Mapping[str, str] | None" = No
         _attach(prompt, receipts)
         return receipts
 
+    live_pools: dict = {}
     drawn: dict = {}
 
-    def draw(surface):
-        # One draw per surface for the whole run, shared by every node that
-        # asked for it: one lane, one still model, one composer.
-        if surface not in drawn:
-            pool = (pools or {}).get(surface) or _POOLS[surface]()
-            drawn[surface] = _draw(surface, pool, env, rng_factory)
-        return drawn[surface]
+    def draw(surface, ticked=()):
+        # One draw per surface and checklist for the whole run, shared by every
+        # node that asked for it: one lane, one still model, one composer.
+        if surface not in live_pools:
+            live_pools[surface] = (pools or {}).get(surface) or _POOLS[surface]()
+        key = (surface, tuple(ticked))
+        if key not in drawn:
+            drawn[key] = _draw(surface, live_pools[surface], env, rng_factory, ticked)
+        return drawn[key]
 
     for node_id, node in by_type.get(_DIRECTOR, []):
         surfaces = wanted.get(node_id, ())
         inputs = node.setdefault("inputs", {})
         where = _where(node_id, node)
         if "video_lane" in surfaces:
-            receipt = draw("video_lane")
+            receipt = draw("video_lane", _ticked(inputs, VIDEO_POOL, where))
             label = _video_label(receipt["selected"])
             for slot in _VIDEO_SLOTS:
                 _set(inputs, slot, label, where)
@@ -612,7 +707,7 @@ def roll_prompt_lanes(prompt, unique_id, *, env: "Mapping[str, str] | None" = No
                 receipts[node_id]["still_model"] = {
                     "skipped": "no video lane in this episode uses a still"}
             else:
-                receipt = draw("still_model")
+                receipt = draw("still_model", _ticked(inputs, STILL_POOL, where))
                 for slot in _IMAGE_SLOTS:
                     _set(inputs, slot, receipt["selected"], where)
                 receipts[node_id]["still_model"] = receipt

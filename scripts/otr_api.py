@@ -1025,6 +1025,7 @@ CREATIVE_WHITELIST = frozenset({
     # The model rolls (2026-09-28); mirror of the package whitelist. Yes/No
     # switches -- the draw happens at the queue-time gate.
     "roll_video_lanes", "roll_still_models", "roll_audio_engines",
+    "video_roll_pool", "still_roll_pool",
     # asset_cleanup -- the Space saver housekeeping dial; mirror of the
     # package whitelist. Decides what stays on disk after publishing, never
     # an engine or route; the mux still refuses any unproven deletion.

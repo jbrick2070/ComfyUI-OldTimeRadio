@@ -304,6 +304,11 @@ models for you. They are meant for cards with 16 GB or more:
 | `roll_still_models` | OTR_VideoDirector | One local image model for every still. Nothing is drawn when no video lane uses a still. |
 | `roll_audio_engines` | OTR_CastLock | One local voice engine for the whole cast and one local music engine for the theme. |
 
+To narrow a draw, tick lanes under **Video lanes to roll** or models under
+**Still models to roll**; with nothing ticked, the draw uses every local model
+that runs here. Those two checklists sit at the bottom of the app view with the
+language, bank and style checklists, after Space saver.
+
 Cloud engines are never drawn, and neither is anything this machine cannot run:
 a lane whose node pack or separate install is missing, one this server's boot
 does not allow, or a voice the episode's language does not offer. A lane it

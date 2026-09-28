@@ -145,7 +145,9 @@ cards with 16 GB or more, sit above the pickers they replace in the app view:
 **Randomize video (non-cloud)** and **Randomize stills (non-cloud)** on
 OTR_VideoDirector, and **Randomize audio (non-cloud)** on OTR_CastLock. Each
 draws one local model for the whole episode from the ones this machine can run,
-downloading it the first time as if you had picked it. The credits name what was
+downloading it the first time as if you had picked it. To narrow the video or
+still draw, tick models in **Video lanes to roll** or **Still models to roll**
+at the bottom of the app view; tick none to draw from all of them. The credits name what was
 drawn, and the ledger records the seed that replays it.
 
 ---

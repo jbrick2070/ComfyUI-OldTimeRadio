@@ -47,6 +47,22 @@ def test_every_offered_choice_parses():
         assert list(got) == choices
 
 
+def test_the_video_and_still_checklists_offer_what_the_roll_accepts():
+    """The director's two pools (2026-09-28) draw from the lane-roll module's
+    own choice lists, so a ticked box always parses."""
+    from nodes import _otr_lane_rolls as LR
+    from nodes import _otr_rolls as ROLLS
+    from nodes.otr_video_director import OTRVideoDirector as D
+    optional = D.INPUT_TYPES()["optional"]
+    for name, choices in (("video_roll_pool", LR.video_roll_choices()),
+                          ("still_roll_pool", LR.still_roll_choices())):
+        kind, meta = optional[name]
+        assert kind == "STRING" and meta["default"] == ""
+        assert meta["otr_choices"] == list(choices) and choices, name
+        assert ROLLS.parse_roll_pool(", ".join(choices), valid_ids=choices,
+                                     surface=name) == tuple(choices)
+
+
 def test_the_pools_are_still_typed_text_underneath():
     """The saved value, the API and headless runs keep the typed list."""
     for name in ("style_roll_pool", "language_roll_pool", "bank_roll_pool"):
@@ -60,6 +76,7 @@ def test_the_glue_replaces_each_pool_in_place_under_its_own_name():
     assert "app.registerExtension(" in glue and "nodeCreated(node)" in glue
     assert 'from "./roll_pickers_core.js"' in glue
     assert '"language_roll_pool", "bank_roll_pool", "style_roll_pool"' in glue
+    assert 'OTR_VideoDirector: ["video_roll_pool", "still_roll_pool"]' in glue
     assert "node.addDOMWidget(name," in glue            # same name as the text box
     assert "node.widgets.splice(index, 1, widget)" in glue  # same slot
     assert "otr_choices" in glue

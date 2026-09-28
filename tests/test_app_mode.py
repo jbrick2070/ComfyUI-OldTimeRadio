@@ -78,15 +78,17 @@ def test_the_form_follows_his_order():
     writing models including cloud sub options, upscaler, my story fields".
     Rows he did not name sit next to their nearest relative: the source row
     under its bank, each still under its video, and story idea / title /
-    Lemmy just above My Story. Space saver closes the form. Each roll pool
-    (2026-09-26) sits under the dropdown it narrows, and each model roll
-    switch (2026-09-28) sits above the pickers it replaces."""
+    Lemmy just above My Story, then Space saver. Each model roll switch
+    (2026-09-28) sits above the pickers it replaces. Every checklist -- the
+    language, bank and style pools and the video and still pools -- closes the
+    form, after Space saver (operator, 2026-09-28: "all the clickbox sections
+    are at the bottom after space saver")."""
     names = [w for _t, w in (tuple(e[:2]) for e in CONFIG["form"])]
     assert names == [
-        "episode_language", "language_roll_pool",
+        "episode_language",
         "num_characters", "act_count",
-        "source_bank", "bank_roll_pool", "source_ref",
-        "visual_style", "style_roll_pool",
+        "source_bank", "source_ref",
+        "visual_style",
         "roll_video_lanes", "roll_still_models",
         "announcer_video_model", "announcer_image_model",
         "character_video_model", "character_image_model",
@@ -103,6 +105,8 @@ def test_the_form_follows_his_order():
         "story_characters", "story_plot", "story_setting", "story_author",
         "music_style",
         "asset_cleanup",
+        "language_roll_pool", "bank_roll_pool", "style_roll_pool",
+        "video_roll_pool", "still_roll_pool",
     ]
 
 

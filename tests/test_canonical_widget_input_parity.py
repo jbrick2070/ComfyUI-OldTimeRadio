@@ -85,8 +85,9 @@ def test_every_widget_value_has_an_input_descriptor(node_id):
 
 
 #: The widgets appended to OTR_VideoDirector after max_render_frames, in
-#: order: the model-roll switches (2026-09-28).
-_APPENDED_AFTER = ("roll_video_lanes", "roll_still_models")
+#: order: the model-roll switches and their checklists (2026-09-28).
+_APPENDED_AFTER = ("roll_video_lanes", "roll_still_models",
+                   "video_roll_pool", "still_roll_pool")
 
 
 def test_node_87_carries_max_render_frames_specifically():
