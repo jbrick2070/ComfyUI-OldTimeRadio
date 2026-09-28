@@ -24,7 +24,9 @@ Per arm it prints:
   brightness step across it net of the local drift (-2.08 before
   PBUG-20260928-03, -0.28 after).
 
-The first ``--arm`` is the baseline the others are counted against.
+The first ``--arm`` is the baseline the others are counted against. A beat is
+scored only when every arm rendered at least 49 frames of it (the last pick is
+frame 48); the report counts the ones left out.
 
     python scripts/otr_replay_ab.py --bundle <output>/otr/episodes/_replay/<episode> ^
         --arm v3=<output>/otr/episodes/<original> ^
@@ -148,9 +150,15 @@ def _median(values):
 
 def report(scores, out=sys.stdout):
     labels = list(scores)
-    common = sorted(set.intersection(*(set(s) for s in scores.values()))) if scores else []
-    common = [b for b in common if all(p in scores[l][b]["distance"] for l in labels for p in PICKS)]
-    out.write("beats compared: %d\n" % len(common))
+    rendered = sorted(set.intersection(*(set(s) for s in scores.values()))) if scores else []
+    # A beat is scored at every frame in PICKS or not at all, so a clip
+    # shorter than the last pick is left out -- and the report says so.
+    common = [b for b in rendered
+              if all(p in scores[l][b]["distance"] for l in labels for p in PICKS)]
+    short = len(rendered) - len(common)
+    out.write("beats compared: %d%s\n" % (
+        len(common), (" (%d left out: a clip shorter than %d frames)"
+                      % (short, max(PICKS) + 1)) if short else ""))
     if not common:
         return
     out.write("%-12s %s  %s  %s  %s  %s\n" % (

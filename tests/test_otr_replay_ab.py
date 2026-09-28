@@ -82,6 +82,43 @@ def test_a_soft_8th_frame_reads_as_a_pulse(episode):
     assert scores["pulses"]["shot_000_b1"]["pulse"] < 0.8
 
 
+@pytest.mark.parametrize("seam", [160, 161, 162])
+def test_a_join_is_scored_across_frames_160_and_161(seam):
+    """A 161-frame segment followed by successors that drop their first frame
+    joins at assembled frame 161: the seam is the change from 160 to 161. A
+    brightness jump placed exactly there must read as a hard join and a
+    positive step; one frame either side must not, or the index is off."""
+    frames = []
+    for i in range(240):
+        level = 150 if i >= seam else 90
+        # A slow drift, so the neighbourhood is not flat zero.
+        frames.append(np.full((H, W, 3), level + (i % 3), np.uint8))
+    decoded = [(f, f[..., 0].copy()) for f in frames]
+    still = frames[0].astype(np.int16)
+    scored = ab.score_clip(decoded, still, segment_frames=161)
+    assert len(scored["joins"]) == 1
+    if seam == 161:
+        assert scored["joins"][0] > 3 and scored["steps"][0] > 50
+    else:
+        # One frame off, the jump lands in the drift window beside the seam, so
+        # the net step reads a few levels (-6.4 here), nowhere near the +60 a
+        # wrong index would report.
+        assert scored["joins"][0] < 3 and abs(scored["steps"][0]) < 10
+
+
+def test_a_short_beat_is_counted_as_left_out():
+    """A clip too short for the last pick is not scored, and the report says
+    how many beats that left out instead of quietly shrinking the count."""
+    full = {"distance": {p: 1.0 for p in ab.PICKS}, "detail": {p: 1.0 for p in ab.PICKS},
+            "pulse": 1.0, "joins": [], "steps": []}
+    short = dict(full, distance={12: 1.0, 24: 1.0}, detail={12: 1.0, 24: 1.0})
+    scores = {"a": {"b1": full, "b2": short}, "b": {"b1": full, "b2": full}}
+    out = io.StringIO()
+    ab.report(scores, out)
+    assert out.getvalue().startswith(
+        "beats compared: 1 (1 left out: a clip shorter than 49 frames)")
+
+
 def test_the_beat_is_matched_by_its_whole_id(episode):
     clips = episode / "holds" / "clips"
     assert ab.clip_for(str(clips), "shot_000_b1").endswith("shot_shot_000_b1_character_video_ltx_8gb.mp4")
