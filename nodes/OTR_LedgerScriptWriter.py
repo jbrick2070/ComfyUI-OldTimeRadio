@@ -3018,6 +3018,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "from: " + ", ".join(_ROLLS.eligible_style_ids())
                             + ". Recorded at meta.style_roll."
                         ),
+                        # THE CLICKABLE LIST'S CHOICES (2026-09-28):
+                        # js/roll_pickers.js draws this box as checkboxes and
+                        # reads its choices from here, so the list is exactly
+                        # what the pool accepts. The value stays the typed list.
+                        "otr_choices": list(_ROLLS.eligible_style_ids()),
                     },
                 ),
                 "language_roll_pool": (
@@ -3036,6 +3041,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             + ". Off is never rolled. Recorded at "
                             "meta.language_roll."
                         ),
+                        "otr_choices": [c for c in _EPLANG.dropdown_choices()
+                                        if c != _EPLANG.OFF_LABEL],
                     },
                 ),
                 # The story bank's pool (2026-09-27), APPENDED after the two
@@ -3055,6 +3062,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             + ", ".join(_ROLLS.eligible_bank_ids())
                             + ". Recorded at meta.bank_roll."
                         ),
+                        "otr_choices": list(_ROLLS.eligible_bank_ids()),
                     },
                 ),
             },

@@ -14,7 +14,7 @@
   "upscale_note": "off = as rendered",
   "cloud_note": "Only with a cloud writer",
   "my_story_note": "Only for the My Story bank",
-  "roll_pool_note": "With the roll; empty = all",
+  "roll_pool_note": "With the roll; none picked = all",
   "form": [
     ["OTR_LedgerScriptWriter", "episode_language"],
     ["OTR_LedgerScriptWriter", "language_roll_pool", "roll_pool_note"],
