@@ -985,3 +985,70 @@ CDN. 82c007da (the Google window fix) is on main, not in 2.3.13.
 **Open.** The operator's ComfyUI Desktop must be restarted to load the no-caps
 code (it loaded at 12:57). Post-push QA running on 90902989 (Sonnet) and
 82c007da (Composer).
+
+## 2026-09-28 16:25 -- LTX 8 GB recipe v5: the pulse gone, v4's cut-aways reverted, joins no longer darken
+
+**The complaint.** costume_masquerade_20260928_132721 (Desktop, `otr_8gb_video`):
+"it really skips", then "much of it is blurry and you can feel it stepping".
+Three defects, all fixed and live-verified on paired replays of that episode --
+the same stills, prompts and seeds, only the code moved -- scored with the new
+`scripts/otr_replay_ab.py` (2131cab5).
+
+**1. Joins stepped darker (PBUG-20260928-03, Bible 12.183).** The terminal frame
+that seeds each chained segment came out of ffmpeg's default yuv420p-to-RGB
+conversion 1.3 luma dark; the compositor's upscaler decode, the credits backdrop
+and the canvas poster had the same conversion. Fixed ae7b4515, 1f457e75,
+625f40de. Live: median join brightness step -2.08 -> -0.13.
+
+**2. A 3 Hz pulse of softness (PBUG-20260928-04, Bible 12.184).** The 16-frame
+temporal decode tile blended every 8th frame. d12f5b61 (64-frame tile), kept in
+v5. Live: pulse 0.72 -> 1.03; detail on the frames v3 blurred +62% and +51%. On
+the 8 GB 4060: peak 7,579 of 8,188 MiB through 161-frame segments.
+
+**3. Recipe v4 cut away from its stills (PBUG-20260928-05, Bible 12.185).** v4
+took Lightricks' canonical distilled schedule and LTXVPreprocess(38): 62 of 68
+beats sat further from their still by frame 24, 58 left it entirely, many as a
+hard cut. A 2x2 on the 4060 blamed the schedule (frame 24: v3 17.0, compression
+alone 20.5, schedule alone 31.2, v4 30.1); the preprocess softened the frames.
+v5 (39bb1f18) is v3's sampling with the 64-frame tile -- its production graph
+differs from v3's only in temporal_size (diffed node by node) -- and 6c18ba84
+requires LTXVPreprocess only when the graph builds it. Live: v5 holds its still
+like v3 (frame 12: further in 37 of 70 beats, median +0.07). v4 was on main for
+42 minutes and never published.
+
+**In otr/obs, for his eye:**
+- costume_masquerade_20260928_155329 -- v5, the one to judge.
+- costume_masquerade_20260928_150631 -- v4 (the cut-aways; reference only).
+- costume_masquerade_20260928_153132 -- measurement arm: canonical schedule, no compression.
+- clink_bone_20260928_154809 -- v5 on the 8 GB 4060 (copied over).
+The 4060's own obs also holds its clink arms (152154 v4, 153604, 154102).
+
+**Also on main since 2.3.13:** e18a855e (a cloud-writer piece that must arrive
+whole gets room for itself) and fbdffba5 (ledger_clean refuses a reworded or
+split repeat of the kept line).
+
+**Review roster (post-push).** Sonnet and Composer 2.5 on d12f5b61 (both hold);
+ae7b4515 (both hold; Sonnet's gap became 625f40de); 1f457e75 (Composer said the
+scale flags cannot govern `format=rgb24` -- measured -1.27 -> +0.03, refuted);
+625f40de (Composer's "may not ride the same path" -- measured -1.83 -> +0.03,
+refuted); 39bb1f18 (both hold; Sonnet's note became 6c18ba84); 6c18ba84
+(Composer holds). Codex is out of credits until 2026-10-03.
+
+**Registry.** 2.3.13 is Active. Main now carries user-visible fixes beyond it
+(v5 and the pulse, the join brightness, the two writer fixes): a 2.3.14 is the
+operator's call, with the full suite first.
+
+**Open.**
+- Guided multi-frame joins (designed, r1 at kibitz-runs/2026-09-28-ltx-chain-guides,
+  not built): a chained segment still restarts from ONE still, so motion
+  restarts at each join -- joins change 2.5x their neighbourhood. It must win a
+  paired replay; the design's LTXVPreprocess(29) on the guide frames is now
+  suspect after -05.
+- AnimateDiff blur: the 8 GB Lightning lane already decodes with vae-ft-mse; it
+  renders 512x288 and holds each frame 3x (8.33 fps, by operator ruling). The
+  levers are his: the compositor's AI upscaler, a larger canvas, the cadence.
+- LTX 2.5 checked: its stage-2 decode tiles 64/16 (no pulse) and the join fix
+  covers it (shared extract_terminal_frame). `LTX25_DECODE_TEMPORAL_SIZE` /
+  `_OVERLAP` (33/4) in ltx25_recipe.py have no consumer.
+- The 4060 clean-room clone sits detached at 39bb1f18; both headless servers
+  are stopped.
