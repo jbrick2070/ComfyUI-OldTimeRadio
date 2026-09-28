@@ -171,7 +171,7 @@ _LTX8_DEFAULT_NEGATIVE = (
 #: leave the recipe invisible to every consumer that matters -- an unowned
 #: ledger field in all but name. It is also `cfg.recipe` in `session_identity`,
 #: so a version bump moves the identity for free.
-RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass_v4"
+RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass_v5"
 
 #: THE CONSENT ACT that re-opens the recipe knobs (B6). One explicit env var,
 #: the same shape as the client-bank build's `--activate`: an operator who
@@ -344,10 +344,11 @@ _SCHEDULE_LTXV_SCHEDULER = "ltxv_scheduler"
 _SCHEDULE_DISTILLED = "distilled_0_9_8"
 _SCHEDULES = (_SCHEDULE_LTXV_SCHEDULER, _SCHEDULE_DISTILLED)
 
-#: THE ACTIVE ltx_8gb RECIPE, v4 -- 2026-09-28, aligned with the canonical
-#: LTX-Video 0.9.8 distilled flow (operator: "be sure we are comparing to the
-#: canonical ltx 0.9.8 graphs", after "much of it is blurry and you can feel it
-#: stepping").
+#: RECIPE v4 -- 2026-09-28, aligned with the canonical LTX-Video 0.9.8
+#: distilled flow (operator: "be sure we are comparing to the canonical ltx
+#: 0.9.8 graphs", after "much of it is blurry and you can feel it stepping").
+#: SUPERSEDED THE SAME EVENING BY v5 (below): its two sampling changes were
+#: measured on paired replays and reverted; its decode tile is kept.
 #:
 #: v1 called its sampling knobs "TODAY'S SHIPPED DEFAULTS, not a measured
 #: selection"; v2's sweep varied only the T5 device and tiled decode, and v3
@@ -381,17 +382,53 @@ _SCHEDULES = (_SCHEDULE_LTXV_SCHEDULER, _SCHEDULE_DISTILLED)
 #: 8 GB card is re-measured on the 4060 (a bigger temporal chunk decodes more
 #: frames at once).
 #:
-#: v3 IS STILL REACHABLE under the consent act for an A/B
-#: (`OTR_LTX_8GB_SCHEDULE=ltxv_scheduler`, `OTR_LTX_8GB_IMG_COMPRESSION=0`,
-#: `OTR_LTX_8GB_VAE_TEMPORAL=16`); those clips stamp their departures from v4.
+#: v3 is reachable under the consent act with `OTR_LTX_8GB_VAE_TEMPORAL=16`
+#: (v5's sampling is v3's).
 LTX8_RECIPE_V4 = dict(LTX8_RECIPE_V3, schedule=_SCHEDULE_DISTILLED,
                       img_compression=38, vae_temporal=64)
+
+#: THE ACTIVE ltx_8gb RECIPE, v5 -- 2026-09-28: v3's sampling with v4's
+#: decode tile. v4's two canonical sampling changes were MEASURED, and both
+#: hurt this lane.
+#:
+#: Paired replays (the same stills, prompts and seeds; only the recipe moved)
+#: of two episodes, scored on how far each beat's opening frames sit from the
+#: still they were conditioned on (mean abs RGB at 512x288):
+#:
+#:   * THE DISTILLED SCHEDULE LEAVES THE STILL. By frame 24, v4 sat further from
+#:     the still than v3 in 62 of 68 beats of costume_masquerade (5080) and 8 of
+#:     8 of clink_against_bone (4060); 58 of the 68 costume beats had left the
+#:     still's composition entirely, many as a hard cut to a different scene
+#:     inside half a second -- the "skips" the operator reported. The 2x2 on
+#:     clink, distance at frame 24: v3 17.0; compression alone 20.5; distilled
+#:     schedule alone 31.2; v4 (both) 30.1. The schedule is the cause.
+#:   * LTXVPreprocess(38) SOFTENS THE FRAMES. Detail (variance of the Laplacian)
+#:     at frames 12/24/48: with the distilled schedule 261/257/291 -> 174/184/184,
+#:     about a third; with LTXVScheduler 282/239/255 -> 215/228/222 -- and on
+#:     that schedule it also nudged the picture off its still (17.0 -> 20.5).
+#:
+#: Lightricks' canonical graph pairs those settings with a prompt that
+#: CAPTIONS the still. This lane's prompt narrates the beat instead, so the
+#: looser the still's grip on the sampler, the more the text wins and the
+#: picture cuts away to what the words describe.
+#:
+#: What v5 keeps from v4 is the 64-frame temporal decode tile: it removed the
+#: 3 Hz softness pulse (every 8th frame's detail against its neighbours
+#: 0.72 -> 1.05 on the costume replay) and cannot move composition -- it acts
+#: after sampling. Its 8 GB proof: the clink replay on the 4060 peaked at
+#: 7,476 of 8,188 MiB through five 161-frame segments.
+#:
+#: v4 stays reachable under the consent act for another A/B
+#: (`OTR_LTX_8GB_SCHEDULE=distilled_0_9_8`, `OTR_LTX_8GB_IMG_COMPRESSION=38`);
+#: those clips stamp their departures from v5.
+LTX8_RECIPE_V5 = dict(LTX8_RECIPE_V4, schedule=_SCHEDULE_LTXV_SCHEDULER,
+                      img_compression=0)
 
 #: THE ONE NAME EVERY CONSUMER READS. Bumping a recipe is repointing this and
 #: the version inside `RECIPE_LTX8_I2V` -- never editing a versioned dict in
 #: place. Kept as a separate binding so `LTX8_RECIPE_V1` and `_V2` stay
 #: readable as history.
-LTX8_RECIPE = LTX8_RECIPE_V4
+LTX8_RECIPE = LTX8_RECIPE_V5
 
 #: The env var each frozen field was read from, kept so the demotion can NAME
 #: what it is ignoring. Presence is all this map is used for outside
@@ -1425,16 +1462,20 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                                   "latent_image": W("img2vid", 2)}},
             "decode": {"class": "decode", "inputs": self._decode_inputs(W)},
         }
-        # v4: the canonical graph gives the still a video frame's compression
-        # before it pins frame 0 (see LTX8_RECIPE_V4). 0 leaves the node out.
+        # LTXVPreprocess gives the still a video frame's compression before it
+        # pins frame 0, as the canonical graph does (v4). v5 sets 0, which
+        # leaves the node out: measured, it softened every frame by about a
+        # third (see LTX8_RECIPE_V5).
         if cfg["img_compression"] > 0:
             graph["preprocess"] = {
                 "class": "preprocess",
                 "inputs": {"image": W("loadimage", 0),
                            "img_compression": int(cfg["img_compression"])}}
-        # v4: the distilled schedule is not built by a node -- the caller hands
-        # the sampler its SIGMAS as the ``sched`` result (``_schedule_results``),
-        # so ``LTXVScheduler`` leaves the graph with the other supplied ids.
+        # The distilled schedule (v4; a measurement arm since v5) is not built
+        # by a node -- the caller hands the sampler its SIGMAS as the ``sched``
+        # result (``_schedule_results``), so ``LTXVScheduler`` leaves the graph
+        # with the other supplied ids. Under v5 nothing is supplied and the
+        # scheduler node builds them, as in v1-v3.
         for nid in set(external_results or ()):
             graph.pop(nid, None)
         return graph

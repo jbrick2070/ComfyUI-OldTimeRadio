@@ -282,10 +282,9 @@ def test_every_wire_that_reads_the_loaders_is_pinned():
     assert g["pos"]["inputs"]["clip"] == wb.Wire("clip", 0)
     assert g["neg"]["inputs"]["clip"] == wb.Wire("clip", 0)
     assert g["sample"]["inputs"]["model"] == wb.Wire("modelsampling", 0)
-    # v4: the still passes through LTXVPreprocess before it pins frame 0.
-    assert g["preprocess"]["inputs"]["image"] == wb.Wire("loadimage", 0)
-    assert g["preprocess"]["inputs"]["img_compression"] == 38
-    assert g["img2vid"]["inputs"]["image"] == wb.Wire("preprocess", 0)
+    # v5: the clean still pins frame 0 (v4's LTXVPreprocess measured softer).
+    assert "preprocess" not in g
+    assert g["img2vid"]["inputs"]["image"] == wb.Wire("loadimage", 0)
     assert g["cond"]["inputs"]["positive"] == wb.Wire("img2vid", 0)
     assert g["sched"]["inputs"]["latent"] == wb.Wire("img2vid", 2)
     assert g["sample"]["inputs"]["latent_image"] == wb.Wire("img2vid", 2)
@@ -712,14 +711,13 @@ def test_the_executor_is_called_with_the_current_keep_contract(staged,
 
     assert seen["kwargs"]["free_after_use"] is True
     assert seen["kwargs"]["keep"] == {"ckpt", "modelsampling", eng._TERMINAL}
-    # THE FLIP: pre-B1b this kwarg was absent. It is now always forwarded.
-    # Since recipe v4 it carries the distilled SIGMAS even when the caller
-    # prepared nothing -- and ONLY those, which is why the loader nodes are still
-    # in the graph while `LTXVScheduler` is not.
-    ext = seen["kwargs"]["external_results"]
-    assert set(ext) == {"sched"}
-    assert [round(float(s), 4) for s in ext["sched"][0]] == list(m.LTX8_DISTILLED_SIGMAS)
-    assert "sched" not in seen["graph"]
+    # THE FLIP: pre-B1b this kwarg was absent. It is now always forwarded, and
+    # it is None exactly when the caller prepared nothing -- which is why the
+    # loader nodes are still in the graph on the very next line. (Recipe v4
+    # supplied its distilled SIGMAS here; v5's scheduler node builds them, so
+    # `LTXVScheduler` is back in the graph.)
+    assert seen["kwargs"]["external_results"] is None
+    assert "sched" in seen["graph"]
     assert "ckpt" in seen["graph"] and "clip" in seen["graph"]
 
 
