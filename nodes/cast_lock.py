@@ -708,6 +708,11 @@ class CastLock:
                     "delivery_profile_id", "delivery_profile_version",
                     "voice_bank_id",
                     "char_voice_engine", "announcer_voice_engine",
+                    # The model-roll receipts stamped above (2026-09-28). The
+                    # credits read THIS durable copy, not the wire ledger, so a
+                    # receipt left off this list never reaches the recipe card
+                    # or the saved ledger -- the 5080 proof leg showed it.
+                    *_lane_rolls.LEDGER_KEYS,
                 ) if k in meta
             },
             source="cast_lock",

@@ -103,6 +103,8 @@ SURFACES = {
 }
 #: The surfaces rolled at the gate. The voice rolls in CastLock.
 GATE_SURFACES = ("video_lane", "still_model", "music_engine")
+#: Every ledger meta key a roll may stamp; CastLock persists exactly these.
+LEDGER_KEYS = tuple(spec[2] for spec in SURFACES.values())
 
 #: Every cloud and Google adapter module in the registries is named so.
 CLOUD_MODULE_PREFIXES = ("eng_cloud", "eng_google")

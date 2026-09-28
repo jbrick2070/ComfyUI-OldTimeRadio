@@ -355,6 +355,14 @@ def test_cast_lock_rolls_the_voice_and_stamps_every_receipt(monkeypatch):
     assert meta["video_lane_roll"] == prompt["87"][L.RECEIPT_KEY]["video_lane"]
     for row in json.loads(out[0])["cast"]:
         assert row["voice_engine"] == voice["selected"], row
+    # The credits read the DURABLE ledger, not the wire copy: every receipt
+    # must land there too (the 5080 proof leg of 2026-09-28 found it did not).
+    from nodes.production_ledger import get_ledger
+    durable = get_ledger().data["meta"]
+    for key in ("voice_engine_roll", "music_engine_roll", "video_lane_roll"):
+        assert durable[key] == meta[key], key
+    assert set(L.LEDGER_KEYS) == {"video_lane_roll", "still_model_roll",
+                                  "music_engine_roll", "voice_engine_roll"}
 
 
 def test_cast_lock_refuses_an_audio_switch_the_gate_never_rolled():
