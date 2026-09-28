@@ -813,3 +813,27 @@ Open:
 - Subgraph blueprint: dropped by the operator.
 Models: Sonnet QA on each pushed diff (bank pool HOLDS; hint HOLDS with one
   real finding fixed in the next commit), Cursor + Fable on the design round.
+
+## 2026-09-27 evening -- 2.3.12 Active, the foley leg, the LLM pet project
+
+- 2.3.12 went Active at 19:04 PDT and is the registry's latest. Nothing else
+  was published tonight.
+- The subgraph blueprint row is out of GO_FORWARD_PLAN.md (operator: OTR is a
+  full pipeline, not a piece to splice; not worth it).
+- A public-facing field guide of vibe-coding gotchas was built from the commit
+  history and the Bug Bible (about 40 items, each with its commit or PBUG). It
+  is a private artifact the operator shares when he chooses; the link is in
+  the driver's memory notes, not here.
+- The operator posted on r/comfyui recruiting an ML trainer for his next pet
+  project, an LLM trained on real ComfyUI node-dev lessons. Not OTR work.
+- 4060 human-install check, continued: otr_8gb_ltx25_foley was at 17 of ~21
+  beats at 22:09 (about 15 min a beat on the 8 GB card; ETA ~23:15). Plan when
+  it publishes: run otr_canonical, then a second still and video run for fair
+  timings (the first runs included downloads). The 8 GB mime and audio_in legs
+  are skipped unless asked: same LTX 2.5 engine, 6-7 h each on this card.
+- Text encoders: confirmed every NVIDIA lane runs them on the GPU. ltx_8gb
+  keeps the CPU T5 on Apple only, until a Mac proves the GPU version (web
+  research the same evening supports waiting: fp16 T5 NaNs on MPS, the 9.9 GB
+  unified-memory footprint).
+- Lemmy cameo ships on its ~11% roll in all 27 workflows; the operator was
+  asked whether it should stay and did not answer. Unchanged.
