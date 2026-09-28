@@ -943,3 +943,45 @@ task to find what holds the memory between beats was offered to the operator.
 **Registry.** 2.3.12 is Active. Main now also carries the clickable roll pools,
 the forgiving pool spelling and everything above; a 2.3.13 publish is the
 operator's call.
+
+## 2026-09-28 14:00 -- 2.3.13 published: no token caps, no doubled dialogue
+
+**Doubled dialogue (90902989, PBUG-20260928-01, Bible 12.181).** The operator
+heard every line twice in signal_time_20260928_105643. A stage-direction repair
+in ledger_clean spliced the rest of the line back in; the splice now refuses a
+replacement that repeats the kept speech. Live verify: hidden_sequence_20260928_125321.
+
+**No token caps on the cloud writers (505d7d51, PBUG-20260928-02, Bible
+12.182).** The operator's My Story run on ComfyUI Desktop (3 acts, OpenRouter
+Sonnet) died inside ledger_clean at 299,911 of a 300,000 per-run ceiling after
+the script was written and paid for; the same death is in the log for 09-17.
+The ceiling counted each call as prompt plus its whole 16,384 output allowance,
+never the bill. Operator: "no caps ... remove that whole feature". OpenRouter,
+Comfy Credits and Google writers now send no output number and have no per-run
+or per-call ceiling; the queue-time wallet check is the money guard, and the
+log shows the provider's real tokens and dollars per call. Live-proven before
+relying on it: Sonnet 5.5 wrote 37,533 tokens uncapped and stopped on its own
+($0.38); OpenRouter kept a 36 s reply alive past a 20 s read timeout; Gemini
+Flash wrote 8,915 tokens to a natural end; ComfyUI's own OpenRouter node posts
+to the Comfy proxy with no max_tokens. Comfy and Google writer timeouts went to
+600 s (replies arrive only when finished).
+
+**Follow-up (82c007da).** Composer on 505d7d51 found the Google writer's context
+check skipped calls with no requested size; grounding it showed the real defect
+was the Google rows' placeholder 8,192 window on models that take 1,048,576
+(measured from Google's model list). Fixed, with the check now on every call.
+Sonnet on 505d7d51: two stale comments, folded into the same commit.
+
+**The operator's "tiptoe" question.** No baked-in text leaked into My Story. The
+queued prompt had the music description in "My Story - by" and "Jeffrey A Brick"
+in "My Story - music in words" -- the two boxes were swapped, so the announcer
+said "Tonight's story is by Playful, gently spooky jazz...". His 13:13 re-run
+(local 12B writer) carries the same swap. The labels were left as they are.
+
+**Registry.** 2.3.13 published at d4328211 (full suite before the bump: 17,246
+passed, 0 failed); Pending at 20:57 UTC with 25 dependencies and its zip on the
+CDN. 82c007da (the Google window fix) is on main, not in 2.3.13.
+
+**Open.** The operator's ComfyUI Desktop must be restarted to load the no-caps
+code (it loaded at 12:57). Post-push QA running on 90902989 (Sonnet) and
+82c007da (Composer).
