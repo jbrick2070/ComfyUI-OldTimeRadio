@@ -6,7 +6,10 @@
  * The saved value stays what it always was: the typed list the backend parses
  * (`nodes/_otr_rolls.py::parse_roll_pool`). These helpers only translate that
  * text to checked boxes and back, matching the backend's forgiveness: case,
- * and spaces, hyphens or underscores, do not matter.
+ * and spaces, hyphens or underscores, do not matter. One known difference: a
+ * saved 2.3.8 list is split on commas, so a quoted entry containing a comma
+ * would split where the backend's literal_eval would not. No choice contains a
+ * comma today.
  */
 
 /** How a pool entry is compared -- the same rule as the backend's `_pool_key`. */

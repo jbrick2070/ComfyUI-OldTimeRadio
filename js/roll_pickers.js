@@ -62,7 +62,8 @@ function makeChecklist(name, choices, initial) {
         for (const box of boxes) box.checked = checked.has(box.value);
         note.hidden = unknown.length === 0;
         note.textContent = unknown.length
-            ? `Not a choice here, so it is ignored: ${unknown.join(", ")}` : "";
+            ? `Not a choice here, and the run will stop on it: ${unknown.join(", ")}. `
+              + "Click any box to clear it." : "";
     };
     paint();
     return {
@@ -85,7 +86,9 @@ app.registerExtension({
                 const widget = node.addDOMWidget(name, "otr_roll_picker", picker.root, {
                     getValue: picker.get,
                     setValue: picker.set,
-                    getMinHeight: () => 26 * Math.ceil(choices.length / 3) + 8,
+                    // The list's real height once drawn; a two-per-row guess before.
+                    getMinHeight: () => picker.root.scrollHeight
+                        || 26 * Math.ceil(choices.length / 2) + 8,
                 });
                 // addDOMWidget appends; move the checklist into the text box's
                 // slot so the saved value's position never changes.

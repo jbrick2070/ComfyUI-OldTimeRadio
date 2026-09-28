@@ -3012,9 +3012,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "multiline": False,
                         "tooltip": (
                             "Read only when Visual style is 'roll (any "
-                            "style)'. Type the styles to roll among, "
-                            "separated by commas; empty rolls among every "
-                            "style, one name is simply that style. Choose "
+                            "style)'. Tick the styles to roll among (or type "
+                            "them, separated by commas); none rolls among every "
+                            "style, one is simply that style. Choose "
                             "from: " + ", ".join(_ROLLS.eligible_style_ids())
                             + ". Recorded at meta.style_roll."
                         ),
@@ -3032,9 +3032,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "multiline": False,
                         "tooltip": (
                             "Read only when Language is 'roll (any "
-                            "language)'. Type the languages to roll among, "
-                            "separated by commas; empty rolls among every "
-                            "language, one name is simply that language. "
+                            "language)'. Tick the languages to roll among (or "
+                            "type them, separated by commas); none rolls among "
+                            "every language, one is simply that language. "
                             "Choose from: " + ", ".join(
                                 c for c in _EPLANG.dropdown_choices()
                                 if c != _EPLANG.OFF_LABEL)
@@ -3055,9 +3055,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "multiline": False,
                         "tooltip": (
                             "Read only when Story bank is 'roll (any "
-                            "eligible bank)'. Type the banks to roll among, "
-                            "separated by commas; empty rolls among every "
-                            "eligible bank, one name is simply that bank. "
+                            "eligible bank)'. Tick the banks to roll among (or "
+                            "type them, separated by commas); none rolls among "
+                            "every eligible bank, one is simply that bank. "
                             "Choose from: "
                             + ", ".join(_ROLLS.eligible_bank_ids())
                             + ". Recorded at meta.bank_roll."
