@@ -1027,7 +1027,12 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
     # negotiation still honors the tag correctly here -- but the encoder side
     # (below) is what needed the fix; adding this belt keeps the pair
     # symmetric and removes the version dependency for future ffmpeg builds.
-    dec_vf_parts.append("scale=in_color_matrix=bt709")
+    # accurate_rnd + full_chroma_int: with swscale's default flags a yuv420p ->
+    # RGB decode came back ~1.3 luma darker with saturation up (measured
+    # 2026-09-28; see wrapper_bridge.ffmpeg_terminal_frame_cmd), and on this
+    # path that is every frame of a model-enhanced segment.
+    dec_vf_parts.append(
+        "scale=in_color_matrix=bt709:flags=accurate_rnd+full_chroma_int")
     dec_vf_parts.append("format=rgb24")
     dec_vf = ",".join(dec_vf_parts)
     dec_args = [fb, "-y", "-loglevel", "error"]

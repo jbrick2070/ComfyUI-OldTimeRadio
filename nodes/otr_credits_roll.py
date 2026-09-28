@@ -1657,14 +1657,17 @@ def extract_final_frame(video_path: str, out_png: str) -> str:
     approximate. RAISES: a body video whose final frame cannot be read is not
     a presentation problem, it is an unreadable body.
     """
-    cmd = [_ffmpeg_bin(), "-y", "-sseof", "-3", "-i", video_path,
+    # Accurate yuv420p -> RGB (an OUTPUT option): the default flags return the
+    # frame ~1.3 luma darker (2026-09-28, wrapper_bridge.ffmpeg_terminal_frame_cmd).
+    accurate = ["-sws_flags", "accurate_rnd+full_chroma_int"]
+    cmd = [_ffmpeg_bin(), "-y", "-sseof", "-3", "-i", video_path] + accurate + [
            "-update", "1", "-frames:v", "1", "-q:v", "2", out_png]
     r = otr_proc.run(cmd, capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(out_png) \
             or os.path.getsize(out_png) == 0:
         # A very short body may have nothing 3s from the end; take frame 0.
         r = otr_proc.run(
-            [_ffmpeg_bin(), "-y", "-i", video_path,
+            [_ffmpeg_bin(), "-y", "-i", video_path] + accurate + [
              "-update", "1", "-frames:v", "1", "-q:v", "2", out_png],
             capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(out_png) \
