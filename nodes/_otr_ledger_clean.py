@@ -79,7 +79,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import re
+import unicodedata
 from typing import Any, Callable, Literal, Mapping, MutableMapping, NamedTuple, Sequence
 
 try:
@@ -268,15 +268,52 @@ def _covers_spoken_row(text: str, intervals: Sequence[tuple[int, int]]) -> bool:
     return bool(spans) and not "".join(outside).strip()
 
 
-_WORD = re.compile(r"[^\W_]+(?:['’][^\W_]+)*", re.UNICODE)
-
 #: A replacement sharing this many consecutive words with the kept speech is
 #: the kept speech said again, not an edit of the marked span.
 _REPEAT_RUN = 4
 
+#: ...and so is one holding this share of the kept speech's distinct words in
+#: any order: "I really see the grid." or "The grid, I see." for a kept "I see
+#: the grid." (Sonnet and Composer QA on 90902989). A refused repair is retried
+#: with the refusal as feedback, and a small writer answers "you repeated this"
+#: with exactly that light reword, so the run alone lets the doubled line back in.
+_REPEAT_SHARE = 0.75
+
+#: Chinese and Japanese put no spaces between words, so a clause is one "word"
+#: and a light reword ("彼は今何かを見ている" for "彼は何かを見ている") shares
+#: none. There the measure is pairs of adjacent characters.
+_REPEAT_PAIR_SHARE = 0.6
+
+
+def _is_word_char(ch: str) -> bool:
+    # Letters, combining marks and digits. The marks matter: Devanagari vowel
+    # signs are marks, and a letters-only pattern cut "किताब" into "क", "त", "ब".
+    return unicodedata.category(ch)[0] in "LMN"
+
 
 def _spoken_words(text: str) -> "list[str]":
-    return [w.casefold().replace("’", "'") for w in _WORD.findall(text or "")]
+    """Casefolded words, apostrophes inside a word kept ("l'ai", "don't")."""
+    words, current = [], []
+    for ch in (text or "").casefold().replace("’", "'"):
+        if _is_word_char(ch) or (ch == "'" and current):
+            current.append(ch)
+        elif current:
+            words.append("".join(current).rstrip("'"))
+            current = []
+    if current:
+        words.append("".join(current).rstrip("'"))
+    return [w for w in words if w]
+
+
+def _written_without_spaces(text: str) -> bool:
+    # Hiragana, katakana and the Han ideographs (Japanese and Chinese).
+    return any("぀" <= ch <= "ヿ" or "㐀" <= ch <= "鿿"
+               for ch in text or "")
+
+
+def _character_pairs(text: str) -> "set[str]":
+    letters = [ch for ch in (text or "").casefold() if _is_word_char(ch)]
+    return {a + b for a, b in zip(letters, letters[1:])}
 
 
 def _longest_shared_run(a: "Sequence[str]", b: "Sequence[str]") -> int:
@@ -300,14 +337,26 @@ def _repeats_kept_speech(replacement: str, kept: str) -> bool:
     as the replacement, so the splice read "I see the grid. I see the ledger. I
     see the grid. I see the ledger." -- and the judge, which reads for stage
     directions, passed it as clean. A replacement that contains all of the kept
-    speech, or shares ``_REPEAT_RUN`` consecutive words with it, is that
-    mistake; Python only refuses the construction, it writes no prose.
+    speech, shares ``_REPEAT_RUN`` consecutive words with it, or holds
+    ``_REPEAT_SHARE`` of its distinct words in any order (``_REPEAT_PAIR_SHARE``
+    of its character pairs in Chinese or Japanese) is that mistake; Python only
+    refuses the construction, it writes no prose.
     """
     rep, keep = _spoken_words(replacement), _spoken_words(kept)
     if not rep or not keep:
         return False
     run = _longest_shared_run(rep, keep)
-    return run >= _REPEAT_RUN or run == len(keep)
+    if run >= _REPEAT_RUN or run == len(keep):
+        return True
+    kept_words = set(keep)
+    if len(kept_words & set(rep)) >= _REPEAT_SHARE * len(kept_words):
+        return True
+    if _written_without_spaces(kept):
+        pairs = _character_pairs(kept)
+        if pairs and (len(pairs & _character_pairs(replacement))
+                      >= _REPEAT_PAIR_SHARE * len(pairs)):
+            return True
+    return False
 
 
 def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: Sequence[Mapping[str, Any]]) -> str:
@@ -338,6 +387,15 @@ def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: 
                 "the approved spans, so the speaker would say them twice. Return only "
                 "what takes the span's place -- an empty replacement removes a "
                 "direction." % span.span_id)
+    # Two spans can split the kept speech between them ("hello" and "world" for
+    # a kept "hello world"); each passes alone, and the line says it twice.
+    if len(spans) > 1 and _repeats_kept_speech(
+            " ".join(by_id[span.span_id] for span in spans), kept_speech):
+        raise ValueError(
+            "Together the replacements repeat words the line already keeps outside "
+            "the approved spans, so the speaker would say them twice. Return only "
+            "what takes each span's place -- an empty replacement removes a "
+            "direction.")
     candidate = "".join(pieces)
     if not candidate.strip():
         raise ValueError("The final spoken row must contain speech")

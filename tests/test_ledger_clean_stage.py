@@ -1407,6 +1407,55 @@ def test_a_real_edit_that_shares_a_word_or_two_still_splices():
         == " The lamp is dead."
 
 
+def test_a_light_reword_of_the_kept_line_is_refused():
+    """Sonnet and Composer QA on 90902989: an inserted word or a reorder slipped
+    under the consecutive-run check, and a refused repair is retried with the
+    refusal as feedback -- which invites exactly that reword."""
+    original = "(pauses) I see the grid."
+    spans = lcl._merge_repair_spans(original, [(0, 8)])
+    for reword in ("I really see the grid.", "The grid, I see."):
+        with pytest.raises(ValueError, match="repeats words"):
+            lcl._splice_replacements(original, spans, _replacement_reply(reword)["replacements"])
+    assert lcl._splice_replacements(original, spans, _replacement_reply("Hmm.")["replacements"]) \
+        == "Hmm. I see the grid."
+
+
+def test_a_japanese_reword_of_the_kept_line_is_refused():
+    """No spaces, so a clause is one word and a one-character insertion shares
+    none of them; the character pairs still see the line said twice."""
+    original = "（静かに）彼は何かを見ている。"
+    spans = lcl._merge_repair_spans(original, [(0, 5)])
+    for reword in ("彼は今何かを見ている。", "彼は何かを見た。"):
+        with pytest.raises(ValueError, match="repeats words"):
+            lcl._splice_replacements(original, spans, _replacement_reply(reword)["replacements"])
+    assert lcl._splice_replacements(original, spans, _replacement_reply("ふう。")["replacements"]) \
+        == "ふう。彼は何かを見ている。"
+
+
+def test_hindi_words_stay_whole_and_an_unrelated_repair_splices():
+    """A letters-only pattern dropped the Devanagari vowel signs and cut every
+    word into consonants, so unrelated Hindi lines shared "words"."""
+    assert lcl._spoken_words("मैं किताब पढ़ रहा हूँ।") == ["मैं", "किताब", "पढ़", "रहा", "हूँ"]
+    original = "(धीरे से) मैं किताब पढ़ रहा हूँ।"
+    spans = lcl._merge_repair_spans(original, [(0, original.index(")") + 1)])
+    assert lcl._splice_replacements(original, spans, _replacement_reply("हम्म।")["replacements"]) \
+        == "हम्म। मैं किताब पढ़ रहा हूँ।"
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(original, spans,
+                                 _replacement_reply("मैं किताब पढ़ रहा हूँ।")["replacements"])
+
+
+def test_two_spans_that_split_the_kept_line_between_them_are_refused():
+    """Composer QA on 90902989: each replacement alone holds too little of the
+    kept speech to refuse, and together they say all of it again."""
+    original = "(softly) Go (beat) home."
+    spans = lcl._merge_repair_spans(original, [(0, 8), (12, 18)])
+    with pytest.raises(ValueError, match="Together the replacements repeat"):
+        lcl._splice_replacements(original, spans, _replacement_reply("Go", "home")["replacements"])
+    assert lcl._splice_replacements(original, spans, _replacement_reply("", "Mm.")["replacements"]) \
+        == " Go Mm. home."
+
+
 def test_a_repeated_line_is_refused_and_the_next_answer_is_used():
     ledger = _ledger(DIRTY)
     kept = "The lamp has not turned since Tuesday."
