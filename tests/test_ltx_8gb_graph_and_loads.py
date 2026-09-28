@@ -166,7 +166,8 @@ def test_node_candidates_are_the_discovery_verified_core_LTX_nodes():
     assert cand["pos"] == ("CLIPTextEncode",)
     assert cand["neg"] == ("CLIPTextEncode",)
     assert cand["loadimage"] == ("LoadImage",)
-    assert cand["preprocess"] == ("LTXVPreprocess",)     # recipe v4, canonical
+    # v5 builds no LTXVPreprocess node, so a production leg requires none.
+    assert "preprocess" not in cand
     assert cand["modelsampling"] == ("ModelSamplingLTXV",)
     assert cand["img2vid"] == ("LTXVImgToVideo",)
     assert cand["cond"] == ("LTXVConditioning",)
@@ -207,8 +208,31 @@ def test_the_decode_CLASS_and_its_INPUTS_are_chosen_by_the_same_switch(
     assert eng._node_candidates()["decode"] == ("VAEDecodeTiled",)
     tiled = eng._build_graph({}, "p.png", plan, 9, 512, 288)["decode"]["inputs"]
     assert tiled["tile_size"] == 512 and tiled["overlap"] == 64
-    # v4 decodes 64-frame temporal tiles (the 3 Hz softness pulse at 16).
+    # v4 and v5 decode 64-frame temporal tiles (the 3 Hz softness pulse at 16).
     assert tiled["temporal_size"] == 64 and tiled["temporal_overlap"] == 8
+
+
+def test_the_preprocess_CLASS_is_required_exactly_when_the_graph_builds_it(
+        monkeypatch):
+    """The class table and the graph read the compression through one
+    accessor. A table that required `LTXVPreprocess` while the graph left it
+    out made a production leg depend on a node it never ran; a graph that
+    built it while the table left it out would name a class nobody resolved."""
+    eng = Ltx8gbEngine()
+    plan = eng._build_render_request(
+        {"asset_refs": {"init_image": "p"},
+         "timing": {"target_frame_count": 9}, "seed_bundle": {"request_seed": 1}})
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    for crf, built in (("0", False), ("38", True)):
+        monkeypatch.setenv("OTR_LTX_8GB_IMG_COMPRESSION", crf)
+        assert ("preprocess" in eng._node_candidates()) is built, crf
+        g = eng._build_graph({}, "p.png", plan, 9, 512, 288)
+        assert ("preprocess" in g) is built, crf
+    # Outside the consent act a stray value moves neither reader.
+    monkeypatch.delenv(m.PREQUALIFICATION_ENV)
+    monkeypatch.setenv("OTR_LTX_8GB_IMG_COMPRESSION", "38")
+    assert "preprocess" not in eng._node_candidates()
+    assert "preprocess" not in eng._build_graph({}, "p.png", plan, 9, 512, 288)
 
 
 def test_a_production_leg_decodes_through_the_FROZEN_class_whatever_the_env_says(

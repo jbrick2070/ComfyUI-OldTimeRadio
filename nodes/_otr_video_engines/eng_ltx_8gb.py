@@ -58,12 +58,14 @@ on a production leg:
 * RESIDENCY, not recipe: ``OTR_LTX_8GB_CONDITIONING_CACHE`` (opt-out; ``0``,
   ``false``, ``no`` or ``off`` disables it and drops what it holds). See the
   conditioning cache above ``render_clip``.
-* FROZEN IN CODE as ``LTX8_RECIPE`` (v2, measured), ignored-with-a-warning:
+* FROZEN IN CODE as ``LTX8_RECIPE`` (a versioned, measured dict -- v5 since
+  2026-09-28), ignored-with-a-warning:
   ``OTR_LTX_8GB_STEPS`` / ``_CFG`` / ``_SAMPLER`` / ``_MAX_SHIFT`` /
   ``_BASE_SHIFT`` / ``_TERMINAL`` / ``_T5_DEVICE`` / ``_TILED_VAE`` /
   ``_NEGATIVE`` / ``_VAE_TILE`` / ``_VAE_OVERLAP`` / ``_VAE_TEMPORAL`` /
-  ``_VAE_TEMPORAL_OVERLAP``. Their defaults live in that dict, not here, so
-  this list cannot drift from the values.
+  ``_VAE_TEMPORAL_OVERLAP`` / ``_SCHEDULE`` / ``_IMG_COMPRESSION``. Their
+  defaults live in that dict, not here, so this list cannot drift from the
+  values.
 * THE CONSENT ACT: set ``OTR_LTX_8GB_PREQUALIFICATION=1`` and the frozen knobs
   bind again, range-checked and fail-closed, for a MEASUREMENT run -- whose
   clips stamp a ``+prequalification`` recipe receipt so a sweep artifact is
@@ -1136,7 +1138,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "max_frames": max_frames,
                 "sampler": LTX8_RECIPE["sampler"],
                 "schedule": LTX8_RECIPE["schedule"],
-                "img_compression": LTX8_RECIPE["img_compression"],
+                "img_compression": self._img_compression(),
             }
 
         # PREQUALIFICATION: the knobs are open, every value is range-checked as
@@ -1179,8 +1181,8 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "sampler": sampler,
             "schedule": schedule,
             # LTXVPreprocess declares 0..100; 0 leaves the node out entirely.
-            "img_compression": _num("OTR_LTX_8GB_IMG_COMPRESSION",
-                                    LTX8_RECIPE["img_compression"], 0, 100, int),
+            # Read through the one accessor the class table uses.
+            "img_compression": self._img_compression(),
         }
 
     def _tile_geometry(self, key):
@@ -1344,15 +1346,29 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         return self.name
 
     # ---- in-process graph spec (0.9.8 distilled; discovery + smoke verified) ----
+    def _img_compression(self):
+        """The CRF ``LTXVPreprocess`` gives the still (0 = no preprocess node):
+        frozen in production, range-checked and fail-closed under the consent
+        act. ONE reader for the render config and the class table, so the node
+        is required exactly when the graph builds it -- the rule the tiled
+        decode's class follows too. v5 builds none (measured softer, see
+        LTX8_RECIPE_V5), so a production leg no longer needs the class."""
+        if not _prequalification_active():
+            return int(LTX8_RECIPE["img_compression"])
+        return self._config_number("OTR_LTX_8GB_IMG_COMPRESSION",
+                                   LTX8_RECIPE["img_compression"], 0, 100, int)
+
     def _node_candidates(self):
         decode_cls = (("VAEDecodeTiled",) if self._tiled_vae() else ("VAEDecode",))
+        preprocess = ({"preprocess": ("LTXVPreprocess",)}
+                      if self._img_compression() > 0 else {})
         return {
             "ckpt": ("CheckpointLoaderSimple",),
             "clip": ("CLIPLoader",),
             "pos": ("CLIPTextEncode",),
             "neg": ("CLIPTextEncode",),
             "loadimage": ("LoadImage",),
-            "preprocess": ("LTXVPreprocess",),
+            **preprocess,
             "modelsampling": ("ModelSamplingLTXV",),
             "img2vid": ("LTXVImgToVideo",),
             "cond": ("LTXVConditioning",),
