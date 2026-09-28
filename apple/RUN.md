@@ -69,6 +69,8 @@ show, all on the **OTR_LedgerScriptWriter** node unless noted.
 | `episode_language` | One switch for writing, Kokoro casting, caption labels/wrapping/fonts, and audience-facing credits. See [MULTILINGUAL.md](MULTILINGUAL.md). |
 | `asset_cleanup` | What to delete from the episode's working folder once it is published. Ships **off**. See [Saving disk space](#saving-disk-space). |
 
+`episode_title` and `custom_premise` are set on the node in graph view; the app form leaves them off and they stay blank unless you fill them there.
+
 **There is no ONE seed for the episode.** The two director nodes each carry
 a `seed_mode` and a `request_seed` widget for their own lane, but there is no
 sampler node and no single knob that reproduces a whole show. What makes a

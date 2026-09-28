@@ -292,6 +292,8 @@ All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
 | `episode_language` | One switch. See [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md). |
 | `asset_cleanup` | What to delete from the episode's working folder once it is published: `off (keep everything)`, `partial (keep only the text files)` or `full (keep only the published video)`. Ships **off**. See [Where things land](#where-things-land). |
 
+`episode_title` and `custom_premise` are set on the node in graph view; the app form leaves them off and they stay blank unless you fill them there.
+
 Pin `source_bank` and `visual_style` when you want to compare two runs; a rolled
 bank and a rolled style change more than anything else you could adjust.
 
