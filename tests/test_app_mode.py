@@ -77,8 +77,9 @@ def test_the_form_follows_his_order():
     story bank, visual style, video model, TTS model, music model, story
     writing models including cloud sub options, upscaler, my story fields".
     Rows he did not name sit next to their nearest relative: the source row
-    under its bank, each still under its video, and story idea / title /
-    Lemmy just above My Story, then Space saver. Each model roll switch
+    under its bank, each still under its video, and Lemmy just above My Story,
+    then Space saver. The story idea and episode title rows came off the form
+    (operator, 2026-09-28); both stay on the canvas. Each model roll switch
     (2026-09-28) sits above the pickers it replaces. Every checklist -- the
     language, bank and style pools and the video and still pools -- closes the
     form, after Space saver (operator, 2026-09-28: "all the clickbox sections
@@ -101,7 +102,7 @@ def test_the_form_follows_his_order():
         "comfy_slot_a_model", "comfy_slot_b_model",
         "google_api_slot_a_model", "google_api_slot_b_model",
         "upscale_engine",
-        "custom_premise", "episode_title", "lemmy_cameo",
+        "lemmy_cameo",
         "story_characters", "story_plot", "story_setting", "story_author",
         "music_style",
         "asset_cleanup",
@@ -243,7 +244,7 @@ def test_the_notes_reach_the_form_as_descriptions():
     config.description), so the note must be in the SHIPPED row."""
     rows = {r[1]: r for r in _load(APP)["extra"]["linearData"]["inputs"]}
     assert rows["source_ref"][2] == {"description": CONFIG["source_ref_note"]}
-    assert rows["custom_premise"][2] == {"description": CONFIG["premise_note"]}
+    assert rows["lemmy_cameo"][2] == {"description": CONFIG["lemmy_note"]}
 
 
 def test_each_still_sits_directly_under_its_video():
