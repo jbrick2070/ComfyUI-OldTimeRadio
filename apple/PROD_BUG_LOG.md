@@ -15651,3 +15651,37 @@ not promote it to the Bug Bible on this evidence alone.
   the CPU model transcribed all 8 stems in 16 s. The same run showed why the
   gate stays: ungated, Whisper wrote "1.5mm 2.5mm 2.5mm ..." and "1.5% 1.5%"
   on stems the gate correctly called voiceless.
+
+## PBUG-20260928-01 -- a stage-direction repair spliced the rest of the line back in, so published lines were spoken twice
+- surfaced: 2026-09-28 13:00, the operator listening to
+  `signal_time_20260928_105643__cart__mh3v__zimg__koko__news__cg4e2__mgen_final.mp4`
+  (published to obs by the 5080 model-roll proof leg): "ALL DIALOGUE IS BEING
+  REPEATED TWICE". A faster-whisper transcript showed four of the six character
+  lines spoken twice back to back, and the ledger text itself carried each one
+  doubled ("Proof doesn't pay the power company. Proof doesn't pay the power
+  company.").
+- root cause: `_otr_ledger_clean` asks the writer model for a replacement for a
+  flagged span -- a stage direction such as "(low, steady tone)" -- and
+  `_splice_replacements` puts it in the span's place, keeping the rest of the
+  line. The E2B writer returned the REST of the line as the span's replacement,
+  so the splice said it twice, and the re-read judge, which reads for stage
+  directions and not for repeats, passed the doubled line as clean. The server
+  log shows it: `[ledger_clean] shot_001_b4 repaired ... '(low, steady tone) I
+  see the grid. I see the ledger.' -> 'I see the grid. I see the ledger. I see
+  the grid. I see the ledger.'`. A scan of the last 45 episode ledgers found
+  doubled rows in five more episodes since 2026-09-26, under the E2B, 12B and
+  Qwen writers.
+- fix (90902989): the splice refuses a replacement that contains all of the
+  kept speech or shares four consecutive words with it, raised as a validation
+  error the model's retry ladder sees. The scoped repair prompt says the kept
+  words are already kept, and drops the whole-line "keep the line roughly its
+  original length" bullet that invited the mistake. A row whose repairs keep
+  repeating ships its original text, flagged unclean -- never doubled. Tests in
+  `tests/test_ledger_clean_stage.py`.
+- live verify (5080, 90902989): the canonical leg
+  `hidden_sequence_20260928_125321` published to obs; its transcript and its
+  ledger carry every line once. (Its one flagged row, the announcer's sign-off,
+  stopped at the scope step as "unresolved" before any repair was tried -- the
+  existing path, not this one.)
+- Bible: 12.181 (a replacement splice must call a repeat check), with BUG-11.64's
+  isolated splice check taught to lift the new helpers.
