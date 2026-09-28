@@ -1303,6 +1303,16 @@
             "name": "voice_device"
           },
           "link": null
+        },
+        {
+          "localized_name": "roll_audio_engines",
+          "name": "roll_audio_engines",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "roll_audio_engines"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -1351,7 +1361,8 @@
         true,
         "kokoro",
         "kokoro",
-        "default"
+        "default",
+        false
       ],
       "color": "#432",
       "bgcolor": "#653"
@@ -2113,6 +2124,26 @@
             "name": "max_render_frames"
           },
           "link": null
+        },
+        {
+          "localized_name": "roll_video_lanes",
+          "name": "roll_video_lanes",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "roll_video_lanes"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "roll_still_models",
+          "name": "roll_still_models",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "roll_still_models"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -2148,7 +2179,9 @@
         "{}",
         "default",
         "no_fp8_no_fp4",
-        0
+        0,
+        false,
+        false
       ],
       "color": "#432",
       "bgcolor": "#653"

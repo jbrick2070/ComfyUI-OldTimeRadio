@@ -295,6 +295,25 @@ All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
 Pin `source_bank` and `visual_style` when you want to compare two runs; a rolled
 bank and a rolled style change more than anything else you could adjust.
 
+**Randomize the models.** Three Yes/No switches, all shipped **off**, draw the
+models for you. They are meant for cards with 16 GB or more:
+
+| Switch | Node | What it draws |
+|---|---|---|
+| `roll_video_lanes` | OTR_VideoDirector | One local video lane for the whole episode, in all three video roles. |
+| `roll_still_models` | OTR_VideoDirector | One local image model for every still. Nothing is drawn when no video lane uses a still. |
+| `roll_audio_engines` | OTR_CastLock | One local voice engine for the whole cast and one local music engine for the theme. |
+
+Cloud engines are never drawn, and neither is anything this machine cannot run:
+a lane whose node pack or separate install is missing, one this server's boot
+does not allow, or a voice the episode's language does not offer. A lane it
+draws downloads its models the first time, as if you had picked it. What was
+drawn, from which list and with which seed, is recorded in the ledger
+(`video_lane_roll`, `still_model_roll`, `voice_engine_roll`, `music_engine_roll`)
+and named in the credits. To replay a draw, set `OTR_VIDEO_LANE_SEED`,
+`OTR_STILL_MODEL_SEED`, `OTR_VOICE_ENGINE_SEED` or `OTR_MUSIC_ENGINE_SEED` to the
+recorded seed.
+
 **Your own story:** set `source_bank` to **`my_story`** (the dropdown lists bank
 ids, so that is the value to pick) and put your idea in `custom_premise`. The
 `story_characters`, `story_plot`, `story_setting` and `story_author` fields on the

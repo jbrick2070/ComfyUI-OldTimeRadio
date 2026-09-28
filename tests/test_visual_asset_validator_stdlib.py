@@ -47,6 +47,9 @@ class VisualAssetValidatorTests(unittest.TestCase):
             self.events.append("drift")
             return self.drift
 
+        def roll_lanes(prompt, unique_id):
+            self.events.append(("rolls", prompt, unique_id))
+
         def ensure_assets(prompt, unique_id):
             self.events.append(("assets", prompt, unique_id))
             if self.asset_error:
@@ -61,6 +64,9 @@ class VisualAssetValidatorTests(unittest.TestCase):
         validation.validate_workflow_contract = validate_contract
         assets = ModuleType("_asset_validator_seam.nodes._otr_visual_assets")
         assets.ensure_prompt_visual_assets = ensure_assets
+        # The model rolls (2026-09-28) run first in the same gate chain.
+        lanes = ModuleType("_asset_validator_seam.nodes._otr_lane_rolls")
+        lanes.roll_prompt_lanes = roll_lanes
         shared = ModuleType("_asset_validator_seam.nodes._otr_shared")
         shared.__path__ = []
         preflight = ModuleType(
@@ -73,6 +79,7 @@ class VisualAssetValidatorTests(unittest.TestCase):
         self.import_stubs = patch.dict(sys.modules, {
             package.__name__: package, nodes.__name__: nodes,
             validation.__name__: validation, assets.__name__: assets,
+            lanes.__name__: lanes,
             shared.__name__: shared, preflight.__name__: preflight,
             balance.__name__: balance,
         })
@@ -153,7 +160,9 @@ class VisualAssetValidatorTests(unittest.TestCase):
     def test_structural_checks_precede_assets_and_success(self):
         result = self.validate(profile_id="profile")
         self.assertEqual(self.events[:4], ["stamp", "load", "contract", "drift"])
-        self.assertEqual(self.events[4], ("assets", self.prompt, "63"))
+        # The rolls rewrite the prompt the asset gate then reads.
+        self.assertEqual(self.events[4:6], [("rolls", self.prompt, "63"),
+                                            ("assets", self.prompt, "63")])
         self.assertIn("OTR_WorkflowValidator: OK", result[0])
 
     def test_structural_failure_never_calls_asset_helper(self):
@@ -170,7 +179,8 @@ class VisualAssetValidatorTests(unittest.TestCase):
 
     def test_structural_bypass_still_gates_assets(self):
         result = self.validate(False, profile_id="profile")
-        self.assertEqual(self.events, ["stamp", ("assets", self.prompt, "63")])
+        self.assertEqual(self.events, ["stamp", ("rolls", self.prompt, "63"),
+                                       ("assets", self.prompt, "63")])
         self.assertIn("contract check skipped", result[0])
 
     def test_asset_error_and_cancellation_propagate_on_both_paths(self):

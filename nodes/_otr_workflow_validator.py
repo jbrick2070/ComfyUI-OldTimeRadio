@@ -74,15 +74,23 @@ def _queue_api_key():
 
 
 def _queue_time_readiness_gates(prompt, unique_id, comfy_api_key=None):
-    """$0 cloud-slug refusal, then wallet vs estimate, then weight downloads.
+    """The model rolls, then the $0 cloud-slug refusal, then wallet vs
+    estimate, then weight downloads.
+
+    The rolls go FIRST (2026-09-28): they rewrite the queued prompt's own
+    pickers, and every check after them must judge the engine that will run,
+    not the saved pick -- a saved cloud lane that a local roll replaced must
+    not trip the balance check, and a rolled lane's weights must download.
 
     ``comfy_api_key`` is this queue's own key -- the one OTR_ComfyCredential
     bound for this prompt, the only Comfy credential since the 2026-09-19
     rip -- so the balance check measures the wallet the run will actually
     spend from."""
+    from ._otr_lane_rolls import roll_prompt_lanes
     from ._otr_shared.cloud_slug_preflight import ensure_prompt_cloud_slugs
     from ._otr_shared.cloud_balance_preflight import ensure_prompt_cloud_balance
     from ._otr_visual_assets import ensure_prompt_visual_assets
+    roll_prompt_lanes(prompt, unique_id)
     ensure_prompt_cloud_slugs(prompt, unique_id)
     ensure_prompt_cloud_balance(prompt, unique_id, comfy_api_key=comfy_api_key)
     ensure_prompt_visual_assets(prompt, unique_id)

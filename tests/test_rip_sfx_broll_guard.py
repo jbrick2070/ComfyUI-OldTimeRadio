@@ -184,7 +184,10 @@ def test_workflow_json_node87_matches_live_widget_model():
     # every earlier slot, including character_video_model at index 2, is
     # untouched. OTR_ImageDirector keeps both of its own seed widgets; this
     # rip was OTR_VideoDirector-only.)
-    assert len(n87["widgets_values"]) == 13, n87["widgets_values"]
+    # Model rolls (2026-09-28): OLD pin 13 -> NEW pin 15 (+roll_video_lanes and
+    # +roll_still_models, both False, appended after max_render_frames; every
+    # earlier slot is untouched).
+    assert len(n87["widgets_values"]) == 15, n87["widgets_values"]
     names87 = {i.get("name") for i in n87["inputs"]}
     # the per-role MODEL widgets are EXACTLY the six live ones -- a closed check
     # that catches any legacy model widget leaking back into the canonical JSON.

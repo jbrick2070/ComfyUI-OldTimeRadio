@@ -84,6 +84,11 @@ def test_every_widget_value_has_an_input_descriptor(node_id):
            [i.get("name") for i in winputs]))
 
 
+#: The widgets appended to OTR_VideoDirector after max_render_frames, in
+#: order: the model-roll switches (2026-09-28).
+_APPENDED_AFTER = ("roll_video_lanes", "roll_still_models")
+
+
 def test_node_87_carries_max_render_frames_specifically():
     """The concrete case, pinned by name.
 
@@ -100,8 +105,12 @@ def test_node_87_carries_max_render_frames_specifically():
         "profile-carried render-length ceiling "
         "has no path from the director widget to the ledger. Descriptors: %r"
         % (names,))
-    assert names[-1] == "max_render_frames", (
-        "max_render_frames must remain LAST so widgets_values stays "
+    # Its SLOT is what must not move (BUG-LOCAL-097): right after
+    # dtype_policy, with only later appends behind it -- the two model-roll
+    # switches since 2026-09-28.
+    assert names[names.index("dtype_policy") + 1] == "max_render_frames", names
+    assert names[names.index("max_render_frames") + 1:] == list(_APPENDED_AFTER), (
+        "max_render_frames must keep its slot so widgets_values stays "
         "positionally stable (BUG-LOCAL-097); got %r" % (names,))
 
 
@@ -214,9 +223,10 @@ def test_every_variant_director_carries_max_render_frames(wf_path):
             "%s node %s has no max_render_frames descriptor -- this tier's "
             "render-length ceiling cannot reach the ledger. Descriptors: %r"
             % (wf_path.name, node.get("id"), names))
-        assert names[-1] == "max_render_frames", (
-            "%s: max_render_frames must stay LAST so widgets_values remains "
-            "positionally stable (BUG-LOCAL-097); got %r"
+        assert names[names.index("dtype_policy") + 1] == "max_render_frames", names
+        assert names[names.index("max_render_frames") + 1:] == list(_APPENDED_AFTER), (
+            "%s: max_render_frames must keep its slot so widgets_values "
+            "remains positionally stable (BUG-LOCAL-097); got %r"
             % (wf_path.name, names))
 
 

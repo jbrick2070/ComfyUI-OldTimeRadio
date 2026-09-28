@@ -502,7 +502,26 @@ class CastLock:
                                "is never second-guessed and still fails loud "
                                "if it is not there.",
                 }),
+                # THE AUDIO ROLL (operator, 2026-09-28), appended LAST so no
+                # saved value moves. The music engine is drawn at the
+                # queue-time gate, before any download; the voice is drawn in
+                # lock(), once the episode's language is known.
+                "roll_audio_engines": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Yes: one local voice engine, drawn at random, "
+                               "voices the whole cast and the announcer, and "
+                               "one local music engine, drawn at random, "
+                               "scores the theme. Cloud engines are never "
+                               "drawn, nor one this machine cannot run or this "
+                               "episode's language does not allow. With "
+                               "preserve_ledger the writer's voices are kept, "
+                               "so only the music is drawn. Suggested for 16 GB "
+                               "cards and up.",
+                }),
             },
+            # This run's prompt and this node's id: where the gate left the
+            # music roll's receipt. Hidden inputs add no widget and no link.
+            "hidden": {"queued_prompt": "PROMPT", "node_id": "UNIQUE_ID"},
         }
 
     @classmethod
@@ -520,7 +539,8 @@ class CastLock:
              cast_voice_policy="preserve_ledger", delivery_profile="neutral",
              allow_voice_reuse=False, char_voice_engine="auto",
              announcer_voice_engine="auto", gate_in="",
-             voice_device="cuda"):
+             voice_device="cuda", roll_audio_engines=False,
+             queued_prompt=None, node_id=None):
         from . import _otr_ledger_consumers as _OTRLC
         from ._otr_delivery_profiles import (
             DELIVERY_PROFILE_VERSION, get_delivery_profile,
@@ -561,6 +581,25 @@ class CastLock:
         # failure nobody can locate afterwards. The rest of the CastLock-owned
         # meta is stamped after casting, as before.
         meta["cast_lock_revision"] = revision
+
+        # THE MODEL ROLLS (2026-09-28). The gate drew the video lane, the still
+        # model and the music before the run and left each receipt in this
+        # run's prompt; they enter the ledger here, the first ledger rewrite
+        # after the gate, beside the writer's bank, style and language rolls.
+        from . import _otr_lane_rolls as _lane_rolls
+        meta.update(_lane_rolls.ledger_meta(queued_prompt))
+        # The audio switch: the music receipt must be on THIS node, or nothing
+        # rolled it this run. The voice is drawn HERE because only the ledger
+        # knows the language, and it replaces both pickers before anything
+        # below reads them.
+        if roll_audio_engines:
+            _lane_rolls.assert_rolled(
+                queued_prompt, node_id, ("music_engine",), "OTR_CastLock")
+            voice_roll = _lane_rolls.roll_voice_engine(meta, cast_voice_policy)
+            if voice_roll.get("selected"):
+                char_voice_engine = voice_roll["selected"]
+                announcer_voice_engine = voice_roll["selected"]
+            meta["voice_engine_roll"] = voice_roll
 
         # Concrete engines FIRST, then banks. `auto` is not a YAML engine --
         # `voice_bank_for_engine("char_voice", "auto")` would climb rank_chain

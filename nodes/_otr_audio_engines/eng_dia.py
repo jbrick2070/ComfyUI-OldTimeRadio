@@ -91,6 +91,16 @@ class DiaEngine:
     def _model_id(self):
         return otr_env.get("OTR_DIA_MODEL") or _DEFAULT_MODEL
 
+    def install_gaps(self):
+        """``[(label, path), ...]`` for each piece of the Path B install that
+        is not on disk. ``load`` refuses on the first; the model rolls
+        (``_otr_lane_rolls``) ask it before the run, so a machine without this
+        install never rolls dia."""
+        return [(label, path) for label, path in (
+            ("isolated venv python", self._venv_python()),
+            ("worker script", self._worker_script()),
+        ) if not os.path.exists(path)]
+
     # ---- worker lifecycle ----
     def load(self):
         if self._proc is not None and self._proc.poll() is None:
@@ -101,19 +111,17 @@ class DiaEngine:
             _SC.close_worker(self._proc, self._stderr)
             self._proc = None
             self._stderr = None
+        for label, path in self.install_gaps()[:1]:
+            raise RuntimeError(
+                "Dia Path B not installed: %s missing at %s -- run "
+                "the installer at https://github.com/jbrick2070/"
+                "ComfyUI-OldTimeRadio/blob/main/scripts/"
+                "_otr_dia_install.ps1 (creates an isolated Python venv, "
+                "installs Dia from source, and fetches its weights, "
+                "separate from the main ComfyUI venv) before rendering "
+                "with dia" % (label, path))
         py = self._venv_python()
         worker = self._worker_script()
-        for label, path in (("isolated venv python", py),
-                            ("worker script", worker)):
-            if not os.path.exists(path):
-                raise RuntimeError(
-                    "Dia Path B not installed: %s missing at %s -- run "
-                    "the installer at https://github.com/jbrick2070/"
-                    "ComfyUI-OldTimeRadio/blob/main/scripts/"
-                    "_otr_dia_install.ps1 (creates an isolated Python venv, "
-                    "installs Dia from source, and fetches its weights, "
-                    "separate from the main ComfyUI venv) before rendering "
-                    "with dia" % (label, path))
         try:
             from .._otr_paths import otr_sidecar_stderr_path
         except ImportError:  # pragma: no cover -- flat test imports

@@ -141,8 +141,11 @@ def test_production_workflow_visual_structure_pinned():
     # that followed shifted down two: max_render_frames is now index 12, not
     # 14. This mirrors OTR_ImageDirector, which KEEPS its own seed widgets
     # unchanged (its own params ARE read).
-    assert len(wv87) == 13, wv87
+    # Model rolls (2026-09-28): 13 -> 15, the two roll switches appended after
+    # max_render_frames and shipped off.
+    assert len(wv87) == 15, wv87
     assert wv87[12] == 0, "canonical must ship the render ceiling UNPINNED"
+    assert wv87[13:] == [False, False], "the model rolls must ship off"
 
     # -- 3. the credits-bearing procgen wiring + chain order ------------------
     out12 = set(nodes[12]["outputs"][0].get("links") or [])

@@ -1022,6 +1022,9 @@ CREATIVE_WHITELIST = frozenset({
     # The selective-roll pools (2026-09-26): which styles / languages a
     # roll may land on. Creative dials, never managed by a workflow row.
     "style_roll_pool", "language_roll_pool", "bank_roll_pool",
+    # The model rolls (2026-09-28); mirror of the package whitelist. Yes/No
+    # switches -- the draw happens at the queue-time gate.
+    "roll_video_lanes", "roll_still_models", "roll_audio_engines",
     # asset_cleanup -- the Space saver housekeeping dial; mirror of the
     # package whitelist. Decides what stays on disk after publishing, never
     # an engine or route; the mux still refuses any unproven deletion.

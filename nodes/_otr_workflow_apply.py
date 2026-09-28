@@ -920,6 +920,12 @@ CREATIVE_WHITELIST = frozenset({
     # The selective-roll pools (2026-09-26): which styles / languages a
     # roll may land on. Creative dials, never managed by a workflow row.
     "style_roll_pool", "language_roll_pool", "bank_roll_pool",
+    # The model rolls (2026-09-28): Yes/No switches that draw the video lane,
+    # the still model and the voice and music engines. No workflow row
+    # manages them, and they choose nothing themselves -- the draw happens at
+    # the queue-time gate, from the engines this machine can run. Whitelisted
+    # so a proof run can turn one on, as lemmy_cameo is.
+    "roll_video_lanes", "roll_still_models", "roll_audio_engines",
     # asset_cleanup (the Space saver, row 0b) is the writer's housekeeping
     # dial: what stays on disk after the episode publishes. It never picks an
     # engine, a route or a model, and no workflow row manages it, so a

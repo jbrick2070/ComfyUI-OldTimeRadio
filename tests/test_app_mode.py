@@ -79,16 +79,19 @@ def test_the_form_follows_his_order():
     Rows he did not name sit next to their nearest relative: the source row
     under its bank, each still under its video, and story idea / title /
     Lemmy just above My Story. Space saver closes the form. Each roll pool
-    (2026-09-26) sits under the dropdown it narrows."""
+    (2026-09-26) sits under the dropdown it narrows, and each model roll
+    switch (2026-09-28) sits above the pickers it replaces."""
     names = [w for _t, w in (tuple(e[:2]) for e in CONFIG["form"])]
     assert names == [
         "episode_language", "language_roll_pool",
         "num_characters", "act_count",
         "source_bank", "bank_roll_pool", "source_ref",
         "visual_style", "style_roll_pool",
+        "roll_video_lanes", "roll_still_models",
         "announcer_video_model", "announcer_image_model",
         "character_video_model", "character_image_model",
         "music_video_model", "music_image_model",
+        "roll_audio_engines",
         "announcer_voice_engine", "char_voice_engine",
         "engine",
         "creative_writing_model", "technical_model",

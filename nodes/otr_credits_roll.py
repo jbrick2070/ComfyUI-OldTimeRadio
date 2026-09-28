@@ -553,6 +553,13 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     _rolled = [label for label, key in (("source bank", "bank_roll"),
                                         ("visual style", "style_roll"))
                if isinstance(meta.get(key), dict)]
+    # The model rolls (2026-09-28) stamp a receipt even when they drew nothing
+    # (a replay, no still in use), so only a receipt that SELECTED counts.
+    _rolled += [label for label, key in (("video lane", "video_lane_roll"),
+                                         ("stills", "still_model_roll"),
+                                         ("voices", "voice_engine_roll"),
+                                         ("music", "music_engine_roll"))
+                if isinstance(meta.get(key), dict) and meta[key].get("selected")]
     if _rolled:
         spine.append(("Rolled:", " · ".join(_rolled)))
     if spine:

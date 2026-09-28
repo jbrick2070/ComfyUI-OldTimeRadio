@@ -76,10 +76,12 @@ def test_input_types_widget_surface():
     # delivery_profile surface removed 2026-07-04 (widget-audit Batch 1); single
     # option "neutral" -- the lock() kwarg still defaults + is validated/stamped.
     # 2026-09-16: voice_bank widget removed. Bank follows the concrete engine
-    # per role. voice_device stays last (append-only).
+    # per role. 2026-09-28: the audio roll switch is appended after
+    # voice_device (append-only).
     assert _serialized_slots(it) == [
         "cast_voice_policy", "allow_voice_reuse",
         "char_voice_engine", "announcer_voice_engine", "voice_device",
+        "roll_audio_engines",
     ]
     for name in ("ledger_json", "cast_lock_revision", "cast_report", "done"):
         assert name in CastLock.RETURN_NAMES

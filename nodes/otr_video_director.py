@@ -386,7 +386,33 @@ class OTRVideoDirector:
                         "effect on that engine."
                     ),
                 }),
+                # THE MODEL ROLLS (operator, 2026-09-28), appended LAST so no
+                # saved value moves. The roll itself happens at the queue-time
+                # gate (_otr_lane_rolls), before any download, which writes the
+                # drawn id into this node's own pickers.
+                "roll_video_lanes": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Yes: one local video lane, drawn at random, "
+                               "renders the whole episode, in place of all three "
+                               "video pickers. Cloud lanes "
+                               "are never drawn, nor a lane this machine "
+                               "cannot run. A lane it draws downloads its "
+                               "models the first time, as if picked by hand. "
+                               "Suggested for 16 GB cards and up.",
+                }),
+                "roll_still_models": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Yes: one local image model, drawn at random, "
+                               "makes every still in the episode, in place of all "
+                               "three still pickers. Cloud "
+                               "models are never drawn. Nothing is drawn when "
+                               "no video lane in the episode uses a still. "
+                               "Suggested for 16 GB cards and up.",
+                }),
             },
+            # This run's prompt and this node's id: where the gate left the
+            # roll's receipt. Hidden inputs add no widget and no link.
+            "hidden": {"queued_prompt": "PROMPT", "node_id": "UNIQUE_ID"},
         }
 
     @classmethod
@@ -418,7 +444,17 @@ class OTRVideoDirector:
                custom_models_json="{}",
                gate_in="",
                device_policy="cuda", dtype_policy="fp8_ok",
-               max_render_frames=0):
+               max_render_frames=0,
+               roll_video_lanes=False, roll_still_models=False,
+               queued_prompt=None, node_id=None):
+        # A switch that is on must have been rolled at the gate, or the pickers
+        # below are the saved ones while the switch says otherwise.
+        from . import _otr_lane_rolls as _lane_rolls
+        _lane_rolls.assert_rolled(
+            queued_prompt, node_id,
+            [surface for surface, on in (("video_lane", roll_video_lanes),
+                                         ("still_model", roll_still_models)) if on],
+            "OTR_VideoDirector")
         warnings: list = []
         custom = self._parse_custom(custom_models_json, warnings)
         descriptors = _registry_descriptors()

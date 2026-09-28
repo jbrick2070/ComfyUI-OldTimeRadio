@@ -188,26 +188,40 @@ class IndexTTS2Engine:
     def _use_fp16(self):
         return os.environ.get("OTR_INDEXTTS2_FP16", "0") == "1"
 
+    _WEIGHTS_CONFIG = "weights config"
+
+    def install_gaps(self):
+        """``[(label, path), ...]`` for each piece of the Path B install that
+        is not on disk, in the order ``load`` checks them; ``load`` refuses on
+        the first. The model rolls (``_otr_lane_rolls``) ask it before the run.
+        The weights config is only looked for once the weights dir exists."""
+        model_dir = self._model_dir()
+        gaps = [(label, path) for label, path in (
+            ("isolated venv python", self._venv_python()),
+            ("worker script", self._worker_script()),
+            ("weights dir", model_dir),
+        ) if not os.path.exists(path)]
+        cfg = os.path.join(model_dir, "config.yaml")
+        if os.path.exists(model_dir) and not os.path.exists(cfg):
+            gaps.append((self._WEIGHTS_CONFIG, cfg))
+        return gaps
+
     # ---- worker lifecycle ----
     def load(self):
         if self._proc is not None and self._proc.poll() is None:
             return
+        for label, path in self.install_gaps()[:1]:
+            if label == self._WEIGHTS_CONFIG:
+                raise RuntimeError(
+                    "IndexTTS2 weights incomplete: %s missing -- re-run "
+                    "scripts\\_otr_idx_download_weights.py" % path)
+            raise RuntimeError(
+                "IndexTTS2 Path B not installed: %s missing at %s -- run "
+                "scripts\\_otr_indextts2_install.ps1 (isolated venv + weights) "
+                "before rendering with indextts2 (the default char voice)" % (label, path))
         py = self._venv_python()
         worker = self._worker_script()
         model_dir = self._model_dir()
-        for label, path in (("isolated venv python", py),
-                            ("worker script", worker),
-                            ("weights dir", model_dir)):
-            if not os.path.exists(path):
-                raise RuntimeError(
-                    "IndexTTS2 Path B not installed: %s missing at %s -- run "
-                    "scripts\\_otr_indextts2_install.ps1 (isolated venv + weights) "
-                    "before rendering with indextts2 (the default char voice)" % (label, path))
-        cfg = os.path.join(model_dir, "config.yaml")
-        if not os.path.exists(cfg):
-            raise RuntimeError(
-                "IndexTTS2 weights incomplete: %s missing -- re-run "
-                "scripts\\_otr_idx_download_weights.py" % cfg)
 
         args = [py, worker, "--model-dir", model_dir]
         if self._use_fp16():

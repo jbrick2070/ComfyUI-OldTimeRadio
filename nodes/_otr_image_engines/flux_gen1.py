@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 
-from .registry import register
+from .registry import register, EngineUnusable, EngineUsabilityReason
 from .._otr_shared.role_compat import ROLES
 
 try:
@@ -235,10 +235,29 @@ class FluxGen1ImageEngine:
         self._loaded = False
 
     def assert_usable(self, host_caps, profile, request_template=None):
-        """Gen-1 Flux is usable wherever ComfyUI itself can run Flux. The real
-        weight/dep check happens in the render (the loader node fails LOUD and the
-        dispatcher degrades to the radio floor); this adapter returns its name
-        (default engine) so the static dropdown + role filter resolve on CPU."""
+        """FAIL CLOSED, by NAME, when the Flux checkpoint is not installed.
+
+        This returned its name unconditionally until 2026-09-28, so a missing
+        checkpoint surfaced only when the loader node ran -- the same hard
+        failure, later and less plainly -- and the still roll
+        (``_otr_lane_rolls``) could draw Flux on a machine that does not have
+        it. ComfyUI's ``folder_paths`` is asked, never the filesystem, so
+        extra_model_paths.yaml is honoured. Off a ComfyUI runtime (the CPU
+        suite) there is nothing to ask, and the name is returned as before."""
+        try:
+            import folder_paths  # noqa: PLC0415 -- ComfyUI runtime only
+            installed = set(folder_paths.get_filename_list("checkpoints"))
+        except Exception:  # noqa: BLE001 -- absent outside ComfyUI (tests)
+            return self.name
+        ckpt = self._flux_params({})["ckpt_name"]
+        if ckpt not in installed:
+            role = profile.get("role", "") if isinstance(profile, dict) else ""
+            raise EngineUnusable(
+                self.name, str(role or ""), EngineUsabilityReason.MISSING_MODEL,
+                f"flux_gen1 needs {ckpt!r} in models/checkpoints (the all-in-one "
+                f"fp8 Flux.1-dev checkpoint, about 17 GB), or set OTR_FLUX_CKPT "
+                f"to the Flux checkpoint you have.",
+                kind="image")
         return self.name
 
     def prepare(self, host_caps, profile, session_ctx):  # pragma: no cover - GPU

@@ -61,8 +61,9 @@ def test_canonical_ships_kokoro_on_both_voice_slots():
     data = json.loads((REPO / "workflows" / "otr_canonical.json").read_text(encoding="utf-8"))
     by_id = {n["id"]: n for n in data["nodes"]}
     assert by_id[80]["type"] == "OTR_CastLock"
+    # The trailing False is roll_audio_engines (2026-09-28), shipped off.
     assert by_id[80]["widgets_values"] == [
-        "auto_registry", True, "kokoro", "kokoro", "default"]
+        "auto_registry", True, "kokoro", "kokoro", "default", False]
     assert by_id[81]["widgets_values"] == [] and by_id[82]["widgets_values"] == []
 
 

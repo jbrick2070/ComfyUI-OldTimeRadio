@@ -186,8 +186,9 @@ def test_widget_vectors_exact(by_id):
     # 2026-09-16: CastLock dropped voice_bank. 4a/4b dropped engine. Saved
     # engines stay kokoro; 4a/4b inherit the CastLock stamps.
     # 2026-09-14 (apple-clean): voice_device "cuda" -> "default".
+    # 2026-09-28: roll_audio_engines appended, shipped off.
     assert by_id[80]["widgets_values"] == [
-        "auto_registry", True, "kokoro", "kokoro", "default"]
+        "auto_registry", True, "kokoro", "kokoro", "default", False]
     assert by_id[81]["widgets_values"] == []
     assert by_id[82]["widgets_values"] == []
     # 83 (StableAudioTheme) joins 80/81 as a node whose SAVED engine is the
