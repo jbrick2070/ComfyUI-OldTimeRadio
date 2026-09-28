@@ -46,6 +46,7 @@ from __future__ import annotations
 import ast
 import json
 import random
+import re
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
 
@@ -131,6 +132,12 @@ def is_language_sentinel(value: Any) -> bool:
     return value == LANGUAGE_SENTINEL
 
 
+def _pool_key(name: Any) -> str:
+    """How a typed pool entry is compared: case-folded, with runs of spaces,
+    hyphens and underscores collapsed to one underscore."""
+    return re.sub(r"[\s_-]+", "_", str(name).strip()).casefold()
+
+
 def parse_roll_pool(
     raw: Any,
     *,
@@ -144,9 +151,14 @@ def parse_roll_pool(
     commas, semicolons or new lines separate names. A JSON list string,
     or a real list (a graph saved by 2.3.8, when the pools were
     multi-selects), parses to the same tuple. Empty (None, "", []) is ``()`` -- "no pool chosen", which the
-    callers read as the whole list. An id outside ``valid_ids``, or one in
-    ``refused``, fails LOUD: a pool that quietly drops a typo rolls from a
-    set nobody chose.
+    callers read as the whole list.
+
+    FORGIVING ABOUT SPELLING-OF-FORM, STRICT ABOUT NAMES (2026-09-28). A
+    person types into a text box: "english, spanish" or "video art" means
+    English, Spanish and video_art. Case, and spaces or hyphens against
+    underscores, are ignored, and each entry comes back as the canonical id.
+    A name that matches nothing, or one in ``refused``, still fails LOUD: a
+    pool that quietly drops a typo rolls from a set nobody chose.
     """
     if raw is None:
         return ()
@@ -178,19 +190,21 @@ def parse_roll_pool(
             f"the {surface} roll pool must be a list of ids, got "
             f"{type(raw).__name__}"
         )
-    valid = set(valid_ids)
+    canonical = {_pool_key(v): v for v in valid_ids}
+    refused_keys = {_pool_key(v) for v in refused}
     chosen: "list[str]" = []
     for item in raw:
-        value = str(item).strip()
-        if value in refused:
+        typed = str(item).strip()
+        value = canonical.get(_pool_key(typed), typed)
+        if _pool_key(typed) in refused_keys:
             raise RollError(
                 f"{value!r} cannot be rolled for {surface}; take it out of "
                 f"the pool, or pick it directly."
             )
-        if value not in valid:
+        if value not in canonical.values():
             raise RollError(
-                f"the {surface} roll pool names {value!r}, which is not one "
-                f"of {sorted(valid)!r}"
+                f"the {surface} roll pool names {typed!r}, which is not one "
+                f"of {sorted(canonical.values())!r}"
             )
         if value not in chosen:
             chosen.append(value)

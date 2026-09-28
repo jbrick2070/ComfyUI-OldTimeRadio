@@ -424,6 +424,9 @@ def test_the_roll_module_imports_nothing_that_could_call_a_model():
         # `ast` (2026-09-27): literal_eval reads a list saved by a 2.3.8 graph
         # after core str()-coerces it. Stdlib; evaluates literals only.
         "ast",
+        # `re` (2026-09-28): the pool compares typed names case- and
+        # separator-insensitively. Stdlib text matching; calls nothing.
+        "re",
     }
     assert imported <= allowed, f"unexpected imports: {imported - allowed}"
 

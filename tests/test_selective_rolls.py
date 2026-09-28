@@ -291,6 +291,48 @@ def test_a_typed_pool_and_a_saved_list_parse_the_same():
     assert typed == saved == ("video_art", "anime", "cartoon")
 
 
+@pytest.mark.parametrize("typed,expected", [
+    ("english, spanish", ("English", "Spanish")),
+    ("ENGLISH;french", ("English", "French")),
+    ("  Japanese  ", ("Japanese",)),
+])
+def test_a_language_pool_ignores_case(typed, expected):
+    """Operator, 2026-09-28: people type into a text box. "english" is
+    English; the whole run must not stop over a capital letter."""
+    assert ROLLS.parse_roll_pool(typed, valid_ids=LANGUAGES,
+                                 surface="episode_language") == expected
+
+
+@pytest.mark.parametrize("typed,expected", [
+    ("video art, Recur-Frac", ("video_art", "recur_frac")),
+    ("VIDEO_ART", ("video_art",)),
+])
+def test_a_style_pool_ignores_case_spaces_and_hyphens(typed, expected):
+    assert ROLLS.parse_roll_pool(typed, valid_ids=ROLLS.eligible_style_ids(),
+                                 surface="visual_style") == expected
+
+
+def test_a_bank_pool_ignores_case_and_spaces():
+    assert ROLLS.parse_roll_pool("Public Domain, SHAKESPEARE",
+                                 valid_ids=ROLLS.eligible_bank_ids(),
+                                 surface="source_bank") == ("public_domain", "shakespeare")
+
+
+def test_forgiving_is_not_guessing():
+    """Case and separators are forgiven; a different name is not."""
+    with pytest.raises(ROLLS.RollError, match="Espanol"):
+        ROLLS.parse_roll_pool("Espanol", valid_ids=LANGUAGES, surface="episode_language")
+    with pytest.raises(ROLLS.RollError):
+        ROLLS.parse_roll_pool("off", valid_ids=LANGUAGES, surface="episode_language",
+                              refused=(LANG.OFF_LABEL,))
+
+
+def test_the_roll_resolvers_return_canonical_ids_for_forgiving_input():
+    sel, rec = ROLLS.resolve_style_selection(ROLLS.STYLE_SENTINEL, pool="Video Art, anime", env={})
+    assert rec.eligible_order == ("anime", "video_art") and sel in rec.eligible_order
+    assert ROLLS.resolve_bank_selection(ROLLS.BANK_SENTINEL, pool="Original", env={}) == ("original", None)
+
+
 def test_the_canonical_saves_every_pool_as_a_trailing_empty_slot():
     wf = json.loads(CANONICAL.read_text(encoding="utf-8"))
     node = next(n for n in wf["nodes"] if n["type"] == "OTR_LedgerScriptWriter")
