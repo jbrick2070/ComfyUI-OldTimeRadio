@@ -134,8 +134,8 @@ def is_language_sentinel(value: Any) -> bool:
 
 def _pool_key(name: Any) -> str:
     """How a typed pool entry is compared: case-folded, with runs of spaces,
-    hyphens and underscores collapsed to one underscore."""
-    return re.sub(r"[\s_-]+", "_", str(name).strip()).casefold()
+    hyphens and underscores collapsed to one underscore, and none at either end."""
+    return re.sub(r"[\s_-]+", "_", str(name).strip()).strip("_").casefold()
 
 
 def parse_roll_pool(

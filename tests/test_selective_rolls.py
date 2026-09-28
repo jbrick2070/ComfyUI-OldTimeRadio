@@ -295,6 +295,7 @@ def test_a_typed_pool_and_a_saved_list_parse_the_same():
     ("english, spanish", ("English", "Spanish")),
     ("ENGLISH;french", ("English", "French")),
     ("  Japanese  ", ("Japanese",)),
+    ("English-, _French", ("English", "French")),
 ])
 def test_a_language_pool_ignores_case(typed, expected):
     """Operator, 2026-09-28: people type into a text box. "english" is
