@@ -63,9 +63,10 @@ Two consequences worth knowing:
 
 ### Rolling among a few styles you choose
 
-Under Visual style sits **Styles to roll** (`style_roll_pool`), a text box:
-type the style ids from the list above, separated by commas (for example
-`anime, video_art`). It only matters while Visual style is `roll (any style)`:
+**Styles to roll** (`style_roll_pool`) is a checklist at the bottom of the
+app view, after Space saver: tick the styles the roll may draw from. Through the
+API a typed list of the ids above works too (for example `anime, video_art`).
+It only matters while Visual style is `roll (any style)`:
 
 - empty -- the roll draws from every style, as above;
 - one name -- that style, every time (a pick, not a roll);

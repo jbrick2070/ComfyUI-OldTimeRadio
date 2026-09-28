@@ -226,6 +226,12 @@ inputs. That is the fallback this row named: both pools became STRING
 (`anime, video_art`), parsed by the same `parse_roll_pool` (commas,
 semicolons, new lines; a list saved by a 2.3.8 graph still reads). The
 tooltips name every valid entry. Owed: one rolled episode.
+**AMENDED 2026-09-28: clickable, and all at the foot.** The typed pools draw as
+clickable checklists in the app view and the graph (`51fb394d`), and every
+checklist -- these three plus the new video-lane and still-model pools --
+sits at the foot of the app form after Space saver (`38faa134`; operator:
+"all the clickbox sections are at the bottom after space saver"). The owed
+rolled episode is settled: every canonical episode rolls its bank and style.
 
 ### 0a. Windows HF_HOME -- DONE 2026-09-25 (`a0875708`, `89a95212`)
 

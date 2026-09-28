@@ -14,10 +14,11 @@ One dropdown changes the language of the whole episode. On
 - `Mandarin`
 
 The dropdown also offers `roll (any language)`, which picks one of those
-languages for you at run time -- never `Off`. Under it, **Languages to roll**
-(`language_roll_pool`), a text box, narrows the roll: type language names
-separated by commas (`French, Spanish`). Empty means every language, one name
-means that language, two or more means just those. The pick is
+languages for you at run time -- never `Off`. **Languages to roll**
+(`language_roll_pool`), a checklist at the bottom of the app view after Space
+saver, narrows the roll: tick the languages. Through the API a typed list works
+too (`French, Spanish`). None ticked means every language, one means that
+language, two or more means just those. The pick is
 recorded at `meta.language_roll` and `OTR_LANGUAGE_SEED` replays it. The roll
 resolves after the story bank and never lands on a language whose row lists
 that bank under `source_bank_exclusions` (none do today). A replay under the
