@@ -15685,3 +15685,41 @@ not promote it to the Bug Bible on this evidence alone.
   existing path, not this one.)
 - Bible: 12.181 (a replacement splice must call a repeat check), with BUG-11.64's
   isolated splice check taught to lift the new helpers.
+
+## PBUG-20260928-02 -- the cloud writer's token ceiling killed paid 3-act episodes on a count the provider never billed
+- surfaced: 2026-09-28 13:06, the operator's own My Story run on ComfyUI Desktop
+  (:8188, `otr_8gb_video`, creative slot `openrouter:slot-a` =
+  `~anthropic/claude-sonnet-latest`, 3 acts, 6 cast, 155 lines). After 284 s,
+  with the whole script written and paid for, the run died inside ledger_clean:
+  `OpenRouterCostCeilingError: this call (~3305 tokens) would push the run total
+  299911 over OPENROUTER_MAX_TOKENS_PER_RUN=300000`. The same log holds an
+  identical death on 2026-09-17 00:56 (`run total 299625`). Operator: "the
+  ceiling tokens don't add up ... no caps ... remove that whole feature".
+- root cause: the ceiling was checked and accumulated from a pre-call ESTIMATE
+  -- prompt characters / 4 PLUS the call's whole output allowance (16384 on the
+  story passes) -- never from what the provider billed. Twelve story calls were
+  each "accounted" at 19,000-21,000 tokens, so an episode the provider billed a
+  fraction of "reached" 300000, and the abort threw away every credit the run
+  had already spent. The Comfy Credits lane had died the same way on 2026-09-15
+  (a 1-act, around its 50th ledger_clean call) and was patched there by
+  counting real usage and raising its ceiling to 1,000,000; the OpenRouter lane,
+  its sibling, never got the fix. No log entry recorded the 09-15 incident.
+- fix (505d7d51): all three cloud writer lanes (OpenRouter, Comfy Credits,
+  Google API) lose every token cap -- no per-run or per-call ceiling, no
+  max_tokens / max_output_tokens on the wire, no per-slot MAXTOK settings, no
+  reasoning output floors or thinking headroom (they existed only to lift a
+  cap). The one pre-send check left is the model's own context window. The run
+  tally is the provider's reported usage (tokens and dollars), logged per call
+  and counted where the reply is read. Money is gated once, at queue time, by
+  the wallet check, before any credit moves. The Comfy and Google writer read
+  timeouts go to 600 s, because those replies arrive only when finished and a
+  120 s timeout would fail a call already billed; OpenRouter keeps the
+  connection alive while a reply is written (measured: a 36 s reply survived a
+  20 s read timeout) and stays at 120 s.
+- live verify: OpenRouter with no max_tokens -- Sonnet 5.5 wrote 37,533 tokens
+  and stopped on its own (finish=stop, $0.3755); Gemini Flash with no
+  max_output_tokens wrote 8,915 tokens to a natural end; ComfyUI's own
+  OpenRouter node posts to the same Comfy proxy without max_tokens. Episode
+  proof on the operator's Desktop run follows.
+- Bible: 12.182 (a cloud LLM client must not abort a run on an accumulated
+  token count).
