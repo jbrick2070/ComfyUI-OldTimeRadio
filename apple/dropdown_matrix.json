@@ -302,6 +302,7 @@
         "nv16": "proven",
         "nv8": "oom"
       },
+      "note": "nv8 oom is MEASURED, not reasoned, since 2026-09-28: otr_8gb_still with this lane in all three video roles, one act, on the 8 GB RTX 4060 (fresh 2.3.10 portable). Three beats rendered -- 145 frames, 612 frames over two chained segments, 139 frames -- at about 34 s per sampler step on a 141-frame clip and 95 s per step on a 260-frame one; the nvfp4 text encoder ran emulated on Ada. Beat 4 then died OUT OF MEMORY loading the text encoder, 2:54:27 in, with CUDA reporting 0 bytes free while PyTorch held only 213 MiB -- memory that was not handed back between beats rather than a model too big to load. No episode published.",
       "size_gb": 41.9
     },
     "musicgen": {
