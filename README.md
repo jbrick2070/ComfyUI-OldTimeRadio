@@ -11,6 +11,9 @@
    then add `--enable-manager` to the end of the `main.py` line in
    `run_nvidia_gpu.bat` and start ComfyUI with that file. ComfyUI Desktop already
    has it.
+   *It installed an older version?* Node Manager's list can lag a release by
+   hours. Open the pack's card, pick **Latest** in its version picker, then
+   **Apply Changes**.
 2. Install ffmpeg: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
 3. Restart ComfyUI.
 4. **Workflow -> Browse Templates -> Extensions -> Old-Time Radio**, open `otr_canonical`.
@@ -167,7 +170,7 @@ pressing **Run** is the whole path.
 |---|---|
 | NVIDIA, 16 GB or more | Minutes for a one-act show. Every default is proven here, and all but the heaviest video lanes are open to you. |
 | NVIDIA, 10 to 15 GB | Minutes. The defaults are proven both above and below you, so run the canonical as shipped. No pre-set workflow exists for this class yet. |
-| NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
+| NVIDIA, 8 GB | Minutes for the canonical (21 on an RTX 4060 laptop). Every 8 GB workflow published from a clean Node Manager install on 2026-09-27; the LTX 2.5 lanes run here too, in hours rather than minutes. Measured times are under [A workflow pre-set for your machine](#a-workflow-pre-set-for-your-machine). |
 | Apple Silicon, 16 GB | **It runs.** Every Mac workflow published a finished episode on a 16 GB M4 on 2026-09-13 -- the writer is Qwen3.5-4B, unquantized. Open an `otr_mac16_*` workflow: the canonical now ships the ComfyUI-native writer, which is not yet proven on a Mac. Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first anyway: memory is unified, so an out-of-memory here can reboot the machine, and the fit has no margin for anything else running. |
 | No GPU at all | About twenty minutes, and it works -- measured, not assumed. Start ComfyUI with `--cpu`. |
 | AMD | **It runs.** First full episode off a Radeon on 2026-09-14 -- RDNA4 (R9700), Ubuntu 24.04, ROCm 7.2, clean pass. Still tier only, and RDNA3 / Windows / 8 GB are untested. [apple/ROCM.md](apple/ROCM.md) has the receipt and what is still open. |
@@ -234,7 +237,10 @@ finished episode plays in the app.
 downloads about **12 GB** -- the writer, the music model and its text encoder, and
 the Kokoro voices -- and then writes, casts, performs, scores and cuts an episode.
 Later runs skip the download. On a 16 GB NVIDIA card a short episode is minutes;
-on CPU it is a long wait, and that is the model working, not a hang.
+on CPU it is a long wait, and that is the model working, not a hang. On an 8 GB
+card the LTX 2.5 workflows are the same story in hours: a three-act foley
+episode took six and a half hours on an RTX 4060, with the progress bars moving
+the whole time.
 
 **The canvas shows you almost nothing until the end.** No thumbnail, no player,
 no progress picture while it works -- and then a single still from the finished
@@ -515,13 +521,31 @@ Which file to open, what each engine costs, and every hand-fetched weight:
 Every
 `shipping` workflow in that table has put a finished episode into `otr/obs/`
 on the hardware its row names, all on 2026-09-13, the day 2.0.0 was published:
-the 8 GB rows on a physical RTX 4060 laptop, which by now
-has published 11 documented full OTR episodes through this pack; the 16 GB rows
+the 8 GB rows on a physical RTX 4060 laptop, and again on 2026-09-27 from a
+clean Node Manager install of 2.3.11 (times below); the 16 GB rows
 on an RTX 5080 laptop; the Apple rows on a Mac mini M4 with 16 GB; and the CPU
 row on that same 5080 laptop with
 ComfyUI started in `--cpu` mode, the card present and unused. `draft` means not
 yet promoted -- it is a status, not a verdict on proof: the AMD stills workflow
 reads `draft` and has an outside tester's published episode behind it.
+
+What the 8 GB workflows took on that clean install -- an RTX 4060 laptop, the
+shipped settings, three acts unless noted, each time including that workflow's
+own first-run downloads:
+
+| Workflow | Time |
+|---|---|
+| `otr_canonical` (one act) | 21 min |
+| `otr_8gb_low` | 25 min |
+| `otr_8gb_still` | 37 min; 58 min on a longer Shakespeare story |
+| `otr_8gb_video` | 46 min; 41 min on a rerun with the models already down |
+| `otr_8gb_animatediff` | 1 h 41 min, after installing its node pack |
+| `otr_8gb_ltx25_foley` | 6 h 27 min |
+
+The story sets the clock more than the download does: the longer still run drew
+47 stills where the shorter one drew 18. LTX 2.5 renders each 3.9-second clip in
+about eight and a half minutes on this card, so the `ltx25_*` workflows are an
+overnight job here, not a hung one.
 
 `scripts/otr_provision.py` needs the **git clone**: `scripts/` is not in a
 Manager install. The saved workflows in `workflows/` need nothing but a pick from
@@ -537,7 +561,9 @@ the matrix row of the same name -- want [ComfyUI-AnimateDiff-Evolved](https://gi
 That is the only one: every LTX lane, `ltx098_low_video` included, uses nodes
 that ship with ComfyUI itself (update ComfyUI if one is reported missing).
 If you pick an AnimateDiff lane without its pack, the render stops before
-anything downloads, with an error that names the pack and its URL.
+anything downloads, with an error that names the pack and its URL -- and since
+2.3.12 the workflow says so the moment it opens: ComfyUI's own missing-node card
+names `comfyui-animatediff-evolved`, and its errors panel leads to Node Manager.
 
 ---
 
@@ -684,6 +710,11 @@ mapped to ComfyUI's output directory.
 [github.com/jbrick2070/ComfyUI-OldTimeRadio/issues](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues)
 with the console from the end backwards -- the `[OldTimeRadio]` lines and the
 last error are what identify it.
+
+**An LTX 2.5 workflow on an 8 GB card has run for hours.** That is its pace, not
+a hang: about eight and a half minutes per clip on an RTX 4060, six and a half
+hours for a three-act foley episode. As long as the progress bars keep moving,
+leave it.
 
 **It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line in
 the console first, because there are two different answers. `obs_publish

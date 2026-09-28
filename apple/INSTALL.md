@@ -13,6 +13,10 @@ on your PATH, restart ComfyUI, and look for `[OldTimeRadio]` in the console.
 **Through the Node Manager** (easiest). In ComfyUI, open **Extensions -> Node
 Manager** and search for **old time radio**, then install it. The registry id is
 `comfyui-old-time-radio`, published by `fluxus`.
+If it installs an older version than the registry's latest, the Manager's cached
+list is lagging the release: open the pack's card, pick **Latest** in its version
+picker, then **Apply Changes**. Measured 2026-09-27: a fresh Manager gave 2.3.9
+while 2.3.11 was live.
 
 **Or clone it yourself**, into your ComfyUI `custom_nodes/` folder:
 

@@ -30,7 +30,9 @@ download.
 Expect a first episode to take a while — the writing pass alone is a local
 language model producing a full script before a single frame is drawn. On a
 16 GB NVIDIA card a short episode is minutes, not seconds; on CPU it is a long
-wait, and that is the model, not a hang.
+wait, and that is the model, not a hang. On an 8 GB card the LTX 2.5 workflows
+take hours (a three-act foley episode measured six and a half hours on an RTX
+4060), and the progress bars keep moving the whole time.
 
 ## Find it
 
