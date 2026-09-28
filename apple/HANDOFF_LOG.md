@@ -770,3 +770,46 @@ Open:
   episode's own ledger receipt.
 Models: DeepSeek, Sonnet and Composer QA on the pushed diffs, as each commit
   names.
+
+## 2026-09-27 afternoon -- 2.3.11 and 2.3.12, the human-install check on the 4060, AnimateDiff friction
+
+Published: 2.3.11 (Active) and 2.3.12 (0149ce33, Pending at writing). 2.3.12
+carries the story bank's roll pool ("Banks to roll", so all three rolls look
+alike in the app view) and the AnimateDiff missing-pack hint.
+
+4060 human install (official ComfyUI portable 0.37.0, `--enable-manager`, pack
+from Node Manager, each workflow from Browse Templates > Old-Time Radio, Run in
+the app view; every episode copied to the 5080's obs):
+
+| workflow | result | time |
+|---|---|---|
+| otr_8gb_low | published (sugar_light_20260927_130357) | 24:43 |
+| otr_8gb_still | published (dry_warning_20260927_133513) | 37:21 |
+| otr_8gb_animatediff | published (candy_box_20260927_141350) after installing AnimateDiff-Evolved from Node Manager | 1:40:31 |
+| otr_8gb_video | published (rhymes_rotten_20260927_155406) | 46:20 |
+| otr_8gb_ltx25_foley | rendering at writing (~3.9 min per 3.88 s clip) | |
+| otr_8gb_ltx25_mime, otr_8gb_ltx25_audio_in, otr_canonical | not started | |
+
+Findings from the human path:
+- A fresh Manager install gave 2.3.9 while 2.3.11 was the Active latest: the
+  Manager's registry cache was stale. The pack card's version picker,
+  "Latest (2.3.11)", then Apply Changes (restart) fixed it.
+- The AnimateDiff workflow failed at Run in 1 s with the right message, but
+  Manager's Missing Nodes could not see the dependency (no ADE node in the
+  graph). Fixed in d40338cb: js/lane_node_packs.js adds the lane's ADE classes
+  to the frontend's missing-node list on load (kibitz r1: Claude + Cursor +
+  Fable; a bypassed placeholder node was measured and rejected, the frontend
+  skips mode 2/4). Proven on a CPU sandbox with no ADE; the Install button
+  itself (Manager on) is not yet seen live.
+- Text encoders: every NVIDIA lane runs them on the GPU; ltx_8gb keeps the CPU
+  T5 on Apple only (operator: until a Mac proves otherwise).
+
+Open:
+- Finish the 4060 set (foley, mime, audio_in, canonical), then a second
+  still and video run for fair timings (the first runs included downloads).
+- Pod AnimateDiff regression: not run. The migrated pod (ckoq6477osfqev, a NEW
+  id) refused SSH until authorized_keys is re-added; stopped, disk kept. Needs
+  the operator at a desktop for the one-line key paste.
+- Subgraph blueprint: dropped by the operator.
+Models: Sonnet QA on each pushed diff (bank pool HOLDS; hint HOLDS with one
+  real finding fixed in the next commit), Cursor + Fable on the design round.
