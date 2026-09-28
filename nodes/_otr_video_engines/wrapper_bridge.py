@@ -1000,10 +1000,21 @@ def ffmpeg_terminal_frame_cmd(clip_path, out_path, *, ffmpeg="ffmpeg"):
     9-frame segment where a one-second tail seek has nothing to land on and a
     non-seekable container where it lands somewhere else entirely. A segment is
     tens of frames; a wrong "last" frame is a visible jump at every cut.
+
+    ACCURATE yuv420p -> RGB, or every join starts darker (2026-09-28). With
+    swscale's default flags the extracted frame came back 1.31 luma darker than
+    the frame that was encoded (every channel down, saturation up), measured
+    with this module's own encode and this command; four chained hops drifted
+    -4.94. On the operator's episodes 93% of ltx_8gb joins and 68% of LTX 2.5
+    joins opened darker than the frame before them. ``accurate_rnd`` +
+    ``full_chroma_int`` brings one hop to +0.06 and four to +0.10 (what is left
+    is the 4:2:0 detail loss, which has no bias). It must be an OUTPUT option,
+    after the input: placed before ``-i`` it measured no effect at all.
     """
     return [
         ffmpeg, "-y", "-i", clip_path,
         "-an",                                # V-1: never carry audio around
+        "-sws_flags", "accurate_rnd+full_chroma_int",
         "-update", "1", "-f", "image2", out_path,
     ]
 

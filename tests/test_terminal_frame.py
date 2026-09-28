@@ -49,6 +49,49 @@ def test_the_command_honours_an_explicit_ffmpeg_binary():
     assert cmd[0] == "/opt/ffmpeg"
 
 
+def test_the_accurate_conversion_flags_are_an_OUTPUT_option():
+    """Placed before ``-i`` they measured no effect at all; after the input
+    they remove the darkening (see the round-trip test below)."""
+    cmd = wb.ffmpeg_terminal_frame_cmd("in.mp4", "out.png")
+    at = cmd.index("-sws_flags")
+    assert at > cmd.index("-i")
+    assert set(cmd[at + 1].split("+")) >= {"accurate_rnd", "full_chroma_int"}
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="needs ffmpeg + ffprobe")
+def test_a_round_trip_keeps_the_frames_brightness():
+    """2026-09-28: with swscale's default flags the extracted terminal frame came
+    back ~1.3 luma darker than the frame encoded, so every chained join opened
+    darker than the frame before it (93% of ltx_8gb joins, 68% of LTX 2.5's).
+    A dark, warm, textured frame -- the kind that showed it -- encoded with this
+    module's own clip encoder and extracted with this command keeps its mean
+    brightness."""
+    import subprocess
+
+    import numpy as np
+    from PIL import Image
+
+    rng = np.random.default_rng(7)
+    h, w = 64, 96
+    yy, xx = np.mgrid[0:h, 0:w]
+    img = np.stack([60 + 90 * xx / w, 30 + 50 * yy / h,
+                    15 + 10 * (xx + yy) / (w + h)], -1)
+    img = np.clip(img + rng.normal(0, 18, img.shape), 0, 255).astype(np.uint8)
+    with tempfile.TemporaryDirectory() as tmp:
+        clip = os.path.join(tmp, "seg.mp4")
+        subprocess.run(wb.ffmpeg_silent_mp4_cmd(clip, w, h, 25),
+                       input=np.stack([img] * 9).tobytes(), check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        out = wb.extract_terminal_frame(clip, os.path.join(tmp, "last.png"))
+        got = np.asarray(Image.open(out).convert("RGB")).astype(np.float64)
+
+    def luma(a):
+        return 0.2126 * a[..., 0] + 0.7152 * a[..., 1] + 0.0722 * a[..., 2]
+
+    bias = float((luma(got) - luma(img.astype(np.float64))).mean())
+    assert abs(bias) < 0.5, "the terminal frame drifted %+.2f luma" % bias
+
+
 # ---------------------------------------------------------------------------
 # The real extraction
 # ---------------------------------------------------------------------------
