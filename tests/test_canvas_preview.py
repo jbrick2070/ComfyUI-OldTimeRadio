@@ -81,6 +81,31 @@ class TestItDrawsWhenItCan:
         assert ui["images"][0]["filename"].startswith("otr_preview_")
         assert ui["images"][0]["filename"].endswith(".png")
 
+    def test_the_poster_keeps_the_episodes_brightness(
+            self, episode, comfy_temp, monkeypatch):
+        """The scale that shrinks the poster is also its yuv420p -> RGB step.
+
+        With swscale's default flags that step lands ~1.3 luma dark with the
+        saturation pushed up, so the poster reads darker than the episode it
+        stands for. The accurate flags ride on the scale itself, which is the
+        filter doing the conversion; bicubic is named so the resize is the
+        same one the default gave.
+        """
+        _stub_ffmpeg(monkeypatch)
+        monkeypatch.setattr(MUX, "_probe_float", lambda *a, **k: 90.0)
+        seen = {}
+
+        def fake_run(argv, **kw):
+            seen["argv"] = argv
+            return subprocess.CompletedProcess(argv, 1, "", "")
+        monkeypatch.setattr(MUX.otr_proc, "run", fake_run)
+
+        MUX._canvas_preview(str(episode), "/obs/copy.mp4")
+        vf = seen["argv"][seen["argv"].index("-vf") + 1]
+        assert vf.startswith("scale=640:-2:"), vf
+        flags = vf.split("flags=", 1)[1].split("+")
+        assert {"bicubic", "accurate_rnd", "full_chroma_int"} <= set(flags), vf
+
     def test_two_runs_of_one_episode_do_not_share_a_filename(
             self, episode, comfy_temp, monkeypatch):
         """A deterministic name served the PREVIOUS frame from the browser

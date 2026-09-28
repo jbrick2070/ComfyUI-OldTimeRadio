@@ -219,10 +219,16 @@ def _canvas_preview(final_path: str, obs_copy) -> dict:
         # thread: an ffmpeg that waits on stdin or deadlocks on a bad container
         # hangs the whole queue, and no try/except catches a process that never
         # returns. The bound is what makes "fail-soft" true rather than hopeful.
+        # The scale does the yuv420p -> RGB conversion too, so it carries
+        # accurate_rnd + full_chroma_int: with the default flags the poster came
+        # back ~1.3 luma darker than the episode (2026-09-28, the same defect
+        # wrapper_bridge.ffmpeg_terminal_frame_cmd fixed). bicubic is named
+        # because a flags= value replaces the default resize algorithm.
         done = otr_proc.run(
             [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
              "-ss", "%.3f" % max(0.0, seek), "-i", final_path,
-             "-an", "-frames:v", "1", "-vf", "scale=640:-2", out],
+             "-an", "-frames:v", "1", "-vf",
+             "scale=640:-2:flags=bicubic+accurate_rnd+full_chroma_int", out],
             capture_output=True, text=True, encoding="utf-8",
             errors="replace", timeout=20)
         if getattr(done, "returncode", 1) == 0 and os.path.isfile(out):
