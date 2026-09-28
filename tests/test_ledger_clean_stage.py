@@ -1376,3 +1376,61 @@ def test_the_clean_stage_is_wired_into_the_one_shared_producer_boundary():
     # rewrites it, so the repaired line still sounds like its neighbours.
     call = body[clean_at:cleanup_at]
     assert "slot_fn=creative_generate_fn" in call
+
+
+# --------------------------------------------------------------------------- #
+# A replacement that says the kept speech again (2026-09-28)
+# --------------------------------------------------------------------------- #
+# signal_time_20260928_105643: for spans like "(low, steady tone)" the writer
+# returned the REST of the line as the replacement, the splice read "I see the
+# grid. I see the ledger. I see the grid. I see the ledger.", and the judge --
+# which reads for stage directions, not repeats -- passed four such rows clean.
+
+def test_the_splice_refuses_a_replacement_that_repeats_the_kept_line():
+    original = "(low, steady tone) I see the grid. I see the ledger."
+    spans = lcl._merge_repair_spans(original, [(0, 18)])
+    with pytest.raises(ValueError, match="repeats words the line already keeps"):
+        lcl._splice_replacements(original, spans,
+                                 _replacement_reply("I see the grid. I see the ledger.")["replacements"])
+    short = "(sighs) Fine."
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(short, lcl._merge_repair_spans(short, [(0, 7)]),
+                                 _replacement_reply("Fine.")["replacements"])
+
+
+def test_a_real_edit_that_shares_a_word_or_two_still_splices():
+    original = "(looks at the lamp) The lamp is dead."
+    spans = lcl._merge_repair_spans(original, [(0, 19)])
+    got = lcl._splice_replacements(original, spans, _replacement_reply("Look at the lamp.")["replacements"])
+    assert got == "Look at the lamp. The lamp is dead."
+    assert lcl._splice_replacements(original, spans, _replacement_reply("")["replacements"]) \
+        == " The lamp is dead."
+
+
+def test_a_repeated_line_is_refused_and_the_next_answer_is_used():
+    ledger = _ledger(DIRTY)
+    kept = "The lamp has not turned since Tuesday."
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(kept), _replacement_reply(FIXED_REPLACEMENT)]})
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == FIXED
+
+
+def test_a_model_that_only_repeats_the_line_never_ships_it_twice():
+    ledger = _ledger(DIRTY)
+    kept = "The lamp has not turned since Tuesday."
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(kept)]})
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"].count(kept) == 1
+
+
+def test_the_scoped_prompt_says_the_kept_speech_is_already_kept():
+    partial = lcl._repair_prompt(
+        speaker="ANA", text="(sighs) I see the grid.", complaint="1. (sighs): action",
+        lines_around=[], authorized_spans=(lcl._RepairSpan("span_001", 0, 7, "(sighs)"),))
+    body = partial[1]["content"]
+    assert "never write any of them again in a replacement" in body
+    assert "keep the line roughly its original length" not in body
+    whole = lcl._repair_prompt(
+        speaker="ANA", text="(sighs) I see the grid.", complaint="1. (sighs): action",
+        lines_around=[])
+    assert "keep the line roughly its original length" in whole[1]["content"]

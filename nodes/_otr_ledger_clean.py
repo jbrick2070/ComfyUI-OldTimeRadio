@@ -79,6 +79,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from typing import Any, Callable, Literal, Mapping, MutableMapping, NamedTuple, Sequence
 
 try:
@@ -267,6 +268,48 @@ def _covers_spoken_row(text: str, intervals: Sequence[tuple[int, int]]) -> bool:
     return bool(spans) and not "".join(outside).strip()
 
 
+_WORD = re.compile(r"[^\W_]+(?:['’][^\W_]+)*", re.UNICODE)
+
+#: A replacement sharing this many consecutive words with the kept speech is
+#: the kept speech said again, not an edit of the marked span.
+_REPEAT_RUN = 4
+
+
+def _spoken_words(text: str) -> "list[str]":
+    return [w.casefold().replace("’", "'") for w in _WORD.findall(text or "")]
+
+
+def _longest_shared_run(a: "Sequence[str]", b: "Sequence[str]") -> int:
+    best = 0
+    prev = [0] * (len(b) + 1)
+    for x in a:
+        row = [0] * (len(b) + 1)
+        for j, y in enumerate(b, 1):
+            if x == y:
+                row[j] = prev[j - 1] + 1
+                best = max(best, row[j])
+        prev = row
+    return best
+
+
+def _repeats_kept_speech(replacement: str, kept: str) -> bool:
+    """True when a replacement says again what the line already keeps.
+
+    Measured 2026-09-28 (signal_time_20260928_105643, four rows of ten): for a
+    span like "(low, steady tone)" a small writer returned the REST of the line
+    as the replacement, so the splice read "I see the grid. I see the ledger. I
+    see the grid. I see the ledger." -- and the judge, which reads for stage
+    directions, passed it as clean. A replacement that contains all of the kept
+    speech, or shares ``_REPEAT_RUN`` consecutive words with it, is that
+    mistake; Python only refuses the construction, it writes no prose.
+    """
+    rep, keep = _spoken_words(replacement), _spoken_words(kept)
+    if not rep or not keep:
+        return False
+    run = _longest_shared_run(rep, keep)
+    return run >= _REPEAT_RUN or run == len(keep)
+
+
 def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: Sequence[Mapping[str, Any]]) -> str:
     ids = [item.get("span_id") for item in replacements]
     expected = {span.span_id for span in spans}
@@ -278,12 +321,23 @@ def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: 
         raise ValueError("Each replacement must be a string")
     cursor = 0
     pieces = []
+    kept = []
     for span in spans:
         if span.start_char < cursor or text[span.start_char:span.end_char] != span.quote:
             raise ValueError("Approved spans must match the immutable original row")
         pieces.extend((text[cursor:span.start_char], by_id[span.span_id]))
+        kept.append(text[cursor:span.start_char])
         cursor = span.end_char
     pieces.append(text[cursor:])
+    kept.append(text[cursor:])
+    kept_speech = " ".join(kept)
+    for span in spans:
+        if _repeats_kept_speech(by_id[span.span_id], kept_speech):
+            raise ValueError(
+                "The replacement for %s repeats words the line already keeps outside "
+                "the approved spans, so the speaker would say them twice. Return only "
+                "what takes the span's place -- an empty replacement removes a "
+                "direction." % span.span_id)
     candidate = "".join(pieces)
     if not candidate.strip():
         raise ValueError("The final spoken row must contain speech")
@@ -1803,7 +1857,18 @@ def _repair_prompt(
     if authorized_spans is not None:
         parts[0] = ("Write replacement speech ONLY for the approved original spans. "
                     "Everything outside them will be retained exactly, including whitespace. "
-                    "The complaints are feedback, never permission to widen those spans.")
+                    "The complaints are feedback, never permission to widen those spans. "
+                    "The words outside the spans are already kept for you: never write any "
+                    "of them again in a replacement, or the speaker says them twice.")
+        # The whole-line bullet asks to keep the speech and the length, which a
+        # small model answers here by returning the kept speech as the span's
+        # replacement (2026-09-28: four doubled rows in one episode). In a
+        # scoped edit the speech is kept by construction, so say that instead.
+        for i, part in enumerate(parts):
+            if part.startswith("- Keep every part that already was speech."):
+                parts[i] = ("- Every part that already was speech is kept for you, outside "
+                            "the spans. A replacement holds only what takes the span's "
+                            "place -- often a few words, sometimes nothing.")
         parts[-1] = ("Return replacements as specified below; the full original row is context, "
                      "not your output or an additional editing surface.")
         parts += ["APPROVED ORIGINAL SPANS:", json.dumps(
