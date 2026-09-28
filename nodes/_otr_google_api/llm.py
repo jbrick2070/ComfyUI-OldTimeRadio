@@ -32,6 +32,9 @@ _LOG = logging.getLogger("OTR.google_api")
 # So the level is per MODEL. Since 2026-09-28 no max_output_tokens is sent at
 # all (no caps), so thinking can no longer starve the answer; the level still
 # decides how many thought tokens are bought.
+# The least room a reply needs after the prompt, as on the OpenRouter and
+# Comfy lanes: a prompt that leaves less is refused before the call.
+MIN_OUTPUT_ROOM = 1024
 _THINKING_LEVEL_BY_FAMILY = (
     ("flash-lite", None),   # already silent; a level would switch it ON
     ("flash", "low"),       # measured 0 thought tokens at "low"
@@ -258,26 +261,29 @@ class GoogleAPIBackend:
         level = thinking_level_for(google_model)
         if level:
             generation_config["thinking_level"] = level
-        if max_new_tokens is not None or reserve_remaining:
-            # NO OUTPUT CAP (operator, 2026-09-28: "no caps"): no
-            # max_output_tokens is sent, so thinking cannot starve the answer
-            # and the model writes until it stops or reaches its own limit.
-            # The context window is the one limit left, and it is the
-            # model's: a prompt that leaves no room, or too little for an
-            # artifact that must arrive whole, is refused before the call.
-            must_fit_whole = require_full_output or bounded_capacity
-            try:
-                fit_output_tokens(
-                    max(1, int(max_new_tokens or 0)) if must_fit_whole else 1,
-                    context_cap=int(
-                        cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW
-                    ),
-                    prompt_tokens=estimate_prompt_tokens(messages),
-                    label=f"Google API {google_model}",
-                    require_full=must_fit_whole,
-                )
-            except GenerationContextOverflowError as exc:
-                raise GoogleAPIRequestShapeError(str(exc)) from exc
+        # NO OUTPUT CAP (operator, 2026-09-28: "no caps"): no
+        # max_output_tokens is sent, so thinking cannot starve the answer and
+        # the model writes until it stops or reaches its own limit. The
+        # context window is the one limit left, and it is the model's: on
+        # every call -- with or without a requested size, as on the
+        # OpenRouter and Comfy lanes -- a prompt that leaves less than the
+        # minimum room, or too little for an artifact that must arrive whole,
+        # is refused before the call.
+        must_fit_whole = require_full_output or bounded_capacity
+        try:
+            fit_output_tokens(
+                (max(1, int(max_new_tokens or 0)) if must_fit_whole
+                 else MIN_OUTPUT_ROOM),
+                context_cap=int(
+                    cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW
+                ),
+                prompt_tokens=estimate_prompt_tokens(messages),
+                min_output_tokens=MIN_OUTPUT_ROOM,
+                label=f"Google API {google_model}",
+                require_full=must_fit_whole,
+            )
+        except GenerationContextOverflowError as exc:
+            raise GoogleAPIRequestShapeError(str(exc)) from exc
         if stop:
             generation_config["stop_sequences"] = [str(s) for s in stop if s]
         payload: dict[str, Any] = {

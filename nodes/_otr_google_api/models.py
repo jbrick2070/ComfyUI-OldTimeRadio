@@ -86,7 +86,13 @@ GOOGLE_API_STATIC_TEXT_MODELS = _dedupe(
     GOOGLE_API_LEGACY_TEXT_MODELS,
 )
 GOOGLE_API_STRUCTURED_OUTPUT_MODELS = frozenset(GOOGLE_API_STATIC_TEXT_MODELS)
-DEFAULT_CONTEXT_WINDOW = 8192
+# Gemini's own input limit, measured 2026-09-28 from Google's model list:
+# gemini-flash-latest, gemini-flash-lite-latest and gemini-pro-latest all
+# report inputTokenLimit 1048576 (outputTokenLimit 65536). It was 8192 -- a
+# local-shaped placeholder that made the writer refuse any prompt past ~8k
+# tokens, and any whole-artifact pass whose prompt plus request passed it, on
+# a model that holds a million.
+DEFAULT_CONTEXT_WINDOW = 1_048_576
 
 _slot_bindings: dict[str, str | None] = {"A": None, "B": None}
 

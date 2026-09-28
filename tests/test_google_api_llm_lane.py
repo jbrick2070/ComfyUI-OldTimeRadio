@@ -251,3 +251,45 @@ def test_google_run_meta_never_contains_key(monkeypatch):
     dumped = repr(meta)
     assert "secret-key" not in dumped
     assert meta["google_api_model_bindings"]["slot_a"] == "gemini-3.5-flash"
+
+
+def test_a_long_prompt_on_a_shipped_gemini_row_is_not_refused(monkeypatch):
+    """The slot rows used to carry a placeholder 8192-token window, so a
+    ~40k-token prompt was refused on a model that holds 1,048,576. The row's
+    window is now Gemini's own, and the call goes out."""
+    from nodes import _otr_model_catalog as catalog
+
+    sent = []
+    monkeypatch.setattr(gllm, "create_interaction",
+                        lambda payload: sent.append(payload) or {"output_text": "ok"})
+    row = next(r for r in catalog._active_curated_models()
+               if r.repo_id == gmodels.GOOGLE_API_SLOT_A_ID)
+    gmodels.set_slot_bindings(slot_a=gmodels.GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT)
+    try:
+        entry = gllm.GoogleAPIBackend().load(gmodels.GOOGLE_API_SLOT_A_ID, row)
+        fn = gllm.make_google_api_generate_fn(entry)
+        assert fn([{"role": "user", "content": "x" * 160000}],
+                  temperature=.2, max_new_tokens=2000) == "ok"
+    finally:
+        gmodels.clear_slot_bindings()
+    assert len(sent) == 1
+
+
+def test_a_call_with_no_requested_size_still_gets_the_context_check(monkeypatch):
+    """A structured pass that asks for no size (max_new_tokens=None) is still
+    refused before the request when its prompt leaves no room -- the check no
+    longer depends on the caller naming a size."""
+    sent = []
+    monkeypatch.setattr(gllm, "create_interaction",
+                        lambda payload: sent.append(payload))
+    entry = {
+        "provider": "google_api",
+        "model_id": gmodels.GOOGLE_API_SLOT_A_ID,
+        "google_model": gmodels.GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT,
+        "context_cap": 8192,
+    }
+    fn = gllm.make_google_api_generate_fn(entry)
+    with pytest.raises(gclient.GoogleAPIRequestShapeError, match="cannot fit"):
+        fn([{"role": "user", "content": "x" * 40000}],
+           temperature=.2, max_new_tokens=None)
+    assert sent == []

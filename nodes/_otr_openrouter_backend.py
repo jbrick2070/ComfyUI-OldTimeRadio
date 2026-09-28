@@ -1354,9 +1354,9 @@ class OpenRouterBackend:
         # reasoning (-> finish_reason=length -> unparseable JSON). Unset -> the
         # field is omitted, so non-thinking models / OpenRouter-proper are
         # byte-identical. Not require_parameters-gated: a backend that ignores it
-        # simply reasons as before -- the output-token floor is the safety net,
-        # and that floor is now reasoning-aware (resolved with the budget above,
-        # because a net sized without the preamble is a net with a hole in it).
+        # simply reasons as before -- and since no max_tokens is sent
+        # (2026-09-28), its reasoning can no longer eat an output budget: the
+        # model has its whole own output limit.
         if reasoning_effort:
             payload["reasoning_effort"] = reasoning_effort
             # EVIDENT (operator 2026-06-22): log ONCE per process so any server

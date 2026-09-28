@@ -560,7 +560,8 @@ class ComfyCreditsBackend:
 
     `load()` builds a provider-tagged cache_entry carrying the resolved
     slug -- no weights, no tokenizer, zero local VRAM. `generate()` posts
-    the chat request behind the cost guard + bounded retries. `unload()`
+    the chat request behind bounded retries and logs the provider's
+    reported usage. `unload()`
     is a no-op (nothing is resident; the resident local model is never
     touched -- C2 no-evict)."""
 
