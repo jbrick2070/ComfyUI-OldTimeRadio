@@ -423,8 +423,8 @@ class OTRVideoDirector:
                                "Suggested for 16 GB cards and up.",
                 }),
                 # The rolls' checklists (operator, 2026-09-28), appended LAST.
-                # Typed lists underneath, drawn as clickable boxes by
-                # js/roll_pickers.js from `otr_choices`.
+                # The saved value is a typed list; js/roll_pickers.js draws it
+                # as clickable boxes from `otr_choices`.
                 "video_roll_pool": ("STRING", {
                     "default": "",
                     "multiline": False,

@@ -239,6 +239,18 @@ def test_the_still_checklist_narrows_the_still_draw():
     assert [prompt["87"]["inputs"][s] for s in IMAGE_SLOTS] == ["sd15"] * 3
 
 
+def test_a_workflow_saved_before_the_checklists_rolls_among_everything():
+    """A graph saved before 2026-09-28 has no pool values at all; the roll then
+    draws from the whole pool, as an empty checklist does."""
+    prompt = _prompt(video=True, still=True)
+    for key in (L.VIDEO_POOL, L.STILL_POOL):
+        del prompt["87"]["inputs"][key]
+    got = L.roll_prompt_lanes(prompt, "63", pools=_pools(), still_check=lambda _i: True)
+    assert got["87"]["video_lane"]["eligible_order"] == ["ltx_8gb", "still_flat", "viz_camera"]
+    assert "ticked" not in got["87"]["video_lane"]
+    assert got["87"]["still_model"]["eligible_order"] == ["sd15", "z_image_turbo"]
+
+
 def test_a_checklist_is_ignored_while_its_switch_is_off():
     prompt = _prompt(video_pool="not_a_lane")
     assert L.roll_prompt_lanes(prompt, "63", pools=_pools()) == {}

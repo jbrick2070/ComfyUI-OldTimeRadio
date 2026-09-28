@@ -213,7 +213,8 @@ stale); a replay under the roll keeps the frozen language, like Off. The
 dynamic-style floor draws from the roll's own pool minus the dynamic lane
 (byte-identical for the whole-list roll). Both API converters now send a
 list widget value as `{"__value__": [...]}`, as the frontend does -- a bare
-list reads as a link. App form: each pool under its dropdown. Docs:
+list reads as a link. App form: each pool under its dropdown (moved to the
+foot of the form on 2026-09-28; see the amendment below). Docs:
 `STYLES.md`, `MULTILINGUAL.md`. Tests: `tests/test_selective_rolls.py`
 plus the pinned widget count 35 -> 37. **Owed:** a live app-view click of
 the picker (the chain holds the 5080 tonight; a CPU-only server on another
