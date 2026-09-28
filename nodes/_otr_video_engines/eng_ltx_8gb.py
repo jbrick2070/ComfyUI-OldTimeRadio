@@ -171,7 +171,7 @@ _LTX8_DEFAULT_NEGATIVE = (
 #: leave the recipe invisible to every consumer that matters -- an unowned
 #: ledger field in all but name. It is also `cfg.recipe` in `session_identity`,
 #: so a version bump moves the identity for free.
-RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass_v3"
+RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass_v4"
 
 #: THE CONSENT ACT that re-opens the recipe knobs (B6). One explicit env var,
 #: the same shape as the client-bank build's `--activate`: an operator who
@@ -326,11 +326,72 @@ LTX8_RECIPE_V3 = dict(LTX8_RECIPE_V2, t5_device="default")
 #: The T5 placement v3 keeps on Apple Silicon (see above).
 _LTX8_V3_APPLE_T5_DEVICE = "cpu"
 
+#: THE DISTILLED 0.9.8 SCHEDULE -- Lightricks' own, for this exact checkpoint.
+#: `Lightricks/LTX-Video configs/ltxv-2b-0.9.8-distilled.yaml` runs the first
+#: pass on timesteps 1.0000 .. 0.7250 and the second on 0.9094, 0.7250,
+#: 0.4219; the canonical ComfyUI distilled I2V graph (ComfyUI-LTXVideo
+#: `example_workflows/low_level/ltxvideo-i2v-distilled.json`) runs the same
+#: values single-stage to 0.0, which is what this single-pass lane is. The model
+#: was distilled ON these timesteps; `LTXVScheduler` builds a shifted schedule
+#: for the full (non-distilled) model instead.
+LTX8_DISTILLED_SIGMAS = (1.0, 0.9937, 0.9875, 0.9812, 0.975, 0.9094, 0.725,
+                         0.4219, 0.0)
+
+#: The two ways this lane can build its sigmas. `ltxv_scheduler` is v1-v3's
+#: `LTXVScheduler(steps, shift, terminal)`; `distilled_0_9_8` is the fixed list
+#: above, handed to the sampler as the SIGMAS it asks for.
+_SCHEDULE_LTXV_SCHEDULER = "ltxv_scheduler"
+_SCHEDULE_DISTILLED = "distilled_0_9_8"
+_SCHEDULES = (_SCHEDULE_LTXV_SCHEDULER, _SCHEDULE_DISTILLED)
+
+#: THE ACTIVE ltx_8gb RECIPE, v4 -- 2026-09-28, aligned with the canonical
+#: LTX-Video 0.9.8 distilled flow (operator: "be sure we are comparing to the
+#: canonical ltx 0.9.8 graphs", after "much of it is blurry and you can feel it
+#: stepping").
+#:
+#: v1 called its sampling knobs "TODAY'S SHIPPED DEFAULTS, not a measured
+#: selection"; v2's sweep varied only the T5 device and tiled decode, and v3
+#: only moved the T5. The sampling itself was never compared with Lightricks'
+#: until now, and two things differ from their distilled I2V graph:
+#:
+#:   * `schedule` -> the distilled list (above) instead of `LTXVScheduler`.
+#:     `ModelSamplingLTXV` stays in the graph and is inert here: LTX samples
+#:     through `ModelSamplingFlux`, whose `timestep(sigma)` returns sigma, so the
+#:     shift it sets reaches only schedulers, and there is no scheduler.
+#:   * `img_compression` 38 -> `LTXVPreprocess` between the still and
+#:     `LTXVImgToVideo`, as the canonical graph does: it gives the still the
+#:     compression of a video frame, the kind of frame the model learned to
+#:     continue, instead of a clean PNG it re-settles away from.
+#:
+#: The sampler stays `euler`: the official config says
+#: `stochastic_sampling: false`, and an ancestral sampler adds noise on the way
+#: down. The official decoder noise (decode_timestep 0.05, decode_noise_scale
+#: 0.025) is already what core ComfyUI applies to this VAE. The 512x288 canvas
+#: stays; the 0.9.8 spatial upscaler and its refine pass are a separate call.
+#:
+#: AND `vae_temporal` 16 -> 64, ComfyUI's own default for VAEDecodeTiled.
+#: Measured 2026-09-28 on this episode's latents: a 16-frame temporal tile is two
+#: latent frames with one of overlap, so every 8th frame is a 50/50 blend of two
+#: chunk decodes, and this checkpoint's decoder looks both ways in time
+#: (`causal_decoder: false`) -- each chunk loses context. Every 8th frame kept
+#: 0.54x the Laplacian variance of an untiled decode (0.75x of its neighbours in
+#: the production clips): a visible ~3 Hz pulse of softness. At 64 the decode
+#: measured 0.995-1.003x of untiled. v2 froze tiled decode for its FLAT VRAM
+#: peak; the spatial tile and the overlap are unchanged, and the peak on an
+#: 8 GB card is re-measured on the 4060 (a bigger temporal chunk decodes more
+#: frames at once).
+#:
+#: v3 IS STILL REACHABLE under the consent act for an A/B
+#: (`OTR_LTX_8GB_SCHEDULE=ltxv_scheduler`, `OTR_LTX_8GB_IMG_COMPRESSION=0`,
+#: `OTR_LTX_8GB_VAE_TEMPORAL=16`); those clips stamp their departures from v4.
+LTX8_RECIPE_V4 = dict(LTX8_RECIPE_V3, schedule=_SCHEDULE_DISTILLED,
+                      img_compression=38, vae_temporal=64)
+
 #: THE ONE NAME EVERY CONSUMER READS. Bumping a recipe is repointing this and
 #: the version inside `RECIPE_LTX8_I2V` -- never editing a versioned dict in
 #: place. Kept as a separate binding so `LTX8_RECIPE_V1` and `_V2` stay
 #: readable as history.
-LTX8_RECIPE = LTX8_RECIPE_V3
+LTX8_RECIPE = LTX8_RECIPE_V4
 
 #: The env var each frozen field was read from, kept so the demotion can NAME
 #: what it is ignoring. Presence is all this map is used for outside
@@ -349,6 +410,8 @@ _RECIPE_ENV_KEYS = {
     "vae_overlap": "OTR_LTX_8GB_VAE_OVERLAP",
     "vae_temporal": "OTR_LTX_8GB_VAE_TEMPORAL",
     "vae_temporal_overlap": "OTR_LTX_8GB_VAE_TEMPORAL_OVERLAP",
+    "schedule": "OTR_LTX_8GB_SCHEDULE",
+    "img_compression": "OTR_LTX_8GB_IMG_COMPRESSION",
 }
 
 #: Per-knob bounds for the tiled-decode geometry, from the LIVE ``/object_info``
@@ -1035,6 +1098,8 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "terminal": LTX8_RECIPE["terminal"],
                 "max_frames": max_frames,
                 "sampler": LTX8_RECIPE["sampler"],
+                "schedule": LTX8_RECIPE["schedule"],
+                "img_compression": LTX8_RECIPE["img_compression"],
             }
 
         # PREQUALIFICATION: the knobs are open, every value is range-checked as
@@ -1047,6 +1112,14 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
                 "OTR_LTX_8GB_SAMPLER=%r is not in the portable floor whitelist %s"
                 % (sampler, sorted(self._PORTABLE_SAMPLERS)), kind="video")
+        schedule = (otr_env.get("OTR_LTX_8GB_SCHEDULE")
+                    or LTX8_RECIPE["schedule"]).strip().lower()
+        if schedule not in _SCHEDULES:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                "OTR_LTX_8GB_SCHEDULE=%r is not one of %s"
+                % (otr_env.get("OTR_LTX_8GB_SCHEDULE"), ", ".join(_SCHEDULES)),
+                kind="video")
         honoured = _ignored_override_keys()
         if honoured:
             _LOG.warning(
@@ -1067,6 +1140,10 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                              0.0, 0.99, float),
             "max_frames": max_frames,
             "sampler": sampler,
+            "schedule": schedule,
+            # LTXVPreprocess declares 0..100; 0 leaves the node out entirely.
+            "img_compression": _num("OTR_LTX_8GB_IMG_COMPRESSION",
+                                    LTX8_RECIPE["img_compression"], 0, 100, int),
         }
 
     def _tile_geometry(self, key):
@@ -1113,6 +1190,8 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "steps": knobs["steps"], "cfg": knobs["cfg"],
             "max_shift": knobs["max_shift"], "base_shift": knobs["base_shift"],
             "terminal": knobs["terminal"], "sampler": knobs["sampler"],
+            "schedule": knobs["schedule"],
+            "img_compression": knobs["img_compression"],
             "t5_device": self._t5_device(),
             "tiled_vae": self._tiled_vae(),
             "negative": self._negative_prompt(),
@@ -1236,6 +1315,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "pos": ("CLIPTextEncode",),
             "neg": ("CLIPTextEncode",),
             "loadimage": ("LoadImage",),
+            "preprocess": ("LTXVPreprocess",),
             "modelsampling": ("ModelSamplingLTXV",),
             "img2vid": ("LTXVImgToVideo",),
             "cond": ("LTXVConditioning",),
@@ -1318,7 +1398,10 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                                          "base_shift": cfg["base_shift"]}},
             "img2vid": {"class": "img2vid",
                         "inputs": {"positive": W("pos", 0), "negative": W("neg", 0),
-                                   "vae": W("ckpt", 2), "image": W("loadimage", 0),
+                                   "vae": W("ckpt", 2),
+                                   "image": (W("preprocess", 0)
+                                             if cfg["img_compression"] > 0
+                                             else W("loadimage", 0)),
                                    "width": int(width), "height": int(height),
                                    "length": int(length), "batch_size": 1,
                                    "strength": 1.0}},
@@ -1342,9 +1425,30 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                                   "latent_image": W("img2vid", 2)}},
             "decode": {"class": "decode", "inputs": self._decode_inputs(W)},
         }
+        # v4: the canonical graph gives the still a video frame's compression
+        # before it pins frame 0 (see LTX8_RECIPE_V4). 0 leaves the node out.
+        if cfg["img_compression"] > 0:
+            graph["preprocess"] = {
+                "class": "preprocess",
+                "inputs": {"image": W("loadimage", 0),
+                           "img_compression": int(cfg["img_compression"])}}
+        # v4: the distilled schedule is not built by a node -- the caller hands
+        # the sampler its SIGMAS as the ``sched`` result (``_schedule_results``),
+        # so ``LTXVScheduler`` leaves the graph with the other supplied ids.
         for nid in set(external_results or ()):
             graph.pop(nid, None)
         return graph
+
+    def _schedule_results(self, knobs):
+        """The ``sched`` result for a fixed schedule, or ``{}`` when
+        ``LTXVScheduler`` builds it. A SIGMAS tensor handed to the executor like
+        the prepared checkpoint, so the lane needs no sigma-list node and runs on
+        any ComfyUI that has the LTX core nodes."""
+        if knobs["schedule"] != _SCHEDULE_DISTILLED:
+            return {}
+        import torch  # lazy: module scope stays cold-import clean (V-12)
+        return {"sched": (torch.tensor(LTX8_DISTILLED_SIGMAS,
+                                       dtype=torch.float32),)}
 
     # ---- residency ----
     def load(self):
@@ -1673,6 +1777,12 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         length = rung
         ext = (prepared or {}).get("external_results") \
             if isinstance(prepared, dict) else None
+        schedule = self._schedule_results(knobs)
+        if schedule:
+            # A NEW dict: ``prepared["external_results"]`` is beat-scoped and
+            # shared by every segment, and must keep describing only what
+            # ``prepare()`` loaded.
+            ext = dict(ext or {}, **schedule)
         graph = self._build_graph(request, image_name, plan, length, width, height,
                                   external_results=ext)
         ext, cond_key, cond_texts = self._apply_conditioning_cache(graph, ext)

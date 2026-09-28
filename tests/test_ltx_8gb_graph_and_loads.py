@@ -130,6 +130,7 @@ def _ltx8_fakes(np, counter, n=9):
         "pos": _node("pos", (("c",),)),
         "neg": _node("neg", (("c",),)),
         "loadimage": _node("loadimage", lambda: (object(), object())),
+        "preprocess": _node("preprocess", lambda: (object(),)),   # LTXVPreprocess -> IMAGE
         "modelsampling": _node("modelsampling",
                                lambda: (_FakeModel("modelsampling"),)),
         "img2vid": _node("img2vid", (("p",), ("n",), ("latent",))),
@@ -165,6 +166,7 @@ def test_node_candidates_are_the_discovery_verified_core_LTX_nodes():
     assert cand["pos"] == ("CLIPTextEncode",)
     assert cand["neg"] == ("CLIPTextEncode",)
     assert cand["loadimage"] == ("LoadImage",)
+    assert cand["preprocess"] == ("LTXVPreprocess",)     # recipe v4, canonical
     assert cand["modelsampling"] == ("ModelSamplingLTXV",)
     assert cand["img2vid"] == ("LTXVImgToVideo",)
     assert cand["cond"] == ("LTXVConditioning",)
@@ -205,7 +207,8 @@ def test_the_decode_CLASS_and_its_INPUTS_are_chosen_by_the_same_switch(
     assert eng._node_candidates()["decode"] == ("VAEDecodeTiled",)
     tiled = eng._build_graph({}, "p.png", plan, 9, 512, 288)["decode"]["inputs"]
     assert tiled["tile_size"] == 512 and tiled["overlap"] == 64
-    assert tiled["temporal_size"] == 16 and tiled["temporal_overlap"] == 8
+    # v4 decodes 64-frame temporal tiles (the 3 Hz softness pulse at 16).
+    assert tiled["temporal_size"] == 64 and tiled["temporal_overlap"] == 8
 
 
 def test_a_production_leg_decodes_through_the_FROZEN_class_whatever_the_env_says(
@@ -279,7 +282,10 @@ def test_every_wire_that_reads_the_loaders_is_pinned():
     assert g["pos"]["inputs"]["clip"] == wb.Wire("clip", 0)
     assert g["neg"]["inputs"]["clip"] == wb.Wire("clip", 0)
     assert g["sample"]["inputs"]["model"] == wb.Wire("modelsampling", 0)
-    assert g["img2vid"]["inputs"]["image"] == wb.Wire("loadimage", 0)
+    # v4: the still passes through LTXVPreprocess before it pins frame 0.
+    assert g["preprocess"]["inputs"]["image"] == wb.Wire("loadimage", 0)
+    assert g["preprocess"]["inputs"]["img_compression"] == 38
+    assert g["img2vid"]["inputs"]["image"] == wb.Wire("preprocess", 0)
     assert g["cond"]["inputs"]["positive"] == wb.Wire("img2vid", 0)
     assert g["sched"]["inputs"]["latent"] == wb.Wire("img2vid", 2)
     assert g["sample"]["inputs"]["latent_image"] == wb.Wire("img2vid", 2)
@@ -706,10 +712,14 @@ def test_the_executor_is_called_with_the_current_keep_contract(staged,
 
     assert seen["kwargs"]["free_after_use"] is True
     assert seen["kwargs"]["keep"] == {"ckpt", "modelsampling", eng._TERMINAL}
-    # THE FLIP: pre-B1b this kwarg was absent. It is now always forwarded, and
-    # it is None exactly when the caller prepared nothing -- which is why the
-    # loader nodes are still in the graph on the very next line.
-    assert seen["kwargs"]["external_results"] is None
+    # THE FLIP: pre-B1b this kwarg was absent. It is now always forwarded.
+    # Since recipe v4 it carries the distilled SIGMAS even when the caller
+    # prepared nothing -- and ONLY those, which is why the loader nodes are still
+    # in the graph while `LTXVScheduler` is not.
+    ext = seen["kwargs"]["external_results"]
+    assert set(ext) == {"sched"}
+    assert [round(float(s), 4) for s in ext["sched"][0]] == list(m.LTX8_DISTILLED_SIGMAS)
+    assert "sched" not in seen["graph"]
     assert "ckpt" in seen["graph"] and "clip" in seen["graph"]
 
 

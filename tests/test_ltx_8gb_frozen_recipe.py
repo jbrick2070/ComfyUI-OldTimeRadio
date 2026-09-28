@@ -94,13 +94,24 @@ def test_v1_is_preserved_unmutated_so_its_receipts_stay_interpretable():
     assert m.LTX8_RECIPE_V1["t5_device"] == "cpu"
     assert m.LTX8_RECIPE_V2["t5_device"] == "cpu"   # what v2 actually shipped
     assert m.LTX8_RECIPE_V2["tiled_vae"] is True
-    assert m.LTX8_RECIPE is m.LTX8_RECIPE_V3
-    assert len({id(m.LTX8_RECIPE_V1), id(m.LTX8_RECIPE_V2), id(m.LTX8_RECIPE_V3)}) == 3
+    assert m.LTX8_RECIPE is m.LTX8_RECIPE_V4
+    assert len({id(m.LTX8_RECIPE_V1), id(m.LTX8_RECIPE_V2), id(m.LTX8_RECIPE_V3),
+                id(m.LTX8_RECIPE_V4)}) == 4
     # Same key set, or they are not comparable as recipe versions; v3 differs
     # from v2 in the T5 placement only.
     assert set(m.LTX8_RECIPE_V1) == set(m.LTX8_RECIPE_V2) == set(m.LTX8_RECIPE_V3)
     assert {k for k in m.LTX8_RECIPE_V3
             if m.LTX8_RECIPE_V3[k] != m.LTX8_RECIPE_V2[k]} == {"t5_device"}
+    # v4 ADDS the two canonical knobs, and of what v3 had changes only the
+    # decode's temporal tile (16 -> 64, the 3 Hz softness pulse).
+    assert set(m.LTX8_RECIPE_V4) - set(m.LTX8_RECIPE_V3) == {"schedule",
+                                                             "img_compression"}
+    assert {k for k in m.LTX8_RECIPE_V3
+            if m.LTX8_RECIPE_V4[k] != m.LTX8_RECIPE_V3[k]} == {"vae_temporal"}
+    assert m.LTX8_RECIPE_V3["vae_temporal"] == 16
+    assert m.LTX8_RECIPE_V4["vae_temporal"] == 64
+    assert m.LTX8_RECIPE_V4["schedule"] == "distilled_0_9_8"
+    assert m.LTX8_RECIPE_V4["img_compression"] == 38
 
 
 def test_the_recipe_string_carries_its_own_version_and_rides_the_receipt(eng):
@@ -108,7 +119,7 @@ def test_the_recipe_string_carries_its_own_version_and_rides_the_receipt(eng):
     ``otr_credits_roll`` -> a published episode. A bare version constant that
     never reached that string would be an unowned ledger field in all but
     name -- and it is ``cfg.recipe``, so a bump moves the session identity."""
-    assert m.RECIPE_LTX8_I2V.endswith("_v3")
+    assert m.RECIPE_LTX8_I2V.endswith("_v4")
     assert "ltx098" in m.RECIPE_LTX8_I2V and "distilled" in m.RECIPE_LTX8_I2V
 
 
@@ -226,7 +237,8 @@ def test_both_legs_return_the_SAME_KEY_SET(eng, monkeypatch):
     # Against a LITERAL too, not just against each other: deleting one branch,
     # or dropping a key from BOTH, would satisfy the equality above alone.
     assert production == {"steps", "cfg", "max_shift", "base_shift",
-                          "terminal", "sampler", "max_frames"}
+                          "terminal", "sampler", "max_frames", "schedule",
+                          "img_compression"}
 
 
 def test_every_frozen_field_has_a_named_env_var_and_vice_versa():
@@ -630,7 +642,7 @@ def test_the_tile_geometry_is_reported_only_when_tiled_decode_RAN(
 _TILE_XCHECK = [
     ("vae_tile", "OTR_LTX_8GB_VAE_TILE", "tile_size", 1024),
     ("vae_overlap", "OTR_LTX_8GB_VAE_OVERLAP", "overlap", 96),
-    ("vae_temporal", "OTR_LTX_8GB_VAE_TEMPORAL", "temporal_size", 64),
+    ("vae_temporal", "OTR_LTX_8GB_VAE_TEMPORAL", "temporal_size", 16),   # v3 value; v4 froze 64
     ("vae_temporal_overlap", "OTR_LTX_8GB_VAE_TEMPORAL_OVERLAP",
      "temporal_overlap", 12),
 ]
@@ -753,3 +765,67 @@ def test_the_named_receipt_reaches_the_canonical_clip_dict(eng, monkeypatch):
         {"shot_id": "b001"})
     assert clip["recipe"] == receipt
     assert "t5_device=cpu" in clip["recipe"]
+
+
+# --- recipe v4: the canonical 0.9.8 schedule and preprocess (2026-09-28) ---- #
+def _plan(eng):
+    return eng._build_render_request(
+        {"asset_refs": {"init_image": "p"},
+         "timing": {"target_frame_count": 9}, "seed_bundle": {"request_seed": 1}})
+
+
+def test_v4_sends_the_distilled_schedule_and_preprocesses_the_still(eng):
+    """Production: the sampler gets Lightricks' distilled timesteps as its
+    SIGMAS (no LTXVScheduler), and the still passes through LTXVPreprocess(38)
+    before it pins frame 0 -- the canonical 0.9.8 distilled I2V graph."""
+    from nodes._otr_video_engines import wrapper_bridge as wb
+    knobs = eng._resolve_render_config()
+    supplied = eng._schedule_results(knobs)
+    assert [round(float(s), 4) for s in supplied["sched"][0]] \
+        == list(m.LTX8_DISTILLED_SIGMAS)
+    g = eng._build_graph({"text_prompt": "x"}, "p.png", _plan(eng), 9, 512, 288,
+                         external_results=supplied)
+    assert "sched" not in g
+    assert g["sample"]["inputs"]["sigmas"] == wb.Wire("sched", 0)
+    assert g["preprocess"]["inputs"]["img_compression"] == 38
+    assert g["img2vid"]["inputs"]["image"] == wb.Wire("preprocess", 0)
+
+
+def test_v3_is_reachable_for_an_AB_and_the_receipt_names_both_departures(
+        eng, monkeypatch):
+    """The A/B arm that reproduces v3 under the consent act: no preprocess, the
+    scheduler back in the graph, and a receipt that says so."""
+    from nodes._otr_video_engines import wrapper_bridge as wb
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_SCHEDULE", "ltxv_scheduler")
+    monkeypatch.setenv("OTR_LTX_8GB_IMG_COMPRESSION", "0")
+    knobs = eng._resolve_render_config()
+    assert eng._schedule_results(knobs) == {}
+    g = eng._build_graph({"text_prompt": "x"}, "p.png", _plan(eng), 9, 512, 288)
+    assert "preprocess" not in g
+    assert g["img2vid"]["inputs"]["image"] == wb.Wire("loadimage", 0)
+    assert g["sched"]["inputs"]["steps"] == 8
+    assert eng._recipe_receipt() == (
+        m.RECIPE_LTX8_I2V
+        + "+prequalification[img_compression=0,schedule=ltxv_scheduler]")
+
+
+def test_a_mistyped_schedule_stops_a_measurement_run(eng, monkeypatch):
+    monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_LTX_8GB_SCHEDULE", "distilled")
+    with pytest.raises(EngineUnusable) as exc:
+        eng._resolve_render_config()
+    assert exc.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
+    assert "OTR_LTX_8GB_SCHEDULE" in str(exc.value)
+
+
+def test_a_production_leg_ignores_a_stray_schedule_in_the_environment(
+        eng, monkeypatch):
+    """PBUG-20260723-02: a production episode goes to an already-booted server,
+    so its recipe may not depend on how that server started."""
+    monkeypatch.setenv("OTR_LTX_8GB_SCHEDULE", "ltxv_scheduler")   # no consent act
+    monkeypatch.setenv("OTR_LTX_8GB_IMG_COMPRESSION", "0")
+    knobs = eng._resolve_render_config()
+    assert knobs["schedule"] == "distilled_0_9_8"
+    assert knobs["img_compression"] == 38
+    assert eng._recipe_receipt() == m.RECIPE_LTX8_I2V
