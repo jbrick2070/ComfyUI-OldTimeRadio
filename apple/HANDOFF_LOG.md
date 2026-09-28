@@ -892,3 +892,54 @@ Two observations, neither a code change:
   {"delete": [id]}` both times. Not seen with a real mouse; check before
   calling it a bug.
 - The 4060's portable server is left resident, idle, on port 8190.
+
+## 2026-09-28 12:40 -- model randomizers with checklists, proven live; H3 on 8 GB
+
+**What shipped.** Three Yes/No switches, off in every workflow, local engines
+only, each noted "Suggested for 16 GB+" in the app view: Randomize video
+(`roll_video_lanes`) and Randomize stills (`roll_still_models`) on
+OTR_VideoDirector, Randomize audio (`roll_audio_engines`) on OTR_CastLock.
+Video and stills each have a checklist, Video lanes to roll and Still models to
+roll; none ticked draws from every local model that runs here. Every checklist
+(language, bank, style, video, still) now sits at the foot of the app form,
+after Space saver (operator idea, same day). Commits: 0088f5fd, 893f3bea,
+f2db297e, 38faa134, 933bc52f, 46a55415.
+
+How it works: the validator's gate draws the video lane, still model and music
+first, before the cloud checks, pack and boot refusals and downloads, and writes
+the drawn ids into the queued prompt. The voice is drawn in CastLock, where the
+episode language is known. CastLock saves every receipt to the durable ledger
+(video_lane_roll, still_model_roll, music_engine_roll, voice_engine_roll) and
+the credits name them under Rolled. Seeds replay through OTR_VIDEO_LANE_SEED,
+OTR_STILL_MODEL_SEED, OTR_VOICE_ENGINE_SEED and OTR_MUSIC_ENGINE_SEED in the
+environment ComfyUI starts with.
+
+**Live proof on the 5080 (both published to otr/obs):**
+
+| leg | draw | time | episode |
+|---|---|---|---|
+| switches on, seeds 9 and 5 | MiniMax H3 (from 24 local lanes), Z-Image-Turbo, MusicGen, Kokoro | 1:36:26 | signal_time_20260928_105643, 1:54 |
+| switches on, still_pan and sd15 ticked | still_pan, sd15, MusicGen, Kokoro | 4:10 | ass_noll_20260928_123415, 2:19 |
+
+The first leg found a real defect: CastLock's durable save copies a fixed key
+list, so the receipts reached the wire ledger but not the saved one the credits
+read (fixed in 893f3bea). The second leg's saved ledger carries all six roll
+receipts, and its credits read "Rolled: source bank, visual style, video lane,
+stills, voices, music".
+
+**Review roster.** Design r1: agy on Gemini 3.8 Flash (Codex is out of credits
+until 2026-10-03 16:04 PDT). Folded: voice language admission, preserve_ledger,
+clone reference clips. Post-push: Sonnet (0 defects on 0088f5fd; one stale-doc
+defect on 38faa134, and a full suite on 38faa134 of 17,245 passed, 0 failed) and
+Composer 2.5 on the Cursor lane (a derived replay's video receipt, test gaps,
+one stale plan line). All folded; judgments under kibitz-runs/2026-09-28-lane-*.
+
+**H3 on the 8 GB 4060 (7db8095b).** otr_8gb_still with minimax_h3_video, one
+act: three beats rendered, then beat 4 died out of memory loading the text
+encoder, 2:54:27 in, with CUDA reporting 0 bytes free while PyTorch held 213 MiB.
+No episode. The dropdown matrix keeps oom, now as a measured note; a follow-up
+task to find what holds the memory between beats was offered to the operator.
+
+**Registry.** 2.3.12 is Active. Main now also carries the clickable roll pools,
+the forgiving pool spelling and everything above; a 2.3.13 publish is the
+operator's call.
