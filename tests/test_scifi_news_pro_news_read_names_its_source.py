@@ -168,6 +168,89 @@ def test_cast_names_never_reach_the_model_only_the_validator():
     test would pass whether or not the validator was also broken."""
     import inspect
 
-    source = inspect.getsource(F2._pass_news_read)
+    source = " ".join(inspect.getsource(F2._pass_news_read).split())
     assert "FICTIONAL CAST NAMES" not in source
-    assert "post_validator=_make_news_read_validator(dossier, cast_names)" in source
+    assert ("post_validator=_make_news_read_validator( dossier, cast_names, "
+            "provenance=provenance, language_iso=language_iso)") in source
+
+
+# --------------------------------------------------------------------------- #
+# A close in another language names its source by the outlet or by digits
+# (PBUG-20260929-06; the closes below are the live ones, 2026-09-29).
+# --------------------------------------------------------------------------- #
+
+_SCIENCEDAILY = {"headline": "The ice blasting from Saturn's moon Enceladus",
+                 "source": "Latest Science News -- ScienceDaily",
+                 "date": "Tue, 29 Sep 2026 05:58:00 EDT",
+                 "link": "https://www.sciencedaily.com/releases/2026/09/260929053528.htm"}
+_BBC = {"headline": "Fossil found on Welsh beach ends 'confusion'", "source": "BBC News",
+        "date": "Mon, 28 Sep 2026 16:04:59 GMT",
+        "link": "https://www.bbc.co.uk/news/articles/ckz7zd7nxj73o?at_medium=RSS"}
+
+
+@pytest.mark.parametrize("iso, provenance, dossier, close", [
+    ("zh", _SCIENCEDAILY, dict(people=["Frank Postberg"], places=["Saturn", "Enceladus"]),
+     "根据 ScienceDaily 报道，研究人员发现土星卫星恩塞拉多斯的海洋水滴会自然分离并浓缩化学品。"),
+    ("ja", _BBC, dict(people=["Jonathan Bow"], places=["Wales"]),
+     "BBCニュースは、ウェールズで発見された2億年前の魚の顎の化石が混乱を解消したと報道しました。"),
+])
+def test_a_close_in_another_language_that_names_the_outlet_names_the_source(
+        iso, provenance, dossier, close):
+    check = F2._make_news_read_validator(
+        _dossier(**dossier), [], provenance=provenance, language_iso=iso)
+    assert check(_read(close)) is None
+
+
+def test_an_english_close_is_still_held_to_the_dossiers_own_names():
+    """The outlet counts only where the article's names were translated away."""
+    check = F2._make_news_read_validator(
+        _dossier(places=["Saturn", "Enceladus"]), [], provenance=_SCIENCEDAILY, language_iso="en")
+    finding = check(_read("According to ScienceDaily, researchers reported a discovery."))
+    assert finding is not None and "never names the real source" in finding
+
+
+def test_an_empty_dossier_is_still_pardoned_in_another_language():
+    """An outlet anchor must not turn the empty-dossier pardon into a demand."""
+    check = F2._make_news_read_validator(_dossier(), [], provenance=_BBC, language_iso="ja")
+    assert check(_read("研究は続いている。")) is None
+
+
+def test_a_number_phrases_digits_name_the_source_in_another_language():
+    check = F2._make_news_read_validator(
+        _dossier(places=["Wales"], numbers=["200 years", "1,200 samples"]), [],
+        provenance=_BBC, language_iso="ja")
+    assert check(_read("化石が200年にわたる混乱を解消した。")) is None
+    assert check(_read("1200個の試料が調べられた。")) is None
+
+
+def test_the_items_own_year_is_never_the_anchor():
+    """A close could say the year without naming anything from the item."""
+    check = F2._make_news_read_validator(
+        _dossier(places=["Enceladus"], numbers=["29 Sep 2026", "10"]), [],
+        provenance=_SCIENCEDAILY, language_iso="zh")
+    finding = check(_read("该研究于2026年发表。"))
+    assert finding is not None and "never names the real source" in finding
+
+
+@pytest.mark.parametrize("link, label", [
+    ("https://www.bbc.co.uk/news/articles/x", "bbc"),
+    ("https://news.mit.edu/2026/living-transistors-0817", "mit"),
+    ("https://www.sciencedaily.com/releases/2026/09/x.htm", "sciencedaily"),
+    ("https://blog.ml.cmu.edu/2026/x/", "cmu"),
+    ("https://www.nasa.gov/news-release/x", "nasa"),
+    ("", ""),
+    ("not a link", ""),
+])
+def test_the_outlet_is_the_label_in_front_of_the_public_suffix(link, label):
+    assert F2._outlet_label(link) == label
+
+
+def test_the_episode_language_reaches_the_close_check():
+    """The helper proves the rule; this proves the lane hands it the language."""
+    import inspect
+
+    source = " ".join(inspect.getsource(F2.run_scifi_news_pro_episode).split())
+    # The whole call: the same keyword also reaches the cameo roll above it.
+    assert ("read = _pass_news_read( fn, pack, dossier, provenance, source_preview, "
+            "cast_names, language_instruction=language_instruction, "
+            "language_iso=_EPLANG.iso_from_meta(meta), )") in source

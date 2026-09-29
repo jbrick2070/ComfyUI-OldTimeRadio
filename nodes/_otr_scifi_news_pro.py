@@ -31,6 +31,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Literal, Mapping, Sequence
+from urllib.parse import urlsplit
 
 from pydantic import (
     BaseModel,
@@ -651,8 +652,8 @@ def _word_re(term: str) -> "re.Pattern[str]":
 #: written with spaces: anything `\w` matches except Han (the extensions
 #: beyond the Basic Multilingual Plane included), kana (with its phonetic
 #: extensions and supplements), and the marks written among them (々 〆 〇).
-_SPACED_WORD_CHAR = (r"[^\W々-〇぀-ヿㇰ-ㇿ㐀-䶿"
-                     r"一-鿿豈-﫿ｦ-ﾟ\U0001b000-\U0001b16f"
+_SPACED_WORD_CHAR = (r"[^\W\u3005-\u3007\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf"
+                     r"\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\U0001b000-\U0001b16f"
                      r"\U00020000-\U0003ffff]")
 
 
@@ -2092,7 +2093,65 @@ def _news_read_source_anchors(dossier: DossierLLM) -> "tuple[str, ...]":
     return tuple(ordered)
 
 
-def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]"):
+#: Second-level public suffixes: in www.bbc.co.uk the outlet is "bbc", not
+#: "co". Enough for the item links the news feeds carry, and any other
+#: publisher that sits under one of these.
+_TWO_LEVEL_SUFFIXES = frozenset({
+    "co.uk", "ac.uk", "org.uk", "gov.uk", "com.au", "org.au", "edu.au",
+    "co.jp", "ac.jp", "or.jp", "co.nz", "co.in", "ac.in", "com.cn", "edu.cn",
+})
+
+
+def _outlet_label(link: str) -> str:
+    """The outlet's name as its item link spells it: the label in front of
+    the public suffix ("sciencedaily", "bbc", "mit"), or "" when there is
+    no host or the label is under three characters."""
+    host = (urlsplit(str(link or "")).hostname or "").lower()
+    labels = [label for label in host.split(".") if label]
+    if len(labels) < 2:
+        return ""
+    at = -3 if len(labels) >= 3 and ".".join(labels[-2:]) in _TWO_LEVEL_SUFFIXES else -2
+    label = labels[at]
+    return label if len(label) >= 3 else ""
+
+
+def _native_close_extra_anchors(dossier: DossierLLM,
+                                provenance: "Mapping[str, str] | None") -> "tuple[str, ...]":
+    """More ways a close written in another language names its source
+    (PBUG-20260929-06). Such a close translates the article's names --
+    Saturn becomes 土星, Wales ウェールズ -- and the dossier holds them in
+    English only. What survives the translation, measured on 2026-09-29's
+    Japanese and Mandarin closes:
+
+    * the OUTLET, which keeps its Latin spelling ("根据 ScienceDaily 报道",
+      "BBCニュースは"). The pass's own seam asks the close to name who
+      reported the find, "a researcher, institution, or publication", so a
+      close naming the publication did what it was asked. It is read from
+      the item link, never from the feed title, whose segments are generic
+      ("Latest Science News", "Machine learning");
+    * the DIGITS of a number phrase: "200 years" is written 200年. Only a
+      run of three or more digits counts (a lone 10 would match anything),
+      thousands separators folded ("1,200" is 1200), and never the year of
+      the item's own date, which a close could say without naming anything.
+    """
+    extra: "list[str]" = []
+    outlet = _outlet_label((provenance or {}).get("link", ""))
+    if outlet:
+        extra.append(outlet)
+    item_years = set(re.findall(r"(?<!\d)(?:19|20)\d\d(?!\d)",
+                                str((provenance or {}).get("date", ""))))
+    for raw in dossier.allowed_numbers:
+        token = re.sub(r"(?<=\d)[,\u00a0\u202f ](?=\d{3}(?!\d))", "",
+                       _folded_for_matching(str(raw or "")))
+        for run in re.findall(r"\d{3,}", token):
+            if run not in item_years:
+                extra.append(run)
+    return tuple(dict.fromkeys(extra))
+
+
+def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]", *,
+                              provenance: "Mapping[str, str] | None" = None,
+                              language_iso: str = "en"):
     """The source-attribution gate this pass shipped without.
 
     P6's codex twin has verified and cleaned its coda since it was built;
@@ -2155,7 +2214,19 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]"):
     # found more names there would refuse more real people. The cost, until
     # the dossier carries localized names: in Japanese and Chinese it misses
     # an invented name written flush against a particle ("Dex Mercerの").
-    anchor_patterns = [_anchor_re(_folded_for_matching(a)) for a in anchors]
+    #
+    # A close in another language may also name its source by the outlet or
+    # by a number phrase's digits (`_native_close_extra_anchors`). English
+    # closes are held to the dossier's own names and numbers, as before, and
+    # the extras never stand in for an empty dossier: that close is pardoned
+    # (below), and an outlet-only demand would turn the pardon into a refusal.
+    # They never widen the real-name exemption either.
+    extra = ()
+    if anchors and str(language_iso or "").strip().lower() not in ("", _EPLANG.ENGLISH_ISO):
+        extra = tuple(a for a in _native_close_extra_anchors(dossier, provenance)
+                      if a.casefold() not in {x.casefold() for x in anchors})
+    looked_for = anchors + extra
+    anchor_patterns = [_anchor_re(_folded_for_matching(a)) for a in looked_for]
 
     def _check(read: NewsCloseRead) -> "str | None":
         text = _norm_ws(read.news_close_read)
@@ -2174,7 +2245,7 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]"):
                 "is never told where the fact stopped and the fiction "
                 "started. Name at least one of them verbatim (looked for: %s; "
                 "the close read: \"%s\")" % (
-                    ", ".join(anchors[:6]) + (" ..." if len(anchors) > 6 else ""),
+                    ", ".join(looked_for[:6]) + (" ..." if len(looked_for) > 6 else ""),
                     text[:120] + ("..." if len(text) > 120 else ""))
             )
         spoken_fiction = [n for n in fiction if _word_re(n).search(text)]
@@ -2197,6 +2268,7 @@ def _pass_news_read(
     digest: str,
     cast_names: "list[str]",
     language_instruction: str = "",
+    language_iso: str = "en",
 ) -> NewsCloseRead:
     """Author one source-grounded factual close through a typed ladder."""
     # `cast_names` is NOT listed here (PBUG-20260824-01 Class B). The
@@ -2233,7 +2305,8 @@ def _pass_news_read(
             base_temperature=0.20,
             structural_retry_temperature=0.10,
             repair_prompt_factory=make_dispatching_repair_factory(),
-            post_validator=_make_news_read_validator(dossier, cast_names),
+            post_validator=_make_news_read_validator(
+                dossier, cast_names, provenance=provenance, language_iso=language_iso),
             max_new_tokens=None,
             helper_name="scifi_news_pro_news_read",
         )
@@ -5053,6 +5126,7 @@ def run_scifi_news_pro_episode(
         read = _pass_news_read(
             fn, pack, dossier, provenance, source_preview, cast_names,
             language_instruction=language_instruction,
+            language_iso=_EPLANG.iso_from_meta(meta),
         )
     receipt("news_read", technical_model, box["calls"], 0.20, None)
     treatment = treatment.model_copy(
