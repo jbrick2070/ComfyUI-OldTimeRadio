@@ -50,6 +50,9 @@ class VisualAssetValidatorTests(unittest.TestCase):
         def roll_lanes(prompt, unique_id):
             self.events.append(("rolls", prompt, unique_id))
 
+        def settle_language(prompt, unique_id):
+            self.events.append(("language", prompt, unique_id))
+
         def ensure_assets(prompt, unique_id):
             self.events.append(("assets", prompt, unique_id))
             if self.asset_error:
@@ -67,6 +70,8 @@ class VisualAssetValidatorTests(unittest.TestCase):
         # The model rolls (2026-09-28) run first in the same gate chain.
         lanes = ModuleType("_asset_validator_seam.nodes._otr_lane_rolls")
         lanes.roll_prompt_lanes = roll_lanes
+        # The episode language (2026-09-28) is settled right after them.
+        lanes.settle_prompt_language = settle_language
         shared = ModuleType("_asset_validator_seam.nodes._otr_shared")
         shared.__path__ = []
         preflight = ModuleType(
@@ -160,8 +165,9 @@ class VisualAssetValidatorTests(unittest.TestCase):
     def test_structural_checks_precede_assets_and_success(self):
         result = self.validate(profile_id="profile")
         self.assertEqual(self.events[:4], ["stamp", "load", "contract", "drift"])
-        # The rolls rewrite the prompt the asset gate then reads.
-        self.assertEqual(self.events[4:6], [("rolls", self.prompt, "63"),
+        # The rolls and the language rewrite the prompt the asset gate then reads.
+        self.assertEqual(self.events[4:7], [("rolls", self.prompt, "63"),
+                                            ("language", self.prompt, "63"),
                                             ("assets", self.prompt, "63")])
         self.assertIn("OTR_WorkflowValidator: OK", result[0])
 
@@ -180,6 +186,7 @@ class VisualAssetValidatorTests(unittest.TestCase):
     def test_structural_bypass_still_gates_assets(self):
         result = self.validate(False, profile_id="profile")
         self.assertEqual(self.events, ["stamp", ("rolls", self.prompt, "63"),
+                                       ("language", self.prompt, "63"),
                                        ("assets", self.prompt, "63")])
         self.assertIn("contract check skipped", result[0])
 

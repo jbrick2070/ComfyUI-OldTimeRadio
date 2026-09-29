@@ -67,6 +67,19 @@ def _require_language_engines(meta, char_engine, announcer_engine) -> str:
     return iso
 
 
+def cast_voice_engines(char_voice_engine="auto", announcer_voice_engine="auto"):
+    """``(char, announcer)``: the two engines ``lock()`` voices the cast with.
+
+    ``auto`` is Kokoro on both, and a saved announcer alias is normalized. The
+    queue-time language check (``_otr_lane_rolls.settle_prompt_language``) asks
+    this too, so it judges the engines this node will actually use.
+    """
+    char = str(char_voice_engine or "auto").strip() or "auto"
+    if char == "auto":
+        char = _DEFAULT_CHAR_ENGINE
+    return char, CastLock._resolve_announcer_engine(announcer_voice_engine)
+
+
 # Leftover ``lock(voice_bank=...)`` kwargs still exist for old callers.
 # The bank is not a CastLock widget; ``_bank_following_engine`` derives it
 # from each engine profile's ``allowed_voice_banks``.
@@ -605,11 +618,8 @@ class CastLock:
         # `voice_bank_for_engine("char_voice", "auto")` would climb rank_chain
         # and land on indextts2/default, which is the opposite of the shipped
         # Kokoro dropdown. 4a/4b inherit these stamps; they have no engine widget.
-        char_voice_engine = str(char_voice_engine or "auto").strip() or "auto"
-        if char_voice_engine == "auto":
-            char_voice_engine = _DEFAULT_CHAR_ENGINE
-        announcer_voice_engine = self._resolve_announcer_engine(
-            announcer_voice_engine)
+        char_voice_engine, announcer_voice_engine = cast_voice_engines(
+            char_voice_engine, announcer_voice_engine)
 
         language_iso = _require_language_engines(
             meta, char_voice_engine, announcer_voice_engine)

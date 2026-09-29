@@ -230,6 +230,13 @@ class KokoroEngine:
         return {"backend": "onnx", "onnx_model": stamp}
 
     # ------------------------------------------------------------------ #
+    def language_gap(self, config):
+        """Why this install cannot speak the language whose ``engines["kokoro"]``
+        block is ``config``, or None when it can. Asked at queue time by the
+        voice roll and the language check (``_otr_lane_rolls``)."""
+        return lang_code_gap((config or {}).get("lang_code"))
+
+    # ------------------------------------------------------------------ #
     def load(self):
         """Select and load the backend. Cache identity is (backend, lang, device).
 
@@ -382,10 +389,20 @@ def _onnx_lang_code_gap(lang_code) -> "str | None":
     lang = str(lang_code or "").strip() or "b"
     if lang in ("a", "b") or lang in _kb.ESPEAK_LANGUAGES:
         return None
-    return ("kokoro lang_code %r needs the torch kokoro package, which installs "
-            "only on Python 3.12 or earlier (its Japanese and Chinese phonemizers "
-            "have no Python 3.13 build); the ONNX kokoro voices English, Spanish, "
-            "French, Hindi, Italian and Portuguese" % lang)
+    return ("lang_code %r needs the torch kokoro package, which installs only on "
+            "Python 3.12 or earlier (its Japanese and Chinese phonemizers have no "
+            "Python 3.13 build); the ONNX kokoro voices English, Spanish, French, "
+            "Hindi, Italian and Portuguese" % lang)
+
+
+def lang_code_gap(lang_code) -> "str | None":
+    """Why this install cannot speak ``lang_code`` at all, or None when it can:
+    the ONNX backend covers it, or the torch package is installed. A spec probe
+    only, so a queue-time check imports nothing."""
+    gap = _onnx_lang_code_gap(lang_code)
+    if gap is None or _spec_present("kokoro"):
+        return None
+    return gap
 
 
 def _spec_present(name: str) -> bool:

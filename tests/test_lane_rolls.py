@@ -345,9 +345,9 @@ def test_one_voice_engine_voices_the_whole_cast():
 
 def test_a_non_english_episode_rolls_only_what_its_row_admits():
     from nodes import _otr_episode_languages as langs
-    admitted = set(langs.row_by_iso("es").engines or {})
-    eligible, left_out = L.voice_pool(NVIDIA, admitted)
-    assert set(eligible) <= admitted
+    spanish = langs.row_by_iso("es")
+    eligible, left_out = L.voice_pool(NVIDIA, spanish)
+    assert set(eligible) <= set(spanish.engines)
     assert "bark" in left_out and "language" in left_out["bark"]
 
 
@@ -492,3 +492,169 @@ def test_flux_refuses_by_name_when_its_checkpoint_is_not_installed(monkeypatch):
         engine.assert_usable({}, {})
     fake.get_filename_list = lambda _kind: ["flux1-dev-fp8.safetensors"]
     assert engine.assert_usable({}, {}) == "flux_gen1"
+
+
+# --- the episode language, settled at the gate (2026-09-28) -----------------
+# Three randomized Desktop runs wrote their scripts and died at the first
+# Spanish line. The ONNX Kokoro speaks Spanish now; what these pin is that a
+# language this run's voices still cannot speak (Japanese without the torch
+# Kokoro build, a voice engine the language does not admit, a missing
+# readiness extra) is caught before the writer: refused when picked by hand,
+# left out of the pool when rolled.
+
+def _langs():
+    from nodes import _otr_episode_languages as langs
+    return langs
+
+
+def _no_torch_kokoro(monkeypatch):
+    from nodes._otr_audio_engines import eng_kokoro
+    monkeypatch.setattr(eng_kokoro, "_spec_present", lambda name: False)
+
+
+def _extras_ready(monkeypatch):
+    monkeypatch.setattr(_langs(), "readiness_extra_ok", lambda token: True)
+
+
+def _language_prompt(language, pool="", audio=False, char="kokoro",
+                     announcer="kokoro", policy="auto_registry", replay=""):
+    prompt = _prompt(audio=audio, replay=replay)
+    prompt["1"]["inputs"].update(episode_language=language, language_roll_pool=pool)
+    prompt["80"]["inputs"].update(char_voice_engine=char, cast_voice_policy=policy,
+                                  announcer_voice_engine=announcer)
+    return prompt
+
+
+def test_kokoro_speaks_the_espeak_rows_everywhere_and_cjk_only_with_torch(monkeypatch):
+    from nodes._otr_audio_engines import eng_kokoro
+    langs = _langs()
+    _extras_ready(monkeypatch)
+    _no_torch_kokoro(monkeypatch)
+    for iso in ("es", "pt", "it", "fr", "hi"):
+        assert L.language_voice_gap(langs.row_by_iso(iso), ("kokoro", "kokoro")) is None
+    for iso, label in (("ja", "Japanese"), ("zh", "Mandarin")):
+        gap = L.language_voice_gap(langs.row_by_iso(iso), ("kokoro", "kokoro"))
+        assert gap.startswith("kokoro cannot speak %s here" % label), gap
+        assert "Python 3.12" in gap
+    monkeypatch.setattr(eng_kokoro, "_spec_present", lambda name: name == "kokoro")
+    assert L.language_voice_gap(langs.row_by_iso("ja"), ("kokoro", "kokoro")) is None
+
+
+def test_an_engine_the_language_does_not_admit_is_a_gap_and_english_never_is():
+    langs = _langs()
+    gap = L.language_voice_gap(langs.row_by_iso("es"), ("kokoro", "cloud_elevenlabs"))
+    assert gap.startswith("the cloud_elevenlabs voice does not speak Spanish"), gap
+    assert L.language_voice_gap(langs.row_by_iso("en"), ("bark", "cloud_elevenlabs")) is None
+    assert L.language_voice_gap(None, ("bark", "bark")) is None
+
+
+def test_a_missing_readiness_extra_is_a_gap(monkeypatch):
+    from nodes._otr_audio_engines import eng_kokoro
+    langs = _langs()
+    monkeypatch.setattr(eng_kokoro, "_spec_present", lambda name: True)
+    monkeypatch.setattr(langs, "readiness_extra_ok", lambda token: False)
+    gap = L.language_voice_gap(langs.row_by_iso("ja"), ("kokoro", "kokoro"))
+    assert "misaki[ja]" in gap
+
+
+def test_the_voice_pool_leaves_out_kokoro_where_it_cannot_speak(monkeypatch):
+    langs = _langs()
+    _no_torch_kokoro(monkeypatch)
+    eligible, left_out = L.voice_pool(NVIDIA, langs.row_by_iso("ja"))
+    assert "kokoro" not in eligible
+    assert left_out["kokoro"].startswith("cannot speak Japanese here"), left_out["kokoro"]
+    eligible, _left_out = L.voice_pool(NVIDIA, langs.row_by_iso("es"))
+    assert "kokoro" in eligible
+
+
+def test_a_hand_picked_language_the_voices_cannot_speak_stops_at_the_gate(monkeypatch):
+    _no_torch_kokoro(monkeypatch)
+    _extras_ready(monkeypatch)
+    with pytest.raises(_langs().EpisodeLanguageError) as exc:
+        L.settle_prompt_language(_language_prompt("Japanese"), "63")
+    text = str(exc.value)
+    assert text.startswith("OTR_LedgerScriptWriter #1: pick another Language"), text
+    assert "Python 3.12" in text
+    spanish = _language_prompt("Spanish")
+    before = copy.deepcopy(spanish)
+    assert L.settle_prompt_language(spanish, "63") == {}
+    assert spanish == before
+
+
+def test_the_roll_leaves_out_what_the_voices_cannot_speak(monkeypatch, caplog):
+    import logging
+    from nodes import _otr_rolls as R
+    _no_torch_kokoro(monkeypatch)
+    _extras_ready(monkeypatch)
+    prompt = _language_prompt(R.LANGUAGE_SENTINEL)
+    with caplog.at_level(logging.INFO):
+        got = L.settle_prompt_language(prompt, "63")
+    assert sorted(got["1"]) == ["Japanese", "Mandarin"]
+    everyone = [c for c in _langs().dropdown_choices() if c != _langs().OFF_LABEL]
+    pool = prompt["1"]["inputs"]["language_roll_pool"]
+    assert pool.split(", ") == [c for c in everyone if c not in ("Japanese", "Mandarin")]
+    assert "left out Japanese (kokoro cannot speak Japanese here" in caplog.text
+    # The writer's own roll draws from what the gate left.
+    label, receipt = R.resolve_language_selection(
+        R.LANGUAGE_SENTINEL, pool=pool, env={R.LANGUAGE_SEED_ENV: "3"})
+    assert label in pool.split(", ")
+    assert sorted(receipt.eligible_order) == sorted(pool.split(", "))
+
+
+def test_a_roll_with_nothing_voiceable_left_stops_at_the_gate(monkeypatch):
+    from nodes import _otr_rolls as R
+    _no_torch_kokoro(monkeypatch)
+    _extras_ready(monkeypatch)
+    prompt = _language_prompt(R.LANGUAGE_SENTINEL, pool="Japanese, Mandarin")
+    with pytest.raises(_langs().EpisodeLanguageError, match="tick English"):
+        L.settle_prompt_language(prompt, "63")
+
+
+def test_a_rolled_voice_is_judged_by_the_voice_pool(monkeypatch):
+    _extras_ready(monkeypatch)
+    asked = []
+
+    def pool(host, language):
+        asked.append(language.iso)
+        return (), {"kokoro": "cannot speak %s here: measured" % language.label,
+                    "bark": "is not admitted for this episode's language"}
+
+    monkeypatch.setattr(L, "voice_pool", pool)
+    with pytest.raises(_langs().EpisodeLanguageError) as exc:
+        L.settle_prompt_language(_language_prompt("Hindi", audio=True), "63")
+    assert "the voice roll has no local engine that speaks Hindi" in str(exc.value)
+    assert "bark" not in str(exc.value)          # only the engines Hindi admits
+    assert asked == ["hi"]
+    asked.clear()                                 # preserve_ledger keeps the widgets
+    assert L.settle_prompt_language(
+        _language_prompt("Hindi", audio=True, policy="preserve_ledger"), "63") == {}
+    assert asked == []
+
+
+def test_english_off_a_replay_and_no_castlock_leave_the_prompt_alone(monkeypatch):
+    _no_torch_kokoro(monkeypatch)
+    for prompt in (_language_prompt("English"), _language_prompt("Off"),
+                   _language_prompt(""), _language_prompt("Japanese", replay="bundle")):
+        before = copy.deepcopy(prompt)
+        assert L.settle_prompt_language(prompt, "63") == {}
+        assert prompt == before
+    prompt = _language_prompt("Japanese")
+    for node_id in ("80", "82", "83"):
+        del prompt[node_id]
+    assert L.settle_prompt_language(prompt, "63") == {}
+
+
+def test_the_gate_settles_the_language_after_the_rolls_and_before_any_spend():
+    from nodes import _otr_workflow_validator as V
+    src = inspect.getsource(V._queue_time_readiness_gates)
+    body = src[src.index('"""', src.index('"""') + 3):]
+    assert body.index("roll_prompt_lanes(prompt, unique_id)") \
+        < body.index("settle_prompt_language(prompt, unique_id)") \
+        < body.index("ensure_prompt_cloud_slugs(prompt, unique_id)")
+
+
+def test_cast_lock_resolves_its_engines_the_way_the_gate_does():
+    from nodes import cast_lock
+    assert "cast_voice_engines(" in inspect.getsource(cast_lock.CastLock.lock)
+    assert cast_lock.cast_voice_engines() == ("kokoro", "kokoro")
+    assert cast_lock.cast_voice_engines("bark", "elevenlabs") == ("bark", "cloud_elevenlabs")

@@ -85,12 +85,17 @@ def _queue_time_readiness_gates(prompt, unique_id, comfy_api_key=None):
     ``comfy_api_key`` is this queue's own key -- the one OTR_ComfyCredential
     bound for this prompt, the only Comfy credential since the 2026-09-19
     rip -- so the balance check measures the wallet the run will actually
-    spend from."""
-    from ._otr_lane_rolls import roll_prompt_lanes
+    spend from.
+
+    The episode language is settled next (2026-09-28): a language this run's
+    voices cannot speak refuses before anything is spent, and a rolled one
+    loses those from its pool."""
+    from ._otr_lane_rolls import roll_prompt_lanes, settle_prompt_language
     from ._otr_shared.cloud_slug_preflight import ensure_prompt_cloud_slugs
     from ._otr_shared.cloud_balance_preflight import ensure_prompt_cloud_balance
     from ._otr_visual_assets import ensure_prompt_visual_assets
     roll_prompt_lanes(prompt, unique_id)
+    settle_prompt_language(prompt, unique_id)
     ensure_prompt_cloud_slugs(prompt, unique_id)
     ensure_prompt_cloud_balance(prompt, unique_id, comfy_api_key=comfy_api_key)
     ensure_prompt_visual_assets(prompt, unique_id)
