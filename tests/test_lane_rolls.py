@@ -658,3 +658,57 @@ def test_cast_lock_resolves_its_engines_the_way_the_gate_does():
     assert "cast_voice_engines(" in inspect.getsource(cast_lock.CastLock.lock)
     assert cast_lock.cast_voice_engines() == ("kokoro", "kokoro")
     assert cast_lock.cast_voice_engines("bark", "elevenlabs") == ("bark", "cloud_elevenlabs")
+
+
+# --- Sonnet QA of 2326632b: the advice must be advice that works -------------
+
+def test_the_readiness_extras_are_kokoros_alone(monkeypatch):
+    # misaki's Japanese and Chinese phonemizers are Kokoro's; Google TTS speaks
+    # the text's language itself. Demanding misaki for Google refused Japanese
+    # on Python 3.13, where misaki cannot install and Google could speak it.
+    from nodes._otr_audio_engines import eng_kokoro
+    langs = _langs()
+    monkeypatch.setattr(langs, "readiness_extra_ok", lambda token: False)
+    monkeypatch.setattr(eng_kokoro, "_spec_present", lambda name: True)
+    japanese = langs.row_by_iso("ja")
+    assert L.language_voice_gap(japanese, ("google_tts", "google_tts")) is None
+    assert "misaki[ja]" in L.language_voice_gap(japanese, ("kokoro", "google_tts"))
+
+
+def test_a_refused_pick_names_the_voice_that_would_speak_it(monkeypatch):
+    _no_torch_kokoro(monkeypatch)
+    monkeypatch.setattr(_langs(), "readiness_extra_ok", lambda token: False)
+    with pytest.raises(_langs().EpisodeLanguageError) as exc:
+        L.settle_prompt_language(_language_prompt("Japanese"), "63")
+    text = str(exc.value)
+    assert text.startswith("OTR_LedgerScriptWriter #1: pick another Language, or set "
+                           "'Characters - voices' and 'Announcer - voice' to google_tts"), text
+    assert "Google API key" in text and "Python 3.12" in text
+    google = _language_prompt("Japanese", char="google_tts", announcer="google_tts")
+    assert L.settle_prompt_language(google, "63") == {}      # and that advice works
+
+
+def test_with_the_audio_roll_on_the_advice_is_to_turn_it_off(monkeypatch):
+    _extras_ready(monkeypatch)
+    monkeypatch.setattr(L, "voice_pool", lambda host, language: (
+        (), {"kokoro": "cannot speak %s here: measured" % language.label}))
+    with pytest.raises(_langs().EpisodeLanguageError) as exc:
+        L.settle_prompt_language(_language_prompt("Japanese", audio=True), "63")
+    assert "turn 'Randomize audio (non-cloud)' off" in str(exc.value)
+
+
+def test_one_language_left_is_logged_as_the_episodes_language(monkeypatch, caplog):
+    import logging
+    from nodes import _otr_rolls as R
+    _no_torch_kokoro(monkeypatch)
+    _extras_ready(monkeypatch)
+    prompt = _language_prompt(R.LANGUAGE_SENTINEL, pool="English, Japanese")
+    with caplog.at_level(logging.INFO):
+        L.settle_prompt_language(prompt, "63")
+    assert prompt["1"]["inputs"]["language_roll_pool"] == "English"
+    assert "only English is left, so that is the episode's language" in caplog.text
+
+
+def test_the_english_row_never_narrows_the_voice_pool():
+    english = _langs().row_by_iso("en")
+    assert L.voice_pool(NVIDIA, english) == L.voice_pool(NVIDIA, None)

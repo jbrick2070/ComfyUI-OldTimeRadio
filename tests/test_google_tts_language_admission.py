@@ -80,3 +80,14 @@ def test_an_unlisted_engine_is_still_refused_off_english(monkeypatch):
     monkeypatch.setattr(eplang, "readiness_extra_ok", lambda extra: True)
     with pytest.raises(ValueError, match="not admitted"):
         cast_lock._require_language_engines({"episode_language": "fr"}, "bark", "kokoro")
+
+
+def test_castlock_asks_for_kokoros_phonemizers_only_when_kokoro_speaks(monkeypatch):
+    """misaki[ja] / misaki[zh] are Kokoro's; a Google-voiced Japanese episode
+    needs neither (and on Python 3.13 misaki cannot install at all)."""
+    monkeypatch.setattr(eplang, "readiness_extra_ok", lambda extra: False)
+    meta = {"episode_language": "ja"}
+    assert cast_lock._require_language_engines(meta, "google_tts", "google_tts") == "ja"
+    for engines in (("kokoro", "google_tts"), ("google_tts", "kokoro"), ("auto", "google_tts")):
+        with pytest.raises(eplang.EpisodeLanguageError, match="misaki"):
+            cast_lock._require_language_engines(meta, *engines)

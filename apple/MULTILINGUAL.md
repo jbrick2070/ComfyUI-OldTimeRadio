@@ -18,8 +18,13 @@ languages for you at run time -- never `Off`. **Languages to roll**
 (`language_roll_pool`), a checklist at the bottom of the app view after Space
 saver, narrows the roll: tick the languages. Through the API a typed list works
 too (`French, Spanish`). None ticked means every language, one means that
-language, two or more means just those. The pick is
-recorded at `meta.language_roll` and `OTR_LANGUAGE_SEED` replays it. The roll
+language, two or more means just those -- always less any the run's voices
+cannot speak here (on Python 3.13 that is Japanese and Mandarin with Kokoro),
+which the validator leaves out when you press Run and logs with the reason.
+The pick is recorded at `meta.language_roll` (when only one language is left
+it is simply that language, as with one ticked) and `OTR_LANGUAGE_SEED`
+replays it on the same machine: a seed draws from the languages this box can
+voice, so a 3.13 box and a 3.12 box can land a seed differently. The roll
 resolves after the story bank and never lands on a language whose row lists
 that bank under `source_bank_exclusions` (none do today). A replay under the
 roll keeps the frozen episode's language, exactly as `Off` does.

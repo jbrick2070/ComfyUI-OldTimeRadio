@@ -438,11 +438,17 @@ def voice_pool(host=None, language=None) -> "tuple[tuple[str, ...], dict]":
     """
     try:
         from .cast_lock import CastLock
+        from ._otr_episode_languages import ENGLISH_ISO
     except ImportError:  # pragma: no cover -- flat test imports
         from cast_lock import CastLock  # type: ignore
+        from _otr_episode_languages import ENGLISH_ISO  # type: ignore
     optional = CastLock.INPUT_TYPES()["optional"]
     characters = [c for c in optional["char_voice_engine"][0] if c != "auto"]
     announcer = set(optional["announcer_voice_engine"][0])
+    if getattr(language, "iso", None) == ENGLISH_ISO:
+        # English does not depend on its row: every engine voices it, so the
+        # English row's short engine list must never narrow this pool.
+        language = None
 
     def language_reason(name, _engine):
         if language is None:
@@ -810,7 +816,8 @@ def language_voice_gap(row, engines=None, *, host=None) -> "str | None":
     (``cast_lock.cast_voice_engines``), or None when CastLock rolls the voice.
     These are the refusals CastLock and the engine would make after the
     writer: an engine the row does not admit, an engine that cannot speak it
-    here, and a readiness extra that does not import. English is never a gap.
+    here, and -- when Kokoro voices part of the cast -- a readiness extra that
+    does not import. English is never a gap.
     """
     try:
         from . import _otr_episode_languages as langs
@@ -825,6 +832,7 @@ def language_voice_gap(row, engines=None, *, host=None) -> "str | None":
             own = {k: v for k, v in left_out.items() if k in admitted} or left_out
             return "the voice roll has no local engine that speaks %s here (%s)" % (
                 row.label, _left_out_words(own))
+        voiced_by = set(eligible)
     else:
         for name in dict.fromkeys(engines):
             if name not in admitted:
@@ -833,10 +841,12 @@ def language_voice_gap(row, engines=None, *, host=None) -> "str | None":
             why = _engine_language_gap(name, row)
             if why:
                 return "%s cannot speak %s here: %s" % (name, row.label, why)
-    try:
-        langs.assert_readiness_extras(row)
-    except langs.EpisodeLanguageError as exc:
-        return str(exc)
+        voiced_by = set(engines)
+    if "kokoro" in voiced_by:        # the extras are Kokoro's phonemizers
+        try:
+            langs.assert_readiness_extras(row)
+        except langs.EpisodeLanguageError as exc:
+            return str(exc)
     return None
 
 
@@ -869,17 +879,42 @@ def _run_voice_gap(row, voices, host):
     return None
 
 
+#: The form's own names for the rows a refusal points at (config/app_mode.json).
+_LANGUAGE_ROW = "Language"
+_POOL_ROW = "Languages to roll"
+_VOICE_ROWS = "'Characters - voices' and 'Announcer - voice'"
+_AUDIO_ROLL_ROW = "Randomize audio (non-cloud)"
+
+
+def _language_advice(row, voices, host) -> str:
+    """What besides another language would let this run speak ``row``: turning
+    the audio roll off when it is on, or the engines that can speak it here."""
+    if any(engines is None for engines in voices):
+        return ("or turn '%s' off and set %s by hand (the roll draws only local "
+                "engines)" % (_AUDIO_ROLL_ROW, _VOICE_ROWS))
+    able = [name for name in sorted(row.engines or {})
+            if language_voice_gap(row, (name, name), host=host) is None]
+    if not able:
+        return "no voice engine can speak it on this machine"
+    words = " or ".join(able)
+    if any(name.startswith("google") for name in able):
+        words += " (a cloud voice: it needs your Google API key)"
+    return "or set %s to %s" % (_VOICE_ROWS, words)
+
+
 def settle_prompt_language(prompt, unique_id, *, host=None) -> dict:
     """Keep each writer's episode language to one this run's voices can speak.
 
     A language picked by hand that they cannot speak refuses now, before the
-    writer runs. A rolled language loses those from its pool, each logged with
-    its reason, and refuses only when nothing is left; the narrowed pool is
-    written into the queued prompt, as the model rolls write theirs, and the
-    writer's roll then draws from it (the ledger's ``language_roll`` names
-    exactly those). Returns ``{writer_id: {label: reason}}`` for what was left
-    out. A replay, English or Off, a wired language input, and a graph with no
-    CastLock downstream of this validator are left alone.
+    writer runs, and says what would work. A rolled language loses those from
+    its pool, each logged with its reason, and refuses only when nothing is
+    left. The narrowed pool is written into the queued prompt, as the model
+    rolls write theirs, and the writer's roll draws from it: with two or more
+    left, the ledger's ``language_roll`` names exactly those; with one left the
+    writer takes it as a pick, as it takes a one-item pool, and the log line
+    here is the record. Returns ``{writer_id: {label: reason}}`` for what was
+    left out. A replay, English or Off, a wired language input, and a graph
+    with no CastLock downstream of this validator are left alone.
     """
     if unique_id is None or not str(unique_id).strip() or not isinstance(prompt, dict):
         return {}
@@ -911,9 +946,9 @@ def settle_prompt_language(prompt, unique_id, *, host=None) -> dict:
             gap = _run_voice_gap(row, voices, host)
             if gap:
                 raise langs.EpisodeLanguageError(
-                    "%s: pick another Language, or set OTR_CastLock's voice "
-                    "engines to one that speaks %s. This run cannot voice it: %s."
-                    % (where, row.label, gap))
+                    "%s: pick another %s, %s. This run cannot voice %s: %s."
+                    % (where, _LANGUAGE_ROW, _language_advice(row, voices, host),
+                       row.label, gap))
             continue
         pool_value = inputs.get("language_roll_pool", "")
         if isinstance(pool_value, (list, tuple)) and len(pool_value) == 2 \
@@ -939,11 +974,13 @@ def settle_prompt_language(prompt, unique_id, *, host=None) -> dict:
         if not remaining:
             raise langs.EpisodeLanguageError(
                 "%s: tick English or another language this run's voices speak "
-                "in Languages to roll. None of the ones it would roll can be "
-                "voiced: %s." % (where, words))
+                "in %s. None of the ones it would roll can be voiced: %s."
+                % (where, _POOL_ROW, words))
         _set(inputs, "language_roll_pool", ", ".join(remaining), where)
-        log.info("[OTR.rolls] episode_language roll: left out %s; rolling among %s",
-                 words, ", ".join(remaining))
+        log.info("[OTR.rolls] episode_language roll: left out %s; %s", words,
+                 ("only %s is left, so that is the episode's language" % remaining[0])
+                 if len(remaining) == 1
+                 else "rolling among " + ", ".join(remaining))
         left[writer_id] = gaps
     return left
 

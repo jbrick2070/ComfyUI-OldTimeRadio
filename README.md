@@ -33,8 +33,9 @@ ComfyUI Desktop and the Windows portable build ship Python 3.13, where Kokoro
 runs as `kokoro-onnx`: it speaks English, Spanish, Portuguese, Italian, French
 and Hindi there, with the same phonemes the torch build uses. Japanese and
 Mandarin need the torch Kokoro build, which installs on Python 3.10 through
-3.12; on 3.13 those two stop at the first spoken line with a named error
-rather than speaking in English.
+3.12. On 3.13 a language roll leaves those two out, and picking one stops the
+run when you press Run, saying what would work (Google TTS speaks both, with
+your own Google API key).
 
 Change nothing else in the workflow. You need an NVIDIA card with 8 GB or more, a 16 GB
 Apple Silicon Mac, or just a CPU (start ComfyUI with `--cpu`; slow but it works),

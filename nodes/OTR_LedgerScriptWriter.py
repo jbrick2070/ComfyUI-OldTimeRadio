@@ -3035,7 +3035,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "Read only when Language is 'roll (any "
                             "language)'. Tick the languages to roll among (or "
                             "type them, separated by commas); none rolls among "
-                            "every language, one is simply that language. "
+                            "every language, one is simply that language. A "
+                            "language this run's voices cannot speak on this "
+                            "machine is left out when you press Run. "
                             "Choose from: " + ", ".join(
                                 c for c in _EPLANG.dropdown_choices()
                                 if c != _EPLANG.OFF_LABEL)

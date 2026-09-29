@@ -47,15 +47,21 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 def _require_language_engines(meta, char_engine, announcer_engine) -> str:
     """Non-English rows admit only the engines listed on the row. English
-    is unchanged -- bark / indextts / the rest still run."""
+    is unchanged -- bark / indextts / the rest still run.
+
+    The row's readiness extras are Kokoro's own phonemizers (misaki's Japanese
+    and Chinese), so they are required only when Kokoro voices part of the
+    cast (``auto`` is Kokoro). Google TTS speaks the text's language itself,
+    and demanding misaki for it refused Japanese on Python 3.13, where misaki
+    cannot install and Google was the one voice that could speak it."""
     from . import _otr_episode_languages as _EPLANG
     iso = _EPLANG.iso_from_meta(meta if isinstance(meta, dict) else {})
     if iso == _EPLANG.ENGLISH_ISO:
         return iso
     row = _EPLANG.row_from_meta(meta)
     admitted = set(row.engines or {})
-    for engine in (char_engine, announcer_engine):
-        eng = str(engine or "").strip()
+    engines = [str(engine or "").strip() for engine in (char_engine, announcer_engine)]
+    for eng in engines:
         if not eng or eng == "auto":
             continue
         if eng not in admitted:
@@ -63,7 +69,8 @@ def _require_language_engines(meta, char_engine, announcer_engine) -> str:
                 "OTR_CastLock: engine %r is not admitted on a %s episode "
                 "(row engines: %s). Kokoro is the dance leader day 1."
                 % (eng, row.label, sorted(admitted)))
-    _EPLANG.assert_readiness_extras(row)
+    if {"kokoro", "auto"}.intersection(engines):
+        _EPLANG.assert_readiness_extras(row)
     return iso
 
 
