@@ -531,6 +531,24 @@ def test_bark_draws_voices_for_rows_a_content_owned_lane_left_empty(bank):
     assert [row["voice_preset"] for row in again] == presets, "a re-lock draws the same voices"
 
 
+def test_the_draw_never_reuses_a_preset_already_on_the_announcer():
+    from nodes.cast_lock import CastLock
+
+    for seed in range(40):
+        cast = _lane_left_unvoiced_cast()
+        cast[0]["voice_preset"] = "v2/en_speaker_6"     # a lane-voiced announcer
+        CastLock._draw_bark_characters(cast, {"episode_seed": seed}, [])
+        assert "v2/en_speaker_6" not in [row["voice_preset"] for row in cast[1:]], seed
+
+
+def test_a_seedless_ledger_says_its_draw_is_shared():
+    from nodes.cast_lock import CastLock
+
+    report: list = []
+    CastLock._draw_bark_characters(_lane_left_unvoiced_cast(), {}, report)
+    assert any("no episode_seed" in line for line in report)
+
+
 def test_a_lane_that_voiced_every_row_draws_nothing():
     from nodes.cast_lock import CastLock
 

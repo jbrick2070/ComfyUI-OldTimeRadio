@@ -967,10 +967,18 @@ class CastLock:
         def voiced(row) -> bool:
             return str(row.get("voice_preset") or "").startswith("v2/")
 
-        characters = [r for r in cast
-                      if isinstance(r, dict) and not _is_announcer_entry(r)]
-        taken = {str(r.get("voice_preset")) for r in characters if voiced(r)}
-        episode_seed = coerce_int_seed((meta or {}).get("episode_seed"))
+        rows = [r for r in cast if isinstance(r, dict)]
+        characters = [r for r in rows if not _is_announcer_entry(r)]
+        # Every Bark preset already on the cast is spoken for, the ANNOUNCER's
+        # included: a lane that pre-voiced its announcer with a v2/* preset
+        # must not see a character drawn the same voice (Composer QA of
+        # 0c1bf1f6).
+        taken = {str(r.get("voice_preset")) for r in rows if voiced(r)}
+        raw_seed = (meta or {}).get("episode_seed")
+        if raw_seed in (None, ""):
+            report.append("bark voices: no episode_seed -- the character draw "
+                          "is the same for every seedless ledger")
+        episode_seed = coerce_int_seed(raw_seed)
         drawn = []
         for row in characters:
             if voiced(row):
