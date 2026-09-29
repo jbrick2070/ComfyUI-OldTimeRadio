@@ -16027,3 +16027,26 @@ not promote it to the Bug Bible on this evidence alone.
 - live verify: pending -- the My Story legs on the rebooted server
   (a709287c) must show unpadded names in their ledgers.
 - Bible: none yet.
+
+## PBUG-20260929-03 and -04 live verify -- on test stories, server on bd5d4e59
+- Written for the proof at the operator's word ("start by creating your own
+  story and filling in the blanks rather than re-testing my story"):
+  tmp/lang_gauntlet_20260929/story_switchboard.json, a 13-character blizzard
+  story credited to "Claude", with ten characters requested (the widget's
+  ceiling). A first run at the canonical's request of two cast only two, fit
+  Bark and published as final_line_20260929_102811 (My Story on Bark).
+- -03, Bark pinned by hand (10:43 PDT): OTR_CastLock refused before any draw
+  -- "Bark has 10 voices, and this cast needs 11: one of its own for each
+  character and the announcer, and no two Bark rows may share one. Voice
+  this story with another engine -- Kokoro, Chatterbox and Dia reuse voices
+  when they run out -- or give it fewer speaking parts."
+- -03, voices rolled (10:43-10:59): "roll_audio_engines: chatterbox, drawn
+  from 3 local voice engines ...; left out: bark has 10 voices, and this
+  cast needs 11: one of its own for each character and the announcer;
+  indextts2 voices characters only". Ten characters voiced, RESULT SUCCESS,
+  published as single_thread_20260929_105350__scif__vgrn__none__chat__myst__
+  cg412__mgen_final.mp4.
+- -04: the refused run's ledger (pending_20260929_103616) holds all ten
+  names unpadded. That run's model did not pad, so it shows the fix in
+  place rather than a padding caught live; tests/test_my_story_runner.py
+  pins the normalization itself.
