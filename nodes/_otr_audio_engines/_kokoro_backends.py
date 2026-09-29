@@ -436,9 +436,10 @@ OWN_G2P_IMPORT = {"z": "._misaki.zh", "j": "._misaki.cutlet"}
 def own_g2p_error(lang_code) -> "str | None":
     """Why the pack's copy of misaki for ``lang_code`` does not work here, or
     None when it does: it imports, and the phonemizer builds -- for Japanese that
-    opens MeCab on its dictionary (about a second), so a dictionary that will
-    not open refuses at the gate rather than at the voice node. An import alone
-    is the half that passes."""
+    opens MeCab on its dictionary (38 ms measured on the 5080, most of it the
+    first import; a dictionary that will not open fails in about 1 ms), so a
+    dictionary that will not open refuses at the gate rather than at the voice
+    node. An import alone is the half that passes."""
     import importlib
     import warnings
 
