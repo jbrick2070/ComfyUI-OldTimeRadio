@@ -71,6 +71,17 @@ def test_an_accented_source_surname_may_be_named():
     assert verdict is None, verdict
 
 
+def test_a_source_name_with_a_separate_combining_accent_is_still_the_source():
+    """The same name in two Unicode spellings -- "é" as one character, or
+    "e" plus a combining accent -- is one name (agy QA of 8fb0f769)."""
+    import unicodedata
+
+    dossier = _dossier(people=[unicodedata.normalize("NFD", "José García")])
+    check = _make_news_read_validator(dossier, ["García"])
+    verdict = check(_read("José García publicó el estudio en Madrid."))
+    assert verdict is None, verdict
+
+
 def test_matching_is_case_insensitive():
     dossier = _dossier(people=["Pat Pataranutaporn"], places=["MIT"])
     check = _make_news_read_validator(dossier, ["PATARANUTAPORN"])

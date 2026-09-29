@@ -649,10 +649,11 @@ def _word_re(term: str) -> "re.Pattern[str]":
 
 #: A letter, digit or underscore that would continue a word in a script
 #: written with spaces: anything `\w` matches except Han (the extensions
-#: beyond the Basic Multilingual Plane included), kana, and the marks
-#: written among them (々 〆 〇).
-_SPACED_WORD_CHAR = (r"[^\W々-〇぀-ヿ㐀-䶿一-鿿"
-                     r"豈-﫿ｦ-ﾟ\U00020000-\U0003ffff]")
+#: beyond the Basic Multilingual Plane included), kana (with its phonetic
+#: extensions and supplements), and the marks written among them (々 〆 〇).
+_SPACED_WORD_CHAR = (r"[^\W々-〇぀-ヿㇰ-ㇿ㐀-䶿"
+                     r"一-鿿豈-﫿ｦ-ﾟ\U0001b000-\U0001b16f"
+                     r"\U00020000-\U0003ffff]")
 
 
 def _anchor_re(term: str) -> "re.Pattern[str]":
@@ -2130,10 +2131,11 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]"):
     # The words are split on anything that is not a letter or digit of ANY
     # script (and on underscores, as before): split on ASCII alone, "José
     # García" exempted "jos" and "garc", and a Spanish close naming García
-    # was refused as invention.
+    # was refused as invention. Both sides are NFKC first, so a name written
+    # with a separate combining accent still equals its composed spelling.
     _source_attested = set()
     for _a in anchors:
-        _a = str(_a or "").strip()
+        _a = unicodedata.normalize("NFKC", str(_a or "").strip())
         if not _a:
             continue
         _source_attested.add(_a.casefold())
@@ -2142,14 +2144,17 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]"):
                 _source_attested.add(_w.casefold())
     fiction = tuple(
         name for name in (str(n or "").strip() for n in cast_names)
-        if len(name) >= 3 and name.casefold() not in _source_attested
+        if len(name) >= 3
+        and unicodedata.normalize("NFKC", name).casefold() not in _source_attested
     )
     # The source check reads the close in whatever language the episode is
     # in; see `_anchor_re` and `_folded_for_matching`. The invented-name
     # check below keeps `_word_re` on purpose: in a Japanese or Chinese
     # episode a real person the cast borrowed is written in the episode's
     # own script, which nothing here can yet vouch for, so a boundary that
-    # found more names there would refuse more real people.
+    # found more names there would refuse more real people. The cost, until
+    # the dossier carries localized names: in Japanese and Chinese it misses
+    # an invented name written flush against a particle ("Dex Mercerの").
     anchor_patterns = [_anchor_re(_folded_for_matching(a)) for a in anchors]
 
     def _check(read: NewsCloseRead) -> "str | None":
