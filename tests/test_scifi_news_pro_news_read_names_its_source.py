@@ -238,6 +238,11 @@ def test_the_items_own_year_is_never_the_anchor():
     ("https://www.sciencedaily.com/releases/2026/09/x.htm", "sciencedaily"),
     ("https://blog.ml.cmu.edu/2026/x/", "cmu"),
     ("https://www.nasa.gov/news-release/x", "nasa"),
+    ("https://news.example.org/x", "example"),
+    ("https://foo.news.edu/x", ""),
+    ("https://www.news.org/x", ""),
+    ("http://192.168.100.200/x", ""),
+    ("https://www.example:8443/x", ""),
     ("", ""),
     ("not a link", ""),
 ])

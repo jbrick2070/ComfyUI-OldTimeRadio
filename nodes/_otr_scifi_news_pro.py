@@ -2102,17 +2102,29 @@ _TWO_LEVEL_SUFFIXES = frozenset({
 })
 
 
+#: Host labels that name no outlet. A link whose label is one of these gets
+#: no outlet anchor at all, rather than a common word ("news") to match.
+_GENERIC_HOST_LABELS = frozenset({
+    "www", "news", "blog", "blogs", "feed", "feeds", "rss", "home", "media",
+    "press", "online", "info", "web", "site", "portal", "science", "research",
+    "today", "daily", "latest",
+})
+
+
 def _outlet_label(link: str) -> str:
     """The outlet's name as its item link spells it: the label in front of
     the public suffix ("sciencedaily", "bbc", "mit"), or "" when there is
-    no host or the label is under three characters."""
+    no host, or the label is under three characters, all digits (an IP
+    address) or a generic word."""
     host = (urlsplit(str(link or "")).hostname or "").lower()
     labels = [label for label in host.split(".") if label]
     if len(labels) < 2:
         return ""
     at = -3 if len(labels) >= 3 and ".".join(labels[-2:]) in _TWO_LEVEL_SUFFIXES else -2
     label = labels[at]
-    return label if len(label) >= 3 else ""
+    if len(label) < 3 or label.isdigit() or label in _GENERIC_HOST_LABELS:
+        return ""
+    return label
 
 
 def _native_close_extra_anchors(dossier: DossierLLM,
