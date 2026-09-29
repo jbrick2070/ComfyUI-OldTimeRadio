@@ -190,3 +190,66 @@ def test_the_japanese_copy_pins_unidic_lite():
     unidic_lite = pytest.importorskip("unidic_lite")
     tagger = _copy_cutlet().tagger
     assert unidic_lite.DICDIR in tagger.dictionary_info[0]["filename"]
+
+
+
+# --------------------------------------------------------------------------- #
+# Randomized parity against misaki itself, where misaki is installed
+# --------------------------------------------------------------------------- #
+#: Kana, katakana, kanji, digits of both widths, half-width katakana with its
+#: voicing marks, both widths of punctuation, the curly quotes, newlines.
+JA_POOL = '\u3042\u3044\u3046\u3048\u304a\u304b\u304d\u304f\u3051\u3053\u3055\u3057\u3059\u305b\u305d\u3063\u3083\u3085\u3087\u3093\u30fc\u30a2\u30a4\u30a6\u30a8\u30aa\u30ab\u30ad\u30af\u30b1\u30b3\u30c3\u30e3\u30e5\u30e7\u30f3\u30f4\u65e5\u672c\u8a9e\u96fb\u6ce2\u653e\u9001\u591c\u4eba\u7269\u5e74\u6708\u5186\u5206\u6642\u56de\u500b0123456789\uff10\uff11\uff12ABCabc\uff21\uff42\uff8a\uff9d\uff76\uff78\uff9e\uff9f\u3001\u3002\uff01\uff1f\u300c\u300d\u2018\u2019\u201c\u201d\u3000 .,!?%\uff05\uff5e\u301c\u2026\n'
+#: Common hanzi, digits, Latin, both widths of punctuation, brackets, newlines.
+ZH_POOL = '\u6211\u4f60\u4ed6\u7684\u662f\u5728\u6709\u4e0d\u4e86\u4eba\u8fd9\u4e2d\u5927\u6765\u4e0a\u56fd\u4e2a\u5230\u8bf4\u4eec\u4e3a\u5b50\u548c\u4f60\u5730\u51fa\u9053\u4e5f\u65f6\u5e74\u7535\u53f0\u4fe1\u53f7\u6863\u6848\u8239\u957f0123456789ABCabc%\u3001\u3002\uff0c\uff01\uff1f\uff1a\uff1b\u300a\u300b\u300c\u300d\uff08\uff09\u201c\u201d .,!?\n'
+
+
+def _outcome(fn, text):
+    """The phonemes, or the failure: misaki itself raises on a few nonsense
+    kana sequences, and the copy must raise the same way there."""
+    try:
+        return fn(text)
+    except Exception as exc:  # noqa: BLE001
+        return (type(exc).__name__, str(exc))
+
+
+def _random_lines(pool, seed, count=300):
+    import random
+    rng = random.Random(seed)
+    return ["".join(rng.choice(pool) for _ in range(rng.randint(1, 60))) for _ in range(count)]
+
+
+def test_the_japanese_copy_matches_misaki_on_random_text():
+    pytest.importorskip("pyopenjtalk")
+    ja = pytest.importorskip("misaki.ja")
+    ours, theirs = _copy_cutlet(), ja.JAG2P()
+    for text in _random_lines(JA_POOL, 28):
+        assert _outcome(ours, text) == _outcome(theirs, text), ascii(text)
+
+
+def test_the_mandarin_copy_matches_misaki_on_random_text():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        zh = pytest.importorskip("misaki.zh")
+    ours, theirs = _copy_g2p(), zh.ZHG2P()
+    for text in _random_lines(ZH_POOL, 29):
+        assert _outcome(ours, text) == _outcome(theirs, text), ascii(text)
+
+
+def test_readiness_builds_the_phonemizer_not_just_the_import(monkeypatch):
+    """An import alone passes a box whose MeCab dictionary will not open; the
+    readiness check builds the phonemizer, so that box refuses at the gate."""
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+    built = []
+
+    def _builds():
+        built.append(True)
+
+    def _cannot_open():
+        raise RuntimeError("Failed initializing MeCab")
+
+    monkeypatch.setitem(kb.OWN_G2P_IMPORT, "j", "._misaki")     # an import that works
+    monkeypatch.setitem(kb.OWN_G2P, "j", _builds)
+    assert kb.own_g2p_ready("j") is True and built == [True]
+    monkeypatch.setitem(kb.OWN_G2P, "j", _cannot_open)
+    assert kb.own_g2p_ready("j") is False
+    assert kb.own_g2p_ready("k") is False

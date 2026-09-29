@@ -406,21 +406,24 @@ OWN_G2P_IMPORT = {"z": "._misaki.zh", "j": "._misaki.cutlet"}
 
 
 def own_g2p_ready(lang_code) -> bool:
-    """True when the pack's copy of misaki for ``lang_code`` imports here: its
-    libraries are installed and their own imports work (the transitive
-    contract, as ``readiness_extra_ok`` asks of misaki itself)."""
+    """True when the pack's copy of misaki for ``lang_code`` works here: it
+    imports, and the phonemizer builds -- for Japanese that opens MeCab on its
+    dictionary (about a second), so a dictionary that will not open refuses now
+    rather than at the voice node. An import alone is the half that passes."""
     import importlib
     import warnings
 
-    module = OWN_G2P_IMPORT.get(str(lang_code or "").strip())
-    if module is None:
+    code = str(lang_code or "").strip()
+    module = OWN_G2P_IMPORT.get(code)
+    if module is None or code not in OWN_G2P:
         return False
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             importlib.import_module(module, __package__)
+            OWN_G2P[code]()
         return True
-    except Exception:  # noqa: BLE001 -- any import failure is "not ready"
+    except Exception:  # noqa: BLE001 -- any failure to build is "not ready"
         return False
 
 
