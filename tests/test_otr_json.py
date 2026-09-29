@@ -247,3 +247,27 @@ def test_a_cut_off_reply_names_where_it_stops():
     text = str(exc.value)
     assert "no decodable top-level" in text and "<<HERE>>" in text
     assert text.index("<<HERE>>") > text.index('"Hi"')
+
+
+def test_the_error_is_about_the_fence_the_extractor_gave_up_on():
+    """A first json fence holding only prose is skipped, as the extractor skips
+    it; the defect named is the one in the fence that held the object
+    (Composer QA of 7ff91d95)."""
+    raw = ("```json\nHere is the act.\n```\n"
+           '```json\n{"n": 1, "lines": [{"speaker": "A", "text": "He said "hi" twice"}]}\n```')
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object(raw)
+    assert 'He said "<<HERE>>hi" twice' in str(exc.value)
+
+
+def test_the_error_follows_a_hop_past_an_empty_preamble_object():
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object('Here is {} {"n": 1, "lines": [')
+    text = str(exc.value)
+    assert "Expecting value" in text and text.index("<<HERE>>") > text.index('"lines": [')
+
+
+def test_a_stray_comma_is_named_as_written():
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object("{,}")
+    assert "Expecting property name enclosed in double quotes near: {<<HERE>>,}" in str(exc.value)

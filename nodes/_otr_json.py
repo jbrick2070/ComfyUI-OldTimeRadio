@@ -139,17 +139,19 @@ def _repair_llm_json(blob: str) -> str:
     return _strip_trailing_commas(_escape_raw_controls_in_strings(blob))
 
 
-def _try_object(decoder: json.JSONDecoder, blob: str):
+def _try_object(decoder: json.JSONDecoder, blob: str, errors=None, is_repair=False):
     try:
         obj, end = decoder.raw_decode(blob)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        if errors is not None:
+            errors.setdefault(is_repair, exc)
         return None
     if not isinstance(obj, dict):
         return None
     return obj, end
 
 
-def _decode_first_object(blob: str) -> str:
+def _decode_first_object(blob: str, failures: "list | None" = None) -> str:
     """First complete nonempty top-level object starting at the first ``{``.
 
     Tries the slice as written, then one LLM-JSON repair of that same
@@ -161,6 +163,10 @@ def _decode_first_object(blob: str) -> str:
     is not a hop. A repair that turns ``{,}`` into ``{}`` with nothing
     after is fail-closed so it stays a JSON syntax miss, not a schema
     miss that skips the structural retry.
+
+    ``failures``, when given, gets the decoder's error for an object this
+    walk gave up on: the one left after the repair, else the one in the
+    slice as written.
     """
     decoder = json.JSONDecoder()
     first_brace = blob.find("{")
@@ -168,6 +174,13 @@ def _decode_first_object(blob: str) -> str:
         return ""
     original = blob[first_brace:]
     repaired = _repair_llm_json(original)
+    errors: dict = {}
+
+    def give_up() -> str:
+        if failures is not None and errors:
+            failures.append(errors.get(True) or errors[False])
+        return ""
+
     seen: set[str] = set()
     for candidate, is_repair in ((original, False), (repaired, True)):
         if candidate in seen:
@@ -177,7 +190,7 @@ def _decode_first_object(blob: str) -> str:
         hops = 0
         while remaining and hops < 4:
             hops += 1
-            got = _try_object(decoder, remaining)
+            got = _try_object(decoder, remaining, errors, is_repair)
             if got is None:
                 break
             obj, end = got
@@ -191,9 +204,9 @@ def _decode_first_object(blob: str) -> str:
                 remaining = rest
                 continue
             if is_repair:
-                return ""
+                return give_up()
             return remaining[:end]
-    return ""
+    return give_up()
 
 
 def extract_first_json_block(raw: str) -> str:
@@ -216,6 +229,12 @@ def extract_first_json_block(raw: str) -> str:
     past the fence. Unescaped quotes inside a string still fail closed --
     inventing the string boundary is not this helper's job.
     """
+    return _extract(raw)
+
+
+def _extract(raw: str, failures: "list | None" = None) -> str:
+    """``extract_first_json_block``, recording into ``failures`` the decoder's
+    error for each object it gave up on, in the order it tried them."""
     if not raw:
         return ""
     text = raw.strip()
@@ -229,12 +248,12 @@ def extract_first_json_block(raw: str) -> str:
     saw_fence = False
     for match in (*labeled, *other):
         saw_fence = True
-        block = _decode_first_object(match.group(1).strip())
+        block = _decode_first_object(match.group(1).strip(), failures)
         if block:
             return block
     if saw_fence:
         return ""
-    return _decode_first_object(text)
+    return _decode_first_object(text, failures)
 
 
 def normalize_json_keys(value):
@@ -278,44 +297,26 @@ def parse_first_json_object(raw: str) -> dict:
     top-level object, so existing ``except json.JSONDecodeError``
     handlers at the call sites still fire unchanged.
     """
-    block = extract_first_json_block(raw)
+    failures: list = []
+    block = _extract(raw, failures)
     if not block:
-        failure = _decode_failure(raw)
-        if failure is None:
+        if not failures:
             raise json.JSONDecodeError(
                 "no decodable top-level JSON object found", raw or "", 0,
             )
-        # Name the defect and show where it is. "line 1 column 1 (char 0)" sent
-        # a log reader nowhere, and it was the whole error a repair turn was
-        # given, so a model asked to fix its reply could not find what to fix
-        # and returned it unchanged (the 2026-09-28 overnight My Story act:
-        # two repairs, the same reply, the episode lost).
+        # Name the defect and show where it is, in the first object the
+        # extractor gave up on. "line 1 column 1 (char 0)" sent a log reader
+        # nowhere, and it was the whole error a repair turn was given, so a
+        # model asked to fix its reply could not find what to fix and returned
+        # it unchanged (the 2026-09-28 overnight My Story act: two repairs, the
+        # same reply, the episode lost).
+        failure = failures[0]
         raise json.JSONDecodeError(
             "no decodable top-level JSON object found; in the object, %s near: %s"
             % (failure.msg, _near(failure.doc, failure.pos)),
             failure.doc, failure.pos,
         )
     return normalize_json_keys(json.loads(block))
-
-
-def _decode_failure(raw: str) -> "json.JSONDecodeError | None":
-    """The strict decoder's own error on the object ``extract_first_json_block``
-    tried first -- the first ```json fence (else the first fence, else the
-    whole reply) from its first ``{``, after the same LLM-JSON repair -- or
-    None when there is no such error to report (no ``{`` at all, or a value
-    that decodes but was not taken). Called only on the failure path, so the
-    extractor itself stays a never-raising lookup."""
-    text = (raw or "").strip()
-    fences = list(_JSON_FENCE_LABELED_RE.finditer(text)) or list(_JSON_FENCE_RE.finditer(text))
-    body = fences[0].group(1).strip() if fences else text
-    first_brace = body.find("{")
-    if first_brace < 0:
-        return None
-    try:
-        json.JSONDecoder().raw_decode(_repair_llm_json(body[first_brace:]))
-    except json.JSONDecodeError as exc:
-        return exc
-    return None
 
 
 def _near(doc: str, pos: int, span: int = 60) -> str:
