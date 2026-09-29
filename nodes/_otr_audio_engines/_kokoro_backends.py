@@ -475,7 +475,9 @@ OWN_G2P_IMPORT = {"z": "._misaki.zh", "j": "._misaki.cutlet"}
 #: fugashi's Tagger leaks about 0.7 MB per construction (Sonnet QA of
 #: c7136448), so a success is remembered for the process rather than rebuilt.
 #: Keyed to the builder object, so a swapped builder is built again; a failure
-#: is never remembered, so a fixed install is seen on the next queue.
+#: is never remembered, so a fixed install is seen on the next queue. The
+#: trade: an install that breaks while ComfyUI is running still reads as ready
+#: here, and the ONNX backend's load refuses it loudly instead.
 _OWN_G2P_BUILT: dict = {}
 
 

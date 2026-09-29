@@ -561,6 +561,8 @@ _MISAKI_G2P_BUILDERS = {
 #: misaki extra -> the imported module whose phonemizer built here once, for
 #: the same reason as ``_kokoro_backends._OWN_G2P_BUILT`` (the Tagger leak on
 #: every queued prompt). Keyed to the module object; a failure is never kept.
+#: The trade: an install that breaks while ComfyUI is running still reads as
+#: ready here, and the voice node refuses it loudly instead.
 _MISAKI_BUILT: dict = {}
 
 
@@ -654,6 +656,10 @@ def assert_readiness_extras(row: LanguageRow) -> None:
                     % (row.label, row.label, kb.own_g2p_error(code), hint))
             sub = extra[7:-1] if extra.startswith("misaki[") else ""
             failure = _misaki_g2p_failure(sub) if sub else None
+            if sub and failure is None:
+                # The second look built it (a flaky first build): the extra is
+                # ready, so there is nothing to refuse (Composer QA of 4d4503dd).
+                continue
             if failure is not None and failure[0] == "build":
                 # misaki imports and its phonemizer will not start: a plain
                 # install changes nothing. The empty-MeCab-dictionary trap gets
