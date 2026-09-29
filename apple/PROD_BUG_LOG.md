@@ -15855,3 +15855,28 @@ not promote it to the Bug Bible on this evidence alone.
 - open: why the full-rewrite repair returns unbalanced JSON on a long act is
   not diagnosed -- the log keeps 80 characters of each failed attempt.
 - Bible: none yet.
+
+## PBUG-20260928-07 follow-up -- the repairs were complete; the error they were given was synthetic
+- correction: the "open" line above guessed the two rewrites held unbalanced
+  JSON. The server log says otherwise: both ended at EOS (1,065 tokens,
+  `ended_with_eos=True`) with the closing brace and fence in the heartbeat
+  tail. They were whole replies with a defect somewhere inside, most likely a
+  stray double quote in a line of dialogue (the extractor escapes raw newlines
+  and drops trailing commas, and deliberately does not guess a string's end).
+- root cause of the repeat: parse_first_json_object discarded the decoder's
+  error and raised "no decodable top-level JSON object found: line 1 column 1
+  (char 0)" -- a synthetic position, and the entire "validation problem" the
+  full-artifact repair turn was given. The model could not find what to fix and
+  returned the same reply twice. Overnight leg 05's first act call failed the
+  same way and recovered only on the structural retry.
+- fix: 7ff91d95, with ba6dd10e (Composer QA) -- the extractor records the
+  decoder's own error on the object it gave up on, and the raised message names
+  it with 60 characters either side of the spot marked <<HERE>> (for example
+  `Stomp shouted "<<HERE>>Three!" and jumped.`). The log line and the repair
+  turn both carry it. A reply with no brace keeps the old message; the
+  extractor's results are unchanged.
+- live verify: the overnight server was restarted on ba6dd10e at 23:26 PDT; the
+  next undecodable reply shows the real defect in the ladder WARNING. Leg 05
+  (my_story, published 23:24) ran on the 21:47 boot, so it does not verify the
+  speaker-slip fix above either; that also waits on the next my_story leg.
+- Bible: none yet.
