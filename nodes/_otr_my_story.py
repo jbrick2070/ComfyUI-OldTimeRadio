@@ -141,6 +141,12 @@ class NamedCast(BaseModel):
     speaking: bool = True
     required: bool = True
 
+    @field_validator("name", mode="before")
+    @classmethod
+    def _norm_name(cls, value):
+        """One spelling per name; see ``CastMember._norm_name``."""
+        return _norm_ws(value)
+
     @field_validator("stated_gender", mode="before")
     @classmethod
     def _norm_gender(cls, value):
@@ -211,6 +217,18 @@ class CastMember(BaseModel):
     timbre: str = ""
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _norm_name(cls, value):
+        """One spelling per name, at the one place it enters. On 2026-09-29
+        the treatment pass wrote ten of thirteen names padded (" Giraffe",
+        " Meerkats"). The speaker match already compared names through
+        ``_norm_ws``, so every line found its character, but the cast rows
+        copied the padded name into the ledger, the credits and the act
+        prompt. A name that is only whitespace becomes empty and fails
+        ``min_length``, so the treatment is repaired, never cast nameless."""
+        return _norm_ws(value)
 
     @field_validator("gender", mode="before")
     @classmethod

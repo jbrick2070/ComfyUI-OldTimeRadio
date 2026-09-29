@@ -571,6 +571,26 @@ def test_writer_does_not_need_the_bark_pool_to_lock_a_cast(monkeypatch):
     assert all(r.get("tts_model") in ("", None) for r in spoken)
 
 
+def test_a_padded_name_is_cast_under_its_one_spelling():
+    """2026-09-29: the treatment pass wrote ten of thirteen names padded
+    (" Giraffe", " Meerkats") and the cast rows carried the padding into the
+    ledger and the credits. A name is normalized where it enters; a name that
+    is only whitespace is refused, so the treatment is repaired, never cast
+    nameless."""
+    import random
+
+    from pydantic import ValidationError
+
+    raw = _treatment(cast=("Ada", "Tom"))
+    raw["cast"][0]["name"] = "  Ada "
+    raw["cast"][1]["name"] = " Tom\tSawyer"
+    rows = MS._assign_voices(MS.StoryTreatment(**raw), random.Random(1))
+    assert [r["name"] for r in rows[1:]] == ["Ada", "Tom Sawyer"]
+    assert MS.NamedCast(name="  Ada ").name == "Ada"
+    with pytest.raises(ValidationError):
+        MS.CastMember(name="   ")
+
+
 def test_exclusive_named_cast_can_exceed_the_requested_character_count():
     slots = Slots(interpretation=_interpretation(planned=2, exclusive=True))
     led, _ = _run(slots, num_characters=1)
