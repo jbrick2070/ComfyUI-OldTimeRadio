@@ -604,7 +604,8 @@ def assert_readiness_extras(row: LanguageRow) -> None:
                 raise EpisodeLanguageError(
                     "language %s: Kokoro's %s phonemizer is installed but does not "
                     "start on this box (%s). Reinstall its libraries with this "
-                    "ComfyUI Python: python -m %s --force-reinstall"
+                    "ComfyUI Python: python -m %s --force-reinstall -- or, if that "
+                    "error names a file inside this pack, reinstall the pack."
                     % (row.label, row.label, kb.own_g2p_error(code), hint))
             raise EpisodeLanguageError(
                 "language %s needs readiness extra %s on this box "

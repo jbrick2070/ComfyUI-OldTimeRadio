@@ -61,6 +61,7 @@ import hashlib
 import logging
 import os
 import re
+import unicodedata
 
 log = logging.getLogger("OTR")
 
@@ -393,18 +394,52 @@ class MandarinPhonemizer:
         return phonemes
 
 
-#: misaki's Japanese number reader stops at nine digits: a longer run (a phone
-#: number, a serial, the digits after a decimal point) raises inside misaki on
-#: both backends and takes the line and the episode with it. Such a run is read
-#: digit by digit instead, as Japanese reads phone numbers and decimals. Every
-#: shorter number reads exactly as misaki reads it.
-_JA_LONG_DIGIT_RUN = re.compile(r"\d{10,}")
+#: Ten or more ASCII digits in a row, once NFKC has run.
+_JA_LONG_DIGIT_RUN = re.compile(r"[0-9]{10,}")
+
+
+def _nfkc_has_digit(ch: str) -> bool:
+    return any("0" <= c <= "9" for c in unicodedata.normalize("NFKC", ch))
 
 
 def japanese_long_numbers_spelled(text: str) -> str:
-    """``text`` with every run of ten or more digits spaced out digit by digit,
-    which misaki's Japanese reader speaks instead of raising on."""
-    return _JA_LONG_DIGIT_RUN.sub(lambda run: " ".join(run.group(0)), text)
+    """``text`` as misaki's Japanese reader can speak it, on both backends.
+
+    misaki's number reader stops at nine digits and raises past them (a phone
+    number, a serial, the digits after a decimal point), and it has no entry
+    for a decimal digit NFKC leaves foreign (Arabic-Indic, Devanagari): either
+    took the line and the episode with it. So such a digit is written as its
+    ASCII digit, and a run of characters that comes to ten or more digits once
+    misaki's own NFKC has run -- counting full-width, circled and superscript
+    digits -- is spaced out, which misaki reads digit by digit, as Japanese
+    reads phone numbers and decimals. Everything else is left as written,
+    because misaki applies some rules before its NFKC; a run of nine digits or
+    fewer reads exactly as misaki reads it.
+    """
+    chars = []
+    for ch in text:
+        value = unicodedata.decimal(ch, None)
+        if value is not None and not unicodedata.normalize("NFKC", ch).isascii():
+            ch = str(value)
+        chars.append(ch)
+    out: list = []
+    run: list = []
+
+    def flush() -> None:
+        if run:
+            joined = "".join(run)
+            long_run = _JA_LONG_DIGIT_RUN.search(unicodedata.normalize("NFKC", joined))
+            out.append(" ".join(run) if long_run else joined)
+            run.clear()
+
+    for ch in chars:
+        if _nfkc_has_digit(ch):
+            run.append(ch)
+        else:
+            flush()
+            out.append(ch)
+    flush()
+    return "".join(out)
 
 
 class JapanesePhonemizer:
@@ -454,8 +489,24 @@ def own_g2p_error(lang_code) -> "str | None":
             OWN_G2P[code]()
         return None
     except Exception as exc:  # noqa: BLE001 -- any failure to build is "not ready"
-        first_line = (str(exc).strip().splitlines() or [""])[0][:200]
-        return "%s: %s" % (type(exc).__name__, first_line) if first_line else type(exc).__name__
+        return _failure_reason(exc)
+
+
+def _failure_reason(exc: BaseException) -> str:
+    """One line saying why: the exception's type, its first line, and its last
+    line when there are more -- fugashi's MeCab error opens with "Failed
+    initializing MeCab" and names the missing file on its last line. Never
+    raises, whatever the exception's message does."""
+    name = type(exc).__name__
+    try:
+        text = str(exc)
+    except Exception:  # noqa: BLE001 -- a message that cannot render is still a failure
+        return name
+    lines = [line.strip() for line in text.splitlines() if any(ch.isalnum() for ch in line)]
+    if not lines:
+        return name
+    detail = lines[0] if len(lines) == 1 else "%s ... %s" % (lines[0], lines[-1])
+    return "%s: %s" % (name, detail[:400])
 
 
 def own_g2p_ready(lang_code) -> bool:
@@ -524,6 +575,43 @@ def _mecab_dictionary_error(error: Exception, lang_code: str) -> Exception:
         "Original error: %s" % error)
 
 
+def _pause_only(text: str) -> bool:
+    """True when ``text`` has something written but no letter or digit in it:
+    pause marks ("...", Japanese middle dots, a dash) or a symbol (a star). The
+    voice gate passes these as spoken lines, and English Kokoro voices "..." as
+    a pause, so a phonemizer that finds no sound in one is right."""
+    stripped = str(text or "").strip()
+    return bool(stripped) and not any(ch.isalnum() for ch in stripped)
+
+
+def _nothing_voiced(text: str, lang_code: str, backend: str):
+    """What a backend gives a line it found no sound in.
+
+    Pause marks only: a quarter second of silence, logged, and the episode
+    goes on. A line with a letter or digit in it: loud, because its words were
+    lost -- another language's script, letters the phonemizer does not read --
+    and a silent clip would hide that (the no-fallback rule, operator
+    2026-07-03, `_otr_voice_node_common`). A blank line is loud as it always
+    was; it should never reach a voice.
+    """
+    import numpy as np
+
+    line = str(text or "").strip()
+    if _pause_only(line):
+        log.warning(
+            "[%s] lang_code %r: %r has no sound to voice (pause marks or symbols "
+            "only); voiced as a %.2f s pause", backend, lang_code, line[:80],
+            UNSPEAKABLE_LINE_S)
+        return np.zeros(int(SAMPLE_RATE * UNSPEAKABLE_LINE_S), dtype=np.float32)
+    if not line:
+        raise RuntimeError("%s produced no audio" % backend)
+    raise RuntimeError(
+        "%s produced no audio: lang_code %r found no sound in %r -- its letters "
+        "are not ones this language's phonemizer reads (another language's "
+        "script?). It is not voiced as silence; the line needs fixing."
+        % (backend, lang_code, line[:120]))
+
+
 class TorchKokoroBackend:
     """The pre-2026-09-02 synthesis path, moved verbatim.
 
@@ -588,13 +676,10 @@ class TorchKokoroBackend:
                 arr = np.asarray(audio_data, dtype=np.float32)
             segments.append(arr.astype(np.float32).squeeze())
         if not segments:
-            if text.strip():
-                # The pipeline skips a line that phonemizes to nothing (a
-                # Japanese line of only middle dots, a musical note, a star):
-                # that is a line with nothing to say, not the end of the
-                # episode. A blank line is still loud -- it should never get here.
-                return np.zeros(int(SAMPLE_RATE * UNSPEAKABLE_LINE_S), dtype=np.float32)
-            raise RuntimeError("kokoro pipeline produced no audio")
+            # The pipeline skips every chunk that phonemizes to nothing and
+            # raises on nothing else (kokoro 0.9.4 pipeline.py), so no segment
+            # at all means no chunk had a sound in it.
+            return _nothing_voiced(text, self.lang_code, "kokoro pipeline")
         return np.concatenate(segments) if len(segments) > 1 else segments[0]
 
     def close(self) -> None:
@@ -709,7 +794,7 @@ class OnnxKokoroBackend:
                 "voice %r is not in the ONNX voice table %s (its .pt file was missing "
                 "or unreadable when the table was built)" % (voice_id, self.voices_npz))
         segments = []
-        unspeakable = False
+        unknown_only = []
         for chunk in _LINE_SPLIT.split(text or ""):
             chunk = chunk.strip()
             if not chunk:
@@ -720,17 +805,14 @@ class OnnxKokoroBackend:
             else:
                 phonemes = self._g2p(chunk)
                 if not phonemes:
-                    # Nothing to say (a Japanese line of only middle dots, a
-                    # musical note): the torch pipeline skips these too.
-                    unspeakable = True
-                    continue
+                    continue            # the torch pipeline skips these too
                 known = getattr(getattr(self._kokoro, "tokenizer", None), "known", None)
                 if callable(known) and not known(phonemes):
                     # Nothing the model has a symbol for (a lone inverted
                     # question mark, a bracket, an emoji): kokoro-onnx refuses
                     # such a chunk outright, where the torch pipeline speaks a
-                    # quarter second of nothing. Say nothing for it here too.
-                    unspeakable = True
+                    # quarter second of nothing.
+                    unknown_only.append(phonemes)
                     continue
                 samples, rate = self._kokoro.create(
                     phonemes, voice=voice_id, speed=speed, is_phonemes=True,
@@ -740,12 +822,16 @@ class OnnxKokoroBackend:
                     "kokoro-onnx returned %r Hz, expected %d" % (rate, SAMPLE_RATE))
             segments.append(np.asarray(samples, dtype=np.float32).squeeze())
         if not segments:
-            if unspeakable:
-                # A whole line with nothing to say -- symbols the model has no
-                # sound for, or no phonemes at all: a quarter second of
-                # silence, as on the torch pipeline, and the episode goes on.
+            if unknown_only:
+                # The torch pipeline voices these phonemes as its own quarter
+                # second of nothing, so the line is not the end of the episode
+                # here either -- but the log says what was not voiced.
+                log.warning(
+                    "[kokoro-onnx] lang_code %r: %r has no phoneme the model knows "
+                    "(%r); voiced as a %.2f s pause", self.lang_code,
+                    str(text).strip()[:80], " ".join(unknown_only)[:80], UNSPEAKABLE_LINE_S)
                 return np.zeros(int(SAMPLE_RATE * UNSPEAKABLE_LINE_S), dtype=np.float32)
-            raise RuntimeError("kokoro-onnx produced no audio")
+            return _nothing_voiced(text, self.lang_code, "kokoro-onnx")
         return np.concatenate(segments) if len(segments) > 1 else segments[0]
 
     def close(self) -> None:

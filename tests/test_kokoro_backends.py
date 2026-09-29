@@ -831,3 +831,90 @@ def test_the_torch_pipeline_reads_a_japanese_phone_number_digit_by_digit(monkeyp
     english.load()
     english.synthesize("Call 0120123456 now.", "bm_george", 1.0)
     assert seen[-1] == "Call 0120123456 now."
+
+
+# --- Sonnet QA of fd2078f4 ------------------------------------------------------
+def test_long_numbers_are_counted_after_nfkc_and_foreign_digits_become_ascii():
+    """misaki counts digits after its own NFKC, so a circled or superscript
+    digit extends a run; and it has no entry for a digit NFKC leaves foreign.
+    Runs of nine or fewer, and everything that is not a digit, stay as written."""
+    spell = kb.japanese_long_numbers_spelled
+    assert spell("0120123456") == "0 1 2 0 1 2 3 4 5 6"
+    assert spell("\u4fa1\u683c\u306f123456789\u5186") == "\u4fa1\u683c\u306f123456789\u5186"
+    circled = "".join(chr(0x2460 + i) for i in range(10))            # one to ten, circled
+    assert spell(circled) == " ".join(circled)
+    assert spell("123456789\u2460") == "1 2 3 4 5 6 7 8 9 \u2460"
+    wide = "".join(chr(0xFF10 + i) for i in range(10))                # full-width 0-9
+    assert spell(wide) == " ".join(wide)
+    assert spell("\u0663") == "3"                                      # Arabic-Indic three
+    assert spell("\uff5e5\u5e74") == "\uff5e5\u5e74"                    # misaki's own rules see it as written
+
+
+def _torch_backend_that_voices_nothing(monkeypatch, lang_code="j"):
+    class _SkipsEverything:
+        def __init__(self, **kw):
+            pass
+
+        def __call__(self, text, **kw):
+            return iter(())
+
+    monkeypatch.setitem(sys.modules, "kokoro", types.SimpleNamespace(KPipeline=_SkipsEverything))
+    backend = kb.TorchKokoroBackend("cpu", lang_code=lang_code)
+    backend.load()
+    return backend
+
+
+def test_letters_that_make_no_sound_are_loud_not_a_silent_clip(monkeypatch):
+    """A Cyrillic or accented word on the Japanese lane phonemizes to nothing.
+    Silence would lose the words without a trace (the no-fallback rule), so
+    both backends refuse the line and say why, as they did before fd2078f4."""
+    torch_backend = _torch_backend_that_voices_nothing(monkeypatch)
+    with pytest.raises(RuntimeError, match="found no sound in") as exc:
+        torch_backend.synthesize("\u041f\u0440\u0438\u0432\u0435\u0442", "jf_alpha", 1.0)
+    assert "kokoro pipeline produced no audio" in str(exc.value)
+    stub = _StubKokoro(voices=("jf_alpha",))
+    onnx_backend = _onnx_backend_with_stub(stub)
+    onnx_backend._g2p = _SilentG2P()
+    with pytest.raises(RuntimeError, match="kokoro-onnx produced no audio: .*found no sound"):
+        onnx_backend.synthesize("caf\u00e9", "jf_alpha", 1.0)
+    assert stub.calls == []
+
+
+def test_a_pause_line_is_a_logged_pause_on_both_backends(monkeypatch, caplog):
+    torch_backend = _torch_backend_that_voices_nothing(monkeypatch)
+    stub = _StubKokoro(voices=("jf_alpha",))
+    onnx_backend = _onnx_backend_with_stub(stub)
+    onnx_backend._g2p = _SilentG2P()
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        for backend in (torch_backend, onnx_backend):
+            out = backend.synthesize("\u30fb\u30fb\u30fb", "jf_alpha", 1.0)
+            assert out.size == int(kb.SAMPLE_RATE * kb.UNSPEAKABLE_LINE_S)
+    assert sum("voiced as a 0.25 s pause" in r.getMessage() for r in caplog.records) == 2
+
+
+def test_unknown_phonemes_are_logged_when_voiced_as_a_pause(caplog):
+    stub = _StubKokoro(voices=("zf_xiaobei",))
+    stub.tokenizer = types.SimpleNamespace(known=lambda ps: "")
+    backend = _onnx_backend_with_stub(stub)
+    backend._g2p = _EchoG2P()
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        backend.synthesize("OK", "zf_xiaobei", 1.0)
+    assert any("no phoneme the model knows" in r.getMessage() for r in caplog.records)
+
+
+def test_a_failure_reason_keeps_the_line_that_names_the_cause():
+    mecab = RuntimeError(
+        "\nFailed initializing MeCab. Please see the README for possible solutions:\n\n"
+        "    https://github.com/polm/fugashi\n\n---- ERROR DETAILS ----\n"
+        "param.cpp(69) [ifs] no such file or directory: /dic/mecabrc\n"
+        "-------------------------\n")
+    reason = kb._failure_reason(mecab)
+    assert reason.startswith("RuntimeError: Failed initializing MeCab.")
+    assert reason.endswith("no such file or directory: /dic/mecabrc")
+
+    class _Unprintable(Exception):
+        def __str__(self):
+            raise ValueError("no")
+
+    assert kb._failure_reason(_Unprintable()) == "_Unprintable"
+    assert kb._failure_reason(OSError()) == "OSError"

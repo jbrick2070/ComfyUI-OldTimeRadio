@@ -293,3 +293,16 @@ def test_the_unidic_lite_pin_holds_against_a_broken_unidic(monkeypatch, tmp_path
         fugashi.Tagger()                           # the trap is real
     ours = _copy_cutlet()
     assert ours("こんにちは")[0]
+
+
+def test_circled_and_foreign_digits_do_not_end_the_line():
+    """Sonnet QA of fd2078f4: digits NFKC creates from a circled number, and a
+    digit NFKC leaves foreign, both raised inside misaki."""
+    for name in ("fugashi", "jaconv", "unidic_lite"):
+        pytest.importorskip(name)
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+    phonemizer = kb.JapanesePhonemizer()
+    circled = "".join(chr(0x2460 + i) for i in range(10))
+    assert phonemizer(circled)
+    assert phonemizer("123456789\u2460")
+    assert phonemizer("\u0663") == _copy_cutlet()("3")[0]
