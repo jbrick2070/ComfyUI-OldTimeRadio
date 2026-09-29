@@ -58,8 +58,9 @@ The Python version decides the voice backend, and this is not a preference:
   language (`requirements.txt` pins it to
   `python_version < "3.13"`).
 * **3.13** (what Desktop and the portable build ship) -> `kokoro-onnx`, on the
-  CPU, about six times faster than realtime. This is the English path;
-  non-English rows require the torch backend above.
+  CPU, about six times faster than realtime. It speaks English, Spanish,
+  Portuguese, Italian, French and Hindi; Japanese and Mandarin require the
+  torch backend above.
 * **3.14** -> **no kokoro backend is packaged yet.** The pack still installs;
   an English user can switch the voice controls to Bark. Non-English episodes
   are unavailable because day-one multilingual rows admit Kokoro only. Say so

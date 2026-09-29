@@ -55,9 +55,10 @@ SAMPLE_RATE = 24000
 
 #: kokoro-onnx ``create()`` keyword arguments, PINNED so a library default change
 #: cannot move the house cadence. ``lang="en-gb"`` mirrors the torch path's British
-#: ``lang_code="b"``; ``trim=False`` mirrors the torch path, which never trims; the
-#: two pauses only apply when kokoro-onnx has to split a chunk longer than 510
-#: phonemes, which the torch path also splits internally.
+#: ``lang_code="b"`` and applies to English lines only: an espeak row replaces it
+#: with its own language and hands over phonemes. ``trim=False`` mirrors the torch
+#: path, which never trims; the two pauses only apply when kokoro-onnx has to split
+#: a chunk longer than 510 phonemes, which the torch path also splits internally.
 ONNX_CREATE_KWARGS = {
     "lang": "en-gb",
     "trim": False,
@@ -513,12 +514,16 @@ class OnnxKokoroBackend:
         logging.getLogger("phonemizer").setLevel(logging.ERROR)
         options = ort.SessionOptions()
         options.intra_op_num_threads = self.threads
-        self._session = ort.InferenceSession(
+        session = ort.InferenceSession(
             self.model_path, sess_options=options, providers=self.providers)
-        self._kokoro = Kokoro.from_session(self._session, self.voices_npz)
-        if self.lang_code in ESPEAK_LANGUAGES:
-            self._g2p = EspeakPhonemizer(ESPEAK_LANGUAGES[self.lang_code])
-        self.providers_active = list(self._session.get_providers())
+        kokoro = Kokoro.from_session(session, self.voices_npz)
+        # After the session (it points phonemizer at kokoro-onnx's espeak-ng),
+        # and before anything is kept: a phonemizer that fails to build leaves
+        # the backend unloaded, never loaded without it.
+        g2p = (EspeakPhonemizer(ESPEAK_LANGUAGES[self.lang_code])
+               if self.lang_code in ESPEAK_LANGUAGES else None)
+        self._session, self._kokoro, self._g2p = session, kokoro, g2p
+        self.providers_active = list(session.get_providers())
 
     def voice_ids(self) -> list:
         return list(self._kokoro.get_voices()) if self._kokoro is not None else []
@@ -528,6 +533,10 @@ class OnnxKokoroBackend:
 
         if self._kokoro is None:
             raise RuntimeError("ONNX backend not loaded")
+        if self._g2p is None and self.lang_code in ESPEAK_LANGUAGES:
+            raise RuntimeError(
+                "the ONNX backend for lang_code %r has no phonemizer; it will not "
+                "read the line as English" % self.lang_code)
         if voice_id not in self.voice_ids():
             raise BackendUnavailable(
                 "voice %r is not in the ONNX voice table %s (its .pt file was missing "
@@ -544,6 +553,13 @@ class OnnxKokoroBackend:
                 phonemes = self._g2p(chunk)
                 if not phonemes:
                     continue            # the torch pipeline skips these too
+                known = getattr(getattr(self._kokoro, "tokenizer", None), "known", None)
+                if callable(known) and not known(phonemes):
+                    # Nothing the model has a symbol for (a lone inverted
+                    # question mark or a bracket): kokoro-onnx refuses such a
+                    # chunk outright, where the torch pipeline speaks a quarter
+                    # second of nothing.
+                    continue
                 samples, rate = self._kokoro.create(
                     phonemes, voice=voice_id, speed=speed, is_phonemes=True,
                     **dict(ONNX_CREATE_KWARGS, lang=self._g2p.language))

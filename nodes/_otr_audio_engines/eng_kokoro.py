@@ -303,9 +303,10 @@ class KokoroEngine:
                     "kokoro ONNX backend failed to load (%s: %s)" % (type(exc).__name__, exc),
                 ) from exc
             log.info(
-                "[OTR.kokoro] backend=onnx provider=%s threads=%d model=%s; the ledger's "
-                "voice_device=%r is not used by this backend (CPU by design)",
-                ",".join(backend.providers_active), backend.threads, model_path, device)
+                "[OTR.kokoro] backend=onnx provider=%s threads=%d lang=%s model=%s; the "
+                "ledger's voice_device=%r is not used by this backend (CPU by design)",
+                ",".join(backend.providers_active), backend.threads, lang, model_path,
+                device)
         self._backend = backend
         self._backend_name = name
         self._backend_key = cache_key

@@ -294,6 +294,7 @@ def test_engine_onnx_path_logs_the_ledger_device_and_returns_the_contract(monkey
     assert eng._backend_name == "onnx"
     text = " ".join(r.getMessage() for r in caplog.records)
     assert "backend=onnx" in text and "voice_device='cuda'" in text and "CPU by design" in text
+    assert "lang=b" in text
     eng.unload()
     assert eng._backend is None and _StubOnnxBackend.instances[-1].closed
 
@@ -474,11 +475,33 @@ _ESPEAK_SAMPLES = {
 }
 
 
+def _kokoro_lang_codes():
+    """``kokoro.pipeline.LANG_CODES``, read from the installed source. Importing
+    the module would leave ``kokoro`` (and torch) in sys.modules, and the node
+    tests that pin "importing the node loads no engine library" would then fail
+    whenever they run after this file."""
+    import ast
+    import importlib.util
+    try:
+        spec = importlib.util.find_spec("kokoro")
+    except (ImportError, ValueError):
+        spec = None
+    if spec is None or not spec.submodule_search_locations:
+        pytest.skip("the torch kokoro package is not installed")
+    path = os.path.join(list(spec.submodule_search_locations)[0], "pipeline.py")
+    with open(path, encoding="utf-8") as fh:
+        tree = ast.parse(fh.read())
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+                getattr(target, "id", "") == "LANG_CODES" for target in node.targets):
+            return {kw.arg: ast.literal_eval(kw.value) for kw in node.value.keywords}
+    pytest.fail("LANG_CODES not found in %s" % path)
+
+
 def test_the_espeak_set_is_the_torch_pipelines_own():
-    pipeline = pytest.importorskip("kokoro.pipeline")
     own_g2p = ("a", "b", "j", "z")        # misaki's English, Japanese, Chinese
     assert kb.ESPEAK_LANGUAGES == {
-        code: lang for code, lang in pipeline.LANG_CODES.items() if code not in own_g2p}
+        code: lang for code, lang in _kokoro_lang_codes().items() if code not in own_g2p}
     assert sorted(_ESPEAK_SAMPLES) == sorted(kb.ESPEAK_LANGUAGES.values())
 
 
@@ -587,3 +610,79 @@ def test_a_cjk_row_moves_to_torch_when_torch_is_installed(monkeypatch, tmp_path)
     eng._lang_code = "z"
     eng.load()
     assert eng._backend_name == "torch" and loaded == ["z"]
+
+
+#: misaki 0.9.4's EspeakG2P on _ESPEAK_SAMPLES (espeak-ng 1.52 through
+#: espeakng_loader 0.2.4), recorded 2026-09-28. The parity test above needs
+#: misaki, which does not install on Python 3.13 -- the very boxes this path is
+#: for -- so these hold the same line there.
+_ESPEAK_GOLDEN = {
+    'es': 'bw\u02c8enas n\u02c8o\u02a7es. \u02c8esta \u02c8es la se\u0272\u02c8al pe\u027e\xf0\u02c8i\xf0a (d\u02c8i\u03b8e w\u02c8\u025bndi): \u201c\xa1m\u02c8u\u02a7as \u0263\u027e\u02c8a\u03b8jas, \u02a7iw\u02c8awa!\u201d',
+    'fr-fr': 'b\u0254\u0303sw\u02c8a\u0281. is\u02c8i l\u0259 sinj\u02c8al p\u025b\u0281d\u02c8y, e w\u02c8\u025bndi \u0281ep\u02c8\u0254\u0303 : \u201c m\u025b\u0281s\u02c8i bok\u02c8u ! \u201d',
+    'hi': '\u0283\u02c8\u028ab\u02b0 s\u02c8\u028cnd\u02b0ja\u02d0 j\u02cc\u0259h k\u02b0\u02c8o\u02d0ja\u02d0 h\u02c8\u028aa\u02d0 s\u0259\u014bk\u02c8e\u02d0t h\u025b\u02d0, \u0254\u02d0\u027e \u028b\u02c8e\u0303\u02d0\u0256i k\u02c8\u028ch\u0259t\u02cci h\u025b\u02d0: b\u02c8\u028ch\u028at d\u02b0\u02cc\u0259nj\u0259\u028b\u02c8a\u02d0d!',
+    'it': 'bw\u02cc\u0254nas\u02c8era. kw\u02c8esto \u02cc\u025b il se\u0272\u02c8ale perd\u02c8uto (d\u02c8i\u02a7e w\u02c8\u025bnd\u026a): \u0261r\u02c8a\u02a6je m\u02c8ille!',
+    'pt-br': 'b\u02c8o\xe6 n\u02c8o\u026a\u02a7y. \u02cces\u02a7y \u025b \u028a sin\u02c8W p\u02cce\u027e\u0259\u02a4\u02c8id\u028a, i w\u02c8A\u014bdi \u02a4\u02c8is: mw\u02c8i\u014btw \u02ccobri\u0261\u02c8ad\u028a!',
+}
+
+
+@pytest.mark.parametrize("language", sorted(_ESPEAK_SAMPLES))
+def test_the_onnx_phonemes_match_misakis_recorded_output(language):
+    pytest.importorskip("phonemizer")
+    loader = pytest.importorskip("espeakng_loader")
+    from phonemizer.backend.espeak.wrapper import EspeakWrapper
+    EspeakWrapper.set_library(loader.get_library_path())
+    EspeakWrapper.set_data_path(loader.get_data_path())
+    ours = kb.EspeakPhonemizer(language)(_ESPEAK_SAMPLES[language])
+    assert ours == _ESPEAK_GOLDEN[language]
+
+
+class _EchoG2P:
+    language = "es"
+
+    def __call__(self, text):
+        return text
+
+
+def test_a_chunk_the_model_has_no_symbol_for_is_skipped_not_fatal():
+    # kokoro-onnx refuses a batch with no vocabulary symbol in it; the torch
+    # pipeline speaks a quarter second of nothing. A lone inverted question
+    # mark must not take the whole line with it.
+    stub = _StubKokoro(voices=("ef_dora",))
+    stub.tokenizer = types.SimpleNamespace(
+        known=lambda ps: "".join(c for c in ps if c not in "\xbf\xa1[]{}"))
+    backend = _onnx_backend_with_stub(stub)
+    backend._g2p = _EchoG2P()
+    backend.synthesize("hola\n\xbf\nadios", "ef_dora", 0.95)
+    assert [c[0] for c in stub.calls] == ["hola", "adios"]
+
+
+def test_an_espeak_row_without_its_phonemizer_never_reads_as_english():
+    backend = _onnx_backend_with_stub(_StubKokoro(voices=("ef_dora",)))
+    backend.lang_code = "e"
+    with pytest.raises(RuntimeError, match="will not read the line as English"):
+        backend.synthesize("hola", "ef_dora", 0.95)
+
+
+def test_a_phonemizer_that_fails_to_build_leaves_the_backend_unloaded(monkeypatch):
+    _fake_onnx_runtime(monkeypatch)
+
+    def _broken(language):
+        raise RuntimeError("espeak-ng missing")
+
+    monkeypatch.setattr(kb, "EspeakPhonemizer", _broken)
+    backend = kb.OnnxKokoroBackend("m.onnx", "v.npz", lang_code="e")
+    with pytest.raises(RuntimeError, match="espeak-ng missing"):
+        backend.load()
+    assert backend._kokoro is None and backend._g2p is None   # a retry loads again
+
+
+def test_a_forced_onnx_backend_keeps_the_espeak_rows_on_onnx(monkeypatch, tmp_path):
+    # OTR_KOKORO_BACKEND=onnx on a box with the torch build: the five espeak
+    # rows now stay on ONNX (they went to torch while ONNX was English-only);
+    # Japanese and Mandarin still go to torch.
+    eng = _onnx_engine(monkeypatch, tmp_path)          # selection forced to onnx
+    monkeypatch.setattr(eng_kokoro, "_spec_present", lambda n: True)
+    eng._lang_code = "f"
+    eng.load()
+    assert eng._backend_name == "onnx"
+    assert _StubOnnxBackend.instances[-1].lang_code == "f"
