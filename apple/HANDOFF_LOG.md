@@ -1370,3 +1370,18 @@ now waits for the server's queue to empty before a leg, and gives a leg up
 only when server.log stops growing for 20 minutes or at a 4-hour cap (the old
 copy is `overnight_randomizers.before_stall_watch.py` beside it). Only the
 supervisor was restarted; the server and leg 15's render were not touched.
+
+## 2026-09-29 08:20 -- 2.3.14 published; the overnight lanes run fast-first
+
+- **2.3.14** (0790a1e0), at his word ("push to registry pyproject"): the
+  publish action succeeded in 32 s and the registry lists 2.3.14 Pending with
+  all 25 dependencies. The scan oracle predicted 0 findings over the 673-file
+  packed set (all ten vendored `_misaki` files ship), so it should auto-promote
+  to Active; 2.3.13 stays the live version until it does.
+- **Mandarin station name** stays 失落的信号 (his call).
+- **Overnight lanes** (his rule: "slow video always keep 1 for proof by run
+  all faster lanes first"): the supervisor now pins the lane per leg from a
+  schedule -- all 16 fast lanes once, shuffled, then one of the five LTX 2.5
+  lanes, rotating -- with bank, style, stills and voices still rolling. Only
+  the supervisor was restarted (08:16); leg 17 (ltx25_foley_16gb) keeps
+  rendering and the new schedule starts at leg 18.
