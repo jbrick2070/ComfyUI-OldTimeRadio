@@ -15971,3 +15971,12 @@ not promote it to the Bug Bible on this evidence alone.
   v2/en_speaker_4, c04 v2/en_speaker_1, the announcer v2/en_speaker_7 (all
   distinct; P-OBS char_voice lines in tmp/overnight_20260928/server.log).
   Published as count_three_20260929_014806__arch__n16m__sd15__bark__myst.
+
+## PBUG-20260929-01 and -02 -- promoted to the Bug Bible
+- 12.187 (two-call-sites-key-one-record-differently) from PBUG-20260929-01 and
+  12.188 (deferred-field-owned-by-nobody) from PBUG-20260929-02, survival-guide
+  0d31eec; README 371 -> 373, otr_coverage_index gains both records. Both are
+  pinned in this repo's tests (test_sanctioned_gap_end_to_end.py,
+  test_cast_lock.py) and recorded in the Bible's suite as exclusion comments,
+  as 12.186 is. PBUG-20260928-07 (the speaker slip) is still waiting on a live
+  my_story leg that actually slips.
