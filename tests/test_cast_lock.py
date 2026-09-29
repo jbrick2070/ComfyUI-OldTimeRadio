@@ -617,46 +617,53 @@ def test_an_announcer_already_on_a_bark_preset_takes_a_seat_whoever_voices_it():
                                      char_voice_engine="bark")
 
 
-def test_the_seat_count_matches_the_draws_for_every_announcer_shape():
-    """Characters plus the larger of: the distinct Bark presets announcer rows
-    already hold (the character draw keeps them off the characters), and one
-    when Bark voices the announcer (its own draw). A second announcer-named row
-    -- a PA system called "Announcer" -- is an announcer to CastLock
-    (agy QA of 8efff924). Each shape is cast at its limit and refused one past
-    it, so the count is proven against the draws, not against itself."""
+def test_the_seat_count_agrees_with_the_draws_themselves(monkeypatch):
+    """The count says a cast fits exactly when the draws, run with the count
+    switched off, cast it -- for every announcer shape: a Kokoro or Bark
+    announcer, one already on a Bark preset (LEMMY's included), a second
+    announcer-named row (a PA system called "Announcer" is an announcer to
+    CastLock), with and without LEMMY, from six characters to eleven. Checked
+    against the draws, not against a table (agy and Composer QA of ee9c2ddf,
+    8efff924 and b23a3441: a pre-voiced announcer and a second announcer ran a
+    draw dry; a preset shared with LEMMY was counted twice)."""
+    import copy
+    import itertools
+
+    import nodes.cast_lock as CL
     from nodes._otr_casting import CastingFailedError
-    from nodes.cast_lock import CastLock, _bark_seats
 
-    def shape(characters, first, second, engine):
-        cast = _story_cast(characters)
-        cast[0]["voice_preset"] = first
+    def cast(n, first, second, lemmy):
+        rows = [{"char_id": "c01", "name": "ANNOUNCER", "gender": "female",
+                 "tts_model": "kokoro", "voice_preset": first}]
+        if lemmy:
+            rows.append({"char_id": "c50", "name": "LEMMY", "gender": "male",
+                         "tts_model": "bark", "voice_preset": "v2/en_speaker_8"})
+        rows += [{"char_id": "c%02d" % (i + 2), "name": "Animal %d" % i, "gender": "",
+                  "tts_model": "", "voice_preset": ""} for i in range(n - int(lemmy))]
         if second is not None:
-            cast.append({"char_id": "c99", "name": "Announcer", "gender": "",
+            rows.append({"char_id": "c99", "name": "Announcer", "gender": "",
                          "tts_model": "kokoro", "voice_preset": second})
-        return cast, engine
+        return rows
 
-    shapes = {  # (first announcer, second announcer, engine): extra seats
-        ("bf_lily", None, "kokoro"): 0,
-        ("bf_lily", None, "bark"): 1,
-        ("v2/en_speaker_9", None, "kokoro"): 1,
-        ("v2/en_speaker_9", None, "bark"): 1,
-        ("v2/en_speaker_9", "v2/en_speaker_7", "kokoro"): 2,
-        ("v2/en_speaker_9", "v2/en_speaker_7", "bark"): 2,
-        ("v2/en_speaker_9", "v2/en_speaker_9", "kokoro"): 1,
-        ("bf_lily", "bf_emma", "bark"): 1,
-    }
-    for (first, second, engine), extra in shapes.items():
-        limit = 10 - extra
-        cast, engine = shape(limit, first, second, engine)
-        assert _bark_seats(cast, engine)[0] == 10, (first, second, engine)
-        CastLock._assign_bark_voices(cast, {"source_bank": "my_story", "episode_seed": 5},
-                                     [], announcer_voice_engine=engine,
-                                     char_voice_engine="bark")
-        cast, engine = shape(limit + 1, first, second, engine)
-        with pytest.raises(CastingFailedError, match="Bark has 10 voices, and this cast needs 11"):
-            CastLock._assign_bark_voices(cast, {"source_bank": "my_story", "episode_seed": 5},
-                                         [], announcer_voice_engine=engine,
-                                         char_voice_engine="bark")
+    count = CL._bark_seats
+    meta = {"source_bank": "my_story", "episode_seed": 5}
+    for first, second, engine, lemmy, n in itertools.product(
+            ("bf_lily", "v2/en_speaker_9", "v2/en_speaker_8"),
+            (None, "bf_emma", "v2/en_speaker_7", "v2/en_speaker_9", "v2/en_speaker_8"),
+            ("kokoro", "bark"), (False, True), range(6, 12)):
+        rows = cast(n, first, second, lemmy)
+        needed, available, _ = count(rows, engine)
+        monkeypatch.setattr(CL, "_bark_seats", lambda _cast, _engine: (0, 0, ""))
+        try:
+            CL.CastLock._assign_bark_voices(copy.deepcopy(rows), dict(meta), [],
+                                            announcer_voice_engine=engine,
+                                            char_voice_engine="bark")
+            drew = True
+        except CastingFailedError:
+            drew = False
+        finally:
+            monkeypatch.setattr(CL, "_bark_seats", count)
+        assert (needed <= available) == drew, (first, second, engine, lemmy, n, needed)
 
 
 def test_the_voice_roll_is_told_which_casts_bark_cannot_voice():

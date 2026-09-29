@@ -221,9 +221,14 @@ def _bark_seats(cast, announcer_engine) -> "tuple[int, int, str]":
     # announcer then draws one voice from what the characters left. So the
     # announcer rows take the larger of the two -- counted as the draws spend
     # them (agy QA of ee9c2ddf and 8efff924: a pre-voiced announcer, and a
-    # second announcer-named row, each ran a draw dry).
-    held = {str(r.get("voice_preset")) for r in announcers
-            if str(r.get("voice_preset") or "").startswith("v2/")}
+    # second announcer-named row, each ran a draw dry). A preset a character
+    # already holds is one seat, not two: the draw's `taken` is a set.
+    def bark_preset(row):
+        preset = str(row.get("voice_preset") or "")
+        return preset if preset.startswith("v2/") else ""
+
+    characters_hold = {bark_preset(r) for r in rows if not _is_announcer_entry(r)}
+    held = {bark_preset(r) for r in announcers} - characters_hold - {""}
     seats = max(len(held), 1 if announcers and announcer_engine == "bark" else 0)
     if seats:
         needed += seats
