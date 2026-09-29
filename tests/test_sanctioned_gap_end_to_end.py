@@ -37,8 +37,15 @@ FRAMES_PER_BEAT = 50
 TOTAL_FRAMES = N_BEATS * FRAMES_PER_BEAT
 
 
-def _all_refused_ledger():
-    """Three beats, every required still refused by the image model."""
+def _all_refused_ledger(explicit_beat_id=False):
+    """Three beats, every required still refused by the image model.
+
+    The shots are shaped as ShotLock writes them -- ``shot_id`` and
+    ``source_line_ids``, no ``beat_id`` -- because a fixture that also set
+    ``beat_id`` is how a render loop keyed on that field passed here while it
+    matched nothing in production (overnight leg 07, 2026-09-29).
+    ``explicit_beat_id`` adds the field back for the rows that do carry it.
+    """
     receipt, shots, lines = [], [], []
     for i in range(1, N_BEATS + 1):
         bid = "b%03d" % i
@@ -52,7 +59,8 @@ def _all_refused_ledger():
             "image_revision": 1,
         })
         shots.append({
-            "shot_id": "shot_%s" % bid, "beat_id": bid,
+            "shot_id": "shot_%s" % bid,
+            **({"beat_id": bid} if explicit_beat_id else {}),
             "engine_id": "still_flat", "family": "static_motion",
             "target_frame_count": FRAMES_PER_BEAT,
             "source_line_ids": [bid], "char_id": "", "creative": {},
@@ -177,22 +185,10 @@ def test_an_UNSANCTIONED_absence_still_poisons_the_predicate():
         rd.validate_and_repair_still_spine(led)
 
 
-def _shotlock_shaped(led):
-    """The rows ShotLock actually writes carry ``shot_id`` and
-    ``source_line_ids``, never ``beat_id`` (otr_shot_lock.py, the shot builder).
-    The fixture above sets both, which is how the render loop's
-    ``shot.get("beat_id")`` passed here and matched nothing in production."""
-    for shot in led["video"]["shots"]:
-        shot.pop("beat_id", None)
-    return led
-
-
-def test_real_shotlock_shots_are_skipped_by_the_render_loop_too():
-    """Overnight leg 07 (2026-09-29): Ideogram refused the music-opening still,
-    the validator waved the beat through as a sanctioned gap, and the render
-    loop -- keyed on a field ShotLock never writes -- rendered it anyway and
-    died in cheap_families.render_clip. The loop must skip it."""
-    led = _shotlock_shaped(_all_refused_ledger())
+def test_a_row_that_does_carry_beat_id_is_skipped_as_well():
+    """Every other test here runs ShotLock's real row shape; a row with an
+    explicit ``beat_id`` must be skipped the same way."""
+    led = _all_refused_ledger(explicit_beat_id=True)
     rd.validate_and_repair_still_spine(led)
     with mock.patch.object(rd, "render_beat_coverage", _explode):
         result = rd.run_episode(led)
@@ -212,3 +208,6 @@ def test_one_predicate_keys_a_shot_the_way_the_validator_does():
     assert not rd.shot_is_sanctioned_gap(
         {"shot_id": "shot_b001", "source_line_ids": ["b001"]}, gaps)
     assert not rd.shot_is_sanctioned_gap({"shot_id": "shot_music_opening_001"}, set())
+    # ShotLock's synthetic opening carries no source line at all.
+    assert rd.shot_is_sanctioned_gap(
+        {"shot_id": "shot_b000_music_open", "source_line_ids": []}, {"b000_music_open"})
