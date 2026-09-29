@@ -1385,3 +1385,58 @@ supervisor was restarted; the server and leg 15's render were not touched.
   lanes, rotating -- with bank, style, stills and voices still rolling. Only
   the supervisor was restarted (08:16); leg 17 (ltx25_foley_16gb) keeps
   rendering and the new schedule starts at leg 18.
+
+## 2026-09-29 09:15 -- quick permutation tests: language, voice engine, bank
+
+The operator asked whether the rolls had been tested for breakage, cheaply,
+without full LTX episodes. Three layers, all against the real code:
+
+- **Queue-time gate sweep** (`tmp/lang_gauntlet_20260929/gate_sweep.py`,
+  in-process, nothing rendered): every language x every pinned voice engine x
+  every bank, rolled cases drawn 24 times -- 180 cases, about 1,600 draws.
+  The gate is right: English-only engines (chatterbox, dia, bark, indextts2,
+  cloud_elevenlabs) are refused on the seven other languages, kokoro and
+  google_tts pass all eight, and a rolled language against an English-only
+  voice narrows to English (or refuses when the pool has no English). One
+  defect, wording only: the refusal read "google_tts or kokoro (a cloud voice:
+  it needs your Google API key)", as if Kokoro needed a Google key --
+  24b163a2 lists local voices first and puts the note on google_tts. Composer
+  and Sonnet both HELD on it (Sonnet executed all eight languages).
+- **CastLock sweep** (`tmp/lang_gauntlet_20260929/castlock_sweep.py`, CPU,
+  OTR_TEST_MODE, the real `lock()`): real overnight ledgers reset to what the
+  writer hands CastLock, re-cast with every engine a roll can draw and every
+  engine a person can pin, on every bank and language. The reset is faithful:
+  re-cast with the engine that really voiced it, each ledger reproduced its
+  saved cast exactly (10 of 10, after swapping a replay copy for its source).
+  Found: **a My Story cast bigger than Bark's ten voices died in CastLock**
+  ("available_voices is empty") after the writer had run -- the 09-28 costume
+  masquerade (announcer and 14 animals). The voice roll draws Bark about one
+  time in four on English. ee9c2ddf + 8efff924 fix it: CastLock counts the Bark
+  voices a cast needs; the roll leaves Bark out of a cast it cannot voice (the
+  count is the receipt's reason); a Bark pinned by hand is refused by the same
+  count, in words. Design contrarian: Cursor grok-4.7-high (Codex is out of
+  credits until 10-03); it dropped a proposed gender exclusion. QA: Composer
+  HELD; agy Gemini 3.8 Flash REFUTED ee9c2ddf on a pre-voiced announcer the
+  count missed -- reproduced, fixed in 8efff924, re-QA running.
+  Also seen, not a defect: on the writer lanes a Bark cast's character rows
+  carry their preset but no engine name (`tts_model`/`voice_engine` empty since
+  259d1faa); the voice stage, Gate 1 and the credits all read it correctly
+  (leg 08's log shows every line spoken on Bark).
+- **Live language gauntlet** (`gauntlet.py`, 11 one-act legs on viz_green plus
+  a refusal proof): stopped before leg 1 because the :8000 server had booted
+  at 00:34, before today's language commits. `after_leg17.py` (detached, pid
+  4056) now waits for overnight leg 17 -- the LTX 2.5 proof leg, beat 22 of 30
+  at 09:05 -- then: the Bark big-cast repro on the old server (the live
+  failure), a reboot from current main, the same repro on the fixed code, the
+  masquerade story with voices rolled, the gauntlet, and the overnight feed
+  resumed (STOP removed). Log: `tmp/lang_gauntlet_20260929/after_leg17.log`.
+
+**2.3.14 was FLAGGED, not promoted.** The registry's pylint scanner crashed on
+`nodes/_otr_casting.py` ("astroid-error ... Fatal error while checking",
+severity critical). That file is byte-identical in 2.3.13, which passed, and
+the crash does not reproduce here: pylint 2.17.7 through 4.0.10 on Python
+3.10 through 3.14, on the file alone and with every shipped .py flattened
+into one folder as their scanner does. No shipped file shadows a standard
+module. It reads as a fault on their side; a fresh scan needs a new version
+(2.3.15 would also carry the Bark fix) or Comfy-Org. His call. 2.3.13 stays
+the live version.
