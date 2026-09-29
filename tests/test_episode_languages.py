@@ -371,22 +371,74 @@ def test_readiness_extra_accepts_a_fully_importable_adapter(monkeypatch):
 def test_the_torch_path_refuses_a_phonemizer_that_will_not_build(monkeypatch):
     """Composer QA of 1a57dc91: the torch path only imported misaki, so a MeCab
     dictionary that would not open passed the queue and died at the voice
-    node. It now refuses at the queue and names what failed."""
+    node. It now refuses at the queue -- and with the fix the voice node gives
+    for the empty-dictionary trap, not a reinstall (Sonnet QA of c7136448)."""
     import types
     monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
+    monkeypatch.setattr(el, "_MISAKI_BUILT", {})
 
     def _broken_dictionary():
-        raise RuntimeError("Failed initializing MeCab.\nno such file: /dic/mecabrc")
+        raise RuntimeError("Failed initializing MeCab. no such file: /dic/mecabrc")
 
-    monkeypatch.setattr(importlib, "import_module",
-                        lambda name: types.SimpleNamespace(JAG2P=_broken_dictionary))
+    module = types.SimpleNamespace(JAG2P=_broken_dictionary)
+    monkeypatch.setattr(importlib, "import_module", lambda name: module)
     assert el.readiness_extra_ok("misaki[ja]") is False
-    monkeypatch.setattr(importlib.util, "find_spec", lambda name: object())
     with pytest.raises(el.EpisodeLanguageError) as exc:
         el.assert_readiness_extras(el.row_by_label("Japanese"))
     text = str(exc.value)
-    assert "installed but its phonemizer does not start" in text
-    assert "no such file: /dic/mecabrc" in text and "--force-reinstall" in text
+    assert "pip uninstall -y unidic" in text and "pip install unidic-lite" in text
+    assert "no such file: /dic/mecabrc" in text and "--force-reinstall" not in text
+
+
+def test_a_torch_box_missing_a_library_is_told_to_install_it(monkeypatch):
+    """misaki itself is on every torch box (kokoro needs misaki[en]); a missing
+    [ja] library is an import failure and gets the plain install line."""
+    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
+    monkeypatch.setattr(el, "_MISAKI_BUILT", {})
+
+    def _no_pyopenjtalk(name):
+        raise ModuleNotFoundError("No module named 'pyopenjtalk'")
+
+    monkeypatch.setattr(importlib, "import_module", _no_pyopenjtalk)
+    with pytest.raises(el.EpisodeLanguageError) as exc:
+        el.assert_readiness_extras(el.row_by_label("Japanese"))
+    text = str(exc.value)
+    assert "python -m pip install 'misaki[ja]'" in text
+    assert "force-reinstall" not in text and "does not start" not in text
+
+
+def test_any_other_build_failure_is_named_as_it_is(monkeypatch):
+    import types
+    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
+    monkeypatch.setattr(el, "_MISAKI_BUILT", {})
+
+    def _odd():
+        raise ValueError("jieba dictionary is unreadable")
+
+    module = types.SimpleNamespace(ZHG2P=lambda version: _odd())
+    monkeypatch.setattr(importlib, "import_module", lambda name: module)
+    with pytest.raises(el.EpisodeLanguageError) as exc:
+        el.assert_readiness_extras(el.row_by_label("Mandarin"))
+    assert "imports on this box but its phonemizer does not start" in str(exc.value)
+    assert "ValueError: jieba dictionary is unreadable" in str(exc.value)
+
+
+def test_a_phonemizer_that_built_is_not_rebuilt_on_every_queue(monkeypatch):
+    """Sonnet QA of c7136448: fugashi's Tagger leaks about 0.7 MB per build,
+    and readiness runs on every queued prompt. A success is kept for the
+    process; a different module (a reinstall) is built again."""
+    import types
+    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
+    monkeypatch.setattr(el, "_MISAKI_BUILT", {})
+    built = []
+    module = types.SimpleNamespace(JAG2P=lambda: built.append(1))
+    monkeypatch.setattr(importlib, "import_module", lambda name: module)
+    for _ in range(5):
+        assert el.readiness_extra_ok("misaki[ja]") is True
+    assert built == [1]
+    other = types.SimpleNamespace(JAG2P=lambda: built.append(2))
+    monkeypatch.setattr(importlib, "import_module", lambda name: other)
+    assert el.readiness_extra_ok("misaki[ja]") is True and built == [1, 2]
 
 
 @pytest.mark.parametrize("label", ADMITTED_LABELS)

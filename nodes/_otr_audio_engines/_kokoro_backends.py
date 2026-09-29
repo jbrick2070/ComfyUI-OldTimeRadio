@@ -470,13 +470,23 @@ OWN_G2P = {"z": MandarinPhonemizer, "j": JapanesePhonemizer}
 OWN_G2P_IMPORT = {"z": "._misaki.zh", "j": "._misaki.cutlet"}
 
 
+#: lang_code -> the phonemizer builder that built here once. The readiness
+#: check runs on every queued prompt whose language pool holds the row, and
+#: fugashi's Tagger leaks about 0.7 MB per construction (Sonnet QA of
+#: c7136448), so a success is remembered for the process rather than rebuilt.
+#: Keyed to the builder object, so a swapped builder is built again; a failure
+#: is never remembered, so a fixed install is seen on the next queue.
+_OWN_G2P_BUILT: dict = {}
+
+
 def own_g2p_error(lang_code) -> "str | None":
     """Why the pack's copy of misaki for ``lang_code`` does not work here, or
     None when it does: it imports, and the phonemizer builds -- for Japanese that
     opens MeCab on its dictionary (38 ms measured on the 5080, most of it the
     first import; a dictionary that will not open fails in about 1 ms), so a
     dictionary that will not open refuses at the gate rather than at the voice
-    node. An import alone is the half that passes."""
+    node. An import alone is the half that passes. A build that succeeded once
+    in this process is not repeated (``_OWN_G2P_BUILT``)."""
     import importlib
     import warnings
 
@@ -484,14 +494,18 @@ def own_g2p_error(lang_code) -> "str | None":
     module = OWN_G2P_IMPORT.get(code)
     if module is None or code not in OWN_G2P:
         return "no pack copy of a phonemizer for lang_code %r" % code
+    builder = OWN_G2P[code]
+    if _OWN_G2P_BUILT.get(code) is builder:
+        return None
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             importlib.import_module(module, __package__)
-            OWN_G2P[code]()
-        return None
+            builder()
     except Exception as exc:  # noqa: BLE001 -- any failure to build is "not ready"
         return _failure_reason(exc)
+    _OWN_G2P_BUILT[code] = builder
+    return None
 
 
 def _failure_reason(exc: BaseException) -> str:

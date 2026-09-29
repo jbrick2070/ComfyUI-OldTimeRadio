@@ -542,7 +542,7 @@ def readiness_extra_ok(token: str) -> bool:
         sub = extra[7:-1].strip()
         if not sub:
             return False
-        if _misaki_g2p_error(sub) is None:
+        if _misaki_g2p_failure(sub) is None:
             return True
         code = _pack_copy_lang(sub)
         return code is not None and _kokoro_backends().own_g2p_ready(code)
@@ -558,9 +558,17 @@ _MISAKI_G2P_BUILDERS = {
 }
 
 
-def _misaki_g2p_error(sub: str) -> "str | None":
-    """Why misaki's own ``sub`` phonemizer does not import and build here, or
-    None when it does."""
+#: misaki extra -> the imported module whose phonemizer built here once, for
+#: the same reason as ``_kokoro_backends._OWN_G2P_BUILT`` (the Tagger leak on
+#: every queued prompt). Keyed to the module object; a failure is never kept.
+_MISAKI_BUILT: dict = {}
+
+
+def _misaki_g2p_failure(sub: str):
+    """Why misaki's own ``sub`` phonemizer does not import and build here, as
+    ``(stage, exception)`` with stage "import" or "build", or None when it
+    does. The stage decides the remedy: a missing library wants an install; a
+    phonemizer that imports and will not start does not."""
     import importlib
     import warnings
 
@@ -568,12 +576,20 @@ def _misaki_g2p_error(sub: str) -> "str | None":
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             module = importlib.import_module("misaki.%s" % sub)
-            build = _MISAKI_G2P_BUILDERS.get(sub)
-            if build is not None:
-                build(module)
+    except Exception as exc:  # noqa: BLE001 -- any failure to import is "not ready"
+        return ("import", exc)
+    if _MISAKI_BUILT.get(sub) is module:
         return None
-    except Exception as exc:  # noqa: BLE001 -- any failure to build is "not ready"
-        return _kokoro_backends()._failure_reason(exc)
+    build = _MISAKI_G2P_BUILDERS.get(sub)
+    if build is not None:
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                build(module)
+        except Exception as exc:  # noqa: BLE001 -- any failure to build is "not ready"
+            return ("build", exc)
+    _MISAKI_BUILT[sub] = module
+    return None
 
 
 #: misaki extra -> the Kokoro lang_code whose phonemizer the pack carries a copy
@@ -637,20 +653,23 @@ def assert_readiness_extras(row: LanguageRow) -> None:
                     "error names a file inside this pack, reinstall the pack."
                     % (row.label, row.label, kb.own_g2p_error(code), hint))
             sub = extra[7:-1] if extra.startswith("misaki[") else ""
-            import importlib.util
-            try:
-                installed = bool(sub) and importlib.util.find_spec("misaki") is not None
-            except (ImportError, ValueError):
-                installed = False
-            if installed:
-                # misaki is here and its phonemizer still will not build: say
-                # what failed, since a plain second install does nothing.
+            failure = _misaki_g2p_failure(sub) if sub else None
+            if failure is not None and failure[0] == "build":
+                # misaki imports and its phonemizer will not start: a plain
+                # install changes nothing. The empty-MeCab-dictionary trap gets
+                # the fix the voice node would have given (PBUG-20260918-06);
+                # anything else is named as it is (Sonnet QA of c7136448: this
+                # used to say "installed" whenever misaki itself was, which is
+                # every torch box, and advised a --force-reinstall).
+                kb = _kokoro_backends()
+                exc = failure[1]
+                reworded = kb._mecab_dictionary_error(exc, _MISAKI_EXTRA_LANG.get(sub, ""))
+                if reworded is not exc:
+                    raise EpisodeLanguageError("language %s: %s" % (row.label, reworded))
                 raise EpisodeLanguageError(
-                    "language %s: readiness extra %s is installed but its "
-                    "phonemizer does not start on this box (%s). Reinstall it "
-                    "outside the render with this ComfyUI Python: "
-                    "python -m pip install %r --force-reinstall"
-                    % (row.label, extra, _misaki_g2p_error(sub), extra))
+                    "language %s: readiness extra %s imports on this box but its "
+                    "phonemizer does not start (%s)."
+                    % (row.label, extra, kb._failure_reason(exc)))
             raise EpisodeLanguageError(
                 "language %s needs readiness extra %s on this box "
                 "(CastLock extra, never an English-install tax). Install it "

@@ -306,3 +306,25 @@ def test_circled_and_foreign_digits_do_not_end_the_line():
     assert phonemizer(circled)
     assert phonemizer("123456789\u2460")
     assert phonemizer("\u0663") == _copy_cutlet()("3")[0]
+
+
+def test_the_pack_copy_is_built_once_per_process(monkeypatch):
+    """Sonnet QA of c7136448: the readiness build runs on every queued prompt
+    and fugashi's Tagger leaks about 0.7 MB per build. A success is kept; a
+    swapped builder is built again; a failure is never kept."""
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+    monkeypatch.setattr(kb, "_OWN_G2P_BUILT", {})
+    monkeypatch.setitem(kb.OWN_G2P_IMPORT, "j", "._misaki")
+    built = []
+    monkeypatch.setitem(kb.OWN_G2P, "j", lambda: built.append(1))
+    for _ in range(5):
+        assert kb.own_g2p_error("j") is None
+    assert built == [1]
+
+    def _fails():
+        built.append(2)
+        raise RuntimeError("Failed initializing MeCab")
+
+    monkeypatch.setitem(kb.OWN_G2P, "j", _fails)
+    assert kb.own_g2p_error("j") and kb.own_g2p_error("j")
+    assert built == [1, 2, 2]
