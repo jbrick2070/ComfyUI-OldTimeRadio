@@ -1359,3 +1359,14 @@ before it was folded in).
 1 xfailed, 0 failed, exit 0, no known-fail banner (17,336 at d786238d earlier
 the same night). Bug Bible regression: 32 passed, 36 skipped, 3 xfailed.
 Nothing is published; 2.3.14 stays his call.
+
+**02:22 PDT, the overnight supervisor.** Leg 15 rolled ltx25_mime_16gb on
+the My Story default draft: 38 beats at about 4-5 minutes each, so roughly
+three hours for one episode. The supervisor's fixed 50-minute leg cap would
+have timed it out while it rendered, queued the next leg behind it and
+counted a failure each time -- five in a row ends the feed, with every
+episode still publishing. `tmp/overnight_20260928/overnight_randomizers.py`
+now waits for the server's queue to empty before a leg, and gives a leg up
+only when server.log stops growing for 20 minutes or at a 4-hour cap (the old
+copy is `overnight_randomizers.before_stall_watch.py` beside it). Only the
+supervisor was restarted; the server and leg 15's render were not touched.
