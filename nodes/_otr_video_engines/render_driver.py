@@ -1134,6 +1134,26 @@ def sanctioned_gap_beat_ids(ledger):
     }
 
 
+def shot_is_sanctioned_gap(shot, gap_beats) -> bool:
+    """Whether ``shot`` renders one of ``gap_beats`` (``sanctioned_gap_beat_ids``).
+
+    Keyed by ``_beat_id_for_shot``, the identity the still-spine validator
+    uses, so the validator and ``run_episode`` cannot disagree about which
+    beat a shot is. ShotLock's shot rows carry ``shot_id`` and
+    ``source_line_ids``, not ``beat_id``: the render loop used to read
+    ``shot.get("beat_id")``, found nothing on every real shot, and rendered a
+    beat the validator had waved through as a gap -- which then died in
+    ``cheap_families.render_clip`` on the missing still (overnight leg 07,
+    2026-09-29: Ideogram refused the music-opening still of a still_pan
+    episode). An explicit ``beat_id`` on the row is honoured too.
+    """
+    if not gap_beats:
+        return False
+    shot = shot or {}
+    return any(bid and bid in gap_beats
+               for bid in (_beat_id_for_shot(shot), str(shot.get("beat_id") or "")))
+
+
 def sanctioned_gap_object_ids(ledger):
     """Object ids of refused targets -- used to IGNORE stale image rows.
 
@@ -1479,7 +1499,7 @@ def validate_and_repair_still_spine(ledger):
             engine_id and _vreg.is_registered(engine_id)
             and getattr(_vreg.get_engine(engine_id), "requires_mesh_fodder", False)
         )
-        if beat_id in gap_beats:
+        if shot_is_sanctioned_gap(shot, gap_beats):
             # Skipped WHOLE, before any materialize attempt: the mesh, scene
             # and jump-segment checks below all raise on an absent file, and
             # this beat is absent by sanction rather than by fault. It is not
@@ -5060,8 +5080,7 @@ def _should_fanout_cloud_episode(section, gap_beats) -> bool:
         return False
     work = 0
     for shot in (section or {}).get("shots") or ():
-        bid = str((shot or {}).get("beat_id") or "")
-        if bid and bid in (gap_beats or ()):
+        if shot_is_sanctioned_gap(shot, gap_beats):
             continue
         eid = str((shot or {}).get("engine_id") or "")
         if not eid:
@@ -5569,7 +5588,7 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
             # render one-after-another inside render_beat_coverage.
             work_shots = []
             for shot in section["shots"]:
-                if str(shot.get("beat_id") or "") in _gap_beats:
+                if shot_is_sanctioned_gap(shot, _gap_beats):
                     continue
                 work_shots.append(shot)
                 _begin_engine_scope(str(shot.get("engine_id") or ""))
@@ -5628,14 +5647,14 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
             # explanation still raises below, from the branch that can say
             # which shot and why.
             for shot in section["shots"]:
-                bid = str(shot.get("beat_id") or "")
+                bid = _beat_id_for_shot(shot)
                 sid = str(shot.get("shot_id") or "")
-                if bid in _gap_beats:
+                if shot_is_sanctioned_gap(shot, _gap_beats):
                     _LOG.warning(
                         "[OTR.render_driver] SANCTIONED GAP shot %s (beat %s): not "
                         "rendered -- the image model refused its required still. "
                         "The beat keeps its place in the timeline and is floored.",
-                        shot.get("shot_id"), shot.get("beat_id"))
+                        sid, bid)
                     new_shots.append(shot)
                     floored_sids.add(sid)
                     continue
@@ -5745,12 +5764,12 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                 # composite's existing floor-fill covers the hole. Nothing is
                 # substituted and nothing is silent: the gap row in the receipt is
                 # the record, and the warning below is the log.
-                if str(shot.get("beat_id") or "") in _gap_beats:
+                if shot_is_sanctioned_gap(shot, _gap_beats):
                     _LOG.warning(
                         "[OTR.render_driver] SANCTIONED GAP shot %s (beat %s): not "
                         "rendered -- the image model refused its required still. "
                         "The beat keeps its place in the timeline and is floored.",
-                        shot.get("shot_id"), shot.get("beat_id"))
+                        shot.get("shot_id"), _beat_id_for_shot(shot))
                     new_shots.append(shot)
                     _serial_floored.add(str(shot.get("shot_id") or ""))
                     continue

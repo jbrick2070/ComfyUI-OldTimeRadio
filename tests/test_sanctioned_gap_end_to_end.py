@@ -175,3 +175,40 @@ def test_an_UNSANCTIONED_absence_still_poisons_the_predicate():
     # The spine now sees b002 as an ordinary missing still and fails loud.
     with pytest.raises(rd.RenderError, match="still-spine"):
         rd.validate_and_repair_still_spine(led)
+
+
+def _shotlock_shaped(led):
+    """The rows ShotLock actually writes carry ``shot_id`` and
+    ``source_line_ids``, never ``beat_id`` (otr_shot_lock.py, the shot builder).
+    The fixture above sets both, which is how the render loop's
+    ``shot.get("beat_id")`` passed here and matched nothing in production."""
+    for shot in led["video"]["shots"]:
+        shot.pop("beat_id", None)
+    return led
+
+
+def test_real_shotlock_shots_are_skipped_by_the_render_loop_too():
+    """Overnight leg 07 (2026-09-29): Ideogram refused the music-opening still,
+    the validator waved the beat through as a sanctioned gap, and the render
+    loop -- keyed on a field ShotLock never writes -- rendered it anyway and
+    died in cheap_families.render_clip. The loop must skip it."""
+    led = _shotlock_shaped(_all_refused_ledger())
+    rd.validate_and_repair_still_spine(led)
+    with mock.patch.object(rd, "render_beat_coverage", _explode):
+        result = rd.run_episode(led)
+    assert not result["clips"]
+    assert [s["shot_id"] for s in result["ledger"]["video"]["shots"]] == [
+        "shot_b001", "shot_b002", "shot_b003"]
+    manifest = rd.build_clip_manifest(result, episode_id="test_ep_all_refused")
+    assert all(_receipt.is_sanctioned_gap(r) for r in manifest["clips"])
+
+
+def test_one_predicate_keys_a_shot_the_way_the_validator_does():
+    gaps = {"music_opening_001"}
+    assert rd.shot_is_sanctioned_gap(
+        {"shot_id": "shot_music_opening_001", "source_line_ids": ["music_opening_001"]}, gaps)
+    assert rd.shot_is_sanctioned_gap({"shot_id": "shot_music_opening_001"}, gaps)
+    assert rd.shot_is_sanctioned_gap({"shot_id": "x", "beat_id": "music_opening_001"}, gaps)
+    assert not rd.shot_is_sanctioned_gap(
+        {"shot_id": "shot_b001", "source_line_ids": ["b001"]}, gaps)
+    assert not rd.shot_is_sanctioned_gap({"shot_id": "shot_music_opening_001"}, set())
