@@ -16050,3 +16050,38 @@ not promote it to the Bug Bible on this evidence alone.
   names unpadded. That run's model did not pad, so it shows the fix in
   place rather than a padding caught live; tests/test_my_story_runner.py
   pins the normalization itself.
+
+## PBUG-20260929-05 -- the JSON grammar cut every required string that opened outside ASCII
+- surfaced: the 2026-09-29 language gauntlet, leg 6 (Japanese, My Story, the
+  lighthouse test story, server on bd5d4e59, 11:23-11:24 PDT): the treatment
+  pass wrote `"name": "ノ` and then only tab characters until end-of-text, on
+  all three attempts ("Unterminated string ... line 9 column 15"); the episode
+  died at 1.5 min. The Japanese before it came out oddly spaced as well.
+- root cause, measured on CPU with the writer's real Gemma 4 tokenizer read
+  from its weight file: lm-format-enforcer copies the parser's construction
+  alphabet (its ASCII default, COMPLETE_ALPHABET) into
+  context.alphabet_without_quotes, and a string with minLength reads that copy
+  until it is long enough; the transformers builder installs the tokenizer's
+  alphabet on parser.config only. A required string whose first character is
+  outside ASCII was rejected on it, and the enforcer fell back to ForceStop:
+  after `"name": "ノ` it allowed 42 tokens (end-of-text and whitespace), not
+  "ラ". Exposed: every minLength field -- Japanese, Chinese and Hindi values,
+  and Latin ones that open with an accent or a Spanish "¿".
+- fix: 62af48ae -- get_cached_transformers_schema_constraint refreshes the
+  copy from the installed alphabet, beside its existing max_json_array_length
+  refresh. Same probe after: 261,231 tokens allowed after "ノ", "ラ" among them.
+  Composer QA held.
+- live verify: pending -- rerun the Japanese and Hindi My Story legs on a
+  server booted from 62af48ae or later.
+
+## PBUG-20260929-06 -- the news lane's closing read must name its source in English words
+- surfaced: the same gauntlet, leg 5 (Hindi, scifi_news_pro, an MIT News
+  robotics item, 11:22-11:23 PDT): pass news_read failed twice, "the closing
+  read never names the real source -- none of the dossier's entities or numbers
+  appears in it", and the episode died at 1.3 min.
+- root cause (reading; the failing close text was not logged): the close is
+  written in the episode's language from an English dossier, and the check
+  demands a dossier name or number verbatim with \b word boundaries. A Hindi,
+  Japanese or Chinese close writes names in its own script, CJK text has no
+  word boundary around a number, and Devanagari digits are not ASCII.
+- fix: pending -- design with one contrarian (Cursor grok-4.7-high) before code.
