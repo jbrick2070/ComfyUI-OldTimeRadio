@@ -500,6 +500,25 @@ def test_the_last_act_must_give_every_unheard_character_a_line():
     assert problem and "Tom" in problem and "last act" in problem
 
 
+def test_a_one_letter_slip_in_a_speaker_name_is_that_cast_member():
+    """Live 2026-09-28 (overnight leg 04): a sound act spelled Stomp as 'Storp';
+    the full-rewrite repair then came back as unbalanced JSON twice and the
+    episode died. The slip is read as the cast member it is."""
+    check = MS._make_act_validator(
+        MS.StoryTreatment(**_treatment(1, ("Stomp", "Tiptoe", "Whiskers"))), 1, ())
+    act = MS.ActScript(**_act(speakers=("Storp", "Tiptoe", "Whiskers")))
+    assert check(act) is None
+    assert [line.speaker for line in act.lines] == ["Stomp", "Tiptoe", "Whiskers", "Stomp"]
+
+
+def test_a_name_as_close_to_two_cast_members_is_not_guessed():
+    check = MS._make_act_validator(
+        MS.StoryTreatment(**_treatment(1, ("Anna", "Anne"))), 1, ())
+    act = MS.ActScript(**_act(speakers=("Ann", "Anne")))
+    problem = check(act)
+    assert problem and "'Ann' is not in the cast" in problem
+
+
 def test_a_speaker_outside_the_cast_is_refused():
     validator = MS._make_act_validator(
         MS.StoryTreatment(**_treatment(1, ("Ada", "Tom"))), 1, ())

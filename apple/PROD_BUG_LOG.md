@@ -15837,3 +15837,21 @@ not promote it to the Bug Bible on this evidence alone.
   box voices all eight once their opt-in libraries are installed; until then the
   queue-time check (2326632b) names the pip line. Measured identical to misaki and
   spoken on the Desktop's Python 3.13.
+
+## PBUG-20260928-07 -- a one-letter slip in a speaker name killed a My Story episode through a full-rewrite repair
+- surfaced: overnight leg 04 on the 5080 headless server (22:49-22:51 PDT): the
+  1-act bank roll landed on my_story with empty boxes (DEFAULT_IDEA), 12B native
+  writer. The act draft was valid JSON but named 'Storp' for cast member
+  'Stomp'. The typed repair asked for the whole act again, and both rewrites
+  (about 1,065 tokens each, at temperature 0.1 and 0.5) held no balanced JSON
+  object: StructuredCallFailedError 'my_story_act_1', episode dead at 4.3 min.
+- root cause: the act validator matched speakers exactly, so a trivially
+  recoverable spelling slip sent a sound draft into a full-artifact rewrite --
+  and a thousand-token rewrite is where the 12B writer breaks its JSON.
+- fix: this commit -- a speaker within difflib ratio 0.8 of exactly one cast
+  name is read as that member and logged ("read as cast member ... a spelling
+  slip"); two cast names equally close, or none close enough, keep the repair.
+- live verify: pending the next my_story leg; unit-tested with the live names.
+- open: why the full-rewrite repair returns unbalanced JSON on a long act is
+  not diagnosed -- the log keeps 80 characters of each failed attempt.
+- Bible: none yet.

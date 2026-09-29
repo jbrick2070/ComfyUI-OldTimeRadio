@@ -627,6 +627,32 @@ def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
 # P2 -- the acts
 # ---------------------------------------------------------------------------
 
+#: How close a speaker name must be to one cast name to be read as a slip of it
+#: (difflib's ratio: "Storp" against "Stomp" is 0.8; "Tim" against "Tom" is 0.67).
+_SPEAKER_SLIP_RATIO = 0.8
+
+
+def _cast_name_slip(key: str, allowed: "Mapping[str, str]") -> "str | None":
+    """The one cast key ``key`` is a slip of, or None.
+
+    A draft that is otherwise sound but spells a speaker one letter off
+    ("Storp" for "Stomp", live 2026-09-28) used to go back to the model for a
+    full rewrite of the act; at about a thousand tokens the 12B writer then
+    returned unbalanced JSON twice and the episode died. A near-unique match is
+    corrected here instead. Two cast names equally close, or none close
+    enough, are not guessed: that is a real cast problem and keeps its repair.
+    """
+    import difflib
+
+    scored = sorted(((difflib.SequenceMatcher(None, key, cast_key).ratio(), cast_key)
+                     for cast_key in allowed), reverse=True)
+    if not scored or scored[0][0] < _SPEAKER_SLIP_RATIO:
+        return None
+    if len(scored) > 1 and scored[1][0] == scored[0][0]:
+        return None
+    return scored[0][1]
+
+
 def _make_act_validator(treatment: StoryTreatment, n: int,
                         must_speak: "tuple[str, ...]"):
     allowed = {_norm_ws(name).casefold(): name for name in treatment.names()}
@@ -636,8 +662,13 @@ def _make_act_validator(treatment: StoryTreatment, n: int,
         for line in model.lines:
             key = _norm_ws(line.speaker).casefold()
             if key not in allowed:
-                return ("%r is not in the cast; the speakers are %s"
-                        % (line.speaker, ", ".join(treatment.names())))
+                slip = _cast_name_slip(key, allowed)
+                if slip is None:
+                    return ("%r is not in the cast; the speakers are %s"
+                            % (line.speaker, ", ".join(treatment.names())))
+                log.info("[OTR_MyStory] act %d: speaker %r read as cast member %r "
+                         "(a spelling slip)", n, line.speaker, allowed[slip])
+                key = slip
             if not _norm_ws(line.text):
                 return "%s has an empty line" % line.speaker
             line.speaker = allowed[key]
