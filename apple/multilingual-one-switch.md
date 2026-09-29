@@ -187,9 +187,9 @@ tried and both are wrong.
 | Japanese | ja | `j` | 5 | `misaki[ja]` extra | CJK font + wrap | **day 1** |
 | Mandarin | zh | `z` | 8 | `misaki[zh]` extra | CJK font + wrap | **day 1** |
 
-Torch-first for every non-English row. Installed `kokoro-onnx` tokenizer docs
-only `en-us` / `en-gb`. Do not guess an ONNX locale; prove it or leave it off
-the row.
+Torch-first for every non-English row (the day-1 rule, amended below for five
+rows). Installed `kokoro-onnx` tokenizer docs only `en-us` / `en-gb`. Do not
+guess an ONNX locale; prove it or leave it off the row.
 
 **Proven 2026-09-28 for the five espeak rows.** Three randomized Desktop runs
 (Python 3.13, no torch Kokoro) died at the first Spanish line. The ONNX backend

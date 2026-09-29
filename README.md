@@ -186,9 +186,9 @@ python -m pip install -r ComfyUI-OldTimeRadio/requirements.txt
 
 **Run that `pip install` with ComfyUI's own Python, not a system one** -- this
 is the most common way an install fails, and it fails much later, as nodes that
-quietly refuse to load. Python 3.10 through 3.13 are fine for English;
-multilingual Kokoro needs the torch path on 3.10 through 3.12. Python 3.14 has
-no Kokoro voice build yet. `main` is the branch: it is the default and the only
+quietly refuse to load. Python 3.10 through 3.13 are fine, and speak every
+language but Japanese and Mandarin, which need the torch Kokoro build on 3.10
+through 3.12. Python 3.14 has no Kokoro voice build yet. `main` is the branch: it is the default and the only
 one that moves. A clone that still tracks a branch other than `main` wants
 re-cloning rather than pulling.
 

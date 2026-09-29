@@ -15799,3 +15799,34 @@ not promote it to the Bug Bible on this evidence alone.
   (v3 17.0), detail 1.13x, pulse 1.01, published. The costume v5 replay on
   the 5080 follows in the handoff entry.
 - Bible: 12.185.
+
+## PBUG-20260928-06 -- the ONNX Kokoro refused every language but English, so a rolled Spanish episode died two minutes in
+- surfaced: the operator's randomized runs on ComfyUI Desktop (Python 3.13,
+  where neither the torch kokoro package nor misaki installs). Three in a row
+  (20:25, 20:27 and 20:29 PDT) wrote their scripts and then stopped at the
+  first character line, 97 to 151 seconds in: "audio engine 'kokoro' is not
+  usable for role 'char_voice': missing_model -- kokoro non-English speech
+  needs the torch kokoro package (lang_code 'e'); kokoro-onnx is English-only
+  on this pack".
+- root cause: the pack pinned the ONNX backend to lang="en-gb" and refused
+  every other lang_code (the 2026-09-18 day-1 rule, "do not guess an ONNX
+  locale"). The torch pipeline voices es, fr-fr, hi, it and pt-br through
+  misaki's EspeakG2P: espeak-ng phonemes plus a few folds into Kokoro's own
+  symbols. phonemizer and espeak-ng ship with kokoro-onnx, so the ONNX side
+  could do the same; nobody had measured it.
+- fix: 4f973e98 -- EspeakPhonemizer repeats misaki 0.9.4's EspeakG2P, and the
+  ONNX backend phonemizes the five espeak rows and hands kokoro-onnx the
+  phonemes. Japanese and Mandarin still need the torch package (misaki's ja
+  and zh phonemizers have no 3.13 build) and refuse by name. Docs corrected in
+  the same change and the next (apple/MAC.md, the README install note).
+- live verify: phoneme strings identical to misaki on eleven sentences across
+  the five languages; the Desktop's Python 3.13 produced the same strings
+  (sha da58ecf08a244611 from both venvs); all five spoken through the pack's
+  real ONNX backend on the Desktop's own Kokoro (Spanish, ef_dora: 4.83 s of
+  audio in 1.88 s on the CPU). Episode-level proof is the operator's next
+  Spanish run after a restart.
+- open: the language roll can still land on Japanese or Mandarin on a 3.13
+  box, and a language the workflow's voice engine does not admit
+  (cloud_elevenlabs) still fails at CastLock after the writer. The queue-time
+  check is the next change.
+- Bible: 12.186.
