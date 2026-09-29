@@ -119,6 +119,12 @@ class MyStoryCastError(MyStoryError):
     """The cast cannot be built or cannot be heard."""
 
 
+def _norm_ws(text: str) -> str:
+    """Whitespace folded: outer trimmed, inner runs collapsed to one space.
+    Defined ahead of the schema: the name validators below call it."""
+    return " ".join(str(text or "").split())
+
+
 # ---------------------------------------------------------------------------
 # P0 -- interpretation
 # ---------------------------------------------------------------------------
@@ -399,10 +405,6 @@ def _require_ledger_save(led: Any, what: str) -> None:
             "the ledger did not persist after %s -- refusing to continue, "
             "because every downstream node reads it from disk" % what,
         )
-
-
-def _norm_ws(text: str) -> str:
-    return " ".join(str(text or "").split())
 
 
 def _sha256(text: str) -> str:
