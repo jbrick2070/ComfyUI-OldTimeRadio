@@ -15830,3 +15830,10 @@ not promote it to the Bug Bible on this evidence alone.
   (cloud_elevenlabs) still fails at CastLock after the writer. The queue-time
   check is the next change.
 - Bible: 12.186.
+
+## PBUG-20260928-06 follow-up -- the open half closed: every row speaks on the ONNX Kokoro
+- 503b2661 (Mandarin) and d786238d (Japanese): the pack carries misaki's own
+  phonemizers for the two rows the ONNX backend could not speak, so a Python 3.13
+  box voices all eight once their opt-in libraries are installed; until then the
+  queue-time check (2326632b) names the pip line. Measured identical to misaki and
+  spoken on the Desktop's Python 3.13.

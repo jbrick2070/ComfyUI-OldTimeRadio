@@ -1165,3 +1165,43 @@ call; the full suite is 17,273 passed / 0 failed at a53865cd (12 min).
 4491c738) and 2326632b (nothing held); Sonnet 5.5 on both (six findings each,
 fixed in 85a1d304 and e4ecb822). Full suite at 2326632b: 17,298 passed, 0
 failed; at e4ecb822: 17,312 passed, 0 failed.
+
+## 2026-09-28 22:40 -- all eight languages on the ONNX Kokoro; an overnight broadcast feed
+
+- **The ask.** Operator: "we standardize everything to ONNX for Mac compat,
+  but if ONNX doesn't handle languages that's a problem", then "do what you
+  can ... I trust you". Two Kokoro lanes were weighed and dropped: the torch
+  build cannot install on Python 3.13 at all (kokoro 0.9.4, misaki 0.9.4 and
+  misaki-fork 0.9.6 all pin <3.13, nothing newer since April 2025), and his
+  own Windows Desktop is 3.13, so a torch lane would fail there too.
+- **503b2661 -- Mandarin.** The pack carries misaki's Chinese phonemizer in
+  `nodes/_otr_audio_engines/_misaki` (zh.py on the legacy path Kokoro-82M
+  uses, transcription.py byte for byte, LICENSE, PROVENANCE.json hashing
+  every file). Needs jieba, pypinyin, cn2an, ordered-set (pure Python).
+- **d786238d -- Japanese.** misaki's Cutlet route (the one JAG2P() takes by
+  default -- not OpenJTalk, which ChatGPT's review of the problem statement
+  caught). mojimoji has no 3.13 wheel; measured over every code point, after
+  NFKC it is a no-op plus a three-character table, which replaces it. The
+  MeCab dictionary is pinned to unidic-lite (the PBUG-20260918-06 trap cannot
+  recur on this path). Needs fugashi, jaconv, unidic-lite (~250 MB).
+- **Proof.** Both copies give output identical to misaki (Japanese on 610
+  strings, including ten nonsense inputs where misaki itself raises); goldens
+  let the tests run where misaki cannot install; on the Desktop's Python 3.13,
+  with the libraries in a scratch --target folder (his Desktop venv was not
+  touched), the pack's real ONNX backend spoke both (clips sent). Full suite
+  17,336 passed, 0 failed. The libraries are opt-in per language: the
+  queue-time check names the pip line when they are missing.
+- **Overnight feed (his OBS broadcast).** Headless server on :8000 from
+  `scripts/_otr_soak_server_launch.cmd`, publishing to
+  `Documents\ComfyUI\output\otr\obs`; supervisor
+  `tmp/overnight_20260928/overnight_randomizers.py` (detached; STOP file beside
+  it ends it) runs 1-act canonical episodes back to back with every roll on,
+  English, and a video pool of the 21 local lanes that are not the 24 GB
+  builds. Episode 1 rolled `ltx25_mime_24gb` before the pool was added and ran
+  heavy (20.5 GB staged through the 16 GB card). Note for a morning reader:
+  `scripts/_otr_overnight_loop_launch.ps1` points at a script that no longer
+  exists.
+
+**Review roster.** Composer 2.5 on 503b2661 (no finding held); Sonnet 5.5 on
+503b2661 and Composer + Sonnet on d786238d were running at this writing -- see
+the next entry for what they found.
