@@ -1052,3 +1052,58 @@ operator's call, with the full suite first.
   `_OVERLAP` (33/4) in ltx25_recipe.py have no consumer.
 - The 4060 clean-room clone sits detached at 39bb1f18; both headless servers
   are stopped.
+
+## 2026-09-28 18:30 -- app form, Start here note, Space saver full, My Story on the roll
+
+Operator requests after the v5 wrap-up, all on main:
+
+- **App form (295a7a09, 9573e5c4).** Story idea (`custom_premise`) and Episode
+  title (`episode_title`) are off the app form of every workflow: "I don't want
+  people using My Story to get confused." Both stay on the canvas, blank.
+  README and RUN.md say where to set them.
+- **Start here note (01abedc1, 26d6ee94).** Fable's redesign, operator:
+  "perfect". Stock pale_blue (#2a363b / #3f5159), no backtick code spans (they
+  drew blue-on-grey chips), all six banks with the house three first, Visual
+  style, one link to apple/MACHINES.md, no custom_premise, "your ComfyUI output
+  folder under otr/obs". Checked live on a ComfyUI canvas.
+  tests/test_workflow_notes_are_never_sent.py pins names, labels, no backticks.
+- **Space saver ships full (26d6ee94).** Operator: "full for everyone". All 27
+  workflows carry "full (keep only the published video)" and so does the node
+  default; a graph saved before the widget opens full too, and only an API
+  prompt that omits the key reads as off. A paired-replay measurement leg that
+  needs the working files passes
+  `--set OTR_LedgerScriptWriter.asset_cleanup="off (keep everything)"`.
+- **My Story on the roll (3dec8a5b).** Four of his randomized runs each stopped
+  in a second: leftover My Story text with Story bank on roll. Operator rule:
+  the roll uses the boxes if it lands on my_story (DEFAULT_IDEA when empty) and
+  ignores them anywhere else, logged; a bank picked by hand with filled boxes
+  still refuses, now in the form's words. StoryInputPolicy.rolled, set at the
+  validator, the writer's pre-roll check and _resolve_inputs. BANKS.md and
+  README updated. **Follow-up a53865cd** (Sonnet 5.5, 3 confirmed): the
+  pre-roll check had reached `_ROLLS` before the replay shortcut (3 replay
+  tests red -- my scoped run grepped by topic and missed files importing the
+  writer as W); the story module now keeps its own BANK_ROLL_LABEL, held equal
+  to the roll module's by a test. Wiring tests added at the gate and the
+  writer; each hookup switched off in turn fails its own test. And the Space
+  saver docs claimed an older saved graph "still reads as off" -- false: the
+  frontend fills it from the widget default, so it opens full; corrected with
+  every stale "ships off" line and an amendment to the standing ruling.
+  Composer on a53865cd doubted that; measured on a live ComfyUI (:8000): the
+  canonical cut back to a pre-Space-saver writer (34 widget names and values,
+  links re-pointed by identity) loads with "full (keep only the published
+  video)" and queues full. OTR's own loader refuses a names/values mismatch
+  outright ("Nothing was loaded"), so a probe must drop both.
+- **Saved workflows moved, not deleted.** Operator: the repo's workflows folder
+  is the only home for workflows. All 8 saved workflows in the two ComfyUI user
+  folders moved to `user\default\_retired_workflows_20260928\` beside them
+  (ComfyUI (1): the BARK test; Documents\ComfyUI: seven, incl. the v1 radio
+  drama). Both installs junction the pack to the repo.
+
+**Review roster.** Composer 2.5 on every commit; Sonnet 5.5 on 3dec8a5b +
+26d6ee94 (3 confirmed, fixed in a53865cd). Composer's findings that held became 9573e5c4 (docs) and the obs
+wording in 26d6ee94; its "free text is not tested" note was declined (no
+doc-wording tests).
+
+**Open.** His Desktop ComfyUI must be restarted to load the roll rule and the
+Space saver default. 2.3.14 (v5, the brightness fixes, these changes) is his
+call; the full suite is 17,273 passed / 0 failed at a53865cd (12 min).
