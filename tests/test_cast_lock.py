@@ -617,6 +617,48 @@ def test_an_announcer_already_on_a_bark_preset_takes_a_seat_whoever_voices_it():
                                      char_voice_engine="bark")
 
 
+def test_the_seat_count_matches_the_draws_for_every_announcer_shape():
+    """Characters plus the larger of: the distinct Bark presets announcer rows
+    already hold (the character draw keeps them off the characters), and one
+    when Bark voices the announcer (its own draw). A second announcer-named row
+    -- a PA system called "Announcer" -- is an announcer to CastLock
+    (agy QA of 8efff924). Each shape is cast at its limit and refused one past
+    it, so the count is proven against the draws, not against itself."""
+    from nodes._otr_casting import CastingFailedError
+    from nodes.cast_lock import CastLock, _bark_seats
+
+    def shape(characters, first, second, engine):
+        cast = _story_cast(characters)
+        cast[0]["voice_preset"] = first
+        if second is not None:
+            cast.append({"char_id": "c99", "name": "Announcer", "gender": "",
+                         "tts_model": "kokoro", "voice_preset": second})
+        return cast, engine
+
+    shapes = {  # (first announcer, second announcer, engine): extra seats
+        ("bf_lily", None, "kokoro"): 0,
+        ("bf_lily", None, "bark"): 1,
+        ("v2/en_speaker_9", None, "kokoro"): 1,
+        ("v2/en_speaker_9", None, "bark"): 1,
+        ("v2/en_speaker_9", "v2/en_speaker_7", "kokoro"): 2,
+        ("v2/en_speaker_9", "v2/en_speaker_7", "bark"): 2,
+        ("v2/en_speaker_9", "v2/en_speaker_9", "kokoro"): 1,
+        ("bf_lily", "bf_emma", "bark"): 1,
+    }
+    for (first, second, engine), extra in shapes.items():
+        limit = 10 - extra
+        cast, engine = shape(limit, first, second, engine)
+        assert _bark_seats(cast, engine)[0] == 10, (first, second, engine)
+        CastLock._assign_bark_voices(cast, {"source_bank": "my_story", "episode_seed": 5},
+                                     [], announcer_voice_engine=engine,
+                                     char_voice_engine="bark")
+        cast, engine = shape(limit + 1, first, second, engine)
+        with pytest.raises(CastingFailedError, match="Bark has 10 voices, and this cast needs 11"):
+            CastLock._assign_bark_voices(cast, {"source_bank": "my_story", "episode_seed": 5},
+                                         [], announcer_voice_engine=engine,
+                                         char_voice_engine="bark")
+
+
 def test_the_voice_roll_is_told_which_casts_bark_cannot_voice():
     from nodes.cast_lock import _cast_gap
 

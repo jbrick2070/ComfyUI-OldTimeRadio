@@ -216,13 +216,17 @@ def _bark_seats(cast, announcer_engine) -> "tuple[int, int, str]":
     announcers = [r for r in rows if _is_announcer_entry(r)]
     needed = len(rows) - len(announcers)
     whose = "each character"
-    # The announcer takes a seat when Bark voices it, and also when it arrives
-    # holding a Bark preset: the character draw keeps that preset off every
-    # character whichever engine the announcer speaks with (agy QA of
-    # ee9c2ddf -- ten characters and a pre-voiced announcer ran dry).
-    if announcers and (announcer_engine == "bark" or any(
-            str(r.get("voice_preset") or "").startswith("v2/") for r in announcers)):
-        needed += 1
+    # The character draw keeps every Bark preset an announcer row already holds
+    # off the characters, whichever engine speaks the announcer; a Bark
+    # announcer then draws one voice from what the characters left. So the
+    # announcer rows take the larger of the two -- counted as the draws spend
+    # them (agy QA of ee9c2ddf and 8efff924: a pre-voiced announcer, and a
+    # second announcer-named row, each ran a draw dry).
+    held = {str(r.get("voice_preset")) for r in announcers
+            if str(r.get("voice_preset") or "").startswith("v2/")}
+    seats = max(len(held), 1 if announcers and announcer_engine == "bark" else 0)
+    if seats:
+        needed += seats
         whose = "each character and the announcer"
     try:
         from ..config import cast_pools as _POOLS  # type: ignore
