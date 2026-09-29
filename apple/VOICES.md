@@ -42,7 +42,7 @@ separate dropdowns and can hold different values.
 
 | Engine | What it is | How you get it | Size | Where it runs |
 |---|---|---|---|---|
-| **`kokoro`** | Built-in voices for every admitted language. The shipped default. The pools are in [MULTILINGUAL.md](MULTILINGUAL.md). | **Automatic** | 0.3 GiB | NVIDIA, Apple Silicon, or CPU-only machines; Japanese and Mandarin need Python 3.10-3.12 |
+| **`kokoro`** | Built-in voices for every admitted language. The shipped default. The pools are in [MULTILINGUAL.md](MULTILINGUAL.md). | **Automatic** | 0.3 GiB | NVIDIA, Apple Silicon, or CPU-only machines; Japanese needs Python 3.10-3.12 |
 | **`bark`** | Preset speaker voices, more theatrical and less predictable | **Automatic** | 4.2 GiB | NVIDIA. **Read the Mac warning below.** |
 | **`chatterbox`** | Clones a voice from a reference recording you supply | Its own Windows installer | 3.0 GiB | 16 GB+ NVIDIA, Windows |
 | **`dia`** | Clones a voice from a reference recording you supply | Its own Windows installer | 6.0 GiB | 16 GB+ NVIDIA, Windows |
@@ -64,11 +64,11 @@ on ComfyUI Desktop and the portable build (Python 3.13, Kokoro's `kokoro-onnx`
 backend) and about 8x on a from-source install (Python 3.12, Kokoro's `torch`
 backend). Either way, voices are not what makes those runs long.
 
-The Python 3.13 ONNX backend speaks English, Spanish, Portuguese, Italian,
-French and Hindi, with the same phonemes the torch pipeline uses. Japanese and
-Mandarin use the torch Kokoro pipeline and therefore require Python 3.10
-through 3.12, and they also check their `misaki[ja]` / `misaki[zh]` readiness
-extras when selected. See [MULTILINGUAL.md](MULTILINGUAL.md).
+The Python 3.13 ONNX backend speaks every language but Japanese, with the
+same phonemes the torch pipeline uses; Mandarin needs its four libraries
+(`pip install jieba pypinyin cn2an ordered-set`). Japanese uses the torch Kokoro pipeline and
+therefore requires Python 3.10 through 3.12, and it checks its `misaki[ja]`
+readiness extra when selected. See [MULTILINGUAL.md](MULTILINGUAL.md).
 
 ### The cloning engines need two things, not one
 

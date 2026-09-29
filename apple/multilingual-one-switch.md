@@ -196,8 +196,10 @@ guess an ONNX locale; prove it or leave it off the row.
 now phonemizes Spanish, French, Hindi, Italian and Portuguese with a copy of
 misaki's `EspeakG2P` and hands kokoro-onnx the phonemes: identical phoneme
 strings to misaki 0.9.4 on every sample, the same strings from Python 3.13, and
-all five spoken on the Desktop's own Kokoro. Japanese and Mandarin stay torch
-only; their misaki phonemizers have no Python 3.13 build.
+all five spoken on the Desktop's own Kokoro. **Mandarin followed the same
+night:** the pack carries misaki's Chinese phonemizer (its libraries install on
+3.13), with phonemes identical to misaki's and spoken on Python 3.13. Japanese
+stays torch only for now.
 
 Kokoro `load()` early-returns if a backend exists. Rebuild on language change.
 Cache identity is `(lang, device)`. A resident server must not run Spanish

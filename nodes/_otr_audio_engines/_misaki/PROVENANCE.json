@@ -1,0 +1,21 @@
+{
+  "upstream": "misaki 0.9.4 (PyPI wheel, hexgrad, Apache-2.0)",
+  "why": "Kokoro's torch pipeline phonemizes Mandarin with misaki's ZHG2P; misaki does not install on Python 3.13, so the ONNX backend carries this copy.",
+  "files": {
+    "transcription.py": {
+      "upstream_sha256": "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32",
+      "vendored_sha256": "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32",
+      "change": "none (byte for byte); its own MIT notice is at the top"
+    },
+    "zh.py": {
+      "upstream_sha256": "97d16aec581832845d2566cb24da2ba045d4552fb65a5017a6eac8feef654c81",
+      "vendored_sha256": "6e92f77134fcf8c2acd592fee71eccf7ff18aa899d0c39cb189cf514dfc6437e",
+      "change": "the version '1.1' frontend branch removed (it imports zh_frontend, not vendored); __init__ refuses any version but None; __call__ ends at the legacy return"
+    },
+    "LICENSE": {
+      "upstream_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "vendored_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "change": "none (misaki's Apache-2.0 licence)"
+    }
+  }
+}

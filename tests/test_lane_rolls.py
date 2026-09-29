@@ -507,9 +507,14 @@ def _langs():
     return langs
 
 
-def _no_torch_kokoro(monkeypatch):
+def _no_torch_kokoro(monkeypatch, mandarin_libraries=True):
+    """A Python 3.13 box: no torch kokoro. Mandarin still speaks through the
+    ONNX backend's copy of misaki when its four libraries are installed."""
+    from nodes._otr_audio_engines import _kokoro_backends as kb
     from nodes._otr_audio_engines import eng_kokoro
     monkeypatch.setattr(eng_kokoro, "_spec_present", lambda name: False)
+    monkeypatch.setattr(kb, "own_g2p_missing",
+                        lambda code: [] if mandarin_libraries or code != "z" else ["jieba"])
 
 
 def _extras_ready(monkeypatch):
@@ -525,17 +530,19 @@ def _language_prompt(language, pool="", audio=False, char="kokoro",
     return prompt
 
 
-def test_kokoro_speaks_the_espeak_rows_everywhere_and_cjk_only_with_torch(monkeypatch):
+def test_kokoro_on_onnx_speaks_all_but_japanese_which_needs_torch(monkeypatch):
     from nodes._otr_audio_engines import eng_kokoro
     langs = _langs()
     _extras_ready(monkeypatch)
     _no_torch_kokoro(monkeypatch)
-    for iso in ("es", "pt", "it", "fr", "hi"):
+    for iso in ("es", "pt", "it", "fr", "hi", "zh"):
         assert L.language_voice_gap(langs.row_by_iso(iso), ("kokoro", "kokoro")) is None
-    for iso, label in (("ja", "Japanese"), ("zh", "Mandarin")):
-        gap = L.language_voice_gap(langs.row_by_iso(iso), ("kokoro", "kokoro"))
-        assert gap.startswith("kokoro cannot speak %s here" % label), gap
-        assert "Python 3.12" in gap
+    gap = L.language_voice_gap(langs.row_by_iso("ja"), ("kokoro", "kokoro"))
+    assert gap.startswith("kokoro cannot speak Japanese here"), gap
+    assert "Python 3.12" in gap
+    _no_torch_kokoro(monkeypatch, mandarin_libraries=False)
+    gap = L.language_voice_gap(langs.row_by_iso("zh"), ("kokoro", "kokoro"))
+    assert "pip install jieba pypinyin cn2an ordered-set" in gap, gap
     monkeypatch.setattr(eng_kokoro, "_spec_present", lambda name: name == "kokoro")
     assert L.language_voice_gap(langs.row_by_iso("ja"), ("kokoro", "kokoro")) is None
 
@@ -589,10 +596,10 @@ def test_the_roll_leaves_out_what_the_voices_cannot_speak(monkeypatch, caplog):
     prompt = _language_prompt(R.LANGUAGE_SENTINEL)
     with caplog.at_level(logging.INFO):
         got = L.settle_prompt_language(prompt, "63")
-    assert sorted(got["1"]) == ["Japanese", "Mandarin"]
+    assert sorted(got["1"]) == ["Japanese"]
     everyone = [c for c in _langs().dropdown_choices() if c != _langs().OFF_LABEL]
     pool = prompt["1"]["inputs"]["language_roll_pool"]
-    assert pool.split(", ") == [c for c in everyone if c not in ("Japanese", "Mandarin")]
+    assert pool.split(", ") == [c for c in everyone if c != "Japanese"]
     assert "left out Japanese (kokoro cannot speak Japanese here" in caplog.text
     # The writer's own roll draws from what the gate left.
     label, receipt = R.resolve_language_selection(
@@ -603,7 +610,7 @@ def test_the_roll_leaves_out_what_the_voices_cannot_speak(monkeypatch, caplog):
 
 def test_a_roll_with_nothing_voiceable_left_stops_at_the_gate(monkeypatch):
     from nodes import _otr_rolls as R
-    _no_torch_kokoro(monkeypatch)
+    _no_torch_kokoro(monkeypatch, mandarin_libraries=False)
     _extras_ready(monkeypatch)
     prompt = _language_prompt(R.LANGUAGE_SENTINEL, pool="Japanese, Mandarin")
     with pytest.raises(_langs().EpisodeLanguageError, match="tick English"):

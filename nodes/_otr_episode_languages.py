@@ -541,14 +541,54 @@ def readiness_extra_ok(token: str) -> bool:
             importlib.import_module("misaki.%s" % sub)
             return True
         except Exception:
-            return False
+            pass
+        code = _pack_copy_lang(sub)
+        return code is not None and _kokoro_backends().own_g2p_ready(code)
     return False
+
+
+#: misaki extra -> the Kokoro lang_code whose phonemizer the pack carries a copy
+#: of (``_otr_audio_engines/_misaki``), for the ONNX backend.
+_MISAKI_EXTRA_LANG = {"zh": "z"}
+
+
+def _kokoro_backends():
+    try:
+        from ._otr_audio_engines import _kokoro_backends as kb
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_audio_engines import _kokoro_backends as kb  # type: ignore
+    return kb
+
+
+def _pack_copy_lang(sub: str):
+    """The lang_code of the pack's copy of misaki's ``sub`` phonemizer when THIS
+    box uses it: the torch kokoro package is absent, so Kokoro runs through ONNX.
+    With the torch package installed its pipeline imports misaki itself, and only
+    misaki satisfies the extra. None when there is no copy or it is not used."""
+    code = _MISAKI_EXTRA_LANG.get(str(sub or "").strip())
+    if code is None:
+        return None
+    import importlib.util
+    try:
+        if importlib.util.find_spec("kokoro") is not None:
+            return None
+    except (ImportError, ValueError):
+        pass
+    return code
 
 
 def assert_readiness_extras(row: LanguageRow) -> None:
     """Fail closed when this box cannot serve the row's extras."""
     for extra in row.admission.get("readiness_extras") or []:
         if not readiness_extra_ok(extra):
+            code = _pack_copy_lang(extra[7:-1] if extra.startswith("misaki[") else "")
+            if code is not None:
+                raise EpisodeLanguageError(
+                    "language %s needs the libraries under Kokoro's %s phonemizer "
+                    "on this box (misaki itself does not install on this Python; "
+                    "the pack carries its code). Install them outside the render "
+                    "with this ComfyUI Python: python -m %s"
+                    % (row.label, row.label, _kokoro_backends().OWN_G2P_INSTALL_HINT[code]))
             raise EpisodeLanguageError(
                 "language %s needs readiness extra %s on this box "
                 "(CastLock extra, never an English-install tax). Install it "

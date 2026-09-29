@@ -302,7 +302,10 @@ def test_readiness_extras_are_not_an_english_install_tax(label, extras):
 ])
 def test_readiness_extra_imports_transitive_contract(
         monkeypatch, label, extra, module_name, dependency):
-    """A discoverable adapter is not usable when a transitive import is absent."""
+    """A discoverable adapter is not usable when a transitive import is absent.
+    The torch path: with the torch kokoro package installed only misaki
+    satisfies the extra, so the pack's own copy is never consulted."""
+    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
     calls = []
 
     def _missing_dependency(requested_module):
@@ -317,6 +320,7 @@ def test_readiness_extra_imports_transitive_contract(
 
 
 def test_readiness_extra_accepts_a_fully_importable_adapter(monkeypatch):
+    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)   # the torch path
     calls = []
 
     def _available(module_name):
@@ -396,3 +400,34 @@ def test_row_sha256_changes_when_the_row_changes(fresh):
     assert after["episode_language_receipt"]["row_revision"] == 99
     assert (after["episode_language_receipt"]["row_sha256"]
             != before["episode_language_receipt"]["row_sha256"])
+
+
+# --- Python 3.13: the pack's own copy of misaki's Mandarin phonemizer --------
+# misaki does not install on 3.13, where Kokoro runs through ONNX; the ONNX
+# backend carries misaki's Mandarin code, so there the extra is met by that
+# copy's libraries, and the message names the pip line that installs them.
+
+def test_without_torch_kokoro_the_mandarin_extra_is_the_pack_copy(monkeypatch):
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+
+    def _no_misaki(name, package=None):
+        raise ModuleNotFoundError("No module named 'misaki'")
+
+    monkeypatch.setattr(importlib, "import_module", _no_misaki)
+    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: {"zh": "z"}.get(sub))
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: code == "z")
+    assert el.readiness_extra_ok("misaki[zh]") is True
+    assert el.readiness_extra_ok("misaki[ja]") is False          # no copy yet
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: False)
+    with pytest.raises(el.EpisodeLanguageError,
+                       match="pip install jieba pypinyin cn2an ordered-set"):
+        el.assert_readiness_extras(el.row_by_label("Mandarin"))
+
+
+def test_with_torch_kokoro_installed_the_copy_is_never_the_answer(monkeypatch):
+    import importlib.util as util
+    monkeypatch.setattr(util, "find_spec", lambda name: object() if name == "kokoro" else None)
+    assert el._pack_copy_lang("zh") is None
+    monkeypatch.setattr(util, "find_spec", lambda name: None)
+    assert el._pack_copy_lang("zh") == "z"
+    assert el._pack_copy_lang("ja") is None

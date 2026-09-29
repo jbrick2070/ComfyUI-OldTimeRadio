@@ -505,11 +505,11 @@ def test_the_espeak_set_is_the_torch_pipelines_own():
     assert sorted(_ESPEAK_SAMPLES) == sorted(kb.ESPEAK_LANGUAGES.values())
 
 
-def test_every_non_english_row_is_espeak_or_needs_torch():
+def test_every_non_english_row_is_espeak_a_pack_copy_or_needs_torch():
     from nodes import _otr_episode_languages as langs
     rows, _by_label, _by_iso = langs.load_registry()
     codes = {row.engines["kokoro"]["lang_code"] for row in rows if row.iso != "en"}
-    assert codes - set(kb.ESPEAK_LANGUAGES) == {"j", "z"}
+    assert codes - set(kb.ESPEAK_LANGUAGES) - set(kb.OWN_G2P) == {"j"}
 
 
 @pytest.mark.parametrize("language", sorted(_ESPEAK_SAMPLES))
@@ -569,10 +569,13 @@ def test_load_builds_the_row_phonemizer_and_refuses_what_onnx_cannot_speak(monke
     english = kb.OnnxKokoroBackend("m.onnx", "v.npz")
     english.load()
     assert english._g2p is None and built == ["es"]
+    monkeypatch.setitem(kb.OWN_G2P, "z", lambda: _StubG2P())
+    mandarin = kb.OnnxKokoroBackend("m.onnx", "v.npz", lang_code="z")
+    mandarin.load()
+    assert isinstance(mandarin._g2p, _StubG2P)
     _absent(monkeypatch, "onnxruntime")          # refused before any import
-    for code in ("j", "z"):
-        with pytest.raises(kb.BackendUnavailable, match="no phonemizer for lang_code '%s'" % code):
-            kb.OnnxKokoroBackend("m.onnx", "v.npz", lang_code=code).load()
+    with pytest.raises(kb.BackendUnavailable, match="no phonemizer for lang_code 'j'"):
+        kb.OnnxKokoroBackend("m.onnx", "v.npz", lang_code="j").load()
 
 
 def test_the_engine_speaks_an_espeak_row_on_onnx(monkeypatch, tmp_path):
@@ -607,9 +610,9 @@ def test_a_cjk_row_moves_to_torch_when_torch_is_installed(monkeypatch, tmp_path)
             pass
 
     monkeypatch.setattr(kb, "TorchKokoroBackend", _Torch)
-    eng._lang_code = "z"
+    eng._lang_code = "j"
     eng.load()
-    assert eng._backend_name == "torch" and loaded == ["z"]
+    assert eng._backend_name == "torch" and loaded == ["j"]
 
 
 #: misaki 0.9.4's EspeakG2P on _ESPEAK_SAMPLES (espeak-ng 1.52 through
@@ -686,3 +689,39 @@ def test_a_forced_onnx_backend_keeps_the_espeak_rows_on_onnx(monkeypatch, tmp_pa
     eng.load()
     assert eng._backend_name == "onnx"
     assert _StubOnnxBackend.instances[-1].lang_code == "f"
+
+
+
+# --------------------------------------------------------------------------- #
+# Mandarin on ONNX through the pack's copy of misaki (2026-09-28)
+# --------------------------------------------------------------------------- #
+def test_mandarin_on_onnx_needs_only_its_four_libraries(monkeypatch, tmp_path):
+    eng = _onnx_engine(monkeypatch, tmp_path)
+    monkeypatch.setattr(eng_kokoro, "_spec_present", lambda n: False)   # no torch kokoro
+    monkeypatch.setattr(kb, "own_g2p_missing", lambda code: [])
+    eng._lang_code = "z"
+    eng.load()
+    assert eng._backend_name == "onnx"
+    assert _StubOnnxBackend.instances[-1].lang_code == "z"
+
+
+def test_mandarin_without_its_libraries_names_the_pip_line(monkeypatch, tmp_path):
+    eng = _onnx_engine(monkeypatch, tmp_path)
+    monkeypatch.setattr(eng_kokoro, "_spec_present", lambda n: False)
+    monkeypatch.setattr(kb, "own_g2p_missing", lambda code: ["jieba", "cn2an"])
+    eng._lang_code = "z"
+    with pytest.raises(EngineUnusable) as exc:
+        eng.load()
+    assert exc.value.reason == EngineUsabilityReason.MISSING_MODEL
+    assert "jieba, cn2an" in str(exc.value)
+    assert "pip install jieba pypinyin cn2an ordered-set" in str(exc.value)
+
+
+def test_the_mandarin_libraries_are_probed_without_importing_them(monkeypatch):
+    import importlib.util as util
+    seen = []
+    monkeypatch.setattr(util, "find_spec",
+                        lambda name: seen.append(name) or (None if name == "cn2an" else object()))
+    assert kb.own_g2p_missing("z") == ["cn2an"]
+    assert seen == list(kb.OWN_G2P_MODULES["z"])
+    assert kb.own_g2p_missing("b") == [] and kb.own_g2p_missing("e") == []

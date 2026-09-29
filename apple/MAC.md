@@ -74,9 +74,8 @@ selects, so that half costs you nothing extra.
 ## Python and voices
 
 3.12 or earlier runs Kokoro on torch and speaks every row. 3.13 runs Kokoro
-through `kokoro-onnx` on the CPU automatically: English, Spanish, Portuguese,
-Italian, French and Hindi, but not Japanese or Mandarin, which need the torch
-path. 3.14 has no Kokoro build and is refused
+through `kokoro-onnx` on the CPU automatically: every language but Japanese,
+which needs the torch path (Mandarin needs `pip install jieba pypinyin cn2an ordered-set`). 3.14 has no Kokoro build and is refused
 rather than half working. Details in [INSTALL.md](INSTALL.md#python-versions) and
 [MULTILINGUAL.md](MULTILINGUAL.md).
 

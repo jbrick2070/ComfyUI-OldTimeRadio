@@ -32,9 +32,15 @@ symbols. misaki does not install on Python 3.13, but phonemizer and espeak-ng
 come with kokoro-onnx, so ``EspeakPhonemizer`` repeats that G2P here and the
 ONNX backend hands kokoro-onnx the phonemes. Measured the day it was written:
 identical phoneme strings to misaki 0.9.4 on eleven sentences across the five
-languages, and the same strings from the Desktop's Python 3.13. Japanese and
-Mandarin use misaki's own Japanese and Chinese G2P, which has no Python 3.13
-build, so those two rows still need the torch package.
+languages, and the same strings from the Desktop's Python 3.13.
+
+MANDARIN ON ONNX (2026-09-28). misaki's Chinese G2P is Python over jieba,
+pypinyin, cn2an and ordered-set, all of which install on 3.13; only misaki's own
+package pin refuses. The pack carries a copy of it (``_misaki``, provenance
+hashed) and ``MandarinPhonemizer`` feeds its phonemes to kokoro-onnx; the four
+libraries are an opt-in install for the Mandarin row (``OWN_G2P_INSTALL_HINT``).
+Japanese uses misaki's Cutlet route (fugashi and a UniDic dictionary) and still
+needs the torch package.
 
 RULES THIS FILE KEEPS: C-5 -- nothing heavy (torch, numpy, onnxruntime, kokoro)
 is imported at module top; the package imports ``eng_kokoro`` at init. C-7 --
@@ -81,6 +87,13 @@ ONNX_THREAD_CAP = 4
 #: three is here: this is exactly the set the ONNX backend voices through
 #: ``EspeakPhonemizer``.
 ESPEAK_LANGUAGES = {"e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br"}
+
+#: The rows the ONNX backend phonemizes with the pack's own copy of misaki
+#: (``_misaki``), because misaki does not install on Python 3.13: lang_code ->
+#: the modules that copy imports, and the pip line that installs them. Opt-in
+#: per language, like the torch path's misaki extras; never an English tax.
+OWN_G2P_MODULES = {"z": ("jieba", "pypinyin", "cn2an", "ordered_set")}
+OWN_G2P_INSTALL_HINT = {"z": "pip install jieba pypinyin cn2an ordered-set"}
 
 TORCH_INSTALL_HINT = "pip install kokoro   (Python 3.12 or earlier)"
 ONNX_INSTALL_HINT = "pip install kokoro-onnx   (Python 3.10 to 3.13; onnxruntime comes with it)"
@@ -332,6 +345,73 @@ class EspeakPhonemizer:
         return ps.replace("\xab", "(").replace("\xbb", ")")
 
 
+class MandarinPhonemizer:
+    """misaki 0.9.4's ``ZHG2P`` on the legacy path hexgrad/Kokoro-82M uses
+    (``version=None``), from the pack's copy in ``_misaki``: the phonemes the
+    torch pipeline feeds its model for a Mandarin line. Needs the
+    ``OWN_G2P_MODULES["z"]`` libraries; jieba's own console chatter (it logs
+    every dictionary load at DEBUG to stderr) is turned down to warnings."""
+
+    language = "zh"
+
+    def __init__(self):
+        import warnings
+
+        with warnings.catch_warnings():
+            # jieba 0.42's import of pkg_resources warns on every new setuptools.
+            warnings.simplefilter("ignore", UserWarning)
+            import jieba
+            from ._misaki.zh import ZHG2P
+        jieba.setLogLevel(logging.WARNING)
+        self._g2p = ZHG2P()
+
+    def __call__(self, text: str) -> str:
+        phonemes, _tokens = self._g2p(text)
+        return phonemes
+
+
+#: lang_code -> the phonemizer the ONNX backend builds from the pack's copy, and
+#: the copy's module (relative to this package) that a readiness check imports.
+OWN_G2P = {"z": MandarinPhonemizer}
+OWN_G2P_IMPORT = {"z": "._misaki.zh"}
+
+
+def own_g2p_ready(lang_code) -> bool:
+    """True when the pack's copy of misaki for ``lang_code`` imports here: its
+    libraries are installed and their own imports work (the transitive
+    contract, as ``readiness_extra_ok`` asks of misaki itself)."""
+    import importlib
+    import warnings
+
+    module = OWN_G2P_IMPORT.get(str(lang_code or "").strip())
+    if module is None:
+        return False
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            importlib.import_module(module, __package__)
+        return True
+    except Exception:  # noqa: BLE001 -- any import failure is "not ready"
+        return False
+
+
+def own_g2p_missing(lang_code) -> list:
+    """The ``OWN_G2P_MODULES`` a row still needs on this box, by spec probe
+    (nothing is imported, so a queue-time check pays no import). Empty for a
+    row that needs none or has them all."""
+    import importlib.util
+
+    missing = []
+    for name in OWN_G2P_MODULES.get(str(lang_code or "").strip(), ()):
+        try:
+            found = importlib.util.find_spec(name) is not None
+        except (ImportError, ValueError):
+            found = False
+        if not found:
+            missing.append(name)
+    return missing
+
+
 # --------------------------------------------------------------------------- #
 # Backends
 # --------------------------------------------------------------------------- #
@@ -469,7 +549,13 @@ class OnnxKokoroBackend:
 
     English lines go to kokoro-onnx as text (its own espeak ``en-gb``). A line
     in one of the ``ESPEAK_LANGUAGES`` goes as phonemes from
-    ``EspeakPhonemizer``, the torch pipeline's own G2P. A line too long for one
+    ``EspeakPhonemizer``, and a Mandarin line as phonemes from
+    ``MandarinPhonemizer`` -- in each case the torch pipeline's own G2P. The
+    style vector is picked by kokoro-onnx from the count of phonemes the model
+    knows, where the torch pipeline counts every character of the phoneme
+    string, so a phoneme string with an unknown character (a Spanish inverted
+    mark) can take the neighbouring style row: measured inaudible, waveforms
+    0.988-0.996 alike on the espeak rows. A line too long for one
     pass is cut where kokoro-onnx cuts it (at punctuation, within 510
     phonemes), where the torch pipeline cuts the text into 400-character
     pieces and truncates any that still run past 510 phonemes.
@@ -492,11 +578,12 @@ class OnnxKokoroBackend:
     def load(self) -> None:
         if self._kokoro is not None:
             return
-        if self.lang_code not in ("a", "b") and self.lang_code not in ESPEAK_LANGUAGES:
+        if self.lang_code not in ("a", "b") and self.lang_code not in ESPEAK_LANGUAGES \
+                and self.lang_code not in OWN_G2P:
             raise BackendUnavailable(
                 "the ONNX kokoro has no phonemizer for lang_code %r; it voices "
                 "English and lang_codes %s" % (
-                    self.lang_code, ", ".join(sorted(ESPEAK_LANGUAGES))))
+                    self.lang_code, ", ".join(sorted(set(ESPEAK_LANGUAGES) | set(OWN_G2P)))))
         import onnxruntime as ort
         from kokoro_onnx import Kokoro
 
@@ -520,8 +607,12 @@ class OnnxKokoroBackend:
         # After the session (it points phonemizer at kokoro-onnx's espeak-ng),
         # and before anything is kept: a phonemizer that fails to build leaves
         # the backend unloaded, never loaded without it.
-        g2p = (EspeakPhonemizer(ESPEAK_LANGUAGES[self.lang_code])
-               if self.lang_code in ESPEAK_LANGUAGES else None)
+        if self.lang_code in ESPEAK_LANGUAGES:
+            g2p = EspeakPhonemizer(ESPEAK_LANGUAGES[self.lang_code])
+        elif self.lang_code in OWN_G2P:
+            g2p = OWN_G2P[self.lang_code]()
+        else:
+            g2p = None
         self._session, self._kokoro, self._g2p = session, kokoro, g2p
         self.providers_active = list(session.get_providers())
 
@@ -533,7 +624,7 @@ class OnnxKokoroBackend:
 
         if self._kokoro is None:
             raise RuntimeError("ONNX backend not loaded")
-        if self._g2p is None and self.lang_code in ESPEAK_LANGUAGES:
+        if self._g2p is None and self.lang_code not in ("a", "b"):
             raise RuntimeError(
                 "the ONNX backend for lang_code %r has no phonemizer; it will not "
                 "read the line as English" % self.lang_code)

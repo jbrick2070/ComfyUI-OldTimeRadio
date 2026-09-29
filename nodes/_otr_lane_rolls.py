@@ -415,7 +415,8 @@ def music_pool(host=None) -> "tuple[tuple[str, ...], dict]":
 def _engine_language_gap(name, row) -> "str | None":
     """Why engine ``name`` cannot speak ``row``'s language on this machine, in
     the engine's own words, or None. Only an engine with a ``language_gap``
-    method knows of one (Kokoro: Japanese and Mandarin need its torch build)."""
+    method knows of one (Kokoro: Japanese needs its torch build, Mandarin its
+    four libraries on the ONNX backend)."""
     try:
         from . import _otr_audio_engines  # noqa: F401 -- registers built-ins
         from ._otr_audio_engines import registry as areg
@@ -803,8 +804,9 @@ def roll_voice_engine(meta, cast_voice_policy, *,
 # Three of the operator's randomized Desktop runs wrote their scripts and died
 # at the first Spanish line, two minutes in. The ONNX Kokoro now speaks the
 # five espeak rows, but a language can still be out of this run's reach:
-# Japanese or Mandarin where the torch kokoro build cannot install, a row
-# whose readiness extra is missing, or a voice engine the row does not admit.
+# Japanese where the torch kokoro build cannot install, a row whose
+# libraries or readiness extra are missing, or a voice engine the row does
+# not admit.
 # CastLock and the voice engine refuse those only after the writer has run, so
 # the gate asks the same questions before it.
 
