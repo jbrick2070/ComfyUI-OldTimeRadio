@@ -1440,3 +1440,48 @@ into one folder as their scanner does. No shipped file shadows a standard
 module. It reads as a fault on their side; a fresh scan needs a new version
 (2.3.15 would also carry the Bark fix) or Comfy-Org. His call. 2.3.13 stays
 the live version.
+
+## 2026-09-29 12:40 -- gauntlet results, two grammar-level fixes, 2.3.15 Active
+
+- **2.3.15 is Active** (23355343; the 2.3.14 Flag was the registry's pylint
+  scanner crashing on an unchanged file -- a fresh scan passed). 2.3.15 also
+  restamps the 27 workflows, which 2.3.14's release commit had left at
+  2.3.13 (memory: a version bump is three edits).
+- **Bark big cast (PBUG-20260929-03)** verified live on test stories written for
+  the purpose (operator: "create your own story and fill in the blanks"):
+  a hand-pinned Bark on ten characters is refused in words; the roll leaves
+  Bark out ("has 10 voices, and this cast needs 11") and the episode published
+  on Chatterbox. Review series: Grok design, Composer and agy Flash QA,
+  settled by a 360-cast test of the count against the draws.
+- **Language gauntlet** (11 one-act legs, viz_green, canonical, 16gb; the
+  server predated the fixes): published Spanish/original, Portuguese/
+  public_domain, Italian/media_archive, French/shakespeare, Mandarin/original,
+  Japanese/shakespeare, roll->French/my_story, Mandarin/scifi_news_pro.
+  Failed: Japanese and Hindi My Story (PBUG-20260929-05), Hindi news
+  (PBUG-20260929-06). The refusal proof (Spanish, Bark forced) was refused at
+  the gate in 5 s with the new wording.
+- **PBUG-20260929-05 fixed and verified live** (62af48ae): the JSON grammar
+  (lm-format-enforcer) read a stale ASCII alphabet for required strings, so any
+  required field opening outside ASCII died after one character. Reruns on
+  efba7606: Japanese and Hindi My Story both published.
+- **PBUG-20260929-06 open**: the Hindi news rerun passed and the Mandarin one
+  kept Latin names ("Nature", "Exeter", "Jim Wild"), so the source check only
+  fails when a close renders every anchor in its own script. efba7606 makes the
+  finding quote the close and the anchors; the design (Grok refuted a
+  model-asserted mapping; localized aliases produced with the dossier are the
+  lead) waits for a failing close's text.
+- **New, measuring now**: Mandarin writer output carries Cantonese particles and
+  traditional characters (65 of 106 Chinese heartbeat lines in the gauntlet log;
+  the published split_account_zh premise reads "Silas 喺木屋入面发现咗..."),
+  even at temperature 0.2; Japanese output carries stray spaces. Hypothesis:
+  ComfyUI applies the repetition penalty (canonical 1.03) to the prompt's
+  tokens too, so the simplified-Mandarin instruction's own tokens start out
+  penalized. tmp/lang_gauntlet_20260929/mandarin_penalty_ab.py runs the same
+  Mandarin My Story at 1.03 and 1.0 and scores both.
+- **Also**: My Story cast names normalized (a709287c, bd5d4e59); a duplicate
+  registry copy of the pack was moved out of the desktop's custom_nodes and
+  sent to the Recycle Bin at his word; the App-badge problem statement for Comfy
+  is published privately (the Templates App filter cannot list any
+  custom-node template; the Apps sidebar lists saved *.app.json workflows).
+- **Paused**: the overnight feed (STOP present) until the A/B is done. The
+  Bash tool broke at 11:24 when Git for Windows updated; PowerShell works.
