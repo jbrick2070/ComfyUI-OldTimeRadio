@@ -271,3 +271,56 @@ def test_a_stray_comma_is_named_as_written():
     with pytest.raises(json.JSONDecodeError) as exc:
         OJ.parse_first_json_object("{,}")
     assert "Expecting property name enclosed in double quotes near: {<<HERE>>,}" in str(exc.value)
+
+
+# --- Sonnet QA of 7ff91d95 + ba6dd10e -------------------------------------------
+def test_the_position_is_in_the_text_as_the_model_wrote_it():
+    """A raw newline the repair tolerates comes first; the defect named is the
+    stray quote after it, at its line as written, with no escape the model
+    never wrote in the context."""
+    body = '{\n "a": "Line one\ncontinues here",\n "b": "He said "hi" twice"\n}'
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object(_fenced(body))
+    text = str(exc.value)
+    assert 'He said "<<HERE>>hi" twice' in text and "line 4" in text
+    assert "Invalid control character" not in text and chr(92) not in text
+
+
+def test_the_object_named_is_the_one_the_decoder_got_furthest_into():
+    raw = ('```\nplan: {a, b}\n```\n'
+           '```\n{"n": 1, "x": "a "b" c"}\n```')
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object(raw)
+    assert '"x": "a "<<HERE>>b" c"' in str(exc.value)
+
+
+def test_the_context_is_sixty_characters_either_side():
+    raw = '{"t": "' + "x" * 100 + '"q' + "y" * 100 + '"}'
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object(raw)
+    near = str(exc.value).split("near: ", 1)[1].rsplit(": line", 1)[0]
+    before, after = near.split("<<HERE>>")
+    assert len(before) == 60 and before.endswith('x"')
+    assert len(after) == 60 and after.startswith("qyyy")
+
+
+def test_nesting_too_deep_is_a_json_miss_not_a_crash():
+    """Where the recursion limit bites depends on the interpreter: in the
+    decoder on one box, in the key normalization on another. Either way the
+    ladder must see a JSON miss it can retry, never a RecursionError."""
+    for depth in (1100, 5000):
+        raw = '{"a":' * depth + "1" + "}" * depth
+        OJ.extract_first_json_block(raw)                  # never raises
+        with pytest.raises(json.JSONDecodeError, match="nesting too deep"):
+            OJ.parse_first_json_object(raw)
+
+
+def test_the_repair_aligns_back_onto_the_text_as_written():
+    original = '{"a": "x\ty\nz", "b": [1, 2,],}'
+    repaired = OJ._repair_llm_json(original)
+    origin = OJ._origin_of(repaired, original)
+    assert origin is not None and len(origin) == len(repaired) + 1
+    assert all(repaired[j] == original[origin[j]]
+               for j in range(len(repaired)) if repaired[j] == original[origin[j]])
+    assert original[origin[repaired.index("z")]] == "z"
+    assert origin[-1] == len(original)

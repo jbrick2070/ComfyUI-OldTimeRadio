@@ -139,16 +139,72 @@ def _repair_llm_json(blob: str) -> str:
     return _strip_trailing_commas(_escape_raw_controls_in_strings(blob))
 
 
+#: How the repair writes a raw control character it finds inside a string.
+_ESCAPED_CONTROLS = {"\n": "\\n", "\r": "\\r", "\t": "\\t"}
+
+
+def _origin_of(repaired: str, original: str) -> "list | None":
+    """For each index of ``repaired``, and its end, the index in ``original``
+    it came from. The repair only writes a raw control character in a string
+    as its escape and drops a trailing comma, so the two align greedily; None
+    if they ever do not (a repair this does not know about)."""
+    origin: list = []
+    i = j = 0
+    while j < len(repaired):
+        if i < len(original) and original[i] == repaired[j]:
+            origin.append(i)
+            i += 1
+            j += 1
+            continue
+        if i < len(original):
+            ch = original[i]
+            escaped = _ESCAPED_CONTROLS.get(ch) or ("\\u%04x" % ord(ch) if ord(ch) < 32 else "")
+            if escaped and repaired.startswith(escaped, j):
+                origin.extend([i] * len(escaped))
+                i += 1
+                j += len(escaped)
+                continue
+            if ch == ",":
+                i += 1
+                continue
+        return None
+    origin.append(i)
+    return origin
+
+
 def _try_object(decoder: json.JSONDecoder, blob: str, errors=None, is_repair=False):
     try:
         obj, end = decoder.raw_decode(blob)
     except json.JSONDecodeError as exc:
         if errors is not None:
-            errors.setdefault(is_repair, exc)
+            errors.setdefault(is_repair, (exc.msg, blob, exc.pos))
+        return None
+    except RecursionError:
+        # Nested deeper than the decoder follows: a JSON miss like any other,
+        # never an exception out of an extractor documented never to raise.
+        if errors is not None:
+            errors.setdefault(is_repair, ("nesting too deep to decode", blob, 0))
         return None
     if not isinstance(obj, dict):
         return None
     return obj, end
+
+
+def _as_written(errors: dict, original: str, repaired: str) -> tuple:
+    """A recorded decode error as ``(msg, doc, pos)`` in the object as the model
+    wrote it: the error left after the repair when there is one -- a raw newline
+    or a trailing comma the repair tolerates is not the defect -- moved back onto
+    ``original``; else the error in ``original`` itself."""
+    if True in errors:
+        msg, doc, pos = errors[True]
+        at = len(repaired) - len(doc) + pos
+        origin = _origin_of(repaired, original)
+        if origin is not None and 0 <= at < len(origin):
+            return msg, original, origin[at]
+        if False not in errors:
+            return msg, repaired, at
+    msg, doc, pos = errors[False]
+    return msg, original, len(original) - len(doc) + pos
 
 
 def _decode_first_object(blob: str, failures: "list | None" = None) -> str:
@@ -164,9 +220,8 @@ def _decode_first_object(blob: str, failures: "list | None" = None) -> str:
     after is fail-closed so it stays a JSON syntax miss, not a schema
     miss that skips the structural retry.
 
-    ``failures``, when given, gets the decoder's error for an object this
-    walk gave up on: the one left after the repair, else the one in the
-    slice as written.
+    ``failures``, when given, gets ``(msg, doc, pos)`` for an object this walk
+    gave up on (see ``_as_written``). Nothing is recorded when it is not given.
     """
     decoder = json.JSONDecoder()
     first_brace = blob.find("{")
@@ -174,11 +229,11 @@ def _decode_first_object(blob: str, failures: "list | None" = None) -> str:
         return ""
     original = blob[first_brace:]
     repaired = _repair_llm_json(original)
-    errors: dict = {}
+    errors = {} if failures is not None else None
 
     def give_up() -> str:
-        if failures is not None and errors:
-            failures.append(errors.get(True) or errors[False])
+        if errors:
+            failures.append(_as_written(errors, original, repaired))
         return ""
 
     seen: set[str] = set()
@@ -304,19 +359,27 @@ def parse_first_json_object(raw: str) -> dict:
             raise json.JSONDecodeError(
                 "no decodable top-level JSON object found", raw or "", 0,
             )
-        # Name the defect and show where it is, in the first object the
-        # extractor gave up on. "line 1 column 1 (char 0)" sent a log reader
-        # nowhere, and it was the whole error a repair turn was given, so a
-        # model asked to fix its reply could not find what to fix and returned
-        # it unchanged (the 2026-09-28 overnight My Story act: two repairs, the
-        # same reply, the episode lost).
-        failure = failures[0]
+        # Name the defect and show where it is. "line 1 column 1 (char 0)" sent
+        # a log reader nowhere, and it is the error a typed repair is given when
+        # a pass's first two replies both fail to decode. The object named is
+        # the one the decoder got furthest into -- not a stray pair of braces in
+        # an earlier prose fence -- and the position is in the text as the
+        # model wrote it.
+        msg, doc, pos = max(failures, key=lambda failure: failure[2])
         raise json.JSONDecodeError(
             "no decodable top-level JSON object found; in the object, %s near: %s"
-            % (failure.msg, _near(failure.doc, failure.pos)),
-            failure.doc, failure.pos,
+            % (msg, _near(doc, pos)),
+            doc, pos,
         )
-    return normalize_json_keys(json.loads(block))
+    try:
+        return normalize_json_keys(json.loads(block))
+    except RecursionError:
+        # An object nested deeper than Python will walk: the same JSON miss,
+        # so the ladder retries it, instead of an exception that ends the pass.
+        raise json.JSONDecodeError(
+            "no decodable top-level JSON object found; in the object, nesting "
+            "too deep to decode", block, 0,
+        ) from None
 
 
 def _near(doc: str, pos: int, span: int = 60) -> str:
