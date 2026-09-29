@@ -943,6 +943,7 @@ class CastLock:
         import random
 
         from . import _otr_casting as _OTRCAST
+        from ._otr_roster_gender import canonical_bank_gender
         from ._otr_voice_bank import bark_preset_gender
         from ._otr_voice_node_common import coerce_int_seed
 
@@ -974,15 +975,22 @@ class CastLock:
         # must not see a character drawn the same voice (Composer QA of
         # 0c1bf1f6).
         taken = {str(r.get("voice_preset")) for r in rows if voiced(r)}
+        # Gender the way the voice-bank caster reads it (`woman` is `female`),
+        # and the rows that STATE a man or a woman draw first: in plain cast
+        # order a genderless row could take the last free preset of a gender a
+        # later row needs (Sonnet QA of 0c1bf1f6: four women and one robot
+        # crossed a woman onto a male voice on 26 of 60 seeds). The sort is
+        # stable, so cast order still decides within each group.
+        unvoiced = [(r, canonical_bank_gender(r.get("gender")))
+                    for r in characters if not voiced(r)]
+        unvoiced.sort(key=lambda pair: pair[1] not in ("male", "female"))
         raw_seed = (meta or {}).get("episode_seed")
-        if raw_seed in (None, ""):
+        if unvoiced and raw_seed in (None, ""):
             report.append("bark voices: no episode_seed -- the character draw "
                           "is the same for every seedless ledger")
         episode_seed = coerce_int_seed(raw_seed)
         drawn = []
-        for row in characters:
-            if voiced(row):
-                continue
+        for row, gender in unvoiced:
             cid = str(row.get("char_id") or "")
             rng = random.Random(hashlib.sha1(
                 f"bark_character:{episode_seed}:{cid}".encode("utf-8")
@@ -990,22 +998,27 @@ class CastLock:
             slot = _OTRCAST.EnsembleSlot(
                 char_id=cid,
                 name=str(row.get("name") or cid),
-                gender=str(row.get("gender") or ""),
+                gender=gender,
                 timbre="",
                 role="support",
             )
             preset = _OTRCAST.python_assign_voice_preset(
                 slot, available_voices=_POOLS.open_voice_pool(taken), rng=rng)
             taken.add(preset)
+            delivered = bark_preset_gender(preset) or gender
             row["voice_preset"] = preset
             row["tts_model"] = "bark"
             row["voice_engine"] = "bark"
             row["voice_ref_id"] = ""
             row["commercial_clean"] = False
             row["voice_cast_fallback"] = ""
-            row["presentation_gender"] = (
-                bark_preset_gender(preset) or str(row.get("gender") or ""))
+            row["presentation_gender"] = delivered
             drawn.append("%s=%s" % (cid, preset))
+            if gender in ("male", "female") and delivered != gender:
+                report.append(
+                    "bark voices: %s gender pool exhausted -- requested %r, "
+                    "delivered %r (presentation_gender stamped from the "
+                    "actual preset)" % (cid, gender, delivered))
         if drawn:
             report.append("bark voices: drew %s for character row(s) the "
                           "source bank left unvoiced" % ", ".join(drawn))

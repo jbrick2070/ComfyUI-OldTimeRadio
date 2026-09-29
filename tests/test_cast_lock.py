@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+from unittest import mock
 
 import pytest
 
@@ -547,6 +548,63 @@ def test_a_seedless_ledger_says_its_draw_is_shared():
     report: list = []
     CastLock._draw_bark_characters(_lane_left_unvoiced_cast(), {}, report)
     assert any("no episode_seed" in line for line in report)
+
+
+def _women_and_a_robot(first_gender="", women=4):
+    cast = [{"char_id": "c01", "name": "ANNOUNCER", "gender": "male",
+             "tts_model": "kokoro", "voice_preset": "bm_george"},
+            {"char_id": "c02", "name": "Robot", "gender": first_gender,
+             "tts_model": "", "voice_preset": ""}]
+    for i, name in enumerate(["Ada", "Bea", "Cy", "Di", "Eve"][:women]):
+        cast.append({"char_id": "c%02d" % (i + 3), "name": name, "gender": "female",
+                     "tts_model": "", "voice_preset": "", "voice_ref_id": "leftover"})
+    return cast
+
+
+def test_stated_genders_draw_before_a_genderless_row():
+    """Sonnet QA of 0c1bf1f6: in cast order a genderless row could take the
+    last free female preset and push a later woman onto a male voice."""
+    from nodes._otr_voice_bank import bark_preset_gender
+    from nodes.cast_lock import CastLock
+
+    for seed in range(60):
+        cast = _women_and_a_robot()
+        CastLock._draw_bark_characters(cast, {"episode_seed": seed}, [])
+        assert [bark_preset_gender(r["voice_preset"]) for r in cast[2:]] == ["female"] * 4, seed
+        assert all(r["voice_ref_id"] == "" for r in cast[2:]), "stale identity cleared"
+
+
+def test_gender_synonyms_are_read_the_way_the_bank_caster_reads_them():
+    from nodes._otr_voice_bank import bark_preset_gender
+    from nodes.cast_lock import CastLock
+
+    cast = _women_and_a_robot(first_gender="woman", women=3)
+    CastLock._draw_bark_characters(cast, {"episode_seed": 7}, [])
+    assert [bark_preset_gender(r["voice_preset"]) for r in cast[1:]] == ["female"] * 4
+
+
+def test_an_exhausted_gender_pool_is_reported_not_silent():
+    from nodes.cast_lock import CastLock
+
+    report: list = []
+    cast = _women_and_a_robot(first_gender="female", women=4)   # five women
+    CastLock._draw_bark_characters(cast, {"episode_seed": 3}, report)
+    assert sum("gender pool exhausted" in line for line in report) == 1
+    assert len({r["voice_preset"] for r in cast[1:]}) == 5
+
+
+def test_without_the_draw_the_lane_cast_fails_as_leg_10_did():
+    """The regression this exists for, kept as a test: with the draw patched
+    out, the news-lane shape raises the exact overnight error."""
+    from nodes._otr_casting import CastingFailedError
+    from nodes.cast_lock import CastLock
+
+    with mock.patch.object(CastLock, "_draw_bark_characters",
+                           staticmethod(lambda cast, meta, report: 0)):
+        with pytest.raises(CastingFailedError, match="empty voice_preset"):
+            CastLock._assign_bark_voices(
+                _lane_left_unvoiced_cast(),
+                {"source_bank": "scifi_news_pro", "episode_seed": 4242}, [])
 
 
 def test_a_lane_that_voiced_every_row_draws_nothing():
