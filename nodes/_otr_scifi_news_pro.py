@@ -2112,11 +2112,18 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]"):
         # An empty dossier cannot prove anything, so it does not accuse:
         # a close is only asked to name a source when a source was indexed.
         if anchors and not any(_word_re(a).search(text) for a in anchors):
+            # The close and the anchors it was checked for ride along, so a
+            # failure explains itself: on 2026-09-29 a Hindi close failed this
+            # twice and killed the episode, and neither the log nor the raised
+            # error said what the close had actually said.
             findings.append(
                 "the closing read never names the real source -- none of the "
                 "dossier's entities or numbers appears in it, so the listener "
                 "is never told where the fact stopped and the fiction "
-                "started. Name at least one of them verbatim"
+                "started. Name at least one of them verbatim (looked for: %s; "
+                "the close read: \"%s\")" % (
+                    ", ".join(anchors[:6]) + (" ..." if len(anchors) > 6 else ""),
+                    text[:120] + ("..." if len(text) > 120 else ""))
             )
         spoken_fiction = [n for n in fiction if _word_re(n).search(text)]
         if spoken_fiction:
