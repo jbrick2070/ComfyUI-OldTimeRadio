@@ -12,11 +12,15 @@ serves character and announcer voice slots through the same reference-clip path.
 
 Subprocess lifecycle (bounded read + idempotent teardown) lives in ``_otr_sidecar``.
 
-Voice cloning: Dia's best clone prepends the TRANSCRIPT of the reference clip. The
-CC0 refs ship without transcripts, so the official path here is audio_prompt-only.
-If ``config/dia_ref_transcripts.json`` exists (keyed by reference WAV basename),
-the adapter sends the matching transcript and the worker prepends it -- a drop-in
-quality upgrade with no code change.
+Voice cloning: Dia clones from an audio prompt and expects the prompt's TRANSCRIPT
+in front of the new line ("[S1] <what the sample says> [S1] <the line>"), so it
+knows where the sample ends. ``config/dia_ref_transcripts.json`` carries one per
+reference WAV (keyed by basename); the adapter sends it and the worker prepends it.
+Without one, Dia reads the sample as the start of the line and garbles it: on
+2026-09-29 a published episode opened its dialogue in gibberish, and the same line,
+voice and seed rendered without the transcript came back as 19 s of nonsense and
+with it word for word. A sample with no entry still renders, audio_prompt-only, and
+the adapter warns once per sample.
 
 Config (env, with box defaults under ``ComfyUI/dia``):
   ``OTR_DIA_VENV``   isolated venv python (``.venv/Scripts/python.exe``
@@ -30,6 +34,7 @@ Import-time is side-effect-free (C-5). UTF-8, no BOM, ASCII-only source.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import tempfile
@@ -55,6 +60,7 @@ _THIS = os.path.realpath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))   # ...\ComfyUI-OldTimeRadio
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))              # ...\ComfyUI
 _DEFAULT_MODEL = "nari-labs/Dia-1.6B-0626"
+log = logging.getLogger("OTR")
 
 
 def _default(*parts):
@@ -79,6 +85,7 @@ class DiaEngine:
         self._proc = None
         self._stderr = None
         self._transcripts = None  # lazily-loaded basename -> transcript map
+        self._warned_untranscribed = set()  # sample basenames already warned about
 
     # ---- config resolution (env override -> box default) ----
     def _venv_python(self):
@@ -178,11 +185,12 @@ class DiaEngine:
         return resolve_voice_ref_path(ref)
 
     def _resolve_transcript(self, ref_clip_path):
-        """Optional clone transcript for this reference WAV, or "".
+        """The clone transcript for this reference WAV, or "".
 
         ``generate_voice`` receives only the ref PATH (not voice_ref_id), so the
         map ``config/dia_ref_transcripts.json`` is keyed by WAV BASENAME. Absent
-        file / key -> "" (audio_prompt-only clone, the official path this pass)."""
+        file / key -> "": the line renders audio_prompt-only, which garbles its
+        start, so that is warned once per sample."""
         if self._transcripts is None:
             self._transcripts = {}
             path = os.path.join(_REPO_ROOT, "config", "dia_ref_transcripts.json")
@@ -195,7 +203,15 @@ class DiaEngine:
                 self._transcripts = {}
         if not ref_clip_path:
             return ""
-        return self._transcripts.get(os.path.basename(ref_clip_path), "")
+        name = os.path.basename(ref_clip_path)
+        transcript = self._transcripts.get(name, "")
+        if not transcript and name not in self._warned_untranscribed:
+            self._warned_untranscribed.add(name)
+            log.warning(
+                "[OTR dia] no transcript for voice sample %s in "
+                "config/dia_ref_transcripts.json; Dia will garble the start of "
+                "lines in this voice until that file gives the sample's words", name)
+        return transcript
 
     # ---- one dialogue line -> mono AUDIO {"waveform","sample_rate"} ----
     def generate_voice(self, text, ref_clip_path, delivery_vector, seed):
