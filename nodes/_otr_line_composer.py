@@ -1458,8 +1458,9 @@ def validate_announcer_line(text: str) -> tuple[bool, str]:
 # is the call sign, not a phrase to be rendered; the grammar bends around it
 # ("Esta es SIGNAL LOST"). Hindi, Japanese and Mandarin voices read it as letter
 # soup, so those rows say it in their own script (operator 2026-09-29: "each
-# gets its own name"), and their writer instruction names it the same way for
-# the lines the model writes. On screen the logo stays SIGNAL LOST.
+# gets its own name"): the row's `station_name`, swapped into the announcer
+# seam by `_announcer_system` and named in the row's writer instruction. On
+# screen the logo stays SIGNAL LOST.
 
 
 def spoken_chrome(episode_meta=None) -> dict:
@@ -1489,13 +1490,26 @@ def _native_announcer_lead(episode_meta=None) -> str:
         return ""
 
 
+#: The call sign as the pack seams write it.
+_CALL_SIGN = "SIGNAL LOST"
+
+
 def _announcer_system(system: str, episode_meta=None) -> str:
     """Lead the pack's announcer seam with the episode language instruction.
 
     The seam text stays English -- it is craft direction to the model, not show
     speech -- but the LINE it asks for is written in the episode's language, so
-    the instruction has to arrive before the seam it modifies.
+    the instruction has to arrive before the seam it modifies. The seam names
+    the station ("You are the radio announcer for SIGNAL LOST"), and the
+    announcer says it on air, so it names it the way the row says it: a row
+    whose voice cannot read Latin letters gets its own name here too, or the
+    model would copy the Latin call sign into a line that voice reads as
+    letters (operator 2026-09-29). English and the Latin-script rows are
+    byte-identical.
     """
+    name = spoken_chrome(episode_meta).get("station_name") or _CALL_SIGN
+    if name != _CALL_SIGN:
+        system = system.replace(_CALL_SIGN, name)
     lead = _native_announcer_lead(episode_meta)
     return (lead + "\n\n" + system) if lead else system
 

@@ -84,6 +84,9 @@ _REQUIRED_AUTHORING = (
     "spoken_name", "writer_instruction", "visual_prompt_iso", "title_instruction",
 )
 _REQUIRED_SPOKEN = (
+    # The station as this row SAYS it: SIGNAL LOST where the voice reads Latin
+    # letters, the row's own script where it cannot (operator 2026-09-29).
+    "station_name",
     "reserved_announcer_name", "sign_on_greeting", "station_id_open",
     "tonight_label", "station_id_close", "sign_off_greeting", "work_line_prefix",
     "open_on_prefix",

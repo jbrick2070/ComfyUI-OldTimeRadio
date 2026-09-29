@@ -13,7 +13,7 @@
       "admitted": true,
       "sort_order": 10,
       "native_header": "English",
-      "row_revision": 4,
+      "row_revision": 5,
       "authoring": {
         "spoken_name": "English",
         "writer_instruction": "Write the episode in English. Titles, dialogue, and announcer copy are English.",
@@ -23,6 +23,7 @@
       "spoken": {
         "reserved_announcer_name": "ANNOUNCER",
         "sign_on_greeting": "Good evening",
+        "station_name": "SIGNAL LOST",
         "station_id_open": "This is SIGNAL LOST",
         "tonight_label": "Tonight",
         "station_id_close": "This has been SIGNAL LOST",
@@ -135,7 +136,7 @@
       "admitted": true,
       "sort_order": 20,
       "native_header": "Español",
-      "row_revision": 4,
+      "row_revision": 5,
       "authoring": {
         "spoken_name": "español",
         "writer_instruction": "Escribe el episodio en español. Títulos, diálogo y locución del locutor en español. No traduzcas un borrador en inglés: genera en español.",
@@ -145,6 +146,7 @@
       "spoken": {
         "reserved_announcer_name": "LOCUTOR",
         "sign_on_greeting": "Buenas noches",
+        "station_name": "SIGNAL LOST",
         "station_id_open": "Esta es SIGNAL LOST",
         "tonight_label": "Esta noche",
         "station_id_close": "Esto ha sido SIGNAL LOST",
@@ -228,7 +230,7 @@
       "admitted": true,
       "sort_order": 30,
       "native_header": "Português",
-      "row_revision": 3,
+      "row_revision": 4,
       "authoring": {
         "spoken_name": "português",
         "writer_instruction": "Escreva o episódio em português brasileiro. Títulos, diálogo e locução do locutor em português. Não traduza um rascunho em inglês: gere em português.",
@@ -238,6 +240,7 @@
       "spoken": {
         "reserved_announcer_name": "LOCUTOR",
         "sign_on_greeting": "Boa noite",
+        "station_name": "SIGNAL LOST",
         "station_id_open": "Esta é SIGNAL LOST",
         "tonight_label": "Esta noite",
         "station_id_close": "Isto foi SIGNAL LOST",
@@ -321,7 +324,7 @@
       "admitted": true,
       "sort_order": 40,
       "native_header": "Italiano",
-      "row_revision": 3,
+      "row_revision": 4,
       "authoring": {
         "spoken_name": "italiano",
         "writer_instruction": "Scrivi l'episodio in italiano. Titoli, dialoghi e locuzione dell'annunciatore in italiano. Non tradurre una bozza inglese: genera in italiano.",
@@ -331,6 +334,7 @@
       "spoken": {
         "reserved_announcer_name": "ANNUNCIATORE",
         "sign_on_greeting": "Buonasera",
+        "station_name": "SIGNAL LOST",
         "station_id_open": "Questa è SIGNAL LOST",
         "tonight_label": "Stasera",
         "station_id_close": "Questa è stata SIGNAL LOST",
@@ -413,7 +417,7 @@
       "admitted": true,
       "sort_order": 50,
       "native_header": "Français",
-      "row_revision": 3,
+      "row_revision": 4,
       "authoring": {
         "spoken_name": "français",
         "writer_instruction": "Écris l'épisode en français. Titres, dialogues et locution de l'annonceur en français. Ne traduis pas un brouillon anglais: génère en français.",
@@ -423,6 +427,7 @@
       "spoken": {
         "reserved_announcer_name": "ANNONCEUR",
         "sign_on_greeting": "Bonsoir",
+        "station_name": "SIGNAL LOST",
         "station_id_open": "Ici SIGNAL LOST",
         "tonight_label": "Ce soir",
         "station_id_close": "C'était SIGNAL LOST",
@@ -507,13 +512,14 @@
       "row_revision": 4,
       "authoring": {
         "spoken_name": "हिन्दी",
-        "writer_instruction": "पूरा एपिसोड हिन्दी में लिखो। शीर्षक, संवाद और उद्घोषक की भाषा हिन्दी हो। अंग्रेज़ी ड्राफ्ट का अनुवाद मत करो — सीधे हिन्दी में लिखो। स्टेशन का नाम देवनागरी में “सिग्नल लॉस्ट” लिखो। बोली जाने वाली पंक्तियों में लैटिन अक्षर मत लिखो; विदेशी नाम और शब्द भी देवनागरी में लिखो।",
+        "writer_instruction": "पूरा एपिसोड हिन्दी में लिखो। शीर्षक, संवाद और उद्घोषक की भाषा हिन्दी हो। अंग्रेज़ी ड्राफ्ट का अनुवाद मत करो — सीधे हिन्दी में लिखो। स्टेशन का नाम देवनागरी में “सिग्नल लॉस्ट” लिखो।",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in Hindi, short, Devanagari. Accents and matras survive."
       },
       "spoken": {
         "reserved_announcer_name": "उद्घोषक",
         "sign_on_greeting": "नमस्कार",
+        "station_name": "सिग्नल लॉस्ट",
         "station_id_open": "यह है सिग्नल लॉस्ट",
         "tonight_label": "आज रात",
         "station_id_close": "यह रहा सिग्नल लॉस्ट",
@@ -601,13 +607,14 @@
       "row_revision": 4,
       "authoring": {
         "spoken_name": "日本語",
-        "writer_instruction": "エピソード全体を日本語で書いてください。タイトル、台詞、アナウンサーも日本語。英語原稿の翻訳ではなく、最初から日本語で書くこと。局名は「シグナル・ロスト」とカタカナで書くこと。話される台詞にはラテン文字を使わず、外国の名前や言葉もカタカナで書くこと。",
+        "writer_instruction": "エピソード全体を日本語で書いてください。タイトル、台詞、アナウンサーも日本語。英語原稿の翻訳ではなく、最初から日本語で書くこと。局名は「シグナル・ロスト」とカタカナで書くこと。",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in Japanese, short. CJK glyphs survive."
       },
       "spoken": {
         "reserved_announcer_name": "アナウンサー",
         "sign_on_greeting": "こんばんは",
+        "station_name": "シグナル・ロスト",
         "station_id_open": "こちらは シグナル・ロスト",
         "tonight_label": "今夜",
         "station_id_close": "シグナル・ロスト でした",
@@ -698,13 +705,14 @@
       "row_revision": 4,
       "authoring": {
         "spoken_name": "普通话",
-        "writer_instruction": "请用普通话写完整集。标题、对白和播音员台词都用中文。不要翻译英文草稿，直接用中文创作。电台名称写作“失落的信号”。口播台词中不要使用拉丁字母，外国人名和词语也用汉字书写。",
+        "writer_instruction": "请用普通话写完整集。标题、对白和播音员台词都用中文。不要翻译英文草稿，直接用中文创作。电台名称写作“失落的信号”。",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in Mandarin Chinese, short. CJK glyphs survive."
       },
       "spoken": {
         "reserved_announcer_name": "播音员",
         "sign_on_greeting": "晚上好",
+        "station_name": "失落的信号",
         "station_id_open": "这里是失落的信号",
         "tonight_label": "今晚",
         "station_id_close": "以上是失落的信号",

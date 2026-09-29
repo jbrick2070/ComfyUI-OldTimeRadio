@@ -268,12 +268,29 @@ def test_each_row_says_its_own_station_name(label):
     the model's own announcer lines say it the same way."""
     row = el.row_by_label(label)
     name = STATION_NAMES[label]
+    assert row.spoken["station_name"] == name, label
     assert name in row.spoken["station_id_open"], label
     assert name in row.spoken["station_id_close"], label
     if name != "SIGNAL LOST":
         for key in ("station_id_open", "station_id_close"):
             assert not any("a" <= ch.lower() <= "z" for ch in row.spoken[key]), (label, key)
         assert name in row.authoring["writer_instruction"], label
+
+
+@pytest.mark.parametrize("label", ADMITTED_LABELS)
+def test_the_announcer_seam_names_the_station_the_way_the_row_says_it(label):
+    """The pack seams say "You are the radio announcer for SIGNAL LOST", and
+    the announcer says the station on air, so a native row's seam carries its
+    own name (Composer QA of 264f9274). Latin-script rows are byte-identical."""
+    from nodes import _otr_line_composer as LC
+    seam = "You are the radio announcer for SIGNAL LOST, an old-time radio drama."
+    system = LC._announcer_system(seam, el.resolve_ledger(label))
+    name = STATION_NAMES[label]
+    assert ("You are the radio announcer for %s, an old-time radio drama." % name) in system
+    if name != "SIGNAL LOST":
+        assert "SIGNAL LOST" not in system, label
+    if label == "English":
+        assert system == seam
 
 
 @pytest.mark.parametrize("label", ADMITTED_LABELS)
