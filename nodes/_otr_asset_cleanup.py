@@ -53,7 +53,12 @@ LABELS = (
     "partial (keep only the text files)",
     "full (keep only the published video)",
 )
-DEFAULT_LABEL = LABELS[0]
+#: SHIPS FULL (operator, 2026-09-28: "full for everyone"). The working folder
+#: is gone once the episode is safely in otr/obs; a person who wants to keep
+#: it, or to freeze a replay bundle, picks off. A graph saved before the
+#: widget existed still carries no value, and "" still reads as off -- only a
+#: graph that SAYS full deletes anything.
+DEFAULT_LABEL = LABELS[2]
 
 #: What ``partial`` deletes, by lower-cased extension. It is a DELETE list and
 #: not a keep list on purpose: an extension nobody thought of is KEPT, because

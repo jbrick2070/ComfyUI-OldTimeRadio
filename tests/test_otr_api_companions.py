@@ -241,7 +241,7 @@ def _writer_schemas_s5() -> dict:
     required["asset_cleanup"] = (
         ["off (keep everything)", "partial (keep only the text files)",
          "full (keep only the published video)"],
-        {"default": "off (keep everything)"},
+        {"default": "full (keep only the published video)"},
     )
     # SELECTIVE ROLLS (2026-09-26): the two trailing native multi-selects.
     # Typed lists since 2026-09-27 (the app view could not draw the

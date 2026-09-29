@@ -290,7 +290,7 @@ All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
 | `visual_style` | How it looks. Ships on *roll*. The ids are in [apple/STYLES.md](apple/STYLES.md). |
 | `lemmy_cameo` | Whether a character named Lemmy drops by. Ships on *roll*, about an 11% chance. |
 | `episode_language` | One switch. See [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md). |
-| `asset_cleanup` | What to delete from the episode's working folder once it is published: `off (keep everything)`, `partial (keep only the text files)` or `full (keep only the published video)`. Ships **off**. See [Where things land](#where-things-land). |
+| `asset_cleanup` | What to delete from the episode's working folder once it is published: `off (keep everything)`, `partial (keep only the text files)` or `full (keep only the published video)`. Ships **full**: once the episode is in `otr/obs`, its working folder goes. See [Where things land](#where-things-land). |
 
 `episode_title` and `custom_premise` are set on the node in graph view; the app form leaves them off and they stay blank unless you fill them there.
 
@@ -658,11 +658,11 @@ Everything for an episode goes under your ComfyUI output folder:
 
 The working folders add up fast. `asset_cleanup` on **OTR_LedgerScriptWriter**
 tidies each one after its episode is published: `partial` deletes the sound and
-the pictures and keeps every text file (ledger, canon, captions, QA), `full`
-deletes the whole folder, and `off`, the default, keeps everything. None of them
+the pictures and keeps every text file (ledger, canon, captions, QA), `full`,
+the default, deletes the whole folder, and `off` keeps everything. None of them
 touch `otr/obs/`, nothing is deleted unless the published copy is there, and an
 episode whose publication was withheld is never cleaned. A cleaned episode can
-no longer be frozen into a replay bundle, so freeze first if you want one. More
+no longer be frozen into a replay bundle, so pick `off` (or freeze first) if you want one. More
 in [apple/RUN.md](apple/RUN.md#saving-disk-space).
 
 The published file is named after what produced it, so a folder of episodes reads

@@ -735,8 +735,9 @@ class TestWriterB2aSurface:
             f"after the 2026-09-27 bank roll pool; every earlier "
             f"count is recorded in the history above)"
         )
-        assert wv[slot('asset_cleanup')] == "off (keep everything)", (
-            f"asset_cleanup must ship off; got {wv[slot('asset_cleanup')]!r}"
+        assert wv[slot('asset_cleanup')] == "full (keep only the published video)", (
+            f"asset_cleanup must ship full (operator, 2026-09-28); "
+            f"got {wv[slot('asset_cleanup')]!r}"
         )
         # The one-switch ships English -- not Off, and never a language the
         # first-run listener did not ask for.

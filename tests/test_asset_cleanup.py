@@ -102,7 +102,8 @@ def test_every_label_says_what_it_keeps_and_its_first_word_is_the_slug():
         "partial (keep only the text files)",
         "full (keep only the published video)",
     )
-    assert AC.DEFAULT_LABEL == "off (keep everything)"
+    # Ships full (operator, 2026-09-28: "full for everyone").
+    assert AC.DEFAULT_LABEL == "full (keep only the published video)"
     assert AC.slug_from_label("") == "off"          # a graph saved before the widget
 
 
@@ -407,11 +408,11 @@ def test_the_mux_calls_the_cleanup_last_after_the_preview_and_the_delivery_gate(
 # --------------------------------------------------------------------------- #
 
 
-def test_the_writer_widget_ships_off_and_offers_the_three_full_labels():
+def test_the_writer_widget_ships_full_and_offers_the_three_full_labels():
     from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter as W
     choices, meta = W.INPUT_TYPES()["optional"]["asset_cleanup"]
     assert list(choices) == list(AC.LABELS)
-    assert meta["default"] == "off (keep everything)"
+    assert meta["default"] == "full (keep only the published video)"
     for phrase in ("otr/obs", "replay bundle", "text file"):
         assert phrase in meta["tooltip"], phrase
 

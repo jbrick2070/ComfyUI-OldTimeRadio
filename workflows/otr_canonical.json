@@ -596,7 +596,7 @@
         true,
         "",
         "English",
-        "off (keep everything)",
+        "full (keep only the published video)",
         "",
         "",
         ""
@@ -2735,7 +2735,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "## Start here\n\n1. On **1 - Story Writer**, pick a **Story bank** (source_bank):\n    - **original**, **scifi_news_pro** and **media_archive** are the pack's own: a new radio drama, science fiction from a live science feed, and restoration adventures from media archives.\n    - **shakespeare** and **public_domain** adapt a classic.\n    - **my_story** builds your own from the My Story fields.\n    - **roll (any eligible bank)** picks one for you.\n2. **Visual style** (visual_style) ships on **roll (any style)**. Leave it, or pick a look.\n3. Press **Run**. The first run on a machine downloads the models it needs, so it takes longer.\n4. The finished episode, an MP4 with sound, lands in **ComfyUI/output/otr/obs**.\n\nWhich workflow fits your machine: [Which machine runs what](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/MACHINES.md)\n\nQuestions or problems: [open an issue](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues)\n"
+        "## Start here\n\n1. On **1 - Story Writer**, pick a **Story bank** (source_bank):\n    - **original**, **scifi_news_pro** and **media_archive** are the pack's own: a new radio drama, science fiction from a live science feed, and restoration adventures from media archives.\n    - **shakespeare** and **public_domain** adapt a classic.\n    - **my_story** builds your own from the My Story fields.\n    - **roll (any eligible bank)** picks one for you.\n2. **Visual style** (visual_style) ships on **roll (any style)**. Leave it, or pick a look.\n3. Press **Run**. The first run on a machine downloads the models it needs, so it takes longer.\n4. The finished episode, an MP4 with sound, lands in your ComfyUI output folder under **otr/obs**.\n\nWhich workflow fits your machine: [Which machine runs what](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/MACHINES.md)\n\nQuestions or problems: [open an issue](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues)\n"
       ],
       "color": "#2a363b",
       "bgcolor": "#3f5159"
