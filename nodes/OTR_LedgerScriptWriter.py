@@ -3261,6 +3261,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             mode=_otr_story_routing.story_input_mode(_story_row_early),
             bank_id=getattr(_story_row_early, "source_bank_id", "")
             or str(source_bank or ""),
+            # Pre-roll: the roll decides later whether the My Story boxes
+            # are read (it lands on my_story) or ignored (anything else).
+            rolled=str(source_bank or "") == _ROLLS.BANK_SENTINEL,
         )
         # THE FLOOR BELONGS HERE TOO, not only at the post-roll site below.
         # This check runs BEFORE the roll, so it sees the LITERAL widget value

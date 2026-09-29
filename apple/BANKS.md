@@ -44,13 +44,16 @@ Domain perform the author's own words in another language is in
 standing premise that ships with it (since 2026-09-13), so a rolled My Story
 run still has something to perform. Anything you type wins over it.
 
-**Those fields are not ignored by the other banks -- they are refused.** If
-you type into any of them while a different source is selected, the run stops
-with a message naming the fields and telling you to either select My Story or
-clear them. That is deliberate: the alternative is an episode that renders
-happily, quietly ignores the characters you described, and looks correct. So
-switching from My Story to another bank means clearing those boxes, not just
-changing the source.
+**What a different bank does with those boxes depends on how it was chosen.**
+
+- **Picked by hand:** the run stops, with a message naming the boxes and
+  telling you to pick My Story, set Story bank to roll, or clear them. That is
+  deliberate: the alternative is an episode that renders happily, quietly
+  ignores the characters you described, and looks correct.
+- **On the roll** (Story bank ships on roll): a roll that lands on My Story
+  uses the boxes, or the standing premise when they are empty; a roll that
+  lands anywhere else ignores them and says so in the log (operator,
+  2026-09-28). Leftover My Story text never stops a randomized run.
 
 `custom_premise` is different and is worth knowing about: it is shared by EVERY
 bank. Typing a premise on the Shakespeare or archive lane is ordinary, not a

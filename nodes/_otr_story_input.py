@@ -128,6 +128,10 @@ class StoryInputPolicy:
 
     mode: str = INPUT_MODE_LEGACY
     bank_id: str = ""
+    #: True when the Story bank widget held the roll, before or after it
+    #: resolved. A roll that lands anywhere but My Story IGNORES the My Story
+    #: boxes; only a bank picked by hand refuses them (operator, 2026-09-28).
+    rolled: bool = False
 
     @property
     def is_user_fields(self) -> bool:
@@ -282,14 +286,16 @@ def filled_dedicated_fields(fields: RawStoryFields) -> "tuple[str, ...]":
     return tuple(name for name in DEDICATED_FIELDS if getattr(norm, name))
 
 
-#: The label each field shows in the graph, so an error names what the reader
-#: sees rather than the internal key.
+#: The label each field shows on the app form (config/app_mode.json `labels`,
+#: also stamped on the per-machine workflows' canvas), so an error names what
+#: the reader sees rather than the internal key. tests/test_my_story_input.py
+#: holds the two together.
 FIELD_LABELS = {
     "idea": "Story input",
-    "characters": "Character names and notes",
-    "plot": "Plot ideas",
-    "setting": "Setting",
-    "author": "Story by",
+    "characters": "My Story - who is in it",
+    "plot": "My Story - what happens",
+    "setting": "My Story - where and when",
+    "author": "My Story - by",
 }
 
 
@@ -310,15 +316,23 @@ def check_selection(
     """
     filled = filled_dedicated_fields(fields)
     if not policy.is_user_fields:
-        # The listener typed into fields no other bank reads. Silently
-        # dropping them is the failure this check exists to prevent: the
-        # episode would render, ignore the character notes, and look correct.
-        if filled:
+        # The listener typed into fields no other bank reads. For a bank
+        # PICKED BY HAND, silently dropping them is the failure this check
+        # exists to prevent: the episode would render, ignore the character
+        # notes, and look correct.
+        #
+        # A ROLL is different (operator, 2026-09-28): "if the roll chose my
+        # story it uses the boxes, ... if the roll chose anything but my story
+        # the boxes are ignored". Story bank ships on the roll, so the old
+        # refusal stopped every randomized run that still had last night's My
+        # Story text in the boxes. The writer logs the ignored boxes where the
+        # roll resolves (_otr_writer_inputs._resolve_inputs).
+        if filled and not policy.rolled:
             names = ", ".join(FIELD_LABELS[name] for name in filled)
             raise StoryInputError(
-                "my_story: %s %s filled, but the selected source is %s. Those "
-                "fields are read only by the My Story bank. Select "
-                "'my_story' in Source, or clear those fields."
+                "my_story: %s %s filled, but Story bank is %s. Those boxes "
+                "are read only by the My Story bank. Pick my_story in Story "
+                "bank, set it to roll, or clear those boxes."
                 % (names, "is" if len(filled) == 1 else "are",
                    _describe_selection(policy))
             )

@@ -140,11 +140,58 @@ def test_a_premise_alone_on_another_bank_is_ordinary():
     SI.check_selection(SI.capture_raw(idea="a premise"), LEGACY)
 
 
-def test_the_roll_sentinel_counts_as_another_bank():
-    sentinel = SI.StoryInputPolicy(mode=SI.INPUT_MODE_LEGACY,
-                                   bank_id="roll (any eligible bank)")
+def test_a_roll_admits_filled_my_story_boxes_and_a_hand_pick_refuses_them():
+    """Operator, 2026-09-28: "if the roll chose my story it uses the boxes,
+    ... if the roll chose anything but my story the boxes are ignored". A roll
+    -- still the sentinel, or already landed on another bank -- admits them; a
+    bank picked by hand still refuses, in the form's words."""
+    boxes = SI.capture_raw(plot="x", author="A. Listener")
+    for rolled in (
+            SI.StoryInputPolicy(mode=SI.INPUT_MODE_LEGACY,
+                                bank_id="roll (any eligible bank)", rolled=True),
+            SI.StoryInputPolicy(mode=SI.INPUT_MODE_LEGACY,
+                                bank_id="shakespeare", rolled=True)):
+        SI.check_selection(boxes, rolled)            # must not raise
+    with pytest.raises(SI.StoryInputError) as caught:
+        SI.check_selection(boxes, SI.StoryInputPolicy(
+            mode=SI.INPUT_MODE_LEGACY, bank_id="shakespeare"))
+    message = str(caught.value)
+    assert "Story bank" in message and "Source" not in message
+    assert "My Story - what happens" in message and "My Story - by" in message
+
+
+def test_the_box_names_in_a_refusal_are_the_app_forms_labels():
+    """The refusal names each box the way the app form shows it."""
+    import json
+    labels = json.loads((Path(__file__).resolve().parents[1] / "config"
+                         / "app_mode.json").read_text(encoding="utf-8"))["labels"]
+    widget = {"characters": "story_characters", "plot": "story_plot",
+              "setting": "story_setting", "author": "story_author"}
+    for field in SI.DEDICATED_FIELDS:
+        assert SI.FIELD_LABELS[field] == labels[
+            "OTR_LedgerScriptWriter.%s" % widget[field]], field
+
+
+def test_a_roll_that_lands_elsewhere_ignores_the_boxes_and_says_so(
+        monkeypatch, caplog):
+    """The resolver runs after the roll: a rolled request that landed on
+    another bank renders without the boxes and logs that it ignored them; the
+    same boxes on a hand-picked bank still refuse."""
+    from nodes import _otr_writer_inputs as WI, _otr_rolls as ROLLS
+    monkeypatch.delenv("OTR_SOURCE_SNAPSHOT_MANIFEST", raising=False)
+    boxes = dict(story_characters="Ada", story_plot="ring the bell")
+    with caplog.at_level("WARNING"):
+        WI._resolve_inputs(source_bank="original", custom_premise="",
+                           num_characters=2, act_count="1",
+                           story_request=_req(source_bank_requested=ROLLS.BANK_SENTINEL),
+                           **boxes)
+    assert "roll chose 'original'" in caplog.text
+    assert "My Story - who is in it" in caplog.text
     with pytest.raises(SI.StoryInputError):
-        SI.check_selection(SI.capture_raw(plot="x"), sentinel)
+        WI._resolve_inputs(source_bank="original", custom_premise="",
+                           num_characters=2, act_count="1",
+                           story_request=_req(source_bank_requested="original"),
+                           **boxes)
 
 
 def test_replay_is_refused_because_it_would_ignore_the_input():

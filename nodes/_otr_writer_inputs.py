@@ -33,6 +33,7 @@ from typing import Any
 # spelling. None of them import back into the writer or into this module.
 from ._otr_shared import device_options as _OTR_DEVICE_OPTIONS
 from . import _otr_model_catalog as _otr_model_catalog
+from . import _otr_rolls as _otr_rolls
 from . import _otr_source_payload as _otr_source_payload
 from . import _otr_source_snapshot as _otr_source_snapshot
 from . import _otr_story_input as _otr_story_input
@@ -269,16 +270,34 @@ def _resolve_inputs(
         # call (a test, a script, a future caller) would otherwise accept
         # character notes for a bank that never reads them and render an
         # episode that silently ignored them.
+        #
+        # A ROLLED bank is the exception (operator, 2026-09-28): the roll
+        # landed somewhere other than My Story, so the boxes are ignored --
+        # and said so here, the one place that knows where it landed. The
+        # pre-roll request is how this function knows it was a roll.
+        _rolled = (
+            str(getattr(story_request, "source_bank_requested", "") or "")
+            == _otr_rolls.BANK_SENTINEL)
+        _raw_ignored = _otr_story_input.capture_raw(
+            idea=custom_premise, characters=story_characters,
+            plot=story_plot, setting=story_setting, author=story_author,
+        )
         _otr_story_input.check_selection(
-            _otr_story_input.capture_raw(
-                idea=custom_premise, characters=story_characters,
-                plot=story_plot, setting=story_setting, author=story_author,
-            ),
+            _raw_ignored,
             _otr_story_input.StoryInputPolicy(
                 mode=_otr_story_input.INPUT_MODE_LEGACY,
                 bank_id=_rb_bank.source_bank_id,
+                rolled=_rolled,
             ),
         )
+        _ignored = _otr_story_input.filled_dedicated_fields(_raw_ignored)
+        if _rolled and _ignored:
+            log.warning(
+                "[OTR_LedgerScriptWriter] the Story bank roll chose %r, so the "
+                "My Story boxes (%s) are ignored; they are read only when the "
+                "roll lands on my_story",
+                _rb_bank.source_bank_id,
+                ", ".join(_otr_story_input.FIELD_LABELS[n] for n in _ignored))
     # Bake-off source-snapshot replay (r3 ruling B7). Loaded IMMEDIATELY after
     # bank resolution and BEFORE the three source branches so a frozen source
     # replays across the base/_v2/_v3 triplet -- the ONLY variable under test is

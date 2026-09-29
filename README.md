@@ -323,14 +323,14 @@ and named in the credits. To replay a draw, start ComfyUI with
 ComfyUI, so a variable set anywhere else is not seen. The same seed draws the
 same model only while the same models are available to draw from.
 
-**Your own story:** set `source_bank` to **`my_story`** (the dropdown lists bank
-ids, so that is the value to pick) and put your idea in `custom_premise`. The
-`story_characters`, `story_plot`, `story_setting` and `story_author` fields on the
-same node take the rest. That bank exists to produce your idea rather than adapt
-something. The roll can land on it like any other bank: a run
-that arrives with those fields blank writes a standing premise that ships
-with the pack, so it always has something to perform. Anything you type wins
-over it.
+**Your own story:** set `source_bank` (Story bank on the form) to
+**`my_story`** and fill the My Story boxes: `story_characters`, `story_plot`,
+`story_setting` and `story_author` (on the form: who is in it, what happens,
+where and when, by). That bank exists to produce your idea rather than adapt
+something. The roll can land on it like any other bank: a run that arrives
+with those fields blank writes a standing premise that ships with the pack, so
+it always has something to perform, and anything you type wins over it. When
+the roll lands on another bank, the boxes are ignored and the log says so.
 
 ---
 
