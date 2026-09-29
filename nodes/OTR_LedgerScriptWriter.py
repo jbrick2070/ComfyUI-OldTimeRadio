@@ -2963,7 +2963,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # after episode_language and before the gate_in socket, which
                 # holds no saved slot, so this is the trailing value
                 # (widgets_values[35]) and no earlier index or link dst_slot
-                # moves (BUG-LOCAL-097). Default off. The ledger stamp is the
+                # moves (BUG-LOCAL-097). Default full since 2026-09-28 (operator:
+                # "full for everyone"). The ledger stamp is the
                 # FIRST WORD of the label, so the labels can be reworded later
                 # without touching a stamp.
                 "asset_cleanup": (
@@ -3263,7 +3264,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             or str(source_bank or ""),
             # Pre-roll: the roll decides later whether the My Story boxes
             # are read (it lands on my_story) or ignored (anything else).
-            rolled=str(source_bank or "") == _ROLLS.BANK_SENTINEL,
+            # Through the story module's own label, NOT _ROLLS: this runs
+            # before the replay shortcut, which must never reach the roll
+            # module.
+            rolled=_otr_story_input.is_bank_roll(source_bank),
         )
         # THE FLOOR BELONGS HERE TOO, not only at the post-roll site below.
         # This check runs BEFORE the roll, so it sees the LITERAL widget value

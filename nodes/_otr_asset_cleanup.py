@@ -1,7 +1,8 @@
 """Asset cleanup after publish -- the writer's `asset_cleanup` choice, carried
 out by the terminal mux (GO_FORWARD_PLAN row 0b, decided 2026-09-25).
 
-Three settings, chosen per run on OTR_LedgerScriptWriter, default off:
+Three settings, chosen per run on OTR_LedgerScriptWriter; every shipped
+workflow carries full (operator, 2026-09-28: "full for everyone"):
 
 * ``off``     -- keep everything (nothing is stamped on the ledger).
 * ``partial`` -- delete the sound and the pictures, keep every text file.
@@ -55,9 +56,11 @@ LABELS = (
 )
 #: SHIPS FULL (operator, 2026-09-28: "full for everyone"). The working folder
 #: is gone once the episode is safely in otr/obs; a person who wants to keep
-#: it, or to freeze a replay bundle, picks off. A graph saved before the
-#: widget existed still carries no value, and "" still reads as off -- only a
-#: graph that SAYS full deletes anything.
+#: it, or to freeze a replay bundle, picks off. This default reaches every
+#: graph the UI opens, including one saved before the widget existed: the
+#: frontend fills a short widgets_values from the widget default, so that
+#: graph comes up full too. Only an API prompt that OMITS the key reads "" --
+#: and "" is off.
 DEFAULT_LABEL = LABELS[2]
 
 #: What ``partial`` deletes, by lower-cased extension. It is a DELETE list and

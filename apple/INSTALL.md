@@ -153,10 +153,11 @@ you need with ComfyUI's own Python:
   locked, logs every deletion and never fails a render. Set
   `OTR_TMP_SWEEP_MAX_AGE_S` to change the age, and do not park files under that
   path.
-- **Only if you ask:** `asset_cleanup` on **OTR_LedgerScriptWriter** ships
-  `off`. Set it to `partial` or `full` and, once an episode is published, that
-  episode's own folder in `otr/episodes/` loses its sound and pictures
-  (`partial`) or goes altogether (`full`). `otr/obs/` is never touched. See
+- **Space saver, on by default:** `asset_cleanup` on
+  **OTR_LedgerScriptWriter** (Space saver on the form) ships `full`: once an
+  episode is published, its own folder in `otr/episodes/` goes altogether and
+  only the published video in `otr/obs/` remains. Pick `partial` to keep the
+  text files, or `off` to keep everything. `otr/obs/` is never touched. See
   [RUN.md](RUN.md#saving-disk-space).
 
 **Nothing by hand.** There is no setup script to run and no model to place

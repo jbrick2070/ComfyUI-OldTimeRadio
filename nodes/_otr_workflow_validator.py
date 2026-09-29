@@ -701,7 +701,6 @@ class WorkflowValidator:
         must never be the reason a healthy run fails.
         """
         try:
-            from . import _otr_rolls as _rolls
             from . import _otr_source_snapshot as _snap
             from . import _otr_story_input as _si
             from . import _otr_story_routing as _routing
@@ -715,7 +714,7 @@ class WorkflowValidator:
                     bank_id=bank_id,
                     # The roll has not resolved at queue time; the boxes are
                     # used if it lands on My Story and ignored otherwise.
-                    rolled=str(bank_id or "") == _rolls.BANK_SENTINEL,
+                    rolled=_si.is_bank_roll(bank_id),
                 ),
                 snapshot_manifest_configured=_snap.manifest_configured(),
             )

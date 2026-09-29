@@ -116,6 +116,20 @@ class StoryRequest:
         }
 
 
+#: The Story bank widget's roll command. Kept HERE rather than read from
+#: `_otr_rolls.BANK_SENTINEL`, for the reason `_otr_episode_languages` keeps
+#: its own ROLL_LABEL: the writer's pre-roll check runs before its replay
+#: shortcut, and a replay must never reach the roll module. A test holds the
+#: two equal.
+BANK_ROLL_LABEL = "roll (any eligible bank)"
+
+
+def is_bank_roll(value: Any) -> bool:
+    """Whether a Story bank value is the roll. Stripped, as the roll module's
+    own sentinel check is."""
+    return str(value or "").strip() == BANK_ROLL_LABEL
+
+
 @dataclass(frozen=True)
 class StoryInputPolicy:
     """The resolved input route for one bank id.

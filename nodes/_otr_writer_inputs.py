@@ -33,7 +33,6 @@ from typing import Any
 # spelling. None of them import back into the writer or into this module.
 from ._otr_shared import device_options as _OTR_DEVICE_OPTIONS
 from . import _otr_model_catalog as _otr_model_catalog
-from . import _otr_rolls as _otr_rolls
 from . import _otr_source_payload as _otr_source_payload
 from . import _otr_source_snapshot as _otr_source_snapshot
 from . import _otr_story_input as _otr_story_input
@@ -275,9 +274,8 @@ def _resolve_inputs(
         # landed somewhere other than My Story, so the boxes are ignored --
         # and said so here, the one place that knows where it landed. The
         # pre-roll request is how this function knows it was a roll.
-        _rolled = (
-            str(getattr(story_request, "source_bank_requested", "") or "")
-            == _otr_rolls.BANK_SENTINEL)
+        _rolled = _otr_story_input.is_bank_roll(
+            getattr(story_request, "source_bank_requested", ""))
         _raw_ignored = _otr_story_input.capture_raw(
             idea=custom_premise, characters=story_characters,
             plot=story_plot, setting=story_setting, author=story_author,

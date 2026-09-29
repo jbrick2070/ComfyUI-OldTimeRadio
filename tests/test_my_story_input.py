@@ -160,6 +160,33 @@ def test_a_roll_admits_filled_my_story_boxes_and_a_hand_pick_refuses_them():
     assert "My Story - what happens" in message and "My Story - by" in message
 
 
+def test_the_story_modules_roll_label_is_the_roll_modules():
+    """The writer's pre-roll check reads the roll through BANK_ROLL_LABEL so
+    its replay shortcut never reaches the roll module; the two must agree."""
+    from nodes import _otr_rolls as ROLLS
+    assert SI.BANK_ROLL_LABEL == ROLLS.BANK_SENTINEL
+    assert SI.is_bank_roll("  %s " % ROLLS.BANK_SENTINEL)
+    assert not SI.is_bank_roll("my_story") and not SI.is_bank_roll(None)
+
+
+def test_the_writers_preroll_check_admits_boxes_on_the_roll(tmp_path, monkeypatch):
+    """THE WIRING, at the writer's own first check (run(), before the roll).
+
+    A replay path that cannot load stops run() right after that check, so the
+    error that surfaces says whether the check admitted the run: a replay
+    error means it did, a StoryInputError means it refused. The roll module is
+    switched off to prove the check never needs it."""
+    from nodes import OTR_LedgerScriptWriter as W, production_ledger as PL
+    monkeypatch.setattr(W, "_ROLLS", None)
+    node = W.OTR_LedgerScriptWriter()
+    bogus = str(tmp_path / "no_such_bundle")
+    boxes = dict(story_characters="Ada", story_plot="ring the bell")
+    with pytest.raises(PL.ReplayBundleError):
+        node.run(source_bank=SI.BANK_ROLL_LABEL, replay_from=bogus, **boxes)
+    with pytest.raises(SI.StoryInputError):
+        node.run(source_bank="shakespeare", replay_from=bogus, **boxes)
+
+
 def test_the_box_names_in_a_refusal_are_the_app_forms_labels():
     """The refusal names each box the way the app form shows it."""
     import json

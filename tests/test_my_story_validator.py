@@ -65,6 +65,20 @@ def test_invalid_literal_values_refuse_before_download(gate, values):
     assert not list(DR.drafts_root().glob("*/input.json"))
 
 
+def test_the_gate_admits_filled_boxes_when_story_bank_is_on_the_roll(gate):
+    """THE WIRING, at the queue gate (operator, 2026-09-28). Story bank ships
+    on the roll, and a run with last night's My Story text still in the boxes
+    stopped here in a second. The roll decides later -- the boxes are used if
+    it lands on my_story and ignored otherwise -- so the gate lets it through
+    to the downloads, and saves no draft: the writer does that once the roll
+    has landed on my_story. The hand-picked mismatch above still stops."""
+    run, downloads = gate
+    run(prompt(source_bank=SI.BANK_ROLL_LABEL, custom_premise="",
+               story_plot="ring the bell", story_author="A. Listener"))
+    assert downloads
+    assert not list(DR.drafts_root().glob("*/input.json"))
+
+
 @pytest.mark.parametrize("values", [
     {"custom_premise": ["8", 0]}, {"story_plot": ["8", 0]},
     {"story_author": ["8", 0]}, {"num_characters": ["8", 0]},

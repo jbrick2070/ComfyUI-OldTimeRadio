@@ -110,7 +110,8 @@ open is skipped and named in the log, never forced.
 **The one thing you give up:** a `partial` or `full` episode can no longer be
 frozen into a replay bundle, because the freeze needs the master WAV and the
 stills. Freeze it first, or run it `off`. A workflow saved before Space saver
-existed has no value for it and still reads as `off`. The ledger records what was removed
+existed opens with the default too, so it runs `full` unless you change it. The
+ledger records what was removed
 under `asset_cleanup_receipt`.
 
 ## Writing your own story

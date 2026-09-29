@@ -221,6 +221,15 @@ still the singleton's last-resort fallback. So:
 into a replay bundle afterwards. Freeze first, or run it off. The harness and
 the 5-minute rule read `otr/obs` and the leg log, never the episode folder.
 
+**AMENDED 2026-09-28 -- IT SHIPS FULL.** Operator: "full for everyone". Every
+shipped workflow and the widget default carry `full (keep only the published
+video)`; a graph saved before the widget existed opens with that default too.
+Only an API prompt that omits the key reads as off. Every safety rule above
+is unchanged -- the right folder, never a blocked episode, the published copy
+proven first -- and the cost above now applies by default: a measurement leg
+that needs the working files passes
+`--set OTR_LedgerScriptWriter.asset_cleanup="off (keep everything)"`.
+
 ## 2026-09-24 -- THE PORTABLE-BANK "NOT DIAGNOSED" NOTE IS NOW EXPLAINED AND FIXED
 
 The 2026-09-20 entry below (and the README's "Known failures" section, and

@@ -4,8 +4,8 @@ contract, operator law 2026-06-11).
 Sweeps STALE entries under ``episodes/_shared/tmp`` ONLY (the scratch tier
 the launchers point TEMP/TMP/OTR_GPU_LEASE_DIR at). Everything else in the
 output tree is operator-gated: episode assets are deleted only when the
-operator CHOSE it for that run -- the writer's ``asset_cleanup`` (default
-off, 2026-09-25), carried out by ``OTR_MasterAudioMux`` on that run's own
+operator CHOSE it for that run -- the writer's ``asset_cleanup`` (2026-09-25;
+ships full since 2026-09-28), carried out by ``OTR_MasterAudioMux`` on that run's own
 folder after the publish is proven (``_otr_asset_cleanup``), which is the
 second sanctioned auto-delete. The OH-4 migration prints a dry-run table
 and STOPS for an explicit yes, and the pending-dir sweep (BUG-LOCAL-290)
