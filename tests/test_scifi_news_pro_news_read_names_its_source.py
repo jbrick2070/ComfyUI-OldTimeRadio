@@ -100,6 +100,43 @@ def test_matching_is_word_boundary_not_substring():
     assert finding is not None, "a substring match would have passed this"
 
 
+@pytest.mark.parametrize("close", [
+    "MITの研究者によると、新しいロボットが完成した。",
+    "据MIT的研究人员称，新机器人已经完成。",
+    "ＭＩＴの研究者によると、新しいロボットが完成した。",
+])
+def test_a_latin_name_flush_against_japanese_or_chinese_names_the_source(close):
+    """PBUG-20260929-06. Japanese and Chinese write no spaces, and `\\b`
+    counts Han and kana as word characters, so "MITの" never matched "MIT"
+    and a close that named its source was refused for naming nothing."""
+    check = F2._make_news_read_validator(_dossier(places=["MIT"]), [])
+    assert check(_read(close)) is None
+
+
+@pytest.mark.parametrize("close", [
+    "2026年に発表された研究だ。",
+    "该研究于2026年发表。",
+    "यह शोध २०२६ में प्रकाशित हुआ।",
+    "２０２６年に発表された。",
+])
+def test_a_number_in_the_closes_own_digits_or_against_han_names_the_source(close):
+    check = F2._make_news_read_validator(_dossier(numbers=["2026"]), [])
+    assert check(_read(close)) is None
+
+
+def test_a_longer_latin_word_before_a_particle_is_still_not_the_anchor():
+    """The boundary moved for Han and kana only: "Adamの" is not "Ada"."""
+    check = F2._make_news_read_validator(_dossier(people=["Ada"]), [])
+    assert check(_read("Adamの研究によると、成果が出た。")) is not None
+
+
+def test_an_anchor_ending_in_a_full_stop_matches_before_a_space():
+    """`\\b` after a final "." needed a letter to follow, so "U.S." never
+    matched "the U.S. agency"."""
+    check = F2._make_news_read_validator(_dossier(places=["U.S."]), [])
+    assert check(_read("The U.S. agency confirmed the burst.")) is None
+
+
 def test_a_short_entity_name_is_not_an_anchor():
     check = F2._make_news_read_validator(_dossier(people=["Xi"]), [])
     assert check(_read("Nothing here names anyone.")) is None

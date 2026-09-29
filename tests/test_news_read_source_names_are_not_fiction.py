@@ -61,6 +61,16 @@ def test_the_source_attribution_check_is_untouched():
     assert verdict and "never names the real source" in verdict
 
 
+def test_an_accented_source_surname_may_be_named():
+    """The exemption split each anchor on ASCII letters only, so "José
+    García" exempted "jos" and "garc", and a Spanish close naming García was
+    refused as invention (PBUG-20260929-06)."""
+    dossier = _dossier(people=["José García"])
+    check = _make_news_read_validator(dossier, ["García"])
+    verdict = check(_read("José García publicó el estudio en Madrid."))
+    assert verdict is None, verdict
+
+
 def test_matching_is_case_insensitive():
     dossier = _dossier(people=["Pat Pataranutaporn"], places=["MIT"])
     check = _make_news_read_validator(dossier, ["PATARANUTAPORN"])

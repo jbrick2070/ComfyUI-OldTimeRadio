@@ -25,6 +25,7 @@ import logging
 import math
 import random
 import re
+import unicodedata
 import warnings
 from contextlib import nullcontext
 from dataclasses import dataclass, replace
@@ -644,6 +645,38 @@ def _resolve_seed() -> int:
 
 def _word_re(term: str) -> "re.Pattern[str]":
     return re.compile(r"\b" + re.escape(term) + r"\b", re.IGNORECASE)
+
+
+#: A letter, digit or underscore that would continue a word in a script
+#: written with spaces: anything `\w` matches except Han and kana.
+_SPACED_WORD_CHAR = (r"[^\W぀-ヿ㐀-䶿一-鿿"
+                     r"豈-﫿ｦ-ﾟ]")
+
+
+def _anchor_re(term: str) -> "re.Pattern[str]":
+    """``term`` as a whole word, for the closing read's source check in any of
+    the episode languages (PBUG-20260929-06).
+
+    `\\b` counts Han and kana as word characters, and Japanese and Chinese
+    write no spaces, so a close that named its source as "MITの研究" or
+    "于2026年发表" was refused for naming nothing. Here only a letter or digit
+    of a spaced script continues the term -- "Adamの" is still not "Ada" --
+    and a term that ends in a full stop ("U.S.") matches before a space,
+    which `\\b` refused as well."""
+    return re.compile(r"(?<!%s)%s(?!%s)" % (
+        _SPACED_WORD_CHAR, re.escape(term), _SPACED_WORD_CHAR), re.IGNORECASE)
+
+
+def _folded_for_matching(text: str) -> str:
+    """``text`` as the source check compares it: compatibility forms folded
+    (NFKC -- full-width letters and digits become ASCII) and every other
+    decimal digit written as its ASCII digit, since a Hindi close may write
+    the year 2026 as २०२६."""
+    out = []
+    for ch in unicodedata.normalize("NFKC", text):
+        value = unicodedata.decimal(ch, None)
+        out.append(str(value) if value is not None and not ch.isascii() else ch)
+    return "".join(out)
 
 
 # Spelled-number equivalence (16th live smoke 2026-07-10: the story said
@@ -2092,26 +2125,37 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]"):
     # holds the full name ("Pat Pataranutaporn"), so exact comparison misses
     # the very case this exists for. Word-level equality (never substring)
     # keeps it precise -- "Ada" is not exempted by an anchor "Adam Smith".
+    # The words are split on anything that is not a letter or digit of ANY
+    # script: split on ASCII alone, "José García" exempted "jos" and "garc",
+    # and a Spanish close naming García was refused as invention.
     _source_attested = set()
     for _a in anchors:
         _a = str(_a or "").strip()
         if not _a:
             continue
         _source_attested.add(_a.casefold())
-        for _w in re.split(r"[^0-9A-Za-z'-]+", _a):
+        for _w in re.split(r"[^\w'-]+", _a):
             if len(_w) >= 3:
                 _source_attested.add(_w.casefold())
     fiction = tuple(
         name for name in (str(n or "").strip() for n in cast_names)
         if len(name) >= 3 and name.casefold() not in _source_attested
     )
+    # The source check reads the close in whatever language the episode is
+    # in; see `_anchor_re` and `_folded_for_matching`. The invented-name
+    # check below keeps `_word_re` on purpose: in a Japanese or Chinese
+    # episode a real person the cast borrowed is written in the episode's
+    # own script, which nothing here can yet vouch for, so a boundary that
+    # found more names there would refuse more real people.
+    anchor_patterns = [_anchor_re(_folded_for_matching(a)) for a in anchors]
 
     def _check(read: NewsCloseRead) -> "str | None":
         text = _norm_ws(read.news_close_read)
+        folded = _folded_for_matching(text)
         findings: "list[str]" = []
         # An empty dossier cannot prove anything, so it does not accuse:
         # a close is only asked to name a source when a source was indexed.
-        if anchors and not any(_word_re(a).search(text) for a in anchors):
+        if anchors and not any(p.search(folded) for p in anchor_patterns):
             # The close and the anchors it was checked for ride along, so a
             # failure explains itself: on 2026-09-29 a Hindi close failed this
             # twice and killed the episode, and neither the log nor the raised
