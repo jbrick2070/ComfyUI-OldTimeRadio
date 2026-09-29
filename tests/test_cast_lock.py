@@ -487,6 +487,61 @@ def test_legacy_lane_without_cast_seed_still_preserves_presets():
     assert any("no cast_seed" in line for line in report)
 
 
+def _lane_left_unvoiced_cast():
+    """scifi_news_pro's rows since 2026-09-17: the announcer on kokoro, LEMMY
+    with his frozen Bark preset, two characters the lane left unvoiced."""
+    return [
+        {"char_id": "c01", "name": "ANNOUNCER", "gender": "male",
+         "tts_model": "kokoro", "voice_preset": "bm_george"},
+        {"char_id": "c02", "name": "LEMMY", "gender": "male",
+         "tts_model": "bark", "voice_preset": "v2/en_speaker_9"},
+        {"char_id": "c03", "name": "Mara Voss", "gender": "female",
+         "tts_model": "", "voice_preset": ""},
+        {"char_id": "c04", "name": "Theo Park", "gender": "male",
+         "tts_model": "", "voice_preset": ""},
+    ]
+
+
+@pytest.mark.parametrize("bank", ["scifi_news_pro", "my_story"])
+def test_bark_draws_voices_for_rows_a_content_owned_lane_left_empty(bank):
+    """Overnight leg 10 (2026-09-29): a Bark roll on scifi_news_pro died at
+    Gate 1 on "empty voice_preset on 2 row(s)". Both content-owned lanes leave
+    character voices to CastLock; Bark now stamps them as every other engine
+    does. A preset the lane did stamp (LEMMY's) is kept and never reused."""
+    from nodes._otr_voice_bank import bark_preset_gender
+    from nodes.cast_lock import CastLock
+
+    cast = _lane_left_unvoiced_cast()
+    meta = {"source_bank": bank, "episode_seed": 4242}
+    report: list = []
+    CastLock._assign_bark_voices(cast, meta, report)
+
+    presets = [row["voice_preset"] for row in cast]
+    assert presets[1] == "v2/en_speaker_9"
+    assert all(p.startswith("v2/") for p in presets[1:])
+    assert len(set(presets[1:])) == 3
+    for row in cast[2:]:
+        assert row["tts_model"] == "bark" and row["voice_engine"] == "bark"
+        assert row["presentation_gender"] == bark_preset_gender(row["voice_preset"])
+        assert row["presentation_gender"] == row["gender"]
+    assert any("drew" in line and "c03=" in line for line in report)
+
+    again = _lane_left_unvoiced_cast()
+    CastLock._assign_bark_voices(again, dict(meta), [])
+    assert [row["voice_preset"] for row in again] == presets, "a re-lock draws the same voices"
+
+
+def test_a_lane_that_voiced_every_row_draws_nothing():
+    from nodes.cast_lock import CastLock
+
+    cast = _content_owned_cast()
+    report: list = []
+    CastLock._assign_bark_voices(cast, {"source_bank": "scifi_news_pro", "episode_seed": 1}, report)
+    assert [row["voice_preset"] for row in cast] == [
+        "bm_george", "v2/en_speaker_6", "v2/en_speaker_3"]
+    assert any("0 unvoiced row(s) drawn here" in line for line in report)
+
+
 # ----------------------------------------------------------------------------
 # Bark as an announcer engine (2026-08-24)
 # ----------------------------------------------------------------------------

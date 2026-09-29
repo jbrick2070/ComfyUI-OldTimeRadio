@@ -863,9 +863,11 @@ class CastLock:
         # stamps a v2/* preset here. Refusing used to crash a live My Story
         # Bark listen at lock() after the writer finished.
         if content_owned:
+            drawn = CastLock._draw_bark_characters(cast, meta, report)
             report.append(
                 "bark voices: source bank owns character cast -- "
-                "voice_preset preserved (no writer replay)"
+                "voice_preset preserved (no writer replay); %d unvoiced "
+                "row(s) drawn here" % drawn
             )
             if announcer_engine == "bark":
                 CastLock._assign_bark_announcer(cast, meta, report)
@@ -915,6 +917,91 @@ class CastLock:
         if cast_seed is not None or bark_announcer:
             _OTRCAST._assert_unique_bark_voices(cast)
             _OTRCAST._assert_voice_preset_invariant(cast)
+
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _draw_bark_characters(cast, meta, report) -> int:
+        """Stamp a ``v2/*`` Bark preset on every character row a content-owned
+        lane left without one. Returns how many were stamped.
+
+        Two lanes say so in their own words: My Story's cast rows keep
+        ``voice_preset`` empty "until lock() stamps the engine that will
+        actually speak", and scifi_news_pro's since 2026-09-17 keep it empty
+        "until CastLock owns it". Every other engine did stamp those rows here;
+        Bark only verified them, so a Bark roll on either lane died at Gate 1
+        (overnight leg 10, 2026-09-29: scifi_news_pro, "empty voice_preset on 2
+        row(s): c02, c03"). A row the lane DID voice keeps its preset -- that
+        is the verify-never-replay contract, and LEMMY's frozen preset is one.
+
+        Drawn the way the announcer's is: from the ten Bark presets minus the
+        ones already on this cast, gender-first, each row seeded by the episode
+        seed and its own ``char_id`` (a distinct sha1 discriminator), so a
+        re-lock of the same episode draws the same voices and no draw perturbs
+        another. ``presentation_gender`` comes from the preset actually drawn.
+        More characters than presets raises from the picker -- loud.
+        """
+        import random
+
+        from . import _otr_casting as _OTRCAST
+        from ._otr_voice_bank import bark_preset_gender
+        from ._otr_voice_node_common import coerce_int_seed
+
+        # The same two-tier import as `_assign_bark_announcer` (2026-08-25
+        # PBUG: a bare `from config import ...` only works where the repo root
+        # happens to be on sys.path, never under a real ComfyUI install).
+        try:
+            from ..config import cast_pools as _POOLS  # type: ignore
+        except ImportError:
+            try:
+                from config import cast_pools as _POOLS  # type: ignore
+            except ImportError:
+                # Fail soft here, fail closed downstream: the rows stay
+                # unvoiced and the caller's Gate 1 names them.
+                report.append(
+                    "bark voices: cast_pools import failed (broken install?) "
+                    "-- character rows left unstamped, downstream invariant "
+                    "will raise"
+                )
+                return 0
+
+        def voiced(row) -> bool:
+            return str(row.get("voice_preset") or "").startswith("v2/")
+
+        characters = [r for r in cast
+                      if isinstance(r, dict) and not _is_announcer_entry(r)]
+        taken = {str(r.get("voice_preset")) for r in characters if voiced(r)}
+        episode_seed = coerce_int_seed((meta or {}).get("episode_seed"))
+        drawn = []
+        for row in characters:
+            if voiced(row):
+                continue
+            cid = str(row.get("char_id") or "")
+            rng = random.Random(hashlib.sha1(
+                f"bark_character:{episode_seed}:{cid}".encode("utf-8")
+            ).hexdigest())
+            slot = _OTRCAST.EnsembleSlot(
+                char_id=cid,
+                name=str(row.get("name") or cid),
+                gender=str(row.get("gender") or ""),
+                timbre="",
+                role="support",
+            )
+            preset = _OTRCAST.python_assign_voice_preset(
+                slot, available_voices=_POOLS.open_voice_pool(taken), rng=rng)
+            taken.add(preset)
+            row["voice_preset"] = preset
+            row["tts_model"] = "bark"
+            row["voice_engine"] = "bark"
+            row["voice_ref_id"] = ""
+            row["commercial_clean"] = False
+            row["voice_cast_fallback"] = ""
+            row["presentation_gender"] = (
+                bark_preset_gender(preset) or str(row.get("gender") or ""))
+            drawn.append("%s=%s" % (cid, preset))
+        if drawn:
+            report.append("bark voices: drew %s for character row(s) the "
+                          "source bank left unvoiced" % ", ".join(drawn))
+        return len(drawn)
 
     # ------------------------------------------------------------------ #
     @staticmethod
