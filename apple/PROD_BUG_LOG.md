@@ -15962,3 +15962,12 @@ not promote it to the Bug Bible on this evidence alone.
 - live verify: pending a Bark roll on a content-owned bank; the overnight
   server restarts on 0c1bf1f6 when leg 11 ends.
 - Bible: none yet.
+
+## PBUG-20260929-02 live verify -- My Story on Bark published
+- Overnight leg 15 (01:48-04:58 PDT, server on 35689b12): my_story, the
+  default draft f7df4c730dda, ltx25_mime_16gb, Bark rolled for every voice --
+  the combination that died at Gate 1 in leg 10. The lane left its character
+  rows unvoiced and CastLock drew them: c02 v2/en_speaker_2, c03
+  v2/en_speaker_4, c04 v2/en_speaker_1, the announcer v2/en_speaker_7 (all
+  distinct; P-OBS char_voice lines in tmp/overnight_20260928/server.log).
+  Published as count_three_20260929_014806__arch__n16m__sd15__bark__myst.
