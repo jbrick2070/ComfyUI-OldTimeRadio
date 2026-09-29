@@ -15880,3 +15880,23 @@ not promote it to the Bug Bible on this evidence alone.
   (my_story, published 23:24) ran on the 21:47 boot, so it does not verify the
   speaker-slip fix above either; that also waits on the next my_story leg.
 - Bible: none yet.
+
+## PBUG-20260928-07 correction -- the named error could not have saved leg 04
+- The follow-up above is wrong about the mechanism (Sonnet QA of 7ff91d95,
+  confirmed in `_otr_structured_call` and the rotated server log
+  `tmp/overnight_20260928/server.20260928_232601_313.log`). Leg 04's base reply
+  decoded and failed the cast check, so the typed repair prompt carried
+  "'Storp' is not in the cast", and the repair syntax retry re-sends that exact
+  prompt by design. The char-0 text was never any turn's validation problem.
+- What the repair replies held is still unknown: both came back complete
+  (EOS, closing fence) with a defect the extractor would not guess past. Leg
+  05's first act reply failed to decode the same way and recovered on the
+  structural retry.
+- What removes leg 04's failure is 29eaeebe: the one-letter slip is now read
+  as the cast member, so no repair runs. 7ff91d95, ba6dd10e and 725af773 make
+  every undecodable reply name its defect in the ladder WARNING, positioned in
+  the text as written, which is the diagnosis this entry lacked. The model
+  sees that error only when a pass's first two replies both fail to decode.
+- open: whether the repair syntax retry should carry the decode error instead
+  of re-sending the same prompt is a ladder design question (every structured
+  pass) and is not changed here.
