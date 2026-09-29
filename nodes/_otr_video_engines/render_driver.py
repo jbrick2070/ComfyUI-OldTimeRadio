@@ -7109,7 +7109,7 @@ def build_clip_manifest(result, *, episode_id=""):
             # Stamped ONLY when the receipt says so; never inferred from the
             # missing file.
             "status": (_receipt.STATUS_SANCTIONED_GAP
-                       if (bid in _gap_beats_for_manifest
+                       if (shot_is_sanctioned_gap(shot, _gap_beats_for_manifest)
                            or _shot_is_budget_floor(shot)
                            or _shot_is_cloud_floor(shot))
                        else _receipt.STATUS_OK),

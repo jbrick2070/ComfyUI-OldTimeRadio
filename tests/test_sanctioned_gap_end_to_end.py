@@ -211,3 +211,19 @@ def test_one_predicate_keys_a_shot_the_way_the_validator_does():
     # ShotLock's synthetic opening carries no source line at all.
     assert rd.shot_is_sanctioned_gap(
         {"shot_id": "shot_b000_music_open", "source_line_ids": []}, {"b000_music_open"})
+
+
+def test_the_manifest_marks_a_skipped_row_the_way_the_loop_skipped_it():
+    """Sonnet QA of 232d9f41: build_clip_manifest keyed the sanction by
+    _beat_id_for_shot alone, so a row the loop skipped on its explicit
+    beat_id (a shot_id that does not spell the beat) came out status=ok with
+    no clip -- an unexplained absence to node 92. One predicate everywhere."""
+    led = _all_refused_ledger(explicit_beat_id=True)
+    for i, shot in enumerate(led["video"]["shots"], start=1):
+        shot["shot_id"] = "shot_%04d" % i
+        shot["source_line_ids"] = []
+    rd.validate_and_repair_still_spine(led)
+    with mock.patch.object(rd, "render_beat_coverage", _explode):
+        result = rd.run_episode(led)
+    manifest = rd.build_clip_manifest(result, episode_id="test_ep_all_refused")
+    assert all(_receipt.is_sanctioned_gap(r) for r in manifest["clips"])
