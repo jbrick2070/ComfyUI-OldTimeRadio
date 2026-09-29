@@ -8,7 +8,9 @@ identical -- the sha256 proof rides on it); the ONNX call kwargs are pinned; the
 voice table is derived from the .pt files under a digest-named file, never a
 replace-in-place; the ledger's cuda stamp is logged, not raised, under ONNX; the
 cache hook is empty under torch; the prefetch's gate never raises on a
-sys.modules fake; and nothing in the backends can reach the network.
+sys.modules fake; nothing in the backends can reach the network; and the five
+espeak rows reach kokoro-onnx as the torch pipeline's own phonemes, while
+Japanese and Mandarin go to torch or refuse by name.
 """
 from __future__ import annotations
 
@@ -248,8 +250,9 @@ class _StubOnnxBackend:
     name = "onnx"
     instances: list = []
 
-    def __init__(self, model_path, voices_npz, providers=None, threads=None):
+    def __init__(self, model_path, voices_npz, providers=None, threads=None, lang_code="b"):
         self.model_path, self.voices_npz = model_path, voices_npz
+        self.lang_code = lang_code
         self.providers_active = ["CPUExecutionProvider"]
         self.threads = 4
         self.closed = False
@@ -447,3 +450,140 @@ def test_other_kpipeline_failures_stay_exactly_as_loud():
 
 def test_the_japanese_row_is_the_only_one_that_loads_mecab():
     assert kb._MECAB_LANG_CODES == ("j",)
+
+
+# --------------------------------------------------------------------------- #
+# the espeak languages on ONNX (2026-09-28)
+# --------------------------------------------------------------------------- #
+# ComfyUI Desktop and the portable build run Python 3.13, where neither the
+# torch package nor misaki installs, and three of the operator's randomized
+# runs died at the first Spanish line after the writer had spent two minutes.
+# The torch pipeline voices these five rows through misaki's EspeakG2P; the
+# ONNX backend now does the same, and the proof is phoneme equality with
+# misaki itself wherever misaki is installed.
+
+#: One sentence per espeak row: a borrowed English name (the language-switch
+#: flags misaki strips), brackets and angle quotes (its bracket handling), and
+#: the tied sounds it folds into Kokoro's own symbols.
+_ESPEAK_SAMPLES = {
+    "es": "Buenas noches. Esta es la se\xf1al perdida (dice Wendy): \xab\xa1muchas gracias, Chihuahua!\xbb",
+    "fr-fr": "Bonsoir. Ici le signal perdu, et Wendy r\xe9pond : \xab merci beaucoup ! \xbb",
+    "it": "Buonasera. Questo \xe8 il segnale perduto (dice Wendy): grazie mille!",
+    "pt-br": "Boa noite. Este \xe9 o sinal perdido, e Wendy diz: muito obrigado!",
+    "hi": "\u0936\u0941\u092d \u0938\u0902\u0927\u094d\u092f\u093e\u0964 \u092f\u0939 \u0916\u094b\u092f\u093e \u0939\u0941\u0906 \u0938\u0902\u0915\u0947\u0924 \u0939\u0948, \u0914\u0930 \u0935\u0947\u0902\u0921\u0940 \u0915\u0939\u0924\u0940 \u0939\u0948: \u092c\u0939\u0941\u0924 \u0927\u0928\u094d\u092f\u0935\u093e\u0926!",
+}
+
+
+def test_the_espeak_set_is_the_torch_pipelines_own():
+    pipeline = pytest.importorskip("kokoro.pipeline")
+    own_g2p = ("a", "b", "j", "z")        # misaki's English, Japanese, Chinese
+    assert kb.ESPEAK_LANGUAGES == {
+        code: lang for code, lang in pipeline.LANG_CODES.items() if code not in own_g2p}
+    assert sorted(_ESPEAK_SAMPLES) == sorted(kb.ESPEAK_LANGUAGES.values())
+
+
+def test_every_non_english_row_is_espeak_or_needs_torch():
+    from nodes import _otr_episode_languages as langs
+    rows, _by_label, _by_iso = langs.load_registry()
+    codes = {row.engines["kokoro"]["lang_code"] for row in rows if row.iso != "en"}
+    assert codes - set(kb.ESPEAK_LANGUAGES) == {"j", "z"}
+
+
+@pytest.mark.parametrize("language", sorted(_ESPEAK_SAMPLES))
+def test_the_onnx_phonemes_are_the_torch_pipelines_phonemes(language):
+    misaki_espeak = pytest.importorskip("misaki.espeak")
+    text = _ESPEAK_SAMPLES[language]
+    ours = kb.EspeakPhonemizer(language)(text)
+    theirs, _ = misaki_espeak.EspeakG2P(language=language)(text)
+    assert ours and ours == theirs
+
+
+class _StubG2P:
+    language = "es"
+
+    def __call__(self, text):
+        return "" if text == "..." else "PH<%s>" % text
+
+
+def test_an_espeak_row_goes_to_kokoro_onnx_as_phonemes():
+    stub = _StubKokoro(voices=("ef_dora",))
+    backend = _onnx_backend_with_stub(stub)
+    backend._g2p = _StubG2P()
+    out = backend.synthesize("hola\n...\nadios", "ef_dora", 0.95)
+    assert [c[0] for c in stub.calls] == ["PH<hola>", "PH<adios>"]   # no phonemes: skipped
+    for _, kw in stub.calls:
+        assert kw == {"voice": "ef_dora", "speed": 0.95, "is_phonemes": True, "lang": "es",
+                      "trim": False, "sentence_pause": 0.25, "clause_pause": 0.1}
+    assert out.size == 200
+
+
+def _fake_onnx_runtime(monkeypatch):
+    class _Session:
+        def __init__(self, path, sess_options=None, providers=None):
+            self.providers = providers
+
+        def get_providers(self):
+            return list(self.providers)
+
+    class _Options:
+        intra_op_num_threads = 0
+
+    monkeypatch.setitem(sys.modules, "onnxruntime", types.SimpleNamespace(
+        InferenceSession=_Session, SessionOptions=_Options,
+        get_available_providers=lambda: ["CPUExecutionProvider"]))
+    monkeypatch.setitem(sys.modules, "kokoro_onnx", types.SimpleNamespace(
+        Kokoro=types.SimpleNamespace(from_session=lambda s, v: _StubKokoro())))
+
+
+def test_load_builds_the_row_phonemizer_and_refuses_what_onnx_cannot_speak(monkeypatch):
+    _fake_onnx_runtime(monkeypatch)
+    built = []
+    monkeypatch.setattr(kb, "EspeakPhonemizer",
+                        lambda language: built.append(language) or _StubG2P())
+    spanish = kb.OnnxKokoroBackend("m.onnx", "v.npz", lang_code="e")
+    spanish.load()
+    assert built == ["es"] and spanish._g2p is not None
+    english = kb.OnnxKokoroBackend("m.onnx", "v.npz")
+    english.load()
+    assert english._g2p is None and built == ["es"]
+    _absent(monkeypatch, "onnxruntime")          # refused before any import
+    for code in ("j", "z"):
+        with pytest.raises(kb.BackendUnavailable, match="no phonemizer for lang_code '%s'" % code):
+            kb.OnnxKokoroBackend("m.onnx", "v.npz", lang_code=code).load()
+
+
+def test_the_engine_speaks_an_espeak_row_on_onnx(monkeypatch, tmp_path):
+    eng = _onnx_engine(monkeypatch, tmp_path)
+    monkeypatch.setattr(eng_kokoro, "_spec_present", lambda n: False)   # no torch kokoro
+    eng._lang_code = "e"
+    eng.load()
+    assert eng._backend_name == "onnx"
+    assert _StubOnnxBackend.instances[-1].lang_code == "e"
+
+
+def test_a_cjk_row_without_torch_names_the_python_it_needs(monkeypatch, tmp_path):
+    eng = _onnx_engine(monkeypatch, tmp_path)
+    monkeypatch.setattr(eng_kokoro, "_spec_present", lambda n: False)
+    eng._lang_code = "j"
+    with pytest.raises(EngineUnusable) as exc:
+        eng.load()
+    assert exc.value.reason == EngineUsabilityReason.MISSING_MODEL
+    assert "'j'" in str(exc.value) and "Python 3.12" in str(exc.value)
+
+
+def test_a_cjk_row_moves_to_torch_when_torch_is_installed(monkeypatch, tmp_path):
+    eng = _onnx_engine(monkeypatch, tmp_path)
+    monkeypatch.setattr(eng_kokoro, "_spec_present", lambda n: True)
+    loaded = []
+
+    class _Torch:
+        def __init__(self, device, lang_code="b"):
+            loaded.append(lang_code)
+
+        def load(self):
+            pass
+
+    monkeypatch.setattr(kb, "TorchKokoroBackend", _Torch)
+    eng._lang_code = "z"
+    eng.load()
+    assert eng._backend_name == "torch" and loaded == ["z"]

@@ -64,10 +64,11 @@ on ComfyUI Desktop and the portable build (Python 3.13, Kokoro's `kokoro-onnx`
 backend) and about 8x on a from-source install (Python 3.12, Kokoro's `torch`
 backend). Either way, voices are not what makes those runs long.
 
-The Python 3.13 ONNX backend is the English path. Non-English rows use the torch
-Kokoro pipeline and therefore require Python 3.10 through 3.12. Japanese and
-Mandarin also check their `misaki[ja]` / `misaki[zh]` readiness extras when
-selected. See [MULTILINGUAL.md](MULTILINGUAL.md).
+The Python 3.13 ONNX backend speaks English, Spanish, Portuguese, Italian,
+French and Hindi, with the same phonemes the torch pipeline uses. Japanese and
+Mandarin use the torch Kokoro pipeline and therefore require Python 3.10
+through 3.12, and they also check their `misaki[ja]` / `misaki[zh]` readiness
+extras when selected. See [MULTILINGUAL.md](MULTILINGUAL.md).
 
 ### The cloning engines need two things, not one
 

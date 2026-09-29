@@ -105,12 +105,18 @@ The admitted Kokoro pools are:
 French and Italian are intentionally thin pools. The caster may reuse a voice
 inside that language. It never fills a thin pool with an English voice.
 
-Python 3.10 through 3.12 use Kokoro's torch backend and are the multilingual
-path. Python 3.13 uses `kokoro-onnx`, which this pack treats as English-only.
-Python 3.14 has no packaged Kokoro path. Japanese and Mandarin additionally
-require the matching `misaki[ja]` or `misaki[zh]` readiness extra; those extras
-are checked only when that language is selected and are not an English-install
-tax.
+Python 3.10 through 3.12 use Kokoro's torch backend and speak every row.
+Python 3.13 (ComfyUI Desktop and the portable build) uses `kokoro-onnx`, which
+speaks English, Spanish, Portuguese, Italian, French and Hindi. The torch
+backend voices those five through espeak-ng, and the ONNX backend repeats that
+step itself, so the model gets the same phonemes either way (measured
+2026-09-28 against misaki 0.9.4, and pinned by `tests/test_kokoro_backends.py`).
+Japanese and Mandarin use misaki's own Japanese and Chinese phonemizers,
+which have no Python 3.13 build, so those two rows need Python 3.10 through
+3.12. Python 3.14 has no packaged Kokoro path. Japanese and Mandarin
+additionally require the matching `misaki[ja]` or `misaki[zh]` readiness
+extra; those extras are checked only when that language is selected and are
+not an English-install tax.
 
 Install one with ComfyUI's own Python before selecting that row:
 

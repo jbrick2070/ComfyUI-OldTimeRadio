@@ -233,9 +233,11 @@ class KokoroEngine:
     def load(self):
         """Select and load the backend. Cache identity is (backend, lang, device).
 
-        A language change rebuilds the pipeline. Non-English is torch-first:
-        kokoro-onnx only documents English locales, so ONNX is never guessed
-        for a Spanish / Hindi / CJK row.
+        A language change rebuilds the pipeline. The ONNX backend speaks English
+        and the five espeak languages with the torch pipeline's own phonemes
+        (``_kokoro_backends.ESPEAK_LANGUAGES``); Japanese and Mandarin need the
+        torch package, so ONNX hands those to torch when it is installed and
+        refuses by name when it is not.
         """
         from . import _kokoro_backends as _kb
         from .registry import EngineUsabilityReason
@@ -251,18 +253,14 @@ class KokoroEngine:
             raise self._unusable(reason, str(exc)) from exc
 
         lang = getattr(self, "_lang_code", None) or "b"
-        if lang not in ("a", "b") and name == "onnx":
+        gap = _onnx_lang_code_gap(lang) if name == "onnx" else None
+        if gap is not None:
             if _spec_present("kokoro"):
                 name = "torch"
-                log.info(
-                    "[OTR.kokoro] non-English lang_code=%s forces torch "
-                    "(ONNX locale is not guessed)", lang)
+                log.info("[OTR.kokoro] lang_code=%s forces torch: the ONNX "
+                         "backend has no phonemizer for it", lang)
             else:
-                raise self._unusable(
-                    EngineUsabilityReason.MISSING_MODEL,
-                    "kokoro non-English speech needs the torch kokoro package "
-                    "(lang_code %r); kokoro-onnx is English-only on this pack"
-                    % lang)
+                raise self._unusable(EngineUsabilityReason.MISSING_MODEL, gap)
 
         device = getattr(self, "requested_device", None) or "cuda"
         cache_key = (name, lang, device)
@@ -287,7 +285,8 @@ class KokoroEngine:
             try:
                 voices_npz = _kb.ensure_voices_npz(_kokoro_voices_dir())
                 providers = _kb.parse_onnx_providers(otr_env.get("OTR_KOKORO_ONNX_PROVIDERS"))
-                backend = _kb.OnnxKokoroBackend(model_path, voices_npz, providers)
+                backend = _kb.OnnxKokoroBackend(model_path, voices_npz, providers,
+                                                lang_code=lang)
                 backend.load()
             except _kb.BackendUnavailable as exc:
                 raise self._unusable(EngineUsabilityReason.MALFORMED_CONFIG, str(exc)) from exc
@@ -374,6 +373,19 @@ class KokoroEngine:
         clip = clip / peak * 0.9  # peak-normalize to ~-1 dBFS (legacy parity)
         wav = torch.from_numpy(np.asarray(clip, dtype=np.float32)).reshape(1, 1, -1)
         return {"waveform": wav, "sample_rate": KOKORO_SAMPLE_RATE}
+
+
+def _onnx_lang_code_gap(lang_code) -> "str | None":
+    """Why the ONNX backend cannot speak ``lang_code``, or None when it can."""
+    from . import _kokoro_backends as _kb
+
+    lang = str(lang_code or "").strip() or "b"
+    if lang in ("a", "b") or lang in _kb.ESPEAK_LANGUAGES:
+        return None
+    return ("kokoro lang_code %r needs the torch kokoro package, which installs "
+            "only on Python 3.12 or earlier (its Japanese and Chinese phonemizers "
+            "have no Python 3.13 build); the ONNX kokoro voices English, Spanish, "
+            "French, Hindi, Italian and Portuguese" % lang)
 
 
 def _spec_present(name: str) -> bool:

@@ -29,12 +29,12 @@ public-domain book, a scene of Shakespeare, or original fiction.
 **It speaks English, Español, Português, Italiano, Français, हिन्दी, 日本語 and 中文.** One `episode_language`
 switch on the same node carries the writing, the voices and the captions;
 [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md) says how each one performs.
-The non-English voices need the torch Kokoro build, which installs on
-Python 3.10 through 3.12. ComfyUI Desktop and the Windows portable build
-ship 3.13, where that build cannot be installed, so a non-English
-`episode_language` stops at the first spoken line with a named error rather
-than speaking it in English. Use a 3.10-3.12 venv if you want to hear
-another language.
+ComfyUI Desktop and the Windows portable build ship Python 3.13, where Kokoro
+runs as `kokoro-onnx`: it speaks English, Spanish, Portuguese, Italian, French
+and Hindi there, with the same phonemes the torch build uses. Japanese and
+Mandarin need the torch Kokoro build, which installs on Python 3.10 through
+3.12; on 3.13 those two stop at the first spoken line with a named error
+rather than speaking in English.
 
 Change nothing else in the workflow. You need an NVIDIA card with 8 GB or more, a 16 GB
 Apple Silicon Mac, or just a CPU (start ComfyUI with `--cpu`; slow but it works),
@@ -704,8 +704,9 @@ If yours lives somewhere unusual, set `OTR_FFMPEG` to the binary's full path.
 
 **`neither kokoro backend is installed` at the first voice line.** Python 3.10 to
 3.12 run Kokoro on torch and serve every admitted language. Python 3.13
-runs English through `kokoro-onnx` on the CPU; non-English rows do not use that
-backend. Python 3.14 has no Kokoro build yet and is refused. The message names
+runs Kokoro through `kokoro-onnx` on the CPU: English, Spanish, Portuguese,
+Italian, French and Hindi, but not Japanese or Mandarin, which need the torch
+build. Python 3.14 has no Kokoro build yet and is refused. The message names
 the exact pip line. An English episode can use Bark instead, except on a 16 GB
 Mac where Bark is a memory hazard. Non-English rows admit Kokoro and Google
 TTS (hosted, your own Google API key).

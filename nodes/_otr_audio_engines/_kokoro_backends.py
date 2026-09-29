@@ -25,6 +25,17 @@ are converted once into a digest-named npz beside them (``ensure_voices_npz``);
 the ``.pt`` stays the identity the bank and the cache fingerprint hash, and the
 npz is derived state.
 
+THE ESPEAK LANGUAGES ON ONNX (2026-09-28). The torch package voices Spanish,
+French, Hindi, Italian and Brazilian Portuguese through misaki's ``EspeakG2P``:
+espeak-ng phonemes, tied affricates and diphthongs folded into Kokoro's own
+symbols. misaki does not install on Python 3.13, but phonemizer and espeak-ng
+come with kokoro-onnx, so ``EspeakPhonemizer`` repeats that G2P here and the
+ONNX backend hands kokoro-onnx the phonemes. Measured the day it was written:
+identical phoneme strings to misaki 0.9.4 on eleven sentences across the five
+languages, and the same strings from the Desktop's Python 3.13. Japanese and
+Mandarin use misaki's own Japanese and Chinese G2P, which has no Python 3.13
+build, so those two rows still need the torch package.
+
 RULES THIS FILE KEEPS: C-5 -- nothing heavy (torch, numpy, onnxruntime, kokoro)
 is imported at module top; the package imports ``eng_kokoro`` at init. C-7 --
 nothing here ever networks; a missing model or voice is a NAMED error raised by
@@ -62,6 +73,13 @@ DEFAULT_ONNX_PROVIDERS = ("CPUExecutionProvider",)
 #: Intra-op thread cap so a 16-thread session does not fight the video encode
 #: running beside it; RTF measured under this cap is ~0.15 on the dev box.
 ONNX_THREAD_CAP = 4
+
+#: Kokoro's lang_code -> the espeak-ng language its torch pipeline phonemizes
+#: with (``kokoro.pipeline.LANG_CODES`` in kokoro 0.9.4). English has its own
+#: G2P on each backend, and Japanese and Mandarin use misaki's, so none of the
+#: three is here: this is exactly the set the ONNX backend voices through
+#: ``EspeakPhonemizer``.
+ESPEAK_LANGUAGES = {"e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br"}
 
 TORCH_INSTALL_HINT = "pip install kokoro   (Python 3.12 or earlier)"
 ONNX_INSTALL_HINT = "pip install kokoro-onnx   (Python 3.10 to 3.13; onnxruntime comes with it)"
@@ -262,6 +280,58 @@ def _remove_stale_npz(voices_dir: str, keep: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# The torch pipeline's espeak G2P, for the ONNX backend
+# --------------------------------------------------------------------------- #
+class EspeakPhonemizer:
+    """misaki 0.9.4 ``EspeakG2P`` at its default version, repeated so the ONNX
+    backend phonemizes a non-English line exactly as the torch pipeline does.
+
+    The same espeak settings (stress marks, punctuation kept, ``^`` ties,
+    language-switch flags removed), the same folds of tied pairs into Kokoro's
+    single symbols, and the same bracket handling. espeak-ng is the copy
+    kokoro-onnx loads (``espeakng_loader``), and ``Kokoro.from_session`` points
+    phonemizer at it, so this is built after the session. The ``phonemizer``
+    logger is passed in so the ERROR level ``OnnxKokoroBackend.load`` sets is
+    kept; left to its default, phonemizer resets it to WARNING. Adapted from
+    misaki (hexgrad, Apache-2.0).
+    """
+
+    #: Tied espeak pairs -> Kokoro's single symbols, in misaki's (sorted) order.
+    FOLDS = tuple(sorted({
+        "a^\u026a": "I", "a^\u028a": "W",
+        "d^z": "\u02a3", "d^\u0292": "\u02a4",
+        "e^\u026a": "A",
+        "o^\u028a": "O", "\u0259^\u028a": "Q",
+        "s^s": "S",
+        "t^s": "\u02a6", "t^\u0283": "\u02a7",
+        "\u0254^\u026a": "Y",
+    }.items()))
+
+    def __init__(self, language: str):
+        import phonemizer
+
+        self.language = language
+        self._backend = phonemizer.backend.EspeakBackend(
+            language=language, preserve_punctuation=True, with_stress=True,
+            tie="^", language_switch="remove-flags",
+            logger=logging.getLogger("phonemizer"))
+
+    def __call__(self, text: str) -> str:
+        # Angle quotes become curly ones, and brackets ride through espeak as
+        # angle quotes, exactly as misaki does it.
+        text = text.replace("\xab", "\u201c").replace("\xbb", "\u201d")
+        text = text.replace("(", "\xab").replace(")", "\xbb")
+        phonemes = self._backend.phonemize([text])
+        if not phonemes:
+            return ""
+        ps = phonemes[0].strip()
+        for old, new in self.FOLDS:
+            ps = ps.replace(old, new)
+        ps = ps.replace("^", "").replace("-", "")
+        return ps.replace("\xab", "(").replace("\xbb", ")")
+
+
+# --------------------------------------------------------------------------- #
 # Backends
 # --------------------------------------------------------------------------- #
 #: The MeCab failure reads as a missing FILE, which sends the reader looking
@@ -395,22 +465,37 @@ class OnnxKokoroBackend:
     box that happens to carry onnxruntime-gpu from another pack does not try
     unqualified CUDA DLLs for a voice. Voices are passed BY NAME from the npz
     ``ensure_voices_npz`` derived from the ``.pt`` files.
+
+    English lines go to kokoro-onnx as text (its own espeak ``en-gb``). A line
+    in one of the ``ESPEAK_LANGUAGES`` goes as phonemes from
+    ``EspeakPhonemizer``, the torch pipeline's own G2P. A line too long for one
+    pass is cut where kokoro-onnx cuts it (at punctuation, within 510
+    phonemes), where the torch pipeline cuts the text into 400-character
+    pieces and truncates any that still run past 510 phonemes.
     """
 
     name = "onnx"
 
-    def __init__(self, model_path: str, voices_npz: str, providers=None, threads=None):
+    def __init__(self, model_path: str, voices_npz: str, providers=None, threads=None,
+                 lang_code: str = "b"):
         self.model_path = model_path
         self.voices_npz = voices_npz
         self.providers = list(providers or DEFAULT_ONNX_PROVIDERS)
         self.threads = int(threads or min(ONNX_THREAD_CAP, os.cpu_count() or 1))
+        self.lang_code = str(lang_code or "b").strip() or "b"
         self.providers_active: list = []
         self._session = None
         self._kokoro = None
+        self._g2p = None
 
     def load(self) -> None:
         if self._kokoro is not None:
             return
+        if self.lang_code not in ("a", "b") and self.lang_code not in ESPEAK_LANGUAGES:
+            raise BackendUnavailable(
+                "the ONNX kokoro has no phonemizer for lang_code %r; it voices "
+                "English and lang_codes %s" % (
+                    self.lang_code, ", ".join(sorted(ESPEAK_LANGUAGES))))
         import onnxruntime as ort
         from kokoro_onnx import Kokoro
 
@@ -431,6 +516,8 @@ class OnnxKokoroBackend:
         self._session = ort.InferenceSession(
             self.model_path, sess_options=options, providers=self.providers)
         self._kokoro = Kokoro.from_session(self._session, self.voices_npz)
+        if self.lang_code in ESPEAK_LANGUAGES:
+            self._g2p = EspeakPhonemizer(ESPEAK_LANGUAGES[self.lang_code])
         self.providers_active = list(self._session.get_providers())
 
     def voice_ids(self) -> list:
@@ -450,8 +537,16 @@ class OnnxKokoroBackend:
             chunk = chunk.strip()
             if not chunk:
                 continue
-            samples, rate = self._kokoro.create(
-                chunk, voice=voice_id, speed=speed, **ONNX_CREATE_KWARGS)
+            if self._g2p is None:
+                samples, rate = self._kokoro.create(
+                    chunk, voice=voice_id, speed=speed, **ONNX_CREATE_KWARGS)
+            else:
+                phonemes = self._g2p(chunk)
+                if not phonemes:
+                    continue            # the torch pipeline skips these too
+                samples, rate = self._kokoro.create(
+                    phonemes, voice=voice_id, speed=speed, is_phonemes=True,
+                    **dict(ONNX_CREATE_KWARGS, lang=self._g2p.language))
             if int(rate) != SAMPLE_RATE:
                 raise RuntimeError(
                     "kokoro-onnx returned %r Hz, expected %d" % (rate, SAMPLE_RATE))
@@ -465,6 +560,7 @@ class OnnxKokoroBackend:
         # is the unload. The npz handle kokoro-onnx holds goes with it.
         self._kokoro = None
         self._session = None
+        self._g2p = None
         try:
             import gc
 

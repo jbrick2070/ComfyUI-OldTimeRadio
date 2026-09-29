@@ -191,6 +191,14 @@ Torch-first for every non-English row. Installed `kokoro-onnx` tokenizer docs
 only `en-us` / `en-gb`. Do not guess an ONNX locale; prove it or leave it off
 the row.
 
+**Proven 2026-09-28 for the five espeak rows.** Three randomized Desktop runs
+(Python 3.13, no torch Kokoro) died at the first Spanish line. The ONNX backend
+now phonemizes Spanish, French, Hindi, Italian and Portuguese with a copy of
+misaki's `EspeakG2P` and hands kokoro-onnx the phonemes: identical phoneme
+strings to misaki 0.9.4 on every sample, the same strings from Python 3.13, and
+all five spoken on the Desktop's own Kokoro. Japanese and Mandarin stay torch
+only; their misaki phonemizers have no Python 3.13 build.
+
 Kokoro `load()` early-returns if a backend exists. Rebuild on language change.
 Cache identity is `(lang, device)`. A resident server must not run Spanish
 through a leftover `b` pipeline.
