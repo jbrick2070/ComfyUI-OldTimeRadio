@@ -1485,3 +1485,25 @@ the live version.
   custom-node template; the Apps sidebar lists saved *.app.json workflows).
 - **Paused**: the overnight feed (STOP present) until the A/B is done. The
   Bash tool broke at 11:24 when Git for Windows updated; PowerShell works.
+## 2026-09-29 15:30 -- Mandarin written in Cantonese: fixed and measured
+
+- **PBUG-20260929-07 fixed** (9d7268db): the zh writer instruction now names
+  the written standard -- 请用简体字的标准普通话（中国大陆书面语）写完整集，
+  不要写粤语，也不要用繁体字。 Measured on the canonical path with the same
+  Mandarin My Story test story (per 1000 Chinese characters of writer output):
+  old instruction 75.3 Cantonese / 19.7 traditional at penalty 1.03 and 71.3 /
+  0.0 at penalty 1.0; new instruction 0.0 / 0.0 at 1.03. The penalty explained
+  only the traditional forms; sampling is unchanged, so English is untouched.
+  Composer QA held: every pass that writes Chinese receives the instruction
+  (outline, compose, exchange, title, ledger-clean judge and repair, the
+  announcer seam); a replay of an older Mandarin episode warns on row drift
+  and keeps its frozen text. Roster for this change: Composer plus the
+  measurement; no second reader.
+- **Japanese spacing: left alone.** ~260 spaces per 1000 kana in the writer's
+  output, but almost all in non-spoken treatment fields; the dialogue lines
+  read cleanly ("聞こえているわよ、サム。落ち着…").
+- **The overnight feed** runs English (pinned), fast lanes first; leg 20
+  (h3_low_audio_in) took ~2 h for 6 beats, slower than its "fast" billing.
+- **Open**: PBUG-20260929-06 waits for a failing close's text (both news reruns
+  passed; the finding now quotes the close). The Mandarin/Hindi/Japanese
+  grammar fix (PBUG-05) is live-verified.
