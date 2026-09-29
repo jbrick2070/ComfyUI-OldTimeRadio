@@ -15900,3 +15900,41 @@ not promote it to the Bug Bible on this evidence alone.
 - open: whether the repair syntax retry should carry the decode error instead
   of re-sending the same prompt is a ladder design question (every structured
   pass) and is not changed here.
+
+## PBUG-20260929-01 -- a refused still killed a still_pan episode: the render loop keyed shots on a field ShotLock never writes
+- surfaced: overnight leg 07 on the 5080 headless server (23:26-00:03 PDT, 37
+  min), my_story on the still_pan lane with Ideogram 4 stills. Ideogram
+  returned its safety placeholder for still_music_opening_001 (a vintage tube
+  radio on a playground). The dispatcher logged TOLERATED GAP (operator ruling
+  2026-08-22: the episode continues without that card), the still-spine
+  validator logged SANCTIONED GAP and waved the beat through, and then
+  run_episode rendered shot_music_opening_001 anyway: still_pan refused the
+  missing still ("refusing the dark floor"), RenderError, episode lost.
+- root cause: sanctioned_gap_beat_ids is documented as ONE PREDICATE, TWO CALL
+  SITES that must never disagree, but the validator keyed the shot by
+  _beat_id_for_shot (source_line_ids[0], else shot_id without "shot_") while
+  run_episode's serial skip, fan-out skip, leftover walk and
+  _should_fanout_cloud_episode read shot.get("beat_id") -- a field ShotLock's
+  shot rows never carry. So no sanctioned gap was ever skipped by the render
+  loop, on any lane. tests/test_sanctioned_gap_end_to_end passed because its
+  fixture set beat_id and source_line_ids both.
+- fix: 232d9f41 -- shot_is_sanctioned_gap(shot, gap_beats) keys by
+  _beat_id_for_shot (an explicit beat_id honoured too) at all five sites;
+  f9ef4f4f makes ShotLock's real row shape the fixture default, so with the
+  old keying patched back in every test in the file fails.
+- live verify: pending the next image refusal on a still lane; the overnight
+  server was restarted on 232d9f41 at 00:10 PDT (leg 08 was stopped six
+  minutes in to load it).
+- Bible: candidate -- "a skip predicate shared by two call sites must be one
+  function, not two keyings of the same record"; not promoted yet.
+
+## Corrections to tonight's entries (Fable gate, 2026-09-29)
+- PBUG-20260928-07: leg 04 ran 22:47:00-22:51:16 PDT by overnight.log, not
+  22:49-22:51.
+- PBUG-20260928-07 follow-up: the example `Stomp shouted "<<HERE>>Three!"` is
+  illustrative -- it is the unit-test fixture, not text from leg 04, whose
+  repair replies were never saved. And 725af773 changed what is named: the
+  object the decoder got furthest into, positioned in the text as written,
+  not "the object it gave up on".
+- The overnight feed is English only (every leg sets episode_language=English),
+  so none of tonight's Japanese, Mandarin or Hindi changes can be proven by it.
