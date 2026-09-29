@@ -16098,3 +16098,30 @@ not promote it to the Bug Bible on this evidence alone.
 - Seen, not a defect of this fix: the model still spaces some Japanese values
   (" 鋭い、 乾燥した 音"); the grammar allows the unspaced forms (the CPU probe
   admitted "から" after "黄昏"), so the spacing is the model's own.
+## PBUG-20260929-07 -- Mandarin episodes were written in Cantonese
+- surfaced: the 2026-09-29 language gauntlet. The published Mandarin episode
+  split_account_zh_20260929_112744 (gauntlet leg 7) was written in
+  Cantonese-flavoured Chinese ("当 Silas 喺木屋入面发现咗...嘅账簿，佢同
+  Thorne..."), and so were the news reruns' closes; 65 of 106 Chinese
+  heartbeat lines in the gauntlet's server log carried Cantonese particles. It
+  reached the SPOKEN lines -- an announcer intro "今晚，我哋带大家去到...嘅灯塔"
+  -- and a rewrite pass turned the station name 失落的信号 into 失落嘅信号. A
+  Mandarin voice reads those characters with Mandarin readings.
+- measured (tmp/lang_gauntlet_20260929/mandarin_penalty_ab.py and
+  mandarin_instruction_ab.py; the same Mandarin My Story test story on the
+  canonical path; per 1000 Chinese characters of writer output):
+  old instruction, repetition_penalty 1.03: Cantonese 75.3, traditional 19.7;
+  old instruction, repetition_penalty 1.0: Cantonese 71.3, traditional 0.0;
+  new instruction, repetition_penalty 1.03: Cantonese 0.0, traditional 0.0.
+- root cause: the zh row's writer_instruction asked for 普通话 but never said
+  simplified characters, written Mandarin, or no Cantonese, and the writer
+  (Gemma 4 12B) filled the gap with Cantonese forms. The repetition penalty,
+  applied by ComfyUI to the prompt's tokens too, accounted only for the
+  traditional forms.
+- fix: 9d7268db -- the zh instruction opens 请用简体字的标准普通话（中国大陆
+  书面语）写完整集，不要写粤语，也不要用繁体字。 Row revision 4 -> 5. The
+  sampling is untouched, so English episodes are unchanged.
+- live verify: the new-instruction A/B arm (15:10 PDT) was itself a canonical
+  Mandarin episode run to success with 0 Cantonese and 0 traditional.
+- Bible: candidate -- "a language instruction names the written standard and
+  the script; 'write in Chinese' leaves the variant to the model".
