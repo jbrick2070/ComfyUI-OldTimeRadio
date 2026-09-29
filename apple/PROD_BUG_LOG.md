@@ -15980,3 +15980,50 @@ not promote it to the Bug Bible on this evidence alone.
   test_cast_lock.py) and recorded in the Bible's suite as exclusion comments,
   as 12.186 is. PBUG-20260928-07 (the speaker slip) is still waiting on a live
   my_story leg that actually slips.
+
+## PBUG-20260929-03 -- a rolled Bark cannot voice a cast bigger than its ten voices; CastLock died after the writer
+- surfaced: the 2026-09-29 CastLock sweep (the real lock() on real ledgers,
+  CPU) flagged it on the 09-28 costume-masquerade My Story cast (the
+  announcer and 14 animals). Verified live the same morning on the 5080
+  server before the fix: My Story, Bark on both voice rows, episode
+  pending_20260929_100014, 10:07 PDT -- OTR_CastLock "Casting failed for
+  ' Meerkats' after 1 attempts. Last error: available_voices is empty --
+  nothing to pick", after the writer had run.
+- root cause: Bark has ten English presets (config/cast_pools.py; the
+  multilingual ones are off because they garble English) and Gate 1 forbids
+  two Bark rows sharing one. The writer's own lanes cap the cast at six, so
+  only a lane that brings its own cast can outnumber the pool: My Story
+  (the story's cast, no upper bound) and scifi_news_pro (up to ten
+  characters, which leaves a Bark announcer nothing). The voice roll draws
+  Bark about one time in four on English, and nothing counted the cast
+  before the draws ran dry.
+- fix: ee9c2ddf, 8efff924, b23a3441, bb5ed977 -- cast_lock._bark_seats
+  counts the Bark voices the draws will spend (each character, plus the
+  larger of the distinct presets announcer rows already hold and one for a
+  Bark announcer's own draw); the voice roll leaves Bark out of a cast it
+  cannot voice, with the count as the receipt's reason; a Bark picked by
+  hand is refused by the same count, in words, before any draw. Proven by a
+  360-cast test of the count against the draws run without it.
+- correction to PBUG-20260929-02: custom_source_bank is the "+ Add Your
+  Own" row and refuses before any story work, so it never reached CastLock;
+  the lanes that could die at Gate 1 were my_story and scifi_news_pro.
+- live verify: pending -- a Bark pinned on a 13-character test story must be
+  refused by count, and the same story with the voices rolled must leave
+  Bark out and publish (tmp/lang_gauntlet_20260929/after_fix.log).
+- Bible: candidate -- "a pool with a hard size needs its capacity counted
+  where the choice is made, not where the draw runs dry".
+
+## PBUG-20260929-04 -- My Story cast names carried the model's padding into the ledger
+- surfaced: the same live leg's ledger (pending_20260929_100014): ten of
+  thirteen treatment cast names began with a space (" Giraffe", " Lion",
+  " Meerkats", " zookeeper"); CastLock's error text above shows one.
+- root cause: CastMember.name stored the treatment pass's output as given.
+  The speaker match compared names through _norm_ws, so every line still
+  found its character, but _assign_voices copied the padded name into the
+  cast rows -- the ledger, the credits and the act prompt.
+- fix: a709287c -- CastMember.name and NamedCast.name normalize through
+  _norm_ws in a before-validator; a whitespace-only name fails min_length and
+  is repaired rather than cast nameless.
+- live verify: pending -- the My Story legs on the rebooted server
+  (a709287c) must show unpadded names in their ledgers.
+- Bible: none yet.
