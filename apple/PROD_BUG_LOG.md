@@ -16169,3 +16169,35 @@ not promote it to the Bug Bible on this evidence alone.
   tmp/lang_gauntlet_20260929/news_close_hunt.py is running five
   Japanese/Hindi/Mandarin news legs on the old server code to see which
   modes actually occur.
+
+## PBUG-20260929-06 -- the failing closes, caught; the outlet and digits count in another language
+- caught live by tmp/lang_gauntlet_20260929/news_close_hunt.py (15:50-15:57
+  PDT, server on efba7606, the old check): five one-act scifi_news_pro legs,
+  none published. The closes that failed the source check:
+  - Mandarin (ScienceDaily item): "根据 ScienceDaily 报道，研究人员发现土星卫星
+    卫星恩塞拉多斯..." -- every dossier name translated (Saturn, Enceladus),
+    no digits, the OUTLET named in Latin. The repair drifted into
+    traditional characters.
+  - Japanese (BBC item): "BBCニュースは、ウェールズで発見された2億年前の...
+    200年にわたる混乱..." -- names in katakana, the dossier's numbers are
+    English phrases ("200 years"). Its repair named "ジョナサン・ボウ" -- the
+    real Jonathan Bow -- and the invented-name check refused "ジョナサン",
+    because the cast holds him in katakana and the exemption holds only
+    Latin words.
+  - Hindi (MIT News item): "एमआईटी के शोधकर्ताओं ने बैक्टीरिया को..." -- MIT
+    and "bacteria" in Devanagari.
+  The other two legs died before the close (Japanese at pitch, Hindi at
+  casting); see PBUG-20260929-08.
+- fix: 5104f2d6 + 6b04d64b, design contrarian Cursor grok-4.7-high. For a
+  non-English episode only, and only when the dossier has anchors, the item
+  link's outlet label (sciencedaily, bbc, mit; generic and numeric labels
+  refused) and the digit runs of three or more in the dossier's number
+  phrases (never the item's own year) also name the source. The pass's
+  seam already asks the close to name "a researcher, institution, or
+  publication", so the check was refusing what the prompt asked for.
+  English closes are held to the dossier's own names as before. Replayed:
+  the four Mandarin and Japanese closes pass; the two Hindi ones do not.
+  Composer QA (its generic-label finding folded into 6b04d64b).
+- still open: native spellings committed with the dossier (a side field tied
+  to each kept entity, Grok's shape) -- for the Hindi closes, and for the
+  invented-name check's refusal of a real person written in katakana.
