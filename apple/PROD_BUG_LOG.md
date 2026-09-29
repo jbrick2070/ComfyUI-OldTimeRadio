@@ -15938,3 +15938,27 @@ not promote it to the Bug Bible on this evidence alone.
   not "the object it gave up on".
 - The overnight feed is English only (every leg sets episode_language=English),
   so none of tonight's Japanese, Mandarin or Hindi changes can be proven by it.
+
+## PBUG-20260929-02 -- a Bark roll on scifi_news_pro died at CastLock: nobody stamped the lane's character voices
+- surfaced: overnight leg 10 on the 5080 headless server (00:21-00:24 PDT),
+  scifi_news_pro with Bark rolled as the voice engine: CastingFailedError
+  "GATE 1 (writer cast-lock exit) FAILED: empty voice_preset on 2 row(s):
+  c02, c03. Bark requires v2/* presets on every non-ANNOUNCER cast row."
+- root cause: two modules each thought the other owned the larynx. My
+  Story's cast rows keep voice_preset empty "until lock() stamps the engine
+  that will actually speak"; scifi_news_pro's did the same from 259d1faa
+  (2026-09-17, "until CastLock owns it", so a Kokoro graph would not credit
+  Bark). CastLock's Bark branch for a content-owned lane only verified the
+  presets -- the 2026-07-11 contract, written when those lanes stamped their
+  own. Every other engine stamps these rows; Bark did not, so any Bark roll
+  on my_story, scifi_news_pro or custom_source_bank died at Gate 1.
+- fix: 0c1bf1f6 -- CastLock._draw_bark_characters stamps a v2/* preset on
+  each character row the lane left without one (the ten Bark presets minus
+  those on the cast, gender-first, seeded per episode and char_id, the
+  announcer draw's shape). A preset the lane stamped is kept (LEMMY's).
+- open: scifi_news_pro's casting LLM still picks a timbre per character from
+  the Bark menu, and since 259d1faa that pick is not used for any engine.
+  Whether it should seed the Bark draw is the operator's call, not a defect.
+- live verify: pending a Bark roll on a content-owned bank; the overnight
+  server restarts on 0c1bf1f6 when leg 11 ends.
+- Bible: none yet.
