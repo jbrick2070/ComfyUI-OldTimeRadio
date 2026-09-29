@@ -1205,3 +1205,152 @@ failed; at e4ecb822: 17,312 passed, 0 failed.
 **Review roster.** Composer 2.5 on 503b2661 (no finding held); Sonnet 5.5 on
 503b2661 and Composer + Sonnet on d786238d were running at this writing -- see
 the next entry for what they found.
+
+## 2026-09-29 01:25 -- overnight feed, a refused still, JSON errors, station names, Japanese QA
+
+What came after the 22:40 entry, in the order it matters to a morning reader.
+
+- **PBUG-20260929-01 -- 232d9f41, f9ef4f4f.** Overnight leg 07 (my_story,
+  still_pan lane) died because Ideogram 4 refused the music-opening still (a
+  vintage tube radio): the still-spine validator waved the beat through as a
+  sanctioned gap, but `run_episode` keyed shots on `shot.get("beat_id")`, a
+  field ShotLock never writes, so it never skipped ANY sanctioned gap and
+  rendered the beat without its still. `shot_is_sanctioned_gap()` now keys all
+  five sites by `_beat_id_for_shot`, the validator's identity; the end-to-end
+  gap tests now build ShotLock's real row shape by default (with the old
+  keying patched back in, they fail).
+- **PBUG-20260929-02 -- 0c1bf1f6, 35689b12, 982427eb.** Overnight leg 10
+  (scifi_news_pro, Bark rolled for the voices) died at CastLock Gate 1:
+  "empty voice_preset on 2 row(s)". Both content-owned lanes (My Story, the
+  news lane; custom_source_bank too) leave character voices to CastLock in
+  their own docstrings, but CastLock's Bark branch for those lanes only
+  verified -- so every Bark roll on them died. `_draw_bark_characters` now
+  stamps a v2/* preset on each character row the lane left unvoiced (gender
+  first, rows that state a gender drawn before genderless ones, seeded per
+  episode and char_id, never reusing a preset already on the cast, the
+  announcer's included; a truly exhausted gender pool is reported). The news lane's casting LLM still
+  picks a Bark timbre per character that nothing uses since 259d1faa --
+  whether that pick should seed the draw is his call.
+- **Readiness on torch boxes -- c7136448, 4d4503dd.** Japanese and Mandarin
+  readiness now builds misaki's own phonemizer (as KPipeline does) on a box
+  with the torch kokoro, not just imports it, so a broken MeCab dictionary
+  refuses at the queue, as the pack-copy path already did (0.13 s / 0.34 s
+  here). 4d4503dd: fugashi's Tagger leaks ~0.7 MB per build and readiness
+  runs on every queued prompt, so a successful build is kept per process (on
+  the pack-copy path too, which had the same leak since 1a57dc91); the
+  refusal advises by what failed -- a missing library gets the plain install
+  line, the empty-MeCab-dictionary trap gets the unidic -> unidic-lite fix,
+  anything else is named without a guessed remedy.
+- **Station names -- 264f9274, d7e22272.** Operator: "each gets its own
+  name". Hindi, Japanese and Mandarin voices read the Latin call sign as
+  letters, so those rows say it in their own script -- Hindi Devanagari
+  transliteration, Japanese katakana (shigunaru rosuto; phonemes measured
+  clean), Mandarin "the lost signal" translated (his ear: the flatter status
+  phrase "xinhao diushi" is the alternative). Every row carries
+  `spoken.station_name`; the station sentences use it, `_announcer_system`
+  swaps it into the announcer seams, and the three rows' writer instruction
+  names it. English, Spanish, Portuguese, Italian, French keep SIGNAL LOST
+  (their voices read it); the on-screen logo stays SIGNAL LOST everywhere. A
+  broader "no Latin letters in spoken lines" sentence was tried and removed
+  the same night: it collided with the fidelity lanes' ALL-CAPS cast names.
+- **JSON decode errors -- 7ff91d95, ba6dd10e, 725af773.** An undecodable
+  reply used to raise "line 1 column 1 (char 0)" -- a synthetic position.
+  Now the ladder WARNING names the decoder's real reason with 60 characters
+  either side of the spot, positioned in the text as the model wrote it, on
+  the object the decoder got furthest into; deep nesting is a retryable miss,
+  not a crash. CORRECTION to what this entry's first draft and 7ff91d95's
+  message said: this could NOT have saved overnight leg 04. Its base reply
+  decoded and failed the cast check ("Storp"), the typed repair asked about
+  that, and the repair syntax retry re-sends the same prompt by design, so the
+  char-0 text was never any turn's validation problem. What removes leg 04's
+  failure is 29eaeebe (a one-letter speaker slip is read as the cast member).
+  The model sees the new message only when a pass's first two replies both
+  fail to decode.
+- **Kokoro lines with no sound -- fd2078f4, then 9d2bad41.** fd2078f4 made
+  every no-sound line a quarter second of silence; Sonnet showed that also
+  swallowed real words (Cyrillic or accented letters on the Japanese lane),
+  which the no-fallback rule forbids. 9d2bad41 splits it: a line with no
+  letter or digit (Japanese middle dots, a dash, a star) is a logged 0.25 s
+  pause; a line with letters that makes no sound is refused, as before
+  fd2078f4. Two limits, written down on purpose: the guard is whole-line, so a
+  foreign word INSIDE a Japanese line is still dropped silently; and plain
+  ASCII Latin is not dropped but spoken as phoneme symbols. The root fix for
+  both is a script check on every voiced line at ledger freeze, where a
+  reroll is possible -- a design row, not done. Note: Kokoro's `prepare_text`
+  is the identity, so the voice gate's text cleaner never runs on this lane.
+- **Japanese numbers -- fd2078f4, 9d2bad41.** misaki's number reader gives
+  up past nine digits (it returns an error sentence that Cutlet then asserts
+  on), so a phone number killed the line on both backends. Long runs are now
+  spaced out, counted after NFKC (circled and superscript digits included),
+  and digits NFKC leaves foreign (Arabic-Indic, Devanagari) become ASCII.
+- **Overnight feed.** Published: ledger_weight (22:49), count_three (23:24),
+  razored_ledger (00:21), private_correspondence (00:33), morning_trumpet
+  (00:47), talisman_toll (01:09). Lost: leg 01 (a
+  24 GB lane before the pool was narrowed), leg 04 (the Storp slip, before
+  29eaeebe was live), leg 07 (PBUG-20260929-01), leg 10 (PBUG-20260929-02);
+  leg 03 timed out at the watcher but published; legs 06 and 08 were stopped
+  one to six minutes in, on purpose, to restart the server. What was live
+  when: legs 02-06 on the 21:47 boot; legs 07-08 on ba6dd10e (restart 23:26,
+  so fd2078f4's blanket silence, not 9d2bad41); legs 09-11 on 232d9f41
+  (restart 00:10); leg 12 onward on 35689b12 (restart 00:34, after leg 11
+  ended on a STOP file), which carries everything above except 2c500d3a,
+  40155f39, c7136448, 982427eb and 4d4503dd (latent, non-English or
+  low-severity fixes, not worth interrupting a leg for; the next restart
+  picks them up). The feed is ENGLISH ONLY: nothing Japanese, Mandarin
+  or Hindi is proven live by it. my_story keeps rolling with empty boxes, which
+  republishes "The Count of Three" from the same default draft each time --
+  intended, not a duplicate bug. The 29eaeebe slip read has not fired live
+  yet (leg 07's act passed on the first try).
+
+**Open.**
+- The script check at ledger freeze (above): Latin letters, foreign scripts
+  and initialisms that reach a voice which cannot read them.
+- Station name residue on the native rows: the five scifi_news_pro seams
+  still say "SIGNAL LOST" as craft direction (only the instruction lead names
+  it natively there), and a model line like "konbanwa, SIGNAL LOST desu"
+  still passes the announcer language guard. Whether to swap those seams or
+  re-ask such a line is a small design call.
+- Whether the news lane's casting LLM timbre pick should seed the Bark draw.
+- Whether the repair syntax retry should carry the decode error rather than
+  re-send the same prompt -- a ladder design question for every pass.
+- Bible promotions for PBUG-20260928-07, PBUG-20260929-01 and -02, each
+  waiting on a live verification.
+
+**Review roster** (Composer = Cursor composer-2.5, ask mode; Sonnet = a
+Sonnet 5.5 subagent briefed to refute by executing; every finding grounded
+before it was folded in).
+- 503b2661: Composer (no finding held); Sonnet -> c47278da.
+- d786238d: Composer (none); Sonnet -> fd2078f4.
+- 1a57dc91, 29eaeebe, c47278da: Composer after the fact (torch readiness
+  held -> c7136448; parity-skip claim a misread: goldens cover those boxes).
+- fd2078f4: Composer (double MeCab open, measured ~1 ms -> ba6f2d09 docstring
+  only); Sonnet (three held -> 9d2bad41).
+- 7ff91d95: Composer (1 of 3 held -> ba6dd10e); ba6dd10e: Composer (none);
+  both: Sonnet (four held -> 725af773, and the mechanism correction 0d1fd31c).
+- 9d2bad41 + 725af773: Composer (fence ranking -> 40155f39; unknown-phoneme
+  letters -> documented limit); Sonnet (non-decimal digits and fence ranking
+  -> 40155f39; initialisms -> documented limit).
+- 232d9f41: Composer (held; fixture coverage -> f9ef4f4f); 232d9f41 +
+  f9ef4f4f: Sonnet on real ShotLock rows (manifest keying -> 2c500d3a).
+- 264f9274: Composer (two held -> d7e22272); d7e22272: Composer (none),
+  Sonnet (none; the five news-lane seams still say SIGNAL LOST, noted).
+- 0c1bf1f6: Composer (two narrow -> 35689b12); 0c1bf1f6 + 35689b12: Sonnet
+  (137,664 real lock() configurations held; cast-order gender crossing,
+  gender synonyms, unreported exhaustion -> 982427eb); 982427eb: Composer
+  (held; its one note is that the commit message says the seedless note
+  fires "when something is drawn" where the code says "when there is
+  something to draw").
+- 2c500d3a, 40155f39, c7136448: Composer (its one claim misread the ranking
+  rule); Sonnet (digits and JSON naming held across ~1M inputs, the manifest
+  over 5,864 real shots; c7136448's false "installed", wrong MeCab remedy and
+  per-queue leak -> 4d4503dd); 4d4503dd: Composer (the cache trade is now
+  stated in its comments; a flaky second look fell through to the plain
+  install line -> f7acaddb, which made that look override the
+  readiness_extra_ok seam and was pushed with three tests RED because its
+  command chain did not stop on the suite; reverted in a1f64b7d five minutes
+  later; the other two points did not hold).
+- Fable 5.1 gate on the batch through 0d1fd31c, at the operator's request:
+  the silence split shipped as is with two limits written down, the third
+  wrong mechanism (the voice gate's cleaner never runs on Kokoro), the stale
+  live-tree claim, the station names per row; corrections in ee9883dd and in
+  this entry.
