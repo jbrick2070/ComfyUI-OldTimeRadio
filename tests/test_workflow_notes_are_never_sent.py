@@ -87,13 +87,26 @@ def test_what_the_note_names_exists():
     wf = _load(CANONICAL)
     (note,) = _notes(wf)
     text = note["widgets_values"][0]
-    banks = set(_otr_story_routing.list_bank_ids()) | {_otr_rolls.BANK_SENTINEL}
-    for name in ("original", "shakespeare", "public_domain", "my_story",
-                 _otr_rolls.BANK_SENTINEL):
-        assert "`%s`" % name in text and name in banks, name
+    banks = set(_otr_story_routing.list_bank_ids())
+    # Every runnable bank but "+ Add Your Own" is named, in bold (2026-09-28:
+    # the house banks sit beside `original`), and so are both roll choices.
+    for name in ("original", "scifi_news_pro", "media_archive", "shakespeare",
+                 "public_domain", "my_story"):
+        assert "**%s**" % name in text and name in banks, name
+    for sentinel in (_otr_rolls.BANK_SENTINEL, _otr_rolls.STYLE_SENTINEL):
+        assert "**%s**" % sentinel in text, sentinel
     writer = next(n for n in wf["nodes"]
                   if n["type"] == "OTR_LedgerScriptWriter")
     widgets = {i["name"] for i in writer["inputs"] if i.get("widget")}
+    # A bold lower-case word is a bank id; a bracketed one is a widget's raw
+    # name, shown beside the label the per-machine workflows give it.
     for bold in re.findall(r"\*\*([a-z_]+)\*\*", text):
-        assert bold in widgets, bold
+        assert bold in banks, bold
+    labels = json.loads((REPO / "config" / "app_mode.json").read_text(
+        encoding="utf-8"))["labels"]
+    for label, raw in re.findall(r"\*\*([A-Z][A-Za-z ]+)\*\* \(([a-z_]+)\)", text):
+        assert raw in widgets, raw
+        assert labels["OTR_LedgerScriptWriter.%s" % raw] == label, (label, raw)
     assert "**%s**" % writer["title"] in text
+    # No code spans: on the note's body they render as blue-on-grey chips.
+    assert "`" not in text
