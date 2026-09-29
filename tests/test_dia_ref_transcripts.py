@@ -10,7 +10,6 @@ fix, and these tests keep a voice from joining the bank without one.
 """
 from __future__ import annotations
 
-import inspect
 import json
 import logging
 import pathlib
@@ -59,9 +58,31 @@ def test_a_sample_with_no_transcript_warns_once(caplog):
     assert len(warnings) == 1
 
 
-def test_the_request_to_the_worker_carries_the_transcript():
-    """The helper proves the lookup; this proves generate_voice sends it."""
+def test_the_request_to_the_worker_carries_the_transcript(monkeypatch):
+    """The helper proves the lookup; this captures the request generate_voice
+    actually writes to the worker and reads the sample's words out of it."""
+    import io
+
+    from nodes._otr_audio_engines import _otr_sidecar as SC
     from nodes._otr_audio_engines.eng_dia import DiaEngine
 
-    source = " ".join(inspect.getsource(DiaEngine.generate_voice).split())
-    assert '"ref_transcript": self._resolve_transcript(ref_clip_path),' in source
+    class CapturedWorker:
+        def __init__(self):
+            self.stdin = io.StringIO()
+
+        def poll(self):
+            return None
+
+    engine = DiaEngine()
+    engine._proc = CapturedWorker()
+    sample = r"C:\refs\vz_bill_boerst.wav"
+    monkeypatch.setattr(engine, "load", lambda: None)
+    monkeypatch.setattr(engine, "_resolve_ref", lambda ref: ref)
+    monkeypatch.setattr(SC, "read_protocol_line", lambda proc, timeout, what: json.dumps(
+        {"ok": True, "out_path": "line.wav", "sample_rate": 44100}))
+    monkeypatch.setattr(SC, "load_wav_as_audio", lambda path, rate: {"sample_rate": rate})
+    engine.generate_voice("Kick it!", sample, None, 7)
+    sent = json.loads(engine._proc.stdin.getvalue().splitlines()[0])
+    assert sent["text"] == "Kick it!"
+    assert sent["ref_clip"] == sample
+    assert sent["ref_transcript"] == TRANSCRIPTS["vz_bill_boerst.wav"]
