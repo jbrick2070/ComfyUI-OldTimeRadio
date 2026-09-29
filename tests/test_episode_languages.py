@@ -580,21 +580,3 @@ def test_installed_but_not_starting_says_reinstall_not_install(monkeypatch):
     with pytest.raises(el.EpisodeLanguageError, match="needs the libraries under"):
         el.assert_readiness_extras(el.row_by_label("Japanese"))
 
-
-def test_a_second_look_that_builds_does_not_refuse(monkeypatch):
-    """Composer QA of 4d4503dd: the refusal looks again to choose its advice;
-    if that look builds, the extra is ready and nothing is refused."""
-    import types
-    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
-    monkeypatch.setattr(el, "_MISAKI_BUILT", {})
-    attempts = []
-
-    def _flaky():
-        attempts.append(1)
-        if len(attempts) == 1:
-            raise RuntimeError("transient")
-
-    module = types.SimpleNamespace(JAG2P=_flaky)
-    monkeypatch.setattr(importlib, "import_module", lambda name: module)
-    el.assert_readiness_extras(el.row_by_label("Japanese"))     # does not raise
-    assert attempts == [1, 1]

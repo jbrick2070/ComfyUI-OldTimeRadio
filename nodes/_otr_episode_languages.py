@@ -655,11 +655,11 @@ def assert_readiness_extras(row: LanguageRow) -> None:
                     "error names a file inside this pack, reinstall the pack."
                     % (row.label, row.label, kb.own_g2p_error(code), hint))
             sub = extra[7:-1] if extra.startswith("misaki[") else ""
+            # This look only chooses the advice. The DECISION is
+            # readiness_extra_ok's -- the seam callers and tests drive -- so a
+            # second look that happens to build (a transient first failure)
+            # still refuses, with the plain install line below.
             failure = _misaki_g2p_failure(sub) if sub else None
-            if sub and failure is None:
-                # The second look built it (a flaky first build): the extra is
-                # ready, so there is nothing to refuse (Composer QA of 4d4503dd).
-                continue
             if failure is not None and failure[0] == "build":
                 # misaki imports and its phonemizer will not start: a plain
                 # install changes nothing. The empty-MeCab-dictionary trap gets
