@@ -16085,6 +16085,7 @@ not promote it to the Bug Bible on this evidence alone.
   Japanese or Chinese close writes names in its own script, CJK text has no
   word boundary around a number, and Devanagari digits are not ASCII.
 - fix: pending -- design with one contrarian (Cursor grok-4.7-high) before code.
+
 ## PBUG-20260929-05 live verify -- Japanese and Hindi My Story publish
 - Server rebooted from efba7606 (contains 62af48ae) at 11:57 PDT; the same
   lighthouse test story (tmp/lang_gauntlet_20260929/story_lighthouse.json)
@@ -16098,6 +16099,7 @@ not promote it to the Bug Bible on this evidence alone.
 - Seen, not a defect of this fix: the model still spaces some Japanese values
   (" 鋭い、 乾燥した 音"); the grammar allows the unspaced forms (the CPU probe
   admitted "から" after "黄昏"), so the spacing is the model's own.
+
 ## PBUG-20260929-07 -- Mandarin episodes were written in Cantonese
 - surfaced: the 2026-09-29 language gauntlet. The published Mandarin episode
   split_account_zh_20260929_112744 (gauntlet leg 7) was written in
@@ -16125,3 +16127,20 @@ not promote it to the Bug Bible on this evidence alone.
   Mandarin episode run to success with 0 Cantonese and 0 traditional.
 - Bible: candidate -- "a language instruction names the written standard and
   the script; 'write in Chinese' leaves the variant to the model".
+
+## PBUG-20260929-03, -04, -05 and -07 -- the Bug Bible
+- promoted: 12.189 (a-hard-capacity-pool-counted-only-where-it-runs-dry) from
+  -03, 12.190 (a-grammar-parser-keeps-a-copy-of-the-alphabet-its-integration-
+  replaced) from -05, and 12.191 (a-language-instruction-that-names-the-
+  language-but-not-the-written-standard) from -07; survival-guide 8ef5228,
+  README 373 -> 376, otr_coverage_index gains four records.
+- 12.190 is asserted in the Bible's own suite: a static check in
+  TestPhase11LLM that fails on this repo's pre-fix _otr_constrained_generate.py
+  (and on a copy that keeps the comment but drops the assignment) and passes
+  on 62af48ae. 12.189 points at test_cast_lock.py and test_lane_rolls.py;
+  12.191 at test_episode_language_writer.py and
+  test_episode_language_painted_show.py.
+- -04 is 12.43's class ("persist the normalised form as the canonical one"),
+  indexed as covered. -06 stays open and unindexed.
+- Bible suite against this repo: 54 passed, 14 skipped, 3 xfailed, 1 failed
+  (BUG-09.02 on four untracked scratch scripts in tmp/, as before the change).
