@@ -1485,6 +1485,7 @@ the live version.
   custom-node template; the Apps sidebar lists saved *.app.json workflows).
 - **Paused**: the overnight feed (STOP present) until the A/B is done. The
   Bash tool broke at 11:24 when Git for Windows updated; PowerShell works.
+
 ## 2026-09-29 15:30 -- Mandarin written in Cantonese: fixed and measured
 
 - **PBUG-20260929-07 fixed** (9d7268db): the zh writer instruction now names
@@ -1499,9 +1500,19 @@ the live version.
   announcer seam); a replay of an older Mandarin episode warns on row drift
   and keeps its frozen text. Roster for this change: Composer plus the
   measurement; no second reader.
-- **Japanese spacing: left alone.** ~260 spaces per 1000 kana in the writer's
-  output, but almost all in non-spoken treatment fields; the dialogue lines
-  read cleanly ("聞こえているわよ、サム。落ち着…").
+- **Japanese spacing: inaudible, left alone.** The writer puts a space between
+  Japanese words (~260 per 1000 kana), in the spoken lines as well as the
+  treatment -- a published line reads 「港 に 着岸 した ぞ。」 (the first push of
+  this entry said the dialogue was clean; the log says otherwise). It never
+  reaches the voice: Kokoro's Japanese reader (misaki's Cutlet over MeCab)
+  splits the words itself, and three published lines give identical phonemes
+  spaced and unspaced, on both the ONNX and the torch backend (15:50).
+- **Seen, not a defect today:** the same Japanese leg shows the pull toward
+  variant spellings that the Mandarin A/B measured for the repetition penalty
+  (traditional forms at 1.03, none at 1.0). The writer switched 灯台 to the old
+  form 燈台 mid-treatment (it reads the same), and two treatment attempts were
+  stopped by the in-decode liveness guard, one after drifting into half-width
+  kana and emoji separators. The retries passed and the episode published.
 - **The overnight feed** runs English (pinned), fast lanes first; leg 20
   (h3_low_audio_in) took ~2 h for 6 beats, slower than its "fast" billing.
 - **Open**: PBUG-20260929-06 waits for a failing close's text (both news reruns
