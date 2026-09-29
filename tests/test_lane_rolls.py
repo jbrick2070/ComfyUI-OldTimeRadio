@@ -720,3 +720,14 @@ def test_one_language_left_is_logged_as_the_episodes_language(monkeypatch, caplo
 def test_the_english_row_never_narrows_the_voice_pool():
     english = _langs().row_by_iso("en")
     assert L.voice_pool(NVIDIA, english) == L.voice_pool(NVIDIA, None)
+
+
+def test_the_language_refusal_lists_local_voices_first_and_notes_the_cloud_one(monkeypatch):
+    """The gate sweep of 2026-09-29 read "google_tts or kokoro (a cloud voice:
+    it needs your Google API key)" -- as if Kokoro needed a Google key."""
+    langs = _langs()
+    monkeypatch.setattr(L, "language_voice_gap", lambda row, engines, host=None: None)
+    advice = L._language_advice(langs.row_by_iso("ja"), [("bark", "bark")], None)
+    assert advice.index("kokoro") < advice.index("google_tts")
+    assert "google_tts (a cloud voice: it needs your Google API key)" in advice
+    assert "kokoro (a cloud" not in advice

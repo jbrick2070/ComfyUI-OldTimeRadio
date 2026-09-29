@@ -897,9 +897,13 @@ def _language_advice(row, voices, host) -> str:
             if language_voice_gap(row, (name, name), host=host) is None]
     if not able:
         return "no voice engine can speak it on this machine"
-    words = " or ".join(able)
-    if any(name.startswith("google") for name in able):
-        words += " (a cloud voice: it needs your Google API key)"
+    # Local engines first, and the cloud note on the cloud engine itself:
+    # after "google_tts or kokoro" it read as if Kokoro needed a Google key.
+    able.sort(key=lambda name: (name.startswith("google"), name))
+    words = " or ".join(
+        name + (" (a cloud voice: it needs your Google API key)"
+                if name.startswith("google") else "")
+        for name in able)
     return "or set %s to %s" % (_VOICE_ROWS, words)
 
 
