@@ -885,11 +885,23 @@ def test_a_pause_line_is_a_logged_pause_on_both_backends(monkeypatch, caplog):
     stub = _StubKokoro(voices=("jf_alpha",))
     onnx_backend = _onnx_backend_with_stub(stub)
     onnx_backend._g2p = _SilentG2P()
-    with caplog.at_level(logging.WARNING, logger="OTR"):
+    with caplog.at_level(logging.INFO, logger="OTR"):
         for backend in (torch_backend, onnx_backend):
             out = backend.synthesize("\u30fb\u30fb\u30fb", "jf_alpha", 1.0)
             assert out.size == int(kb.SAMPLE_RATE * kb.UNSPEAKABLE_LINE_S)
-    assert sum("voiced as a 0.25 s pause" in r.getMessage() for r in caplog.records) == 2
+    pauses = [r for r in caplog.records if "voiced as a 0.25 s pause" in r.getMessage()]
+    # Expected content, so INFO, not WARNING (Fable gate, 2026-09-29).
+    assert len(pauses) == 2 and all(r.levelno == logging.INFO for r in pauses)
+
+
+def test_dingbat_and_ethiopic_digits_become_ascii_digits():
+    """Sonnet QA of 9d2bad41: digits ``unicodedata.decimal`` does not cover
+    (a dingbat negative circled one, an Ethiopic one) still reached misaki,
+    which raises on them. ``unicodedata.digit`` covers them."""
+    spell = kb.japanese_long_numbers_spelled
+    assert spell("\u2776") == "1"                 # dingbat negative circled one
+    assert spell("\u1369") == "1"                 # Ethiopic digit one
+    assert spell("\u624b\u9806\u2776\u3092") == "\u624b\u9806" + "1" + "\u3092"
 
 
 def test_unknown_phonemes_are_logged_when_voiced_as_a_pause(caplog):

@@ -289,7 +289,9 @@ def extract_first_json_block(raw: str) -> str:
 
 def _extract(raw: str, failures: "list | None" = None) -> str:
     """``extract_first_json_block``, recording into ``failures`` the decoder's
-    error for each object it gave up on, in the order it tried them."""
+    error for each object it gave up on, in the order it tried them, as
+    ``(preference, msg, doc, pos)``: 0 for a ```json fence, which the
+    extractor prefers, 1 for any other fence or the bare reply."""
     if not raw:
         return ""
     text = raw.strip()
@@ -300,15 +302,22 @@ def _extract(raw: str, failures: "list | None" = None) -> str:
         m for m in _JSON_FENCE_RE.finditer(text)
         if (m.start(), m.end()) not in labeled_spans
     ]
+    def attempt(blob: str, preference: int) -> str:
+        found = [] if failures is not None else None
+        block = _decode_first_object(blob, found)
+        if found:
+            failures.extend((preference,) + tuple(f) for f in found)
+        return block
+
     saw_fence = False
-    for match in (*labeled, *other):
+    for preference, match in [(0, m) for m in labeled] + [(1, m) for m in other]:
         saw_fence = True
-        block = _decode_first_object(match.group(1).strip(), failures)
+        block = attempt(match.group(1).strip(), preference)
         if block:
             return block
     if saw_fence:
         return ""
-    return _decode_first_object(text, failures)
+    return attempt(text, 1)
 
 
 def normalize_json_keys(value):
@@ -362,10 +371,15 @@ def parse_first_json_object(raw: str) -> dict:
         # Name the defect and show where it is. "line 1 column 1 (char 0)" sent
         # a log reader nowhere, and it is the error a typed repair is given when
         # a pass's first two replies both fail to decode. The object named is
-        # the one the decoder got furthest into -- not a stray pair of braces in
-        # an earlier prose fence -- and the position is in the text as the
-        # model wrote it.
-        msg, doc, pos = max(failures, key=lambda failure: failure[2])
+        # the one the extractor prefers -- a ```json fence over any other --
+        # and within that, the first the decoder got past its opening brace
+        # on, so a stray "{a, b}" in a prose fence does not outrank the answer
+        # and a longer draft fence does not either (Sonnet QA of 725af773:
+        # comparing positions across fences did exactly that). The position
+        # is in the text as the model wrote it.
+        order = range(len(failures))
+        best = min(order, key=lambda i: (failures[i][0], failures[i][3] <= 1, i))
+        _preference, msg, doc, pos = failures[best]
         raise json.JSONDecodeError(
             "no decodable top-level JSON object found; in the object, %s near: %s"
             % (msg, _near(doc, pos)),

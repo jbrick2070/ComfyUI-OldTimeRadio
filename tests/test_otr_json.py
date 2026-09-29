@@ -324,3 +324,22 @@ def test_the_repair_aligns_back_onto_the_text_as_written():
                for j in range(len(repaired)) if repaired[j] == original[origin[j]])
     assert original[origin[repaired.index("z")]] == "z"
     assert origin[-1] == len(original)
+
+
+def test_a_json_fence_outranks_a_longer_draft_fence():
+    """Sonnet QA of 725af773: comparing positions across fences named a
+    JSON-shaped draft that failed later over the ```json answer."""
+    draft = '{"speaker": "A", "lines": ["one", "two", "three", "four"], "note": oops}'
+    raw = "```\nDraft: " + draft + "\n```\n```json\n{\"speaker\": 'A', \"lines\": []}\n```"
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object(raw)
+    assert "{\"speaker\":<<HERE>>'A', \"lines\": []}" in str(exc.value)
+
+
+def test_among_plain_fences_the_first_real_object_is_named():
+    answer = '{"n": 1, "text": "a "b" c"}'
+    draft = '{"n": 2, "lines": ["one", "two", "three", "four", "five"], "x": oops}'
+    raw = "```\n" + answer + "\n```\n```\n" + draft + "\n```"
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object(raw)
+    assert '"text": "a "<<HERE>>b" c"' in str(exc.value)

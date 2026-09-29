@@ -405,20 +405,22 @@ def _nfkc_has_digit(ch: str) -> bool:
 def japanese_long_numbers_spelled(text: str) -> str:
     """``text`` as misaki's Japanese reader can speak it, on both backends.
 
-    misaki's number reader stops at nine digits and raises past them (a phone
-    number, a serial, the digits after a decimal point), and it has no entry
-    for a decimal digit NFKC leaves foreign (Arabic-Indic, Devanagari): either
-    took the line and the episode with it. So such a digit is written as its
-    ASCII digit, and a run of characters that comes to ten or more digits once
-    misaki's own NFKC has run -- counting full-width, circled and superscript
-    digits -- is spaced out, which misaki reads digit by digit, as Japanese
-    reads phone numbers and decimals. Everything else is left as written,
-    because misaki applies some rules before its NFKC; a run of nine digits or
-    fewer reads exactly as misaki reads it.
+    misaki's number reader gives up past nine digits (it returns an error
+    sentence, which Cutlet then asserts on) -- a phone number, a serial, the
+    digits after a decimal point -- and it has no entry for a digit NFKC leaves
+    foreign (Arabic-Indic, Devanagari, a dingbat digit): either took the line
+    and the episode with it. So such a digit is written as its ASCII digit
+    (``unicodedata.digit``, which covers the dingbat and Ethiopic digits
+    ``decimal`` does not), and a run of characters that comes to ten or more
+    digits once misaki's own NFKC has run -- counting full-width, circled and
+    superscript digits -- is spaced out, which misaki reads digit by digit, as
+    Japanese reads phone numbers and decimals. Everything else is left as
+    written, because misaki applies some rules before its NFKC; a run of nine
+    digits or fewer reads exactly as misaki reads it.
     """
     chars = []
     for ch in text:
-        value = unicodedata.decimal(ch, None)
+        value = unicodedata.digit(ch, None)
         if value is not None and not unicodedata.normalize("NFKC", ch).isascii():
             ch = str(value)
         chars.append(ch)
@@ -598,7 +600,9 @@ def _nothing_voiced(text: str, lang_code: str, backend: str):
 
     line = str(text or "").strip()
     if _pause_only(line):
-        log.warning(
+        # INFO, not WARNING: a pause line is expected content (Fable gate,
+        # 2026-09-29); the unknown-phoneme pause stays a WARNING.
+        log.info(
             "[%s] lang_code %r: %r has no sound to voice (pause marks or symbols "
             "only); voiced as a %.2f s pause", backend, lang_code, line[:80],
             UNSPEAKABLE_LINE_S)
