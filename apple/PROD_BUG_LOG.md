@@ -16144,3 +16144,28 @@ not promote it to the Bug Bible on this evidence alone.
   indexed as covered. -06 stays open and unindexed.
 - Bible suite against this repo: 54 passed, 14 skipped, 3 xfailed, 1 failed
   (BUG-09.02 on four untracked scratch scripts in tmp/, as before the change).
+
+## PBUG-20260929-06 -- three matching faults fixed; the native-script mode stays open
+- found by reading the check and proven on CPU (the failing close was still
+  not logged): the source check's `\b` counts Han and kana as word
+  characters, so a Japanese or Chinese close that names MIT or 2026 flush
+  against a particle or a Han character ("MITの", "据MIT的", "2026年")
+  matched nothing; a close's own digits (Devanagari २०२६, full-width
+  ２０２６) never matched an ASCII number; an anchor ending in a full stop
+  ("U.S.") never matched before a space; and the real-name exemption split
+  anchors on ASCII letters, so "José García" exempted "jos" and "garc" and a
+  close naming García was refused as invention.
+- fix: 4fce0c9a + 8fb0f769 -- `_anchor_re` (only a letter or digit of a
+  spaced script continues a term), `_folded_for_matching` (NFKC, native
+  digits as ASCII), the exemption split on any script's letters. The
+  invented-name check keeps `\b` on purpose. A HEAD-versus-fix probe on
+  twelve closes: the nine pinned by the new tests flip from refused to
+  accepted; "Adamの" (anchor "Ada"), "transmitted" (anchor "MIT") and a
+  katakana MIT stay refused. Composer QA twice (its findings folded into
+  8fb0f769); agy Flash QA running.
+- still open: a close that writes the source's names in its own script (MIT
+  as マサチューセッツ工科大学 or एमआईटी) has no anchor to match; that needs
+  names localized with the dossier (a design question for one contrarian).
+  tmp/lang_gauntlet_20260929/news_close_hunt.py is running five
+  Japanese/Hindi/Mandarin news legs on the old server code to see which
+  modes actually occur.
