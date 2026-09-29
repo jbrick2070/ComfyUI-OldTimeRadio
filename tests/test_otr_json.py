@@ -212,3 +212,38 @@ def test_shot_lock_parse_directives_accepts_padded_beat_id():
     assert out["b001"]["camera"] == "push in"
     assert out["b001"]["expression"] == "grim"
     assert out["b001"]["motion"] == "steps forward"
+
+
+# --- the decode error names the defect and where it is (2026-09-28 overnight) --
+def test_an_undecodable_reply_names_its_defect_and_shows_where():
+    """A stray quote inside a line of dialogue: the error used to say only
+    "line 1 column 1 (char 0)", which was also everything a repair turn was
+    told. It now carries the decoder's own reason and the text around it."""
+    body = (
+        '{\n  "n": 1,\n  "lines": [\n'
+        '    {"speaker": "Tiptoe", "text": "One, two, three!"},\n'
+        '    {"speaker": "Whiskers", "text": "Stomp shouted "Three!" and jumped."}\n'
+        "  ]\n}"
+    )
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object("Here it is.\n" + _fenced(body))
+    text = str(exc.value)
+    assert text.startswith("no decodable top-level JSON object found; in the object, ")
+    assert "Expecting ',' delimiter" in text
+    assert 'Stomp shouted "<<HERE>>Three!" and jumped.' in text
+    assert "\n" not in text and "line 5" in text
+
+
+def test_a_reply_with_no_object_at_all_keeps_the_old_message():
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object("I could not write that act.")
+    assert str(exc.value) == "no decodable top-level JSON object found: line 1 column 1 (char 0)"
+
+
+def test_a_cut_off_reply_names_where_it_stops():
+    raw = '```json\n{"n": 1, "lines": [{"speaker": "Ada", "text": "Hi"}'
+    with pytest.raises(json.JSONDecodeError) as exc:
+        OJ.parse_first_json_object(raw)
+    text = str(exc.value)
+    assert "no decodable top-level" in text and "<<HERE>>" in text
+    assert text.index("<<HERE>>") > text.index('"Hi"')

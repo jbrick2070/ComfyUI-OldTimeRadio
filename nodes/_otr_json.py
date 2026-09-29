@@ -280,7 +280,46 @@ def parse_first_json_object(raw: str) -> dict:
     """
     block = extract_first_json_block(raw)
     if not block:
+        failure = _decode_failure(raw)
+        if failure is None:
+            raise json.JSONDecodeError(
+                "no decodable top-level JSON object found", raw or "", 0,
+            )
+        # Name the defect and show where it is. "line 1 column 1 (char 0)" sent
+        # a log reader nowhere, and it was the whole error a repair turn was
+        # given, so a model asked to fix its reply could not find what to fix
+        # and returned it unchanged (the 2026-09-28 overnight My Story act:
+        # two repairs, the same reply, the episode lost).
         raise json.JSONDecodeError(
-            "no decodable top-level JSON object found", raw or "", 0,
+            "no decodable top-level JSON object found; in the object, %s near: %s"
+            % (failure.msg, _near(failure.doc, failure.pos)),
+            failure.doc, failure.pos,
         )
     return normalize_json_keys(json.loads(block))
+
+
+def _decode_failure(raw: str) -> "json.JSONDecodeError | None":
+    """The strict decoder's own error on the object ``extract_first_json_block``
+    tried first -- the first ```json fence (else the first fence, else the
+    whole reply) from its first ``{``, after the same LLM-JSON repair -- or
+    None when there is no such error to report (no ``{`` at all, or a value
+    that decodes but was not taken). Called only on the failure path, so the
+    extractor itself stays a never-raising lookup."""
+    text = (raw or "").strip()
+    fences = list(_JSON_FENCE_LABELED_RE.finditer(text)) or list(_JSON_FENCE_RE.finditer(text))
+    body = fences[0].group(1).strip() if fences else text
+    first_brace = body.find("{")
+    if first_brace < 0:
+        return None
+    try:
+        json.JSONDecoder().raw_decode(_repair_llm_json(body[first_brace:]))
+    except json.JSONDecodeError as exc:
+        return exc
+    return None
+
+
+def _near(doc: str, pos: int, span: int = 60) -> str:
+    """The text either side of ``pos`` on one line, the spot marked <<HERE>>."""
+    before = " ".join(doc[max(0, pos - span):pos].split())
+    after = " ".join(doc[pos:pos + span].split())
+    return "%s<<HERE>>%s" % (before, after)
