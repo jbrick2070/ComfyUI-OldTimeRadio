@@ -1107,3 +1107,61 @@ doc-wording tests).
 **Open.** His Desktop ComfyUI must be restarted to load the roll rule and the
 Space saver default. 2.3.14 (v5, the brightness fixes, these changes) is his
 call; the full suite is 17,273 passed / 0 failed at a53865cd (12 min).
+
+## 2026-09-28 23:00 -- Kokoro speaks five more languages on Python 3.13; the language settles at Run
+
+- **The failure (PBUG-20260928-06, Bible 12.186 at 4ddba6c).** Three of his
+  randomized Desktop runs (ComfyUI Desktop, Python 3.13) wrote their scripts
+  and died at the first Spanish line: the ONNX Kokoro was pinned to en-gb and
+  refused every other lang_code. Operator: "we standardize everything to ONNX
+  for Mac compat, but if ONNX doesn't handle languages that's a problem."
+- **4f973e98 -- ONNX speaks Spanish, French, Italian, Portuguese, Hindi.**
+  EspeakPhonemizer repeats misaki 0.9.4's EspeakG2P (phonemizer and espeak-ng
+  already come with kokoro-onnx) and the ONNX backend hands kokoro-onnx the
+  phonemes. Measured: phonemes identical to misaki (Sonnet: 821 hand-written
+  and 7,500 random strings, 0 mismatches; torch KPipeline feeds its model the
+  same phonemes; ONNX and torch waveforms correlate 0.988-0.996 with identical
+  Whisper transcripts); all five spoken on the Desktop's own Kokoro, clips
+  sent to him.
+- **2326632b -- the language settles at the queue-time gate.**
+  `settle_prompt_language` runs after the model rolls and before any
+  download: a language picked by hand that the run's voices cannot speak
+  refuses when he presses Run; a rolled one loses those from its pool, logged
+  with the reason. It asks the same questions CastLock and the engine do
+  (`cast_voice_engines`, Kokoro's `language_gap` / `lang_code_gap`,
+  `voice_pool(host, language=row)`). 0.47 s cold, 0.01 s warm.
+- **85a1d304 -- Sonnet QA of 4f973e98 (six findings).** A chunk with no
+  vocabulary symbol (a lone inverted question mark) is skipped instead of
+  killing the line; the ONNX load is atomic and an espeak row with no
+  phonemizer refuses rather than reading as English; golden phonemes let the
+  parity test run on 3.13 boxes; the LANG_CODES pin reads kokoro's source
+  (importing it left `kokoro` in sys.modules and the node import tests failed
+  whenever they ran after it -- the full suite passed only by file order); the
+  ONNX log names its lang; AGENT_INSTALL.md and VOICES.md corrected.
+- **e4ecb822 -- Sonnet QA of 2326632b (six findings).** misaki's Japanese and
+  Chinese extras are Kokoro's own, now required only when Kokoro voices the
+  cast: Google TTS voices Japanese and Mandarin on 3.13 (the misaki rule used
+  to refuse it); the refusal says what works in the form's words (google_tts
+  with his Google API key, or turn 'Randomize audio (non-cloud)' off); one
+  language left is logged as the episode's language; the English row never
+  narrows the voice pool; README, MULTILINGUAL.md and the pool tooltip.
+- **Declined, with reasons.** The app form's "none = all" note is shared by
+  five pools and stays true as "all that can run here" (a label change
+  restamps 26 workflows); a language seed lands differently on a 6-language
+  and an 8-language box, as the model rolls do (documented); wired voice
+  inputs and missing weights are not language questions.
+- **Behaviour change to know:** `OTR_KOKORO_BACKEND=onnx` on a box with the
+  torch build now keeps the five espeak rows on ONNX (pinned by a test);
+  Japanese and Mandarin still go to torch.
+- **Open.** Japanese and Mandarin with Kokoro on Python 3.13: their libraries
+  install there (pyopenjtalk-plus and fugashi have cp313 wheels; jieba,
+  pypinyin, cn2an are pure Python), but misaki 0.9.4 and misaki-fork 0.9.6 pin
+  Python below 3.13. Copying misaki's ja/zh modules (about 1,400 lines,
+  Apache-2.0) would close it; he has the problem statement and it is his
+  call. His Desktop needs a restart to load all of this; no Desktop Spanish
+  episode has run yet.
+
+**Review roster.** Composer 2.5 on 4f973e98 (two stale docs, fixed in
+4491c738) and 2326632b (nothing held); Sonnet 5.5 on both (six findings each,
+fixed in 85a1d304 and e4ecb822). Full suite at 2326632b: 17,298 passed, 0
+failed; at e4ecb822: 17,312 passed, 0 failed.
