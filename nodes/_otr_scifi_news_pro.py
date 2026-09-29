@@ -648,9 +648,11 @@ def _word_re(term: str) -> "re.Pattern[str]":
 
 
 #: A letter, digit or underscore that would continue a word in a script
-#: written with spaces: anything `\w` matches except Han and kana.
-_SPACED_WORD_CHAR = (r"[^\W぀-ヿ㐀-䶿一-鿿"
-                     r"豈-﫿ｦ-ﾟ]")
+#: written with spaces: anything `\w` matches except Han (the extensions
+#: beyond the Basic Multilingual Plane included), kana, and the marks
+#: written among them (々 〆 〇).
+_SPACED_WORD_CHAR = (r"[^\W々-〇぀-ヿ㐀-䶿一-鿿"
+                     r"豈-﫿ｦ-ﾟ\U00020000-\U0003ffff]")
 
 
 def _anchor_re(term: str) -> "re.Pattern[str]":
@@ -2126,15 +2128,16 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]"):
     # the very case this exists for. Word-level equality (never substring)
     # keeps it precise -- "Ada" is not exempted by an anchor "Adam Smith".
     # The words are split on anything that is not a letter or digit of ANY
-    # script: split on ASCII alone, "José García" exempted "jos" and "garc",
-    # and a Spanish close naming García was refused as invention.
+    # script (and on underscores, as before): split on ASCII alone, "José
+    # García" exempted "jos" and "garc", and a Spanish close naming García
+    # was refused as invention.
     _source_attested = set()
     for _a in anchors:
         _a = str(_a or "").strip()
         if not _a:
             continue
         _source_attested.add(_a.casefold())
-        for _w in re.split(r"[^\w'-]+", _a):
+        for _w in re.split(r"(?:[^\w'-]|_)+", _a):
             if len(_w) >= 3:
                 _source_attested.add(_w.casefold())
     fiction = tuple(
