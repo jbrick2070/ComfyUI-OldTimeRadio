@@ -702,10 +702,10 @@
       "admitted": true,
       "sort_order": 80,
       "native_header": "普通话",
-      "row_revision": 4,
+      "row_revision": 5,
       "authoring": {
         "spoken_name": "普通话",
-        "writer_instruction": "请用普通话写完整集。标题、对白和播音员台词都用中文。不要翻译英文草稿，直接用中文创作。电台名称写作“失落的信号”。",
+        "writer_instruction": "请用简体字的标准普通话（中国大陆书面语）写完整集，不要写粤语，也不要用繁体字。标题、对白和播音员台词都用中文。不要翻译英文草稿，直接用中文创作。电台名称写作“失落的信号”。",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in Mandarin Chinese, short. CJK glyphs survive."
       },
