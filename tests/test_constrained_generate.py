@@ -350,6 +350,39 @@ def test_real_lmfe_accepts_twenty_five_items_without_implicit_limit(nested):
     assert parser.config.alphabet, "the tokenizer-installed alphabet must survive"
 
 
+@pytest.mark.parametrize("value", ["ノラ", "诺拉", "नोरा", "Ángel", "¿Dónde?"])
+def test_real_lmfe_accepts_a_required_string_that_opens_outside_ascii(value):
+    """A string with minLength read LMFE's ASCII construction alphabet until it
+    was long enough, because the transformers builder installs the tokenizer's
+    alphabet on parser.config only. Its first character outside ASCII sent the
+    enforcer to ForceStop -- whitespace and EOS -- and live on 2026-09-29 a
+    Japanese cast name came out as "ノ" and a run of tabs, three attempts."""
+    import json
+    from pydantic import Field
+    from nodes._otr_constrained_generate import get_cached_transformers_schema_constraint
+
+    class Named(BaseModel):
+        name: str = Field(min_length=1)
+
+    entry = TestFactoryContract()._make_minimal_cache_entry()
+    tokenizer = entry["tokenizer"]
+    vocab = dict(tokenizer.get_vocab.return_value)
+    vocab.update({ch: ord(ch) for ch in value})
+    tokenizer.get_vocab.return_value = vocab
+    tokenizer.vocab_size = len(vocab)
+    tokenizer.__len__.return_value = max(vocab.values()) + 1
+    known = set(vocab.values())
+    tokenizer.decode = lambda ids, **kw: "".join(
+        chr(i) if i in known and i not in (200, 201, 202) else "?"
+        for i in (ids if hasattr(ids, "__iter__") else [ids]))
+    tokenizer.convert_ids_to_tokens = lambda ids: [
+        chr(i) if i in known and i not in (200, 201, 202) else f"<{i}>"
+        for i in (ids if hasattr(ids, "__iter__") else [ids])]
+    _, prefix = get_cached_transformers_schema_constraint(entry, Named)
+    text = json.dumps({"name": value}, ensure_ascii=False, separators=(",", ":"))
+    assert 200 in _feed_json(prefix, text), "the grammar must let the object close"
+
+
 @pytest.mark.parametrize("limit", [2, 25])
 def test_real_lmfe_preserves_explicit_array_limit(limit):
     import json

@@ -156,6 +156,16 @@ def get_cached_transformers_schema_constraint(
     # Disable only LMFE's implicit20-item default at BOTH boundaries; explicit
     # schema maxItems remains authoritative. Preserve the installed alphabet.
     parser.config.max_json_array_length = 0
+    # The same stale-copy trap, for the alphabet itself. The parser copied
+    # its construction alphabet -- LMFE's ASCII default -- into
+    # context.alphabet_without_quotes, which a string with minLength reads
+    # until it is long enough; only config got the tokenizer's alphabet. A
+    # required string that opened outside ASCII (a Japanese name, "Élodie",
+    # a Spanish "¿") was rejected on its first character and the enforcer
+    # fell back to ForceStop: whitespace and EOS only. Live 2026-09-29: a
+    # Japanese My Story cast name came out as "ノ" and a run of tabs on all
+    # three attempts, and the episode died.
+    parser.context.alphabet_without_quotes = parser.config.alphabet.replace('"', "")
     return parser, prefix_fn
 
 
