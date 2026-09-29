@@ -529,8 +529,11 @@ def readiness_extra_ok(token: str) -> bool:
     rows list no extras, so this is not called on the default path.
 
     A module spec is not readiness. ``misaki.ja`` can have a discoverable file
-    while importing it raises because ``pyopenjtalk`` is absent. Import the
-    selected adapter so its transitive contract is exercised before TTS.
+    while importing it raises because ``pyopenjtalk`` is absent, and an import
+    is not readiness either: the phonemizer is BUILT here, as the torch
+    pipeline builds it, so a MeCab dictionary that will not open refuses at the
+    queue rather than at the voice node -- the same check 1a57dc91 gave the
+    pack's own copy (Composer QA of 1a57dc91: the torch path only imported).
     """
     extra = str(token or "").strip()
     if not extra:
@@ -539,15 +542,38 @@ def readiness_extra_ok(token: str) -> bool:
         sub = extra[7:-1].strip()
         if not sub:
             return False
-        import importlib
-        try:
-            importlib.import_module("misaki.%s" % sub)
+        if _misaki_g2p_error(sub) is None:
             return True
-        except Exception:
-            pass
         code = _pack_copy_lang(sub)
         return code is not None and _kokoro_backends().own_g2p_ready(code)
     return False
+
+
+#: How kokoro 0.9.4's KPipeline builds misaki's phonemizer for
+#: hexgrad/Kokoro-82M, by misaki extra: Japanese on its default route, Mandarin
+#: on the legacy route that repo uses. An extra not listed is import-only.
+_MISAKI_G2P_BUILDERS = {
+    "ja": lambda module: module.JAG2P(),
+    "zh": lambda module: module.ZHG2P(version=None),
+}
+
+
+def _misaki_g2p_error(sub: str) -> "str | None":
+    """Why misaki's own ``sub`` phonemizer does not import and build here, or
+    None when it does."""
+    import importlib
+    import warnings
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            module = importlib.import_module("misaki.%s" % sub)
+            build = _MISAKI_G2P_BUILDERS.get(sub)
+            if build is not None:
+                build(module)
+        return None
+    except Exception as exc:  # noqa: BLE001 -- any failure to build is "not ready"
+        return _kokoro_backends()._failure_reason(exc)
 
 
 #: misaki extra -> the Kokoro lang_code whose phonemizer the pack carries a copy
@@ -610,6 +636,21 @@ def assert_readiness_extras(row: LanguageRow) -> None:
                     "ComfyUI Python: python -m %s --force-reinstall -- or, if that "
                     "error names a file inside this pack, reinstall the pack."
                     % (row.label, row.label, kb.own_g2p_error(code), hint))
+            sub = extra[7:-1] if extra.startswith("misaki[") else ""
+            import importlib.util
+            try:
+                installed = bool(sub) and importlib.util.find_spec("misaki") is not None
+            except (ImportError, ValueError):
+                installed = False
+            if installed:
+                # misaki is here and its phonemizer still will not build: say
+                # what failed, since a plain second install does nothing.
+                raise EpisodeLanguageError(
+                    "language %s: readiness extra %s is installed but its "
+                    "phonemizer does not start on this box (%s). Reinstall it "
+                    "outside the render with this ComfyUI Python: "
+                    "python -m pip install %r --force-reinstall"
+                    % (row.label, extra, _misaki_g2p_error(sub), extra))
             raise EpisodeLanguageError(
                 "language %s needs readiness extra %s on this box "
                 "(CastLock extra, never an English-install tax). Install it "

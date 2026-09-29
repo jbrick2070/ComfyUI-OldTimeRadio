@@ -353,16 +353,40 @@ def test_readiness_extra_imports_transitive_contract(
 
 
 def test_readiness_extra_accepts_a_fully_importable_adapter(monkeypatch):
+    """The torch path imports misaki's adapter AND builds its phonemizer the
+    way KPipeline does (Mandarin on the legacy route Kokoro-82M uses)."""
+    import types
     monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)   # the torch path
-    calls = []
+    calls, built = [], []
 
     def _available(module_name):
         calls.append(module_name)
-        return object()
+        return types.SimpleNamespace(ZHG2P=lambda version: built.append(version))
 
     monkeypatch.setattr(importlib, "import_module", _available)
     assert el.readiness_extra_ok("misaki[zh]") is True
-    assert calls == ["misaki.zh"]
+    assert calls == ["misaki.zh"] and built == [None]
+
+
+def test_the_torch_path_refuses_a_phonemizer_that_will_not_build(monkeypatch):
+    """Composer QA of 1a57dc91: the torch path only imported misaki, so a MeCab
+    dictionary that would not open passed the queue and died at the voice
+    node. It now refuses at the queue and names what failed."""
+    import types
+    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
+
+    def _broken_dictionary():
+        raise RuntimeError("Failed initializing MeCab.\nno such file: /dic/mecabrc")
+
+    monkeypatch.setattr(importlib, "import_module",
+                        lambda name: types.SimpleNamespace(JAG2P=_broken_dictionary))
+    assert el.readiness_extra_ok("misaki[ja]") is False
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: object())
+    with pytest.raises(el.EpisodeLanguageError) as exc:
+        el.assert_readiness_extras(el.row_by_label("Japanese"))
+    text = str(exc.value)
+    assert "installed but its phonemizer does not start" in text
+    assert "no such file: /dic/mecabrc" in text and "--force-reinstall" in text
 
 
 @pytest.mark.parametrize("label", ADMITTED_LABELS)
