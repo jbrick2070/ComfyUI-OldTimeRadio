@@ -129,6 +129,14 @@ only when that language is selected and never an English-install tax:
 `misaki[ja]` / `misaki[zh]` on 3.10 - 3.12, and on 3.13 the libraries under
 the pack's copy.
 
+Where the two backends differ, the ONNX one errs toward speaking. Ordinary
+lines match the torch output (Sonnet QA, 2026-09-28: same duration to the
+millisecond). A line too long for one pass is split at punctuation and spoken in
+full, where the torch pipeline cuts the text into 400-character pieces and drops
+anything past 510 phonemes; a run of spaces becomes one pause; a symbol the
+model has no sound for can pick a neighbouring style row; and a line with
+nothing speakable in it is a quarter second of silence on both.
+
 Install one with ComfyUI's own Python before selecting that row:
 
 ```text

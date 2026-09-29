@@ -435,3 +435,15 @@ def test_with_torch_kokoro_installed_the_copy_is_never_the_answer(monkeypatch):
     assert el._pack_copy_lang("zh") == "z"
     assert el._pack_copy_lang("ja") == "j"
     assert el._pack_copy_lang("ko") is None
+
+
+def test_a_forced_onnx_backend_uses_the_pack_copy_even_beside_torch(monkeypatch):
+    """OTR_KOKORO_BACKEND=onnx on a box with the torch package: load() voices
+    Mandarin through the pack's copy, so the readiness extra must accept it
+    there too (Sonnet QA of 503b2661: the gate refused what load() would say)."""
+    import importlib.util as util
+    monkeypatch.setattr(util, "find_spec", lambda name: object() if name == "kokoro" else None)
+    monkeypatch.setenv("OTR_KOKORO_BACKEND", "onnx")
+    assert el._pack_copy_lang("zh") == "z"
+    monkeypatch.setenv("OTR_KOKORO_BACKEND", "auto")
+    assert el._pack_copy_lang("zh") is None

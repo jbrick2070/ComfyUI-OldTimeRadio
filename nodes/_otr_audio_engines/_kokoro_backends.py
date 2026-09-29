@@ -88,6 +88,10 @@ DEFAULT_ONNX_PROVIDERS = ("CPUExecutionProvider",)
 #: running beside it; RTF measured under this cap is ~0.15 on the dev box.
 ONNX_THREAD_CAP = 4
 
+#: Seconds of silence for a line with nothing the model can say: what the torch
+#: pipeline gives the same line (measured by Sonnet QA of 503b2661).
+UNSPEAKABLE_LINE_S = 0.25
+
 #: Kokoro's lang_code -> the espeak-ng language its torch pipeline phonemizes
 #: with (``kokoro.pipeline.LANG_CODES`` in kokoro 0.9.4). English has its own
 #: G2P on each backend, and Japanese and Mandarin use misaki's, so none of the
@@ -256,16 +260,20 @@ def ensure_voices_npz(voices_dir: str) -> str:
     return written
 
 
-def _fallback_voices_dir() -> str:
-    """Where the voice table goes when the voices folder refuses the write:
-    OTR's own scratch tier (``<output>/otr/episodes/_shared/tmp/kokoro_voices``),
-    which the janitor sweeps -- never the ambient system TEMP, which nothing
-    sweeps (tests/test_node_temp_hygiene.py)."""
+def _otr_scratch_dir() -> str:
+    """OTR's own scratch tier (``<output>/otr/episodes/_shared/tmp``), which the
+    janitor sweeps -- never the ambient system TEMP, which nothing sweeps
+    (tests/test_node_temp_hygiene.py)."""
     try:
         from .._otr_paths import otr_shared_tmp_dir
     except ImportError:                       # imported straight from nodes/
         from _otr_paths import otr_shared_tmp_dir  # type: ignore
-    return os.path.join(str(otr_shared_tmp_dir()), "kokoro_voices")
+    return str(otr_shared_tmp_dir())
+
+
+def _fallback_voices_dir() -> str:
+    """Where the voice table goes when the voices folder refuses the write."""
+    return os.path.join(_otr_scratch_dir(), "kokoro_voices")
 
 
 def _write_npz(target: str, arrays: dict):
@@ -372,6 +380,12 @@ class MandarinPhonemizer:
             import jieba
             from ._misaki.zh import ZHG2P
         jieba.setLogLevel(logging.WARNING)
+        try:
+            # jieba caches its 9 MB dictionary index under the system TEMP by
+            # default; keep it in OTR's own swept scratch tier instead.
+            jieba.dt.tmp_dir = _otr_scratch_dir()
+        except Exception:  # noqa: BLE001 -- no OTR output tree (a bare probe)
+            pass
         self._g2p = ZHG2P()
 
     def __call__(self, text: str) -> str:
@@ -665,6 +679,7 @@ class OnnxKokoroBackend:
                 "voice %r is not in the ONNX voice table %s (its .pt file was missing "
                 "or unreadable when the table was built)" % (voice_id, self.voices_npz))
         segments = []
+        unspeakable = False
         for chunk in _LINE_SPLIT.split(text or ""):
             chunk = chunk.strip()
             if not chunk:
@@ -679,9 +694,10 @@ class OnnxKokoroBackend:
                 known = getattr(getattr(self._kokoro, "tokenizer", None), "known", None)
                 if callable(known) and not known(phonemes):
                     # Nothing the model has a symbol for (a lone inverted
-                    # question mark or a bracket): kokoro-onnx refuses such a
-                    # chunk outright, where the torch pipeline speaks a quarter
-                    # second of nothing.
+                    # question mark, a bracket, an emoji): kokoro-onnx refuses
+                    # such a chunk outright, where the torch pipeline speaks a
+                    # quarter second of nothing. Say nothing for it here too.
+                    unspeakable = True
                     continue
                 samples, rate = self._kokoro.create(
                     phonemes, voice=voice_id, speed=speed, is_phonemes=True,
@@ -691,6 +707,11 @@ class OnnxKokoroBackend:
                     "kokoro-onnx returned %r Hz, expected %d" % (rate, SAMPLE_RATE))
             segments.append(np.asarray(samples, dtype=np.float32).squeeze())
         if not segments:
+            if unspeakable:
+                # A whole line of symbols the model has none of: the torch
+                # pipeline gives it a quarter second of silence and the episode
+                # goes on, so the line is not the end of the episode here either.
+                return np.zeros(int(SAMPLE_RATE * UNSPEAKABLE_LINE_S), dtype=np.float32)
             raise RuntimeError("kokoro-onnx produced no audio")
         return np.concatenate(segments) if len(segments) > 1 else segments[0]
 

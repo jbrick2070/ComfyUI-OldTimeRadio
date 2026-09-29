@@ -562,12 +562,19 @@ def _kokoro_backends():
 
 def _pack_copy_lang(sub: str):
     """The lang_code of the pack's copy of misaki's ``sub`` phonemizer when THIS
-    box uses it: the torch kokoro package is absent, so Kokoro runs through ONNX.
-    With the torch package installed its pipeline imports misaki itself, and only
-    misaki satisfies the extra. None when there is no copy or it is not used."""
+    box uses it: Kokoro runs through ONNX, because the torch kokoro package is
+    absent or ``OTR_KOKORO_BACKEND=onnx`` forces it. Otherwise the torch pipeline
+    imports misaki itself, and only misaki satisfies the extra. None when there
+    is no copy or it is not used."""
     code = _MISAKI_EXTRA_LANG.get(str(sub or "").strip())
     if code is None:
         return None
+    try:
+        from ._otr_shared import env as _otr_env
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import env as _otr_env  # type: ignore
+    if str(_otr_env.get("OTR_KOKORO_BACKEND", "") or "").strip().lower() == "onnx":
+        return code
     import importlib.util
     try:
         if importlib.util.find_spec("kokoro") is not None:

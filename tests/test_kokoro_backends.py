@@ -738,3 +738,31 @@ def test_the_mandarin_libraries_are_probed_without_importing_them(monkeypatch):
     assert kb.own_g2p_missing("z") == ["cn2an"]
     assert seen == list(kb.OWN_G2P_MODULES["z"])
     assert kb.own_g2p_missing("b") == [] and kb.own_g2p_missing("e") == []
+
+
+# --- Sonnet QA of 503b2661 ----------------------------------------------------
+def test_a_line_with_nothing_speakable_is_a_quarter_second_of_silence():
+    """A line of only symbols the model has none of (an emoji, a lone percent
+    sign) got 0.25 s of silence from the torch pipeline and killed the episode
+    on ONNX with "produced no audio". Now it is the same short silence."""
+    stub = _StubKokoro(voices=("zf_xiaobei",))
+    stub.tokenizer = types.SimpleNamespace(known=lambda ps: "")
+    backend = _onnx_backend_with_stub(stub)
+    backend._g2p = _EchoG2P()
+    out = backend.synthesize("%\n~", "zf_xiaobei", 0.95)
+    assert stub.calls == []
+    assert out.dtype == np.float32 and out.size == int(kb.SAMPLE_RATE * kb.UNSPEAKABLE_LINE_S)
+    assert float(np.abs(out).max()) == 0.0
+    with pytest.raises(RuntimeError, match="produced no audio"):
+        backend.synthesize("  \n ", "zf_xiaobei", 0.95)       # truly empty is still loud
+
+
+def test_jieba_caches_in_otrs_scratch_tier_not_system_temp(monkeypatch, tmp_path):
+    jieba = pytest.importorskip("jieba")
+    pytest.importorskip("pypinyin")
+    pytest.importorskip("cn2an")
+    pytest.importorskip("ordered_set")
+    monkeypatch.setattr(kb, "_otr_scratch_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(jieba.dt, "tmp_dir", None)
+    kb.MandarinPhonemizer()
+    assert jieba.dt.tmp_dir == str(tmp_path)
