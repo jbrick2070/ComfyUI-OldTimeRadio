@@ -601,6 +601,22 @@ def test_ten_news_characters_leave_no_bark_voice_for_the_announcer():
     assert len({row["voice_preset"] for row in cast[1:]}) == 10
 
 
+def test_an_announcer_already_on_a_bark_preset_takes_a_seat_whoever_voices_it():
+    """The character draw keeps an announcer's Bark preset off every character
+    even when Kokoro voices the announcer, so ten characters beside it are
+    eleven Bark voices. The count must say so rather than let the tenth draw
+    run dry (agy QA of ee9c2ddf)."""
+    from nodes._otr_casting import CastingFailedError
+    from nodes.cast_lock import CastLock
+
+    cast = _story_cast(10)
+    cast[0]["voice_preset"] = "v2/en_speaker_9"
+    with pytest.raises(CastingFailedError, match="Bark has 10 voices, and this cast needs 11"):
+        CastLock._assign_bark_voices(cast, {"source_bank": "scifi_news_pro", "episode_seed": 3},
+                                     [], announcer_voice_engine="kokoro",
+                                     char_voice_engine="bark")
+
+
 def test_the_voice_roll_is_told_which_casts_bark_cannot_voice():
     from nodes.cast_lock import _cast_gap
 

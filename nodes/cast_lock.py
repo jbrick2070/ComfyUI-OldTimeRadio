@@ -213,9 +213,15 @@ def _bark_seats(cast, announcer_engine) -> "tuple[int, int, str]":
     it to the draws, which fail closed on their own.
     """
     rows = [r for r in cast or [] if isinstance(r, dict)]
-    needed = sum(1 for r in rows if not _is_announcer_entry(r))
+    announcers = [r for r in rows if _is_announcer_entry(r)]
+    needed = len(rows) - len(announcers)
     whose = "each character"
-    if announcer_engine == "bark" and any(_is_announcer_entry(r) for r in rows):
+    # The announcer takes a seat when Bark voices it, and also when it arrives
+    # holding a Bark preset: the character draw keeps that preset off every
+    # character whichever engine the announcer speaks with (agy QA of
+    # ee9c2ddf -- ten characters and a pre-voiced announcer ran dry).
+    if announcers and (announcer_engine == "bark" or any(
+            str(r.get("voice_preset") or "").startswith("v2/") for r in announcers)):
         needed += 1
         whose = "each character and the announcer"
     try:
