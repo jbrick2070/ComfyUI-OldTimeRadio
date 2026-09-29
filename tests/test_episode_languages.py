@@ -414,14 +414,17 @@ def test_without_torch_kokoro_the_mandarin_extra_is_the_pack_copy(monkeypatch):
         raise ModuleNotFoundError("No module named 'misaki'")
 
     monkeypatch.setattr(importlib, "import_module", _no_misaki)
-    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: {"zh": "z"}.get(sub))
-    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: code == "z")
+    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: {"zh": "z", "ja": "j"}.get(sub))
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: code in ("z", "j"))
     assert el.readiness_extra_ok("misaki[zh]") is True
-    assert el.readiness_extra_ok("misaki[ja]") is False          # no copy yet
+    assert el.readiness_extra_ok("misaki[ja]") is True
     monkeypatch.setattr(kb, "own_g2p_ready", lambda code: False)
     with pytest.raises(el.EpisodeLanguageError,
                        match="pip install jieba pypinyin cn2an ordered-set"):
         el.assert_readiness_extras(el.row_by_label("Mandarin"))
+    with pytest.raises(el.EpisodeLanguageError,
+                       match="pip install fugashi jaconv unidic-lite"):
+        el.assert_readiness_extras(el.row_by_label("Japanese"))
 
 
 def test_with_torch_kokoro_installed_the_copy_is_never_the_answer(monkeypatch):
@@ -430,4 +433,5 @@ def test_with_torch_kokoro_installed_the_copy_is_never_the_answer(monkeypatch):
     assert el._pack_copy_lang("zh") is None
     monkeypatch.setattr(util, "find_spec", lambda name: None)
     assert el._pack_copy_lang("zh") == "z"
-    assert el._pack_copy_lang("ja") is None
+    assert el._pack_copy_lang("ja") == "j"
+    assert el._pack_copy_lang("ko") is None

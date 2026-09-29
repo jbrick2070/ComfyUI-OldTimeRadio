@@ -507,14 +507,15 @@ def _langs():
     return langs
 
 
-def _no_torch_kokoro(monkeypatch, mandarin_libraries=True):
-    """A Python 3.13 box: no torch kokoro. Mandarin still speaks through the
-    ONNX backend's copy of misaki when its four libraries are installed."""
+def _no_torch_kokoro(monkeypatch, missing=("j",)):
+    """A Python 3.13 box: no torch kokoro. Mandarin and Japanese speak through
+    the ONNX backend's copy of misaki once their libraries are installed;
+    ``missing`` names the lang_codes whose libraries are not."""
     from nodes._otr_audio_engines import _kokoro_backends as kb
     from nodes._otr_audio_engines import eng_kokoro
     monkeypatch.setattr(eng_kokoro, "_spec_present", lambda name: False)
     monkeypatch.setattr(kb, "own_g2p_missing",
-                        lambda code: [] if mandarin_libraries or code != "z" else ["jieba"])
+                        lambda code: ["a-library"] if code in missing else [])
 
 
 def _extras_ready(monkeypatch):
@@ -530,17 +531,17 @@ def _language_prompt(language, pool="", audio=False, char="kokoro",
     return prompt
 
 
-def test_kokoro_on_onnx_speaks_all_but_japanese_which_needs_torch(monkeypatch):
+def test_kokoro_on_onnx_speaks_every_row_once_its_libraries_are_in(monkeypatch):
     from nodes._otr_audio_engines import eng_kokoro
     langs = _langs()
     _extras_ready(monkeypatch)
-    _no_torch_kokoro(monkeypatch)
-    for iso in ("es", "pt", "it", "fr", "hi", "zh"):
+    _no_torch_kokoro(monkeypatch, missing=())
+    for iso in ("es", "pt", "it", "fr", "hi", "zh", "ja"):
         assert L.language_voice_gap(langs.row_by_iso(iso), ("kokoro", "kokoro")) is None
+    _no_torch_kokoro(monkeypatch, missing=("j", "z"))
     gap = L.language_voice_gap(langs.row_by_iso("ja"), ("kokoro", "kokoro"))
     assert gap.startswith("kokoro cannot speak Japanese here"), gap
-    assert "Python 3.12" in gap
-    _no_torch_kokoro(monkeypatch, mandarin_libraries=False)
+    assert "pip install fugashi jaconv unidic-lite" in gap
     gap = L.language_voice_gap(langs.row_by_iso("zh"), ("kokoro", "kokoro"))
     assert "pip install jieba pypinyin cn2an ordered-set" in gap, gap
     monkeypatch.setattr(eng_kokoro, "_spec_present", lambda name: name == "kokoro")
@@ -581,7 +582,7 @@ def test_a_hand_picked_language_the_voices_cannot_speak_stops_at_the_gate(monkey
         L.settle_prompt_language(_language_prompt("Japanese"), "63")
     text = str(exc.value)
     assert text.startswith("OTR_LedgerScriptWriter #1: pick another Language"), text
-    assert "Python 3.12" in text
+    assert "pip install fugashi jaconv unidic-lite" in text
     spanish = _language_prompt("Spanish")
     before = copy.deepcopy(spanish)
     assert L.settle_prompt_language(spanish, "63") == {}
@@ -610,7 +611,7 @@ def test_the_roll_leaves_out_what_the_voices_cannot_speak(monkeypatch, caplog):
 
 def test_a_roll_with_nothing_voiceable_left_stops_at_the_gate(monkeypatch):
     from nodes import _otr_rolls as R
-    _no_torch_kokoro(monkeypatch, mandarin_libraries=False)
+    _no_torch_kokoro(monkeypatch, missing=("j", "z"))
     _extras_ready(monkeypatch)
     prompt = _language_prompt(R.LANGUAGE_SENTINEL, pool="Japanese, Mandarin")
     with pytest.raises(_langs().EpisodeLanguageError, match="tick English"):
@@ -690,7 +691,7 @@ def test_a_refused_pick_names_the_voice_that_would_speak_it(monkeypatch):
     text = str(exc.value)
     assert text.startswith("OTR_LedgerScriptWriter #1: pick another Language, or set "
                            "'Characters - voices' and 'Announcer - voice' to google_tts"), text
-    assert "Google API key" in text and "Python 3.12" in text
+    assert "Google API key" in text and "pip install fugashi jaconv unidic-lite" in text
     google = _language_prompt("Japanese", char="google_tts", announcer="google_tts")
     assert L.settle_prompt_language(google, "63") == {}      # and that advice works
 

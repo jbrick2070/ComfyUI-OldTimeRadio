@@ -509,7 +509,7 @@ def test_every_non_english_row_is_espeak_a_pack_copy_or_needs_torch():
     from nodes import _otr_episode_languages as langs
     rows, _by_label, _by_iso = langs.load_registry()
     codes = {row.engines["kokoro"]["lang_code"] for row in rows if row.iso != "en"}
-    assert codes - set(kb.ESPEAK_LANGUAGES) - set(kb.OWN_G2P) == {"j"}
+    assert codes - set(kb.ESPEAK_LANGUAGES) - set(kb.OWN_G2P) == set()
 
 
 @pytest.mark.parametrize("language", sorted(_ESPEAK_SAMPLES))
@@ -573,9 +573,13 @@ def test_load_builds_the_row_phonemizer_and_refuses_what_onnx_cannot_speak(monke
     mandarin = kb.OnnxKokoroBackend("m.onnx", "v.npz", lang_code="z")
     mandarin.load()
     assert isinstance(mandarin._g2p, _StubG2P)
+    monkeypatch.setitem(kb.OWN_G2P, "j", lambda: _StubG2P())
+    japanese = kb.OnnxKokoroBackend("m.onnx", "v.npz", lang_code="j")
+    japanese.load()
+    assert isinstance(japanese._g2p, _StubG2P)
     _absent(monkeypatch, "onnxruntime")          # refused before any import
-    with pytest.raises(kb.BackendUnavailable, match="no phonemizer for lang_code 'j'"):
-        kb.OnnxKokoroBackend("m.onnx", "v.npz", lang_code="j").load()
+    with pytest.raises(kb.BackendUnavailable, match="no phonemizer for lang_code 'k'"):
+        kb.OnnxKokoroBackend("m.onnx", "v.npz", lang_code="k").load()
 
 
 def test_the_engine_speaks_an_espeak_row_on_onnx(monkeypatch, tmp_path):
@@ -587,19 +591,24 @@ def test_the_engine_speaks_an_espeak_row_on_onnx(monkeypatch, tmp_path):
     assert _StubOnnxBackend.instances[-1].lang_code == "e"
 
 
-def test_a_cjk_row_without_torch_names_the_python_it_needs(monkeypatch, tmp_path):
+def test_a_row_onnx_has_no_phonemizer_for_names_the_python_it_needs(monkeypatch, tmp_path):
+    # Every shipped row speaks on ONNX now; a future row without a phonemizer
+    # there still refuses by name, pointing at the torch build.
     eng = _onnx_engine(monkeypatch, tmp_path)
     monkeypatch.setattr(eng_kokoro, "_spec_present", lambda n: False)
-    eng._lang_code = "j"
+    eng._lang_code = "k"
     with pytest.raises(EngineUnusable) as exc:
         eng.load()
     assert exc.value.reason == EngineUsabilityReason.MISSING_MODEL
-    assert "'j'" in str(exc.value) and "Python 3.12" in str(exc.value)
+    assert "'k'" in str(exc.value) and "Python 3.12" in str(exc.value)
 
 
-def test_a_cjk_row_moves_to_torch_when_torch_is_installed(monkeypatch, tmp_path):
+def test_a_cjk_row_moves_to_torch_when_its_libraries_are_not_in(monkeypatch, tmp_path):
+    # Forced onnx on a box with the torch build but without the Japanese
+    # libraries the pack's copy needs: torch voices the row, as it always did.
     eng = _onnx_engine(monkeypatch, tmp_path)
     monkeypatch.setattr(eng_kokoro, "_spec_present", lambda n: True)
+    monkeypatch.setattr(kb, "own_g2p_missing", lambda code: ["fugashi"])
     loaded = []
 
     class _Torch:
@@ -695,26 +704,30 @@ def test_a_forced_onnx_backend_keeps_the_espeak_rows_on_onnx(monkeypatch, tmp_pa
 # --------------------------------------------------------------------------- #
 # Mandarin on ONNX through the pack's copy of misaki (2026-09-28)
 # --------------------------------------------------------------------------- #
-def test_mandarin_on_onnx_needs_only_its_four_libraries(monkeypatch, tmp_path):
+@pytest.mark.parametrize("code", ["z", "j"])
+def test_mandarin_and_japanese_on_onnx_need_only_their_libraries(monkeypatch, tmp_path, code):
     eng = _onnx_engine(monkeypatch, tmp_path)
     monkeypatch.setattr(eng_kokoro, "_spec_present", lambda n: False)   # no torch kokoro
-    monkeypatch.setattr(kb, "own_g2p_missing", lambda code: [])
-    eng._lang_code = "z"
+    monkeypatch.setattr(kb, "own_g2p_missing", lambda c: [])
+    eng._lang_code = code
     eng.load()
     assert eng._backend_name == "onnx"
-    assert _StubOnnxBackend.instances[-1].lang_code == "z"
+    assert _StubOnnxBackend.instances[-1].lang_code == code
 
 
-def test_mandarin_without_its_libraries_names_the_pip_line(monkeypatch, tmp_path):
+@pytest.mark.parametrize("code,missing,pip", [
+    ("z", ["jieba", "cn2an"], "pip install jieba pypinyin cn2an ordered-set"),
+    ("j", ["fugashi", "unidic_lite"], "pip install fugashi jaconv unidic-lite"),
+])
+def test_without_their_libraries_they_name_the_pip_line(monkeypatch, tmp_path, code, missing, pip):
     eng = _onnx_engine(monkeypatch, tmp_path)
     monkeypatch.setattr(eng_kokoro, "_spec_present", lambda n: False)
-    monkeypatch.setattr(kb, "own_g2p_missing", lambda code: ["jieba", "cn2an"])
-    eng._lang_code = "z"
+    monkeypatch.setattr(kb, "own_g2p_missing", lambda c: list(missing))
+    eng._lang_code = code
     with pytest.raises(EngineUnusable) as exc:
         eng.load()
     assert exc.value.reason == EngineUsabilityReason.MISSING_MODEL
-    assert "jieba, cn2an" in str(exc.value)
-    assert "pip install jieba pypinyin cn2an ordered-set" in str(exc.value)
+    assert ", ".join(missing) in str(exc.value) and pip in str(exc.value)
 
 
 def test_the_mandarin_libraries_are_probed_without_importing_them(monkeypatch):

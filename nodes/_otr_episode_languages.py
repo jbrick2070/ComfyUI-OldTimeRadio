@@ -549,7 +549,7 @@ def readiness_extra_ok(token: str) -> bool:
 
 #: misaki extra -> the Kokoro lang_code whose phonemizer the pack carries a copy
 #: of (``_otr_audio_engines/_misaki``), for the ONNX backend.
-_MISAKI_EXTRA_LANG = {"zh": "z"}
+_MISAKI_EXTRA_LANG = {"zh": "z", "ja": "j"}
 
 
 def _kokoro_backends():

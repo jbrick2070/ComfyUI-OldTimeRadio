@@ -19,8 +19,8 @@ languages for you at run time -- never `Off`. **Languages to roll**
 saver, narrows the roll: tick the languages. Through the API a typed list works
 too (`French, Spanish`). None ticked means every language, one means that
 language, two or more means just those -- always less any the run's voices
-cannot speak here (on Python 3.13 that is Japanese with Kokoro, and Mandarin
-until its libraries are installed),
+cannot speak here (on Python 3.13, Mandarin or Japanese with Kokoro until
+their libraries are installed),
 which the validator leaves out when you press Run and logs with the reason.
 The pick is recorded at `meta.language_roll` (when only one language is left
 it is simply that language, as with one ticked) and `OTR_LANGUAGE_SEED`
@@ -113,19 +113,21 @@ inside that language. It never fills a thin pool with an English voice.
 
 Python 3.10 through 3.12 use Kokoro's torch backend and speak every row.
 Python 3.13 (ComfyUI Desktop and the portable build) uses `kokoro-onnx`, which
-speaks every row but Japanese. The torch backend voices Spanish, French,
+speaks every row. The torch backend voices Spanish, French,
 Hindi, Italian and Portuguese through espeak-ng, and the ONNX backend repeats
 that step itself, so the model gets the same phonemes either way (measured
 2026-09-28 against misaki 0.9.4, and pinned by `tests/test_kokoro_backends.py`).
-Mandarin uses misaki's Chinese phonemizer, which is Python over four
-libraries that do install on 3.13; misaki itself does not, so the pack
-carries its Mandarin code (`nodes/_otr_audio_engines/_misaki`, pinned by
-`tests/test_kokoro_misaki_copy.py`). Japanese uses misaki's own Japanese
-phonemizer and still needs Python 3.10 through 3.12. Python 3.14 has no
-packaged Kokoro path. Japanese and Mandarin additionally require their
-readiness extra, checked only when that language is selected and never an
-English-install tax: `misaki[ja]` / `misaki[zh]` on 3.10 - 3.12, and on 3.13
-the four Mandarin libraries.
+Mandarin and Japanese use misaki's Chinese phonemizer and its Cutlet route for
+Japanese, which are Python over libraries that do install on 3.13; misaki
+itself does not, so the pack carries that code
+(`nodes/_otr_audio_engines/_misaki`, pinned by
+`tests/test_kokoro_misaki_copy.py`). Its Japanese copy drops mojimoji, which
+has no 3.13 wheel (after NFKC it is a three-character table, measured), and
+pins the unidic-lite dictionary. Python 3.14 has no packaged Kokoro path.
+Japanese and Mandarin additionally require their readiness extra, checked
+only when that language is selected and never an English-install tax:
+`misaki[ja]` / `misaki[zh]` on 3.10 - 3.12, and on 3.13 the libraries under
+the pack's copy.
 
 Install one with ComfyUI's own Python before selecting that row:
 
@@ -133,6 +135,7 @@ Install one with ComfyUI's own Python before selecting that row:
 <ComfyUI Python> -m pip install "misaki[ja]"
 <ComfyUI Python> -m pip install "misaki[zh]"
 <ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set     # Mandarin on Python 3.13
+<ComfyUI Python> -m pip install fugashi jaconv unidic-lite        # Japanese on Python 3.13
 ```
 
 Use only the line for the language you need.

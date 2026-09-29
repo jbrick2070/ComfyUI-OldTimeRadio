@@ -242,9 +242,10 @@ class KokoroEngine:
 
         A language change rebuilds the pipeline. The ONNX backend speaks English
         and the five espeak languages with the torch pipeline's own phonemes
-        (``_kokoro_backends.ESPEAK_LANGUAGES``) and Mandarin through the pack's
-        copy of misaki (``OWN_G2P``); Japanese needs the torch package, so ONNX
-        hands it to torch when that is installed and refuses by name when not.
+        (``_kokoro_backends.ESPEAK_LANGUAGES``), and Mandarin and Japanese
+        through the pack's copy of misaki (``OWN_G2P``) once their libraries are
+        installed. A row ONNX cannot speak goes to torch when that is installed
+        and refuses by name, with the pip line, when it is not.
         """
         from . import _kokoro_backends as _kb
         from .registry import EngineUsabilityReason
@@ -397,10 +398,8 @@ def _onnx_lang_code_gap(lang_code) -> "str | None":
         return ("lang_code %r on the ONNX kokoro needs %s, which are not installed. "
                 "Install them outside the render with ComfyUI's own Python: "
                 "python -m %s" % (lang, ", ".join(missing), _kb.OWN_G2P_INSTALL_HINT[lang]))
-    return ("lang_code %r needs the torch kokoro package, which installs only on "
-            "Python 3.12 or earlier (its Japanese phonemizer has no Python 3.13 "
-            "build); the ONNX kokoro voices English, Spanish, French, Hindi, "
-            "Italian, Portuguese and Mandarin" % lang)
+    return ("lang_code %r has no phonemizer on the ONNX kokoro and needs the torch "
+            "kokoro package, which installs only on Python 3.12 or earlier" % lang)
 
 
 def lang_code_gap(lang_code) -> "str | None":

@@ -198,8 +198,11 @@ misaki's `EspeakG2P` and hands kokoro-onnx the phonemes: identical phoneme
 strings to misaki 0.9.4 on every sample, the same strings from Python 3.13, and
 all five spoken on the Desktop's own Kokoro. **Mandarin followed the same
 night:** the pack carries misaki's Chinese phonemizer (its libraries install on
-3.13), with phonemes identical to misaki's and spoken on Python 3.13. Japanese
-stays torch only for now.
+3.13), with phonemes identical to misaki's and spoken on Python 3.13. So did
+**Japanese**: misaki's Cutlet route, with mojimoji (no 3.13 wheel) replaced by
+the three-character table it measures to after NFKC and the dictionary pinned
+to unidic-lite; identical phonemes, spoken on 3.13. All eight rows now speak
+on the ONNX backend.
 
 Kokoro `load()` early-returns if a backend exists. Rebuild on language change.
 Cache identity is `(lang, device)`. A resident server must not run Spanish

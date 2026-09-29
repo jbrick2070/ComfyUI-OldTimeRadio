@@ -39,8 +39,15 @@ pypinyin, cn2an and ordered-set, all of which install on 3.13; only misaki's own
 package pin refuses. The pack carries a copy of it (``_misaki``, provenance
 hashed) and ``MandarinPhonemizer`` feeds its phonemes to kokoro-onnx; the four
 libraries are an opt-in install for the Mandarin row (``OWN_G2P_INSTALL_HINT``).
-Japanese uses misaki's Cutlet route (fugashi and a UniDic dictionary) and still
-needs the torch package.
+
+JAPANESE ON ONNX (the same night). ``JAG2P()`` defaults to misaki's Cutlet
+route: fugashi (MeCab) over a UniDic dictionary, jaconv, a word list and
+misaki's number-to-kana code. All of it installs on 3.13 except mojimoji, whose
+two calls follow NFKC; measured over every code point, one is then a no-op and
+the other a three-character table, which the pack's copy uses instead. The copy
+also pins unidic-lite, so a `unidic` package without its dictionary (the
+PBUG-20260918-06 trap) cannot take MeCab over. ``JapanesePhonemizer`` feeds its
+phonemes to kokoro-onnx; fugashi, jaconv and unidic-lite are the opt-in install.
 
 RULES THIS FILE KEEPS: C-5 -- nothing heavy (torch, numpy, onnxruntime, kokoro)
 is imported at module top; the package imports ``eng_kokoro`` at init. C-7 --
@@ -92,8 +99,10 @@ ESPEAK_LANGUAGES = {"e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br"}
 #: (``_misaki``), because misaki does not install on Python 3.13: lang_code ->
 #: the modules that copy imports, and the pip line that installs them. Opt-in
 #: per language, like the torch path's misaki extras; never an English tax.
-OWN_G2P_MODULES = {"z": ("jieba", "pypinyin", "cn2an", "ordered_set")}
-OWN_G2P_INSTALL_HINT = {"z": "pip install jieba pypinyin cn2an ordered-set"}
+OWN_G2P_MODULES = {"z": ("jieba", "pypinyin", "cn2an", "ordered_set"),
+                   "j": ("fugashi", "jaconv", "unidic_lite")}
+OWN_G2P_INSTALL_HINT = {"z": "pip install jieba pypinyin cn2an ordered-set",
+                        "j": "pip install fugashi jaconv unidic-lite"}
 
 TORCH_INSTALL_HINT = "pip install kokoro   (Python 3.12 or earlier)"
 ONNX_INSTALL_HINT = "pip install kokoro-onnx   (Python 3.10 to 3.13; onnxruntime comes with it)"
@@ -370,10 +379,30 @@ class MandarinPhonemizer:
         return phonemes
 
 
+class JapanesePhonemizer:
+    """misaki 0.9.4's Japanese phonemizer on the route ``JAG2P()`` takes by
+    default (``version='cutlet'``), from the pack's copy in ``_misaki``: the
+    phonemes the torch pipeline feeds its model for a Japanese line. Needs the
+    ``OWN_G2P_MODULES["j"]`` libraries; the copy pins its MeCab dictionary to
+    unidic-lite and replaces mojimoji, which has no Python 3.13 wheel, with the
+    three-character table it measured to be after NFKC (see ``_misaki``)."""
+
+    language = "ja"
+
+    def __init__(self):
+        from ._misaki.cutlet import Cutlet
+
+        self._g2p = Cutlet()
+
+    def __call__(self, text: str) -> str:
+        phonemes, _tokens = self._g2p(text)
+        return phonemes
+
+
 #: lang_code -> the phonemizer the ONNX backend builds from the pack's copy, and
 #: the copy's module (relative to this package) that a readiness check imports.
-OWN_G2P = {"z": MandarinPhonemizer}
-OWN_G2P_IMPORT = {"z": "._misaki.zh"}
+OWN_G2P = {"z": MandarinPhonemizer, "j": JapanesePhonemizer}
+OWN_G2P_IMPORT = {"z": "._misaki.zh", "j": "._misaki.cutlet"}
 
 
 def own_g2p_ready(lang_code) -> bool:

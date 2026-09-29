@@ -58,10 +58,10 @@ The Python version decides the voice backend, and this is not a preference:
   language (`requirements.txt` pins it to
   `python_version < "3.13"`).
 * **3.13** (what Desktop and the portable build ship) -> `kokoro-onnx`, on the
-  CPU, about six times faster than realtime. It speaks every language but
-  Japanese, which requires the torch backend above. Mandarin also needs
-  `<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set` (the pack carries misaki's
-  Mandarin code; misaki itself does not install on 3.13).
+  CPU, about six times faster than realtime. It speaks every language;
+  Mandarin also needs `<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set` and
+  Japanese `<ComfyUI Python> -m pip install fugashi jaconv unidic-lite` (the pack carries
+  misaki's code for both; misaki itself does not install on 3.13).
 * **3.14** -> **no kokoro backend is packaged yet.** The pack still installs;
   an English user can switch the voice controls to Bark. Non-English episodes
   are unavailable because day-one multilingual rows admit Kokoro only. Say so

@@ -132,16 +132,17 @@ or for a crash during ComfyUI's startup, before any node loaded.
 | Your Python | Voices | Notes |
 |---|---|---|
 | 3.10 – 3.12 | Kokoro on torch | The multilingual path; every admitted language. |
-| 3.13 | Kokoro through `kokoro-onnx`, on CPU | Picked automatically. Every language but Japanese works (Mandarin after its four libraries below); Japanese requires the torch path above. |
+| 3.13 | Kokoro through `kokoro-onnx`, on CPU | Picked automatically. Every language works (Mandarin and Japanese after their libraries below). |
 | 3.14 and up | Refused | No Kokoro build exists yet. The provisioner refuses rather than installing something that cannot speak. |
 
 Japanese and Mandarin also need their readiness extras, checked only when
 that language is selected. On 3.10 - 3.12 install the one you need with
 ComfyUI's own Python: `<ComfyUI Python> -m pip install "misaki[ja]"` or
 `<ComfyUI Python> -m pip install "misaki[zh]"`. On 3.13, where misaki does
-not install, Mandarin needs the four libraries under the pack's copy of its
-phonemizer instead: `<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set`. See
-[MULTILINGUAL.md](MULTILINGUAL.md).
+not install, the pack carries misaki's code for both and they need its
+libraries instead: `<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set` for
+Mandarin and `<ComfyUI Python> -m pip install fugashi jaconv unidic-lite` for Japanese.
+See [MULTILINGUAL.md](MULTILINGUAL.md).
 
 ## Weights: what you do not have to do
 

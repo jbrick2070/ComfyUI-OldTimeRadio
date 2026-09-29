@@ -30,12 +30,11 @@ public-domain book, a scene of Shakespeare, or original fiction.
 switch on the same node carries the writing, the voices and the captions;
 [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md) says how each one performs.
 ComfyUI Desktop and the Windows portable build ship Python 3.13, where Kokoro
-runs as `kokoro-onnx`: it speaks every language but Japanese there, with the
-same phonemes the torch build uses (Mandarin once its four small libraries are
-installed: `pip install jieba pypinyin cn2an ordered-set`). Japanese needs the torch Kokoro build,
-which installs on Python 3.10 through 3.12. On 3.13 a language roll leaves
-Japanese out, and picking it stops the run when you press Run, saying what
-would work (Google TTS speaks it, with your own Google API key).
+runs as `kokoro-onnx`: it speaks all eight there, with the same phonemes the
+torch build uses. Mandarin and Japanese need a few small libraries first
+(`pip install jieba pypinyin cn2an ordered-set`, `pip install fugashi jaconv unidic-lite`); until they are
+installed a language roll leaves that language out, and picking it stops the
+run when you press Run with the pip line to fix it.
 
 Change nothing else in the workflow. You need an NVIDIA card with 8 GB or more, a 16 GB
 Apple Silicon Mac, or just a CPU (start ComfyUI with `--cpu`; slow but it works),
@@ -187,9 +186,8 @@ python -m pip install -r ComfyUI-OldTimeRadio/requirements.txt
 
 **Run that `pip install` with ComfyUI's own Python, not a system one** -- this
 is the most common way an install fails, and it fails much later, as nodes that
-quietly refuse to load. Python 3.10 through 3.13 are fine, and speak every
-language but Japanese, which needs the torch Kokoro build on 3.10 through
-3.12. Python 3.14 has no Kokoro voice build yet. `main` is the branch: it is the default and the only
+quietly refuse to load. Python 3.10 through 3.13 are fine and speak every
+language. Python 3.14 has no Kokoro voice build yet. `main` is the branch: it is the default and the only
 one that moves. A clone that still tracks a branch other than `main` wants
 re-cloning rather than pulling.
 
@@ -705,8 +703,8 @@ If yours lives somewhere unusual, set `OTR_FFMPEG` to the binary's full path.
 
 **`neither kokoro backend is installed` at the first voice line.** Python 3.10 to
 3.12 run Kokoro on torch and serve every admitted language. Python 3.13
-runs Kokoro through `kokoro-onnx` on the CPU: every language but Japanese,
-which needs the torch build (Mandarin needs `pip install jieba pypinyin cn2an ordered-set`). Python 3.14 has no Kokoro build yet and is refused. The message names
+runs Kokoro through `kokoro-onnx` on the CPU and speaks every language
+(Mandarin needs `pip install jieba pypinyin cn2an ordered-set`, Japanese `pip install fugashi jaconv unidic-lite`). Python 3.14 has no Kokoro build yet and is refused. The message names
 the exact pip line. An English episode can use Bark instead, except on a 16 GB
 Mac where Bark is a memory hazard. Non-English rows admit Kokoro and Google
 TTS (hosted, your own Google API key).

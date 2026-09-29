@@ -1,4 +1,4 @@
-"""The pack's copy of misaki's Mandarin phonemizer (nodes/_otr_audio_engines/_misaki).
+"""The pack's copy of misaki's Mandarin and Japanese phonemizers (nodes/_otr_audio_engines/_misaki).
 
 misaki does not install on Python 3.13, so the ONNX Kokoro carries misaki
 0.9.4's own Mandarin code. What keeps the copy honest: its files hash to
@@ -62,7 +62,7 @@ def test_the_copy_is_the_files_its_provenance_names():
     for name, record in provenance["files"].items():
         assert _sha(COPY / name) == record["vendored_sha256"], name
     unchanged = [n for n, r in provenance["files"].items() if r["change"].startswith("none")]
-    assert sorted(unchanged) == ["LICENSE", "transcription.py"]
+    assert sorted(unchanged) == ["LICENSE", "data/ja_words.txt", "num2kana.py", "transcription.py"]
     for name in unchanged:
         record = provenance["files"][name]
         assert record["upstream_sha256"] == record["vendored_sha256"], name
@@ -73,7 +73,7 @@ def test_the_installed_misaki_is_the_one_the_copy_was_taken_from():
     misaki = pytest.importorskip("misaki")
     root = pathlib.Path(misaki.__file__).resolve().parent
     provenance = json.loads((COPY / "PROVENANCE.json").read_text(encoding="utf-8"))
-    for name in ("zh.py", "transcription.py"):
+    for name in ("zh.py", "transcription.py", "cutlet.py", "num2kana.py", "data/ja_words.txt"):
         assert _sha(root / name) == provenance["files"][name]["upstream_sha256"], name
 
 
@@ -106,3 +106,87 @@ def test_only_the_legacy_frontend_is_carried():
     with pytest.raises(ValueError, match="legacy frontend"):
         ZHG2P(version="1.1")
     assert ZHG2P()("   ") == ("", None)
+
+
+
+# --------------------------------------------------------------------------- #
+# Japanese: misaki's Cutlet route, the one JAG2P() takes by default
+# --------------------------------------------------------------------------- #
+#: Kanji, kana and katakana; corner brackets and full-width digits; the three
+#: curly quotes mojimoji maps after NFKC; half-width katakana and full-width
+#: Latin; interjections with a small tsu and long vowel marks.
+JA_SAMPLES = [
+    '\u3053\u3093\u3070\u3093\u306f\u3002\u3053\u3061\u3089\u306f\u5931\u308f\u308c\u305f\u4fe1\u53f7\u3067\u3059\u3002',
+    '\u30a2\u30fc\u30ab\u30a4\u30d6\u306f\u3069\u3053\uff1f\u300c\u660e\u65e5\u300d\u3068\u5f7c\u5973\u306f\u8a00\u3063\u305f\u3002\uff12\uff10\uff12\uff16\u5e74\uff19\u6708\uff12\uff18\u65e5\u3002',
+    '\u2018Hello\u2019 \u3068 \u201c\u30a6\u30a7\u30f3\u30c7\u30a3\u201d\u304c\u8a00\u3063\u305f\u3002',
+    '\uff8a\uff9d\uff76\uff78\uff76\uff80\uff76\uff85\u3068\u5168\u89d2\uff21\uff22\uff23\u3001\u4fa1\u683c\u306f3.5\u5186\u3002',
+    '\u3048\u3063\u30fc\uff01\u3084\u3063\u305f\u30fc\uff01\u3059\u3054\u3063\u30fc\u3044\u2026\u2026',
+]
+
+#: misaki 0.9.4 JAG2P() on JA_SAMPLES, recorded 2026-09-28 (fugashi 1.5.2,
+#: unidic-lite 1.0.8 -- the only UniDic on that venv, as the copy pins).
+JA_GOLDEN = [
+    'komba\u0274\u03b2a. ko\u02a8i\u027ea \u03b2a \u026f\u0255ina\u03b2a \u027ee ta \u0255i\u014b\u0261o\u02d0 des\u0268.',
+    'a\u02d0kaib\u026f \u03b2a doko? \u201cas\u0268\u201d to kano\u02a5o \u03b2a i\u0294ta. \u0272i se\u0274 \u0272i\u02a5\u0268\u02d0\u027eok\u026f ne\u0274 k\u02b2\u0268\u02d0 \u0261a\u02a6\u0268 \u0272i\u02a5\u0268\u02d0ha\u02a8i \u0272i\u02a8i.',
+    '` Hello \' to \u03b2end\u02b2i " \u0261a i\u0294ta.',
+    'ha\u014bkak\u026fkatakana to \u02a3e\u014bkak\u026f ABC, kakak\u026f \u03b2a sa\u0274. \u0261o e\u0274.',
+    'e\u0294\u02d0! ja\u0294ta! s\u0268\u0261o\u0294\u02d0 i......',
+]
+
+
+def _copy_cutlet():
+    for name in ("fugashi", "jaconv", "unidic_lite"):
+        pytest.importorskip(name)
+    from nodes._otr_audio_engines._misaki.cutlet import Cutlet
+    return Cutlet()
+
+
+def test_the_japanese_copy_phonemizes_exactly_as_misaki_does():
+    pytest.importorskip("pyopenjtalk")            # misaki.ja imports it at module top
+    ja = pytest.importorskip("misaki.ja")
+    ours, theirs = _copy_cutlet(), ja.JAG2P()
+    for text in JA_SAMPLES:
+        assert ours(text) == theirs(text), text
+
+
+def test_the_japanese_copy_matches_misakis_recorded_output():
+    ours = _copy_cutlet()
+    assert [ours(text)[0] for text in JA_SAMPLES] == JA_GOLDEN
+
+
+def test_every_japanese_symbol_is_one_kokoro_has():
+    """Every phoneme misaki makes is in the vocabulary. What the text carries
+    through unchanged (Latin letters after NFKC, the three quotes the mojimoji
+    table maps) is not a phoneme; both backends drop it at tokenization."""
+    import unicodedata
+    config = pytest.importorskip("kokoro_onnx.config")
+    for text, phonemes in zip(JA_SAMPLES, JA_GOLDEN):
+        carried = set(unicodedata.normalize("NFKC", text)) | set("`'\"")
+        unknown = sorted(set(c for c in phonemes if c not in config.DEFAULT_VOCAB) - carried)
+        assert unknown == [], (text, unknown)
+
+
+def test_the_mojimoji_table_is_what_mojimoji_does_after_nfkc():
+    """The copy drops mojimoji (no Python 3.13 wheel). Its two calls follow
+    NFKC; over the Basic Multilingual Plane (the full range was measured once,
+    2026-09-28) han_to_zen then changes nothing and zen_to_han changes exactly
+    the three characters the copy's table maps."""
+    import unicodedata
+    mojimoji = pytest.importorskip("mojimoji")
+    from nodes._otr_audio_engines._misaki import cutlet
+    changed = {}
+    for cp in range(0x10000):
+        if 0xD800 <= cp <= 0xDFFF:
+            continue
+        text = unicodedata.normalize("NFKC", chr(cp))
+        half = mojimoji.zen_to_han(text, kana=False)
+        if half != text:
+            changed[text] = half
+        assert mojimoji.han_to_zen(half, digit=False, ascii=False) == half, hex(cp)
+    assert {ord(k): v for k, v in changed.items()} == cutlet.ZEN_TO_HAN_AFTER_NFKC
+
+
+def test_the_japanese_copy_pins_unidic_lite():
+    unidic_lite = pytest.importorskip("unidic_lite")
+    tagger = _copy_cutlet().tagger
+    assert unidic_lite.DICDIR in tagger.dictionary_info[0]["filename"]

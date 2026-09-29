@@ -1,6 +1,6 @@
 {
   "upstream": "misaki 0.9.4 (PyPI wheel, hexgrad, Apache-2.0)",
-  "why": "Kokoro's torch pipeline phonemizes Mandarin with misaki's ZHG2P; misaki does not install on Python 3.13, so the ONNX backend carries this copy.",
+  "why": "Kokoro's torch pipeline phonemizes Mandarin with misaki's ZHG2P and Japanese with misaki's Cutlet; misaki does not install on Python 3.13, so the ONNX backend carries this copy.",
   "files": {
     "transcription.py": {
       "upstream_sha256": "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32",
@@ -16,6 +16,26 @@
       "upstream_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
       "vendored_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
       "change": "none (misaki's Apache-2.0 licence)"
+    },
+    "num2kana.py": {
+      "upstream_sha256": "26ca4b39ac7165104e53971bd2459df6466ff8140e1dac836a3bf1f9e811e2d2",
+      "vendored_sha256": "26ca4b39ac7165104e53971bd2459df6466ff8140e1dac836a3bf1f9e811e2d2",
+      "change": "none (byte for byte)"
+    },
+    "data/__init__.py": {
+      "upstream_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "vendored_sha256": "90f25b474b25801f53558a806bd8dac049b65ba2eeb0395b429e20587dc10608",
+      "change": "a one-line docstring (upstream is empty; a 0-byte file reads as truncation here)"
+    },
+    "data/ja_words.txt": {
+      "upstream_sha256": "a93a8e8aee24db307a32becb8bf01c4c2908ecf37e6c91f7a705fafdfeba67ff",
+      "vendored_sha256": "a93a8e8aee24db307a32becb8bf01c4c2908ecf37e6c91f7a705fafdfeba67ff",
+      "change": "none (byte for byte)"
+    },
+    "cutlet.py": {
+      "upstream_sha256": "7695fc7d853ae4e99679dff4ca0c8404d4804a6fb1059a9d6ad02baeabc4d4de",
+      "vendored_sha256": "f262681075efccc40666f5e46297154bd83e036066f5ba6f46414acbd3b9496f",
+      "change": "mojimoji removed: han_to_zen after NFKC is a no-op and zen_to_han after NFKC is a three-character table (both measured over every code point); the fugashi Tagger pinned to unidic-lite; import os"
     }
   }
 }
