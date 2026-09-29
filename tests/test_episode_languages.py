@@ -25,8 +25,16 @@ EXPECTED_CHOICES = [
 ]
 ADMITTED_LABELS = EXPECTED_CHOICES[1:]
 
-# Brand tokens and machine serials stay English on every row.
-BRAND_TOKENS = ("SIGNAL LOST",)
+#: The station as each row SAYS it. The Latin call sign stays where the
+#: row's voice reads it; Hindi, Japanese and Mandarin voices read it as
+#: letters, so those rows carry their own (operator 2026-09-29).
+STATION_NAMES = {
+    "English": "SIGNAL LOST", "Spanish": "SIGNAL LOST", "Portuguese": "SIGNAL LOST",
+    "Italian": "SIGNAL LOST", "French": "SIGNAL LOST",
+    "Hindi": "सिग्नल लॉस्ट",
+    "Japanese": "シグナル・ロスト",
+    "Mandarin": "失落的信号",
+}
 
 
 @pytest.fixture
@@ -252,12 +260,20 @@ def test_every_admitted_row_carries_every_english_key_non_empty(label):
 
 
 @pytest.mark.parametrize("label", ADMITTED_LABELS)
-def test_brand_tokens_survive_on_every_row(label):
-    """SIGNAL LOST is the call sign; grammar bends around it."""
+def test_each_row_says_its_own_station_name(label):
+    """SIGNAL LOST where the row's voice reads Latin letters; the native name
+    where it would read the call sign as letter soup (operator 2026-09-29:
+    each gets its own name). A native row hands its voice no Latin letter in
+    either station sentence, and its writer instruction names the station so
+    the model's own announcer lines say it the same way."""
     row = el.row_by_label(label)
-    for token in BRAND_TOKENS:
-        assert token in row.spoken["station_id_open"], label
-        assert token in row.spoken["station_id_close"], label
+    name = STATION_NAMES[label]
+    assert name in row.spoken["station_id_open"], label
+    assert name in row.spoken["station_id_close"], label
+    if name != "SIGNAL LOST":
+        for key in ("station_id_open", "station_id_close"):
+            assert not any("a" <= ch.lower() <= "z" for ch in row.spoken[key]), (label, key)
+        assert name in row.authoring["writer_instruction"], label
 
 
 @pytest.mark.parametrize("label", ADMITTED_LABELS)

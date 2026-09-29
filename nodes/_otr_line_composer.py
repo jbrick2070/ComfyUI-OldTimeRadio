@@ -1454,8 +1454,12 @@ def validate_announcer_line(text: str) -> tuple[bool, str]:
 # tests/test_episode_languages.py). So this is a byte-identical change on every
 # English episode and the reason the English row exists.
 #
-# SIGNAL LOST stays SIGNAL LOST on every row. It is the call sign, not a phrase
-# to be rendered; the grammar bends around it ("Esta es SIGNAL LOST").
+# SIGNAL LOST stays SIGNAL LOST on every row whose voice reads Latin letters. It
+# is the call sign, not a phrase to be rendered; the grammar bends around it
+# ("Esta es SIGNAL LOST"). Hindi, Japanese and Mandarin voices read it as letter
+# soup, so those rows say it in their own script (operator 2026-09-29: "each
+# gets its own name"), and their writer instruction names it the same way for
+# the lines the model writes. On screen the logo stays SIGNAL LOST.
 
 
 def spoken_chrome(episode_meta=None) -> dict:

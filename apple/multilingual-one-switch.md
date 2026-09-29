@@ -289,6 +289,13 @@ Accepted:
 - `SIGNAL LOST` stays the call sign. Grammar bends around it
   (`Esta es SIGNAL LOST` / `Esto ha sido SIGNAL LOST`). Do not make it
   `SENAL PERDIDA`.
+  **Amended 2026-09-29 (operator: "each gets its own name"):** on the rows
+  whose voice cannot read Latin letters -- Hindi, Japanese, Mandarin -- the
+  call sign was spoken as letter soup, so those rows say the station in their
+  own script (Hindi and Japanese keep its sound, Mandarin translates it), and
+  their `writer_instruction` names it the same way and asks for no Latin
+  letters in spoken lines. The Latin-script rows keep `SIGNAL LOST`, and the
+  on-screen logo stays `SIGNAL LOST` everywhere.
 - `language_header` = `Espanol` with the n-tilde (UTF-8 in the ledger).
 - Reserved speaker `ANNOUNCER` -> `LOCUTOR` (es and pt). Station role, not
   gendered `LOCUTORA`.

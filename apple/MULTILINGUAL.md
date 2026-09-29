@@ -53,7 +53,11 @@ The selected row controls:
 - the Kokoro language code and the voices eligible for casting;
 - source-bank combinations that must refuse for fidelity.
 
-`SIGNAL LOST` remains the station name in every language. Machine receipts,
+`SIGNAL LOST` remains the spoken station name in English, Spanish, Portuguese,
+Italian and French. Hindi, Japanese and Mandarin voices would read those Latin
+letters as letter soup, so those episodes say the station in their own script:
+सिग्नल लॉस्ट, シグナル・ロスト and 失落的信号. On screen the logo stays
+`SIGNAL LOST` in every language. Machine receipts,
 engine ids and diagnostic text also remain English. Visual prompts stay English
 in this first version because they are instructions to image and video models,
 not audience dialogue.

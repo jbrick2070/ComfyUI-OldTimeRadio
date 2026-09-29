@@ -130,13 +130,17 @@ def test_the_safe_open_uses_the_rows_own_open_on_and_work_prefix(label):
 
 
 @pytest.mark.parametrize("label", ["English"] + NON_ENGLISH)
-def test_signal_lost_survives_on_every_row(label):
-    """The call sign is not a phrase to be rendered. Grammar bends around it."""
+def test_the_station_is_named_as_its_row_says_it(label):
+    """Every fallback opening and closing names the station in the row's own
+    words: SIGNAL LOST where the voice reads Latin letters, the row's native
+    name where it cannot (operator 2026-09-29)."""
     meta = _meta(label)
-    for line in (LC.fallback_announcer_intro("", episode_meta=meta),
-                 LC.fallback_announcer_outro("", episode_meta=meta),
-                 LC.fallback_safe_open(_Brief(), episode_meta=meta)):
-        assert "SIGNAL LOST" in line, (label, line)
+    spoken = el.row_by_label(label).spoken
+    for line, sentence in (
+            (LC.fallback_announcer_intro("", episode_meta=meta), spoken["station_id_open"]),
+            (LC.fallback_announcer_outro("", episode_meta=meta), spoken["station_id_close"]),
+            (LC.fallback_safe_open(_Brief(), episode_meta=meta), spoken["station_id_open"])):
+        assert sentence in line, (label, line)
 
 
 def test_spanish_reads_as_the_fable_seed_authored_it():
