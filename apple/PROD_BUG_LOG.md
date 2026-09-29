@@ -16085,3 +16085,16 @@ not promote it to the Bug Bible on this evidence alone.
   Japanese or Chinese close writes names in its own script, CJK text has no
   word boundary around a number, and Devanagari digits are not ASCII.
 - fix: pending -- design with one contrarian (Cursor grok-4.7-high) before code.
+## PBUG-20260929-05 live verify -- Japanese and Hindi My Story publish
+- Server rebooted from efba7606 (contains 62af48ae) at 11:57 PDT; the same
+  lighthouse test story (tmp/lang_gauntlet_20260929/story_lighthouse.json)
+  that died at the first character of a cast name on bd5d4e59:
+  - Japanese (12:10): treatment complete, cast=3, the names whole ("ピップ");
+    published as lost_signal_ja_20260929_120336__vstb__vgrn__none__koko__myst
+    __cg412__sa3_final.mp4.
+  - Hindi (12:18): published as final_light_hi_20260929_121328__pori__vgrn__
+    none__koko__myst__cg412__sa3_final.mp4. On bd5d4e59 the same leg had died
+    at `"name": "नो` (gauntlet leg 11, 11:56).
+- Seen, not a defect of this fix: the model still spaces some Japanese values
+  (" 鋭い、 乾燥した 音"); the grammar allows the unspaced forms (the CPU probe
+  admitted "から" after "黄昏"), so the spacing is the model's own.
