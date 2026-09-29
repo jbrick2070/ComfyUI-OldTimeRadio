@@ -429,13 +429,17 @@ def _engine_language_gap(name, row) -> "str | None":
     return check((row.engines or {}).get(name) or {}) if callable(check) else None
 
 
-def voice_pool(host=None, language=None) -> "tuple[tuple[str, ...], dict]":
+def voice_pool(host=None, language=None, *,
+               cast_check=None) -> "tuple[tuple[str, ...], dict]":
     """``(eligible, left_out)``: the voice engines a roll may draw here.
 
     From CastLock's own dropdowns, and only an engine both of them offer,
     because one engine voices the characters and the announcer. ``language``
     is the episode's language row, or None for English: an engine the row
     does not admit, or one that cannot speak it on this machine, is left out.
+    ``cast_check(name)`` says why an engine cannot voice the cast in hand, or
+    None -- only CastLock holds a cast, so only its roll passes one; the
+    language gate asks this before the writer runs, with no cast to ask about.
     """
     try:
         from .cast_lock import CastLock
@@ -463,7 +467,8 @@ def voice_pool(host=None, language=None) -> "tuple[tuple[str, ...], dict]":
         [c for c in characters if c in announcer], _VOICE_ROLES,
         live_host() if host is None else host,
         extra=lambda name, engine: (language_reason(name, engine)
-                                    or _reference_clips_reason(name, engine)))
+                                    or _reference_clips_reason(name, engine)
+                                    or (cast_check(name) if cast_check else None)))
     for name in characters:
         if name not in announcer and name not in left_out:
             left_out[name] = "voices characters only, so it cannot voice the whole cast"
@@ -774,12 +779,15 @@ def _attach(prompt, receipts) -> None:
 
 def roll_voice_engine(meta, cast_voice_policy, *,
                       env: "Mapping[str, str] | None" = None, host=None,
-                      pool=None, rng_factory: Callable[[int], Any] = random.Random
+                      pool=None, rng_factory: Callable[[int], Any] = random.Random,
+                      cast_check: "Callable[[str], str | None] | None" = None
                       ) -> dict:
     """The voice roll's receipt: ``selected`` names the engine for the whole
     cast, or ``skipped`` says why none was rolled.
 
-    ``meta`` is the ledger meta, which carries the episode's language. ``pool``
+    ``meta`` is the ledger meta, which carries the episode's language.
+    ``cast_check`` is CastLock's word on the cast it holds: why an engine
+    cannot voice it, or None (see ``voice_pool``). ``pool``
     (``(eligible, left_out)``) replaces the live read, for tests.
     """
     if cast_voice_policy != _AUTO_REGISTRY:
@@ -794,7 +802,7 @@ def roll_voice_engine(meta, cast_voice_policy, *,
         language = None
         if langs.iso_from_meta(meta) != langs.ENGLISH_ISO:
             language = langs.row_from_meta(meta)
-        pool = voice_pool(host, language)
+        pool = voice_pool(host, language, cast_check=cast_check)
     return _draw("voice_engine", pool, env, rng_factory)
 
 

@@ -441,6 +441,36 @@ def test_cast_lock_rolls_the_voice_and_stamps_every_receipt(monkeypatch):
 
 
 
+def test_cast_lock_leaves_bark_out_of_a_roll_for_a_cast_bigger_than_its_voices(monkeypatch):
+    """The roll draws only an engine that can voice the cast in hand. A 13-strong
+    My Story cast on a roll offering Bark and Kokoro gets Kokoro on every seed,
+    and the receipt says why Bark was left out (2026-09-29: the real 15-strong
+    cast died on Bark after the writer had run)."""
+    from nodes.cast_lock import CastLock
+
+    def pool(host=None, language=None, *, cast_check=None):
+        offered = ("bark", "kokoro")
+        left_out = {name: cast_check(name) for name in offered
+                    if cast_check and cast_check(name)}
+        return tuple(name for name in offered if name not in left_out), left_out
+
+    monkeypatch.setattr(L, "voice_pool", pool)
+    prompt = _prompt(video=True, still=True, audio=True)
+    L.roll_prompt_lanes(prompt, "63", pools=_pools(), still_check=lambda _i: True)
+    cast = [{"char_id": "c01", "name": "ANNOUNCER", "gender": "female"}]
+    cast += [{"char_id": "c%02d" % i, "name": "Animal %d" % i, "gender": ""}
+             for i in range(2, 14)]
+    ledger = json.dumps({"meta": {"episode_seed": 42, "source_bank": "my_story"},
+                         "cast": cast, "lines": []})
+    for seed in range(8):
+        monkeypatch.setenv(L.VOICE_SEED_ENV, str(seed))
+        out = CastLock().lock(script_json=ledger, cast_voice_policy="auto_registry",
+                              roll_audio_engines=True, queued_prompt=prompt, node_id="80")
+        roll = json.loads(out[0])["meta"]["voice_engine_roll"]
+        assert roll["selected"] == "kokoro", (seed, roll)
+        assert "has 10 voices, and this cast needs 13" in roll["left_out"]["bark"], roll
+
+
 def test_cast_lock_refuses_an_audio_switch_the_gate_never_rolled():
     from nodes.cast_lock import CastLock
     with pytest.raises(L.LaneRollError, match=L.AUDIO_SWITCH):

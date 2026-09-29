@@ -550,6 +550,66 @@ def test_a_seedless_ledger_says_its_draw_is_shared():
     assert any("no episode_seed" in line for line in report)
 
 
+def _story_cast(characters, announcer_gender="female"):
+    """A cast the way a content-owned lane hands it over: the announcer on its
+    Kokoro id, then ``characters`` rows left unvoiced for CastLock."""
+    cast = [{"char_id": "c01", "name": "ANNOUNCER", "gender": announcer_gender,
+             "tts_model": "kokoro", "voice_preset": "bf_lily"}]
+    for i in range(characters):
+        cast.append({"char_id": "c%02d" % (i + 2), "name": "Animal %d" % (i + 1),
+                     "gender": "", "tts_model": "", "voice_preset": ""})
+    return cast
+
+
+def test_a_cast_bigger_than_barks_voices_is_refused_by_count_before_any_draw():
+    """2026-09-29: the real 15-strong My Story cast of 09-28 (the costume
+    masquerade) on Bark died in the character draw as "available_voices is
+    empty -- nothing to pick", after the writer had run. Bark has ten voices and
+    no two Bark rows may share one; the refusal says so, before any draw."""
+    from nodes._otr_casting import CastingFailedError
+    from nodes.cast_lock import CastLock
+
+    meta = {"source_bank": "my_story", "episode_seed": 7}
+    with pytest.raises(CastingFailedError,
+                       match="Bark has 10 voices, and this cast needs 15"):
+        CastLock._assign_bark_voices(_story_cast(14), dict(meta), [],
+                                     announcer_voice_engine="bark",
+                                     char_voice_engine="bark")
+    # Ten speakers fit exactly: nine characters and a Bark announcer.
+    fits = _story_cast(9)
+    CastLock._assign_bark_voices(fits, dict(meta), [],
+                                 announcer_voice_engine="bark", char_voice_engine="bark")
+    assert len({row["voice_preset"] for row in fits}) == 10
+
+
+def test_ten_news_characters_leave_no_bark_voice_for_the_announcer():
+    """The news lane seats up to ten characters. With a Bark announcer that is
+    eleven speakers for ten voices, which used to die in the announcer's draw;
+    a Kokoro announcer leaves the ten characters their ten voices."""
+    from nodes._otr_casting import CastingFailedError
+    from nodes.cast_lock import CastLock
+
+    meta = {"source_bank": "scifi_news_pro", "episode_seed": 11}
+    with pytest.raises(CastingFailedError, match=(
+            "needs 11: one of its own for each character and the announcer")):
+        CastLock._assign_bark_voices(_story_cast(10), dict(meta), [],
+                                     announcer_voice_engine="bark",
+                                     char_voice_engine="bark")
+    cast = _story_cast(10)
+    CastLock._assign_bark_voices(cast, dict(meta), [],
+                                 announcer_voice_engine="kokoro", char_voice_engine="bark")
+    assert len({row["voice_preset"] for row in cast[1:]}) == 10
+
+
+def test_the_voice_roll_is_told_which_casts_bark_cannot_voice():
+    from nodes.cast_lock import _cast_gap
+
+    assert "has 10 voices, and this cast needs 15" in _cast_gap("bark", _story_cast(14))
+    assert _cast_gap("bark", _story_cast(9)) is None
+    for engine in ("kokoro", "chatterbox", "dia", "indextts2", "google_tts"):
+        assert _cast_gap(engine, _story_cast(14)) is None, engine
+
+
 def _women_and_a_robot(first_gender="", women=4):
     cast = [{"char_id": "c01", "name": "ANNOUNCER", "gender": "male",
              "tts_model": "kokoro", "voice_preset": "bm_george"},

@@ -195,6 +195,58 @@ def _is_announcer_entry(entry: dict) -> bool:
     return char_id == "announcer" or name == "ANNOUNCER" or role == "announcer"
 
 
+def _bark_seats(cast, announcer_engine) -> "tuple[int, int, str]":
+    """``(needed, available, whose)``: the Bark voices this cast takes when Bark
+    voices its characters, how many Bark has, and whose voices they are in
+    words ("each character", or "each character and the announcer").
+
+    Every character takes a voice of its own, and so does the announcer when
+    Bark voices it too: no two Bark rows may share one (Gate 1,
+    ``_otr_casting._assert_unique_bark_voices``). The ten English presets are
+    all there are -- the multilingual ones are off because they garble English
+    (``config/cast_pools.py``). The writer's own lanes cap the cast at six, so
+    only a lane that brings its own cast can outnumber them: My Story's cast is
+    the story's, and the news lane seats up to ten characters, which leaves
+    nothing for a Bark announcer.
+
+    ``available`` is 0 when cast_pools cannot be imported; the caller then leaves
+    it to the draws, which fail closed on their own.
+    """
+    rows = [r for r in cast or [] if isinstance(r, dict)]
+    needed = sum(1 for r in rows if not _is_announcer_entry(r))
+    whose = "each character"
+    if announcer_engine == "bark" and any(_is_announcer_entry(r) for r in rows):
+        needed += 1
+        whose = "each character and the announcer"
+    try:
+        from ..config import cast_pools as _POOLS  # type: ignore
+    except (ImportError, ValueError):
+        try:
+            from config import cast_pools as _POOLS  # type: ignore
+        except ImportError:
+            return needed, 0, whose
+    return needed, len(_POOLS.open_voice_pool(set())), whose
+
+
+def _cast_gap(engine, cast) -> "str | None":
+    """Why a rolled ``engine`` -- which voices the characters AND the announcer
+    -- cannot voice this cast, or None. The voice roll asks it, so an engine
+    that would die on the cast is left out of the draw, with this reason, the
+    way IndexTTS2 is for voicing characters only.
+
+    Only Bark has a limit: every other engine reuses voices when its bank runs
+    out (``allow_voice_reuse``). A Bark pinned by hand is not rolled, and still
+    refuses the cast in ``_assign_bark_voices``, with the same count.
+    """
+    if engine != "bark":
+        return None
+    needed, available, whose = _bark_seats(cast, "bark")
+    if available and needed > available:
+        return ("has %d voices, and this cast needs %d: one of its own for %s"
+                % (available, needed, whose))
+    return None
+
+
 def _row_has_resolvable_voice(row) -> bool:
     """A spoken row is voiced once it has a preset OR a bank reference.
 
@@ -615,7 +667,9 @@ class CastLock:
         if roll_audio_engines:
             _lane_rolls.assert_rolled(
                 queued_prompt, node_id, ("music_engine",), "OTR_CastLock")
-            voice_roll = _lane_rolls.roll_voice_engine(meta, cast_voice_policy)
+            voice_roll = _lane_rolls.roll_voice_engine(
+                meta, cast_voice_policy,
+                cast_check=lambda engine: _cast_gap(engine, cast))
             if voice_roll.get("selected"):
                 char_voice_engine = voice_roll["selected"]
                 announcer_voice_engine = voice_roll["selected"]
@@ -852,6 +906,24 @@ class CastLock:
                 _OTRCAST._assert_unique_bark_voices(cast)
             return
 
+        # Count before any draw. A cast with more speakers than Bark has voices
+        # used to die in whichever draw ran dry -- a character's, or with ten
+        # news-lane characters the announcer's -- as "available_voices is
+        # empty", after the writer had run (2026-09-29, a 15-strong My Story
+        # cast). A rolled Bark never gets here with such a cast: the roll
+        # leaves it out (`_cast_gap`). One pinned by hand is told why.
+        needed, available, whose = _bark_seats(cast, announcer_engine)
+        if available and needed > available:
+            raise _OTRCAST.CastingFailedError(
+                attempts=[("", (
+                    "Bark has %d voices, and this cast needs %d: one of its own "
+                    "for %s, and no two Bark rows may share one. Voice this "
+                    "story with another engine -- Kokoro, Chatterbox and Dia "
+                    "reuse voices when they run out -- or give it fewer "
+                    "speaking parts." % (available, needed, whose)))],
+                name="the Bark cast",
+            )
+
         # A content-owned lane builds its OWN character-cast rows; the writer's
         # seeded picker never ran, so there is no sequence to replay. Replaying
         # anyway would fabricate a cast that was never rolled. VERIFY what the
@@ -938,7 +1010,9 @@ class CastLock:
         seed and its own ``char_id`` (a distinct sha1 discriminator), so a
         re-lock of the same episode draws the same voices and no draw perturbs
         another. ``presentation_gender`` comes from the preset actually drawn.
-        More characters than presets raises from the picker -- loud.
+        More characters than presets never reaches this draw:
+        ``_assign_bark_voices`` counts them first (``_bark_seats``) and refuses
+        the cast in words.
         """
         import random
 
