@@ -447,3 +447,26 @@ def test_a_forced_onnx_backend_uses_the_pack_copy_even_beside_torch(monkeypatch)
     assert el._pack_copy_lang("zh") == "z"
     monkeypatch.setenv("OTR_KOKORO_BACKEND", "auto")
     assert el._pack_copy_lang("zh") is None
+
+
+def test_installed_but_not_starting_says_reinstall_not_install(monkeypatch):
+    """A second pip install does nothing when the libraries are there and the
+    dictionary will not open; the message says what failed and to reinstall."""
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+
+    def _no_misaki(name, package=None):
+        raise ModuleNotFoundError("No module named 'misaki'")
+
+    monkeypatch.setattr(importlib, "import_module", _no_misaki)
+    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: {"zh": "z", "ja": "j"}.get(sub))
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: False)
+    monkeypatch.setattr(kb, "own_g2p_missing", lambda code: [])
+    monkeypatch.setattr(kb, "own_g2p_error", lambda code: "RuntimeError: Failed initializing MeCab")
+    with pytest.raises(el.EpisodeLanguageError) as exc:
+        el.assert_readiness_extras(el.row_by_label("Japanese"))
+    text = str(exc.value)
+    assert "installed but does not start" in text and "Failed initializing MeCab" in text
+    assert "pip install fugashi jaconv unidic-lite --force-reinstall" in text
+    monkeypatch.setattr(kb, "own_g2p_missing", lambda code: ["fugashi"])
+    with pytest.raises(el.EpisodeLanguageError, match="needs the libraries under"):
+        el.assert_readiness_extras(el.row_by_label("Japanese"))

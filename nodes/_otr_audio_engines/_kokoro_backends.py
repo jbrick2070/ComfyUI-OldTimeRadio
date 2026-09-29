@@ -393,6 +393,20 @@ class MandarinPhonemizer:
         return phonemes
 
 
+#: misaki's Japanese number reader stops at nine digits: a longer run (a phone
+#: number, a serial, the digits after a decimal point) raises inside misaki on
+#: both backends and takes the line and the episode with it. Such a run is read
+#: digit by digit instead, as Japanese reads phone numbers and decimals. Every
+#: shorter number reads exactly as misaki reads it.
+_JA_LONG_DIGIT_RUN = re.compile(r"\d{10,}")
+
+
+def japanese_long_numbers_spelled(text: str) -> str:
+    """``text`` with every run of ten or more digits spaced out digit by digit,
+    which misaki's Japanese reader speaks instead of raising on."""
+    return _JA_LONG_DIGIT_RUN.sub(lambda run: " ".join(run.group(0)), text)
+
+
 class JapanesePhonemizer:
     """misaki 0.9.4's Japanese phonemizer on the route ``JAG2P()`` takes by
     default (``version='cutlet'``), from the pack's copy in ``_misaki``: the
@@ -409,7 +423,7 @@ class JapanesePhonemizer:
         self._g2p = Cutlet()
 
     def __call__(self, text: str) -> str:
-        phonemes, _tokens = self._g2p(text)
+        phonemes, _tokens = self._g2p(japanese_long_numbers_spelled(text))
         return phonemes
 
 
@@ -419,26 +433,33 @@ OWN_G2P = {"z": MandarinPhonemizer, "j": JapanesePhonemizer}
 OWN_G2P_IMPORT = {"z": "._misaki.zh", "j": "._misaki.cutlet"}
 
 
-def own_g2p_ready(lang_code) -> bool:
-    """True when the pack's copy of misaki for ``lang_code`` works here: it
-    imports, and the phonemizer builds -- for Japanese that opens MeCab on its
-    dictionary (about a second), so a dictionary that will not open refuses now
-    rather than at the voice node. An import alone is the half that passes."""
+def own_g2p_error(lang_code) -> "str | None":
+    """Why the pack's copy of misaki for ``lang_code`` does not work here, or
+    None when it does: it imports, and the phonemizer builds -- for Japanese that
+    opens MeCab on its dictionary (about a second), so a dictionary that will
+    not open refuses at the gate rather than at the voice node. An import alone
+    is the half that passes."""
     import importlib
     import warnings
 
     code = str(lang_code or "").strip()
     module = OWN_G2P_IMPORT.get(code)
     if module is None or code not in OWN_G2P:
-        return False
+        return "no pack copy of a phonemizer for lang_code %r" % code
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             importlib.import_module(module, __package__)
             OWN_G2P[code]()
-        return True
-    except Exception:  # noqa: BLE001 -- any failure to build is "not ready"
-        return False
+        return None
+    except Exception as exc:  # noqa: BLE001 -- any failure to build is "not ready"
+        first_line = (str(exc).strip().splitlines() or [""])[0][:200]
+        return "%s: %s" % (type(exc).__name__, first_line) if first_line else type(exc).__name__
+
+
+def own_g2p_ready(lang_code) -> bool:
+    """True when ``own_g2p_error`` finds nothing wrong."""
+    return own_g2p_error(lang_code) is None
 
 
 def own_g2p_missing(lang_code) -> list:
@@ -554,6 +575,8 @@ class TorchKokoroBackend:
         import numpy as np
         import torch
 
+        if self.lang_code == "j":
+            text = japanese_long_numbers_spelled(text)
         segments = []
         for _, _, audio_data in self._pipeline(
             text, voice=voice_id, speed=speed, split_pattern=r"\n+",
@@ -564,6 +587,12 @@ class TorchKokoroBackend:
                 arr = np.asarray(audio_data, dtype=np.float32)
             segments.append(arr.astype(np.float32).squeeze())
         if not segments:
+            if text.strip():
+                # The pipeline skips a line that phonemizes to nothing (a
+                # Japanese line of only middle dots, a musical note, a star):
+                # that is a line with nothing to say, not the end of the
+                # episode. A blank line is still loud -- it should never get here.
+                return np.zeros(int(SAMPLE_RATE * UNSPEAKABLE_LINE_S), dtype=np.float32)
             raise RuntimeError("kokoro pipeline produced no audio")
         return np.concatenate(segments) if len(segments) > 1 else segments[0]
 
@@ -595,16 +624,16 @@ class OnnxKokoroBackend:
 
     English lines go to kokoro-onnx as text (its own espeak ``en-gb``). A line
     in one of the ``ESPEAK_LANGUAGES`` goes as phonemes from
-    ``EspeakPhonemizer``, and a Mandarin line as phonemes from
-    ``MandarinPhonemizer`` -- in each case the torch pipeline's own G2P. The
-    style vector is picked by kokoro-onnx from the count of phonemes the model
-    knows, where the torch pipeline counts every character of the phoneme
-    string, so a phoneme string with an unknown character (a Spanish inverted
-    mark) can take the neighbouring style row: measured inaudible, waveforms
-    0.988-0.996 alike on the espeak rows. A line too long for one
-    pass is cut where kokoro-onnx cuts it (at punctuation, within 510
-    phonemes), where the torch pipeline cuts the text into 400-character
-    pieces and truncates any that still run past 510 phonemes.
+    ``EspeakPhonemizer``, and a Mandarin or Japanese line as phonemes from
+    ``MandarinPhonemizer`` or ``JapanesePhonemizer`` -- in each case the torch
+    pipeline's own G2P. The style vector is picked by kokoro-onnx from the
+    count of phonemes the model knows, where the torch pipeline counts every
+    character of the phoneme string, so a phoneme string with an unknown
+    character (a Spanish inverted mark) can take the neighbouring style row:
+    measured inaudible, waveforms 0.988-0.996 alike on the espeak rows. A line
+    too long for one pass is cut where kokoro-onnx cuts it (at punctuation,
+    within 510 phonemes), where the torch pipeline cuts the text into
+    400-character pieces and truncates any that still run past 510 phonemes.
     """
 
     name = "onnx"
@@ -690,7 +719,10 @@ class OnnxKokoroBackend:
             else:
                 phonemes = self._g2p(chunk)
                 if not phonemes:
-                    continue            # the torch pipeline skips these too
+                    # Nothing to say (a Japanese line of only middle dots, a
+                    # musical note): the torch pipeline skips these too.
+                    unspeakable = True
+                    continue
                 known = getattr(getattr(self._kokoro, "tokenizer", None), "known", None)
                 if callable(known) and not known(phonemes):
                     # Nothing the model has a symbol for (a lone inverted
@@ -708,9 +740,9 @@ class OnnxKokoroBackend:
             segments.append(np.asarray(samples, dtype=np.float32).squeeze())
         if not segments:
             if unspeakable:
-                # A whole line of symbols the model has none of: the torch
-                # pipeline gives it a quarter second of silence and the episode
-                # goes on, so the line is not the end of the episode here either.
+                # A whole line with nothing to say -- symbols the model has no
+                # sound for, or no phonemes at all: a quarter second of
+                # silence, as on the torch pipeline, and the episode goes on.
                 return np.zeros(int(SAMPLE_RATE * UNSPEAKABLE_LINE_S), dtype=np.float32)
             raise RuntimeError("kokoro-onnx produced no audio")
         return np.concatenate(segments) if len(segments) > 1 else segments[0]

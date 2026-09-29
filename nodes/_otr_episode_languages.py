@@ -590,12 +590,22 @@ def assert_readiness_extras(row: LanguageRow) -> None:
         if not readiness_extra_ok(extra):
             code = _pack_copy_lang(extra[7:-1] if extra.startswith("misaki[") else "")
             if code is not None:
+                kb = _kokoro_backends()
+                hint = kb.OWN_G2P_INSTALL_HINT[code]
+                if kb.own_g2p_missing(code):
+                    raise EpisodeLanguageError(
+                        "language %s needs the libraries under Kokoro's %s phonemizer "
+                        "on this box (misaki itself does not install on this Python; "
+                        "the pack carries its code). Install them outside the render "
+                        "with this ComfyUI Python: python -m %s"
+                        % (row.label, row.label, hint))
+                # Installed, and still not working: a second pip install does
+                # nothing, so say what failed and how to reinstall.
                 raise EpisodeLanguageError(
-                    "language %s needs the libraries under Kokoro's %s phonemizer "
-                    "on this box (misaki itself does not install on this Python; "
-                    "the pack carries its code). Install them outside the render "
-                    "with this ComfyUI Python: python -m %s"
-                    % (row.label, row.label, _kokoro_backends().OWN_G2P_INSTALL_HINT[code]))
+                    "language %s: Kokoro's %s phonemizer is installed but does not "
+                    "start on this box (%s). Reinstall its libraries with this "
+                    "ComfyUI Python: python -m %s --force-reinstall"
+                    % (row.label, row.label, kb.own_g2p_error(code), hint))
             raise EpisodeLanguageError(
                 "language %s needs readiness extra %s on this box "
                 "(CastLock extra, never an English-install tax). Install it "

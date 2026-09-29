@@ -766,3 +766,68 @@ def test_jieba_caches_in_otrs_scratch_tier_not_system_temp(monkeypatch, tmp_path
     monkeypatch.setattr(jieba.dt, "tmp_dir", None)
     kb.MandarinPhonemizer()
     assert jieba.dt.tmp_dir == str(tmp_path)
+
+
+class _SilentG2P:
+    language = "ja"
+
+    def __call__(self, text):
+        return ""
+
+
+def test_a_line_that_phonemizes_to_nothing_is_silence_too():
+    """A line of only "...", a musical note or a star phonemizes to nothing in
+    misaki; it killed the episode on ONNX (Sonnet QA of d786238d)."""
+    stub = _StubKokoro(voices=("jf_alpha",))
+    backend = _onnx_backend_with_stub(stub)
+    backend._g2p = _SilentG2P()
+    out = backend.synthesize("・・・", "jf_alpha", 0.95)
+    assert stub.calls == [] and out.size == int(kb.SAMPLE_RATE * kb.UNSPEAKABLE_LINE_S)
+
+
+def test_the_torch_pipeline_gives_a_line_with_nothing_to_say_silence(monkeypatch):
+    """KPipeline skips a line whose phonemes come back empty and yields nothing;
+    the torch backend raised "produced no audio" and killed the episode. It is
+    the same quarter second of silence as on ONNX; a blank line is still loud."""
+
+    class _SkipsEverything:
+        def __init__(self, **kw):
+            pass
+
+        def __call__(self, text, **kw):
+            return iter(())
+
+    monkeypatch.setitem(sys.modules, "kokoro", types.SimpleNamespace(KPipeline=_SkipsEverything))
+    backend = kb.TorchKokoroBackend("cpu", lang_code="j")
+    backend.load()
+    out = backend.synthesize("・・・", "jf_alpha", 0.95)
+    assert out.dtype == np.float32 and out.size == int(kb.SAMPLE_RATE * kb.UNSPEAKABLE_LINE_S)
+    assert float(np.abs(out).max()) == 0.0
+    with pytest.raises(RuntimeError, match="produced no audio"):
+        backend.synthesize(" \n ", "jf_alpha", 0.95)
+
+
+def test_the_torch_pipeline_reads_a_japanese_phone_number_digit_by_digit(monkeypatch):
+    """misaki's own Japanese reader raises past nine digits on the torch
+    pipeline too; the torch backend hands it the same spelled-out digits the
+    ONNX phonemizer reads, and only for Japanese."""
+    seen = []
+
+    class _Pipe:
+        def __init__(self, **kw):
+            pass
+
+        def __call__(self, text, **kw):
+            seen.append(text)
+            yield ("g", "p", np.full(4, 0.5, dtype=np.float32))
+
+    monkeypatch.setitem(sys.modules, "kokoro", types.SimpleNamespace(KPipeline=_Pipe))
+    japanese = kb.TorchKokoroBackend("cpu", lang_code="j")
+    japanese.load()
+    japanese.synthesize("電話は0120123456です。価格は123456789円", "jf_alpha", 1.0)
+    assert seen[-1] == ("電話は0 1 2 0 1 2 3 4 5 6です。"
+                        "価格は123456789円")
+    english = kb.TorchKokoroBackend("cpu", lang_code="b")
+    english.load()
+    english.synthesize("Call 0120123456 now.", "bm_george", 1.0)
+    assert seen[-1] == "Call 0120123456 now."

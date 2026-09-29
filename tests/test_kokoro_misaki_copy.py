@@ -9,6 +9,7 @@ symbol it produces is one Kokoro's model has.
 from __future__ import annotations
 
 import hashlib
+import sys
 import json
 import logging
 import pathlib
@@ -253,3 +254,42 @@ def test_readiness_builds_the_phonemizer_not_just_the_import(monkeypatch):
     monkeypatch.setitem(kb.OWN_G2P, "j", _cannot_open)
     assert kb.own_g2p_ready("j") is False
     assert kb.own_g2p_ready("k") is False
+
+
+# --------------------------------------------------------------------------- #
+# Sonnet QA of d786238d
+# --------------------------------------------------------------------------- #
+def test_a_long_digit_run_is_read_digit_by_digit_not_a_crash():
+    """misaki's number reader stops at nine digits and raises past it (a phone
+    number, the digits after a decimal point), which killed the line and the
+    episode on both backends. JapanesePhonemizer reads such a run digit by
+    digit; a number of nine digits or fewer reads exactly as misaki reads it."""
+    for name in ("fugashi", "jaconv", "unidic_lite"):
+        pytest.importorskip(name)
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+    phonemizer = kb.JapanesePhonemizer()
+    cutlet = _copy_cutlet()
+    phone = "電話は0120123456です"
+    with pytest.raises(AssertionError):
+        cutlet(phone)
+    spaced = "電話は0 1 2 0 1 2 3 4 5 6です"
+    assert phonemizer(phone) == cutlet(spaced)[0]
+    assert phonemizer("3.14159265358979")
+    nine = "価格は123456789円"
+    assert phonemizer(nine) == cutlet(nine)[0]
+
+
+def test_the_unidic_lite_pin_holds_against_a_broken_unidic(monkeypatch, tmp_path):
+    """fugashi's Tagger() prefers a `unidic` package whenever it imports, and
+    one without its dictionary cannot start MeCab (PBUG-20260918-06). The pinned
+    -r/-d come last, so MeCab still opens unidic-lite. Without the pin this
+    test fails, which the plain-venv test above cannot show."""
+    import types
+    fugashi = pytest.importorskip("fugashi")
+    for name in ("jaconv", "unidic_lite"):
+        pytest.importorskip(name)
+    monkeypatch.setitem(sys.modules, "unidic", types.SimpleNamespace(DICDIR=str(tmp_path)))
+    with pytest.raises(RuntimeError):
+        fugashi.Tagger()                           # the trap is real
+    ours = _copy_cutlet()
+    assert ours("こんにちは")[0]
