@@ -16362,3 +16362,14 @@ not promote it to the Bug Bible on this evidence alone.
   the Real-ESRGAN upscaler (fetch-at-load probe: file absent -> fetched and
   loaded in 5.4 s, PROBE OK). Nine episodes published from nothing across
   the drill.
+
+## PBUG-20260929-06 -- live verify, Japanese: the close passes with the native spellings
+
+- same server (c3dbaa6c + 332655a8), a one-act Japanese scifi_news_pro
+  episode queued after the Hindi one: `'scifi_news_pro_native_names' attempt
+  1/3`, `'scifi_news_pro_news_read' attempt 1/3` and no refusal, RESULT
+  SUCCESS at 08:44, published as
+  lost_signal_ja_20260930_070343__arch__l25v__zimg__koko__news__cg412__sa3_final.mp4.
+  Both native-script rows the pass covers are now proven live; the row is
+  closed except for the documented Latin-boundary gap in the invented-name
+  check.
