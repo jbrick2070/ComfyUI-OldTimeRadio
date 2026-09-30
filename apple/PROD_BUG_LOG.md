@@ -16201,3 +16201,34 @@ not promote it to the Bug Bible on this evidence alone.
 - still open: native spellings committed with the dossier (a side field tied
   to each kept entity, Grok's shape) -- for the Hindi closes, and for the
   invented-name check's refusal of a real person written in katakana.
+
+## PBUG-20260929-09 -- Dia episodes spoke gibberish: every voice sample went to Dia without its words
+- surfaced: operator, 16:2x PDT, on rainbow_smoke_20260929_152330__vstb__stfl
+  __lumi__dia__myst (overnight leg 21, Dia on every voice): "the first few
+  words on these are some gibberish". Whisper: the announcer clean, the
+  dialogue garbled ("30 no, come on.", "Look at the smoke stop.", "I wanna
+  kick the buck!") against the script's "Smoke? No way. Cats do not make
+  smoke. Kick it! I want to kick the boxes first."
+- root cause: Dia clones from an audio sample and expects the sample's
+  transcript before the line ("[S1] <sample words> [S1] <line>") so it knows
+  where the sample ends. eng_dia and the worker supported
+  config/dia_ref_transcripts.json, but the file was never written, so every
+  line rendered audio-prompt-only and Dia read the sample as the start of the
+  line. Several samples are also meta-speech (the LibriVox disclaimer, a
+  voice-cloning consent statement), which Dia carried on from.
+- measured (the real worker on CPU, same line, sample and seed): bill_boerst
+  without the transcript 19.1 s of nonsense, with it word for word;
+  hannah without "to Plong Forest." (1.0 s), with it the line.
+- fix: d794ba3f + 9768c2a9 -- a Whisper transcript for each of the 42 sample
+  clips (evident Whisper slips corrected), a once-per-sample warning when a
+  sample has none, tests/test_dia_ref_transcripts.py (every dia voice in the
+  bank covered; the request written to the worker carries the words).
+  Composer QA twice (its findings folded into 9768c2a9).
+- live verify (server restarted on d794ba3f, 16:50): My Story test story,
+  both voice rows pinned to dia -- published as last_watch_20260929_170057
+  __sbke__vgrn__none__dia__myst. Per caption line, Whisper hears the opening
+  words of 16 of 18 lines (one flag is a curly-apostrophe miss). Still open:
+  Sam's two longest lines (26-27 words, voice dia_donor_gyroo, a sample
+  Whisper transcribes two different ways) come back unintelligible for
+  ~11 s plus ~9 s of quiet; his 15-23 word lines are clean. On CPU, hannah
+  also showed a 10-14 s silence inside a line at two of three seeds.
