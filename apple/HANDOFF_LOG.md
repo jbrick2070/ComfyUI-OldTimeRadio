@@ -1557,5 +1557,5 @@ the live version.
   each leg pins one fast video lane from a shuffled cycle (the four stills,
   three AnimateDiff lanes, LTX 0.9.8 low); still models rolled; asset cleanup
   OFF so a failed leg keeps its whole episode folder for debugging. 120 legs
-  max, stops after 8 failures, a 20-minute stall watch. Touch STOP in that
+  max, stops after 8 failures in a row, a 20-minute stall watch. Touch STOP in that
   folder to end it after the current leg.
