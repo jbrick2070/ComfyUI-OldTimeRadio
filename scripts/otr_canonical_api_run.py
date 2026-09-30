@@ -110,6 +110,7 @@ def _apply_video_lane(workflow: dict, schemas: dict, lane: str) -> list[str]:
     """
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
+    from nodes._otr_shared import route_freeze
     from nodes._otr_shared.public_engines import resolve_engine_id
     from nodes._otr_visual_assets import VisualAssetError, planned_downloads
     from nodes.otr_video_director import exact_menu_option_for
@@ -123,17 +124,30 @@ def _apply_video_lane(workflow: dict, schemas: dict, lane: str) -> list[str]:
     # The queue-time preflight downloads and checks only the lanes the pack
     # fetches itself; for any other lane a missing file surfaces when the lane
     # loads -- the same as picking it in the app (Sonnet review, 9e677825).
+    #
+    # THE LANES THE RUN WILL USE, NOT JUST THE ONE PICKED (4060 cold drill,
+    # 2026-09-29). A lane that serves one role is redirected on the others --
+    # HuMo plays the character only, so the announcer and music beats go to
+    # the LTX 2.5 audio-in lane -- and the preflight fetches those weights
+    # too. This message said "4 weight file(s)" for humo_1.7B while the run
+    # downloaded twelve; it now plans the same frozen role map the preflight
+    # plans, and names any routed lane.
+    effective = route_freeze.freeze_role_engines({w: engine for w in VIDEO_LANE_WIDGETS})
+    lanes = {resolve_engine_id(v) for v in effective.values() if v} or {engine}
+    routed = sorted(lanes - {engine})
     try:
-        fetched = planned_downloads({engine})
+        fetched = planned_downloads(lanes)
     except VisualAssetError as exc:
         fetched = set()
         print(f"[canonical-api] video lane {lane!r}: the queue-time preflight "
               f"will refuse it ({exc})", flush=True)
     else:
         if fetched:
+            also = (" and the lane(s) its other roles are routed to (%s)"
+                    % ", ".join(routed)) if routed else ""
             print(f"[canonical-api] video lane {lane!r}: the queue-time "
-                  f"preflight downloads and checks its {len(fetched)} weight "
-                  f"file(s)", flush=True)
+                  f"preflight downloads and checks {len(fetched)} weight "
+                  f"file(s) for it{also}", flush=True)
         else:
             print(f"[canonical-api] WARNING video lane {lane!r}: the pack does "
                   f"not download this lane, so nothing checks its weights "

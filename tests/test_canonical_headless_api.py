@@ -399,8 +399,11 @@ def test_video_lane_warns_when_nothing_checks_the_lanes_weights(tmp_path):
     assert "nothing checks its weights before the run" in out
 
 
-def test_video_lane_says_the_preflight_fetches_humo(tmp_path):
-    """HuMo downloads itself since 2026-09-29; the 1.7B tier's four files."""
+def test_video_lane_says_the_preflight_fetches_humo_and_its_routed_lane(tmp_path):
+    """HuMo downloads itself since 2026-09-29 -- and HuMo plays the character
+    only, so the announcer and music roles are routed to the LTX 2.5 audio-in
+    lane, whose weights the preflight fetches too. The 4060 cold drill saw
+    this message promise four files while the run downloaded twelve."""
     rc, out = _run_main([
         "--offline-schemas", "--dry-run",
         "--profile", "otr_16gb_video",
@@ -408,7 +411,20 @@ def test_video_lane_says_the_preflight_fetches_humo(tmp_path):
         "--dump-prompt", str(tmp_path / "prompt.json"),
     ])
     assert rc == 0
-    assert "downloads and checks its 4 weight file(s)" in out
+    assert "downloads and checks 9 weight file(s) for it" in out
+    assert "routed to (ltx25_audio_in_16gb)" in out
+
+
+def test_video_lane_that_serves_every_role_names_no_routed_lane(tmp_path):
+    rc, out = _run_main([
+        "--offline-schemas", "--dry-run",
+        "--machine", "16gb",
+        "--video-lane", "h3_low_video",
+        "--dump-prompt", str(tmp_path / "prompt.json"),
+    ])
+    assert rc == 0
+    assert "weight file(s) for it" in out
+    assert "routed to" not in out
 
 
 def test_video_lane_applies_after_a_machine_key_too(tmp_path):
