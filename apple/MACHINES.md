@@ -72,8 +72,8 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `ltx25_foley_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_high_video` | **auto** | 25.4 GiB | measured | measured | not offered | ? | not offered |
 | `ltx25_mime_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
-| `humo14_high_audio_in_portrait` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `humo14_high_audio_in_wide` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo14_high_audio_in_portrait` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo14_high_audio_in_wide` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `ltx25_audio_in_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_foley_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_mime_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
@@ -148,18 +148,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 Every file a **manual** row needs: the repository to download it from, and the folder under your ComfyUI `models/` directory to put it in. `gated` means you must accept the model's licence on Hugging Face first, while signed in.
 
 Two engines can share one group and still download different amounts, because they draw different files from it. **The size in the machine grid above is what YOUR pick costs**; the total on a heading here is the whole group. A heading with no total means that group's manifest predates byte receipts -- the machine grid still has the figure.
-
-### humo &mdash; 26.7 GiB total
-
-Selected by: `humo14_high_audio_in_portrait`, `humo14_high_audio_in_wide`
-
-| File | From | Put it in | Size | Gated |
-|---|---|---|---|---|
-| `Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors` | [`Kijai/WanVideo_comfy_fp8_scaled`](https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled) | `models/diffusion_models/` | 16.66 GiB | no |
-| `umt5_xxl_fp8_e4m3fn_scaled.safetensors` | [`Comfy-Org/Wan_2.1_ComfyUI_repackaged`](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged) | `models/text_encoders/` | 6.27 GiB | no |
-| `whisper_large_v3_fp16.safetensors` | [`Comfy-Org/HuMo_ComfyUI`](https://huggingface.co/Comfy-Org/HuMo_ComfyUI) | `models/audio_encoders/` | 2.88 GiB | no |
-| `wan_2.1_vae.safetensors` | [`Comfy-Org/Wan_2.2_ComfyUI_Repackaged`](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged) | `models/vae/` | 0.24 GiB | no |
-| `lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors` | [`Kijai/WanVideo_comfy`](https://huggingface.co/Kijai/WanVideo_comfy) | `models/loras/` | 0.69 GiB | no |
 
 ### humo_1_7b &mdash; 12.6 GiB total
 

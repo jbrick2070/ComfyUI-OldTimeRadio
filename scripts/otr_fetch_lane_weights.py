@@ -214,51 +214,18 @@ LANES = {
     # That wrong download was a fresh-install breaker: it consumed ~16 GB and
     # the engine still reported not installed.
     #
-    # Unlike the legacy lane rows below, every HuMo source is revision-pinned
-    # and carries exact bytes + SHA-256. fetch() verifies the temporary file
-    # before os.replace(), so neither a moved upstream ref nor an interrupted
-    # transfer can become a loadable final checkpoint.
+    # THE ROWS ARE NOT WRITTEN HERE: like the MiniMax H3 stack below, their
+    # repo, revision, bytes and SHA-256 are `_PINNED_SOURCES` in
+    # nodes/_otr_visual_assets.py, which the canonical graph fetches from at
+    # queue time. fetch() verifies the temporary file before os.replace(), so
+    # neither a moved upstream ref nor an interrupted transfer can become a
+    # loadable final checkpoint.
     "humo": [
-        WeightSpec(
-            "Kijai/WanVideo_comfy_fp8_scaled",
-            "HuMo/Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors",
-            "diffusion_models/Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors",
-            "033a4e487f60220b3d6e469599a6aebc46e13cee",
-            17_892_294_098,
-            "a67ed82a7c008892f9192cdc5b23bbfe2e2a8e2f87d0b5b8dfb0226fafec022d",
-        ),
-        WeightSpec(
-            "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
-            "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-            "text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-            "617a7633e636506f850e043bc4605f290a466a8e",
-            6_735_906_897,
-            "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68",
-        ),
-        WeightSpec(
-            "Comfy-Org/HuMo_ComfyUI",
-            "split_files/audio_encoders/whisper_large_v3_fp16.safetensors",
-            "audio_encoders/whisper_large_v3_fp16.safetensors",
-            "3a5e6947d865c3910cb2407cf2dac6a8df506b5a",
-            3_087_130_976,
-            "a8e94b85976e5864ba3e9525c7e6c83b2a1eca42d4b797a0c7c24d778e40fd95",
-        ),
-        WeightSpec(
-            "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
-            "split_files/vae/wan_2.1_vae.safetensors",
-            "vae/wan_2.1_vae.safetensors",
-            "c4f60d30c55a624e35427060fdd217579a6c1d77",
-            253_815_318,
-            "2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b",
-        ),
-        WeightSpec(
-            "Kijai/WanVideo_comfy",
-            "Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
-            "loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
-            "8260d429d19fd7a72304cad059160b95d843913f",
-            738_005_744,
-            "85c4a61c30e0497aa44b91d93a893b624708461a56fe5485183b28fa07e2dfb3",
-        ),
+        _PINNED["Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"],
+        _PINNED["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+        _PINNED["whisper_large_v3_fp16.safetensors"],
+        _PINNED["wan_2.1_vae.safetensors"],
+        _PINNED["lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors"],
     ],
     # THE MINIMAX H3 STACK, one lane per DiT like LTX 2.5 below. FL2VA
     # (h3_low_video) loads its DiT, the NVFP4 Qwen3-VL encoder and the video

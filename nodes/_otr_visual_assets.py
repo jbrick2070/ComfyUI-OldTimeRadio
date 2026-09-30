@@ -5,8 +5,8 @@ No model imports or network at module import. Only the allowlisted files in
 sd15 and lumina_image weights (the Flux ae VAE is the z_image row), the native
 LTX 2.5 and AnimateDiff lane weights (AnimateDiff's SD 1.5 checkpoint is the sd15
 row), and -- at an exact pinned revision -- the two MiniMax H3 lanes' weights,
-the Ideogram 4 and Flux.1-dev image weights, and the Comfy-native Gemma 4
-writer's text encoder. The list is the count; this
+the Ideogram 4 and Flux.1-dev image weights, the HuMo tiers' weights, and the
+Comfy-native Gemma 4 writer's text encoder. The list is the count; this
 paragraph deliberately does not repeat a total that would drift.
 Existing native loader choices are preserved, not rehash-qualified, and
 readiness is NOT a claim of GPU/render compatibility. Other engines keep
@@ -124,6 +124,41 @@ _PINNED_SOURCES = (
     ("checkpoints", "Comfy-Org/flux1-dev", "flux1-dev-fp8.safetensors",
      "83c446ef27a6ac1e9e36ecf13257283aa12cf22a", 17_246_524_772,
      "8e91b68084b53a7fc44ed2a3756d821e355ac1a7b6fe29be760c1db532f3d88a"),
+    # HUMO, added 2026-09-29 for the same directive. The 14B tiers' five files
+    # (the pins scripts/otr_fetch_lane_weights.py carried alone until now, and
+    # which it now reads from here) and the 1.7B tiers' own DiT; the 1.7B
+    # tiers share the encoder, VAE and Whisper and run without the LoRA. All
+    # five repos are public and ungated. The 14B DiT is deliberately Kijai's
+    # `..._scaled_KJ` file, the one eng_humo._HUMO_DEFAULT_UNET loads.
+    ("diffusion_models", "Kijai/WanVideo_comfy_fp8_scaled",
+     "HuMo/Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+     "033a4e487f60220b3d6e469599a6aebc46e13cee", 17_892_294_098,
+     "a67ed82a7c008892f9192cdc5b23bbfe2e2a8e2f87d0b5b8dfb0226fafec022d"),
+    ("diffusion_models", "Comfy-Org/HuMo_ComfyUI",
+     "split_files/diffusion_models/humo_1.7B_fp16.safetensors",
+     "14c03e404cf05c4b334805f58942b463aeae9a22", 3_483_511_088,
+     "3f8c08e7db17e807397b9a9ed9d9b28a6e42c8083029395674e95544191b1b15"),
+    # The UMT5 encoder comes from a byte-identical mirror that keeps it at the
+    # repo root, for the reason the LTX 2.5 rows use one: Comfy-Org's
+    # `Wan_2.1_ComfyUI_repackaged/split_files/text_encoders/` copy (same
+    # SHA-256) puts the HF cache tail at 165 characters, past the 162 that
+    # prestartup_script.py budgets for Windows MAX_PATH. Here it is 134.
+    ("text_encoders", "theunlikely/wan2.1-i2v-720p-fp8",
+     "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+     "b62c979714abecaa67814d8b9d081804ec508f0f", 6_735_906_897,
+     "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68"),
+    ("audio_encoders", "Comfy-Org/HuMo_ComfyUI",
+     "split_files/audio_encoders/whisper_large_v3_fp16.safetensors",
+     "3a5e6947d865c3910cb2407cf2dac6a8df506b5a", 3_087_130_976,
+     "a8e94b85976e5864ba3e9525c7e6c83b2a1eca42d4b797a0c7c24d778e40fd95"),
+    ("vae", "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+     "split_files/vae/wan_2.1_vae.safetensors",
+     "c4f60d30c55a624e35427060fdd217579a6c1d77", 253_815_318,
+     "2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b"),
+    ("loras", "Kijai/WanVideo_comfy",
+     "Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+     "8260d429d19fd7a72304cad059160b95d843913f", 738_005_744,
+     "85c4a61c30e0497aa44b91d93a893b624708461a56fe5485183b28fa07e2dfb3"),
 )
 
 _SOURCES = (
@@ -285,10 +320,14 @@ _MINIMAX_H3_WEIGHT_ENGINES = frozenset({
     "minimax_h3_video",
     "minimax_h3_audio_in",
 })
+#: Every registered HuMo tier. Each one is asked for its own files through
+#: ``_weight_tokens()``, so a 1.7B tier never pulls the 14B DiT or the LoRA.
+_HUMO_WEIGHT_ENGINES = frozenset({"humo", "humo_14B_169", "humo_1.7B", "humo_1.7B_169"})
 _COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image",
                       "ideogram4_local", "flux_gen1"}
                      | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES
-                     | _ANIMATEDIFF_WEIGHT_ENGINES | _MINIMAX_H3_WEIGHT_ENGINES)
+                     | _ANIMATEDIFF_WEIGHT_ENGINES | _MINIMAX_H3_WEIGHT_ENGINES
+                     | _HUMO_WEIGHT_ENGINES)
 #: The music node is scanned alongside OTR_VideoDirector. It is a DIFFERENT
 #: class with a single ``engine`` widget rather than per-role slots, so it gets
 #: its own pass; an absent node is a skip, not a refusal, because a graph
@@ -630,7 +669,8 @@ def _same_file(left, right):
 
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
                     sd15=None, lumina=None, ideogram=None, flux=None, ltx25=None,
-                    animatediff=None, minimax_h3=None, env=None, writer_models=()):
+                    animatediff=None, minimax_h3=None, humo=None, env=None,
+                    writer_models=()):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
     A missing nondefault choice is a refusal, never a default-weight fallback.
@@ -831,6 +871,20 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
             for label, categories, default, _floor in lane._weight_rows():
                 add(categories[0], lane._token_for(label, default),
                     explicit=str(env.get("OTR_MINIMAX_H3_%s_NAME" % label) or ""))
+    selected_humo = sorted(engines & _HUMO_WEIGHT_ENGINES)
+    if selected_humo:
+        # ASK EACH TIER: `_weight_tokens()` reads the same `_loader_names()` the
+        # graph is built from, env overrides included, and leaves the LoRA out
+        # of a tier that runs LoRA-free. Tiers share the encoder, VAE and
+        # Whisper, and `add` requests each once.
+        if not humo:
+            raise VisualAssetError("HuMo adapter resolution is unavailable")
+        for eid in selected_humo:
+            lane = humo.get(eid)
+            if lane is None:
+                raise VisualAssetError("HuMo adapter for %s is unavailable" % eid)
+            for category, token in lane._weight_tokens():
+                add(category, token)
     if writer_models:
         lookup = _native_writer_lookup()
         if lookup is None:
@@ -1113,7 +1167,7 @@ def _load_adapters(engines):
     ``engines`` -- no adapter module is imported for a lane nobody selected."""
     adapters = dict.fromkeys(
         ("zimage", "ltx", "sa3", "sd15", "lumina", "ideogram", "flux", "ltx25",
-         "animatediff", "minimax_h3"))
+         "animatediff", "minimax_h3", "humo"))
     if "z_image_turbo" in engines:
         from ._otr_image_engines import z_image_turbo
         adapters["zimage"] = z_image_turbo
@@ -1137,7 +1191,8 @@ def _load_adapters(engines):
         adapters["flux"] = FluxGen1ImageEngine()
     for key, family in (("animatediff", _ANIMATEDIFF_WEIGHT_ENGINES),
                         ("ltx25", _LTX25_WEIGHT_ENGINES),
-                        ("minimax_h3", _MINIMAX_H3_WEIGHT_ENGINES)):
+                        ("minimax_h3", _MINIMAX_H3_WEIGHT_ENGINES),
+                        ("humo", _HUMO_WEIGHT_ENGINES)):
         if engines & family:
             from . import _otr_video_engines  # noqa: F401 -- registers built-ins
             from ._otr_video_engines import registry as _vreg

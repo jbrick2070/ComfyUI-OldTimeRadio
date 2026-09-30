@@ -315,8 +315,16 @@ def test_only_the_pinned_sources_carry_a_pin():
         ("vae", "flux2-vae.safetensors"),
         ("checkpoints", "flux1-dev-fp8.safetensors"),
     }
+    humo = {
+        ("diffusion_models", "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"),
+        ("diffusion_models", "humo_1.7B_fp16.safetensors"),
+        ("text_encoders", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"),
+        ("audio_encoders", "whisper_large_v3_fp16.safetensors"),
+        ("vae", "wan_2.1_vae.safetensors"),
+        ("loras", "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors"),
+    }
     assert pinned == (EXPECTED["minimax_h3_video"] | EXPECTED["minimax_h3_audio_in"]
-                      | writers | images)
+                      | writers | images | humo)
     for key, spec in VA.MANIFEST.items():
         if key in pinned:
             assert set(spec) == {"repo_id", "filename", "revision", "size", "sha256"}

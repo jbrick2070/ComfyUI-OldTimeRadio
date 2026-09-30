@@ -776,6 +776,21 @@ class HuMoEngine(_MC.MotionEngineBase):
                 "OTR_HUMO_AUDIO_ENCODER_NAME", "whisper_large_v3_fp16.safetensors"),
         }
 
+    def _weight_tokens(self):
+        """``[(folder, filename), ...]`` for every file this tier's loader nodes
+        open (UNETLoader, CLIPLoader, VAELoader, AudioEncoderLoader, and the
+        LoRA unless this tier runs LoRA-free) -- what the queue-time preflight
+        in ``_otr_visual_assets`` fetches, read from the same
+        :meth:`_loader_names` the graph is built from."""
+        names = self._loader_names()
+        tokens = [("diffusion_models", names["unet"]),
+                  ("text_encoders", names["clip"]),
+                  ("vae", names["vae"]),
+                  ("audio_encoders", names["whisper"])]
+        if not self._lora_is_skipped(names["lora"]):
+            tokens.append(("loras", names["lora"]))
+        return tokens
+
     def _native_dims(self):
         """HuMo's render size from this engine's ``render_aspect``: 'portrait'
         480x832 (the classic talking-head pillarbox, humo_1.7B) or 'wide' 832x480

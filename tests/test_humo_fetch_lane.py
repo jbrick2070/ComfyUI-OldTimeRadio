@@ -56,10 +56,10 @@ def test_humo_lane_has_one_exact_receipt_per_artifact():
             "033a4e487f60220b3d6e469599a6aebc46e13cee", 17_892_294_098,
             "a67ed82a7c008892f9192cdc5b23bbfe2e2a8e2f87d0b5b8dfb0226fafec022d"),
         fetcher.WeightSpec(
-            "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
-            "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+            "theunlikely/wan2.1-i2v-720p-fp8",
+            "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
             "text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-            "617a7633e636506f850e043bc4605f290a466a8e", 6_735_906_897,
+            "b62c979714abecaa67814d8b9d081804ec508f0f", 6_735_906_897,
             "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68"),
         fetcher.WeightSpec(
             "Comfy-Org/HuMo_ComfyUI",

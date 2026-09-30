@@ -1,7 +1,7 @@
-"""Ideogram 4 and Flux.1-dev fetch their own weights at queue time.
+"""Ideogram 4, Flux.1-dev and HuMo fetch their own weights at queue time.
 
 Operator, 2026-09-29: "all of our models should be auto-download ability".
-Both engines refused on a fresh install with "missing: ..." and nothing able
+These engines refused on a fresh install with "missing: ..." and nothing able
 to fetch the files. Each now asks its own adapter which files it will load,
 and the queue-time preflight downloads exactly those, pinned by SHA-256.
 
@@ -99,3 +99,38 @@ def test_a_flux_override_with_no_allowlisted_download_refuses(monkeypatch):
     monkeypatch.setenv("OTR_FLUX_CKPT", "some-other-flux.safetensors")
     with pytest.raises(VA.VisualAssetError, match="no allowlisted download"):
         VA.planned_downloads({"flux_gen1"})
+
+
+_HUMO_SHARED = {
+    ("text_encoders", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"),
+    ("vae", "wan_2.1_vae.safetensors"),
+    ("audio_encoders", "whisper_large_v3_fp16.safetensors"),
+}
+_HUMO_14B = _HUMO_SHARED | {
+    ("diffusion_models", "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"),
+    ("loras", "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors"),
+}
+_HUMO_17B = _HUMO_SHARED | {("diffusion_models", "humo_1.7B_fp16.safetensors")}
+
+
+@pytest.fixture
+def no_humo_env(monkeypatch):
+    for name in ("OTR_HUMO_CKPT", "OTR_HUMO_UNET_NAME", "OTR_HUMO_LORA_NAME",
+                 "OTR_HUMO_CLIP_NAME", "OTR_HUMO_VAE_NAME", "OTR_HUMO_AUDIO_ENCODER_NAME",
+                 "OTR_HUMO_17B_CKPT", "OTR_HUMO_17B_UNET_NAME", "OTR_HUMO_17B_LORA_NAME"):
+        monkeypatch.delenv(name, raising=False)
+
+
+@pytest.mark.parametrize("engine,expected", [
+    ("humo", _HUMO_14B), ("humo_14B_169", _HUMO_14B),
+    ("humo_1.7B", _HUMO_17B), ("humo_1.7B_169", _HUMO_17B),
+])
+def test_each_humo_tier_fetches_exactly_what_its_loaders_open(no_humo_env, engine, expected):
+    """The 1.7B tiers run LoRA-free, so they never pull the 14B LoRA or DiT."""
+    assert VA.planned_downloads({engine}) == expected
+
+
+def test_every_humo_file_is_pinned():
+    for key in _HUMO_14B | _HUMO_17B:
+        spec = VA.MANIFEST[key]
+        assert set(spec) == {"repo_id", "filename", "revision", "size", "sha256"}, key

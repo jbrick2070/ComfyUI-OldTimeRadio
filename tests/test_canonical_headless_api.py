@@ -387,8 +387,20 @@ def test_video_lane_sets_the_three_video_dropdowns_as_the_app_does(tmp_path):
 
 
 def test_video_lane_warns_when_nothing_checks_the_lanes_weights(tmp_path):
-    """HuMo is in the dropdown but the pack does not download it, so no
-    preflight checks its weights; the runner must say so, not imply one does."""
+    """The mesh stage is in the dropdown but the pack does not download it, so
+    no preflight checks its weights; the runner must say so, not imply one does."""
+    rc, out = _run_main([
+        "--offline-schemas", "--dry-run",
+        "--profile", "otr_16gb_video",
+        "--video-lane", "mesh_stage",
+        "--dump-prompt", str(tmp_path / "prompt.json"),
+    ])
+    assert rc == 0
+    assert "nothing checks its weights before the run" in out
+
+
+def test_video_lane_says_the_preflight_fetches_humo(tmp_path):
+    """HuMo downloads itself since 2026-09-29; the 1.7B tier's four files."""
     rc, out = _run_main([
         "--offline-schemas", "--dry-run",
         "--profile", "otr_16gb_video",
@@ -396,7 +408,7 @@ def test_video_lane_warns_when_nothing_checks_the_lanes_weights(tmp_path):
         "--dump-prompt", str(tmp_path / "prompt.json"),
     ])
     assert rc == 0
-    assert "nothing checks its weights before the run" in out
+    assert "downloads and checks its 4 weight file(s)" in out
 
 
 def test_video_lane_applies_after_a_machine_key_too(tmp_path):

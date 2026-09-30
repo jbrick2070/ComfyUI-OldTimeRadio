@@ -59,8 +59,8 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 | `ltx25_foley_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_high_video` | **auto** | 25.4 GiB | measured | measured | not offered | ? | not offered |
 | `ltx25_mime_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
-| `humo14_high_audio_in_portrait` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `humo14_high_audio_in_wide` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo14_high_audio_in_portrait` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo14_high_audio_in_wide` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `ltx25_audio_in_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_foley_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `ltx25_mime_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
