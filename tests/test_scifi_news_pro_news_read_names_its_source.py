@@ -87,6 +87,105 @@ def test_both_findings_arrive_together_so_one_retry_can_fix_both():
     assert "names invented characters" in finding
 
 
+# --------------------------------------------------------------------------- #
+# The source's names as the episode's own script writes them (PBUG-20260929-06)
+# --------------------------------------------------------------------------- #
+def test_a_hindi_close_naming_the_source_in_devanagari_passes():
+    """The 2026-09-29 soak, twice: "एमआईटी न्यूज के अनुसार, एमआईटी के इंजीनियरों
+    ने..." names MIT News and MIT and was refused, because the check knew only
+    the Latin spellings. With the spellings this language writes, it passes."""
+    dossier = _dossier(people=["Markus Buehler"], places=["MIT"])
+    close = _read("एमआईटी न्यूज के अनुसार, एमआईटी के इंजीनियरों ने एक एआई मॉडल विकसित किया है।")
+    without = F2._make_news_read_validator(
+        dossier, [], provenance={"link": "https://news.mit.edu/2026/x"}, language_iso="hi")
+    assert without(close) is not None
+    with_names = F2._make_news_read_validator(
+        dossier, [], provenance={"link": "https://news.mit.edu/2026/x"}, language_iso="hi",
+        native_names={"MIT": ["एमआईटी"], "Markus Buehler": ["मार्कस बुहलर"]})
+    assert with_names(close) is None
+
+
+def test_a_real_person_written_in_katakana_is_not_refused_as_fiction():
+    """2026-09-29: the cast borrowed the real Jonathan Bow as ジョナサン・ボウ
+    and the factual close naming him was refused as invention, because the
+    exemption held only the Latin spelling."""
+    dossier = _dossier(people=["Jonathan Bow"], things=["BBC"])
+    check = F2._make_news_read_validator(
+        dossier, ["ジョナサン・ボウ"], provenance={"link": "https://www.bbc.co.uk/news/x"},
+        language_iso="ja", native_names={"Jonathan Bow": ["ジョナサン・ボウ"]})
+    assert check(_read("BBCニュースによると、ジョナサン・ボウ氏が化石を発見した。")) is None
+
+
+def test_a_native_spelling_never_widens_the_source_gate_for_english():
+    """English closes are held to the dossier's own names; a native spelling
+    is only ever an extra way to match, never a substitute for the gate."""
+    check = F2._make_news_read_validator(
+        _dossier(places=["MIT"]), [], native_names={"MIT": ["एमआईटी"]})
+    assert check(_read("Scientists continue to study the phenomenon.")) is not None
+
+
+@pytest.mark.parametrize("value,ok", [
+    ("एमआईटी", True),
+    ("ジョナサン・ボウ", True),
+    ("ボウ", True),
+    ("マサチューセッツ工科大学", True),
+    ("MIT", False),                 # Latin: the dossier's own anchor already
+    ("研究者", False),               # three Han characters: an ordinary word
+    ("土星", False),                 # two Han characters
+    ("", False),
+    ("エ", False),                   # one letter
+    ("エ" * 61, False),
+])
+def test_native_name_ok(value, ok):
+    assert F2._native_name_ok(value) is ok
+
+
+def test_native_names_pass_keeps_only_asked_names_and_sound_spellings(monkeypatch):
+    """Python judges the reply: a name nobody asked for, a Latin spelling and
+    a three-character Han word are dropped; at most three spellings survive."""
+    replies = F2.NativeNames(rows=[
+        F2.NativeNameRow(name="MIT", spellings=["एमआईटी", "MIT", "एम.आई.टी.", "एमआइटी", "एमआईटी", "एम आई टी"]),
+        F2.NativeNameRow(name="mit", spellings=["एमआईटी"]),
+        F2.NativeNameRow(name="Stranger", spellings=["अजनबी"]),
+        F2.NativeNameRow(name="Jonathan Bow", spellings=["研究者", ""]),
+    ])
+    monkeypatch.setattr(F2, "structured_call", lambda **kw: replies)
+    out = F2._pass_native_names(
+        lambda *a, **k: "", _dossier(people=["Jonathan Bow"], places=["MIT"]),
+        {"link": "https://news.mit.edu/2026/x"}, language_label="Hindi")
+    # The outlet label "mit" and the place "MIT" are one name.
+    assert out == {"MIT": ["एमआईटी", "एम.आई.टी.", "एमआइटी"]}
+
+
+def test_native_names_pass_degrades_to_nothing_on_failure(monkeypatch):
+    def boom(**kw):
+        raise RuntimeError("no model")
+    monkeypatch.setattr(F2, "structured_call", boom)
+    assert F2._pass_native_names(
+        lambda *a, **k: "", _dossier(places=["MIT"]), {}, language_label="Hindi") == {}
+
+
+def test_native_names_pass_asks_nothing_without_names():
+    calls = []
+    def never(**kw):
+        calls.append(kw)
+    assert F2._pass_native_names(never, _dossier(numbers=["17.2"]), {}, language_label="Hindi") == {}
+    assert calls == []
+
+
+def test_the_runner_asks_for_native_spellings_before_the_close_and_hands_them_over():
+    """A helper nothing calls is this repo's most repeated defect: the call
+    must sit in run_scifi_news_pro_episode, before the news read, and the news
+    read must receive its result."""
+    import inspect
+    src = inspect.getsource(F2.run_scifi_news_pro_episode)
+    ask = src.index("_pass_native_names(")
+    close = src.index("_pass_news_read(")
+    assert ask < close
+    assert "native_names=native_names" in src[close:close + 600]
+    assert "_NATIVE_SCRIPT_ISOS" in src[:ask]
+
+
 def test_an_empty_dossier_does_not_accuse():
     """A close is only asked to name a source when a source was indexed."""
     check = F2._make_news_read_validator(_dossier(), [])
@@ -171,7 +270,8 @@ def test_cast_names_never_reach_the_model_only_the_validator():
     source = " ".join(inspect.getsource(F2._pass_news_read).split())
     assert "FICTIONAL CAST NAMES" not in source
     assert ("post_validator=_make_news_read_validator( dossier, cast_names, "
-            "provenance=provenance, language_iso=language_iso)") in source
+            "provenance=provenance, language_iso=language_iso, "
+            "native_names=native_names)") in source
 
 
 # --------------------------------------------------------------------------- #
@@ -255,7 +355,10 @@ def test_the_episode_language_reaches_the_close_check():
     import inspect
 
     source = " ".join(inspect.getsource(F2.run_scifi_news_pro_episode).split())
-    # The whole call: the same keyword also reaches the cameo roll above it.
+    # The whole call. The iso is read once into a local (2026-09-30) that the
+    # native-spellings pass and the close both use; the cameo roll above them
+    # reads the same stamp.
+    assert "language_iso = _EPLANG.iso_from_meta(meta)" in source
     assert ("read = _pass_news_read( fn, pack, dossier, provenance, source_preview, "
             "cast_names, language_instruction=language_instruction, "
-            "language_iso=_EPLANG.iso_from_meta(meta), )") in source
+            "language_iso=language_iso, native_names=native_names, )") in source

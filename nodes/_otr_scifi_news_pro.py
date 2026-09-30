@@ -2163,7 +2163,8 @@ def _native_close_extra_anchors(dossier: DossierLLM,
 
 def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]", *,
                               provenance: "Mapping[str, str] | None" = None,
-                              language_iso: str = "en"):
+                              language_iso: str = "en",
+                              native_names: "Mapping[str, Sequence[str]] | None" = None):
     """The source-attribution gate this pass shipped without.
 
     P6's codex twin has verified and cleaned its coda since it was built;
@@ -2204,8 +2205,18 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]", *,
     # García" exempted "jos" and "garc", and a Spanish close naming García
     # was refused as invention. Both sides are NFKC first, so a name written
     # with a separate combining accent still equals its composed spelling.
+    #
+    # The source's names as the episode's own script writes them
+    # (`_pass_native_names`) are attested too: a real person the cast
+    # borrowed is written in katakana in a Japanese close, and the Latin
+    # anchor alone could not vouch for him (the katakana refusal of
+    # 2026-09-29).
+    native = tuple(dict.fromkeys(
+        unicodedata.normalize("NFKC", str(r or "")).strip()
+        for rs in (native_names or {}).values() for r in rs
+        if str(r or "").strip()))
     _source_attested = set()
-    for _a in anchors:
+    for _a in anchors + native:
         _a = unicodedata.normalize("NFKC", str(_a or "").strip())
         if not _a:
             continue
@@ -2237,7 +2248,10 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]", *,
     if anchors and str(language_iso or "").strip().lower() not in ("", _EPLANG.ENGLISH_ISO):
         extra = tuple(a for a in _native_close_extra_anchors(dossier, provenance)
                       if a.casefold() not in {x.casefold() for x in anchors})
-    looked_for = anchors + extra
+    # A native spelling names the source as surely as the Latin one, in a
+    # close that writes nothing in Latin letters.
+    looked_for = anchors + extra + tuple(
+        n for n in native if n.casefold() not in {x.casefold() for x in anchors + extra})
     anchor_patterns = [_anchor_re(_folded_for_matching(a)) for a in looked_for]
 
     def _check(read: NewsCloseRead) -> "str | None":
@@ -2281,6 +2295,7 @@ def _pass_news_read(
     cast_names: "list[str]",
     language_instruction: str = "",
     language_iso: str = "en",
+    native_names: "Mapping[str, Sequence[str]] | None" = None,
 ) -> NewsCloseRead:
     """Author one source-grounded factual close through a typed ladder."""
     # `cast_names` is NOT listed here (PBUG-20260824-01 Class B). The
@@ -2298,6 +2313,14 @@ def _pass_news_read(
         + "\n\nBOUNDED SOURCE PREVIEW (names and numbers may be quoted; "
         + "the dossier above owns complete-source coverage):\n"
         + digest
+        + (
+            # The source's names as this language writes them, so the close
+            # names its source in a spelling the check can find.
+            "\n\nSOURCE NAMES IN THIS LANGUAGE (write them this way):\n"
+            + json.dumps({k: list(v) for k, v in native_names.items()},
+                         ensure_ascii=False, indent=2)
+            if native_names else ""
+        )
         + "\n\nWrite the closing news read now."
     )
     try:
@@ -2318,7 +2341,8 @@ def _pass_news_read(
             structural_retry_temperature=0.10,
             repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_make_news_read_validator(
-                dossier, cast_names, provenance=provenance, language_iso=language_iso),
+                dossier, cast_names, provenance=provenance, language_iso=language_iso,
+                native_names=native_names),
             max_new_tokens=None,
             helper_name="scifi_news_pro_news_read",
         )
@@ -2424,6 +2448,155 @@ def _pass_cast_aliases(technical_fn, pack, treatment: Treatment,
                     ANNOUNCER_NAME)]
         if keep:
             out.setdefault(name, []).extend(keep)
+    return out
+
+
+#: The episode languages whose closing read writes EVERY source name in its
+#: own script -- MIT as एमआईटी, Jonathan Bow as ジョナサン・ボウ -- so the
+#: source check has no Latin spelling to match (PBUG-20260929-06). Mandarin is
+#: not here: its closes kept "ScienceDaily" and "BBC" in Latin letters and pass
+#: on the outlet anchor. Spanish, French, Italian and Portuguese write names
+#: as the source does.
+_NATIVE_SCRIPT_ISOS = frozenset({"hi", "ja"})
+
+#: The pass's prompt lives here, not in the pack: a new key in the frozen
+#: scifi_news_pro pack JSON would change the pack every embedded receipt pins.
+_NATIVE_NAMES_SYSTEM = (
+    "You transliterate source names for a radio news read. You are given the "
+    "episode's language and a list of names from a science news source: "
+    "people, places, institutions and publications. For each name, write how "
+    "a {language} news reader would WRITE it in the {language} script, by "
+    "sound -- a transliteration, the way a {language} newspaper prints a "
+    "foreign name. Give one to three spellings per name, the most common "
+    "first. Do not translate a name into an ordinary word, do not add titles, "
+    "and do not return a name that is not in the list. Return each name "
+    "exactly as given, with its spellings."
+)
+
+
+class NativeNameRow(BaseModel):
+    """One source name and how the episode's script writes it."""
+
+    name: str
+    spellings: "list[str]" = Field(default_factory=list)
+
+
+class NativeNames(BaseModel):
+    """Every source name the close may be checked for, in the episode's script."""
+
+    rows: "list[NativeNameRow]" = Field(default_factory=list)
+
+
+def _is_han(ch: str) -> bool:
+    code = ord(ch)
+    return (0x4E00 <= code <= 0x9FFF or 0x3400 <= code <= 0x4DBF
+            or 0xF900 <= code <= 0xFAFF or 0x20000 <= code <= 0x3FFFF)
+
+
+def _native_name_ok(text: str) -> bool:
+    """A spelling the close may be checked for: non-empty, at most 60
+    characters, written with letters outside ASCII (a Latin spelling is the
+    dossier's own anchor already), at least two letters, and never three or
+    fewer Han characters -- 研究者 ("researchers") is an ordinary word a close
+    naming nothing could contain, while a two-kana ボウ or a Devanagari
+    एमआईटी is a transliteration and nothing else."""
+    value = unicodedata.normalize("NFKC", str(text or "")).strip()
+    if not value or len(value) > 60:
+        return False
+    letters = [ch for ch in value if unicodedata.category(ch).startswith("L")]
+    if len(letters) < 2 or all(ch.isascii() for ch in letters):
+        return False
+    han = [ch for ch in letters if _is_han(ch)]
+    if len(han) == len(letters) and len(han) <= 3:
+        return False
+    return True
+
+
+def _pass_native_names(technical_fn, dossier: DossierLLM,
+                       provenance: "Mapping[str, str] | None", *,
+                       language_label: str,
+                       language_instruction: str = "") -> "dict[str, list[str]]":
+    """How the episode's script writes the source's names (PBUG-20260929-06).
+
+    A Hindi or Japanese close transliterates every name -- "एमआईटी न्यूज के
+    अनुसार" is MIT News -- and the source check knew only the dossier's Latin
+    spellings, so a close that named its source correctly was refused twice
+    and the episode died (two of the 2026-09-29 soak's 57 legs, its only
+    failure). The repair prompt had already shown the model the Latin anchors
+    and it transliterated again, as the language row tells it to; a sentence
+    asking it to keep Latin spellings loses that fight. So the spellings are
+    asked for once, from the technical model, and become both the vocabulary
+    the close is written with and the strings the check looks for.
+
+    A SIDE DICT, NOT A DOSSIER FIELD (design contrarian, 2026-09-30): the
+    dossier's dump is the pitch, treatment and news-read prompt and the
+    coverage hash, so a new field would change every episode's prompts, and
+    a multi-window merge rebuilds the dossier from its four fields and would
+    drop it. TRANSLITERATIONS ONLY: the check accepts any one anchor, and a
+    translation ("researchers") is an ordinary word.
+
+    Best-effort by construction, like the cast-alias pass: a failure degrades
+    to the dossier's own anchors, never to a refusal. Python judges the reply:
+    only names that were asked for, only spellings that pass
+    :func:`_native_name_ok`, at most three each.
+    """
+    entities = dossier.named_entities
+    wanted: "list[str]" = []
+    for bucket in (entities.people, entities.places, entities.things):
+        for raw in bucket:
+            name = str(raw or "").strip()
+            if len(name) >= 3:
+                wanted.append(name)
+    outlet = _outlet_label((provenance or {}).get("link", ""))
+    if outlet:
+        wanted.append(outlet)
+    # One entry per name however it is cased: the outlet label "mit" and the
+    # place "MIT" are one name, spelled the dossier's way.
+    by_key: "dict[str, str]" = {}
+    for name in wanted:
+        by_key.setdefault(unicodedata.normalize("NFKC", name).casefold(), name)
+    wanted = list(by_key.values())
+    if not wanted:
+        return {}
+    label = str(language_label or "").strip() or "the episode's"
+    user = (
+        "EPISODE LANGUAGE: " + label
+        + "\n\nSOURCE NAMES:\n" + json.dumps(wanted, ensure_ascii=False, indent=2)
+        + "\n\nWrite each name's " + label + " spellings now."
+    )
+    try:
+        # LLM slot: technical -- spelling judgment, no story content.
+        result = structured_call(
+            prompt=ProviderCapacityMessages([
+                {"role": "system", "content": _EPLANG.lead_system(
+                    _NATIVE_NAMES_SYSTEM.replace("{language}", label),
+                    language_instruction)},
+                {"role": "user", "content": user},
+            ]),
+            schema=NativeNames,
+            slot_fn=technical_fn,
+            base_temperature=0.10,
+            structural_retry_temperature=0.0,
+            repair_prompt_factory=make_dispatching_repair_factory(),
+            max_new_tokens=None,
+            helper_name="scifi_news_pro_native_names",
+        )
+    except Exception as exc:  # noqa: BLE001 -- degrade, never refuse
+        log.warning("[scifi_news_pro] native spellings pass declined (%s); the "
+                    "close is checked on the dossier's own names", exc)
+        return {}
+    out: "dict[str, list[str]]" = {}
+    for row in result.rows:
+        key = by_key.get(unicodedata.normalize("NFKC", str(row.name or "")).strip().casefold())
+        if not key:
+            continue
+        keep: "list[str]" = list(out.get(key, ()))
+        for raw in row.spellings or []:
+            value = unicodedata.normalize("NFKC", str(raw or "")).strip()
+            if _native_name_ok(value) and value not in keep:
+                keep.append(value)
+        if keep:
+            out[key] = keep[:3]
     return out
 
 
@@ -5133,12 +5306,31 @@ def run_scifi_news_pro_episode(
         receipt("cast_aliases", technical_model, box["calls"], 0.10, None)
     f2["cast_aliases"] = {k: list(v) for k, v in cast_aliases.items()}
 
+    # HOW THIS LANGUAGE WRITES THE SOURCE'S NAMES. One small technical call,
+    # only for a script that transliterates them (Hindi, Japanese), only when
+    # the dossier has names to check the close for; the spellings go to the
+    # close's prompt and to its source check (PBUG-20260929-06).
+    language_iso = _EPLANG.iso_from_meta(meta)
+    native_names: "dict[str, list[str]]" = {}
+    if language_iso in _NATIVE_SCRIPT_ISOS and _news_read_source_anchors(dossier):
+        language_row = _EPLANG.row_by_iso(language_iso)
+        fn, box = _counting(technical_fn)
+        with _helper_ctx(slot_scheduler, "scifi_news_pro_native_names"):
+            native_names = _pass_native_names(
+                fn, dossier, provenance,
+                language_label=getattr(language_row, "label", "") or language_iso,
+                language_instruction=language_instruction)
+        if box["calls"]:
+            receipt("native_names", technical_model, box["calls"], 0.10, None)
+        f2["native_names"] = {k: list(v) for k, v in native_names.items()}
+
     fn, box = _counting(technical_fn)
     with _helper_ctx(slot_scheduler, "scifi_news_pro_news_read"):
         read = _pass_news_read(
             fn, pack, dossier, provenance, source_preview, cast_names,
             language_instruction=language_instruction,
-            language_iso=_EPLANG.iso_from_meta(meta),
+            language_iso=language_iso,
+            native_names=native_names,
         )
     receipt("news_read", technical_model, box["calls"], 0.20, None)
     treatment = treatment.model_copy(

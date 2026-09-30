@@ -125,4 +125,6 @@ def test_internal_receipt_passes_take_no_rule(fn):
 def test_the_runner_reads_the_stamp_once_and_hands_it_to_the_five_spoken_passes():
     src = inspect.getsource(PRO.run_scifi_news_pro_episode)
     assert "language_instruction = _EPLANG.native_authoring_instruction(meta)" in src
-    assert src.count("language_instruction=language_instruction") == 5
+    # The five spoken passes, plus the native-spellings pass (2026-09-30),
+    # which writes the source's names in the episode's own script.
+    assert src.count("language_instruction=language_instruction") == 6
