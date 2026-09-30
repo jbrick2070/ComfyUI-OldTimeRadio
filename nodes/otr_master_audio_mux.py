@@ -190,6 +190,14 @@ def _canvas_preview(final_path: str, obs_copy) -> dict:
         playable = _served_output_ref(obs_copy or final_path)
         if playable:
             ui["video"] = [playable]
+            # THE SAME FILE UNDER THE KEY THE API READS (2026-09-30). The
+            # Comfy API v2 (comfy-api-proxy 0.1.6, the bridge the Comfy SDK
+            # talks to) turns a history entry into a downloadable output only
+            # for the keys "images", "gifs" and "audio"; "video" is invisible
+            # to it, so an SDK caller's job.get_outputs("85") saw the poster
+            # frame and not the episode. "gifs" is what OTR_SignalLostVideo
+            # already uses for its silent cut and what the frontend plays.
+            ui["gifs"] = [dict(playable)]
         try:
             import folder_paths  # ComfyUI's own; absent under bare pytest
             temp_dir = folder_paths.get_temp_directory()
