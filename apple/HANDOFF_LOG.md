@@ -1676,3 +1676,22 @@ the live version.
 - Runbook and scripts: tmp/sdk_demo/README.md, otr_sdk_demo.py,
   fetch_outputs.py (reattach to a finished job), the two API-format graphs.
 - Platform observations for the Comfy call, in the README's last section.
+
+## 2026-09-30 13:20 -- a stranger's app: the Comfy SDK drives a cold install to a finished episode
+
+- **The 4060, from an empty model store** (every weight moved aside at
+  12:18; pack on main with 04329e1e), the only driver Comfy's SDK through
+  Comfy's bridge (comfy-sdk 0.4.0 and comfy-api-proxy 0.1.6 installed into
+  the portable's own Python 3.13): server booted in 96 s, the 8 GB workflow
+  exported in API format by the pack's runner (--dry-run), bridge on :8189,
+  `client.submit` at 12:19:53. The pack's queue-time preflight downloaded and
+  verified the five files the workflow needs, 10.9 GB in about 3.5 minutes
+  (Stable Audio 3 base and its text encoder, SD 1.5, the AnimateDiff v3
+  adapter, the Gemma 4 E2B writer), wrote, voiced and rendered the one-act
+  episode (AnimateDiff haunted lane), and the job succeeded after 35.7 min.
+  `job.get_outputs("85")` saved the published episode, 67,064,389 bytes, and
+  its poster. Kit: C:\OTR-CleanRoom\sdk_prep.ps1, sdk_test.py, sdk_test.cmd
+  (task OTR_sdk_test); log C:\OTR-CleanRoom\sdk_test\sdk_test.log.
+- So the self-hosted story holds for someone else's machine: install
+  ComfyUI and the pack, add the bridge, and an app that only speaks the SDK
+  gets a finished episode, with the models arriving on their own.
