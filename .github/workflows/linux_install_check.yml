@@ -1,0 +1,69 @@
+name: Linux install check
+
+# Proves that `pip install -r requirements.txt` resolves and installs on a
+# headless Linux Python, the shape Comfy-Org's node-pack-extract container
+# uses to read the published node list. Runs on every push that touches the
+# requirements, and by hand with an optional list of extra packages to try
+# BEFORE they are declared (2026-09-29: the Japanese and Mandarin phonemizer
+# libraries, proven here because the operator no longer has a Mac and a Linux
+# box is what the registry extractor is).
+on:
+  workflow_dispatch:
+    inputs:
+      extra:
+        description: "extra pip specs to install alongside requirements.txt"
+        required: false
+        default: ""
+      python:
+        description: "Python version"
+        required: false
+        default: "3.13"
+  push:
+    branches:
+      - main
+    paths:
+      - "requirements.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ github.event.inputs.python || '3.13' }}
+      - name: Install the pack's requirements (plus any extras)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt ${{ github.event.inputs.extra }}
+      - name: Import the voice-language libraries that are present
+        run: |
+          python - <<'EOF'
+          import importlib, sys
+          print(sys.version)
+          for name in ("kokoro_onnx", "phonemizer", "unidic_lite", "fugashi", "jaconv",
+                       "jieba", "pypinyin", "cn2an", "ordered_set"):
+              try:
+                  importlib.import_module(name)
+                  print("OK      ", name)
+              except Exception as exc:  # noqa: BLE001
+                  print("MISSING ", name, "--", type(exc).__name__, exc)
+          EOF
+      - name: The Japanese and Mandarin phonemizers start
+        run: |
+          python - <<'EOF'
+          import importlib.util
+          have = all(importlib.util.find_spec(n) for n in ("fugashi", "jaconv", "jieba", "pypinyin", "cn2an", "ordered_set"))
+          if not have:
+              print("phonemizer libraries not installed in this run; skipped")
+              raise SystemExit(0)
+          import fugashi, unidic_lite
+          tagger = fugashi.Tagger("-d " + unidic_lite.DICDIR)
+          print("fugashi words:", [w.surface for w in tagger("海の水は塩辛い")])
+          import jieba, pypinyin, cn2an
+          print("jieba words:", list(jieba.cut("海水是咸的")))
+          print("pinyin:", pypinyin.lazy_pinyin("海水"), "cn2an:", cn2an.cn2an("三百二十"))
+          EOF
