@@ -153,7 +153,10 @@ below only to repair an install that lost them:
 <ComfyUI Python> -m pip install fugashi jaconv unidic-lite        # Japanese on Python 3.13 (repair)
 ```
 
-Use only the line for the language you need.
+Use only the line for the language you need. One edge: on 3.10 - 3.12 with
+`OTR_KOKORO_BACKEND=onnx` forced, Kokoro uses the pack's copy and needs the
+3.13 lines, which the requirements do not install there; the refusal names
+them.
 
 ---
 

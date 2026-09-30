@@ -69,6 +69,25 @@ def test_kokoro_onnx_is_the_313_backend_and_is_bounded_below_314():
             % (version, installs))
 
 
+@pytest.mark.parametrize("package", ["fugashi", "jaconv", "jieba", "pypinyin", "cn2an",
+                                     "ordered-set"])
+def test_the_phonemizer_libraries_track_the_onnx_window(package):
+    """The six libraries under the pack's copy of misaki install exactly where
+    kokoro-onnx does (2026-09-29, PBUG-20260929-10): on 3.13 the ONNX Kokoro
+    phonemizes Japanese and Mandarin with them; on 3.12 the torch Kokoro uses
+    misaki's own extras and they would be an English-install tax; on 3.14
+    nothing speaks yet."""
+    reqs = _parsed()
+    assert package in reqs, "%s is the 3.13 Japanese/Mandarin phonemizer library" % package
+    marker = reqs[package].marker
+    onnx = reqs["kokoro-onnx"].marker
+    assert marker is not None, "%s must carry kokoro-onnx's python_version marker" % package
+    for version in ("3.12", "3.13", "3.14"):
+        env = {"python_version": version}
+        assert marker.evaluate(env) is onnx.evaluate(env), (
+            "%s installs on %s differently from kokoro-onnx" % (package, version))
+
+
 @pytest.mark.parametrize("python_version", ["3.12", "3.13"])
 def test_requirements_resolve_to_a_nonempty_set_on_shipped_interpreters(python_version):
     """A marker may exclude a line on an interpreter; it must never exclude
