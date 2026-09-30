@@ -141,13 +141,16 @@ anything past 510 phonemes; a run of spaces becomes one pause; a symbol the
 model has no sound for can pick a neighbouring style row; and a line with
 nothing speakable in it is a quarter second of silence on both.
 
-Install one with ComfyUI's own Python before selecting that row:
+On Python 3.13 the libraries both rows need install with the pack's
+requirements, so nothing is added by hand. On 3.10 - 3.12 install one with
+ComfyUI's own Python before selecting that row, and on 3.13 use the lines
+below only to repair an install that lost them:
 
 ```text
-<ComfyUI Python> -m pip install "misaki[ja]"
-<ComfyUI Python> -m pip install "misaki[zh]"
-<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set     # Mandarin on Python 3.13
-<ComfyUI Python> -m pip install fugashi jaconv unidic-lite        # Japanese on Python 3.13
+<ComfyUI Python> -m pip install "misaki[ja]"                       # Japanese on Python 3.10 - 3.12
+<ComfyUI Python> -m pip install "misaki[zh]"                       # Mandarin on Python 3.10 - 3.12
+<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set     # Mandarin on Python 3.13 (repair)
+<ComfyUI Python> -m pip install fugashi jaconv unidic-lite        # Japanese on Python 3.13 (repair)
 ```
 
 Use only the line for the language you need.

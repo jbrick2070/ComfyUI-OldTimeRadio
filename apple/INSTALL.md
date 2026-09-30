@@ -139,8 +139,9 @@ Japanese and Mandarin also need their readiness extras, checked only when
 that language is selected. On 3.10 - 3.12 install the one you need with
 ComfyUI's own Python: `<ComfyUI Python> -m pip install "misaki[ja]"` or
 `<ComfyUI Python> -m pip install "misaki[zh]"`. On 3.13, where misaki does
-not install, the pack carries misaki's code for both and they need its
-libraries instead: `<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set` for
+not install, the pack carries misaki's code for both, and the libraries that
+code needs install with the pack's requirements. If an install lost them:
+`<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set` for
 Mandarin and `<ComfyUI Python> -m pip install fugashi jaconv unidic-lite` for Japanese.
 See [MULTILINGUAL.md](MULTILINGUAL.md).
 

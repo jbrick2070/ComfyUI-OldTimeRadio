@@ -161,6 +161,24 @@ kokoro-onnx>=0.6.1; python_version >= "3.13" and python_version < "3.14"
 # Blast radius: the Japanese row only. No other language row loads MeCab, and
 # the seven non-ja rows rendered unchanged.
 unidic-lite>=1.0.8
+# THE JAPANESE AND MANDARIN PHONEMIZER LIBRARIES (2026-09-29). On Python 3.13
+# Kokoro runs as kokoro-onnx and phonemizes those two rows with the pack's
+# own copy of misaki's code (nodes/_otr_audio_engines/_misaki), which needs
+# these six. They were an install-by-hand extra until the 4060 cold drill: a
+# fresh portable install refused Japanese and Mandarin at Run, and a language
+# roll quietly chose from six languages instead of the eight the dropdown
+# lists. The marker is kokoro-onnx's, so only the interpreter that uses the
+# copy carries them; on 3.12 and earlier the torch kokoro needs misaki[ja] /
+# misaki[zh] instead (apple/MULTILINGUAL.md). fugashi ships wheels for
+# Windows, Linux (x86_64, aarch64) and macOS on 3.13; the other five are pure
+# Python (jieba and unidic-lite as sdists). Proven installing on Windows (the
+# 4060 portable) and Linux (.github/workflows/linux_install_check.yml).
+fugashi>=1.5; python_version >= "3.13" and python_version < "3.14"
+jaconv>=0.4; python_version >= "3.13" and python_version < "3.14"
+jieba>=0.42; python_version >= "3.13" and python_version < "3.14"
+pypinyin>=0.50; python_version >= "3.13" and python_version < "3.14"
+cn2an>=0.5.22; python_version >= "3.13" and python_version < "3.14"
+ordered-set>=4.1; python_version >= "3.13" and python_version < "3.14"
 
 # pyloudnorm was declared NOWHERE -- not here, not in pyproject.toml -- while
 # `scene_sequencer.py` imports it to measure integrated loudness and master

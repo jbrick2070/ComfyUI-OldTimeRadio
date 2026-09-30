@@ -68,6 +68,12 @@ PyYAML>=6.0
 kokoro>=0.7.16; python_version < "3.13"
 kokoro-onnx>=0.6.1; python_version >= "3.13" and python_version < "3.14"
 unidic-lite>=1.0.8
+fugashi>=1.5; python_version >= "3.13" and python_version < "3.14"
+jaconv>=0.4; python_version >= "3.13" and python_version < "3.14"
+jieba>=0.42; python_version >= "3.13" and python_version < "3.14"
+pypinyin>=0.50; python_version >= "3.13" and python_version < "3.14"
+cn2an>=0.5.22; python_version >= "3.13" and python_version < "3.14"
+ordered-set>=4.1; python_version >= "3.13" and python_version < "3.14"
 pyloudnorm>=0.1.1
 pycairo>=1.24; sys_platform == 'win32'
 pillow>=10.0

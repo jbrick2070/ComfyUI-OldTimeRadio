@@ -74,9 +74,10 @@ selects, so that half costs you nothing extra.
 ## Python and voices
 
 3.12 or earlier runs Kokoro on torch and speaks every row. 3.13 runs Kokoro
-through `kokoro-onnx` on the CPU automatically and speaks every language
-(Mandarin needs `pip install jieba pypinyin cn2an ordered-set`, Japanese
-`pip install fugashi jaconv unidic-lite`). 3.14 has no Kokoro build and is refused
+through `kokoro-onnx` on the CPU automatically and speaks every language; the
+Mandarin and Japanese libraries install with the pack (the repair lines, if an
+install lost them: `pip install jieba pypinyin cn2an ordered-set`, `pip install
+fugashi jaconv unidic-lite`). 3.14 has no Kokoro build and is refused
 rather than half working. Details in [INSTALL.md](INSTALL.md#python-versions) and
 [MULTILINGUAL.md](MULTILINGUAL.md).
 

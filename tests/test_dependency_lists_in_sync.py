@@ -89,16 +89,20 @@ def test_torch_is_declared_nowhere():
         assert not offenders, "%s declares torch: %s" % (name, offenders)
 
 
-@pytest.mark.parametrize("package", ["kokoro", "kokoro-onnx", "pycairo", "bitsandbytes"])
+@pytest.mark.parametrize("package", ["kokoro", "kokoro-onnx", "pycairo", "bitsandbytes",
+                                     "fugashi", "jaconv", "jieba", "pypinyin", "cn2an",
+                                     "ordered-set"])
 def test_marker_bearing_lines_carry_the_same_marker_in_both_files(package):
-    """The four lines whose ENVIRONMENT MARKER is the whole point.
+    """The lines whose ENVIRONMENT MARKER is the whole point.
 
-    Each of these has already cost a real install when its marker was absent or
-    differed: kokoro/kokoro-onnx are complementary by Python version (a bare
-    kokoro line made `pip install -r requirements.txt` install NONE of the 18
-    packages on Python 3.13), pycairo is win32-only because there are zero Linux
-    wheels and the sdist build killed the extractor's container boot, and
-    bitsandbytes without its marker blocked macOS entirely.
+    Each of the first four has already cost a real install when its marker was
+    absent or differed: kokoro/kokoro-onnx are complementary by Python version
+    (a bare kokoro line made `pip install -r requirements.txt` install NONE of
+    the 18 packages on Python 3.13), pycairo is win32-only because there are
+    zero Linux wheels and the sdist build killed the extractor's container
+    boot, and bitsandbytes without its marker blocked macOS entirely. The six
+    phonemizer libraries ride kokoro-onnx's marker: they serve the pack's copy
+    of misaki, which only the ONNX backend on 3.13 uses.
     """
     def pick(deps):
         return {d for d in deps if re.match(r"^%s(\W|$)" % re.escape(package), d)}

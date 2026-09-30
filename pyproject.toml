@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.3.16"
+version = "2.3.17"
 description = "Press Queue once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. No account, no API key, nothing paid. Needs an NVIDIA card with 8 GB or more, a 16 GB Apple Silicon Mac, or a CPU (start ComfyUI with --cpu), plus about 25 GB of free disk; the first run fetches roughly 12 GB of models."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -74,6 +74,16 @@ dependencies = [
     # requirements.txt and in code the same day and was unreachable from a
     # registry install until this line existed.
     "unidic-lite>=1.0.8",
+    # The Japanese and Mandarin phonemizer libraries for the ONNX Kokoro on
+    # Python 3.13 (2026-09-29): the pack's copy of misaki's code needs them,
+    # and until this line a fresh Desktop or portable install refused those
+    # two languages at Run. Same marker as kokoro-onnx. Mirrors requirements.txt.
+    "fugashi>=1.5; python_version >= '3.13' and python_version < '3.14'",
+    "jaconv>=0.4; python_version >= '3.13' and python_version < '3.14'",
+    "jieba>=0.42; python_version >= '3.13' and python_version < '3.14'",
+    "pypinyin>=0.50; python_version >= '3.13' and python_version < '3.14'",
+    "cn2an>=0.5.22; python_version >= '3.13' and python_version < '3.14'",
+    "ordered-set>=4.1; python_version >= '3.13' and python_version < '3.14'",
     # pyloudnorm is imported by scene_sequencer to master every episode to
     # -14 LUFS. Its import is try/except with a deliberate fallback, so a
     # missing install does not crash -- it quietly ships a differently

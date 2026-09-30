@@ -102,8 +102,10 @@ ESPEAK_LANGUAGES = {"e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br"}
 
 #: The rows the ONNX backend phonemizes with the pack's own copy of misaki
 #: (``_misaki``), because misaki does not install on Python 3.13: lang_code ->
-#: the modules that copy imports, and the pip line that installs them. Opt-in
-#: per language, like the torch path's misaki extras; never an English tax.
+#: the modules that copy imports, and the pip line that installs them. Since
+#: 2026-09-29 requirements.txt declares all six on 3.13 (a fresh install used
+#: to refuse both rows at Run), so the pip line is the repair for an install
+#: that lost them, not a step every user takes.
 OWN_G2P_MODULES = {"z": ("jieba", "pypinyin", "cn2an", "ordered_set"),
                    "j": ("fugashi", "jaconv", "unidic_lite")}
 OWN_G2P_INSTALL_HINT = {"z": "pip install jieba pypinyin cn2an ordered-set",
