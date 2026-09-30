@@ -1559,3 +1559,40 @@ the live version.
   OFF so a failed leg keeps its whole episode folder for debugging. 120 legs
   max, stops after 8 failures in a row, a 20-minute stall watch. Touch STOP in that
   folder to end it after the current leg.
+
+## 2026-09-29 21:00 -- every local model downloads itself
+
+- **Operator:** "all of our models should be auto-download ability. Non-GGUF.
+  I realize some may be gated." An audit of every local engine found eight
+  families with no automatic fetch; four were plain weight downloads and are
+  now done, all from public ungated repos, each file pinned by revision,
+  size and SHA-256:
+  - **Ideogram 4** (55413147): nvfp4 set on a Blackwell card, fp8 on any
+    other NVIDIA card; an installed precision still wins. Design contrarian
+    Grok (PARTIAL, folded in); Composer HOLDS.
+  - **Flux.1-dev** (55413147): the all-in-one fp8 checkpoint from
+    Comfy-Org/flux1-dev (the 5080's copy has the same SHA-256).
+  - **HuMo, all four tiers** (0bc08d22, 0ac8a438): pins moved from the
+    stripped fetch script into the shipped table; the UMT5 encoder comes from
+    a byte-identical root-level mirror (theunlikely/wan2.1-i2v-720p-fp8)
+    because Comfy-Org's path broke the Windows MAX_PATH budget (165 > 162).
+    Composer PARTIAL -> a full-path OTR_HUMO_*CKPT is now checked against
+    the loader before any download.
+  - **Real-ESRGAN upscaler** (344bc0d1, 362a7410): fetched when the engine
+    loads, not at queue time -- Grok REFUTED the queue-time plan because
+    OTR_SilentComposite is outside the validator's gate walk. Source
+    nateraw/real-esrgan, same SHA-256 as the GitHub release. Composer HOLDS.
+- **The 5080 is unchanged**, measured on its real model paths: all eleven
+  Ideogram, Flux and HuMo files resolve as installed and nothing is fetched.
+- **What a download cannot fix** (left as they are): Chatterbox (its own
+  venv, installer not shipped; the worker pulls weights once the venv
+  exists), IndexTTS2 (not in the published pack at all), the mesh stage
+  (needs Blender), stable_audio_music (a pip package plus a gated
+  stabilityai token; in no workflow). Bark, MusicGen, Whisper and the HF
+  writers already pull from the Hub on first load.
+- **Release:** 2.3.16 is still Pending. These four are user-visible (a
+  fresh install that picks Ideogram, Flux, HuMo or the upscaler now works),
+  so they want 2.3.17 once 2.3.16 goes Active -- the operator's call.
+- **Soak so far** (19:25-20:37): six episodes published (zh, hi, es, es,
+  ja, ja); leg 28 died on the known Hindi news close (PBUG-06, University of
+  Alberta written in Devanagari).
