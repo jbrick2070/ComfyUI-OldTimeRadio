@@ -1627,3 +1627,38 @@ the live version.
   the drill to end; the aside folders on the 4060 (D:\OTR-ColdDrill-aside-
   20260929, C:\OTR-ColdDrill-aside-20260926, ~530 GB) are the operator's to
   delete.
+
+## 2026-09-30 08:10 -- the night's verdicts; the SDK demo for the Comfy call
+
+- **Auto-download (2.3.17) is live-proven on the 4060** from an empty store:
+  every family above the PBUG entries, nine episodes published. HuMo 14B
+  downloads but cannot finish on 8 GB (capped); Ideogram fp8 runs but the
+  model refused every card (its own filter; not chased, operator).
+- **Japanese and Mandarin on 3.13 ship** (PBUG-10 live verify). **The
+  Hindi news close is fixed at the root** (c3dbaa6c, 332655a8; PBUG-06 live
+  verify), and the Japanese proof leg is running.
+- **The 5080 soak**: 60 legs, 36 episodes in eight languages, 2 failures
+  (both the Hindi close, now fixed); ended by STOP at 08:00 for the demo.
+  Its supervisor died once at 00:13 (relaunched as a scheduled task; memory
+  supervisors-run-as-scheduled-tasks).
+- **Comfy SDK demo (for today's call with Comfy's CEO)**: Comfy Cloud's
+  catalog has no OTR nodes, so the cloud path cannot run the show; the
+  self-hosted path can: `comfy-api-proxy` (0.1.6) on :8189 in front of the
+  5080's :8000, `comfy-sdk` (0.4.0) with COMFY_BASE_URL=http://127.0.0.1:8189
+  and no key; the graph is the canonical one exported in API format
+  (tmp/sdk_demo/otr_demo_api.json, one act, English). Script
+  tmp/sdk_demo/otr_sdk_demo.py: submit, stream events, save outputs. Both
+  packages live in a scratch venv this session made; a job was submitted at
+  08:01 behind the Japanese proof (tmp/sdk_demo/demo_run.log). Stop the
+  bridge with `comfy-api-proxy stop` from that venv.
+- **Python 3.10-3.12 Japanese/Mandarin (open row, designed):** Cursor
+  grok-4.7-high on tmp/lang_gauntlet_20260929/problem_japanese_mandarin_py312.md
+  chose B: drop the `>= "3.13"` bound on the six libraries (keep `< "3.14"`),
+  phonemize ja/zh with the pack's misaki copy on the torch path too, and
+  synthesize those two with `KModel(phonemes, ref_s, speed)` (KPipeline has
+  no phoneme input and builds misaki's JAG2P/ZHG2P at construction), with
+  `_pack_copy_lang` counting the copy as ready on the torch path; replicate
+  the 400-character cut and 510-phoneme truncate. A/C refuted (misaki[ja]
+  cannot be declared safely; ONNX-only would take the GPU voice off 3.12).
+  Not built yet; ChatGPT's answer to the same statement is the operator's
+  to bring.

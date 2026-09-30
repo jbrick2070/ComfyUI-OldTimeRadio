@@ -16321,3 +16321,44 @@ not promote it to the Bug Bible on this evidence alone.
   the same fp8 files (the int8 template is the other; neither is
   Blackwell-only). Operator: the 4060 did its job on the download; Ideogram
   on 8 GB is not chased.
+
+## PBUG-20260929-06 -- live verify: the Hindi close names its source in Devanagari and passes
+
+- server on c3dbaa6c + 332655a8 (the 5080 soak relaunched at 04:10), a
+  one-act Hindi scifi_news_pro episode queued behind the soak: the new
+  native-spellings pass ran once (`'scifi_news_pro_native_names' attempt
+  1/3`), the close passed its source check on the first attempt
+  (`'scifi_news_pro_news_read' attempt 1/3`, no PostValidationError), RESULT
+  SUCCESS at 06:53 and published as
+  signal_lost_hi_20260930_042756__cart__l25v__zimg__koko__news__cg412__sa3_final.mp4.
+  Before the fix the same shape had died twice on the soak (legs 28 and 56).
+  The Japanese leg is running behind it. Fixing this exposed a second fault
+  (332655a8): a Devanagari vowel sign is a combining mark, not a letter, so
+  the whole-word boundary let एमआईटी match inside प्रीएमआईटी; the boundary
+  now counts a mark as part of the word.
+- still open, the Latin half of the same rule: the invented-name check keeps
+  `\b`, so in Japanese an invented name written flush against a particle is
+  missed (documented in the validator).
+
+## PBUG-20260929-10 -- live verify: Japanese and Mandarin publish on a fresh Python 3.13 with the shipped libraries
+
+- the 4060 cold drill's after-drill reruns (fresh portable, Python 3.13, the
+  six libraries installed as 2.3.17 declares them, server rebooted): Japanese
+  (shakespeare, otr_8gb_video) RESULT SUCCESS at 05:45, published as
+  dark_whisper_ja_20260930_053131__arch__lx8g__zimg__koko__sspr__cg4e2__sa3_final.mp4;
+  Mandarin (media_archive, otr_8gb_still, Flux rolled) RESULT SUCCESS at
+  06:07, published as card_summer_zh_20260930_055239__vstb__stmo__flg1__koko__marc__cg4e2__sa3_final.mp4.
+  The same two legs had refused at Run at 21:58 and 22:46 the night before.
+
+## 2.3.17 auto-download -- live verify on the 4060 from an empty model store
+
+- Every family fetched itself, verified, and ran or was cut by the 8 GB
+  card's cap: the writer, Stable Audio 3, SD 1.5, AnimateDiff v3 and
+  Lightning, Z-Image, LTX 0.9.8 low, the fp8 Ideogram set (the card-aware
+  pick), Flux.1-dev (17 GB, Mandarin leg above), Lumina (Italian leg,
+  passion_room_it_20260930_050733, published 05:22), HuMo 1.7B (61 GB with
+  its routed LTX 2.5 lane; rendered until the box slept), HuMo 14B (27 GB;
+  capped at 100 min, RESULT FAIL by the drill's cap, not by a download), and
+  the Real-ESRGAN upscaler (fetch-at-load probe: file absent -> fetched and
+  loaded in 5.4 s, PROBE OK). Nine episodes published from nothing across
+  the drill.
