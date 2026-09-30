@@ -441,9 +441,14 @@ class HuMoEngine(_MC.MotionEngineBase):
             os.fspath(model_type_dir("diffusion_models")), name)
         return configured if os.path.exists(configured) else joined
 
+    #: The env knob that pins this tier's DiT by full path. The queue-time
+    #: preflight reads it too, so a pinned path the loader would not open is
+    #: refused before any download.
+    _CKPT_ENV = "OTR_HUMO_CKPT"
+
     def _ckpt_path(self):
         return self._resolve_unet(
-            "OTR_HUMO_CKPT", "OTR_HUMO_UNET_NAME", _HUMO_DEFAULT_UNET)
+            self._CKPT_ENV, "OTR_HUMO_UNET_NAME", _HUMO_DEFAULT_UNET)
 
     def _installed(self):
         """True iff the primary checkpoint exists on disk (no import -- cheap,
@@ -1374,6 +1379,7 @@ class HuMo17BEngine(HuMoEngine):
     #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` -- shared HuMo shape,
     #: portrait REQUIRED for the audio-driven-face lane).
     still_plan = _HUMO_STILL_PLAN
+    _CKPT_ENV = "OTR_HUMO_17B_CKPT"
 
     def _ckpt_path(self):
         # Same resolver as every other tier (lane 2) -- this was a second copy
@@ -1381,7 +1387,7 @@ class HuMo17BEngine(HuMoEngine):
         # The 1.7B lane's own packet is lane 3; it is NOT marked green by this,
         # it just stops carrying a bug lane 1 already paid for.
         return self._resolve_unet(
-            "OTR_HUMO_17B_CKPT", "OTR_HUMO_17B_UNET_NAME", _HUMO_17B_UNET)
+            self._CKPT_ENV, "OTR_HUMO_17B_UNET_NAME", _HUMO_17B_UNET)
 
     def _loader_names(self):
         names = super()._loader_names()

@@ -884,7 +884,10 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
             if lane is None:
                 raise VisualAssetError("HuMo adapter for %s is unavailable" % eid)
             for category, token in lane._weight_tokens():
-                add(category, token)
+                # A DiT pinned by full path must be the file the loader opens.
+                explicit = (str(env.get(lane._CKPT_ENV) or "")
+                            if category == "diffusion_models" else "")
+                add(category, token, explicit=explicit)
     if writer_models:
         lookup = _native_writer_lookup()
         if lookup is None:

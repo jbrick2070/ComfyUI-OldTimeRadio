@@ -130,6 +130,26 @@ def test_each_humo_tier_fetches_exactly_what_its_loaders_open(no_humo_env, engin
     assert VA.planned_downloads({engine}) == expected
 
 
+@pytest.mark.parametrize("engine,env_var", [("humo", "OTR_HUMO_CKPT"),
+                                            ("humo_1.7B", "OTR_HUMO_17B_CKPT")])
+def test_a_humo_dit_pinned_by_a_path_the_loader_would_not_open_refuses(
+        no_humo_env, monkeypatch, tmp_path, engine, env_var):
+    """Composer QA on 0bc08d22: a full-path OTR_HUMO_*CKPT passes HuMo's own
+    presence check while UNETLoader opens the basename through folder_paths.
+    The preflight now compares the two before any download."""
+    elsewhere = tmp_path / "elsewhere" / "my_humo.safetensors"
+    elsewhere.parent.mkdir()
+    elsewhere.write_bytes(b"weights")
+    monkeypatch.setenv(env_var, str(elsewhere))
+    from nodes import _otr_video_engines  # noqa: F401 -- registers built-ins
+    from nodes._otr_video_engines import registry as vreg
+    lane = vreg.get_engine(engine)
+    lane = lane() if isinstance(lane, type) else lane
+    with pytest.raises(VA.VisualAssetError, match="disagrees with native loader"):
+        VA.native_requests({engine}, folder_paths=_Shelf(tmp_path / "models", ()),
+                           env={env_var: str(elsewhere)}, humo={engine: lane})
+
+
 def test_every_humo_file_is_pinned():
     for key in _HUMO_14B | _HUMO_17B:
         spec = VA.MANIFEST[key]
