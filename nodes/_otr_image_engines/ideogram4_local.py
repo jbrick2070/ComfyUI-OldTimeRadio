@@ -316,39 +316,73 @@ def canonical_aspect(width: int, height: int) -> str:
     return f"{w}:{h}"
 
 
-def _resolve_artifact(env_var: str, candidates, category: str):
+def _runs_nvfp4() -> bool:
+    """Is this machine's CUDA device a Blackwell card (compute capability 10 or
+    later), the only NVIDIA generation that executes nvfp4 weights? Guarded:
+    ``get_device_capability`` raises on a CUDA-less host, which is simply no."""
+    try:
+        import torch  # noqa: PLC0415 -- lazy, keeps the module cold-import clean
+        return bool(torch.cuda.is_available()
+                    and torch.cuda.get_device_capability()[0] >= 10)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _default_for_this_card(names):
+    """The candidate to name when none is installed: the one this card can run.
+
+    That name is what the refusal quotes and what the queue-time fetch
+    downloads, so it must be a file this machine can execute: nvfp4 on a
+    Blackwell card (the smallest and fastest), otherwise the first rung that is
+    not nvfp4 (fp8). A one-name ladder (the VAE) and an env override are
+    returned as given."""
+    if len(names) == 1:
+        return names[0]
+    wants_nvfp4 = _runs_nvfp4()
+    for name in names:
+        if ("nvfp4" in name) == wants_nvfp4:
+            return name
+    return names[0]
+
+
+def _resolve_artifact(env_var: str, candidates, category: str, folder_paths=None):
     """``(basename, verified)`` for one artifact, walking a precision ladder.
 
-    ONE resolver shared by ``assert_usable`` and the params path, so the
-    usability gate and the render can never disagree -- the 2026-07-05 landmine
-    where a gate required an env var while render fell back to an absent default
-    and died deep in a FileNotFoundError instead of greying out early.
+    ONE resolver shared by ``assert_usable``, the params path and the
+    queue-time fetch (``_otr_visual_assets.native_requests``), so the usability
+    gate, the render and the download can never disagree -- the 2026-07-05
+    landmine where a gate required an env var while render fell back to an
+    absent default and died deep in a FileNotFoundError instead of greying out
+    early. ``folder_paths`` is ComfyUI's own module unless the fetch planner
+    hands in its stand-in.
 
     An ENV OVERRIDE WINS ABSOLUTELY and is used verbatim: it is the operator
     naming a mirror or a quant we have never heard of, and second-guessing it
     against a ladder would defeat the reason it exists. Only the default walk
     consults ``candidates``, taking the first one actually INSTALLED so a box
-    that has fp8 but not nvfp4 resolves instead of being refused.
+    that has fp8 but not nvfp4 resolves instead of being refused. With nothing
+    installed, the name is the one this card can run
+    (:func:`_default_for_this_card`).
     """
     override = os.path.basename((otr_env.get(env_var, "") or "").strip())
     names = [override] if override else [os.path.basename(c) for c in candidates]
     try:
-        import folder_paths  # ComfyUI runtime; absent in the CPU suite
+        if folder_paths is None:
+            import folder_paths  # ComfyUI runtime; absent in the CPU suite
+        listed = getattr(folder_paths, "get_filename_list", None)
         installed = {os.path.basename(n)
-                     for n in (folder_paths.get_filename_list(category) or [])}
+                     for n in ((listed(category) if listed else None) or [])}
         for name in names:
             if name in installed or folder_paths.get_full_path(category, name):
                 return name, True
-        # Nothing on the shelf: report the FIRST candidate, which is what the
-        # refusal should name and what an operator most likely wants to fetch.
-        return names[0], False
     except Exception:  # noqa: BLE001 -- no folder_paths -> nothing discoverable
-        return names[0], False
+        pass
+    return _default_for_this_card(names), False
 
 
-def resolve_all_artifacts():
+def resolve_all_artifacts(folder_paths=None):
     """``[(basename, verified, category), ...]`` in the fixed artifact order."""
-    return [(*_resolve_artifact(env, candidates, cat), cat)
+    return [(*_resolve_artifact(env, candidates, cat, folder_paths), cat)
             for env, candidates, cat in _ARTIFACTS]
 
 

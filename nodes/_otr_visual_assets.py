@@ -4,8 +4,9 @@ No model imports or network at module import. Only the allowlisted files in
 ``_SOURCES`` below can be fetched: the z_image_turbo, ltx_8gb, stable_audio_3,
 sd15 and lumina_image weights (the Flux ae VAE is the z_image row), the native
 LTX 2.5 and AnimateDiff lane weights (AnimateDiff's SD 1.5 checkpoint is the sd15
-row), and -- at an exact pinned revision -- the two MiniMax H3 lanes' weights and
-the Comfy-native Gemma 4 writer's text encoder. The list is the count; this
+row), and -- at an exact pinned revision -- the two MiniMax H3 lanes' weights,
+the Ideogram 4 and Flux.1-dev image weights, and the Comfy-native Gemma 4
+writer's text encoder. The list is the count; this
 paragraph deliberately does not repeat a total that would drift.
 Existing native loader choices are preserved, not rehash-qualified, and
 readiness is NOT a claim of GPU/render compatibility. Other engines keep
@@ -81,6 +82,48 @@ _PINNED_SOURCES = (
      "text_encoders/gemma4_12b_int8_convrot.safetensors",
      "63d0f7c476756b88910170c1df75e2384ea1af31", 12_055_234_634,
      "bf77dc0b435c487a638909d8f2ccf5a7e4c9838e7bc56545ea6e251a603c5793"),
+    # IDEOGRAM 4, added 2026-09-29 (operator: "all of our models should be
+    # auto-download ability"). Comfy-Org/Ideogram-4 is public and ungated
+    # (Hub API gated:false at this revision). Two precisions of each ladder
+    # rung the adapter can pick with nothing installed: nvfp4 for a Blackwell
+    # card, fp8 for any other NVIDIA card (ideogram4_local._default_for_this_card).
+    # int8 is not fetched: the repo has no int8 text encoder, and fp8 already
+    # serves every card nvfp4 does not.
+    ("diffusion_models", "Comfy-Org/Ideogram-4",
+     "diffusion_models/ideogram4_nvfp4_mixed.safetensors",
+     "2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d", 5_490_550_037,
+     "e7923b4b0a1129ae5afcc09e63046185688c8b09eb9a1a748cccdbde5d381609"),
+    ("diffusion_models", "Comfy-Org/Ideogram-4",
+     "diffusion_models/ideogram4_unconditional_nvfp4_mixed.safetensors",
+     "2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d", 5_490_550_037,
+     "639e37bd1dd7ee35e23c7cfccf93a518ddc7f4587818956ec42b31e659fd6ac0"),
+    ("text_encoders", "Comfy-Org/Ideogram-4",
+     "text_encoders/qwen3vl_8b_nvfp4.safetensors",
+     "2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d", 6_305_221_764,
+     "e462e9e0c3b9313ae17f82040d7c77beb92d7aef3e40692d7803228dab7c3b98"),
+    ("diffusion_models", "Comfy-Org/Ideogram-4",
+     "diffusion_models/ideogram4_fp8_scaled.safetensors",
+     "2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d", 9_280_741_285,
+     "49a946f1b0f8bcf5eab7d3b1ecc7b453c104e034cb1b592032745692724bd306"),
+    ("diffusion_models", "Comfy-Org/Ideogram-4",
+     "diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
+     "2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d", 9_280_741_293,
+     "9b359007dae162cca7591d00868feea733eb7c56e56e3a214a4d5a9a2a07cd60"),
+    ("text_encoders", "Comfy-Org/Ideogram-4",
+     "text_encoders/qwen3vl_8b_fp8_scaled.safetensors",
+     "2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d", 10_588_637_512,
+     "4ba424cf62e51392e4d1a39933e803706f4e823c1065f36aaf149c6453f66bcd"),
+    ("vae", "Comfy-Org/Ideogram-4", "vae/flux2-vae.safetensors",
+     "2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d", 336_211_292,
+     "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3"),
+    # FLUX.1-DEV, added 2026-09-29 for the same directive. The all-in-one fp8
+    # checkpoint flux_gen1 loads through CheckpointLoaderSimple (model, CLIP
+    # and VAE in one file). Comfy-Org/flux1-dev is public and ungated, unlike
+    # black-forest-labs/FLUX.1-dev; the 5080's installed copy has this exact
+    # SHA-256.
+    ("checkpoints", "Comfy-Org/flux1-dev", "flux1-dev-fp8.safetensors",
+     "83c446ef27a6ac1e9e36ecf13257283aa12cf22a", 17_246_524_772,
+     "8e91b68084b53a7fc44ed2a3756d821e355ac1a7b6fe29be760c1db532f3d88a"),
 )
 
 _SOURCES = (
@@ -242,7 +285,8 @@ _MINIMAX_H3_WEIGHT_ENGINES = frozenset({
     "minimax_h3_video",
     "minimax_h3_audio_in",
 })
-_COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image"}
+_COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image",
+                      "ideogram4_local", "flux_gen1"}
                      | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES
                      | _ANIMATEDIFF_WEIGHT_ENGINES | _MINIMAX_H3_WEIGHT_ENGINES)
 #: The music node is scanned alongside OTR_VideoDirector. It is a DIFFERENT
@@ -585,8 +629,8 @@ def _same_file(left, right):
 
 
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
-                    sd15=None, lumina=None, ltx25=None, animatediff=None,
-                    minimax_h3=None, env=None, writer_models=()):
+                    sd15=None, lumina=None, ideogram=None, flux=None, ltx25=None,
+                    animatediff=None, minimax_h3=None, env=None, writer_models=()):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
     A missing nondefault choice is a refusal, never a default-weight fallback.
@@ -714,6 +758,23 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         ):
             explicit = str(env.get(key) or "")
             add(category, os.path.basename(explicit or default), explicit=explicit)
+    if "ideogram4_local" in engines:
+        # ASK THE ADAPTER, through the same folder lookup this call was given:
+        # `resolve_all_artifacts` is the one resolver assert_usable and the
+        # render share. An installed file of any precision wins; with none,
+        # it names the precision this card runs, and that is what is fetched.
+        if ideogram is None:
+            raise VisualAssetError("ideogram4_local adapter resolution is unavailable")
+        for (token, _verified, category), (env_var, _names, _category) in zip(
+                ideogram.resolve_all_artifacts(folder_paths), ideogram._ARTIFACTS):
+            add(category, token, explicit=str(env.get(env_var) or ""))
+    if "flux_gen1" in engines:
+        # ASK THE ADAPTER: `_flux_params` is what assert_usable and the loader
+        # read, OTR_FLUX_CKPT included.
+        if flux is None:
+            raise VisualAssetError("flux_gen1 adapter resolution is unavailable")
+        add("checkpoints", flux._flux_params({})["ckpt_name"],
+            explicit=str(env.get("OTR_FLUX_CKPT") or ""))
     selected_animatediff = sorted(engines & _ANIMATEDIFF_WEIGHT_ENGINES)
     if selected_animatediff:
         # ASK EACH LANE: `_weight_tokens()` names the files its own
@@ -1051,8 +1112,8 @@ def _load_adapters(engines):
     """The adapter objects :func:`native_requests` asks, loaded for exactly
     ``engines`` -- no adapter module is imported for a lane nobody selected."""
     adapters = dict.fromkeys(
-        ("zimage", "ltx", "sa3", "sd15", "lumina", "ltx25", "animatediff",
-         "minimax_h3"))
+        ("zimage", "ltx", "sa3", "sd15", "lumina", "ideogram", "flux", "ltx25",
+         "animatediff", "minimax_h3"))
     if "z_image_turbo" in engines:
         from ._otr_image_engines import z_image_turbo
         adapters["zimage"] = z_image_turbo
@@ -1068,6 +1129,12 @@ def _load_adapters(engines):
     if "lumina_image" in engines:
         from ._otr_image_engines import lumina_image
         adapters["lumina"] = lumina_image
+    if "ideogram4_local" in engines:
+        from ._otr_image_engines import ideogram4_local
+        adapters["ideogram"] = ideogram4_local
+    if "flux_gen1" in engines:
+        from ._otr_image_engines.flux_gen1 import FluxGen1ImageEngine
+        adapters["flux"] = FluxGen1ImageEngine()
     for key, family in (("animatediff", _ANIMATEDIFF_WEIGHT_ENGINES),
                         ("ltx25", _LTX25_WEIGHT_ENGINES),
                         ("minimax_h3", _MINIMAX_H3_WEIGHT_ENGINES)):

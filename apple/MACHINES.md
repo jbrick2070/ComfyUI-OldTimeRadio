@@ -86,8 +86,8 @@ If you change a dropdown yourself, these are the only picks that need anything b
 |---|---|---|---|---|---|---|---|
 | `sd15` | **auto** | 2.0 GiB | fits | **proven** | **proven** | ? | too slow |
 | `lumina_image` | **auto** | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `ideogram4_local` | manual | 17.3 GiB | **no** | **proven** | not offered | not offered | not offered |
+| `flux_gen1` | **auto** | 13.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `ideogram4_local` | **auto** | 17.3 GiB | **no** | **proven** | not offered | not offered | not offered |
 | `z_image_turbo` | **auto** | 19.3 GiB | **proven** | **proven** | not offered | **proven** | not offered |
 
 **Image -- hosted**
@@ -176,8 +176,6 @@ Selected by: `humo17_high_audio_in_portrait`, `humo17_high_audio_in_wide`
 
 This pack cannot fetch them, and no table here can tell you the filename, because the engine chooses it. Select one anyway and it refuses by name before anything else runs -- **that refusal is the install instruction**: it prints the exact file it wants and the folder it expects. It never quietly substitutes another.
 
-* `flux_gen1`
-* `ideogram4_local`
 * `mesh_stage`
 * `spandrel_esrgan`
 

@@ -297,15 +297,26 @@ def test_a_forged_pin_is_refused_before_any_metadata_call():
 # --------------------------------------------- nothing else's plan changed -- #
 def test_only_the_pinned_sources_carry_a_pin():
     """Every other row keeps the HEAD-at-queue-time pinning it had. The pinned
-    rows are the two H3 lanes' and, since 2026-09-26, the Comfy-native Gemma
-    writers' text encoders (plan row 0n: E2B, then E4B and 12B)."""
+    rows are the two H3 lanes', since 2026-09-26 the Comfy-native Gemma
+    writers' text encoders (plan row 0n: E2B, then E4B and 12B), and since
+    2026-09-29 the Ideogram 4 (nvfp4 and fp8) and Flux.1-dev image weights."""
     from nodes import _otr_comfy_textgen_backend as native
     pinned = {(category, filename.rsplit("/", 1)[-1])
               for category, _repo, filename, *_rest in VA._PINNED_SOURCES}
     writers = {weight for model_id in native.NATIVE_WRITER_FILES
                for weight in native.native_writer_weights(model_id)}
+    images = {
+        ("diffusion_models", "ideogram4_nvfp4_mixed.safetensors"),
+        ("diffusion_models", "ideogram4_unconditional_nvfp4_mixed.safetensors"),
+        ("text_encoders", "qwen3vl_8b_nvfp4.safetensors"),
+        ("diffusion_models", "ideogram4_fp8_scaled.safetensors"),
+        ("diffusion_models", "ideogram4_unconditional_fp8_scaled.safetensors"),
+        ("text_encoders", "qwen3vl_8b_fp8_scaled.safetensors"),
+        ("vae", "flux2-vae.safetensors"),
+        ("checkpoints", "flux1-dev-fp8.safetensors"),
+    }
     assert pinned == (EXPECTED["minimax_h3_video"] | EXPECTED["minimax_h3_audio_in"]
-                      | writers)
+                      | writers | images)
     for key, spec in VA.MANIFEST.items():
         if key in pinned:
             assert set(spec) == {"repo_id", "filename", "revision", "size", "sha256"}
