@@ -1662,3 +1662,17 @@ the live version.
   cannot be declared safely; ONNX-only would take the GPU voice off 3.12).
   Not built yet; ChatGPT's answer to the same statement is the operator's
   to bring.
+
+## 2026-09-30 09:55 -- the Comfy SDK runs the show end to end (self-hosted)
+
+- **Live verify of 04329e1e** (the mux reports the episode under the key the
+  API reads): through comfy-api-proxy :8189, job f76413b1 (one act, English,
+  still_flat) went queued -> running -> OutputReady for node 12 and node 85
+  -> succeeded in 304 s, and `job.get_outputs("85")` saved the published mp4
+  (12,252,831 bytes, identical to the otr/obs copy) and the poster png. Before
+  the fix (job 52a51943, 58 min on the LTX 2.5 lane) the SDK saw the poster
+  only. Composer QA: no grounded break; the frontend's handling of the same
+  file under 'video' and 'gifs' is outside the pack and unverified.
+- Runbook and scripts: tmp/sdk_demo/README.md, otr_sdk_demo.py,
+  fetch_outputs.py (reattach to a finished job), the two API-format graphs.
+- Platform observations for the Comfy call, in the README's last section.
