@@ -1518,3 +1518,44 @@ the live version.
 - **Open**: PBUG-20260929-06 waits for a failing close's text (both news reruns
   passed; the finding now quotes the close). The Mandarin/Hindi/Japanese
   grammar fix (PBUG-05) is live-verified.
+
+## 2026-09-29 19:30 -- Dia removed, 2.3.16 published, the multilingual soak
+
+- **Dia is gone** (7d82f535). It put gibberish into a published episode
+  (rainbow_smoke_20260929_152330): every voice sample went to Dia without the
+  words spoken in it. The transcript fix (d794ba3f, 9768c2a9, PBUG-09) cleared
+  16 of 18 lines live, but one voice still garbled its two longest lines and
+  another fell silent for 10-14 s inside a line. The operator: "remove it,
+  Kokoro is our shining star"; "removal 100%, no negative test, no
+  tombstones." Removed atomically per apple/EXTENDING.md; the full suite
+  diffed against an untouched HEAD worktree shows only a failure the baseline
+  shares (the pod script's bash syntax check -- bash left PATH when Git for
+  Windows updated). Composer QA: clean on the shipped surface; its one hit is
+  the untracked local kibitz overlay, which lists the Dia weights because they
+  are still in the model cache.
+- **Left on disk for the operator to delete if the space is wanted:** the Dia
+  venv `C:\Users\jeffr\Documents\ComfyUI\dia` and the weights
+  `C:\ComfyUI-Models\huggingface\models--nari-labs--Dia-1.6B-0626`. Nothing
+  reads either now.
+- **2.3.16 published** (05fb8219) at the operator's word: the Dia removal plus the news
+  close fixes. The action succeeded; the registry shows it Pending until
+  Comfy's scan runs.
+- **PBUG-06** (news close must name its source): Mandarin and Japanese closes
+  pass on replay (outlet label and number anchors count in another language).
+  Still open: Hindi closes, which spell the institution in Devanagari, and the
+  invented-name check refusing a real person written in katakana. Both want
+  native spellings committed with the dossier (Grok's shape: a side field tied
+  to each kept entity) -- design plus contrarian first.
+- **PBUG-08 logged, not fixed**: repetition penalty 1.03 pushes Japanese and
+  Chinese toward variant spellings (A/B numbers in the entry); a Japanese pitch
+  looped to death and a Hindi speaker's name came out in three scripts. A
+  per-language penalty (1.0 for ja/zh) is the proposal; it needs a contrarian
+  before code.
+- **Overnight on the 5080: the multilingual soak**
+  (tmp/overnight_20260928/multilang_soak.py, notes in overnight.log). One act;
+  every bank rolled; every one of the eight languages rolled; Kokoro only;
+  each leg pins one fast video lane from a shuffled cycle (the four stills,
+  three AnimateDiff lanes, LTX 0.9.8 low); still models rolled; asset cleanup
+  OFF so a failed leg keeps its whole episode folder for debugging. 120 legs
+  max, stops after 8 failures, a 20-minute stall watch. Touch STOP in that
+  folder to end it after the current leg.

@@ -16232,3 +16232,32 @@ not promote it to the Bug Bible on this evidence alone.
   Whisper transcribes two different ways) come back unintelligible for
   ~11 s plus ~9 s of quiet; his 15-23 word lines are clean. On CPU, hannah
   also showed a 10-14 s silence inside a line at two of three seeds.
+
+## PBUG-20260929-08 -- non-English news episodes died before the close: a Japanese pitch looped, a Hindi speaker's name came out in three scripts
+
+- seen: the news-close hunt on 2026-09-29 (canonical workflow, scifi_news_pro,
+  one act, tmp/lang_gauntlet_20260929/newshunt_*.log). Two of five legs died
+  before the closing read:
+  - newshunt_01_japanese (15:51): `pass 'pitch' failed after 3 attempt(s):
+    generation was halted by the in-decode liveness guard: the output repeated
+    a run of tokens verbatim`.
+  - newshunt_02_hindi (15:53): `pass 'casting_voices' failed after 2
+    attempt(s): cast names ['माया', 'દાનियु লো'] != script speakers
+    ['दानियु लो', 'माया', 'દાનियु लो']`. One character's name is written with
+    Gujarati and Bengali letters inside Devanagari, and differently in two
+    places, so the cast cannot match the script.
+- measured the same day (tmp/lang_gauntlet_20260929, one leg per arm, same
+  story and seed, writer output per 1000 characters), repetition penalty 1.03
+  (shipped) against 1.0:
+  - Japanese half-width kana 64.7 vs 1.4; emoji and symbol letters 19.3 vs
+    1.4; spaces between words 258 vs 142.
+  - Mandarin traditional characters 27.8 vs 8.2 (on the old instruction;
+    PBUG-07's instruction brings it to 0.0 at 1.03).
+  - Hindi stray letters from other Indian scripts: 0 vs 0.
+  The penalty pushes Japanese and Chinese toward variant spellings of the same
+  word (half-width, traditional, symbol forms), which is how a long pitch
+  degenerates into a loop the liveness guard stops. It does NOT explain the
+  Hindi mix, which the A/B did not reproduce at either setting.
+- not fixed. The proposed fix is a per-language penalty (1.0 for Japanese and
+  Chinese), which changes sampling on the shipping path and needs a design
+  contrarian before code. The Hindi script mix needs its own reproduction.
