@@ -507,287 +507,6 @@
       "commercial_clean": true
     },
     {
-      "voice_ref_id": "dia_bill_boerst",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "warm",
-        "baritone"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_bill_boerst.wav",
-      "ref_sha256": "be4815e4fb760ba1b78117545a260cce4a4c124c7657bc5c6127a0fef8ba661f",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_peter_yearsley",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "neutral",
-        "clear"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "elder",
-      "ref_path": "models/TTS/refs/indextts2/vz_peter_yearsley.wav",
-      "ref_sha256": "fbb3920fda7ae26a5a8b317ffcae1d55c0bd5d89d075205f5a52b1e924b83f51",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_stuart_bell",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "bright",
-        "tenor"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_stuart_bell.wav",
-      "ref_sha256": "00c7baeb2fb7a8c1c6198e045b5e853a7ccc04002a51a09b4be3dd7c96994f73",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_caro_davy",
-      "engine": "dia",
-      "gender": "female",
-      "timbre": [
-        "warm",
-        "alto"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_caro_davy.wav",
-      "ref_sha256": "40c692c005a0268a7a5b6ebae348077d3dca6a86eb6b12bd36e343bbcd71b5f6",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_announcer_male",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "authoritative",
-        "resonant"
-      ],
-      "roles": [
-        "announcer_voice"
-      ],
-      "age_band": "adult",
-      "style_tags": [
-        "preferred_announcer",
-        "british_leaning"
-      ],
-      "ref_path": "models/TTS/refs/indextts2/vz_peter_yearsley.wav",
-      "ref_sha256": "fbb3920fda7ae26a5a8b317ffcae1d55c0bd5d89d075205f5a52b1e924b83f51",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_announcer_female",
-      "engine": "dia",
-      "gender": "female",
-      "timbre": [
-        "authoritative",
-        "clear"
-      ],
-      "roles": [
-        "announcer_voice"
-      ],
-      "age_band": "adult",
-      "style_tags": [
-        "preferred_announcer",
-        "british_leaning"
-      ],
-      "ref_path": "models/TTS/refs/indextts2/vz_caro_davy.wav",
-      "ref_sha256": "40c692c005a0268a7a5b6ebae348077d3dca6a86eb6b12bd36e343bbcd71b5f6",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_donor_c0a0",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "donated",
-        "warm"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_donor_c0a0.wav",
-      "ref_sha256": "d366d5e0fc6526b71bbf71f01f0487e5994dce95765af1257b160bd827587826",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_donor_haku",
-      "engine": "dia",
-      "gender": "female",
-      "timbre": [
-        "donated",
-        "bright"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_donor_haku.wav",
-      "ref_sha256": "8cab88dc3ba79d30f3f2be73e3f95f272dd58fbeb4d8ba63f1cafd7b2c538d81",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_donor_ss_1684",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "donated",
-        "warm"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_donor_ss_1684.wav",
-      "ref_sha256": "2ca4a53a6945d91dde2e39e0aebf7ab4822d4381f88a2c6dc21fba6c874a656a",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_donor_gyroo",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "donated",
-        "warm"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_donor_gyroo.wav",
-      "ref_sha256": "7391a853d194c779c11cadb69af863fcf75f4ab1d5cd1f774a7dd575ebdac54b",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_ljspeech",
-      "speaker_id": "ljspeech_linda_johnson",
-      "engine": "dia",
-      "gender": "female",
-      "timbre": [
-        "clear",
-        "narration"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_ljspeech.wav",
-      "ref_sha256": "ac9a068dfa385afba72f39e6a9847a0ded6a5c71058502a56f743b8e4959f8dc",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_donor_hugo_the_frenchie",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "donated",
-        "warm"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_donor_hugo_the_frenchie.wav",
-      "ref_sha256": "602494cea2b850ab9e284b9039adf971867fff6b98b1e2e79706ca9793995545",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_donor_hillbilly_jim",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "donated",
-        "bright"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_donor_hillbilly_jim.wav",
-      "ref_sha256": "6b7996e3d5d244561c69f5da9ea3b3572a92d21ccbbf8c1d1badd9e30879cf03",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_donor_bathri",
-      "engine": "dia",
-      "gender": "female",
-      "timbre": [
-        "donated",
-        "bright"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_donor_bathri.wav",
-      "ref_sha256": "449d2c799df069f5751f3b7e311a57da2a9d1ac3d67b3d34223076340d27e621",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_donor_hannah",
-      "engine": "dia",
-      "gender": "female",
-      "timbre": [
-        "donated",
-        "bright"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_donor_hannah.wav",
-      "ref_sha256": "91e6422bfa3c747445ba7aea0fb3ec08dca7b2dcdcf1e956cf7d03bd78a5393c",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_donor_selfie",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "donated",
-        "bright"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_donor_selfie.wav",
-      "ref_sha256": "f0fe51523f1aac0023050ae6ab1bfda19cc1f4997ef8314824550aee2f41615b",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_kathleen",
-      "engine": "dia",
-      "gender": "female",
-      "timbre": [
-        "clear",
-        "narration"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_kathleen.wav",
-      "ref_sha256": "10395fb6433365057b7ac51a9c53160f618a0ae4fc96b448bbd958223e550183",
-      "commercial_clean": true
-    },
-    {
       "voice_ref_id": "cb_announcer_male",
       "engine": "chatterbox",
       "gender": "male",
@@ -1309,22 +1028,6 @@
       "commercial_clean": true
     },
     {
-      "voice_ref_id": "dia_pd_ljspeech_linda_johnson",
-      "speaker_id": "ljspeech_linda_johnson",
-      "engine": "dia",
-      "gender": "female",
-      "timbre": [
-        "neutral"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_pd_ljspeech_linda_johnson.wav",
-      "ref_sha256": "5565adb18a88919da5c56fde21f2dfd057683dbaa80e22abc288c3554e253104",
-      "commercial_clean": true
-    },
-    {
       "voice_ref_id": "vz_pd_librivox_mark_f_smith",
       "speaker_id": "librivox_mark_f_smith",
       "engine": "indextts2",
@@ -1344,22 +1047,6 @@
       "voice_ref_id": "cb_pd_librivox_mark_f_smith",
       "speaker_id": "librivox_mark_f_smith",
       "engine": "chatterbox",
-      "gender": "male",
-      "timbre": [
-        "warm"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_mark_f_smith.wav",
-      "ref_sha256": "359b967dbadca14e03b54d758d140a56c6252449398102f9dbb2d9a87c32e2a4",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_pd_librivox_mark_f_smith",
-      "speaker_id": "librivox_mark_f_smith",
-      "engine": "dia",
       "gender": "male",
       "timbre": [
         "warm"
@@ -1407,23 +1094,6 @@
       "commercial_clean": true
     },
     {
-      "voice_ref_id": "dia_pd_librivox_mark_f_smith_elder",
-      "speaker_id": "librivox_mark_f_smith",
-      "engine": "dia",
-      "gender": "male",
-      "timbre": [
-        "warm",
-        "resonant"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "elder",
-      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_mark_f_smith_elder.wav",
-      "ref_sha256": "4ca2513f359b33b69ebf3a5124542c8a5fe514689a307b5407621e856f00127a",
-      "commercial_clean": true
-    },
-    {
       "voice_ref_id": "vz_pd_librivox_phil_chenevert",
       "engine": "indextts2",
       "gender": "male",
@@ -1442,22 +1112,6 @@
     {
       "voice_ref_id": "cb_pd_librivox_phil_chenevert",
       "engine": "chatterbox",
-      "gender": "male",
-      "timbre": [
-        "crisp",
-        "bright"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/vz_pd_librivox_phil_chenevert.wav",
-      "ref_sha256": "53ebacd17becad2558407d18a6209f87b433a9ccec3a97d21e2e94cd5ba78ed8",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_pd_librivox_phil_chenevert",
-      "engine": "dia",
       "gender": "male",
       "timbre": [
         "crisp",
@@ -2812,23 +2466,6 @@
       "voice_ref_id": "cb_lemmy_algenib_cockney_v1",
       "reserved_for": "lemmy",
       "engine": "chatterbox",
-      "gender": "male",
-      "timbre": [
-        "gravelly",
-        "warm"
-      ],
-      "roles": [
-        "char_voice"
-      ],
-      "age_band": "adult",
-      "ref_path": "models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav",
-      "ref_sha256": "47e733d51ea58773142f934f3484cf3633cada5fe603b672cdfc47c712a60db2",
-      "commercial_clean": true
-    },
-    {
-      "voice_ref_id": "dia_lemmy_algenib_cockney_v1",
-      "reserved_for": "lemmy",
-      "engine": "dia",
       "gender": "male",
       "timbre": [
         "gravelly",

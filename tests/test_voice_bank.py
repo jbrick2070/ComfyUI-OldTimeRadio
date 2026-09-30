@@ -220,9 +220,6 @@ def test_announcer_voice_ref_resolves_for_active_engine():
     assert announcer_voice_ref("chatterbox").voice_ref_id in {
         "cb_announcer_male", "cb_announcer_female",
     }
-    assert announcer_voice_ref("dia").voice_ref_id in {
-        "dia_announcer_male", "dia_announcer_female",
-    }
 
 
 def test_kokoro_announcer_rotates_across_the_whole_curated_pool():
@@ -244,14 +241,13 @@ def test_kokoro_announcer_rotates_across_the_whole_curated_pool():
 
 
 def test_seeded_announcer_draw_leaves_single_candidate_engines_unmoved():
-    """chatterbox / dia / google_tts each expose exactly ONE preferred announcer
-    per gender, so the seeded draw runs over a one-element list and is the
+    """chatterbox / google_tts each expose exactly ONE preferred announcer per
+    gender, so the seeded draw runs over a one-element list and is the
     identity. Their pick sequences must not move -- this is what keeps the
     change scoped to kokoro.
     """
     for engine, expected in (
         ("chatterbox", {"cb_announcer_male", "cb_announcer_female"}),
-        ("dia", {"dia_announcer_male", "dia_announcer_female"}),
         ("google_tts", {"gt_charon_announcer", "gt_sulafat_announcer"}),
     ):
         seq = [
@@ -296,34 +292,6 @@ def test_chatterbox_announcer_selection_mixes_gender_by_episode_seed():
     }
     assert announcer_voice_ref("chatterbox", episode_seed=17) == announcer_voice_ref(
         "chatterbox", episode_seed=17)
-
-
-def test_dia_voice_bank_has_british_gendered_announcers():
-    entries, _ = load_voice_bank()
-    announcers = [
-        e for e in entries
-        if e.engine == "dia" and "announcer_voice" in e.roles
-        and "preferred_announcer" in e.style_tags
-    ]
-    genders = {e.gender for e in announcers}
-    assert {"male", "female"} <= genders
-    assert all("british_leaning" in e.style_tags for e in announcers)
-
-
-def test_dia_announcer_selection_mixes_gender_by_episode_seed():
-    picks = [
-        announcer_voice_ref("dia", episode_seed=i)
-        for i in range(80)
-    ]
-    genders = [p.gender for p in picks]
-    assert set(genders) == {"male", "female"}
-    delta = abs(genders.count("male") - genders.count("female"))
-    assert delta <= 24
-    assert {p.voice_ref_id for p in picks} <= {
-        "dia_announcer_male", "dia_announcer_female",
-    }
-    assert announcer_voice_ref("dia", episode_seed=17) == announcer_voice_ref(
-        "dia", episode_seed=17)
 
 
 def test_google_voice_bank_has_gendered_chars_and_announcers():
@@ -403,38 +371,6 @@ def test_chatterbox_castlock_uses_british_announcer_pair_and_separate_chars():
     assert male["voice_engine"] == "chatterbox"
     assert female["voice_engine"] == "chatterbox"
     assert ann["voice_ref_id"] in {"cb_announcer_male", "cb_announcer_female"}
-    assert "british_leaning" in by_id[ann["voice_ref_id"]].style_tags
-    assert ann["voice_ref_id"] not in {male["voice_ref_id"], female["voice_ref_id"]}
-    assert by_id[ann["voice_ref_id"]].ref_path not in {
-        by_id[male["voice_ref_id"]].ref_path,
-        by_id[female["voice_ref_id"]].ref_path,
-    }
-    assert by_id[male["voice_ref_id"]].gender == "male"
-    assert by_id[female["voice_ref_id"]].gender == "female"
-
-
-def test_dia_castlock_uses_british_announcer_pair_and_separate_chars():
-    from nodes.cast_lock import CastLock
-
-    led = {"meta": {"episode_seed": "dia-seed"}}
-    cast = [
-        {"char_id": "ann", "name": "ANNOUNCER", "speaker_role": "announcer"},
-        {"char_id": "m1", "name": "CAPTAIN", "gender": "male"},
-        {"char_id": "f1", "name": "DOCTOR", "gender": "female"},
-    ]
-    report = []
-    CastLock()._auto_registry(
-        led, cast, "default", False, report,
-        char_voice_engine="dia",
-        announcer_voice_engine="dia",
-    )
-    entries, _ = load_voice_bank()
-    by_id = {e.voice_ref_id: e for e in entries}
-    ann, male, female = cast
-    assert ann["voice_engine"] == "dia"
-    assert male["voice_engine"] == "dia"
-    assert female["voice_engine"] == "dia"
-    assert ann["voice_ref_id"] in {"dia_announcer_male", "dia_announcer_female"}
     assert "british_leaning" in by_id[ann["voice_ref_id"]].style_tags
     assert ann["voice_ref_id"] not in {male["voice_ref_id"], female["voice_ref_id"]}
     assert by_id[ann["voice_ref_id"]].ref_path not in {

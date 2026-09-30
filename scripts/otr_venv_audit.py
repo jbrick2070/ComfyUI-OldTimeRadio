@@ -57,7 +57,7 @@ _HOST_PROVIDED = {
 #: Engines that run in their OWN isolated venv by design. Absent from ComfyUI's
 #: interpreter is CORRECT for these -- flagging them would train a reader to
 #: ignore the report. `bpy` is Blender's, only used by an optional mesh script.
-_ISOLATED = {"chatterbox", "dia", "indextts", "bpy", "mathutils"}
+_ISOLATED = {"chatterbox", "indextts", "bpy", "mathutils"}
 
 
 def _first_party() -> set:

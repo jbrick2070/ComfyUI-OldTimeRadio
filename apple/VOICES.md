@@ -45,7 +45,6 @@ separate dropdowns and can hold different values.
 | **`kokoro`** | Built-in voices for every admitted language. The shipped default. The pools are in [MULTILINGUAL.md](MULTILINGUAL.md). | **Automatic** | 0.3 GiB | NVIDIA, Apple Silicon, or CPU-only machines; every language on Python 3.10-3.13 |
 | **`bark`** | Preset speaker voices, more theatrical and less predictable | **Automatic** | 4.2 GiB | NVIDIA. **Read the Mac warning below.** |
 | **`chatterbox`** | Clones a voice from a reference recording you supply | Its own Windows installer | 3.0 GiB | 16 GB+ NVIDIA, Windows |
-| **`dia`** | Clones a voice from a reference recording you supply | Its own Windows installer | 6.0 GiB | 16 GB+ NVIDIA, Windows |
 | **`indextts2`** | Clones a voice, with emotion control. Characters only -- it cannot read the announcer. | Its own Windows installer | 11.1 GiB | 16 GB+ NVIDIA, Windows |
 | **`elevenlabs`** | Hosted. The ElevenLabs library voices. | Comfy account and credits | -- | anywhere |
 | **`google_tts`** | Hosted. The prebuilt Gemini voices. | Your own Google API key | -- | anywhere |
@@ -71,7 +70,7 @@ the torch pipeline uses; Mandarin and Japanese need their libraries first
 
 ### The cloning engines need two things, not one
 
-`chatterbox`, `dia` and `indextts2` do not have voices of their own. They copy a
+`chatterbox` and `indextts2` do not have voices of their own. They copy a
 voice out of a recording, so each needs:
 
 1. **An installer run by hand.** Each ships a PowerShell script in `scripts/`
@@ -116,8 +115,8 @@ and only those.
 |---|---|---|---|
 | **`kokoro_builtin`** *(shipped)* | Kokoro's voices, filtered by episode language before casting | `kokoro` | `kokoro` |
 | **`bark_legacy`** | Bark's speaker presets | `bark` | `bark` |
-| **`default`** | The reference recordings for the cloning engines | `indextts2`, `chatterbox`, `dia` | `chatterbox`, `dia` |
-| **`default_clean`** | The same recordings, minus IndexTTS2 | `chatterbox`, `dia` | `dia` |
+| **`default`** | The reference recordings for the cloning engines | `indextts2`, `chatterbox` | `chatterbox` |
+| **`default_clean`** | The same recordings, minus IndexTTS2 | `chatterbox` | -- |
 | **`elevenlabs_cloud`** | The ElevenLabs library voices | `elevenlabs` | `elevenlabs` |
 | **`google_tts`** | The prebuilt Gemini voices | `google_tts` | `google_tts` |
 
@@ -231,7 +230,7 @@ same value -- see the table above.
 engine are not a legal pair. The bank table above says which go together.
 
 **"... has no reference entries in the active voice bank."** You picked a
-cloning engine against a preset bank. `indextts2`, `chatterbox` and `dia` read
+cloning engine against a preset bank. `indextts2` and `chatterbox` read
 the `default` or `default_clean` banks, never `kokoro_builtin` or `bark_legacy`.
 
 **"Path B not installed."** A cloning engine whose installer has not been run.

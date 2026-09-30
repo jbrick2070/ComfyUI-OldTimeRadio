@@ -230,7 +230,7 @@ CAPABILITIES = {
                "needs_fp8_te": False, "needs_fp4_te": False,
                "practical_without_gpu": True, "sidecar_conditional": False,
                "model_requirements": ["kokoro-82m"]},
-    # indextts2 / chatterbox / dia: isolated sidecar venvs pinned to cu128
+    # indextts2 / chatterbox: isolated sidecar venvs pinned to cu128
     # torch (uv.lock / installer pins) -> vendor-locked nvidia until a
     # ROCm/Metal port of the sidecar installs exists.
     "indextts2": {"required_toolchain": None, "requires_sidecar": True,
@@ -245,11 +245,6 @@ CAPABILITIES = {
                    "practical_without_gpu": False,
                    "sidecar_conditional": False,
                    "model_requirements": ["chatterbox"]},
-    "dia": {"required_toolchain": None, "requires_sidecar": True,
-            "device_backends": ["cuda"], "requires_vendor": "nvidia",
-            "needs_fp8_te": False, "needs_fp4_te": False,
-            "practical_without_gpu": False, "sidecar_conditional": False,
-            "model_requirements": ["dia-1.6b"]},
     "musicgen": {"required_toolchain": None, "requires_sidecar": False,
                  "device_backends": ["cuda", "cpu", "mps"],
                  "requires_vendor": None,

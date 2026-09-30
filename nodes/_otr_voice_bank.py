@@ -91,7 +91,7 @@ def _min_tier_pool() -> int:
 # had exactly one announcer-role row (bm_george), so every published episode
 # opened with the same voice. cast_lock.py reads this same tuple -- the two
 # must never drift, which is why it lives here and not as a second literal.
-_SEEDED_ANNOUNCER_ENGINES = ("google_tts", "chatterbox", "dia", "kokoro")
+_SEEDED_ANNOUNCER_ENGINES = ("google_tts", "chatterbox", "kokoro")
 
 _BANK_FILENAME = "voice_reference_bank.json"
 _SCHEMA_FILENAME = "voice_bank_entry_schema.json"
@@ -347,7 +347,7 @@ def load_voice_bank(path: Optional[str] = None) -> Tuple[Tuple[VoiceBankEntry, .
 # ``default_char_engine`` returns the first approved engine that has char_voice
 # refs, so appending leaves that resolution byte-identical.
 APPROVED_VOICE_ENGINES: Tuple[str, ...] = (
-    "indextts2", "chatterbox", "dia", "kokoro", "google_tts")
+    "indextts2", "chatterbox", "kokoro", "google_tts")
 
 
 def compute_bank_coverage(
@@ -554,7 +554,7 @@ def accent_timbre_tags(accent, bank=None, engine="") -> Tuple[str, ...]:
     THE FIRST VERSION OF THIS CHECKED THE WHOLE BANK AND WAS WRONG. A word that
     is real vocabulary on another engine -- `british`, which kokoro and the
     cloud engines carry -- passed the check and perturbed the draw on
-    `indextts2` and `dia`, which carry no british voice of either gender.
+    `indextts2`, which carries no british voice of either gender.
     Measured: eight of twelve seeds moved. "Does any voice carry this tag" was
     never the question; "can the pool this character draws from carry it" is,
     and they differ whenever the bank is uneven across engines, which it always
@@ -905,8 +905,8 @@ def _seeded_preferred_announcer_voice_ref(
         )
     # Draw WITHIN the selected gender rather than taking the head of the sorted
     # pool. Sorting first keeps the tie-break order stable, so an engine that
-    # offers exactly one preferred announcer per gender (google_tts, chatterbox,
-    # dia) draws from a one-element list and is byte-identical to the old pin.
+    # offers exactly one preferred announcer per gender (google_tts, chatterbox)
+    # draws from a one-element list and is byte-identical to the old pin.
     # Engines with a real pool (kokoro) now reach every voice in it.
     ordered = sorted(pool, key=_key)
     pick_seed = hashlib.sha1(

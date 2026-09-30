@@ -39,7 +39,7 @@ from nodes._otr_voice_bank import (
 GENDERS = ("male", "female")
 #: Every engine that draws a cloned character voice. The fallback below is
 #: engine-scoped, so a per-engine sweep is the only honest coverage.
-CLONER_ENGINES = ("indextts2", "chatterbox", "dia")
+CLONER_ENGINES = ("indextts2", "chatterbox")
 
 
 def _bank():
@@ -158,13 +158,12 @@ def test_an_injected_bank_is_used_exactly_as_given():
 
 
 def test_the_shipped_reserved_set_is_exactly_the_owned_clones():
-    """Named explicitly, so a fourth row quietly gaining `reserved_for` -- or
+    """Named explicitly, so another row quietly gaining `reserved_for` -- or
     one of these losing it -- is a red test rather than a silent change to what
     every other character can be cast as."""
     assert reserved_voice_ref_ids() == {
         "idx_lemmy_algenib_cockney_v1",
         "cb_lemmy_algenib_cockney_v1",
-        "dia_lemmy_algenib_cockney_v1",
     }
 
 

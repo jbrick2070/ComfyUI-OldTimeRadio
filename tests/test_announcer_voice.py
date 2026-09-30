@@ -99,7 +99,7 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
     keys = set(it.get("required", {})) | set(it.get("optional", {}))
     assert "engine" not in keys
     assert list(A.LEGACY_FIRST_FALLBACK) == [
-        "kokoro", "chatterbox", "dia", "cloud_elevenlabs", "bark", "google_tts",
+        "kokoro", "chatterbox", "cloud_elevenlabs", "bark", "google_tts",
     ]
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
     it2 = A.INPUT_TYPES()
@@ -119,7 +119,7 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     keys = set(it.get("required", {})) | set(it.get("optional", {}))
     assert "engine" not in keys
     engines = list(A.LEGACY_FIRST_FALLBACK)
-    assert engines == ["kokoro", "chatterbox", "dia", "cloud_elevenlabs", "bark",
+    assert engines == ["kokoro", "chatterbox", "cloud_elevenlabs", "bark",
                        "google_tts"]
     assert engines[0] == "kokoro", "index 0 is the byte-identical default"
     assert engines

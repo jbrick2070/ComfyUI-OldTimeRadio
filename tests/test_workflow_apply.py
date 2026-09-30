@@ -81,7 +81,7 @@ def _registry_engine_ids():
     )
     from nodes._otr_audio_engines import registry as areg
     from nodes._otr_audio_engines import (  # noqa: F401
-        eng_bark, eng_chatterbox, eng_dia, eng_indextts2, eng_kokoro,
+        eng_bark, eng_chatterbox, eng_indextts2, eng_kokoro,
         eng_cloud_elevenlabs, eng_cloud_sonilo, eng_musicgen,
         eng_stable_audio, eng_stable_audio_3,
     )

@@ -40,7 +40,7 @@ _REPO_RE = re.compile(r'["\']([A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+)["\']')
 _PUBLISHERS = (
     "Lightricks", "Kijai", "city96", "Comfy-Org", "guoyww", "hexgrad",
     "facebook", "google", "mistralai", "stabilityai", "tencent", "Wan-AI",
-    "Skywork", "MiniMax", "IndexTeam", "SWivid", "nari-labs", "ResembleAI",
+    "Skywork", "MiniMax", "IndexTeam", "SWivid", "ResembleAI",
 )
 _ENV_RE = re.compile(r'["\'](OTR_[A-Z0-9_]+)["\']')
 #: An engine that shells out to its OWN interpreter is a separate INSTALL, not a

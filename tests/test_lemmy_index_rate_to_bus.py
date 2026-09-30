@@ -12,7 +12,6 @@ encode is `-ar 48000` (`otr_master_audio_mux.py`). So:
     chatterbox  24000  -> resampled 24000 -> 48000
     kokoro      24000  -> resampled 24000 -> 48000
     bark        24000  -> resampled 24000 -> 48000
-    dia         44100  -> resampled 44100 -> 48000
 
 NOBODY is already at the bus rate. Every clip is resampled, per clip, using its
 own true native rate, by one ratio-agnostic gcd/polyphase helper. That is why
@@ -189,9 +188,9 @@ def test_the_resampler_stays_on_CPU_and_returns_float32():
 
 @pytest.mark.parametrize("src", [22050, 24000, 44100, 16000])
 def test_every_shipped_engine_rate_lands_on_the_bus(src):
-    """22050 indextts2, 24000 kokoro/chatterbox/bark, 44100 dia. One
-    ratio-agnostic path serves all of them, which is why Lemmy needed no special
-    case."""
+    """22050 indextts2, 24000 kokoro/chatterbox/bark, and the other rates a
+    clip can arrive at. One ratio-agnostic path serves all of them, which is
+    why Lemmy needed no special case."""
     from nodes.scene_sequencer import _resample_audio
 
     out = _resample_audio(_tone(330.0, 0.4, src), src, BUS_SR)

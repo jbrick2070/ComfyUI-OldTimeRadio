@@ -440,7 +440,7 @@ and the platform quant bakes NF4 only when the vendor is NVIDIA.
    episode's telemetry line reads the live log only -- the frozen
    pack-folder log is shown by `otr_tail_logs` as history, never read as
    current (a Sonnet review reproduced a stale model name leaking in).
-8. Lower. DONE: the Chatterbox/Dia default venv path (`3e1fd8be`) and the
+8. Lower. DONE: the Chatterbox default venv path (`3e1fd8be`) and the
    video no-ledger output fallback (`ed4cd47b`). Still open: NVFP4 is preferred among installed files without a hardware check;
    `config/otr_windows_extra_model_paths.yaml` names `C:/ComfyUI-Models`.
 LOW PRIORITY, operator ruling 2026-09-25 ("no biggie" / "doesn't matter

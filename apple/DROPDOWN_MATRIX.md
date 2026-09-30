@@ -99,7 +99,6 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 | `stable_audio_3` | **auto** | 3.5 GiB | **proven** | **proven** | **proven** | ? | not offered |
 | `bark` | **auto** | 4.2 GiB | **proven** | **proven** | **OOM** | ? | too slow |
 | `stable_audio_music` | GATED | 4.5 GiB | fits | fits | not offered | ? | not offered |
-| `dia` | own installer (Windows) | 6.0 GiB | not offered | fits | not offered | not offered | not offered |
 | `indextts2` | own installer (Windows) | 11.1 GiB | not offered | **proven** | not offered | not offered | not offered |
 
 **Voice and music -- hosted**

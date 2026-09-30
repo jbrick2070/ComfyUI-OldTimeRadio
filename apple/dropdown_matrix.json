@@ -132,14 +132,6 @@
       },
       "size_gb": null
     },
-    "dia": {
-      "memory": {
-        "mac16": "fits",
-        "nv16": "fits",
-        "nv8": "oom"
-      },
-      "size_gb": 6.0
-    },
     "flux_gen1": {
       "memory": {
         "mac16": "oom",

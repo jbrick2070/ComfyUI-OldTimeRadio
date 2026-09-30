@@ -51,14 +51,14 @@ _VALID_ERROR_POLICIES = {"", "fail_loud"}
 # announcer stays kokoro.
 _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
     # char_voice PROMOTED 2026-06-04: indextts2 (Path B oop_venv worker) is the
-    # shipped default; chatterbox + dia (both Path B sidecars) + bark are
-    # selectable. Index 0 stays indextts2 -> byte-identical default combo.
+    # shipped default; chatterbox (a Path B sidecar) + bark are selectable.
+    # Index 0 stays indextts2 -> byte-identical default combo.
     # cloud_elevenlabs (Comfy Credits, dropdown-opt-in) APPENDED 2026-07-03 --
     # index 0 stays the byte-identical default; a cloud pick is never automatic
     # (C2). Renamed from ``elevenlabs`` so the CastLock label cannot be read as
     # a local install.
     "char_voice": (
-        "indextts2", "chatterbox", "dia", "bark", "kokoro", "cloud_elevenlabs",
+        "indextts2", "chatterbox", "bark", "kokoro", "cloud_elevenlabs",
         "google_tts",
     ),
     # bark APPENDED 2026-08-24 -- a second zero-setup engine for a fresh
@@ -67,7 +67,7 @@ _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
     # google_tts stays LAST -- draft google_* only; never a CastLock default
     # and never pinned by otr_cloud_* (Comfy Credits uses cloud_elevenlabs).
     "announcer_voice": (
-        "kokoro", "chatterbox", "dia", "cloud_elevenlabs", "bark", "google_tts",
+        "kokoro", "chatterbox", "cloud_elevenlabs", "bark", "google_tts",
     ),
     # music PROMOTED 2026-06-03: Stable Audio 3 (ComfyUI-native, no dep conflict,
     # render-proven) is index 0 = the shipped default; musicgen kept selectable.
@@ -148,8 +148,8 @@ class EngineProfile(BaseModel):
     # DEFAULT False, AND THAT IS THE SAFETY. Every profile that does not opt in
     # keeps the legacy formula byte for byte -- announcer profiles included,
     # which are deliberately left alone: an announcer is not a cloned character
-    # and has no identity to hold steady across beats. Opted in today: the three
-    # char_* CLONE profiles (indextts2, chatterbox, dia).
+    # and has no identity to hold steady across beats. Opted in today: the two
+    # char_* CLONE profiles (indextts2, chatterbox).
     character_stable_seed: bool = False
 
     @model_validator(mode="after")

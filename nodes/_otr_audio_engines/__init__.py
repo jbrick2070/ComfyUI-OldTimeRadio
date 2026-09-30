@@ -30,7 +30,6 @@ from . import eng_bark, eng_kokoro, eng_musicgen  # noqa: E402,F401
 # Opt-in engines (flag-gated; never a default).
 from . import (  # noqa: E402,F401
     eng_chatterbox,
-    eng_dia,
     eng_stable_audio,
     eng_stable_audio_3,
 )
@@ -42,7 +41,7 @@ from . import (  # noqa: E402,F401
 # with full capability, and on a registry install the file is simply absent, so
 # the engine does not register -- exactly the partial-install resilience the
 # pack already relies on. kokoro (the shipped default on both voice slots),
-# bark, chatterbox, dia and the cloud engines are unaffected.
+# bark, chatterbox and the cloud engines are unaffected.
 try:
     from . import eng_indextts2  # noqa: E402,F401
 except ImportError:

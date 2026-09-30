@@ -481,7 +481,6 @@ def test_cast_lock_refuses_an_audio_switch_the_gate_never_rolled():
 # --- the checks the pools borrow ---------------------------------------------
 
 @pytest.mark.parametrize("name,env_var", [("chatterbox", "OTR_CHATTERBOX_VENV"),
-                                          ("dia", "OTR_DIA_VENV"),
                                           ("indextts2", "OTR_INDEXTTS2_VENV")])
 def test_a_missing_separate_install_is_named(monkeypatch, tmp_path, name, env_var):
     from nodes._otr_audio_engines import registry as areg

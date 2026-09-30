@@ -133,7 +133,6 @@ What each voice engine needs, read from the audio registry. Kokoro is the shippe
 | `bark` | char, announcer | cuda, cpu, mps | no | in-process | ships: weights download on first use (about 4 GB) |
 | `chatterbox` | char, announcer | cuda | no | sidecar, nvidia only | install it yourself: isolated sidecar venv, reference WAVs |
 | `cloud_elevenlabs` | char, announcer | cuda, cpu, mps | yes | in-process | install it yourself |
-| `dia` | char, announcer | cuda | no | sidecar, nvidia only | install it yourself: isolated sidecar venv, reference WAVs |
 | `google_tts` | char, announcer | cuda, cpu, mps | yes | in-process | your own API key (cloud) |
 | `indextts2` | char | cuda | no | sidecar, nvidia only | install it yourself: `scripts/_otr_indextts2_install.ps1` plus your own reference WAVs (voice cloning) |
 | `kokoro` | announcer, char | cuda, cpu, mps | yes | in-process | ships: `kokoro` (torch) on Python 3.12, `kokoro-onnx` (CPU) on 3.13; voices and the ONNX model fetch once at boot |
@@ -172,9 +171,9 @@ The honest use of these numbers is COMPARATIVE -- which lane is heavier than whi
 
 ## Known limits, written down when they were found
 
-* indextts2 is NOT selectable as the announcer voice -- OTR_CastLock's announcer combo is (auto, kokoro, chatterbox, dia, elevenlabs, google_tts, bark). It IS selectable as the character voice. Recorded here rather than worked around: the dropdown decides, the workflow runs it, and a failure gets written down.
+* indextts2 is NOT selectable as the announcer voice -- OTR_CastLock's announcer combo is (auto, kokoro, chatterbox, elevenlabs, google_tts, bark). It IS selectable as the character voice. Recorded here rather than worked around: the dropdown decides, the workflow runs it, and a failure gets written down.
 
-* chatterbox and dia are announcer-capable cloning engines but each needs its own isolated venv; neither is installed on the rented pod.
+* chatterbox is an announcer-capable cloning engine but needs its own isolated venv; it is not installed on the rented pod.
 
 * OTR_ImageDirector dtype_policy accepts fp8_ok / no_fp8 / no_fp8_no_fp4 only. 'fp16' is not a choice -- it was invented here once and failed at apply time, which is the intended behaviour.
 

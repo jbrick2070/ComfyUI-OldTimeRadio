@@ -19,7 +19,7 @@ node UI. No translated knobs.
 
 **Kokoro is the multilingual dance leader.** The first ship, and every later
 row until a second engine earns a seat, speaks through Kokoro defaults only.
-No extra voice-pack download. Bark / Dia / Chatterbox / IndexTTS / ElevenLabs /
+No extra voice-pack download. Bark / Chatterbox / IndexTTS / ElevenLabs /
 Google do not block the release. A non-Kokoro engine on a non-English episode
 fails at CastLock until that engine is listed on the row.
 

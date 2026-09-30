@@ -448,7 +448,7 @@ def test_the_owned_recording_is_never_drawn_for_another_character(bank):
     reserved = reserved_voice_ref_ids()
     assert reserved, "nothing is reserved -- this test would prove nothing"
 
-    for engine in ("indextts2", "chatterbox", "dia"):
+    for engine in ("indextts2", "chatterbox"):
         for seed in range(40):
             ref = assign_voice_for_slot(
                 role="char_voice", engine=engine, char_id="c03", gender="male",
@@ -481,13 +481,13 @@ def test_only_the_owned_recording_is_reserved_not_the_borrowed_catalogue():
 #
 # Section 6 proves the clone is withheld from everybody else. That is only half
 # of a reservation, and for a while it was the only half that was true: between
-# the casting cutover and 2026-09-24 Lemmy's chatterbox and dia clones were
-# withheld from every other character AND never delivered to him, so he was cast
+# the casting cutover and 2026-09-24 Lemmy's own clones were withheld from
+# every other character AND never delivered to him, so he was cast
 # on an ordinary librivox voice while his own recording sat reserved for nobody.
 # Measured against the pre-cutover commit, not inferred.
 # ---------------------------------------------------------------------------
 
-_CLONE_ENGINES = ("indextts2", "chatterbox", "dia")
+_CLONE_ENGINES = ("indextts2", "chatterbox")
 
 
 @pytest.mark.parametrize("policy", ["auto_registry", "preserve_ledger"])

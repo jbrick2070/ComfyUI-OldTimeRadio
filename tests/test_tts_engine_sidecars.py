@@ -1,7 +1,7 @@
-"""Tests for the chatterbox + Dia Path-B sidecars and the adapter-metadata
-refactor that replaced the ``_OTR_CLONE_ENGINES`` name tuple (2026-06-05).
+"""Tests for the chatterbox Path-B sidecar and the adapter-metadata refactor
+that replaced the ``_OTR_CLONE_ENGINES`` name tuple (2026-06-05).
 
-Headless-safe: never imports the chatterbox / dia libraries or spawns a worker.
+Headless-safe: never imports the chatterbox library or spawns a worker.
 Exercises the registry, adapter metadata, fail-closed ``load()``, the pure worker
 helpers, the bank mirror, and the C-5 import-safety property.
 """
@@ -18,7 +18,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 def _load_script(name):
     """Import a scripts/<name> module by path (side-effect-free at import:
     the workers do the fd dance + heavy imports inside main(), not at module
-    load, so this never pulls torch / chatterbox / dia)."""
+    load, so this never pulls torch / chatterbox)."""
     path = REPO_ROOT / "scripts" / name
     spec = importlib.util.spec_from_file_location(name[:-3], path)
     mod = importlib.util.module_from_spec(spec)
@@ -27,16 +27,13 @@ def _load_script(name):
 
 
 # --- registry + metadata --------------------------------------------------- #
-def test_chatterbox_and_dia_registered_with_roles():
+def test_chatterbox_registered_with_roles():
     from nodes import _otr_audio_engines as AE
     cbx = AE.get_engine("chatterbox")
-    dia = AE.get_engine("dia")
     assert "char_voice" in cbx.roles
-    assert dia.roles == ("char_voice", "announcer_voice")
     assert cbx.requires_flag is None  # C6: registry IS the menu (no flag gate)
-    assert dia.requires_flag is None
-    assert cbx.commercial_clean is True and dia.commercial_clean is True
-    assert cbx.sample_rate == 24000 and dia.sample_rate == 44100
+    assert cbx.commercial_clean is True
+    assert cbx.sample_rate == 24000
 
 
 def test_clone_engines_declare_ref_metadata():
@@ -44,7 +41,7 @@ def test_clone_engines_declare_ref_metadata():
     # missing ref now FAILS LOUD in the dispatch -- there is NO bark fallback, so
     # missing_ref_fallback is None on every cloning engine.
     from nodes import _otr_audio_engines as AE
-    for name in ("indextts2", "chatterbox", "dia"):
+    for name in ("indextts2", "chatterbox"):
         e = AE.get_engine(name)
         assert e.requires_voice_ref is True
         assert e.voice_ref_kind == "wav_path"
@@ -70,52 +67,38 @@ def test_requires_voice_ref_implies_voice_ref_kind():
 
 
 # --- fail-closed gating + load() ------------------------------------------- #
-def test_optin_engines_selectable_no_flag(monkeypatch):
-    # C6 -- registry IS the menu: chatterbox + dia are selectable with NO flag
-    # gate (the venv/weights checks run in load(), not assert_usable).
+def test_optin_engine_selectable_no_flag(monkeypatch):
+    # C6 -- registry IS the menu: chatterbox is selectable with NO flag gate
+    # (the venv/weights checks run in load(), not assert_usable).
     from nodes import _otr_audio_engines as AE
     monkeypatch.delenv("OTR_ENABLE_CHATTERBOX", raising=False)
-    monkeypatch.delenv("OTR_ENABLE_DIA", raising=False)
-    for name in ("chatterbox", "dia"):
-        assert AE.assert_usable(name, "char_voice") == name
+    assert AE.assert_usable("chatterbox", "char_voice") == "chatterbox"
 
 
-def test_optin_engines_usable_when_flagged(monkeypatch):
+def test_optin_engine_usable_when_flagged(monkeypatch):
     from nodes import _otr_audio_engines as AE
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
-    monkeypatch.setenv("OTR_ENABLE_DIA", "1")
     assert AE.assert_usable("chatterbox", "char_voice") == "chatterbox"
-    assert AE.assert_usable("dia", "char_voice") == "dia"
 
 
 def test_load_fails_closed_when_not_installed(monkeypatch):
     from nodes import _otr_audio_engines as AE
-    # Point the sidecars at a venv python that does not exist -> NAMED error.
+    # Point the sidecar at a venv python that does not exist -> NAMED error.
     monkeypatch.setenv("OTR_CHATTERBOX_VENV", str(REPO_ROOT / "nope" / "python.exe"))
-    monkeypatch.setenv("OTR_DIA_VENV", str(REPO_ROOT / "nope" / "python.exe"))
-    for name, needle in (("chatterbox", "Chatterbox Path B not installed"),
-                         ("dia", "Dia Path B not installed")):
-        with pytest.raises(RuntimeError) as ei:
-            AE.get_engine(name).load()
-        assert needle in str(ei.value)
+    with pytest.raises(RuntimeError) as ei:
+        AE.get_engine("chatterbox").load()
+    assert "Chatterbox Path B not installed" in str(ei.value)
 
 
 # --- C-5 import safety ------------------------------------------------------ #
 def test_import_engines_pulls_no_sidecar_library():
-    # Importing the registry must NOT import the chatterbox / dia libraries
-    # (they are imported only inside the isolated worker subprocess).
+    # Importing the registry must NOT import the chatterbox library (it is
+    # imported only inside the isolated worker subprocess).
     import nodes._otr_audio_engines  # noqa: F401
-    for mod in ("chatterbox", "dia"):
-        assert mod not in sys.modules, "%s imported at registry import (C-5)" % mod
+    assert "chatterbox" not in sys.modules, "chatterbox imported at registry import (C-5)"
 
 
 # --- pure worker helpers (no GPU, no model) -------------------------------- #
-def test_dia_worker_build_prompt():
-    w = _load_script("_otr_dia_worker.py")
-    assert w._build_prompt("Hello there.", "") == "[S1] Hello there."
-    assert w._build_prompt("Hi.", "Ref line.") == "[S1] Ref line. [S1] Hi."
-
-
 def test_chatterbox_worker_supported_kwargs_drops_unknown():
     w = _load_script("_otr_chatterbox_worker.py")
 
@@ -128,24 +111,24 @@ def test_chatterbox_worker_supported_kwargs_drops_unknown():
 
 
 # --- bank mirror ----------------------------------------------------------- #
-def test_bank_has_chatterbox_and_dia_pools():
+def test_bank_has_a_chatterbox_pool_mirroring_indextts2():
     from nodes._otr_voice_bank import load_voice_bank
     bank, _ = load_voice_bank()
     cbx = [e for e in bank if e.engine == "chatterbox" and "char_voice" in e.roles]
-    dia = [e for e in bank if e.engine == "dia" and "char_voice" in e.roles]
+    idx = [e for e in bank if e.engine == "indextts2" and "char_voice" in e.roles]
     # FLOOR, not an exact count: the bank GROWS as public-domain voices are
     # added (scripts/otr_ingest_pd_voices.py). The original mirrored pools were
     # 36 each.
     #
     # LOWERED 36 -> 20 ON 2026-08-20, and only because the OPERATOR SHRANK THE
     # BANK ON PURPOSE. He auditioned all 63 donor references and retired 21 of
-    # them as dupes or voices he does not want, which removed 63 rows (21 refs
-    # x indextts2/chatterbox/dia) and took every char_voice pool from 41 to 20.
-    # The mirrored-pool INVARIANT is untouched and is what this test actually
-    # guards: all three engines still carry the same 20, so a cast that works on
-    # one engine works on all three.
+    # them as dupes or voices he does not want, and every char_voice pool went
+    # from 41 to 20. The mirrored-pool INVARIANT is what this test actually
+    # guards: chatterbox carries the same references as indextts2 (it is
+    # generated from them by scripts/_otr_mirror_clone_refs.py), so a cast that
+    # works on one engine works on the other.
     #
-    # THE FLOOR IS NOT A TARGET. If a future change drops a pool below 20
+    # THE FLOOR IS NOT A TARGET. If a future change drops the pool below 20
     # without a matching operator ruling, that is a regression and this is where
     # it surfaces. Raise it again when public-domain ingestion grows the bank.
     #
@@ -153,19 +136,18 @@ def test_bank_has_chatterbox_and_dia_pools():
     # engine. Seven female char voices is thin for an episode that casts several
     # women, and repeats will be audible before male repeats are.
     assert len(cbx) >= 20
-    assert len(dia) >= 20
-    assert len(cbx) == len(dia), (
-        "the pools must stay MIRRORED -- chatterbox %d vs dia %d" % (len(cbx), len(dia)))
-    assert all(e.roles == ("char_voice",) for e in dia)
+    assert {e.ref_path for e in cbx} == {e.ref_path for e in idx}, (
+        "the pools must stay MIRRORED -- chatterbox %d vs indextts2 %d"
+        % (len(cbx), len(idx)))
+    assert all(e.roles == ("char_voice",) for e in cbx)
 
 
-def test_caster_assigns_clone_voice_for_each_engine():
+def test_caster_assigns_a_chatterbox_voice():
     from nodes._otr_voice_bank import assign_voice_for_slot, load_voice_bank
     bank, _ = load_voice_bank()
-    for engine in ("chatterbox", "dia"):
-        e = assign_voice_for_slot(role="char_voice", engine=engine,
-                                  char_id="c1", gender="female", bank=bank)
-        assert e.engine == engine and e.gender == "female"
+    e = assign_voice_for_slot(role="char_voice", engine="chatterbox",
+                              char_id="c1", gender="female", bank=bank)
+    assert e.engine == "chatterbox" and e.gender == "female"
 
 
 def test_no_dangling_placeholder_chatterbox_rows():
@@ -250,7 +232,7 @@ def test_remove_quietly_is_safe(tmp_path):
     SC.remove_quietly(str(p))  # already gone -> must not raise
 
 
-# --- role-aware ref resolution + Dia prompt normalization ------------------ #
+# --- role-aware ref resolution ---------------------------------------------- #
 def test_announcer_role_threads_to_caster():
     # _resolve_clone_ref_path now passes self.ROLE to the caster; with the
     # announcer ref's timbre the announcer-role tier wins deterministically.
@@ -260,46 +242,14 @@ def test_announcer_role_threads_to_caster():
                               char_id="ann", gender="male",
                               timbre=("authoritative", "resonant"), bank=bank)
     assert e.voice_ref_id == "cb_announcer_male"
-    d = assign_voice_for_slot(role="announcer_voice", engine="dia",
-                              char_id="ann", gender="male",
-                              timbre=("authoritative", "resonant"), bank=bank)
-    assert d.voice_ref_id == "dia_announcer_male"
 
 
 def test_resolve_clone_ref_path_accepts_role_kwarg():
     from nodes import _otr_voice_node_common as VC
     # Unknown gender + no matching ref -> graceful None, never a crash.
-    out = VC._resolve_clone_ref_path("dia", {"char_id": "x", "gender": "zzz"}, 1,
+    out = VC._resolve_clone_ref_path("chatterbox", {"char_id": "x", "gender": "zzz"}, 1,
                                      role="char_voice")
     assert out is None or isinstance(out, str)
-
-
-def test_dia_worker_normalizes_leading_speaker_tag():
-    w = _load_script("_otr_dia_worker.py")
-    # a transcript that already carries [S1] must not produce "[S1] [S1]".
-    assert w._build_prompt("Hi.", "[S1] Ref words.") == "[S1] Ref words. [S1] Hi."
-    assert w._strip_lead_tag("[S2] x") == "x"
-
-
-def test_dia_worker_loads_wav_ref_without_torchcodec(tmp_path):
-    sf = pytest.importorskip("soundfile")
-    np = pytest.importorskip("numpy")
-    torch = pytest.importorskip("torch")
-    w = _load_script("_otr_dia_worker.py")
-    ref = tmp_path / "ref.wav"
-    sf.write(ref, np.zeros((128, 1), dtype="float32"), w._SR)
-
-    class Model:
-        device = torch.device("cpu")
-
-        def _encode(self, audio):
-            self.audio = audio
-            return torch.ones((3, 9), dtype=torch.int32)
-
-    model = Model()
-    codes = w._load_audio_prompt_codes(model, str(ref))
-    assert tuple(model.audio.shape) == (1, 128)
-    assert tuple(codes.shape) == (3, 9)
 
 
 # --- polish round 2: pipe closure, double-close, timeout clamp ------------- #
@@ -438,7 +388,7 @@ def test_default_venv_python_is_platform_correct(tmp_path, monkeypatch):
         str(root), ".venv", "bin", "python")
     # posix WITH the provisioner's Scripts entry: the launcher wins. For
     # IndexTTS2 it sets the offline env (Composer QA: routing around it runs
-    # the worker online on a network-less pod); for chatterbox/dia it is an
+    # the worker online on a network-less pod); for chatterbox it is an
     # equivalent symlink. This is what a provisioned pod resolves.
     launcher = root / ".venv" / "Scripts" / "python.exe"
     launcher.parent.mkdir(parents=True)
@@ -449,24 +399,20 @@ def test_default_venv_python_is_platform_correct(tmp_path, monkeypatch):
 
 def test_windows_venv_default_is_byte_identical(monkeypatch):
     from nodes._otr_audio_engines import _otr_sidecar as SC
-    from nodes._otr_audio_engines import (
-        eng_chatterbox, eng_dia, eng_indextts2)
+    from nodes._otr_audio_engines import eng_chatterbox, eng_indextts2
     monkeypatch.setattr(SC.os, "name", "nt")
-    for mod, sub in ((eng_chatterbox, "chatterbox"), (eng_dia, "dia"),
-                     (eng_indextts2, "index-tts")):
+    for mod, sub in ((eng_chatterbox, "chatterbox"), (eng_indextts2, "index-tts")):
         old = os.path.join(mod._COMFY_ROOT, sub, ".venv", "Scripts", "python.exe")
         assert SC.default_venv_python(os.path.join(mod._COMFY_ROOT, sub)) == old
 
 
-def test_all_three_engines_delegate_to_the_shared_helper(monkeypatch):
+def test_both_sidecar_engines_delegate_to_the_shared_helper(monkeypatch):
     from nodes import _otr_audio_engines as AE
     from nodes._otr_audio_engines import _otr_sidecar as SC
-    from nodes._otr_audio_engines import (
-        eng_chatterbox, eng_dia, eng_indextts2)
-    for var in ("OTR_CHATTERBOX_VENV", "OTR_DIA_VENV", "OTR_INDEXTTS2_VENV"):
+    from nodes._otr_audio_engines import eng_chatterbox, eng_indextts2
+    for var in ("OTR_CHATTERBOX_VENV", "OTR_INDEXTTS2_VENV"):
         monkeypatch.delenv(var, raising=False)
     for name, mod, sub in (("chatterbox", eng_chatterbox, "chatterbox"),
-                           ("dia", eng_dia, "dia"),
                            ("indextts2", eng_indextts2, "index-tts")):
         for os_name in ("nt", "posix"):
             monkeypatch.setattr(SC.os, "name", os_name)
@@ -477,8 +423,6 @@ def test_all_three_engines_delegate_to_the_shared_helper(monkeypatch):
 def test_venv_env_overrides_still_win(monkeypatch):
     from nodes import _otr_audio_engines as AE
     monkeypatch.setenv("OTR_CHATTERBOX_VENV", "C:/custom/cbx/python.exe")
-    monkeypatch.setenv("OTR_DIA_VENV", "C:/custom/dia/python.exe")
     monkeypatch.setenv("OTR_INDEXTTS2_VENV", "C:/custom/idx/python.exe")
     assert AE.get_engine("chatterbox")._venv_python() == "C:/custom/cbx/python.exe"
-    assert AE.get_engine("dia")._venv_python() == "C:/custom/dia/python.exe"
     assert AE.get_engine("indextts2")._venv_python() == "C:/custom/idx/python.exe"

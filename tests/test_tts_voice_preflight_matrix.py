@@ -154,16 +154,16 @@ def _mirror_module():
 
 
 def test_p3_1_the_mirror_generator_never_deletes_a_row_it_cannot_recreate():
-    """P3.1 -- THE ONE THAT NEARLY COST THREE ROWS.
+    """P3.1 -- THE ONE THAT NEARLY COST HAND-MADE ROWS.
 
-    The generator used to drop EVERY chatterbox/dia row and rebuild from the
+    The generator used to drop EVERY mirrored-engine row and rebuild from the
     indextts2 rows, so anything it did not itself produce was destroyed. The
-    bank had since gained `cb_announcer_female`, `dia_announcer_male` and
-    `dia_announcer_female` -- pinned by nine assertions across
+    bank had since gained announcer rows it does not generate
+    (`cb_announcer_female` among them) -- pinned by assertions across
     tests/test_voice_bank.py and tests/test_tts_engine_sidecars.py -- and a
-    re-run invited by its own "idempotent" docstring would have deleted all
-    three, turning the suite red for reasons nobody would connect to
-    "I refreshed the mirror".
+    re-run invited by its own "idempotent" docstring would have deleted them,
+    turning the suite red for reasons nobody would connect to "I refreshed the
+    mirror".
 
     A generator may only own the keys it can actually recreate.
     """
@@ -198,7 +198,7 @@ def test_p3_3_generated_ids_do_not_carry_the_source_prefix():
 
     assert module._new_id("cb_", "idx_lemmy_algenib_cockney_v1") == \
         "cb_lemmy_algenib_cockney_v1"
-    assert module._new_id("dia_", "vz_bill_boerst") == "dia_bill_boerst"
+    assert module._new_id("cb_", "vz_bill_boerst") == "cb_bill_boerst"
 
 
 def test_p3_4_the_generator_never_drops_a_FIELD_from_a_row_it_owns():
@@ -232,8 +232,8 @@ def test_p3_5_a_mirror_carries_its_sources_speaker_id():
     ref_path collision cannot catch two recordings of ONE person: LibriVox's
     Mark F. Smith has a plain and a grandfatherly take in two different files.
     Strip it from the clone engines and one narrator can be cast as two
-    characters in the same episode -- on chatterbox and dia only, which is a
-    casting defect nobody would trace back to a bank generator."""
+    characters in the same episode -- on chatterbox only, which is a casting
+    defect nobody would trace back to a bank generator."""
     planned = _mirror_module().plan_rows(_bank_rows())["voices"]
     by_id = {(row["engine"], row["voice_ref_id"]): row for row in planned}
 
@@ -244,7 +244,7 @@ def test_p3_5_a_mirror_carries_its_sources_speaker_id():
     for src in sources:
         if "char_voice" not in src.get("roles", []):
             continue
-        for engine, prefix in (("chatterbox", "cb_"), ("dia", "dia_")):
+        for engine, prefix in (("chatterbox", "cb_"),):
             mirror = by_id.get(
                 (engine, _mirror_module()._new_id(prefix, src["voice_ref_id"])))
             assert mirror is not None

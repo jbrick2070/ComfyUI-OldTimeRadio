@@ -202,7 +202,6 @@ IMAGE_GEN = {
 TTS = {
     "kokoro": "koko",
     "chatterbox": "chat",
-    "dia": "dia",
     "cloud_elevenlabs": "elev",
     "google_tts": "gtts",
     "bark": "bark",

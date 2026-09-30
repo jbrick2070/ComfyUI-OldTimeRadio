@@ -8,7 +8,7 @@ WHY THIS FILE EXISTS. `vz_donor_glenn` was imported FEMALE on 2026-06-05 and
 cast on 115 female slots -- it became the #2 female voice in the corpus -- until
 the operator heard it and it was flipped to MALE in `e1c84cf6` (2026-08-17,
 "the operator heard four bugs the code could not"), together with its
-`cb_`/`dia_` siblings. That is two and a half months of female characters
+clone-engine siblings. That is two and a half months of female characters
 speaking with a male voice, found by ear because no test could find it.
 
 His instruction on 2026-08-18, in his words: *"We [spent] so much time fixing
@@ -17,8 +17,8 @@ i may need to confirm."* This file is the "don't break it again" half.
 
 THIS IS A PIN, NOT AN AUDIT. It asserts only what the operator has actually
 ruled on. Rows that merely LOOK mis-stamped are deliberately NOT asserted here --
-as of 2026-08-18 nine of them are open and unconfirmed (the `hillbilly_jim`,
-`rup` and `james` trios, all stamped female on indextts2/chatterbox/dia).
+as of 2026-08-18 the `hillbilly_jim`, `rup` and `james` voices were open and
+unconfirmed, stamped female on every cloning engine.
 Adding an unconfirmed row to this file would turn a guess into a contract.
 When he confirms one, add it here in the same change.
 """
@@ -37,14 +37,12 @@ OPERATOR_SETTLED_GENDERS = {
     # BY EAR on 2026-08-20 in the donor audition page.
     "vz_donor_hillbilly_jim": "male",
     "cb_donor_hillbilly_jim": "male",
-    "dia_donor_hillbilly_jim": "male",
     # Heard male on 2026-08-20; the bank had it female from the same F0 bucket.
     # This is the ONLY gender the audition changed -- every other voice he
     # judged already matched the bank, which is the receipt that the naming-rule
     # repair had substantially worked.
     "vz_donor_selfie": "male",
     "cb_donor_selfie": "male",
-    "dia_donor_selfie": "male",
 }
 
 #: RETIRED 2026-08-20 BY THE OPERATOR'S EAR -- and glenn's absence needs the

@@ -555,7 +555,7 @@ def test_the_capped_vector_is_what_reaches_the_worker(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------- #
 # SCOPE. Seeding = three clone profiles. Cap = IndexTTS2 only. [QA-6]
 # --------------------------------------------------------------------------- #
-def test_exactly_the_three_char_clone_profiles_opt_into_character_seeding():
+def test_exactly_the_char_clone_profiles_opt_into_character_seeding():
     """Announcer profiles are deliberately untouched: an announcer is not a
     cloned character and has no identity to hold steady across beats."""
     from nodes._otr_engine_profiles import load_resolver
@@ -565,11 +565,10 @@ def test_exactly_the_three_char_clone_profiles_opt_into_character_seeding():
         pid for pid in resolver.profile_ids()
         if getattr(resolver.get(pid), "character_stable_seed", False))
 
-    assert opted_in == ["char_chatterbox_v1", "char_dia_v1",
-                        "char_indextts2_v1"], opted_in
+    assert opted_in == ["char_chatterbox_v1", "char_indextts2_v1"], opted_in
 
 
-def test_those_three_profiles_bumped_their_impl_version():
+def test_those_profiles_bumped_their_impl_version():
     """[E] Stale audio is invalidated honestly: `engine_impl_version` keys the
     cache, so audio rendered under the per-line seed can never be replayed as
     if this build had made it."""
@@ -578,9 +577,8 @@ def test_those_three_profiles_bumped_their_impl_version():
     resolver = load_resolver()
     # indextts2 is at 3: the emotion ceiling moved on 2026-08-18 and this field
     # is the profile's declared "the engine's behaviour changed" statement.
-    # The other two only ever took the seed change.
-    expected = {"char_indextts2_v1": "3",
-                "char_chatterbox_v1": "2", "char_dia_v1": "2"}
+    # chatterbox only ever took the seed change.
+    expected = {"char_indextts2_v1": "3", "char_chatterbox_v1": "2"}
     for pid, want in expected.items():
         assert resolver.get(pid).engine_impl_version == want, pid
 
@@ -600,8 +598,8 @@ def test_the_bumped_version_moves_the_cache_key():
 
 
 def test_the_emotion_cap_is_indextts2_only():
-    """Chatterbox and dia get the character SEED, not the emotion ceiling --
-    they have no emotion vector to cap."""
+    """Chatterbox gets the character SEED, not the emotion ceiling -- it has
+    no emotion vector to cap."""
     from nodes._otr_audio_engines import registry as areg
 
     declaring = []

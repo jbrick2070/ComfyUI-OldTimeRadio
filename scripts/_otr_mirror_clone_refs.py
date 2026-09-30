@@ -1,7 +1,7 @@
-"""Mirror the indextts2 CC0 char_voice references onto the chatterbox + dia clone
-engines. The CC0 reference WAVs are clone-engine-agnostic, so each clone engine gets
-the same voice pool by re-tagging the engine -- no new files, no downloads. Run with
-the ComfyUI venv python; the bank JSON hot-reloads (no restart).
+"""Mirror the indextts2 CC0 char_voice references onto the chatterbox clone engine.
+The CC0 reference WAVs are clone-engine-agnostic, so a clone engine gets the same
+voice pool by re-tagging the engine -- no new files, no downloads. Run with the
+ComfyUI venv python; the bank JSON hot-reloads (no restart).
 
   python scripts/_otr_mirror_clone_refs.py [--dry-run]
 
@@ -11,7 +11,7 @@ and passes every other row through untouched -- so a second run over its own
 output is byte-identical.
 
 OWNERSHIP HAD TO BE FIXED TWICE, and the second time is worth reading before
-trusting this script again. The original version dropped EVERY chatterbox/dia row
+trusting this script again. The original version dropped EVERY mirrored-engine row
 and rebuilt from the indextts2 rows, destroying anything it did not itself
 produce -- three announcer rows pinned by nine assertions. That was fixed at the
 ROW level: own only the keys you can recreate.
@@ -27,8 +27,7 @@ field but its identity, and a row this script merely bootstraps is created only
 when it is missing.
 
 Regenerates:
-  - 36 chatterbox char_voice rows  (cb_*)
-  - 36 dia char_voice rows         (dia_*)
+  - the chatterbox char_voice rows (cb_*), one per indextts2 char_voice row
   - 1  chatterbox announcer row    (cb_announcer_male -> a real male CC0 ref)
 UTF-8, no BOM, ASCII-only.
 """
@@ -38,8 +37,8 @@ import os
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _BANK = os.path.join(_REPO, "config", "voice_reference_bank.json")
-_MIRROR_ENGINES = ("chatterbox", "dia")
-_PREFIX = {"chatterbox": "cb_", "dia": "dia_"}
+_MIRROR_ENGINES = ("chatterbox",)
+_PREFIX = {"chatterbox": "cb_"}
 
 #: The only two fields a mirror does NOT take from its source. Everything else
 #: rides along, and that is a deliberate reversal of the earlier allow-list.
@@ -50,8 +49,8 @@ _PREFIX = {"chatterbox": "cb_", "dia": "dia_"}
 #: records the real human behind a reference, and it exists because ref_path
 #: collision cannot catch two recordings of one person -- LibriVox's Mark F. Smith
 #: has a plain and a grandfatherly take in two different files. Without it one
-#: narrator can be cast as two characters in the same episode, on chatterbox and
-#: dia only, which is a casting defect nobody would trace back to a generator.
+#: narrator can be cast as two characters in the same episode, on chatterbox
+#: only, which is a casting defect nobody would trace back to a generator.
 #:
 #: A deny-list of exactly the identity pair is the right shape: a mirror IS its
 #: source, re-tagged, so any future bank field mirrors correctly without anyone
@@ -88,12 +87,11 @@ def plan_rows(voices):
     """Pure planner: the FULL new voices list, plus what changed.
 
     THE OWNERSHIP RULE, and why this was rewritten 2026-08-16. The original
-    version dropped EVERY chatterbox/dia row and rebuilt from the indextts2
+    version dropped EVERY mirrored-engine row and rebuilt from the indextts2
     rows -- so any row it did not itself produce was destroyed. The bank had
-    since gained three announcer rows it does not generate
-    (`cb_announcer_female`, `dia_announcer_male`, `dia_announcer_female`), each
-    pinned by assertions, and a re-run invited by the word "idempotent" would
-    have deleted all three.
+    since gained announcer rows it does not generate (`cb_announcer_female`
+    among them), each pinned by assertions, and a re-run invited by the word
+    "idempotent" would have deleted them.
 
     A generator may only own the keys it can actually recreate -- and only the
     FIELDS it can actually derive, which is the half the first repair missed. So
@@ -112,7 +110,7 @@ def plan_rows(voices):
             mirrored.append(_mirror_row(src, engine))
 
     # One chatterbox announcer row off a real male CC0 ref, so announcer-via-
-    # chatterbox is not dangling (dia stays char_voice-only this pass).
+    # chatterbox is not dangling.
     #
     # CREATED ONLY WHEN ABSENT, and that is the fix to the second thing this
     # generator used to destroy. This row is a BOOTSTRAP, not a mirror -- it is

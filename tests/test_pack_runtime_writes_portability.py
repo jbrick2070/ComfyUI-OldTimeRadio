@@ -117,33 +117,6 @@ def test_chatterbox_unwritable_stderr_does_not_crash_before_worker(pinned_out, m
         eng.load()
 
 
-def test_dia_unwritable_stderr_does_not_crash_before_worker(pinned_out, monkeypatch, tmp_path):
-    from nodes._otr_audio_engines import eng_dia as mod
-
-    eng = mod.DiaEngine()
-    (tmp_path / "py.exe").write_text("", encoding="utf-8")
-    (tmp_path / "worker.py").write_text("", encoding="utf-8")
-    monkeypatch.setattr(eng, "_venv_python", lambda: str(tmp_path / "py.exe"))
-    monkeypatch.setattr(eng, "_worker_script", lambda: str(tmp_path / "worker.py"))
-
-    real_open = open
-
-    def guarded_open(path, *args, **kwargs):
-        if "_otr_dia_worker.err" in str(path):
-            raise OSError(13, "Permission denied")
-        return real_open(path, *args, **kwargs)
-
-    monkeypatch.setattr("builtins.open", guarded_open)
-    monkeypatch.setattr(
-        mod.otr_proc,
-        "popen",
-        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("popen reached")),
-    )
-
-    with pytest.raises(RuntimeError, match="popen reached"):
-        eng.load()
-
-
 def test_the_episode_telemetry_never_reads_the_frozen_legacy_log(
         pinned_out, monkeypatch, tmp_path):
     """A field the live log has not written yet keeps its default; it never

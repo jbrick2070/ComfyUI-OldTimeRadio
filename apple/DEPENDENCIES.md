@@ -97,15 +97,7 @@ Each pins torch/transformers versions that would brick ComfyUI's own venv, so th
 * source: `pip: chatterbox-tts soundfile torch torchaudio`
 * build: own venv; torch pinned separately from ComfyUI's
 * env: `OTR_CHATTERBOX_VENV / _WORKER`
-* MIT, commercial-clean, and announcer-capable -- one of only two cloning engines the announcer accepts.
-
-### `dia`
-
-* install to: `<comfy-root>/dia` (or anywhere, and set the env var)
-* source: `pip: git+https://github.com/nari-labs/dia.git`
-* build: own venv; torch pinned separately
-* env: `OTR_DIA_VENV / _WORKER`
-* Apache, the second commercial-clean cloner, also announcer-capable.
+* MIT, commercial-clean, and announcer-capable -- the only cloning engine the announcer accepts.
 
 **Reference WAVs** for cloning engines live at `<models_root>/TTS/refs/<engine>/*.wav`, one per cast voice. They ship with nothing. Without a resolvable reference the engine refuses by name and there is no fallback.
 

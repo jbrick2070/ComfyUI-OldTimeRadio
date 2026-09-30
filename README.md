@@ -451,10 +451,9 @@ What `otr_canonical` ships, and why:
 - **Voices:** `kokoro` on both slots. It is the only one-click voice on every
   platform, which is why it is the default. The voice engines come with a Manager
   install, except one: the IndexTTS2 voice cloner ships in the GitHub tree only.
-  Chatterbox and Dia assume Windows -- they run in their own
-  venv and install through PowerShell scripts with no shell twin. Point
-  `OTR_CHATTERBOX_VENV` or `OTR_DIA_VENV` at your own interpreter to run them
-  elsewhere; nothing here has proven that path.
+  Chatterbox assumes Windows -- it runs in its own venv and installs through a
+  PowerShell script with no shell twin. Point `OTR_CHATTERBOX_VENV` at your own
+  interpreter to run it elsewhere; nothing here has proven that path.
 - **Music:** `stable_audio_3`. Commercially clean and ungated. MusicGen remains
   selectable and is noncommercial.
 
@@ -814,7 +813,7 @@ that actually failed in a real run get in.
 
 The pack is [MIT](LICENSE). It is built on ComfyUI and the open-weight LTX, Wan,
 HuMo, AnimateDiff, Z-Image-Turbo, Lumina, Kokoro, Stable Audio,
-Qwen and Gemma ecosystems, plus the optional Chatterbox, Dia, Bark, MusicGen and
+Qwen and Gemma ecosystems, plus the optional Chatterbox, Bark, MusicGen and
 IndexTTS2 engines -- thanks to all of their authors.
 
 **The shipped defaults are not a blanket commercial clearance.** A few optional,

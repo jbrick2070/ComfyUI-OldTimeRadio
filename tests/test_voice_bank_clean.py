@@ -1,7 +1,7 @@
 """default_clean voice bank -- the commercial-clean cast selector (2026-06-18
 voice-engine roundtable). Selecting voice_bank=default_clean routes the cast
-char engine to chatterbox (MIT), then dia (Apache); indextts2 (non-commercial)
-is excluded. voice_bank=default is unchanged (indextts2 first = best quality)."""
+char engine to chatterbox (MIT); indextts2 (non-commercial) is excluded.
+voice_bank=default is unchanged (indextts2 first = best quality)."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -26,22 +26,16 @@ def test_default_clean_still_routes_through_the_engine_profiles():
 
 
 def test_default_clean_routes_to_chatterbox():
-    # all three cloners have refs; default_clean excludes indextts2 -> chatterbox.
+    # both cloners have refs; default_clean excludes indextts2 -> chatterbox.
     eng = CastLock._resolve_char_engine(
-        "default_clean", _entries("indextts2", "chatterbox", "dia"))
+        "default_clean", _entries("indextts2", "chatterbox"))
     assert eng == "chatterbox"
 
 
 def test_default_still_routes_to_indextts2():
     eng = CastLock._resolve_char_engine(
-        "default", _entries("indextts2", "chatterbox", "dia"))
+        "default", _entries("indextts2", "chatterbox"))
     assert eng == "indextts2"
-
-
-def test_default_clean_falls_to_dia_without_chatterbox():
-    eng = CastLock._resolve_char_engine(
-        "default_clean", _entries("indextts2", "dia"))
-    assert eng == "dia"
 
 
 def test_default_clean_excludes_non_commercial_indextts2():

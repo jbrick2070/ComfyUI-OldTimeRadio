@@ -248,12 +248,12 @@ IndexTTS2 route. Both are now resolved, in seven commits
   separate work.
 * **The Lemmy regression the note also described was real, and is fixed.**
   Between the cutover and `1d5e18ff`, Lemmy's own clone recordings on
-  indextts2/chatterbox/dia sat in the bank marked `reserved_for` him, but
+  indextts2/chatterbox sat in the bank marked `reserved_for` him, but
   nothing read that field, so he was cast on an ordinary drawn voice
   instead. `1d5e18ff` added the missing rule: a bank row `reserved_for` a
   recurring character now outranks the shared catalogue entry in
   `RECURRING_CHARACTER_VOICES` (`config/cast_pools.py`). Lemmy is cast on
-  his own recordings on indextts2/chatterbox/dia and on a shared catalogue
+  his own recordings on indextts2/chatterbox and on a shared catalogue
   voice on kokoro/cloud_elevenlabs/google_tts, in both casting policies,
   today.
 * **The runtime-fingerprint staleness gate the old route subsystem used to
@@ -2648,9 +2648,16 @@ the same day: *"kokoro onnx is our new go-to."*
   workflow and every generated variant, is kokoro through the kokoro-onnx backend
   (Section 1.11 of the plan), because it is the only local voice that pip-installs on the
   Python 3.13 that ComfyUI Desktop and the portable ship, on Linux, and on Mac.
-* indextts2, chatterbox, dia and bark stay in the dropdowns as upgrades the user installs
+* indextts2, chatterbox and bark stay in the dropdowns as upgrades the user installs
   on their own. They are not defaults anywhere, and no shipped graph may depend on a
   reference WAV that does not ship.
+* **Amended 2026-09-29 (operator):** an engine that cannot reliably speak a line does
+  not stay in the dropdown when there are alternatives. Operator: *"it shouldn't stay
+  in the dropdown if it can't handle multiple lines and we have alternatives"*;
+  *"remove it, Kokoro is our shining star"*; *"removal 100%, no negative test, no
+  tombstones."* A voice engine is removed atomically -- registry row, module, worker,
+  installer, bank rows, profiles, dropdown lists, tests, generated docs -- and a grep
+  returns only the survivors expected.
 * What "compatible" means is published as ONE generated table in `apple/MACHINE_MATRIX.md`
   from the audio engine registry, never a hand-kept list; README points at it.
 * This closes the 2026-09-01 ship-audit blocker about the indextts2 default without

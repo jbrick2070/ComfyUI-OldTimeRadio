@@ -4,8 +4,8 @@ speak without the operator downloading anything by hand.
 WHY THIS EXISTS (operator, 2026-08-24). Someone installs the pack from the
 Comfy registry, clicks Run, and needs a voice. Only two local TTS engines
 work with NO user-supplied audio: Bark, whose voices live inside its weights,
-and Kokoro, whose voices are separate files. The other three local engines
-(`indextts2`, `chatterbox`, `dia`) all declare `requires_voice_ref = True` --
+and Kokoro, whose voices are separate files. The other two local engines
+(`indextts2`, `chatterbox`) both declare `requires_voice_ref = True` --
 they CLONE, so they need a reference WAV the user has to supply, and a fresh
 install has none.
 

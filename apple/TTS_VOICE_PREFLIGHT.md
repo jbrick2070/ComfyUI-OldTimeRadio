@@ -127,12 +127,12 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
 - **P3.1 If bank rows are GENERATED, prove a re-run reproduces the bank as it
   stands -- before trusting the word "idempotent".**
   *Why, and this one nearly cost three rows:* `scripts/_otr_mirror_clone_refs.py`
-  drops every chatterbox/dia row and regenerates them from the indextts2 rows.
-  The bank had since gained four clone-engine announcer rows; the generator
-  recreates exactly one. A well-meaning re-run -- which its own docstring
-  invited -- would have permanently deleted `cb_announcer_female`,
-  `dia_announcer_male` and `dia_announcer_female`, which nine assertions across
-  `tests/test_voice_bank.py` and `tests/test_tts_engine_sidecars.py` pin, and
+  dropped every mirrored-engine row and regenerated them from the indextts2
+  rows. The bank had since gained clone-engine announcer rows the generator
+  does not recreate. A well-meaning re-run -- which its own docstring invited
+  -- would have permanently deleted them (`cb_announcer_female` among them),
+  which assertions across `tests/test_voice_bank.py` and
+  `tests/test_tts_engine_sidecars.py` pin, and
   the resulting red would have looked unrelated to "I refreshed the mirror".
   **A generator may only be trusted to own rows it can actually recreate.** The
   script now refuses to write when it would destroy an unregenerated row;
@@ -159,13 +159,13 @@ evidence, so a new harness gets its own output root.
   hand-written engine table. *Twin:* `test_p5_1_every_engine_declares_how_its_identity_arrives`.
 - **P5.2 Sample rate is declared per adapter and must match its profile.**
   `pack_audio_batch` raises on any clip whose rate differs, i.e. long after the
-  render is paid for. Today: indextts2 22050, chatterbox 24000, dia 44100,
+  render is paid for. Today: indextts2 22050, chatterbox 24000,
   bark 24000, kokoro 24000, elevenlabs 44100, google_tts 24000.
   *Twin:* `test_p5_2_every_char_voice_engine_declares_a_positive_sample_rate`.
-- **P5.3 Clone references are engine-agnostic.** All three clone engines share
+- **P5.3 Clone references are engine-agnostic.** Both clone engines share
   one pool of reference wavs under `refs/indextts2/`; the per-engine
   `refs/<engine>/` convention was retired deliberately. One approved wav clones
-  on all three.
+  on both.
 
 ## Gate 6 -- Cloud engines
 

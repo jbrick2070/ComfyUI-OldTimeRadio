@@ -107,7 +107,7 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
     assert "engine" not in keys
     # Fallback combo still exists for a degraded profiles import (C-5).
     assert list(B.LEGACY_FIRST_FALLBACK) == [
-        "indextts2", "chatterbox", "dia", "bark", "kokoro", "cloud_elevenlabs",
+        "indextts2", "chatterbox", "bark", "kokoro", "cloud_elevenlabs",
         "google_tts",
     ]
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
@@ -129,7 +129,7 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     keys = set(it.get("required", {})) | set(it.get("optional", {}))
     assert "engine" not in keys
     engines = list(B.LEGACY_FIRST_FALLBACK)
-    assert engines == ["indextts2", "chatterbox", "dia", "bark", "kokoro",
+    assert engines == ["indextts2", "chatterbox", "bark", "kokoro",
                        "cloud_elevenlabs", "google_tts"]
     assert engines[0] == "indextts2", "index 0 is the byte-identical ENGINE"
     assert engines, "engine combo must never be empty (C-5)"

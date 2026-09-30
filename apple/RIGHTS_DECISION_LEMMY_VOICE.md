@@ -158,8 +158,8 @@ re-hashed to the values below on 2026-09-26.
 
 ### The clone rows (one reference, one cross-engine manifest)
 
-All three clone rows carry the same reference bytes (sha256 `47e733d5...`
-above) and are `reserved_for: lemmy` in the bank. Chatterbox and dia spoke the
+Both clone rows carry the same reference bytes (sha256 `47e733d5...`
+above) and are `reserved_for: lemmy` in the bank. Chatterbox spoke the
 frozen lines at seed `20260816` on 2026-08-17 into
 `otr/episodes/lemmy_cross_engine/` (`MANIFEST.json` sha256
 `ac55c90ce8325705862d6f8fbdaaadaf4153681444363dca4572f5583d4b2762`; listen
@@ -170,7 +170,6 @@ note kept both as provisional; the clips themselves are no longer on disk.
 |---|---|---|---|---|
 | indextts2 | `idx_lemmy_algenib_cockney_v1` | `lemmy-indextts2-algenib-cockney-v2` | (qualified above) | (qualified above) |
 | chatterbox | `cb_lemmy_algenib_cockney_v1` | `lemmy-chatterbox-algenib-cockney-provisional-v1` | `4ac0a455825b77c4f4026b8ce0b03faa84935fefe5fb84d0a1dba1c454d64a8d` | `fbd9a72962160b71fc479dd8fda3dfc772506ab5b0ffc320c15973aceb576437` |
-| dia | `dia_lemmy_algenib_cockney_v1` | `lemmy-dia-algenib-cockney-provisional-v1` | `b576a561c2fb9c97d2cd8774f066537962582eccd9bf9fbbd334649ca74ba355` | `840acfde18b31e1b8fc0cc78e07c564d891a9a990621619e4a87742216830a72` |
 
 The same 2026-08-17 page confirmed kokoro `bm_george` by name (neutral
 `996d9e005e49ce6fc217c5df6b964e733c20a0cb2c43763240aff1ce9c6d230d`,

@@ -1,8 +1,8 @@
 """A fresh install can speak without the operator downloading anything.
 
 THE PROBLEM (operator, 2026-08-24). Someone installs the pack from the Comfy
-registry, clicks Run, and needs a voice. Of the five LOCAL TTS engines, three
-(`indextts2`, `chatterbox`, `dia`) declare `requires_voice_ref = True` -- they
+registry, clicks Run, and needs a voice. Of the four LOCAL TTS engines, two
+(`indextts2`, `chatterbox`) declare `requires_voice_ref = True` -- they
 CLONE, so they need a reference WAV the user must supply, and a fresh install
 ships none. That left exactly two zero-setup engines: Bark, whose voices live
 inside its weights, and Kokoro, whose voices are separate files that nothing

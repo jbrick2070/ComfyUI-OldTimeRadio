@@ -658,7 +658,6 @@ _VOICE_SHIP_NOTES = {
     "indextts2": "install it yourself: `scripts/_otr_indextts2_install.ps1` plus your "
                  "own reference WAVs (voice cloning)",
     "chatterbox": "install it yourself: isolated sidecar venv, reference WAVs",
-    "dia": "install it yourself: isolated sidecar venv, reference WAVs",
     "elevenlabs": "your own API key (cloud)",
     "google_tts": "your own API key (cloud)",
 }

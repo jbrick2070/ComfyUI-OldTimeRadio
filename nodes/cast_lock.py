@@ -92,10 +92,10 @@ def cast_voice_engines(char_voice_engine="auto", announcer_voice_engine="auto"):
 # from each engine profile's ``allowed_voice_banks``.
 _CAST_POLICIES = ("preserve_ledger", "auto_registry")
 _CHAR_VOICE_ENGINES = (
-    "auto", "indextts2", "chatterbox", "dia", "bark", "kokoro",
+    "auto", "indextts2", "chatterbox", "bark", "kokoro",
     "cloud_elevenlabs", "google_tts")
 _ANNOUNCER_VOICE_ENGINES = (
-    "auto", "kokoro", "chatterbox", "dia", "cloud_elevenlabs", "bark",
+    "auto", "kokoro", "chatterbox", "cloud_elevenlabs", "bark",
     "google_tts")
 # google_tts stays last in the COMBO (draft google_* profiles need it) but is
 # never a CastLock default and must not be pinned by any otr_cloud_* profile.
@@ -423,8 +423,8 @@ def _recurring_character_bank_ref(entry, engine, bank_entries, language):
     # IS him rather than a stand-in, and because withholding a row from
     # everyone and then not giving it to its owner reserves it for nobody --
     # which is exactly what happened between the casting cutover and this
-    # change: Lemmy's chatterbox and dia clones sat reserved while he was cast
-    # on an ordinary librivox voice.
+    # change: Lemmy's own clones sat reserved while he was cast on an ordinary
+    # librivox voice.
     #
     # Read off the bank, not a second table: `reserved_for` already carries
     # the owner, and duplicating those ids into RECURRING_CHARACTER_VOICES
@@ -933,7 +933,7 @@ class CastLock:
                 attempts=[("", (
                     "Bark has %d voices, and this cast needs %d: one of its own "
                     "for %s, and no two Bark rows may share one. Voice this "
-                    "story with another engine -- Kokoro, Chatterbox and Dia "
+                    "story with another engine -- Kokoro and Chatterbox "
                     "reuse voices when they run out -- or give it fewer "
                     "speaking parts." % (available, needed, whose)))],
                 name="the Bark cast",

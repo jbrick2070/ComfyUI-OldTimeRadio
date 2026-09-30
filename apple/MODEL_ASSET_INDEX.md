@@ -76,7 +76,6 @@ Anything not listed there is a manual install -- see its row below.
 | `chatterbox` | **a SEPARATE project + its own venv** | manual, see below | - |
 | `cloud_elevenlabs` | nothing on disk | - | 5 profile(s) |
 | `cloud_sonilo` | nothing on disk | - | - |
-| `dia` | **a SEPARATE project + its own venv**; `nari-labs/Dia-1.6B-0626` | manual, see below | - |
 | `google_lyria` | nothing on disk | - | 1 profile(s) |
 | `google_tts` | nothing on disk | - | 1 profile(s) |
 | `indextts2` | **a SEPARATE project + its own venv** | manual, see below | - |
@@ -107,14 +106,6 @@ Declared in `nodes/_otr_audio_engines/eng_chatterbox.py`. Environment variables 
 
 ```
 OTR_CHATTERBOX_VENV
-```
-
-### `dia`
-
-Declared in `nodes/_otr_audio_engines/eng_dia.py`. Environment variables it reads:
-
-```
-OTR_DIA_VENV
 ```
 
 ### `indextts2`
@@ -206,10 +197,6 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 - `minimax_h3_ref2va_pruned_int8_convrot.safetensors`
 - `minimax_h3_video_vae_fp16.safetensors`
 - `qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors`
-
-**`dia`** -- `nodes/_otr_audio_engines/eng_dia.py`
-
-- Hugging Face: `nari-labs/Dia-1.6B-0626`
 
 **`kokoro`** -- `nodes/_otr_audio_engines/eng_kokoro.py`
 

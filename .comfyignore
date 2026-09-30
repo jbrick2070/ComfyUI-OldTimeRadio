@@ -17,7 +17,7 @@ secrets/
 # alpha.8 was the last version the registry marked Active. alpha.9, .10 and
 # .11 are all Flagged. Between alpha.8 and alpha.9 three files were ADDED that
 # shipped: two subprocess-spawning sweep scripts and a PowerShell .ps1. The
-# tree also ships _otr_chatterbox_install.ps1, _otr_dia_install.ps1,
+# tree also ships _otr_chatterbox_install.ps1,
 # _otr_indextts2_install.ps1, .bat and .cmd files -- INSTALLER scripts that
 # spawn processes, inside a Python node pack. That is exactly the shape a
 # security scanner is built to flag.
@@ -96,31 +96,29 @@ secrets/
 scripts/*
 
 # 2026-09-01 (ship audit finding registry-flag-08): the scripts/ exclusion
-# above silently broke three shipped TTS engines. eng_chatterbox.py (~line
-# 76), eng_dia.py (~line 78) and eng_indextts2.py (~line 183), all under
+# above silently broke the shipped sidecar TTS engines. eng_chatterbox.py
+# (~line 76) and eng_indextts2.py (~line 183), under
 # nodes/_otr_audio_engines/, each resolve their Path B subprocess worker as
 # os.path.join(_REPO_ROOT, "scripts", "_otr_<engine>_worker.py") at runtime
-# -- on a registry install those files never existed, so none of the three
+# -- on a registry install those files never existed, so none of those
 # engines could ever start (RuntimeError: "worker script ... missing").
 # Checked each worker for its own scripts/ dependencies: _otr_chatterbox_
-# worker.py, _otr_dia_worker.py and _otr_indextts2_worker.py import only
-# stdlib plus third-party packages (torch, torchaudio, chatterbox, dia,
-# indextts, soundfile, numpy) resolved from the engine's own ISOLATED venv,
-# never a sibling file under scripts/ -- no other scripts/ file needs to
-# ship. The sidecar installers and _otr_idx_download_weights.py remain
-# GitHub-only. (IndexTTS2's whole surface left the zip on 2026-09-05; see
-# below.)
+# worker.py and _otr_indextts2_worker.py import only stdlib plus third-party
+# packages (torch, torchaudio, chatterbox, indextts, soundfile, numpy)
+# resolved from the engine's own ISOLATED venv, never a sibling file under
+# scripts/ -- no other scripts/ file needs to ship. The sidecar installers
+# and _otr_idx_download_weights.py remain GitHub-only. (IndexTTS2's whole
+# surface left the zip on 2026-09-05; see below.)
 #
 # scripts/ is rewritten to scripts/* (excludes the directory's CONTENTS,
 # not the directory itself) because a gitignore-style negation cannot
 # re-include a file whose PARENT DIRECTORY is excluded. Verified against
 # real git semantics in a scratch repo: with a bare "scripts/" line,
-# `git check-ignore -v` still matched all three worker files against the
+# `git check-ignore -v` still matched the worker files against the
 # "scripts/" rule even with the negations below present (never reached to
-# decide); with "scripts/*", `git add -A` staged exactly the three worker
-# files and nothing else under scripts/.
+# decide); with "scripts/*", `git add -A` staged exactly the worker files
+# and nothing else under scripts/.
 !scripts/_otr_chatterbox_worker.py
-!scripts/_otr_dia_worker.py
 # 2026-09-05: IndexTTS2 is REMOVED FROM THE REGISTRY BUNDLE (see the
 # nodes/_otr_audio_engines/eng_indextts2.py exclusion below and the tolerant
 # import in that package's __init__). Its whole surface leaves the zip -- the
@@ -159,7 +157,7 @@ scripts/*
 # reference WAVs a registry user does not have anyway, so it is dropped from the
 # zip. The package __init__ imports it in a try/except, so its absence just
 # means the engine does not register -- kokoro (the shipped default), bark,
-# chatterbox, dia and the cloud engines are all still present. Full capability
+# chatterbox and the cloud engines are all still present. Full capability
 # remains in the GitHub tree.
 nodes/_otr_audio_engines/eng_indextts2.py
 

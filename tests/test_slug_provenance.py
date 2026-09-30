@@ -365,7 +365,7 @@ def test_twins_on_ONE_surface_are_banned_and_cross_surface_pairs_are_only_report
 ENGINE_COVERAGE = {
     # --- audio: local engines ship presets or weights, not provider slugs ----
     "bark": "local", "kokoro": "local", "chatterbox": "local",
-    "dia": "local", "indextts2": "local", "musicgen": "local",
+    "indextts2": "local", "musicgen": "local",
     "stable_audio_3": "local", "stable_audio_music": "local",
     # --- audio: cloud engines ship concrete provider model ids ---------------
     "cloud_elevenlabs": "collected",

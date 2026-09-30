@@ -1052,10 +1052,10 @@ def cuda_wheel_tag():
     architectures needs an edit every time a new one ships.
 
     This exists because pip's default resolution is blind to the GPU. On a
-    Blackwell pod it installed torch 2.6.0+cu124 for chatterbox and
-    2.6.0+cu126 for dia; both imported fine and both died at the first kernel
-    launch with 'no kernel image is available for execution on the device',
-    while index-tts happened to get cu128 and worked.
+    Blackwell pod it installed torch 2.6.0+cu124 for chatterbox, which imported
+    fine and died at the first kernel launch with 'no kernel image is available
+    for execution on the device', while index-tts happened to get cu128 and
+    worked.
     """
     r = run([sys.executable, "-c", "import torch;print(torch.version.cuda or '')"])
     ver = (r.stdout or "").strip()
@@ -1071,10 +1071,10 @@ def install_isolated_voice(comfy: str, name: str, pip_args: list) -> None:
     (`.venv/Scripts/python.exe`); setting OTR_<ENGINE>_VENV points it at the
     venv built here without editing the adapter.
 
-    chatterbox (MIT) and dia (Apache) are the two commercial-clean cloners and
-    the ONLY cloning engines the announcer accepts -- indextts2 is excluded
-    there by its non-commercial licence. So these are not spare options; they
-    are the only route to a cloned announcer.
+    chatterbox (MIT) is the commercial-clean cloner and the ONLY cloning engine
+    the announcer accepts -- indextts2 is excluded there by its non-commercial
+    licence. So it is not a spare option; it is the only route to a cloned
+    announcer.
     """
     if os.name == "nt":
         installer = os.path.join(_HERE, "_otr_%s_install.ps1" % name)
@@ -1156,8 +1156,6 @@ def install_isolated_voice(comfy: str, name: str, pip_args: list) -> None:
 #: The isolated voice engines and what each venv needs.
 ISOLATED_VOICES = {
     "chatterbox": ["chatterbox-tts", "soundfile", "torch", "torchaudio"],
-    "dia": ["git+https://github.com/nari-labs/dia.git", "soundfile",
-            "torch", "torchaudio"],
 }
 
 
@@ -1350,7 +1348,6 @@ NO_LANE_REASON = {
     "stable_audio_music": "hf_cache",
     # Voice engines with their own installers (scripts/_otr_*_install.ps1).
     "chatterbox": "sidecar",
-    "dia": "sidecar",
     "indextts2": "sidecar",
     # Hosted voice/music.
     "elevenlabs": "remote",
@@ -1572,7 +1569,7 @@ def main(argv=None) -> int:
                           help="exact config/machine_classes.json key")
     ap.add_argument("--with-all-voices", action="store_true",
                     help="build EVERY isolated voice engine: indextts2, "
-                         "chatterbox, dia. Large; each gets its own venv.")
+                         "chatterbox. Large; each gets its own venv.")
     ap.add_argument("--with-indextts2", action="store_true",
                     help="build the isolated voice-cloning environment (large)")
     plan_mode = ap.add_mutually_exclusive_group()

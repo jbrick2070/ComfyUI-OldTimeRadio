@@ -198,12 +198,10 @@ def test_the_draw_is_gender_correct_whatever_the_accent(accent, bank_by_id):
         assert bank_by_id[got].gender == "male", (accent, seed, got)
 
 
-@pytest.mark.parametrize("engine", ["indextts2", "dia"])
-def test_an_engine_with_no_british_voices_still_casts_and_never_raises(
-        engine, bank_by_id):
-    """indextts2 and dia carry NO british male character rows at all. The
-    request must degrade to an ordinary gender-correct draw, not fail."""
-    got = _cast(_with_accent(ONE_MALE, "british"), engine=engine)["c01"]
+def test_an_engine_with_no_british_voices_still_casts_and_never_raises(bank_by_id):
+    """indextts2 carries NO british male character rows at all. The request
+    must degrade to an ordinary gender-correct draw, not fail."""
+    got = _cast(_with_accent(ONE_MALE, "british"), engine="indextts2")["c01"]
     assert got, "no voice was assigned at all"
     assert bank_by_id[got].gender == "male"
 

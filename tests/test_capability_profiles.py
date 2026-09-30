@@ -73,7 +73,7 @@ def _video_registry():
 def _audio_registry():
     from nodes._otr_audio_engines import registry as areg
     from nodes._otr_audio_engines import (  # noqa: F401  (register adapters)
-        eng_bark, eng_chatterbox, eng_dia, eng_indextts2, eng_kokoro,
+        eng_bark, eng_chatterbox, eng_indextts2, eng_kokoro,
         eng_musicgen, eng_stable_audio, eng_stable_audio_3,
     )
     return areg
@@ -265,14 +265,14 @@ def test_v2_every_registry_row_validates():
 
 
 def test_v2_vendor_pins_gate_amd_hosts():
-    """dia / indextts2 / chatterbox (cu128 sidecars) are vendor-locked
+    """indextts2 / chatterbox (cu128 sidecars) are vendor-locked
     nvidia: an AMD cuda profile must see REASON_REQUIRES_VENDOR, an nvidia
     one REASON_OK-or-sidecar-gated."""
     amd = copy.deepcopy(cp.load_profile(NV16))
     amd["gpu_vendor"] = "amd"
     decls = _declarations_by_registry()
     audio_avail = cp.availability(amd, decls["audio"])
-    for eng in ("dia", "indextts2", "chatterbox"):
+    for eng in ("indextts2", "chatterbox"):
         assert audio_avail[eng] == cp.REASON_REQUIRES_VENDOR, eng
 
     nv = cp.load_profile(NV16)

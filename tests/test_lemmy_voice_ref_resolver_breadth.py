@@ -1,7 +1,7 @@
-"""LEMMY CHUNK B -- one resolver for a voice-bank ref, not four.
+"""LEMMY CHUNK B -- one resolver for a voice-bank ref, not one per caller.
 
-THE DEFECT, AND IT WAS LIVE ON THE QUALIFIED ROUTE. Three cloning adapters
-(indextts2, chatterbox, dia) each carried a private `_resolve_ref` that tried
+THE DEFECT, AND IT WAS LIVE ON THE QUALIFIED ROUTE. The cloning adapters
+(indextts2, chatterbox) each carried a private `_resolve_ref` that tried
 exactly ONE candidate -- `<comfy_base>/models/<ref>` -- and otherwise fell back
 to `os.path.abspath(ref)`, a cwd-relative path that does not exist. The voice
 node's own `_resolve_ref_to_disk` knew about three more places, including the
@@ -31,7 +31,7 @@ from nodes._otr_voice_node_common import _resolve_ref_to_disk
 
 
 #: The engines that clone from a reference WAV and therefore must resolve one.
-CLONING_ENGINES = ("indextts2", "chatterbox", "dia")
+CLONING_ENGINES = ("indextts2", "chatterbox")
 
 #: A bank-relative ref in the canonical stored form.
 BANK_REF = "models/TTS/refs/indextts2/vz_donor_marshal_indian.wav"

@@ -4,8 +4,8 @@ ONE distinct VOICE per SPEAKER (not per clip): LJSpeech is a single narrator and
 LibriVox book is one reader, so a speaker's clips are CONCATENATED into one richer
 ~25 s reference -- registering each clip as its own "voice" would hand the caster
 duplicate voices. Each voice is MIRRORED across the cloner engines -- indextts2
-(vz_), chatterbox (cb_), dia (dia_) -- one physical WAV, three bank entries
-(matching the existing convention). kokoro is NOT a cloner (built-in .pt voices),
+(vz_), chatterbox (cb_) -- one physical WAV, two bank entries (matching the
+existing convention). kokoro is NOT a cloner (built-in .pt voices),
 so reference clips do not apply to it.
 
 Pipeline per voice:
@@ -15,7 +15,7 @@ Pipeline per voice:
      spoken intro, take 25 s),
   3. CONCATENATE the speaker's normalized clips and CAP at 25 s -> the ref WAV at
      <models-base>/TTS/refs/indextts2/vz_<voice_id>.wav,
-  4. sha256 + three bank entries (vz_/cb_/dia_), commercial_clean=True,
+  4. sha256 + two bank entries (vz_/cb_), commercial_clean=True,
   5. merge into config/voice_reference_bank.json (dedup), re-validate the bank.
 
 USAGE (the OPERATOR runs this -- it does the network downloads + ffmpeg):
@@ -44,7 +44,7 @@ if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
 BANK_JSON = os.path.join(_REPO, "config", "voice_reference_bank.json")
-_CLONER_ENGINES = (("indextts2", "vz"), ("chatterbox", "cb"), ("dia", "dia"))
+_CLONER_ENGINES = (("indextts2", "vz"), ("chatterbox", "cb"))
 _REF_REL_DIR = "models/TTS/refs/indextts2"
 _REF_CAP_SECONDS = 25
 
@@ -227,7 +227,7 @@ def main() -> int:
             all_entries.extend(build_entries(spec, rel, "<sha-after-download>"))
             print(f"  [plan] {spec['voice_id']} ({spec['gender']}/"
                   f"{spec['age_band']}, {len(spec['clips'])} clip(s)) "
-                  f"-> 1 voice x vz_/cb_/dia_", flush=True)
+                  f"-> 1 voice x vz_/cb_", flush=True)
             continue
         try:
             all_entries.extend(_ingest_speaker(spec, args.models_base))

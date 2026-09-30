@@ -55,7 +55,7 @@ will be re-wired. Rip all of:
 
 Replacement already exists: portable bank drops private IndexTTS2 rows;
 recurring table + missing row is an ordinary draw; `reserved_for` still
-travels with the chatterbox/dia clone rows.
+travels with the chatterbox clone rows.
 
 ### 1.3 Comments that would put the subsystem back
 
@@ -104,7 +104,7 @@ KEEP the PBUG-20260817-09 seed / emotion-cap / kill-switch tests
 KEEP (retarget if they mention route ids):
 
 - portable WAV contract: distinct male/female, atomic publish, too-short
-  refusal, reservation travels with chatterbox/dia rows (`:42-98` and
+  refusal, reservation travels with chatterbox rows (`:42-98` and
   siblings)
 - `test_cli_emits_runtime_override_and_schema_valid_bank` -- drop the
   `unavailable_qualified_route_ids` assertion at `:242-243`; keep CLI /
@@ -174,8 +174,8 @@ stale-ledger file. Do not call `lock()` first.
 - Listen record, same commit as the policy deletion: append it to
   `apple/RIGHTS_DECISION_LEMMY_VOICE.md` (dated docs were retired, so no
   new dated file). Quote the 2026-08-18 listen path, the winning clone
-  ids, and the hashes that lived on the approved IndexTTS2 / chatterbox /
-  dia records. Add a supersession line under
+  ids, and the hashes that lived on the approved IndexTTS2 / chatterbox
+  records. Add a supersession line under
   `apple/OTR_STANDING_RULINGS.md` (the Lemmy listen ruling) -- the listen stands; the receipt
   machinery is retired; identity is `RECURRING_CHARACTER_VOICES` +
   `reserved_for`.

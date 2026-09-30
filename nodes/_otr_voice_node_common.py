@@ -1378,7 +1378,7 @@ class OTRVoiceNodeBase:
         # wrote, which is ALWAYS `tts_model="kokoro"` regardless of what
         # engine was actually requested. An earlier cut of this guard read
         # the row's stale field and would have raised "controls disagree" on
-        # every agreeing chatterbox/dia announcer request under
+        # every agreeing chatterbox announcer request under
         # preserve_ledger -- a real regression against existing, working
         # functionality, caught by kibitz r4 before it shipped.
         if self.ROLE == "announcer_voice":
@@ -1427,7 +1427,7 @@ class OTRVoiceNodeBase:
         # Per-line delivery (emotion) vector for expressive engines (indextts2
         # emo-vector, chatterbox exaggeration). Prefer a stamped vector; else
         # derive it deterministically (pure -> C7) from line text + scene tension.
-        # Engines that ignore delivery (bark / kokoro / dia) stay byte-identical;
+        # Engines that ignore delivery (bark / kokoro) stay byte-identical;
         # OTR_DELIVERY_VECTOR=0 reproduces pre-delivery (flat) renders -- and is a
         # TRUE old path: the delivery module is imported lazily only when on.
         _delivery_on = otr_env.get("OTR_DELIVERY_VECTOR", "1") != "0"

@@ -33,7 +33,7 @@ class BatchCharacterVoices(OTRVoiceNodeBase):
         "Synthesizes spoken dialogue for all dramatic characters in the script using "
         "voice assignments from the production ledger. Dispatches character lines to "
         "the chosen speech engine and packs the resulting audio into a batch for "
-        "sequencing. Change the engine dropdown to select IndexTTS2, Chatterbox, Dia, "
+        "sequencing. Change the engine dropdown to select IndexTTS2, Chatterbox, "
         "Bark, Kokoro, or cloud voice models, or connect execution gates."
     )
 
@@ -48,7 +48,7 @@ class BatchCharacterVoices(OTRVoiceNodeBase):
     # google_tts with no error anywhere. A fallback that is not equal to the
     # thing it stands in for is not a fallback; it is a second, worse answer.
     # Held equal by `tests/test_tts_voice_preflight_matrix.py`.
-    LEGACY_FIRST_FALLBACK = ("indextts2", "chatterbox", "dia", "bark", "kokoro",
+    LEGACY_FIRST_FALLBACK = ("indextts2", "chatterbox", "bark", "kokoro",
                              "cloud_elevenlabs", "google_tts")
 
     CATEGORY = "OldTimeRadio/v2/audio"

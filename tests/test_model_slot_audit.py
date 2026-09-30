@@ -157,13 +157,6 @@ def test_requested_local_smoke_candidate_contracts_are_inspected():
     assert chatterbox.missing_ref_fallback is None
     assert chatterbox.sample_rate == 24000
 
-    dia = audio_engines.get_engine("dia")
-    assert dia.roles == ("char_voice", "announcer_voice")
-    assert dia.interface == "per_line"
-    assert dia.requires_voice_ref is True
-    assert dia.missing_ref_fallback is None
-    assert dia.sample_rate == 44100
-
 
 def test_requested_cloud_smoke_candidate_contracts_are_inspected():
     cloud_still_candidates = {

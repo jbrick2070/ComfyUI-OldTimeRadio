@@ -671,7 +671,7 @@ def test_the_voice_roll_is_told_which_casts_bark_cannot_voice():
 
     assert "has 10 voices, and this cast needs 15" in _cast_gap("bark", _story_cast(14))
     assert _cast_gap("bark", _story_cast(9)) is None
-    for engine in ("kokoro", "chatterbox", "dia", "indextts2", "google_tts"):
+    for engine in ("kokoro", "chatterbox", "indextts2", "google_tts"):
         assert _cast_gap(engine, _story_cast(14)) is None, engine
 
 

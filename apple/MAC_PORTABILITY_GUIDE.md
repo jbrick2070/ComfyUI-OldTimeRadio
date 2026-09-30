@@ -296,7 +296,7 @@ of these answers; that is a hardware question, not a portability defect.
 
 **Never run here.** `lumina_image`, `flux_gen1`, `humo_1.7B`, `humo_1.7B_169`,
 `mesh_stage`, `stable_audio_music`, the sidecar voices (`indextts2`,
-`chatterbox`, `dia` -- blocked by a PowerShell-only installer, not by Metal;
+`chatterbox` -- blocked by a PowerShell-only installer, not by Metal;
 `indextts2` by size as well).
 The matrix reads each one's code and sizes it; **an "unsafe at 16 GB" for any
 of them is a size estimate, not a measurement**, and the reason not to try

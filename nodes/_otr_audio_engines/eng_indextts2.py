@@ -251,8 +251,8 @@ class IndexTTS2Engine:
         # hold VRAM indefinitely with nothing in the log. It is indistinguishable
         # from a slow render, which is what makes it expensive.
         #
-        # eng_dia and eng_chatterbox already route the identical read through
-        # this helper; this engine simply never imported it.
+        # eng_chatterbox already routes the identical read through this
+        # helper; this engine simply never imported it.
         try:
             line = _SC.read_protocol_line(
                 proc, _SC.startup_timeout(), "IndexTTS2 readiness")

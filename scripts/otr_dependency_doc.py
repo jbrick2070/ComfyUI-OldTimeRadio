@@ -48,12 +48,8 @@ ISOLATED = [
     ("chatterbox", "chatterbox", "pip: chatterbox-tts soundfile torch torchaudio",
      "own venv; torch pinned separately from ComfyUI's",
      "OTR_CHATTERBOX_VENV / _WORKER",
-     "MIT, commercial-clean, and announcer-capable -- one of only two cloning "
-     "engines the announcer accepts."),
-    ("dia", "dia", "pip: git+https://github.com/nari-labs/dia.git",
-     "own venv; torch pinned separately",
-     "OTR_DIA_VENV / _WORKER",
-     "Apache, the second commercial-clean cloner, also announcer-capable."),
+     "MIT, commercial-clean, and announcer-capable -- the only cloning engine "
+     "the announcer accepts."),
 ]
 
 _WHY_ISOLATED = (

@@ -7,7 +7,7 @@ voice-node dispatch core with OTR_BatchCharacterVoices:
     self-contained Kokoro engine (audio clean-break 1b). One British voice is
     chosen per episode (seeded from episode_seed); the voice .pt is verified on
     local disk in a C-7 preflight (never fetched during execute).
-  * ``chatterbox`` / ``dia`` (opt-in, ``per_line``) -> one frozen
+  * ``chatterbox`` (opt-in, ``per_line``) -> one frozen
     ``ResolvedVoiceRequest`` per announcer line, prepared text, the adapter
     call, then ``pack_audio_batch`` into the Bark AUDIO-batch contract (C-4).
   * ``bark`` (opt-in, ``per_line``, 2026-08-24) -> the same preset engine
@@ -36,7 +36,7 @@ class AnnouncerVoice(OTRVoiceNodeBase):
         "Synthesizes narration, opening introductions, and outro bookends for the "
         "episode using the selected voice engine. Dispatches each announcer line "
         "from the script to generate an audio batch for the scene sequencer. Change "
-        "the engine dropdown to switch between Kokoro, Chatterbox, Dia, Bark, or "
+        "the engine dropdown to switch between Kokoro, Chatterbox, Bark, or "
         "cloud TTS, or connect optional execution gates."
     )
 
@@ -49,7 +49,7 @@ class AnnouncerVoice(OTRVoiceNodeBase):
     # updated, so a degraded boot offered a dropdown that could not represent a
     # saved graph using either. Held equal by
     # `tests/test_tts_voice_preflight_matrix.py`.
-    LEGACY_FIRST_FALLBACK = ("kokoro", "chatterbox", "dia", "cloud_elevenlabs",
+    LEGACY_FIRST_FALLBACK = ("kokoro", "chatterbox", "cloud_elevenlabs",
                              "bark", "google_tts")
 
     CATEGORY = "OldTimeRadio/v2/audio"

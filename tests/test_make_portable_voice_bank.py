@@ -80,14 +80,13 @@ def test_portable_bank_preserves_non_index_rows_and_replaces_only_index(tmp_path
     # it. Reservation moved onto the bank row itself on 2026-09-24; before that
     # it was derived from a casting policy, so it was the same answer no matter
     # which bank was loaded. Now it is a property of THIS file, which is exactly
-    # why the portable build has to be checked: the two retained clone rows must
+    # why the portable build has to be checked: the retained clone row must
     # keep it, and the two GENERATED rows must not gain it -- a portable bank
     # that reserved its own replacements would refuse to cast the only
     # indextts2 voices it ships.
     reserved_here = {row["voice_ref_id"] for row in result["voices"]
                      if str(row.get("reserved_for") or "").strip()}
-    assert reserved_here == {"cb_lemmy_algenib_cockney_v1",
-                             "dia_lemmy_algenib_cockney_v1"}, reserved_here
+    assert reserved_here == {"cb_lemmy_algenib_cockney_v1"}, reserved_here
     assert all("reserved_for" not in row or not row["reserved_for"]
                for row in index), "a generated replacement row was reserved"
 

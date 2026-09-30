@@ -1,6 +1,6 @@
-"""Shared lifecycle helpers for the Path-B audio sidecars (chatterbox / dia).
+"""Shared lifecycle helpers for the Path-B audio sidecars (chatterbox, indextts2).
 
-Centralizes the things the polish roundtable flagged across both new adapters:
+Centralizes the things the polish roundtable flagged across the sidecar adapters:
 
 * :func:`read_protocol_line` -- a bounded, Windows-safe read of one protocol line
   (``select`` does not work on Windows pipes, so a daemon reader thread is used).
@@ -35,8 +35,8 @@ def default_venv_python(engine_root):
     """Isolated-venv interpreter under ``engine_root``, platform-correct.
 
     ``.venv/Scripts/python.exe`` on Windows, always -- byte-identical to the
-    old ``_default(".venv", "Scripts", "python.exe")`` the three Path-B
-    adapters (chatterbox, dia, indextts2) hardcoded.
+    old ``_default(".venv", "Scripts", "python.exe")`` the Path-B adapters
+    (chatterbox, indextts2) hardcoded.
 
     On Linux/Mac the provisioner's ``.venv/Scripts/python.exe`` still wins
     WHEN IT EXISTS, and that exception is the whole point: for IndexTTS2 it
@@ -45,7 +45,7 @@ def default_venv_python(engine_root):
     TRANSFORMERS_OFFLINE=1 and the vendor cwd before execing the real venv
     python -- the runtime adapter is documented as finding that wrapper
     through its default path (RUNPOD_INSTALL.md), and routing around it
-    would run the worker online on a network-less pod. For chatterbox/dia
+    would run the worker online on a network-less pod. For chatterbox
     the provisioned Scripts path is a plain symlink to bin/python, so
     preferring it changes nothing there. A manual install with no Scripts
     entry falls through to ``.venv/bin/python``, the interpreter venv

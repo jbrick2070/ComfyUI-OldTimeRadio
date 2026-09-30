@@ -410,7 +410,7 @@ class TestPythonOwnsTheRowsToTheEnd:
                     continue
                 for chunk in PS.chunk_speech(speech.text):
                     projected = prep.keep_spoken_parentheticals(chunk)
-                    after_engine = prep.clean_spoken_text(projected)      # chatterbox / indextts2 / dia
+                    after_engine = prep.clean_spoken_text(projected)      # chatterbox / indextts2
                     after_bark = re.sub(r"\([^)]{1,80}\)\s*", "", projected)  # bark's own stripper
                     for text in (after_engine, after_bark):
                         if _words(re.sub(r"[()]", " ", chunk)) != _words(text):

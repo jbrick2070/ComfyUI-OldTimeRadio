@@ -124,8 +124,8 @@ def resolve_voice_ref_path(ref):
     (``models/TTS/refs/indextts2/x.wav``) and have to become an absolute path an
     ISOLATED WORKER can open regardless of its own cwd.
 
-    WHY THIS IS SHARED NOW. Three cloning adapters (indextts2, chatterbox, dia)
-    each carried a private copy that tried exactly ONE candidate --
+    WHY THIS IS SHARED NOW. The cloning adapters (indextts2, chatterbox) each
+    carried a private copy that tried exactly ONE candidate --
     ``<comfy_base>/models/<ref>`` -- and fell back to ``os.path.abspath(ref)``,
     which is a cwd-relative path that generally does not exist. The voice node's
     own ``_resolve_ref_to_disk`` meanwhile knew about three MORE places, notably
