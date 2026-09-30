@@ -16261,3 +16261,63 @@ not promote it to the Bug Bible on this evidence alone.
 - not fixed. The proposed fix is a per-language penalty (1.0 for Japanese and
   Chinese), which changes sampling on the shipping path and needs a design
   contrarian before code. The Hindi script mix needs its own reproduction.
+
+## PBUG-20260929-10 -- a fresh Python 3.13 install refused Japanese and Mandarin at Run; the roll quietly chose from six languages
+
+- seen: the 4060 auto-download pressure drill (2026-09-29, a fresh ComfyUI
+  portable on Python 3.13, every model moved aside, the pack's declared
+  requirements only). Leg ja_shakespeare_video (21:58) and leg zh_flux_still
+  (22:46) both died at the queue-time validator in 0.3 min:
+  `EpisodeLanguageError: ... kokoro cannot speak Japanese here: lang_code 'j'
+  on the ONNX kokoro needs fugashi, jaconv, which are not installed` (and the
+  same for Mandarin: jieba, pypinyin, cn2an, ordered-set). On such a box
+  `settle_prompt_language` drops those two rows from a rolled pool, so
+  "roll (any language)" draws from six of the eight the dropdown lists.
+- cause: the six phonemizer libraries were an install-by-hand extra
+  (README, INSTALL.md, MULTILINGUAL.md: "opt-in per language, never an
+  English tax"). The dictionary they depend on (unidic-lite) was already a
+  declared requirement, so the tax argument had mostly lapsed while the
+  refusal stayed.
+- fix (2.3.17): fugashi, jaconv, jieba, pypinyin, cn2an and ordered-set are
+  declared in requirements.txt and pyproject.toml under kokoro-onnx's marker
+  (Python 3.13 only, the interpreter that uses the pack's copy of misaki);
+  the pip line stays as the repair text for an install that lost them.
+  Proven installing and importing on Windows 3.13 (the 4060 portable, pip
+  exit 0, jieba built from its sdist) and on Linux 3.13
+  (.github/workflows/linux_install_check.yml run 36675531236: all six
+  import, fugashi and jieba segment a sentence each). Design contrarian
+  Cursor grok-4.7-high refuted a bare, unmarked line (an English tax on 3.12
+  boxes, where the torch kokoro needs misaki[ja]/[zh] instead); the marker
+  is its answer. 3.10-3.12 still need misaki's extras by hand; that row stays
+  open.
+
+## PBUG-20260929-11 -- the headless runner promised four weight files for a HuMo lane and the run downloaded twelve
+
+- seen: the same drill, leg es_humo17 (22:47): the runner printed
+  `video lane 'humo_1.7B': the queue-time preflight downloads and checks its 4
+  weight file(s)` and the server then planned twelve files, 61.5 GB: the
+  four HuMo 1.7B files, the five LTX 2.5 audio-in 16 GB files and the three
+  Z-Image files.
+- cause: HuMo plays the character role only (`roles = ("character_video",)`),
+  so the route freeze sends the announcer and music roles to
+  `ltx25_audio_in_16gb` (render_driver._NEVER_HUMO_REDIRECT_ENGINE), and the
+  preflight fetches that lane too; Z-Image is the row's still model, needed
+  because HuMo consumes a still. The download was correct; the message
+  planned only the picked engine.
+- fix: 6c955001 -- `_apply_video_lane` plans the same frozen role map the
+  preflight plans and names the routed lane ("9 weight file(s) for it and the
+  lane(s) its other roles are routed to (ltx25_audio_in_16gb)"). Tests
+  updated; Composer QA on the pushed diff.
+
+## Observation, not a bug row -- Ideogram 4 fp8 on the 4060: 7 of 7 cards came back as the model's safety placeholder
+
+- Leg hi_ideogram_still (22:46) downloaded the fp8 set (the card-aware pick
+  for a non-Blackwell card, 29.5 GB, all verified), did not run out of memory,
+  and published -- but every Ideogram card was the refusal placeholder
+  (min 77-84, std 10.2-10.3), the same signature the 5080's nvfp4 refusals
+  carry (min 73-84, std 10.2-10.6; 13 refused of 48 tonight). Comfy's own
+  template note says plain-text prompts have a high false-positive rate on
+  Ideogram 4's built-in safety filter, and Comfy's default template ships
+  the same fp8 files (the int8 template is the other; neither is
+  Blackwell-only). Operator: the 4060 did its job on the download; Ideogram
+  on 8 GB is not chased.

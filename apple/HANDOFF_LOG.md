@@ -1596,3 +1596,34 @@ the live version.
 - **Soak so far** (19:25-20:37): six episodes published (zh, hi, es, es,
   ja, ja); leg 28 died on the known Hindi news close (PBUG-06, University of
   Alberta written in Devanagari).
+
+## 2026-09-29 23:20 -- 2.3.17 published; the 4060 cold drill; Japanese and Mandarin ship
+
+- **2.3.17** (b65ba4a8, operator: "publish"): every local model downloads
+  itself (Ideogram 4, Flux, HuMo x4, the upscaler) and the six Japanese and
+  Mandarin phonemizer libraries install with the pack on Python 3.13.
+  Full suite on the tree: one failure, the pod script's bash check (bash
+  left PATH on this box; shared with baseline).
+- **The 4060 cold drill** (C:\OTR-CleanRoom, every model moved aside to
+  D:\OTR-ColdDrill-aside-20260929, pressure_drill.py): from an empty store,
+  an English episode and a Hindi episode with the fp8 Ideogram set both
+  downloaded what they needed and published; HuMo 1.7B downloaded its
+  61 GB (its own files plus the LTX 2.5 audio-in lane its other roles are
+  routed to, plus Z-Image) and was rendering at 23:10. Japanese and
+  Mandarin refused at Run for want of the libraries (PBUG-20260929-10,
+  fixed in 2.3.17; the six are now installed on the 4060 for a rerun). The
+  runner's weight-count message was wrong for routed lanes
+  (PBUG-20260929-11, fixed). Ideogram fp8 on 8 GB: no OOM, every card a
+  model safety refusal; operator: not chased.
+- **Linux**: .github/workflows/linux_install_check.yml installs the
+  requirements on ubuntu Python 3.13 on every push that touches them, and
+  by hand with extra packages; run 36675531236 proved the six libraries
+  and both phonemizers there. The operator no longer has a Mac.
+- **Comfy meeting**: the operator meets Comfy's CEO (a Comfy Router sync);
+  Router as the pack's one cloud writer/image/video lane, a queue-time
+  balance check, and platform-level model auto-download are the asks.
+- **Open**: 3.10-3.12 boxes still need misaki[ja]/[zh] by hand for the torch
+  Kokoro; the 4060 reruns of the ja/zh legs and the upscaler probe wait for
+  the drill to end; the aside folders on the 4060 (D:\OTR-ColdDrill-aside-
+  20260929, C:\OTR-ColdDrill-aside-20260926, ~530 GB) are the operator's to
+  delete.
