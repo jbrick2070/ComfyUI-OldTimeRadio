@@ -279,12 +279,12 @@ class SpandrelEsrgan:
         if model_path is None:
             # FETCH IT ONCE, THEN LOOK AGAIN (operator 2026-09-29: every local
             # model downloads itself). A failed fetch is reported below with
-            # the manual route; a cancelled run stays a cancel.
+            # the manual route. A cancel is ComfyUI's
+            # InterruptProcessingException, a BaseException, so it is not
+            # caught here and stays a cancel.
             try:
                 self._fetch_model()
             except Exception as exc:  # noqa: BLE001 -- reported in the refusal
-                if type(exc).__name__ == "InterruptProcessingException":
-                    raise
                 fetch_error = exc
             candidates, model_path = self._resolve_model()
         if model_path is None:
