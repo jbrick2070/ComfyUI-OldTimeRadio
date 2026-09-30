@@ -105,6 +105,22 @@ def test_a_hindi_close_naming_the_source_in_devanagari_passes():
     assert with_names(close) is None
 
 
+@pytest.mark.parametrize("close,names_it", [
+    ("एमआईटी के इंजीनियरों ने कहा।", True),      # the term, then a space
+    ("(एमआईटी) ने कहा।", True),                  # inside punctuation
+    ("एमआईटीयन ने कहा।", False),                 # a longer Devanagari word
+    ("प्रीएमआईटी ने कहा।", False),               # a prefix joins it
+])
+def test_a_devanagari_spelling_matches_as_a_whole_word(close, names_it):
+    """Composer QA on c3dbaa6c: Devanagari is a spaced script, so a spelling
+    must match as a whole word -- vowel signs are marks, not letters, and
+    must neither break a term nor let it match inside a longer word."""
+    check = F2._make_news_read_validator(
+        _dossier(places=["MIT"]), [], provenance={"link": "https://news.mit.edu/2026/x"},
+        language_iso="hi", native_names={"MIT": ["एमआईटी"]})
+    assert (check(_read(close)) is None) is names_it
+
+
 def test_a_real_person_written_in_katakana_is_not_refused_as_fiction():
     """2026-09-29: the cast borrowed the real Jonathan Bow as ジョナサン・ボウ
     and the factual close naming him was refused as invention, because the

@@ -657,18 +657,45 @@ _SPACED_WORD_CHAR = (r"[^\W\u3005-\u3007\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf"
                      r"\U00020000-\U0003ffff]")
 
 
-def _anchor_re(term: str) -> "re.Pattern[str]":
+_SPACED_WORD_CHAR_RE = re.compile(_SPACED_WORD_CHAR)
+
+
+def _continues_spaced_word(ch: str) -> bool:
+    """Would ``ch`` continue a word of a spaced script? A letter or digit of
+    one (``_SPACED_WORD_CHAR``), or a combining mark: a Devanagari vowel sign
+    is a mark, not a letter, so without this "एमआईटी" (MIT) matched inside
+    "प्रीएमआईटी" across the sign that joins the prefix (Composer QA of
+    c3dbaa6c)."""
+    return bool(ch) and (bool(_SPACED_WORD_CHAR_RE.match(ch))
+                         or unicodedata.category(ch) in ("Mn", "Mc"))
+
+
+class _AnchorPattern:
     """``term`` as a whole word, for the closing read's source check in any of
-    the episode languages (PBUG-20260929-06).
+    the episode languages (PBUG-20260929-06). ``search`` returns the first
+    occurrence that stands on its own, or None, like a compiled pattern's.
 
     `\\b` counts Han and kana as word characters, and Japanese and Chinese
     write no spaces, so a close that named its source as "MITの研究" or
-    "于2026年发表" was refused for naming nothing. Here only a letter or digit
-    of a spaced script continues the term -- "Adamの" is still not "Ada" --
-    and a term that ends in a full stop ("U.S.") matches before a space,
-    which `\\b` refused as well."""
-    return re.compile(r"(?<!%s)%s(?!%s)" % (
-        _SPACED_WORD_CHAR, re.escape(term), _SPACED_WORD_CHAR), re.IGNORECASE)
+    "于2026年发表" was refused for naming nothing. Here only a letter, digit or
+    combining mark of a spaced script continues the term -- "Adamの" is still
+    not "Ada" -- and a term that ends in a full stop ("U.S.") matches before a
+    space, which `\\b` refused as well."""
+
+    def __init__(self, term: str):
+        self._re = re.compile(re.escape(term), re.IGNORECASE)
+
+    def search(self, text: str):
+        for found in self._re.finditer(text):
+            before = text[found.start() - 1] if found.start() > 0 else ""
+            after = text[found.end()] if found.end() < len(text) else ""
+            if not _continues_spaced_word(before) and not _continues_spaced_word(after):
+                return found
+        return None
+
+
+def _anchor_re(term: str) -> _AnchorPattern:
+    return _AnchorPattern(term)
 
 
 def _folded_for_matching(text: str) -> str:
