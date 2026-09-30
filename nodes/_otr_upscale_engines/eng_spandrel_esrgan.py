@@ -86,8 +86,9 @@ class SpandrelEsrgan:
     requires_vendor = None
     intrinsic_scale = 2
 
-    # PINNED CHECKPOINT. Filename lives under models/upscale_models/.
-    # `scripts/ensure_upscale_models.py` handles URL + SHA-256 provisioning.
+    # PINNED CHECKPOINT. Filename lives under models/upscale_models/. A
+    # missing file is fetched at load (`_fetch_model`); the dev-tree script
+    # `scripts/ensure_upscale_models.py` still provisions it from GitHub.
     _model_filename = "RealESRGAN_x2plus.pth"
 
     # SHA-256 PINNED 2026-08-08. An empty string SKIPS verification entirely,
@@ -248,6 +249,13 @@ class SpandrelEsrgan:
     # -----------------------------------------------------------------
     # Lifecycle: load + unload
     # -----------------------------------------------------------------
+    def _fetch_model(self):
+        """Download the pinned checkpoint through the pack's verified fetch
+        (``_otr_visual_assets.ensure_upscale_weights``, a pinned Hub copy with
+        this engine's SHA-256). Raises when the fetch cannot complete."""
+        from .._otr_visual_assets import ensure_upscale_weights
+        return ensure_upscale_weights(self._model_filename)
+
     def load(self, device) -> None:
         """Load the pinned Real-ESRGAN x2plus weights onto ``device``.
 
@@ -267,17 +275,29 @@ class SpandrelEsrgan:
                 kind="upscale")
 
         candidates, model_path = self._resolve_model()
+        fetch_error = None
+        if model_path is None:
+            # FETCH IT ONCE, THEN LOOK AGAIN (operator 2026-09-29: every local
+            # model downloads itself). A failed fetch is reported below with
+            # the manual route; a cancelled run stays a cancel.
+            try:
+                self._fetch_model()
+            except Exception as exc:  # noqa: BLE001 -- reported in the refusal
+                if type(exc).__name__ == "InterruptProcessingException":
+                    raise
+                fetch_error = exc
+            candidates, model_path = self._resolve_model()
         if model_path is None:
             raise EngineUnusable(
                 self.name, "upscale_stage",
                 EngineUsabilityReason.MISSING_MODEL,
                 f"{self._model_filename} not found under any of "
-                f"{list(candidates)}. Download it from "
+                f"{list(candidates)}, and the pinned download from "
+                f"nateraw/real-esrgan did not complete ({fetch_error}). "
+                f"Download it from "
                 f"https://github.com/xinntao/Real-ESRGAN/releases/download/"
                 f"v0.2.1/RealESRGAN_x2plus.pth into models/upscale_models "
-                f"(sha256 {self._model_sha256}), or run the script at "
-                f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                f"main/scripts/ensure_upscale_models.py",
+                f"(sha256 {self._model_sha256}).",
                 kind="upscale")
 
         # SHA-256 verify if pinned. Empty string = skip (dev mode / first run).

@@ -171,12 +171,52 @@ def test_load_raises_missing_model_when_file_absent(tmp_path, monkeypatch):
     mock_folder_paths.get_folder_paths = mock.MagicMock(return_value=[str(empty_dir)])
     engine = SpandrelEsrgan()
     engine._model_sha256 = _FAKE_WEIGHTS_SHA
+    # The download is attempted once and fails here (no network in the suite).
+    engine._fetch_model = mock.MagicMock(side_effect=RuntimeError("offline"))
     with mock.patch.dict("sys.modules",
                           {"spandrel": mock_spandrel,
                            "folder_paths": mock_folder_paths}):
         with pytest.raises(EngineUnusable) as excinfo:
             engine.load(torch.device("cpu"))
     assert excinfo.value.reason == EngineUsabilityReason.MISSING_MODEL
+    engine._fetch_model.assert_called_once_with()
+    assert "offline" in str(excinfo.value)
+
+
+def test_load_fetches_a_missing_checkpoint_then_loads_it(tmp_path, monkeypatch):
+    """Operator 2026-09-29: every local model downloads itself. With nothing on
+    disk, load() runs the pinned fetch once and loads the file it wrote."""
+    from nodes._otr_upscale_engines import eng_spandrel_esrgan
+    from nodes._otr_upscale_engines.eng_spandrel_esrgan import SpandrelEsrgan
+    models = tmp_path / "upscale_models"
+    models.mkdir()
+    # Keep the repo-relative fallback off the real models dir (as above).
+    fake_file = (tmp_path / "fake_comfy_root" / "custom_nodes" / "ComfyUI-OldTimeRadio"
+                 / "nodes" / "_otr_upscale_engines" / "eng_spandrel_esrgan.py")
+    monkeypatch.setattr(eng_spandrel_esrgan, "__file__", str(fake_file))
+    engine = SpandrelEsrgan()
+    engine._model_sha256 = _FAKE_WEIGHTS_SHA
+
+    def fetch():
+        (models / engine._model_filename).write_bytes(_FAKE_WEIGHTS)
+
+    engine._fetch_model = mock.MagicMock(side_effect=fetch)
+    mock_spandrel = mock.MagicMock()
+    descriptor = mock.MagicMock(scale=2)
+    mock_spandrel.ModelLoader.return_value.load_from_file.return_value = descriptor
+    mock_folder_paths = mock.MagicMock()
+    mock_folder_paths.get_folder_paths = mock.MagicMock(return_value=[str(models)])
+    with mock.patch.dict("sys.modules", {"spandrel": mock_spandrel,
+                                         "folder_paths": mock_folder_paths}):
+        try:
+            engine.load(torch.device("cpu"))
+        except EngineUnusable as exc:
+            # Only a failure AFTER the file was found is acceptable here (the
+            # mock descriptor may not satisfy later shape checks).
+            assert "not found under" not in str(exc)
+    engine._fetch_model.assert_called_once_with()
+    mock_spandrel.ModelLoader.return_value.load_from_file.assert_called_once_with(
+        str(models / engine._model_filename))
 
 
 def test_load_raises_missing_model_when_sha_mismatches(tmp_path):

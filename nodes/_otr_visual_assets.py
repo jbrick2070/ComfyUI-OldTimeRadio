@@ -159,6 +159,14 @@ _PINNED_SOURCES = (
      "Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
      "8260d429d19fd7a72304cad059160b95d843913f", 738_005_744,
      "85c4a61c30e0497aa44b91d93a893b624708461a56fe5485183b28fa07e2dfb3"),
+    # REAL-ESRGAN x2plus, added 2026-09-29 for the same directive: the
+    # spandrel_esrgan upscaler's checkpoint. Upstream ships it as a GitHub
+    # release asset; this Hub copy (public, ungated, BSD-3-Clause, since
+    # 2022) has the SHA-256 eng_spandrel_esrgan pins. Fetched by the engine at
+    # load through `ensure_upscale_weights`, not by the queue-time preflight.
+    ("upscale_models", "nateraw/real-esrgan", "RealESRGAN_x2plus.pth",
+     "42efb9c3eeed1f5c0c8a626cf5f7f4481dfbb094", 67_061_725,
+     "49fafd45f8fd7aa8d31ab2a22d14d91b536c34494a5cfe31eb5d89c2fa266abb"),
 )
 
 _SOURCES = (
@@ -670,7 +678,7 @@ def _same_file(left, right):
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
                     sd15=None, lumina=None, ideogram=None, flux=None, ltx25=None,
                     animatediff=None, minimax_h3=None, humo=None, env=None,
-                    writer_models=()):
+                    writer_models=(), upscale_models=()):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
     A missing nondefault choice is a refusal, never a default-weight fallback.
@@ -897,6 +905,8 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         for model_id in sorted(writer_models):
             for category, token in native_writer_weights(model_id):
                 add(category, token)
+    for token in sorted(upscale_models):
+        add("upscale_models", token)
     return requests
 
 
@@ -1527,20 +1537,35 @@ def ensure_writer_weights(model_id):
     preflight: an isolated writer graph without the validator, or a second
     writer pick the plan could not see. A file already in place costs a folder
     lookup and nothing else. Returns the path ComfyUI's loader will open."""
+    return _ensure_one("Comfy-native writer", model_id, writer_models={model_id})
+
+
+def ensure_upscale_weights(filename):
+    """An upscaler checkpoint on disk before the upscale engine loads it.
+
+    The upscaler is chosen on OTR_SilentComposite, which sits outside the
+    validator's gate walk, so the queue-time preflight never sees the pick --
+    and the composite skips the model entirely when no clip needs it. So the
+    engine asks here, at load, and a failed fetch fails only the upscale step
+    rather than refusing the episode. Same pinned, hash-verified download as
+    the preflight. Returns the path the engine will open."""
+    return _ensure_one("upscale model", filename, upscale_models={filename})
+
+
+def _ensure_one(what, name, **selection):
+    """Fetch the one weight ``selection`` names, if missing; return its path."""
     import folder_paths
     from comfy import model_management
     from ._otr_shared import env as otr_env
 
-    writers = {model_id}
-
     def resolve():
         return native_requests(set(), folder_paths=folder_paths,
-                               env=otr_env.snapshot(), writer_models=writers)
+                               env=otr_env.snapshot(), **selection)
 
     requests = resolve()
     if len(requests) != 1:
-        raise VisualAssetError("%r names %d Comfy-native writer weights; expected one"
-                               % (model_id, len(requests)))
+        raise VisualAssetError("%r names %d %s weights; expected one"
+                               % (name, len(requests), what))
     _acquire(requests, folder_paths=folder_paths,
              cancel=model_management.throw_exception_if_processing_interrupted,
              reresolve=resolve)

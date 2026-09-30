@@ -299,7 +299,8 @@ def test_only_the_pinned_sources_carry_a_pin():
     """Every other row keeps the HEAD-at-queue-time pinning it had. The pinned
     rows are the two H3 lanes', since 2026-09-26 the Comfy-native Gemma
     writers' text encoders (plan row 0n: E2B, then E4B and 12B), and since
-    2026-09-29 the Ideogram 4 (nvfp4 and fp8) and Flux.1-dev image weights."""
+    2026-09-29 the Ideogram 4 (nvfp4 and fp8) and Flux.1-dev image weights,
+    the HuMo tiers' weights and the Real-ESRGAN upscaler checkpoint."""
     from nodes import _otr_comfy_textgen_backend as native
     pinned = {(category, filename.rsplit("/", 1)[-1])
               for category, _repo, filename, *_rest in VA._PINNED_SOURCES}
@@ -323,8 +324,9 @@ def test_only_the_pinned_sources_carry_a_pin():
         ("vae", "wan_2.1_vae.safetensors"),
         ("loras", "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors"),
     }
+    upscalers = {("upscale_models", "RealESRGAN_x2plus.pth")}
     assert pinned == (EXPECTED["minimax_h3_video"] | EXPECTED["minimax_h3_audio_in"]
-                      | writers | images | humo)
+                      | writers | images | humo | upscalers)
     for key, spec in VA.MANIFEST.items():
         if key in pinned:
             assert set(spec) == {"repo_id", "filename", "revision", "size", "sha256"}
