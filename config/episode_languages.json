@@ -122,7 +122,8 @@
             "am_santa"
           ]
         },
-        "google_tts": {}
+        "google_tts": {},
+        "cloud_elevenlabs": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -216,7 +217,8 @@
             "em_santa"
           ]
         },
-        "google_tts": {}
+        "google_tts": {},
+        "cloud_elevenlabs": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -310,7 +312,8 @@
             "pm_santa"
           ]
         },
-        "google_tts": {}
+        "google_tts": {},
+        "cloud_elevenlabs": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -403,7 +406,8 @@
             "im_nicola"
           ]
         },
-        "google_tts": {}
+        "google_tts": {},
+        "cloud_elevenlabs": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -495,7 +499,8 @@
             "ff_siwis"
           ]
         },
-        "google_tts": {}
+        "google_tts": {},
+        "cloud_elevenlabs": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -590,7 +595,8 @@
             "hm_psi"
           ]
         },
-        "google_tts": {}
+        "google_tts": {},
+        "cloud_elevenlabs": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -686,7 +692,8 @@
             "jm_kumo"
           ]
         },
-        "google_tts": {}
+        "google_tts": {},
+        "cloud_elevenlabs": {}
       },
       "admission": {
         "source_bank_exclusions": [],
@@ -787,7 +794,8 @@
             "zm_yunyang"
           ]
         },
-        "google_tts": {}
+        "google_tts": {},
+        "cloud_elevenlabs": {}
       },
       "admission": {
         "source_bank_exclusions": [],

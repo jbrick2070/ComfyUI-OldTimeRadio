@@ -71,15 +71,17 @@ def test_kokoro_lang_codes_match_the_measured_catalog():
     assert by_label["English"].engines["kokoro"]["lang_code_character_pool"] == ["a", "b"]
 
 
-def test_every_admitted_row_declares_kokoro_first_and_google_tts():
+def test_every_admitted_row_declares_kokoro_first_then_the_cloud_voices():
     """Kokoro stays the dance leader (first, with a voice list); Google TTS is
     admitted beside it on every row (0i, operator 2026-09-25: "all supported
-    as Kokoro"). Its entry carries no config -- Gemini TTS voices are not tied
-    to a language. Any THIRD engine must be added and qualified on purpose."""
+    as Kokoro"), and ElevenLabs third (2026-09-30: its multilingual models
+    speak every row). Neither entry carries config -- both voices speak the
+    text's language. Any FOURTH engine must be added and qualified on purpose."""
     rows, _by_label, _by_iso = el.reload_registry()
     for row in rows:
-        assert list(row.engines) == ["kokoro", "google_tts"], row.label
+        assert list(row.engines) == ["kokoro", "google_tts", "cloud_elevenlabs"], row.label
         assert row.engines["google_tts"] == {}, row.label
+        assert row.engines["cloud_elevenlabs"] == {}, row.label
         voices = row.engines["kokoro"]["voices"]
         assert voices, row.label
         assert len(set(voices)) == len(voices), "duplicate voice id on %s" % row.label

@@ -1139,7 +1139,17 @@
       "ref_path": "cloud:cloud_elevenlabs:CwhRBWXzGAHq8TQ4Fs17",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "CwhRBWXzGAHq8TQ4Fs17"
+      "provider_voice_id": "CwhRBWXzGAHq8TQ4Fs17",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_sarah",
@@ -1156,7 +1166,17 @@
       "ref_path": "cloud:cloud_elevenlabs:EXAVITQu4vr4xnSDxMaL",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "EXAVITQu4vr4xnSDxMaL"
+      "provider_voice_id": "EXAVITQu4vr4xnSDxMaL",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_laura",
@@ -1172,7 +1192,17 @@
       "ref_path": "cloud:cloud_elevenlabs:FGY2WhTYpPnrIDTdsKH5",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "FGY2WhTYpPnrIDTdsKH5"
+      "provider_voice_id": "FGY2WhTYpPnrIDTdsKH5",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_charlie",
@@ -1188,7 +1218,17 @@
       "ref_path": "cloud:cloud_elevenlabs:IKne3meq5aSn9XLyUdCD",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "IKne3meq5aSn9XLyUdCD"
+      "provider_voice_id": "IKne3meq5aSn9XLyUdCD",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_george",
@@ -1205,7 +1245,17 @@
       "ref_path": "cloud:cloud_elevenlabs:JBFqnCBsd6RMkjVDRZzb",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "JBFqnCBsd6RMkjVDRZzb"
+      "provider_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_callum",
@@ -1221,7 +1271,17 @@
       "ref_path": "cloud:cloud_elevenlabs:N2lVS1w4EtoT3dr4eOWO",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "N2lVS1w4EtoT3dr4eOWO"
+      "provider_voice_id": "N2lVS1w4EtoT3dr4eOWO",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_river",
@@ -1237,7 +1297,17 @@
       "ref_path": "cloud:cloud_elevenlabs:SAz9YHcvj6GT2YYXdXww",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "SAz9YHcvj6GT2YYXdXww"
+      "provider_voice_id": "SAz9YHcvj6GT2YYXdXww",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_harry",
@@ -1253,7 +1323,17 @@
       "ref_path": "cloud:cloud_elevenlabs:SOYHLrjzK2X1ezoPC6cr",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "SOYHLrjzK2X1ezoPC6cr"
+      "provider_voice_id": "SOYHLrjzK2X1ezoPC6cr",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_liam",
@@ -1269,7 +1349,17 @@
       "ref_path": "cloud:cloud_elevenlabs:TX3LPaxmHKxFdv7VOQHJ",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "TX3LPaxmHKxFdv7VOQHJ"
+      "provider_voice_id": "TX3LPaxmHKxFdv7VOQHJ",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_alice",
@@ -1285,7 +1375,17 @@
       "ref_path": "cloud:cloud_elevenlabs:Xb7hH8MSUJpSbSDYk0k2",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "Xb7hH8MSUJpSbSDYk0k2"
+      "provider_voice_id": "Xb7hH8MSUJpSbSDYk0k2",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_matilda",
@@ -1301,7 +1401,17 @@
       "ref_path": "cloud:cloud_elevenlabs:XrExE9yKIg1WjnnlVkGX",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "XrExE9yKIg1WjnnlVkGX"
+      "provider_voice_id": "XrExE9yKIg1WjnnlVkGX",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_will",
@@ -1317,7 +1427,17 @@
       "ref_path": "cloud:cloud_elevenlabs:bIHbv24MWmeRgasZH58o",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "bIHbv24MWmeRgasZH58o"
+      "provider_voice_id": "bIHbv24MWmeRgasZH58o",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_jessica",
@@ -1333,7 +1453,17 @@
       "ref_path": "cloud:cloud_elevenlabs:cgSgspJ2msm6clMCkdW9",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "cgSgspJ2msm6clMCkdW9"
+      "provider_voice_id": "cgSgspJ2msm6clMCkdW9",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_eric",
@@ -1349,7 +1479,17 @@
       "ref_path": "cloud:cloud_elevenlabs:cjVigY5qzO86Huf0OWal",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "cjVigY5qzO86Huf0OWal"
+      "provider_voice_id": "cjVigY5qzO86Huf0OWal",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_bella",
@@ -1365,7 +1505,17 @@
       "ref_path": "cloud:cloud_elevenlabs:hpp4J3VqNfWAUOO0d1Us",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "hpp4J3VqNfWAUOO0d1Us"
+      "provider_voice_id": "hpp4J3VqNfWAUOO0d1Us",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_chris",
@@ -1381,7 +1531,17 @@
       "ref_path": "cloud:cloud_elevenlabs:iP95p4xoKVk53GoZ742B",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "iP95p4xoKVk53GoZ742B"
+      "provider_voice_id": "iP95p4xoKVk53GoZ742B",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_brian",
@@ -1398,7 +1558,17 @@
       "ref_path": "cloud:cloud_elevenlabs:nPczCjzI2devNBz1zQrb",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "nPczCjzI2devNBz1zQrb"
+      "provider_voice_id": "nPczCjzI2devNBz1zQrb",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_daniel",
@@ -1414,7 +1584,17 @@
       "ref_path": "cloud:cloud_elevenlabs:onwK4e9ZLuTAKqWW03F9",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "onwK4e9ZLuTAKqWW03F9"
+      "provider_voice_id": "onwK4e9ZLuTAKqWW03F9",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_lily",
@@ -1430,7 +1610,17 @@
       "ref_path": "cloud:cloud_elevenlabs:pFZP5JQG7iQjIQuC4Bku",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "pFZP5JQG7iQjIQuC4Bku"
+      "provider_voice_id": "pFZP5JQG7iQjIQuC4Bku",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_adam",
@@ -1447,7 +1637,17 @@
       "ref_path": "cloud:cloud_elevenlabs:pNInz6obpgDQGcFmaJgB",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "pNInz6obpgDQGcFmaJgB"
+      "provider_voice_id": "pNInz6obpgDQGcFmaJgB",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "el_bill",
@@ -1463,7 +1663,17 @@
       "ref_path": "cloud:cloud_elevenlabs:pqHfZKP75CvOlQylNhV4",
       "ref_sha256": "cloud",
       "commercial_clean": true,
-      "provider_voice_id": "pqHfZKP75CvOlQylNhV4"
+      "provider_voice_id": "pqHfZKP75CvOlQylNhV4",
+      "languages": [
+        "en",
+        "es",
+        "pt",
+        "it",
+        "fr",
+        "hi",
+        "ja",
+        "zh"
+      ]
     },
     {
       "voice_ref_id": "gt_algenib",

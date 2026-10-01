@@ -579,8 +579,8 @@ def test_kokoro_on_onnx_speaks_every_row_once_its_libraries_are_in(monkeypatch):
 
 def test_an_engine_the_language_does_not_admit_is_a_gap_and_english_never_is():
     langs = _langs()
-    gap = L.language_voice_gap(langs.row_by_iso("es"), ("kokoro", "cloud_elevenlabs"))
-    assert gap.startswith("the cloud_elevenlabs voice does not speak Spanish"), gap
+    gap = L.language_voice_gap(langs.row_by_iso("es"), ("kokoro", "bark"))
+    assert gap.startswith("the bark voice does not speak Spanish"), gap
     assert L.language_voice_gap(langs.row_by_iso("en"), ("bark", "cloud_elevenlabs")) is None
     assert L.language_voice_gap(None, ("bark", "bark")) is None
 
@@ -719,8 +719,10 @@ def test_a_refused_pick_names_the_voice_that_would_speak_it(monkeypatch):
         L.settle_prompt_language(_language_prompt("Japanese"), "63")
     text = str(exc.value)
     assert text.startswith("OTR_LedgerScriptWriter #1: pick another Language, or set "
-                           "'Characters - voices' and 'Announcer - voice' to google_tts"), text
-    assert "Google API key" in text and "pip install fugashi jaconv unidic-lite" in text
+                           "'Characters - voices' and 'Announcer - voice' to "
+                           "cloud_elevenlabs (a cloud voice: it spends Comfy Credits) "
+                           "or google_tts (a cloud voice: it needs your Google API key)"), text
+    assert "pip install fugashi jaconv unidic-lite" in text
     google = _language_prompt("Japanese", char="google_tts", announcer="google_tts")
     assert L.settle_prompt_language(google, "63") == {}      # and that advice works
 

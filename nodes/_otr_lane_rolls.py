@@ -894,6 +894,13 @@ _POOL_ROW = "Languages to roll"
 _VOICE_ROWS = "'Characters - voices' and 'Announcer - voice'"
 _AUDIO_ROLL_ROW = "Randomize audio (non-cloud)"
 
+#: The note a refusal hangs on each cloud voice it suggests: what it costs.
+#: An engine not listed here is local and needs no note.
+_CLOUD_VOICE_NOTES = {
+    "cloud_elevenlabs": " (a cloud voice: it spends Comfy Credits)",
+    "google_tts": " (a cloud voice: it needs your Google API key)",
+}
+
 
 def _language_advice(row, voices, host) -> str:
     """What besides another language would let this run speak ``row``: turning
@@ -907,11 +914,8 @@ def _language_advice(row, voices, host) -> str:
         return "no voice engine can speak it on this machine"
     # Local engines first, and the cloud note on the cloud engine itself:
     # after "google_tts or kokoro" it read as if Kokoro needed a Google key.
-    able.sort(key=lambda name: (name.startswith("google"), name))
-    words = " or ".join(
-        name + (" (a cloud voice: it needs your Google API key)"
-                if name.startswith("google") else "")
-        for name in able)
+    able.sort(key=lambda name: (name in _CLOUD_VOICE_NOTES, name))
+    words = " or ".join(name + _CLOUD_VOICE_NOTES.get(name, "") for name in able)
     return "or set %s to %s" % (_VOICE_ROWS, words)
 
 
