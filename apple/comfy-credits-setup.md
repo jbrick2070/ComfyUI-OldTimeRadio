@@ -16,9 +16,11 @@ queue's Comfy API key is the whole switch.
 
 ## Enable it
 
-1. **Sign in to ComfyUI with a Comfy API key.** Create the key on your Comfy
-   account and use the API-key option on ComfyUI's sign-in dialog (see
-   ComfyUI's *Partner Nodes Overview*), then `Settings → Credits` to top up
+1. **Sign in to ComfyUI with a Comfy API key.** Create the key at
+   <https://platform.comfy.org> on the account whose credits should pay (the
+   sign-in dialog's own "Need an API key? Get one here" link goes there).
+   Already signed in with Google or email? Sign out, sign in again, choose
+   **Comfy API Key** and paste the key. Then `Settings → Credits` to top up
    (prepaid -- no surprise charges). A key works on any host, `localhost` or
    not. **That sign-in is the only credential the pack reads** -- the same
    `api_key_comfy_org` hidden input ComfyUI's own partner nodes use. The pack
@@ -28,6 +30,49 @@ queue's Comfy API key is the whole switch.
    token, because the Comfy Registry security scan flags any third-party pack
    that declares that hidden input (2026-09-02). A plain email / Google
    sign-in without an API key therefore does not enable this lane.
+
+   **Why a Google / email sign-in cannot be accepted (re-verified
+   2026-10-01).** A Google-signed-in Comfy Desktop user with credits ran
+   `otr_cloud_low_1act.json` on 2026-09-30 and was refused; this is what was
+   checked before deciding the refusal, not the pack, had to change:
+   * *The registry evidence.* `GET https://api.comfy.org/nodes/comfyui-old-time-radio/versions?include_status_reason=true`
+     still shows `2.0.0-alpha.13` to `.15` with two `pylint-scanner`
+     findings of severity `critical`, type `prohibited-string`, text
+     "Prohibited string detected" naming the session-bearer type string, on
+     the writer's `hidden` dict. The `api_key_comfy_org` line beside it was
+     not flagged, and every version since alpha.30 (which declares only the
+     key) has passed the automated scan, apart from unrelated findings.
+   * *How ComfyUI hands the session over.* ComfyUI's `execution.py`
+     (`get_input_data`) gives the signed-in session to a node only when its
+     hidden inputs declare it: a V1 node by the type string, a V3 node by
+     `io.Hidden.auth_token_comfy_org`, which a V3 schema with
+     `is_api_node=True` adds automatically. No core helper makes the
+     authenticated call for a custom node, and Comfy's own partner nodes
+     (`comfy_api_nodes/util/_helpers.py`) read it from their own hidden
+     inputs. OTR's in-process partner calls supply those inputs themselves,
+     so they would still need the session from OTR code. The app always
+     sends both `extra_data` fields; a Google / email sign-in fills only the
+     session one.
+   * *What was rejected.*
+     * Building the type string at runtime: that is deliberate evasion of a
+       registry security rule, and the registry also runs admin code reviews.
+     * The V3 enum or `is_api_node`: no flagged string appears, but it takes
+       exactly what the critical prohibits. Whether Comfy-Org allows it for
+       third-party packs is unresolved; asking on the registry-backend
+       tracker would settle it.
+     * Reading the server's `extra_data` directly: the same evasion.
+   * *The one sanctioned route,* recorded for later: let Comfy's own partner
+     nodes make the call, on the canvas or through node expansion, so the
+     session never reaches OTR code. The writer's sequential, data-dependent
+     calls and the per-beat media calls make that a rewrite of every cloud
+     lane, not a fix.
+   * *What changed instead.* Every cloud lane now refuses with one shared
+     text (`NO_CREDENTIAL_HINT` in `nodes/_otr_shared/cloud_media_backend.py`,
+     which the Comfy Credits writer reuses). It explains why the sign-in is
+     not enough and gives the two steps above, plus the comfy-cli
+     `COMFY_API_KEY` route. The queue-time balance warning says the same in
+     one line. The text is static, so no credential can reach an error
+     report.
 
    **Headless (no app sign-in):** put the key in `OTR_COMFY_API_KEY` in the
    environment of the machine that *submits* the prompt and submit through

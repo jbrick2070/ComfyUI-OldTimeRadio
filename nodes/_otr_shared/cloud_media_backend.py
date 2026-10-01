@@ -373,14 +373,30 @@ class CloudAuth:
         return f"CloudAuth(kind={self.kind!r}, value=***)"
 
 
+#: The ONE refusal text for "no Comfy API key on this queue" -- the media
+#: lanes raise it here and the Comfy Credits writer backend reuses it, so a
+#: user sees the same two steps whichever cloud lane stops first. Static
+#: text only: never format a key, an exception, or extra_data into it.
+#:
+#: WHY A GOOGLE/EMAIL SIGN-IN CANNOT BE ACCEPTED (verified 2026-10-01, see
+#: apple/comfy-credits-setup.md): ComfyUI hands the signed-in session only to
+#: a node that declares the session-bearer hidden input, and the Comfy
+#: Registry scanner rejects that declaration in a third-party pack as a
+#: critical finding (PBUG-20260902-04). The API key is the only credential a
+#: pack may take, so the refusal says how to get one.
 NO_CREDENTIAL_HINT = (
-    "no Comfy API key reached this queue (api_key_comfy_org is empty). The "
-    "workflow needs its '0 - Comfy Credential' node wired into the Workflow "
-    "Validator -- every shipped OTR workflow has one -- and ComfyUI needs a "
-    "key: sign into Comfy in the app WITH A COMFY API KEY (a plain "
-    "email/Google login injects nothing), or submit headless through "
-    "scripts/otr_api.py with OTR_COMFY_API_KEY in the SUBMITTER's "
-    "environment (sent as extra_data.api_key_comfy_org). No request was sent."
+    "no Comfy API key reached this queue (api_key_comfy_org is empty), so "
+    "no request was sent. A Google or email sign-in to the Comfy app is not "
+    "enough: custom node packs cannot use that sign-in (the Comfy Registry "
+    "flags any pack that asks for it). Two steps: 1) create an API key at "
+    "https://platform.comfy.org on the account whose credits should pay; "
+    "2) in ComfyUI sign out, sign in again choosing 'Comfy API Key', and "
+    "paste it. Headless: `comfy run --workflow <file>` with COMFY_API_KEY set "
+    "and no `comfy cloud login` session, or scripts/otr_api.py with "
+    "OTR_COMFY_API_KEY -- both send it as extra_data.api_key_comfy_org. "
+    "(A hand-built graph also needs the '0 - Comfy Credential' node.) Setup: "
+    "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/"
+    "comfy-credits-setup.md"
 )
 
 

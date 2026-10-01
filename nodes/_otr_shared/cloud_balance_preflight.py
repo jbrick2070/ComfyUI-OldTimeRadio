@@ -298,8 +298,9 @@ def _comfy_bearer_from(api_key) -> Callable[[], str]:
         key = str(api_key or "").strip()
         if not key:
             raise RuntimeError(
-                "no api_key_comfy_org reached this queue (the '0 - Comfy "
-                "Credential' node binds it)")
+                "api_key_comfy_org is empty; a Google or email sign-in "
+                "does not reach custom node packs -- sign in to ComfyUI "
+                "with a Comfy API key")
         return key
     return bearer
 

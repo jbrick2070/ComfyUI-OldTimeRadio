@@ -577,18 +577,12 @@ class ComfyCreditsBackend:
                 f"profile lane_allowlist {list(policy.lane_allowlist)}."
             )
         if not _bearer():
+            # The same static text the cloud media lanes raise, so the user
+            # gets one set of steps whichever lane stops first. It never
+            # carries a credential.
+            from ._otr_shared.cloud_media_backend import NO_CREDENTIAL_HINT
             raise ComfyCreditsConfigError(
-                f"{repo_id} selected but this queue carries no Comfy API key. "
-                f"The workflow needs its '0 - Comfy Credential' node wired "
-                f"into the Workflow Validator (every shipped OTR workflow has "
-                f"one). Sign into Comfy in the app WITH A COMFY API KEY (a plain "
-                f"email/Google login injects no api_key_comfy_org), or submit "
-                f"headless through "
-                f"scripts/otr_api.py with OTR_COMFY_API_KEY in the SUBMITTER's "
-                f"environment (sent as extra_data.api_key_comfy_org). See "
-                f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                f"main/apple/comfy-credits-setup.md."
-            )
+                f"{repo_id} selected, but {NO_CREDENTIAL_HINT}")
         letter = _slot_letter(repo_id)
         slug = resolve_slug(repo_id)
         # The window belongs to the SLUG, not the static virtual row.

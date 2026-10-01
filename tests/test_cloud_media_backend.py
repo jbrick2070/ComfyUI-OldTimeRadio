@@ -79,6 +79,32 @@ def test_auth_missing_fails_closed_naming_both_real_paths(monkeypatch):
     assert "ignored-on-the-server" not in text
 
 
+def assert_helpful_no_key_refusal(text: str) -> None:
+    """The live 2026-09-30 case: a Google-signed-in Comfy user with credits
+    hit this refusal and could not tell what to do. The text must say why a
+    plain sign-in is not enough and give the two steps plus the headless
+    route, and stay short enough to read in an error toast."""
+    assert "Google or email sign-in" in text
+    assert "https://platform.comfy.org" in text           # step 1: make a key
+    assert "'Comfy API Key'" in text                       # step 2: the app's own label
+    assert "COMFY_API_KEY" in text                         # comfy-cli headless route
+    assert "comfy cloud login" in text                     # its session would win
+    assert len(text) < 1100
+
+
+def test_no_key_refusal_gives_the_two_steps():
+    with pytest.raises(cmb.CloudMediaError) as ei:
+        cmb.resolve_auth(None)
+    assert_helpful_no_key_refusal(str(ei.value))
+
+
+def test_no_key_refusal_is_static_text():
+    """Nothing is formatted into the shared text, so no credential or
+    exception message can ever ride along with it."""
+    assert "{" not in cmb.NO_CREDENTIAL_HINT
+    assert "%s" not in cmb.NO_CREDENTIAL_HINT
+
+
 def test_auth_blank_is_missing():
     with pytest.raises(cmb.CloudMediaError):
         cmb.resolve_auth("   ")

@@ -325,6 +325,13 @@ def test_backend_load_rejects_flag_alone_without_auth(monkeypatch):
     text = str(ei.value)
     assert "api_key_comfy_org" in text
     assert "extra_data.api_key_comfy_org" in text
+    # The live 2026-09-30 case (Google-signed-in user, comfy:slot-b): the
+    # writer refusal is the media lanes' shared text, slot named first.
+    from nodes._otr_shared.cloud_media_backend import NO_CREDENTIAL_HINT
+    from tests.test_cloud_media_backend import assert_helpful_no_key_refusal
+    assert text.startswith(f"{occ.SLOT_A_ID} selected, but ")
+    assert NO_CREDENTIAL_HINT in text
+    assert_helpful_no_key_refusal(text)
 
 
 def test_backend_generate_posts_and_extracts(comfy_on, monkeypatch):
