@@ -206,15 +206,61 @@ def test_a_budget_floor_shows_its_scene_still_too(floor_engines, tmp_path,
         assert _mean_luma(out["clips"][sid]["path"]) > 60.0
 
 
-def test_a_floor_with_no_scene_still_fails_loud_instead_of_painting_black(
-        floor_engines, tmp_path, monkeypatch):
+def test_a_floor_with_no_scene_still_keeps_its_black_gap_and_the_episode(
+        floor_engines, tmp_path, monkeypatch, caplog):
+    """Operator 2026-10-01: a failed clip whose still cannot be drawn still
+    gets its black gap -- one bad beat must never abort the episode and throw
+    away the clips already paid for (QA on 0385d3b1)."""
+    import logging
     monkeypatch.setenv("OTR_CLOUD_FANOUT", "2")
     led = _ledger(tmp_path, ["cloud_floorstub_timeout", "cloud_floorstub_ok"],
                   with_stills=False)
-    with pytest.raises(rd.RenderError) as ei:
-        rd.run_episode(led)
-    msg = str(ei.value)
-    assert "shot_b000" in msg and "no scene still" in msg
+    with caplog.at_level(logging.ERROR):
+        out = rd.run_episode(led)
+    shots = out["ledger"]["video"]["shots"]
+    assert shots[0]["cloud_floor"] == "timeout"
+    assert shots[0]["floor_render"] == "none"
+    assert "shot_b000" not in out["clips"]        # the composite's black gap
+    assert "shot_b001" in out["clips"]            # the paid beat survives
+    assert any("FLOOR STILL FAILED shot shot_b000" in r.getMessage()
+               for r in caplog.records)
+
+
+class _LocalFloorStub(_CloudStubBase):
+    """A LOCAL engine (not provider-side, no cloud_ prefix)."""
+    name = "localfloorstub_render"
+    provider_side = False
+
+    def render_clip(self, request, prepared):
+        self.calls += 1
+        return {"raw": True}
+
+
+def test_a_spend_cap_halt_floors_cloud_beats_only(floor_engines, tmp_path,
+                                                 monkeypatch):
+    """Operator 2026-10-01: "cloud budget should only be counted against cloud
+    beats". After a 402 halt the next cloud beat is floored, but a LOCAL beat
+    costs nothing and renders normally."""
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "1")
+    monkeypatch.setenv("OTR_CLOUD_VIDEO_FANOUT", "1")
+
+    class _Broke(_CloudStubBase):
+        name = "cloud_floorstub_broke2"
+
+        def render_clip(self, request, prepared):
+            raise cmb.CloudMediaError(cmb.CloudErrorCode.BUDGET, "HTTP 402")
+
+    local = _LocalFloorStub()
+    vreg.register(_Broke())
+    vreg.register(local)
+    led = _ledger(tmp_path, ["cloud_floorstub_broke2", "localfloorstub_render",
+                             "cloud_floorstub_ok"])
+    out = rd.run_episode(led)
+    shots = out["ledger"]["video"]["shots"]
+    assert rd._shot_is_budget_floor(shots[0])
+    assert not rd._shot_is_budget_floor(shots[1])   # local beat not floored
+    assert local.calls == 1                          # and it actually rendered
+    assert rd._shot_is_budget_floor(shots[2])       # later cloud beat floored
 
 
 # --------------------------------------------------------------------------- #

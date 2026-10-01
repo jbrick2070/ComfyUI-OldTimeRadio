@@ -5664,14 +5664,29 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
         so no floor reaches the composite as a missing clip -- which a cloud
         lane fills with black. ``stamped_row`` keeps its floor stamp (the beat
         is still a counted, degraded hole in the accounting); the clip is what
-        stops it being a black one. A beat with no scene still raises inside
-        ``_render_still_floor`` rather than publishing black.
+        stops it being a black one.
+
+        If the still cannot be drawn (no scene still, an unreadable file, an
+        ffmpeg fault), the beat falls back to the stamped clipless row -- the
+        black hole floors had before -- with a loud error naming the beat. A
+        floor exists so one bad beat cannot abort the episode; raising here
+        would throw away every clip already paid for (QA on 0385d3b1).
         """
         sid = str(shot.get("shot_id") or "")
-        clips[sid] = _render_still_floor(
-            shot, ledger, host_caps=_episode_host_caps,
-            profile=_episode_profile, frame_count=frame_count)
         row = dict(stamped_row)
+        try:
+            clips[sid] = _render_still_floor(
+                shot, ledger, host_caps=_episode_host_caps,
+                profile=_episode_profile, frame_count=frame_count)
+        except Exception as exc:  # noqa: BLE001 -- a floor must not abort the episode
+            _LOG.error(
+                "[OTR video] FLOOR STILL FAILED shot %s -- %s: %s. The beat is "
+                "left as a black hole; every other beat is kept.",
+                sid, type(exc).__name__, exc)
+            clips.pop(sid, None)
+            row["floor_render"] = "none"
+            new_shots.append(row)
+            return
         row["floor_render"] = CLOUD_FLOOR_RENDER_ENGINE
         new_shots.append(row)
 
@@ -5883,7 +5898,10 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                     new_shots.append(shot)
                     _serial_floored.add(str(shot.get("shot_id") or ""))
                     continue
-                if cloud_spend_halt:
+                # ENGINE-GATED like the cascade below: a spend-cap halt is about
+                # money, and a LOCAL beat costs none -- it renders normally.
+                if cloud_spend_halt and _is_cloud_video_engine(
+                        str(shot.get("engine_id") or "")):
                     _LOG.error(
                         "[OTR video] BUDGET floor shot %s -- "
                         "not submitted after spend-cap halt",
