@@ -69,6 +69,12 @@ H3_8GB_LAB = "h3_8gb_lab"
 #: ``launch.extra_args``; that field was rendered into prose but ignored by
 #: every launcher. Naming the process state makes the resolver emit the real
 #: argv and lets preflight verify the server rather than trust its profile.
+#:
+#: ``--cpu`` is what a machine WITHOUT a GPU launches with, not something a
+#: machine WITH one must give up (operator, 2026-09-30: "allow people with
+#: GPUs to run it too"). Every row on this contract is a cloud workflow --
+#: the writer, voices, music and video are all paid lanes -- so nothing in it
+#: renders wrong on a GPU server. See ``LAUNCH_ONLY_KNOBS``.
 CPU = "cpu"
 
 #: name -> the boot state a server must be in. ``None`` means "this contract
@@ -96,6 +102,17 @@ BOOT_CONTRACTS = {
         "sage_attention": None,
         "cpu": True,
     },
+}
+
+#: contract -> knobs it APPLIES at launch but does not REQUIRE of a running
+#: server. ``launch_args_for`` still emits them, and identifying a server's
+#: boot still reads them, so a ``--cpu`` server is still recognised as CPU.
+#: Only ``check_running_server`` -- the refusal -- ignores them. The CPU
+#: contract's ``--cpu`` is the one case: it lets a GPU-less box start at all,
+#: and a box with a GPU loses nothing by keeping it. A knob that guards a
+#: CORRECTNESS fact (H3's Sage, H3's ``cpu: False``) never belongs here.
+LAUNCH_ONLY_KNOBS = {
+    CPU: frozenset({"cpu"}),
 }
 
 #: The compatibility channel used by the Windows headless launcher for clamp
@@ -217,6 +234,8 @@ def check_running_server(name, state=None) -> list:
     exception it has to catch.
     """
     spec = contract_spec(name)
+    for knob in LAUNCH_ONLY_KNOBS.get(str(name or DEFAULT), ()):
+        spec[knob] = None
     state = running_server_boot_state() if state is None else dict(state)
     constrained = [k for k in ("disable_pinned_memory", "sage_attention", "cpu")
                    if spec.get(k) is not None]
@@ -446,7 +465,7 @@ def check_engine_against_profile(engine, profile) -> list:
 
 __all__ = [
     "DEFAULT", "H3", "H3_8GB_LAB", "CPU",
-    "BOOT_CONTRACTS", "CONTRACT_ENV",
+    "BOOT_CONTRACTS", "CONTRACT_ENV", "LAUNCH_ONLY_KNOBS",
     "BootContractError", "known_contract", "contract_spec", "launch_env_for",
     "launch_args_for",
     "running_server_boot_state", "check_running_server",

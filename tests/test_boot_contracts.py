@@ -81,11 +81,27 @@ def test_cpu_contract_owns_the_real_comfyui_argv():
     assert bc.launch_env_for(bc.CPU) == {}
     assert bc.check_running_server(
         bc.CPU, {"available": True, "cpu": True}) == []
-    assert "--cpu" in " ".join(bc.check_running_server(
-        bc.CPU, {"available": True, "cpu": False}))
-    with pytest.raises(bc.BootContractError, match="generated launch recipe"):
-        bc.assert_running_server(
-            bc.CPU, {"available": True, "cpu": False})
+
+
+def test_cpu_contract_also_runs_on_a_gpu_server():
+    """`--cpu` is how a GPU-less box launches, not a GPU a box must give up
+    (operator, 2026-09-30). The cloud workflows on this contract refused the
+    5080 outright before this."""
+    gpu_server = {"available": True, "disable_pinned_memory": False,
+                  "sage_attention": True, "cpu": False}
+    assert bc.check_running_server(bc.CPU, gpu_server) == []
+    bc.assert_running_server(bc.CPU, gpu_server)
+    # An unreadable boot has nothing left to violate on this contract.
+    assert bc.check_running_server(bc.CPU, {"available": False}) == []
+
+
+def test_launch_only_knobs_never_loosen_a_correctness_contract():
+    """H3's `cpu: False` is a correctness fact; only CPU's launch flag is
+    exempt from the refusal."""
+    assert set(bc.LAUNCH_ONLY_KNOBS) == {bc.CPU}
+    assert "CPU-only mode ON" in " ".join(bc.check_running_server(
+        bc.H3, {"available": True, "disable_pinned_memory": False,
+                "sage_attention": False, "cpu": True}))
 
 
 def test_cpu_contract_is_identified_from_the_running_server(monkeypatch):

@@ -265,8 +265,10 @@ def test_validator_asserts_master_hash(tmp_path, canonical, schemas,
                         bv.GENERATED_BY)
 
 
-def test_validator_refuses_cpu_snapshot_on_a_non_cpu_server(
+def test_validator_runs_cpu_snapshot_on_a_gpu_server(
         tmp_path, canonical, schemas, mapping, monkeypatch):
+    """otr_cloud_low on the 5080 refused with "needs --cpu ON" (2026-09-30).
+    A cloud workflow runs on a GPU server too; the stamp still passes."""
     from nodes._otr_workflow_validator import WorkflowValidator
     from nodes._otr_shared import boot_contracts as bc
 
@@ -283,11 +285,11 @@ def test_validator_refuses_cpu_snapshot_on_a_non_cpu_server(
         "cpu": False,
     })
 
-    with pytest.raises(ValueError, match="needs --cpu ON"):
-        WorkflowValidator()._assert_stamp(
-            str(path), CPU_ROW, value(vnode, "master_hash"),
-            bv.GENERATED_BY,
-        )
+    msg = WorkflowValidator()._assert_stamp(
+        str(path), CPU_ROW, value(vnode, "master_hash"),
+        bv.GENERATED_BY,
+    )
+    assert "stamp OK" in msg
 
 
 # ---------------------------------------------------------------------------
