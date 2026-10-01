@@ -138,46 +138,58 @@ failures into one cause; a second measurement settled which half it had right.
   single-segment beats, 125 and 74 frames, do NOT: 1.00, 1.41, 2.01, 1.96 and
   1.00, 1.00, 1.00, 1.11. So the ease-off tracks the long render, not the end
   of every request. n=2 short clips is thin, and their last few frames were
-  trimmed to the beat (a rendered rung is cut down), so this supports the cap;
-  it does not prove it. Segment 2s mostly start hot and settle (001_b2: 19.4
+  trimmed to the beat (a rendered rung is cut down), so this supported trying
+  the cap; it did not prove it, and the paired result below closed the cap. Segment 2s mostly start hot and settle (001_b2: 19.4
   -> 3.1 across its quarters) -- the lurch, seen from the other side.
-* *RESULT 2026-10-01 -- THE CAP IS REJECTED.* Paired replay on the 5080 of
-  the 70-shot costume bundle, v5 untouched, the ONLY change the ledger's
-  `video.max_render_frames` 161 -> 121 (a derived bundle, every plan
-  re-stamped by `otr_shot_lock._stamp_coverage_plan`; 47 of 70 changed).
-  Both arms RESULT SUCCESS + obs_publish OK (`costume_masquerade_20261001_115540`
-  = 161, `..._122600` = 121; 23:49 vs 24:41). Scored on the finals over 73
-  shared beat cuts (`tmp/ltx8_cap_ab/compare_finals.py`):
+* *RESULT 2026-10-01 -- THE 121 CAP IS CLOSED; 161 STAYS.* Paired replay on
+  the 5080 of the 70-shot costume bundle, v5 untouched, the ONLY change the
+  ledger's `video.max_render_frames` 161 -> 121 (a derived bundle, every plan
+  re-stamped by `otr_shot_lock._stamp_coverage_plan`; 47 of 70 changed). Both
+  arms RESULT SUCCESS + obs_publish OK (`costume_masquerade_20261001_115540` =
+  161, `..._122600` = 121; 23:49 vs 24:41). Scored on the finals over 73 shared
+  beat cuts (`tmp/ltx8_cap_ab/compare_finals.py`, `join_breakdown.py`):
 
-  | | joins | jump at join, median / >=3x | speed mismatch, median / >=2x | segment tail | detail |
-  |---|---|---|---|---|---|
-  | 161 | 39 | 1.51x / 7 | 2.50x / 20 | 0.80 | 708 |
-  | 121 | 65 | 1.77x / 11 | 2.28x / 37 | 0.83 | 698 |
+  | | joins | jump at join, median / >=3x | speed mismatch, median / >=2x | detail |
+  |---|---|---|---|---|
+  | 161 | 39 | 1.51x / 7 | 2.50x / 20 | 708 |
+  | 121 | 65 | 1.77x / 11 | 2.28x / 37 | 698 |
 
-  The tail barely moved (0.80 -> 0.83): **the clip eases off at the end of
-  whatever length it is asked for**, so the second review's worry was right
-  and the n=2 single-clip hint above was not enough. A shorter render keeps
-  the ease-off and adds 26 joins, nearly twice as many bad ones. The
-  planner's greedy fill also leaves tiny last segments ([121, 9]). P1's only
-  live lever is now the motion-bearing handoff (option 2).
-* *Fix to decide, ranked (as written before the result).*
-  1. **A lower segment cap (121 frames, 4.8 s, a legal 8n+1).** It TESTS
-     whether avoiding the long render removes the eased-off tail, so the two
-     sides of a join move at closer speeds. It costs about one extra join per
-     long beat, so it is judged on the WHOLE beat: a smaller lurch more often
-     can still be worse. This is the frame contract / the lane's max-frames
-     ceiling, not the sampling recipe.
-  2. **A motion-bearing handoff** only if the cap leaves a visible lurch: the
-     next segment conditioned on several preceding frames (or a latent
-     continuation), so it gets the motion, not only the look. It is not a
-     knob on this graph: the lane is image-to-video, the vendor's extend
-     graph is a different graph, and `extract_terminal_frame` is shared, so a
-     lane-scoped version needs an adapter capability (as `accepts_last_frame`
-     already is) rather than a driver-wide change. Any such design must name
-     which frames are context and which are newly delivered, or it repeats
-     action, drops time, or drifts off the audio.
-  * **No crossfade.** A dissolve between an easing tail and a restart reads as
-    mush, which is the other half of "loose".
+  26 more joins, 17 more bad ones, and the per-join jump did not shrink.
+  **Where the extra bad joins come from:** joins followed by a full segment
+  14/30 bad at 161 vs 27/49 at 121; joins followed by a stub (< 40 frames,
+  e.g. `[121, 9]`) 6/9 vs 10/16. So most of the increase is new joins cutting
+  beats that used to be one clip, not the stubs -- stubs are bad more often
+  but are the minority. (At 121, 63 of 65 joins sit where 161 had none.)
+  **What it does NOT show:** that a clip eases off at the end of whatever
+  length it is given. Full-length segments only (stubs excluded), motion per
+  10 frames vs frames 5-24: the 161 clips rise to 1.38 at f50 and are still
+  1.09 at f150 -- no end sag on this set; the 121 clips sag mildly to 0.92 at
+  f90-100. The earlier last-quarter ratio (0.80 / 0.83) hid that shape and is
+  withdrawn as evidence. **What the joins DO show:** the 8 frames after a join
+  move 2.50x the 8 before (median, 161) -- the next segment restarts fast. On
+  this set the lurch is the restart, not a dying tail.
+  **Settled, and no wider:** the evidence does not justify another cap sweep
+  (97, 81): the rung chosen from "alive through f120" added cuts and did not
+  calm the joins.
+* *State of P1 now.*
+  * **Gate before any design: his eye.** Watch `costume_masquerade_20261001_115540`
+    (161) and `..._122600` (121). If the 161 cut shows the stagger he saw on
+    `ice_relay_fr` and the 121 is worse, the design question is the restart at
+    a 161-frame join. If the 161 already looks acceptable, this bundle did not
+    reproduce the complaint strongly enough to build on, and the next step is a
+    bundle that does (ice_relay_fr has none frozen).
+  * **The candidate after that gate: a motion-bearing handoff, a design, not a
+    knob.** It stays on this lane (`extract_terminal_frame` is shared; a
+    lane-scoped adapter capability, as `accepts_last_frame` already is). It
+    keeps v5's grip on the still. "Several frames" and "latent continuation"
+    are different graphs: the first re-generates from pictures and can repeat
+    action or pop anyway; the second continues the sample and must say which
+    frames are context and which advance the beat. The name is not evidence --
+    the arm has to show the motion carried. Its control KEEPS the 161-frame
+    plans and the delivered join positions; re-planning again would mix a new
+    cut pattern into what is being measured.
+  * **No crossfade.** A dissolve between two clips reads as mush, the other
+    half of "loose".
 * *Fence.* Whatever ships keeps v5's grip on the still. The 2026-09-28 paired
   replays reverted v4 because its distilled schedule let the picture leave
   the still (hard cuts inside half a second; `eng_ltx_8gb.py`, the v5
@@ -215,12 +227,12 @@ failures into one cause; a second measurement settled which half it had right.
 
 **Experiments, one change at a time.**
 
-| Arm | Answers |
-|---|---|
-| v5, 161-frame cap | the reproducible baseline |
-| v5, 121-frame cap | does a shorter render cut the slowdown and improve the whole beat? |
-| best cap + motion-bearing handoff | is what is left the still-only restart? (only if needed) |
-| best motion arm, with vs without 0.9.8 refine | is the detail worth its cost, inside 8 GB? |
+| Arm | Answers | State |
+|---|---|---|
+| v5, 161-frame cap | the reproducible baseline | ran 2026-10-01 |
+| v5, 121-frame cap | does a shorter render improve the whole beat? | ran, CLOSED (worse) |
+| 161 plans + motion-bearing handoff | is the lurch the still-only restart? | after his eye, after a design round |
+| best motion arm, with vs without 0.9.8 refine | is the detail worth its cost, inside 8 GB? | P2, separate |
 
 Never move cap, sampling, conditioning, upscaling and encoding together: a
 better picture would not say which change earned it.
@@ -230,8 +242,9 @@ soak's `FAST_LANES` covers every fast lane on purpose. Do not read
 `ice_relay_fr` as what the 5080 can do. A 16 GB lane on the same story is a
 different model and canvas, so it neither confirms nor kills P1.
 
-Order if he says go: P1's segment cap first; P2 is a different complaint with
-a different proof.
+Order: his eye on the two costume cuts first; then, only if the 161 shows the
+stagger, a design round for the handoff. P2 is a different complaint with a
+different proof.
 
 ### The registry -- his clicks and his word
 
