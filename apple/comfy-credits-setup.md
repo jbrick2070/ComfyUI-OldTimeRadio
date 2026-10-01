@@ -36,6 +36,15 @@ queue's Comfy API key is the whole switch.
    **0 - Comfy Credential** node exactly as the app's sign-in would; that node
    passes it to the rest and never lets it reach an error report. The ComfyUI server itself never reads
    that variable.
+
+   **Headless with comfy-cli:** `comfy run --workflow workflows/otr_cloud_low_1act.json`
+   against your local ComfyUI does the same thing when the key is in
+   `COMFY_API_KEY` (or passed as `--api-key`): comfy-cli puts it in
+   `extra_data.api_key_comfy_org` and converts the saved workflow to API format
+   itself (checked against comfy-cli source, 2026-10-01). **Do not also be
+   signed in with `comfy cloud login`:** a browser session takes precedence and
+   comfy-cli then sends the session token instead of the key, which this pack
+   does not read -- the run stops with "carries no Comfy API key".
 2. On the **1. Story Writer** node, two pickers are always present:
    `comfy_slot_a_model` (creative) and `comfy_slot_b_model` (technical). Pick a
    model in each. Then set `creative_writing_model` to **`comfy:slot-a`** and/or
