@@ -171,7 +171,18 @@ failures into one cause; a second measurement settled which half it had right.
   **Settled, and no wider:** the evidence does not justify another cap sweep
   (97, 81): the rung chosen from "alive through f120" added cuts and did not
   calm the joins.
-* *State of P1 now.*
+* *HIS EYE, 2026-10-01 -- REVERSES "CLOSED".* A side-by-side page of nine
+  7-second windows (`tmp/ltx8_cap_ab/viewer/`, served locally): windows 1-6
+  centred on the 161 cut's joins (worst three, two typical, one smooth), 7-9
+  on the 121 cut's own worst joins so neither side is shown only at its
+  weakest. His picks: **121 better 5, 161 better 2, same 1** (one unrated),
+  and 121 won all three windows centred on its own worst joins. He changed
+  five of six first-pass picks on a second pass, so the difference is real
+  but subtle. The motion-trace join counts above do NOT match what he sees,
+  and his eye is the gate, so the cap is open again, as a decision for him,
+  not a closed arm. The `ice_relay_fr` reference window was not played, so
+  whether this bundle reproduces his original complaint is still unknown.
+* *State of P1 now (written before his eye; read with the paragraph above).*
   * **Gate before any design: his eye.** Watch `costume_masquerade_20261001_115540`
     (161) and `..._122600` (121). If the 161 cut shows the stagger he saw on
     `ice_relay_fr` and the 121 is worse, the design question is the restart at
@@ -230,7 +241,7 @@ failures into one cause; a second measurement settled which half it had right.
 | Arm | Answers | State |
 |---|---|---|
 | v5, 161-frame cap | the reproducible baseline | ran 2026-10-01 |
-| v5, 121-frame cap | does a shorter render improve the whole beat? | ran, CLOSED (worse) |
+| v5, 121-frame cap | does a shorter render improve the whole beat? | ran; numbers worse, his eye prefers it 5-2 -- his call |
 | 161 plans + motion-bearing handoff | is the lurch the still-only restart? | after his eye, after a design round |
 | best motion arm, with vs without 0.9.8 refine | is the detail worth its cost, inside 8 GB? | P2, separate |
 
@@ -242,8 +253,8 @@ soak's `FAST_LANES` covers every fast lane on purpose. Do not read
 `ice_relay_fr` as what the 5080 can do. A 16 GB lane on the same story is a
 different model and canvas, so it neither confirms nor kills P1.
 
-Order: his eye on the two costume cuts first; then, only if the 161 shows the
-stagger, a design round for the handoff. P2 is a different complaint with a
+Order: his call on the 121 cap (his eye preferred it); then, if the stagger
+he named is still there, a design round for the handoff. P2 is a different complaint with a
 different proof.
 
 ### The registry -- his clicks and his word
