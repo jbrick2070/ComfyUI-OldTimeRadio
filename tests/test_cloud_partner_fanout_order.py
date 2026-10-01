@@ -154,7 +154,8 @@ def test_run_cloud_fanout_halts_on_partner_402_text():
 
 def test_render_driver_stamps_budget_floors_on_fanout_and_serial_paths():
     src = Path(rd.__file__).read_text(encoding="utf-8")
-    assert src.count("new_shots.append(_stamp_budget_floor_shot(shot))") >= 3
+    # Budget floors commit through the still floor (2026-10-01), on both walks.
+    assert src.count("_commit_still_floor(shot, _stamp_budget_floor_shot(shot))") >= 3
     assert "cloud_spend_halt" in src
     assert "_shot_is_budget_floor(shot)" in src
 

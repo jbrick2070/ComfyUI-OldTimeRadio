@@ -547,6 +547,19 @@ def declared_render_canvas(engine_id):
     return (width, height)
 
 
+def _landscape_canvas():
+    """``(w, h)`` of the landscape composite canvas every non-face lane renders
+    at -- ``OTR_VIDEO_LANDSCAPE_CANVAS`` (default 1472x832). One reader, shared
+    by ``build_request_from_shot`` and the cloud still floor, so a floored beat
+    is framed exactly like a still_pan beat."""
+    raw = otr_env.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
+    try:
+        width, height = (int(x) for x in raw.lower().split("x", 1))
+    except (ValueError, AttributeError):
+        width, height = 1472, 832
+    return width, height
+
+
 def build_request(shot, assets, frame_count, canvas=None):
     """A SCHEMA-VALID ``VideoRequest`` dict per shot (deterministic: the seed
     is keyed to the shot id so render-twice is identical -- V-7).
@@ -2990,12 +3003,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         if _face_wide:
             _face_excl.discard("audio_driven_face")
     if _canvas_fam not in _face_excl:
-        _lc = otr_env.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
-        try:
-            _lw, _lh = (int(x) for x in _lc.lower().split("x", 1))
-        except (ValueError, AttributeError):
-            _lw, _lh = 1472, 832
-        req["canvas"]["w"], req["canvas"]["h"] = _lw, _lh
+        req["canvas"]["w"], req["canvas"]["h"] = _landscape_canvas()
     # A DECLARED RENDER CANVAS WINS (B5, 2026-07-27). LAST in the chain on
     # purpose: every write above is guarded by a mutually exclusive engine id
     # or family, so nothing can clobber this and this clobbers nothing -- and
@@ -5229,6 +5237,69 @@ def _shot_is_cloud_floor(shot) -> bool:
     return bool(isinstance(shot, dict) and shot.get("cloud_floor"))
 
 
+#: The lane a floored cloud beat is SHOWN through (2026-10-01). A floor used
+#: to reach OTR_SilentComposite with no clip at all, and a cloud lane has no
+#: procgen floor video, so the composite filled the hole with its black gap
+#: segment: the 2026-09-30 Spanish "the_keel" episode (Vidu, five 900 s
+#: timeouts and one rejection) published with about 136 s of black. The beat's
+#: own scene still -- minted and spine-checked before the first cloud job was
+#: submitted -- is shown instead, through the SAME still_pan engine a local
+#: still lane uses (``cheap_families.StillPanFamily.render_clip``: an ffmpeg
+#: pan, CPU only, nothing paid). The beat stays a counted floor
+#: (``status=sanctioned_gap`` plus its reason); ``floor_render`` records how it
+#: was shown.
+CLOUD_FLOOR_RENDER_ENGINE = "still_pan"
+
+
+def _render_still_floor(shot, ledger, *, host_caps=None, profile=None,
+                        frame_count=25):
+    """Render a floored cloud beat as its own scene still. Never black.
+
+    The still is read through ``_still_index`` keyed by ``_beat_id_for_shot``
+    -- the exact resolver ``build_request_from_shot`` uses for the still_pan
+    lane -- and the clip is rendered by the real ``render_shot`` path, so the
+    floor is a still_pan beat in every respect except that it was not planned.
+
+    NO STILL IS A LOUD FAILURE, never a quiet black beat. It is not reachable
+    on a healthy ledger: every provider-side engine that accepts a still has
+    its per-beat scene still minted and checked by the still spine before any
+    cloud job is submitted (``_still_spine_requires_scene``), and a beat whose
+    still the image model REFUSED is a sanctioned still gap that never reaches
+    this function. Reaching here without one means the image phase and the
+    ledger disagree, and the operator needs that named.
+
+    The frame budget is the shot's own ``target_frame_count`` -- the count the
+    composite positions the beat by and the count its audio was cut against.
+    A coverage plan belongs to the cloud engine's frame ladder and is dropped:
+    still_pan is unbounded and renders the whole beat in one pass.
+    """
+    sid = str((shot or {}).get("shot_id") or "")
+    bid = _beat_id_for_shot(shot or {})
+    still = _still_index(ledger).get(str(bid), "")
+    if not still or not os.path.isfile(still):
+        raise RenderError(
+            "CLOUD FLOOR shot %s (beat %s): the provider returned no clip and "
+            "there is no scene still for this beat%s, so the floor has nothing "
+            "to show. Refusing to paint the beat black -- the image phase owes "
+            "beat %s a scene still." % (
+                sid, bid, (" (%s is not on disk)" % still) if still else
+                " in the ledger", bid))
+    floor_shot = {k: v for k, v in (shot or {}).items() if k != "coverage_plan"}
+    floor_shot["engine_id"] = CLOUD_FLOOR_RENDER_ENGINE
+    floor_shot["family"] = engine_family(CLOUD_FLOOR_RENDER_ENGINE)
+    frames = int((shot or {}).get("target_frame_count") or 0) or int(frame_count)
+    request = build_request(floor_shot, {"init_image": still}, frames,
+                            canvas=_landscape_canvas())
+    request["observability"]["init_source"] = "scene_still"
+    request["observability"]["init_image"] = os.path.basename(still)
+    clip, _out, _attempts, _peak = render_shot(
+        floor_shot, request, host_caps=host_caps, profile=profile)
+    if isinstance(clip, dict) and isinstance(clip.get("receipt"), dict):
+        # The render trace must not read as a planned still_pan beat.
+        clip["receipt"]["status"] = "cloud_floor"
+    return clip
+
+
 def assert_chain_order(shots):
     """Every chain predecessor must appear BEFORE its successor. Raise if not.
 
@@ -5390,6 +5461,15 @@ def _report_cloud_floors(shots):
     tally = "; ".join(
         "%s: %s" % (why, ", ".join(ids))
         for why, ids in sorted(by_reason.items()))
+    # HOW THE HOLES LOOK ON SCREEN, said in the same line (2026-10-01). A cloud
+    # or budget floor is shown as the beat's own scene still; a refused-still
+    # gap has no still to show and is still the composite's black fill.
+    shown_as_still = [
+        str((s or {}).get("shot_id") or "") for s in (shots or ())
+        if (s or {}).get("floor_render")]
+    black = len(floored) - len(shown_as_still)
+    tally += (" | shown as the beat's scene still (%s): %d; black: %d"
+              % (CLOUD_FLOOR_RENDER_ENGINE, len(shown_as_still), black))
     if share >= CLOUD_FLOOR_SYSTEMIC_SHARE:
         _LOG.error(
             "[OTR video] SYSTEMIC CLOUD FAILURE: the provider returned no clip "
@@ -5577,6 +5657,24 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                          "release that would evict other owners too",
                          engine_id, _exc)
 
+    def _commit_still_floor(shot, stamped_row):
+        """Commit a floored cloud beat WITH its scene-still clip.
+
+        Every cloud and budget floor below goes through here, on both walks,
+        so no floor reaches the composite as a missing clip -- which a cloud
+        lane fills with black. ``stamped_row`` keeps its floor stamp (the beat
+        is still a counted, degraded hole in the accounting); the clip is what
+        stops it being a black one. A beat with no scene still raises inside
+        ``_render_still_floor`` rather than publishing black.
+        """
+        sid = str(shot.get("shot_id") or "")
+        clips[sid] = _render_still_floor(
+            shot, ledger, host_caps=_episode_host_caps,
+            profile=_episode_profile, frame_count=frame_count)
+        row = dict(stamped_row)
+        row["floor_render"] = CLOUD_FLOOR_RENDER_ENGINE
+        new_shots.append(row)
+
     try:
         # Beats whose required still the image model REFUSED. Read once, not
         # per beat: the receipt is frozen by the time the render starts.
@@ -5674,11 +5772,11 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                     _LOG.error(
                         "[OTR video] BUDGET floor shot %s -- "
                         "empty wallet or an explicit spend-off cap refused "
-                        "a further reserve; the beat keeps its place and "
-                        "SilentComposite floors it. %s",
+                        "a further reserve; the beat keeps its place and is "
+                        "shown as its scene still. %s",
                         sid,
                         errors.get(sid) or "not submitted after spend-cap halt")
-                    new_shots.append(_stamp_budget_floor_shot(shot))
+                    _commit_still_floor(shot, _stamp_budget_floor_shot(shot))
                     floored_sids.add(sid)
                     continue
                 _floor_why = _cloud_floor_reason(sid, errors, shot)
@@ -5686,11 +5784,11 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                     _LOG.error(
                         "[OTR video] CLOUD floor shot %s (beat %s) [%s] -- %s "
                         "The beat keeps its place, the episode still "
-                        "assembles, and SilentComposite floors it. %s",
+                        "assembles, and the beat is shown as its scene still. %s",
                         sid, bid, _floor_why,
                         _cloud_floor_sentence(_floor_why), errors.get(sid))
-                    new_shots.append(
-                        _stamp_cloud_floor_shot(shot, _floor_why))
+                    _commit_still_floor(
+                        shot, _stamp_cloud_floor_shot(shot, _floor_why))
                     floored_sids.add(sid)
                     continue
                 if sid in errors:
@@ -5710,12 +5808,12 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                             "[OTR video] CLOUD floor shot %s (beat %s) "
                             "[predecessor_floored] -- %s It chains from %s, "
                             "which was floored, so it was never submitted. "
-                            "The beat keeps its place and SilentComposite "
-                            "floors it.",
+                            "The beat keeps its place and is shown as its "
+                            "scene still.",
                             sid, bid,
                             _cloud_floor_sentence("predecessor_floored"),
                             _pred)
-                        new_shots.append(_stamp_cloud_floor_shot(
+                        _commit_still_floor(shot, _stamp_cloud_floor_shot(
                             shot, "predecessor_floored"))
                         floored_sids.add(sid)
                         continue
@@ -5790,7 +5888,7 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                         "[OTR video] BUDGET floor shot %s -- "
                         "not submitted after spend-cap halt",
                         shot.get("shot_id"))
-                    new_shots.append(_stamp_budget_floor_shot(shot))
+                    _commit_still_floor(shot, _stamp_budget_floor_shot(shot))
                     _serial_floored.add(str(shot.get("shot_id") or ""))
                     continue
                 # THE CASCADE, ON THIS BRANCH TOO. The fan-out walk learns a
@@ -5823,11 +5921,11 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                         "[OTR video] CLOUD floor shot %s "
                         "[predecessor_floored] -- %s It chains from %s, which "
                         "was floored, so it is not attempted. The beat keeps "
-                        "its place and SilentComposite floors it.",
+                        "its place and is shown as its scene still.",
                         shot.get("shot_id"),
                         _cloud_floor_sentence("predecessor_floored"), _pred)
-                    new_shots.append(
-                        _stamp_cloud_floor_shot(shot, "predecessor_floored"))
+                    _commit_still_floor(
+                        shot, _stamp_cloud_floor_shot(shot, "predecessor_floored"))
                     _serial_floored.add(str(shot.get("shot_id") or ""))
                     continue
                 # CS-3 inter-beat reclaim (2026-06-15): before a beat that loads a
@@ -5911,10 +6009,10 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                         _LOG.error(
                             "[OTR video] BUDGET floor shot %s -- "
                             "empty wallet or an explicit spend-off cap "
-                            "refused a further reserve; SilentComposite "
-                            "floors it. %s",
+                            "refused a further reserve; the beat is shown "
+                            "as its scene still. %s",
                             sid, exc)
-                        new_shots.append(_stamp_budget_floor_shot(shot))
+                        _commit_still_floor(shot, _stamp_budget_floor_shot(shot))
                         _serial_floored.add(sid)
                         cloud_spend_halt = True
                         continue
@@ -5922,11 +6020,11 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                     if _floor_why:
                         _LOG.error(
                             "[OTR video] CLOUD floor shot %s [%s] -- %s The "
-                            "beat keeps its place and SilentComposite floors "
-                            "it. %s", sid, _floor_why,
+                            "beat keeps its place and is shown as its scene "
+                            "still. %s", sid, _floor_why,
                             _cloud_floor_sentence(_floor_why), exc)
-                        new_shots.append(
-                            _stamp_cloud_floor_shot(shot, _floor_why))
+                        _commit_still_floor(
+                            shot, _stamp_cloud_floor_shot(shot, _floor_why))
                         _serial_floored.add(sid)
                         continue
                     raise
@@ -6773,8 +6871,11 @@ def persist_episode_clips(result, episode_id):
     shot_meta = {}
     for shot in (((result or {}).get("ledger") or {}).get("video") or {}).get("shots") or []:
         if isinstance(shot, dict) and shot.get("shot_id"):
+            # A floored beat's clip was drawn by its floor engine, not by the
+            # cloud engine the plan named -- the filename says what made it.
             shot_meta[str(shot["shot_id"])] = (
-                str(shot.get("role") or ""), str(shot.get("engine_id") or ""))
+                str(shot.get("role") or ""),
+                str(shot.get("floor_render") or shot.get("engine_id") or ""))
     import shutil
     moved = 0
     for sid, clip in clips.items():
@@ -7213,8 +7314,14 @@ def build_clip_manifest(result, *, episode_id=""):
             # shot row so ``meta.render_engines`` can name the reason without
             # depending on a later ledger rewrite of ``video.shots``.
             **{k: shot[k] for k in (
-                "cloud_floor", "content_floor", "budget_floor")
+                "cloud_floor", "content_floor", "budget_floor", "floor_render")
                if isinstance(shot, dict) and k in shot and shot.get(k)},
+            # A FLOOR SHOWN AS A STILL (2026-10-01) names the engine that was
+            # PLANNED beside the one that drew it: ``engine_id`` above is the
+            # still_pan clip's, which is true of the pixels and says nothing
+            # about which provider failed. Present-key-only, like the above.
+            **({"planned_engine_id": str(shot.get("engine_id") or "")}
+               if isinstance(shot, dict) and shot.get("floor_render") else {}),
         }
         # C1 (textured-hero 3D PoC): a mesh_stage DIRECTORY clip is a textured
         # turntable mesh on a TRANSPARENT background -- it composites over a
@@ -7264,6 +7371,10 @@ def build_clip_manifest(result, *, episode_id=""):
         "canvas": {"w": int(canvas.get("w") or 0), "h": int(canvas.get("h") or 0)},
         "n_beats": len(rows),
         "clip_count": sum(1 for r in rows if r["exists"]),
+        # Of those, how many are a floored cloud beat shown as its scene still
+        # -- on disk, but not the motion the plan asked for.
+        "floor_clip_count": sum(1 for r in rows
+                                if r["exists"] and r.get("floor_render")),
         # Existing consumers read total_target_frames. Its intended contract is
         # the final output timeline, now corrected for positioned overlaps.
         "total_target_frames": timeline_total,

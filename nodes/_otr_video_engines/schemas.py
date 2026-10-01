@@ -397,3 +397,8 @@ class ShotRow(_Forbid):
     #: beat (``sanctioned_gap``). Optional -- delivered beats leave this
     #: unset; the clip manifest is the authority for ``exists``.
     status: Optional[str] = None
+    #: HOW A FLOORED BEAT WAS SHOWN (2026-10-01): the engine that drew it in
+    #: place of the failed cloud clip -- ``still_pan`` over the beat's own
+    #: scene still (``render_driver.CLOUD_FLOOR_RENDER_ENGINE``). ABSENCE on a
+    #: floored row means no clip was drawn (a refused-still gap).
+    floor_render: Optional[str] = None

@@ -591,28 +591,55 @@ def _temp_dest(session, node_key: str, ext: str) -> Path:
     return root / f"{node_key}-{uuid.uuid4().hex[:8]}{ext}"
 
 
+#: Tries at fetching a FINISHED result (2026-10-01). This is the one cloud
+#: retry that cannot pay twice: the provider has already delivered, the URL
+#: is in hand, and a second GET resubmits nothing. Re-running the partner job
+#: on a TIMEOUT is deliberately NOT done anywhere -- ``session.submit(rid,
+#: None)`` never learns the provider job id, so there is no recovery or
+#: idempotency key, the watchdog cancels only the local poll, and a timed-out
+#: job that completes provider-side is billed alongside any resubmission.
+_DOWNLOAD_ATTEMPTS = 2
+
+
 def _stream_to_temp(url: str, dest: Path) -> None:
-    """Chunked download; never buffers the whole body."""
+    """Chunked download; never buffers the whole body. Retried once.
+
+    A download that still fails is RETRYABLE_TRANSPORT marked
+    ``provider_charged``: the job finished (and was charged) before the GET
+    began, so :func:`_settle_failure` bills the estimate instead of releasing
+    it as an unsent request -- the budget ceiling stays honest.
+    """
     import urllib.request
     from urllib.request import urlopen  # bare name clears the registry $http2 literal; still seen by the network-sites guard
     req = urllib.request.Request(url, headers={"User-Agent": _USAGE_SOURCE})
-    try:
-        with urlopen(req, timeout=120) as resp, \
-                open(dest, "wb") as out:
-            while True:
-                chunk = resp.read(1 << 20)
-                if not chunk:
-                    break
-                out.write(chunk)
-    except CloudMediaError:
-        raise
-    except Exception as exc:
-        with contextlib.suppress(OSError):
-            dest.unlink()
-        raise CloudMediaError(
-            CloudErrorCode.RETRYABLE_TRANSPORT,
-            f"download failed from {url!r}: {exc}",
-        )
+    last_exc: Exception | None = None
+    for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
+        try:
+            with urlopen(req, timeout=120) as resp, \
+                    open(dest, "wb") as out:
+                while True:
+                    chunk = resp.read(1 << 20)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+            return
+        except CloudMediaError:
+            raise
+        except Exception as exc:
+            last_exc = exc
+            with contextlib.suppress(OSError):
+                dest.unlink()
+            if attempt < _DOWNLOAD_ATTEMPTS:
+                print(f"[cloud_media] result download failed ({exc}); "
+                      f"retrying once -- the job is already delivered, so "
+                      f"this fetch resubmits nothing")
+    err = CloudMediaError(
+        CloudErrorCode.RETRYABLE_TRANSPORT,
+        f"download failed from {url!r} after {_DOWNLOAD_ATTEMPTS} "
+        f"attempt(s): {last_exc}",
+    )
+    err.provider_charged = True
+    raise err
 
 
 def _unwrap_outputs(raw: Any) -> tuple:
@@ -800,7 +827,10 @@ def _settle_failure(session, rid: str, err: CloudMediaError,
     estimate on ambiguous outcomes (timeout/interrupt/corrupt) so the
     budget ceiling stays honest."""
     try:
-        if err.code in _RELEASE_CODES:
+        # ``provider_charged`` overrides the code: a result that could not be
+        # FETCHED was still produced and charged (see _stream_to_temp).
+        if err.code in _RELEASE_CODES and not getattr(
+                err, "provider_charged", False):
             session.release(rid)
             settlement = "released"
         else:

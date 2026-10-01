@@ -1084,6 +1084,26 @@ def cloud_stub_registry():
         vreg._VIDEO_REGISTRY._registry.update(saved)
 
 
+_SCENE_STILL = {}
+
+
+def _scene_still():
+    """One real scene still on disk, shared by every cloud fixture.
+
+    A floored cloud beat is SHOWN as its scene still (2026-10-01), and a floor
+    with no still fails loud rather than painting black -- so a cloud ledger
+    that exercises a floor owes every beat a still, as a real one does.
+    """
+    path = _SCENE_STILL.get("path")
+    if not path or not pathlib.Path(path).is_file():
+        import tempfile
+        from PIL import Image
+        path = str(pathlib.Path(tempfile.mkdtemp(prefix="otr_scene_")) / "scene.png")
+        Image.new("RGB", (320, 180), (200, 140, 60)).save(path)
+        _SCENE_STILL["path"] = path
+    return path
+
+
 def _cloud_ledger(refused_index, n=3):
     shots = []
     for i in range(n):
@@ -1095,7 +1115,11 @@ def _cloud_ledger(refused_index, n=3):
             "family": "abstract", "group_id": "g%d" % i,
             "target_frame_count": 25, "degradation_trail": [],
         })
-    return rd.build_full_ledger({"video_revision": 1, "fps": 25, "shots": shots})
+    led = rd.build_full_ledger({"video_revision": 1, "fps": 25, "shots": shots})
+    led["images"] = {"images": [
+        {"kind": "scene_beat", "beat_id": rd._beat_id_for_shot(s),
+         "path": _scene_still()} for s in shots]}
+    return led
 
 
 def test_content_refusal_floors_one_beat_and_the_episode_survives(
@@ -1120,7 +1144,9 @@ def test_content_refusal_floors_one_beat_and_the_episode_survives(
     assert not rd._shot_is_content_floor(shots[2])
     # The beats AFTER the refusal still rendered -- that is the whole point.
     assert "shot_0000" in out["clips"] and "shot_0002" in out["clips"]
-    assert "shot_0001" not in out["clips"]
+    # The refused beat is shown as its own scene still, never as black.
+    assert out["clips"]["shot_0001"]["engine_id"] == "still_pan"
+    assert shots[1]["floor_render"] == "still_pan"
     assert out["ledger"]["audio"]["master_audio_sha256"] == rd.FROZEN_AUDIO_SHA
 
 
@@ -1302,7 +1328,9 @@ def test_a_floored_beat_does_not_kill_the_run_through_its_chain_successor(
     assert not rd._shot_is_content_floor(done[2])
     # The independent beats around the chain still rendered and committed.
     assert "shot_0000" in out["clips"] and "shot_0003" in out["clips"]
-    assert "shot_0001" not in out["clips"] and "shot_0002" not in out["clips"]
+    # Both floored beats are shown as their scene stills, not left as holes.
+    assert out["clips"]["shot_0001"]["engine_id"] == "still_pan"
+    assert out["clips"]["shot_0002"]["engine_id"] == "still_pan"
 
 
 def test_a_missing_shot_with_no_floored_predecessor_still_raises():
@@ -1343,7 +1371,9 @@ def test_a_still_gap_does_not_kill_the_run_through_its_chain_successor(
     assert done[2]["cloud_floor"] == "predecessor_floored"
     # Every independent beat still rendered and committed.
     assert "shot_0000" in out["clips"] and "shot_0003" in out["clips"]
-    assert "shot_0001" not in out["clips"] and "shot_0002" not in out["clips"]
+    # The refused-still beat has no still to show; its successor does.
+    assert "shot_0001" not in out["clips"]
+    assert out["clips"]["shot_0002"]["engine_id"] == "still_pan"
 
 
 def test_a_still_gap_cascade_is_floored_on_the_serial_walk_too(
@@ -1363,7 +1393,7 @@ def test_a_still_gap_cascade_is_floored_on_the_serial_walk_too(
     done = out["ledger"]["video"]["shots"]
     assert done[2]["cloud_floor"] == "predecessor_floored"
     assert "shot_0000" in out["clips"] and "shot_0003" in out["clips"]
-    assert "shot_0002" not in out["clips"]
+    assert out["clips"]["shot_0002"]["engine_id"] == "still_pan"
 
 
 def test_a_stuck_shot_with_no_floored_predecessor_still_raises_loud(

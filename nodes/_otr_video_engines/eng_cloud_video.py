@@ -299,6 +299,22 @@ def ltx25_estimated_usd(duration_s: int, *, floor_usd: float | None = None) -> f
 
 
 def _timeout_s() -> float:
+    """Per-job watchdog, measured from submit (``invoke_partner_node``).
+
+    900 s STAYS THE DEFAULT (reviewed 2026-10-01 against the billing ledger).
+    The ledger carries terminal events only, so latency is read from
+    completion spacing: the 2026-09-15 Vidu runs averaged 137-181 s per job
+    end to end; the 2026-09-30 Spanish run (56 jobs, four in flight) averaged
+    about 250 s, with its late completions spaced 130-230 s apart -- jobs
+    approaching the cap -- and all five of its timeouts landed in that tail.
+    900 s is roughly five times the unloaded latency, so those timeouts read
+    as jobs stuck in the provider queue, not a cap set too tight. Raising it
+    would lengthen every genuine hang and widen the double-bill window (a
+    timed-out job keeps running provider-side and has no recovery key), and a
+    floored beat no longer costs a black hole: it is shown as its scene still.
+    Fan-out width went 4 -> 2 the same day; the next run's ledger is the
+    measurement that confirms or refutes the queue reading.
+    """
     try:
         return float(otr_env.get("OTR_CLOUD_VIDEO_TIMEOUT_S", "900"))
     except ValueError:

@@ -154,6 +154,26 @@ def _clip_delivered_motion(clip):
     return bool((clip or {}).get("exists"))
 
 
+def _beat_accounting(clips):
+    """Pure: every manifest row counted ONCE as delivered, sanctioned or neither.
+
+    SANCTIONED WINS (2026-10-01). A floored cloud beat shown as its scene still
+    is on disk AND sanctioned. The old arithmetic, ``len - delivered -
+    sanctioned``, counted such a row twice and went negative, so ``== 0``
+    failed and an honest degraded episode would have reported ``ok=False``.
+    """
+    from ._otr_shared import still_receipt as _receipt
+    counts = {"delivered": 0, "sanctioned": 0, "unaccounted": 0}
+    for clip in clips or []:
+        if _receipt.is_sanctioned_gap(clip):
+            counts["sanctioned"] += 1
+        elif _clip_delivered_motion(clip):
+            counts["delivered"] += 1
+        else:
+            counts["unaccounted"] += 1
+    return counts
+
+
 def _build_render_engines_payload(manifest, vram_peak_mb):
     """Pure: the ``meta.render_engines`` payload. Preserves the existing keys
     (histogram / video_revision / by_role / vram_peak_mb) and ADDS the S-E5
@@ -214,7 +234,13 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
     # as ``sanctioned_gap_shot_ids``.
     sanctioned_gap_reasons: list = []
     for clip in (manifest or {}).get("clips") or []:
-        if not _clip_delivered_motion(clip):
+        # A SANCTIONED ROW IS SORTED HERE EVEN WHEN IT HAS A FILE (2026-10-01).
+        # A floored cloud beat is now shown as its scene still, so its row is
+        # ``exists`` AND ``sanctioned_gap``. Testing delivery first would bill
+        # that still to an engine as delivered motion and drop it from the
+        # gap reasons -- the exact receipt the operator reads to learn the
+        # episode is degraded.
+        if _receipt.is_sanctioned_gap(clip) or not _clip_delivered_motion(clip):
             # The beat is a real fact about the episode, so it leaves this loop
             # by the OTHER door rather than vanishing. It keeps its shot id and
             # its position; what it does not keep is a claim that an engine
@@ -243,13 +269,19 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
                     why = str(clip.get("cloud_floor") or "cloud")
                 else:
                     why = "still_gap"
-                sanctioned_gap_reasons.append({
+                reason_row = {
                     "shot_id": sid,
                     "beat_id": str(clip.get("beat_id") or ""),
                     "role": str(clip.get("role") or ""),
-                    "planned_engine": str(clip.get("engine_id") or ""),
+                    # A floor drawn as a still carries the still's engine in
+                    # ``engine_id``; the PLAN is ``planned_engine_id``.
+                    "planned_engine": str(clip.get("planned_engine_id")
+                                          or clip.get("engine_id") or ""),
                     "reason": why,
-                })
+                }
+                if clip.get("floor_render"):
+                    reason_row["floor_render"] = str(clip.get("floor_render"))
+                sanctioned_gap_reasons.append(reason_row)
             else:
                 unsanctioned_gap_shot_ids.append(
                     str(clip.get("shot_id") or "?"))
@@ -565,7 +597,20 @@ class OTRVideoRenderBatch:
                     f.write(manifest_payload)
         except Exception as exc:              # noqa: BLE001
             log.warning("[OTR_VideoRenderBatch] report write failed: %s", exc)
-        log.warning("[OTR_VideoRenderBatch] ok=%s -> %s", ok, name)
+        # THE FINAL LINE SAYS DEGRADED IN WORDS (2026-10-01). A floored beat now
+        # shows its scene still instead of black, so a degraded episode no
+        # longer LOOKS broken in obs -- this line, and the report beside it,
+        # are where it must still read as degraded.
+        _floored = int(report.get("sanctioned_gap_count") or 0)
+        if _floored:
+            log.warning(
+                "[OTR_VideoRenderBatch] ok=%s DEGRADED: %d beat(s) floored "
+                "(%d shown as the beat's scene still, %d black) -- see "
+                "meta.render_engines.sanctioned_gap_reasons -> %s",
+                ok, _floored, int(report.get("floor_clip_count") or 0),
+                _floored - int(report.get("floor_clip_count") or 0), name)
+        else:
+            log.warning("[OTR_VideoRenderBatch] ok=%s -> %s", ok, name)
         return {"ui": {"text": [payload[:6000]]},
                 "result": (payload, manifest_payload)}
 
@@ -659,15 +704,18 @@ class OTRVideoRenderBatch:
         # DELIVERED or when its absence was SANCTIONED. Anything else is an
         # unexplained hole and the episode is not ok. ``degraded`` then carries
         # the ruling's other half -- publishable, but never reported clean.
-        from ._otr_shared import still_receipt as _receipt
         _clips = manifest.get("clips") or []
-        _sanctioned = sum(1 for c in _clips if _receipt.is_sanctioned_gap(c))
-        _delivered_n = sum(1 for c in _clips if (c or {}).get("exists"))
-        _unaccounted = len(_clips) - _delivered_n - _sanctioned
+        _counts = _beat_accounting(_clips)
+        _sanctioned = _counts["sanctioned"]
+        _unaccounted = _counts["unaccounted"]
         report = {
             "ok": bool(_clips) and _unaccounted == 0,
             "degraded": _sanctioned > 0,
             "sanctioned_gap_count": _sanctioned,
+            # Floored cloud beats shown as their scene still (a subset of the
+            # sanctioned count): on screen, but not the motion that was paid
+            # for or planned.
+            "floor_clip_count": int(manifest.get("floor_clip_count") or 0),
             "unaccounted_beat_count": _unaccounted,
             "mode": "episode",
             "episode_id": manifest_episode_id, "n_beats": manifest["n_beats"],

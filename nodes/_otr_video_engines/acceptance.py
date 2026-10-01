@@ -599,6 +599,12 @@ def grade_multiclip_honesty(ledger, manifest):
         row = rows.get(shot_id)
         if row is None or not row.get("exists"):
             continue                       # already reported by grade_delivered
+        if str(row.get("status") or "") == "sanctioned_gap":
+            # A FLOORED beat shown as its scene still (2026-10-01) makes no
+            # claim to the plan's multi-clip coverage -- the plan is the cloud
+            # engine's, and the floor is one still_pan pass over the whole
+            # beat. Literal compare for the same import rule as grade_delivered.
+            continue
         mode = row.get("extension_mode")
         if mode is None:
             findings.append(_finding(
