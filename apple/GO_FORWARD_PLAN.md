@@ -131,25 +131,43 @@ failures into one cause; a second measurement settled which half it had right.
   fresh-start pace -- a speed mismatch against a slow tail, plus a one-frame
   pop at the join on the quiet beats (0.4 -> 3.7 -> 1.7). The fear cape is
   not involved: it fires only at 4+ segments (one beat here, `shot_002_b3`).
+* *Fixed frame, or end of whatever was asked for?* (second review's question;
+  answered as far as this file can.) Per quarter of each clip, relative to its
+  first quarter: the 161-frame segment-1 renders average 1.00, 1.56, 1.93,
+  1.09 (n=6 moving) -- they ease off in the last quarter. The two moving
+  single-segment beats, 125 and 74 frames, do NOT: 1.00, 1.41, 2.01, 1.96 and
+  1.00, 1.00, 1.00, 1.11. So the ease-off tracks the long render, not the end
+  of every request. n=2 short clips is thin, and their last few frames were
+  trimmed to the beat (a rendered rung is cut down), so this supports the cap;
+  it does not prove it. Segment 2s mostly start hot and settle (001_b2: 19.4
+  -> 3.1 across its quarters) -- the lurch, seen from the other side.
 * *Fix to decide, ranked.*
-  1. **A lower segment cap (~121 frames, 4.8 s).** Cheap, because the motion
-     holds that long: it removes the eased-off tail, so the two sides of the
-     join move at closer speeds. It costs about one extra join per long beat.
-     This is the frame contract / the lane's max-frames ceiling, not the
-     sampling recipe.
-  2. **A multi-frame handoff** only if the cap leaves a visible lurch. It is
-     not a knob on this graph: the lane is image-to-video, the vendor's extend
+  1. **A lower segment cap (121 frames, 4.8 s, a legal 8n+1).** It TESTS
+     whether avoiding the long render removes the eased-off tail, so the two
+     sides of a join move at closer speeds. It costs about one extra join per
+     long beat, so it is judged on the WHOLE beat: a smaller lurch more often
+     can still be worse. This is the frame contract / the lane's max-frames
+     ceiling, not the sampling recipe.
+  2. **A motion-bearing handoff** only if the cap leaves a visible lurch: the
+     next segment conditioned on several preceding frames (or a latent
+     continuation), so it gets the motion, not only the look. It is not a
+     knob on this graph: the lane is image-to-video, the vendor's extend
      graph is a different graph, and `extract_terminal_frame` is shared, so a
      lane-scoped version needs an adapter capability (as `accepts_last_frame`
-     already is) rather than a driver-wide change.
+     already is) rather than a driver-wide change. Any such design must name
+     which frames are context and which are newly delivered, or it repeats
+     action, drops time, or drifts off the audio.
   * **No crossfade.** A dissolve between an easing tail and a restart reads as
     mush, which is the other half of "loose".
 * *Fence.* Whatever ships keeps v5's grip on the still. The 2026-09-28 paired
   replays reverted v4 because its distilled schedule let the picture leave
   the still (hard cuts inside half a second; `eng_ltx_8gb.py`, the v5
   comment). Do not loosen sampling to buy motion.
-* *Proof.* A paired replay on the 4060's eight-beat test set: the motion trace
-  at each join, and his eye.
+* *Proof.* A paired replay on the 4060's eight-beat test set, his eye
+  deciding. The motion trace (mean abs grey difference) is a change signal,
+  not subject speed: read it beside the actual subject and camera movement.
+  Still fidelity is a separate gate -- more motion that leaves the character,
+  framing or scene fails.
 
 **P2. The lane renders 512x288 and is stretched 3.75x to 1080p.**
 * *Evidence.* `eng_ltx_8gb.render_canvas = (512, 288)`; log
@@ -162,8 +180,31 @@ failures into one cause; a second measurement settled which half it had right.
   (`C:\ComfyUI-Models\latent_upscale_models` holds only the LTX-2 / 2.3 / 2.5
   upscalers, which do not fit the 0.9.8 latent), and it adds a second call per
   segment on the lane whose whole point is the 8 GB ceiling.
+* *The 8 GB baseline is already proven; the 5080 number is not that proof.*
+  The 5080's 8,989-10,653 MB is measured with room to spare (10,653 is the
+  segment where T5 loads). The v5 comment in `eng_ltx_8gb.py` records the
+  4060's own: the clink replay peaked at 7,476 of 8,188 MiB through five
+  161-frame segments. The upscale candidate is measured against THAT, on the
+  4060, with the same peak definition.
 * *Proof and stop rule.* The 4060's measured peak first. If it does not fit
   8 GB, this row ends; it never ships as 16 GB behaviour under the 8 GB name.
+  Then matching crops at the same display size (faces, hands, clothing
+  edges, background texture, steadiness over time), with the Laplacian as a
+  supporting number, never the only gate. v5 sampling stays the control: the
+  official multiscale config differs, and the 2026-09-28 replays already
+  showed its distilled schedule losing the still.
+
+**Experiments, one change at a time.**
+
+| Arm | Answers |
+|---|---|
+| v5, 161-frame cap | the reproducible baseline |
+| v5, 121-frame cap | does a shorter render cut the slowdown and improve the whole beat? |
+| best cap + motion-bearing handoff | is what is left the still-only restart? (only if needed) |
+| best motion arm, with vs without 0.9.8 refine | is the detail worth its cost, inside 8 GB? |
+
+Never move cap, sampling, conditioning, upscaling and encoding together: a
+better picture would not say which change earned it.
 
 **Label, not a problem: this file is the 8 GB lane on a 16 GB card.** The
 soak's `FAST_LANES` covers every fast lane on purpose. Do not read
