@@ -253,8 +253,12 @@ soak's `FAST_LANES` covers every fast lane on purpose. Do not read
 `ice_relay_fr` as what the 5080 can do. A 16 GB lane on the same story is a
 different model and canvas, so it neither confirms nor kills P1.
 
-Order: his call on the 121 cap (his eye preferred it); then, if the stagger
-he named is still there, a design round for the handoff. P2 is a different complaint with a
+**PARKED 2026-10-01 (his call: "probably not worth a code update").** 161
+stays. The 121 preference was mild and flipped between passes, and the
+motion numbers lean the other way, so neither justifies touching the shipped
+workflows. The handoff design stays unopened. Reopen only if the stagger
+comes back as a complaint; the viewer, scripts and both cuts are in
+`tmp/ltx8_cap_ab/` and `otr/obs/` to start from. P2 is a different complaint with a
 different proof.
 
 ### The registry -- his clicks and his word
