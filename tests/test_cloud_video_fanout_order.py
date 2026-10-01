@@ -145,9 +145,29 @@ def test_cloud_fanout_unset_defaults_to_four(monkeypatch):
     assert cf.cloud_fanout_workers() == 4
 
 
+def test_cloud_video_runs_two_wide_unless_a_knob_is_pinned(monkeypatch):
+    """Video is narrower than stills/TTS/music by default (2026-10-01: five
+    Vidu timeouts while four jobs were in flight); a pinned knob still wins."""
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_CLOUD_FANOUT", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_VIDEO_FANOUT", raising=False)
+    assert rd.cloud_video_fanout_workers() == rd.CLOUD_VIDEO_FANOUT_DEFAULT == 2
+    assert cf.cloud_fanout_workers() == 4  # stills/TTS/music unchanged
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "4")
+    assert rd.cloud_video_fanout_workers() == 4
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "1")
+    assert rd.cloud_video_fanout_workers() == 1
+    monkeypatch.delenv("OTR_CLOUD_FANOUT", raising=False)
+    monkeypatch.setenv("OTR_CLOUD_VIDEO_FANOUT", "3")
+    assert rd.cloud_video_fanout_workers() == 3
+
+
 def test_cloud_only_episode_fans_out_but_commits_in_ledger_order(
         stub_registry, monkeypatch):
+    # Three shots must be in flight together for the last to land first;
+    # pin the width rather than ride the video default (2 since 2026-10-01).
     monkeypatch.delenv("OTR_CLOUD_VIDEO_FANOUT", raising=False)
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "4")
     out = rd.run_episode(_ledger(
         "cloud_fanout_stub", "cloud_fanout_stub", "cloud_fanout_stub"))
     assert _FINISH[0] == "shot_0002", (

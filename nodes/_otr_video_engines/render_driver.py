@@ -5002,16 +5002,28 @@ _TRACE_OBS_KEYS = (
 )
 
 
+#: Cloud VIDEO width when no knob is set (operator, 2026-10-01: "turn down
+#: our fan-out concurrency to 2 or 3"). Video jobs are minutes long and the
+#: provider queues them per account, so four in flight made the last ones
+#: wait out the 900 s timeout: the 2026-09-30 Spanish episode lost 5 Vidu
+#: segments to timeouts, all while several jobs were running at once.
+#: Stills, TTS and music are seconds long and keep the shared default of 4.
+CLOUD_VIDEO_FANOUT_DEFAULT = 2
+
+
 def cloud_video_fanout_workers() -> int:
     """How many cloud beats may be in flight.
 
-    Same knob as stills / TTS / music: ``OTR_CLOUD_FANOUT``, with the
-    older ``OTR_CLOUD_VIDEO_FANOUT`` name still honored. Unset defaults
-    to 4. ``1`` (or less) forces the historical serial walk. Local-GPU
-    episodes never consult this -- they cannot share VRAM.
+    An explicit ``OTR_CLOUD_FANOUT`` (or the older ``OTR_CLOUD_VIDEO_FANOUT``)
+    wins, as it does for stills / TTS / music. Unset, video runs
+    ``CLOUD_VIDEO_FANOUT_DEFAULT`` wide. ``1`` (or less) forces the
+    historical serial walk. Local-GPU episodes never consult this -- they
+    cannot share VRAM.
     """
     from .._otr_shared.cloud_fanout import cloud_fanout_workers as _workers
-    return _workers()
+    pinned = (str(otr_env.get("OTR_CLOUD_FANOUT", "") or "").strip()
+              or str(otr_env.get("OTR_CLOUD_VIDEO_FANOUT", "") or "").strip())
+    return _workers() if pinned else CLOUD_VIDEO_FANOUT_DEFAULT
 
 
 def _shot_is_first_to_last_chain(shot) -> bool:
