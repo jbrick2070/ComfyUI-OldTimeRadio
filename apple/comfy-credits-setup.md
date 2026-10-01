@@ -89,7 +89,7 @@ queue's Comfy API key is the whole switch.
    itself (checked against comfy-cli source, 2026-10-01). **Do not also be
    signed in with `comfy cloud login`:** a browser session takes precedence and
    comfy-cli then sends the session token instead of the key, which this pack
-   does not read -- the run stops with "carries no Comfy API key".
+   does not read -- the run stops with "no Comfy API key reached this queue".
 2. On the **1. Story Writer** node, two pickers are always present:
    `comfy_slot_a_model` (creative) and `comfy_slot_b_model` (technical). Pick a
    model in each. Then set `creative_writing_model` to **`comfy:slot-a`** and/or
