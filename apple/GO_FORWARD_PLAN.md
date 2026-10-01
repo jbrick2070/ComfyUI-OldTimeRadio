@@ -101,52 +101,77 @@ ear on the 50% depth and false positives from effects/music. Mocked tests
 prove wiring and gain arithmetic, not ASR/LLM judgement. No live/GPU work was
 performed in the isolated duck build while the regression chain was running.
 
-### ltx_8gb looks steppy and soft -- three problem statements (2026-10-01)
+### ltx_8gb looks steppy and soft -- problem statements (2026-10-01, revised)
 
 Operator, on `otr/obs/ice_relay_fr_20261001_034937__shst__lx8g__...mp4`
 (overnight soak, 5080): "a little staggery, steppy, loose." Measured with a
 per-frame motion trace (mean abs grey difference, 256x144) over the final file
 and the leg's lines in `tmp/overnight_20260930/server.log`. Frame rate is not
 the cause: native 25 fps, delivered 25 fps, almost no repeated frames.
+Revised the same day after an outside review argued the first draft welded two
+failures into one cause; a second measurement settled which half it had right.
 
-**P1. Every long beat stops moving, then lurches, about 6.4 s in.**
-* *Evidence.* 11 of the episode's 15 beats are two-segment chains; segment 1
-  is 161 frames (the lane's longest render). At the join, motion falls to near
-  zero over the last frames of segment 1 (0.1-1.5) and jumps on the first
-  frame of segment 2 (3.5-12.4), at 15.96, 24.40, 42.08, 54.04, 66.08,
-  75.00, 98.84, 107.28, 114.00 and 139.64 s. Same shape every time.
-* *Cause, from the code.* `render_driver` hands segment 2 a single still, the
-  terminal frame of segment 1 (`extract_terminal_frame`). One frame carries
-  position but no velocity, so segment 2 starts from rest, and a 161-frame
-  LTX 0.9.8 clip has already settled by its end. The fear cape is not it: it
-  fires only on beats of 4+ segments (one beat here, `shot_002_b3`).
-* *Fix to decide.* Either (a) condition segment 2 on the last several frames
-  instead of one, so motion carries across (LTX 0.9.8 accepts a multi-frame
-  guide; check the vendor ComfyUI-LTXVideo extend graph first), or (b) shorter
-  segments, inside the span where the clip still moves, with a short overlap
-  crossfade at each join. (a) fixes the cause; (b) hides it.
-* *Proof.* A paired replay on the 4060's eight-beat test set, scored on the
-  motion trace at the join and judged by his eye.
+**P1. Long beats ease off, then lurch, at the 6.44 s join.**
+* *Evidence.* 11 of 15 beats are two-segment chains; segment 1 is 161 frames
+  (6.44 s at 25 fps). Motion jumps on the first frames of segment 2 (to
+  3.5-12.4) at 15.96, 24.40, 42.08, 54.04, 66.08, 75.00, 98.84, 107.28, 114.00
+  and 139.64 s. Same shape at every join.
+* *Where segment 1 loses its motion -- the deciding number.* Across the ten
+  joined beats, motion per 20-frame bin relative to frames 5-39: 1.10, 0.93,
+  2.23, 2.39, 2.44, 1.59, 0.97, 0.69. The clip is alive through about frame
+  120 and eases off over its last ~40 frames to roughly a third of its
+  mid-clip peak. It never goes dead early: by a 25%-of-early-motion test it
+  "dies" in 3 of 10 beats, and only in the last 2-9 frames (f152-f159). The
+  first draft's "near zero (0.1-1.5)" mixed in beats that were nearly still
+  for their whole length (100.84, 133.20); it was not decay.
+* *So there are two mechanisms at one timestamp.* (1) The tail eases off
+  inside segment 1, before any handoff. (2) Segment 2 is an image-to-video
+  restart from one still (`render_driver` -> `extract_terminal_frame`, a
+  shared path for every chaining engine), and it comes out moving at its own
+  fresh-start pace -- a speed mismatch against a slow tail, plus a one-frame
+  pop at the join on the quiet beats (0.4 -> 3.7 -> 1.7). The fear cape is
+  not involved: it fires only at 4+ segments (one beat here, `shot_002_b3`).
+* *Fix to decide, ranked.*
+  1. **A lower segment cap (~121 frames, 4.8 s).** Cheap, because the motion
+     holds that long: it removes the eased-off tail, so the two sides of the
+     join move at closer speeds. It costs about one extra join per long beat.
+     This is the frame contract / the lane's max-frames ceiling, not the
+     sampling recipe.
+  2. **A multi-frame handoff** only if the cap leaves a visible lurch. It is
+     not a knob on this graph: the lane is image-to-video, the vendor's extend
+     graph is a different graph, and `extract_terminal_frame` is shared, so a
+     lane-scoped version needs an adapter capability (as `accepts_last_frame`
+     already is) rather than a driver-wide change.
+  * **No crossfade.** A dissolve between an easing tail and a restart reads as
+    mush, which is the other half of "loose".
+* *Fence.* Whatever ships keeps v5's grip on the still. The 2026-09-28 paired
+  replays reverted v4 because its distilled schedule let the picture leave
+  the still (hard cuts inside half a second; `eng_ltx_8gb.py`, the v5
+  comment). Do not loosen sampling to buy motion.
+* *Proof.* A paired replay on the 4060's eight-beat test set: the motion trace
+  at each join, and his eye.
 
-**P2. The lane renders at 512x288 and is stretched 3.75x to 1080p.**
+**P2. The lane renders 512x288 and is stretched 3.75x to 1080p.**
 * *Evidence.* `eng_ltx_8gb.render_canvas = (512, 288)`; log
-  `VRAM render-phase peak 8989-10653 MB @ 512x288`. Upscaling magnifies the
-  frame-to-frame shimmer of the distilled 2B model along with the softness.
-* *Fix to decide.* The vendor's own route: the 0.9.8 latent spatial upscaler
-  x2 plus its refine pass (512x288 -> 1024x576), which the recipe comments
-  already name as "a separate call". The 0.9.8 upscaler is NOT on disk:
-  `C:\ComfyUI-Models\latent_upscale_models` holds only LTX-2 / 2.3 / 2.5
-  upscalers, which do not fit the 0.9.8 latent. It needs a download and a
-  peak-VRAM measurement on the 4060, because the lane exists for 8 GB cards.
-* *Proof.* The same paired replay, plus the 4060's measured peak.
+  `VRAM render-phase peak 8989-10653 MB @ 512x288`. The motion trace does NOT
+  measure softness; the evidence today is his eye plus the canvas. Before any
+  go, measure detail the way the v5 notes did (variance of the Laplacian).
+* *Fix to decide.* The 0.9.8 latent spatial upscaler x2 plus its refine pass
+  (512x288 -> 1024x576). That halves the stretch, it does not remove it: 1080p
+  is still another 1.875x. The 0.9.8 upscaler is NOT on disk
+  (`C:\ComfyUI-Models\latent_upscale_models` holds only the LTX-2 / 2.3 / 2.5
+  upscalers, which do not fit the 0.9.8 latent), and it adds a second call per
+  segment on the lane whose whole point is the 8 GB ceiling.
+* *Proof and stop rule.* The 4060's measured peak first. If it does not fit
+  8 GB, this row ends; it never ships as 16 GB behaviour under the 8 GB name.
 
-**P3. The 5080 rendered the 8 GB lane.** Not a defect: the soak's
-`FAST_LANES` covers every fast lane on purpose. Recorded so this episode is not
-read as what the 5080 can do; a 16 GB lane on the same story is the fair
-comparison.
+**Label, not a problem: this file is the 8 GB lane on a 16 GB card.** The
+soak's `FAST_LANES` covers every fast lane on purpose. Do not read
+`ice_relay_fr` as what the 5080 can do. A 16 GB lane on the same story is a
+different model and canvas, so it neither confirms nor kills P1.
 
-Order if he says go: P1 first (it causes the "steppy" he named), then P2.
-Both are recipe changes, so each ships only on a paired-replay win.
+Order if he says go: P1's segment cap first; P2 is a different complaint with
+a different proof.
 
 ### The registry -- his clicks and his word
 
