@@ -141,7 +141,26 @@ failures into one cause; a second measurement settled which half it had right.
   trimmed to the beat (a rendered rung is cut down), so this supports the cap;
   it does not prove it. Segment 2s mostly start hot and settle (001_b2: 19.4
   -> 3.1 across its quarters) -- the lurch, seen from the other side.
-* *Fix to decide, ranked.*
+* *RESULT 2026-10-01 -- THE CAP IS REJECTED.* Paired replay on the 5080 of
+  the 70-shot costume bundle, v5 untouched, the ONLY change the ledger's
+  `video.max_render_frames` 161 -> 121 (a derived bundle, every plan
+  re-stamped by `otr_shot_lock._stamp_coverage_plan`; 47 of 70 changed).
+  Both arms RESULT SUCCESS + obs_publish OK (`costume_masquerade_20261001_115540`
+  = 161, `..._122600` = 121; 23:49 vs 24:41). Scored on the finals over 73
+  shared beat cuts (`tmp/ltx8_cap_ab/compare_finals.py`):
+
+  | | joins | jump at join, median / >=3x | speed mismatch, median / >=2x | segment tail | detail |
+  |---|---|---|---|---|---|
+  | 161 | 39 | 1.51x / 7 | 2.50x / 20 | 0.80 | 708 |
+  | 121 | 65 | 1.77x / 11 | 2.28x / 37 | 0.83 | 698 |
+
+  The tail barely moved (0.80 -> 0.83): **the clip eases off at the end of
+  whatever length it is asked for**, so the second review's worry was right
+  and the n=2 single-clip hint above was not enough. A shorter render keeps
+  the ease-off and adds 26 joins, nearly twice as many bad ones. The
+  planner's greedy fill also leaves tiny last segments ([121, 9]). P1's only
+  live lever is now the motion-bearing handoff (option 2).
+* *Fix to decide, ranked (as written before the result).*
   1. **A lower segment cap (121 frames, 4.8 s, a legal 8n+1).** It TESTS
      whether avoiding the long render removes the eased-off tail, so the two
      sides of a join move at closer speeds. It costs about one extra join per
