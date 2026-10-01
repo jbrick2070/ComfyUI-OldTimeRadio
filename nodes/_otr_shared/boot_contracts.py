@@ -68,7 +68,7 @@ H3_8GB_LAB = "h3_8gb_lab"
 #: CPU-only ComfyUI. Several CPU/cloud profiles used to put ``--cpu`` only in
 #: ``launch.extra_args``; that field was rendered into prose but ignored by
 #: every launcher. Naming the process state makes the resolver emit the real
-#: argv and lets preflight verify the server rather than trust its profile.
+#: argv, and lets a server booted with it be identified as CPU.
 #:
 #: ``--cpu`` is what a machine WITHOUT a GPU launches with, not something a
 #: machine WITH one must give up (operator, 2026-09-30: "allow people with
