@@ -1699,6 +1699,11 @@ ordinary dead helpers. **Four are not dead code at all: they are code that was
 written to run and never wired**, which is a different and more interesting
 thing. NONE were deleted. Each is reported with what it would have done.
 
+**RETIRED 2026-10-08 by operator decision (no dead code; recoverable from git):
+items 1-2 below and every other unreferenced symbol of `_otr_scifi_p0_contract`
+are deleted; only its two live exports, `MAX_QUOTE_CHARS` and
+`p0_source_chunks`, remain. The open PBUG stays open.**
+
 **1-2. `_otr_scifi_p0_contract.p0_contract_instruction` and
 `p0_contract_receipt` -- and this pair may explain the suspicion in the section
 below.** `_otr_scifi_news_pro` imports only `MAX_QUOTE_CHARS` and
@@ -1771,6 +1776,11 @@ not one test touched, which is what "dead" should mean).** Removed:
 `cloud_media_canonical._not_built_yet`, `_otr_episode_budget._self_test`, and
 `_otr_ledger_clean.probe_context_visibility` / `_grade_probe`.
 
+**RETIRED 2026-10-08 by operator decision (no dead code; recoverable from git):
+the four schema classes (plus `CanonicalImage`), `freezedetect_silent` and the
+unreferenced symbols of `_otr_scifi_p0_contract` below are deleted. Only
+`content_oracle`'s wrappers remain kept.**
+
 **DELIBERATELY KEPT, and each for a stated reason:** the four schema classes
 (`AdapterDescriptor`, `VideoProfileRow`, `ImageEngineConfig`,
 `ImageLedgerSection`) are declared contract shapes and the campaign protects
@@ -1797,7 +1807,7 @@ recorded here so the next window does not re-derive them --
 `_otr_shared/slot_matrix.profile_keys_for_all_roles` (3).
 `_otr_video_engines/schemas.VideoProfileRow` is ALSO unreferenced and is
 explicitly KEPT: it is the declared row shape for a live `video_profiles.yaml`,
-and the campaign protects protocol fixtures.
+and the campaign protects protocol fixtures. (RETIRED 2026-10-08, see above.)
 
 ### OPEN -- still suspect, deliberately not fixed
 
@@ -2297,6 +2307,8 @@ female 400/400, and the shuffle's stream consumption varies with count (getrandb
 0, 0, 3, 3, 9, 11 for counts 0..5). The shipped design overrides in place and leaves the
 allocator untouched.
 
+**RETIRED 2026-10-08 by operator decision (never wired; recoverable from git):
+`nodes/_otr_source_grounding.py` is deleted; the `source_block` consumers stay.**
 **Source-grounding sprint, the one piece left:** chunk 3b-ii -- the supply line
 that feeds grounding into the writer -- is BUILT-BUT-UNWIRED and PARKED under the
 story-quality directive. The delivery mechanism exists and nothing calls it. A
@@ -2478,7 +2490,8 @@ machinery is BUILT AND TESTED:
   the WRITE LINE cue at `:908-915`.
 * An ENTIRE selector module, `nodes/_otr_source_grounding.py` (16 KB) --
   `select_grounding` at `:255`, `SourceGrounding` at `:168`,
-  `render_source_block` at `:362`.
+  `render_source_block` at `:362`. **RETIRED 2026-10-08 by operator decision
+  (never wired; recoverable from git): the module is deleted.**
 **`select_grounding` has ZERO production callers: 1 reference under `nodes/`
 (its own definition) against 33 under `tests/`.** So this was never a design
 problem. It is an unwired supply line between a built producer and a built
