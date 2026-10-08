@@ -59,8 +59,11 @@ $ComfyMarker = '(^|[\\/"\s])main\.py'
 # the first argument after the interpreter. Allowed in between: python's
 # no-value flags (-u, -B, -I, ...), -X/-W with their value, and `--`. -c, -m
 # and -V never pass, because then python is not running a worker script.
-# `python pylint.py ..\_otr_x_worker.py` does not match.
-$WorkerMarker = '^\s*(?:"[^"]*"|\S+)\s+(?:(?:-[bBdEiIOPqRsSuvx]+|-[XW]\s*\S+)\s+)*(?:--\s+)?(?:"(?:[^"]*[\\/])?_otr_[A-Za-z0-9_]+_worker\.py"|(?:\S*[\\/])?_otr_[A-Za-z0-9_]+_worker\.py)(?:\s|$)'
+# `python pylint.py ..\_otr_x_worker.py` does not match. The flag group is
+# CASE-SENSITIVE via (?-i:...): PowerShell's -match ignores case, which let -V
+# and a bare -X through and made -x/-X overlap into exponential backtracking.
+# Separators are space/tab only, as Windows argv splitting uses.
+$WorkerMarker = '^[ \t]*(?:"[^"]*"|[^ \t]+)[ \t]+(?:(?-i:-[bBdEiIOPqRsSuvx]+|-[XW][ \t]*[^ \t]+)[ \t]+)*(?:--[ \t]+)?(?:"(?:[^"]*[\\/])?_otr_[A-Za-z0-9_]+_worker\.py"|(?:[^ \t]*[\\/])?_otr_[A-Za-z0-9_]+_worker\.py)(?:[ \t]|$)'
 
 # Any ffmpeg* build, the same prefix rule nodes/_otr_shared/proc.py allows:
 # ffmpeg.exe, imageio-ffmpeg's ffmpeg-win-x86_64-v7.1.exe (ffmpeg.py falls back

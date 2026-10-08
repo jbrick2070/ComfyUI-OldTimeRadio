@@ -98,8 +98,9 @@ def _entry_is_fresh(p: Path, cutoff: float) -> bool:
     fresh time.time() against the cutoff, exactly as the full walk did -- so
     it is not unconditionally fresh. A negative max age larger than the gap
     between the two clock readings is stale; at zero (or a tiny negative)
-    the verdict is fresh only when the clock ticked in between, which on
-    Windows' ~15.6 ms clock is rare. An unstat-able child is skipped, and a
+    the verdict is fresh exactly when the clock advanced in between, which
+    depends on the clock's resolution (nearly always on Python 3.13's,
+    rarely on a coarse one). An unstat-able child is skipped, and a
     walk that errors keeps
     what it already saw. The differences: a directory walk stops at the
     first child newer than the cutoff instead of stat-ing everything under

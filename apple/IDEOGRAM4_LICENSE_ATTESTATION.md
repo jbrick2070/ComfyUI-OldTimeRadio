@@ -85,10 +85,10 @@ is already carried by the **shipping hero video engine**:
 
 | engine | file:line | note |
 | :-- | :-- | :-- |
-| `eng_ltx25` | `nodes/_otr_video_engines/eng_ltx25.py:396` | **ships episodes today** |
-| `eng_minimax_h3` | `nodes/_otr_video_engines/eng_minimax_h3.py:461` | attested separately |
-| `flux_gen1` | `nodes/_otr_image_engines/flux_gen1.py:96` | BFL non-commercial, **registered** |
-| `eng_musicgen` | `nodes/_otr_audio_engines/eng_musicgen.py:26` | CC-BY-NC-4.0 |
+| `eng_ltx25` | `nodes/_otr_video_engines/eng_ltx25.py:373` | **ships episodes today** |
+| `eng_minimax_h3` | `nodes/_otr_video_engines/eng_minimax_h3.py:460` | attested separately |
+| `flux_gen1` | `nodes/_otr_image_engines/flux_gen1.py:100` | BFL non-commercial, **registered** |
+| `eng_musicgen` | `nodes/_otr_audio_engines/eng_musicgen.py:31` | CC-BY-NC-4.0 |
 
 **Correction (r1 review, cursor lane, verified):** an earlier draft also listed
 `sd35_large.py:127` here. It does declare `commercial_clean = False`, but the

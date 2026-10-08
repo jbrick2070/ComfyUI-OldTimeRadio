@@ -67,8 +67,11 @@ INVENTORY = [
     _proc(213, 985, "python.exe", PY + " -- " + PACK + r"\scripts\_otr_chatterbox_worker.py",
           "2026-10-08T09:00:00"),
     _proc(214, 984, "python.exe", PY + ' "_otr_indextts2_worker.py" --device cpu', "2026-10-08T09:00:00"),
-    # -m runs a MODULE named that, not the worker script -> never a target.
+    # -m runs a MODULE named that, not the worker script; -V only prints the
+    # version (and is upper-case: flags are matched case-sensitively).
     _proc(215, 983, "python.exe", PY + " -m _otr_chatterbox_worker.py", "2026-10-08T09:00:00"),
+    _proc(216, 980, "python.exe", PY + " -V " + PACK + r"\scripts\_otr_chatterbox_worker.py",
+          "2026-10-08T09:00:00"),
     # Path markers start at a segment boundary: neither of these is OTR's.
     _proc(305, 988, "ffmpeg.exe", r"ffmpeg -i C:\Videos\not_otr_cbx_report.wav out.mp4", "2026-10-08T09:20:00"),
     _proc(306, 987, "ffmpeg.exe", r"ffmpeg -i D:\backup\ComfyUI-OldTimeRadio-old\a.wav b.wav", "2026-10-08T09:20:00"),
