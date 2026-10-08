@@ -1228,17 +1228,9 @@ def compose_line(
 
 _ANNOUNCER_MAX_NEW_TOKENS = 320
 _ANNOUNCER_LABELS = ("ANNOUNCER", "HOST", "NARRATOR", "NARRATION")
-_ANNOUNCER_INTRO_SYSTEM = """Write one spoken radio-announcer opening.
-Return only spoken words, without a label, markup, or stage direction.
-Do not reveal the ending."""
-_ANNOUNCER_INTRO_SYSTEM_SAFE = """Write one spoken radio-announcer opening
-from the supplied safe-open brief. Return only spoken words, without a label,
-markup, or stage direction. Do not invent facts or reveal the ending."""
-_ANNOUNCER_OUTRO_SYSTEM = """Write one spoken radio-announcer closing.
-Return only spoken words, without a label, markup, or stage direction."""
-_NEWS_CODA_SYSTEM = """Write one short spoken transition into the supplied
-factual source note. Return only the transition, without a label or markup."""
-_NEWS_CODA_SYSTEM_V2_EXAMPLES = ""
+# The announcer intro/outro and coda system prompts are the bank pack's
+# announcer_intro_system / announcer_intro_safe_system / announcer_outro_system
+# / coda_system seams (see _resolved_closing_prompt below).
 
 
 def clean_one_line(text: str) -> str:

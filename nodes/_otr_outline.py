@@ -903,10 +903,12 @@ def validate_outline_against_budget(
 #
 # Each call has its own 3-attempt retry. Failures localize to one
 # stage / one phase / one beat instead of poisoning the whole
-# outline. The legacy single-call generate_outline + _SYSTEM_PROMPT +
-# _build_user_prompt remain exported for back-compat (test imports,
-# creative_prompt_router byte-identity check) but are no longer the
-# main path.
+# outline. The three stage system prompts are the bank pack's
+# outline_macro/phase/beat_system seams (resolved in generate_outline).
+# The legacy single-call _SYSTEM_PROMPT + _build_user_prompt remain:
+# _SYSTEM_PROMPT is the router's object-identity sentinel for the plain
+# `outline` phase, and _build_user_prompt is the single-call builder the
+# tests still exercise; neither is the main path.
 
 # Stage 1 schema -- macro shape.
 class _MacroShape(BaseModel):
@@ -918,7 +920,7 @@ class _MacroShape(BaseModel):
     # (like Beat.arc_phase) -- a small local model frequently omits an
     # Optional field, so default="" guarantees the macro parses even when
     # omitted; the combiner then falls back to the premise. Capable
-    # models emit it from the _MACRO_SYSTEM_PROMPT schema below.
+    # models emit it from the pack's outline_macro_system schema.
     central_tension: str = ""
 
 
@@ -953,45 +955,6 @@ class _PhaseSkeleton(BaseModel):
 class _BeatFleshout(BaseModel):
     intent: str = Field(..., min_length=1)
     mood: str = Field(..., min_length=1)
-
-
-_MACRO_SYSTEM_PROMPT = """\
-You plan short science-fiction audio dramas. Return one JSON object only -- no prose, no fences.
-
-Schema:
-{
-  "title":           non-empty episode title,
-  "premise":         non-empty dramatic extrapolation from the story,
-  "setting":         non-empty concrete place,
-  "time_of_day":     non-empty time context,
-  "central_tension": "one yes/no question naming who wants what and what stops them".
-}
-"""
-
-_PHASE_SYSTEM_PROMPT = """\
-You plan one phase of a science-fiction audio drama. Return one JSON object only -- no prose, no fences.
-
-Schema:
-{
-  "beats": array of 1-10 objects, each:
-    { "speaker": one exact name from the Cast block }
-}
-
-Rules:
-- Use ONLY the exact names from the Cast block. Never invent a name or alter its spelling.
-- Speaker variation across beats is optional, not required. Vary speakers only when it serves the scene; repeating the same speaker on consecutive beats is fine.
-- The number of beats you return MUST equal the requested count.
-"""
-
-_BEAT_SYSTEM_PROMPT = """\
-You flesh out one beat of a science-fiction audio drama. Return one JSON object only -- no prose, no fences.
-
-Schema:
-{
-  "intent": a non-empty statement of what this beat accomplishes; not dialogue.
-  "mood":   a non-empty tone descriptor.
-}
-"""
 
 
 def _build_macro_user_prompt(req: OutlineRequest) -> str:
@@ -1605,8 +1568,7 @@ def generate_outline(
     creative_repo_id: str | None = None,  # Sprint D D2b: routes via resolver
     # Lane-enablement chunk 1 (2026-07-06): the episode's story-path bank.
     # The three outline STAGE system prompts resolve from its pack seams
-    # (outline_macro/phase/beat_system) via the router's repo=None lane --
-    # science stays byte-identical (pack == constants, test-pinned).
+    # (outline_macro/phase/beat_system) via the router's repo=None lane.
     source_bank_id: str = "media_archive",
     # The verbatim executor (2026-09-11): one speaker per voiced beat and the
     # fixed words of each, in outline order. Non-empty ONLY on a bank that
@@ -1742,9 +1704,8 @@ def generate_outline(
     # Lane-enablement chunk 1 (2026-07-06): the three STAGE system prompts
     # resolve ONCE from the bank's pack seams via the router's repo=None lane
     # (repo None skips the period branch -- the overlay above keeps owning
-    # period; the pack owns the stage text). Science is byte-identical (pack
-    # == the module constants, extraction-pinned). A bank whose pack lacks
-    # the outline seams FAILS LOUD here (its lane-enablement item). NO
+    # period; the pack owns the stage text). A bank whose pack lacks the
+    # outline seams FAILS LOUD here (its lane-enablement item). NO
     # swallow -- a resolver/pack failure fails the episode (Fable
     # forward-note law, AST-pinned).
     from ._otr_creative_prompt_router import (

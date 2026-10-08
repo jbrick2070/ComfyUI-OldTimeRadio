@@ -27,6 +27,10 @@ import pytest
 from nodes import _otr_compose_exchange as ce
 from nodes._otr_dialogue_policy import _COCKNEY_ORTHOGRAPHY_RULE
 
+# The static system portion is injected by the writer (the bank pack's
+# exchange_system seam); these tests only need *a* base to build on.
+_SYSTEM = "Write an EXCHANGE between the speakers below.\n\nCraft rules:\n"
+
 
 # ---------------------------------------------------------------------------
 # Fixtures / fakes
@@ -205,6 +209,7 @@ def test_compose_ok_first_attempt_no_repair():
     res = ce.compose_exchange(
         slots, _contracts(), [], _cast(),
         generate_fn=gen, tier_a_check=_always_ok,
+        system_prompt=_SYSTEM,
     )
     assert res.status == "ok"
     assert res.repaired is False
@@ -235,6 +240,7 @@ def test_repair_triggers_once_then_succeeds():
     res = ce.compose_exchange(
         slots, _contracts(), [], _cast(),
         generate_fn=gen, tier_a_check=tier_a,
+        system_prompt=_SYSTEM,
     )
     assert res.status == "ok_repaired"
     assert res.repaired is True
@@ -258,6 +264,7 @@ def test_repair_pass_prompt_includes_failure_reasons():
     ce.compose_exchange(
         slots, _contracts(), [], _cast(),
         generate_fn=gen, tier_a_check=tier_a,
+        system_prompt=_SYSTEM,
     )
     # The second (repair) prompt must carry the failure reason; the first
     # must not.
@@ -278,6 +285,7 @@ def test_fail_loud_after_one_failed_repair():
     res = ce.compose_exchange(
         slots, _contracts(), [], _cast(),
         generate_fn=gen, tier_a_check=_always_fail,
+        system_prompt=_SYSTEM,
     )
     assert res.status == "fail"
     assert res.repaired is True
@@ -293,6 +301,7 @@ def test_fail_loud_on_unparseable_then_unparseable():
     res = ce.compose_exchange(
         slots, _contracts(), [], _cast(),
         generate_fn=gen, tier_a_check=_always_ok,
+        system_prompt=_SYSTEM,
     )
     assert res.status == "fail"
     assert res.attempts == 2
@@ -308,6 +317,7 @@ def test_parse_failure_then_repair_succeeds():
     res = ce.compose_exchange(
         slots, _contracts(), [], _cast(),
         generate_fn=gen, tier_a_check=_always_ok,
+        system_prompt=_SYSTEM,
     )
     assert res.status == "ok_repaired"
     assert res.attempts == 2
@@ -320,7 +330,7 @@ def test_parse_failure_then_repair_succeeds():
 
 def test_prompt_has_one_grounding_per_exchange_instruction():
     slots = _group(3)
-    messages = ce.build_exchange_prompt(slots, _contracts(), [], _cast())
+    messages = ce.build_exchange_prompt(slots, _contracts(), [], _cast(), system_prompt=_SYSTEM)
     blob = "\n".join(m["content"] for m in messages)
     # "one concrete detail ... not one per line" -- per-exchange, not per-line.
     assert "ONE concrete detail" in blob
@@ -331,7 +341,7 @@ def test_prompt_has_one_grounding_per_exchange_instruction():
 
 def test_prompt_preserves_slot_ids_and_speakers():
     slots = _group(3)
-    messages = ce.build_exchange_prompt(slots, _contracts(), [], _cast())
+    messages = ce.build_exchange_prompt(slots, _contracts(), [], _cast(), system_prompt=_SYSTEM)
     blob = "\n".join(m["content"] for m in messages)
     for sid in ("d001", "d002", "d003"):
         assert sid in blob
@@ -342,14 +352,14 @@ def test_prompt_includes_prior_committed_lines():
     slots = _group(2)
     prior = ["d000|ANNOUNCER: The clock reads eleven.",
              "d001|REESE: You're late, Marlow."]
-    messages = ce.build_exchange_prompt(slots, _contracts(), prior, _cast())
+    messages = ce.build_exchange_prompt(slots, _contracts(), prior, _cast(), system_prompt=_SYSTEM)
     blob = "\n".join(m["content"] for m in messages)
     assert "You're late, Marlow." in blob
 
 
 def test_must_turn_instruction_present_for_turning_slot():
     slots = _group(2)  # d002 has must_turn=True in _contracts()
-    messages = ce.build_exchange_prompt(slots, _contracts(), [], _cast())
+    messages = ce.build_exchange_prompt(slots, _contracts(), [], _cast(), system_prompt=_SYSTEM)
     blob = "\n".join(m["content"] for m in messages)
     assert "TURN the scene" in blob
 
@@ -364,6 +374,7 @@ def test_empty_group_fails_without_generate_call():
     res = ce.compose_exchange(
         [], _contracts(), [], _cast(),
         generate_fn=gen, tier_a_check=_always_ok,
+        system_prompt=_SYSTEM,
     )
     assert res.status == "fail"
     assert len(gen.calls) == 0
@@ -495,6 +506,7 @@ def test_prepass_composes_a_voiced_group():
     ]
     out = ce.run_exchange_prepass(
         beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_ok,
+        system_prompt=_SYSTEM,
     )
     assert set(out) == {"b001", "b002", "b003"}
     assert all(out.values())
@@ -509,6 +521,7 @@ def test_prepass_announcer_breaks_group_and_is_excluded():
     ]
     out = ce.run_exchange_prepass(
         beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_ok,
+        system_prompt=_SYSTEM,
     )
     assert set(out) == {"b002", "b003"}
 
@@ -520,6 +533,7 @@ def test_prepass_single_voiced_beat_is_not_composed():
     ]
     out = ce.run_exchange_prepass(
         beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_ok,
+        system_prompt=_SYSTEM,
     )
     assert out == {}
 
@@ -531,6 +545,7 @@ def test_prepass_failed_group_is_excluded():
     ]
     out = ce.run_exchange_prepass(
         beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_fail,
+        system_prompt=_SYSTEM,
     )
     assert out == {}
 
@@ -542,6 +557,7 @@ def test_prepass_multi_group_threads_prior_without_parse_drift():
     beats = [_beat(f"b00{i}", f"d00{i}", "REN") for i in range(1, 6)]
     out = ce.run_exchange_prepass(
         beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_ok,
+        system_prompt=_SYSTEM,
     )
     assert set(out) == {"b001", "b002", "b003", "b004", "b005"}
 
@@ -613,7 +629,7 @@ def _system_content(messages):
 
 
 def test_exchange_without_lemmy_carries_no_cockney_policy():
-    messages = ce.build_exchange_prompt(_group(3), _contracts(), [], _cast())
+    messages = ce.build_exchange_prompt(_group(3), _contracts(), [], _cast(), system_prompt=_SYSTEM)
     assert _COCKNEY_ORTHOGRAPHY_RULE not in _system_content(messages)
 
 
@@ -621,6 +637,7 @@ def test_mixed_exchange_scopes_the_cockney_rule_to_lemmy_alone():
     slots = _lemmy_group()
     messages = ce.build_exchange_prompt(
         slots, _lemmy_contracts(), [], _lemmy_cast(),
+        system_prompt=_SYSTEM,
     )
     system = _system_content(messages)
     assert system.count(_COCKNEY_ORTHOGRAPHY_RULE) == 1
@@ -645,6 +662,7 @@ def test_exchange_repair_keeps_the_identical_scoped_system_message():
     res = ce.compose_exchange(
         slots, _lemmy_contracts(), [], _lemmy_cast(),
         generate_fn=gen, tier_a_check=tier_a,
+        system_prompt=_SYSTEM,
     )
 
     assert res.status == "ok_repaired"
@@ -697,6 +715,7 @@ def test_prepass_cast_containing_lemmy_leaves_a_non_lemmy_group_unscoped():
 
     out = ce.run_exchange_prepass(
         beats, {}, cast, generate_fn=gen, tier_a_check=_tier_ok,
+        system_prompt=_SYSTEM,
     )
 
     assert set(out) == {"b001", "b002"}

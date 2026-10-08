@@ -5795,8 +5795,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             # try/except below: a pack/seam failure (a bank without the
             # exchange_system seam) must FAIL THE EPISODE LOUD, never be
             # swallowed into a silent legacy fallback (no-fallback law;
-            # Fable forward-note pattern from chunk 1). Science is
-            # byte-identical (pack == EXCHANGE_SYSTEM_PROMPT, test-pinned).
+            # Fable forward-note pattern from chunk 1).
             from ._otr_creative_prompt_router import (
                 resolve_creative_system_prompt as _resolve_ex_prompt,
             )

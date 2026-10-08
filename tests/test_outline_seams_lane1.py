@@ -4,15 +4,12 @@ LANE-ENABLEMENT CHUNK 1 -- the three outline STAGE system prompts migrate
 from hard-wired constants to pack routing (router repo=None lane).
 
 Pins:
-  1. BYTE IDENTITY: the science pack's outline_macro/phase/beat_system seams
-     == the _otr_outline constants (which remain as the extraction fixture).
-  2. Router: the three new phases resolve the pack seam; repo=None on the
-     science lane returns those exact bytes; the plain "outline" phase is
-     UNTOUCHED (object identity preserved for the period-overlay sentinel).
-     3. NON-SCIENCE ROUTING: public_domain_story has its own outline seams;
-     routing must use them, not the science fixtures.
-  4. generate_outline threads source_bank_id (signature + AST pin on the
-     writer's two call sites).
+  1. Router: the plain "outline" phase is UNTOUCHED (object identity
+     preserved for the period-overlay sentinel).
+  2. NON-DEFAULT ROUTING: public_domain has its own outline seams; routing
+     must use them, not the default bank's.
+  3. generate_outline threads source_bank_id (signature + AST pin on the
+     writer's call site).
 """
 from __future__ import annotations
 
@@ -27,11 +24,11 @@ from nodes._otr_creative_prompt_router import resolve_creative_system_prompt
 
 _REPO = Path(__file__).resolve().parent.parent
 
-_SEAM_TO_CONST = {
-    "outline_macro_system": outline_mod._MACRO_SYSTEM_PROMPT,
-    "outline_phase_system": outline_mod._PHASE_SYSTEM_PROMPT,
-    "outline_beat_system": outline_mod._BEAT_SYSTEM_PROMPT,
-}
+_STAGE_PHASES = (
+    "outline_macro_system",
+    "outline_phase_system",
+    "outline_beat_system",
+)
 
 
 class TestByteIdentity:
@@ -42,12 +39,12 @@ class TestByteIdentity:
 
 
 class TestPublicDomainRouting:
-    @pytest.mark.parametrize("phase", sorted(_SEAM_TO_CONST))
+    @pytest.mark.parametrize("phase", sorted(_STAGE_PHASES))
     def test_public_domain_outline_seams_route(self, phase):
         resolved = resolve_creative_system_prompt(
             None, phase=phase, source_bank_id="public_domain")
         assert "public-domain" in resolved or "adaptation" in resolved
-        assert resolved != _SEAM_TO_CONST[phase]
+        assert resolved != resolve_creative_system_prompt(None, phase=phase)
 
 
 class TestThreading:
@@ -73,9 +70,3 @@ class TestThreading:
                     f"missing source_bank_id")
                 sites += 1
         assert sites == 1, f"expected 1 authoritative writer call site, found {sites}"
-
-    def test_outline_stage_constants_still_fixture(self):
-        # The constants stay in _otr_outline as the extraction fixture; the
-        # router imports them for _MODERN_BY_PHASE. Non-empty sanity.
-        for const in _SEAM_TO_CONST.values():
-            assert isinstance(const, str) and len(const) > 50

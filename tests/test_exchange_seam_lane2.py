@@ -4,19 +4,15 @@ LANE-ENABLEMENT CHUNK 2 -- the Build-4 grouped-exchange STATIC system prompt
 migrates from a hard-wired literal to pack routing (router repo=None lane).
 
 Pins:
-  1. BYTE IDENTITY: the science pack's `exchange_system` seam ==
-     _otr_compose_exchange.EXCHANGE_SYSTEM_PROMPT (which remains as the
-     extraction fixture), and the router resolves those exact bytes.
-  2. ASSEMBLY IDENTITY: build_exchange_prompt(system_prompt=None) ==
-     build_exchange_prompt(system_prompt=<routed science value>) -- the
-     science lane is byte-identical end to end.
-  3. NON-SCIENCE ROUTING: public_domain_story has its own exchange seam;
-     routing must use it, not the science fixture.
-  4. THREADING: system_prompt is threaded run_exchange_prepass ->
-     compose_exchange -> build_exchange_prompt (signature pins), the writer
-     call site passes it, and the writer's resolve call sits OUTSIDE any
-     try/except (a pack failure must fail the episode LOUD -- the exchange
-     prepass PD1 swallow must not eat it).
+  1. ASSEMBLY: build_exchange_prompt leads with the injected static portion
+     and appends the dynamic grounding guidance after it.
+  2. NON-DEFAULT ROUTING: public_domain has its own exchange seam; routing
+     must use it, not the default bank's.
+  3. THREADING: system_prompt is a required keyword threaded
+     run_exchange_prepass -> compose_exchange -> build_exchange_prompt
+     (signature pins), the writer call site passes it, and the writer's
+     resolve call sits OUTSIDE any try/except (a pack failure must fail the
+     episode LOUD -- the exchange prepass PD1 swallow must not eat it).
 """
 from __future__ import annotations
 
@@ -28,7 +24,6 @@ import pytest
 
 from nodes import _otr_compose_exchange as ex_mod
 from nodes._otr_compose_exchange import (
-    EXCHANGE_SYSTEM_PROMPT,
     SlotContract,
     TierAResult,
     VoicedSlot,
@@ -42,14 +37,8 @@ from nodes._otr_story_routing import resolve_story_pack
 _REPO = Path(__file__).resolve().parent.parent
 _WRITER = _REPO / "nodes" / "OTR_LedgerScriptWriter.py"
 
-
-class TestByteIdentity:
-    def test_constant_still_fixture(self):
-        # The constant stays in _otr_compose_exchange as the extraction
-        # fixture; the router imports it for _MODERN_BY_PHASE.
-        assert isinstance(EXCHANGE_SYSTEM_PROMPT, str)
-        assert len(EXCHANGE_SYSTEM_PROMPT) > 50
-        assert EXCHANGE_SYSTEM_PROMPT.endswith("\n")
+#: The static portion the writer injects: the default bank's exchange seam.
+_BASE = resolve_creative_system_prompt(None, phase="exchange_system")
 
 
 class TestAssemblyIdentity:
@@ -71,23 +60,23 @@ class TestAssemblyIdentity:
     def test_dynamic_grounding_guidance_is_appended(self):
         # The pack owns only the STATIC portion; prompt-only grounding guidance
         # is appended without any Python vocabulary filter.
-        system = self._messages(None)[0]["content"]
-        assert system.startswith(EXCHANGE_SYSTEM_PROMPT)
+        system = self._messages(_BASE)[0]["content"]
+        assert system.startswith(_BASE)
         assert "Ground the exchange in ONE concrete detail" in system
 
     def test_custom_system_prompt_replaces_static_portion_only(self):
         custom = "You write anime-style radio banter.\n\nCraft rules:\n"
         system = self._messages(custom)[0]["content"]
         assert system.startswith(custom)
-        assert EXCHANGE_SYSTEM_PROMPT not in system
+        assert _BASE not in system
         assert "Ground the exchange in ONE concrete detail" in system
 
     def test_native_instruction_leads_system_and_precedes_format(self):
         rule = "Escribe todo el diálogo en español."
-        messages = self._messages(None, rule)
+        messages = self._messages(_BASE, rule)
         system = messages[0]["content"]
         user = messages[1]["content"]
-        assert system.startswith(rule + "\n\n" + EXCHANGE_SYSTEM_PROMPT)
+        assert system.startswith(rule + "\n\n" + _BASE)
         assert user.index(rule) < user.index(
             "Output EXACTLY one line per slot id")
 
@@ -98,7 +87,7 @@ class TestPublicDomainRouting:
             None, phase="exchange_system",
             source_bank_id="public_domain")
         assert "public-domain" in resolved
-        assert resolved != EXCHANGE_SYSTEM_PROMPT
+        assert resolved != _BASE
 
 
 class TestThreading:
@@ -107,10 +96,10 @@ class TestThreading:
         ex_mod.compose_exchange,
         ex_mod.run_exchange_prepass,
     ])
-    def test_system_prompt_param_default_none(self, fn):
+    def test_system_prompt_param_is_required(self, fn):
         params = inspect.signature(fn).parameters
         assert "system_prompt" in params
-        assert params["system_prompt"].default is None
+        assert params["system_prompt"].default is inspect.Parameter.empty
         assert params["system_prompt"].kind is inspect.Parameter.KEYWORD_ONLY
 
     @pytest.mark.parametrize("fn", [
@@ -205,6 +194,7 @@ def test_exchange_repair_keeps_native_instruction_on_both_calls():
         [],
         generate_fn=generate,
         tier_a_check=lambda *_a: TierAResult(ok=True),
+        system_prompt=_BASE,
         language_instruction=rule,
     )
     assert result.status == "ok_repaired"

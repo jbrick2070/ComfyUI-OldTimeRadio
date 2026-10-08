@@ -14,6 +14,10 @@ from nodes import _otr_line_composer as lc
 from nodes import _otr_source_document as osd
 from nodes import _otr_source_grounding as osg
 
+# The static system portion is injected by the writer (the bank pack's
+# exchange_system seam); these tests only need *a* base to build on.
+_SYSTEM = "Write an EXCHANGE between the speakers below.\n\nCraft rules:\n"
+
 
 def _block() -> str:
     doc = osd.build_source_document(
@@ -40,7 +44,7 @@ def _slots():
 def test_the_exchange_prompt_carries_the_source_as_user_data():
     block = _block()
     messages = ce.build_exchange_prompt(
-        _slots(), {}, [], [], source_block=block)
+        _slots(), {}, [], [], source_block=block, system_prompt=_SYSTEM)
     system = messages[0]["content"]
     user = messages[1]["content"]
     # The passage rides the USER turn...
@@ -52,22 +56,22 @@ def test_the_exchange_prompt_carries_the_source_as_user_data():
 
 def test_the_exchange_system_seam_is_byte_identical_with_and_without_a_source():
     with_src = ce.build_exchange_prompt(
-        _slots(), {}, [], [], source_block=_block())[0]["content"]
-    without = ce.build_exchange_prompt(_slots(), {}, [], [])[0]["content"]
+        _slots(), {}, [], [], source_block=_block(), system_prompt=_SYSTEM)[0]["content"]
+    without = ce.build_exchange_prompt(_slots(), {}, [], [], system_prompt=_SYSTEM)[0]["content"]
     assert with_src == without
 
 
 def test_omitting_the_source_leaves_the_user_prompt_unchanged():
     # Every invention-lane caller passes nothing; their prompt must not move.
-    a = ce.build_exchange_prompt(_slots(), {}, [], [])[1]["content"]
-    b = ce.build_exchange_prompt(_slots(), {}, [], [], source_block="")[1]["content"]
+    a = ce.build_exchange_prompt(_slots(), {}, [], [], system_prompt=_SYSTEM)[1]["content"]
+    b = ce.build_exchange_prompt(_slots(), {}, [], [], source_block="", system_prompt=_SYSTEM)[1]["content"]
     assert a == b
 
 
 def test_the_write_instruction_still_comes_last():
     # The last thing the model reads must be what to WRITE, not what to read.
     user = ce.build_exchange_prompt(
-        _slots(), {}, [], [], source_block=_block())[1]["content"]
+        _slots(), {}, [], [], source_block=_block(), system_prompt=_SYSTEM)[1]["content"]
     assert user.index("END SOURCE PASSAGE") < user.index(
         "Write these slots as one exchange:")
 
@@ -127,6 +131,7 @@ def test_a_repair_quotes_the_same_passage_as_the_attempt_it_repairs():
         generate_fn=generate_fn,
         tier_a_check=tier_a_check,
         source_block=block,
+        system_prompt=_SYSTEM,
     )
 
     assert len(seen) >= 2, "expected a first attempt and a repair"
@@ -157,7 +162,7 @@ def test_a_non_string_source_block_is_refused_loudly():
     key = osg.window_key_for_line("d001")
     span = osg.select_grounding(doc, [key]).require_window(key)
     with pytest.raises(TypeError):
-        ce.build_exchange_prompt(_slots(), {}, [], [], source_block=span)
+        ce.build_exchange_prompt(_slots(), {}, [], [], source_block=span, system_prompt=_SYSTEM)
 
 
 def test_the_group_and_its_line_fallback_can_share_one_passage():
@@ -166,6 +171,6 @@ def test_the_group_and_its_line_fallback_can_share_one_passage():
     # reselecting.
     block = _block()
     group_user = ce.build_exchange_prompt(
-        _slots(), {}, [], [], source_block=block)[1]["content"]
+        _slots(), {}, [], [], source_block=block, system_prompt=_SYSTEM)[1]["content"]
     line_user = lc._build_user_prompt(_line_request(source_block=block))
     assert block in group_user and block in line_user

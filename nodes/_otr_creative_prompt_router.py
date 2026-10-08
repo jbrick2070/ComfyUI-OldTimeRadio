@@ -16,8 +16,8 @@ The resolver covers the direct outline sentinel plus the pack-routed creative
 seams in `Phase`: line composer, outline stages, exchange, coda, and announcer
 intro/outro. The `outline` phase still returns the modern constant
 object-identically because _otr_outline's `resolved is _SYSTEM_PROMPT`
-sentinel depends on it. Pack-routed seams return byte-identical values from the
-selected story bank under the default science lane.
+sentinel depends on it. Pack-routed seams return the selected story bank's
+pack value.
 
 A caller-count test pins the current production call sites so missed wiring and
 accidental extra calls both fail loudly.
@@ -29,49 +29,16 @@ render_few_shot_block at 0 production callers; re-introducing it
 fires the test and forces a deliberate scope decision.
 
 Audio C7 contract: at default config (writer on Mistral-Nemo,
-prompt_profile = "modern") the resolver returns prompts BYTE-IDENTICAL
-to the legacy direct-constant lookups. `outline` is object-identical;
-`line_composer_system` is value-identical (sourced from the JSON pack,
-pinned byte-for-byte by tests/test_story_pack_stage1.py). The audio
-baseline is unchanged either way.
+prompt_profile = "modern") the resolver's answer is STABLE: `outline` is
+object-identical to _otr_outline._SYSTEM_PROMPT, and every other phase is
+the selected bank's pack seam.
 """
 from __future__ import annotations
 
 from typing import Literal
 
 from . import _otr_model_catalog
-from ._otr_line_composer import (
-    _SYSTEM_PROMPT as _MODERN_LINE_COMPOSER_SYSTEM,
-)
-# Closing-layer seams (2026-07-09 source-route QA F1): the coda + announcer
-# prompts are pack-routed; the constants below remain as the science
-# extraction fixture (byte-identity pinned by tests/test_story_pack_stage1.py).
-# Before this, banks.json REQUIRED these four seams in every pack and the
-# registry sweep validated them -- but no phase ever routed them, so every
-# bank closed with the science-lane "real news report" framing.
-from ._otr_line_composer import (
-    _ANNOUNCER_INTRO_SYSTEM as _MODERN_ANNOUNCER_INTRO_SYSTEM,
-    _ANNOUNCER_INTRO_SYSTEM_SAFE as _MODERN_ANNOUNCER_INTRO_SAFE_SYSTEM,
-    _ANNOUNCER_OUTRO_SYSTEM as _MODERN_ANNOUNCER_OUTRO_SYSTEM,
-    _NEWS_CODA_SYSTEM as _MODERN_CODA_SYSTEM,
-    _NEWS_CODA_SYSTEM_V2_EXAMPLES as _MODERN_CODA_V2_EXAMPLES,
-)
 from ._otr_outline import _SYSTEM_PROMPT as _MODERN_OUTLINE_SYSTEM
-# Lane-enablement chunk 1 (2026-07-06): the three outline STAGE prompts are
-# pack-routed; the constants below remain as the science extraction fixture
-# (byte-identity pinned by tests).
-from ._otr_outline import (
-    _BEAT_SYSTEM_PROMPT as _MODERN_OUTLINE_BEAT_SYSTEM,
-    _MACRO_SYSTEM_PROMPT as _MODERN_OUTLINE_MACRO_SYSTEM,
-    _PHASE_SYSTEM_PROMPT as _MODERN_OUTLINE_PHASE_SYSTEM,
-)
-# Lane-enablement chunk 2 (2026-07-05): the exchange static system prompt is
-# pack-routed; the constant remains as the science extraction fixture
-# (byte-identity pinned). _otr_compose_exchange is stdlib-pure (no imports
-# from this package), so this import cannot cycle.
-from ._otr_compose_exchange import (
-    EXCHANGE_SYSTEM_PROMPT as _MODERN_EXCHANGE_SYSTEM,
-)
 from ._otr_period_prompts import OTR_PERIOD_SYSTEM_PROMPT
 from ._otr_story_pack import get_pack_prompt
 from ._otr_story_routing import resolve_story_pack
@@ -97,37 +64,13 @@ Phase = Literal[
 ]
 
 
-# Frozen mapping from phase identifier to the corresponding modern
-# system-prompt string. Built at module-import time from the four
-# per-phase constants so the returned references are object-identity
-# stable across calls (preserves the Sprint D audio C7 contract under
-# default config).
-_MODERN_BY_PHASE: dict[str, str] = {
-    "outline":              _MODERN_OUTLINE_SYSTEM,
-    "line_composer_system": _MODERN_LINE_COMPOSER_SYSTEM,
-    "outline_macro_system": _MODERN_OUTLINE_MACRO_SYSTEM,
-    "outline_phase_system": _MODERN_OUTLINE_PHASE_SYSTEM,
-    "outline_beat_system":  _MODERN_OUTLINE_BEAT_SYSTEM,
-    "exchange_system":      _MODERN_EXCHANGE_SYSTEM,
-    # coda_system's modern fixture matches the science PACK value, which
-    # inlines the S2 V2 examples (constant + examples, pinned by
-    # tests/test_story_pack_stage1.py) -- NOT the bare constant.
-    "coda_system":                 _MODERN_CODA_SYSTEM + _MODERN_CODA_V2_EXAMPLES,
-    "announcer_intro_system":      _MODERN_ANNOUNCER_INTRO_SYSTEM,
-    "announcer_intro_safe_system": _MODERN_ANNOUNCER_INTRO_SAFE_SYSTEM,
-    "announcer_outro_system":      _MODERN_ANNOUNCER_OUTRO_SYSTEM,
-}
-
-
-# Stage 1b (multi-modal story schema): the science lane sources selected creative
-# seams from its JSON story pack instead of the local Python constant. The pack
-# value is BYTE-IDENTICAL to the constant (pinned by tests/test_story_pack_stage1.py);
-# object-identity is intentionally not preserved for a pack-sourced phase, so the
-# audio C7 contract now holds by VALUE, not object reference.
+# Stage 1b (multi-modal story schema): every phase but the plain `outline` one
+# sources its system prompt from the selected bank's JSON story pack, so
+# object-identity is not preserved for a pack-sourced phase and the audio C7
+# contract holds by VALUE, not object reference.
 #
-# Only `line_composer_system` is migrated. `outline` stays on its constant (its
-# downstream `resolved is _SYSTEM_PROMPT` sentinel in _otr_outline depends on
-# object identity).
+# `outline` stays on its constant (its downstream `resolved is _SYSTEM_PROMPT`
+# sentinel in _otr_outline depends on object identity).
 #
 # Stage 2: the pack is resolved through the ROUTING layer
 # (resolve_story_pack via banks.json), no fixed path. Stage 2C: the workflow
@@ -188,10 +131,10 @@ def resolve_creative_system_prompt(
     just because the creative slot is a remote model (BUG: a remote creative
     writer aborted the whole run here, 2026-06-18).
     """
-    if phase not in _MODERN_BY_PHASE:
+    if phase != "outline" and phase not in _PHASE_TO_PACK_SEAM:
         raise ValueError(
             f"unknown creative phase {phase!r}; expected one of "
-            f"{sorted(_MODERN_BY_PHASE)}"
+            f"{sorted(['outline', *_PHASE_TO_PACK_SEAM])}"
         )
     # The picker's VRAM badge is part of the widget value the graph now saves,
     # so normalize BEFORE the lookup -- the same strip the loader performs.
@@ -210,13 +153,13 @@ def resolve_creative_system_prompt(
         return OTR_PERIOD_SYSTEM_PROMPT
     seam = _PHASE_TO_PACK_SEAM.get(phase)
     if seam is not None:
-        # Byte-identical to _MODERN_BY_PHASE[phase] under the default
-        # (science_news) bank; routed through banks.json so JSON owns the
-        # prompt content. Fail-loud on unknown bank/model/seam. Stage 2C:
-        # the workflow `source_bank` widget selection threads here via
-        # `source_bank_id`; the science literal survives ONLY as the default.
+        # Routed through banks.json so JSON owns the prompt content.
+        # Fail-loud on unknown bank/model/seam. Stage 2C: the workflow
+        # `source_bank` widget selection threads here via `source_bank_id`;
+        # the literal survives ONLY as the default.
         return get_pack_prompt(resolve_story_pack(source_bank_id), seam)
-    return _MODERN_BY_PHASE[phase]
+    # Only the plain `outline` phase is not pack-routed.
+    return _MODERN_OUTLINE_SYSTEM
 
 
 __all__ = [

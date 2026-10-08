@@ -115,13 +115,17 @@ class TestBeatFleshoutSchema:
         assert fleshout.intent == "advance the scene"
 
     def test_beat_system_prompt_drops_target_words(self):
-        from nodes._otr_outline import _BEAT_SYSTEM_PROMPT
-        assert "target_words" not in _BEAT_SYSTEM_PROMPT, (
+        from nodes._otr_creative_prompt_router import (
+            resolve_creative_system_prompt,
+        )
+        beat_system = resolve_creative_system_prompt(
+            None, phase="outline_beat_system")
+        assert "target_words" not in beat_system, (
             "the Stage 3 system prompt must no longer ask for "
             "target_words"
         )
-        assert "intent" in _BEAT_SYSTEM_PROMPT
-        assert "mood" in _BEAT_SYSTEM_PROMPT
+        assert "intent" in beat_system
+        assert "mood" in beat_system
 
 
 # ---------------------------------------------------------------------------
