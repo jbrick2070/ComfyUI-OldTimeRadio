@@ -53,6 +53,16 @@ INVENTORY = [
     _proc(301, 996, "ffmpeg.exe", r"ffmpeg -y -i C:\Temp\otr_assemble_ab12\seg_001.mp4 -c copy out.mp4", "2026-10-08T09:20:00"),
     _proc(302, 994, "ffmpeg.exe", r"ffmpeg -i C:\Videos\holiday.mp4 out.mp4", "2026-10-08T09:20:00"),
     _proc(303, 100, "ffmpeg.exe", r"ffmpeg -i D:\ComfyUI\output\otr\episodes\ep1\a.wav b.wav", "2026-10-08T09:30:00"),
+    # The worker must be the SCRIPT python runs, not a mention: a linter run on
+    # a worker file is not a worker (Codex review of 91389427).
+    _proc(209, 991, "python.exe", PY + r" C:\tools\pylint.py " + PACK + r"\scripts\_otr_chatterbox_worker.py",
+          "2026-10-08T09:00:00"),
+    # A real worker launched with -u from a quoted path with spaces -> TARGET.
+    _proc(210, 989, "python.exe", PY + r' -u "C:\Program Files\OTR Pack\scripts\_otr_indextts2_worker.py" --model-dir m',
+          "2026-10-08T09:00:00"),
+    # Path markers start at a segment boundary: neither of these is OTR's.
+    _proc(305, 988, "ffmpeg.exe", r"ffmpeg -i C:\Videos\not_otr_cbx_report.wav out.mp4", "2026-10-08T09:20:00"),
+    _proc(306, 987, "ffmpeg.exe", r"ffmpeg -i D:\backup\ComfyUI-OldTimeRadio-old\a.wav b.wav", "2026-10-08T09:20:00"),
     # imageio-ffmpeg's versioned build, which nodes/_otr_shared/ffmpeg.py falls
     # back to: same rules as ffmpeg.exe -> TARGET when orphaned with an OTR path.
     _proc(304, 992, "ffmpeg-win-x86_64-v7.1.exe",
@@ -89,6 +99,7 @@ def test_selects_only_orphaned_otr_sidecars(tmp_path):
     assert _select(tmp_path, INVENTORY) == {
         201: "otr-worker",
         203: "otr-worker",
+        210: "otr-worker",
         301: "otr-ffmpeg",
         304: "otr-ffmpeg",
     }

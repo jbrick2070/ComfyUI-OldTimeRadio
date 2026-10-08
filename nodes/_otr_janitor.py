@@ -110,10 +110,12 @@ def _entry_mtime(p: Path) -> float:
 def _entry_is_fresh(p: Path, cutoff: float) -> bool:
     """``_entry_mtime(p) > cutoff``, without walking the whole tree.
 
-    Same verdict under every error rule: an unstat-able entry compares
-    "now" against the cutoff (so a zero or negative max age still makes it
-    stale -- it is not unconditionally fresh), an unstat-able child is
-    skipped, and a walk that errors keeps what it already saw. The one
+    Same verdict under every error rule: an unstat-able entry compares a
+    fresh "now" against the cutoff, exactly as the full walk did (so it is
+    not unconditionally fresh: a negative max age makes it stale, while a
+    zero max age reads fresh because the clock has moved on since the cutoff
+    was taken), an unstat-able child is skipped, and a walk that errors keeps
+    what it already saw. The one
     difference is that a directory walk stops at the first child newer
     than the cutoff instead of stat-ing everything under it.
     """

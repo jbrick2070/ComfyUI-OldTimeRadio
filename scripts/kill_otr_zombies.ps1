@@ -3,8 +3,10 @@
 #
 # A process is a target only when BOTH are true:
 #   1. It carries a positive OTR marker:
-#        * python/pythonw running an OTR worker script (scripts\_otr_*_worker.py,
-#          e.g. the Chatterbox and IndexTTS2 sidecars), or
+#        * python/pythonw whose SCRIPT is an OTR worker (scripts\_otr_*_worker.py,
+#          e.g. the Chatterbox and IndexTTS2 sidecars) -- the first argument
+#          after the interpreter, as OTR launches them, not merely a mention of
+#          a worker file somewhere on the command line, or
 #        * ffmpeg -- ffmpeg.exe, or a versioned build such as imageio's
 #          ffmpeg-win-x86_64-v7.1.exe, which OTR falls back to -- whose command
 #          line names an OTR path (otr\episodes, otr\obs, an OTR temp folder or
@@ -50,15 +52,20 @@ $NeverKill = @(
 # ComfyUI's own server process (Desktop or headless) runs main.py.
 $ComfyMarker = '(^|[\\/"\s])main\.py'
 
-# OTR sidecar worker scripts, e.g. scripts\_otr_chatterbox_worker.py.
-$WorkerMarker = '_otr_[A-Za-z0-9_]+_worker\.py'
+# OTR sidecar workers, e.g. scripts\_otr_chatterbox_worker.py, AS THE SCRIPT
+# python runs: OTR launches them as [python, worker, args...], so the worker is
+# the first argument after the interpreter (simple -X flags like -u allowed,
+# quoted or bare path). `python pylint.py ..\_otr_x_worker.py` does not match.
+$WorkerMarker = '^\s*(?:"[^"]*"|\S+)\s+(?:-[A-Za-z]+\s+)*(?:"[^"]*[\\/]_otr_[A-Za-z0-9_]+_worker\.py"|(?:\S*[\\/])?_otr_[A-Za-z0-9_]+_worker\.py)(?:\s|$)'
 
 # ffmpeg itself, or a versioned build such as imageio-ffmpeg's
 # ffmpeg-win-x86_64-v7.1.exe (nodes/_otr_shared/ffmpeg.py falls back to it).
 $FfmpegName = '^ffmpeg(-[^\\/]+)?\.exe$'
 
-# Paths only OTR's ffmpeg calls write to or read from.
-$FfmpegMarker = '[\\/]otr[\\/](episodes|obs)[\\/]|otr_(assemble|pcm_probe|cbx|idx2|mesh_tmp)_|ComfyUI-OldTimeRadio'
+# Paths only OTR's ffmpeg calls write to or read from. Every marker starts at a
+# path-segment boundary, so `not_otr_cbx_report.wav` or a folder merely
+# containing the pack's name does not count.
+$FfmpegMarker = '[\\/]otr[\\/](episodes|obs)[\\/]|[\\/]otr_(assemble|pcm_probe|cbx|idx2|mesh_tmp)_|[\\/]ComfyUI-OldTimeRadio[\\/]'
 
 # Always UTC: local wall-clock times repeat an hour at the DST fall-back, which
 # could make a live parent look younger than its child.
