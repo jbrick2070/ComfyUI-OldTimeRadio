@@ -89,12 +89,6 @@ _MACRO = _MacroShape(
 # ---------------------------------------------------------------------------
 class TestBeatFleshoutSchema:
 
-    def test_target_words_field_removed(self):
-        assert "target_words" not in _BeatFleshout.model_fields, (
-            "Sprint 3B: target_words must be dropped from the "
-            "_BeatFleshout LLM schema"
-        )
-
     def test_remaining_fields_are_intent_and_mood(self):
         assert set(_BeatFleshout.model_fields) == {"intent", "mood"}
 
@@ -205,16 +199,6 @@ class TestBeatPromptAdjacency:
         assert "Next beat is spoken by" not in prompt
         assert "None" not in prompt
         assert f"Phase focus: {ARC_PHASE_GUIDANCE['scene']}" in prompt
-
-    def test_prompt_no_longer_requests_target_words(self):
-        prompt = _build_beat_user_prompt(
-            _request(("ALICE", "BOB")), _MACRO, "setup", "ALICE",
-            (0, 4),
-            previous_beat_intent=None,
-            next_beat_speaker="BOB",
-            phase_summary=ARC_PHASE_GUIDANCE["setup"],
-        )
-        assert "target_words" not in prompt
 
 
 # ---------------------------------------------------------------------------

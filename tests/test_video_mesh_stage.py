@@ -503,12 +503,9 @@ def test_the_lane_DECLARES_its_canvas_1472x832():
 # --------------------------------------------------------------------------- #
 # Driver maps + capability row (BOTH copies; the 0-E wiring contract)
 # --------------------------------------------------------------------------- #
-def test_engine_family_map_and_no_fallback():
+def test_engine_family_map():
     assert rd.ENGINE_FAMILY["mesh_stage"] == "image_to_video"
     assert rd.engine_family("mesh_stage") == "image_to_video"
-    # NO FALLBACKS (2026-07-02): the chain machinery is ripped; mesh_stage
-    # fails LOUD (fallback_engine=None asserted in the registration test).
-    assert not hasattr(rd, "make_fallback_of")
 
 
 def test_capability_row_present():

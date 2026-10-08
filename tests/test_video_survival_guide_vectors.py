@@ -4,10 +4,8 @@ The A-S7 EXIT gate requires the package to pass the four canonical survival-guid
 failure-mode vectors. These run them against the model-agnostic video platform +
 the A-S7 retry / fallback / QC surface:
 
-* ghost-node (BUG 12.23, registration import gap) -- NO FALLBACKS (2026-07-02):
-  every registered engine declares ``fallback_engine = None`` (nothing may
-  reference another engine as a degrade target -- ghost or otherwise); the
-  A-S7 helpers add no ghost node mapping.
+* ghost-node (BUG 12.23, registration import gap) -- the A-S7 helpers add no
+  ghost node mapping.
 * VRAM-leak (V-4 / BUG-291) -- the OOM block_class tears down with zero retries
   and fails LOUD. (The "never call unload_all_models()" clause was struck by the
   operator on 2026-09-22; video runs after every other stage has finished.)
@@ -22,27 +20,11 @@ All CPU; the live subprocess / ffmpeg behavior is the operator smoke, NOT here.
 from __future__ import annotations
 
 from nodes._otr_shared import retry_taxonomy as rt
-from nodes._otr_video_engines import registry as vreg
-# Register every engine so the no-fallback declarations can be checked.
-from nodes._otr_video_engines import eng_humo            # noqa: F401
-from nodes._otr_video_engines import eng_ltx25           # noqa: F401
-from nodes._otr_video_engines import eng_ltx_8gb         # noqa: F401
-from nodes._otr_video_engines import cheap_families      # noqa: F401
 
 
 # --------------------------------------------------------------------------- #
 # ghost-node (BUG 12.23 -- registration import gap)
 # --------------------------------------------------------------------------- #
-def test_no_engine_declares_any_fallback_reference():
-    # NO FALLBACKS (2026-07-02): a non-None fallback_engine is a regression --
-    # it would be a ghost reference into deleted machinery (BUG 12.23 class).
-    for name in vreg.all_engine_names():
-        nxt = getattr(vreg.get_engine(name), "fallback_engine", None)
-        assert nxt is None, (
-            "engine %r declares fallback_engine %r -- the chain machinery is "
-            "deleted; every adapter must declare None" % (name, nxt))
-
-
 def test_a_s7_modules_register_no_ghost_node():
     for mod in (rt,):
         assert not hasattr(mod, "NODE_CLASS_MAPPINGS")

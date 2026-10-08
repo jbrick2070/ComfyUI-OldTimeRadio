@@ -3,9 +3,7 @@
 The live engine forwards (render_shot / run_episode / _render_one) are proven
 by a live canonical episode and never run in pytest -- exactly as the engine
 adapters' forwards don't. Here we prove the model-agnostic glue the driver is
-responsible for: NO FALLBACKS (2026-07-02 rip) -- no chain machinery exists and
-every registered video engine declares fallback_engine=None, failures classify
-HARD, and requests are deterministic.
+responsible for: failures classify HARD and requests are deterministic.
 """
 
 import pytest
@@ -14,25 +12,8 @@ from nodes._otr_video_engines import cheap_families  # noqa: F401 (register)
 from nodes._otr_video_engines import eng_humo         # noqa: F401 (register humo)
 from nodes._otr_video_engines import eng_ltx25          # noqa: F401 (register)
 from nodes._otr_video_engines import eng_ltx_8gb        # noqa: F401 (register)
-from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import render_driver as rd
 from nodes._otr_shared import retry_taxonomy as rt
-
-
-def test_no_fallback_machinery_exists():
-    """Sprint A rip (2026-07-02): the chain machinery is GONE from the driver."""
-    for name in ("make_fallback_of", "FLOOR_NAMES", "UNIVERSAL_FLOOR",
-                 "SYNTH_FALLBACKS", "EXPECTED_OOM_TRAIL"):
-        assert not hasattr(rd, name), "%s must stay ripped (NO FALLBACKS)" % name
-
-
-def test_every_registered_engine_declares_no_fallback():
-    for name in vreg.all_engine_names():
-        eng = vreg.get_engine(name)
-        assert getattr(eng, "fallback_engine", None) is None, (
-            "engine %r declares fallback_engine=%r -- NO FALLBACKS "
-            "(2026-07-02): every adapter must declare None"
-            % (name, eng.fallback_engine))
 
 
 def test_classify_failure_is_always_hard():

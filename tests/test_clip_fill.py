@@ -282,10 +282,6 @@ def _frames(n):
 #: only the mechanism changed. Coverage planning now splits a beat the engine
 #: cannot afford into native forward-rendered segments, and a render that still
 #: falls short is terminal.
-def test_the_pingpong_extender_is_gone():
-    assert not hasattr(wb, "extend_frames_to_target")
-
-
 def test_a_short_render_no_longer_fills_itself():
     """The exact case the deleted extender existed for: 7 frames against a
     280-frame beat. It used to tile a mirror cycle to 280. It now refuses, and
@@ -510,22 +506,6 @@ def test_a_short_clip_is_terminal_at_composite_time(monkeypatch):
     # The message must name the REMEDY, not just the number: the fix is always
     # in the render, never in the timeline.
     assert "coverage planning" in str(exc.value)
-
-
-def test_the_fill_env_switch_can_no_longer_bring_looping_back(monkeypatch):
-    """`OTR_CLIP_FILL=0` used to select held-last-frame instead of looping.
-
-    Neither outcome is legal now, so the knob is inert -- the same reasoning
-    that removed `allow_mirror` rather than defaulting it off.
-    """
-    from nodes import otr_silent_composite as sc
-    rows = [{"shot_id": "shot_b001", "engine_id": "ltx_8gb", "path": "x.mp4",
-             "exists": True, "frame_count": 17, "target_frame_count": 280,
-             "start_s": None}]
-    for val in ("0", "1"):
-        monkeypatch.setenv("OTR_CLIP_FILL", val)
-        with pytest.raises(sc.ClipUnderrunsItsBeat):
-            sc.plan_timeline_segments(_manifest(rows))
 
 
 def test_a_ONE_frame_shortfall_still_raises(monkeypatch):

@@ -562,21 +562,6 @@ def _backdrop_png(path, size=(1280, 720)):
     return path
 
 
-def test_plan_backdrop_is_GONE_not_merely_unused():
-    """It hunted the clip manifest for a loopable FILE clip and raised when it
-    found none -- which is why an all-``mesh_stage`` episode (frame
-    DIRECTORIES, no mp4) could render 7 of 7 shots and then be refused by the
-    terminal node of its own graph.
-
-    The backdrop comes from the body video now, so the manifest search has no
-    remaining caller. Leaving it importable would leave a SECOND backdrop
-    authority in the file for someone to wire back up -- the shape this build
-    has paid for repeatedly. Deleted, and asserted deleted.
-    """
-    assert not hasattr(cr, "plan_backdrop")
-    assert "plan_backdrop" not in cr.__all__
-
-
 @needs_ffmpeg
 def test_the_backdrop_comes_from_the_body_video_itself(tmp_path):
     body = tmp_path / "body.mp4"

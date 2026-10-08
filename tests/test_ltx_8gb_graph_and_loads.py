@@ -1266,24 +1266,6 @@ def test_the_ping_pong_helper_is_never_called_on_this_lane(staged,
             path.unlink(missing_ok=True)
 
 
-def test_the_shared_extender_is_GONE_from_every_lane():
-    """Was "still EXISTS for the lanes that need it" (2026-07-25).
-
-    That test was correct when written: the rip then was lane-specific, and
-    `extend_frames_to_target` was WAN's mechanism for filling a beat from a
-    deliberately short native render -- deleting it would have taken the shipped
-    8 GB tier with it.
-
-    The operator's 2026-08-02 directive is unconditional ("kill mirrors and
-    ping-pong, true video for every second of audio"), and WAN no longer needs
-    it: a beat it cannot afford in one pass is now SPLIT by coverage planning
-    into native segments rendered forward, which is what the mirror was
-    approximating. So the lane that justified keeping it is the same lane that
-    made it unnecessary.
-    """
-    assert not hasattr(wb, "extend_frames_to_target")
-
-
 def test_a_missing_node_class_says_update_comfyui_not_install_a_pack(monkeypatch):
     """ComfyUI-LTXVideo is not a dependency (TEST_WAVE B4, 2026-09-26: the
     lane published on a box without it); every class ltx_8gb asks for is

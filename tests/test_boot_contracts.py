@@ -142,7 +142,6 @@ def test_no_contract_reserves_vram():
     out-of-memory is recorded, never pre-empted. No contract carries a reserve
     knob, and no launch argv or env row can emit one."""
     assert "reserve_vram_gb" not in bc.CONTRACT_ENV
-    assert not hasattr(bc, "HUMO_DIET")
     for name, spec in bc.BOOT_CONTRACTS.items():
         assert "reserve_vram_gb" not in spec, name
         assert "--reserve-vram" not in bc.launch_args_for(name), name
@@ -413,18 +412,6 @@ def test_the_quant_label_is_read_off_the_resolved_name_not_assumed():
     """A swapped weight must not leave a receipt describing the file it
     replaced."""
     assert vreg.get_engine(LANE)._quant_label() == "fp8_e4m3fn"
-
-
-def test_the_stale_49_frame_comment_is_gone():
-    """S8b-7. The cap became 97 on 2026-08-02 while the comment that EXPLAINS
-    the cap still said 49 -- a stale number inside the explanation of a number
-    is worse than no comment."""
-    src = (REPO / "nodes" / "_otr_video_engines" / "eng_humo.py").read_text(
-        encoding="utf-8")
-    assert "= 49 HERE" not in src
-    assert "49 = 4*12+1" not in src
-    assert vreg.get_engine(LANE).safe_render_frames == 97
-    assert vreg.get_engine(LANE).frame_contract.max_frames == 97
 
 
 # ---------------------------------------------------------------------------

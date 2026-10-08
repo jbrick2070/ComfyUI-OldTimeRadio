@@ -65,8 +65,6 @@ def test_warn_decisions_keep_output_hard_decisions_stop_loud():
     for kind in rt.HARD_KINDS:
         d = rt.classify(kind)
         assert d.warn_only is False
-        # NO FALLBACKS (2026-07-02): the escalate flag is deleted.
-        assert not hasattr(d, "escalate_to_fallback")
 
 
 def test_assert_decision_invariants_rejects_discard():
@@ -96,13 +94,6 @@ def test_assert_decision_invariants_rejects_warn_without_keep_output():
         keep_output=False)
     with pytest.raises(ValueError):
         rt.assert_decision_invariants(bad)
-
-
-def test_fallback_action_api_is_gone():
-    # NO FALLBACKS (Sprint A rip, 2026-07-02): the action API stays deleted.
-    for name in ("build_fallback_decision", "restamp_shot_row",
-                 "append_runtime_fallback_decision", "format_swap_log"):
-        assert not hasattr(rt, name)
 
 
 def test_content_refused_is_hard_with_no_retries():

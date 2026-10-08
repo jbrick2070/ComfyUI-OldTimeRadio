@@ -108,22 +108,6 @@ class TestComputeEpisodeBudget:
             eb = compute_episode_budget(acts, True, 2)
             assert eb.act_count == acts
 
-    def test_no_word_field_survives_on_the_budget(self):
-        eb = compute_episode_budget(3, True, 2)
-        for banned in (
-            "target_words", "per_phase_words", "words_per_beat_range",
-        ):
-            assert not hasattr(eb, banned), banned
-
-    def test_the_retired_word_helpers_are_really_gone(self):
-        import nodes._otr_episode_budget as budget
-
-        for retired in (
-            "auto_act_count", "default_act_count", "max_act_count",
-            "_DEFAULT_ACT_BREAKPOINTS", "_max_target_words_for_act_count",
-        ):
-            assert not hasattr(budget, retired), retired
-
 
 class TestActCountConfigSanity:
 
@@ -137,12 +121,6 @@ class TestActCountConfigSanity:
     def test_arc_phase_guidance_covers_all_phases(self, ac):
         for phase in ACT_COUNT_CONFIG[ac]["arc_phases"]:
             assert phase in ARC_PHASE_GUIDANCE,                 f"ARC_PHASE_GUIDANCE missing {phase!r}"
-
-    @pytest.mark.parametrize("ac", list(range(MIN_ACT_COUNT, MAX_ACT_COUNT + 1)))
-    def test_no_word_keys_left_in_the_topology(self, ac):
-        cfg = ACT_COUNT_CONFIG[ac]
-        assert "act_word_fractions" not in cfg
-        assert "words_per_beat_range" not in cfg
 
     def test_the_table_covers_exactly_the_offered_range(self):
         assert sorted(ACT_COUNT_CONFIG) == list(

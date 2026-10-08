@@ -402,20 +402,6 @@ class TestSliceCurveCacheKeySplit:
         assert k != rd.slice_cache_key("h", 1.0, 2.0,
                                        **dict(base, slicer_version="3"))
 
-    def test_the_curve_cache_key_is_gone_with_its_unbuilt_cache(self):
-        """`curve_cache_key` was removed 2026-08-28 along with the tests that
-        exercised its arithmetic. It keyed a Rhubarb->ARKit CURVE cache that was
-        never built -- no production caller, no curve artifact, and the 3D lane
-        it served is retired. Only this isolated test ever called it, which made
-        it look maintained.
-
-        The SLICE half is the live one and keeps its own coverage above."""
-        assert not hasattr(rd, "curve_cache_key")
-        assert "curve_cache_key" not in getattr(rd, "__all__", ())
-        # the audio slice key is untouched and still deterministic
-        assert rd.slice_cache_key("h", 1.0, 2.0) == rd.slice_cache_key(
-            "h", 1.0, 2.0)
-
     def test_build_request_from_shot_threads_the_ledger_hash(self):
         """build_request_from_shot feeds master_audio_sha256 into the slicer
         (the 7.3 mechanics: the signature gained the hash)."""

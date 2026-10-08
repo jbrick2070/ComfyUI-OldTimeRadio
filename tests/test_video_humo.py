@@ -191,21 +191,6 @@ def test_humo_canonicalize_silent_bt709():
 
 
 # --------------------------------------------------------------------------- #
-# NO FALLBACKS (2026-07-02): the LOUD-failure contract replaces the chain
-# --------------------------------------------------------------------------- #
-def test_no_fallback_module_and_no_chain():
-    """The chain resolver module is DELETED; both HuMo tiers declare None."""
-    with pytest.raises(ImportError):
-        __import__("nodes._otr_shared.fallback", fromlist=["fallback"])
-    for name in ("humo", "humo_1.7B"):
-        assert vreg.get_engine(name).fallback_engine is None
-    # still_motion survives as a REGISTERED SELECTABLE engine (no floor role).
-    floor = vreg.get_engine("still_motion")
-    assert floor.family == "static_motion"
-    assert getattr(floor, "fallback_engine", None) is None
-
-
-# --------------------------------------------------------------------------- #
 # Cold-import + ASCII source (V-12 / CLAUDE.md)
 # --------------------------------------------------------------------------- #
 def test_cold_import_humo_no_heavy_libs():

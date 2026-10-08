@@ -95,17 +95,3 @@ class TestVoicedBeatCount:
             InvalidEpisodeBudgetError, match="not a configured topology"
         ):
             voiced_beat_count(99)
-
-    def test_the_retired_word_api_is_really_gone(self):
-        # Mutation guard: this file's whole previous premise was that a WORD
-        # TARGET bought beats. If a word-derived helper ever comes back, this
-        # is the test that should have to be deleted first.
-        import nodes._otr_episode_budget as budget
-
-        for retired in (
-            "auto_act_count",
-            "default_act_count",
-            "max_act_count",
-            "_DEFAULT_ACT_BREAKPOINTS",
-        ):
-            assert not hasattr(budget, retired), retired

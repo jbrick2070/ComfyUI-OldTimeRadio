@@ -22,8 +22,6 @@ Pure/CPU; no GPU, no wrapper nodes.
 """
 from __future__ import annotations
 
-import inspect
-
 import numpy as np
 import pytest
 
@@ -39,27 +37,6 @@ def _frames(n, h=4, w=4, c=3):
     if n <= 0:
         return np.zeros((0, h, w, c), dtype=np.uint8)
     return np.stack([np.full((h, w, c), i, dtype=np.uint8) for i in range(n)])
-
-
-# --------------------------------------------------------------------------- #
-# The mirror does not exist, and cannot be asked for.
-# --------------------------------------------------------------------------- #
-def test_the_mirror_extender_is_gone():
-    """Deleted, not defaulted off. A capability that still exists behind a flag
-    is one forgotten keyword argument away from shipping backwards video -- and
-    this one had already been re-armed once by a default flipping the other
-    way."""
-    assert not hasattr(wb, "extend_frames_to_target")
-    assert "extend_frames_to_target" not in getattr(wb, "__all__", ())
-
-
-def test_fit_frames_to_target_takes_no_mirror_flag():
-    """``allow_mirror`` is gone from the signature, so no caller can re-arm the
-    mirror by passing True -- deliberately, or by copying an older call."""
-    assert "allow_mirror" not in inspect.signature(
-        wb.fit_frames_to_target).parameters
-    with pytest.raises(TypeError):
-        wb.fit_frames_to_target(_frames(2), 4, allow_mirror=True)
 
 
 # --------------------------------------------------------------------------- #

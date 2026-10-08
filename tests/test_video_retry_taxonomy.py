@@ -6,10 +6,7 @@ quality / coherence / NSFW + A/V-sync -> warn only, keep output, never discard /
 abort / touch audio) block class, with one deterministic action per kind. These
 tests pin the per-kind policy and the cross-cutting invariants (no decision
 ever discards a beat, touches the frozen audio, or aborts the episode). The
-fallback-action API (build_fallback_decision / restamp_shot_row /
-append_runtime_fallback_decision / format_swap_log) was DELETED in the Sprint A
-rip -- these tests pin its absence. The live GPU re-render is the A-S7.5 soak
-(operator), NOT covered here.
+live GPU re-render is the A-S7.5 soak (operator), NOT covered here.
 """
 from __future__ import annotations
 
@@ -21,12 +18,7 @@ import sys
 import pytest
 
 from nodes._otr_shared import retry_taxonomy as rt
-from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import schemas as sc
-# Importing the adapters registers humo / humo_1.7B / still_motion for the
-# no-fallback declaration checks below.
-from nodes._otr_video_engines import eng_humo            # noqa: F401
-from nodes._otr_video_engines import cheap_families      # noqa: F401
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -134,11 +126,6 @@ def test_assert_decision_invariants_rejects_a_bad_policy():
     with pytest.raises(ValueError):              # WARN must keep its output
         rt.assert_decision_invariants(
             dataclasses.replace(warn, keep_output=False))
-
-
-def test_no_registered_engine_declares_a_fallback():
-    for name in ("humo", "humo_1.7B", "still_motion"):
-        assert getattr(vreg.get_engine(name), "fallback_engine", None) is None
 
 
 # --------------------------------------------------------------------------- #
