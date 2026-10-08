@@ -1,5 +1,10 @@
 # Hardened plan -- finish deleting the voice-route subsystem
 
+**DONE 2026-09-26 (`88211ed2`), proven live -- see
+[GO_FORWARD_PLAN](GO_FORWARD_PLAN.md) section 0.** Kept as the record of
+how the deletion was planned; the `:line` references below are from the
+pre-deletion heads and no longer resolve.
+
 HEAD to build on: current `main`. Written against `e8960496`; every
 `:line` below is from that head and must be re-read before editing.
 Re-grounded 2026-09-25 at `d167f0ab`: the module, the `cast_pools`

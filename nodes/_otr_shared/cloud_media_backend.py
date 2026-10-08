@@ -354,7 +354,8 @@ def _budget_ceiling_from_env():
 def mute_ok_roles() -> frozenset:
     """Roles the operator EXPLICITLY opted down to mute video.
     Operator amendment 2026-07-02: default EMPTY -- audio reactivity is
-    default-on for every video role; ledger stamps MUTE_OPT_DOWN."""
+    default-on for every video role. Parsed here, but no production code
+    reads it yet and nothing stamps MUTE_OPT_DOWN into the ledger."""
     raw = otr_env.get("OTR_VIDEO_MUTE_OK_ROLES", "")
     return frozenset(r.strip() for r in raw.split(",") if r.strip())
 

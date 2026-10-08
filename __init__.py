@@ -331,8 +331,8 @@ _NODE_MODULES = {
     # Additive shell: VideoProbe (usable engines + host caps) -> VideoDirector
     # (per-role A/B/C model + image selectors, Other-Beats clip mode) ->
     # ShotLock (audio-derived clip budget + DAG-validated execution_groups +
-    # M4 per-beat creative derivation; supersedes OTR_VideoPlan). Concrete
-    # engine adapters + the render path land in later windows.
+    # M4 per-beat creative derivation; supersedes OTR_VideoPlan). The engine
+    # adapters and the render path live in nodes/_otr_video_engines/.
     # =========================================================================
     # OTR_VideoProbe RETIRED 2026-08-23 (lean-mean order 5): the manual
     # usable-engines/host-caps report, absent from canonical. Its replacements

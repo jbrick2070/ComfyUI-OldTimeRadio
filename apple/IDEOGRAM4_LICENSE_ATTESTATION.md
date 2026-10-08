@@ -112,9 +112,12 @@ true for AUDIO and false for IMAGES**, and the distinction matters:
   release-gate sidecar and `nodes/cast_lock.py:985` emits a *"non-blocking
   warning (I-8)"*. The gate's three-state rule is real: `True` ships silently,
   `False` warns and still renders, **missing/null fails closed stop-ship**.
-* **Images:** `nodes/_otr_release_gate.py:3-6` scans *"roles, voice-bank
-  entries, audio cache sidecars, and `audio_meta`"* -- **images are not in that
-  list**, and the image ledger row built in
+* **Images:** the release gate's documented scope
+  (`nodes/_otr_release_gate.py:3-6`) is *"roles, voice-bank entries, audio
+  cache sidecars, and `audio_meta`"* -- **images are not in that list**. (That
+  module defines only the `ReleaseReport` dataclass and two helpers; the scan
+  its docstring describes is not implemented there.) The image ledger row
+  built in
   `nodes/otr_image_gen_dispatcher.py:1606-1621` carries `engine_id`,
   `engine_version` and hashes but **no `commercial_clean` field at all**.
 
