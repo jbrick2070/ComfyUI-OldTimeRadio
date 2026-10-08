@@ -4,8 +4,8 @@ docs/2026-07-09-platform-portability-final.md section 1: a platform
 variant = stamped regenerated JSON + its launch-recipe section from ONE canonical;
 the SAME semantic normalizer guards both the generator (stamp time) and
 OTR_WorkflowValidator._assert_stamp (verify time); ratify_before_emit
-refuses emission until the operator clears it; the otr_api stale-variant
-soft skip stays dead.
+refuses emission until the operator clears it; `--check` keeps the otr_api
+stale-variant soft skip dead.
 """
 from __future__ import annotations
 
@@ -290,21 +290,6 @@ def test_validator_runs_cpu_snapshot_on_a_gpu_server(
         bv.GENERATED_BY,
     )
     assert "stamp OK" in msg
-
-
-# ---------------------------------------------------------------------------
-# otr_api: the stale-variant soft skip stays dead
-# ---------------------------------------------------------------------------
-
-def test_otr_api_widget_vector_mismatch_hard_fails(schemas):
-    import otr_api
-
-    wf = {"nodes": [{"type": "OTR_WorkflowValidator", "id": 63,
-                     "widgets_values": ["", True, True]}]}
-    with pytest.raises(ValueError, match="NO soft skip"):
-        otr_api.normalize_stamp_widgets_for_live_schema(wf, schemas)
-    src = (REPO_ROOT / "scripts" / "otr_api.py").read_text(encoding="utf-8")
-    assert "trimming the 3 EMPTY stamp slots" not in src
 
 
 # ---------------------------------------------------------------------------

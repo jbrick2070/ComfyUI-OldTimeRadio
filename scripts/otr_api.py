@@ -1100,32 +1100,6 @@ def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
     return apply_profile(workflow, profile, schemas=schemas)
 
 
-def normalize_stamp_widgets_for_live_schema(workflow: dict, schemas: dict) -> dict:
-    """S5 platform-portability (2026-07-10): the 2026-06-11 stale-server
-    TRIM shim is RETIRED. A widget vector that mismatches the live
-    INPUT_TYPES -- ANY node, stamped or not -- is a HARD FAIL: the old
-    soft-skip could submit a silently-reshaped graph, which is exactly the
-    drift class the variant pipeline exists to kill. Fixes: restart the
-    ComfyUI server (stale class) or regenerate the variant
-    (scripts/build_variants.py)."""
-    for node in workflow.get("nodes", []):
-        if node.get("type") != "OTR_WorkflowValidator":
-            continue
-        try:
-            live = _serialized_slot_names("OTR_WorkflowValidator", schemas)
-        except KeyError:
-            return workflow
-        wv = node.get("widgets_values") or []
-        if len(live) != len(wv):
-            raise ValueError(
-                "node 63 widget vector (%d values) does not match the live "
-                "OTR_WorkflowValidator schema (%d slots). NO soft skip: "
-                "RESTART ComfyUI (stale server class) or regenerate the "
-                "variant (scripts/build_variants.py)." % (len(wv), len(live))
-            )
-    return workflow
-
-
 def queue_snapshot() -> tuple[int, int]:
     """Return (running_count, pending_count) from /queue. Best-effort."""
     try:
