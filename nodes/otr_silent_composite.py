@@ -822,45 +822,6 @@ def timeline_quality_report(manifest, segments):
                          if b["quality_status"] in ("looped_fill", "held_last_frame")]}
 
 
-_FREEZE_RE = None
-
-
-def parse_freezedetect(stderr):
-    """Parse ffmpeg ``freezedetect`` stderr into a list of frozen spans
-    ``[{start, end}]`` (seconds). PURE -- offline-testable. An open
-    freeze_start with no freeze_end (frozen through EOF) yields end=None."""
-    global _FREEZE_RE
-    if _FREEZE_RE is None:
-        import re
-        _FREEZE_RE = re.compile(
-            r"lavfi\.freezedetect\.freeze_(start|end)[:=]\s*([0-9.]+)")
-    spans = []
-    cur = None
-    for tag, val in _FREEZE_RE.findall(stderr or ""):
-        v = float(val)
-        if tag == "start":
-            cur = {"start": v, "end": None}
-            spans.append(cur)
-        elif tag == "end" and cur is not None:
-            cur["end"] = v
-            cur = None
-    return spans
-
-
-def freezedetect_silent(video_path, *, ffmpeg="ffmpeg", noise_db=-60, dur_s=2.0):
-    """Run ffmpeg ``freezedetect`` over the SILENT video only (never the master)
-    and return the parsed frozen spans. Used by the S-A live legibility proof;
-    NOT wired into the default assemble path (it adds a full decode pass).
-    FAIL-SOFT: returns ``[]`` if ffmpeg is unavailable."""
-    fb = _ffmpeg_bin(ffmpeg)
-    if not fb or not os.path.isfile(video_path):
-        return []
-    p = _run([fb, "-hide_banner", "-i", video_path, "-vf",
-              "freezedetect=n=%ddB:d=%s" % (int(noise_db), str(dur_s)),
-              "-map", "0:v:0", "-f", "null", os.devnull])
-    return parse_freezedetect((p.stderr or "") + (p.stdout or ""))
-
-
 def _seg_vf(w, h, fps, start_frame, sharpen=True, mode=None):
     """The per-segment ``-vf`` chain: an optional source trim, then the SHARED
     scale chain (lanczos+unsharp when ``sharpen``), then the tpad last-frame hold.

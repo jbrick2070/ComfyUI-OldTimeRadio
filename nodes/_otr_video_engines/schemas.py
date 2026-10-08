@@ -215,47 +215,6 @@ class VideoRequest(_Forbid):
         return present
 
 
-class AdapterDescriptor(_Forbid):
-    """Static metadata an adapter declares (cold-import-safe, no weights)."""
-
-    engine_id: str
-    adapter_api_version: int = 1
-    family: str
-    roles: tuple = ()
-    required_inputs: tuple = ()
-    optional_inputs: tuple = ()
-    prepare_semantics: str = "none"
-    canonicalizer: Optional[str] = None
-    supports_audio_output: bool = False
-    provides: tuple = ()
-    allowed_consumers: tuple = ()
-    provider_vram_tier: str = "radio"
-    preprocess_manifest: dict = Field(default_factory=dict)
-    dependency_manifest: dict = Field(default_factory=dict)
-    # (requires_mesh_portrait was here -- retired 2026-08-23 with the
-    # character_3d family, lean-mean order 4. Zero declarers, zero carriers in
-    # any YAML/JSON row, and its only reader -- the ImageDirector granularity
-    # lock -- is removed in the same change. extra="forbid" means a stale row
-    # carrying the key now fails LOUD, which is correct: that row was written
-    # against a capability that no longer exists.)
-
-
-class VideoProfileRow(_Forbid):
-    """One row of ``video_profiles.yaml`` (engine x preset policy data)."""
-
-    profile_id: str
-    engine_id: str
-    family: str
-    default_params: dict = Field(default_factory=dict)
-    prepare_semantics: str = "none"
-    provider_vram_tier: str = "radio"
-    dependency_manifest: dict = Field(default_factory=dict)
-    preprocess_manifest: dict = Field(default_factory=dict)
-    license: dict = Field(default_factory=dict)
-    # (the requires_mesh_portrait mirror was here -- retired with the field
-    # above, 2026-08-23.)
-
-
 class ShotRow(_Forbid):
     """One row of ``ledger['video']['shots']``, as ``OTR_ShotLock`` stamps it.
 

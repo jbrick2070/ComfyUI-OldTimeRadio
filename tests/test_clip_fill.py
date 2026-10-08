@@ -581,14 +581,3 @@ def test_a_frame_DIRECTORY_clip_is_still_exempt(monkeypatch, tmp_path):
              "start_s": None}]
     segs, total = sc.plan_timeline_segments(_manifest(rows))
     assert total == 280
-
-
-def test_parse_freezedetect():
-    from nodes import otr_silent_composite as sc
-    stderr = (
-        "[Parsed_freezedetect_0 @ 0x1] lavfi.freezedetect.freeze_start: 1.5\n"
-        "[Parsed_freezedetect_0 @ 0x1] lavfi.freezedetect.freeze_duration: 1.5\n"
-        "[Parsed_freezedetect_0 @ 0x1] lavfi.freezedetect.freeze_end: 3.0\n"
-        "[Parsed_freezedetect_0 @ 0x1] lavfi.freezedetect.freeze_start: 7.2\n")
-    spans = sc.parse_freezedetect(stderr)
-    assert spans == [{"start": 1.5, "end": 3.0}, {"start": 7.2, "end": None}]

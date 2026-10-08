@@ -1,19 +1,10 @@
-"""Pydantic schemas for the image-gen platform (C1) -- ``extra="forbid"`` everywhere.
+"""Vocabulary for the image-gen platform (C1): the granularity modes the
+director offers per role.
 
-Mirrors the video schemas' discipline (a typo'd key is a hard error, never a
-silently-dropped field) but for the reduced ``prompt -> image`` domain. These are
-the contracts at the C->A/B seam: what an image request carries, what a rendered
-still records, and the per-engine config the director emits.
-
-Dependency note: pydantic is imported at module scope (same as the video
-schemas). The cold-import invariant (V-12) bans torch / transformers / diffusers
-at import, not pydantic -- the video schemas already establish that.
+Stdlib only, so importing it keeps the cold-import invariant (V-12: no torch /
+transformers / diffusers at import).
 """
 from __future__ import annotations
-
-from typing import Optional
-
-from pydantic import BaseModel, ConfigDict, Field
 
 
 #: Image generation granularity. ``per_object`` REUSES one image per
@@ -34,56 +25,3 @@ GRANULARITY_MODES: tuple = ("per_object", "per_beat")
 # would have consulted it, seen two legal tokens, and had no way to learn that
 # the real gate accepts four and lives in another module. One vocabulary, one
 # owner -- import from ``role_compat`` if you need the token set.
-
-
-class _Forbid(BaseModel):
-    """Common base: reject unknown keys (extra='forbid') everywhere."""
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class ImageEngineConfig(_Forbid):
-    """The ``IMAGE_ENGINE_CONFIG`` the director resolves per role (spine §J)."""
-
-    engine_id: str
-    role: str
-    granularity: str = "per_object"
-    resolution: tuple = (1024, 1024)
-    enabled: bool = True
-    sidecar_venv: Optional[str] = None
-    custom: bool = False
-
-
-class CanonicalImage(_Forbid):
-    """A rendered still recorded in the ledger (content-addressed on disk).
-
-    ``path`` is ``output/otr/stills/{portrait_content_hash}.png`` (AS-5,
-    never-overwrite). ``portrait_content_hash`` = sha256 of the DECODED pixels so
-    a re-gen yields a new hash and B's mesh cache (keyed on it) invalidates
-    correctly. ``has_alpha`` records straight/premultiplied for the 3D overlay.
-    """
-
-    image_id: str
-    role: str
-    object_id: str
-    path: str
-    width: int = 0
-    height: int = 0
-    image_format: str = "png"
-    engine_id: str = ""
-    engine_version: str = "1"
-    request_hash: str = ""               # the (role,object,prompt,seed,engine) cache key
-    portrait_content_hash: str = ""      # decoded-pixel hash == the file name stem
-    prompt_hash: str = ""
-    provenance: dict = Field(default_factory=dict)
-
-
-class ImageLedgerSection(_Forbid):
-    """The ``ledger['images']`` section the dispatcher writes back."""
-
-    image_revision: int = 1
-    granularity_by_role: dict = Field(default_factory=dict)
-    images: list[CanonicalImage] = Field(default_factory=list)
-    #: request-cache-key -> image_id (dispatch dedup; a changed key -> regen).
-    cache_index: dict = Field(default_factory=dict)
-    warnings: list[str] = Field(default_factory=list)
