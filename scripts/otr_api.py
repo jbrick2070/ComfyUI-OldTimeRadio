@@ -634,7 +634,8 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
                     f"({ntype}): len(wv)={len(wv)} vs "
                     f"len(serialized_slots)={len(serialized_slots)} "
                     f"(linked={linked_widget_count}). Refusing API prompt "
-                    f"conversion."
+                    f"conversion. Fix: restart ComfyUI (stale server class) "
+                    f"or regenerate the variant (scripts/build_variants.py)."
                 )
 
             wv_idx = 0

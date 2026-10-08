@@ -587,7 +587,9 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
                     f"widgets_values length mismatch on node {nid} ({ntype}): "
                     f"len(wv)={len(wv)} vs len(serialized_slots)="
                     f"{len(serialized_slots)} (linked={linked_widget_count}). "
-                    f"Refusing API prompt conversion."
+                    f"Refusing API prompt conversion. Fix: restart ComfyUI "
+                    f"(stale server class) or regenerate the variant "
+                    f"(scripts/build_variants.py)."
                 )
             wv_idx = 0
             for slot_name in serialized_slots:
