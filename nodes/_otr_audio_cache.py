@@ -11,12 +11,10 @@ Why one key and one record:
     (sha256 over the IN_KEY identity fields). The engine never keys on a raw
     widget float; the cache never invents its own key.
   * **One record.** :class:`AudioCacheRecord` is the canonical sidecar shape the
-    impl writes, the release gate (E.5) scans, and the Wave-0 cache-sidecar JSON
-    schema mirrors. Coding both producer and consumer against this dataclass
-    keeps them from drifting.
-  * **Release safety (G0).** Every record carries ``allowed_for_release`` and
-    ``commercial_clean``; the release gate refuses any record that is not
-    releasable or is missing the commercial boolean (fail-closed, I-8).
+    cache writes and the Wave-0 cache-sidecar JSON schema mirrors, so the writer
+    and the schema cannot drift.
+  * **Release facts (G0).** Every record carries ``allowed_for_release`` and
+    ``commercial_clean`` (I-8).
 """
 from __future__ import annotations
 
@@ -49,7 +47,7 @@ class AudioCacheRecord:
     whose version != the build target is re-rendered, Wave 1f). The three
     ``*_version`` fields participate in IS_CHANGED so a projection/template bump
     invalidates cleanly (E.5). ``allowed_for_release`` + ``commercial_clean``
-    feed the release gate (I-8).
+    record the audio's release standing (I-8).
     """
 
     cache_key: str
@@ -111,8 +109,8 @@ def record_from_request(
 ) -> AudioCacheRecord:
     """Build the sidecar record for a resolved request + its rendered audio.
 
-    Pure: copies the identity-relevant fields off the frozen request so the
-    Wave-1f writer and the release-gate scanner share one mapping.
+    Pure: copies the identity-relevant fields off the frozen request, so the
+    Wave-1f writer builds the record in one place.
     """
     return AudioCacheRecord(
         cache_key=cache_key_for(request),

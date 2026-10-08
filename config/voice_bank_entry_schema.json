@@ -60,7 +60,7 @@
     },
     "commercial_clean": {
       "type": "boolean",
-      "description": "I-8 three-state input at the bank layer: true = clean, false = known-gated (non-blocking warning). A missing value is fail-closed at the release gate, not here."
+      "description": "I-8 at the bank layer: true = clean, false = known-gated (non-blocking warning). Required and must be a boolean: a missing or non-boolean value fails the bank load (fail-closed)."
     },
     "quality_tier": {
       "type": "string",

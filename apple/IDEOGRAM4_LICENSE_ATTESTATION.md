@@ -108,16 +108,18 @@ by the driver against the files).** An earlier draft of this section claimed
 enforcement is *"declare-and-record, non-blocking"* across the stack. **That is
 true for AUDIO and false for IMAGES**, and the distinction matters:
 
-* **Audio:** `nodes/_otr_audio_cache.py` carries `commercial_clean` into the
-  release-gate sidecar and `nodes/cast_lock.py:1887` emits a *"non-blocking
-  warning (I-8)"*. The gate's three-state rule is real: `True` ships silently,
-  `False` warns and still renders, **missing/null fails closed stop-ship**.
-* **Images:** the release gate's documented scope
-  (`nodes/_otr_release_gate.py:3-6`) is *"roles, voice-bank entries, audio
-  cache sidecars, and `audio_meta`"* -- **images are not in that list**. (That
-  module defines only the `ReleaseReport` dataclass and two helpers; the scan
-  its docstring describes is not implemented there.) The image ledger row
-  built in
+* **Audio:** `nodes/_otr_audio_cache.py` carries `commercial_clean` into each
+  audio-cache sidecar record and `nodes/cast_lock.py:1887` emits a *"non-blocking
+  warning (I-8)"*. The three-state rule is real, but it is enforced where the
+  flag is read, not by a release scan: `True` ships silently, `False` warns and
+  still renders, and a voice-bank row whose `commercial_clean` is missing or
+  not a boolean fails closed at bank load (`nodes/_otr_voice_bank.py`).
+* **Images:** the release scan that `nodes/_otr_release_gate.py` documented was
+  never wired into production, and the module has been removed (last present at
+  `787ee61e`; its scan function was ripped 2026-09-04, `47bf95d6`, for having no
+  caller). Its documented scope was *"roles, voice-bank entries, audio cache
+  sidecars, and `audio_meta`"* -- **images were never in that list**. The image
+  ledger row built in
   `nodes/otr_image_gen_dispatcher.py:1325-1337` carries `engine_id`,
   `engine_version` and hashes but **no `commercial_clean` field at all**.
 
@@ -126,9 +128,9 @@ scans it. **This is a pre-existing gap, not one Ideogram creates** --
 `flux_gen1` and `sd35_large` are already `commercial_clean = False` image
 engines whose ledger rows carry no flag. But it means this attestation is
 **documentation-only for the image lane**, and it must not be read as an
-enforced control. Adding image provenance to the release scan is a separate,
-explicitly-scoped change; note that doing so naively would trip the fail-closed
-rule on every historical image row.
+enforced control. Building any release scan that covers image provenance is a
+separate, explicitly-scoped change; note that a scan treating a missing
+`commercial_clean` as fail-closed would trip on every historical image row.
 
 The Ideogram adapter still declares `commercial_clean = False`, exactly as its
 image-engine peers do.

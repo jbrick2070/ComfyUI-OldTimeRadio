@@ -21,8 +21,7 @@ original bug because it looks audited. The AST guard makes that unwritable, and
 the negative control below proves the guard actually bites.
 
 ENFORCEMENT STAYS OFF. Nothing here blocks a render; ``gated`` feeds one
-non-blocking warning (I-8). The release gate is a separate, unarmed mechanism
-fed by the profile layer, which was already truthful.
+non-blocking warning (I-8).
 """
 from __future__ import annotations
 

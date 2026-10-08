@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "otr:audio_cache_sidecar/v2",
   "title": "OTR audio cache sidecar",
-  "description": "Metadata sidecar persisted beside each cached audio buffer (plan G0). Mirrors nodes/_otr_audio_cache.AudioCacheRecord field-for-field; the cache key is cache_key == ResolvedVoiceRequest.cache_key (I-6). Only cache_key is required so a partially-populated record still round-trips; the release gate enforces allowed_for_release + a present commercial_clean boolean (I-8). v2 (cloud-audio-cache chunk 2, 2026-08-08) adds actual_sample_rate and provider_model_id for drift forensics against Gemini TTS.",
+  "description": "Metadata sidecar persisted beside each cached audio buffer (plan G0). Mirrors nodes/_otr_audio_cache.AudioCacheRecord field-for-field; the cache key is cache_key == ResolvedVoiceRequest.cache_key (I-6). Only cache_key is required so a partially-populated record still round-trips. v2 (cloud-audio-cache chunk 2, 2026-08-08) adds actual_sample_rate and provider_model_id for drift forensics against Gemini TTS.",
   "type": "object",
   "additionalProperties": true,
   "required": ["cache_key"],
@@ -34,11 +34,11 @@
     },
     "commercial_clean": {
       "type": ["boolean", "null"],
-      "description": "I-8; a null here is fail-closed at the release gate."
+      "description": "I-8: true = clean, false = known-gated; null when the request carried no value."
     },
     "allowed_for_release": {
       "type": "boolean",
-      "description": "G0: the release manifest refuses any record not allowed_for_release."
+      "description": "G0: set from the producing profile's license state (true only for a clean profile)."
     },
     "audio_path": { "type": "string" },
     "audio_sha256": { "type": "string" },
