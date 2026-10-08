@@ -22,6 +22,7 @@ so ``.to("cuda")`` raises -- which means the old code cannot pass them.
 from __future__ import annotations
 
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -255,13 +256,36 @@ def test_bark_first_load_does_not_crash_without_cuda(monkeypatch):
     call (mirrored by this fix) proves the guard shape works; this proves
     the SAME shape was applied to the first-load site too.
 
-    The real load path is driven past the guard and into the actual
-    transformers import/from_pretrained call, which fails for an unrelated,
-    expected reason (no cached model, no network) in this offline test
-    environment -- that failure is allowed. Only an AssertionError (the bug's
-    signature) fails this test.
+    The real load path is driven past the guard and into the model load, where
+    a stand-in ``transformers`` raises a private sentinel from both
+    ``from_pretrained`` targets. No weights are read and no network is touched,
+    so the test costs the same whether or not Bark is cached on the box (the
+    real load it used to drive read the 4.2 GB checkpoint onto the CPU: 234 s
+    in a full-suite run). The sentinel is the assertion: an unguarded
+    ``empty_cache`` raises the AssertionError first and the sentinel never
+    fires, and a first-load path that bailed out before reaching the loader
+    would not raise it either.
     """
     import torch
+
+    # ``_load_bark`` imports the model-loader module between the guard and the
+    # model load, and that module pulls the REAL ``transformers`` in when it is
+    # first imported. Import it now so the stand-in below is only ever seen by
+    # the model load itself, never by an import that would cache it.
+    from nodes import _otr_model_loader  # noqa: F401
+
+    class _ReachedTheModelLoad(Exception):
+        """Raised by the stand-in: the guard was passed and the path got as
+        far as asking transformers for weights."""
+
+    class _StandInLoader:
+        @classmethod
+        def from_pretrained(cls, *args, **kwargs):
+            raise _ReachedTheModelLoad
+
+    stand_in = types.ModuleType("transformers")
+    stand_in.AutoProcessor = _StandInLoader
+    stand_in.BarkModel = _StandInLoader
 
     monkeypatch.setattr(bl, "_BARK_CACHE",
                          {"model": None, "processor": None, "device": None})
@@ -271,13 +295,10 @@ def test_bark_first_load_does_not_crash_without_cuda(monkeypatch):
         raise AssertionError("Torch not compiled with CUDA enabled")
 
     monkeypatch.setattr(torch.cuda, "empty_cache", _raise_not_compiled)
+    monkeypatch.setitem(sys.modules, "transformers", stand_in)
 
-    try:
+    with pytest.raises(_ReachedTheModelLoad):
         bl._load_bark(device="cpu")
-    except AssertionError:
-        raise
-    except Exception:
-        pass  # any later, unrelated failure (no cached model / no network)
 
 
 def test_bark_generate_path_has_no_hardcoded_cuda_literal():
