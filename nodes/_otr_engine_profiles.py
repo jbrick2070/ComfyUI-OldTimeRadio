@@ -240,7 +240,7 @@ class EngineProfileResolver:
     ) -> EngineProfile:
         """Resolve (role, engine[, voice_bank]) -> EngineProfile, FAIL CLOSED.
 
-        Ladder: ``assert_usable`` (registry: gated_by_flag / malformed_config /
+        Ladder: ``assert_usable`` (registry: malformed_config /
         incompatible_profile) -> a profile must exist for (role, engine), else
         malformed_config -> if a voice bank is requested it must be in the
         profile's ``allowed_voice_banks``, else incompatible_profile (this is how

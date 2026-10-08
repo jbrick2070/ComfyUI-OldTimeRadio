@@ -188,7 +188,7 @@ def test_dispatch_fails_closed_with_taxonomy(monkeypatch):
         node.generate(script_json=script, engine="stable_audio_3")  # music-only, not a char voice
     assert wrong_role.value.reason is EngineUsabilityReason.INCOMPATIBLE_PROFILE
 
-    # C6: no GATED_BY_FLAG dispatch case any more -- a registered engine is
+    # C6: no flag-gate dispatch case any more -- a registered engine is
     # selectable (the registry IS the menu). The fail-closed taxonomy here is
     # MALFORMED_CONFIG (unknown engine) + INCOMPATIBLE_PROFILE (wrong role) above.
 

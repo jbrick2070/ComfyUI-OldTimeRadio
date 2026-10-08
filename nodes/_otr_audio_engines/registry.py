@@ -19,7 +19,7 @@ one shared extensible pool.
 Usability is **fail-closed** (plan C-6, "names the missing piece -- never
 crash, never silent swap"). ``assert_usable`` validates that the requested
 engine can actually run for the role and either returns the validated engine
-name or raises :class:`EngineUnusable` carrying one of the five
+name or raises :class:`EngineUnusable` carrying one of the four
 :class:`EngineUsabilityReason` codes. It NEVER silently swaps an opt-in engine
 for the role default -- the byte-identical safety property is provided by the
 shipped workflow defaulting its engine widget to the legacy engine until
@@ -59,18 +59,16 @@ class AudioEngine(Protocol):
 
 
 class EngineUsabilityReason(str, enum.Enum):
-    """The five reasons an engine may be refused for a role (fail-closed).
+    """The four reasons an engine may be refused for a role (fail-closed).
 
     ``assert_usable`` (registry level, no IO) raises ``MALFORMED_CONFIG`` and
-    ``INCOMPATIBLE_PROFILE`` (there is NO GATED_BY_FLAG case -- C6, the
-    registry IS the menu; the enum member survives only for parity). The
-    disk/token reasons (``MISSING_MODEL``, ``MISSING_HF_TOKEN``) require IO
-    and are raised by the profile resolver and the engine adapters, which
-    reuse this same enum + :class:`EngineUnusable` so the taxonomy is
-    single-sourced.
+    ``INCOMPATIBLE_PROFILE`` (there is no flag-gate reason -- C6, the
+    registry IS the menu). The disk/token reasons (``MISSING_MODEL``,
+    ``MISSING_HF_TOKEN``) require IO and are raised by the profile resolver
+    and the engine adapters, which reuse this same enum +
+    :class:`EngineUnusable` so the taxonomy is single-sourced.
     """
 
-    GATED_BY_FLAG = "gated_by_flag"
     MISSING_MODEL = "missing_model"
     MISSING_HF_TOKEN = "missing_hf_token"
     INCOMPATIBLE_PROFILE = "incompatible_profile"
@@ -153,7 +151,7 @@ def assert_usable(name: str, role: str) -> str:
     * ``MALFORMED_CONFIG`` -- no engine named ``name`` is registered.
     * ``INCOMPATIBLE_PROFILE`` -- the engine does not list ``role`` in ``roles``.
 
-    There is NO ``GATED_BY_FLAG`` case (C6 -- the registry IS the menu): a
+    There is no flag gate (C6 -- the registry IS the menu): a
     registered, role-compatible engine is always usable. Disk and token checks
     require IO and are enforced downstream by the profile resolver and the
     engine adapters, not here (the registry does no IO).

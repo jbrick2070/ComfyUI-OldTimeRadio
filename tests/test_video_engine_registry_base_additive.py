@@ -5,7 +5,7 @@ a LOCAL EngineRegistry instance with stub adapters (no global registry mutation,
 no GPU, no model load). Pins the fail-closed contract: register-by-class or
 -instance, default-first role ordering, and assert_usable returning the
 validated name or raising EngineUnusable with the right classified reason
-(MALFORMED_CONFIG / INCOMPATIBLE_PROFILE / GATED_BY_FLAG) -- never a silent swap.
+(MALFORMED_CONFIG / INCOMPATIBLE_PROFILE) -- never a silent swap.
 Pure stdlib + the module under test. UTF-8, no BOM, ASCII-only, SFW.
 """
 from __future__ import annotations
@@ -138,19 +138,18 @@ def test_assert_usable_optin_with_flag_set_ok(monkeypatch):
 
 def test_engine_unusable_carries_classified_fields():
     err = base.EngineUnusable(
-        "humo", "music_visual", base.EngineUsabilityReason.GATED_BY_FLAG,
-        "set OTR_ENABLE_HUMO=1", kind="video")
+        "humo", "music_visual", base.EngineUsabilityReason.MISSING_MODEL,
+        "weights not on disk", kind="video")
     assert err.engine == "humo"
     assert err.role == "music_visual"
-    assert err.reason is base.EngineUsabilityReason.GATED_BY_FLAG
+    assert err.reason is base.EngineUsabilityReason.MISSING_MODEL
     assert err.kind == "video"
     assert "video engine 'humo'" in str(err)
-    assert "gated_by_flag" in str(err)
+    assert "missing_model" in str(err)
 
 
-def test_usability_reason_has_the_five_codes():
+def test_usability_reason_has_the_four_codes():
     assert {r.value for r in base.EngineUsabilityReason} == {
-        "gated_by_flag",
         "missing_model",
         "missing_hf_token",
         "incompatible_profile",

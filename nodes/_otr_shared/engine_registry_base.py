@@ -18,7 +18,7 @@ module re-expresses the pattern as dependency-free, reusable primitives:
   return annotations of the shipped ``AudioEngine(Protocol)`` so
   ``test_protocol_parity`` can prove the video (and later image) protocols are
   structural supersets of the audio core -- the single source of "same shape".
-* :class:`EngineUsabilityReason` -- the five fail-closed reason codes (identical
+* :class:`EngineUsabilityReason` -- the four fail-closed reason codes (identical
   taxonomy to the audio registry, single-sourced here for video + image).
 * :class:`EngineUnusable` -- the classified, never-crash/never-silent-swap error.
 * :class:`EngineRegistry` -- one reusable registry instance per namespace. The
@@ -70,16 +70,15 @@ class EngineUsabilityReason(str, enum.Enum):
     """The reasons an engine may be refused for a role (fail-closed).
 
     Registry-level checks (no IO) raise ``MALFORMED_CONFIG`` and
-    ``INCOMPATIBLE_PROFILE``. ``GATED_BY_FLAG`` is now DEAD -- the flag gate was
-    removed (C2-C6, "registry IS the menu"); the member is retained only so the
-    enum stays identical to the frozen audio taxonomy (protocol-parity). The
-    disk/token reasons (``MISSING_MODEL``, ``MISSING_HF_TOKEN``) require IO and
-    are raised downstream by the profile resolver and the engine adapters,
-    which reuse this same enum + :class:`EngineUnusable` so the taxonomy is
-    single-sourced across audio, video and image.
+    ``INCOMPATIBLE_PROFILE``. There is no flag-gate reason: the flag gate was
+    removed (C2-C6, "registry IS the menu"), and this enum stays identical to
+    the audio taxonomy (protocol-parity). The disk/token reasons
+    (``MISSING_MODEL``, ``MISSING_HF_TOKEN``) require IO and are raised
+    downstream by the profile resolver and the engine adapters, which reuse
+    this same enum + :class:`EngineUnusable` so the taxonomy is single-sourced
+    across audio, video and image.
     """
 
-    GATED_BY_FLAG = "gated_by_flag"   # DEAD: no engine gates on a flag (C2-C6); kept for parity
     MISSING_MODEL = "missing_model"
     MISSING_HF_TOKEN = "missing_hf_token"
     INCOMPATIBLE_PROFILE = "incompatible_profile"
@@ -201,7 +200,7 @@ class EngineRegistry:
         * ``MALFORMED_CONFIG`` -- no engine named ``name`` is registered.
         * ``INCOMPATIBLE_PROFILE`` -- the engine does not list ``role``.
 
-        There is NO ``GATED_BY_FLAG`` case (C2-C6 -- the registry IS the menu): a
+        There is no flag gate (C2-C6 -- the registry IS the menu): a
         registered, role-compatible engine is always usable. Disk and token checks
         require IO and are enforced downstream (this method does no IO).
         """

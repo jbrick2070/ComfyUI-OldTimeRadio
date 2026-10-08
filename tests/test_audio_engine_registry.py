@@ -89,9 +89,9 @@ def test_assert_usable_optin_runs_when_flag_on(monkeypatch):
     assert R.assert_usable("stub_optin", "stub_role") == "stub_optin"
 
 
-def test_usability_reason_taxonomy_is_exactly_five():
+def test_usability_reason_taxonomy_is_exactly_four():
     assert {r.value for r in R.EngineUsabilityReason} == {
-        "gated_by_flag", "missing_model", "missing_hf_token",
+        "missing_model", "missing_hf_token",
         "incompatible_profile", "malformed_config",
     }
 

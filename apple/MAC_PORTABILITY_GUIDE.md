@@ -1433,8 +1433,8 @@ That covers every knob that binds: the loader-name and path overrides
 changed, you almost certainly set it on the wrong process.
 
 **`ENABLE_FLAG` constants gate nothing.** Every registered engine sets
-`requires_flag = None`, `EngineUsabilityReason.GATED_BY_FLAG` is documented
-dead, and `tests/test_registry_is_the_menu_guard.py` asserts that no registered
+`requires_flag = None`, `EngineUsabilityReason` has no flag-gate member, and
+`tests/test_registry_is_the_menu_guard.py` asserts that no registered
 engine carries a live flag. If an engine refuses, the reason is in its
 `assert_usable` message, not a missing opt-in.
 
