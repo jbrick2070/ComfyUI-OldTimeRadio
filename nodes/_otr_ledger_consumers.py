@@ -199,31 +199,6 @@ def voice_assignments_from_cast(led: dict) -> dict:
     return out
 
 
-# S25/MG-3 (BUG-LOCAL-213). Enum the music writeback may stamp.
-#
-# DOCUMENTATION ONLY SINCE 2026-08-19. Its sole consumer was
-# ``audit_post_freeze_writeback``, deleted on the operator's ruling because it
-# was exported, documented and never called by a single production consumer --
-# its own docstring described a "soft rollout" that reached nobody. The values
-# below are still the truth about what the music writeback stamps, so the
-# frozenset is kept as the written-down contract; it is simply no longer
-# checked by anything. Do not read its presence as enforcement.
-#   ""                       -- unrendered / pre-render state
-#   "ok"                     -- fresh generate, save confirmed
-#   "ok_cache"               -- cache hit at resolve
-#   "error"                  -- _save_wav returned False
-#   "fallback_silence"       -- ImportError + allow_silence_fallback
-#   "fallback_output_shape"  -- short-output guard fired
-ALLOWED_MUSIC_RENDER_STATUS: frozenset = frozenset({
-    "",
-    "ok",
-    "ok_cache",
-    "error",
-    "fallback_silence",
-    "fallback_output_shape",
-})
-
-
 __all__ = [
     "load_ledger",
     "iter_lines",
@@ -231,5 +206,4 @@ __all__ = [
     "speaker_name",
     "voice_preset",
     "voice_assignments_from_cast",
-    "ALLOWED_MUSIC_RENDER_STATUS",
 ]
