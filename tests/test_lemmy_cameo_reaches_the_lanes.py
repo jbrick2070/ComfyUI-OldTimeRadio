@@ -26,24 +26,35 @@ _WRITER_SOURCE = os.path.join(
     "nodes", "OTR_LedgerScriptWriter.py",
 )
 
+#: The resolver calls below keep the default source bank, and with no premise
+#: that bank fetches its source live: about ten science-news feeds over the
+#: network, 3-5 s per call, with a result that depends on what the feeds serve
+#: that day. A typed premise takes the resolver's custom-premise branch, which
+#: reaches the same `lemmy_force` line with no fetch at all.
+_PREMISE = "A lighthouse keeper hears the sea answer back."
+
 
 @pytest.mark.parametrize("choice, expected", [
     ("roll (~11% chance)", None),
     ("always include", True),
     ("never include", False),
 ])
-def test_the_resolver_lands_the_tri_state_under_lemmy_force(choice, expected):
+def test_the_resolver_lands_the_tri_state_under_lemmy_force(
+        choice, expected, monkeypatch):
     """Every consumer reads `resolved["lemmy_force"]`, so that is what the
     resolver owes them -- a tri-state, not the widget's display string."""
-    resolved = _resolve_inputs(lemmy_cameo=choice)
+    # A configured replay manifest outranks the premise (or refuses the bank).
+    monkeypatch.delenv("OTR_SOURCE_SNAPSHOT_MANIFEST", raising=False)
+    resolved = _resolve_inputs(lemmy_cameo=choice, custom_premise=_PREMISE)
 
     assert resolved["lemmy_force"] is expected
 
 
-def test_the_default_is_the_natural_roll():
+def test_the_default_is_the_natural_roll(monkeypatch):
     """Omitting the knob must behave exactly as 'roll', or an old workflow with
     a short widgets_values vector would silently change the cameo rate."""
-    assert _resolve_inputs()["lemmy_force"] is None
+    monkeypatch.delenv("OTR_SOURCE_SNAPSHOT_MANIFEST", raising=False)
+    assert _resolve_inputs(custom_premise=_PREMISE)["lemmy_force"] is None
 
 
 def test_run_forwards_the_cameo_choice_to_the_resolver():
