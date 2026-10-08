@@ -475,11 +475,6 @@ class OutlineRequest:
                 f"{type(self.budget).__name__}={self.budget!r}."
             )
 
-    @property
-    def cast_size(self) -> int:
-        """Back-compat accessor. Reads len(character_cast)."""
-        return len(self.character_cast)
-
 
 # ---------------------------------------------------------------------------
 # Prompts
