@@ -1,0 +1,113 @@
+"""scripts/kill_otr_zombies.ps1 selects ONLY orphaned OTR sidecars.
+
+The script used to kill any python with more than 10 s of CPU, and every
+python at all when nothing listened on :8000 -- which reached the Desktop
+ComfyUI on :8188 and unrelated applications. It now requires a positive OTR
+marker AND a provably dead parent. These tests drive its -InventoryPath test
+mode with a mocked process table; that mode never terminates anything.
+"""
+import json
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "scripts" / "kill_otr_zombies.ps1"
+
+PACK = r"D:\custom_nodes\ComfyUI-OldTimeRadio"
+PY = r'"C:\ComfyUI\.venv\Scripts\python.exe"'
+
+
+def _proc(pid, ppid, name, cmd, created):
+    return {"ProcessId": pid, "ParentProcessId": ppid, "Name": name,
+            "CommandLine": cmd, "CreationDate": created}
+
+
+INVENTORY = [
+    _proc(4, 0, "System", "", "2026-10-08T00:00:00"),
+    _proc(50, 4, "Comfy Desktop.exe", r'"C:\Program Files\Comfy Desktop\Comfy Desktop.exe"', "2026-10-08T07:59:00"),
+    # Desktop ComfyUI on :8188 -- never a target.
+    _proc(100, 50, "python.exe", PY + r' "C:\ComfyUI\main.py" --port 8188', "2026-10-08T08:00:00"),
+    # An orphaned headless ComfyUI (parent gone) is still ComfyUI -- never a target.
+    _proc(211, 990, "python.exe", PY + r' D:\ComfyUI\main.py --port 8000', "2026-10-08T08:30:00"),
+    # Orphaned Chatterbox worker: parent PID no longer exists -> TARGET.
+    _proc(201, 999, "python.exe", PY + " " + PACK + r"\scripts\_otr_chatterbox_worker.py --serve", "2026-10-08T09:00:00"),
+    # IndexTTS2 worker whose ComfyUI parent is alive and older -> live, not a target.
+    _proc(202, 100, "python.exe", PY + " " + PACK + r"\scripts\_otr_indextts2_worker.py", "2026-10-08T09:05:00"),
+    # Worker whose parent PID was recycled by a YOUNGER process -> TARGET.
+    _proc(300, 4, "notepad.exe", r"C:\Windows\notepad.exe", "2026-10-08T10:00:00"),
+    _proc(203, 300, "python.exe", PY + " " + PACK + r"\scripts\_otr_chatterbox_worker.py", "2026-10-08T09:10:00"),
+    # Unrelated orphaned python, and an unrelated busy python -> never targets.
+    _proc(204, 998, "python.exe", PY + r" C:\tools\other_app.py", "2026-10-08T09:00:00"),
+    _proc(206, 50, "pythonw.exe", PY + r" C:\tools\heavy_cpu_job.py", "2026-10-08T08:10:00"),
+    # A Claude / MCP helper is protected even if it matches a worker name.
+    _proc(205, 997, "python.exe", PY + r" C:\Users\u\desktop-commander\_otr_fake_worker.py", "2026-10-08T09:00:00"),
+    # Ambiguous identities are skipped: no creation time, no recorded parent.
+    _proc(207, 995, "python.exe", PY + " " + PACK + r"\scripts\_otr_chatterbox_worker.py", None),
+    _proc(208, 0, "python.exe", PY + " " + PACK + r"\scripts\_otr_indextts2_worker.py", "2026-10-08T09:00:00"),
+    # ffmpeg: OTR path + dead parent -> TARGET; no OTR marker -> never;
+    # OTR path but a live older parent -> not a target.
+    _proc(301, 996, "ffmpeg.exe", r"ffmpeg -y -i C:\Temp\otr_assemble_ab12\seg_001.mp4 -c copy out.mp4", "2026-10-08T09:20:00"),
+    _proc(302, 994, "ffmpeg.exe", r"ffmpeg -i C:\Videos\holiday.mp4 out.mp4", "2026-10-08T09:20:00"),
+    _proc(303, 100, "ffmpeg.exe", r"ffmpeg -i D:\ComfyUI\output\otr\episodes\ep1\a.wav b.wav", "2026-10-08T09:30:00"),
+]
+
+
+def _powershell():
+    if os.name != "nt":
+        pytest.skip("PowerShell 5.1 script")
+    exe = shutil.which("powershell.exe") or shutil.which("powershell")
+    if not exe:
+        pytest.skip("PowerShell is unavailable")
+    return exe
+
+
+def _select(tmp_path, inventory):
+    inv = tmp_path / "inventory.json"
+    inv.write_text(json.dumps(inventory), encoding="utf-8")
+    result = subprocess.run(
+        [_powershell(), "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+         str(SCRIPT), "-InventoryPath", str(inv)],
+        capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
+    lines = [ln for ln in result.stdout.splitlines() if ln.startswith("SELECTED_JSON: ")]
+    assert len(lines) == 1, result.stdout + result.stderr
+    rows = json.loads(lines[0][len("SELECTED_JSON: "):])
+    if isinstance(rows, dict):
+        rows = [rows]
+    return {row["PID"]: row["Kind"] for row in rows}
+
+
+def test_selects_only_orphaned_otr_sidecars(tmp_path):
+    assert _select(tmp_path, INVENTORY) == {
+        201: "otr-worker",
+        203: "otr-worker",
+        301: "otr-ffmpeg",
+    }
+
+
+def test_empty_inventory_selects_nothing(tmp_path):
+    assert _select(tmp_path, []) == {}
+
+
+def test_no_comfy_listener_does_not_widen_selection(tmp_path):
+    # Nothing listens anywhere and every python is busy or orphaned, but
+    # none carries an OTR marker: nothing may be selected.
+    inventory = [
+        _proc(4, 0, "System", "", "2026-10-08T00:00:00"),
+        _proc(401, 993, "python.exe", PY + r" C:\tools\a.py", "2026-10-08T09:00:00"),
+        _proc(402, 4, "python.exe", PY + r" C:\tools\b.py", "2026-10-08T09:00:00"),
+    ]
+    assert _select(tmp_path, inventory) == {}
+
+
+def test_old_heuristics_are_gone():
+    src = SCRIPT.read_text(encoding="utf-8")
+    assert "-gt 10" not in src, "CPU-time targeting must not return"
+    assert "LocalPort 8000" not in src, "a missing :8000 listener must not widen selection"
+    # Test mode must exit before any Stop-Process call can run.
+    test_mode = src.index("if ($InventoryPath) {")
+    assert src.index("exit 0", test_mode) < src.index("Stop-Process")
