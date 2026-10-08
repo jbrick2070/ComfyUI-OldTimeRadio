@@ -343,10 +343,28 @@ def _fake_folder_paths(tmp_path, encoder_name):
     return _FakeFolderPaths
 
 
-def _stage(tmp_path, sizes):
+def _stage(monkeypatch, tmp_path, sizes):
+    """Placeholder files that REPORT the given sizes (MiB) without having them.
+
+    The resolver reads a weight's size through ``os.path.getsize`` and nothing
+    else, so only that call needs to lie. Extending a real file to 12 GB
+    (``truncate``) writes every byte on NTFS and cost ~12 s per test. Only the
+    staged paths are answered; every other path goes to the real function."""
+    real_getsize = os.path.getsize
+    reported = {}
     for name, mb in sizes.items():
-        with open(tmp_path / name, "wb") as fh:
-            fh.truncate(mb * 1024 * 1024)
+        path = tmp_path / name
+        path.write_bytes(b"placeholder")
+        reported[os.path.normcase(str(path))] = mb * 1024 * 1024
+
+    def getsize(path):
+        try:
+            key = os.path.normcase(os.fspath(path))
+        except TypeError:
+            return real_getsize(path)
+        return reported[key] if key in reported else real_getsize(path)
+
+    monkeypatch.setattr(os.path, "getsize", getsize)
 
 
 SIZES = {"enc.safetensors": 5000, "unet.safetensors": 6000,
@@ -360,7 +378,7 @@ def test_on_unified_memory_every_artifact_is_charged(monkeypatch, tmp_path):
     5000 + 6000 + 1000 = 12000. A two-phase answer would be max(5000, 7000) =
     7000, and the gap between them is an entire text encoder -- which is exactly
     the amount by which the machine was under-charged when it died."""
-    _stage(tmp_path, SIZES)
+    _stage(monkeypatch, tmp_path, SIZES)
     monkeypatch.setitem(sys.modules, "folder_paths",
                         _fake_folder_paths(tmp_path, "enc.safetensors"))
     monkeypatch.setattr(mc, "_loader_filenames",
@@ -377,7 +395,7 @@ def test_on_a_discrete_card_the_two_phase_credit_still_applies(monkeypatch,
     credit is correct there and must not be removed by the Metal fix.
 
     max(encoder 5000, resident 6000 + 1000) = 7000."""
-    _stage(tmp_path, SIZES)
+    _stage(monkeypatch, tmp_path, SIZES)
     monkeypatch.setitem(sys.modules, "folder_paths",
                         _fake_folder_paths(tmp_path, "enc.safetensors"))
     monkeypatch.setattr(mc, "_loader_filenames",
