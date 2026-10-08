@@ -319,12 +319,12 @@ class LineRequest:
     # drops the block entirely. Default "" keeps every existing caller
     # and test working unchanged.
     continuity_slice: str = ""
-    # Source grounding (2026-08-04). A pre-rendered, delimited source passage
-    # for this beat, built by _otr_source_grounding and frozen for the whole
-    # call including retries. Internal Python field only -- no ComfyUI node
-    # contract, INPUT_TYPES or widget is involved. Empty string means this
-    # lane has no source to carry, which is the normal case for the
-    # invention banks.
+    # A pre-rendered source passage for this beat, frozen for the whole call
+    # including retries. Its only producer is the cast-coverage repair
+    # (_otr_cast_coverage_repair._source_block_for: a Shakespeare character's
+    # attested first speech). Internal Python field only -- no ComfyUI node
+    # contract, INPUT_TYPES or widget is involved. Empty string means there is
+    # no source to carry, which is every other line the pipeline composes.
     source_block: str = ""
     # ---- Sprint 3 (2026-05-28): arc-aware line generation ----
     # The line composer's previous diet (style + canon + cast + spine +
@@ -856,12 +856,10 @@ def _build_user_prompt(req: LineRequest) -> str:
     )
     parts.append(_format_last_lines(req.last_lines))
 
-    # SOURCE PASSAGE -- the per-line half of source grounding. This route is
-    # the FALLBACK the grouped exchange drops to, and it carried no source at
-    # all before: a grounding fix that reached only the happy path just moved
-    # the guess down here. The block is pre-rendered and delimited by the
-    # caller (_otr_source_grounding.render_source_block) and rides the USER
-    # prompt as quoted DATA, never the system seam.
+    # SOURCE PASSAGE -- supplied only by the cast-coverage repair's fidelity
+    # graft (_otr_cast_coverage_repair), which grounds a repaired line in the
+    # author's own words. The block is pre-rendered by the caller and rides the
+    # USER prompt as quoted DATA, never the system seam.
     #
     # It sits HERE, immediately above WRITE LINE, rather than up with the
     # episode context: a per-line prompt can run many hundreds of tokens, and

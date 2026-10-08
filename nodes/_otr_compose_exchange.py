@@ -286,7 +286,6 @@ def build_exchange_prompt(
     *,
     failure_reasons: Optional[Sequence[str]] = None,
     system_prompt: str,
-    source_block: str = "",
     language_instruction: str = "",
 ) -> List[dict]:
     """Build the chat messages for one exchange over a 2-3 slot group.
@@ -405,32 +404,6 @@ def build_exchange_prompt(
         "",
     ]
 
-    # The source passage rides the USER message as delimited DATA, never the
-    # pack-routed system seam. Two reasons, both load-bearing: the seam is a
-    # static, test-pinned constant that must stay byte-identical, and a source
-    # is quoted material whose imperative sentences ("Come thy ways, Signior")
-    # must never read as direction to the model. It sits BEFORE the slot
-    # instructions so the last thing the model reads is what to write, not
-    # what to read.
-    if source_block and not isinstance(source_block, str):
-        # Fail loud rather than coerce. Passing a SourceSpan or SourceGrounding
-        # here would embed a repr in a live prompt -- and because the repr is
-        # deliberately body-free, the model would receive a description of the
-        # passage instead of the passage, which reads as plausible grounding
-        # while grounding nothing.
-        raise TypeError(
-            f"source_block must be a pre-rendered str from "
-            f"render_source_block, got {type(source_block).__name__}"
-        )
-    if source_block:
-        user_parts.extend([
-            "The passage below is the SOURCE this scene adapts. Carry its "
-            "people, place, period and events; where it gives these "
-            "characters words, carry those words.",
-            source_block,
-            "",
-        ])
-
     user_parts.extend([
         "Write these slots as one exchange:",
         slot_block,
@@ -545,7 +518,6 @@ def _run_once(
     max_new_tokens: int,
     failure_reasons: Optional[Sequence[str]],
     system_prompt: str,
-    source_block: str = "",
     language_instruction: str = "",
 ) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
     """One generate + parse cycle. Returns (parsed_or_None, parse_error).
@@ -564,7 +536,6 @@ def _run_once(
         cast,
         failure_reasons=failure_reasons,
         system_prompt=system_prompt,
-        source_block=source_block,
         language_instruction=language_instruction,
     )
     # LLM slot: creative
@@ -593,7 +564,6 @@ def compose_exchange(
     temperature: float = DEFAULT_EXCHANGE_TEMPERATURE,
     max_new_tokens: int = DEFAULT_EXCHANGE_MAX_NEW_TOKENS,
     system_prompt: str,
-    source_block: str = "",
     language_instruction: str = "",
 ) -> ExchangeResult:
     """Compose one exchange over a 2-3 voiced beat group.
@@ -657,7 +627,6 @@ def compose_exchange(
             max_new_tokens=max_new_tokens,
             failure_reasons=None,
             system_prompt=system_prompt,
-            source_block=source_block,
             language_instruction=language_instruction,
         )
         result.attempts += 1
@@ -699,11 +668,6 @@ def compose_exchange(
         max_new_tokens=max_new_tokens,
         failure_reasons=last_reasons,
         system_prompt=system_prompt,
-        # THE SAME window as the first attempt. Reselecting here would mean
-        # the repair quoted different material than the attempt whose
-        # failure reasons it is answering, and the receipt could no longer
-        # say which passage the accepted line came from.
-        source_block=source_block,
         language_instruction=language_instruction,
     )
     result.attempts += 1
