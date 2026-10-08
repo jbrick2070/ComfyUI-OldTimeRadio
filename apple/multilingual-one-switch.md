@@ -170,7 +170,7 @@ operator heard a woman's voice on a bearded Horatio. The borrow is gated on
 "this language carries zero voices of this gender", not on any selector
 failure: a Spanish woman whose only in-language voice is already on the
 announcer row does NOT borrow (measured: the first cut leaked on eight of
-eight seeds). Stamped `voice_cast_fallback = gender_borrowed_en`. The render
+eight seeds). The report line says "borrowed from English, same gender". The render
 path takes `lang_code` from the episode row, so a borrowed voice still speaks
 with the language's phonemes; the accent is the accepted cost. Do not "fix"
 this back to never-borrow, and do not widen it to any failed draw -- both were

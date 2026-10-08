@@ -101,17 +101,6 @@ def test_every_non_announcer_row_carries_a_voice_ref_id():
         assert cast[cid].get("voice_ref_id"), cid
 
 
-def test_voice_cast_fallback_is_defined_on_every_row_it_considers():
-    from nodes.cast_lock import CastLock
-
-    out = CastLock().lock(
-        script_json=_ledger(_UNSERVABLE_CAST),
-        cast_voice_policy="auto_registry")
-    cast = {e["char_id"]: e for e in json.loads(out[0])["cast"]}
-    assert cast["c1"]["voice_cast_fallback"] == ""
-    assert cast["c2"]["voice_cast_fallback"] == "gender_unservable"
-
-
 @pytest.mark.parametrize("gender", [None, "", "   "])
 def test_unspecified_gender_names_the_real_render_reference_without_changing_identity(gender):
     from nodes.cast_lock import CastLock
@@ -133,7 +122,6 @@ def test_unspecified_gender_names_the_real_render_reference_without_changing_ide
         ref = next(e for e in entries if e.voice_ref_id == row["voice_ref_id"])
         path = vnc._resolve_clone_ref_path(row["voice_engine"], row, 42)
         assert path and path.endswith(ref.ref_path.replace("/", "\\").split("\\")[-1])
-        assert row["voice_cast_fallback"] == "gender_unspecified"
 
 
 def test_the_unservable_row_is_not_refused_or_gender_restricted():
@@ -232,16 +220,3 @@ def test_passing_no_used_set_is_byte_identical_to_before():
                 entries, engine="indextts2", char_id=cid, episode_seed=seed,
                 used=set())
             assert a.voice_ref_id == b.voice_ref_id == c.voice_ref_id
-
-
-def test_announcer_row_reports_a_verdict_even_when_it_cannot_be_cast():
-    """The announcer branch has its own `continue`, so it was the one row the
-    caster touched without leaving a voice_cast_fallback verdict.
-    """
-    from nodes.cast_lock import CastLock
-
-    out = CastLock().lock(
-        script_json=_ledger(_UNSERVABLE_CAST),
-        cast_voice_policy="auto_registry")
-    cast = {e["char_id"]: e for e in json.loads(out[0])["cast"]}
-    assert "voice_cast_fallback" in cast["a1"]

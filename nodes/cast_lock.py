@@ -1101,7 +1101,6 @@ class CastLock:
             row["voice_engine"] = "bark"
             row["voice_ref_id"] = ""
             row["commercial_clean"] = False
-            row["voice_cast_fallback"] = ""
             drawn.append("%s=%s" % (cid, preset))
             if gender in ("male", "female") and delivered != gender:
                 report.append(
@@ -1229,7 +1228,6 @@ class CastLock:
         row["voice_engine"] = "bark"
         row["voice_ref_id"] = ""
         row["commercial_clean"] = False
-        row["voice_cast_fallback"] = ""
         report.append(
             f"bark voices: announcer stamped {preset} "
             f"(excluded {len(taken)} character preset(s))"
@@ -1466,7 +1464,7 @@ class CastLock:
         # caster never reached did not take one.
         stamped_this_lock: set = set()
 
-        def _stamp_row(entry, ref, *, fallback: str = "") -> None:
+        def _stamp_row(entry, ref) -> None:
             """Stamp a cast row, clearing the CLAIMED row's stale cross-engine
             identity in the same operation.
 
@@ -1492,7 +1490,7 @@ class CastLock:
                         "  %s: cleared stale voice identity before re-stamp (%s)"
                         % (entry.get("char_id") or entry.get("name"),
                            ", ".join(cleared)))
-            self._stamp(entry, ref, fallback=fallback)
+            self._stamp(entry, ref)
             stamped_this_lock.add(id(entry))
 
         if (announcer_ref is not None and target_engine == announcer_engine
@@ -1503,17 +1501,6 @@ class CastLock:
             if not isinstance(entry, dict):
                 continue
             char_id = str(entry.get("char_id") or "")
-
-            # Ledger completeness: every row this caster CONSIDERS carries the
-            # field, so a downstream reader never has to tell "cast normally"
-            # apart from "field never written". Set BEFORE the announcer branch,
-            # which has its own `continue` -- an announcer whose engine cannot
-            # serve it is reported NOT cast and would otherwise be the one row
-            # the caster touched without leaving a verdict. _stamp overwrites it;
-            # rows that fall through keep the empty default. preserve_ledger is
-            # deliberately not touched -- that mode's contract is byte-safety,
-            # and a row the caster never ran on has no cast decision to report.
-            entry.setdefault("voice_cast_fallback", "")
 
             if _is_announcer_entry(entry):
                 if announcer_engine == "bark":
@@ -1560,7 +1547,7 @@ class CastLock:
             _recurring_ref, _recurring_miss = _recurring_character_bank_ref(
                 entry, target_engine, bank_entries, language)
             if _recurring_ref is not None:
-                _stamp_row(entry, _recurring_ref, fallback="character_voice")
+                _stamp_row(entry, _recurring_ref)
                 _mark_used(_recurring_ref)
                 gated += 0 if _delivered_commercial_clean(
                     entry, _recurring_ref) else 1
@@ -1737,7 +1724,7 @@ class CastLock:
                     except VoiceCastingError:
                         reused = None
                 if reused is not None:
-                    _stamp_row(entry, reused, fallback="gender_reused_in_lang")
+                    _stamp_row(entry, reused)
                     _mark_used(reused)
                     gated += 0 if _delivered_commercial_clean(
                         entry, reused) else 1
@@ -1768,7 +1755,7 @@ class CastLock:
                     except VoiceCastingError:
                         borrowed = None
                 if borrowed is not None:
-                    _stamp_row(entry, borrowed, fallback="gender_borrowed_en")
+                    _stamp_row(entry, borrowed)
                     _mark_used(borrowed)
                     gated += 0 if _delivered_commercial_clean(
                         entry, borrowed) else 1
@@ -1795,8 +1782,7 @@ class CastLock:
                 if fallback_ref is None:
                     report.append(f"  {char_id}: NOT cast -- {exc}")
                     continue
-                _stamp_row(entry, fallback_ref, fallback=(
-                    "gender_unservable" if gender else "gender_unspecified"))
+                _stamp_row(entry, fallback_ref)
                 _mark_used(fallback_ref)
                 gated += 0 if _delivered_commercial_clean(
                     entry, fallback_ref) else 1
@@ -1871,12 +1857,6 @@ class CastLock:
                          "with a character" % ", ".join(sorted(shared)))
             report.append(line)
 
-        # LEDGER COMPLETENESS FOR THE TIER, and this sweep is why the three fields
-        # can be read as an enumeration downstream. The claimed row can leave the
-        # loop above by several doors -- the hybrid voice-fit, the gender-agnostic
-        # fallback, the ordinary draw -- and a field written at only some of them
-        # is worse than no field at all.
-        #
         if gated:
             report.append(
                 f"auto_registry: {gated} assigned voice(s) are known-gated "
@@ -1981,7 +1961,7 @@ class CastLock:
             # different engine, and a leftover provider id or reference path
             # renders with the wrong voice while nothing reports it.
             _clear_stale_voice_identity(entry)
-            self._stamp(entry, ref, fallback="character_voice")
+            self._stamp(entry, ref)
             changed += 1
             report.append(
                 f"  {entry.get('char_id') or entry.get('name')}: "
@@ -2052,19 +2032,12 @@ class CastLock:
 
     # ------------------------------------------------------------------ #
     @staticmethod
-    def _stamp(entry, ref, *, fallback: str = "") -> None:
-        """Stamp the chosen reference onto a cast entry (I-4 / I-9).
-
-        ``fallback`` records HOW the reference was chosen. It is written on every
-        stamped row, empty string for the ordinary deterministic cast, so a
-        downstream reader never has to distinguish "cast normally" from "field
-        was never written".
-        """
+    def _stamp(entry, ref) -> None:
+        """Stamp the chosen reference onto a cast entry (I-4 / I-9)."""
         entry["voice_ref_id"] = ref.voice_ref_id
         entry["voice_engine"] = ref.engine
         entry["tts_model"] = str(getattr(ref, "engine", "") or "")
         entry["commercial_clean"] = _delivered_commercial_clean(entry, ref)
-        entry["voice_cast_fallback"] = fallback
         # A kokoro / google / elevenlabs stamp must not keep a leftover Bark
         # ``v2/`` preset. Lime 20260917 left Stomp/Tiptoe/Whiskers speaking
         # kokoro while the ledger still named Bark, and the two CastLock

@@ -348,7 +348,6 @@ def test_auto_registry_stamps_genderless_character_without_inventing_gender():
     row = led["cast"][0]
     assert row["voice_ref_id"] and row["voice_engine"] == "kokoro"
     assert not row.get("gender")
-    assert row["voice_cast_fallback"] == "gender_unspecified"
     assert "gender-agnostic reference" in out[2]
 
 

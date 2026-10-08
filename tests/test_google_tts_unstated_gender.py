@@ -80,12 +80,11 @@ def test_a_gender_no_google_voice_carries_takes_the_seeded_draw(google_bank, tok
     in CastLock on a cast row the writer gave gender `other` (c04): no Google
     voice carries it, and the refusal meant for a stated man or woman caught
     it. Any such token now takes the same seeded gender-agnostic draw Kokoro
-    gives it, and the ledger says so."""
+    gives it, and the ledger names the voice it drew."""
     row = {"char_id": "c04", "name": "UNIT NINE", "gender": token,
            "voice_preset": "v2/en_speaker_4"}
     rows = _lock([dict(row), dict(STATED)], seed=11)
     assert rows["c04"].get("voice_ref_id") in google_bank
-    assert rows["c04"].get("voice_cast_fallback") == "gender_unservable"
     again = _lock([dict(row), dict(STATED)], seed=11)
     assert again["c04"]["voice_ref_id"] == rows["c04"]["voice_ref_id"]
     assert google_bank[rows["c02"]["voice_ref_id"]].gender == "male"

@@ -208,12 +208,10 @@ def test_a_gender_the_language_cannot_serve_borrows_english_same_gender():
     # the men are men, from the English pool, and DISTINCT from each other
     for cid in ("c1", "c2"):
         assert rows[cid]["voice_ref_id"] in {"am_adam", "am_liam"}, rows[cid]
-        assert rows[cid]["voice_cast_fallback"] == "gender_borrowed_en"
     assert rows["c1"]["voice_ref_id"] != rows["c2"]["voice_ref_id"]
 
     # a gender the row DOES serve never leaves the language
     assert rows["c3"]["voice_ref_id"] == "ff_siwis"
-    assert rows["c3"]["voice_cast_fallback"] == ""
 
     joined = "\n".join(report)
     assert "borrowed from English, same gender" in joined
@@ -261,7 +259,7 @@ def test_a_gender_the_language_does_serve_never_borrows_english():
     the announcer row.
 
     This pins only that the borrow stays confined: a Spanish woman must NOT be
-    stamped `gender_borrowed_en`. It deliberately does not pin what she gets
+    handed an English voice. It deliberately does not pin what she gets
     instead -- that is the pre-existing path and a separate ruling.
     """
     from nodes.cast_lock import CastLock
@@ -290,8 +288,6 @@ def test_a_gender_the_language_does_serve_never_borrows_english():
             announcer_engine="kokoro", language="es")
         rows = {e["char_id"]: e for e in led["cast"]}
         assert rows["a1"]["voice_ref_id"] == "ef_dora", seed
-        assert rows["c1"]["voice_cast_fallback"] != "gender_borrowed_en", (
-            seed, rows["c1"])
         assert rows["c1"]["voice_ref_id"] != "af_heart", (seed, rows["c1"])
         assert rows["c2"]["voice_ref_id"] in {"em_alex", "em_santa"}, seed
         assert "has no 'es' voice" not in "\n".join(report), seed
@@ -299,8 +295,6 @@ def test_a_gender_the_language_does_serve_never_borrows_english():
         # on the announcer row. Sharing the narrator's voice beats taking a
         # man's -- the old path stamped `em_alex` here and presented MALE.
         assert rows["c1"]["voice_ref_id"] == "ef_dora", (seed, rows["c1"])
-        assert rows["c1"]["voice_cast_fallback"] == "gender_reused_in_lang", (
-            seed, rows["c1"])
 
 
 def test_the_narrator_sharing_a_character_voice_is_reported():
