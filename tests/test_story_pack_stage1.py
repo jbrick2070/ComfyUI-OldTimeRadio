@@ -18,19 +18,12 @@ from nodes import _otr_line_composer as L
 from nodes import _otr_outline as O
 
 REPO = Path(__file__).resolve().parents[1]
-PACK_PATH = REPO / "nodes" / "story_packs" / "media_archive" / "media_restoration_adventure.json"
 
 EXPECTED_SEAMS = frozenset({
     "outline_macro_system", "outline_phase_system", "outline_beat_system",
     "line_composer_system", "exchange_system", "coda_system",
     "announcer_intro_system", "announcer_intro_safe_system", "announcer_outro_system",
 })
-
-
-@pytest.fixture
-def pack():
-    sp._PACK_CACHE.clear()
-    return sp.load_pack(PACK_PATH)
 
 
 # -- (a) byte-identity + (b) exact seam set --------------------------------

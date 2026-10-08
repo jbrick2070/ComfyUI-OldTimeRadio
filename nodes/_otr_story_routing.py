@@ -884,11 +884,10 @@ def user_bank_bundle(source_bank_id: str):
 
 
 def _clear_caches() -> None:
-    """Test hook: reset the routing registry AND both pack caches."""
+    """Test hook: reset the routing registry AND the pack cache."""
     global _REGISTRY, _LOADING
     _REGISTRY = None
     _LOADING = False
-    _sp._PACK_CACHE.clear()
     _sp._PACK_CACHE_WITH_SEAMS.clear()
 
 

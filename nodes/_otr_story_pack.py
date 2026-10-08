@@ -12,15 +12,13 @@ THIS MODULE IS LIVE, and the paragraph here used to say the opposite.
 
 Until 2026-08-28 it read "STAGE 1 IS DORMANT: this module is loaded + tested
 but NOT yet consumed by any production node." The migration it was waiting for
-happened: `_otr_creative_prompt_router.py:76` imports `get_pack_prompt` and
+happened: `_otr_creative_prompt_router.py` imports `get_pack_prompt` and
 the router's own comments name it as the fail-loud boundary for three separate
 lanes ("a lane that lacks them fails LOUD at get_pack_prompt"). The router
 serves the canonical writer, so a claim of dormancy sent every reader looking
 for a caller that was one import away.
 
 `get_pack_prompt` raises on a missing pack -- no hidden fallback.
-`get_pack_prompt_or_none` remains the pre-migration passthrough (None -> the
-caller keeps its Python constant) for seams that have not moved.
 """
 from __future__ import annotations
 
@@ -98,14 +96,9 @@ class StoryPack:
 
 _KNOWN_FIELDS = frozenset(StoryPack.__dataclass_fields__.keys())
 
-# Load-once cache keyed by resolved absolute path (STRICT production-only
-# validation -- load_pack).
-_PACK_CACHE: "dict[str, StoryPack]" = {}
-
-# Stage 2: SEPARATE cache for pipeline-seam-aware loads, keyed by
-# (resolved path, extra_seams). Sharing _PACK_CACHE would poison the strict
-# path: a pack cached under a permissive seam union would later satisfy a
-# strict load_pack call without re-validation (kibitz r2 M1).
+# Load-once cache keyed by (resolved path, extra_seams): a pack validated under
+# one seam union must never satisfy a load under another without re-validation
+# (kibitz r2 M1). Reset by _otr_story_routing._clear_caches.
 _PACK_CACHE_WITH_SEAMS: "dict[tuple[str, frozenset], StoryPack]" = {}
 
 
@@ -192,8 +185,8 @@ def _read_pack_data(p: Path) -> dict:
 def load_pack_with_seams(path, extra_seams: frozenset) -> StoryPack:
     """Stage 2 routing loader: validate prompt_stages against
     PRODUCTION_SEAM_ALLOWLIST | extra_seams (the pack's pipeline-declared
-    seams). SEPARATE cache keyed (path, extra_seams) so the strict load_pack
-    cache is never poisoned by a permissive load. Sole sanctioned production
+    seams). Cached by (path, extra_seams), so a load under one seam union is
+    never answered from another's validation. Sole sanctioned production
     caller: nodes/_otr_story_routing.py (test-pinned)."""
     if not isinstance(extra_seams, frozenset):
         raise StoryPackValidationError(
