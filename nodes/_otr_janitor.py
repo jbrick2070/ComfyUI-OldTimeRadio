@@ -91,8 +91,7 @@ def _entry_is_fresh(p: Path, cutoff: float) -> bool:
     """True when the entry, or anything inside it, is newer than ``cutoff``.
 
     This replaced a helper that stat'ed EVERY file under the entry for its
-    newest mtime and then compared that with the cutoff
-    (tests/test_janitor_fresh_predicate.py keeps it as the oracle).
+    newest mtime and then compared that with the cutoff.
 
     Same verdict under every error rule: an unstat-able entry compares a
     fresh time.time() against the cutoff, exactly as the full walk did -- so
