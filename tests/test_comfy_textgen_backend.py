@@ -28,14 +28,11 @@ def _plan(prompt):
 
 def test_the_manifest_row_is_the_backend_pin():
     """One pin, two readers: the fetch table and the backend must name the same
-    file at the same revision, size and hash, or the download verifies a file the
-    loader then refuses."""
+    file with the same size and hash, or the download verifies a file the loader
+    then refuses. The repo and revision live only in the fetch table."""
     spec = va.MANIFEST[(native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)]
-    assert spec == {"repo_id": native.WEIGHT_REPO,
-                    "filename": native.WEIGHT_FILENAME,
-                    "revision": native.WEIGHT_REVISION,
-                    "size": native.WEIGHT_SIZE,
-                    "sha256": native.WEIGHT_SHA256}
+    assert (spec["filename"], spec["size"], spec["sha256"]) == (
+        native.WEIGHT_FILENAME, native.WEIGHT_SIZE, native.WEIGHT_SHA256)
     assert native.WEIGHT_FILENAME.rsplit("/", 1)[-1] == native.WEIGHT_TOKEN
 
 
@@ -47,9 +44,8 @@ def test_every_native_writer_has_its_manifest_pin():
     for model_id, (filename, size, sha256) in native.NATIVE_WRITER_FILES.items():
         token = filename.rsplit("/", 1)[-1]
         assert native.native_writer_weights(model_id) == ((native.WEIGHT_CATEGORY, token),)
-        assert va.MANIFEST[(native.WEIGHT_CATEGORY, token)] == {
-            "repo_id": native.WEIGHT_REPO, "filename": filename,
-            "revision": native.WEIGHT_REVISION, "size": size, "sha256": sha256}
+        spec = va.MANIFEST[(native.WEIGHT_CATEGORY, token)]
+        assert (spec["filename"], spec["size"], spec["sha256"]) == (filename, size, sha256)
         row = catalog._by_repo_id()[model_id]
         assert row.approx_safetensors_gb == round(size / 2**30, 2)
     native_rows = {m.repo_id for m in catalog._active_curated_models()
@@ -97,7 +93,7 @@ def test_both_slots_request_the_pinned_weight_once():
     assert [(r["category"], r["token"]) for r in requests] == [
         (native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)]
     assert requests[0]["path"] is None
-    assert requests[0]["spec"]["revision"] == native.WEIGHT_REVISION
+    assert requests[0]["spec"] == va.MANIFEST[(native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)]
     assert requests[0]["spec"]["sha256"] == native.WEIGHT_SHA256
 
 
@@ -600,7 +596,7 @@ def _row():
 def test_the_catalog_row_names_this_backend_and_its_pin():
     row = _row()
     assert (row.provider, row.loader_backend) == (native.PROVIDER, native.LOADER_BACKEND)
-    assert row.hf_repo_id == native.WEIGHT_REPO
+    assert row.hf_repo_id == va.MANIFEST[(native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)]["repo_id"]
     assert row.approx_safetensors_gb == round(native.WEIGHT_SIZE / 2**30, 2)
     assert row.context_window == native.WORKING_CONTEXT_CAP
     assert row.implied_quant_policy == "none" and row.requires_auth is False

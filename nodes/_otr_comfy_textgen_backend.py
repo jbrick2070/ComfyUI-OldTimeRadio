@@ -37,12 +37,11 @@ LOADER_BACKEND = "comfy_textgen"
 WEIGHT_CATEGORY = "text_encoders"
 WEIGHT_TOKEN = "gemma4_e2b_it_int8_convrot.safetensors"
 
-#: The exact upstream file, read from the Hub API on 2026-09-26 without a token
-#: (the repo is ungated). ``_otr_visual_assets._PINNED_SOURCES`` carries the same
-#: row; tests/test_comfy_textgen_backend.py holds the two in agreement.
-WEIGHT_REPO = "Comfy-Org/gemma-4"
+#: The upstream file's name, size and hash, read from the Hub API on 2026-09-26
+#: without a token (the repo is ungated). ``_otr_visual_assets._PINNED_SOURCES``
+#: owns the repo and the revision and carries the same row;
+#: tests/test_comfy_textgen_backend.py holds the two in agreement.
 WEIGHT_FILENAME = "text_encoders/gemma4_e2b_it_int8_convrot.safetensors"
-WEIGHT_REVISION = "63d0f7c476756b88910170c1df75e2384ea1af31"
 WEIGHT_SIZE = 5_199_997_904
 WEIGHT_SHA256 = "efeca0fcad2f863e5ed0a75e3af952b72bc963604c1dda6d20aee87a32b17566"
 
@@ -61,10 +60,9 @@ WORKING_CONTEXT_CAP = 8192
 MODEL_ID_E4B = "comfy_native:gemma4-e4b-it-int8-convrot"
 MODEL_ID_12B = "comfy_native:gemma4-12b-int8-convrot"
 
-#: Every Comfy-native writer: dropdown id -> (Hub filename, bytes, sha256), all in
-#: WEIGHT_REPO at WEIGHT_REVISION under WEIGHT_CATEGORY.
-#: ``_otr_visual_assets._PINNED_SOURCES`` carries the same rows; a test holds them
-#: in agreement.
+#: Every Comfy-native writer: dropdown id -> (Hub filename, bytes, sha256), all
+#: under WEIGHT_CATEGORY. ``_otr_visual_assets._PINNED_SOURCES`` names the repo and
+#: revision and carries the same rows; a test holds them in agreement.
 NATIVE_WRITER_FILES = {
     MODEL_ID: (WEIGHT_FILENAME, WEIGHT_SIZE, WEIGHT_SHA256),
     MODEL_ID_E4B: ("text_encoders/gemma4_e4b_it_int8_convrot.safetensors", 8_090_965_702,

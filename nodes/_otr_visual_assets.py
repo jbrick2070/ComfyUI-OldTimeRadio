@@ -67,13 +67,14 @@ _PINNED_SOURCES = (
     # stranger's first episode needs, and a second downloader would be a second
     # thing to get wrong. Separate from the LTX 2.5 Gemma encoder file: the two
     # share a folder, not an identity. Pin read from the Hub API, token-less
-    # (gated False); _otr_comfy_textgen_backend holds the same values.
+    # (gated False); _otr_comfy_textgen_backend holds the same file name, size
+    # and hash.
     ("text_encoders", "Comfy-Org/gemma-4",
      "text_encoders/gemma4_e2b_it_int8_convrot.safetensors",
      "63d0f7c476756b88910170c1df75e2384ea1af31", 5_199_997_904,
      "efeca0fcad2f863e5ed0a75e3af952b72bc963604c1dda6d20aee87a32b17566"),
     # The larger native writers (same repo, same revision; the backend's
-    # NATIVE_WRITER_FILES holds the same values).
+    # NATIVE_WRITER_FILES holds the same file names, sizes and hashes).
     ("text_encoders", "Comfy-Org/gemma-4",
      "text_encoders/gemma4_e4b_it_int8_convrot.safetensors",
      "63d0f7c476756b88910170c1df75e2384ea1af31", 8_090_965_702,

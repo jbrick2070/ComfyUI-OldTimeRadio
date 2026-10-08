@@ -494,16 +494,6 @@ def mood_devices(mood_terms, *, limit: int = 2) -> list[str]:
     return _mood_devices_with_pace(mood_terms, limit=limit)[0]
 
 
-def mood_pace(mood_terms) -> str:
-    """The pace the brief's mood words imply -- ``"slow"`` / ``"fast"`` /
-    ``"neutral"``. Drives the tempo phrase, which is the only musical-time
-    information the model receives.
-
-    Public because the pace is the FACT and the phrase is one rendering of
-    it -- the tests assert on the fact."""
-    return _mood_devices_with_pace(mood_terms, limit=2)[1]
-
-
 def tempo_phrase(mood_terms) -> str:
     """The words that tell the model how fast to play -- dread gets a taut
     sustain where grief gets rubato. Never a BPM number: a background cue

@@ -103,7 +103,6 @@ def test_one_pace_per_cue_a_contradictory_second_device_is_dropped():
     pace agrees."""
     both = P.mood_devices(["folk", "melancholic", "playful"])
     assert both == ["a slow cello line over held minor chords"], both
-    assert P.mood_pace(["folk", "melancholic", "playful"]) == "slow"
     # two SLOW moods still stack -- the rule drops contradictions, not depth
     agree = P.mood_devices(["melancholic", "mysterious"])
     assert len(agree) == 2, agree
@@ -129,7 +128,6 @@ def test_dread_is_slow_and_RIGID_where_grief_is_slow_and_free():
     assert P.tempo_phrase(["tense"]) == "slow tempo, sustained and taut, no rubato"
     assert P.tempo_phrase(["foreboding"]) == "slow tempo, sustained and taut, no rubato"
     assert P.tempo_phrase(["grief"]) == "slow tempo, unhurried, expressive rubato"
-    assert P.mood_pace(["tense"]) == P.mood_pace(["grief"]) == "slow"
     assert len(P.mood_devices(["tense", "grief"])) == 2, "they do not contradict"
 
 
@@ -138,17 +136,17 @@ def test_the_majority_mood_sets_the_pace_not_whichever_word_came_first():
     order, so letting the first decide gave a comedy a rubato lullaby when
     "pastoral" happened to precede "playful"."""
     comedy = ["playful", "merry", "pastoral"]
-    assert P.mood_pace(comedy) == "fast", "two of three are playful"
-    assert P.tempo_phrase(comedy) == "moving tempo, flowing line"
+    assert P.tempo_phrase(comedy) == "moving tempo, flowing line", (
+        "two of three are playful")
     # the same words in a different order reach the same verdict
-    assert P.mood_pace(["pastoral", "playful", "merry"]) == "fast"
+    assert P.tempo_phrase(["pastoral", "playful", "merry"]) == "moving tempo, flowing line"
     # A GENUINE TIE RESOLVES THE SAME WAY BOTH WAYS ROUND (codex,
     # 2026-09-12). It used to fall to whichever word the writer typed
     # first, which is the very thing this test is named after; it now
     # falls to `_PACE_TIE_ORDER`, where the slower reading wins: at four to
     # twelve seconds the fast one is what comes back as a repeating figure.
-    assert P.mood_pace(["melancholic", "playful"]) == "slow"
-    assert P.mood_pace(["playful", "melancholic"]) == "slow"
+    assert P.tempo_phrase(["melancholic", "playful"]) == "slow tempo, unhurried, expressive rubato"
+    assert P.tempo_phrase(["playful", "melancholic"]) == "slow tempo, unhurried, expressive rubato"
 
 
 def test_the_same_moods_give_the_same_pace_and_tempo_in_any_order():
@@ -158,13 +156,15 @@ def test_the_same_moods_give_the_same_pace_and_tempo_in_any_order():
     then asked for heroic's unhurried phrasing.
 
     The device LIST still follows the brief on purpose (see `mood_devices`),
-    so this asserts the two whole-cue facts, not the list."""
+    so this asserts the two whole-cue facts, not the list's order: which
+    devices survive (the pace decides that) and the tempo."""
     for brief in (["heroic", "playful"], ["grief", "tense"],
                   ["tense", "warm", "grand"], ["playful", "merry", "pastoral"],
                   ["melancholic", "playful"], ["moonlit", "dread", "secretive"],
                   ["urgent", "warm"], ["tense", "tense", "grief"],
                   ["grief", "tense", "playful", "grand"]):
-        verdicts = {(P.mood_pace(list(order)), P.tempo_phrase(list(order)))
+        verdicts = {(tuple(sorted(P.mood_devices(list(order), limit=len(order)))),
+                     P.tempo_phrase(list(order)))
                     for order in itertools.permutations(brief)}
         assert len(verdicts) == 1, (brief, verdicts)
 
@@ -173,7 +173,6 @@ def test_the_tempo_may_never_contradict_the_pace():
     """The defect codex found, stated as the invariant it breaks: a FAST
     cue asking for unhurried broad phrasing because a neutral device
     happened to be listed first."""
-    assert P.mood_pace(["heroic", "playful"]) == "fast"
     assert P.tempo_phrase(["heroic", "playful"]) == "moving tempo, flowing line"
     assert P.tempo_phrase(["playful", "heroic"]) == "moving tempo, flowing line"
     # a slow cue never takes the one moving phrase
