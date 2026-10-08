@@ -186,16 +186,15 @@ def roster_owns(identity: str, roster_names: Sequence[str]) -> bool:
     Ownership is normalised EQUALITY, or an identical token set (which absorbs
     word order and title differences: ``DR. JONAS REED`` and ``Reed, Jonas``).
 
-    **SUBSET CONTAINMENT WAS REMOVED, and that is a correction.** It counted a
-    single shared token as ownership of a whole person, so a roster row
-    ``SOM STONE`` silently claimed the foreign identity ``DR. STONE`` and the
-    guard stopped considering it -- a false NEGATIVE wearing the costume of
-    caution. It was justified as protecting the adaptation shape (``MACBETH``
-    against a roster ``LADY MACBETH``), but that protection is not needed:
-    adaptation lanes record no ``selected_concept.cast``, so they supply NO
-    upstream identities and never reach this function with the source's names
-    at all. Where one ever did, the names ARE the roster rows and equality
-    already covers it.
+    **NO SUBSET CONTAINMENT, deliberately.** Counting a single shared token as
+    ownership of a whole person would let a roster row ``SOM STONE`` silently
+    claim the foreign identity ``DR. STONE`` and the guard would stop
+    considering it -- a false NEGATIVE wearing the costume of caution.
+    Protecting the adaptation shape (``MACBETH`` against a roster ``LADY
+    MACBETH``) is not needed: adaptation lanes record no
+    ``selected_concept.cast``, so they supply NO upstream identities and never
+    reach this function with the source's names at all. Where one ever did, the
+    names ARE the roster rows and equality already covers it.
     """
     ident_norm = normalize_text(identity)
     if not ident_norm:

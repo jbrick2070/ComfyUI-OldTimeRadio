@@ -228,15 +228,13 @@ def normalize(fields: RawStoryFields) -> RawStoryFields:
 
 
 #: THE STANDING PREMISE, and the reason `my_story` may sit in the roll pool at
-#: all (operator decision 2026-09-13, superseding the 09-10 build).
+#: all (operator decision 2026-09-13).
 #:
-#: The 09-10 design excluded this bank from automatic selection and enforced it
-#: at parse time, because a roll landing here would "fail at admission every
-#: time" -- true, when the only source was whatever the listener had typed and
-#: a blind run types nothing. This constant removes that premise rather than
-#: arguing with it: a My Story run with every creative field blank falls back
-#: to THIS, so the bank can be drawn like any other and still have something to
-#: write from.
+#: A roll landing here with nothing typed would otherwise "fail at admission
+#: every time", because the only source was whatever the listener had typed
+#: and a blind run types nothing. A My Story run with every creative field
+#: blank therefore falls back to THIS, so the bank can be drawn like any other
+#: and still have something to write from.
 #:
 #: IT LIVES IN CODE, NOT IN A WIDGET VALUE, on purpose. Shipped graphs keep
 #: the Story widgets empty (see tests/test_no_shipped_graph_carries_a_premise.py);
@@ -246,8 +244,7 @@ def normalize(fields: RawStoryFields) -> RawStoryFields:
 #:
 #: Applied at EVERY admission point through `with_default_idea`, never at just
 #: one: the validator and the writer each build a bundle from these fields, and
-#: a digest that disagreed between them would break the draft identity the
-#: 09-10 design is careful about.
+#: a digest that disagreed between them would break the draft identity.
 #:
 #: Anything the listener types overrides it completely. This is a floor, not a
 #: default anyone has to delete.
@@ -337,9 +334,9 @@ def check_selection(
         #
         # A ROLL is different (operator, 2026-09-28): "if the roll chose my
         # story it uses the boxes, ... if the roll chose anything but my story
-        # the boxes are ignored". Story bank ships on the roll, so the old
-        # refusal stopped every randomized run that still had last night's My
-        # Story text in the boxes. The writer logs the ignored boxes where the
+        # the boxes are ignored". Story bank ships on the roll, so refusing here
+        # would stop every randomized run that still had last night's My Story
+        # text in the boxes. The writer logs the ignored boxes where the
         # roll resolves (_otr_writer_inputs._resolve_inputs).
         if filled and not policy.rolled:
             names = ", ".join(FIELD_LABELS[name] for name in filled)

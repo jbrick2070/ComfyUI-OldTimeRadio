@@ -119,14 +119,12 @@ def validate_spoken_structure(beat: Any, line_text: Any) -> ValidationFinding | 
 
 
 def validate_sfw(beat: Any, line_text: Any) -> ValidationFinding | None:
-    """Retired 2026-08-05: always None. Kept so callers/exports do not shift.
+    """Always None: no content guardrails on generated episodes.
 
-    This returned a BLOCKING finding whenever a spoken line matched the
-    profanity / weapon / sexual word list. Deleted by operator directive -- no
-    content guardrails on generated episodes, and on the adaptation lanes the
-    author's own language is carried as written. The symbol survives (it is in
-    ``__all__`` and inside ``validate_line``'s finding chain) so removing the
-    policy does not become an API break in the same change.
+    Operator directive 2026-08-05: on the adaptation lanes the author's own
+    language is carried as written, so no spoken line is blocked for matching
+    a word list. The symbol is kept because it is in ``__all__`` and inside
+    ``validate_line``'s finding chain.
     """
     del beat, line_text
     return None

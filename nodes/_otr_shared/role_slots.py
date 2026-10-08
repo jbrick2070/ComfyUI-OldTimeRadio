@@ -1,11 +1,8 @@
-"""ONE shared role -> video-slot map (Route-A, 2026-06-28 HuMo-14B promotion;
-rip-sfx-broll 2026-07-01: retired_role_a / retired_role_b roles REMOVED;
-2026-07-03: the legacy catch-all video slot + its migration fallback
-RETIRED -- three first-class video slots only).
+"""ONE shared role -> video-slot map: three first-class video slots only.
 
 There are exactly THREE video roles/slots -- announcer, music, character -- each
 with its OWN dedicated slot. This module is the SINGLE source of the role -> slot
-rule, imported identically by the four former duplicate maps so they cannot drift:
+rule, imported identically by the four consumers below so they cannot drift:
 
 * ``OTR_VideoDirector`` (``VIDEO_SLOT_ROLES`` + ``_role_aspects``),
 * ``OTR_ShotLock`` (``build_execution_plan`` engine pick),
@@ -16,8 +13,7 @@ Dependency-free: stdlib + the :class:`Role` enum from :mod:`role_compat`. No
 torch / comfy / numpy at module scope (cold-import clean, V-12).
 
 NO FALLBACKS (operator directive 2026-07-03): character_video resolves ONLY via
-its dedicated ``character_video_model`` slot. The old empty-slot fallback to a
-legacy catch-all video slot is GONE -- an empty character slot
+its dedicated ``character_video_model`` slot -- an empty character slot
 resolves to "" and the Director fails LOUD; an unknown role token always RAISES.
 """
 from __future__ import annotations
@@ -54,10 +50,10 @@ def _engine_id_of(entry) -> str:
 def slot_for_role(role: str) -> str:
     """The dedicated per-role video slot for ``role``.
 
-    NO FALLBACKS (rip-sfx-broll, 2026-07-01): an unknown role RAISES
-    ``ValueError`` -- the historical silent map to the legacy catch-all
-    slot was exactly the kind of fallback that let dead roles ride along
-    unnoticed. A raise here names the bad token so the producer gets fixed.
+    NO FALLBACKS (2026-07-01): an unknown role RAISES ``ValueError`` -- a
+    silent map to a catch-all slot is exactly the kind of fallback that lets
+    dead roles ride along unnoticed. A raise here names the bad token so the
+    producer gets fixed.
     """
     slot = ROLE_TO_VIDEO_SLOT.get(role)
     if slot is None:
@@ -74,9 +70,9 @@ def engine_id_for_role(video_models, role: str) -> str:
 
     The role is validated FIRST via :func:`slot_for_role` (unknown role ->
     ``ValueError``, never a silent lane). Then reads the role's dedicated
-    per-role slot. NO FALLBACK (operator 2026-07-03): the old empty-slot
-    fallback to a legacy catch-all video slot is gone. Each slot
-    value may be a bare engine-id string or a ``{"engine_id": ...}`` dict.
+    per-role slot. NO FALLBACK (operator 2026-07-03): an empty slot is never
+    filled from a catch-all video slot. Each slot value may be a bare
+    engine-id string or a ``{"engine_id": ...}`` dict.
     Returns "" when the slot is absent/empty (the Director fails LOUD on that).
     """
     slot = slot_for_role(role)  # raises on unknown role

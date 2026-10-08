@@ -43,9 +43,9 @@ OUTPUT TREE CONTRACT (operator law 2026-06-11; OH-1):
 
 Every OUTPUT helper below validates its result against that contract
 (``_validate_contract``) and the production write helpers RAISE LOUD on
-an empty/invalid ``episode_id`` -- the silent ``_legacy_*`` fallbacks
-are KILLED. Input/models/log/HF resolvers are exempt (not OTR-output
-paths). Walkers over ``episodes/`` must skip ``_``-prefixed entries
+an empty/invalid ``episode_id``; there is no silent ``_legacy_*`` fallback.
+Input/models/log/HF resolvers are exempt (not OTR-output paths). Walkers over
+``episodes/`` must skip ``_``-prefixed entries
 (``_shared`` is never an episode) -- see ``is_reserved_episode_entry``.
 """
 from __future__ import annotations
@@ -496,35 +496,24 @@ def otr_audio_dir(episode_id: str = "") -> Path:
 
     Holds the procgen mp4, the canonical ``<episode_id>_ledger.json``,
     Bark / Kokoro output wavs, and MusicGen + AudioGen cache files
-    for this episode. (LLMDirector raw-output dumps were removed in
-    voice-path-cleanbreak S23.1 along with the helper that owned
-    them.)
+    for this episode.
 
     The ``episode_id`` argument is REQUIRED: an empty/invalid value
-    RAISES :class:`OtrPathContractError` LOUD (OH-1 -- the
-    ``_legacy_audio`` fallback was removed by the output-tree
-    contract, 2026-06-11).
+    RAISES :class:`OtrPathContractError` LOUD (OH-1).
 
     For ledger auto-pick across all episodes, use
     ``otr_episodes_root()`` and walk ``*/audio/*_ledger.json``
     (skipping ``_``-prefixed entries -- ``is_reserved_episode_entry``).
 
     Cache trade-off (Jeffrey acknowledged 2026-05-02 EVENING):
-    MusicGen + AudioGen used to write SHA-keyed cache files into a
-    single shared ``otr/audio/`` dir so the same prompt across two
-    episodes hit the cache. Per-episode audio dirs lose that
-    cross-episode cache hit -- each episode now re-renders music + sfx
-    even when prompts are identical. Acceptable cost for the cleaner
-    organization; revisit only if cache loss becomes a wallclock pain.
+    Per-episode audio dirs lose the cross-episode cache hit that a single
+    shared ``otr/audio/`` dir gave MusicGen + AudioGen (SHA-keyed cache
+    files, same prompt across two episodes) -- each episode re-renders
+    music + sfx even when prompts are identical. Acceptable cost for the
+    cleaner organization; revisit only if cache loss becomes a wallclock pain.
     """
     eid = _validate_episode_id(episode_id)
     return _validate_contract(otr_episodes_root() / eid / "audio")
-
-
-# S28 cleanbreak: otr_legacy_audio_dir() removed. The pre-BUG-079
-# fallback root (`<output>/old_time_radio/`) was extinct in production
-# — per-episode workspace is the only contract. All callers were
-# extinguished in s28-p1-1 through s28-p1-8 before this deletion.
 
 
 def otr_stills_dir(episode_id: str = "") -> Path:
@@ -533,8 +522,7 @@ def otr_stills_dir(episode_id: str = "") -> Path:
 
     Holds ``full_env_NNNNN_.png`` cast environment portraits and the
     ``radio_bookend_<episode_id>.png`` LTX I2V reference still.
-    An empty/invalid ``episode_id`` RAISES LOUD (OH-1; the
-    ``_legacy_stills`` fallback is gone). The cross-episode
+    An empty/invalid ``episode_id`` RAISES LOUD (OH-1). The cross-episode
     content-addressed pool lives at ``otr_shared_cache_dir()``.
     """
     eid = _validate_episode_id(episode_id)
@@ -544,8 +532,7 @@ def otr_stills_dir(episode_id: str = "") -> Path:
 def otr_portraits_dir(episode_id: str = "") -> Path:
     """Per-episode PASS1 character portrait dir:
     ``<output>/otr/episodes/<episode_id>/portraits/``.
-    An empty/invalid ``episode_id`` RAISES LOUD (OH-1; the
-    ``_legacy_portraits`` fallback is gone).
+    An empty/invalid ``episode_id`` RAISES LOUD (OH-1).
     """
     eid = _validate_episode_id(episode_id)
     return _validate_contract(otr_episodes_root() / eid / "portraits")
@@ -586,31 +573,19 @@ def otr_composited_dir(episode_id: str) -> Path:
     ``otr_scopes_<label>_<ts>.mp4``, written by OTR_SceneAwareScopes and
     read by OTR_PostUpscaleProcgenBlend as its third blend input.
 
-    It was RE-TENANTED deliberately, so read this before adding a third
-    writer. The original tenant was OTR_VideoComposite's
-    ``<episode_id>.mp4``; that node was DELETED 2026-06-07 and nothing
-    has written this tier since 2026-06-06, so the name describes the
-    era, not the occupant. The scopes video moved in under
-    PBUG-20260911-03: it is a RETAINED deliverable that had been living
-    in ``episodes/_shared/tmp``, the janitor-swept scratch tier, behind
-    an ambient system-temp fallback. The episode ROOT is arguably the
-    better semantic home -- the rest of the video chain writes flat
-    there -- but it has no validated helper, and minting one was not on
-    the table. This helper already carries the two guards the fix needs:
+    The ``composited`` name is a misnomer for that occupant, so read this
+    before adding another writer. The scopes video is a RETAINED deliverable
+    (PBUG-20260911-03), so it must not live in ``episodes/_shared/tmp``, the
+    janitor-swept scratch tier. The episode ROOT is arguably the better
+    semantic home -- the rest of the video chain writes flat there -- but it
+    has no validated helper, and minting one was not on the table. This
+    helper already carries the two guards the fix needs:
     ``_validate_episode_id`` (raises on empty, reserved or traversing
-    ids) and ``_validate_contract``. A misnamed but GUARDED home beat an
+    ids) and ``_validate_contract``. A misnamed but GUARDED home beats an
     unguarded one; renaming the tier is a separate, larger change.
 
     NOT swept: the janitor is scoped to ``_shared/tmp`` alone, which is
     the whole reason an episode asset belongs here rather than there.
-
-    HISTORY (queue item 8, 2026-08-08): a standalone OTR_RTXUpscale
-    stage used to sit in between, reading this dir and writing 1080p
-    into a per-episode ``upscaled/`` subdir. That node was ripped and
-    its path helper deleted 2026-08-10 (operator call); the
-    composite now delivers 1080p directly via ``render.composite_w/h``
-    per profile, and per-clip model enhancement happens inside
-    SilentComposite (``nodes/_otr_upscale_engines/``).
     """
     eid = _validate_episode_id(episode_id)
     return _validate_contract(otr_episodes_root() / eid / "composited")
@@ -620,11 +595,9 @@ def otr_state_dir() -> Path:
     """Per-machine OTR runtime-state dir:
     ``<output>/otr/episodes/_shared/state/``.
 
-    BUG-LOCAL-090 (2026-05-04): added so persistent runtime state
-    (news_history.json, node run reports, future per-machine cursors)
-    lives under the user's ComfyUI output tree. MOVED by the
-    output-tree contract (OH-1, 2026-06-11) from the old top-level
-    ``otr/state/`` into the ``episodes/_shared`` system tier -- the
+    Persistent runtime state (news_history.json, node run reports, future
+    per-machine cursors) lives under the user's ComfyUI output tree, in the
+    ``episodes/_shared`` system tier (output-tree contract, OH-1) -- the
     otr/ top level is EXACTLY ``episodes`` + ``obs``. State that's
     per-episode goes under ``otr/episodes/<episode_id>/``.
 
@@ -668,7 +641,7 @@ def otr_runtime_log_read_paths() -> list[Path]:
 
 
 def otr_sidecar_stderr_path(basename: str) -> Path:
-    """Captured stderr for Path-B audio sidecar workers (formerly pack root).
+    """Captured stderr for Path-B audio sidecar workers.
 
     ``OTR_SIDECAR_STDERR_DIR`` overrides the directory; the basename is fixed
     per engine (``_otr_chatterbox_worker.err``, etc.)."""
@@ -695,21 +668,15 @@ def otr_obs_dir() -> Path:
 
     Render chain (one final mp4 per episode lands here):
 
-      1. VideoComposite -> otr/episodes/<ep>/composited/<ep>.mp4
+      1. OTR_SilentComposite -> otr/episodes/<ep>/<ep>_silent.mp4
          (composite intermediate, already at delivery resolution;
          per-clip model enhancement happens inside SilentComposite via
          nodes/_otr_upscale_engines/)
       2. OTR_PostUpscaleProcgenBlend -> otr/obs/<ep>_procgen_blended.mp4
          (final broadcast cut with green-CRT overlay -- this dir)
 
-    HISTORY, because the "one mp4 per episode" rule was won the hard
-    way: a standalone OTR_RTXUpscale stage used to sit between those
-    two steps, and before 2026-05-05 it wrote straight into otr/obs/ --
-    correct while it was the final stage, but once
-    OTR_PostUpscaleProcgenBlend joined the chain (BUG-099 onward) two
-    mp4s landed in obs/ per episode and broke the broadcast-folder
-    contract. Its output was moved under the episode dir, and queue
-    item 8 (2026-08-08) then ripped the node entirely. Intermediates
+    The "one mp4 per episode" rule is load-bearing: a second mp4 landing in
+    obs/ per episode breaks the broadcast-folder contract. Intermediates
     live under their episode; only the broadcast cut lives here.
     """
     pinned = (otr_env.get("OTR_OBS_DIR") or "").strip()
@@ -827,7 +794,6 @@ __all__ = [
     "otr_shared_cache_dir",
     "otr_shared_tmp_dir",
     "otr_audio_dir",
-    # S28 cleanbreak: dropped "otr_legacy_audio_dir".
     "otr_stills_dir",
     "otr_portraits_dir",
     "otr_videos_dir",
@@ -839,6 +805,5 @@ __all__ = [
     "legacy_pack_runtime_log_path",
     "otr_runtime_log_read_paths",
     "otr_sidecar_stderr_path",
-    # director_raw_dump_dir entry removed in voice-path-cleanbreak S23.1
     "comfyui_log_path",
 ]

@@ -270,11 +270,9 @@ class StoryTreatment(BaseModel):
 # P2 -- one act
 # ---------------------------------------------------------------------------
 
-#: Live Gemma misspellings of the spoken-line body key. ``tex`` is the
-#: truncated ``text`` that killed RunPod my_story_act_2 on 2026-09-14
-#: (``lines.10.text Field required``, input dict had ``speaker`` plus
-#: ``tex``). Mapping the leftover string is schema tolerance, not new
-#: dialogue -- the model already wrote the words.
+#: Live Gemma misspellings of the spoken-line body key (``tex`` is a
+#: truncated ``text``). Mapping the leftover string is schema tolerance, not
+#: new dialogue -- the model already wrote the words.
 _SPOKEN_TEXT_ALIASES = ("text", "line", "dialogue", "speech", "content", "tex")
 
 
@@ -647,11 +645,11 @@ def _cast_name_slip(key: str, allowed: "Mapping[str, str]") -> "str | None":
     """The one cast key ``key`` is a slip of, or None.
 
     A draft that is otherwise sound but spells a speaker one letter off
-    ("Storp" for "Stomp", live 2026-09-28) used to go back to the model for a
-    full rewrite of the act; at about a thousand tokens the 12B writer then
-    returned unbalanced JSON twice and the episode died. A near-unique match is
-    corrected here instead. Two cast names equally close, or none close
-    enough, are not guessed: that is a real cast problem and keeps its repair.
+    ("Storp" for "Stomp") is corrected here, not sent back to the model for a
+    full rewrite of the act: at about a thousand tokens the 12B writer can
+    return unbalanced JSON. A near-unique match is corrected. Two cast names
+    equally close, or none close enough, are not guessed: that is a real cast
+    problem and keeps its repair.
     """
     import difflib
 

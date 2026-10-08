@@ -1,12 +1,9 @@
 """
 hf_token.py  --  User-scope HF_TOKEN resolver
 =================================================================
-MOVED 2026-08-23 (lean-mean order 6) from visual/_hf_token.py, unchanged in
-behavior: this was the ONE live startup dependency inside the retired visual/
-POC tree -- the package __init__ calls ensure_hf_token() at load so gated
-models (Gemma, Mistral, FLUX-dev) do not 401 on first download. It lives in
-_otr_shared now because it is exactly that: shared, pure-stdlib startup
-infrastructure with no visual anything about it.
+The package __init__ calls ensure_hf_token() at load so gated models (Gemma,
+Mistral, FLUX-dev) do not 401 on first download. It lives in _otr_shared
+because it is shared, pure-stdlib startup infrastructure.
 =================================================================
 Reads HF_TOKEN from the Windows user environment (HKCU\\Environment)
 because the running ComfyUI process often does not inherit it.

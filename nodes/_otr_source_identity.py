@@ -136,7 +136,7 @@ def _canonical_url(
     -- no `source_url`. That key lives in the sibling rights record built by
     `source_rights_from_unit` / `source_rights_from_scene`. The RSS lanes are
     the other way round: `_rss_source_fetch_result`
-    (`_otr_source_payload.py:604-610`) puts `source_url` INSIDE `source_meta`.
+    (in `_otr_source_payload.py`) puts `source_url` INSIDE `source_meta`.
 
     Reading only `source_meta` therefore returned "" on every public_domain and
     shakespeare episode -- the two banks this code actually runs on -- while

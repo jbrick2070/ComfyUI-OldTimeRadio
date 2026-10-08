@@ -22,27 +22,24 @@ it is a policy, and every policy stays exactly where it was:
 * ``cloud_media_canonical`` raises ``CORRUPT_OUTPUT`` -- partial provider media
   never proceeds.
 
-THREE THINGS THIS FIXES, all of them found by reading the callers rather than
-guessed at:
+THREE THINGS THIS OWNS, so that no caller re-derives them:
 
-1. **Only ``otr_credits_roll`` honoured ``OTR_FFPROBE``.** Every other caller
-   trusted ``PATH`` or a literal ``"ffprobe"``, so on a box where ffmpeg is
-   configured but not on ``PATH`` the credits rendered and the clip-contract
-   proof did not. One resolver, one answer, everywhere.
-2. **The rational frame-rate parse had been re-fixed independently at least
-   three times.** ffprobe answers ``r_frame_rate`` as ``"25/1"`` or
-   ``"30000/1001"``, and ``float("25/1")`` raises -- so every caller that
-   forgot grew its own crash or its own silent zero.
+1. **``OTR_FFPROBE`` is honoured by every caller.** A caller that trusts
+   ``PATH`` or a literal ``"ffprobe"`` fails on a box where ffmpeg is
+   configured but not on ``PATH``: the credits render and the clip-contract
+   proof does not. One resolver, one answer, everywhere.
+2. **The rational frame-rate parse.** ffprobe answers ``r_frame_rate`` as
+   ``"25/1"`` or ``"30000/1001"``, and ``float("25/1")`` raises -- so every
+   caller that forgets grows its own crash or its own silent zero.
 3. **A bare ``"ffprobe"`` in an argv is not a configuration**, it is a hope.
-   It is now the ONE thing this module refuses to treat as a caller's choice.
+   It is the ONE thing this module refuses to treat as a caller's choice.
 
-A COLD INSTALL HAS ffmpeg AND NO ffprobe (2026-09-11). The imageio-ffmpeg wheel
-that requirements.txt installs ships ONE binary, so on a fresh Mac or pod
-``resolve_ffprobe`` answers ``None`` and the first clip probe-back used to end
-the leg. ``probe_json`` now builds the same document from PyAV (a ComfyUI
-core dependency) when no binary resolves -- the fallback section below. The
-policies above are untouched: each caller still decides what "no probe"
-costs; the box simply has no probe far less often.
+A COLD INSTALL HAS ffmpeg AND NO ffprobe. The imageio-ffmpeg wheel that
+requirements.txt installs ships ONE binary, so on a fresh Mac or pod
+``resolve_ffprobe`` answers ``None``; ``probe_json`` therefore builds the same
+document from PyAV (a ComfyUI core dependency) when no binary resolves -- the
+fallback section below. The policies above are untouched: each caller still
+decides what "no probe" costs; the box simply has no probe far less often.
 
 Stdlib only, no ComfyUI, no torch: importing this must never pull a framework
 into memory (invariant V-12, the cold-import test). UTF-8, no BOM, ASCII source.
@@ -181,15 +178,14 @@ def _usable(candidate):
     an ffprobe is a broken install, and the probe call that follows says so far
     more clearly than a guess here could.
 
-    ABSOLUTE IS THE CONTRACT (2026-09-04). This used to accept whatever
-    ``os.path.isfile`` matched, which for a BARE name is resolved against the
-    process cwd: with a file named ``ffmpeg`` beside the server,
-    ``resolve_ffmpeg()`` returned the string ``'ffmpeg'``, and Windows
-    ``CreateProcess`` searches the cwd. A relative answer is now refused
-    outright -- a bare name goes to PATH through :func:`_which_no_cwd`, and a
-    path is honoured only when it is already absolute. Callers that legitimately
-    supply a path (an operator pin, a resolved sibling, a Windows install dir)
-    all supply absolute ones.
+    ABSOLUTE IS THE CONTRACT. Accepting whatever ``os.path.isfile`` matches
+    would let a BARE name resolve against the process cwd: with a file named
+    ``ffmpeg`` beside the server, ``resolve_ffmpeg()`` would return the string
+    ``'ffmpeg'``, and Windows ``CreateProcess`` searches the cwd. A relative
+    answer is therefore refused outright -- a bare name goes to PATH through
+    :func:`_which_no_cwd`, and a path is honoured only when it is already
+    absolute. Callers that legitimately supply a path (an operator pin, a
+    resolved sibling, a Windows install dir) all supply absolute ones.
     """
     if not candidate:
         return None

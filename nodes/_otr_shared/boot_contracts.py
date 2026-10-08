@@ -6,11 +6,9 @@ render time: by the time a beat renders, the server has been up for an hour.
 
 **No contract reserves VRAM (operator, 2026-09-26).** "We need to unload models
 after they are used, and if it OOMs we record it, not artificially create a
-scenario"; "I don't like messing with reserves." The measured reserves this
-module used to carry -- HuMo's 2.921 GiB diet and H3's 12 GiB -- were boot flags
-a user had to set to steer one lane around one measured peak. Both are gone,
-and with them the ``humo_diet`` contract and the reserve knob itself. What a
-contract may still pin is a CORRECTNESS fact (SageAttention silently corrupting
+scenario"; "I don't like messing with reserves." A reserve is a boot flag a user
+has to set to steer one lane around one measured peak, so none is carried here.
+What a contract may pin is a CORRECTNESS fact (SageAttention silently corrupting
 H3), the device (CPU-only), and the 8 GB H3 lab's pinned-memory switch.
 
 So a contract is NAMED here, a workflow row SELECTS one, a launcher APPLIES it,
@@ -23,8 +21,8 @@ happened:
 **The contract rides `launch.boot_contract`, never `launch.extra_args`.** A
 launcher derives argv from the named contract through :func:`launch_args_for`;
 the Windows headless launcher receives the compatible clamp subset through
-``launch.env``. `extra_args` used to be written only into a markdown string, so
-a load-bearing flag placed there changed no process while looking configured
+``launch.env``. `extra_args` is written only into a markdown string, so
+a load-bearing flag placed there changes no process while looking configured
 (lesson L6).
 
 **Enforcement probes the RUNNING SERVER, not the profile text.** A check that
@@ -56,19 +54,19 @@ DEFAULT = "default"
 
 #: The MiniMax H3 boot: Sage-free (Sage silently turns H3 output to noise --
 #: Comfy-Org/ComfyUI#15263, and the per-model KJ probe FAILED on sm_120) and
-#: not CPU-only. Until 2026-09-26 it also held a measured 12 GiB reserve and
-#: pinned memory off (lane 19's receipts); the operator's rule removed both --
-#: an out-of-memory on a stock boot is recorded as a bug, not pre-empted.
+#: not CPU-only. It holds no VRAM reserve and no pinned-memory switch (the
+#: operator's rule): an out-of-memory on a stock boot is recorded as a bug,
+#: not pre-empted.
 H3 = "h3"
 
 #: Physical 8 GB MiniMax H3 lab launch shape: pinned host memory disabled and
 #: Sage forbidden. This names a lab candidate, not a published OTR H3 episode.
 H3_8GB_LAB = "h3_8gb_lab"
 
-#: CPU-only ComfyUI. Several CPU/cloud profiles used to put ``--cpu`` only in
-#: ``launch.extra_args``; that field was rendered into prose but ignored by
-#: every launcher. Naming the process state makes the resolver emit the real
-#: argv, and lets a server booted with it be identified as CPU.
+#: CPU-only ComfyUI. ``--cpu`` placed only in ``launch.extra_args`` is rendered
+#: into prose but ignored by every launcher. Naming the process state makes the
+#: resolver emit the real argv, and lets a server booted with it be identified
+#: as CPU.
 #:
 #: ``--cpu`` is what a machine WITHOUT a GPU launches with, not something a
 #: machine WITH one must give up (operator, 2026-09-30: "allow people with
@@ -423,20 +421,19 @@ def check_engine_against_profile(engine, profile) -> list:
     """Every reason this engine may not run on this profile's boot, as
     sentences. Empty = compatible.
 
-    NOT pure any more, and only on the branch that would otherwise REFUSE
-    (2026-08-26). A production episode leg is submitted to an already-booted
+    NOT pure, and only on the branch that would otherwise REFUSE. A
+    production episode leg is submitted to an already-booted
     server, and ``render_driver.build_episode_render_policy`` builds the profile
     every adapter sees from the ledger's ``video`` section -- four keys, no
     ``launch``. So on a real leg ``contract_for_profile`` ALWAYS answers
     ``default``, whatever the profile JSON declared and however the server was
     actually started.
 
-    That silently bricked every lane declaring a non-default contract: the
-    2026-08-26 soak booted MiniMax H3 correctly and the adapter still rejected
-    itself as
-    INCOMPATIBLE_PROFILE, 9.6 minutes in, having never reached H3 sampling. The
-    weights, the graph and the VRAM envelope were never the problem; the
-    contract identity was dropped in transport.
+    Without the probe that silently bricks every lane declaring a non-default
+    contract: MiniMax H3, booted correctly, would still be rejected as
+    INCOMPATIBLE_PROFILE minutes in, having never reached H3 sampling. The
+    weights, the graph and the VRAM envelope are never the problem; the
+    contract identity is dropped in transport.
 
     So when the profile names NO contract and the engine cannot run the default,
     ask the SERVER what it was really started with before refusing. That is

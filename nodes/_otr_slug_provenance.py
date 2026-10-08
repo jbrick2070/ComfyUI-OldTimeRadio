@@ -1,20 +1,19 @@
 """Provenance for every CONCRETE provider model this pack ships.
 
 WHY THIS EXISTS. `tencent/hy3:free` sat in the OpenRouter dropdown until its
-promo ended and the slug stopped resolving. Chunk A (2026-08-07) fixed that ONE
-lane. The same "concrete version pin, no date, nothing able to notice it went
-stale" shape was left live in six others. This module closes that, and
-`tests/test_slug_provenance.py` enforces it.
+promo ended and the slug stopped resolving. A "concrete version pin, no date,
+nothing able to notice it went stale" is that shape; this module closes it for
+every lane, and `tests/test_slug_provenance.py` enforces it.
 
-WHAT CHANGED 2026-08-10, AND WHY IT HAD TO. The old schema was
-`slug -> (lane, date | UNVERIFIED)`, keyed by the SHIPPED SELECTOR. That guard
-read as a totality claim and was not one: `eng_cloud_image` ships the display
-name `Nano Banana 2 (Gemini 3.1 Flash Image)`, and `cloud_media_invoke.py`
-resolves it at invoke time to the real id `gemini-3.1-flash-image-preview`. The
-guard was green while dating the LABEL and never seeing the id that actually went
-on the wire. Provenance is now keyed by **`(provider_id, authority_lane)`** and
-built from `_otr_shared.slug_inventory`, the same collector the verifier uses, so
-there is no second list to drift.
+WHY THE KEY IS THE WIRE ID, NOT THE SELECTOR. A guard keyed by the SHIPPED
+SELECTOR reads as a totality claim and is not one: `eng_cloud_image` ships the
+display name `Nano Banana 2 (Gemini 3.1 Flash Image)`, and
+`cloud_media_invoke.py` resolves it at invoke time to the real id
+`gemini-3.1-flash-image-preview`. Such a guard is green while dating the LABEL
+and never sees the id that actually goes on the wire. Provenance is keyed by
+**`(provider_id, authority_lane)`** and built from
+`_otr_shared.slug_inventory`, the same collector the verifier uses, so there
+is no second list to drift.
 
 The key is a PAIR because one id can legitimately arrive through two authorities:
 `gemini-3.1-flash-lite-image` is offered directly by `eng_google_image` (BYO key,
@@ -137,18 +136,11 @@ SLUG_PROVENANCE: Dict[Tuple[str, str], ProvenanceRecord] = {
     # --- google_api text -----------------------------------------------------
     # Pointers (`*-latest`) carry no version claim and are excluded from this
     # table entirely, by `is_pointer`.
-    # EMPTIED BY THE EVERGREEN SWEEP (2026-08-10). This lane offers only
-    # `*-latest` pointers now, and a pointer is never dated -- it has no version
-    # claim to go stale. gemini-3.5-flash, gemini-3.1-flash-lite,
-    # gemini-2.5-flash and gemini-2.5-pro were all LIVE in the same catalog run
-    # and were dropped for being pins, not for being dead.
-    # `gemini-2.0-flash` and `gemini-2.0-flash-lite` USED TO SIT HERE. The
-    # 2026-08-10 verifier run found both absent from a completed catalog, so they
-    # were retired from `GOOGLE_API_STABLE_TEXT_MODELS` rather than left in a
-    # dropdown that could only fail at request time. They are gone from this
-    # table too -- provenance describes what the pack SHIPS, and a row for
-    # something no longer offered is the stale-entry defect in the other
-    # direction (`test_provenance_carries_nothing_the_pack_no_longer_ships`).
+    # NO ROWS HERE. This lane offers only `*-latest` pointers, and a pointer is
+    # never dated -- it has no version claim to go stale. Provenance describes
+    # what the pack SHIPS, and a row for something no longer offered is the
+    # stale-entry defect in the other direction
+    # (`test_provenance_carries_nothing_the_pack_no_longer_ships`).
 
     # --- cloud_elevenlabs: its own endpoint was not fetched ------------------------
     ("eleven_multilingual_v2", "cloud_elevenlabs"): _UNSET,
@@ -253,15 +245,10 @@ def has_preview_token(provider_id: str) -> bool:
 # The operator's word for a pointer is EVERGREEN, and it is the better word: the
 # point is not that the slug indirects, it is that it does not die.
 #
-# A concrete version pin is a slug with an expiry date nobody wrote down.
-# `tencent/hy3:free` sat in a dropdown until its promo ended. `gemini-2.0-flash`
-# and `gemini-2.0-flash-lite` sat in the Google slot dropdowns until a catalog
-# fetch on 2026-08-10 showed they were simply gone. Every one of those was found
-# LATE, by a person, after it had already shipped.
-#
-# WHERE IT COULD BE APPLIED, IT WAS. The Google text lane is now three pointers
-# and nothing else, and the OpenRouter lane was already eleven aliases plus one
-# pin.
+# A concrete version pin is a slug with an expiry date nobody wrote down, and
+# it is found LATE, by a person, after it has already shipped
+# (`tencent/hy3:free` sat in a dropdown until its promo ended). So the policy
+# is applied wherever a pointer exists.
 #
 # WHERE IT CANNOT BE, THE REASON IS MEASURED AND WRITTEN DOWN. A policy that
 # empties a working dropdown is not a policy, it is an outage: Google publishes

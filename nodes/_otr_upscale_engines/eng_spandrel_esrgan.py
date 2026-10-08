@@ -35,10 +35,10 @@ from .registry import register
 _LOG = logging.getLogger("OTR.upscale.spandrel_esrgan")
 
 #: Exception types already reported by _resolve_model's folder_paths guard.
-#: That warning used to sit only on load() -- an occasional, explicit call.
-#: model_fingerprint_parts() now calls the same resolver from IS_CHANGED, which
-#: ComfyUI runs on EVERY prompt evaluation, so a persistently broken
-#: folder_paths would emit one warning per evaluation forever. Keyed on the
+#: model_fingerprint_parts() calls the same resolver from IS_CHANGED, which
+#: ComfyUI runs on EVERY prompt evaluation (load() is an occasional, explicit
+#: call), so a persistently broken folder_paths would emit one warning per
+#: evaluation forever. Keyed on the
 #: exception class name: tiny, stable, and bounded (Bug Bible 06.04).
 _RESOLVE_WARNED: set = set()
 _RESOLVE_WARNED_MAX = 32
@@ -117,13 +117,12 @@ class SpandrelEsrgan:
         """Locate the checkpoint. Returns ``(candidates, path_or_None)``.
 
         SINGLE-SOURCED DELIBERATELY. ``load()`` and
-        ``model_fingerprint_parts()`` both need the answer, and before this
-        existed they asked DIFFERENT questions: the loader walked this
-        candidate list while the composite's cache key called
-        ``folder_paths.get_full_path`` alone. On a box where the checkpoint is
-        reachable only through the repo-relative fallback, the loader found it
-        and the cache key did not -- so swapping those weights never
-        invalidated the composite.
+        ``model_fingerprint_parts()`` both need the answer; were they to ask
+        DIFFERENT questions (the loader walking this candidate list while the
+        composite's cache key called ``folder_paths.get_full_path`` alone), a
+        box where the checkpoint is reachable only through the repo-relative
+        fallback would have the loader find it and the cache key not -- so
+        swapping those weights would never invalidate the composite.
 
         Returns a plain tuple rather than a dataclass/NamedTuple on purpose:
         this module imports only stdlib + the registry base, and staying
@@ -141,8 +140,7 @@ class SpandrelEsrgan:
         ``_ignore_error()``, which returns False only for the not-found family
         and re-raises everything else, so a ``PermissionError`` escapes here
         rather than masquerading as absence. That is the behaviour we want and
-        it costs no code -- see ``model_fingerprint_parts`` for why an explicit
-        classification pass was written and then deleted as unreachable.
+        it costs no code (see ``model_fingerprint_parts``).
         """
         raw: list = []
         try:
@@ -223,9 +221,8 @@ class SpandrelEsrgan:
         ``OSError(EIO)`` propagate out of ``is_file()``; ``FileNotFoundError``
         and ``NotADirectoryError`` return False. So ``_resolve_model`` returns
         ``None`` for genuine absence ONLY, and a permission fault has already
-        escaped before we get here. An earlier draft of this method re-stat'ed
-        every candidate to classify the failure itself; that pass was
-        unreachable and was removed rather than kept as reassuring dead code.
+        escaped before we get here, so no explicit classification pass is
+        needed.
 
         No live hashing -- ``_model_sha256`` is the DECLARED constant, folded
         in so that re-pinning it changes the key. What this key can prove is

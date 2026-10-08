@@ -291,11 +291,10 @@ _COMPILED_MOOD_DEVICES = tuple(
     (re.compile(pattern, re.IGNORECASE), device, pace, tempo)
     for pattern, device, pace, tempo in _MOOD_DEVICES)
 
-#: WHICH TEMPO WINS when a brief's devices ask for different ones (codex,
-#: 2026-09-12). They used to be read in the order the BRIEF happened to list
-#: its moods, which is the same order-dependence the majority-pace rule was
-#: written to remove: ["grief","tense"] and ["tense","grief"] are the same
-#: cue and were getting different tempo words.
+#: WHICH TEMPO WINS when a brief's devices ask for different ones. It is a
+#: declared priority, never the order the BRIEF lists its moods in:
+#: ["grief","tense"] and ["tense","grief"] are the same cue and get the same
+#: tempo words.
 #:
 #: The order below is an ARGUMENT, not a measurement, and it is written down
 #: here rather than left implicit in the mood table so that a reader can
@@ -325,8 +324,7 @@ _PACE_TIE_ORDER = ("slow", "fast")
 _PACE_TEMPO = {"slow": _RUBATO, "fast": _MOVING, "neutral": _BROAD}
 
 #: When no mood word maps: still a musical instruction, never a texture, and
-#: never "steady" -- that word asks for exactly the repetition this module
-#: spent 2026-09-12 removing.
+#: never "steady" -- that word asks for the repetition a cue must avoid.
 DEFAULT_DEVICE = "a clear unhurried melody over warm harmony"
 DEFAULT_PACE = "slow"
 
@@ -500,13 +498,10 @@ def tempo_phrase(mood_terms) -> str:
     must not imply a click track.
 
     THE SAME MOODS GIVE THE SAME TEMPO IN ANY ORDER (codex, 2026-09-12).
-    It used to take the first SURVIVING device's tempo, so the answer moved
-    with the brief's word order and could contradict the cue's own pace:
-    ["heroic","playful"] resolved to a FAST cue and then asked for heroic's
-    unhurried phrasing. The tempo now comes from every matching device that
-    AGREES with the winning pace -- including ones the ``limit`` dropped,
-    since the tempo is a property of the brief and not of how many devices
-    fit in the prompt -- ranked by `_TEMPO_PRIORITY`."""
+    The tempo comes from every matching device that AGREES with the winning
+    pace -- including ones the ``limit`` dropped, since the tempo is a
+    property of the brief and not of how many devices fit in the prompt --
+    ranked by `_TEMPO_PRIORITY`."""
     return _mood_devices_and_tempo(mood_terms, limit=2)[1]
 
 
@@ -523,12 +518,10 @@ def _mood_devices_and_tempo(mood_terms, *, limit: int = 2):
     4-to-12-second cue cannot be two paces at once.
 
     NEITHER ARBITRATION MAY READ THE BRIEF'S ORDER (codex, 2026-09-12).
-    Both of them used to, quietly: a tied vote fell to whichever term was
-    listed first, and the tempo came from whichever surviving device was
-    listed first. Both now fall back to a declared constant instead --
-    `_PACE_TIE_ORDER` and `_TEMPO_PRIORITY`. The DEVICE LIST still follows
-    the brief, and that is the one place where its order is signal rather
-    than noise.
+    A tied vote and the tempo each fall back to a declared constant --
+    `_PACE_TIE_ORDER` and `_TEMPO_PRIORITY` -- never to whichever term or
+    device the brief listed first. The DEVICE LIST still follows the brief,
+    and that is the one place where its order is signal rather than noise.
     """
     matched = []
     votes = []

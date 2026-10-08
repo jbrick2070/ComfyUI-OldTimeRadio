@@ -108,21 +108,11 @@ VALID_ASPECTS = frozenset((
 #: The closed activation enum (never a bool, never an expression per spec
 #: section 5). Adding a new token is an operator decision.
 #:
-#: ``when_ltx_i2v_enabled`` WAS REMOVED 2026-08-28 and must not come back. It
-#: was an ad-hoc token invented for exactly one engine, gating on the
-#: ``OTR_ENABLE_LTX_I2V`` env flag, and at mint time it already behaved
-#: identically to ``always`` -- nothing branched on it. That engine now
-#: declares ``required="always"`` like every sibling, and the flag is retired
-#: under the operator ruling "no switches nor flags, all video models request
-#: and ingest stills". A closed enum with a dead member invites a future
-#: declaration nothing honours.
-#:
-#: The talking-face-portrait activation token WAS REMOVED 2026-09-25
-#: (operator ruling): it evaluated a per-engine lip-sync capability hook,
-#: but the sole engine that ever declared that capability (Kling Avatar)
-#: was retired, no other engine was ever wired to it, and no ``still_plan``
-#: row ever set this token. The talking-face still mode is ripped, not
-#: reassigned to another engine.
+#: A closed enum with a dead member invites a future declaration nothing
+#: honours, so there is no ad-hoc per-engine token and none for a capability
+#: no engine declares (operator ruling: "no switches nor flags, all video
+#: models request and ingest stills"). ``when_ltx_i2v_enabled`` and a
+#: talking-face-portrait token must not come back.
 REQUIRED_ALWAYS = "always"
 REQUIRED_NEVER = "never"
 
@@ -145,19 +135,17 @@ VALID_STYLE_TAIL_POLICIES = frozenset((
 #:
 #: THE LANE DECIDES WHETHER PIXELS ARE MINTED. IT DOES NOT DECIDE WHETHER THE
 #: CHARACTER HAS AN IDENTITY. Splitting those two questions is the whole point
-#: of this field, and it exists because they were once the same switch:
-#: commit 89e82181 (2026-08-05) gave every beat of a character the same seed by
-#: deriving it from that character's PORTRAIT prompt hash; commit a88cede5
-#: (2026-08-22) then let a lane's ``kind="portrait" required="never"`` suppress
-#: minting the portrait at all -- correctly, for PIXELS, since an unused
-#: portrait had killed a live leg -- and silently emptied the hash the seed
-#: needs. Measured 2026-08-26: 75 scene_character stills, 4 anchored, 71 not.
+#: of this field: every beat of a character gets the same seed, derived from
+#: that character's PORTRAIT prompt hash, so a lane whose ``kind="portrait"
+#: required="never"`` suppresses minting the portrait (correctly, for PIXELS,
+#: since an unused portrait can kill a live leg) must not also silently
+#: empty the hash the seed needs.
 #:
 #: ``portrait_seed`` is the DEFAULT and that direction is deliberate. Identity
 #: costs no render (the basis is a text hash, and the portrait pixels stay
 #: suppressed by ``required``), so a lane that forgets to declare gets a stable
-#: face for free. Defaulting the other way would re-create the 2026-08-22 bug
-#: for every lane written from here on.
+#: face for free. Defaulting the other way would re-create the bug for every
+#: lane written from here on.
 #:
 #: ``none`` is for a row whose subject is not a face at all -- the still_word
 #: word-card being the case in hand: its ``scene_character`` row inherits face

@@ -6,8 +6,8 @@ Public ids follow the ``<model><version>_<low|high>_<capability>`` convention
 This module is the SINGLE place that maps a menu/saved/profile string back to the
 concrete internal engine id: it strips the display suffix (`ltx098_low_video (16:9)`), maps a
 public id to its internal id, THEN maps a renamed engine's legacy id to its current
-id (the `_LEGACY_ENGINE_ALIASES` MOVED here from otr_video_director so both the
-director and every other boundary read ONE table).
+id (`_LEGACY_ENGINE_ALIASES`, so the director and every other boundary read ONE
+table).
 
 The friendly prose labels (`LTX 0.9.8 2B - low VRAM`, ...) live in `_PUBLIC_LABEL` for
 the static widget tooltip + docs ONLY -- they are NEVER the combo value / saved value
@@ -21,11 +21,11 @@ from __future__ import annotations
 #: Public menu id -> internal engine id.
 _PUBLIC_ENGINES = {
     # --- the low/high naming convention starts here (lane 1, 2026-08-11) ---
-    # `<model><version>_<low|high>_<capability>`. The `<vramtier>gb` token above
-    # is RETIRED by operator ruling 2026-08-09: it encoded "the card this lane
-    # was built for", which drifted badly from measured usage. `low` / `high`
-    # is deliberately COARSE so a user self-selects by
-    # their own hardware, and it survives measurement drift.
+    # `<model><version>_<low|high>_<capability>`. `low` / `high` is deliberately
+    # COARSE so a user self-selects by their own hardware, and it survives
+    # measurement drift (a `<vramtier>gb` token encoded "the card this lane
+    # was built for", which drifted badly from measured usage -- operator,
+    # 2026-08-09).
     #
     # Renamed lanes MOVE their old public id into _LEGACY_ENGINE_ALIASES; they
     # never keep a second row here, because two public ids on one internal id
@@ -36,10 +36,10 @@ _PUBLIC_ENGINES = {
     #
     # Lane 2, 2026-08-11. The id STATES what the lane is, per the operator's
     # 2026-08-10 refinements: audio-conditioned lanes say `audio_in` (HuMo is
-    # audio-driven and now says so), and the aspect is in the id rather than
+    # audio-driven), and the aspect is in the id rather than
     # only in the label suffix -- the bare `humo14_high_face` hid that its
     # sibling renders 480x832. `high` comes from a measurement receipt: 13.06
-    # GiB warm at 832x480x97 with a since-retired 2.9 GiB reserve.
+    # GiB warm at 832x480x97 (measured with a 2.9 GiB reserve).
     "humo14_high_audio_in_wide": "humo_14B_169",
     # Lane 3, 2026-08-11. The LONG-BEAT lane (the 1.7B renders to 177 frames,
     # 7.08 s, where the 14B stops at 97) and the auto-downgrade target. Its
@@ -48,19 +48,15 @@ _PUBLIC_ENGINES = {
     "humo17_high_audio_in_portrait": "humo_1.7B",
     "humo17_high_audio_in_wide": "humo_1.7B_169",
     # Lane 4, 2026-08-11: the last HuMo tier. The 2026-06-09 keystone, and
-    # the only one of the four whose id was previously just "humo".
+    # the only one of the four whose internal id is just "humo".
     "humo14_high_audio_in_portrait": "humo",
-    # Lane 8, 2026-08-11. `ltx_8gb` was an IDENTITY row, so it needs NO alias
-    # on the way out -- a bare internal id
-    # already passes through resolve_engine_id step 3, and adding one would
-    # imply an internal rename that never happened. The internal id KEEPS the
-    # `8gb` token; only the public surface loses it.
+    # Lane 8, 2026-08-11. `ltx_8gb` is an IDENTITY row, so it needs NO alias --
+    # a bare internal id already passes through resolve_engine_id step 3, and
+    # adding one would imply an internal rename that never happened. The
+    # internal id KEEPS the `8gb` token; only the public surface lacks it.
     #
-    # `low` is MEASURED here, not inherited from the retired token: 9,106 MB
-    # absolute / 6,835 MB net, cold, at 512x288x161 -- the cheapest lane in the
-    # roster. Until this lane's own
-    # smoke ran, the marker was provisional in the evidence manifest's own
-    # words ("NO measurement of any kind on this box").
+    # `low` is MEASURED here: 9,106 MB absolute / 6,835 MB net, cold, at
+    # 512x288x161 -- the cheapest lane in the roster.
     "ltx098_low_video": "ltx_8gb",
     # Lane 19, 2026-08-12 -- the first NEW ENGINE in the campaign rather than a
     # rename, so this is an ADD with no alias to move.
@@ -96,10 +92,10 @@ _PUBLIC_ENGINES = {
     "ltx25_high_video": "ltx25_video",
 }
 
-#: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
-#: so the resolver, the director, the applier, the render driver and the capability
-#: profiles all read ONE table. A saved graph / old ledger carrying the pre-rename
-#: name resolves to the current engine so the pick keeps working.
+#: Legacy engine-id aliases (renamed engines) -- ONE table, read by the
+#: resolver, the director, the applier, the render driver and the capability
+#: profiles. A saved graph / old ledger carrying the pre-rename name resolves
+#: to the current engine so the pick keeps working.
 _LEGACY_ENGINE_ALIASES = {
     "flat_still": "still_flat",
     "flux_still": "still_pan",
@@ -113,12 +109,11 @@ _INTERNAL_TO_PUBLIC = {v: k for k, v in _PUBLIC_ENGINES.items()}
 
 #: Friendly prose labels -- TOOLTIP / DOCS ONLY, never the combo/saved value.
 _PUBLIC_LABEL = {
-    # MEASURED, and deliberately NOT an 8 GB claim. The retired `8gb` token
-    # encoded the card the lane was built for; this label states what the lane
-    # was measured to COST (6.8 GiB net at 512x288x161, cold) and lets the user
-    # decide what that fits on. Saying "runs on an 8 GB card" would repeat the
-    # exact mistake lane 5 retired the token for -- net cost is not the whole
-    # story on a card whose desktop already eats some of it.
+    # MEASURED, and deliberately NOT an 8 GB claim. This label states what the
+    # lane was measured to COST (6.8 GiB net at 512x288x161, cold) and lets the
+    # user decide what that fits on. Saying "runs on an 8 GB card" would encode
+    # the card the lane was built for, and net cost is not the whole story on a
+    # card whose desktop already eats some of it.
     "ltx098_low_video": (
         "LTX 0.9.8 2B - low VRAM (6.8 GiB net at 512x288x161; "
         "the cheapest local video lane, ~22 s a beat)"),
@@ -165,11 +160,11 @@ _PUBLIC_LABEL = {
     # was run for this lane. "very-low-VRAM-targeted" is a design target, so the
     # label says targeted and nothing stronger.
     # ONE GHOST LANE (operator, 2026-08-23: "delete any animatediff that are
-    # not haunted"). The five siblings are RETIRED and tombstoned below. The
-    # adapter IS this lane's identity, so the label says so plainly. "Apache-2.0"
-    # is in the label deliberately: the golden lane's module had no licence at
-    # all, and for anyone deciding what to build on that is the most load-bearing
-    # fact about this one.
+    # not haunted"); its five non-haunted siblings are RETIRED and listed in
+    # RETIRED_ENGINE_IDS below. The adapter IS this lane's identity, so the
+    # label says so plainly. "Apache-2.0" is in the label deliberately: for
+    # anyone deciding what to build on, the licence is the most load-bearing
+    # fact about this lane.
     "animatediff15_v3_haunted_video": (
         "AnimateDiff v3 haunted -- Ghost Signal (official v3 module + the "
         "removable domain adapter, Apache-2.0; degraded transmission look)"),
@@ -199,24 +194,17 @@ def resolve_engine_id(value) -> str:
     return _LEGACY_ENGINE_ALIASES.get(resolved, resolved)  # then legacy -> current
 
 
-#: The engine ids RETIRED by the 2026-08-06 SFX-bed rip. A user-saved workflow
-#: or an external API client may still name one; the contract is a NAMED
-#: refusal -- a stale selection must never silently resolve to another engine.
+#: RETIRED engine ids. A user-saved workflow or an external API client may
+#: still name one; the contract is a NAMED refusal -- a stale selection must
+#: never silently resolve to another engine.
 #: These ids are DATA consulted by :func:`check_retired_engine`: never a row in
 #: the registry's ``CAPABILITIES``, never importable as an adapter. IMMUTABLE:
 #: append here only when another engine is retired, never remove.
 RETIRED_ENGINE_IDS = frozenset({
-    # THE NON-HAUNTED GHOST LANES, RETIRED 2026-08-23 (operator: "delete any
-    # animatediff that are not haunted"). All five were PUBLIC, menu-selectable
-    # ids, and animatediff15_video carried the lane's published proof
-    # (signal_lost_the_constables_knock_20260822_050116, 8/8 beats) -- so a saved
-    # graph naming it is a graph that once worked, which is exactly why these are
-    # NAMED tombstones rather than the generic unregistered-engine refusal.
-    #
-    # THE CLASSES ARE NOT ALL GONE: GhostSignalV3HauntedEngine inherits
-    # GhostSignalV3Engine inherits GhostSignalEngine, so those two SURVIVE as the
-    # winner's own machinery -- unregistered, not deleted. Only the true leaves
-    # (v2, and the h3/h5 cadence pair) had their code removed.
+    # The non-haunted ghost lanes: public, menu-selectable ids (operator:
+    # "delete any animatediff that are not haunted"). A saved graph naming one
+    # once worked, hence NAMED tombstones rather than the generic
+    # unregistered-engine refusal.
     "animatediff15_video",
     "animatediff15_v2_video",
     "animatediff15_v3_video",
@@ -227,39 +215,28 @@ RETIRED_ENGINE_IDS = frozenset({
     "google_vid_sfx_veo_fast",
     "google_vid_sfx_veo_lite",
     "google_vid_sfx_veo_pro",
-    # The dormant 3D / dark family, RETIRED 2026-08-23 (lean-mean order 4).
-    # All five were registered/selectable in alpha builds before their
-    # unregister commits (character_3d talkers 2026-06-29, the other two
-    # 2026-06-30), so an alpha-era saved workflow may still name one. NAMED
-    # tombstones rather than the generic unregistered-engine refusal at the
-    # director boundary, because "retired" is the truthful diagnosis for a
-    # graph that was once valid -- "not registered" reads as a broken install.
-    # The adapter FILES are deleted in the same change; resurrection means a
-    # real forward, a fresh registration, AND removing the id from this set.
+    # The dormant 3D / dark family: selectable in alpha builds, so an alpha-era
+    # saved workflow may still name one. NAMED tombstones, because "retired" is
+    # the truthful diagnosis for a graph that was once valid -- "not registered"
+    # reads as a broken install. Resurrection means a real forward, a fresh
+    # registration, AND removing the id from this set.
     "triposg_talk",
     "hunyuan3d_talk",
     "trellis_talk",
     "triposr",
     "still_parallax",
-    # THE CLOUD PIXVERSE WORD-CARD LANE, RETIRED 2026-09-17 (operator:
-    # "WORD_RAZZLE / CLOUD GETS RIPPED"). The adapter was CloudWordRazzleEngine
-    # on partner row cloud_pixverse_i2v. Local razzle_ltx_8gb stays; this id
-    # is a named tombstone so a saved graph or force-map still fails as
-    # RetiredEngineError, never as a silent remap and never as "not registered".
+    # The cloud Pixverse word-card lane. A named tombstone, so a saved graph or
+    # force-map still fails as RetiredEngineError, never as a silent remap and
+    # never as "not registered". Local razzle_ltx_8gb stays.
     "word_razzle",
-    # THE SEVEN "native"-NAMED LTX 2.5 IDS, RENAMED 2026-09-25 (0b2 step 2,
-    # operator: "'native' meant 'ComfyUI's own loaders, not GGUF'; GGUF is
-    # gone, the word is noise"). These were the VideoDirector's DEFAULT
-    # widget values on four shipped, gallery-published workflows
-    # (otr_8gb_ltx25_native_foley/mime/audio_in, otr_24gb_native_foley) --
-    # not an obscure lane like wan_i2v above, which the same rename policy
-    # deliberately left OFF this set. Plain rename, no alias (operator:
-    # "don't worry about back compat") -- but a stale saved copy of one of
-    # those four workflows still names these ENGINE ids, and deserves the
-    # named RetiredEngineError ("retired and no longer selectable"), not
-    # the generic unregistered-engine refusal that reads like a broken
-    # install. (A leftover old workflow FILENAME is a different miss: that
-    # is a missing file, and this set does not see it.)
+    # The seven "native"-named LTX 2.5 ids, renamed with no alias (operator:
+    # "don't worry about back compat"). They were the VideoDirector's DEFAULT
+    # widget values on four shipped, gallery-published workflows, so a stale
+    # saved copy of one still names these ENGINE ids and deserves the named
+    # RetiredEngineError ("retired and no longer selectable"), not the generic
+    # unregistered-engine refusal that reads like a broken install. (A leftover
+    # old workflow FILENAME is a different miss: that is a missing file, and
+    # this set does not see it.)
     "ltx25_native_foley_16gb",
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",

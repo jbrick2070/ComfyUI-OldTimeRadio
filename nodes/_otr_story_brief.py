@@ -70,9 +70,7 @@ _DYNAMIC_REFLECTION_MAX_NEW_TOKENS: int = 1024
 # Sprint 2A/2B: Attempt 2 structural-retry temperature for the shared
 # structured_call retry ladder. STRICTLY BELOW _REFLECTION_TEMPERATURE
 # -- a JSON-schema re-roll LOWERS entropy, it never raises it.
-# structured_call asserts this invariant at entry. This replaces the
-# old _REPAIR_TEMPERATURE_BUMP (which RAISED repair temperature by
-# +0.15 -- the Sprint 2B bug the ladder conversion corrects).
+# structured_call asserts this invariant at entry.
 _REFLECTION_STRUCTURAL_RETRY_TEMPERATURE: float = 0.15
 
 # Refinement section 4 prompt-version field stamped on every output.
@@ -373,9 +371,8 @@ def _build_reflection_input(led: Any) -> str:
 # ---------------------------------------------------------------------------
 # JSON extraction
 # ---------------------------------------------------------------------------
-# The naive first-'{'-to-last-'}' extractor was removed in the
-# BUG-LOCAL-261 consolidation; story-brief JSON is now parsed via the
-# shared _otr_json.parse_first_json_object. Package import in production;
+# Story-brief JSON is parsed via the shared
+# _otr_json.parse_first_json_object. Package import in production;
 # flat import when loaded standalone / under test.
 try:
     from . import _otr_json
@@ -769,9 +766,9 @@ def _build_produced_story_input(led: Any) -> str:
     opening = spoken[:_PRODUCED_STORY_OPENING_CAP]
     closing: list = []
     middle: list = []
-    # Local-fanout QA 2026-07-09: any spoken rows beyond the opening window
-    # get a closing window (sliced to avoid overlap) -- the old strict
-    # `n > OPEN + CLOSE` dropped the whole second half at exact equality.
+    # Any spoken rows beyond the opening window get a closing window (sliced
+    # to avoid overlap); a strict `n > OPEN + CLOSE` test would drop the whole
+    # second half at exact equality.
     if n > _PRODUCED_STORY_OPENING_CAP:
         closing = spoken[
             max(_PRODUCED_STORY_OPENING_CAP, n - _PRODUCED_STORY_CLOSING_CAP):
@@ -1001,10 +998,10 @@ def _validate_produced_open(
     roster (case-insensitive) -- the derive pass must never introduce a name the
     episode does not have.
 
-    Viability is the COMPOSER's predicate, imported rather than restated. This
-    used to check only that setting and opening_status_quo were not both empty,
-    which let a brief through with NO CAST -- and every bank's safe-open seam
-    promises the model "the cast list below", so those briefs produced an
+    Viability is the COMPOSER's predicate, imported rather than restated:
+    checking only that setting and opening_status_quo are not both empty would
+    let a brief through with NO CAST -- and every bank's safe-open seam
+    promises the model "the cast list below", so such briefs produce an
     announcer asking the operator for the roster. Two definitions of "usable
     brief" is what the shared predicate exists to end.
     """

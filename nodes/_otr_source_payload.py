@@ -450,14 +450,12 @@ class SourceInterpreterFallback:
 
 
 #: NO CONTENT CLAUSE IN THE PER-BANK SCRIPT INSTRUCTIONS (operator directive
-#: 2026-08-03/08-05, finished 2026-09-23). Five of the ``script`` strings below
-#: used to read "a compact SFW ..." or "a compact, faithful, SFW radio
-#: adaptation ...". The 2026-08-05 rip removed the equivalent clause from the
-#: source lanes -- `_otr_public_domain_sources.py` and
-#: `_otr_shakespeare_sources.py` each carry a comment saying so -- and missed
-#: these, so the FIDELITY lanes went on asking for an adaptation of a
-#: Shakespeare scene that was both "faithful" and "SFW". The author's own
-#: language is carried as written; that is what faithful means.
+#: 2026-08-03/08-05): the ``script`` strings below must not ask for a
+#: "compact SFW" adaptation, or a FIDELITY lane would ask for an adaptation
+#: of a Shakespeare scene that is both "faithful" and "SFW". The author's own
+#: language is carried as written; that is what faithful means. The source
+#: lanes (`_otr_public_domain_sources.py`, `_otr_shakespeare_sources.py`) each
+#: carry the matching note.
 
 def build_source_interpreter_fallback(
     *, bank, payload: dict, source_meta: dict | None,
@@ -643,9 +641,9 @@ def _rss_source_fetch_result(
 ) -> SourceFetchResult:
     """Wrap a selected RSS item without changing the seven-key payload.
 
-    RSS fetchers historically returned the raw payload dict, so their selected
-    article URL and outlet disappeared at ``normalize_fetch_result`` while the
-    manifest-backed banks carried typed provenance sidecars.  The selected item
+    RSS fetchers return the raw payload dict, so their selected article URL
+    and outlet would disappear at ``normalize_fetch_result`` while the
+    manifest-backed banks carry typed provenance sidecars.  The selected item
     -- not the blank/ignored widget request -- owns RSS provenance.  Rights stay
     explicitly unknown; selecting an item is not evidence of a license.
     """
@@ -659,13 +657,11 @@ def _rss_source_fetch_result(
     # wraps the item that was chosen, not the widget request that asked for
     # one. Without it an episode cannot name what it adapted.
     #
-    # THIS FIELD WAS ALREADY BEING READ AND NEVER WRITTEN.
-    # `_otr_source_identity.identity_from_meta` reads
+    # THE CONSUMER READS IT: `_otr_source_identity.identity_from_meta` reads
     # `source_meta["post_headline"]` for the media_archive lane, and
     # `SourceIdentity.is_degraded` returns True for that lane precisely when
-    # the headline is missing -- so EVERY media_archive episode has carried a
-    # degraded identity since that module was written. The consumer was built
-    # first and the producer was never wired; this is the missing half.
+    # the headline is missing, so without this stamp EVERY media_archive
+    # episode carries a degraded identity.
     #
     # Stamped for BOTH RSS lanes rather than branching on `fetcher_kind`.
     # "the selected post's headline" means exactly the same thing on science
@@ -704,9 +700,8 @@ def _fetch_science_rss(*, bank, technical_model: str,
 
     Forwards technical_model POSITIONALLY -- the S31 B6 slot-label/id
     agreement invariant (technical model routes the technical re-rank
-    slot) survives here, test-pinned. Style-engine consolidation
-    (2026-07-05): style_slug removed -- the fetch/rerank chain is
-    style-agnostic now, there is no style value yet at this pre-contract
+    slot) survives here, test-pinned. The fetch/rerank chain is
+    style-agnostic: there is no style value yet at this pre-contract
     sourcing stage."""
     del source_ref  # science fetch ignores Source Banks v2 references
     try:
@@ -731,14 +726,14 @@ def _interpret_news(*, bank, payload: dict, technical_fn,
 
     Kwarg mapping is the contract's RENAME foot-gun, pinned by test:
     payload["source"] -> outlet, payload["date"] -> pub_date. seed=0 keeps the
-    news-interpreter cache key stable (the seed widget was removed,
-    BUG-LOCAL-269/270). Translates ONLY NewsInterpreterError ->
+    news-interpreter cache key stable (there is no seed widget). Translates
+    ONLY NewsInterpreterError ->
     SourceInterpretError (chained); ANY other exception propagates untouched.
 
-    Style-engine consolidation (2026-07-05): this stage runs BEFORE the
-    single style engine (build_story_contract needs script_brief, which
-    this call produces) -- there is no style value to feed it, and none
-    is needed; news interpretation is style-agnostic by design now.
+    This stage runs BEFORE the single style engine (build_story_contract
+    needs script_brief, which this call produces) -- there is no style value
+    to feed it, and none is needed; news interpretation is style-agnostic by
+    design.
     """
     del bank  # science interpret needs no bank fields; contract signature only
     try:

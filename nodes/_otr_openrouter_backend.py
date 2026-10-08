@@ -7,8 +7,7 @@ surface the local transformers backends use -- with zero local VRAM.
 
 Hard constraints honoured here (see the go-forward plan, C1-C9):
   * offline-first: no remote path is reachable unless an OpenRouter key
-    is present (env or the two pack files in the README heading). C6: the
-    separate OTR_ENABLE_OPENROUTER opt-in flag gate was removed.
+    is present (env or the two pack files in the README heading).
   * No token caps (2026-09-28): no per-call or per-run ceiling and no
     max_tokens on the wire -- the model writes until it stops or reaches
     its own limit, and the provider bills what it wrote. Money is gated
@@ -24,9 +23,6 @@ Hard constraints honoured here (see the go-forward plan, C1-C9):
 This module is import-safe with no network and no torch. The mockable
 seam the tests drive is the module-level `_post_chat_completion`; patch
 it to prove the retry ladder and the usage tally without a network.
-
-S3 wires this backend into the live loader path; S1 (this file) only
-builds + registers it and proves it under mocked HTTP.
 """
 from __future__ import annotations
 
@@ -159,11 +155,8 @@ DEFAULT_CONTEXT_WINDOW = 8192
 # OTR_OPENROUTER_SLOT_x_DEFAULT override. They are recommended STARTING points,
 # never a cage -- any cached slug can be chosen. Creative favours a strong
 # narrative model; technical favours a reliably structured-output model.
-# CREATIVE is an ALIAS (chunk B, 2026-08-09). It was pinned to
-# `anthropic/claude-opus-4.8`, which was ALREADY a version behind -- opus-5 was
-# live at the identical price ($5/$25 per M) while the pin still said 4.8. That
-# is the whole failure mode the curation policy exists to stop, and a pin cannot
-# notice it has gone stale. Replay is unaffected: the ledger stamps the RESOLVED
+# A pin cannot notice it has gone stale -- the whole failure mode the curation
+# policy exists to stop. Replay is unaffected: the ledger stamps the RESOLVED
 # concrete model, proven by tests/test_openrouter_resolved.py.
 # BOTH SLOTS DEFAULT TO THE AUTO-ROUTER (operator, 2026-08-10: "lets make auto
 # default -- for both openrouter A/B").
@@ -189,28 +182,13 @@ DEFAULT_CONTEXT_WINDOW = 8192
 # fully auditable after the fact (`meta["resolved_models"]`,
 # tests/test_openrouter_resolved.py), so "which model wrote this episode, and
 # what did it cost" always has an answer -- just not before the run.
-#
-# The previous defaults, kept here because reverting should be a one-line edit
-# rather than an archaeology exercise:
-#   creative  ~anthropic/claude-opus-latest
-#   technical deepseek/deepseek-v4-pro   (concrete on purpose -- the only
-#             DeepSeek pointer is the FLASH tier, so aliasing it would be a
-#             capability DROP on the slot that most needs structured output)
 OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT = "openrouter/auto"
 OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT = "openrouter/auto"
 
 # NO TOKEN CAPS (operator, 2026-09-28: "no caps ... remove that whole
-# feature"; PBUG-20260928-02). There was a per-run ceiling (300000), a per-call
-# ceiling (32768) and an output cap (16384 max_tokens, with floors to lift it
-# for reasoning models). The run ceiling counted every call as its prompt PLUS
-# its whole output allowance, so a 3-act episode "reached" 300000 while the
-# provider billed a fraction of that, and the abort threw away every credit the
-# run had already spent (live 2026-09-17 and 2026-09-28, both inside
-# ledger_clean). The output cap bought nothing: the provider bills only what the
-# model writes, so a cap can only cut a reply short -- and the floors existed
-# only to stop it doing that to reasoning models. A call now sends no max_tokens
-# (live 2026-09-28: Sonnet 5.5 wrote 37533 tokens and stopped on its own), and
-# money is gated once, at queue time, by the wallet check.
+# feature"). A call sends no max_tokens: the provider bills only what the
+# model writes, so a cap can only cut a reply short. Money is gated once, at
+# queue time, by the wallet check.
 DEFAULT_TIMEOUT_S = 120
 DEFAULT_MAX_RETRIES = 2  # total attempts = retries + 1
 
@@ -353,10 +331,10 @@ def _openrouter_key() -> str | None:
 
 def openrouter_enabled() -> bool:
     """Remote is reachable when the API KEY is present -- a creds-present check,
-    NOT a promotion gate. C6 (2026-06-29 -- "registry IS the menu"): the separate
-    OTR_ENABLE_OPENROUTER opt-in flag is GONE; any CONFIGURED LLM (its credentials
-    present) is selectable, and the virtual rows appear in the dropdowns whenever
-    the key is set. No key ⇒ remote is off (the rows never appear, S2)."""
+    NOT a promotion gate. C6 ("registry IS the menu"): any CONFIGURED LLM (its
+    credentials present) is selectable, and the virtual rows appear in the
+    dropdowns whenever the key is set. No key => remote is off (the rows
+    never appear, S2)."""
     from ._otr_shared.api_key_files import KeyFileError
 
     try:
@@ -804,12 +782,10 @@ def _catalog_cache_path() -> Path:
     ``<ComfyUI output>/otr/episodes/_shared/cache/openrouter/openrouter_models.json``
     by default, overridable with ``OTR_OPENROUTER_CACHE_DIR`` (tests / relocation).
 
-    IT USED TO LIVE AT ``<repo>/models/`` -- INSIDE THE INSTALLED PACK -- and a
-    registry update replaces that directory, so every update silently threw the
-    warmed catalog away. The user then ran at ``DEFAULT_CONTEXT_WINDOW`` (8192)
-    instead of each model's real window until they re-ran the refresh script, and
-    the empty-cache sentinel told them to run a script that, until 2026-09-11, was
-    not even in the bundle.
+    IT LIVES OUTSIDE THE INSTALLED PACK. ``<repo>/models/`` is inside it, and a
+    registry update replaces that directory, which would silently throw the
+    warmed catalog away and leave the user at ``DEFAULT_CONTEXT_WINDOW`` (8192)
+    instead of each model's real window until they re-ran the refresh script.
 
     `otr_shared_cache_dir()` is the right tier by its own contract -- "a cache
     entry is NEVER the only copy" -- which this satisfies exactly: the catalog is
@@ -818,15 +794,15 @@ def _catalog_cache_path() -> Path:
     rather than an error. It is also NOT janitor-swept: `_otr_janitor` sweeps
     ``episodes/_shared/tmp`` only and refuses any other root.
 
-    NO COPY-FORWARD, deliberately. A cold cache after this move is a designed,
-    safe state (empty catalog, a logged context fallback, never a raise), so
-    migrating the old file is a separable nicety rather than part of the fix.
+    NO COPY-FORWARD from the in-pack location, deliberately. A cold cache is a
+    designed, safe state (empty catalog, a logged context fallback, never a
+    raise), so migrating the old file is a separable nicety.
 
     THIS FUNCTION MUST NOT RAISE. It is read while building node dropdowns, and
-    `otr_shared_cache_dir()` validates the output-tree contract, so it CAN throw
-    where the old pure-Path version could not. A failure falls back to the old
-    in-pack location: worse, but identical to the behaviour that shipped for
-    months, and a dropdown that cannot build is a broken node.
+    `otr_shared_cache_dir()` validates the output-tree contract, so it CAN
+    throw. A failure falls back to the in-pack location: worse, since a
+    registry update wipes it, but a dropdown that cannot build is a broken
+    node.
     """
     override = _env("OTR_OPENROUTER_CACHE_DIR")
     if override:
@@ -1357,9 +1333,9 @@ class OpenRouterBackend:
         # reasoning (-> finish_reason=length -> unparseable JSON). Unset -> the
         # field is omitted, so non-thinking models / OpenRouter-proper are
         # byte-identical. Not require_parameters-gated: a backend that ignores it
-        # simply reasons as before -- and since no max_tokens is sent
-        # (2026-09-28), its reasoning can no longer eat an output budget: the
-        # model has its whole own output limit.
+        # simply reasons as before -- and since no max_tokens is sent, its
+        # reasoning cannot eat an output budget: the model has its whole own
+        # output limit.
         if reasoning_effort:
             payload["reasoning_effort"] = reasoning_effort
             # EVIDENT (operator 2026-06-22): log ONCE per process so any server

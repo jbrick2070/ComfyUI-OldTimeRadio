@@ -162,8 +162,7 @@ def _probe_video_dims(ffmpeg: str, src: str):
     string-valued dict) and converts to concrete types. Sonnet 5 MF-1:
     ``ffprobe``'s ``avg_frame_rate`` / ``r_frame_rate`` come back as rational
     STRINGS like ``"25/1"`` or ``"30000/1001"`` -- ``float()`` on those raises
-    ``ValueError``. That N/D split used to be COPIED here from two other
-    files; lean-mean order 8 moved the rule to
+    ``ValueError``. The N/D split lives in
     ``nodes/_otr_shared/ffprobe.py:parse_rate`` so there is one of it.
 
     Raises :class:`RuntimeError` on missing keys OR unparseable rate.

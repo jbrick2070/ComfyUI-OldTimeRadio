@@ -29,7 +29,6 @@ import re
 
 # Bump NORMALIZATION_VERSION when the canonical body bytes for an unchanged
 # source would change -- that invalidates every stored offset and hash.
-# (OVERVIEW_VERSION was removed with SourceOverview, 2026-09-05.)
 NORMALIZATION_VERSION = "otr_source_normalization_v1"
 
 

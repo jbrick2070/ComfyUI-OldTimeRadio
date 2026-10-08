@@ -15,10 +15,8 @@ and each class has a single deterministic action:
 * ``BlockClass.WARN`` -- subjective quality / coherence / NSFW gates (and the
   A/V-sync guard). These WARN only: the already-rendered clip is RETAINED and a
   warning is logged; a WARN gate NEVER discards rendered output, NEVER aborts
-  an episode, and NEVER touches the frozen master audio. (The offline NSFW
-  frame-QC sampler that used to be named here was REMOVED 2026-08-28; the
-  FailureKind.NSFW value below is independent of it and stays -- an image
-  model can still decline a card, and that is a WARN, not a stop.)
+  an episode, and NEVER touches the frozen master audio. (FailureKind.NSFW
+  below is a WARN, not a stop: an image model can still decline a card.)
   The A/V-sync guard does a best-effort deterministic retime of the VIDEO
   frames (never the audio).
 
@@ -27,10 +25,9 @@ This mirrors the SHIPPED audio ``freeze_block_class`` structural/quality split
 module -- the frozen audio cascade is read-only and never imported here.
 
 The module is PURE and dependency-free (stdlib only): it classifies a failure
-and yields the deterministic :class:`RetryDecision`. The fallback-action API
-(build_fallback_decision / restamp_shot_row / append_runtime_fallback_decision
-/ format_swap_log) was DELETED in the Sprint A rip (2026-07-02); the ledger's
-``runtime_fallback_decisions`` schema slot survives but is stamped never.
+and yields the deterministic :class:`RetryDecision`. There is no fallback-action
+API; the ledger's ``runtime_fallback_decisions`` schema slot survives but is
+stamped never.
 UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
@@ -122,11 +119,10 @@ class RetryDecision:
     """The single deterministic action keyed to a failure's block class.
 
     HARD decisions retry (per the kind) on the SAME engine, then the render
-    driver raises LOUD (NO FALLBACKS, 2026-07-02 -- the escalate_to_fallback
-    flag was deleted with the chain machinery); WARN decisions ``keep_output``
-    and ``warn_only``. The three guard flags ``discards_output`` /
-    ``touches_audio`` / ``aborts_episode`` are FALSE for every decision the
-    taxonomy emits -- they exist so a test (and
+    driver raises LOUD (NO FALLBACKS, 2026-07-02); WARN decisions
+    ``keep_output`` and ``warn_only``. The three guard flags
+    ``discards_output`` / ``touches_audio`` / ``aborts_episode`` are FALSE for
+    every decision the taxonomy emits -- they exist so a test (and
     :func:`assert_decision_invariants`) can prove no class can ever drop a
     beat, mutate the frozen audio, or abort the episode.
     """
@@ -251,11 +247,9 @@ def assert_decision_invariants(decision: RetryDecision) -> RetryDecision:
     return decision
 
 
-# NO FALLBACKS (Sprint A rip, 2026-07-02): the fallback-action API
-# (build_fallback_decision / restamp_shot_row / append_runtime_fallback_decision
-# / format_swap_log) was DELETED with the chain machinery. The ledger's
-# runtime_fallback_decisions schema slot survives (stamped never, A5 -- no
-# schema churn); this module keeps ONLY the failure-classification role.
+# NO FALLBACKS (2026-07-02): this module keeps ONLY the failure-classification
+# role. The ledger's runtime_fallback_decisions schema slot survives (stamped
+# never, A5 -- no schema churn).
 
 __all__ = [
     "DEFAULT_TRANSIENT_IO_RETRIES",

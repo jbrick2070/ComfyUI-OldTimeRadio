@@ -666,9 +666,9 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         "major turns, and ending. Compression is allowed; replacement is not. "
         "Do not invent an unrelated framing story, a new protagonist, or a "
         "different ending.\n\n"
-        # SFW clause DELETED 2026-08-05 (operator directive): a fidelity lane
-        # must not be told to avoid the source's own content. See the matching
-        # note in _otr_shakespeare_sources.
+        # No SFW clause here (operator directive 2026-08-05): a fidelity
+        # lane must not be told to avoid the source's own content. See the
+        # matching note in _otr_shakespeare_sources.
         "Return ONE JSON object only with exactly these keys:\n"
         "{\n"
         "  \"casting_brief\": \"source-grounded roles and voices\",\n"
@@ -724,11 +724,10 @@ def build_public_domain_briefs(
         if len(brief.character_names) < 1:
             return ("public-domain briefs require at least one source character "
                     "name (the story's own cast, from its text)")
-        # The brief-level safety rejection that used to sit here was DELETED
-        # 2026-08-05 (operator directive). It re-rolled the whole brief when the
-        # SOURCE's own vocabulary appeared in it, which on an adaptation lane
-        # means burning a draft for being faithful. Nothing replaces it: a brief
-        # that names what the author named is a correct brief.
+        # No brief-level safety rejection here (operator directive 2026-08-05):
+        # re-rolling the whole brief when the SOURCE's own vocabulary appears in
+        # it would, on an adaptation lane, burn a draft for being faithful. A
+        # brief that names what the author named is a correct brief.
         return None
 
     try:

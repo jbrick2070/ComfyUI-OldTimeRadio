@@ -19,12 +19,11 @@ THE CHAIN, in order, and the order is the whole contract::
 rungs. Both surface news/outline text as a title and neither is what belongs on
 screen (Path B, confirmed 2026-05-09).
 
-THERE IS NO WIDGET RUNG (2026-09-14). A typed override used to sit between
-``led.title`` and the timestamp, declared on the renderer and on the Assembler.
-It could only ever win on a run whose ledger carried no title at all, and having
-three nodes declare the same field made it ambiguous which one the operator was
-supposed to type into. The writer's widget is the single workflow-facing owner;
-everything downstream reads the ledger.
+THERE IS NO WIDGET RUNG. A typed override between ``led.title`` and the
+timestamp could only ever win on a run whose ledger carried no title at all,
+and having three nodes declare the same field would make it ambiguous which
+one the operator was supposed to type into. The writer's widget is the single
+workflow-facing owner; everything downstream reads the ledger.
 
 THE LAST RESORT IS LOAD-BEARING, not a nicety. The published episode's title
 card comes from this chain, and a run that reaches the end of it must still

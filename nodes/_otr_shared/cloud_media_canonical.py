@@ -635,8 +635,3 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
         frame_count=frame_count,
     )
 
-
-# The SFX-bed extraction chain (extract_sfx_bed_from_provider_video ->
-# _normalize_sfx_stem_audio -> _sfx_loudnorm_params -> _env_float/_rms_dbfs,
-# plus _provider_video_path) was deleted with the SFX bed producers
-# (rip-sfx 2026-08-06). No surviving engine keeps provider audio.

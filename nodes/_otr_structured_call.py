@@ -109,8 +109,7 @@ _STRUCTURED_MAX_NEW_TOKENS: int = 512
 # temperature so the repair attempt is the calmest attempt in the
 # ladder.  P3's bounded authored-text patch uses this same value rather than
 # inventing a second repair temperature. The underscore name is the only
-# spelling: the unused public alias was ripped on 2026-09-04 (dead-code audit
-# row F), and every call site and test already used this one.
+# spelling.
 _REPAIR_TEMPERATURE: float = 0.10
 
 # A typed repair that starts but does not finish decodable JSON gets one
@@ -476,13 +475,13 @@ def default_repair_prompt_factory(
     """
     error_text = f"{type(error).__name__}: {error}"
     original_text = _prompt_to_text(original_prompt)
-    # THE DIRECTIVE GOES LAST (2026-09-23) -- same change and same reasoning
-    # as `_otr_repair_prompts._compose_repair`, whose shape this mirrors.
-    # Both used to close on the restated original, which put a verbatim echo
-    # of the contract that had just failed at the generation boundary, and
-    # left the sentence naming the fix hundreds of tokens upstream. The
-    # restatement stays -- a repair turn must be self-contained -- but the
-    # directive now sits closest to generation.
+    # THE DIRECTIVE GOES LAST (2026-09-23) -- same reasoning as
+    # `_otr_repair_prompts._compose_repair`, whose shape this mirrors.
+    # Closing on the restated original would put a verbatim echo of the
+    # contract that had just failed at the generation boundary, with the
+    # sentence naming the fix hundreds of tokens upstream. The restatement
+    # stays -- a repair turn must be self-contained -- but the directive sits
+    # closest to generation.
     body = (
         "The original instruction was:\n\n"
         + original_text
@@ -1106,14 +1105,13 @@ def structured_call(
                     helper_name, attempts_run,
                 )
                 # The attempt COMPLETED here, so report it like every other
-                # successful return does. This was the one exit of six that
-                # skipped the hook: `attempts_run` had already been
+                # successful return does: `attempts_run` has already been
                 # incremented for this rung, so a caller counting attempts
-                # under-reported by one whenever a typed repair factory
+                # would under-report by one whenever a typed repair factory
                 # resolved the failure itself. Unreachable from callers that
                 # pass no `deterministic_repair` (the story-brief reflection),
                 # but a lane MAY pass one.
-                # Mutation-checked 2026-08-09: deleting this call turns
+                # Mutation-checked: deleting this call turns
                 # test_deterministic_repair_return_still_reports_its_attempt
                 # red, so the guard is real rather than decorative.
                 notify_attempt(None)

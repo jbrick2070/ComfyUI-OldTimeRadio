@@ -284,16 +284,10 @@ def eligible_bank_ids() -> "tuple[str, ...]":
     predates the field keeps its place in the pool; only a bank that declares
     itself manual-only leaves it.
 
-    my_story was the reason this field exists and is NO LONGER excluded by it
-    (operator, 2026-09-13). The old reasoning -- a bank whose story is the
-    person's own typed fields has nothing to write on a blank automatic run --
-    was answered by giving it something: `_otr_story_input.DEFAULT_IDEA` is
-    the floor a blank My Story run writes. Do not "fix" this back.
-
-    The retired third filter -- "the lane's declared request compatibility" --
-    went 2026-08-14 with the word authority. It existed solely so a lane could
-    refuse a `target_words` outside its band, and there is no longer a target
-    to refuse. See `_otr_lane_specs`.
+    my_story is NOT excluded by this field (operator, 2026-09-13), although
+    its story is the person's own typed fields: a blank automatic run still
+    has something to write, because `_otr_story_input.DEFAULT_IDEA` is the
+    floor a blank My Story run writes. Do not "fix" this back.
     """
     banks = _ROUTING._ensure_loaded().banks
     return tuple(sorted(

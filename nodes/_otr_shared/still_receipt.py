@@ -21,10 +21,9 @@ THE RULE THE STATUSES ENCODE, because it is easy to get backwards:
 
 **Absence is never a status.** A row missing from the receipt means the
 receipt is incomplete, not that a target was refused -- readers must treat a
-missing row as a fault rather than inferring a gap from it. That inference is
-precisely the defect the 2026-08-28 panel caught in the first draft of this
-work: counting every absent clip as sanctioned would report a crashed render
-as a publishable degraded episode.
+missing row as a fault rather than inferring a gap from it. Counting every
+absent clip as sanctioned would report a crashed render as a publishable
+degraded episode.
 
 **NOT every absence is sanctionable, and this is STILL deliberately narrow.**
 Exactly TWO reasons earn a gap row -- ``model_refusal`` (the model declined the
@@ -37,8 +36,7 @@ The set was widened ONCE, on evidence, and the bar for widening it again is the
 same: the reason must be a POSITIVE record that something specific declined or
 failed for this object, never an inference from a missing file. Read the set
 through :func:`is_sanctionable_skip`, never by comparing against one constant --
-that comparison is what this docstring used to describe, and a caller still
-doing it would silently stop tolerating half the sanctionable cases.
+a caller doing that would silently stop tolerating half the sanctionable cases.
 """
 from __future__ import annotations
 

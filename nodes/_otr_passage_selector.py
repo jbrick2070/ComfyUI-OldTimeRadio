@@ -284,9 +284,9 @@ def chunk_speech(text: str, *, cap: int = BEAT_WORD_HARD_MAX) -> tuple[str, ...]
 
     This is the ONE owner of "how many beats does a speech need": ``Speech.
     beat_cost`` calls it, so a selected passage can always be executed exactly
-    as it was costed. The old ``ceil(words / cap)`` estimate disagreed with real
-    line packing on one corpus speech (BENEDICK, Much Ado 2.3, 309 words: 4 vs
-    5) -- an estimate the executor could not honour is a paraphrase waiting to
+    as it was costed. An estimate such as ``ceil(words / cap)`` disagrees with
+    real line packing (BENEDICK, Much Ado 2.3, 309 words: 4 vs 5), and an
+    estimate the executor could not honour is a paraphrase waiting to
     happen. A chunk's lines are joined with ONE SPACE: the words are verbatim;
     the newline is a TTS segmentation choice (Kokoro splits synthesis on it),
     a transcript-line choice and a caption-wrap choice, none of them the

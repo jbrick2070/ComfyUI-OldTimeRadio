@@ -9,14 +9,6 @@ briefs.
 This helper lives in its own small module so tests can exercise it
 without importing the heavy OTR_LedgerScriptWriter module (which
 pulls in comfy.utils + the LLM loader).
-
-History: `override_announcer_close` also lived here -- it stamped
-`news_close_brief` onto the last announcer line. It was retired
-2026-05-22 (BUG-LOCAL-255): it matched a private `_speaker_role`
-key absent from the ledger's `lines[]` rows, so the close was
-silently never applied. The announcer closing line is now written
-by `_otr_line_composer.compose_announcer_outro`, a dedicated
-creative pass run post-loop in OTR_LedgerScriptWriter.
 """
 from __future__ import annotations
 

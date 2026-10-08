@@ -74,14 +74,13 @@ def _compose_repair(
     `default_repair_prompt_factory` so the typed factories stay
     drop-in compatible with it.
 
-    THE DIRECTIVE GOES LAST (2026-09-23). It used to lead, and the
-    restated original instruction closed the message -- so the last thing
-    a small model read before generating was a verbatim echo of the prompt
-    that had just failed it, and the one sentence naming the fix was
-    hundreds of tokens upstream. The restatement STAYS, because a repair
-    turn has to be self-contained; only the order changed. Same content,
-    and the fix now sits at the generation boundary where recency works
-    for it instead of against it.
+    THE DIRECTIVE GOES LAST (2026-09-23). If it led, the restated original
+    instruction would close the message, and the last thing a small model read
+    before generating would be a verbatim echo of the prompt that had just
+    failed it, with the one sentence naming the fix hundreds of tokens
+    upstream. The restatement STAYS, because a repair turn has to be
+    self-contained; the fix sits at the generation boundary where recency
+    works for it instead of against it.
     """
     original_text = _prompt_to_text(original_prompt)
     body = (

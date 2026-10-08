@@ -53,16 +53,14 @@ __all__ = [
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 #: THERE IS NO PROFILE FOLDER. Every workflow this pack runs is a row in
-#: `config/workflow_matrix.json`, and `load_profile` resolves nothing else. The
-#: experiment rigs that used to sit beside it (`config/experiments/`) were retired
-#: with the harnesses that drove them on 2026-09-25 -- operator: "the only thing we
-#: have is the canonical and 24 variants in the workflows folder."
+#: `config/workflow_matrix.json`, and `load_profile` resolves nothing else
+#: (operator: "the only thing we have is the canonical and 24 variants in the
+#: workflows folder.").
 
-#: The node-type-to-widget map every applier reads at render time. It is NOT an
-#: experiment rig and never was a profile -- it sat in that folder by accident of
-#: history. Moved out with the rename. Safe to move because `semantic_master_hash`
-#: hashes this file's CONTENT, never its path, so no saved graph's stamp depends on
-#: where it lives.
+#: The node-type-to-widget map every applier reads at render time. It is NOT a
+#: profile. Safe to relocate because `semantic_master_hash` hashes this file's
+#: CONTENT, never its path, so no saved graph's stamp depends on where it
+#: lives.
 WIDGET_MAPPING_PATH = os.path.join(_REPO_ROOT, "config", "widget_map.json")
 
 
@@ -308,23 +306,20 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
     """S0 shape validator. Returns the config on success; raises
     :class:`ProfileError` naming the first offending key otherwise.
 
-    UNKNOWN KEYS ARE STILL REJECTED -- a typo'd key silently doing nothing is
-    the drift class this validator exists to kill, and that is untouched.
+    UNKNOWN KEYS ARE REJECTED -- a typo'd key silently doing nothing is the
+    drift class this validator exists to kill.
 
-    ABSENT KEYS ARE NOW LEGAL (2026-09-24), which is a different property that
-    had been conflated with it. Only `id` is required. Everything else absent
-    means "take the canonical's value", which is what the applier has always
-    done: `_flatten_profile_values` guards every key with `if k in`, so a
-    partial document was already safe to apply and only this function forbade
-    writing one.
+    ABSENT KEYS ARE LEGAL, which is a different property from the one above.
+    Only `id` is required. Everything else absent means "take the canonical's
+    value", which is what the applier does: `_flatten_profile_values` guards
+    every key with `if k in`, so a partial document is safe to apply.
 
-    WHY IT MATTERS RATHER THAN BEING TIDINESS. Requiring every key meant every
-    config restated values it did not mean to own -- 584 of them across the 24
-    shipped configs, each one a fork point that silently keeps its value when
-    the canonical moves. That is exactly how 82 configs once pinned
-    `char_voice_engine: indextts2` and kept shipping it after the canonical
-    moved to kokoro. A key a config does not mention now follows the canonical
-    forever, by construction.
+    WHY IT MATTERS RATHER THAN BEING TIDINESS. Requiring every key would make
+    every config restate values it does not mean to own, each one a fork point
+    that silently keeps its value when the canonical moves. That is exactly
+    how 82 configs once pinned `char_voice_engine: indextts2` and kept
+    shipping it after the canonical moved to kokoro. A key a config does not
+    mention follows the canonical forever, by construction.
     """
     if not isinstance(profile, dict):
         raise ProfileError(f"profile {source}: expected a JSON object, got {type(profile).__name__}")
@@ -438,9 +433,9 @@ def matrix_rows(path: Optional[str] = None) -> dict:
 def shipping_ids(path: Optional[str] = None) -> tuple:
     """The ids that emit a graph into ``workflows/``, matrix order.
 
-    An allow-list, deliberately, exactly as the hand-kept tuple this replaces
-    was: a row has to say `ships` to reach a user, so a new row defaults to NOT
-    shipping, which is the safe direction to be wrong in.
+    An allow-list, deliberately: a row has to say `ships` to reach a user, so
+    a new row defaults to NOT shipping, which is the safe direction to be
+    wrong in.
     """
     return tuple(r["id"] for r in load_matrix(path)["rows"] if r.get("ships"))
 
@@ -488,10 +483,10 @@ def profile_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
       from the matrix's own `defaults` block, merged shallowly so a row states
       only what differs.
 
-    Getting that second half wrong is what drifted all 24 launch recipes on the
-    first attempt: the graphs were perfect and the recipes read fields the row
-    had silently dropped. A `None` in a merge section means the row deliberately
-    does not have that key, as opposed to inheriting it.
+    Getting that second half wrong drifts the launch recipes: the graphs stay
+    perfect while the recipes read fields the row has silently dropped. A
+    `None` in a merge section means the row deliberately does not have that
+    key, as opposed to inheriting it.
     """
     if defaults is None:
         try:

@@ -38,8 +38,7 @@ def find_ffmpeg(ffmpeg: str = "ffmpeg") -> Optional[str]:
 #: naming a different ffmpeg gets its own probe, not the first caller's.
 _NVENC_PROBE: dict = {}
 #: The probe takes up to twenty seconds; two first callers racing on the same
-#: binary must run it once, not twice (the lock this replaced lived in
-#: `video_engine`, in front of a cache that is gone -- it belongs HERE).
+#: binary must run it once, not twice.
 _NVENC_PROBE_LOCK = threading.Lock()
 
 

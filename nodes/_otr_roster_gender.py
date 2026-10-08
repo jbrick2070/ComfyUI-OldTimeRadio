@@ -440,7 +440,7 @@ def _honorific_verdict(stated: str) -> Optional[RosterGenderVerdict]:
     that is the honest shape for evidence that came from the slot's spelling
     rather than from a record. It sits below every roster tier and above the
     40/40/20 roll, which is what a slot for a person the source never gave a row
-    to used to fall straight through to.
+    to would otherwise fall straight through to.
     """
     if stated not in _BINARY:
         return None

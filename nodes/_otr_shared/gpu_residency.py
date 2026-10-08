@@ -93,15 +93,12 @@ def _pid_alive(pid: int) -> bool:
     except Exception:  # noqa: BLE001  (psutil absent/erroring -> manual check)
         pass
     if os.name == "nt":
-        # There used to be a ctypes OpenProcess probe here. It was this pack's
-        # ONE process-inspection site, and it is not worth carrying for a case
-        # that cannot arise on a working box: psutil is a ComfyUI CORE
-        # requirement, so a Windows install without it is already broken in
-        # ways this lease cannot fix.
+        # There is deliberately no ctypes OpenProcess fallback: psutil is a
+        # ComfyUI CORE requirement, so a Windows install without it is already
+        # broken in ways this lease cannot fix.
         #
-        # THE TRADE, stated so nobody rediscovers it as a bug: the probe used to
-        # return False for a genuinely dead pid, so a stale lease was reclaimed.
-        # Without psutil, a psutil-less Windows box now never reclaims and times
+        # THE TRADE, stated so nobody rediscovers it as a bug: without psutil
+        # a box never reclaims a stale lease for a genuinely dead pid and times
         # out LOUDLY instead. Loud and wrong-but-safe beats silent and
         # lock-stealing, and the warning below says exactly that.
         global _WARNED_NO_PSUTIL

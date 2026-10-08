@@ -27,23 +27,9 @@ prompts and make them more musical ... ideally it is relevant to the story"):
   it, one setting phrase, then the instrumental instruction. An AUTHORED row
   on the my_story / scifi_news_pro lanes is his own words and follows the
   genre verbatim. Plus the one negative prompt for every engine that takes
-  one. The per-engine "analog tape warmth / vintage / radio" anchors that used
-  to be prepended were the withdrawn ask and appear nowhere.
+  one.
 
-  A LONG FORM used to sit beside this one, built from the palette's
-  INSTRUMENTS plus a production anchor and the row text, capped at 1000
-  characters. It was ripped on 2026-09-13 on the operator's ruling that every
-  engine gets the short form.
-
-  IT WAS NOT RIPPED FOR MISSING THE IDIOM, whatever an earlier draft of this
-  paragraph said. `compose_engine_prompt` did not read `palette.idiom` itself,
-  but it appended the ROW TEXT, and `compose_music_prompt` puts the idiom on
-  every branch -- so the genre and the BPM reached every engine, in 18 of 18
-  bank/cue combinations when it was finally measured. The difference the two
-  forms actually had was length and the instrument list, which is a taste
-  question and was decided as one.
-
-  The character cap went with it and is not missed. Sonilo owns its own
+  No character cap is applied here: Sonilo owns its own
   1000-character limit and raises on it (`eng_cloud_sonilo.generate_clip`),
   which is the fail-closed shape this pack prefers over a silent trim -- and
   google_lyria and stable_audio_music, which have NO local length guard, are
@@ -86,9 +72,8 @@ _PROMPT_TAIL = ", instrumental only, no dialogue, no vocals"
 # "intro" / "outro" words are kept on purpose: the SA3 engine's context window
 # still falls back to them for a caller that hands over no placement.
 _CUE_CHARACTER: dict[str, str] = {
-    # "settles into a STEADY theme" asked for the repetition this module
-    # spent 2026-09-12 removing; a theme that FLOWS is the same musical idea
-    # without the word that invites a two-bar loop.
+    # "settles into a STEADY theme" asks for repetition; a theme that FLOWS
+    # is the same musical idea without the word that invites a two-bar loop.
     "opening":      "a rising overture that settles into a flowing theme, "
                     "instrumental intro",
     "closing":      "a final statement of the theme resolving to a warm held "
@@ -456,8 +441,7 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
     # THE NEUTRAL FLOOR IS A SUSTAINED WORD, so a `groove_arc` palette does
     # not get it (operator's ear, 2026-09-12). With no brief there are no mood
     # terms, and "atmospheric" then LED the prompt -- a texture instruction
-    # standing in front of "Detroit techno at 128 BPM" and agreeing with the
-    # pads that used to close the palette.
+    # standing in front of "Detroit techno at 128 BPM".
     #
     # `groove_arc` AND NOT `rhythmic`, deliberately: jazz and salsa are
     # rhythmic too and he judged their cues RIGHT, floor and all, so they keep
@@ -529,14 +513,14 @@ def compose_brief_engine_prompt(meta: dict, authored_text: str = "",
                                 story_flavour: str = "") -> EnginePrompt:
     """The SHORT form, for engines trained on short descriptions.
 
-    WHY IT EXISTS, measured 2026-09-12 with MusicGen's own T5 tokenizer: the
-    full form runs 72-88 tokens and Meta's own MusicGen examples are 12-14
-    ("80s pop track with bassy drums and synth"). Operator: *"musicgen, that
-    seems too long of a prompt ... for Suno maybe, musicgen nah ... especially
-    for a 10 sec clip."* Both halves hold, and the second is the sharper one:
-    the cues are 8 and 12 seconds, so an arc clause describes structure the
-    clip has no room to contain, and every token spent on it dilutes the
-    conditioning that decides whether it sounds like the genre at all.
+    WHY IT EXISTS, measured 2026-09-12 with MusicGen's own T5 tokenizer: Meta's
+    own MusicGen examples are 12-14 tokens ("80s pop track with bassy drums and
+    synth"). Operator: *"musicgen, that seems too long of a prompt ... for Suno
+    maybe, musicgen nah ... especially for a 10 sec clip."* Both halves hold,
+    and the second is the sharper one: the cues are 8 and 12 seconds, so an arc
+    clause describes structure the clip has no room to contain, and every token
+    spent on it dilutes the conditioning that decides whether it sounds like
+    the genre at all.
 
     THE DERIVED FORM NAMES NO INSTRUMENTS, and that is the operator's call
     rather than an economy: *"probably better to keep to general, to drama, not
@@ -554,21 +538,15 @@ def compose_brief_engine_prompt(meta: dict, authored_text: str = "",
 
     THREE THINGS, IN THIS ORDER, and the order is the whole point:
       1. the palette's IDIOM -- genre and BPM, which is what his ear judged;
-      2. the episode's MOOD, from the same resolver the long form uses, so the
-         music still answers to this story rather than to its bank;
+      2. the episode's MOOD, from `resolve_mood_terms`, so the music still
+         answers to this story rather than to its bank;
       3. the instrumental instruction.
 
-    COMPOSED, NEVER TRIMMED, and that is why the long form could not simply be
-    shortened. It trimmed a long row from the MIDDLE at a clause boundary --
-    which on these palettes cuts the genre and BPM clause, because it sat
-    after the instruments. Trimming to length would have silently reinstated
-    the exact defect he heard in the techno and house cues. Measured output:
-    15-28 tokens.
+    COMPOSED, NEVER TRIMMED. A trim cuts from the MIDDLE at a clause boundary,
+    which silently reinstates the exact defect he heard in the techno and
+    house cues (the genre and BPM clause lost). Measured output: 15-28 tokens.
 
-    THIS IS NOW THE ONLY ENGINE FORM (2026-09-13). Every music engine receives
-    it -- the fork that let an engine ask for a longer one is gone, because
-    what the long form actually differed in was the IDIOM it omitted, not the
-    length it added.
+    THIS IS THE ONLY ENGINE FORM: every music engine receives it.
     """
     palette = story_palette(meta)
     # AN AUTHORED ROW IS THE OPERATOR'S OWN WORDS AND OUTRANKS EVERY DERIVED
@@ -582,23 +560,18 @@ def compose_brief_engine_prompt(meta: dict, authored_text: str = "",
     # because that is what his ear judged, and his line follows it.
     authored = str(authored_text or "").strip()
     if authored:
-        # NEVER EDIT HIS WORDS. An earlier cut here ran `.rstrip(",.")`, which
-        # turned an authored "Resolve." into "Resolve" -- mutating the operator's
-        # own text inside the branch whose entire job is to preserve it (codex
-        # contrarian, 2026-09-12). Only whitespace is stripped now. The tail is
-        # joined so it reads correctly whatever the line ends with, instead of
-        # the text being changed to suit the join.
-        # AN AUTHORED ROW GETS THE CUE CLAUSE TOO, and the reason is a claim
-        # that was asserted here rather than measured. This branch used to
-        # return without reading `cue_id` at all, excused by "an authored row
-        # is already per-cue". That is true of the WRITER's intent and false of
-        # its output often enough to matter: across the 920 ledgers on disk
-        # carrying two or more authored cues, 15 repeat the same
-        # generation_prompt text for different cues -- banks scifi_sonnet
-        # through scifi_news_pro, 2026-07-11 through 2026-09-13, so it is
-        # ongoing writer behaviour rather than one bad episode. On the worst of
-        # them the opening and the closing of a Detroit techno episode asked the
-        # engine for a byte-identical string.
+        # NEVER EDIT HIS WORDS: only whitespace is stripped, so an authored
+        # "Resolve." never becomes "Resolve". The tail is joined so it reads
+        # correctly whatever the line ends with, instead of the text being
+        # changed to suit the join.
+        # AN AUTHORED ROW GETS THE CUE CLAUSE TOO. "An authored row is already
+        # per-cue" is true of the WRITER's intent and false of its output often
+        # enough to matter: across the 920 ledgers on disk carrying two or more
+        # authored cues, 15 repeat the same generation_prompt text for different
+        # cues -- banks scifi_sonnet through scifi_news_pro, 2026-07-11 through
+        # 2026-09-13, so it is ongoing writer behaviour rather than one bad
+        # episode. On the worst of them the opening and the closing of a Detroit
+        # techno episode asked the engine for a byte-identical string.
         #
         # The clause goes AFTER his words, never in front of them and never
         # inside them. His line still leads the prompt behind the genre; this
@@ -608,12 +581,7 @@ def compose_brief_engine_prompt(meta: dict, authored_text: str = "",
         # No story flavour here: an authored row already names its own scene,
         # and a scene line from the ledger beside it would say the same thing
         # twice.
-        # HIS TEXT IS NEVER TOUCHED -- the arc joins through the TAIL, which is
-        # the same seam that already existed. An earlier cut here ran
-        # `.rstrip(",.")` and turned an authored "Resolve." into "Resolve",
-        # mutating the operator's own words inside the branch whose entire job
-        # is to preserve them (codex contrarian, 2026-09-12). With no arc this
-        # composes byte-identically to what it did before.
+        # HIS TEXT IS NEVER TOUCHED -- the arc joins through the TAIL.
         arc = _brief_cue_arc(cue_id, palette)
         joiner = " " if authored.endswith((".", "!", "?", ",")) else ", "
         after = ", ".join(([arc] if arc else []) + ["instrumental, no vocals"])

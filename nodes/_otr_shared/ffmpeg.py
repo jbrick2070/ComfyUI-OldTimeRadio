@@ -382,27 +382,19 @@ def caption_support_gap(path=None) -> Optional[str]:
             % (caps["path"], " and ".join(missing)))
 
 
-# REMOVED 2026-09-13: ``widget_ffmpeg_is_ignored(value, node)`` lived here,
-# with a module-level warn-once set beside ``_CAPABILITY_CACHE`` above.
+# THE DEFENCE AGAINST A WIDGET-SUPPLIED ffmpeg PATH IS NON-DECLARATION: no node
+# declares an ``ffmpeg`` STRING widget. A ComfyUI widget value arrives in the
+# body of an unauthenticated ``/prompt`` request and is whatever a downloaded
+# workflow JSON says, so such a widget would be a channel by which untrusted
+# input reaches argv[0] -- ahead of the operator's own ``OTR_FFMPEG`` pin, and
+# the ffprobe sibling rule would turn one such value into a SECOND attacker
+# binary. With no widget ComfyUI never passes a value at all: the channel is
+# closed rather than cleaned, which is strictly stronger than sanitising it. A
+# sanitiser would also invite a future window to re-declare the widget and
+# "handle" it, restoring the weaker design.
 #
-# WHAT IT DEFENDED AGAINST. A ComfyUI widget value arrives in the body of an
-# unauthenticated ``/prompt`` request and is whatever a downloaded workflow
-# JSON says. While five node classes declared an ``ffmpeg`` STRING widget,
-# that value was a channel by which untrusted input could reach argv[0] --
-# ahead of the operator's own ``OTR_FFMPEG`` pin, and the ffprobe sibling
-# rule turned one such value into a SECOND attacker binary. From 2026-09-04
-# the defence was to SANITISE: each execute method handed its widget value to
-# this function, which discarded it and returned ``""``.
-#
-# THE DEFENCE IS NOW NON-DECLARATION, WHICH IS STRICTLY STRONGER. The widget
-# is gone from all five classes that declared it, so ComfyUI never passes a
-# value at all: the channel is closed rather than cleaned. A sanitiser with no
-# caller would not be harmless decoration here -- it would invite a future
-# window to re-declare the widget and "handle" it, restoring the weaker
-# design. Hence the rip, per this repo's orphans rule.
-#
-# ``OTR_FFMPEG`` remains the one way to pin a build, because a workflow cannot
-# set an environment variable -- exactly why the pin is the trustworthy channel
+# ``OTR_FFMPEG`` is the one way to pin a build, because a workflow cannot set
+# an environment variable -- exactly why the pin is the trustworthy channel
 # and a widget is not. ``resolve_ffmpeg`` here, and ``resolve_ffprobe`` in the
-# sibling ``ffprobe`` module, remain the live security surface: their
+# sibling ``ffprobe`` module, are the live security surface: their
 # absolute-path and bare-name rules are what decide argv[0].

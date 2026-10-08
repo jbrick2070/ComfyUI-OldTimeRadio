@@ -269,16 +269,12 @@ def phase_7_audio_readiness(led) -> AudioReadinessReport:
 # field (+ a source-text sha for staleness detection + a receipt), leaving
 # `text`/counts/proof pristine.
 #
-# CORRECTION (2026-08-15): this note used to say Phase 7 "REWRITES
-# canonical `line.text` in place", and offered that as the reason it is
-# skipped. It does not. `:242-246` writes only `text_for_tts`, its source
-# hash and its receipt -- exactly what `stamp_text_for_tts_delivery` below
-# writes. NEITHER function mutates canonical text, and the distinction is
-# load-bearing rather than tidy: the D2 clean window reconciles the
-# acceptance proof immediately BEFORE this stamp, and that ordering is
-# only safe because nothing here can move a hash the proof covers. A
-# reader who believes the old claim goes hunting for a mutator that does
-# not exist.
+# Phase 7 writes only `text_for_tts`, its source hash and its receipt --
+# exactly what `stamp_text_for_tts_delivery` below writes. NEITHER function
+# mutates canonical text, and the distinction is load-bearing rather than
+# tidy: the D2 clean window reconciles the acceptance proof immediately
+# BEFORE this stamp, and that ordering is only safe because nothing here can
+# move a hash the proof covers.
 #
 # The voice node speaks `text_for_tts` via the delivery resolver
 # (`_otr_text_delivery`); the C1 durable-identity merge keeps the stamp

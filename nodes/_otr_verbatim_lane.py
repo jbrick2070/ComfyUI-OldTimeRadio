@@ -4,9 +4,8 @@ Operator ruling (apple/OTR_STANDING_RULINGS.md, "THE PASSAGE LANE"): *"For
 shakespeare I'm open to a version that is very strict and finds, based on word
 count and random choice, hones in on a specific part of a play to get real
 specific dialogue, no paraphrasing."* And: *"`shakespeare` is VERBATIM and gets
-the executor."* Before this module the lane's model wrote Shakespeare from a
-beat's intent and mood -- the newest live ledger on 2026-09-11 had HERO holding
-"this blade high between us" in a scene with no blade.
+the executor."* Without this module the lane's model writes Shakespeare from a
+beat's intent and mood, inventing business the scene does not contain.
 
 THE SHAPE. ``_otr_passage_selector`` chooses one contiguous window of
 consecutive speeches (seeded, replayable) and cuts it into exactly the voiced
@@ -28,7 +27,7 @@ guard reads (``num_characters_effective``), unchanged.
 THE TOPOLOGY IS NOT DERIVED FROM THE PASSAGE. ``compute_episode_budget`` stays
 the one topology owner and the act dial is honoured exactly; the passage FILLS
 the beats. The alternative -- deriving an act count from the words selected --
-is the word-to-act veto deleted on 2026-08-14 wearing new clothes.
+is the old word-to-act veto wearing new clothes.
 
 THE SEED. Same helper and same ``OTR_CAST_SEED`` pin as the cast draw, but a
 SEPARATE draw taken here, on this lane only: the cast mint at the writer's own
@@ -115,12 +114,11 @@ def vendored_credit_line(existing: str, *, translator: str,
                          episode_meta: Any = None) -> str:
     """The printed credit when a REAL TRANSLATOR'S words were performed.
 
-    WE WERE PERFORMING A NAMED HUMAN'S WORK AND NOT SAYING SO. A French Hamlet
-    speaks Francois-Victor Hugo's 1865 lines, and the credits roll printed only
-    "adapted from <Folger>, used under CC BY-NC 3.0" -- accurate about the
-    scene, silent about whose French it was. The provenance was on the ledger
-    the whole time (`verbatim_passage.vendored`) with no consumer anywhere, so
-    it reached no human surface at all.
+    A NAMED HUMAN'S WORK IS BEING PERFORMED AND THE CREDIT MUST SAY SO. A French
+    Hamlet speaks Francois-Victor Hugo's 1865 lines, and "adapted from
+    <Folger>, used under CC BY-NC 3.0" alone is accurate about the scene but
+    silent about whose French it was. The provenance rides on the ledger
+    (`verbatim_passage.vendored`); this line is its human surface.
 
     PRINT ONLY, deliberately. The 2026-08-05 ruling in `_otr_provenance` settles
     that attribution is a printed surface and not a spoken one, so this does not

@@ -5,10 +5,9 @@ not by a filename or a generation seed: ``portrait_content_hash =
 sha256(decoded_pixels.tobytes())``. The file lives at a deterministic,
 content-addressed location
 ``<output>/otr/episodes/_shared/cache/{portrait_content_hash}.png``
-(the OH-1 output-tree contract, 2026-06-11: the pool moved from the old
-top-level ``otr/stills/`` into the ``episodes/_shared`` system tier --
-cache entries are cross-episode copies, NEVER the only copy; the
-episode's own ``stills/`` dir holds the asset of record).
+(the OH-1 output-tree contract: the pool lives in the ``episodes/_shared``
+system tier -- cache entries are cross-episode copies, NEVER the only copy;
+the episode's own ``stills/`` dir holds the asset of record).
 
 Two consequences the platform relies on:
 
@@ -37,8 +36,8 @@ from typing import Optional
 log = logging.getLogger("OTR.portrait_ledger")
 
 #: ``<output>/otr/episodes/_shared/cache`` -- the content-addressed
-#: cross-episode pool (OH-1: moved from the old top-level ``otr/stills``;
-#: ``_shared`` is the reserved system tier, never an episode).
+#: cross-episode pool (OH-1: ``_shared`` is the reserved system tier, never an
+#: episode).
 _STILLS_SUBDIR = ("otr", "episodes", "_shared", "cache")
 
 

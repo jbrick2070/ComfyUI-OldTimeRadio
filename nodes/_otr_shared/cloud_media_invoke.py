@@ -506,10 +506,10 @@ async def _call_gemini_nano_banana2_v2(cls, inputs: dict) -> Any:
 
     validate_string(prompt, strip_whitespace=True, min_length=1)
     model_choice = model["model"]
-    # Resolution moved to _otr_shared/google_image_model_ids.py so the provenance
-    # collector reads the SAME table this call does. Behaviour is unchanged,
-    # identity fallthrough included; a second copy of the mapping is exactly the
-    # drift that hid two shipped model ids from the guard.
+    # Resolution lives in _otr_shared/google_image_model_ids.py (identity
+    # fallthrough included) so the provenance collector reads the SAME table
+    # this call does; a second copy of the mapping is exactly the drift that
+    # hid two shipped model ids from the guard.
     model_id = resolve_selector_to_model_id(model_choice)
 
     images = model.get("images") or {}
@@ -563,7 +563,7 @@ def _inject_hidden_inputs(row: dict, inputs: dict, session) -> dict:
     declares. Caller-provided keys are never overridden."""
     kwargs = dict(inputs)
     hidden = (row.get("inputs") or {}).get("hidden") or {}
-    # The API key is the only credential kind since the 2026-09-19 rip, so
+    # The API key is the only credential kind, so
     # the partner row must declare the api_key_comfy_org hidden input.
     auth_name = "api_key_comfy_org"
     if auth_name not in hidden:
@@ -809,8 +809,8 @@ def _map_exception(exc: BaseException, node_key: str) -> CloudMediaError:
     # A POLICY VERDICT IS NOT A GENERIC REJECTION, and the difference is the
     # whole reason this branch exists. PROVIDER_REJECTED is the catch-all for
     # "the provider said no and we do not know why", and the render driver
-    # treats not-knowing as a crash -- which killed a 58-minute episode at
-    # beat 40 on 2026-09-16 over one filtered prompt. Naming the verdict here,
+    # treats not-knowing as a crash -- one filtered prompt would end a whole
+    # episode. Naming the verdict here,
     # while the provider's own words are still in hand, is what lets the
     # driver floor that one beat instead of the whole run.
     if is_content_policy_message(text):

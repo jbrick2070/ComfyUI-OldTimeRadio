@@ -17,7 +17,7 @@ Env surface (all read per session-create, never mutated mid-run):
   (no credential env)             auth is ONLY the api_key_comfy_org hidden
                                   input ComfyUI injects into the OTR host
                                   node (app sign-in, or a headless
-                                  submitter's extra_data). Rip 2026-09-19.
+                                  submitter's extra_data).
   OTR_CLOUD_MEDIA_BUDGET_USD      optional per-run USD ceiling. UNSET =
                                   no local ceiling -- the wallet 402 is
                                   the stop (operator 2026-09-16: do not
@@ -25,11 +25,9 @@ Env surface (all read per session-create, never mutated mid-run):
                                   cap). An EXPLICIT 0 = every reserve
                                   fails closed with `budget` (spend-off).
 
-NOTE (operator directive 2026-07-02 evening): the OTR_ENABLE_COMFY_CLOUD_MEDIA
-opt-in flag was REMOVED -- same clean break as the OpenRouter lane's C6
-(OTR_ENABLE_OPENROUTER removal). Cloud rows run iff the user PICKS a
-"Comfy Cloud" entry in the video/image/TTS dropdowns; picking one without
-credentials fails LOUD at auth resolution naming all three sources.
+NOTE (operator directive 2026-07-02 evening): there is no opt-in flag. Cloud
+rows run iff the user PICKS a "Comfy Cloud" entry in the video/image/TTS
+dropdowns; picking one without credentials fails LOUD at auth resolution.
   OTR_CLOUD_MEDIA_CACHE_DIR       cache root override.
   OTR_CLOUD_MAX_CONCURRENCY_<ID>  per-provider semaphore size.
   OTR_VIDEO_MUTE_OK_ROLES         comma list of roles allowed mute video
@@ -127,11 +125,10 @@ class CloudMediaError(RuntimeError):
 def is_wallet_empty_message(text: str) -> bool:
     """True when the provider refused because the Comfy account is empty.
 
-    Live 2026-09-16: Credits returned ``HTTP 402 Payment Required``. The
-    partner LTX path used to map unknown HTTP errors to
-    ``PROVIDER_REJECTED``, so fan-out halt has to recognize the
-    wallet-empty text too. ``402`` is matched as a whole token so a job
-    id containing 1402 does not trip this.
+    Credits answers an empty account with ``HTTP 402 Payment Required``, which
+    would otherwise read as an unknown HTTP error (``PROVIDER_REJECTED``), so
+    fan-out halt has to recognize the wallet-empty text too. ``402`` is matched
+    as a whole token so a job id containing 1402 does not trip this.
     """
     blob = str(text or "").lower()
     if "payment required" in blob or "insufficient credit" in blob:
@@ -168,8 +165,8 @@ def is_auth_failure_message(text: str) -> bool:
 #: of them with one needle each instead of four spellings each.
 #:
 #: EVERY NEEDLE HERE IS SELF-ANCHORED -- it names content AND a verdict in the
-#: same token. That rule is what keeps ordinary faults out. Four needles were
-#: cut on 2026-09-16 review for failing it, and the reasons are worth keeping:
+#: same token. That rule is what keeps ordinary faults out. These four fail
+#: it and stay OUT, and the reasons are worth keeping:
 #: ``policy restriction`` matches a corporate proxy's "blocked by policy
 #: restriction", which is systemic and would floor EVERY beat; ``safety
 #: system`` matches "our safety system is temporarily unavailable", a
@@ -365,7 +362,7 @@ def mute_ok_roles() -> frozenset:
 
 @dataclass(frozen=True)
 class CloudAuth:
-    kind: str  # always "api_key_hidden" since the 2026-09-19 rip
+    kind: str  # always "api_key_hidden"
     value: str
 
     def __repr__(self) -> str:  # never leak the secret into logs/ledger
@@ -404,8 +401,8 @@ def resolve_auth(hidden_api_key: Optional[str] = None) -> CloudAuth:
     host node's `api_key_comfy_org` hidden input -- the signed-in app
     session, or `extra_data.api_key_comfy_org` on a headless POST /prompt
     (scripts/otr_api.py sends it). No env var, no pack key file, no
-    session bearer (rip 2026-09-19: three sources in two orders was the
-    defect). Missing = fail closed, and the hint names both real paths."""
+    session bearer (three sources in two orders was the defect). Missing =
+    fail closed, and the hint names both real paths."""
     if isinstance(hidden_api_key, str) and hidden_api_key.strip():
         return CloudAuth("api_key_hidden", hidden_api_key.strip())
     raise CloudMediaError(CloudErrorCode.AUTH, NO_CREDENTIAL_HINT)
@@ -629,21 +626,20 @@ class CloudMediaSession:
     def ledger_path(self) -> Path:
         """The cloud-media billing ledger -- an append-only record of real money.
 
-        MOVED OUT OF THE PACK DIRECTORY 2026-09-11. It used to live under the
-        old default ``cache_root`` inside the installed pack; ``cache_root``
-        now defaults to ``otr_shared_cache_dir()/cloud_media`` under the output
-        tree (see :func:`resolve_cache_root`). A registry update or reinstall
-        tree, and this file is the ONLY copy of that spend history anywhere on
-        disk (verified: nothing reads it back, so nothing could rebuild it).
+        IT LIVES OUTSIDE THE PACK DIRECTORY. A registry update or reinstall
+        replaces the pack tree, and this file is the ONLY copy of that spend
+        history anywhere on disk (verified: nothing reads it back, so nothing
+        could rebuild it).
 
-        It now lives under ``otr_state_dir()``, which is the tier that already
+        It lives under ``otr_state_dir()``, which is the tier that already
         exists for exactly this -- durable per-machine runtime state under the
         user's output tree, never swept by the janitor (which is scoped to
         ``_shared/tmp`` alone) and never treated as disposable. The cache tier
-        would have been the wrong home for the opposite reason: its own
-        contract says "a cache entry is NEVER the only copy", and this is.
+        would be the wrong home for the opposite reason: its own contract says
+        "a cache entry is NEVER the only copy", and this is.
 
-        ``cache_root`` is unchanged and still owns ``partner_tmp/`` -- genuinely
+        ``cache_root`` (default ``otr_shared_cache_dir()/cloud_media``, see
+        :func:`resolve_cache_root`) still owns ``partner_tmp/`` -- genuinely
         transient bytes, written and consumed inside one node execution.
 
         Existing ledgers are COPIED FORWARD once, not abandoned and not moved:
@@ -776,9 +772,9 @@ def prompt_api_key(prompt_id: str) -> Optional[str]:
 
 def _sweep_locked(now: float) -> None:
     # THE EXECUTING PROMPT IS NEVER SWEPT. The key is stashed ONCE, when the
-    # credential node runs at the start of the queue (every host used to
-    # re-stash at its own start), and a render can outlast the six-hour age
-    # (the longest logged run is 4:48:18). Everything else ages out as before.
+    # credential node runs at the start of the queue, and a render can outlast
+    # the six-hour age (the longest logged run is 4:48:18). Everything else
+    # ages out.
     live = live_prompt_id()
     stale_keys = [pid for pid, (_key, at) in _PROMPT_API_KEYS.items()
                   if now - at > SESSION_SWEEP_MAX_AGE_S and pid != live]

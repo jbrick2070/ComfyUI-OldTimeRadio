@@ -12,14 +12,14 @@ from collections.abc import MutableMapping
 from typing import Any
 
 
-#: A WORD STARTS WITH A LETTER OF ANY SCRIPT, not only A-Z. The first cut was
-#: `[A-Za-z][A-Za-z0-9'-]*`, and on 2026-09-19 it counted Tsubouchi's whole
-#: Japanese balcony scene -- 3,606 characters -- as TWO words, so the verbatim
-#: planner refused the vendored translation ("a 2-word passage cannot fill 12
-#: beats") and every Japanese Shakespeare episode fell back to a machine
-#: translation wearing the translator's credit. The same regex split `n\u00e3o` at
-#: the accent into two words, so every Portuguese, Spanish, Italian and French
-#: ledger row was over-counted. ON ASCII THIS PATTERN IS THE OLD ONE, LETTER
+#: A WORD STARTS WITH A LETTER OF ANY SCRIPT, not only A-Z. An ASCII-only start
+#: (`[A-Za-z][A-Za-z0-9'-]*`) counts Tsubouchi's whole Japanese balcony scene
+#: -- 3,606 characters -- as TWO words, so the verbatim planner refuses the
+#: vendored translation ("a 2-word passage cannot fill 12 beats") and every
+#: Japanese Shakespeare episode falls back to a machine translation wearing the
+#: translator's credit. The same regex splits `n\u00e3o` at the accent into two
+#: words, so every Portuguese, Spanish, Italian and French ledger row is
+#: over-counted. ON ASCII THIS PATTERN IS THE ASCII-ONLY ONE, LETTER
 #: FOR LETTER: `[^\W\d_]` is "a letter" and equals `[A-Za-z]` on ASCII;
 #: `[^\W_]` is "a letter or digit" and equals `[A-Za-z0-9]` there; the
 #: apostrophes and the hyphen are admitted anywhere in the continuation

@@ -26,13 +26,11 @@ VISUAL_SAFETY_NEGATIVE_PROMPT = ""
 
 
 def append_visual_safety_clause(prompt: str) -> str:
-    """Pass the prompt through unchanged. Retired 2026-08-05.
+    """Pass the prompt through unchanged.
 
-    This appended a family-safe / no-weapons / no-nudity clause to every image
-    and video request. The operator's no-content-guardrails directive covers
-    the visual path too, so nothing is appended now. The function survives
-    because it is a named seam on the render path (and because the path guard
-    is being reordered around it), not because it still does anything.
+    The operator's no-content-guardrails directive (2026-08-05) covers the
+    visual path, so no family-safe / no-weapons / no-nudity clause is appended.
+    The function is kept because it is a named seam on the render path.
     """
     return str(prompt or "").strip()
 
@@ -145,8 +143,7 @@ def log_story_brief_disposition(meta: Any, consumer_id: str, log: Any) -> str:
     Returns the resolved status string so the caller can branch on it
     if needed. Each consumer calls this exactly ONCE per run with its
     own `log` (logging.Logger) and a string consumer_id from the
-    canonical set (refreshed 2026-06-10 gap audit -- the legacy batch
-    renderers are gone; the live consumers are):
+    canonical set (the live consumers are):
 
         ltx_scene_open  render_driver.run_real_episode (scene composer)
         shotlock_m4     OTR_ShotLock (per-beat creative derivation)
@@ -186,15 +183,11 @@ def log_story_brief_disposition(meta: Any, consumer_id: str, log: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
-# The prompt FINISHER (2026-06-10 brief-downstream gap audit, F1).
-#
-# The CW-1 teardown deleted otr_video_plan.py, the only consumer that appended
-# the brief's era prose + the film style tail to visual prompts -- every
-# post-refactor prompt rendered without them (gap G2/G3, roundtable-hardened
-# fix). These helpers restore that
-# finishing as ONE shared seam. Pure functions: no logging here (the
-# disposition log keeps its once-per-run contract at the NODE level), no
-# dedupe, no style presets (3-model panel consensus cuts).
+# The prompt FINISHER (2026-06-10 brief-downstream gap audit, F1): ONE shared
+# seam that appends the brief's era prose + the film style tail to visual
+# prompts. Pure functions: no logging here (the disposition log keeps its
+# once-per-run contract at the NODE level), no dedupe, no style presets
+# (3-model panel consensus cuts).
 # ---------------------------------------------------------------------------
 
 # STAGE 3 (multi-modal story schema, 2026-07-05): every tail below is a field
@@ -204,14 +197,13 @@ def log_story_brief_disposition(meta: Any, consumer_id: str, log: Any) -> str:
 # ``positive_tail`` (the film aesthetic), ``image_grade_tail`` and
 # ``broadcast_tail``.
 #
-# BUG-411 restore (2026-06-14) is why the last two exist: the 6/5 FLUX image
-# pipeline appended a RICHER cinematic grade ("anamorphic lens, heavy vignette,
-# muted color grade, sharp focus") than the shared positive tail, and a
-# broadcast-distress identity suffix ("35mm film grain, broadcast-distressed")
-# to every radio still, and the image-pipeline rewrite into _otr_image_engines
-# dropped both. They are re-added on the IMAGE STILL path ONLY
-# (compose_still_prompt, after the positive tail); the shared tail that LTX
-# scene clips + character video (style_tail=True) use stays untouched.
+# BUG-411 is why the last two exist: the 6/5 FLUX image pipeline appended a
+# RICHER cinematic grade ("anamorphic lens, heavy vignette, muted color grade,
+# sharp focus") than the shared positive tail, and a broadcast-distress
+# identity suffix ("35mm film grain, broadcast-distressed") to every radio
+# still. They apply on the IMAGE STILL path ONLY (compose_still_prompt, after
+# the positive tail); the shared tail that LTX scene clips + character video
+# (style_tail=True) use stays untouched.
 
 #: The render-constraint clause the LTX scene prompts carry; preserved
 #: verbatim through max_chars trimming.
@@ -382,7 +374,7 @@ def _radio_form_haystack(meta: Any) -> str:
 def radio_form_from_meta(meta: Any) -> str:
     """DETERMINISTIC brief -> radio-form noun phrase (NO LLM). The first keyword
     match in :data:`_RADIO_FORM_MAP` wins; :data:`_RADIO_FORM_DEFAULT` (a neutral
-    tube radio, NOT the retired 1940s studio anchor) when nothing matches. Pure;
+    tube radio, never a 1940s studio anchor) when nothing matches. Pure;
     never empty."""
     hay = _radio_form_haystack(meta)
     for keys, form in _RADIO_FORM_MAP:
@@ -550,8 +542,8 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     pieces.append(get_era_tail(meta, profile="still", style=_style))
     pieces.append(_style.positive_tail)
     if not is_portrait:
-        # BUG-411: restore the 6/5 cinematic grade + the radio broadcast-distress
-        # identity the image-pipeline rewrite dropped. Scene stills are all radio
+        # BUG-411: the 6/5 cinematic grade + the radio broadcast-distress
+        # identity. Scene stills are all radio
         # context (open/announcer/music), so both tails apply; appended AFTER the
         # shared style tail and BEFORE the NO_TEXT_CLAUSE so the 5-layer
         # order and the no-text contract are preserved. Portraits are unchanged
@@ -567,12 +559,11 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
     if not is_portrait:
         out = f"{out}, {NO_TEXT_CLAUSE}"
-    # The slash/backslash laundering that used to sit here was REMOVED
-    # 2026-08-05 with its root fix. It rewrote authored prose -- "the corner of
-    # 5th/Main" became "the corner of 5th or Main" -- to dodge a path guard that
-    # treated a bare separator anywhere as a path. The guard now classifies the
-    # WHOLE STRING, so prose slashes pass and a real path still refuses loudly
-    # rather than being laundered into a quiet garbled render.
+    # No slash/backslash laundering here: rewriting authored prose ("the corner
+    # of 5th/Main" -> "the corner of 5th or Main") to dodge the path guard is
+    # wrong. The guard classifies the WHOLE STRING, so prose slashes pass and a
+    # real path still refuses loudly rather than being laundered into a quiet
+    # garbled render.
     return out
 
 

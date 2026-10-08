@@ -4,8 +4,7 @@ _otr_speaker_role.py
 
 Speaker-role taxonomy for the v2.0-alpha architecture.
 
-**Routing contract (locked 2026-05-01 after BUG-LOCAL-129; sfx role RIPPED
-2026-07-01):**
+**Routing contract (locked 2026-05-01 after BUG-LOCAL-129):**
 
 Every line in ``ledger.lines[]`` carries a ``speaker_role``. Routing:
 
@@ -17,21 +16,17 @@ Every line in ``ledger.lines[]`` carries a ``speaker_role``. Routing:
     music_close -> same as music_open.
     music_inter -> same as music_open.
 
-The historical ``sfx`` role was removed 2026-07-01 (kibitz r1+r2 grounded:
-it produced ZERO script/audio/video content -- the writer nudge never fired,
-TTS never saw it, and its SceneSequencer overlay inputs were unwired). A
-ledger that still carries ``speaker_role: "sfx"`` is an OLD ledger and is
+A ledger that carries ``speaker_role: "sfx"`` is an OLD ledger and is
 rejected LOUD by :func:`resolve_speaker_role`, the ledger-freeze per-line
 invariant, and the SceneSequencer dispatch. NO FALLBACKS.
 
-**Why the old "radio is the visual performer" premise was retired:**
+**Why the radio is never HuMo's reference:**
 
-BUG-LOCAL-129 (2026-05-01) discovered that HuMo's finetuned weights
-will not animate non-face references. Passing the radio still as
-HuMo's ``ref_image`` for announcer/music produced two unrelated
-generic faces (l001 + l021 of the 2026-05-01_110019 run) instead of
-the radio itself. HuMo is for speaking faces only; everything else
-goes through the deterministic radio-console editorial path.
+HuMo's finetuned weights will not animate non-face references
+(BUG-LOCAL-129). Passing the radio still as HuMo's ``ref_image`` for
+announcer/music produces unrelated generic faces instead of the radio
+itself. HuMo is for speaking faces only; everything else goes through the
+deterministic radio-console editorial path.
 
 This module is pure stdlib -- no torch, no comfy imports -- so it's
 safe to load from tests, scripts, and any node without adding
@@ -54,7 +49,7 @@ SPEAKER_ROLE_MUSIC_INTER = "music_inter"
 
 
 # All valid roles, in canonical order.  Used by validators and tests.
-# 2026-07-01: "sfx" REMOVED (rip-sfx-broll). Old sfx ledgers fail loud.
+# A ledger carrying "sfx" is rejected loud.
 VALID_SPEAKER_ROLES = (
     SPEAKER_ROLE_CHARACTER,
     SPEAKER_ROLE_ANNOUNCER,
@@ -64,14 +59,12 @@ VALID_SPEAKER_ROLES = (
 )
 
 
-# BUG-LOCAL-129 fix (2026-05-01): no role routes to the radio still
-# as a HuMo I2V reference any more. HuMo's weights only animate faces;
-# passing the radio still produces unconstrained generic-face output
-# (BUG-129's two-blonde-women symptom). Roles that previously routed
-# here now fall through the portrait chain; if no portrait is found
-# the line gets a deterministic static-radio fill (BUG-129a). The
-# empty set is preserved as a defense-in-depth signal: if a future
-# commit re-populates this set, is_radio_role() flips True and the
+# No role routes to the radio still as a HuMo I2V reference (BUG-LOCAL-129).
+# HuMo's weights only animate faces; passing the radio still produces
+# unconstrained generic-face output. Such roles fall through the portrait
+# chain; if no portrait is found the line gets a deterministic static-radio
+# fill (BUG-129a). The set is deliberately empty as a defense-in-depth signal:
+# if a future commit re-populates it, is_radio_role() flips True and the
 # regression resurfaces visibly.
 _RADIO_ROLES: frozenset[str] = frozenset()
 
@@ -108,10 +101,7 @@ _MUSIC_ROLES = frozenset({
 def resolve_speaker_role(line: Any) -> str:
     """Return the canonical ``speaker_role`` for a ledger line, or RAISE.
 
-    NO FALLBACKS (rip-sfx-broll, 2026-07-01 -- the silent
-    default-to-character path was removed; repo grep confirmed zero
-    production callers at conversion time, so no production path relied
-    on the old fallback):
+    NO FALLBACKS (2026-07-01): there is no silent default-to-character path:
 
       - ``line`` must be a ``Mapping`` carrying a string ``speaker_role``
         whose normalized value is in :data:`VALID_SPEAKER_ROLES`;
@@ -156,16 +146,15 @@ def is_dialogue_role(role: str) -> bool:
 
 
 def is_radio_role(role: str) -> bool:
-    """Always returns ``False`` post-BUG-LOCAL-129 (2026-05-01).
+    """Always returns ``False`` (``_RADIO_ROLES`` is empty; BUG-LOCAL-129).
 
-    Historical contract: True for announcer + music_*, which used the
-    radio still PNG as HuMo's I2V reference. Retired because HuMo's
-    weights only animate faces -- passing a non-face produced
-    unconstrained generic-face output (BUG-129).
+    HuMo's weights only animate faces -- passing the radio still as a
+    non-face reference produces unconstrained generic-face output
+    (BUG-129) -- so no role uses the radio still as HuMo's I2V reference.
 
-    The predicate is preserved (rather than deleted) as a defense-in-
-    depth flag: any test that asserts ``is_radio_role(r)`` is True will
-    fail loudly if a future commit re-populates :data:`_RADIO_ROLES`.
+    The predicate is preserved as a defense-in-depth flag: any test that
+    asserts ``is_radio_role(r)`` is True will fail loudly if a future commit
+    re-populates :data:`_RADIO_ROLES`.
     """
     return role in _RADIO_ROLES
 
@@ -204,13 +193,10 @@ def is_music_role(role: str) -> bool:
 def stamp_default_role(line: Dict[str, Any]) -> Dict[str, Any]:
     """Validate ``line``'s ``speaker_role`` in place; RAISE if bad.
 
-    NO FALLBACKS (rip-sfx-broll, 2026-07-01): the historical backfill
-    behavior (silently stamping ``character`` over a missing or invalid
-    role -- including on lines that had NO speaker_role at all) was
-    removed. Every producer stamps a valid role at init; a line that
-    reaches this helper without one is a bug upstream, not a legacy
-    shape to repair. Repo grep at conversion time confirmed zero
-    production callers.
+    NO FALLBACKS (2026-07-01): no silent backfill (stamping ``character`` over
+    a missing or invalid role, including on lines that have NO speaker_role at
+    all). Every producer stamps a valid role at init; a line that reaches this
+    helper without one is a bug upstream, not a legacy shape to repair.
 
     Raises ``TypeError`` if ``line`` is not a dict (this helper
     expects a mutable row) and ``ValueError`` on a missing/invalid

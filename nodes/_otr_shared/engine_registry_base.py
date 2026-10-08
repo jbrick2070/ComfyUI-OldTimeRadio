@@ -70,9 +70,9 @@ class EngineUsabilityReason(str, enum.Enum):
     """The reasons an engine may be refused for a role (fail-closed).
 
     Registry-level checks (no IO) raise ``MALFORMED_CONFIG`` and
-    ``INCOMPATIBLE_PROFILE``. There is no flag-gate reason: the flag gate was
-    removed (C2-C6, "registry IS the menu"), and this enum stays identical to
-    the audio taxonomy (protocol-parity). The disk/token reasons
+    ``INCOMPATIBLE_PROFILE``. There is no flag-gate reason ("registry IS the
+    menu"), and this enum stays identical to the audio taxonomy
+    (protocol-parity). The disk/token reasons
     (``MISSING_MODEL``, ``MISSING_HF_TOKEN``) require IO and are raised
     downstream by the profile resolver and the engine adapters, which reuse
     this same enum + :class:`EngineUnusable` so the taxonomy is single-sourced

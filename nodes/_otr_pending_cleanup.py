@@ -15,18 +15,12 @@ a `pending_*` dir routinely holds the ENTIRE writer + TTS + music +
 assembly stage before it is renamed. Aborted runs leave the
 `pending_*` dir behind forever.
 
-WHAT THIS SWEEP MAY DELETE (tightened 2026-09-05, Fable gate): a dir
-whose ledger is shaped and EMPTY, or a dir with NO ledger and NO
-regular file anywhere beneath it. An UNREADABLE ledger is reported
-and preserved -- "cannot read it" was being treated as "may delete
+WHAT THIS SWEEP MAY DELETE: a dir whose ledger is shaped and EMPTY, or a
+dir with NO ledger and NO regular file anywhere beneath it. An UNREADABLE
+ledger is reported and preserved -- "cannot read it" is never "may delete
 it", and the writer's atomic saves mean an unreadable ledger has an
 outside cause. Age is measured from the newest mtime BENEATH the dir,
 because an NTFS directory mtime moves only on direct-child changes.
-
-Live evidence: 17 pending_20260527_* dirs accumulated on
-2026-05-27 between 11:28 and 15:09 (all with 0 lines, all with
-just `episode_id` + `style` in meta) before the operator restarted
-ComfyUI and the cleanup was added.
 
 This module is PURE: no torch, no Comfy. Pure stdlib + the
 `_otr_paths.otr_episodes_root` helper. Called by
@@ -97,7 +91,7 @@ class PendingSweepReport:
 
 
 #: The four things a pending dir's ledger can be. They are DIFFERENT
-#: dispositions, and collapsing two of them is what this module used to do.
+#: dispositions, and collapsing two of them is a defect.
 LEDGER_ABSENT = "absent"          # no audio/ dir or no *_ledger.json in it
 LEDGER_UNREADABLE = "unreadable"  # a file is there and we cannot read it
 LEDGER_EMPTY = "empty"            # shaped, lines=[] -- the writer never composed
@@ -107,14 +101,13 @@ LEDGER_HAS_LINES = "has_lines"    # a real ledger; forensic evidence, keep it
 def _ledger_state(audio_dir: Path) -> str:
     """Classify the dir's *_ledger.json as one of the four states above.
 
-    UNREADABLE IS NOT ABSENT, and that distinction is the whole fix
-    (2026-09-05). This used to return ``None`` for both "there is no ledger"
-    and "there is a ledger and json.load raised", and the caller read ``None``
-    as permission to delete. A truncated or BOM-prefixed ledger -- an AV
-    transient, a disk fault, a hand edit -- therefore erased everything under
-    the directory. The writer's own saves are atomic (``os.replace`` of a
-    ``.tmp``), so an unreadable ledger has an OUTSIDE cause, which is exactly
-    the case where the contents are worth keeping.
+    UNREADABLE IS NOT ABSENT, and that distinction is the whole point. One
+    value for both "there is no ledger" and "there is a ledger and json.load
+    raised" would read as permission to delete: a truncated or BOM-prefixed
+    ledger -- an AV transient, a disk fault, a hand edit -- would erase
+    everything under the directory. The writer's own saves are atomic
+    (``os.replace`` of a ``.tmp``), so an unreadable ledger has an OUTSIDE
+    cause, which is exactly the case where the contents are worth keeping.
     """
     if not audio_dir.is_dir():
         return LEDGER_ABSENT
@@ -131,9 +124,8 @@ def _ledger_state(audio_dir: Path) -> str:
         with open(led_p, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError, UnicodeDecodeError):
-        # ValueError covers json.JSONDecodeError. UnicodeDecodeError used to
-        # ESCAPE this function entirely, contradicting its never-raises
-        # contract; the writer's outer except swallowed it by accident.
+        # ValueError covers json.JSONDecodeError. UnicodeDecodeError is named
+        # so it cannot escape this function (its never-raises contract).
         return LEDGER_UNREADABLE
     if not isinstance(data, dict):
         return LEDGER_UNREADABLE
@@ -154,8 +146,8 @@ def _newest_mtime_beneath(child: Path) -> float:
     """The most recent mtime anywhere under ``child``, falling back to the
     dir's own. On NTFS a directory's mtime moves only on DIRECT-child
     create/delete/rename, not on writes inside ``audio/`` -- so a long audio
-    stage looked "old" to the top-level stat and the 2-hour guard was weaker
-    than it promised."""
+    stage would look "old" to the top-level stat and the 2-hour guard would be
+    weaker than it promises."""
     newest = child.stat().st_mtime
     try:
         for p in child.rglob("*"):

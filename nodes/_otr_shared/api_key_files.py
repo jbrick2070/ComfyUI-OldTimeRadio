@@ -37,7 +37,7 @@ LANES = {
         "location": "openrouter_api_key.location",
         "env": ("OPENROUTER_API_KEY",),
     },
-    # No "comfy" lane (rip 2026-09-19): the Comfy credential is ONLY the
+    # No "comfy" lane: the Comfy credential is ONLY the
     # api_key_comfy_org hidden input ComfyUI injects -- app sign-in, or a
     # headless submitter's extra_data. Never an env var or a pack file.
 }

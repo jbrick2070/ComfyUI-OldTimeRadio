@@ -31,9 +31,9 @@ D5a). ``blocks_publish`` feeds ``_otr_publication_eligibility``, whose receipt
 Phase 10 stamps and ``OTR_MasterAudioMux`` consumes: a research_only episode
 still freezes and still keeps its ARCHIVAL final, and only the OBS copy -- the
 published deliverable -- is withheld. ``G14`` in ``run_gap_audit`` reports the
-same fact as a WARNING so the audit still explains why. It used to raise
-``FreezeAssertionError``, which enforced the rule by destroying a finished
-render and left the operator without even the copy a research-only source is
+same fact as a WARNING so the audit still explains why. Raising
+``FreezeAssertionError`` would enforce the rule by destroying a finished
+render and leave the operator without even the copy a research-only source is
 cleared for. Pure; never raises. Self-contained. UTF-8 no BOM, SFW.
 """
 from __future__ import annotations
@@ -173,10 +173,8 @@ def spoken_coda_line(provenance: Any, identity: Any = None, *,
     existing caller is byte-identical.
 
     THE 2026-08-05 LICENSED-SOURCE RULING IS SUPERSEDED FOR AUTHOR AND WORK
-    (operator, 2026-08-15). That ruling stopped the announcer reciting a
-    LICENCE, and its own reasoning was "Folger publishes the edition and
-    Shakespeare wrote the play" -- yet what shipped also stopped it naming the
-    author and the play, which is the opposite of what that sentence argues.
+    (operator, 2026-08-15). That ruling was meant to stop the announcer
+    reciting a LICENCE, not to stop it naming the author and the play.
     Naming Shakespeare is not a licence claim. The licensor and the licence are
     still never spoken; they remain print-only via ``printed_credit_line``.
 
@@ -204,11 +202,11 @@ def spoken_coda_line(provenance: Any, identity: Any = None, *,
     # A LICENSED SOURCE GETS NO SPOKEN LINE (operator ruling 2026-08-05):
     # "I get it, thanks to Folger, but they didn't write it -- Shakespeare did."
     #
-    # This used to append "used under CC BY-NC 3.0 (Folger Shakespeare
-    # Library)", so a listener heard a licence identifier mid-drama. On
-    # 2026-08-04 the licence was dropped and the EDITION NAME kept, which left
-    # the announcer thanking the licensor of a public-domain play -- crediting
-    # the wrong party to anyone actually listening. Now neither is spoken.
+    # Neither the licence identifier ("used under CC BY-NC 3.0 (Folger
+    # Shakespeare Library)", heard mid-drama) nor the EDITION NAME is spoken:
+    # the edition name has the announcer thanking the licensor of a
+    # public-domain play -- crediting the wrong party to anyone actually
+    # listening.
     #
     # Attribution is not lost and was never legally required in the audio: CC BY
     # asks for credit "in the manner specified", not credit read aloud, and

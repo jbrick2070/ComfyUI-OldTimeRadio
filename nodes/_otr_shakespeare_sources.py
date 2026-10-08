@@ -333,10 +333,11 @@ def source_document_from_text(
 #   verse -- the name alone on its line, speech beneath:  ORLANDO\nHang there, my verse
 #   prose -- the name inline, two spaces, then speech:    TOBY  Come thy ways, Signior
 # Either may carry a stage qualifier: ROSALIND, [as Ganymede] / BENEDICK, [aside]
-# Recognizing only the colon form returned NO speakers from real Folger text, so
-# payload_from_scene silently fell back to the curated cast_hints -- the list whose
-# ordering dropped Orlando from the scene he is named in and let a writer substitute
-# Romeo from another play. The people in a scene are a fact OF the scene.
+# Recognizing only the colon form would return NO speakers from real Folger
+# text, so payload_from_scene would silently fall back to the curated
+# cast_hints -- the list whose ordering drops Orlando from the scene he is named
+# in and lets a writer substitute Romeo from another play. The people in a
+# scene are a fact OF the scene.
 _FOLGER_SPEECH_RE = re.compile(
     r"^(?P<name>[A-Z][A-Z'’.\-]*(?: [A-Z][A-Z'’.\-]*)*)"
     r"(?:,\s*\[[^\]]*\])?"
@@ -690,12 +691,11 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         "major turn, and the play-world stakes. Compression is allowed; do "
         "not replace the scene with a modern mystery or unrelated framing "
         "story.\n\n"
-        # The SFW clause that used to sit here was DELETED 2026-08-05 (operator
-        # directive). It told the model to avoid "guns/knives/weapons" while we
-        # handed it MACBETH -- so "Is this a dagger which I see before me" was
-        # being discouraged at the prompt, rewritten if it survived, and finally
-        # rejected at the G9 freeze gate. On a fidelity lane the author's own
-        # language is carried AS WRITTEN; that is the whole point of the lane.
+        # No SFW clause here (operator directive 2026-08-05): telling the
+        # model to avoid "guns/knives/weapons" while handing it MACBETH
+        # would discourage "Is this a dagger which I see before me" at the
+        # prompt. On a fidelity lane the author's own language is carried
+        # AS WRITTEN; that is the whole point of the lane.
         "Make stage directions audible through spoken implication or concrete "
         "radio business.\n\n"
         "Return ONE JSON object only with exactly these keys:\n"
@@ -733,11 +733,10 @@ def build_shakespeare_briefs(
         return technical_fn(msgs, temperature=temperature, max_new_tokens=max_new_tokens)
 
     def _content_validator(brief: ShakespeareBriefs) -> str | None:
-        # The brief-level safety rejection that used to sit here was DELETED
-        # 2026-08-05 (operator directive). It re-rolled the brief whenever
-        # Shakespeare's own vocabulary showed up in it -- a draft burned for
-        # being faithful. Nothing replaces it; the validator is kept as a seam
-        # so a future NON-content brief check has somewhere to live.
+        # No brief-level safety rejection here (operator directive 2026-08-05):
+        # re-rolling the brief whenever Shakespeare's own vocabulary shows up in
+        # it would burn a draft for being faithful. The validator is kept as a
+        # seam so a future NON-content brief check has somewhere to live.
         del brief
         return None
 

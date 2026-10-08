@@ -274,10 +274,7 @@ def translate_entries(
         #
         # The fix is to GROW rather than to predict, and the reason is NOT
         # that the ratio cannot be measured. A writer's tokenizer is reachable,
-        # so a table COULD be built. (An earlier version of this comment
-        # claimed otherwise for a backend since retired; corrected by the Fable
-        # architecture review, 2026-09-18, because the next reader would have
-        # believed it.)
+        # so a table COULD be built.
         #
         # The real reason is that a measured table would be a SECOND ARTEFACT
         # TO KEEP IN SYNC. The ratio is per model and per passage, so the

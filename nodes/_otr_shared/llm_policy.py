@@ -5,8 +5,7 @@ object built from the writer's widgets in ``_resolve_inputs`` and threaded
 ``_SlotScheduler -> request_slot(slot, id, policy) -> backend.load(...,
 policy)``. NO legacy/auto sentinel anywhere: every field default EQUALS
 today's resolved 16 GB (nv50) baseline, so an explicit BASELINE policy
-reproduces current behavior exactly while replacing the deleted FA2
-auto-probe and tag-based auto-quant.
+reproduces current behavior exactly.
 
 Stdlib-only by contract (this package is imported by the workflow
 validator, which must stay light).

@@ -74,11 +74,9 @@ TTS_CHARS_PER_ACT = 4000
 #: slots, an OpenRouter slug missing from the cache). USD per million tokens;
 #: above every writer slug this pack recommends.
 WRITER_FLOOR_USD_PER_MTOK = 5.0
-#: Writer tokens one episode is priced at, per wallet. Estimates only: since
-#: 2026-09-28 the writer backends carry no token caps, so this check -- made
-#: before any credit moves -- is the one money guard, and it is deliberately
-#: high. (They were the old per-run ceilings, which counted each call's whole
-#: output allowance and so ran well above what the provider billed.)
+#: Writer tokens one episode is priced at, per wallet. Estimates only: the
+#: writer backends carry no token caps, so this check -- made before any credit
+#: moves -- is the one money guard, and it is deliberately high.
 OPENROUTER_EPISODE_TOKENS = 300_000
 COMFY_EPISODE_TOKENS = 1_000_000
 GOOGLE_EPISODE_TOKENS = 300_000
@@ -291,9 +289,9 @@ def parse_comfy_balance(payload) -> Optional[float]:
 
 def _comfy_bearer_from(api_key) -> Callable[[], str]:
     """The queue's own credential: the api_key_comfy_org that
-    OTR_ComfyCredential bound for this prompt (the only Comfy credential
-    since the 2026-09-19 rip). Empty raises, which comfy_balance reports as
-    a warn -- a local-only graph never carries one."""
+    OTR_ComfyCredential bound for this prompt (the only Comfy credential).
+    Empty raises, which comfy_balance reports as a warn -- a local-only graph
+    never carries one."""
     def bearer() -> str:
         key = str(api_key or "").strip()
         if not key:

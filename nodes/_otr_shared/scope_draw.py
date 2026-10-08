@@ -17,13 +17,13 @@ couples to NOTHING (neither the floor node nor the overlay node). The invariant 
 DIRECTIONAL and always was: this module must not import a node; a node importing
 THIS module is the refactor the line below anticipated.
 
-``encode_silent_mp4`` is no longer one of the copies. 2026-07-28 hardened it -- the
-frames are counted against the declared ``total``, the rawvideo size is derived from
-the first frame so the declared stride cannot disagree with the piped bytes, a frame
-that changes shape or dtype mid-stream is refused, nvenc is skipped below its 145x49
-floor, stderr goes to a file rather than a deadlockable pipe, and ffmpeg is reaped on
-every refusal path -- and ``otr_scene_aware_scopes`` deleted its own copy and calls
-this one. There is ONE streaming clip encoder now, not three. UTF-8, no BOM.
+``encode_silent_mp4`` is not one of the copies. The frames are counted against
+the declared ``total``, the rawvideo size is derived from the first frame so
+the declared stride cannot disagree with the piped bytes, a frame that changes
+shape or dtype mid-stream is refused, nvenc is skipped below its 145x49 floor,
+stderr goes to a file rather than a deadlockable pipe, and ffmpeg is reaped on
+every refusal path -- and ``otr_scene_aware_scopes`` calls this one rather than
+keeping its own copy. There is ONE streaming clip encoder. UTF-8, no BOM.
 """
 from __future__ import annotations
 
@@ -156,22 +156,20 @@ _SCOPE_FACES_DEFAULT = ["DejaVuSans.ttf", "LiberationSans-Regular.ttf"]
 def _small_font(h):
     """A small chrome font at the REQUESTED SIZE, or PIL's default with a warning.
 
-    WHY THIS IS NOT JUST `DejaVuSans.ttf` ANY MORE. It used to try that one
-    bare name and silently swallow every failure. DejaVu is a Linux font: it
-    ships with neither Windows nor macOS, so on BOTH of the platforms that
-    actually render episodes this always fell through to
-    `ImageFont.load_default()` -- a ~10px bitmap face that IGNORES the size
-    argument. Scope chrome has therefore been drawing at bitmap size instead of
-    `h // 72` everywhere except Linux, quietly, since it was written.
+    WHY THIS IS NOT JUST `DejaVuSans.ttf`. DejaVu is a Linux font: it ships
+    with neither Windows nor macOS, so on BOTH of the platforms that actually
+    render episodes a lookup of that one bare name (silently swallowing every
+    failure) always falls through to `ImageFont.load_default()` -- a ~10px
+    bitmap face that IGNORES the size argument. Scope chrome would then draw
+    at bitmap size instead of `h // 72` everywhere except Linux, quietly.
 
-    Found by BUG-12.159's own regression test the day that rule was added, in a
-    file the original fix had not touched -- which is the whole argument for
-    writing the portable rule rather than only fixing the site that hurt.
+    This is the portable rule of BUG-12.159, applied here rather than only at
+    the site that hurt.
 
     Milder than the `video_engine` case that produced that rule: nothing here
     MEASURES this font to position anything (no `textbbox`/`textlength` call in
     this module), so the failure is text that is too small rather than text
-    that is off-frame. It is still wrong, and it was still silent.
+    that is off-frame. It is still wrong, and it would still be silent.
     """
     global _WARNED_SCOPE_BITMAP
     size = max(9, h // 72)
@@ -820,8 +818,8 @@ def find_ffmpeg(ffmpeg):
     """Resolve the ffmpeg binary: an explicit CHOICE if it resolves, then the
     ``OTR_FFMPEG`` env var, then PATH -- the pack's one owner
     (``_otr_shared.ffmpeg``) answers. A bare ``ffmpeg`` is the caller's
-    default, not a choice: with ffmpeg on PATH it used to win here and the
-    pin was never read.
+    default, not a choice: with ffmpeg on PATH it would otherwise win here and
+    the pin would never be read.
 
     The env step is not optional politeness -- OTR_SceneAwareScopes ships a
     tooltip promising exactly this order, and without it an install where
@@ -857,12 +855,11 @@ def _read_sink(sink):
 def _reap(proc, sink=None):
     """Close the pipes and make sure ffmpeg is GONE.
 
-    A refusal raised part-way through the frame stream used to leave the child
-    running: it was still waiting for the rest of its input, still holding the
-    OUTPUT FILE open. On Windows that also stops the caller deleting the
-    directory it wrote into -- the first refusal test written against this
-    encoder failed on a PermissionError from its own TemporaryDirectory
-    cleanup, not on the refusal it was checking."""
+    A refusal raised part-way through the frame stream would otherwise leave
+    the child running: still waiting for the rest of its input, still holding
+    the OUTPUT FILE open. On Windows that also stops the caller deleting the
+    directory it wrote into (a PermissionError from the caller's own
+    TemporaryDirectory cleanup instead of the refusal under test)."""
     try:
         if proc.stdin is not None and not proc.stdin.closed:
             proc.stdin.close()
@@ -886,14 +883,13 @@ def _reap(proc, sink=None):
 def _has_nvenc(ffmpeg):
     """Can h264_nvenc actually ENCODE here -- delegated, never re-implemented.
 
-    THE THIRD COPY OF A BUG THAT WAS ALREADY FIXED TWICE (2026-09-03). This
-    used to answer with ``"h264_nvenc" in (ffmpeg -codecs)``, which reports
-    only that ffmpeg was COMPILED with nvenc. `encode_sink.has_nvenc` was
-    rewritten on 2026-08-30 to run a real one-frame probe because that exact
-    string test "cost a whole episode", and its docstring states it is the only
-    nvenc decision in the pack. It was not: this copy survived, and the four
-    viz_* engines reach ffmpeg through THIS module rather than through
-    `RawVideoSink`, so they kept selecting a dead encoder.
+    WHY DELEGATE. The obvious test, ``"h264_nvenc" in (ffmpeg -codecs)``,
+    reports only that ffmpeg was COMPILED with nvenc. `encode_sink.has_nvenc`
+    runs a real one-frame probe because that exact string test "cost a whole
+    episode", and its docstring states it is the only nvenc decision in the
+    pack. The four viz_* engines reach ffmpeg through THIS module rather than
+    through `RawVideoSink`, so a copy of the string test here would keep
+    selecting a dead encoder.
 
     Proven on a rented RTX 4090 (2026-09-03). ffmpeg lists the encoder and
     cannot open a session -- the normal case in a GPU container that does not
@@ -902,13 +898,13 @@ def _has_nvenc(ffmpeg):
         [h264_nvenc] OpenEncodeSessionEx failed: unsupported device (2)
         [h264_nvenc] No capable devices found     (ffmpeg exits 187)
 
-    The string test said yes, so `viz_camera` streamed raw frames into a
-    doomed encoder and died as `ffmpeg closed the pipe after 3 frame(s)` --
-    naming ffmpeg, not the encoder, eight minutes into the leg. libx264 was
+    The string test says yes, so `viz_camera` streams raw frames into a
+    doomed encoder and dies as `ffmpeg closed the pipe after 3 frame(s)` --
+    naming ffmpeg, not the encoder, eight minutes into the leg. libx264 is
     available the whole time.
 
-    Delegating rather than copying the probe is the point: a fourth
-    re-implementation is how this recurs a fourth time.
+    Delegating rather than copying the probe is the point: every extra copy
+    of the string test is how this recurs.
     """
     try:
         try:
@@ -960,29 +956,28 @@ def cfr_flags(ffmpeg):
 def encode_silent_mp4(frames_iter, total, out_path, w, h, fps, ffmpeg):
     """Stream ``frames_iter`` to a SILENT bt709 / yuv420p H.264 mp4.
 
-    THE SECOND CLIP ENCODER of this build (filed 2026-07-28): four live
-    engines -- ``viz_green``, ``viz_camera``, ``viz_mxc_mandala`` and
+    Four live engines -- ``viz_green``, ``viz_camera``, ``viz_mxc_mandala`` and
     ``viz_mxc_cpu`` -- write every clip they emit through here.
 
-    Three things this used to do that it no longer does, all of them silent:
+    Three silent failures this refuses:
 
-    * ``total`` was accepted and NEVER READ. The signature promised a frame
-      count and checked nothing, so a generator that stopped early wrote a
-      short clip and the engines went on to stamp the requested number as
-      ``CanonicalClip.frame_count`` -- the integer timing authority the
-      composite positions the beat by. Now the frames are counted as they are
-      piped, and a divergence is REFUSED by name.
-    * The rawvideo ``-s`` was built from the CALLER'S ``w``/``h`` while the
-      pipe carried whatever the generator actually painted. Two derivations of
-      one fact: when they disagree ffmpeg slices the byte stream on the wrong
+    * A frame count that diverges from ``total``. The frames are counted as
+      they are piped and a divergence is REFUSED by name; otherwise a
+      generator that stops early writes a short clip and the engines stamp the
+      requested number as ``CanonicalClip.frame_count`` -- the integer timing
+      authority the composite positions the beat by.
+    * A rawvideo ``-s`` derived from the CALLER'S ``w``/``h`` while the pipe
+      carries whatever the generator actually painted: two derivations of one
+      fact, and when they disagree ffmpeg slices the byte stream on the wrong
       boundaries and writes a skewed clip behind a clean exit code. The
-      declared size now comes from the FIRST FRAME, and a caller whose ``w``/
-      ``h`` disagree with it is refused rather than quietly re-cut. (This is
-      the same defect class filed against ``ffmpeg_silent_mp4_cmd`` on
-      2026-07-28, where ``even_dim()`` declares one size and ``tobytes()``
-      pipes another -- it is NOT copied in here.)
-    * A frame of a different shape or dtype midway through the generator went
-      straight down the pipe and desynchronised everything after it.
+      declared size comes from the FIRST FRAME, and a caller whose ``w``/``h``
+      disagree with it is refused rather than quietly re-cut. (This is the
+      same defect class as ``ffmpeg_silent_mp4_cmd``, where ``even_dim()``
+      declares one size and ``tobytes()`` pipes another -- it is NOT copied in
+      here.)
+    * A frame of a different shape or dtype midway through the generator,
+      which would go straight down the pipe and desynchronise everything
+      after it.
 
     It still returns ``out_path`` alone: the count PROVEN AGAINST THE FILE is
     the caller's to take, because this encoder is also used for the

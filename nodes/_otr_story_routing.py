@@ -53,9 +53,8 @@ _PIPELINES_FILENAME = "pipelines.json"
 _REGISTRY_FILENAMES = frozenset({_BANKS_FILENAME, _PIPELINES_FILENAME})
 _PACK_SIDECAR_FILENAMES_BY_BANK = {
     "media_archive": frozenset({"drama_seeds.json"}),
-    # original (renamed from original_radio 2026-07-19; kibitz r2-r4): the spark
-    # deck is entropy data for the concept pass, not a story pack --
-    # _otr_original_radio validates it with its own schema at load.
+    # original: the spark deck is entropy data for the concept pass, not a story
+    # pack -- _otr_original_radio validates it with its own schema at load.
     "original": frozenset({"spark_deck.json"}),
     # scifi_news_pro: the frame-card + stance deck is entropy data for the P1
     # pitch pass, not a story pack -- its dedicated internal runner validates
@@ -288,24 +287,15 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
         raise RegistryValidationError(
             f"{origin}: defaults.auto_select must be a bool, got {_asel!r}"
         )
-    # THE GUARD THAT USED TO LIVE HERE IS GONE, and this is the note that
-    # explains why so the next reader does not restore it (operator decision
-    # 2026-09-13: "the roll needs to work").
-    #
-    # It refused `story_input_mode=user_fields_v1` together with any
-    # `auto_select` but false, on the reasoning that a roll landing on a bank
-    # whose source is the person's typed fields "would fail at admission every
-    # time, and an unrunnable row in the pool is a registry fault, not a run
-    # fault." Every word of that was true of the code as it stood.
-    #
-    # What changed is the premise, not the judgement: `_otr_story_input`
-    # now carries a DEFAULT_IDEA floor, applied at every admission point, so a
-    # user-fields bank with nothing typed into it is no longer unrunnable -- it
-    # writes the standing premise instead of refusing. The combination this
-    # guard forbade is now a combination that works, and forbidding it would
-    # only stop the operator from putting the bank in the pool on purpose.
-    #
-    # If that floor is ever removed, THIS GUARD COMES BACK in the same change.
+    # NO GUARD AGAINST `story_input_mode=user_fields_v1` WITH `auto_select`
+    # TRUE (operator decision 2026-09-13: "the roll needs to work"). A roll
+    # landing on a bank whose source is the person's typed fields works,
+    # because `_otr_story_input` carries a DEFAULT_IDEA floor applied at every
+    # admission point: a user-fields bank with nothing typed into it writes the
+    # standing premise instead of refusing. Forbidding the combination would
+    # only stop the operator from putting the bank in the pool on purpose. If
+    # that floor is ever removed, the guard (refuse that combination: "would
+    # fail at admission every time") COMES BACK in the same change.
     for _bkey in (
         "propagate_adaptation_cast",
         "provenance_normalize",  # v4 P1(viii): opt-in source-provenance normalizer

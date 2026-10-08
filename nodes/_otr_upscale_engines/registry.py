@@ -7,9 +7,8 @@ namespaces. Every upscale engine (``off`` pass-through, ``spandrel_esrgan`` Real
 future rows) is a pluggable adapter selected via one ``upscale_stage.engine`` profile
 field per tier.
 
-The registry replaces the retired ``nodes/rtx_upscale.py`` (RTX-VSR, NVIDIA-only) which
-was ripped in the same commit as this package. The D-2 codicil pinned every design
-constraint: registry rows with ``device_backends`` per engine (nvidia/amd/mps/cpu),
+The D-2 codicil pinned every design constraint: registry rows with
+``device_backends`` per engine (nvidia/amd/mps/cpu),
 per-tier profile values, fail-loud on unsupported hardware, and the HONEST-SWITCH LAW
 (widgets + working engine land together; ``off`` is a real registered engine).
 

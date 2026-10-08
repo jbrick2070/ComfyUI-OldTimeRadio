@@ -41,13 +41,13 @@ _RE_TITLE = re.compile(r"^TITLE:\s*(.+)$", re.IGNORECASE)
 _RE_MUSIC = re.compile(r"^MUSIC:\s*(.+)$", re.IGNORECASE)
 _RE_SCENE = re.compile(r"^SCENE\s+(\d{1,2}):\s*(.+)$", re.IGNORECASE)
 _RE_CODA = re.compile(r"^CODA:\s*(.+)$", re.IGNORECASE)
-#: THE TERMINAL DELIMITER, AND IT USED TO DEMAND A PERIOD NOBODY ASKED FOR.
+#: THE TERMINAL DELIMITER DOES NOT DEMAND A PERIOD NOBODY ASKED FOR
+#: (PBUG-20260815-03).
 #:
-#: This was ``^END\.\s*$``. A model that wrote a bare ``END`` fell past it, past
+#: A pattern that required ``END.`` would let a bare ``END`` fall past it, past
 #: ``_RE_SPEAKER`` (which needs a colon), onto ``BAD_LINE_SHAPE`` -- and because
-#: ``on_end`` never fired, the end-of-text check then added ``MISSING_END`` too.
-#: TWO reported defects, ONE missing character. `scifi_news_pro` died on it at
-#: 3.3 minutes with ``BAD_LINE_SHAPE: END`` (PBUG-20260815-03).
+#: ``on_end`` never fired, the end-of-text check would then add ``MISSING_END``
+#: too: TWO reported defects, ONE missing character.
 #:
 #: FOUR ACCEPTED FORMS, and no more: ``END``, ``END.``, ``[END]``, ``[END.]``.
 #: The bracketed pair is admitted because the lane's own house style brackets
@@ -113,13 +113,12 @@ def _family_balanced(inner: str, marker: str) -> bool:
 def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
     """Strip a BALANCED emphasis wrapper from a structural label. Report it.
 
-    THE DEFECT THIS CLOSES (live, 2026-08-01). A local model emitted its markup
-    wrapped in Markdown -- ``**TITLE:** ...``, ``**ANNOUNCER:** ...``,
-    ``**END.**``. Every classifier here is ``^``-anchored, so a decorated line
-    misses ``_RE_TITLE`` and then MATCHES the ``_RE_SPEAKER`` catch-all, whose
-    group(1) becomes a character literally named ``**TITLE``. That is not in the
-    cast, so each line raised UNKNOWN_SPEAKER *and* SKELETON_BREAK -- 106 of each
-    across one campaign, and three of six episodes died in the writer.
+    WHY IT EXISTS. A local model may wrap its markup in Markdown --
+    ``**TITLE:** ...``, ``**ANNOUNCER:** ...``, ``**END.**``. Every classifier
+    here is ``^``-anchored, so a decorated line misses ``_RE_TITLE`` and then
+    MATCHES the ``_RE_SPEAKER`` catch-all, whose group(1) becomes a character
+    literally named ``**TITLE``. That is not in the cast, so each such line
+    raises UNKNOWN_SPEAKER *and* SKELETON_BREAK.
 
     WHAT IS AND IS NOT AUTHORSHIP. ``_normalize_line`` already owns "transport"
     normalization, and emphasis wrapped around a DELIMITER is transport: it
@@ -134,15 +133,14 @@ def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
         <M>TOKEN<M>            ->  TOKEN               (standalone, e.g. END.)
         <M>LABEL: payload<M>   ->  LABEL: payload      (wrapper spans the LINE)
 
-    SHAPE 4 (2026-08-03, live). The 30-word sweep lost two legs to a model that
-    wrote its structure as whole-line markdown -- ``**SCENE 5: The vault**``,
-    ``**MUSIC**``, ``**CODA**``, ``**TITLE: ...**``. The wrapper spans label AND
-    payload, so shapes 1-3 all miss: the body opens with a space after the colon
-    (not the marker) and the label does not end with the marker. The line then
-    fell to the ``_RE_SPEAKER`` catch-all and produced a character literally
-    named ``**SCENE 5``, i.e. ``UNKNOWN_SPEAKER`` four attempts running until
-    the markup ladder exhausted and the leg died in the writer having never
-    reached a video engine.
+    SHAPE 4. A model may write its structure as whole-line markdown --
+    ``**SCENE 5: The vault**``, ``**MUSIC**``, ``**CODA**``,
+    ``**TITLE: ...**``. The wrapper spans label AND payload, so shapes 1-3 all
+    miss: the body opens with a space after the colon (not the marker) and the
+    label does not end with the marker. The line then falls to the
+    ``_RE_SPEAKER`` catch-all and produces a character literally named
+    ``**SCENE 5``, i.e. ``UNKNOWN_SPEAKER`` on every attempt until the markup
+    ladder exhausts.
 
     Shape 4 is ORDERED LAST and GATED ON TRANSPORT. Last, because checked
     earlier it would mangle the case this function exists to preserve:
@@ -221,7 +219,7 @@ def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
 
 #: A speaker label that re-states the character's ROLE after the name --
 #: "Commander Vance (Space Force Tactician)". The writer does this when the
-#: cast card is fresh in its context, and every such line used to raise
+#: cast card is fresh in its context, and such a line would raise
 #: UNKNOWN_SPEAKER against a roster holding the bare name.
 _RE_ROLE_PARENTHETICAL = re.compile(r"\s*\([^()]*\)\s*$")
 
@@ -241,15 +239,13 @@ def _strip_role_parenthetical(name: str) -> str:
 # --- speaker identity: ONE matcher, shared with the writer -------------------
 #
 # WHY THIS LIVES HERE AND WHY IT IS THE ONLY COPY (Bug Bible 12.132, verify
-# condition 3). Until 2026-08-24 the "is this label a cast member" rule existed
-# in TWO compositions -- this module's `on_speaker` and the writer's
-# `_resolves_to_cast` -- plus TWO hand-written copies of the identity key.
-# `_resolves_to_cast`'s own docstring claimed it was "imported rather than
-# reimplemented", but only the HELPERS were imported; the LADDER was copied.
-# That is not a style complaint: `_resolves_to_cast` decides whether the repair
-# rung tells the model "restore this real character's label" or "fold or omit
-# this row", so a parser that accepts a label the note believes is illegal
-# instructs the model to DELETE A LINE THE PARSER WOULD HAVE TAKEN.
+# condition 3). The "is this label a cast member" rule exists once: the
+# writer's `_resolves_to_cast` asks the roster built here, with no ladder or
+# identity key of its own. That is not a style complaint:
+# `_resolves_to_cast` decides whether the repair rung tells the model
+# "restore this real character's label" or "fold or omit this row", so a
+# parser that accepts a label the note believes is illegal instructs the
+# model to DELETE A LINE THE PARSER WOULD HAVE TAKEN.
 #
 # THE LAYER MATTERS. `_canonicalize_transport_line` above normalizes LINE TEXT
 # and is deliberately closed -- it feeds `normalize_scifi_news_pro_markup_text`,
@@ -342,9 +338,9 @@ def _label_candidates(label: str) -> "tuple[str, ...]":
 
     Breadth-first over the three strippers so single-defect labels resolve
     before compound ones, and so a compound label like
-    ``**DR. CHEN**, urgent`` -- decoration AND a delivery tag, which is the
-    shape that actually killed the 2026-08-24 leg -- is reachable by composing
-    them in either order without hard-coding a sequence.
+    ``**DR. CHEN**, urgent`` -- decoration AND a delivery tag, a shape the
+    local models really emit -- is reachable by composing them in either
+    order without hard-coding a sequence.
     """
     ordered: "list[str]" = []
     seen: "set[str]" = set()
@@ -492,7 +488,7 @@ class SpeakerRoster:
         #: salvage adoption can touch `self.aliases`, because `adopt()` must
         #: be able to tell "an alias a real cast member already owns" from
         #: "an alias another stranger claimed". Without this distinction it
-        #: deleted the former, which silently erased a locked character --
+        #: would delete the former, which silently erases a locked character --
         #: see the guard in `adopt`.
         self._locked_alias_keys: "frozenset[str]" = frozenset(self.aliases)
 
@@ -574,16 +570,12 @@ class SpeakerRoster:
                 continue
             # A LOCKED MEMBER'S ALIAS IS NEVER STOLEN AND NEVER DELETED.
             #
-            # THE REGRESSION THIS CLOSES, caught by the Sonnet QA pass on the
-            # finished diff and reproduced live: the ambiguity branch below
-            # deleted ANY contested alias, including one a real cast member
-            # already owned. So adopting a stranger called `PROFESSOR CHEN`
-            # erased locked `Dr. Haorong Chen`'s own `Chen` alias, his later
-            # `CHEN:` line then resolved to nothing and was adopted as a THIRD
-            # identity, and the locked doctor vanished from his own episode --
-            # with ZERO defects raised. That is the exact defect class this
-            # work exists to remove, reintroduced through a new door and
-            # silent, which makes it worse than the bug it replaced.
+            # If the ambiguity branch below deleted ANY contested alias,
+            # adopting a stranger called `PROFESSOR CHEN` would erase locked
+            # `Dr. Haorong Chen`'s own `Chen` alias; his later `CHEN:` line
+            # would then resolve to nothing and be adopted as a THIRD identity,
+            # and the locked doctor would vanish from his own episode -- with
+            # ZERO defects raised.
             #
             # A stranger simply does not get to contest it: skipping leaves
             # the locked owner's claim intact, which is what "locked names are
@@ -627,18 +619,17 @@ def build_speaker_roster(cast_names, extra_aliases=None) -> SpeakerRoster:
 #: LABELS THAT NAME A SOUND, NOT A PERSON. A CLOSED vocabulary.
 #:
 #: THE RULE IS THE WORD, NOT THE PUNCTUATION (operator, 2026-08-24: *"they
-#: should not chunk off dialogue, we should just never do any SFX"*). The first
-#: draft of this dropped any DECORATED unresolvable label, which is wrong and
-#: was caught immediately: ``(SOMEONE NEW): I have something to say.`` is a
-#: character the model invented, wearing brackets, WITH DIALOGUE IN IT.
-#: Dropping it would delete a real spoken line -- the one thing salvage exists
-#: to prevent. Decoration is not evidence that something is not a person.
+#: should not chunk off dialogue, we should just never do any SFX"*). Dropping
+#: any DECORATED unresolvable label would be wrong: ``(SOMEONE NEW): I have
+#: something to say.`` is a character the model invented, wearing brackets, WITH
+#: DIALOGUE IN IT. Dropping it would delete a real spoken line -- the one thing
+#: salvage exists to prevent. Decoration is not evidence that something is not
+#: a person.
 #:
 #: A cue word IS that evidence. ``SFX: a door slams`` carries no dialogue: it
-#: describes a sound, and this pipeline HAS NO SOUND EFFECTS. The `[SFX: ...]`
-#: ledger token was removed 2026-07-01 and the whole SFX bed subsystem was
-#: ripped 2026-08-06, so a cue row can only ever become a character reading a
-#: stage direction aloud in their own voice.
+#: describes a sound, and this pipeline HAS NO SOUND EFFECTS (no `[SFX: ...]`
+#: ledger token, no SFX bed subsystem), so a cue row can only ever become a
+#: character reading a stage direction aloud in their own voice.
 #:
 #: MUSIC is absent on purpose -- it is a real structural delimiter with its own
 #: classifier, and listing it here would be dead code.
@@ -760,17 +751,16 @@ class ParsedScript:
     coda: str
     character_word_count: int
     announcer_word_count: int
-    # Retained for receipt compatibility; prose normalization is retired.
+    # Retained for receipt compatibility.
     #
-    # SPEAKER RESOLUTIONS DO NOT BELONG HERE, and putting them here cost a live
-    # leg on 2026-08-24. `_parsed_payload` SEALS this field, and the seal is
-    # re-verified by re-parsing the raw source. The build parses against the
-    # treatment's full `cast_names`; the seal check parses against
-    # `_speakers_in_order(parsed)` -- a SMALLER roster. Same script, same
-    # speakers, but a label can reach its character by a different RUNG, so the
-    # receipt STRING differs and the seal reports "parsed artifact seal is
-    # stale" for a draft nothing touched. A seal must depend on the script, not
-    # on how the parser got there.
+    # SPEAKER RESOLUTIONS DO NOT BELONG HERE. `_parsed_payload` SEALS this
+    # field, and the seal is re-verified by re-parsing the raw source. The
+    # build parses against the treatment's full `cast_names`; the seal check
+    # parses against `_speakers_in_order(parsed)` -- a SMALLER roster. Same
+    # script, same speakers, but a label can reach its character by a
+    # different RUNG, so the receipt STRING differs and the seal reports
+    # "parsed artifact seal is stale" for a draft nothing touched. A seal must
+    # depend on the script, not on how the parser got there.
     normalizations: "tuple[str, ...]" = ()
     #: How each non-exact speaker label reached its character. A RECEIPT, and
     #: deliberately OUTSIDE the sealed payload for the reason above.
@@ -826,11 +816,9 @@ class _Parse:
         self.coda: "str | None" = None
         self.saw_end = False
 
-    #: RETIRED 2026-08-24. The identity rule now lives once, module level, as
-    #: `speaker_identity_key`, which the writer imports instead of keeping its
-    #: own hand-written copy. Kept as a thin alias only so a caller reaching
-    #: for the old private name gets the same answer rather than an
-    #: AttributeError; there is no second implementation behind it.
+    #: Thin alias of the module-level `speaker_identity_key` (the one
+    #: implementation, which the writer imports), kept so a caller reaching for
+    #: the old private name gets the same answer rather than an AttributeError.
     _speaker_key = staticmethod(speaker_identity_key)
 
     def defect(self, code: NewsProParseDefect, detail: str = "",
@@ -945,10 +933,9 @@ class _Parse:
         if canonical_name is None:
             if _is_sound_cue_label(supplied_name):
                 # A SOUND CUE IS NEVER A CHARACTER, in salvage or out of it.
-                # THIS PIPELINE HAS NO SOUND EFFECTS -- the ledger token went
-                # 2026-07-01 and the SFX subsystem was ripped 2026-08-06 -- so
-                # a cue row can only become a character reading a stage
-                # direction aloud in their own voice, or an SFX row in a
+                # THIS PIPELINE HAS NO SOUND EFFECTS (no ledger token, no SFX
+                # subsystem), so a cue row can only become a character reading a
+                # stage direction aloud in their own voice, or an SFX row in a
                 # ledger that has nowhere to put one.
                 #
                 # DROPPED, NOT ADOPTED, and it costs no dialogue: a cue row
@@ -1013,11 +1000,11 @@ class _Parse:
             elif self.state == _SCENES:
                 if self.salvage:
                     # THE FRAME STAYS OPEN IN SALVAGE. A mid-scene ANNOUNCER
-                    # row is what actually killed the 2026-08-24 leg: it
-                    # closed the story frame, and every later character line
-                    # became "after the last scene". Here the outro text is
-                    # KEPT (the ledger needs a non-empty outro) but the scenes
-                    # stay open, so the drama that follows still lands.
+                    # row would otherwise close the story frame, and every later
+                    # character line would become "after the last scene". Here
+                    # the outro text is KEPT (the ledger needs a non-empty
+                    # outro) but the scenes stay open, so the drama that follows
+                    # still lands.
                     self.outro.append(text)
                     return
                 self._close_scene(no)

@@ -4,11 +4,10 @@ THE ONE OWNER of ``_models_root()``. Every part of the pack that needs to know
 where weights live -- audio engines, video engines, the provisioner, the lane
 weight fetcher, the asset index -- asks here.
 
-WHY THIS MODULE EXISTS SEPARATELY. This resolution used to live inside a writer
-backend module. That made a question every subsystem asks depend on one
-optional backend, so the backend could not be retired without taking the shared
-answer with it. Nothing here knows or cares which writer or which loader is in
-use; it resolves a directory and raises when it honestly cannot.
+WHY THIS MODULE EXISTS SEPARATELY. A question every subsystem asks must not
+depend on one optional backend. Nothing here knows or cares which writer or
+which loader is in use; it resolves a directory and raises when it honestly
+cannot.
 
 IT IS DELIBERATELY DEPENDENCY-LIGHT: stdlib plus the pack's own env shim, no
 torch, no transformers, no model library, and the one runtime-only import
@@ -30,10 +29,9 @@ try:
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
-#: ``_models_root`` keeps its leading underscore. Sixteen call sites already
-#: import it under that name, and renaming it inside a removal would be churn
-#: rather than a fix -- a second public spelling is exactly the kind of drift
-#: this extraction exists to end.
+#: ``_models_root`` keeps its leading underscore: sixteen call sites already
+#: import it under that name, and a second public spelling is exactly the kind
+#: of drift this extraction exists to end.
 __all__ = ["ModelsRootUnresolved", "_models_root", "model_type_dir"]
 
 

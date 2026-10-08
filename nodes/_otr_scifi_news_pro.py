@@ -138,14 +138,11 @@ log = logging.getLogger("OTR")
 # load-bearing prompt vocabulary and cannot be renamed, so pydantic's
 # name-shadowing warning is expected and is silenced for clean logs.
 #
-# THE WARNING WAS TELLING THE TRUTH, AND THIS FILTER HELPED IT HIDE
-# (PBUG-20260812-02). "nothing in this module ever calls the shadowed
-# attribute" was the wrong reassurance: the danger was never a call, it was
-# that pydantic read the inherited attribute as the field's DEFAULT and quietly
-# made a required contract field optional. That is fixed at the field itself --
-# `CastShape.register` is declared `Field(...)` -- and `Field(...)` is what
-# makes this filter safe. The suite pins both halves; see
-# tests/test_writer_model_field_shadowing.py.
+# Silencing it is safe only because the danger was never a call: pydantic
+# reads the inherited attribute as the field's DEFAULT and could quietly make
+# a required contract field optional (PBUG-20260812-02). `CastShape.register`
+# is declared `Field(...)`, and that is what makes this filter safe. The suite
+# pins both halves; see tests/test_writer_model_field_shadowing.py.
 warnings.filterwarnings(
     "ignore", message='Field name "register"', category=UserWarning)
 
@@ -230,33 +227,22 @@ _DOSSIER_ENTITIES_PER_BUCKET_MAX = 10
 #: `_DOSSIER_ENTITIES_PER_BUCKET_MAX` is how many entities the merged dossier
 #: KEEPS, and `_merge_window_dossiers` already enforces it deterministically
 #: (`_balanced_window_values(limit=...)`). Putting the same number on the
-#: pydantic field made it a REFUSAL that fired first: a source naming more
-#: than ten places could never be extracted at all, so the trim that exists to
-#: handle exactly that case never got to run.
+#: pydantic field would make it a REFUSAL that fires first: a source naming
+#: more than ten places could never be extracted at all, so the trim that
+#: exists to handle exactly that case would never get to run. News stories
+#: with more than ten proper nouns are ordinary, not exotic.
 #:
-#: Measured 2026-08-14: a UCLA Health story names 11 places and 14
-#: institutions. The model extracted them correctly, the schema rejected the
-#: reply three times, and the episode died with
-#: `NewsProDossierError: 2 validation errors for DossierLLM`. The model was
-#: right and the cap was wrong -- and news stories with more than ten proper
-#: nouns are ordinary, not exotic.
-#:
-#: This is the same doctrine the score compiler already applies to a stale cue
-#: anchor ("a stale index must never be a fatal count gate") and the same
-#: reason the word budget's upper bound was removed: a cap that refuses a
-#: legitimate source is a defect, not a safeguard. The ceiling below stays
-#: only to keep a degenerate decode finite.
+#: Same doctrine as the score compiler's stale cue anchor ("a stale index
+#: must never be a fatal count gate"): a cap that refuses a legitimate source
+#: is a defect, not a safeguard. The ceiling below stays only to keep a
+#: degenerate decode finite.
 _DOSSIER_ENTITIES_PER_BUCKET_CEILING = 60
 
-#: THE SAME CONTRADICTION, THREE MORE TIMES. `facts_to_keep`,
-#: `allowed_numbers` and `dramatizable_vectors` each carried a pydantic cap
-#: equal to the number `_merge_dossiers` already trims them to
-#: (`_balanced_window_values(limit=...)`), so a source richer than the keep
-#: limit was refused before the trim could run -- exactly the defect that
-#: killed two `scifi_news_pro` episodes on a UCLA Health story. Found by
-#: sweeping every bounded list field in the story lanes after the first one
-#: was fixed, which is the only reason these were not three more live
-#: failures waiting for a richer source.
+#: THE SAME CONTRADICTION APPLIES TO `facts_to_keep`, `allowed_numbers` and
+#: `dramatizable_vectors`: a pydantic cap equal to the number `_merge_dossiers`
+#: already trims them to (`_balanced_window_values(limit=...)`) would refuse a
+#: source richer than the keep limit before the trim could run. These ceilings
+#: are backstops too.
 _DOSSIER_FACTS_CEILING = 60
 _DOSSIER_NUMBERS_CEILING = 60
 _DOSSIER_VECTORS_CEILING = 40
@@ -266,16 +252,6 @@ _DIGEST_SOURCE_CHAR_CAP = 120
 _DIGEST_DATE_CHAR_CAP = 64
 _DIGEST_SUMMARY_CHAR_CAP = 720
 _DIGEST_FRAME_TRIM_MARK = " [...TRIMMED]"
-
-# RETIRED 2026-08-14: a table here mapped a WORD TOTAL to a scene count (rising
-# thresholds 164..824 -> 1..8 scenes). The scene count follows the act topology
-# now, and word count is never a gate (operator: "we never chase word count").
-#
-# (lean-mean 2026-08-22) The eight rows themselves are deleted; this note is the
-# tombstone. The knowledge worth keeping is WHY it went -- scene count is a
-# structural property, not a function of length -- and that survives in prose.
-# The data did not: nothing read it, and a retired lookup table sitting in
-# source reads like a live policy to the next person who greps for it.
 
 # The finite P0 source dossier may retain a source-proof reservation. Every
 # prose-bearing pass below uses the provider's remaining output capacity.
@@ -480,13 +456,9 @@ class NewsCloseRead(BaseModel):
     78-char read; brevity is a style preference, never a correctness
     gate.
 
-    THE COMMENT HERE USED TO CLAIM "the seam still asks for 1-2 wire-desk
-    sentences" -- FALSE against the live prompt on disk (2026-08-18): the
-    `scifi_news_pro_news_read_system` seam carried NO length instruction at
-    all, and a real episode's read ran 149 words citing three named
-    scientists and a cosmology model. Fixed at the prompt, not here -- this
-    Field has no `max_length` on purpose (brevity is not a correctness
-    gate), so the bound lives in the seam text the model actually reads."""
+    This Field has no `max_length` on purpose (brevity is not a correctness
+    gate): the bound lives in the `scifi_news_pro_news_read_system` seam
+    text the model actually reads."""
 
     news_close_read: str = Field(min_length=1)
 
@@ -795,11 +767,7 @@ def _deal(rng: random.Random, deck: dict):
 class SceneEnvelope:
     """Advisory scene plan derived before generation; never a delivery gate.
 
-    2026-08-14: `scene_word_targets` and `total_words` were removed with the
-    word authority. This lane carried its OWN copy of the word machinery --
-    a word-total-to-scene-count table plus a per-scene word split -- on top
-    of the one in `_otr_episode_budget` and the one in the codex circuit.
-    The scene count follows the ACT TOPOLOGY now, like every other lane.
+    The scene count follows the ACT TOPOLOGY, like every other lane.
     """
 
     scene_count: int
@@ -1681,8 +1649,8 @@ def _extract_complete_source_dossier(
 #: LABELLED-SECTION EXTRACTION (2026-08-25). Section header -> where its bullet
 #: items land in DossierLLM. A tuple means a nested bucket under named_entities.
 #:
-#: WHY THIS EXISTS. P0 used to ask a small local model to emit one nested JSON
-#: object. gemma-4-E2B-it failed ALL THREE ladder rungs on a live leg with the
+#: WHY THIS EXISTS. A small local model cannot reliably emit one nested JSON
+#: object: gemma-4-E2B-it failed ALL THREE ladder rungs on a live leg with the
 #: same error each time -- "no decodable top-level JSON object found" -- after
 #: stopping at 503 tokens of a 700-token budget, i.e. it believed it had
 #: finished while the object was still unclosed.
@@ -1750,10 +1718,10 @@ class DossierSectionDefect(json.JSONDecodeError):
 
     Raised today for exactly one shape: a KNOWN header with inline content.
     "FACTS: a fact" might be a header plus its item; "PEOPLE: including
-    Dr. Smith" mid-FACTS is a fact that starts with a section word. BOTH
-    wrong guesses shipped tonight and were caught by review -- the first
-    dropped a supplied fact, the second HIJACKED the open section and filed
-    every later fact as a person. The parser therefore refuses to guess:
+    Dr. Smith" mid-FACTS is a fact that starts with a section word. Guessing
+    either way is wrong -- the first drops a supplied fact, the second
+    HIJACKS the open section and files every later fact as a person. The
+    parser therefore refuses to guess:
     loud and retryable beats silently wrong in either direction, and the
     repair prompt tells the model precisely what to change.
     """
@@ -1890,18 +1858,18 @@ def _dossier_section_repair(*, original_prompt, failed_output, error):
     """Repair prompt for the dossier pass, in ITS OWN format.
 
     The shared `make_dispatching_repair_factory()` prompts all say "Return ONE
-    valid JSON object, no Markdown, no prose"
-    (`nodes/_otr_repair_prompts.py:106,129,188`). That directive is correct for
+    valid JSON object, no Markdown, no prose" (`nodes/_otr_repair_prompts.py`).
+    That directive is correct for
     the eleven callers that DO speak JSON and actively wrong here: it would
     steer the model back to balancing braces on the one extra chance a
     marginal small model gets -- undoing this pass's whole reason for
     existing. Those shared prompts are left untouched precisely because they
     are shared; this pass supplies its own instead.
 
-    THE REPAIR RUNG MUST STILL SEE THE SOURCE. The first cut of this function
-    sent only the failed reply, which asked the model to redo a SOURCE
-    EXTRACTION with the source removed -- a blind rung that could only
-    hallucinate or repeat itself, on the last attempt before the lane dies.
+    THE REPAIR RUNG MUST STILL SEE THE SOURCE. Sending only the failed reply
+    would ask the model to redo a SOURCE EXTRACTION with the source removed --
+    a blind rung that could only hallucinate or repeat itself, on the last
+    attempt before the lane dies.
     The digest is recovered from the ORIGINAL PROMPT rather than closed over,
     so this stays a plain RepairPromptFactory and cannot drift out of sync
     with what the first attempt actually saw.
@@ -2072,11 +2040,9 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
 def _news_read_source_anchors(dossier: DossierLLM) -> "tuple[str, ...]":
     """Verbatim strings that would PROVE the factual close named its source.
 
-    The twin of the retired codex lane's `_news_coda_source_anchors`, reading this
-    lane's dossier instead of that lane's fact index. Names shorter than three
-    characters are dropped for the same reason: a one- or two-letter "entity"
-    matches inside ordinary words and would let a close that names nothing
-    pass by accident.
+    Read from this lane's dossier. Names shorter than three characters are
+    dropped: a one- or two-letter "entity" matches inside ordinary words and
+    would let a close that names nothing pass by accident.
     """
     anchors: "list[str]" = []
     entities = dossier.named_entities
@@ -2187,17 +2153,9 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]", *,
     # A NAME THE SOURCE ITSELF USES IS NEVER FICTION, even when the cast
     # borrowed it (PBUG-20260829-20). This lane builds its characters FROM the
     # article's entities, so a real person named in the source routinely ends
-    # up in `cast_names` too -- and then the factual close, correctly naming
-    # him, was rejected as "naming invented characters". Observed on an MIT
-    # News item about Pat Pataranutaporn: the writer's own entity pass had
-    # extracted him under PEOPLE, next to PLACES - MIT, and the validator
-    # failed the read twice and killed the episode at 5.7 minutes.
-    #
-    # The error text carried its own refutation -- "it names invented
-    # characters (Pataranutaporn) ... report only what the source says, using
-    # the source's own names" -- and no retry could rescue it, because the
-    # answer was never wrong. A lower-temperature repair produced the same
-    # correct text and was rejected identically.
+    # up in `cast_names` too -- and the factual close, correctly naming him,
+    # must not be rejected as "naming invented characters": no retry could
+    # rescue that, because the answer was never wrong.
     #
     # Subtracting the anchors keeps the real check intact: a character the
     # source never mentions, appearing in a factual report, is still caught.
@@ -2215,8 +2173,7 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]", *,
     # The source's names as the episode's own script writes them
     # (`_pass_native_names`) are attested too: a real person the cast
     # borrowed is written in katakana in a Japanese close, and the Latin
-    # anchor alone could not vouch for him (the katakana refusal of
-    # 2026-09-29).
+    # anchor alone could not vouch for him.
     native = tuple(dict.fromkeys(
         unicodedata.normalize("NFKC", str(r or "")).strip()
         for rs in (native_names or {}).values() for r in rs
@@ -2268,9 +2225,8 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]", *,
         # a close is only asked to name a source when a source was indexed.
         if anchors and not any(p.search(folded) for p in anchor_patterns):
             # The close and the anchors it was checked for ride along, so a
-            # failure explains itself: on 2026-09-29 a Hindi close failed this
-            # twice and killed the episode, and neither the log nor the raised
-            # error said what the close had actually said.
+            # failure explains itself: the log and the raised error say what the
+            # close had actually said.
             findings.append(
                 "the closing read never names the real source -- none of the "
                 "dossier's entities or numbers appears in it, so the listener "
@@ -2816,11 +2772,9 @@ def _is_lemmy(value: str) -> bool:
 def _resolves_to_cast(label: str, roster) -> bool:
     """Whether ``label`` names someone on the roster, the parser's way.
 
-    NOW GENUINELY THE PARSER'S WAY, which it previously only claimed to be.
-    The old body re-implemented the lookup ladder inline -- exact, then the
-    parenthetical fallback -- while its docstring said "imported rather than
-    reimplemented". Only the HELPERS were imported; the LADDER was a copy, and
-    the moment `on_speaker` grew a rung the copy went stale.
+    It asks the roster itself rather than re-implementing the lookup ladder
+    (exact, then the parenthetical fallback): a copy goes stale the moment
+    `on_speaker` grows a rung.
 
     WHY A STALE COPY IS A LIVE BUG AND NOT A TIDINESS ISSUE: this function is
     what decides whether the repair rung says "restore this real character's
@@ -2854,15 +2808,13 @@ def _undecorated_label(label: str) -> str:
         return ""
     opener = token[0]
     closer = {"(": ")", "[": "]", "*": "*"}[opener]
-    # A RUN, NOT A CHARACTER (fixed 2026-08-24). This stripped exactly one
-    # opener and one closer, so the DOUBLE-asterisk shape the local models
-    # actually emit was mangled rather than undecorated: `**Ada**` came back
-    # as `*Ada*` and `**DR. CHEN**, urgent` as `*DR. CHEN**, urgent`. Neither
-    # ever hit the roster, so a REAL cast member wearing `**` fell through to
-    # the stage-direction branch and the model was told to fold or omit the
-    # line -- deleting a real character's dialogue. Every fixture in
-    # `tests/test_scifi_news_pro_stage_direction_repair_note.py` used a single
-    # `*`, which is why four QA rounds never saw it.
+    # A RUN, NOT A CHARACTER. The local models emit the DOUBLE-asterisk shape,
+    # and stripping exactly one opener and one closer would mangle it rather
+    # than undecorate it: `**Ada**` would come back as `*Ada*` and
+    # `**DR. CHEN**, urgent` as `*DR. CHEN**, urgent`. Neither would ever hit
+    # the roster, so a REAL cast member wearing `**` would fall through to the
+    # stage-direction branch and the model would be told to fold or omit the
+    # line -- deleting a real character's dialogue.
     # Brackets and parentheses do not nest this way in a speaker label, so the
     # run is only ever consumed for the asterisk family.
     if opener == "*":
@@ -2885,15 +2837,14 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
     evidence in the repair instruction so a retry repairs the named format
     defect instead of regenerating a similarly shaped whole-play artifact.
 
-    SCOPED TOO NARROWLY UNTIL 2026-08-12 (PBUG-20260812-03), and it cost a live
-    leg. It fired only on ``BAD_LINE_SHAPE`` whose detail opened with ``(`` or
-    ``[``. A model wrote ``*SFX: ...``, which HAS a colon and therefore parses
-    as a SPEAKER -- so the defects were ``UNKNOWN_SPEAKER: *SFX (line 25)`` and
-    ``SKELETON_BREAK``, this note returned "", and the repair rung got only the
-    generic "repair the defects below". The model re-emitted the same shape four
-    attempts running, the ladder exhausted, and the episode died in the writer
-    having never reached a video engine -- the third time this module's own
-    docstring records that exact ending.
+    THE NOTE MUST ALSO FIRE ON A STAGE DIRECTION THAT PARSES AS A SPEAKER
+    (PBUG-20260812-03). A model that writes ``*SFX: ...`` has a colon, so the
+    row parses as a SPEAKER and the defects are ``UNKNOWN_SPEAKER: *SFX`` and
+    ``SKELETON_BREAK``, not ``BAD_LINE_SHAPE``. A note keyed only on
+    ``BAD_LINE_SHAPE`` whose detail opens with ``(`` or ``[`` would return
+    "", the repair rung would get only the generic "repair the defects
+    below", the model would re-emit the same shape attempt after attempt, and
+    the episode would die in the writer having never reached a video engine.
 
     STILL DELIBERATELY NARROW where it matters: the note only fires when the
     offending TOKEN actually looks like a stage direction. An
@@ -2908,11 +2859,10 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
     a real character's line that LOOKS exactly like a stage direction.
 
     SO THERE ARE TWO RULES, NOT ONE RULE AND A MUTE BUTTON. Going silent on a
-    roster hit was the first design, and it was wrong for the same reason the
-    original defect was wrong: silence hands back the generic "repair the
-    defects below", which is exactly the instruction that failed four attempts
-    running. A decorated REAL name has an obvious, safe repair -- restore the
-    canonical label and keep the dialogue -- so say that instead.
+    roster hit would hand back the generic "repair the defects below", which
+    is exactly the instruction that fails attempt after attempt. A decorated
+    REAL name has an obvious, safe repair -- restore the canonical label and
+    keep the dialogue -- so say that instead.
 
     Both branches take their token from ``UNKNOWN_SPEAKER`` details only.
     ``BAD_LINE_SHAPE`` carries a LINE FRAGMENT rather than a label, so a roster
@@ -2920,15 +2870,11 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
     """
     roster = build_speaker_roster(cast_names)
 
-    # ONE NOTE PER DEFECT CLASS, NOT ONE NOTE PER TURN (fixed 2026-08-24).
-    #
-    # THE DEFECT THIS CLOSES, measured on the live 2026-08-24 leg that ran the
-    # ladder to exhaustion: this function used to RETURN on the first matching
-    # defect. That draft's first one was a `BAD_LINE_SHAPE` action row, so all
-    # four repair turns carried the fold-the-stage-direction rule and NEVER
-    # ONCE mentioned the six broken speaker labels that were actually failing
-    # the parse. The model re-emitted the same shape four times because nobody
-    # ever told it about the shape that mattered, and the episode died.
+    # ONE NOTE PER DEFECT CLASS, NOT ONE NOTE PER TURN. Returning on the first
+    # matching defect would let a stray `BAD_LINE_SHAPE` action row crowd out
+    # the broken speaker labels that actually fail the parse: every repair turn
+    # would carry the fold-the-stage-direction rule and never mention the shape
+    # that mattered, so the model would re-emit it until the ladder exhausted.
     #
     # Aggregating per CLASS rather than per DEFECT is what keeps the repair
     # turn short: ten rows of the same shape teach the model nothing that one
@@ -2993,11 +2939,11 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
             # here and let the dedicated note own this shape.
             if _RE_SCENE_HEADER_BARE.match(detail):
                 continue
-            # AN UNLABELLED ROW, and it used to get NOTHING. A prose action
-            # line that opens with a letter -- "Eli opens his package." --
-            # failed every classifier, raised BAD_LINE_SHAPE, and matched no
-            # branch here, so the ladder never once told the model that rows
-            # like it are illegal. Five of them sat in the leg that died.
+            # AN UNLABELLED ROW gets its own note. A prose action line that
+            # opens with a letter -- "Eli opens his package." -- fails every
+            # classifier, raises BAD_LINE_SHAPE, and matches no other branch
+            # here, so without this one the ladder would never tell the model
+            # that rows like it are illegal.
             _remember("unlabelled_row", (
                 "\nFORMAT REPAIR RULE: every nonblank row must begin with a "
                 "legal label followed by a colon -- TITLE, MUSIC, SCENE, "
@@ -3036,25 +2982,12 @@ def _stage_direction_rule(evidence: str) -> str:
             "legal label; do not invent an unlabeled narration row."
             f"\n{evidence} It must not appear as a standalone output row."
     )
-# THE WORKED EXAMPLE THAT USED TO SIT IN THAT RULE IS GONE (2026-08-24).
-#
-# It read "a row like '*SFX: a door slams' is a stage direction wearing a
-# label". Operator: *"there should be no SFX"* -- and this pipeline HAS no
-# sound effects: the `[SFX: ...]` ledger token went 2026-07-01 and the SFX bed
-# subsystem was ripped 2026-08-06. So the single place in the whole generation
-# path that said the word to a model was a repair note that survived both rips
-# because it reads as documentation rather than as pipeline output.
-#
-# WHY THIS IS A REAL DEFECT AND NOT A TIDY-UP: this string is RETURNED INTO THE
-# WRITER'S PROMPT. Every repair turn handed a small local model a concrete,
-# copyable example of a token nothing downstream can render. It is the same
-# self-defeating shape as showing a model the names it must not use -- and
-# Bug Bible 12.132 says plainly that instructing a model about a forbidden form
-# is what produces an intermittent, expensive-to-diagnose failure.
-#
-# The rule loses nothing by it. `evidence` immediately below quotes the
-# model's OWN offending row with its line number, which teaches the shape far
-# better than an invented example ever did.
+# NO WORKED EXAMPLE IN THAT RULE, ON PURPOSE: the string is RETURNED INTO THE
+# WRITER'S PROMPT, so a concrete, copyable example of a token nothing
+# downstream can render (this pipeline has no sound effects) would hand a
+# small local model what it must not produce -- the self-defeating shape Bug
+# Bible 12.132 warns about. `evidence` quotes the model's OWN offending row
+# with its line number, which teaches the shape better than an invented one.
 
 
 #: The skeleton breaks that mean "the story frame closed and then more drama
@@ -3241,16 +3174,14 @@ def _draft_fits_repair_turn(base_user: str, draft: str,
     Budgets the WHOLE TURN -- prompt plus the reply the model still has to
     write -- rather than allowing the prompt a flat fraction of the window.
 
-    THE FLAT FRACTION WAS WRONG AND QA CAUGHT IT (2026-08-12). The first
-    version allowed the prompt 55% of an 8192-token window at a pessimistic 3
-    chars/token, i.e. ~13.5k characters for base_user + draft. Measured against
-    REAL inputs, a full-length episode blows straight through that: a maxed
+    A FLAT FRACTION OF THE WINDOW WOULD BE WRONG. A flat 55% of an 8192-token
+    window at a pessimistic 3 chars/token is ~13.5k characters for base_user
+    + draft, and a full-length episode blows straight through that: a maxed
     3600-char digest gives a ~6.1k-char `base_user`, and a 1520-word draft (the
-    documented structural ceiling) is ~9.2k characters -- 15.3k together. So
-    the guard dropped the draft for exactly the full-length episodes its own
-    comment said it existed to serve, silently restoring the cold-regeneration
-    bug this change was written to fix. Worse, the test that was supposed to
-    cover it asserted on a 400-character toy play, so it passed throughout.
+    documented structural ceiling) is ~9.2k characters -- 15.3k together. The
+    guard would then drop the draft for exactly the full-length episodes it
+    exists to serve, silently restoring the cold-regeneration bug it was
+    written to prevent.
 
     Approximate by design: an exact tokenizer count would bind this to one
     provider's tokenizer, and the decision only has to be SAFE. The asymmetry
@@ -3407,12 +3338,12 @@ def _run_markup_ladder(
         # structure it just produced.
         #
         # HOLD THE PREVIOUS RUNG, DO NOT RESET TO THE OPENING TEMPERATURE.
-        # Resetting was the first version and QA caught it: with the draft
-        # dropped on attempt 2 the real sequence became 0.75, 0.49, 0.75, 0.30
-        # -- a RISE, breaking `_MARKUP_LADDER_TEMPS`'s documented invariant
-        # ("the markup ladder NEVER raises temperature") and putting the
-        # last-chance attempt at full exploration instead of the narrowed rung
-        # the ladder's whole "depth, not temperature" design calls for.
+        # With the draft dropped on attempt 2, resetting would make the real
+        # sequence 0.75, 0.49, 0.75, 0.30 -- a RISE, breaking
+        # `_MARKUP_LADDER_TEMPS`'s documented invariant ("the markup ladder
+        # NEVER raises temperature") and putting the last-chance attempt at
+        # full exploration instead of the narrowed rung the ladder's whole
+        # "depth, not temperature" design calls for.
         # Holding gives 0.75, 0.49, 0.49, 0.30: still non-increasing, and still
         # away from the near-deterministic rung that a cold retry must avoid.
         if attempt > 1 and not draft_block and last_temp is not None:
@@ -3424,11 +3355,7 @@ def _run_markup_ladder(
             """The rung's messages for a given user turn.
 
             Factored out of the loop body so the two-branch format_example
-            shape is stated once. The wording is byte-identical to what it
-            always was -- this is a readability split, not a prompt change.
-            (It was originally added for an in-place overflow retry that was
-            then removed for breaking the attempt/call count invariant; the
-            helper stayed because one expression beats two branches inline.)
+            shape is stated once.
             """
             if format_example is None:
                 return ProviderCapacityMessages([
@@ -3683,13 +3610,11 @@ def _run_markup_ladder(
 
 #: One valid episode, shown to the model as its own prior output.
 #:
-#: THE GRAMMAR WAS DESCRIBED AND NEVER DEMONSTRATED. `_run_markup_ladder` has
-#: always accepted a `format_example` and built a one-shot user/assistant turn
-#: from it -- and NOTHING EVER PASSED ONE, so that path was dead code and the
-#: pack's own `"examples": []` was empty. The r1 review arc reached the same
-#: conclusion from two directions: showing one conversion is worth more than any
-#: rule sentence, and the failing legs were structural-compliance failures
-#: rather than instruction-following failures.
+#: THE GRAMMAR IS DEMONSTRATED, NOT ONLY DESCRIBED. `_run_markup_ladder`
+#: builds a one-shot user/assistant turn from this example: showing one
+#: conversion is worth more than any rule sentence, because the failing legs
+#: were structural-compliance failures rather than instruction-following
+#: failures.
 #:
 #: DELIBERATELY A DIFFERENT DOMAIN. A sci-fi example beside a sci-fi assignment
 #: invites the model to lift the example's cast or premise, which would be a
@@ -3700,14 +3625,12 @@ def _run_markup_ladder(
 #: kept getting wrong -- an event that a screenplay would narrate ("she crosses
 #: to the window") carried instead by somebody SAYING it. Radio has no camera:
 #: anything the audience must know is spoken or scored.
-#: THE MUSIC ROWS NAME NO INSTRUMENT, and that is deliberate (cursor contrarian
-#: round, 2026-09-12). They used to read "a slow fiddle, up and under" and "the
-#: fiddle returns, and out". This block is injected as the GOLD FORMAT on every
-#: script call, and this lane AUTHORS its own music rows -- so the one example
-#: the writer is shown was teaching a string register while the user turn was
-#: telling it the show is Detroit techno. It wrote "Tense strings, pulsating
-#: rhythm" over a TR-909 palette, and the engine resolved that contradiction
-#: toward the strings.
+#: THE MUSIC ROWS NAME NO INSTRUMENT, and that is deliberate. This block is
+#: injected as the GOLD FORMAT on every script call, and this lane AUTHORS its
+#: own music rows -- so an example naming "a slow fiddle" teaches a string
+#: register while the user turn tells the writer the show is Detroit techno:
+#: the writer answers "Tense strings, pulsating rhythm" over a TR-909 palette,
+#: and the engine resolves that contradiction toward the strings.
 #:
 #: Naming the show's OWN genre here instead would be worse, not better: the
 #: example is a gardening programme precisely so its content cannot be lifted,
@@ -3791,18 +3714,17 @@ def _pool_gender_for_label(label: str) -> str:
 def _make_casting_repair(menu: VoiceMenu, speakers: "list[str]"):
     """RUNG 2 of two: a hedged gender is answered by the VOICE they picked.
 
-    THE DEFECT (PBUG-20260824-03, live twice in one evening on the
-    fast-iteration loop). `CastVoice.gender` is `Literal["male", "female"]`
-    -- there is no third option, because every voice in stock is one or the
-    other. A model that will not commit writes a hedge instead, and it does
-    not repeat itself: the first live failure was `'both'`, the second, hours
-    later and WITH the targeted repair prompt already deployed, was `'n/a'`
-    (a legal `age_band` value, so it is confusing the two fields). Both died
-    after 2 attempts and killed the episode.
+    THE DEFECT (PBUG-20260824-03). `CastVoice.gender` is
+    `Literal["male", "female"]` -- there is no third option, because every
+    voice in stock is one or the other. A model that will not commit writes a
+    hedge instead, and it does not repeat itself: `'both'` once, then `'n/a'`
+    (a legal `age_band` value, so it is confusing the two fields) even with
+    the targeted repair prompt in place. Left alone, either kills the episode
+    after 2 attempts.
 
-    A PROMPT COULD NOT FIX THIS, and the second failure is the proof. Telling
-    a small local model "commit to one" is still asking the question it just
-    declined to answer, and there is always another hedge word.
+    A PROMPT CANNOT FIX THIS. Telling a small local model "commit to one" is
+    still asking the question it just declined to answer, and there is always
+    another hedge word.
 
     SO STOP ASKING AND READ IT OFF THE ARTIFACT. The row already carries
     `timbre` -- the menu id the model CHOSE from the voice stock -- and every
@@ -3924,11 +3846,10 @@ def _make_casting_repair(menu: VoiceMenu, speakers: "list[str]"):
         if not missing and not extras:
             return False
         # COUNT ONLY THE VOICES THAT SURVIVE. Taking `used` from every row
-        # including the extras about to be dropped reserved larynges for
+        # including the extras about to be dropped would reserve larynges for
         # characters who are leaving, so on a thin menu the rung could decline
         # a completion it actually had room for -- pushing the episode back
-        # into the retry ladder, against this rung's whole purpose. Caught by
-        # the Sonnet QA pass on the finished diff.
+        # into the retry ladder, against this rung's whole purpose.
         keep = [r for r in rows
                 if isinstance(r, dict)
                 and _norm_ws(str(r.get("name") or "")).casefold() in want]
@@ -4071,17 +3992,17 @@ def _shapes_for_speakers(treatment: Treatment, speakers: "list[str]",
                          final_draft: FinalDraft) -> "list[dict]":
     """Cast shapes keyed by the SPEAKER LABEL the model must return.
 
-    THE DEFECT (kibitz r1, Cursor and Fable independently; live pass006).
-    This prompt used to dump `treatment.cast_shapes` verbatim -- carrying the
-    names the TREATMENT invented -- directly above an instruction to return
-    one row per SCRIPT SPEAKER. On a salvaged episode those two name sets
-    disagree, because the script writer mislabelled its own cast. The model
-    was handed `Dr. Michael Elowitz` in the shapes and `DR. MICHAEL ELOTWIZ`
-    in the speaker list, sensibly answered with the treatment's people, and
-    `_make_casting_validator` refused it for not matching the script. Two
-    attempts later a finished episode was discarded.
+    THE DEFECT THIS AVOIDS (kibitz r1, Cursor and Fable independently).
+    Dumping `treatment.cast_shapes` verbatim would carry the names the
+    TREATMENT invented directly above an instruction to return one row per
+    SCRIPT SPEAKER. On a salvaged episode those two name sets disagree,
+    because the script writer mislabelled its own cast: the model would be
+    handed `Dr. Michael Elowitz` in the shapes and `DR. MICHAEL ELOTWIZ` in
+    the speaker list, sensibly answer with the treatment's people, and
+    `_make_casting_validator` would refuse it for not matching the script,
+    discarding a finished episode.
 
-    The model was not being unreasonable; the prompt was self-contradicting.
+    The model is not being unreasonable; that prompt is self-contradicting.
     So the shapes are RE-KEYED onto the labels the script actually used, and
     a treatment character who never spoke is OMITTED rather than dangled in
     front of the model as a name it might return.
@@ -4957,15 +4878,14 @@ def _assemble(
     # tests self-consistent.
     meta.setdefault("source_bank", owner_bank)
     # EVERY CAST MEMBER GETS A VOICE, and the operator's ruling (2026-08-02)
-    # names two exits: write the lines, or remove the character. Until
-    # 2026-09-13 this lane implemented neither -- the gate inside
-    # stamp_receipt refused and the episode died (a 4060 leg: "The Toad
-    # (c04)" cast with no sayable line, PBUG-20260913-02). Operator, that
-    # morning: "delete the member." This is the last point before the
-    # receipt's proofs are minted, any line is voiced, or a portrait or
-    # credit exists; the voice ASSIGNMENT already sitting on the cast row
-    # leaves with the row, and the draft proof entries the removed lines
-    # consumed leave the proof map with them.
+    # names two exits: write the lines, or remove the character. This lane
+    # takes the second (operator, 2026-09-13: "delete the member."), because
+    # the gate inside stamp_receipt would otherwise refuse and kill the
+    # episode (PBUG-20260913-02). This is the last point before the receipt's
+    # proofs are minted, any line is voiced, or a portrait or credit exists;
+    # the voice ASSIGNMENT already sitting on the cast row leaves with the
+    # row, and the draft proof entries the removed lines consumed leave the
+    # proof map with them.
     from ._otr_cast_voice_coverage import remove_silent_cast_members
     removal = remove_silent_cast_members(led.data, owner_bank=owner_bank)
     if removal["removed"]:
@@ -5047,23 +4967,14 @@ def _apply_fable_safety_cleanup(
     *,
     technical_fn,
 ) -> "tuple[str, ParsedScript, Treatment, dict[str, Any]]":
-    """Return the script unchanged. The content cleanup this ran is retired.
+    """Return the script unchanged; there is no content cleanup.
 
-    Same-story SAFETY CLEANUP RETIRED 2026-08-05 (operator directive: no
-    content guardrails on generated episodes). This built a projection of every
-    spoken row -- intro, scene lines, outro, coda, news read -- scanned it,
-    asked the model to rewrite any row matching the profanity / weapon / sexual
-    list, and raised a terminal audit error when a term survived: two content
-    failures inside the scifi_news_pro lane. That error class went with the
-    scan (2026-09-04) -- nothing else ever raised it.
-
-    The projection fed that scan and nothing else -- no receipt, no treatment
-    mutation, no patched_news propagation read it -- so it is gone with the scan
-    rather than left to walk every line and be discarded. The script is returned
-    exactly as written, and the receipt below keeps its established shape so the
-    caller's ledger field never loses a value.
+    No content guardrails on generated episodes (operator directive
+    2026-08-05). The script is returned exactly as written, and the receipt
+    below keeps its established shape so the caller's ledger field never
+    loses a value.
     """
-    del technical_fn  # the retired scan was this function's only model call
+    del technical_fn  # unused: this function makes no model call
     return raw_source, parsed, treatment, {
         "status": "retired_no_content_policy",
         "hits": [],
@@ -5136,9 +5047,8 @@ def run_scifi_news_pro_episode(
 ) -> NewsProTailParts:
     """Produce one proof-backed story with target-independent topology."""
     del episode_root, episode_id
-    # `target = int(resolved["target_words"])` and its `< 1` guard were removed
-    # 2026-08-14 with the word authority. The act count is validated where it
-    # is used, by `_build_envelope`, against the real topology range.
+    # The act count is validated where it is used, by `_build_envelope`,
+    # against the real topology range.
     n_max = max(1, int(resolved["num_characters"]))
     creative_model = str(resolved["creative_writing_model"])
     technical_model = str(resolved["technical_model"])
@@ -5343,7 +5253,7 @@ def run_scifi_news_pro_episode(
         update={"news_close_read": read.news_close_read}
     )
     envelope = _build_envelope(int(resolved["act_count"]))
-    # Wired 2026-09-25; standing ruling #3 said this guard must not be deleted.
+    # Standing ruling #3: this guard must not be deleted.
     # The envelope was just built, so this asserts _build_envelope is
     # self-consistent -- rebuilt from its own scene_count it equals itself --
     # and fails closed as final_draft the day that stops being true.
@@ -5485,9 +5395,6 @@ def run_scifi_news_pro_episode(
     )
     f2 = _news_pro_meta(led)
     f2["delivery_telemetry"] = delivery
-    # Terminal "safety_scan" over the assembled ledger DELETED 2026-08-05
-    # (operator directive). It was the last of the scifi_news_pro lane's content
-    # refusals -- a fully assembled episode thrown away for a word.
     f2["pass_receipts"] = receipts
     # REQUIRED: the completed episode's receipts and every f2 field the
     # downstream consumers key on.

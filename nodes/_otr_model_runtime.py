@@ -135,7 +135,7 @@ class TransformersGPTQInt4Backend:
     backends. The `AutoGPTQForCausalLM` runtime load path is
     reserved for a future period model behind
     `OTR_REGRESSION_RUNTIME=1`; no curated row uses this backend at
-    present (the talkie row that did was removed 2026-05-22).
+    present.
 
     Until D1c lands, every callable raises a clear NotImplementedError
     so a structural-pytest invocation does not accidentally try to

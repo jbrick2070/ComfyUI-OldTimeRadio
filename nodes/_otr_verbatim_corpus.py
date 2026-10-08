@@ -1,7 +1,7 @@
 """The vendored-translation corpus: legal tests, the acceptance gate, the manifest.
 
-Operator ruling 2026-09-18, EVENING, and it supersedes the morning's: *"I don't
-want to waste anything in rights I'm not publishing these commercially."*
+Operator ruling 2026-09-18: *"I don't want to waste anything in rights I'm
+not publishing these commercially."*
 RIGHTS REFUSE NOTHING HERE. The publication years and the licence are recorded
 on the row and written into `LeadReport.notes`, where a reader sees them and no
 verdict reads them. A scene ships a real translator's words when its TEXT is
@@ -14,12 +14,6 @@ WHAT STILL REFUSES: fidelity. A translation made from an intermediary --
 Maffei's Macbeth came from Schiller's German, not Shakespeare's English -- is
 excluded, and so is a source whose text does not exist. That is a different
 axis from rights and is unaffected by the ruling above.
-
-THE MORNING'S RULE, kept so the reversal is legible: leads had to clear the US
-first-publication test AND life+70. It was withdrawn the same day. Before that,
-the first inventory used "translator died before 1944", which is not a
-copyright test in any jurisdiction -- a conservative bound that happened to
-clear everything it listed.
 
 WHY A PURE MODULE. The fetcher (`scripts/otr_shakespeare_corpus_gate.py`) is a
 one-off that touches the network; the writer's plan step WILL read the manifest
@@ -55,22 +49,9 @@ LIFE_PLUS_70_DEATH_BEFORE = 1956
 LIFE_PLUS_50_DEATH_BEFORE = 1976
 
 
-# `clears_publication_anywhere` WAS HERE and is deleted, 2026-09-18.
-#
-# It answered "is this public domain under both tests" as a BOOLEAN, which is
-# only ever useful for refusing something, and rights refuse nothing now
-# (operator: "I don't want to waste anything in rights I'm not publishing
-# these commercially"). Its single production caller was `load_manifest`,
-# which is exactly where a date could have killed a render; when that call
-# went, the function became a verified orphan -- `grep -rn
-# clears_publication_anywhere --include=*.py .` returned only its own
-# definition, its `__all__` entry, and tests. This repo's standing rule is
-# that such a symbol is deleted in full or wired back, never left sitting as
-# "documentation", so it is gone along with the tests that only it justified.
-#
-# `publication_reasons` below SURVIVES and is wired: it writes the human
-# sentence into `LeadReport.notes`, which a reader sees and no verdict reads.
-# The difference is the whole point -- a sentence informs, a boolean refuses.
+# `publication_reasons` writes the human sentence into `LeadReport.notes`,
+# which a reader sees and no verdict reads. The difference is the whole point
+# -- a sentence informs, a boolean refuses, and rights refuse nothing here.
 
 
 def publication_reasons(first_published: Any, translator_died: Any) -> list[str]:
@@ -235,20 +216,19 @@ def assess(report: LeadReport) -> LeadReport:
     reasons: list[str] = []
 
     # RIGHTS REPORT, THEY DO NOT REFUSE (operator 2026-09-18: "I don't want to
-    # waste anything in rights I'm not publishing these commercially"). These
-    # used to return BLOCKED and that was wrong twice over: it is not the
-    # project's question to answer, and the arithmetic was wrong anyway --
+    # waste anything in rights I'm not publishing these commercially").
+    # Returning BLOCKED on them would be wrong twice over: it is not the
+    # project's question to answer, and the arithmetic is wrong anyway --
     # "first published before 1931" is the rule for a US-published work, and
-    # applying it to a foreign one produced a false BLOCKED that discarded the
-    # entire Mandarin lane. A false BLOCKED is the expensive direction, because
-    # a false READY ships bad text and gets caught while a false BLOCKED throws
-    # away a good source in silence. The years still travel on the row and
-    # still appear here, so a reader sees them; they decide nothing.
-    # These go to `notes`, NOT `reasons`. Putting them in `reasons` was the
-    # first attempt and it was a gate in disguise: the verdict is READY only
-    # when `reasons` is empty, so every rights-failing lead was pinned at
-    # PARTIAL and `select_scene` -- which takes READY only -- could never pick
-    # it. The refusal had moved, not gone.
+    # applying it to a foreign one produces a false BLOCKED that discards a
+    # whole lane. A false BLOCKED is the expensive direction, because a false
+    # READY ships bad text and gets caught while a false BLOCKED throws away a
+    # good source in silence. The years still travel on the row and still
+    # appear here, so a reader sees them; they decide nothing.
+    # These go to `notes`, NOT `reasons`: the verdict is READY only when
+    # `reasons` is empty, so putting them there would be a gate in disguise
+    # -- every rights-failing lead would be pinned at PARTIAL and `select_scene`
+    # (which takes READY only) could never pick it.
     report.notes = list(publication_reasons(report.first_published,
                                             report.translator_died))
     if not str(report.licence or "").strip():
@@ -470,22 +450,22 @@ def _labelled(raw: str, words: tuple, value: str) -> "re.Match | None":
 
     TWO RULES EARNED ON REAL PAGES, 2026-09-18 (PBUG-20260918-07).
 
-    A LATIN HEADING WORD NEEDS A SEPARATOR BEFORE ITS NUMBER. The gap used to
-    be `{0,4}`, so `act` followed by the roman `i` matched the middle of the
-    French word `action` -- 24 times on one cached page, against 3 real
-    `ACTE` headings, which is why a five-act Macbeth measured as two acts.
+    A LATIN HEADING WORD NEEDS A SEPARATOR BEFORE ITS NUMBER. A `{0,4}` gap
+    lets `act` followed by the roman `i` match the middle of the French word
+    `action` -- 24 times on one cached page, against 3 real `ACTE` headings,
+    which is how a five-act Macbeth measured as two acts.
     CJK keeps the zero-width join because `第1幕` genuinely has none.
 
     THE EARLIEST MATCH WINS, NOT THE FIRST WORD TRIED. `_ACT_WORDS` lists
     `act` before `acte`, and returning on the first word that matched ANYWHERE
-    let a trailing `FIN DU PREMIER ACTE.` steal the anchor from the real
+    would let a trailing `FIN DU PREMIER ACTE.` steal the anchor from the real
     heading above it. Words are also tried longest-first so a prefix cannot
     claim a longer word's match.
 
     WHAT THE SEPARATOR RULE KNOWINGLY GIVES UP, so the next reader does not
-    rediscover it as a bug: a GLUED Latin heading (`ACT1`, no space) no longer
-    matches, and neither does Latin NUMBER-then-WORD (`PREMIER ACTE` as a
-    heading in its own right). Both were reachable under the old `{0,4}` gap.
+    rediscover it as a bug: a GLUED Latin heading (`ACT1`, no space) does not
+    match, and neither does Latin NUMBER-then-WORD (`PREMIER ACTE` as a
+    heading in its own right). Both are reachable with a `{0,4}` gap.
     Neither form appears in any lead, any fixture, or any row of
     `config/episode_languages.json` -- they were checked before the trade --
     and both are the same latitude that made ordinary prose match. If a real
@@ -648,16 +628,13 @@ def load_manifest(path: str) -> list:
         # would bind some of a scene's people and silently leave the rest to
         # the roll, and the manifest is documented as never degraded around.
         _validate_speaker_map(path, i, row.get(SPEAKER_MAP_FIELD))
-        # NO RIGHTS TEST HERE, DELIBERATELY. This used to raise CorpusError on
-        # a publication-date failure, and CorpusError is documented as never
-        # degraded around. Nothing in production calls `load_manifest` yet, so
-        # it was never killing a render -- it was armed to, the moment the plan
-        # step starts reading this manifest, which is the next step on the row.
-        # A copyright-date arithmetic result would then have decided whether an
-        # episode rendered at all. That breaks the
-        # standing rule that authoring-time tools fail loud while the render
-        # path degrades to the best available result with an honest receipt,
-        # and a copyright question is the textbook authoring-time concern. The
+        # NO RIGHTS TEST HERE, DELIBERATELY. Raising CorpusError on a
+        # publication-date failure would be wrong: CorpusError is documented as
+        # never degraded around, and a copyright-date arithmetic result must not
+        # decide whether an episode renders at all. That breaks the standing
+        # rule that authoring-time tools fail loud while the render path
+        # degrades to the best available result with an honest receipt, and a
+        # copyright question is the textbook authoring-time concern. The
         # operator settled the wider point on 2026-09-18 -- "I don't want to
         # waste anything in rights I'm not publishing these commercially" -- so
         # rights refuse nothing anywhere. The years remain REQUIRED fields

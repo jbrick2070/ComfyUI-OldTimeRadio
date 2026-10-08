@@ -2,14 +2,14 @@
 
 WHY THIS MODULE EXISTS
 ----------------------
-The hero title used to be drawn straight into the procgen CRT frame, which is
-then composited by ``otr_post_upscale_procgen_blend`` with ``screen`` +
+The hero title cannot be drawn straight into the procgen CRT frame, which is
+composited by ``otr_post_upscale_procgen_blend`` with ``screen`` +
 ``green_only`` -- a LIGHTEN-ONLY blend. ``screen(A, 0) = A``, so black is the
 blend's identity and an outline drawn there is a mathematical no-op. Measured on
 a published episode the title ran 8.96:1 over a dark ceiling and 1.13:1 over a
 lit monitor. Bible 07.32.
 
-The fix moves the title DOWNSTREAM of that blend, into the ASS text layer
+So the title is drawn DOWNSTREAM of that blend, in the ASS text layer
 ``OTR_CaptionBurn`` already burns, where an outline is real. That means two
 different modules must agree, frame for frame, on what the title looks like --
 so neither of them owns the arithmetic. This module does.
@@ -119,10 +119,10 @@ def plan_card_frame(*, title, card, fi, frame_size, ident_xy, title_size,
                     rng_title=_UNSET):
     """Plan ONE frame of ONE card. Returns a list of draw items.
 
-    This is the arithmetic ``_CRTRenderer._draw_title_card`` used to carry
-    inline, lifted out verbatim so the ASS emitter and the procgen draw cannot
-    disagree. Items are ``{"kind": "text", ...}`` and ``{"kind": "rect", ...}``
-    in draw order, with pixel geometry in the frame's own coordinate space.
+    This is the arithmetic the ASS emitter and the procgen draw share, so they
+    cannot disagree. Items are ``{"kind": "text", ...}`` and
+    ``{"kind": "rect", ...}`` in draw order, with pixel geometry in the
+    frame's own coordinate space.
 
     ``measure_text(text, size) -> (width, height)`` and
     ``fit_hero(title) -> (lines, size)`` are injected because measuring needs

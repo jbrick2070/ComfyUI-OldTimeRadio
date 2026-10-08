@@ -31,11 +31,8 @@ class Role(str, enum.Enum):
     """The three video roles (policy menu-filter keys, not pipelines).
 
     Maps onto the user-facing per-role selectors: ``announcer_visual`` -> A,
-    ``music_visual`` -> B, ``character_video`` -> C. The former
-    ``retired_role_a`` / ``retired_role_b`` roles were RIPPED 2026-07-01
-    (rip-sfx-broll: proven to receive ZERO beats -- the only producer was the
-    dead ``sfx`` speaker-role plus a default fallback, both removed).
-    Unknown role tokens FAIL LOUD via :class:`RoleCompatError`.
+    ``music_visual`` -> B, ``character_video`` -> C. Unknown role tokens FAIL
+    LOUD via :class:`RoleCompatError`.
     """
 
     ANNOUNCER_VISUAL = "announcer_visual"
@@ -107,8 +104,8 @@ def engine_fits_role(descriptor: EngineDescriptor, role: str) -> bool:
 
     Eligibility is PURELY capability: every token in the engine's
     ``required_inputs`` must be available in the role
-    (``required_inputs <= role_available_inputs``). The legacy per-engine
-    ``roles`` whitelist is NO LONGER a gate (operator 2026-06-22, model-agnostic
+    (``required_inputs <= role_available_inputs``). A per-engine ``roles``
+    whitelist is NOT a gate (operator 2026-06-22, model-agnostic
     routing): an engine fits any role whose inputs satisfy it -- audio-driven
     engines stay limited to audio-supplying roles BY CAPABILITY, while b-roll
     (text/still) engines fit every role. A descriptor missing ``required_inputs``
