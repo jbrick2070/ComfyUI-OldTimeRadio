@@ -13,15 +13,14 @@ Pins:
      silent `or ...["announcer"]` fallback is RETIRED (a stub style with a
      missing console key raises KeyError, never remaps); the
      OTR_LTX_OPEN_MOTION_KEY retarget works off the STATIC key set.
-  2. LOOK SPLITS: object anchors / plate scaffold compose geometry + pack
-     look byte-identically; the emblem template formats {base} at the real
+  2. LOOK SPLITS: the radio-object anchor / background plate compose
+     geometry + pack look; the emblem template formats {base} at the real
      fallback; music_visual keeps radio_form_from_meta.
   3. PROVENANCE: visual_style + prompt_field_source stamped ADDITIVELY on
      the 4 scene-family image objects + the motion-lane request
      observability; prompt text + sha stamps unchanged; the trace-copy
      allowlist carries the new keys.
-  4. AST guards: zero production Loads of the retired motion fixture; the
-     A2 look fixtures read only in their designated lanes.
+  4. AST guards: zero production Loads of the retired motion fixture.
 """
 from __future__ import annotations
 
@@ -173,21 +172,6 @@ class TestMotionRegisters:
 # 2. Look splits + emblem (byte-identity)
 # ---------------------------------------------------------------------------
 class TestLookSplits:
-    def test_object_anchor_fixtures_compose(self):
-        assert imgp._RADIO_OBJECT_ANCHOR == "%s, %s" % (
-            imgp.RADIO_OBJECT_GEOMETRY, imgp.RADIO_OBJECT_LOOK_DEFAULT)
-        assert imgp._RADIO_OBJECT_ANCHOR_WIDE == "%s, %s" % (
-            imgp.RADIO_OBJECT_GEOMETRY_WIDE, imgp.RADIO_OBJECT_LOOK_DEFAULT)
-        assert imgp.BACKGROUND_PLATE_POS_SCAFFOLD == "%s, %s" % (
-            imgp.BACKGROUND_PLATE_GEOMETRY, imgp.PLATE_LOOK_DEFAULT)
-
-    def test_pack_fixture_byte_identity(self):
-        s = vs.resolve_visual_style("sci_fi_radio")
-        assert s.radio_object_look == imgp.RADIO_OBJECT_LOOK_DEFAULT
-        assert s.plate_look == imgp.PLATE_LOOK_DEFAULT
-        assert (s.non_character_emblem_fallback
-                == imgp.NON_CHARACTER_EMBLEM_FALLBACK_DEFAULT)
-
     def test_radio_object_host_byte_identical(self):
         s = vs.resolve_visual_style("sci_fi_radio")
         for aspect in ("portrait", "wide"):
@@ -208,7 +192,8 @@ class TestLookSplits:
         entry = imgp._compose_background_plate_prompt(_META_BRIEF,
                                                       "mars post")
         assert styled == entry
-        assert imgp.BACKGROUND_PLATE_POS_SCAFFOLD in styled
+        assert ("%s, %s" % (imgp.BACKGROUND_PLATE_GEOMETRY, s.plate_look)
+                in styled)
 
     def test_emblem_template_formats_base(self):
         s = vs.resolve_visual_style("sci_fi_radio")
@@ -218,10 +203,6 @@ class TestLookSplits:
         assert subj == ("a single emblematic object representing "
                         "the door seals shut")
         assert src == "non_character_emblem_fallback"
-        # legacy fixture lane byte-identical
-        assert imgp._mesh_fodder_subject(
-            _META_BRIEF, None, {"beat_intent": "the door seals shut"},
-            "mars post", "character_video") == subj
 
     def test_music_and_announcer_keep_radio_form_never_emblem(self):
         s = vs.resolve_visual_style("sci_fi_radio")
@@ -308,7 +289,6 @@ class TestImageObjectProvenance:
 # 4. AST guards + trace allowlist
 # ---------------------------------------------------------------------------
 _RD = _NODES / "_otr_video_engines" / "render_driver.py"
-_IMGP = _NODES / "otr_meta_brief_image_prompt.py"
 
 
 class TestAstGuards:
@@ -325,28 +305,6 @@ class TestAstGuards:
         assert not offenders, (
             f"production loads of the retired motion fixture (route through "
             f"the pack motion_registers): {offenders}")
-
-    def test_a2_look_fixtures_read_only_in_designated_lanes(self):
-        tree = ast.parse(_IMGP.read_text(encoding="utf-8"))
-        names = {"RADIO_OBJECT_LOOK_DEFAULT", "PLATE_LOOK_DEFAULT",
-                 "NON_CHARACTER_EMBLEM_FALLBACK_DEFAULT"}
-        allowed = set()
-        for node in tree.body:  # module-level fixture compositions
-            if isinstance(node, ast.Assign):
-                for n in ast.walk(node):
-                    if isinstance(n, ast.Name) and n.id in names:
-                        allowed.add(n.lineno)
-        for node in ast.walk(tree):  # the one legacy lane
-            if (isinstance(node, ast.FunctionDef)
-                    and node.name == "_mesh_fodder_subject_and_source"):
-                for n in ast.walk(node):
-                    if isinstance(n, ast.Name) and n.id in names:
-                        allowed.add(n.lineno)
-        offenders = [
-            f"{n.lineno}:{n.id}" for n in ast.walk(tree)
-            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
-            and n.id in names and n.lineno not in allowed]
-        assert not offenders
 
     def test_trace_allowlist_carries_the_provenance_keys(self):
         src = _RD.read_text(encoding="utf-8")

@@ -352,8 +352,10 @@ class TestSelfVocativeBackstop:
 
 class TestPortraitPromptGuidance:
     def test_style_anchor_positive_only_three_quarter(self):
+        from nodes import _otr_visual_styles as vs
         from nodes import otr_meta_brief_image_prompt as mb
-        low = mb.STYLE_ANCHOR.lower()
+        low = mb._style_anchor_for_aspect(
+            "portrait", style=vs.get_visual_style({})).lower()
         assert "three-quarter" in low
         assert "no microphone" not in low and "not a recording" not in low
 

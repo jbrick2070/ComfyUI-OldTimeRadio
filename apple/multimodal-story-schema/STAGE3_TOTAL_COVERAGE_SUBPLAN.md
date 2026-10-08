@@ -6,6 +6,16 @@ downstream prompts -- stills, video, 3D, announcer_visual + music_visual include
 **CONVERGED, BUILD-READY** -- kibitz r1-r4 complete (codex + antigravity, Claude anchor+judge;
 judgments `kibitz-runs/2026-07-05-style-total-coverage/{r1,r2,r3,r4}/final.md`).
 
+**FIXTURE RETIREMENT (2026-10-08, phase-2 cleanup):** the Python extraction
+fixtures this plan keeps in `otr_meta_brief_image_prompt.py` (STYLE_ANCHOR*,
+`*_LOOK_DEFAULT`, `_RADIO_CONSOLE_FACE` / `_RADIO_CONSOLE_MOUTH`,
+`_RADIO_OBJECT_SUBJECT` / `_RADIO_OBJECT_ANCHOR*`, BACKGROUND_PLATE_POS_SCAFFOLD,
+NON_CHARACTER_EMBLEM_FALLBACK_DEFAULT, `_STILL_WORD_TYPOGRAPHY` / `_BACKDROP` /
+`_TITLE_MOOD_STYLE`) and the legacy no-style lanes of `_style_anchor_for_aspect`
+and `_mesh_fodder_subject_and_source` were deleted: the packs own every value
+and nothing in the workflow read the constants. The sections below describe the
+build as it was.
+
 **AUTHORITATIVE v2 SCHEMA INVENTORY (r4 reconciliation -- overrides any older count below):**
 v1 fields kept (7): style_id, label, positive_tail, image_grade_tail, broadcast_tail,
 era_tail, allow_radio_tails (+forbidden_terms, schema_version -> "v2").

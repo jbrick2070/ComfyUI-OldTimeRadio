@@ -19,6 +19,7 @@ import json
 
 import pytest
 
+from nodes import _otr_visual_styles as vs
 from nodes import otr_meta_brief_image_prompt as ip
 from nodes import otr_video_director as vd
 from nodes._otr_video_engines import cheap_families, registry as vreg
@@ -353,8 +354,9 @@ def test_typography_and_backdrop_locked_per_episode():
     b = ip.compose_still_word_prompt(
         _NOIR_OK, "character_video",
         {"text": "She waited all night.", "traits": "somber"})
-    lettering = ip._STILL_WORD_TYPOGRAPHY["noir"]
-    backdrop = ip._STILL_WORD_BACKDROP["noir"]
+    style = vs.get_visual_style(_NOIR_OK)
+    lettering = style.still_word_typography["noir"]
+    backdrop = style.still_word_backdrop["noir"]
     assert lettering in a and lettering in b
     assert backdrop in a and backdrop in b
     assert "tense mood" in a and "somber mood" in b
@@ -375,13 +377,14 @@ def test_word_mode_has_positive_text_guard_never_no_text_clause():
 def test_word_mode_legibility_guard_present_and_ordered():
     out = ip.compose_still_word_prompt(_NOIR_OK, "character_video",
                                        {"text": "Come home."})
+    style = vs.get_visual_style(_NOIR_OK)
     assert ip._STILL_WORD_LEGIBILITY_GUARD in out
     # order: quoted words -> legibility -> lettering -> backdrop -> ... -> text guard
     assert out.index("Come home.") < out.index(ip._STILL_WORD_LEGIBILITY_GUARD)
     assert out.index(ip._STILL_WORD_LEGIBILITY_GUARD) < out.index(
-        ip._STILL_WORD_TYPOGRAPHY["noir"])
-    assert out.index(ip._STILL_WORD_TYPOGRAPHY["noir"]) < out.index(
-        ip._STILL_WORD_BACKDROP["noir"])
+        style.still_word_typography["noir"])
+    assert out.index(style.still_word_typography["noir"]) < out.index(
+        style.still_word_backdrop["noir"])
 
 
 def test_mood_allowlist_free_form_traits():
@@ -407,7 +410,7 @@ def test_announcer_card_has_no_beat_mood():
         _NOIR_OK, "announcer_visual",
         {"text": "And now, our story.", "traits": "urgent"})
     assert "mood" not in out
-    assert ip._STILL_WORD_BACKDROP["noir"] in out
+    assert vs.get_visual_style(_NOIR_OK).still_word_backdrop["noir"] in out
 
 
 def test_line_length_word_boundary_reduction_not_abort():
@@ -444,16 +447,17 @@ def test_blank_line_still_fails_loud_after_reduction():
 
 
 def test_absent_and_failed_brief_use_neutral_defaults():
+    style = vs.get_visual_style({})
     # absent brief (no status) -> default lettering + backdrop
     out = ip.compose_still_word_prompt(
         {"story_brief_terms": {"setting": ["a rain-slick city office"]}},
         "character_video", {"text": "Hello."})
-    assert ip._STILL_WORD_TYPOGRAPHY["default"] in out
-    assert ip._STILL_WORD_BACKDROP["default"] in out
+    assert style.still_word_typography["default"] in out
+    assert style.still_word_backdrop["default"] in out
     # failed brief -> also default (never the noir map even with a noir style)
     failed = {"story_brief_status": "failed", "style": "1940s noir detective"}
     out2 = ip.compose_still_word_prompt(failed, "character_video", {"text": "Hi."})
-    assert ip._STILL_WORD_TYPOGRAPHY["default"] in out2
+    assert style.still_word_typography["default"] in out2
 
 
 def test_genre_typography_and_backdrop_maps():
@@ -463,16 +467,17 @@ def test_genre_typography_and_backdrop_maps():
         "western": "a dusty old west frontier tale",
         "pulp": "a lurid pulp adventure with a monster",
     }
+    pack = vs.get_visual_style({})
     for genre, style in cases.items():
         meta = {"story_brief_status": "ok", "style": style,
                 "story_brief_terms": {"setting": [style]}}
         assert ip._still_word_genre(meta) == genre
         out = ip.compose_still_word_prompt(meta, "character_video", {"text": "Go."})
-        assert ip._STILL_WORD_TYPOGRAPHY[genre] in out
-        assert ip._STILL_WORD_BACKDROP[genre] in out
+        assert pack.still_word_typography[genre] in out
+        assert pack.still_word_backdrop[genre] in out
         # every lettering phrase locks the CASE
-        assert ip._STILL_WORD_TYPOGRAPHY[genre].endswith("capitals") or \
-            "capitals" in ip._STILL_WORD_TYPOGRAPHY[genre]
+        assert pack.still_word_typography[genre].endswith("capitals") or \
+            "capitals" in pack.still_word_typography[genre]
 
 
 def test_era_tail_preserves_authored_world_terms_in_word_mode():

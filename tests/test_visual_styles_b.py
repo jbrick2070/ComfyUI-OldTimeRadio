@@ -126,9 +126,10 @@ class TestSurfaceDeltas:
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
     def test_portrait_anchors_delta(self, style_id):
         s = vs.resolve_visual_style(style_id)
+        d = vs.resolve_visual_style("sci_fi_radio")
         for aspect in ("portrait", "wide"):
             styled = imgp._style_anchor_for_aspect(aspect, style=s)
-            default = imgp._style_anchor_for_aspect(aspect)
+            default = imgp._style_anchor_for_aspect(aspect, style=d)
             assert styled != default
             assert styled.endswith(s.portrait_look)
 

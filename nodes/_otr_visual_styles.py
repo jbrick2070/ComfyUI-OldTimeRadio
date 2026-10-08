@@ -40,12 +40,11 @@ is KNOWN-but-OPTIONAL rather than required so that FROZEN embedded packs, whose
 sha256 receipt forbids injecting a default, still validate.
 
 The byte-identity contract: sci_fi_radio.json's fields are byte-identical to
-the extraction-fixture constants (tails in _otr_story_brief_helpers.py; look/
-subject fixtures in otr_meta_brief_image_prompt.py + the open-subject
-templates in _otr_story_brief_helpers.py; motion registers in
-render_driver.py; still_word maps in otr_meta_brief_image_prompt.py) --
-pinned by tests. Production code reads the PACK; the constants survive only
-as those fixtures + the designated legacy no-style lanes.
+the extraction-fixture constants (tails and open-subject templates in
+_otr_story_brief_helpers.py; motion registers in render_driver.py) -- pinned
+by tests. Production code reads the PACK; the constants survive only as those
+fixtures + the designated legacy no-style lanes. otr_meta_brief_image_prompt.py
+keeps no fixture of its own: it reads the pack alone.
 """
 from __future__ import annotations
 

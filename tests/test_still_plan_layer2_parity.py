@@ -26,11 +26,10 @@ judges prose, so none of them can collide with THE LAW:
    (``otr_meta_brief_image_prompt.py:96-104``) makes geometry ENGINE-SAFETY
    framing owned by Python and the LOOK segment (costume / environment /
    lighting) PACK-OWNED (``VisualStyle.portrait_look`` /
-   ``plate_look``). A plan row that swallowed a
-   ``*_LOOK_DEFAULT`` would hard-code the sci_fi_radio pack's look into an
-   engine and quietly take a decision away from the style authority -- spec
-   section 4: a plan "may only contribute layer 2 ... it may never decide
-   style".
+   ``plate_look``). A plan row that swallowed the sci_fi_radio pack's look
+   segment would hard-code it into an engine and quietly take a decision away
+   from the style authority -- spec section 4: a plan "may only contribute
+   layer 2 ... it may never decide style".
 
 3. **No plan object is shared by engines of DIFFERENT shipped aspects.** The
    producer picks between ``PORTRAIT_GEOMETRY`` and ``WIDE_PORTRAIT_GEOMETRY``
@@ -81,6 +80,7 @@ if "folder_paths" not in sys.modules:
 
 import nodes._otr_video_engines as _video_pkg  # noqa: F401,E402
 from nodes import _otr_story_brief_helpers as _sbh  # noqa: E402
+from nodes import _otr_visual_styles as _vs  # noqa: E402
 from nodes import otr_meta_brief_image_prompt as _mb  # noqa: E402
 from nodes._otr_video_engines import registry as _vreg  # noqa: E402
 
@@ -94,12 +94,6 @@ _KIND_GEOMETRY = {
     "mesh_fodder": _mb.MESH_FODDER_POS_SCAFFOLD,
     "scene_background_plate": _mb.BACKGROUND_PLATE_GEOMETRY,
 }
-
-#: The pack-owned LOOK segments. None of these may appear inside a plan row.
-_LOOK_SEGMENTS = (
-    _mb.PORTRAIT_LOOK_DEFAULT,
-    _mb.PLATE_LOOK_DEFAULT,
-)
 
 
 def _registered():
@@ -157,10 +151,13 @@ def test_no_plan_row_carries_pack_owned_look_vocabulary():
     """Invariant 2 -- the chunk-A1 geometry/LOOK boundary, made executable. A
     plan row that swallowed a LOOK segment would hard-code one style pack's
     look into an engine and take the decision away from the style authority."""
+    # The pack-owned LOOK segments. None of these may appear inside a plan row.
+    pack = _vs.resolve_visual_style("sci_fi_radio")
+    looks = (pack.portrait_look, pack.plate_look)
     leaks = []
     for name, engine in _registered():
         for i, row in enumerate(getattr(engine, "still_plan", ())):
-            for look in _LOOK_SEGMENTS:
+            for look in looks:
                 if look and look in row.framing_geometry:
                     leaks.append(
                         "%s row %d (kind=%s) contains pack-owned LOOK %r"

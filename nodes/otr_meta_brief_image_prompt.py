@@ -151,10 +151,7 @@ def _ensure_gender_anchor(prompt: str, char: dict) -> str:
 # the *_GEOMETRY constants below are ENGINE-SAFETY framing contracts
 # (framing / headroom / face-visibility / mouth-safety) and NEVER move into
 # style packs; the LOOK segment (costume/environment/lighting vocabulary) is
-# pack-owned (VisualStyle.portrait_look). The
-# *_LOOK_DEFAULT constants survive ONLY as the sci_fi_radio extraction
-# fixtures + the legacy no-style lane of _style_anchor_for_aspect --
-# production callers always pass style= (AST-pinned).
+# pack-owned (VisualStyle.portrait_look) and appended by _style_anchor_for_aspect.
 PORTRAIT_GEOMETRY = ("in-character cinematic three-quarter portrait, full head and face "
                      "clearly visible with natural headroom above the head (never crop "
                      "the top of the head)")
@@ -162,39 +159,23 @@ WIDE_PORTRAIT_GEOMETRY = ("in-character cinematic medium shot, head and shoulder
                           "clearly visible, subject centred with natural headroom above "
                           "the head (never crop the top of the head)")
 
-#: Extraction fixtures (pack byte-identity pins; sci_fi_radio.json values).
-PORTRAIT_LOOK_DEFAULT = ("period-accurate costume and environment, "
-                         "dramatic film lighting")
-#: The LLM-facing look language _build_char_prompt_request used to hard-code
-#: (chunk A1: production reads the pack's portrait_instruction_look; this
-#: survives ONLY as the sci_fi_radio extraction fixture).
-PORTRAIT_INSTRUCTION_LOOK_DEFAULT = "photographic and period-consistent"
 
-#: The composed legacy anchors -- BYTE-IDENTICAL by construction (fixtures for
-#: pre-A1 pins; production reads go through _style_anchor_for_aspect(style=)).
-STYLE_ANCHOR = "%s, %s" % (PORTRAIT_GEOMETRY, PORTRAIT_LOOK_DEFAULT)
-
-#: WIDE (16:9) framing anchor. A three-quarter body shot cannot fit a short
-#: landscape still without cropping the head, so wide character stills use a
-#: head-and-shoulders MEDIUM shot, subject centred with headroom (operator framing
-#: catch 2026-06-17: the wide character beats were decapitating the subject).
-#: Portrait stills keep the three-quarter look (operator KEEPER 2026-06-10).
-STYLE_ANCHOR_WIDE = "%s, %s" % (WIDE_PORTRAIT_GEOMETRY, PORTRAIT_LOOK_DEFAULT)
-
-
-def _style_anchor_for_aspect(aspect, style=None) -> str:
+def _style_anchor_for_aspect(aspect, style) -> str:
     """Framing anchor for a still's aspect: head-and-shoulders for WIDE (16:9) so
     the head is not cropped by the short frame, three-quarter for PORTRAIT.
 
+    A three-quarter body shot cannot fit a short landscape still without
+    cropping the head, so wide character stills use a head-and-shoulders MEDIUM
+    shot, subject centred with headroom (operator framing catch 2026-06-17: the
+    wide character beats were decapitating the subject). Portrait stills keep
+    the three-quarter look (operator KEEPER 2026-06-10).
+
     Chunk A1: geometry stays Python; the LOOK segment comes from the resolved
-    ``style`` pack, appended at the SAME position the legacy anchors carried
-    it (sci_fi_radio is byte-identical by construction). ``style=None`` is
-    the LEGACY fixture lane (tests) -- production callers pass style=
-    (AST-pinned); helpers never re-resolve."""
-    look = style.portrait_look if style is not None else PORTRAIT_LOOK_DEFAULT
+    ``style`` pack. Callers pass the ALREADY-RESOLVED style; helpers never
+    re-resolve."""
     geometry = (WIDE_PORTRAIT_GEOMETRY if str(aspect).lower() == "wide"
                 else PORTRAIT_GEOMETRY)
-    return "%s, %s" % (geometry, look)
+    return "%s, %s" % (geometry, style.portrait_look)
 
 #: The station ANNOUNCER is a synthetic, non-cast portrait subject (CastLock
 #: owns ``ledger['cast']``; the announcer is the station voice, never a cast
@@ -217,72 +198,54 @@ except ImportError:  # pragma: no cover -- flat test imports
         radio_form_from_meta, _RADIO_FORM_DEFAULT)
 
 
-#: Radio-HOST FACE styling. The FACE-BEARING looks are for AUDIO-DRIVEN engines
-#: only (something animates a mouth); a static/forced bookend uses the FACELESS
-#: ``radio_object`` style below (radio-face logic 2026-07-04, operator: "a
-#: bookend needs a face only when something animates it").
-#:   style="console_face": an ANTHROPOMORPHIC RADIO CONSOLE whose glowing tuning
-#:     dial forms an expressive face -- dial-eyes + a radiating needle-fan mouth.
-#:     "The radio IS the host"; NO human present. Used for the HuMo radio-host
-#:     FACE object AND the HuMo-driven synthetic-announcer portrait.
-#:   style="ltx_radio_mouth": the LTX-ONLY mouth-forward dial-face (below).
-#:   style="radio_object": a FACELESS stylized radio on its plate -- no dial-face,
-#:     no person -- for a static/i2v or force-mapped announcer (nothing drives a
-#:     mouth, so no face). Facelessness is carried by the POSITIVE prompt.
-#: Overtness is BRIEF-DRIVEN (operator: "brief-driven mix"): subtle/period for
-#: noir/deco, more overt/playful for retro-futurist / sci-fi briefs.
-_RADIO_CONSOLE_FACE = ("its glowing tuning dial forming an expressive stylized "
-                       "face -- two round dial-eyes and a radiating needle-fan "
-                       "mouth, an anthropomorphic radio that hosts the broadcast")
-#: FACELESS radio-object subject + anchors (radio-face logic 2026-07-04). The
-#: person anchors (_style_anchor_for_aspect -> STYLE_ANCHOR*) carry "full head
-#: and face", "period-accurate costume", "in-character" -- anatomy/person tokens
-#: that would defeat facelessness. radio_object leans on OBJECT/material language
-#: only (zero anatomy tokens; facelessness rides the POSITIVE) and
-#: an OBJECT anchor, and it never appends _radio_face_overtness (which returns
-#: face-bearing text). Exact anchor strings pinned (r3) so devs don't drift.
-_RADIO_OBJECT_SUBJECT = ("presented as a stylized tabletop radio set on its "
-                         "plate, its bakelite cabinet, woven speaker grille and "
-                         "a glowing tuning dial")
-# Chunk A2 geometry-vs-look split: the OBJECT anchors decompose into
-# isolation/composition GEOMETRY (Python, never in packs) + the pack-owned
-# lighting LOOK (VisualStyle.radio_object_look). The composed _RADIO_OBJECT_
-# ANCHOR* constants survive as extraction fixtures + the legacy no-style lane.
+# Radio-HOST FACE styling. The FACE-BEARING looks are for AUDIO-DRIVEN engines
+# only (something animates a mouth); a static/forced bookend uses the FACELESS
+# ``radio_object`` style below (radio-face logic 2026-07-04, operator: "a
+# bookend needs a face only when something animates it").
+#   style="console_face": an ANTHROPOMORPHIC RADIO CONSOLE whose glowing tuning
+#     dial forms an expressive face -- dial-eyes + a radiating needle-fan mouth.
+#     "The radio IS the host"; NO human present. Used for the HuMo radio-host
+#     FACE object AND the HuMo-driven synthetic-announcer portrait.
+#   style="ltx_radio_mouth": the LTX-ONLY mouth-forward dial-face (below).
+#   style="radio_object": a FACELESS stylized radio on its plate -- no dial-face,
+#     no person -- for a static/i2v or force-mapped announcer (nothing drives a
+#     mouth, so no face). Facelessness is carried by the POSITIVE prompt.
+# Overtness is BRIEF-DRIVEN (operator: "brief-driven mix"): subtle/period for
+# noir/deco, more overt/playful for retro-futurist / sci-fi briefs. The three
+# SUBJECT texts are pack-owned (VisualStyle.announcer_subject_face /
+# announcer_subject_ltx_mouth / announcer_subject_object).
+#: FACELESS radio-object anchors (radio-face logic 2026-07-04). The person
+#: anchors (_style_anchor_for_aspect) carry "full head and face",
+#: "period-accurate costume", "in-character" -- anatomy/person tokens that would
+#: defeat facelessness. radio_object leans on OBJECT/material language only
+#: (zero anatomy tokens; facelessness rides the POSITIVE) and an OBJECT anchor,
+#: and it never appends _radio_face_overtness (which returns face-bearing text).
+#: Chunk A2 geometry-vs-look split: the OBJECT anchor is isolation/composition
+#: GEOMETRY (Python, never in packs) + the pack-owned lighting LOOK
+#: (VisualStyle.radio_object_look).
 RADIO_OBJECT_GEOMETRY = ("isolated tabletop still, the whole radio centered "
                          "and fully visible")
 RADIO_OBJECT_GEOMETRY_WIDE = ("isolated tabletop still, the whole radio "
                               "centered and fully visible, wide shot")
-RADIO_OBJECT_LOOK_DEFAULT = "dramatic film lighting"
-_RADIO_OBJECT_ANCHOR = "%s, %s" % (RADIO_OBJECT_GEOMETRY,
-                                   RADIO_OBJECT_LOOK_DEFAULT)
-_RADIO_OBJECT_ANCHOR_WIDE = "%s, %s" % (RADIO_OBJECT_GEOMETRY_WIDE,
-                                        RADIO_OBJECT_LOOK_DEFAULT)
-#: LTX-ONLY mouth-forward radio face (talking-radio kibitz r1, 2026-07-01).
-#: style="ltx_radio_mouth" is used ONLY by the ltx talking radio-face still mint
-#: (the init stills the EXISTING audio-in bookend engine receives -- no new
-#: video model / path). NEVER used by the HuMo hosts: the console_face look
-#: above stays byte-unchanged (a mouth-tuned change
-#: could hurt HuMo face-readability -- the Codex MUST-FIX #4 split). LTX-2.3
-#: has no face/landmark detector; it drives whatever READS as a mouth, so the
-#: subject puts a PROMINENT rubbery grille-mouth right after the form noun
-#: (FLUX weights earlier tokens). Sub-plan C probes whether this actually
-#: lip-syncs; until then the audio-in lane stays documented as AMBIENT motion.
-#: MATERIAL-ANCHORED (live catch 2026-07-02, probe B): the image dispatcher
-#: leans on the POSITIVE prompt for facelessness, so
-#: the object-row "no human" negative is inert on the still engines -- the
-#: first live mint rendered a literal HUMAN face inside the radio. Anatomy
-#: words must therefore be bound to APPLIANCE materials in the positive
-#: itself (appliance face; lips molded from grille cloth; glass dial-eyes;
-#: cabinet fills the frame). No negation words -- image models ignore "no X"
-#: in a positive and the person guard greps for the bare tokens.
-_RADIO_CONSOLE_MOUTH = ("%s as a living cartoon appliance face: its wide "
-                        "woven speaker grille bends into a huge expressive "
-                        "rubbery mouth, big cartoon lips molded from grille "
-                        "cloth and wood, open mid-speech, and its two round "
-                        "glass tuning dials are its eyes -- a face-forward "
-                        "anthropomorphic radio made entirely of bakelite, "
-                        "wood, grille fabric and chrome, the radio cabinet "
-                        "itself filling the frame")
+# LTX-ONLY mouth-forward radio face (talking-radio kibitz r1, 2026-07-01).
+# style="ltx_radio_mouth" is used ONLY by the ltx talking radio-face still mint
+# (the init stills the EXISTING audio-in bookend engine receives -- no new
+# video model / path). NEVER used by the HuMo hosts: the console_face look
+# stays byte-unchanged (a mouth-tuned change
+# could hurt HuMo face-readability -- the Codex MUST-FIX #4 split). LTX-2.3
+# has no face/landmark detector; it drives whatever READS as a mouth, so the
+# subject puts a PROMINENT rubbery grille-mouth right after the form noun
+# (FLUX weights earlier tokens). Sub-plan C probes whether this actually
+# lip-syncs; until then the audio-in lane stays documented as AMBIENT motion.
+# MATERIAL-ANCHORED (live catch 2026-07-02, probe B): the image dispatcher
+# leans on the POSITIVE prompt for facelessness, so
+# the object-row "no human" negative is inert on the still engines -- the
+# first live mint rendered a literal HUMAN face inside the radio. Anatomy
+# words must therefore be bound to APPLIANCE materials in the positive
+# itself (appliance face; lips molded from grille cloth; glass dial-eyes;
+# cabinet fills the frame). No negation words -- image models ignore "no X"
+# in a positive and the person guard greps for the bare tokens. The pack's
+# announcer_subject_ltx_mouth carries that wording.
 #: Brief keywords that push the face OVERT (playful cartoon) vs subtle.
 _RADIO_FACE_OVERT_KEYS = ("space", "orbital", "docking", "spacecraft", "starship",
                           "sci-fi", "science fiction", "futuristic",
@@ -601,15 +564,11 @@ MESH_FODDER_NEG_SCAFFOLD = (
 )
 #: The BACKGROUND PLATE is the subject-free world the mesh stands in front of.
 #: Chunk A2 split: the no-subject/composition GEOMETRY stays Python; the
-#: "period-accurate set" LOOK is pack-owned (VisualStyle.plate_look). The
-#: composed scaffold survives as the extraction fixture + legacy lane.
+#: "period-accurate set" LOOK is pack-owned (VisualStyle.plate_look).
 BACKGROUND_PLATE_GEOMETRY = (
     "empty establishing environment, no people, no subject, no characters, "
     "wide 16:9 cinematic scene, atmospheric depth"
 )
-PLATE_LOOK_DEFAULT = "period-accurate set"
-BACKGROUND_PLATE_POS_SCAFFOLD = "%s, %s" % (BACKGROUND_PLATE_GEOMETRY,
-                                            PLATE_LOOK_DEFAULT)
 #: Mesh fodder is rendered near-square/portrait (Hunyuan wants an isolated,
 #: fully-in-frame subject), independent of the beat's final video aspect.
 MESH_FODDER_W = PORTRAIT_W
@@ -863,11 +822,25 @@ _STILL_WORD_MUSIC_ROLE = "music_visual"
 # lettering + backdrop are LOCKED per episode (deterministic, no LLM) so every
 # word card in an episode reads as ONE consistent typographic set; only the beat
 # MOOD adjective varies per character card (the operator's consistency ask).
+# The lettering, backdrop and music-card title-mood VALUES are pack-owned
+# (VisualStyle.still_word_typography / still_word_backdrop /
+# still_word_title_mood_style, the first two keyed by the genre below). The
+# rules the sci_fi_radio pack was written to, kept here because JSON has no
+# comments: every lettering phrase ENDS in "capitals" (Fable: lock the CASE,
+# not just the family -- Ideogram mixes case between renders otherwise;
+# "capitals" is the cheapest per-episode consistency lock) and carries no
+# era/period/letterpress words (era-bias + ink-squash distress moved OUT of the
+# guard); every backdrop is COLOR + LIGHT DIRECTION + ATMOSPHERE DENSITY only,
+# NEVER an OBJECT / PARTICLE / PLACE (any countable noun becomes high-frequency
+# texture inside the letter counters), kept in the DARK value register (the
+# value gap, not saturation, keeps caps legible under the grade); the music
+# card's title-mood style is WORDLESS.
 
 #: Genre classifier over the SAME haystack radio_form uses (meta.style + brief
 #: setting/atmosphere). First match wins; an absent/failed brief OR no keyword
 #: match -> "default". The genre KEY (noir|sci-fi|western|pulp|default) is the
-#: provenance ``backdrop_family`` value AND the key into both maps below.
+#: provenance ``backdrop_family`` value AND the key into the pack's typography
+#: and backdrop maps.
 _STILL_WORD_GENRE_KEYWORDS = (
     ("noir", ("noir", "detective", "deco", "art deco", "1930s", "1940s",
               "prohibition", "hardboiled", "gumshoe")),
@@ -879,33 +852,6 @@ _STILL_WORD_GENRE_KEYWORDS = (
     ("pulp", ("pulp", "adventure", "jungle", "ray gun", "monster", "horror",
               "crime", "mystery", "swashbuckling")),
 )
-#: EXTRACTION FIXTURE (chunk C, 2026-07-05): production reads the visual-style
-#: pack (``VisualStyle.still_word_typography``); these three maps survive ONLY
-#: as the sci_fi_radio byte-identity fixtures (pinned by test_still_word_maps_
-#: match; an AST guard forbids production reads). Edit the PACK, not these.
-#:
-#: LOCKED per-episode lettering. Every phrase ENDS in "capitals" (Fable: lock the
-#: CASE, not just the family -- Ideogram mixes case between renders otherwise;
-#: "capitals" is the cheapest per-episode consistency lock). No era/period/
-#: letterpress words here (era-bias + ink-squash distress moved OUT of the guard).
-_STILL_WORD_TYPOGRAPHY = {
-    "noir": "heavy condensed sans-serif capitals, tightly spaced",
-    "sci-fi": "wide geometric sans-serif capitals, sleek machined edges",
-    "western": "bold wood-type slab-serif capitals, sturdy and squared",
-    "pulp": "heavy blocky display serif capitals, hard drop shadow",
-    "default": "bold clean sans-serif capitals, evenly spaced",
-}
-#: COOL backdrop -- COLOR + LIGHT DIRECTION + ATMOSPHERE DENSITY only, NEVER an
-#: OBJECT / PARTICLE / PLACE (any countable noun becomes high-frequency texture
-#: inside the letter counters). Kept in the DARK value register (the value gap,
-#: not saturation, keeps caps legible under the grade).
-_STILL_WORD_BACKDROP = {
-    "noir": "smoky midnight-blue haze, dim slatted lamplight",
-    "sci-fi": "deep void-black gradient, cold teal horizon glow",
-    "western": "deep amber dusk haze, low golden horizon glow",
-    "pulp": "deep crimson gradient haze, dramatic low uplight glow",
-    "default": "soft dark gradient haze, faint warm center glow",
-}
 #: SPLIT out of the old _STILL_WORD_CARD_STYLE: the genre-NEUTRAL legibility /
 #: composition tokens stay fixed; the per-episode lettering supplies the idiom.
 #: "filling the frame" is a literal instruction the model acts on; "clear space
@@ -918,10 +864,6 @@ _STILL_WORD_LEGIBILITY_GUARD = (
 #: failure is an invented subtitle line.
 _STILL_WORD_TEXT_GUARD = (
     "only the quoted words, no other text, no logos, no captions")
-#: WORDLESS abstract-title styling for the music card (UNTOUCHED path).
-_STILL_WORD_TITLE_MOOD_STYLE = (
-    "abstract evocative mood image, atmospheric period illustration, symbolic "
-    "non-literal composition, no lettering")
 
 #: Beat-mood ALLOWLIST (the load-bearing safety property, Fable). ONLY these
 #: lemmas emit a mood; everything else (voice descriptors, novel LLM adjectives,
@@ -1821,15 +1763,8 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
     return prompt, source
 
 
-#: Chunk A2 extraction fixture: the general no-character emblem template is
-#: pack-owned (VisualStyle.non_character_emblem_fallback, {base} template);
-#: this survives ONLY as the sci_fi_radio fixture + the legacy no-style lane.
-NON_CHARACTER_EMBLEM_FALLBACK_DEFAULT = (
-    "a single emblematic object representing {base}")
-
-
 def _mesh_fodder_subject_and_source(meta, char_entry, line, setting, role,
-                                    style=None) -> "tuple[str, str]":
+                                    style) -> "tuple[str, str]":
     """``(subject, prompt_field_source)`` for a mesh_fodder still -> always a
     single, isolated thing the mesher can carve cleanly. A character beat
     meshes the CHARACTER (appearance); the announcer meshes the announcer
@@ -1840,7 +1775,7 @@ def _mesh_fodder_subject_and_source(meta, char_entry, line, setting, role,
     no-character beat meshes ONE emblematic story object -- chunk A2: that
     emblem TEMPLATE is pack-owned (non_character_emblem_fallback, formatted
     with {base}); music_visual keeps radio_form_from_meta (brief axis, r1
-    codex M2 + AG M3). ``style=None`` is the legacy fixture lane. Pure;
+    codex M2 + AG M3). ``style`` is the ALREADY-RESOLVED pack. Pure;
     never empty (a bare fallback keeps the mesher fed). The source tag is
     the chunk-A2 provenance value for the minted object."""
     appearance = ""
@@ -1865,13 +1800,12 @@ def _mesh_fodder_subject_and_source(meta, char_entry, line, setting, role,
     # the mesher fed cleanly).
     intent = str((line or {}).get("beat_intent") or "").strip()[:120]
     base = intent or setting or "the story"
-    template = (style.non_character_emblem_fallback if style is not None
-                else NON_CHARACTER_EMBLEM_FALLBACK_DEFAULT)
+    template = style.non_character_emblem_fallback
     return template.format(base=base), "non_character_emblem_fallback"
 
 
 def _mesh_fodder_subject(meta, char_entry, line, setting, role,
-                         style=None) -> str:
+                         style) -> str:
     """Subject-only wrapper of :func:`_mesh_fodder_subject_and_source`."""
     return _mesh_fodder_subject_and_source(
         meta, char_entry, line, setting, role, style=style)[0]

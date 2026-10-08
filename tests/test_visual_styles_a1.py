@@ -12,17 +12,18 @@ Pins:
      forbidden-terms lint over ALL new leaves; a v1 pack fails load LOUD
      naming the path + "upgrade to v2".
   2. EXTRACTION FIXTURES: sci_fi_radio.json's v2 fields == the Python
-     fixture constants byte-for-byte (imgp looks/subjects, helpers open
-     subjects, render_driver motion registers, imgp still_word maps).
+     fixture constants byte-for-byte (helpers open subjects, render_driver
+     motion registers). The image-prompt module keeps no fixture: it reads
+     the pack alone.
   3. SEAM BYTE-IDENTITY (the A1 build gate, r2 codex CUT: seam-level string
      equality, NOT full-episode): every re-routed composer's OUTPUT under a
-     default meta equals the constants-built pre-change expectation --
-     portrait anchors x3, radio-host x3 dispatch arms, open subjects x3,
-     the LLM instruction texts, the deterministic portrait fallback.
+     default meta equals its pack-composed expectation -- radio-host x3
+     dispatch arms, open subjects x3, the LLM instruction texts, the
+     deterministic portrait fallback.
   4. GEOMETRY guards: *_GEOMETRY constants carry no pack look vocabulary.
-  5. AST guards: no production reads of the extracted fixture constants
-     outside their designated legacy lanes; every production
-     _style_anchor_for_aspect / get_open_subject call passes style=.
+  5. AST guards: no production reads of the open-subject defaults outside
+     get_open_subject's legacy lane; every production get_open_subject call
+     passes style=.
   6. Dormant-field pin: the 4 non-default packs carry the sci-fi default
      values for every NEW field (behavior identical to the tails-only v1
      delta until chunk B authors them).
@@ -178,19 +179,6 @@ class TestLoaderV2:
 # 2. Extraction fixtures -- pack values == Python fixture constants
 # ---------------------------------------------------------------------------
 class TestExtractionFixtures:
-    def test_portrait_looks(self):
-        s = vs.resolve_visual_style("sci_fi_radio")
-        assert s.portrait_look == imgp.PORTRAIT_LOOK_DEFAULT
-        assert (s.portrait_instruction_look
-                == imgp.PORTRAIT_INSTRUCTION_LOOK_DEFAULT)
-
-    def test_announcer_subjects(self):
-        s = vs.resolve_visual_style("sci_fi_radio")
-        assert s.announcer_subject_face == imgp._RADIO_CONSOLE_FACE
-        assert (s.announcer_subject_ltx_mouth
-                == imgp._RADIO_CONSOLE_MOUTH.replace("%s", "{form}"))
-        assert s.announcer_subject_object == imgp._RADIO_OBJECT_SUBJECT
-
     def test_open_subjects(self):
         s = vs.resolve_visual_style("sci_fi_radio")
         assert s.open_subjects["synthetic"] == \
@@ -206,70 +194,39 @@ class TestExtractionFixtures:
         s = vs.resolve_visual_style("sci_fi_radio")
         assert dict(s.motion_registers) == rd._LTX_MOTION_PROMPT_BY_ROLE
 
-    def test_still_word_maps_match(self):
-        # Chunk C consumes these; A1 pins the extraction.
-        s = vs.resolve_visual_style("sci_fi_radio")
-        assert dict(s.still_word_typography) == imgp._STILL_WORD_TYPOGRAPHY
-        assert dict(s.still_word_backdrop) == imgp._STILL_WORD_BACKDROP
-        assert (s.still_word_title_mood_style
-                == imgp._STILL_WORD_TITLE_MOOD_STYLE)
-
-    def test_a2_look_fields_match_their_source_literals(self):
-        # radio_object_look / plate_look / emblem are consumed by chunk A2;
-        # the pack values equal the literals they replaced (fixtures).
-        s = vs.resolve_visual_style("sci_fi_radio")
-        assert s.radio_object_look in imgp._RADIO_OBJECT_ANCHOR
-        assert s.radio_object_look in imgp._RADIO_OBJECT_ANCHOR_WIDE
-        assert s.plate_look in imgp.BACKGROUND_PLATE_POS_SCAFFOLD
-        assert (s.non_character_emblem_fallback.replace("{base}", "%s")
-                == "a single emblematic object representing %s")
-
-    def test_legacy_anchor_fixtures_compose_from_geometry_plus_look(self):
-        assert imgp.STYLE_ANCHOR == "%s, %s" % (
-            imgp.PORTRAIT_GEOMETRY, imgp.PORTRAIT_LOOK_DEFAULT)
-        assert imgp.STYLE_ANCHOR_WIDE == "%s, %s" % (
-            imgp.WIDE_PORTRAIT_GEOMETRY, imgp.PORTRAIT_LOOK_DEFAULT)
-
 
 # ---------------------------------------------------------------------------
 # 3. Seam byte-identity (default meta -> pre-change output)
 # ---------------------------------------------------------------------------
 class TestSeamByteIdentity:
-    def test_style_anchor_seams(self):
-        s = vs.resolve_visual_style("sci_fi_radio")
-        for aspect in ("portrait", "wide"):
-            styled = imgp._style_anchor_for_aspect(aspect, style=s)
-            legacy = imgp._style_anchor_for_aspect(aspect)
-            assert styled == legacy
-        assert imgp._style_anchor_for_aspect("portrait") == imgp.STYLE_ANCHOR
-        assert imgp._style_anchor_for_aspect("wide") == imgp.STYLE_ANCHOR_WIDE
-
     def test_radio_host_three_arms_byte_identical(self):
-        # Reconstruct each arm's pre-change prompt from the FIXTURE constants
-        # (the 3A pattern) and require equality with the pack-routed output.
+        # Reconstruct each arm's prompt from the PACK fields (the 3A pattern)
+        # and require equality with the routed output.
         form = imgp.radio_form_from_meta(_META_BRIEF)
         overt = imgp._radio_face_overtness(_META_BRIEF)
         s = vs.resolve_visual_style("sci_fi_radio")
-        for aspect, obj_anchor in (("portrait", imgp._RADIO_OBJECT_ANCHOR),
-                                   ("wide", imgp._RADIO_OBJECT_ANCHOR_WIDE)):
+        for aspect, obj_geometry in (("portrait", imgp.RADIO_OBJECT_GEOMETRY),
+                                     ("wide", imgp.RADIO_OBJECT_GEOMETRY_WIDE)):
             got = imgp.build_radio_host_prompt(
                 _META_BRIEF, aspect, radio_host_style="radio_object")
             core = ", ".join(
-                ["%s, %s" % (form, imgp._RADIO_OBJECT_SUBJECT), obj_anchor])
+                ["%s, %s" % (form, s.announcer_subject_object),
+                 "%s, %s" % (obj_geometry, s.radio_object_look)])
             assert got.startswith(core)
 
             got = imgp.build_radio_host_prompt(
                 _META_BRIEF, aspect, radio_host_style="console_face")
             core = ", ".join([
-                "%s, %s, %s" % (form, imgp._RADIO_CONSOLE_FACE, overt),
-                imgp._style_anchor_for_aspect(aspect)])
+                "%s, %s, %s" % (form, s.announcer_subject_face, overt),
+                imgp._style_anchor_for_aspect(aspect, style=s)])
             assert got.startswith(core)
 
             got = imgp.build_radio_host_prompt(
                 _META_BRIEF, aspect, radio_host_style="ltx_radio_mouth")
             expected = "%s, warm dramatic lighting" % ", ".join([
-                "%s, %s" % (imgp._RADIO_CONSOLE_MOUTH % form, overt),
-                imgp._style_anchor_for_aspect(aspect)])
+                "%s, %s" % (s.announcer_subject_ltx_mouth.format(form=form),
+                            overt),
+                imgp._style_anchor_for_aspect(aspect, style=s)])
             assert got == expected
         # vstyle threading == entry resolve (no drift between the lanes)
         assert imgp.build_radio_host_prompt(
@@ -354,11 +311,6 @@ class TestGeometryGuards:
 _IMGP = _NODES / "otr_meta_brief_image_prompt.py"
 _HELPERS = _NODES / "_otr_story_brief_helpers.py"
 
-_ANCHOR_NAMES = ("STYLE_ANCHOR", "STYLE_ANCHOR_WIDE")
-_SUBJECT_FIXTURES = ("_RADIO_CONSOLE_FACE", "_RADIO_CONSOLE_MOUTH",
-                     "_RADIO_OBJECT_SUBJECT")
-_LOOK_DEFAULTS = ("PORTRAIT_LOOK_DEFAULT",
-                  "PORTRAIT_INSTRUCTION_LOOK_DEFAULT")
 _OPEN_DEFAULTS = ("OPEN_SUBJECT_SYNTHETIC_DEFAULT",
                   "OPEN_SUBJECT_ANNOUNCER_DEFAULT",
                   "OPEN_SUBJECT_DEFAULT_DEFAULT")
@@ -371,67 +323,7 @@ def _function_def(tree: ast.Module, name: str) -> ast.FunctionDef:
     raise AssertionError(f"function {name} not found")
 
 
-def _loads_in(node: ast.AST, names) -> list:
-    return [n.id for n in ast.walk(node)
-            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
-            and n.id in names]
-
-
 class TestAstGuards:
-    def test_no_production_loads_of_legacy_anchor_constants(self):
-        # The composed STYLE_ANCHOR* fixtures are Store-only in production
-        # (tests import them freely). Any production Load = a missed
-        # re-route.
-        offenders = []
-        for path in _NODES.rglob("*.py"):
-            rel = path.relative_to(_NODES).as_posix()
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if (isinstance(node, ast.Name)
-                        and isinstance(node.ctx, ast.Load)
-                        and node.id in _ANCHOR_NAMES):
-                    offenders.append(f"{rel}:{node.lineno}:{node.id}")
-        assert not offenders, (
-            f"production loads of the legacy anchors (route through "
-            f"_style_anchor_for_aspect(style=)): {offenders}")
-
-    def test_radio_host_builder_reads_pack_not_fixtures(self):
-        tree = ast.parse(_IMGP.read_text(encoding="utf-8"))
-        fn = _function_def(tree, "build_radio_host_prompt")
-        hits = _loads_in(fn, _SUBJECT_FIXTURES)
-        assert not hits, (
-            f"build_radio_host_prompt reads subject fixtures {hits} -- the "
-            f"three dispatch arms must read the pack")
-
-    def test_look_defaults_read_only_in_the_designated_lanes(self):
-        tree = ast.parse(_IMGP.read_text(encoding="utf-8"))
-        anchor_fn = _function_def(tree, "_style_anchor_for_aspect")
-        allowed = set()
-        for node in ast.walk(anchor_fn):
-            if isinstance(node, ast.Name) and node.id in _LOOK_DEFAULTS:
-                allowed.add(node.lineno)
-        # module-level anchor fixture definitions are Store targets with a
-        # Load of the look default on the SAME assignment -- collect them.
-        for node in tree.body:
-            if isinstance(node, ast.Assign):
-                targets = {t.id for t in node.targets
-                           if isinstance(t, ast.Name)}
-                if targets & set(_ANCHOR_NAMES):
-                    for n in ast.walk(node):
-                        if (isinstance(n, ast.Name)
-                                and n.id in _LOOK_DEFAULTS):
-                            allowed.add(n.lineno)
-        offenders = []
-        for node in ast.walk(tree):
-            if (isinstance(node, ast.Name)
-                    and isinstance(node.ctx, ast.Load)
-                    and node.id in _LOOK_DEFAULTS
-                    and node.lineno not in allowed):
-                offenders.append(f"{node.lineno}:{node.id}")
-        assert not offenders, (
-            f"look-default fixtures read outside _style_anchor_for_aspect's "
-            f"legacy lane / the anchor fixture definitions: {offenders}")
-
     def test_open_subject_defaults_read_only_in_get_open_subject(self):
         tree = ast.parse(_HELPERS.read_text(encoding="utf-8"))
         fn = _function_def(tree, "get_open_subject")
@@ -445,23 +337,6 @@ class TestAstGuards:
                     and node.lineno not in allowed):
                 offenders.append(f"{node.lineno}:{node.id}")
         assert not offenders
-
-    def test_production_anchor_callers_pass_style(self):
-        # Every _style_anchor_for_aspect call in the image module passes
-        # style= (the no-style lane is the tests-only legacy fixture).
-        tree = ast.parse(_IMGP.read_text(encoding="utf-8"))
-        offenders = []
-        for call in ast.walk(tree):
-            if not isinstance(call, ast.Call):
-                continue
-            name = getattr(call.func, "id",
-                           getattr(call.func, "attr", ""))
-            if name != "_style_anchor_for_aspect":
-                continue
-            if "style" not in {k.arg for k in call.keywords}:
-                offenders.append(str(call.lineno))
-        assert not offenders, (
-            f"_style_anchor_for_aspect callers missing style=: {offenders}")
 
     def test_production_get_open_subject_callers_pass_style(self):
         offenders = []

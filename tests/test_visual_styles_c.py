@@ -10,15 +10,14 @@ LOCK stay Python (operator lettering-consistency directive 2026-07-04).
 Coverage:
   1. Raw-field deltas -- every non-default pack authors all 3 still_word fields
      (5 typography keys + 5 backdrop keys + title-mood) away from sci_fi.
-  2. sci_fi byte-identity through the re-route (composer output still carries the
-     extraction-fixture constants for the default lane).
+  2. sci_fi default lane through the re-route (composer output carries the
+     sci_fi_radio pack values).
   3. Composed delta through the REAL composer per genre.
   4. Provenance stamps (still_word_typography:<genre> / still_word_title_mood_style)
      + lettering_style sourced from the pack, through derive_image_prompts.
   5. Per-episode lettering LOCK preserved (determinism).
   6. Negative-vocab: no pack's own forbidden term survives into a styled card.
-  7. AST guard: the composer body reads the pack attributes, NOT the module
-     extraction constants (which survive only as sci_fi fixtures).
+  7. AST guard: the composer body reads the pack attributes.
 
 This chunk RETIRES the still_word half of
 test_visual_styles_a1.TestDormantDefaults (those fields are now consumed).
@@ -105,22 +104,24 @@ class TestStillWordFieldDeltas:
 
 
 # --------------------------------------------------------------------------- #
-# 2. sci_fi byte-identity through the re-route (the default lane is unchanged)
+# 2. sci_fi default lane through the re-route
 # --------------------------------------------------------------------------- #
 class TestSciFiByteIdentical:
     @pytest.mark.parametrize("genre", _GENRE_KEYS)
-    def test_default_word_card_carries_fixture_constants(self, genre):
-        # No visual_style -> sci_fi_radio; the pack values equal the extraction
-        # fixtures, so the composed card is byte-identical to pre-chunk-C.
+    def test_default_word_card_carries_the_pack_values(self, genre):
+        # The default lane is the sci_fi_radio pack: the composed card carries
+        # that pack's lettering + backdrop for the genre.
+        s = vs.resolve_visual_style("sci_fi_radio")
         out = ip.compose_still_word_prompt(
             _meta("sci_fi_radio", genre), "character_video", {"text": "Go."})
-        assert ip._STILL_WORD_TYPOGRAPHY[genre] in out
-        assert ip._STILL_WORD_BACKDROP[genre] in out
+        assert s.still_word_typography[genre] in out
+        assert s.still_word_backdrop[genre] in out
 
-    def test_default_music_card_carries_fixture_title_mood(self):
+    def test_default_music_card_carries_the_pack_title_mood(self):
+        s = vs.resolve_visual_style("sci_fi_radio")
         out = ip.compose_still_word_prompt(
             _meta("sci_fi_radio", "default"), "music_visual", {})
-        assert ip._STILL_WORD_TITLE_MOOD_STYLE in out
+        assert s.still_word_title_mood_style in out
 
     def test_absent_visual_style_equals_explicit_sci_fi(self):
         no_style = {k: v for k, v in _meta("sci_fi_radio", "noir").items()
@@ -192,7 +193,7 @@ class TestProvenanceStamps:
             else:
                 assert o["prompt_field_source"] == \
                     "still_word_typography:%s" % genre
-                # lettering_style is the PACK value, not the Python fixture.
+                # lettering_style is the PACK value.
                 assert o["lettering_style"] == s.still_word_typography[genre]
                 assert o["backdrop_family"] == genre
 
@@ -214,7 +215,7 @@ class TestLetteringLock:
         assert s.still_word_backdrop[genre] in b
 
 # --------------------------------------------------------------------------- #
-# 7. AST guard: the composer reads the PACK, not the module fixtures
+# 7. AST guard: the composer reads the PACK
 # --------------------------------------------------------------------------- #
 def _compose_fn_node():
     src = inspect.getsource(ip)
@@ -233,12 +234,3 @@ class TestReRouteAST:
         assert "still_word_typography" in attrs
         assert "still_word_backdrop" in attrs
         assert "still_word_title_mood_style" in attrs
-
-    def test_does_not_read_extraction_constants(self):
-        names = {n.id for n in ast.walk(_compose_fn_node())
-                 if isinstance(n, ast.Name)}
-        for banned in ("_STILL_WORD_TYPOGRAPHY", "_STILL_WORD_BACKDROP",
-                       "_STILL_WORD_TITLE_MOOD_STYLE"):
-            assert banned not in names, (
-                f"{banned} is an extraction fixture -- production must read "
-                f"the pack (VisualStyle.still_word_*), not the constant")

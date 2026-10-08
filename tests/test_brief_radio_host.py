@@ -20,6 +20,7 @@ import pytest
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+from nodes import _otr_visual_styles as vs  # noqa: E402
 from nodes import otr_meta_brief_image_prompt as mbp  # noqa: E402
 from nodes import otr_image_gen_dispatcher as disp  # noqa: E402
 from nodes._otr_video_engines import render_driver as rd  # noqa: E402
@@ -119,9 +120,11 @@ def test_radio_object_is_faceless_no_anatomy():
     # positive-side guarantee is still the one under test.) Scope the
     # no-anatomy assertion to the constructed subject + anchor (the era/grade
     # tails are controlled, not sanitized).
+    style = vs.get_visual_style(_SPACE_META)
     subj = "%s, %s" % (mbp.radio_form_from_meta(_SPACE_META),
-                       mbp._RADIO_OBJECT_SUBJECT)
-    for anchor in (mbp._RADIO_OBJECT_ANCHOR, mbp._RADIO_OBJECT_ANCHOR_WIDE):
+                       style.announcer_subject_object)
+    for geometry in (mbp.RADIO_OBJECT_GEOMETRY, mbp.RADIO_OBJECT_GEOMETRY_WIDE):
+        anchor = "%s, %s" % (geometry, style.radio_object_look)
         wording = (subj + ", " + anchor).lower()
         assert not re.search(r"\b(person|man|woman|presenter|figure|face)\b",
                              wording), wording
@@ -158,8 +161,8 @@ def test_overtness_is_brief_driven():
 def test_host_prompt_aspect_follows_slot():
     wide = mbp.build_radio_host_prompt(_SPACE_META, aspect="wide")
     portrait = mbp.build_radio_host_prompt(_SPACE_META, aspect="portrait")
-    assert "head and shoulders" in wide          # STYLE_ANCHOR_WIDE
-    assert "three-quarter" in portrait           # STYLE_ANCHOR
+    assert "head and shoulders" in wide          # WIDE_PORTRAIT_GEOMETRY
+    assert "three-quarter" in portrait           # PORTRAIT_GEOMETRY
     assert wide != portrait
 
 
