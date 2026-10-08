@@ -491,7 +491,7 @@ def mood_devices(mood_terms, *, limit: int = 2) -> list[str]:
     pizzicato with brushed drums, and the model answered with a loop
     (operator, 2026-09-12: "a loop-a-loop tape deck").
     """
-    return _mood_devices_with_pace(mood_terms, limit=limit)[0]
+    return _mood_devices_and_tempo(mood_terms, limit=limit)[0]
 
 
 def tempo_phrase(mood_terms) -> str:
@@ -507,11 +507,11 @@ def tempo_phrase(mood_terms) -> str:
     AGREES with the winning pace -- including ones the ``limit`` dropped,
     since the tempo is a property of the brief and not of how many devices
     fit in the prompt -- ranked by `_TEMPO_PRIORITY`."""
-    return _mood_devices_with_pace(mood_terms, limit=2)[2]
+    return _mood_devices_and_tempo(mood_terms, limit=2)[1]
 
 
-def _mood_devices_with_pace(mood_terms, *, limit: int = 2):
-    """``(devices, pace, tempo)`` -- the shared body of the readers above.
+def _mood_devices_and_tempo(mood_terms, *, limit: int = 2):
+    """``(devices, tempo)`` -- the shared body of the readers above.
 
     THE MAJORITY PACE WINS, not the first term's (Fable, 2026-09-12). The
     brief lists its mood words in no particular order, so letting the first
@@ -548,7 +548,7 @@ def _mood_devices_with_pace(mood_terms, *, limit: int = 2):
                     matched.append((device, pace, tempo))
                 break
     if not matched:
-        return [DEFAULT_DEVICE], DEFAULT_PACE, _PACE_TEMPO[DEFAULT_PACE]
+        return [DEFAULT_DEVICE], _PACE_TEMPO[DEFAULT_PACE]
     winner = _winning_pace(votes)
     tempo = _arbitrate_tempo([(p, t) for _d, p, t in matched], winner)
     cap = _device_limit(limit)
@@ -559,7 +559,7 @@ def _mood_devices_with_pace(mood_terms, *, limit: int = 2):
         if pace != "neutral" and pace != winner:
             continue
         devices.append(device)
-    return devices, winner, tempo
+    return devices, tempo
 
 
 def _device_limit(limit) -> int:
