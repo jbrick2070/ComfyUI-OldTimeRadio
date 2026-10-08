@@ -99,16 +99,6 @@ class SourceIdentity:
     provenance: Dict[str, str] = field(default_factory=dict)
 
     @property
-    def names_a_work(self) -> bool:
-        """True when there is enough to name something out loud.
-
-        A work title alone is enough for a spoken credit; an author alone is
-        not, because "adapted from a work by H. G. Wells" is vaguer than the
-        generic sentence it would replace.
-        """
-        return bool(self.work_title or self.post_headline)
-
-    @property
     def is_degraded(self) -> bool:
         """True when a field this lane SHOULD have carried is missing.
 

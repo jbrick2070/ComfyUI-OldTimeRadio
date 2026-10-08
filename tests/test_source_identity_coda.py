@@ -61,7 +61,6 @@ def test_public_domain_identity_reads_title_and_author():
     assert ident.source_kind == "public_domain"
     assert ident.work_title == "Nonsense Novels"
     assert ident.author == "Stephen Leacock"
-    assert ident.names_a_work is True
     assert ident.is_degraded is False
     assert ident.provenance["work_title"] == "meta.source_meta.title"
 
@@ -120,7 +119,6 @@ def test_media_archive_without_a_stamped_headline_is_degraded():
 def test_unreadable_or_invention_lane_meta_never_raises(meta):
     ident = identity_from_meta(meta)
     assert isinstance(ident, SourceIdentity)
-    assert ident.names_a_work is False
     assert ident.is_degraded is True
 
 
@@ -302,5 +300,4 @@ def test_the_ghost_of_elsinore_meta_now_names_shakespeare():
 def test_an_invention_lane_meta_is_untouched_by_any_of_this():
     """`original` has no source to credit and must stay exactly as it was."""
     line, identity = _writer_coda({"source_bank": "original", "source_meta": {}})
-    assert identity.names_a_work is False
     assert line == ""
