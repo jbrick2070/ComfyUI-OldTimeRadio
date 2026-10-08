@@ -148,18 +148,13 @@ def _reject_filtergraph_syntax(name: str) -> str:
     return name
 
 
+# The path-length RULE lives in `_otr_shared/pathbudget.py` and this node only
+# calls it: spelling it twice is exactly how the caption node drifted from the
+# credits node.
 try:
-    from ._otr_shared.pathbudget import (WINDOWS_PATH_BUDGET, compact_artifact,
-                                         compact_scratch, path_fits)
+    from ._otr_shared.pathbudget import compact_artifact, compact_scratch
 except ImportError:  # pragma: no cover -- flat (sys.path) test import
-    from _otr_shared.pathbudget import (WINDOWS_PATH_BUDGET, compact_artifact,  # type: ignore
-                                        compact_scratch, path_fits)
-
-#: Kept as module names so the existing tests and any reader of this file still
-#: find them here, but the RULE lives in `_otr_shared/pathbudget.py`. Spelling
-#: it twice is exactly how the caption node drifted from the credits node.
-_WINDOWS_PATH_BUDGET = WINDOWS_PATH_BUDGET
-_path_fits = path_fits
+    from _otr_shared.pathbudget import compact_artifact, compact_scratch  # type: ignore
 
 
 def _ass_sidecar_path(out_path: str) -> str:

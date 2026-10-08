@@ -38,8 +38,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from nodes.otr_caption_burn import (  # noqa: E402
-    _WINDOWS_PATH_BUDGET, _ass_sidecar_path, _path_fits)
+from nodes._otr_shared.pathbudget import (  # noqa: E402
+    WINDOWS_PATH_BUDGET, path_fits)
+from nodes.otr_caption_burn import _ass_sidecar_path  # noqa: E402
 
 # The exact episode that failed on the 4060, 2026-09-07 00:12.
 DEEP_ROOT = (r"C:\Users\jeffr\AppData\Local\Comfy-Desktop\ComfyUI-Installs"
@@ -57,9 +58,9 @@ class SidecarBudgetTests(unittest.TestCase):
         self.assertGreater(len(naive), 260,
                            "fixture no longer reproduces the overflow")
         chosen = _ass_sidecar_path(LONG_OUT)
-        self.assertTrue(_path_fits(chosen),
+        self.assertTrue(path_fits(chosen),
                         "sidecar is still over the %d-unit budget: %d"
-                        % (_WINDOWS_PATH_BUDGET, len(chosen)))
+                        % (WINDOWS_PATH_BUDGET, len(chosen)))
 
     def test_it_stays_in_the_episode_folder(self):
         """ffmpeg is given cwd = the sidecar's folder, and a stray file in the
@@ -104,9 +105,6 @@ class SidecarBudgetTests(unittest.TestCase):
         existing one-owner modules for ffmpeg and ffprobe. Asserting the shared
         import is stronger than asserting a matching magic number.
         """
-        from nodes._otr_shared import pathbudget
-
-        self.assertEqual(_WINDOWS_PATH_BUDGET, pathbudget.WINDOWS_PATH_BUDGET)
         for module_name in ("otr_credits_roll", "otr_master_audio_mux",
                             "otr_post_upscale_procgen_blend",
                             "otr_caption_burn"):
