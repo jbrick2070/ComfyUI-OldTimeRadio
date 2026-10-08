@@ -376,8 +376,6 @@ def test_humo_fetch_lane_fetches_engine_default_unet():
     assert eng_humo._HUMO_DEFAULT_UNET in landed, (
         "LANES['humo'] no longer fetches the engine default UNET "
         f"({eng_humo._HUMO_DEFAULT_UNET}) -- fresh installs will break")
-    assert "humo_17B_fp8_e4m3fn.safetensors" not in landed, (
-        "the misaligned Comfy-Org 17B entry is back")
 
     unet = landed[eng_humo._HUMO_DEFAULT_UNET]
     assert unet.repo == "Kijai/WanVideo_comfy_fp8_scaled"

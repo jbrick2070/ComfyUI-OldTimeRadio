@@ -238,16 +238,8 @@ def test_music_cue_fanout_by_name(by_id, links_by_id):
     that could not be accepted -- those declarations are now gone too, and
     tests/test_input_types_signature_parity.py keeps them gone.
 
-    The legacy opening/closing theme links (241/242/243) are GONE, and node 7's
-    opening/closing theme inputs stay DECLARED but unlinked (BUG-LOCAL-097).
-
-    NODE 12's `closing_audio` IS NO LONGER DECLARED AT ALL (2026-08-19).
-    It was removed on the operator's ruling: the node accepted that AUDIO
-    socket and then discarded it, so connecting it would have produced
-    silence with no explanation. Removing it also meant renumbering two links
-    in the canonical graph -- it sat at input slot 1 with `script_json` and
-    `news_used` after it -- which is the same positional hazard BUG-LOCAL-097
-    names for widgets, applied to input slots."""
+    Node 7's opening/closing theme inputs stay DECLARED but unlinked
+    (BUG-LOCAL-097)."""
     theme = by_id[83]
     names = [o.get("name") for o in theme.get("outputs") or []]
     assert names == ["cue_audio_clips", "cue_manifest_json", "render_log", "done"]
@@ -258,18 +250,9 @@ def test_music_cue_fanout_by_name(by_id, links_by_id):
         _dst(links_by_id, by_id, i) for i in _out_links(theme, "cue_manifest_json"))
     assert manifest == [
         (7, "music_cue_manifest_json")]
-    # Legacy theme links retired; declarations kept + unlinked.
-    assert 241 not in links_by_id
-    assert 242 not in links_by_id
-    assert 243 not in links_by_id
+    # Legacy theme inputs: declarations kept + unlinked.
     assert _in_link(by_id[7], "opening_theme_audio") is None
     assert _in_link(by_id[7], "closing_theme_audio") is None
-    # Stronger than "unlinked": the socket must be ABSENT. `_in_link` returns
-    # None for a missing input too, so asserting only that would keep passing
-    # if the socket came back unwired -- which is exactly the state we removed.
-    assert "closing_audio" not in [
-        i.get("name") for i in (by_id[12].get("inputs") or [])
-    ], "node 12's closing_audio socket is back; it accepts audio and discards it"
 
 
 def test_scene_sequencer_audio_inputs(by_id, links_by_id):

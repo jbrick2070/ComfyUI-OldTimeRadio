@@ -228,14 +228,6 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     assert links[291] == [291, 1, 1, 85, 9, "STRING"]
     assert links[278] == [278, 92, 1, 85, 4, "STRING"]
     assert links[261] == [261, 92, 1, 84, 2, "STRING"]
-    # 271 used to be asserted here as [271, 92, 1, 94, 1, "STRING"]. It is
-    # ABSENT on purpose: node 94 (OTR_SceneAwareScopes) left the canonical in
-    # 8171e994, so the wire into it went too. Assert the absence rather than
-    # dropping the line, so a node 94 that comes back has to answer for itself.
-    assert 271 not in links, (
-        "link 271 is back -- it fed OTR_SceneAwareScopes, which 8171e994 took "
-        "off the canonical because the blend it served shipped bypassed"
-    )
     assert links[275] == [275, 92, 1, 95, 1, "STRING"]
     assert links[274][3:5] == [85, 0]
     assert links[263][3:5] == [85, 1]

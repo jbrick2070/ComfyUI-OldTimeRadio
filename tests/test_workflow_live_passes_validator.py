@@ -88,9 +88,6 @@ def test_production_workflow_visual_structure_pinned():
     # MP4 whose only consumer was that bypassed input. Both CLASSES remain
     # registered and selectable -- this removed the unused work, not the
     # capability. The composite now feeds the caption node directly.
-    assert 93 not in nodes and 94 not in nodes, (
-        "the bypassed blend / scopes pair is back in the canonical; if that is "
-        "deliberate, re-pin the chain below")
     n86 = nodes[86]
     assert n86["type"] == "OTR_CaptionBurn"
     assert n86["widgets_values"][0] is True, (

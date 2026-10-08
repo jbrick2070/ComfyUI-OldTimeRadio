@@ -39,14 +39,11 @@ def _otr_ncm() -> dict:
 # -- W1: widget-vector drift across the full resolvable OTR node set ----------
 
 
-def test_widget_vector_drift_all_nodes_except_known_musicgen():
+def test_widget_vector_drift_all_nodes():
     drift = widget_vector_drift(WF, _otr_ncm())
-    # node-14 OTR_MusicGenTheme's forceInput slot is the documented open
-    # BUG-281; every OTHER node must carry zero widgets_values drift. Existing
-    # tests pin only AudioGen length -- this extends the gate to all nodes.
-    unexpected = [d for d in drift if "OTR_MusicGenTheme" not in d]
-    assert unexpected == [], (
-        "widget-vector drift on non-MusicGen node(s): " + "; ".join(unexpected)
+    # Every resolvable node must carry zero widgets_values drift.
+    assert drift == [], (
+        "widget-vector drift on node(s): " + "; ".join(drift)
     )
 
 
