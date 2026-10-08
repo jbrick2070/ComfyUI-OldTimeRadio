@@ -1,8 +1,7 @@
-"""Story-grammar: 100-style catalog + climax-class ending taxonomy + the
-deterministic selector (2026-06-24). Pure / CPU. UTF-8 no BOM, SFW.
+"""Story-grammar: 100-style catalog + the deterministic selector (2026-06-24).
+Pure / CPU. UTF-8 no BOM, SFW.
 
-Chunk 1 (l12): climax_role param + climax-class validator (default-preserving).
-Chunk 2 (catalog): ending_tag per style.
+Chunk 2 (catalog): ending_mode prose.
 Chunk 3 (catalog): deterministic select_style.
 """
 from __future__ import annotations
@@ -18,23 +17,9 @@ from nodes import _otr_style_catalog as CAT  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Chunk 2 -- catalog ending taxonomy
+# Chunk 2 -- catalog ending mode
 # ---------------------------------------------------------------------------
 class TestCatalogEndings:
-
-    def test_all_have_climax_class_tag(self):
-        # 100 invention/media styles + 4 faithful ADAPTATION styles (2026-07-14,
-        # shakespeare/public_domain source-deferential period styles).
-        assert len(CAT.STYLE_CATALOG) == 104
-        for s in CAT.STYLE_CATALOG:
-            assert s["ending_tag"]
-
-    def test_variety_and_irreversible_is_rare(self):
-        used = {s["ending_tag"] for s in CAT.STYLE_CATALOG}
-        assert len(used) >= 8                     # not collapsed to one ending
-        n_irrev = sum(1 for s in CAT.STYLE_CATALOG
-                      if s["ending_tag"] == "irreversible_choice")
-        assert n_irrev <= 12                       # demoted from 100% to a sliver
 
     def test_ending_mode_prose_preserved(self):
         # The rename trap: render_style_grammar still reads ending_mode.

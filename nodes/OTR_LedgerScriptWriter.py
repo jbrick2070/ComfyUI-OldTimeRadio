@@ -4599,7 +4599,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 meta["story_contract"] = {
                     "slug": contract.slug,
                     "label": contract.label,
-                    "ending_tag": contract.ending_tag,
                     # 2026-06-25: carry the selected style's sound_world into the
                     # ledger meta. It was DROPPED here before, so the episode
                     # canon's sound_palette (derived from it) was always empty

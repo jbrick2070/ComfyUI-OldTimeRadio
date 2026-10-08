@@ -44,8 +44,7 @@ from nodes._otr_ledger_consistency import (  # noqa: E402
 def _contract(sound_world="wind, static, a lonely carrier tone", slug="lost_signal"):
     return StoryContract(
         slug=slug, label="Lost Signal", sound_world=sound_world,
-        story_engine="isolation", ending_mode="open", ending_tag="unresolved",
-        grammar="",
+        story_engine="isolation", ending_mode="open", grammar="",
     )
 
 

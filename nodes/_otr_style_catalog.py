@@ -464,17 +464,6 @@ STYLE_CATALOG: List[Dict[str, str]] = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Ending taxonomy (2026-06-24) -- the CLIMAX-CLASS tag per style
-# ---------------------------------------------------------------------------
-# The climax's TYPE is one of nine climax classes: irreversible_choice,
-# revelation, reversal, unresolved_final_sound, reconciliation,
-# bittersweet_parting, ironic_twist, quiet_acceptance, confession.
-# `irreversible_choice` is no longer the universal climax -- it is just ONE
-# class, used only where a story genuinely earns a decisive choice. Each style
-# maps to exactly one ending_tag (_ENDING_TAG_BY_SLUG below).
-
-
 def premise_texts(meta: Any) -> Tuple[str, ...]:
     """Return available premise text for style selection."""
     out: List[str] = []
@@ -487,125 +476,6 @@ def premise_texts(meta: Any) -> Tuple[str, ...]:
                 if isinstance(source, Mapping) and source.get(field_name):
                     out.append(str(source.get(field_name)))
     return tuple(out)
-
-_DEFAULT_ENDING_TAG = "revelation"
-
-# Per-style climax class. Deliberately VARIED so the climax stops being the same
-# shape every episode; `irreversible_choice` is now ~6% of the pool (only the
-# stories that genuinely earn a decisive choice), not 100%.
-_ENDING_TAG_BY_SLUG: Dict[str, str] = {
-    # Adaptation styles (2026-07-14): the ending DEFERS to the source, but the
-    # climax CLASS still guides the writer's beat shaping toward the source's kind
-    # of ending. faithful_stage_adaptation keeps the generic default.
-    "storm_lit_tragedy": "irreversible_choice",
-    "candlelit_period_chamber": "bittersweet_parting",
-    "lamplit_road_and_threshold": "quiet_acceptance",
-    "locked_room_suspense": "reversal",
-    "detective_case_file_reconstruction": "revelation",
-    "pulp_serial_cliffhanger": "unresolved_final_sound",
-    "mission_control_procedural": "irreversible_choice",
-    "deep_space_distress_transmission": "unresolved_final_sound",
-    "noir_interrogation_chamber": "confession",
-    "small_town_uncanny_mystery": "revelation",
-    "newsroom_emergency_bulletin": "irreversible_choice",
-    "haunted_broadcast_signal": "unresolved_final_sound",
-    "laboratory_containment_breach": "irreversible_choice",
-    "isolated_lighthouse_confession": "confession",
-    "courtroom_testimony_thriller": "reversal",
-    "missing_person_audio_diary": "unresolved_final_sound",
-    "submarine_pressure_crisis": "irreversible_choice",
-    "train_car_murder_mystery": "revelation",
-    "stormbound_inn_conspiracy": "reversal",
-    "expedition_camp_radio_log": "bittersweet_parting",
-    "wartime_code_room_drama": "bittersweet_parting",
-    "emergency_dispatch_night_shift": "quiet_acceptance",
-    "psychiatric_ward_interview": "revelation",
-    "lost_expedition_recordings": "unresolved_final_sound",
-    "arctic_outpost_survival": "quiet_acceptance",
-    "desert_station_signal_hunt": "unresolved_final_sound",
-    "mountain_rescue_countdown": "bittersweet_parting",
-    "plague_town_quarantine_drama": "bittersweet_parting",
-    "museum_after_hours_haunting": "unresolved_final_sound",
-    "factory_floor_sabotage_mystery": "revelation",
-    "hotel_switchboard_thriller": "reversal",
-    "space_station_systems_failure": "confession",
-    "underwater_research_panic": "quiet_acceptance",
-    "private_eye_street_noir": "reversal",
-    "corrupt_city_political_wiretap": "ironic_twist",
-    "blackmail_phone_call_thriller": "reversal",
-    "ransom_negotiation_countdown": "quiet_acceptance",
-    "witness_protection_confession": "confession",
-    "fugitive_safehouse_drama": "bittersweet_parting",
-    "border_crossing_identity_mystery": "revelation",
-    "prison_cell_psychological_duel": "reversal",
-    "interrogation_under_blackout": "confession",
-    "informant_dead_drop_suspense": "unresolved_final_sound",
-    "rural_folklore_investigation": "revelation",
-    "carnival_after_midnight_uncanny": "unresolved_final_sound",
-    "roadside_diner_mystery": "revelation",
-    "abandoned_motel_transmission": "unresolved_final_sound",
-    "ghost_town_field_recording": "unresolved_final_sound",
-    "cursed_object_inventory": "ironic_twist",
-    "family_attic_revelation": "revelation",
-    "seance_room_audio_anomaly": "unresolved_final_sound",
-    "funeral_home_midnight_call": "revelation",
-    "old_theater_phantom_rehearsal": "bittersweet_parting",
-    "scientific_ethics_chamber_drama": "irreversible_choice",
-    "artificial_mind_awakening_interview": "revelation",
-    "failed_experiment_countdown": "quiet_acceptance",
-    "time_loop_command_log": "reversal",
-    "alternate_history_news_bulletin": "revelation",
-    "memory_erasure_clinic_session": "bittersweet_parting",
-    "cryogenic_revival_confusion": "quiet_acceptance",
-    "alien_contact_translation_room": "revelation",
-    "robot_witness_testimony": "reversal",
-    "simulated_world_glitch_mystery": "revelation",
-    "courtroom_of_the_future_trial": "reversal",
-    "planetary_colony_town_meeting": "reconciliation",
-    "terraforming_disaster_broadcast": "quiet_acceptance",
-    "generation_ship_succession_crisis": "bittersweet_parting",
-    "asteroid_mining_labor_dispute": "reconciliation",
-    "orbital_rescue_relay": "bittersweet_parting",
-    "first_contact_diplomatic_standoff": "reconciliation",
-    "forbidden_zone_survey_log": "quiet_acceptance",
-    "lost_satellite_recovery_mission": "bittersweet_parting",
-    "evacuation_order_moral_dilemma": "irreversible_choice",
-    "family_dinner_secret_eruption": "confession",
-    "inheritance_tape_revelation": "reconciliation",
-    "marriage_under_surveillance_drama": "reconciliation",
-    "sibling_rivalry_confession_room": "confession",
-    "old_friendship_betrayal_call": "reconciliation",
-    "neighborhood_watch_paranoia": "bittersweet_parting",
-    "landlord_tenant_hidden_room_mystery": "revelation",
-    "retirement_home_ghost_story": "bittersweet_parting",
-    "school_reunion_accusation": "confession",
-    "hospital_waiting_room_vigil": "quiet_acceptance",
-    "live_variety_show_disaster": "ironic_twist",
-    "radio_play_within_a_radio_play": "ironic_twist",
-    "fake_advertisement_dystopia": "ironic_twist",
-    "propaganda_station_moral_collapse": "reversal",
-    "pirate_radio_resistance_drama": "bittersweet_parting",
-    "public_service_announcement_nightmare": "ironic_twist",
-    "call_in_show_confession_spiral": "confession",
-    "childrens_program_turns_sinister": "unresolved_final_sound",
-    "overnight_jazz_host_mystery": "revelation",
-    "numbers_station_spy_thriller": "reversal",
-    "archaeological_dig_curse_log": "unresolved_final_sound",
-    "jungle_temple_expedition": "quiet_acceptance",
-    "island_evacuation_suspense": "bittersweet_parting",
-    "sinking_ship_wireless_drama": "bittersweet_parting",
-    "airship_storm_emergency": "reconciliation",
-    "frontier_trading_post_siege": "reconciliation",
-    "traveling_preacher_scandal": "confession",
-    "gold_rush_camp_murder": "revelation",
-    "circus_train_disaster": "revelation",
-    "final_message_before_silence": "quiet_acceptance",
-}
-
-# Attach the ending_tag to each entry at module load (keep the `ending_mode`
-# prose unchanged -- render_style_grammar reads it).
-for _s in STYLE_CATALOG:
-    _s["ending_tag"] = _ENDING_TAG_BY_SLUG.get(_s["slug"], _DEFAULT_ENDING_TAG)
 
 
 # ---------------------------------------------------------------------------
@@ -813,7 +683,6 @@ class StoryContract:
     sound_world: str
     story_engine: str
     ending_mode: str
-    ending_tag: str
     grammar: str
 
 
@@ -844,6 +713,5 @@ def build_story_contract(cast_seed: Any, script_brief: str, news_seed: str,
         sound_world=effective_sound_world,
         story_engine=s.get("story_engine", ""),
         ending_mode=s.get("ending_mode", ""),
-        ending_tag=s.get("ending_tag", ""),
         grammar=render_style_grammar(slug, sound_world=effective_sound_world),
     )

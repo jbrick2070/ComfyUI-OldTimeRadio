@@ -216,7 +216,6 @@ def test_style_selection_is_unaffected_by_the_override():
     assert a.slug == b.slug
     assert a.story_engine == b.story_engine
     assert a.ending_mode == b.ending_mode
-    assert a.ending_tag == b.ending_tag
 
 
 def test_an_empty_override_is_ignored_rather_than_blanking_the_world():
