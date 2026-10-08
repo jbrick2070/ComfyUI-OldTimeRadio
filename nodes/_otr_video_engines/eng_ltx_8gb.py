@@ -739,8 +739,8 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     # LTX-Video 0.9.x Open Weights License (Lightricks; HF license:other) -- commercial
     # use permitted below the revenue threshold (same revenue-capped community model
     # already treated as clean elsewhere; same LTX family as the retired 22B lanes).
-    # NOTE: commercial_clean is NOT a selection gate -- it drives only the release-gate
-    # non-blocking warning + the release filename tag. Operator confirms at license review.
+    # NOTE: commercial_clean is NOT a selection gate -- it is a declared licensing
+    # fact that nothing gates on. Operator confirms at license review.
     commercial_clean = True
     requires_flag = None                  # registry IS the menu; no flag gate
     engine_version = "1"

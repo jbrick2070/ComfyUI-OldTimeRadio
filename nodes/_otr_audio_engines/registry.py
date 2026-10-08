@@ -19,7 +19,7 @@ one shared extensible pool.
 Usability is **fail-closed** (plan C-6, "names the missing piece -- never
 crash, never silent swap"). ``assert_usable`` validates that the requested
 engine can actually run for the role and either returns the validated engine
-name or raises :class:`EngineUnusable` carrying one of the six
+name or raises :class:`EngineUnusable` carrying one of the five
 :class:`EngineUsabilityReason` codes. It NEVER silently swaps an opt-in engine
 for the role default -- the byte-identical safety property is provided by the
 shipped workflow defaulting its engine widget to the legacy engine until
@@ -59,22 +59,21 @@ class AudioEngine(Protocol):
 
 
 class EngineUsabilityReason(str, enum.Enum):
-    """The six reasons an engine may be refused for a role (fail-closed).
+    """The five reasons an engine may be refused for a role (fail-closed).
 
     ``assert_usable`` (registry level, no IO) raises ``MALFORMED_CONFIG`` and
     ``INCOMPATIBLE_PROFILE`` (there is NO GATED_BY_FLAG case -- C6, the
     registry IS the menu; the enum member survives only for parity). The
-    disk/token/commercial reasons (``MISSING_MODEL``, ``MISSING_HF_TOKEN``,
-    ``NONCOMMERCIAL_BLOCKED``) are raised by the profile resolver and the
-    release gate, which reuse this same enum + :class:`EngineUnusable` so the
-    taxonomy is single-sourced.
+    disk/token reasons (``MISSING_MODEL``, ``MISSING_HF_TOKEN``) require IO
+    and are raised by the profile resolver and the engine adapters, which
+    reuse this same enum + :class:`EngineUnusable` so the taxonomy is
+    single-sourced.
     """
 
     GATED_BY_FLAG = "gated_by_flag"
     MISSING_MODEL = "missing_model"
     MISSING_HF_TOKEN = "missing_hf_token"
     INCOMPATIBLE_PROFILE = "incompatible_profile"
-    NONCOMMERCIAL_BLOCKED = "noncommercial_blocked"
     MALFORMED_CONFIG = "malformed_config"
 
 
@@ -155,9 +154,9 @@ def assert_usable(name: str, role: str) -> str:
     * ``INCOMPATIBLE_PROFILE`` -- the engine does not list ``role`` in ``roles``.
 
     There is NO ``GATED_BY_FLAG`` case (C6 -- the registry IS the menu): a
-    registered, role-compatible engine is always usable. Disk/token/commercial
-    checks require IO and are enforced downstream by the profile resolver and
-    release gate, not here (the registry does no IO).
+    registered, role-compatible engine is always usable. Disk and token checks
+    require IO and are enforced downstream by the profile resolver and the
+    engine adapters, not here (the registry does no IO).
     """
     if not is_registered(name):
         raise EngineUnusable(
@@ -173,7 +172,7 @@ def assert_usable(name: str, role: str) -> str:
         )
     # Registered + role-compatible == usable. The registry IS the menu: a
     # registered audio engine is selectable (C6 -- no flag gate; validation is the
-    # operator's MANUAL process). Disk/token/commercial checks require IO and are
+    # operator's MANUAL process). Disk and token checks require IO and are
     # enforced downstream (this method does no IO). The byte-identical default
     # voice/music engines + the master-mux path are UNCHANGED -- only the
     # selectability of the non-default engines changes.

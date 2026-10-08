@@ -7,7 +7,6 @@ IS_CHANGED classmethod. Every test uses an isolated ``tmp_path`` cache dir via
 output tree.
 
 Non-goals covered:
-- Production release-gate wiring (not in this chunk).
 - Bounded same-model 429 retry (not in this chunk).
 - Local engine cache activation (profile-opt-in; local profiles default off).
 """

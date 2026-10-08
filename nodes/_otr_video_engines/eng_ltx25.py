@@ -352,12 +352,12 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     target_fps = R.LTX25_FPS
 
     #: UNVERIFIED, and False is the honest default rather than a verdict. This
-    #: flag drives the release-gate warning and the release filename tag, never
-    #: selection (the H3 precedent). No license attestation exists on this box
-    #: for the LTX 2.5 Distilled weights the way the H3 attestation file does
-    #: for H3. Claiming clean on
-    #: inheritance is exactly the kind of assumption a release gate exists to
-    #: catch, so it warns until the operator confirms at license review.
+    #: flag is a declared licensing fact, never a selection input (the H3
+    #: precedent), and nothing gates on it. No license attestation exists on
+    #: this box for the LTX 2.5 Distilled weights the way the H3 attestation
+    #: file does for H3. Claiming clean on inheritance is an assumption nobody
+    #: has checked, so it stays False until the operator confirms at license
+    #: review.
     #:
     #: THE ATTESTATION FILE IS NAMED WITHOUT ITS PATH PREFIX ON PURPOSE.
     #: ``tools/engine_matrix.py`` scrapes adapter sources for doc-directory

@@ -148,12 +148,11 @@ def test_engine_unusable_carries_classified_fields():
     assert "gated_by_flag" in str(err)
 
 
-def test_usability_reason_has_the_six_codes():
+def test_usability_reason_has_the_five_codes():
     assert {r.value for r in base.EngineUsabilityReason} == {
         "gated_by_flag",
         "missing_model",
         "missing_hf_token",
         "incompatible_profile",
-        "noncommercial_blocked",
         "malformed_config",
     }

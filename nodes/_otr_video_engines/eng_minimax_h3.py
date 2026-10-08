@@ -453,8 +453,8 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
     #: MiniMax H3 Community License, plus written authorization from MiniMax
     #: dated 2026-08-07 (apple/H3_LICENSE_ATTESTATION.md). NOT OSI, so this is
-    #: False: ``commercial_clean`` drives the release-gate warning and the
-    #: release filename tag, never selection, and a conditional grant to one
+    #: False: ``commercial_clean`` is a declared licensing fact, never a
+    #: selection input (nothing gates on it), and a conditional grant to one
     #: licensee is not a clean commercial license for a published open-source
     #: pipeline. The operator confirms at license review.
     commercial_clean = False

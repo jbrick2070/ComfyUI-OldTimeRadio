@@ -18,7 +18,7 @@ module re-expresses the pattern as dependency-free, reusable primitives:
   return annotations of the shipped ``AudioEngine(Protocol)`` so
   ``test_protocol_parity`` can prove the video (and later image) protocols are
   structural supersets of the audio core -- the single source of "same shape".
-* :class:`EngineUsabilityReason` -- the six fail-closed reason codes (identical
+* :class:`EngineUsabilityReason` -- the five fail-closed reason codes (identical
   taxonomy to the audio registry, single-sourced here for video + image).
 * :class:`EngineUnusable` -- the classified, never-crash/never-silent-swap error.
 * :class:`EngineRegistry` -- one reusable registry instance per namespace. The
@@ -73,17 +73,16 @@ class EngineUsabilityReason(str, enum.Enum):
     ``INCOMPATIBLE_PROFILE``. ``GATED_BY_FLAG`` is now DEAD -- the flag gate was
     removed (C2-C6, "registry IS the menu"); the member is retained only so the
     enum stays identical to the frozen audio taxonomy (protocol-parity). The
-    disk/token/commercial reasons (``MISSING_MODEL``, ``MISSING_HF_TOKEN``,
-    ``NONCOMMERCIAL_BLOCKED``) require IO and are raised downstream by the profile
-    resolver + release gate, which reuse this same enum + :class:`EngineUnusable`
-    so the taxonomy is single-sourced across audio, video and image.
+    disk/token reasons (``MISSING_MODEL``, ``MISSING_HF_TOKEN``) require IO and
+    are raised downstream by the profile resolver and the engine adapters,
+    which reuse this same enum + :class:`EngineUnusable` so the taxonomy is
+    single-sourced across audio, video and image.
     """
 
     GATED_BY_FLAG = "gated_by_flag"   # DEAD: no engine gates on a flag (C2-C6); kept for parity
     MISSING_MODEL = "missing_model"
     MISSING_HF_TOKEN = "missing_hf_token"
     INCOMPATIBLE_PROFILE = "incompatible_profile"
-    NONCOMMERCIAL_BLOCKED = "noncommercial_blocked"
     MALFORMED_CONFIG = "malformed_config"
 
 
@@ -203,8 +202,8 @@ class EngineRegistry:
         * ``INCOMPATIBLE_PROFILE`` -- the engine does not list ``role``.
 
         There is NO ``GATED_BY_FLAG`` case (C2-C6 -- the registry IS the menu): a
-        registered, role-compatible engine is always usable. Disk/token/commercial
-        checks require IO and are enforced downstream (this method does no IO).
+        registered, role-compatible engine is always usable. Disk and token checks
+        require IO and are enforced downstream (this method does no IO).
         """
         if not self.is_registered(name):
             raise EngineUnusable(
@@ -223,8 +222,8 @@ class EngineRegistry:
         # Registered + role-compatible == usable. The registry IS the menu: a
         # registered engine is selectable and renders (it may still hard-fail
         # LOUD downstream); there is NO flag gate -- validation is the operator's
-        # manual process, never a code gate. Disk/token/commercial checks require
-        # IO and are enforced downstream (this method does no IO).
+        # manual process, never a code gate. Disk and token checks require IO and
+        # are enforced downstream (this method does no IO).
         return name
 
 
