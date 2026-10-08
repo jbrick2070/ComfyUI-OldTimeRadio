@@ -185,7 +185,7 @@ class PlannedEngineBecomesADownloadRequestTests(unittest.TestCase):
                 % r["token"])
 
     def test_both_files_are_in_the_allowlist(self):
-        """download_verified refuses anything not in MANIFEST.values(), so a
+        """_pin_metadata refuses anything not in MANIFEST.values(), so a
         request whose spec is absent would fail at transfer rather than here."""
         for category, token in (("checkpoints", self._SA3._FETCH_DEFAULT),
                                 ("text_encoders", self._SA3._TENC)):

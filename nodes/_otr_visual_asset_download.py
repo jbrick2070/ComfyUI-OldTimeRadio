@@ -5,21 +5,19 @@ and the network transport. This module never imports ComfyUI/model code and has
 no default network callable. No URL is logged or returned in receipts.
 Transport/cancellation exceptions propagate unchanged to the caller.
 
-TWO ENTRY POINTS, and the difference is who moves the bytes.
-
-``download_verified`` takes an injected ``open_stream`` and runs the read loop
-itself. It does not retry or resume: a later explicit attempt starts a fresh
-temporary file.
-
 ``fetch_verified`` (2026-09-07) takes an injected ``fetch`` that returns a LOCAL
-PATH some library has already produced, and verifies that. It exists because
-shipping a bespoke downloader inside the package correlates with the Comfy
-Registry marking the version Flagged -- and a Flagged version never resolves as
+PATH some library has already produced, and verifies that: the pinned size and
+SHA-256 are checked HERE, against the returned bytes, so a stale or poisoned
+library cache is still refused. It gains resume, retry, and the operator's token
+from whatever library the caller injected.
+
+THERE IS NO SOCKET LOOP HERE. ``download_verified`` was one -- an injected
+``open_stream`` and a read loop -- and was REMOVED 2026-10-08, with its tests,
+because nothing in production called it after the move to ``fetch_verified``.
+Shipping a bespoke downloader inside the package correlates with the Comfy
+Registry marking the version Flagged, and a Flagged version never resolves as
 ``latest_version``, so ComfyUI Manager's default install button does not offer
-it. Its verification is identical: the pinned size and SHA-256 are checked HERE,
-against the returned bytes, so a stale or poisoned library cache is still
-refused. It gains resume, retry, and the operator's token from whatever library
-the caller injected.
+it.
 """
 from __future__ import annotations
 
@@ -30,7 +28,6 @@ from pathlib import Path
 import re
 import shutil
 import sys
-import tempfile
 from urllib.parse import urlsplit
 
 
@@ -210,17 +207,29 @@ def fetch_verified(
     progress=None,
     disk_free=None,
 ) -> dict:
-    """Same contract as :func:`download_verified`, for a LIBRARY transport.
+    """Publish one caller-authorized artifact a LIBRARY fetched, without overwriting.
 
-    WHY THIS EXISTS (2026-09-07). `download_verified` owns the bytes: it opens a
-    socket through an injected `open_stream` and loops. That is a bespoke
-    downloader living in the shipped package, and comparing four published zips
-    showed the Comfy Registry security scanner Flags exactly the versions that
-    carry one -- alpha.25 added this module's siblings and was Flagged while
-    alpha.24 was Active; alpha.23 REMOVED an indextts2 weight-fetcher plus a
-    PowerShell installer and went Active while alpha.22 was Flagged. Nine of
-    fourteen versions are Flagged, and a Flagged version does not resolve as
-    `latest_version`, so Manager's default button never offers it.
+    ``fetch(spec, metadata, progress)`` must return a LOCAL PATH. ``cancel()`` may
+    raise or return truthy. ``progress(done, total)`` receives (0, size) before the
+    fetch and (size, size) only after the verified publish; it is also handed to
+    ``fetch`` for in-flight reports. ``disk_free(existing_path)`` optionally
+    replaces ``shutil.disk_usage(existing_path).free`` for deterministic tests.
+
+    ``status='exists'`` means *unverified*: the caller must re-resolve the native
+    loader token. Even a broken destination symlink is preserved. A successful
+    publish is an atomic no-clobber hard link (an ``O_EXCL`` copy where the
+    filesystem cannot link), never an overwriting rename.
+
+    WHY THIS EXISTS (2026-09-07). The first transport, `download_verified`
+    (removed 2026-10-08), owned the bytes: it opened a socket through an injected
+    `open_stream` and looped. That is a bespoke downloader living in the shipped
+    package, and comparing four published zips showed the Comfy Registry security
+    scanner Flags exactly the versions that carry one -- alpha.25 added this
+    module's siblings and was Flagged while alpha.24 was Active; alpha.23 REMOVED
+    an indextts2 weight-fetcher plus a PowerShell installer and went Active while
+    alpha.22 was Flagged. Nine of fourteen versions are Flagged, and a Flagged
+    version does not resolve as `latest_version`, so Manager's default button
+    never offers it.
 
     The LLM lane downloads just as much and has never been a differing file,
     because it goes through `huggingface_hub`. So `fetch` is handed the same
@@ -313,125 +322,3 @@ def fetch_verified(
         receipt.update(status="downloaded", verified=True,
                        bytes_verified=metadata["size"])
         return receipt
-
-
-def download_verified(
-    spec: dict,
-    destination: Path,
-    metadata: dict,
-    *,
-    open_stream,
-    cancel=None,
-    progress=None,
-    disk_free=None,
-) -> dict:
-    """Transfer exactly one caller-authorized artifact without overwriting.
-
-    ``open_stream(url)`` must return a context manager yielding a binary object
-    with ``read(n)``. ``cancel()`` may raise or return truthy. ``progress(done,
-    total)`` receives exact byte counts. ``disk_free(existing_path)`` optionally
-    replaces ``shutil.disk_usage(existing_path).free`` for deterministic tests.
-
-    ``status='exists'`` means *unverified*: the caller must re-resolve the native
-    loader token. Even a broken destination symlink is preserved. A successful
-    transfer publishes with an atomic hard link, not an overwriting rename;
-    unsupported filesystems fail closed. Only this call's unique temp is cleaned.
-    """
-    _validate(spec, metadata)
-    # Callbacks must not be able to change the approved size/hash mid-transfer.
-    spec = spec.copy()
-    metadata = metadata.copy()
-    if not callable(open_stream):
-        raise TypeError("open_stream must be an injected callable")
-    destination = Path(destination)
-    _check_cancel(cancel)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    receipt = {
-        "repo_id": spec["repo_id"],
-        "filename": spec["filename"],
-        "commit": metadata["commit"].lower(),
-        "sha256": metadata["sha256"].lower(),
-        "size": metadata["size"],
-        "destination": str(destination),
-        "status": "exists",
-        "verified": False,
-        "bytes_verified": 0,
-        "resume_supported": False,
-    }
-    lock_path = destination.with_name(destination.name + ".lock")
-    with _destination_lock(lock_path):
-        _check_cancel(cancel)
-        if os.path.lexists(destination):
-            return receipt
-        filesystem_path = _existing_ancestor(destination.parent)
-        free = (disk_free(filesystem_path) if disk_free is not None
-                else shutil.disk_usage(filesystem_path).free)
-        if type(free) is not int or free < metadata["size"] + DISK_MARGIN_BYTES:
-            raise VisualAssetDownloadError(
-                "insufficient destination disk space: need %d bytes plus %d bytes margin"
-                % (metadata["size"], DISK_MARGIN_BYTES)
-            )
-        temporary = None
-        try:
-            fd, name = tempfile.mkstemp(
-                prefix="." + destination.name + ".", suffix=".part",
-                dir=destination.parent,
-            )
-            temporary = Path(name)
-            digest = hashlib.sha256()
-            received = 0
-            with os.fdopen(fd, "wb") as output:
-                _check_cancel(cancel)
-                if progress is not None:
-                    progress(0, metadata["size"])
-                with open_stream(metadata["url"]) as stream:
-                    while True:
-                        _check_cancel(cancel)
-                        chunk = stream.read(CHUNK_BYTES)
-                        _check_cancel(cancel)
-                        if not isinstance(chunk, bytes):
-                            raise VisualAssetDownloadError("transport must return binary bytes")
-                        if not chunk:
-                            break
-                        if received + len(chunk) > metadata["size"]:
-                            raise VisualAssetDownloadError(
-                                "download exceeds declared size %d bytes" % metadata["size"]
-                            )
-                        output.write(chunk)
-                        digest.update(chunk)
-                        received += len(chunk)
-                        if progress is not None:
-                            progress(received, metadata["size"])
-                if received != metadata["size"]:
-                    raise VisualAssetDownloadError(
-                        "download size mismatch: received %d, expected %d bytes"
-                        % (received, metadata["size"])
-                    )
-                if digest.hexdigest() != metadata["sha256"].lower():
-                    raise VisualAssetDownloadError("download SHA-256 mismatch")
-                output.flush()
-                os.fsync(output.fileno())
-            _check_cancel(cancel)
-            # Unlike replace/rename on POSIX, link is atomically no-clobber.
-            # If an uncooperative writer races us, preserve its final too.
-            try:
-                os.link(temporary, destination)
-            except FileExistsError:
-                return receipt
-            receipt.update(status="downloaded", verified=True, bytes_verified=received)
-            return receipt
-        finally:
-            if temporary is not None:
-                original_error = sys.exc_info()[1]
-                try:
-                    temporary.unlink(missing_ok=True)
-                except OSError as cleanup_error:
-                    if original_error is None:
-                        raise
-                    # Preserve the full transport/verification/interruption
-                    # error even when antivirus/permissions delay temp cleanup.
-                    detail = "owned temporary cleanup failed: " + str(cleanup_error)
-                    if hasattr(original_error, "add_note"):
-                        original_error.add_note(detail)
-                    else:  # Python 3.10: retain detail without replacing error.
-                        original_error.visual_asset_cleanup_error = detail
