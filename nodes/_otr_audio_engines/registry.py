@@ -190,33 +190,21 @@ def assert_usable(name: str, role: str) -> str:
 # impractical engines off the cpu floor; needs_fp8_te/needs_fp4_te flag
 # fp8/fp4 artifact dependencies (excluded on ROCm/MPS tiers).
 CAPABILITIES = {
-    # S0 portability ruling (R4, 2026-07-10) UPDATED 2026-08-25: bark's
-    # generation path used to hardcode CUDA (_generate_single_line
-    # force-moved inputs to torch.device("cuda"), asserted
-    # input_ids.device.type == "cuda", and monkeypatched torch.tensor/arange
-    # to default device="cuda"), so the old cpu_ok=True row really was a lie
-    # -- cpu_floor selected bark and it crashed on the first line. That is
-    # fixed: _generate_single_line now asks the loaded model for its real
-    # device (next(model.parameters()).device) and uses that everywhere, so a
-    # CPU-loaded bark generates correctly instead of asserting.
-    # "cpu" is now a HONEST backend -- it runs. It is not a PRACTICAL one --
-    # bark is a ~1B-parameter three-stage autoregressive stack, so
-    # practical_without_gpu stays False and cpu_floor still excludes it
-    # (REASON_IMPRACTICAL_ON_CPU, not REASON_REQUIRES_CUDA -- see
-    # tests/test_platform_s0_guards.py). "mps" is deliberately NOT listed:
-    # _load_bark has no MPS branch, so on Apple Silicon
-    # torch.cuda.is_available() is False and it falls to the (working) CPU
-    # path already covered by "cpu" -- there is no separate MPS code path to
-    # declare.
+    # S0 portability ruling (R4, 2026-07-10): "cpu" is an HONEST backend for
+    # bark -- _generate_single_line asks the loaded model for its real device
+    # (next(model.parameters()).device) and uses that everywhere, so a
+    # CPU-loaded bark generates correctly instead of asserting. It is not a
+    # PRACTICAL one -- bark is a ~1B-parameter three-stage autoregressive
+    # stack, so practical_without_gpu stays False and cpu_floor still
+    # excludes it (REASON_IMPRACTICAL_ON_CPU, not REASON_REQUIRES_CUDA -- see
+    # tests/test_platform_s0_guards.py).
     "bark": {"required_toolchain": None, "requires_sidecar": False,
-             # mps added 2026-09-07 ON A MEASUREMENT, not a guess: Bark ran on a
+             # mps is listed ON A MEASUREMENT, not a guess: Bark ran on a
              # Mac mini M4 in 40.8 s producing 4.6 s of structured speech
-             # (spectral flatness 0.070, finite). The old ["cuda","cpu"] row and
-             # the `cuda if available else cpu` line in _otr_bark_lib.py:132 both
-             # denied Apple Silicon a device it demonstrably has. Bark is a
-             # transformers model, so it is NOT affected by the ComfyUI
-             # sub-quadratic attention fault that hits ComfyUI-native models on
-             # Metal (PBUG-20260907-11).
+             # (spectral flatness 0.070, finite). Bark is a transformers
+             # model, so it is NOT affected by the ComfyUI sub-quadratic
+             # attention fault that hits ComfyUI-native models on Metal
+             # (PBUG-20260907-11).
              "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
              "needs_fp8_te": False, "needs_fp4_te": False,
              "practical_without_gpu": False, "sidecar_conditional": False,

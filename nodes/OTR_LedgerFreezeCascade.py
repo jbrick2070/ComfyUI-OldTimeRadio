@@ -17,11 +17,10 @@ log = logging.getLogger("OTR")
 __all__ = ["OTR_LedgerFreezeCascade"]
 
 
-# S30 B3: DEFAULT_MODEL_ID literal DELETED. The cascade no longer
-# carries a local widget default; the technical_model id arrives over
-# the wire from the writer's broadcast output socket. An unwired
-# socket triggers MissingModelInputError at run-time -- the recovery
-# is graph-level (connect the writer's `technical_model` output),
+# The cascade carries no local widget default; the technical_model id
+# arrives over the wire from the writer's broadcast output socket. An
+# unwired socket triggers MissingModelInputError at run-time -- the
+# recovery is graph-level (connect the writer's `technical_model` output),
 # not a code-side fallback.
 
 
@@ -141,16 +140,10 @@ class OTR_LedgerFreezeCascade:
                         "INT slot. Not touched by the cascade."
                     ),
                 }),
-                # S30 B3: model_id widget + 6 phase-toggle widgets
-                # DELETED. The writer's broadcast `technical_model`
-                # socket below is kept for graph compatibility: the
-                # cascade validates only that a non-empty id arrived
-                # (an unwired socket delivers the empty default) and
-                # acquires nothing (the reviewer passes that once
-                # consumed it are gone). Phase 3/4/4.5/5/6 toggles were all
-                # defaulted OFF and the surrounding standalone LFC
-                # nodes went away in B4 -- the cascade never invoked
-                # those phases in any shipped workflow.
+                # The writer's broadcast `technical_model` socket below is
+                # kept for graph compatibility: the cascade validates only
+                # that a non-empty id arrived (an unwired socket delivers the
+                # empty default) and acquires nothing.
                 "technical_model": ("STRING", {
                     "forceInput": True,
                     "tooltip": (
@@ -182,17 +175,6 @@ class OTR_LedgerFreezeCascade:
                         "Default ON."
                     ),
                 }),
-                # Positional compatibility inputs retained because the canonical
-                # workflow is immutable in this change. All four are ignored;
-                # real render selection belongs exclusively to ShotLock.
-                # Four "deprecated compatibility inputs" (render_selection,
-                # render_max_n, protagonist_only, manual_line_ids) were REMOVED
-                # 2026-08-28: each was accepted and immediately deleted, so the
-                # UI showed four knobs that controlled nothing. They were the
-                # TRAILING widget suffix, so the saved-graph migration was
-                # [true,true,"all",6,false,""] -> [true,true] with no re-index
-                # of survivors and no link movement (safety-gated: no link in
-                # any of the 63 graphs targeted their slots).
             },
         }
 
@@ -207,9 +189,8 @@ class OTR_LedgerFreezeCascade:
         script_json: str = "",
         news_used: str = "",
         estimated_minutes: int = 0,
-        # S30 B3: technical_model arrives via input socket (no widget).
-        # The 6 phase-toggle kwargs are deleted; the orchestrator's
-        # function defaults still keep Phases 3/4/4.5/5/6 OFF.
+        # technical_model arrives via input socket (no widget). The
+        # orchestrator's function defaults keep Phases 3/4/4.5/5/6 OFF.
         technical_model: str = "",
         enable_phase_7_audio_readiness: bool = True,
         enable_phase_8_video_readiness: bool = True,
@@ -279,9 +260,7 @@ class OTR_LedgerFreezeCascade:
         # require_model rejects a blank/whitespace value, which is what an
         # unwired socket delivers; it checks neither catalog membership nor
         # connectivity. The cascade is deterministic and never generates with
-        # this model, so nothing is acquired here. The slot request that used to sit at this
-        # point fed a callback the orchestrator has not invoked since the
-        # same-story cleanup was retired (2026-08-05); removed 2026-09-10.
+        # this model, so nothing is acquired here.
         _OTRMI.require_model(technical_model, slot="technical")
 
         log.info(
@@ -304,12 +283,10 @@ class OTR_LedgerFreezeCascade:
         rebuilt_script_text = script_text or ""
         unload_ok = True
         try:
-            # S30 B3: Phase 3/4/4.5/5/6 toggles deleted at the
-            # cascade-NODE surface. The orchestrator's defaults
-            # (all OFF) carry them; B4 deletes the underlying
-            # phase functions from _otr_lfc.py. The first positional
-            # argument is the orchestrator's public generation
-            # callback; it is never invoked, so no callable is built.
+            # The orchestrator's defaults (all OFF) carry the Phase 3/4/4.5/5/6
+            # toggles. The first positional argument is the orchestrator's
+            # public generation callback; it is never invoked, so no callable
+            # is built.
             disp = _LFC_ORCH.run_freeze_cascade(
                 None,
                 led,

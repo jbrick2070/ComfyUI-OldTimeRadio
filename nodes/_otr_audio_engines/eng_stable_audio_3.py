@@ -51,14 +51,12 @@ log = logging.getLogger("OTR")
 _CKPT_PREFERENCE = ("stable_audio_3_small_music_base.safetensors",
                     "stable_audio_3_small_music.safetensors")
 #: WHAT A FRESH INSTALL IS SENT TO FETCH (2026-09-12). With NO checkpoint on
-#: disk, `resolve_ckpt` used to fall through to the LAST entry above -- the
-#: post-trained file -- and the visual-asset preflight downloads whatever
-#: name the engine returns. So every fresh install fetched the one file whose
-#: negative prompt is inert and then ran it forever: the exact configuration
-#: PBUG-20260912-03 was written to escape, on every machine except the one
-#: where the base file had been fetched by hand. The fall-through now names
-#: the base file, and `tests/test_music_prompts_are_musical.py` pins that
-#: this name is one `_otr_visual_assets.MANIFEST` is allowed to download.
+#: disk, `resolve_ckpt` falls through to the BASE file, not the post-trained
+#: one: the visual-asset preflight downloads whatever name the engine
+#: returns, and the post-trained file's negative prompt is inert (the
+#: configuration PBUG-20260912-03 was written to escape).
+#: `tests/test_music_prompts_are_musical.py` pins that this name is one
+#: `_otr_visual_assets.MANIFEST` is allowed to download.
 #: The medium checkpoint was benched against this one the same day: 9.22 GB,
 #: unproven on 8 GB, and the operator's ear decides it -- it is not a default.
 _FETCH_DEFAULT = _CKPT_PREFERENCE[0]
@@ -73,20 +71,16 @@ _CKPT = otr_env.get("OTR_SA3_CKPT", "")
 _TENC = otr_env.get("OTR_SA3_TEXT_ENCODER", "t5gemma_b_b_ul2.safetensors")
 _CLIP_TYPE = otr_env.get("OTR_SA3_CLIP_TYPE", "stable_audio")
 
-# BUG-408 (2026-06): SA3 is a different model than the old MusicGen default
-# and wants genre + instrumentation + a production anchor, a real negative
+# BUG-408 (2026-06): SA3 wants genre + instrumentation, a real negative
 # prompt, and a multi-second STRUCTURAL context (seconds_total) to sound like
-# music rather than a 4-12 s texture. The structural window is still here.
-# The prompt anchor is NOT (2026-09-11): every branch of it said "analog tape
-# warmth" and the negative pushed "AWAY from a clean modern sound" -- the
-# radio-hiss texture the operator has now withdrawn ("make them more
-# musical"). The genre and tempo come from the STORY through the shared
-# composer -- `_otr_music_prompt.compose_brief_engine_prompt` since 2026-09-13,
-# which is the only engine form there is and so is the same text every other
-# music engine receives; this adapter sends what it is handed and reads the
-# composer's negative unless the operator overrides it with OTR_SA3_NEG_PROMPT,
-# the one escape hatch.
-
+# music rather than a 4-12 s texture. It gets NO production anchor (2026-09-11):
+# "analog tape warmth" and a negative pushing "AWAY from a clean modern sound"
+# are the radio-hiss texture the operator withdrew ("make them more musical").
+# The genre and tempo come from the STORY through the shared composer --
+# `_otr_music_prompt.compose_brief_engine_prompt`, the only engine form there
+# is and so the same text every other music engine receives; this adapter
+# sends what it is handed and reads the composer's negative unless the
+# operator overrides it with OTR_SA3_NEG_PROMPT, the one escape hatch.
 
 
 def _env_float(name, default):
@@ -234,15 +228,8 @@ class StableAudio3Engine:
     interface = "clip"
     sample_rate = 44100
 
-    #: NO PROMPT-FORM FLAG. This adapter carried `wants_brief_prompt`
-    #: for part of 2026-09-13, then the fork it selected was removed
-    #: entirely: every music engine now receives
-    #: `_otr_music_prompt.compose_brief_engine_prompt`, so there is
-    #: nothing left to choose between. The long form it replaced carried
-    #: the genre and the tempo too, via the row text it appended -- an
-    #: earlier version of this comment claimed otherwise and was wrong.
-    #: The change is the operator's taste ("everyone gets brief"), not a
-    #: repair of a missing signal.
+    #: No prompt-form flag: every music engine receives the same brief
+    #: prompt (`_otr_music_prompt.compose_brief_engine_prompt`).
 
     def __init__(self):
         self._bundle = None     # (model, clip, vae)

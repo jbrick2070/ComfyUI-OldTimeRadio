@@ -35,12 +35,9 @@ def _voiced_rows(ledger_data: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     if not isinstance(rows, list):
         raise ContentAuthorshipError("ledger lines must be a list")
     # `skip` IS THE AUTHORITATIVE FIELD (_otr_ledger_consumers.py:86 says so in
-    # as many words), and this function used to read ONLY `skip_tts` -- a name
-    # no production code has ever written. Measured 2026-08-02: zero writers
-    # outside a test fixture, and 0 of 16,435 line rows across every episode on
-    # disk carry it. So this filter never excluded anything; it matched the
-    # fixture that invented the name rather than the ledger, and the proof set
-    # could include a row the entire rest of the pipeline treats as skipped.
+    # as many words); reading only `skip_tts` -- a name no production code has
+    # ever written -- would never exclude anything, and the proof set could
+    # include a row the entire rest of the pipeline treats as skipped.
     # Both are honoured -- `skip` because it is the truth, `skip_tts` because a
     # ledger saved by an older tree may still carry it and a proof set that
     # silently widens is exactly the bug this file exists to prevent.

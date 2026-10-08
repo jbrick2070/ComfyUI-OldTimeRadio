@@ -471,40 +471,18 @@ def _isoformat_utc_now() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Phase 7 / 8 readiness stubs (deterministic; Phase 3 / 4 / 4.5 / 5 / 6
-# DELETED at S30 B4 -- the standalone OTR_LFCPhase4Scene / 5Voice /
-# 6Arc node classes were orphaned from every shipped workflow JSON and
-# all five backing functions defaulted OFF on every code path. The
-# cascade's main path is now:
+# Phase 7 / 8 readiness stubs (deterministic). The cascade's main path is:
 #   Phase 0 -> Phase 1/2/9 (reviewer composite) -> Phase 7 -> Phase 8
 #   -> Phase 10
-# Phase3PolishReport + the five `_phase_*` wrappers + their backing
-# files (_otr_lfc_phase_4_scene_coherence, _otr_lfc_phase_5_voice_drift,
-# _otr_lfc_phase_6_episode_arc, _otr_lfc_smart_suggestion,
-# _otr_lfc_phase_verdicts, _otr_lfc_llm_helpers) all deleted in
-# lockstep. B7 adds the symbol names as forbidden-pattern markers.
 # ---------------------------------------------------------------------------
-
-
-# S30 B4: the five phase function wrappers
-# (_phase_3_per_line_polish, _phase_4_per_scene_coherence,
-# _phase_4_5_smart_suggestion, _phase_5_voice_drift,
-# _phase_6_episode_arc) and the Phase3PolishReport dataclass DELETED.
-# Standalone OTR_LFCPhase4Scene / 5Voice / 6Arc node classes and their
-# backing files (_otr_lfc_phase_4_scene_coherence,
-# _otr_lfc_phase_5_voice_drift, _otr_lfc_phase_6_episode_arc,
-# _otr_lfc_smart_suggestion, _otr_lfc_phase_verdicts,
-# _otr_lfc_llm_helpers) deleted in the same commit. All five phases
-# defaulted OFF on every code path; the cascade-side enable widgets
-# were already removed in B3.
 
 
 #: Failure reasons that mark a phase as DELIBERATELY not run rather than faulty.
 #: `build_phase_telemetry` and the capability receipt both derive `skipped` from
 #: this one tuple, so a phase cannot be "skipped" to one reader and a warning to
-#: another. The last two entries were added 2026-08-05 with the content-guardrail
-#: rip: a retired phase that reports skipped=False raises a warning for doing
-#: exactly what it was told to do (kibitz r3, Codex).
+#: another. The last two entries mark phases retired by policy: a retired
+#: phase that reports skipped=False raises a warning for doing exactly what
+#: it was told to do (kibitz r3, Codex).
 _PHASE_SKIP_REASONS: tuple[str, ...] = (
     "stub_bypassed",
     "terminal_skipped",
@@ -614,8 +592,7 @@ def _build_terminal_skip_disposition(
     # and never reach a terminal disposition.
     meta["freeze_block_class"] = block_class
     # B5: stamp the remaining phases as terminal_skipped so
-    # meta.cleanup_passes / readiness_passes stay contiguous. S30 B4:
-    # phase 4 / 4.5 / 5 / 6 names removed -- those phases no longer exist.
+    # meta.cleanup_passes / readiness_passes stay contiguous.
     for skipped_name in remaining_phase_names:
         _stamp_stub_or_skipped_phase(
             ledger_data,
@@ -652,20 +629,17 @@ def _build_terminal_skip_disposition(
 
 
 def _run_inline_safety_cleanup(generate_fn, led) -> dict[str, Any]:
-    """RETIRED 2026-08-05. Stamps the phase; edits nothing.
+    """Stamp the phase as retired (operator directive 2026-08-05); edit nothing.
 
-    This used to run one atomic safety-only patch set over the accepted inline
-    story -- rewriting a delivered spoken row whose words matched the
-    profanity / weapon / sexual list. It is gone by operator directive: no
-    content guardrails on generated episodes, and the inline lanes get the same
-    treatment as the adaptation lanes.
+    No content guardrails run on generated episodes, and the inline lanes get
+    the same treatment as the adaptation lanes.
 
-    The PHASE is not deleted along with the pass. ``same_story_safety_cleanup``
-    is a declared cascade phase with a registry entry, a telemetry group and a
-    ledger field that two scifi_news_pro artifact tests assert on, so it keeps
-    stamping -- with a retired status and zero edits -- exactly the way the
-    producer-owned branch already stamps its not-applicable receipt. A ripped
-    pass may not leave an unowned field.
+    The PHASE is kept. ``same_story_safety_cleanup`` is a declared cascade
+    phase with a registry entry, a telemetry group and a ledger field that
+    two scifi_news_pro artifact tests assert on, so it keeps stamping -- with
+    a retired status and zero edits -- exactly the way the producer-owned
+    branch already stamps its not-applicable receipt. A retired pass may not
+    leave an unowned field.
     """
     del generate_fn
     ledger_data = led.data
@@ -1040,12 +1014,10 @@ def run_freeze_cascade(
         # when it raised (when meta was stampable).
         if not meta.get("freeze_verdict"):
             meta["freeze_verdict"] = "needs_full_rerun"
-        # G9 (terminal spoken-safety) was deleted 2026-08-05 by operator
-        # directive, so a freeze can no longer be blocked on content -- the
-        # "safety" class became unreachable and the branch that computed it is
-        # gone rather than left as dead code. The FIELD stays, with exactly one
-        # owner and a defined value on every path, because soak telemetry and
-        # the disposition readers expect it.
+        # A freeze cannot be blocked on content (operator directive 2026-08-05),
+        # so the block class is always "structural". The FIELD stays, with
+        # exactly one owner and a defined value on every path, because soak
+        # telemetry and the disposition readers expect it.
         meta["freeze_block_class"] = "structural"
         disp = FreezeDisposition(
             verdict="needs_full_rerun",

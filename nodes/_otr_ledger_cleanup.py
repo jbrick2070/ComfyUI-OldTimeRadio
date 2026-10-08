@@ -18,13 +18,11 @@ cascade -- and it does three things in order:
      owner: mint a missing ``line_id``, resolve a blank ``speaker_role`` from a
      cast ``char_id``, turn an unspeakable row into an EXPLICIT skip carrying
      its reason, re-stamp text metrics. No prose is authored here.
-  2. (RETIRED 2026-08-05.) This step used to be SAFETY REPAIR IN PLACE --
-     rewriting a delivered spoken row whose words matched a profanity / weapon /
-     sexual list. It is GONE by operator directive: no content guardrails on
-     generated episodes, and on an adaptation lane the author's own language is
-     carried as written. The terminal G9 freeze gate it fed was deleted in the
-     same change. The receipt key ``safety`` survives with a retired status so
-     no consumer of ``meta.ledger_cleanup`` loses a field.
+  2. (RETIRED.) No safety repair runs: by operator directive (2026-08-05)
+     there are no content guardrails on generated episodes, and on an
+     adaptation lane the author's own language is carried as written. The
+     receipt key ``safety`` stays with a retired status so no consumer of
+     ``meta.ledger_cleanup`` loses a field.
   3. PROSE COMPLETION. A required prose field that survives step 1 with no
      value (today: ``meta.episode_title``) gets one bounded same-story LLM
      fill, then a deterministic source-grounded backstop.
@@ -306,9 +304,6 @@ def _complete_deterministic(
 # ---------------------------------------------------------------------------
 
 
-# _repair_safety() was DELETED 2026-08-05 (operator directive). Its receipt
-# key survives with a retired status -- see run_ledger_cleanup.
-
 # ---------------------------------------------------------------------------
 # step 3 -- prose completion (bounded; deterministic backstop)
 # ---------------------------------------------------------------------------
@@ -415,14 +410,10 @@ def _llm_episode_title(
     prompt = [
         {
             "role": "system",
-            # NO CONTENT CLAUSE HERE (operator directive 2026-08-03/08-05).
-            # This prompt used to end "...and do not add profanity, explicit
-            # weapon language, or explicit sexual or nudity language." The
-            # step-2 safety repair it belonged with was ripped on 2026-08-05 --
-            # see this module's own docstring -- but the clause asking the
-            # TITLE model to self-censor was left behind. On an adaptation lane
-            # the author's own language is carried as written, and a title that
-            # names what the script does is the point.
+            # NO CONTENT CLAUSE HERE (operator directive 2026-08-03/08-05): the
+            # TITLE model is never asked to self-censor. On an adaptation
+            # lane the author's own language is carried as written, and a
+            # title that names what the script does is the point.
             "content": (
                 ((language_instruction + "\n\n") if language_instruction else "")
                 +
@@ -444,10 +435,10 @@ def _llm_episode_title(
     ]
 
     def _validate(result: "_EpisodeTitle") -> "str | None":
-        # The unsafe-language rejection here was DELETED 2026-08-05 (operator
-        # directive). A title drawn from the story's own words is a good title;
-        # re-rolling it for containing one of them is the same fidelity defect
-        # as the lane-level clauses. Emptiness is STRUCTURAL and still refuses.
+        # No unsafe-language rejection here (operator directive 2026-08-05): a
+        # title drawn from the story's own words is a good title; re-rolling it
+        # for containing one of them is the same fidelity defect as the
+        # lane-level clauses. Emptiness is STRUCTURAL and still refuses.
         candidate = " ".join(str(result.episode_title or "").split())
         if not candidate:
             return "episode_title is empty after whitespace normalization"
@@ -601,13 +592,11 @@ def run_ledger_cleanup(
     slot_fn: "Callable[..., str] | None" = None,
     bank_id: str = "",
 ) -> dict:
-    """Complete, sanitize and verify the ledger. Stamps `meta.ledger_cleanup`.
+    """Complete and verify the ledger. Stamps `meta.ledger_cleanup`.
 
-    Order is load-bearing. Deterministic completion runs FIRST so the safety
-    scan sees final rows and the gap report sees everything that could be
-    filled. Safety repair runs BEFORE the caller stamps TTS delivery text --
-    sanitizing after that stamp would leave the delivery string carrying the
-    language the canonical row no longer has.
+    Order is load-bearing. Deterministic completion runs FIRST so the gap
+    report sees everything that could be filled, and the whole pass runs
+    BEFORE the caller stamps TTS delivery text.
 
     `slot_fn` is the technical LLM slot; without one the deterministic half
     still runs and the receipt says which halves were skipped.
@@ -624,11 +613,9 @@ def run_ledger_cleanup(
     deterministic = _complete_deterministic(ledger_data)
     receipt["deterministic_fills"] = deterministic
 
-    # Safety repair REMOVED 2026-08-05 (operator directive: no content
-    # guardrails on generated episodes). The pass used to rewrite a delivered
-    # spoken row whose words matched the profanity / weapon / sexual list, which
-    # on an adaptation lane meant editing the author. The receipt KEY stays with
-    # its established shape and a defined value on every path -- a ripped pass
+    # No safety repair runs (operator directive 2026-08-05: no content
+    # guardrails on generated episodes). The receipt KEY stays with its
+    # established shape and a defined value on every path -- a retired pass
     # may not leave an unowned field, and meta.ledger_cleanup.safety is read by
     # the freeze cascade's receipt plumbing.
     receipt["safety"] = {

@@ -2,21 +2,13 @@
 
 A source bank's `default_story_pipeline` decides HOW its episode executes:
 either a DISPATCHED lane (a dedicated runner module) or this writer's own
-INLINE body. Before this module that authority lived inside
-`OTR_LedgerScriptWriter` as `_RUNNER_BY_PIPELINE` /
-`_LEGACY_INLINE_PIPELINES` / `_resolve_lane_runner`, which meant anything
-that is NOT the writer -- the bank randomizer, a future replay tool, a
-checker -- had to import the writer (and therefore ComfyUI) to ask a
-question about lanes. It lives here now. There is exactly ONE table; no
-view, no shadow copy.
+INLINE body. This authority lives here, not in `OTR_LedgerScriptWriter`, so
+anything that is NOT the writer -- the bank randomizer, a future replay tool,
+a checker -- can ask a question about lanes without importing the writer (and
+therefore ComfyUI). There is exactly ONE table; no view, no shadow copy.
 
-The two request-compatibility entry points (`assert_supported` and
-`is_roll_compatible`) were REMOVED 2026-08-14 along with `RollRequest` and the
-word authority. Both existed to ask a lane whether it would accept a
-`target_words`; exactly one retired lane ever declared a band (30..900).
-
-A lane that genuinely cannot build a requested SHAPE still fails loudly when
-it tries -- only the timing of that failure moved.
+A lane that genuinely cannot build a requested SHAPE fails loudly when it
+tries.
 
 LaneSpec stores NAMES, never callables and never exception CLASSES.
 Building the table out of imported objects would drag every runner module
@@ -49,12 +41,6 @@ class UnknownLanePipelineError(_ROUTING.StoryRoutingError):
     """
 
 
-# `RollRequest` was REMOVED 2026-08-14 with the word authority. It carried
-# exactly one field, `target_words`, and existed so a lane could decline a
-# target outside its band. With no target there is nothing to decline, and a
-# gate whose only input is gone is worse than no gate: it still reads as live.
-
-
 @dataclass(frozen=True)
 class LaneSpec:
     """One dispatched lane, by NAME. Nothing here is imported eagerly."""
@@ -64,10 +50,6 @@ class LaneSpec:
 
     runner_attr: str
     """The lane entry point inside `module`."""
-
-    # `compat_attr` / `compat_error_attrs` were removed 2026-08-14. They named
-    # the target-band preflight and the exceptions it raised; both policed
-    # `target_words` and nothing else.
 
 
 # The dispatched lanes. The key IS the pipeline id from pipelines.json.
@@ -129,10 +111,8 @@ def runner_for(pipeline_id: str) -> "Callable[..., Any] | None":
     raise _unknown(pipeline_id)
 
 
-# `_compat_hook`, `assert_supported` and `is_roll_compatible` were REMOVED
-# 2026-08-14 with `RollRequest`. All three existed only to ask a lane
-# whether it would accept a `target_words`. The bank roll now filters on
-# `bank.runnable` alone -- see `_otr_rolls.eligible_bank_ids`.
+# The bank roll filters on `bank.runnable` alone -- see
+# `_otr_rolls.eligible_bank_ids`.
 
 
 __all__ = [

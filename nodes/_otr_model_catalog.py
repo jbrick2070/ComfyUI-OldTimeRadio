@@ -525,34 +525,18 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         implied_quant_policy="none",
         hf_repo_id="Comfy-Org/gemma-4",
     ),
-    # 2026-08-25: catalog pruned -- Qwen/Qwen2.5-14B-Instruct removed
-    # (operator: "if it doesn't fit nicely or requires Ollama rip it from
-    # the dropdown and blast radius"; "I only want easy to load LLMs").
-    # It was the LAST WARN-tier row and the only curated row with no
-    # weights on disk, so it was a dropdown entry that could not have
-    # loaded if anyone picked it. Its own note conceded the case: 28 GB of
-    # safetensors "needs quantization or offload to fit 16 GB -- not
-    # soak-tested as PASS yet. Available for users with bigger rigs."
-    # A dropdown row is a promise the model will load; that one could not
-    # keep it on this hardware. Nothing required Ollama, so that half of the
-    # sweep had no targets. See apple/LLM_PREFLIGHT.md for the seven gates a new
-    # row must clear. WARN is information, not an automatic rip
-    # (operator 2026-09-06); ripping a row is an explicit decision.
-    # 2026-05-23: catalog pruned -- the two community WARN-tier 12B
-    # rows (Captain-Eris_Violet-V0.420-12B, MN-12B-Mag-Mell-R1) were
-    # removed. The curated set now also includes the official Gemma 4 12B HF
-    # row restored in 2026-07.
-    # 2026-05-24: gemma-2-2b-it added as the smallest technical-slot
-    # pick (BUG-LOCAL-262). Gemma-2's chat template rejects the system
-    # role; the generate path normalizes system messages before
-    # apply_chat_template so the row is a clean technical pick.
-    # No otr_1940s_v1 period row is curated at present. The broken
-    # talkie-lm/talkie-1930-13b-it row was removed 2026-05-22 (raw
-    # research checkpoint -- no config.json / tokenizer -- crashed the
-    # writer at the style picker). The period-routing surface
-    # (otr_1940s_v1 profile, GPTQ-int4 backend, _otr_period_prompts)
-    # stays parked for a future period model; see the ROADMAP
-    # period-model strategy section.
+    # A dropdown row is a promise the model will load. See
+    # apple/LLM_PREFLIGHT.md for the seven gates a new row must clear. WARN is
+    # information, not an automatic rip (operator 2026-09-06); ripping a row
+    # is an explicit decision.
+    # gemma-2-2b-it is the smallest technical-slot pick (BUG-LOCAL-262).
+    # Gemma-2's chat template rejects the system role; the generate path
+    # normalizes system messages before apply_chat_template so the row is a
+    # clean technical pick.
+    # No otr_1940s_v1 period row is curated at present. The period-routing
+    # surface (otr_1940s_v1 profile, GPTQ-int4 backend, _otr_period_prompts)
+    # stays parked for a future period model; see the ROADMAP period-model
+    # strategy section.
 )
 
 
@@ -740,9 +724,9 @@ def _canonical_qwen_id(model_id: str) -> str:
 
 #: EACH LOCAL WRITER MODEL SAMPLES AT ITS MAKER'S OWN BASELINE (operator
 #: 2026-09-25: "find the canonical temp baseline for each model and that's
-#: it"). Replaces the creativity dial, which applied ONE preset map to every
-#: model -- measured that day, it ran Qwen3 hotter and Gemma 4 cooler than
-#: their makers intend, and Mistral-Nemo at more than double its card's value.
+#: it"). ONE preset map for every model (a creativity dial) ran Qwen3 hotter
+#: and Gemma 4 cooler than their makers intend, and Mistral-Nemo at more than
+#: double its card's value (measured 2026-09-25).
 #: (temperature, top_p, top_k); None means "the maker publishes none, do not
 #: send the key". Keyed by the CANONICAL id, so a quant twin row resolves to
 #: its base model through `_canonical_qwen_id` / `hf_weights_id` instead of
@@ -770,7 +754,7 @@ SAMPLING_BASELINES = {
 LOCAL_PROVIDERS = frozenset({"local", "comfy_native"})
 
 #: A local model with no published baseline (google/gemma-2-2b-it, or a model
-#: found in the cache that the catalog does not curate). The old "balanced"
+#: found in the cache that the catalog does not curate). The "balanced"
 #: preset, so it still SAMPLES: a model left greedy flattens dialogue.
 SAMPLING_FALLBACK = (0.85, 0.95, None)
 
@@ -942,10 +926,10 @@ def _hf_hub_root() -> Path | None:
 
     Read live from os.environ (no import-time cached constant) so the
     resolver reflects the process env at call time and stays monkeypatch-
-    testable. HF_HUB_CACHE was the missing branch: the box sets it (the
-    var huggingface_hub honors) but the old resolver read only HF_HOME +
-    the legacy HUGGINGFACE_HUB_CACHE, so it silently fell through to the
-    stale ~/.cache default and mislabeled on-disk models NOT DOWNLOADED.
+    testable. HF_HUB_CACHE must be honored: the box sets it (the var
+    huggingface_hub honors), and a resolver that read only HF_HOME + the
+    legacy HUGGINGFACE_HUB_CACHE would silently fall through to the stale
+    ~/.cache default and mislabel on-disk models NOT DOWNLOADED.
     """
     for var in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE"):
         val = otr_env.get(var)
@@ -1098,19 +1082,18 @@ def _snapshot_has_weights(snapshot_path: Path) -> bool:
     the real blob size, so a present-but-unmaterialized (broken/absent)
     link never counts. Returns False on any read error -- fail closed.
 
-    SHARD COMPLETENESS IS PART OF "HAS WEIGHTS" (2026-09-06). The older rule
-    returned True on the FIRST nonzero weight file it found, which is wrong for
-    every multi-shard repo -- and the rows an 8 GB card must consider are
-    multi-shard (Qwen/Qwen3.5-4B is 9,319,828,096 bytes over two shards, well
-    past HF's 5 GB default shard size). A first download interrupted after
-    shard 1 lands -- an operator cancel, a dropped connection, a ComfyUI
-    restart, all of which happened during this campaign -- left one shard
-    materialized. That made ``on_disk`` True, which makes
-    ``auto_download_if_missing`` short-circuit the download, and ``load_llm``
-    has no network fallback: the repo would then fail to load on every
-    subsequent attempt with no way back except manually clearing the cache.
-    A partially downloaded model is NOT on disk, and saying so cost nothing
-    but a re-download.
+    SHARD COMPLETENESS IS PART OF "HAS WEIGHTS" (2026-09-06). Returning True
+    on the FIRST nonzero weight file would be wrong for every multi-shard repo
+    -- and the rows an 8 GB card must consider are multi-shard
+    (Qwen/Qwen3.5-4B is 9,319,828,096 bytes over two shards, well past HF's
+    5 GB default shard size). A first download interrupted after shard 1
+    lands -- an operator cancel, a dropped connection, a ComfyUI restart, all
+    of which happened during this campaign -- leaves one shard materialized.
+    That would make ``on_disk`` True, which makes ``auto_download_if_missing``
+    short-circuit the download, and ``load_llm`` has no network fallback: the
+    repo would then fail to load on every subsequent attempt with no way back
+    except manually clearing the cache. A partially downloaded model is NOT
+    on disk, and saying so costs nothing but a re-download.
     """
     declared = _shards_named_by_index(snapshot_path)
     if declared is not None:
@@ -1238,8 +1221,8 @@ def build_dropdown_choices(
     wrong badge is worse than none. A model that is not already cached is
     simply fetched by auto_download_if_missing on first Queue; selection is
     never gated on the badge. `on_disk` is still tracked (it drives the
-    recovery hint + the auto-download short-circuit), it just no longer
-    decorates the visible label.
+    recovery hint + the auto-download short-circuit), it just does not
+    decorate the visible label.
     """
     scan = {r.repo_id: r for r in scan_local_llm_cache(hub_root=hub_root)}
     entries: list[DropdownEntry] = []
@@ -1316,13 +1299,13 @@ def default_llm_option() -> str:
     another. That failure is already recorded (2026-08-04, both writer widgets
     rendering red) and is why callers must never hand-build "repo_id (N GB)".
 
-    WHY THIS EXISTS (PBUG-20260906-09). Four test modules hard-coded
-    ``"google/gemma-4-12b-it (11.9 GB)"``. When DEFAULT_LLM moved to Qwen those
-    literals did not, so the tests asserted the OLD default was shipped -- they
-    pinned the drift in place instead of catching it, and a test that fails
-    when the default legitimately changes is a test that will be edited rather
-    than believed. Deriving the label here means one edit to DEFAULT_LLM moves
-    the constant, the shipped graphs' checker, and every test at once.
+    WHY THIS EXISTS (PBUG-20260906-09). A hard-coded
+    ``"google/gemma-4-12b-it (11.9 GB)"`` in a test does not move when
+    DEFAULT_LLM does, so the test asserts the OLD default is shipped -- it pins
+    the drift in place instead of catching it, and a test that fails when the
+    default legitimately changes is a test that will be edited rather than
+    believed. Deriving the label here means one edit to DEFAULT_LLM moves the
+    constant, the shipped graphs' checker, and every test at once.
 
     Cache-independent by construction: it composes the same way
     :func:`build_dropdown_choices` composes a curated row
@@ -1367,7 +1350,7 @@ def fresh_llm_option() -> str:
 #
 # The 2026-06-01 four-dropdown router: creative_writing_model and
 # technical_model stay LOCAL + slot-a/b selectors (build_dropdown_choices
-# above -- the OpenRouter catalog NEVER appears there). The two NEW pickers
+# above -- the OpenRouter catalog NEVER appears there). The two pickers
 # openrouter_slot_a_model / openrouter_slot_b_model choose the real OpenRouter
 # slug from the S0 disk cache (nodes/_otr_openrouter_backend.cached_models()).
 # INPUT_TYPES-safe: every tier reads the on-disk cache only, never the network.
@@ -1380,11 +1363,11 @@ OPENROUTER_EMPTY_CACHE_SENTINEL = "(no OpenRouter models cached -- run refresh_c
 """Shown when remote is enabled but the catalog cache is missing/empty. The
 recommended default is offered alongside so the slot still has a valid pick."""
 
-# 2026-08-07: the "recent" tier is GONE. It contributed 8 of the 21 slot-a
-# choices from whatever the disk cache happened to hold, which is the opposite
-# of curation -- an uncurated, silently-changing block. Discovery now lives in
-# OTR_OPENROUTER_FAVORITES, the allowlist/provider filters, and the explicit
-# OTR_OPENROUTER_FULL_CATALOG=1 opt-in, all of which already existed.
+# There is no "recent" tier: a block drawn from whatever the disk cache
+# happened to hold is the opposite of curation -- an uncurated,
+# silently-changing block. Discovery lives in OTR_OPENROUTER_FAVORITES, the
+# allowlist/provider filters, and the explicit OTR_OPENROUTER_FULL_CATALOG=1
+# opt-in.
 
 
 def _lead_with_sentinel(sentinel: str, choices: list[str]) -> list[str]:
@@ -1473,7 +1456,7 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
     return out
 
 
-# The CURATED alias set (2026-08-07 curation; supersedes the 2026-06-20 block).
+# The CURATED alias set (2026-08-07 curation).
 #
 # POLICY, in priority order:
 #   (a) PREFER `~author/family-latest` routing aliases. They resolve upstream at
@@ -1487,16 +1470,15 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
 #       identifiers do not -- `tencent/hy3:free` was carried here until its promo
 #       ended and the slug stopped resolving. test_openrouter_slug_curation.py
 #       enforces this; a comment cannot.
-#   (d) Auto-routers ARE now offered, as SELECTABLE ENTRIES ONLY -- never as a
-#       default (operator, 2026-08-10). This reverses the previous blanket
-#       exclusion, which read "any of them picks a model by criteria we do not
-#       control, so one config resolves differently week to week". That is still
-#       TRUE, and it is still why no router may be a default; it is not a reason
-#       to withhold the choice. See OPENROUTER_CURATED_ROUTERS below for which
+#   (d) Auto-routers are offered as SELECTABLE ENTRIES ONLY -- never as a
+#       default (operator, 2026-08-10). Any of them picks a model by criteria
+#       we do not control, so one config resolves differently week to week;
+#       that is why no router may be a default, and it is not a reason to
+#       withhold the choice. See OPENROUTER_CURATED_ROUTERS below for which
 #       two, and why only two.
 #
-#       The budget objection was RETIRED as inconsistent, by the operator:
-#       "you can't budget against a -latest either." He is half right, and the
+#       The operator's budget objection -- "you can't budget against a -latest
+#       either." -- is half right, and the
 #       measured half matters. A `~latest` alias carries a REAL published price
 #       (`~anthropic/claude-opus-latest` = $5/$25 per M on 2026-08-10), so it is
 #       discoverable at any moment and merely moves when the vendor ships. A
@@ -1519,8 +1501,8 @@ OPENROUTER_CURATED_ALIASES = (
     "~openai/gpt-mini-latest",
     "~google/gemini-flash-latest",
     "~moonshotai/kimi-latest",
-    # 2026-08-07: x-ai now publishes a `~latest` resolver, which retired ~30
-    # lines of bespoke "pick the author's newest concrete slug" synthesis.
+    # x-ai publishes a `~latest` resolver (2026-08-07), so no bespoke "pick
+    # the author's newest concrete slug" synthesis is needed.
     "~x-ai/grok-latest",
     # 2026-08-09 (chunk B): THE CHEAP SLOT, and it is an alias on purpose.
     # ~$0.08/$0.25 per M -- the cheapest option that is a POINTER rather than a
@@ -2006,15 +1988,14 @@ def vram_badge_for(repo_id: str) -> str:
 
     It reports the same figure :func:`_estimate_resident_gb` computes, so the
     badge and the gate cannot drift apart. Remote handles and un-estimable rows
-    get no badge rather than a guess -- the download-state badge was removed
-    for exactly that reason, and a wrong number is worse than none.
+    get no badge rather than a guess: a wrong number is worse than none (the
+    same reason there is no download-state badge).
 
-    PBUG-20260829-17 is why no surviving row carries a context term here. The
-    only rows whose badge depended on one were priced as weights + KV, where KV
-    scales with the context the caller asks for, so a single number meant
-    nothing without naming the context it assumed. Every surviving row is a
+    PBUG-20260829-17 is why no row carries a context term here: a badge priced
+    as weights + KV scales with the context the caller asks for, so a single
+    number means nothing without naming the context it assumed. Every row is a
     safetensors download whose badge does not move with context, so the number
-    is unconditional again by construction rather than by annotation."""
+    is unconditional by construction rather than by annotation."""
     try:
         est = _estimate_resident_gb(repo_id)
     except Exception:  # noqa: BLE001 -- a badge must never break the picker
@@ -2023,7 +2004,7 @@ def vram_badge_for(repo_id: str) -> str:
         return ""
 
     # STATE THE DOWNLOAD, THEN WHERE IT FITS. The resident estimate stays the
-    # gate's number and is no longer what the label leads with, because it is
+    # gate's number and is not what the label leads with, because it is
     # platform-blind: it halves every row on the stated assumption of 8-bit/NF4
     # loading, which does not exist on Apple Silicon. The shipped Mac default
     # read "(4.3 GB)" for a model that measured 14 GB there, and a reader who
@@ -2169,8 +2150,7 @@ def validate_model_id(
 
 
 # ---------------------------------------------------------------------------
-# B1b: dynamic context-cap resolution (replaces _otr_model_loader's
-# MODEL_CONTEXT_CAPS static dict + DEFAULT_CONTEXT_CAP)
+# B1b: dynamic context-cap resolution.
 # ---------------------------------------------------------------------------
 
 
@@ -2210,11 +2190,10 @@ CURATED_CONTEXT_OVERRIDES: dict[str, int] = {
     "google/gemma-4-E2B-it": 8192,
     "google/gemma-4-E4B-it": 8192,
     "google/gemma-4-12b-it": 8192,
-    # 2026-08-25: the Qwen2.5-14B, Captain-Eris and MN-12B-Mag-Mell entries
-    # were removed with (or after) their catalog rows. An override for a
-    # repo_id no curated row can name is unreachable -- resolve_context_cap
-    # only ever reaches this dict via .get(model_id) for a real selection --
-    # so a stale key is dead weight that reads like a supported model.
+    # Keep entries only for repo_ids a curated row can name: an override for
+    # any other repo_id is unreachable (resolve_context_cap only ever reaches
+    # this dict via .get(model_id) for a real selection) and reads like a
+    # supported model.
 }
 
 
@@ -2338,16 +2317,12 @@ def _estimate_resident_gb(
     context_cap: int | None = None,
 ) -> float | None:
     # `context_cap` IS DELIBERATELY NOT READ, and that is the contract rather
-    # than an oversight. Its only reader was the removed writer-backend branch,
-    # where cost was weights + a KV cache that scaled with the requested
-    # context. Every surviving row is a safetensors download whose resident
+    # than an oversight. Every row is a safetensors download whose resident
     # size does not move with context, so pricing one against a context would
-    # be the same defect family returning: judging a request by a number the
-    # loader will not honour. PBUG-20260829-08 (priced the row's max QUANT) and
-    # -17 (priced its max CONTEXT in the dropdown badge) are the two LOGGED
-    # instances. A review found this comment's original "-20" citation points at
-    # an unrelated news-validator bug, so the number is dropped rather than left
-    # sending the next reader to the wrong entry.
+    # be the defect family of judging a request by a number the loader will
+    # not honour. PBUG-20260829-08 (priced the row's max QUANT) and -17
+    # (priced its max CONTEXT in the dropdown badge) are the two LOGGED
+    # instances.
     #
     # The parameter stays because it is the handle the tripwire needs --
     # tests/test_gate_prices_the_policy_context.py calls this at 8192 and at

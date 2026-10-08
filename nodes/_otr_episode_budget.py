@@ -5,15 +5,15 @@ everything else — arc-phase labels, per-phase beat counts, music_inter
 count — is derived from it alone.
 
 WORDS ARE AN OBSERVATION, NEVER AN INSTRUCTION (operator directive
-2026-08-14). `target_words` and every word-derived control were removed
-from this module in the same change: the per-phase word allocation, the
-per-beat word range widening, the word->act breakpoint table, the
-default/max act gates that could REFUSE an operator's act choice, and
-the word-feasibility guard. A story's length is what the story turns out
-to be. Nothing here may reintroduce a length authority, in any form.
+2026-08-14). This module carries no `target_words` and no word-derived
+control: no per-phase word allocation, no per-beat word range, no
+word->act breakpoint table, no default/max act gates that could REFUSE an
+operator's act choice, and no word-feasibility guard. A story's length is
+what the story turns out to be. Nothing here may reintroduce a length
+authority, in any form.
 
-`BEAT_WORD_HARD_MAX` deliberately SURVIVES that removal and is not a
-length authority: it is the Stage-3 Beat schema's structural cap, and
+`BEAT_WORD_HARD_MAX` is deliberately kept and is not a length
+authority: it is the Stage-3 Beat schema's structural cap, and
 `_otr_passage_selector.chunk_speech` needs it to split one long
 source speech across consecutive beats. Without it the Shakespeare lane
 silently loses its best material — Banquo's 91-word speech, Lear's love
@@ -94,32 +94,20 @@ MAX_ACT_COUNT: int = 7
 # ACT_COUNT_CONFIG -- per-act-count outline shape
 # ---------------------------------------------------------------------------
 #
-# Two keys only. `act_word_fractions` and `words_per_beat_range` were removed
-# 2026-08-14: the first split a word total across phases, the second was
-# widened from that split, and both fed word counts into the outline prompt.
-#
-# `voiced_beats_per_act` is NOT word-derived and never was -- it is the act
-# topology, which is why the beat count moves in steps rather than sliding
-# with a length request.
+# Two keys only, `arc_phases` and `voiced_beats_per_act`; neither feeds word
+# counts into the outline prompt. `voiced_beats_per_act` is NOT word-derived --
+# it is the act topology, which is why the beat count moves in steps rather
+# than sliding with a length request.
 
 #: Beats in one act. OPERATOR RULING 2026-08-15: *"ideally we say each act is
 #: 4 beats and we have a separate LLM pass per beat"*, and an act count is a
 #: number of ACT PATHS -- *"if I say 7 acts it goes through 7 different act
 #: paths, that should ensure there are more with 7"*.
 #:
-#: What that replaced: a hand-tuned table where every row had a different
-#: shape and two rows broke the operator's own model. Three acts and four
-#: acts both bought 14 beats, and SEVEN acts bought 19 while six bought 20 --
-#: asking for a longer story made a shorter one. The 7-act row `(2,3,3,3,3,3,2)`
-#: predates the word rip and was almost certainly a word-fitting artifact:
-#: act counts above 3 were only reachable when `target_words // 50` allowed
-#: them, so the rows were tuned to fit a word budget rather than to describe
-#: a dramatic shape. The budget is gone; the shapes it left behind are too.
-#:
 #: A uniform act is also the honest one. Every act runs the same arc machinery
 #: and gets the same per-beat authoring passes, so there is no mechanism that
-#: would make a "setup" act intrinsically thinner than a "climax" act -- the
-#: old varying rows encoded a length guess, not a dramatic fact.
+#: would make a "setup" act intrinsically thinner than a "climax" act --
+#: varying rows would encode a length guess, not a dramatic fact.
 BEATS_PER_ACT: int = 4
 
 ACT_COUNT_CONFIG: dict[int, dict] = {
@@ -202,8 +190,8 @@ class EpisodeBudget:
       * outline validators           all fields
       * composer prompt (arc_phase)  arc_phases (looked up by beat index)
 
-    `per_phase_words`, `words_per_beat_range` and `target_words` were
-    removed 2026-08-14. Nothing here carries a length instruction.
+    Nothing here carries a length instruction (no `per_phase_words`,
+    `words_per_beat_range` or `target_words`).
     """
 
     act_count: int
@@ -223,7 +211,7 @@ def compute_episode_budget(
 
     The operator's `act_count` is ALWAYS honoured inside
     [MIN_ACT_COUNT, MAX_ACT_COUNT]. There is no derived floor, no derived
-    ceiling and no feasibility guard, because all three used to be
+    ceiling and no feasibility guard, because all three would have to be
     computed from a word total.
 
     Raises InvalidEpisodeBudgetError on:

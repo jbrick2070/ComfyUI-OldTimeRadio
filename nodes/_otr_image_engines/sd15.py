@@ -219,16 +219,14 @@ class SD15Engine:
 
         # THE FIELD IS "prompt", NOT "text_prompt". The dispatcher supplies
         # `prompt` (otr_image_gen_dispatcher.py:1686) and z_image_turbo.py:348
-        # reads exactly that. An earlier version of this method read
-        # `text_prompt` -- the name from `required_inputs`, which describes the
-        # CONTRACT, not the request key -- so every still would have been minted
-        # from an EMPTY prompt. Silently: a valid PNG of nothing in particular,
-        # with no error anywhere. Caught by the codex review lane before the
-        # first render, 2026-09-07.
+        # reads exactly that. `text_prompt` is the name from `required_inputs`,
+        # which describes the CONTRACT, not the request key, and reading it
+        # would mint every still from an EMPTY prompt. Silently: a valid PNG of
+        # nothing in particular, with no error anywhere.
         #
-        # One getter for both request shapes, copied from z_image_turbo rather
-        # than reinvented; the hand-rolled conditional this replaces also turned
-        # a dict {"text_prompt": None} into the literal string "None".
+        # One getter for both request shapes, as in z_image_turbo; a hand-rolled
+        # conditional also turned a dict {"text_prompt": None} into the literal
+        # string "None".
         get = request.get if isinstance(request, dict) else (
             lambda k, d=None: getattr(request, k, d))
         neg = str(get("negative_prompt") or "").strip().strip(",").strip()
@@ -321,12 +319,11 @@ class SD15Engine:
         IT GATES THE FALLBACK, WHICH IS THE ONE IT CAN REACH. This is handed no
         request on the dispatcher path, so it cannot know the episode's visual
         style and resolves without one; `_sd15_params` resolves WITH it, so
-        since 2026-09-12 the two can legitimately name different files. The
-        safety property is unchanged and stronger than the old "cannot
-        disagree" wording claimed: `_style_ckpt_name` only ever returns a name
-        that already passed `_installed`, so the render path can differ from
-        this gate ONLY by picking a file that is definitely present. A missing
-        pack checkpoint is invisible here and falls back, exactly as intended.
+        the two can legitimately name different files. The safety property:
+        `_style_ckpt_name` only ever returns a name that already passed
+        `_installed`, so the render path can differ from this gate ONLY by
+        picking a file that is definitely present. A missing pack checkpoint
+        is invisible here and falls back, exactly as intended.
         """
         ckpt = _resolve_ckpt_name()
         if not _installed(ckpt):
@@ -366,8 +363,8 @@ class SD15Engine:
             # is its own small lie: the clamp branch avoids SD 1.5 duplicating
             # subjects, while the snap branch only rounds to a multiple of 8 and
             # has nothing to do with duplication. A 750x750 request mints at
-            # 744x744 purely from the snap, and the old single message claimed
-            # it had exceeded a 768 ceiling it never approached.
+            # 744x744 purely from the snap, never having approached the
+            # 768 ceiling.
             if max(params["asked_width"], params["asked_height"]) > params["max_side"]:
                 log.info(
                     "[OTR.image.sd15] request asked %dx%d; minting %dx%d -- SD 1.5 "

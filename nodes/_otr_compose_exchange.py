@@ -380,7 +380,7 @@ def build_exchange_prompt(
     from ._otr_dialogue_policy import append_dialogue_policy
     # Only the speakers this exchange actually voices. `cast` stays where it
     # belongs -- rendering voice guidance for those speakers in the user
-    # message -- and no longer votes on the accent policy.
+    # message -- and does not vote on the accent policy.
     system = append_dialogue_policy(
         system,
         active_speakers=tuple(slot.speaker for slot in beat_group),

@@ -52,10 +52,7 @@ WHAT THIS IS NOT:
 * NOT terminal by itself -- it raises a REROLLABLE phase, so a false positive
   costs a retry rather than the episode. The thresholds below stay deliberately
   conservative anyway: repeated false fires would burn a run's retry budget and
-  then end it. (This paragraph used to justify itself with
-  ``MAX_CANDIDATE_CYCLES`` from ``_otr_scifi_codex.py`` -- a retry budget in a
-  module that no longer exists. Tuning against a deleted mechanism is how a
-  threshold ends up defended by nothing.)
+  then end it.
 
 DESIGN NOTES that are load-bearing (settled review, 2026-08-13):
 * The criterion LATCHES rather than raising. Raising from inside a criterion

@@ -157,20 +157,20 @@ def mention_forms(name: str) -> Tuple[str, ...]:
     The full name, the same without a leading article ("the water ghost" ->
     "water ghost"), its final token, AND its first token.
 
-    BOTH ENDS, because assuming one was a real defect. This function used to
-    take the SURNAME only, on the reasoning that prose introduces "Captain
-    Ahab" once and then says "Ahab" four hundred times. True of Melville, and
-    false of Austen, Montgomery and Twain, who use the GIVEN name throughout.
+    BOTH ENDS, because assuming one is a real defect. Prose introduces
+    "Captain Ahab" once and then says "Ahab" four hundred times -- true of
+    Melville, and false of Austen, Montgomery and Twain, who use the GIVEN
+    name throughout.
     Measured on the shipped corpus:
 
         Anne Shirley      "Shirley"  0 occurrences   "Anne"      75
         Elizabeth Bennet  "Bennet"   0              "Elizabeth"   9
         Huck Finn         "Finn"     1              "Huck"        7
 
-    So the scan was hunting a word those stories never use, finding nothing,
-    and declining -- and the characters it failed on were the LEADS, the ones a
-    listener is most certain to notice. Those declines were never ambiguity;
-    they were the wrong search term.
+    A surname-only scan would hunt a word those stories never use, find
+    nothing, and decline -- on the LEADS, the ones a listener is most certain
+    to notice. Those declines are never ambiguity; they are the wrong
+    search term.
 
     The first token is taken only when it is TITLE-CASED as authored and is not
     an honorific or an abbreviation. Lower-case openers are role words, not

@@ -5,14 +5,13 @@ preset mechanism either way; the caller's ``role`` (threaded onto the
 adapter instance by the dispatch core) only selects which curated profile
 (``char_bark_v1`` / ``announcer_bark_v1``) supplies the per-stage temps.
 
-Sources inference from _otr_bark_lib (relocated, delegation-free); no
+Sources inference from _otr_bark_lib (delegation-free); no
 construction of the heavy batch node. interface == "per_line". Library imports
 are lazy so importing the registry package stays light (C-5).
 
 Gate 3 (voice-path-cleanbreak): an empty / non-v2/* voice_preset is a writer
 cast-lock contract violation -- generate_voice fails closed with a named
-EngineUnusable(MALFORMED_CONFIG), the same renderability net the legacy batch
-node enforced before it was retired.
+EngineUnusable(MALFORMED_CONFIG).
 
 The live per-stage temperatures come from the char_bark_v1 profile
 (config/audio_engine_profiles.yaml, the curated-params SSOT, plan D5) via
@@ -229,9 +228,9 @@ class BarkEngine:
                     fine_temp=fine_temp,
                     inject_first_line_anchor=inject_first_line_anchor,
                     speech_only=speech_only,
-                    # B2: thread the EXISTING per-line seed (was dropped before)
-                    # so the clip is reproducible (Bark.generate is unseeded
-                    # otherwise). On a re-roll `seed` is the ladder's next rung.
+                    # B2: thread the per-line seed so the clip is reproducible
+                    # (Bark.generate is unseeded otherwise). On a re-roll `seed`
+                    # is the ladder's next rung.
                     seed=seed,
                 )
             except Exception as exc:  # noqa: BLE001 -- a thrown attempt is an

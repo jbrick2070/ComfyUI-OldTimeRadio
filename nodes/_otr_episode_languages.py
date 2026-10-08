@@ -662,9 +662,7 @@ def assert_readiness_extras(row: LanguageRow) -> None:
                 # misaki imports and its phonemizer will not start: a plain
                 # install changes nothing. The empty-MeCab-dictionary trap gets
                 # the fix the voice node would have given (PBUG-20260918-06);
-                # anything else is named as it is (Sonnet QA of c7136448: this
-                # used to say "installed" whenever misaki itself was, which is
-                # every torch box, and advised a --force-reinstall).
+                # anything else is named as it is.
                 kb = _kokoro_backends()
                 exc = failure[1]
                 reworded = kb._mecab_dictionary_error(exc, _MISAKI_EXTRA_LANG.get(sub, ""))

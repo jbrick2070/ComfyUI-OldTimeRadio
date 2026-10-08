@@ -142,8 +142,8 @@ def _retry_after_seconds(headers: Any) -> float | None:
 # a per-minute cap (it is also consistent with the last of a daily allowance
 # running out mid-wave -- the evidence licenses a BOUNDED recovery attempt,
 # not a promise that the cap clears). The classifier files 429 under
-# GoogleAPIBillingOrQuotaError and every poster re-raised it at once, so a
-# rate limit killed the whole shot with "no fallback". Google reports
+# GoogleAPIBillingOrQuotaError, and re-raising it at once would kill the whole
+# shot with "no fallback" on a plain rate limit. Google reports
 # per-minute and per-day exhaustion with the same 429, so the shape is a
 # bounded backoff that honours Retry-After: a per-minute cap MAY clear
 # inside it, a real quota wall still surfaces as the same error after the

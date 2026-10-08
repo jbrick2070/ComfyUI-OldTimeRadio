@@ -34,9 +34,7 @@ except ImportError:  # pragma: no cover -- flat test imports
 def default_venv_python(engine_root):
     """Isolated-venv interpreter under ``engine_root``, platform-correct.
 
-    ``.venv/Scripts/python.exe`` on Windows, always -- byte-identical to the
-    old ``_default(".venv", "Scripts", "python.exe")`` the Path-B adapters
-    (chatterbox, indextts2) hardcoded.
+    ``.venv/Scripts/python.exe`` on Windows, always.
 
     On Linux/Mac the provisioner's ``.venv/Scripts/python.exe`` still wins
     WHEN IT EXISTS, and that exception is the whole point: for IndexTTS2 it
@@ -49,8 +47,7 @@ def default_venv_python(engine_root):
     the provisioned Scripts path is a plain symlink to bin/python, so
     preferring it changes nothing there. A manual install with no Scripts
     entry falls through to ``.venv/bin/python``, the interpreter venv
-    layouts actually create on posix -- which is the fix: the old default
-    pointed at an interpreter that does not exist there.
+    layouts actually create on posix.
 
     The env overrides (OTR_*_VENV) are read by the callers and unchanged.
     """

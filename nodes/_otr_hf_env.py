@@ -90,13 +90,13 @@ def _user_hf_cache() -> str:
 def _default_hf_home() -> str:
     r"""The HF cache root to fall back to when nothing else names one.
 
-    WHY THIS IS A FUNCTION AND NOT THE CONSTANT IT USED TO BE. The constant was
-    ``r"C:\ComfyUI-Models\huggingface"`` unconditionally. On Windows that is an
-    absolute path; on macOS and Linux it is a perfectly LEGAL RELATIVE FILENAME,
-    backslashes and colon included. So instead of failing, the process quietly
-    created a directory literally named ``C:\ComfyUI-Models\huggingface`` inside
-    whatever the working directory happened to be -- the repo checkout, in the
-    case that found this -- and downloaded models into it.
+    WHY THIS IS A FUNCTION AND NOT A CONSTANT. A constant
+    ``r"C:\ComfyUI-Models\huggingface"`` is an absolute path on Windows, but
+    on macOS and Linux it is a perfectly LEGAL RELATIVE FILENAME, backslashes
+    and colon included. So instead of failing, the process would quietly
+    create a directory literally named ``C:\ComfyUI-Models\huggingface``
+    inside whatever the working directory happens to be -- the repo checkout,
+    in the case that found this -- and download models into it.
 
     MEASURED 2026-09-08: 8.7 GB of duplicate cache, including a second copy of
     the Qwen3.5-4B writer, sitting untracked in the repo tree beside a perfectly

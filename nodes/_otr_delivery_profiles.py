@@ -29,11 +29,9 @@ class UnknownDeliveryProfile(ValueError):
 class DeliveryProfile:
     """One delivery profile. ``neutral`` is the identity profile (E.3)."""
 
-    # `version` / `projection_version` fields were removed 2026-08-28: the ONE
-    # instance (`_NEUTRAL`) always took the defaults and nothing ever read
-    # them, so they advertised per-profile versioning that did not exist. The
-    # live consumers read the MODULE constants below directly (cast_lock and
-    # the audio cache both do), which is where the real versions live.
+    # No per-profile version fields: the live consumers read the MODULE
+    # constants above directly (cast_lock and the audio cache both do), which
+    # is where the real versions live.
     profile_id: str
 
 

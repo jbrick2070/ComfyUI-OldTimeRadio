@@ -226,10 +226,9 @@ def _carry_evidence(target: BaseException, source: BaseException) -> BaseExcepti
 def _post_interaction(api_key: str, payload: dict) -> dict:
     """POST one Interactions request through the SHARED Google client.
 
-    This adapter used to hand-roll the transport, so a refusal or a quota
-    failure arrived as a bare urllib error carrying no status, no parsed body,
-    and nothing a caller could classify on. The shared client owns transport,
-    best-effort error-body parsing, and structured evidence.
+    The shared client owns transport, best-effort error-body parsing, and
+    structured evidence, so a refusal or a quota failure arrives with a
+    status and a parsed body a caller can classify on.
 
     Retries stay with the caller: the model ladder in ``generate_voice`` is
     this adapter's retry policy, and a second one inside the client would
@@ -263,8 +262,9 @@ def _split_mime(mime_type: str) -> tuple[str, dict]:
 
     The live endpoint answers with MIME PARAMETERS (measured 2026-09-19 on
     the first Google lane leg: gemini-2.5-flash-preview-tts returned exactly
-    that string and the old equality check refused every line). The rate
-    parameter is the provider's own statement of the sample rate."""
+    that string), so a bare equality check on the type would refuse every
+    line. The rate parameter is the provider's own statement of the sample
+    rate."""
     parts = [p.strip() for p in str(mime_type or "").split(";")]
     base = parts[0].lower() if parts else ""
     params: dict = {}

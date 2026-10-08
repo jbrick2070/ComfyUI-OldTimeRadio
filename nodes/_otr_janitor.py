@@ -90,21 +90,18 @@ def ensure_shared_readme() -> None:
 def _entry_is_fresh(p: Path, cutoff: float) -> bool:
     """True when the entry, or anything inside it, is newer than ``cutoff``.
 
-    This replaced a helper that stat'ed EVERY file under the entry for its
-    newest mtime and then compared that with the cutoff.
-
-    Same verdict under every error rule: an unstat-able entry compares a
-    fresh time.time() against the cutoff, exactly as the full walk did -- so
+    Error rules: an unstat-able entry compares a fresh time.time() against
+    the cutoff -- so
     it is not unconditionally fresh. A negative max age larger than the gap
     between the two clock readings is stale; at zero (or a tiny negative)
     the verdict is fresh exactly when the clock advanced in between, which
     depends on the clock's resolution (nearly always on Python 3.13's,
     rarely on a coarse one). An unstat-able child is skipped, and a
     walk that errors keeps
-    what it already saw. The differences: a directory walk stops at the
+    what it already saw. A directory walk stops at the
     first child newer than the cutoff instead of stat-ing everything under
     it, and an entry whose own mtime already decides it is never asked
-    is_dir() (so an is_dir() error there can no longer abort the sweep).
+    is_dir() (so an is_dir() error there cannot abort the sweep).
     """
     try:
         if p.stat().st_mtime > cutoff:

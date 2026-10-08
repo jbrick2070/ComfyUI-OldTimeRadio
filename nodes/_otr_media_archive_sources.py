@@ -134,9 +134,9 @@ def parse_media_archive_feed(
     more robust than a small bespoke XML parser for mixed RSS/Atom blog feeds.
 
     Wave 5: when ``raw_or_url`` is a URL the bytes come from the bounded seam
-    (``_otr_feed_fetch``) and feedparser is handed a DOCUMENT. It previously
-    received the URL and did its own fetch, which had no timeout, no size cap,
-    no redirect cap, no scheme check and no address check. A ``FeedFetchRefused``
+    (``_otr_feed_fetch``) and feedparser is handed a DOCUMENT, never the URL:
+    its own fetch has no timeout, no size cap, no redirect cap, no scheme check
+    and no address check. A ``FeedFetchRefused``
     is deliberately NOT wrapped in ``MediaArchiveSourceError``: the caller
     (``fetch_media_archive_rss``) collects that error per feed and carries on to
     the next one, so wrapping a tripped bound would let a misconfigured feed URL
@@ -276,13 +276,12 @@ def fetch_media_archive_rss(*, bank: Any, technical_model: str = "",
     ``bank``, ``technical_model``, and ``source_ref`` are accepted for the
     shared fetcher contract; RSS feeds ignore ``source_ref``.
 
-    SELECTION, AND WHY IT IS NOT JUST INDEX 0 ANY MORE (PBUG-20260815-06).
-    Feed entries arrive newest-first and this returned
-    `payloads[_configured_index() % len(payloads)]` with the index defaulting to
-    `"0"`, so absent an operator-set env var the lane adapted THE NEWEST POST
-    EVERY TIME -- forever, with no dedup, ranking or history anywhere in the
-    module. The science lane never had that problem because it filters against a
-    shared news history; this lane now uses the SAME one.
+    SELECTION IS NOT JUST INDEX 0 (PBUG-20260815-06). Feed entries arrive
+    newest-first, so `payloads[_configured_index() % len(payloads)]` with the
+    index defaulting to `"0"` would, absent an operator-set env var, adapt THE
+    NEWEST POST EVERY TIME -- forever, with no dedup, ranking or history. The
+    science lane filters against a shared news history; this lane uses the
+    SAME one.
 
     Order of precedence, deliberately:
       1. An explicitly set ``OTR_MEDIA_ARCHIVE_ITEM_INDEX`` still wins outright.

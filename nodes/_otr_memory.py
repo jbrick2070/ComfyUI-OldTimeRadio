@@ -17,20 +17,16 @@ composite pipeline:
     never blocks a render that would otherwise complete. Caller decides
     whether to log + abort or just log + continue when ``ok=False``.
 
-Why a shared module: it was written for three phase barriers, so
-putting the logic in one place kept the invariants identical and made
-adding a call site cheap.
+Why a shared module: putting the logic in one place keeps the invariants
+identical and makes adding a call site cheap.
 
 CURRENT REALITY (grep before trusting this paragraph): there is
 exactly ONE live ``phase_gc`` call site in production --
-``otr_post_upscale_procgen_blend.py`` at its entry. The other two
-barriers are gone, not merely quiet: ``OTR_BatchHumoRender`` was
-removed (it is in ``DELETED_NODE_TYPES``; HuMo is an in-process
-adapter now), and queue item 8 (2026-08-08) ripped the standalone
-RTXUpscale stage, folding per-clip model enhancement INSIDE
-SilentComposite (``nodes/_otr_upscale_engines/``) where it needs no
-handoff of its own. The helpers stay because the remaining barrier is
-real and a future phase may want one.
+``otr_post_upscale_procgen_blend.py`` at its entry. HuMo is an in-process
+adapter and per-clip model enhancement runs INSIDE SilentComposite
+(``nodes/_otr_upscale_engines/``), where neither needs a handoff of its
+own. The helpers stay because the remaining barrier is real and a future
+phase may want one.
 
 Both helpers are best-effort: any internal exception is caught and
 logged at WARNING. Callers should NEVER let memory hygiene abort

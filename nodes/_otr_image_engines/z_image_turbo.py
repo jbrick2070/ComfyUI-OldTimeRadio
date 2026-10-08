@@ -5,8 +5,8 @@ S3-DiT (Alibaba Tongyi) that renders a still in 8 steps. It registers EXACTLY li
 ``flux_gen1`` / ``lumina_image`` so the operator picks it per role; Flux stays the
 in-stack default (``default_roles=()`` here -- no model is "primary").
 
-ARCHITECTURE (2026-06-18 roundtable-converged; SUPERSEDES the old cu128 sidecar
-stub): Z-Image is now a ComfyUI-CORE split-file model, so it runs IN-PROCESS via
+ARCHITECTURE (2026-06-18 roundtable-converged): Z-Image is a ComfyUI-CORE
+split-file model, so it runs IN-PROCESS via
 ``wrapper_bridge`` exactly like ``lumina_image`` -- UNETLoader (diffusion) +
 CLIPLoader (the Qwen3-4B text encoder) + VAELoader (the Flux ``ae`` VAE) ->
 ModelSamplingAuraFlow (sigma shift) -> KSampler -> VAEDecode. No sidecar.
@@ -44,7 +44,6 @@ Fail-closed: ``assert_usable`` raises MISSING_MODEL until the diffusion-model fi
 exists (the TE+VAE loaders fail LOUD at render -> dispatcher floor). No enable
 flag gates selection -- the registry is the menu; ``OTR_ENABLE_ZIMAGE`` is
 vestigial and read by nothing (``test_image_engine_c2.py`` pins the no-gate
-behavior). ``registry.VALIDATED_ENGINES`` was removed 2026-06-29 (C4).
 
 Cold-import clean (V-12): module scope imports only the dep-free registry + role
 vocabulary + stdlib. torch / comfy / the model are NEVER imported here -- the heavy
@@ -94,15 +93,16 @@ _DEFAULT_LATENT_NODE = "EmptySD3LatentImage"   # 16-ch (matches the Flux ae VAE;
 
 #: ANTI-ARTIFACT ONLY -- the hygiene floor, with NO style opinion in it.
 #:
-#: PBUG-20260817-01: this constant used to also carry "clean digital, cartoon,
-#: illustration", which made it a STYLE authority living engine-side. On a
-#: `cartoon` episode every still was minted with the positive "bright cartoon
-#: illustration" AND the negative "cartoon, illustration" -- the engine vetoed
-#: the style the episode had selected. By literal phrase match it fought FOUR
-#: of the nine packs (anime, cartoon, sci_fi_radio, storybook_engraving).
-#: The style half now lives in each pack's `negative_tail`, which the
-#: dispatcher composes into the request; `sci_fi_radio` carries the historical
-#: string verbatim so the default lane is unchanged.
+#: PBUG-20260817-01: a style word here (e.g. "clean digital, cartoon,
+#: illustration") makes it a STYLE authority living engine-side. On a
+#: `cartoon` episode every still would be minted with the positive "bright
+#: cartoon illustration" AND the negative "cartoon, illustration" -- the
+#: engine vetoing the style the episode selected (by literal phrase match
+#: it fights FOUR of the nine packs: anime, cartoon, sci_fi_radio,
+#: storybook_engraving). The style half lives in each pack's
+#: `negative_tail`, which the dispatcher composes into the request;
+#: `sci_fi_radio` carries the historical string verbatim so the default
+#: lane is unchanged.
 #:
 #: This remains the FALLBACK for a mint that arrives with no composed negative
 #: at all -- a legacy frozen pack, or a direct/standalone engine call. Falling

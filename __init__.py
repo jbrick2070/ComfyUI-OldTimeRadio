@@ -11,7 +11,6 @@ Self-contained: drop into custom_nodes/ and go. No external node deps.
 
 Audio:  LedgerScriptWriter -> FreezeCascade -> BatchBark -> SceneSequencer -> AudioEnhance -> EpisodeAssembler
 Video:  EpisodeAssembler -> SignalLostVideo -> .mp4 + _treatment.txt (cast, voices, full script, stats)
-        (legacy "Director" stage was removed in voice-path-cleanbreak S2)
 
 BEST PRACTICE (per comfyui-custom-node-survival-guide Section 8):
   Uses isolated per-node loading so a broken dependency in one node
@@ -83,8 +82,6 @@ warnings.filterwarnings("ignore", category=UserWarning,   module=r"transformers\
 #    401 on first download.  Pull the token from the user registry now and
 #    export it into os.environ so every downstream loader picks it up.
 try:
-    # (moved from .visual._hf_token 2026-08-23, lean-mean order 6 -- the
-    # one live dependency the retired visual/ POC tree carried)
     from .nodes._otr_shared.hf_token import ensure_hf_token
     ensure_hf_token()
 except Exception as _hf_err:
@@ -170,101 +167,16 @@ _NODE_MODULES = {
     # key = NODE_CLASS_MAPPINGS key (permanent public ID — never rename)
     # value = (module_path, class_name, display_name)
     "OTR_LedgerScriptWriter": (".nodes.OTR_LedgerScriptWriter", "OTR_LedgerScriptWriter", " LPL Script Writer (v2.0)"),
-    # Ledger Freeze Cascade (LFC sprint, 2026-05-11). Renamed from
-    # OTR_LedgerScriptReviewer in commit 2 of 14. Wires AFTER
-    # OTR_LedgerScriptWriter, BEFORE OTR_SceneSequencer. Existing
-    # 3-pass cast-gated reviewer (Phases 1, 2, 9) is now wrapped by
-    # Phase 0 (gap_audit_pre) at entry and Phase 10 (gap_audit_post +
-    # freeze) at exit. The legacy OTR_LedgerScriptReviewer name is
-    # DEAD as of S29 (2026-05-14) per the no-legacy-back-compat
-    # standing directive; workflow JSONs that still reference it
-    # fail to load loudly via the workflow validator's
-    # DELETED_NODE_TYPES sentinel. They must be re-saved against
-    # OTR_LedgerFreezeCascade. See S29 final QA review.
+    # Ledger Freeze Cascade: wires AFTER OTR_LedgerScriptWriter, BEFORE
+    # OTR_SceneSequencer. The 3-pass cast-gated reviewer (Phases 1, 2, 9) is
+    # wrapped by Phase 0 (gap_audit_pre) at entry and Phase 10 (gap_audit_post +
+    # freeze) at exit.
     "OTR_LedgerFreezeCascade": (".nodes.OTR_LedgerFreezeCascade", "OTR_LedgerFreezeCascade", " LFC Ledger Freeze Cascade (v2.0)"),
-    # S30 B4 (2026-05-14): standalone OTR_LFCPhase4Scene /
-    # OTR_LFCPhase5Voice / OTR_LFCPhase6Arc node classes DELETED.
-    # The three classes were orphaned from every shipped workflow JSON
-    # (per S30 parent plan section 2a-bis audit). Combined with the
-    # deletion-bias policy, the node files + their _otr_lfc phase
-    # function backing (_phase_3_per_line_polish,
-    # _phase_4_scene_coherence, _phase_4_5_smart_suggestion,
-    # _phase_5_voice_drift, _phase_6_episode_arc) go entirely. B7 adds
-    # the three class names as forbidden-pattern markers so the symbols
-    # cannot reappear.
-    # Voice-path-cleanbreak Sprint 2 (2026-05-12): OTR_LLMDirector deleted.
-    # The LLMDirector class was the legacy LLM-derived production plan
-    # generator. P2 severed the voice side (commit 446ec81); Sprint 2
-    # migrated the two remaining video-side consumers (OTR_SignalLostVideo,
-    # OTR_VideoPlan) to read meta.visual_plan + meta.voice_assignments +
-    # meta.style directly from the L3 ledger stamped by the writer.
-    # The deleted Director class + registration + workflow node +
-    # workflow links 17 + 38 all delete in lockstep.
-    #
-    # Voice-path-cleanbreak 2026-05-12 (P3): the legacy single-line
-    # nodes OTR_BarkTTS / OTR_SFXGenerator / OTR_VoiceRender plus the
-    # pre-L3 parser-list reader OTR_BatchKokoroGenerator are deleted.
-    # Their registrations are removed in lockstep with the file deletes.
     "OTR_SceneSequencer":     (".nodes.scene_sequencer",     "SceneSequencer",       " Scene Sequencer"),
     "OTR_EpisodeAssembler":   (".nodes.scene_sequencer",     "EpisodeAssembler",     " Episode Assembler"),
     "OTR_AudioEnhance":       (".nodes.audio_enhance",       "AudioEnhance",         " Spatial Audio Enhance"),
     "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", " Signal Lost Video"),
-    # OTR_ProjectStateLoader RETIRED 2026-08-23 (lean-mean order 5): manual
-    # series-bible loader, absent from canonical; its one repo importer was an
-    # UNUSED StoryOrchestrator import. Tombstoned in DELETED_NODE_TYPES.
-    # OTR_VRAMGuardian RETIRED 2026-08-23 (lean-mean order 5): the manual
-    # blanket-unload node conflicted with the targeted-lever VRAM policy (the
-    # model loader owns eviction and now LOGS a failed one by name). The plan
-    # offered retire / debug-gate / rewrite; retire is the only option that
-    # does not preserve a policy exception. Tombstoned in DELETED_NODE_TYPES.
     "OTR_VRAMContextTest":    (".nodes.vram_context_test",     "VRAMContextTest",         " VRAM Context Test (diagnostics)"),
-    # The v2.0 "Visual Generation Trio" POC is RETIRED 2026-08-23 (lean-mean
-    # order 6): OTR_VisualBridge / OTR_VisualPoll / OTR_VisualRenderer /
-    # OTR_VisualPromptCoercion / OTR_VisualExtractFluxPrompt, plus the whole
-    # visual/ tree behind them (worker CLI, wedge probe, legacy backends).
-    # All five public ids are tombstoned in DELETED_NODE_TYPES. The one LIVE
-    # thing that tree carried -- the HF_TOKEN startup bake-in above -- was
-    # moved to nodes/_otr_shared/hf_token.py and PROVEN working from its new
-    # home before this deletion. Production visuals are the model-agnostic
-    # platform: OTR_ImageGenDispatcher for stills, OTR_VideoRenderBatch for
-    # motion.
-    # OTR_FluxBranchGate -- DELETED in the Chunk E cleanbreak completion
-    # (2026-06-09). The Sprint H 3.7 FLUX topology gate only sequenced the
-    # legacy FLUX batch chain (deleted in the CW cleanbreak); the platform
-    # image gate (OTR_ImageGenDispatcher) is ordered by audio_done +
-    # script_json edges instead. Tombstoned in DELETED_NODE_TYPES.
-    # OTR_DeferredCheckpointLoader + OTR_DeferredLtxTextEncoderLoader --
-    # DELETED in the Chunk E cleanbreak completion (2026-06-09). V-5: ALL
-    # model loading is adapter-internal (comfy model_management); no
-    # deferred-loader shell nodes survive. Their only consumers were the
-    # deleted legacy FLUX/LTX batch chains. Tombstoned in
-    # DELETED_NODE_TYPES; the Sprint H finding they encoded (executor
-    # pre-loads loaders at graph-start regardless of downstream gates)
-    # lives on in the adapters' lazy in-execute loading.
-    # OTR_VideoPlan -- DELETED in CW-1 (2026-06-06) of the OTR video platform
-    # build. Its prompt-generation + planning was absorbed by OTR_ShotLock
-    # (M4 per-beat creative derivation). The legacy FLUX/HuMo/LTX render chain
-    # it fed was unwired from otr_canonical.json in the same commit; the
-    # type is in the workflow validator's DELETED_NODE_TYPES sentinel so a
-    # stale workflow referencing it fails loudly (must be re-saved).
-    # OTR_FixedShotDurationStub -- registration REMOVED in the Chunk E
-    # cleanbreak completion (2026-06-09; the module-level mapping was
-    # already cleared 2026-06-08). OTR_ShotLock owns ALL per-episode
-    # budget / shot-duration logic. The implementation module
-    # nodes/otr_shot_duration_calculator.py was DELETED on 2026-08-23
-    # (lean-mean order 2): its only remaining consumer was a test proving
-    # it still existed. The type stays tombstoned in DELETED_NODE_TYPES so
-    # a stale workflow JSON naming it fails LOUDLY at validation -- the code
-    # is what nobody runs, the tombstone is what a user actually hits.
-    # OTR_PostAudioVideoPipeline -- DELETED S27 (commit lands in s27-
-    # cleanbreak-tail). The class was a subprocess trigger for the
-    # pre-2026-04-27 HuMo batch + concat pipeline; it was superseded
-    # in-graph by OTR_BatchHumoRender + OTR_VideoComposite. S26 kept
-    # the registration "so any old workflow JSON that still references
-    # it loads without error" -- exactly the back-compat-for-old-data
-    # pattern S27 was authorized to delete. Old workflow JSONs that
-    # still name the type now fail to load loudly via the workflow
-    # validator's DELETED_NODE_TYPES sentinel; they must be re-saved.
     # S26 Sprint 3 (T1.2): opt-in execution-time workflow contract
     # validator. Reads the workflow JSON from disk and runs the same
     # validate_workflow_contract check the S16.6 CI test runs. Place
@@ -275,41 +187,6 @@ _NODE_MODULES = {
     # key. A V1 node declaring the hidden key writes it into /history when it
     # raises; this one cannot raise. Wired into the validator, the root.
     "OTR_ComfyCredential":         (".nodes.otr_comfy_credential", "OTR_ComfyCredential", "0 - Comfy Credential"),
-    # OTR_HuMoTierLoader -- DELETED in the CW cleanbreak (2026-06-08): it only
-    # fed the now-removed OTR_BatchHumoRender; the in-process HuMo adapter
-    # (nodes/_otr_video_engines/eng_humo.py) loads its own stack. Tombstoned in
-    # the workflow validator's DELETED_NODE_TYPES.
-    # OTR_VideoComposite -- DELETED (CW-4 legacy render-path teardown,
-    # 2026-06-07). The legacy episode compositor mixed audio inside the
-    # graph (master_mix / per-clip-mux / humo_concat) and used
-    # ffmpeg `-shortest`, which the frozen-audio spine forbids. The new
-    # render path is SignalLostVideo -> OTR_SilentComposite (always
-    # silent, no audio) -> OTR_MasterAudioMux (terminal, -c:a copy, NO
-    # -shortest, byte-identical master). The type is tombstoned in the
-    # workflow validator's DELETED_NODE_TYPES so any stale workflow JSON
-    # naming it fails loudly at validation; such workflows must be re-saved.
-    # Queue item 8 (2026-08-08): the NVIDIA-only RTX VSR upscaler
-    # (nodes/rtx_upscale.py) was RIPPED and REPLACED by the device-
-    # selectable upscale namespace at nodes/_otr_upscale_engines/. The new
-    # stage runs INSIDE OTR_SilentComposite (per-clip model dispatch in
-    # _encode_segment's sharpen=True branch), so it does NOT ship as a
-    # separate ComfyUI node -- the SilentComposite widget dropdown selects
-    # the engine, and cross-vendor support (CUDA + CPU today; MPS deferred
-    # pending a Mac receipt) comes from the shipped device_backends
-    # declaration on each engine row. OTR_RTXUpscale is in
-    # nodes/_workflow_validation.py DELETED_NODE_TYPES so any stale saved
-    # workflow fails loudly at validation.
-    # BUG-LOCAL-028 fix (2026-05-03): per-episode-aware image save sink.
-    # Replaces stock SaveImage nodes whose hardcoded filename_prefix
-    # couldn't track the in-flight episode_id. Reads the Ledger singleton
-    # at runtime and routes images to output/otr/episodes/<ep>/stills/
-    # or .../portraits/. Falls back to legacy flat dirs in headless/test.
-    # OTR_SaveToEpisodeWorkspace RETIRED 2026-08-23 (lean-mean order 5): the
-    # manual FLUX-stills episode sink. Its one known saved consumer,
-    # Documents/ComfyUI/_otr_full_api.json, was VERIFIED GONE from disk before
-    # this retirement -- there is no artifact left to migrate. Production
-    # stills route through OTR_ImageGenDispatcher. Tombstoned in
-    # DELETED_NODE_TYPES.
     # BUG-LOCAL-030 Phase B (2026-05-03 EVENING): post-RTXUpscale procgen
     # visual blend. Overlays 1920x1080 native procgen on the upscaled
     # HuMo + LTX composite at delivery res. Audio passes through with
@@ -328,17 +205,11 @@ _NODE_MODULES = {
     # =========================================================================
     # OTR Open Video Model Platform -- A-Seam core (CW-1, 2026-06-06).
     # Model-agnostic, per-role video model selection; NO model is "primary".
-    # Additive shell: VideoProbe (usable engines + host caps) -> VideoDirector
-    # (per-role A/B/C model + image selectors, Other-Beats clip mode) ->
-    # ShotLock (audio-derived clip budget + DAG-validated execution_groups +
-    # M4 per-beat creative derivation; supersedes OTR_VideoPlan). The engine
-    # adapters and the render path live in nodes/_otr_video_engines/.
+    # Additive shell: VideoDirector (per-role A/B/C model + image selectors,
+    # Other-Beats clip mode) -> ShotLock (audio-derived clip budget +
+    # DAG-validated execution_groups + M4 per-beat creative derivation). The
+    # engine adapters and the render path live in nodes/_otr_video_engines/.
     # =========================================================================
-    # OTR_VideoProbe RETIRED 2026-08-23 (lean-mean order 5): the manual
-    # usable-engines/host-caps report, absent from canonical. Its replacements
-    # are named, not implied: /object_info on the running server, the canonical
-    # runner's preflight model gate, and render_single for a one-engine smoke.
-    # Tombstoned in DELETED_NODE_TYPES.
     "OTR_VideoDirector":           (".nodes.otr_video_director", "OTRVideoDirector", " VideoDirector (per-role model select)"),
     "OTR_ShotLock":                (".nodes.otr_shot_lock",      "OTRShotLock",      " Shot Lock (video plan authority)"),
 
@@ -419,12 +290,8 @@ if _otr_dup is None:
             mod = importlib.import_module(module_path, package=__name__)
             cls = getattr(mod, class_name)
 
-            # Single canonical registration (OTR_ prefix only). The legacy
-            # bare-name (NodeName) alias mirror loop was deleted in the
-            # voice-path-cleanbreak 2026-05-12 sprint per the Standing
-            # Directive. Saved workflow JSONs that reference bare-name
-            # node types are expected to be rewritten against the OTR_
-            # prefix; there is no parallel legacy-workflow path.
+            # Single canonical registration (OTR_ prefix only); no bare-name
+            # alias or parallel legacy-workflow path.
             NODE_CLASS_MAPPINGS[node_name] = cls
             NODE_DISPLAY_NAME_MAPPINGS[node_name] = display_name
 
@@ -433,12 +300,9 @@ if _otr_dup is None:
             print(f"[OldTimeRadio] Skipped '{node_name}': {e}")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Clean-break v2.0-alpha (2026-05-12): _RENAME_ALIASES dict removed. No
-# back-compat surface. Every workflow JSON references the current canonical
-# class names directly. Legacy class names (OTR_Gemma4Director,
-# OTR_LedgerScriptReviewer, OTR_Gemma4ScriptWriter, OTR_LLMScriptWriter) are
-# DEAD -- attempting to load a workflow that references one will fail loudly,
-# which is the desired behaviour during a greenfield rewrite.
+# No rename-alias or back-compat surface: every workflow JSON references
+# the current canonical class names directly, and a workflow that names a
+# stale class fails loudly.
 # ─────────────────────────────────────────────────────────────────────────────
 
 _loaded = sum(1 for k in NODE_CLASS_MAPPINGS if k.startswith("OTR_"))
@@ -459,29 +323,18 @@ if _otr_dup is None:
 # beside it made otr_canonical list in the gallery and 404 on click (2026-09-01
 # ship audit).
 #
-# NAME ONLY WHAT SHIPS. This line used to point a first-time user at
-# `otr_4060_floor`, which the operator's 2026-09-02 ruling removed from the
-# gallery -- so the very first message a new install prints named a template
-# that is not there, which is the exact failure the paragraph above exists to
-# prevent. Verified against the PUBLISHED bundle rather than the repo, because
-# .comfyignore decides what ships. The otr_canonical.jpg gallery thumbnail was
-# deleted 2026-09-11 (operator call): the still was an 8/22-era frame grab,
-# three weeks older than the workflow it advertised. otr_story_only.json was
-# deleted 2026-09-07. The gallery lists only the directory level
-# (`*/workflows/*.json`), so on 2026-09-25 the 24 per-machine workflows moved up
-# from workflows/variants/ into workflows/ beside the canonical (operator: "we
-# can't store the variants in a subfolder") and the gallery lists every one.
+# NAME ONLY WHAT SHIPS: a first-boot message that names a template that is
+# not in the gallery is the exact failure the paragraph above exists to
+# prevent. Verify against the PUBLISHED bundle rather than the repo, because
+# .comfyignore decides what ships. The gallery lists only the directory level
+# (`*/workflows/*.json`), so every per-machine workflow sits in workflows/
+# beside the canonical, and the gallery lists every one.
 # The banner names the canonical, which runs on any machine, and points at
-# apple/MACHINES.md for the per-card pick. `otr_4060_floor` is gone altogether:
-# every machine configuration is a row in config/workflow_matrix.json since
-# 2026-09-24, and there is no row by that name. If a template is added or
-# dropped, this line changes in the same edit.
-# The banner used to end with "per the README's 'Pick the graph' table".
-# That table does not exist -- grep README.md for the phrase and it is not
-# there -- so every boot pointed every user at nothing, and the advice
-# contradicted the README besides: the canonical resolves the device at run
-# time and every dropdown already holds a working value. Say what the README
-# says, or say nothing.
+# apple/MACHINES.md for the per-card pick. Every machine configuration is a
+# row in config/workflow_matrix.json. If a template is added or dropped,
+# this line changes in the same edit.
+# Say what the README says, or say nothing: the canonical resolves the device
+# at run time and every dropdown already holds a working value.
 # The gallery keys its Extensions entry on this pack's FOLDER (ComfyUI's
 # custom_node_manager keys on the directory that holds workflows/), and
 # locales/en/main.json maps BOTH folder names -- comfyui-old-time-radio from the
@@ -510,8 +363,8 @@ if _otr_dup is None:
 
 # =====================================================================
 # HTTP route: GET /otr/latest_ledger
-# Exposes the freshest *_ledger.json from output/otr/audio/ (or the legacy
-# output/old_time_radio/ fallback) as plain JSON over ComfyUI's existing
+# Exposes the in-flight ledger (else the freshest per-episode *_ledger.json)
+# as plain JSON over ComfyUI's existing
 # HTTP server. Lets the live-run-tail Cowork artifact poll a single URL
 # without needing Desktop Commander or any MCP transport.
 # Wrapped in try/except so a server import failure cannot break node load.
@@ -578,15 +431,10 @@ try:
     @_otr_PromptServer.instance.routes.get("/otr/latest_ledger")
     async def _otr_latest_ledger(request):
         try:
-            # Ledger durability P1 (2026-05-19): the old discovery scanned
-            # hardcoded legacy-flat dirs (output/otr/audio +
-            # output/old_time_radio) that have been extinct since the S28
-            # per-episode workspace reorg, so this endpoint returned stale
-            # pre-S28 ledgers and never saw a live run. Delegate to the
-            # canonical resolver in_flight_ledger_path() -- it returns the
-            # in-flight Ledger singleton's path during a run and falls back
-            # to the per-episode mtime walker headless. Same resolver every
-            # node uses, so the endpoint can no longer desync from the real
+            # Delegate to the canonical resolver in_flight_ledger_path() -- it
+            # returns the in-flight Ledger singleton's path during a run and
+            # falls back to the per-episode mtime walker headless. Same resolver
+            # every node uses, so the endpoint cannot desync from the real
             # on-disk layout.
             try:
                 from .nodes._otr_ledger import in_flight_ledger_path
@@ -650,22 +498,13 @@ except Exception as _otr_route_err:
     print(f"[OldTimeRadio] HTTP route registration skipped: {_otr_route_err}")
 
 # =====================================================================
-# THE TWO POST RENDER-HARNESS ROUTES ARE GONE (2026-09-05).
-# `POST /otr/video_render_single` and `POST /otr/video_render_soak` read
-# caller-supplied paths out of an unauthenticated JSON body and started a
-# background GPU render, writing a report whose FILENAME came from the body's
-# `engine` field. That is the Comfy Registry's second-largest ban class
-# (`policy-v0.2: UNAUTHENTICATED_SIDE_EFFECT`) with an unconfined write inside
-# it. They had been behind `OTR_ENABLE_HTTP_RENDER_ROUTES=1`, default off, and
-# no reviewer verdict in the surveyed corpus says whether an env gate around a
-# ROUTE REGISTRATION discharges the class -- so the answer is to not ship the
-# construct rather than to argue about it.
-#
-# NOTHING SHIPPED CALLED THEM. They were a hand-built GPU-gate harness for the
-# operator to poll during development; the real render path is the canonical
-# workflow through `/prompt`, and `scripts/` (excluded from the published zip)
-# still drives the same `render_driver` entry points in-process. If a future
-# session wants the harness back, it belongs in `scripts/`, not in the module
+# NO POST ROUTE HERE MAY START WORK FROM A CALLER-SUPPLIED PATH. An
+# unauthenticated route with a side effect is the Comfy Registry ban class
+# `policy-v0.2: UNAUTHENTICATED_SIDE_EFFECT`, and no reviewer verdict says an
+# env gate around a ROUTE REGISTRATION discharges it, so the answer is not
+# to ship the construct rather than to argue about it. The real render path
+# is the canonical workflow through `/prompt`; a development render harness
+# belongs in `scripts/` (excluded from the published zip), not in the module
 # every install imports.
 # =====================================================================
 

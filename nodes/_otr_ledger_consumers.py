@@ -7,10 +7,9 @@ production-ledger dict (``{"cast": [...], "lines": [...], "meta": {...}}``)
 instead of the legacy parser-list shape (``[{"type": "dialogue",
 "content": "[VOICE: NAME, traits] text"}, ...]``).
 
-Every downstream audio/video consumer used to do
-``json.loads(script_json)`` -> iterate as a list -> regex-parse
-``[VOICE: NAME, traits]`` from a ``content`` field. That path crashes on
-the new ledger dict. This module gives those consumers a single, audited
+A consumer that does ``json.loads(script_json)`` -> iterate as a list ->
+regex-parse ``[VOICE: NAME, traits]`` from a ``content`` field crashes on
+the ledger dict. This module gives consumers a single, audited
 read surface so the parsing logic lives in one place rather than copied
 into seven node files.
 
@@ -34,11 +33,6 @@ Strict on shape, graceful on missing fields:
     gracefully (return ``{}`` / ``"UNKNOWN"`` / ``None``) on missing
     char_id so a stub ledger or a non-character line (announcer,
     music) doesn't blow up.
-
-(``production_plan_or_empty`` was deleted in voice-path-cleanbreak
-S23.6 along with its tests -- the helper was a Director-derived
-fallback with zero production consumers, in violation of standing
-directive 11.)
 
 UTF-8 no BOM. No GPU. No I/O. Safe to import anywhere.
 """
@@ -154,23 +148,14 @@ def voice_preset(ledger: dict, line: dict) -> Optional[str]:
     return cast_lookup(ledger, char_id).get("voice_preset")
 
 
-# production_plan_or_empty was removed in voice-path-cleanbreak S23.6.
-# The helper was a Director-derived fallback (parses a legacy
-# production_plan_json string) with zero production consumers per the
-# S15.5.1 audit -- directive 11 violation. Its companion tests in
-# tests/test_otr_ledger_consumers.py were removed in lockstep.
-
-
 def voice_assignments_from_cast(led: dict) -> dict:
-    """Voice-path-cleanbreak Sprint 6.2 (2026-05-12). Render-time
-    derivation of the legacy ``voice_assignments`` shape from the
+    """Render-time derivation of the ``voice_assignments`` shape from the
     canonical ``led["cast"]``.
 
-    Replaces ``meta.voice_assignments`` which Sprint 2 stamped at
-    writer-time and Sprint 6 retired. The cast contract is the only
-    source of truth for per-character voice data; persisting a
-    derived view in ``meta`` invited drift between cast.voice_preset
-    and meta.voice_assignments[name].voice_preset.
+    Nothing is persisted at ``meta.voice_assignments``: the cast contract is
+    the only source of truth for per-character voice data, and a stored
+    derived view in ``meta`` invites drift between cast.voice_preset and
+    meta.voice_assignments[name].voice_preset.
 
     Shape:
         {
@@ -181,10 +166,8 @@ def voice_assignments_from_cast(led: dict) -> dict:
           ...   # since 2026-08-24, Bark)
         }
 
-    The ``notes`` field is intentionally absent. Sprint 2 mirrored
-    character_description into both ``portrait_prompt`` (visual_plan)
-    and ``notes`` (voice_assignments); Sprint 6 retired ``notes`` --
-    ``portrait_prompt`` is the canonical character description.
+    The ``notes`` field is intentionally absent: ``portrait_prompt`` (in the
+    visual_plan) is the canonical character description.
     """
     out: dict = {}
     for c in led.get("cast") or []:

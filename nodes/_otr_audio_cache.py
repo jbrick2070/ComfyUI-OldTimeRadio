@@ -75,8 +75,8 @@ class AudioCacheRecord:
     def from_dict(cls, data: dict) -> "AudioCacheRecord":
         """Build from a (possibly forward-compatible) dict; unknown keys are
         ignored so a newer sidecar on disk never crashes an older reader, and a
-        sidecar written before a field was dropped (``allowed_for_release``,
-        retired 2026-10-08: nothing read it) still loads.
+        sidecar written before a field was dropped (``allowed_for_release``)
+        still loads.
         ``cache_key`` is required."""
         known = {f.name for f in _dc_fields(cls)}
         kwargs = {k: v for k, v in (data or {}).items() if k in known}
@@ -136,12 +136,6 @@ def record_from_request(
 # ===========================================================================
 from ._otr_resolved_request import REQUEST_SCHEMA_VERSION  # noqa: E402
 
-# LEDGER_SCHEMA_VERSION_TARGET was removed on 2026-09-24. It declared a
-# registry-path ledger schema target and had exactly one line in the repo --
-# its own assignment. No production code, no test, and no doc read it, so it
-# stated a rule that nothing enforced. Reinstating it means giving it a reader
-# in the same change; a constant is not a contract on its own.
-
 
 def needs_rerender(record, *, target_request_schema_version: str = REQUEST_SCHEMA_VERSION) -> bool:
     """True iff a cached record's request schema differs from the build target.
@@ -185,8 +179,7 @@ class FileAudioCache:
                 record = AudioCacheRecord.from_dict(json.load(fh))
         except Exception as exc:  # noqa: BLE001 -- still a miss, but NOT a silent one
             # A PRESENT-but-unparseable sidecar is the worst corruption this
-            # cache can show, and it used to be the only one that said nothing
-            # while nine lesser ones warned. `put()` publishes the sidecar LAST
+            # cache can show, so it warns. `put()` publishes the sidecar LAST
             # via os.replace precisely so its presence IS the commit signal, so
             # a garbled one means the commit marker itself is damaged -- torn
             # write, external tool, or BOM contamination from a stray

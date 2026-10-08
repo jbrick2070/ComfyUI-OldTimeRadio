@@ -2,16 +2,9 @@
 
 DETERMINISTIC Tier-A integrity gate for slot-formatted dialogue output.
 
-WHO ACTUALLY CALLS THIS, corrected 2026-08-28. The paragraph here used to say
-it was "wired into OTR_StoryRoomExtract.run" and lazily imported by that node.
-BOTH NODES IN THAT SENTENCE WERE DELETED on 2026-05-29 with the dormant Story
-Room cluster, and they now appear only in the retired-node-ID tombstone list in
-`_workflow_validation.py` so a stale workflow referencing them fails loudly.
-The module itself is very much alive -- under a different caller entirely:
-`OTR_LedgerScriptWriter` imports `evaluate_tier_a` / `normalize_slot_line`
-(`OTR_LedgerScriptWriter.py:4914-4916`) on its exchange-prepass path, via
-`_otr_compose_exchange.make_tier_a_adapter`. Nothing about the Story Room
-design survives here but the vocabulary.
+WHO CALLS THIS: `OTR_LedgerScriptWriter` imports `evaluate_tier_a` /
+`normalize_slot_line` (`OTR_LedgerScriptWriter.py:4914-4916`) on its
+exchange-prepass path, via `_otr_compose_exchange.make_tier_a_adapter`.
 
 Helper module only -- not a node, not in _NODE_MODULES, so ComfyUI never
 auto-imports it.
@@ -33,30 +26,23 @@ What it validates (Tier-A, all deterministic):
     6. DUPLICATE_SLOT       -- the same slot id appears twice.
 
 Contract assumptions (read from the live Build-1 code, see WIRING_SPEC):
-    * The Story Room writer (Build 2 task 3a) EMITS one block per voiced
+    * The dialogue writer EMITS one block per voiced
       slot in the form d001|SPEAKER: text. Exactly one ledger row per
       slot id. A block MAY contain internal pauses / multiple sentences,
       but it is ONE block terminated by the next d###| prefix or EOF
       (critique 8: one slot = exactly one committed text block).
     * The expected slot manifest is the ordered list of
       {slot_id, speaker} derived from the in-flight ledger's voiced
-      lines (dialogue_slot_id + speaker), the same ordered list
-      OTR_StoryRoomExtract already passes as voice_slot_ids and that
-      OTR_StoryRoomCommit joins on. Slot ids match d\\d{3} (d001..dNNN).
+      lines (dialogue_slot_id + speaker). Slot ids match d\\d{3}
+      (d001..dNNN).
     * Speaker is a cast name OR the literal 'ANNOUNCER' (bookends).
-      Match is case-sensitive and exact, mirroring the commit join.
+      Match is case-sensitive and exact.
 
 This module is PURE: no I/O, no GPU, no ComfyUI imports, no torch, no
 pydantic. Prose length and vocabulary never participate in the verdict.
 
 UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 4-space indentation. No profanity. SFW.
-
-PROMOTION NOTE (Build 2, 2026-05-28): `from __future__ import annotations`
-was re-added on promotion (first import below) per repo convention.
-Inside the nodes/ package the normal import path is used, so the Python
-3.10 dataclasses string-annotation resolver race that the staged
-file-path test loader hit does not apply here.
 """
 
 from __future__ import annotations

@@ -47,7 +47,7 @@ _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
     # Index 0 stays indextts2 -> byte-identical default combo.
     # cloud_elevenlabs (Comfy Credits, dropdown-opt-in) APPENDED 2026-07-03 --
     # index 0 stays the byte-identical default; a cloud pick is never automatic
-    # (C2). Renamed from ``elevenlabs`` so the CastLock label cannot be read as
+    # (C2). The ``cloud_`` prefix keeps the CastLock label from being read as
     # a local install.
     "char_voice": (
         "indextts2", "chatterbox", "bark", "kokoro", "cloud_elevenlabs",

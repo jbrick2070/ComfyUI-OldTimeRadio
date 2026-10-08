@@ -132,16 +132,10 @@ def _load_bark(model_id="suno/bark", device=None):
     # This repo runs one canonical across a CUDA 5080, a CUDA 4060 and an Apple
     # Silicon Mac, and workflows/otr_canonical.json currently stamps
     # voice_device="mps" by operator ruling while the Mac is the machine under
-    # test. Before 2026-09-07 bark IGNORED that stamp entirely and auto-picked
-    # cuda, so the mismatch was invisible on NVIDIA. Threading the stamp through
-    # (the correct fix, so a Mac finally gets its GPU) removed that accidental
-    # protection and would have made an unprofiled NVIDIA run try mps and die.
-    # Caught by the codex review lane before the operator's boxes ever saw it.
-    #
-    # So the stamp is HONOURED WHERE IT IS REAL and falls through where it is
-    # not. That is strictly safer than both the old behaviour (stamp ignored
-    # everywhere) and the naive fix (stamp obeyed blindly), and it needs no
-    # per-machine profile to keep NVIDIA working.
+    # test. Obeying that stamp blindly would make an unprofiled NVIDIA run
+    # try mps and die. So the stamp is HONOURED WHERE IT IS REAL and falls
+    # through where it is not, which needs no per-machine profile to keep
+    # NVIDIA working.
     if device is not None:
         _d = str(device).strip().lower()
         if not _d:
@@ -164,21 +158,16 @@ def _load_bark(model_id="suno/bark", device=None):
 
     # Auto-detect device: CUDA, then MPS, then CPU.
     #
-    # This line used to read `"cuda" if torch.cuda.is_available() else "cpu"`,
-    # which silently denied Apple Silicon the GPU: mps was never a candidate,
-    # so a Mac always took the CPU branch and was told "CUDA not available"
-    # about hardware it does not have.
-    #
     # MEASURED 2026-09-07 on a Mac mini M4 (torch 2.12.1) -- Bark runs on mps:
     #   mps  40.8 s -> 4.6 s of audio, spectral flatness 0.070, finite
     #   cpu  27.8 s -> 3.0 s of audio, spectral flatness 0.064, finite
     # Structured speech both ways. Note mps is NOT dramatically faster here
-    # (roughly a wash per second of audio at this model size), so the fix is
+    # (roughly a wash per second of audio at this model size), so choosing it is
     # about the selection being HONEST, not about a speed win -- and about the
-    # log line no longer blaming missing CUDA on a machine that never had any.
+    # log line not blaming missing CUDA on a machine that never had any.
     #
     # CUDA IS UNAFFECTED: cuda still wins whenever it is available, so this is
-    # purely an added branch for hosts that previously fell through to cpu.
+    # purely an added branch for hosts that would otherwise fall through to cpu.
     if device is None:
         if torch.cuda.is_available():
             device = "cuda"
@@ -567,8 +556,8 @@ def _split_long_sentence(sentence, max_len):
 def _chunk_text_for_bark(text, max_len=180):
     """Split text into Bark-friendly chunks at sentence boundaries.
 
-    B3: a SINGLE sentence longer than ``max_len`` is no longer returned whole
-    (which let bark over-generate on a runaway clause). It is split on clause
+    B3: a SINGLE sentence longer than ``max_len`` is never returned whole
+    (a runaway clause lets bark over-generate). It is split on clause
     punctuation first, then on whitespace -- never mid-word."""
     import re
     if len(text) <= max_len:
@@ -770,18 +759,13 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
     # THE DEVICE THE MODEL IS ACTUALLY ON -- resolved once, from the model
     # itself, never assumed (2026-08-25).
     #
-    # These three sites used to hardcode the literal "cuda". `_load_bark` has
-    # always been device-aware (it picks `cuda if torch.cuda.is_available()
-    # else cpu` and builds device_map/dtype from that), so on a Mac, an Intel
-    # box, or any CUDA-less install the model loaded happily on CPU and then
-    # the FIRST spoken line raised here. Nothing gated it either: the
-    # CAPABILITIES row declares bark `device_backends: ["cuda"]`, but that
-    # table feeds capability_profiles to derive per-profile enable-sets and is
-    # NOT consulted at voice dispatch -- `registry.assert_usable` only checks
-    # "registered + role-compatible". So a stranger who picked bark (the
-    # zero-setup announcer/char engine, which is exactly what a fresh install
-    # reaches for) walked into an AssertionError mid-render, after the story,
-    # the casting and every still had already been paid for.
+    # `_load_bark` is device-aware (it picks the device and builds
+    # device_map/dtype from that), and nothing else gates a CUDA-less install:
+    # the CAPABILITIES table feeds capability_profiles to derive per-profile
+    # enable-sets and is NOT consulted at voice dispatch --
+    # `registry.assert_usable` only checks "registered + role-compatible". A
+    # hardcoded "cuda" here would raise on the FIRST spoken line, after the
+    # story, the casting and every still had already been paid for.
     #
     # Asking the model is the right source: `_load_bark` does `model.to(device)`
     # and forces every sub-model to the same device, so the parameters are

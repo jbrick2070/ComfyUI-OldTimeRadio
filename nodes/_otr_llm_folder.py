@@ -1,8 +1,8 @@
 """Where the writer LLM lives as REAL FILES -- the ComfyUI ``LLM`` model folder.
 
 WHY THIS EXISTS (operator, 2026-09-25: "real folder", "what's best practice").
-The writer used to download through ``snapshot_download(cache_dir=...)`` into
-the Hugging Face hub cache, whose ``blobs`` + ``snapshots`` layout is built from
+Downloading through ``snapshot_download(cache_dir=...)`` into the Hugging Face
+hub cache gives a ``blobs`` + ``snapshots`` layout that is built from
 symlinks. On Windows without Developer Mode that prints a warning on every first
 download and can duplicate multi-GB files, and the cache sits somewhere a
 ComfyUI user never looks. Well-behaved ComfyUI packs keep model weights in a

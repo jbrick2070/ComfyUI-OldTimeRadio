@@ -8,8 +8,8 @@ portable ship, while the saved dropdown value is the one string "kokoro" on ever
 machine. So the ENGINE keeps its name, its voice ids, its ledger contract and its
 per_line interface, and only the synthesis call differs:
 
-* ``TorchKokoroBackend`` -- the code that ran before 2026-09-02, moved here
-  VERBATIM (one ``KPipeline(text, voice=..., speed=..., split_pattern=r"\\n+")``
+* ``TorchKokoroBackend`` -- the original engine code, VERBATIM (one
+  ``KPipeline(text, voice=..., speed=..., split_pattern=r"\\n+")``
   call over the full line). The RTX 5080's 3.12 venv keeps selecting it and its
   output is byte-identical to the pre-change engine; that is proven by sha256,
   not asserted (a 5080 torch-baseline sha256 receipt from 2026-09-02).

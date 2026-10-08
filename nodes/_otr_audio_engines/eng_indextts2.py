@@ -78,9 +78,8 @@ def _default(*parts):
 
 #: Emotion-blend strength when ``OTR_INDEXTTS2_EMO_ALPHA`` is unset or unusable.
 #:
-#: PINNED AT 1.0 AND NO LONGER A TUNING KNOB (2026-08-18). It went 1.0 -> 0.4 on
-#: the voice-identity fix, when two knobs shared one job; the ceiling below now
-#: owns that job alone, so alpha is a pass-through on the default path -- at
+#: PINNED AT 1.0, NOT A TUNING KNOB (2026-08-18): the ceiling below owns the
+#: emotion budget alone, so alpha is a pass-through on the default path -- at
 #: exactly 1.0 :meth:`IndexTTS2Engine._apply_vendor_alpha` short-circuits and
 #: the vendor's pre-scaling does nothing.
 #:
@@ -163,10 +162,10 @@ class IndexTTS2Engine:
     requires_flag = None             # default engine -> always usable; venv/weights checked in load()
     interface = "per_line"
     sample_rate = 22050
-    # Model-agnostic dispatch metadata (replaces the old _OTR_CLONE_ENGINES
-    # tuple): a clone engine needs a per-character reference WAV. NO-FALLBACK
-    # (operator 2026-07-03): a char_voice line with no usable ref now FAILS LOUD
-    # (named EngineUnusable in the dispatch) -- it never silently renders on bark.
+    # Model-agnostic dispatch metadata: a clone engine needs a
+    # per-character reference WAV. NO-FALLBACK (operator 2026-07-03): a
+    # char_voice line with no usable ref FAILS LOUD (named EngineUnusable in
+    # the dispatch) -- it never silently renders on bark.
     requires_voice_ref = True
     voice_ref_kind = "wav_path"
     missing_ref_fallback = None
@@ -317,13 +316,10 @@ class IndexTTS2Engine:
         :data:`EMO_ALPHA_DEFAULT`. Read per render so a long-running server
         picks up env changes.
 
-        THE DEFAULT WENT 1.0 -> 0.4 -> 1.0, AND THAT IS NOT A ROUND TRIP TO
-        WHERE IT STARTED. The voice-identity fix dropped it to 0.4 while alpha
-        and the ceiling shared one job; the ceiling now owns that job alone at
-        0.56, so alpha returns to 1.0 as a pass-through and the emotion budget
-        has exactly one owner. The pre-fix build was alpha 1.0 with NO ceiling,
-        which is a different thing entirely -- it spent the vector's whole sum
-        and left nothing of the speaker.
+        THE DEFAULT IS 1.0, A PASS-THROUGH: the ceiling (0.56) owns the
+        emotion budget alone, so the budget has exactly one owner. Alpha 1.0
+        with NO ceiling would spend the vector's whole sum and leave nothing
+        of the speaker.
 
         So this is a DIAGNOSTIC override now, not a taste control. Turning it
         down still works and still keys, which is what a control arm needs; it
@@ -517,9 +513,7 @@ class IndexTTS2Engine:
         ``models/TTS/refs/...``). Resolve to an absolute path the isolated worker
         can open regardless of its own cwd.
 
-        DELEGATES to the ONE shared resolver (Lemmy chunk B). This used to be a
-        private copy that tried a single candidate, so it could miss a reference
-        the voice node's own broader check had just confirmed exists."""
+        DELEGATES to the ONE shared resolver (Lemmy chunk B)."""
         from .base import resolve_voice_ref_path
         return resolve_voice_ref_path(ref)
 

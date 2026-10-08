@@ -142,9 +142,8 @@ value. No KeyError on either side.
 # The show prefix every archival episode id carries (`signal_lost_<title>_<ts>`).
 # Spelled ONCE, here: `otr_master_audio_mux._obs_basename` strips it to build
 # the published (watching) name, and `_published_obs_path` below must accept
-# that name for this episode. PBUG-20260904-06 was the two disagreeing -- the
-# validator demanded the prefix the publisher had just removed, so every
-# `meta.paths.obs_final` since the rename pointed at a file that did not exist.
+# that name for this episode. The two disagreeing (PBUG-20260904-06) leaves
+# `meta.paths.obs_final` pointing at a file that does not exist.
 SHOW_PREFIX = "signal_lost_"
 
 GATE_HASH_BYTES = 1024
@@ -469,8 +468,8 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
     Cleanup: any partial temp file is unlinked on failure.
     """
     try:
-        # STAMP THE CURRENT VERSION, OR PRESERVE A FOREIGN ONE. This used to
-        # restamp unconditionally, which is only safe while nothing older is
+        # STAMP THE CURRENT VERSION, OR PRESERVE A FOREIGN ONE. Restamping
+        # unconditionally is only safe while nothing older is
         # ever written back -- and post-hoc tools do exactly that over
         # EXISTING episodes (audio_enhance, otr_master_audio_mux, scene_sequencer, otr_video_render_batch,
         # otr_post_upscale_procgen_blend). A read-only corpus measurement found
@@ -579,8 +578,8 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
 def in_flight_ledger_path() -> Optional[Path]:
     """Return the in-flight Ledger singleton's on-disk path.
 
-    BUG-LOCAL-021 (Phase G, 2026-05-03): replaces ``find_most_recent_ledger``
-    for in-flight write-back paths. The mtime walker can return a stale
+    BUG-LOCAL-021 (Phase G, 2026-05-03): in-flight write-back paths use this
+    rather than ``find_most_recent_ledger``. The mtime walker can return a stale
     leftover ledger across queue boundaries (proven by the FLUX radio
     bookend stamping to a 6-day-old episode on the 2026-05-02 soak). The
     in-flight singleton's ``path`` property advances correctly through
@@ -642,8 +641,7 @@ def in_flight_ledger_path() -> Optional[Path]:
             from . import _otr_paths as _P
         except ImportError:
             import _otr_paths as _P  # type: ignore
-        # S28 cleanbreak: dropped _P.otr_legacy_audio_dir() — per-episode
-        # workspace is the only contract; legacy flat audio dir is extinct.
+        # The per-episode workspace is the only contract (no flat audio dir).
         return find_most_recent_ledger([_P.otr_episodes_root()])
     except Exception as exc:  # noqa: BLE001
         log.warning("[OTR_Ledger] fallback mtime walker failed: %s", exc)
@@ -659,21 +657,15 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
       layout, post 2026-05-02 EVENING reorg -- see
       ``otr_episodes_root()`` in ``_otr_paths``)
 
-    BUG-LOCAL-103 (2026-04-29 morning): we used to filter out
-    ``pending_*_ledger.json`` here, which silently broke every
-    audio-node ledger write. BatchBark / SceneSequencer /
-    AudioEnhance / EpisodeAssembler all run while the ledger is
-    still ``pending_<title>_ledger.json`` (LLMScriptWriter creates
-    the pending file; SignalLostVideo renames it once the audio
-    title is finalized). Filtering pending_* meant those four
-    nodes' write-backs no-op'd because they couldn't find the
-    in-flight ledger. Fix: include pending_* in the glob; mtime
-    sort still prefers the newest, so a renamed canonical ledger
-    naturally wins after rename.
-
-    S28 cleanbreak retired the legacy flat-layout walk
-    (``<dir>/*_ledger.json``) — the per-episode workspace glob is
-    the only contract.
+    BUG-LOCAL-103 (2026-04-29 morning): ``pending_*_ledger.json`` files are
+    INCLUDED in the glob. BatchBark / SceneSequencer / AudioEnhance /
+    EpisodeAssembler all run while the ledger is still
+    ``pending_<title>_ledger.json`` (LLMScriptWriter creates the pending
+    file; SignalLostVideo renames it once the audio title is finalized), so
+    filtering pending_* would make those four nodes' write-backs no-op
+    because they could not find the in-flight ledger. mtime sort still
+    prefers the newest, so a renamed canonical ledger naturally wins after
+    rename.
     """
     candidates: list[Path] = []
     for d in audio_dirs:
@@ -681,9 +673,6 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
             d = Path(d)
             if not d.exists():
                 continue
-            # S28 cleanbreak: dropped flat-layout walk
-            # `candidates.extend(d.glob("*_ledger.json"))`. Per-episode
-            # workspace is the only contract.
             # Per-episode workspace layout (post 2026-05-02 EVENING):
             # ledgers under <dir>/<episode_id>/audio/*_ledger.json.
             # OH-1 (output-tree contract 2026-06-11): SKIP `_`-prefixed
@@ -756,14 +745,11 @@ def patch_line_text(
 # Per-line audio render metadata (BUG-LOCAL-030 audit-completion, 2026-05-03 EVENING)
 # ---------------------------------------------------------------------------
 #
-# Adds explicit forensic provenance for every per-line audio render
-# (Bark / Kokoro / MusicGen / AudioGen) to the ledger. Closes the audit
-# gap surfaced by the artifacts-grid review: previously only Bark
-# stamped per-line metadata (text_for_tts + bark_render_ms); the other
-# three TTS/audio engines either stamped nothing per-line (Kokoro) or
-# stamped only the render-result wav path (MusicGen, AudioGen).
+# Explicit forensic provenance for every per-line audio render
+# (Bark / Kokoro / MusicGen / AudioGen) in the ledger, so an audit can see
+# which engine, voice and render produced each line.
 #
-# Five new per-line fields any audio node can stamp:
+# Five per-line fields any audio node can stamp:
 #   - tts_engine       : "bark" | "kokoro" | "musicgen" | "audiogen"
 #   - voice_preset     : the voice/instrument slot used
 #   - render_ms        : wall-clock generation time
@@ -1018,63 +1004,12 @@ def append_transition(
         log.warning("[OTR_Ledger] append_transition failed: %s", exc)
 
 
-# ---------------------------------------------------------------------------
-# l3-2026-05-08: BUG-126 telemetry helpers
-# ---------------------------------------------------------------------------
-#
-# All helpers below are best-effort and never raise. Callers (HuMo
-# loop, audit script, etc.) MUST be able to call these from
-# recovery paths without escalating the fault.
-
-
-# `VALID_RENDER_METHODS` and `_find_line` went with the eleven stampers above
-# (2026-08-28). Both existed ONLY to serve them -- the vocabulary validated a
-# render-method field nothing stamped any more, and the line lookup was the
-# helper those per-line stampers shared. Orphaned by the same removal, which
-# is why a dead-symbol sweep has to be iterative: cutting callers is what makes
-# their helpers visible.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ---------------------------------------------------------------------------
-# l3-2026-05-08: Cast Contract pre-wiring helpers (Phase 0+ §1+§2+§3)
-# ---------------------------------------------------------------------------
-#
-# These helpers were pre-wired so the ledger schema would align with a cast
-# contract module. THE WIRES NEVER LANDED: the orchestrator hooks that were to
-# call them do not exist, and `nodes/_otr_cast_contract.py` /
-# `_otr_cast_repair.py` were DELETED as unadopted prototypes (lean-mean,
-# 2026-08-23). The live cast path is `nodes/_otr_casting.lock_cast` via
-# `nodes/cast_lock.py`.
-#
-# The helpers below are KEPT because they are harmless ledger-field stampers and
-# removing them is a separate schema decision, not a dead-code one -- but read
-# them as unused pre-wiring, not as an active contract.
-#
-# The rule they were written under is still worth keeping, because it is about
-# CONTENT ADDRESSING and would apply to any future version sha: compute it from
-# the canonical roster ONLY. It must never include the l3-2026-05-08 telemetry
-# fields (process_runs, audit_verdict, cuda_hard_reset_count, soak_cap, ...),
-# or content addressing breaks across otherwise-identical resumes.
-
-
-
-
-
-
-
-
+# Content addressing: any cast-contract version sha must be computed from the
+# canonical roster ONLY. It must never include the telemetry fields
+# (process_runs, audit_verdict, cuda_hard_reset_count, soak_cap, ...), or
+# content addressing breaks across otherwise-identical resumes. The live cast
+# path is `nodes/_otr_casting.lock_cast` via `nodes/cast_lock.py`
+# (meta.cast_contract, written by OTR_LedgerScriptWriter, read by cast_lock).
 
 
 __all__ = [
@@ -1092,19 +1027,4 @@ __all__ = [
     "set_meta",
     "record_phase_ms",
     "append_transition",
-    # l3-2026-05-08 Cast Contract pre-wiring
 ]
-
-# ELEVEN ZERO-CALL LEDGER STAMPERS WERE REMOVED 2026-08-28:
-# patch_clip_fields, bump_line_oom_recovery_count,
-# stamp_line_render_method, stamp_clip_humo_oom_recovered,
-# bump_meta_cuda_hard_reset_count, stamp_meta_soak_cap,
-# append_meta_process_run, stamp_cast_contract_version,
-# stamp_cast_contract, stamp_line_cast_contract_version and
-# stamp_cast_voice_spec. Every one was exported in __all__ and called by
-# NOTHING -- not this package, not scripts/, not tests/. One of them
-# (stamp_line_cast_contract_version) documented a consumer in
-# production_ledger that does not read cast_contract at all. Membership
-# of __all__ is not a caller, and a stamper nobody calls writes no
-# receipt. The LIVE cast-contract path is meta.cast_contract, written by
-# OTR_LedgerScriptWriter and read by cast_lock.

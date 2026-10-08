@@ -26,9 +26,7 @@ Cascade ADR).
 Schema mapping (ADR §6.16 reality-check vs L3 ledger):
     ADR §6.16 references `sfx_cues` / `music_cues` (plural lists) on
     each line. The live L3 schema has a top-level `music` list on the
-    ledger root. The legacy top-level `sfx` list was deleted in S26
-    (CD-3), and the whole sfx subsystem (the `sfx` speaker-role +
-    `sfx_cue` field) followed 2026-07-01 (rip-sfx-broll). The
+    ledger root and no `sfx` list, `sfx` speaker-role or `sfx_cue` field. The
     null-rejection invariants here apply to the fields that actually
     exist:
 
@@ -99,9 +97,9 @@ except Exception:  # pragma: no cover -- defensive fallback
 
 # Allowed values for line.speaker_role. Drawn from
 # `_otr_ledger_reviewer._ALLOWED_SPEAKER_ROLES`; kept local so this
-# module does not import the reviewer. "sfx" REMOVED 2026-07-01
-# (rip-sfx-broll): an old ledger carrying speaker_role="sfx" now
-# fails the per-line invariant as a hard ERROR (Phase 10 raises).
+# module does not import the reviewer. "sfx" is NOT allowed: a ledger
+# carrying speaker_role="sfx" fails the per-line invariant as a hard ERROR
+# (Phase 10 raises).
 ALLOWED_SPEAKER_ROLES: frozenset[str] = frozenset({
     "character",
     "announcer",
@@ -136,9 +134,8 @@ _REQUIRED_TOP_LEVEL_LISTS: tuple[str, ...] = (
     "beats",
     "scenes",
     "shots",
-    # S26-A3: legacy top-level "sfx" list removed from schema; the
-    # whole sfx subsystem followed 2026-07-01 (rip-sfx-broll) -- a
-    # speaker_role="sfx" line is now an invariant ERROR.
+    # The schema has no top-level "sfx" list; a speaker_role="sfx" line is an
+    # invariant ERROR.
     "music",
     "clips",
 )
@@ -290,10 +287,8 @@ def _check_per_line_invariants(
     info["line_count"] = len(lines)
 
     # Build the set of valid beat ids from top-level beats.
-    # S28 cleanbreak: dropped the meta.outline.beats walk that was a
-    # back-compat fallback for caller-shaped ledgers (pre-D-inversion,
-    # pre-2026-05-10). OTR_LedgerScriptWriter always stamps top-level
-    # `ledger["beats"]` from the outline pass.
+    # OTR_LedgerScriptWriter always stamps top-level `ledger["beats"]` from the
+    # outline pass.
     valid_beat_ids: set[str] = set()
     top_beats = ledger_data.get("beats")
     if isinstance(top_beats, list):
@@ -353,11 +348,9 @@ def _check_per_line_invariants(
                 )
             tsr = ln.get("tts_skip_reason")
             if not isinstance(tsr, str) or not tsr:
-                # S28 cleanbreak: promoted warning -> error. Phantom-skip
-                # and reviewer-skip both stamp tts_skip_reason on every
-                # production path. The pre-S28 warn-only tolerance for
-                # "some legacy fallbacks set skip without the reason"
-                # is extinct under Rule A + Rule B (uniform shape).
+                # A skip without tts_skip_reason is an ERROR: phantom-skip and
+                # reviewer-skip both stamp tts_skip_reason on every production
+                # path (Rule A + Rule B, uniform shape).
                 errors.append(
                     f"line_id={line_id!r} skip=True but tts_skip_reason "
                     f"empty/missing (writer contract violation; every "
@@ -430,15 +423,12 @@ def _check_per_line_invariants(
 def cast_coverage_gaps(ledger_data: dict) -> list[tuple[str, str]]:
     """Non-announcer cast rows referenced by zero non-skipped lines.
 
-    ``(char_id, name)`` pairs, in CAST ORDER. Extracted from
-    ``_check_per_cast_invariants`` (PBUG-20260802-02's universal backstop) so
-    a REPAIR pass can find the same gaps one stage earlier -- before the
-    freeze gate has to refuse -- without a second, drifting implementation of
-    "what counts as coverage". Iterating ``cast`` in its own order rather than
-    the set the inline check used to walk is a harmless correctness fix, not
-    a behavior change: the SET of gaps is identical either way, and the
-    freeze gate's pass/fail verdict only ever depended on whether that set
-    was empty.
+    ``(char_id, name)`` pairs, in CAST ORDER. Shared by
+    ``_check_per_cast_invariants`` (PBUG-20260802-02's universal backstop) and
+    a REPAIR pass, so the repair finds the same gaps one stage earlier --
+    before the freeze gate has to refuse -- without a second, drifting
+    implementation of "what counts as coverage". The freeze gate's pass/fail
+    verdict only depends on whether that set of gaps is empty.
     """
     cast = ledger_data.get("cast")
     if not isinstance(cast, list) or not cast:
@@ -480,11 +470,10 @@ def _check_per_cast_invariants(
     char_id / name / traits / voice_preset present and non-empty;
     each char_id is referenced by ≥ 1 non-skipped line.
 
-    THE ANNOUNCER-ONLY ESCAPE HATCH IS GONE (operator ruling 2026-08-19).
-    This checked ``meta.announcer_only_fallback`` to let an empty cast through
-    -- but nothing in production ever wrote that key, so the hatch could never
-    open and an empty cast has always failed here. Removing it changes no
-    behaviour; it removes a branch that read as a supported path and was not.
+    THERE IS NO ANNOUNCER-ONLY ESCAPE HATCH (operator ruling 2026-08-19): an
+    empty cast fails here, and no ``meta.announcer_only_fallback`` key lets it
+    through -- nothing in production writes one, so such a branch would read as
+    a supported path and not be.
     """
     cast = ledger_data.get("cast")
     if not isinstance(cast, list):
@@ -541,17 +530,10 @@ def _check_per_cast_invariants(
         # _assert_unique_bark_voices, engine-conditional on tts_model) are
         # the real, post-assignment gate for a Bark-delivered announcer.
         # Empty / None / non-v2 preset is a writer contract violation.
-        # S28 cleanbreak: dropped the "promoted from the legacy
-        # WARN-fallback (tts_model / speaker_role substitutes) which
-        # was a back-compat shim" framing — that retirement happened
-        # in voice-path-cleanbreak Gate 2 and the shim is long gone;
-        # the comment was carrying forensic history that's now in the
-        # git log instead.
-        # ONE predicate, shared with the pre-mint voice gate. These two layers
-        # disagreed for a few hours on 2026-08-02 -- the gate matched
-        # name-or-role, this matched char_id-or-name -- so a row with
-        # role="announcer" and any other name passed the gate and then hard-
-        # failed HERE for owning no line under its own roster id.
+        # ONE predicate, shared with the pre-mint voice gate: if the two layers
+        # matched differently (name-or-role vs char_id-or-name), a row with
+        # role="announcer" and any other name would pass the gate and then hard-
+        # fail HERE for owning no line under its own roster id.
         from ._otr_cast_voice_coverage import is_announcer_cast_row
         is_announcer = is_announcer_cast_row(row)
         if is_announcer:
@@ -567,9 +549,9 @@ def _check_per_cast_invariants(
             voice_preset = row.get("voice_preset")
             if not voice_preset:
                 # Sprint 2 (a): bark voice_preset is assigned by OTR_CastLock
-                # AFTER this freeze (the writer no longer stamps it), so an empty
+                # AFTER this freeze (the writer does not stamp it), so an empty
                 # preset here is EXPECTED, not a contract violation. WARN only --
-                # CastLock's exit invariant is the hard gate now.
+                # CastLock's exit invariant is the hard gate.
                 warnings.append(
                     f"cast[{idx}] (char_id={char_id!r}) has no voice_preset yet "
                     f"(assigned by OTR_CastLock post-freeze)"
@@ -608,13 +590,12 @@ def _check_per_cast_invariants(
         if char_id in announcer_ids:
             # The announcer CAST row carries a roster id (c01) while its LINES
             # carry the sentinel "announcer" (production_ledger.py:114-139) --
-            # so a raw-id comparison can never mark it referenced. The old
-            # `char_id == "announcer"` skip matched no real cast row, which
-            # meant this check WARNED on c01 for every episode ever frozen,
-            # into a warning list nobody reads. Match the row by NAME, credit
+            # so a raw-id comparison can never mark it referenced (a
+            # `char_id == "announcer"` skip matches no real cast row and would
+            # WARN on c01 for every episode). Match the row by NAME, credit
             # it via the sentinel, and keep the no-announcer-lines case a
-            # WARNING (the original comment's "the writer chose not to use
-            # it" is a legitimate episode shape; a mime CHARACTER is not).
+            # WARNING ("the writer chose not to use it" is a legitimate episode
+            # shape; a mime CHARACTER is not).
             if not announcer_voiced:
                 warnings.append(
                     f"cast char_id={char_id!r} (ANNOUNCER) has no non-skipped "
@@ -685,13 +666,8 @@ def _check_meta_invariants(
         elif val == "":
             warnings.append(f"meta.{key} is empty string")
 
-    # Style-engine consolidation (2026-07-05): meta.gen_params_initial.style
-    # (and the whole gen_params_initial style/style_combo/style_custom/
-    # style_source quartet) is DELETED along with the retired resolver --
-    # this block used to validate that field's slug shape (S25/MG-6
-    # BUG-LOCAL-216, relaxed BUG-LOCAL-240) and is removed with it. The
-    # canonical `meta.style` (already checked above) is the only surviving
-    # style record now, derived from meta.story_contract.slug.
+    # The canonical `meta.style` (already checked above) is the only style
+    # record, derived from meta.story_contract.slug.
 
     # Phase-history bucket lists (B6 split, 2026-05-12). Optional
     # at Phase 0; present-as-list at Phase 10. Validate-when-present
@@ -735,12 +711,6 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g8_line_id_uniqueness(
             ledger_data, report.errors, report.warnings,
         )
-        # G9 (terminal spoken-safety) was REMOVED 2026-08-05 (operator
-        # directive: no violence or swearing guardrails on generated episodes).
-        # It rejected an episode outright when a delivered row kept a word from
-        # the profanity / weapon / sexual list -- so a faithful MACBETH failed
-        # the freeze on "dagger". It wrote no ledger field; it only appended to
-        # report.errors, so nothing downstream loses an owner by its removal.
         _check_g14_provenance_publish(
             ledger_data, report.errors, report.warnings,
         )
@@ -750,10 +720,8 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
     return report
 
 
-# G9 (terminal spoken-safety) was DELETED 2026-08-05 -- operator directive, no
-# content guardrails on generated episodes. The gate code number is retired
-# rather than reused, so an old ledger or log mentioning "G9:" stays readable.
-
+# Gate code G9 is retired and not reused, so an old ledger or log mentioning
+# "G9:" stays readable.
 
 
 # G14 PROVENANCE PUBLISH GATE (v4 campaign P1(viii)). Operator decision
@@ -763,14 +731,14 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
 # 2026-08-04, and inert elsewhere. Only the research_only status blocks;
 # public_domain_us / cc0 / licensed / synthetic all pass.
 #
-# G14 IS NOW A WARNING, AND THE RULE IS STRONGER FOR IT (2026-08-15, build
-# contract D5a). This used to append to `errors`, which at Phase 10 means
-# FreezeAssertionError -- so the rule was realised by DESTROYING a finished
-# render. The episode had already been written, cast, voiced, rendered and
-# muxed; it died at the freeze and the operator was left with nothing, not even
-# the archival copy a research-only source is actually cleared for. That is the
-# Law 7 violation ("a render must not die"; structural refusal belongs BEFORE
-# generation), and the freeze is long past generation.
+# G14 IS A WARNING, AND THE RULE IS STRONGER FOR IT (2026-08-15, build
+# contract D5a). Appending to `errors` would mean FreezeAssertionError at
+# Phase 10 -- the rule realised by DESTROYING a finished render. The episode
+# has already been written, cast, voiced, rendered and muxed; dying at the
+# freeze would leave the operator with nothing, not even the archival copy a
+# research-only source is actually cleared for. That is the Law 7 violation
+# ("a render must not die"; structural refusal belongs BEFORE generation),
+# and the freeze is long past generation.
 #
 # The block now lands where publication happens. `_otr_publication_eligibility`
 # is the ONE producer of the durable verdict -- stamped by Phase 10 below, from
@@ -882,10 +850,9 @@ def _check_g15_scene_coherence(
         )
 
 
-# G7 (SFX per-cue dur_s bounds) DELETED 2026-07-01 (rip-sfx-broll):
-# the sfx speaker-role no longer exists, so there are no sfx lines to
-# bound. An old ledger carrying speaker_role="sfx" now fails the
-# per-line invariant (ALLOWED_SPEAKER_ROLES) as a hard ERROR instead.
+# Gate code G7 (SFX per-cue dur_s bounds) is retired and not reused: a ledger
+# carrying speaker_role="sfx" fails the per-line invariant
+# (ALLOWED_SPEAKER_ROLES) as a hard ERROR.
 
 
 # G8 line_id uniqueness. Phase 0 collect / Phase 10 raise.

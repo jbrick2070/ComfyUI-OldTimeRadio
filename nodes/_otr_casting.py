@@ -11,25 +11,20 @@ See `spaces/.../memory/project_cast_contract_architecture_target.md`
 and `spaces/.../memory/project_llm_agnostic_design_constraint.md`
 for the full architectural spec.
 
-Sprint 3D -- three-stage split. Casting used to be ONE LLM call per
-open character that produced character_description + gender +
-voice_preset together: the LLM picked the voice and there was no
-Python-side global gender/timbre/role balance, only a static prompt
-line "~40% male / ~40% female / ~20% other". Sprint 3D moves balance
-and voice selection out of the LLM:
+Sprint 3D -- three-stage split. Casting is ONE description-only LLM call per
+open character; gender/timbre/role balance and voice selection are Python's
+job, not the LLM's (there is no static "~40% male / ~40% female / ~20% other"
+prompt line):
 
   1. precompute_ensemble_slots -- PURE PYTHON. Decides the whole
      ensemble's gender / timbre / role distribution up front. Python
      owns balance now, not the LLM.
   2. llm_write_description -- the LLM writes ONLY the prose character
-     description for one slot. It no longer picks gender or voice.
+     description for one slot. It picks neither gender nor voice.
   3. python_assign_voice_preset -- PURE PYTHON. Picks the voice preset
      from the pre-filtered pool by gender + timbre, per slot.
 
-Net effect: voice selection and gender/timbre/role balance leave the
-LLM; the LLM's per-character job shrinks to description-only. The
-total LLM call count is unchanged-or-lower -- still at most one call
-per open character, and no extra call site is added.
+At most one LLM call per open character; no extra call site is added.
 
 Voice collisions remain impossible by construction: Python pre-filters
 `available_voices = full_pool - taken_voices` before each slot, and
@@ -197,8 +192,8 @@ class DescriptionResponse(BaseModel):
 class CastingResponse(BaseModel):
     """Assembled casting result for one open character.
 
-    Sprint 3D: this is no longer a raw LLM-response shape. The LLM
-    now produces only `character_description` (see DescriptionResponse);
+    Sprint 3D: this is not a raw LLM-response shape. The LLM produces
+    only `character_description` (see DescriptionResponse);
     `gender` is decided by precompute_ensemble_slots and `voice_preset`
     by python_assign_voice_preset, both pure Python. cast_one_character
     composes the three stages and returns this combined object so the
@@ -216,13 +211,11 @@ class CastingResponse(BaseModel):
     # F5 (story-engine v1): speech register/signature, assembled from the
     # description call. Optional (default "") -> backfilled to "plain spoken".
     speech_signature: str = ""
-    # Sprint 2 (a): voice_preset is no longer assigned by the writer -- OTR_CastLock
-    # replays the picker and stamps it after the freeze. cast_one_character leaves
-    # it EMPTY, so the field allows "" (was min_length=3).
-    # VC chunk 2 (2026-06-22): cap 80 -> 255. The two-lane identity contract lets
-    # this field carry a verbose voice_ref_id (cloner id) in addition to a short
-    # bark v2/* preset; a deeply-named clone reference can exceed 80 chars. The cap
-    # is a runaway guard, not a content target.
+    # voice_preset is assigned by OTR_CastLock, not the writer -- it replays
+    # the picker and stamps it after the freeze. cast_one_character leaves it
+    # EMPTY, so the field allows "". The two-lane identity contract lets this
+    # field carry a verbose voice_ref_id (cloner id) in addition to a short
+    # bark v2/* preset; a deeply-named clone reference can exceed 80 chars.
     voice_preset: str = ""
 
     @field_validator("gender")
@@ -290,10 +283,9 @@ class CastValidationLLMError(CastingFailedError):
 # ---------------------------------------------------------------------------
 # JSON extraction
 # ---------------------------------------------------------------------------
-# The naive first-'{'-to-last-'}' extractor was removed in the
-# BUG-LOCAL-261 consolidation. Cast JSON is now parsed via the shared
-# _otr_json.parse_first_json_object, which takes the first complete
-# object and tolerates a trailing second object / prose.
+# Cast JSON is parsed via the shared _otr_json.parse_first_json_object, which
+# takes the first complete object and tolerates a trailing second object /
+# prose.
 
 
 # ---------------------------------------------------------------------------
@@ -319,9 +311,9 @@ def _build_user_prompt(
     Sprint 3D: the LLM writes ONLY the prose character description.
     Python has already decided this slot's gender / timbre / role
     (precompute_ensemble_slots); those are handed to the LLM as fixed
-    facts to write into, NOT choices to make. The 'Voices:' block and
-    the 'Aim ~40/40/20' balance line are gone -- voice selection and
-    ensemble balance are now pure-Python concerns.
+    facts to write into, NOT choices to make. The prompt carries no
+    'Voices:' block or 'Aim ~40/40/20' balance line -- voice selection and
+    ensemble balance are pure-Python concerns.
 
     Layout (every line except 'Cast so far' is mandatory; the cast-
     so-far block is omitted entirely when prior_cast is empty):
@@ -495,8 +487,8 @@ def _format_prior_entry(row: dict) -> str:
 # Sprint 3D Stage 1 -- precompute_ensemble_slots (PURE PYTHON)
 #
 # Python owns the ensemble gender / timbre / role distribution. The LLM
-# no longer makes any of these choices; it only writes prose into the
-# facts Python has fixed.
+# makes none of these choices; it only writes prose into the facts Python
+# has fixed.
 # ---------------------------------------------------------------------------
 
 
@@ -580,8 +572,8 @@ def _plan_gender_distribution(
     near target -- not just the open slots in isolation.
 
     Pure Python, deterministic for a given (count, prior_genders, rng).
-    This is the balance the old static prompt line only *asked* the LLM
-    to honour; Python now enforces it.
+    This is the balance a static prompt line could only *ask* the LLM
+    to honour; Python enforces it.
     """
     if count <= 0:
         return []
@@ -717,10 +709,9 @@ def precompute_ensemble_slots(
     """Stage 1: decide the whole ensemble's gender / timbre / role
     distribution up front. PURE PYTHON -- no LLM.
 
-    Sprint 3D: this is where ensemble balance now lives. Previously the
-    LLM was merely *asked* (a static "~40% male / ~40% female / ~20%
-    other" prompt line) to honour a split it had no global view of.
-    Python now decides it deterministically:
+    Sprint 3D: this is where ensemble balance lives. A static "~40% male /
+    ~40% female / ~20% other" prompt line cannot enforce a split the LLM has
+    no global view of, so Python decides it deterministically:
 
       * gender -- largest-remainder allocation of the 40/40/20 split
         across the open slots, offset by the genders the prior cast
@@ -811,12 +802,12 @@ def llm_write_description(
     """Stage 2: the LLM writes ONLY the prose description for one slot.
 
     Sprint 3D: this is the lone LLM call in the casting pipeline. It
-    used to also pick gender and voice_preset; those have moved to
+    picks neither gender nor voice_preset; those belong to the
     pure-Python stages (precompute_ensemble_slots and
-    python_assign_voice_preset). The call still routes through the
+    python_assign_voice_preset). The call routes through the
     shared `structured_call` retry ladder (base -> structural retry ->
-    typed repair); the schema is now `DescriptionResponse` (one field),
-    so the voice-pool post_validator is gone -- there is no voice for
+    typed repair); the schema is `DescriptionResponse` (one field),
+    so there is no voice-pool post_validator -- there is no voice for
     the LLM to get wrong.
 
     `max_attempts=1` is allowed (single-shot, no retry). `0` is not.
@@ -1121,8 +1112,8 @@ def cast_one_character(
 
     # Sprint 2 (a): bark voice_preset is assigned by OTR_CastLock AFTER the
     # freeze (replay_voice_assignment -- byte-identical to this picker), NOT
-    # here. The writer no longer stamps it; it stays empty through the writer +
-    # the freeze and is filled at cast-lock.
+    # here. It stays empty through the writer + the freeze and is filled at
+    # cast-lock.
     voice_preset = ""
 
     response = CastingResponse(
@@ -1506,17 +1497,11 @@ def assemble_pre_locked_rows(
 
     # 2. LEMMY: ONE DECISION FUNCTION, NOT A SECOND COPY OF THE RULE.
     #
-    # This block used to re-implement `resolve_lemmy_cameo` inline -- the same
-    # three branches in the same order (fidelity exclusion, then the natural
-    # roll, then the forced knob), deciding the same thing from the same
-    # inputs. The two agreed by luck and nothing made them keep agreeing: no
-    # test compared them, and a change to the exclusion set or to the
-    # precedence had to be remembered in two places. That is Bug Bible 12.132's
-    # class exactly ("one matcher, never two"), and it cost the LEGACY lanes
-    # their receipt -- a bare bool cannot say WHY, so `media_archive`,
-    # `original` and `science_news` shipped 0 cameo receipts across 413
-    # episodes while `scifi_news_pro`, which calls the real function, stamped
-    # one every time.
+    # `resolve_lemmy_cameo` decides it alone (fidelity exclusion, then the
+    # natural roll, then the forced knob). A second inline copy of that rule
+    # agrees only by luck, and a bare bool cannot say WHY, so a lane that
+    # decided it inline would ship no cameo receipt (Bug Bible 12.132: "one
+    # matcher, never two").
     #
     # `roll_lemmy()` inside it still uses OS entropy, never the seeded `rng` --
     # the cameo stays decoupled from the C7 seed (BUG-LOCAL-260: a fixed seed
@@ -1535,7 +1520,7 @@ def assemble_pre_locked_rows(
     # literally named "Lemmy" is skipped, so the play's own people cannot
     # smuggle the cameo in through the back door. Taking it from the carried
     # policy keeps one authority -- calling `_source_bank_excludes_lemmy` again
-    # here would restore the duplication this change exists to delete.
+    # here would duplicate the rule.
     source_fidelity_excludes_lemmy = (
         decision.lemmy_policy == LEMMY_POLICY_SOURCE_FIDELITY_EXCLUSION)
 
@@ -1656,7 +1641,7 @@ def _apply_llm_slot_fill(
 ):
     """Overlay LLM names + texture onto the finished deterministic cast. ONE
     creative-slot call, NO retry (per the sprint plan). This lane is OPT-IN
-    (name_mode == "llm_slot_fill"); NO-FALLBACK rip (2026-07-03): when the naming
+    (name_mode == "llm_slot_fill"); NO-FALLBACK (2026-07-03): when the naming
     LLM is selected and it fails (raises) or returns un-validatable output, this
     FAILS LOUD (CastValidationLLMError) rather than silently keeping the
     deterministic RNG-pool names -- a failed naming LLM stops the episode. A
@@ -1685,10 +1670,9 @@ def _apply_llm_slot_fill(
     # the video path every character directive in every episode). A row of the
     # prompt's own shape, with both texture notes at their stated 6-10 word cap,
     # runs ~44 tokens; 60 leaves headroom for a long name and JSON whitespace.
-    # The old flat 400 was sized against the legacy 6-slot ceiling and never
-    # rechecked when the UI ceiling became _FABLE2_MAX_CAST = 10, where the
-    # arithmetic (10 x 44 = 440) already overruns it. This lane has NO retry, so
-    # a truncation here does not degrade -- it stops the episode.
+    # A flat 400 overruns at the UI ceiling _FABLE2_MAX_CAST = 10
+    # (10 x 44 = 440). This lane has NO retry, so a truncation here does not
+    # degrade -- it stops the episode.
     slot_budget = max(400, len(plan) * 60 + 80)
     # LLM slot: creative -- cast naming + texture is a creative-writing pass; it
     # reuses the writer's creative_fn (no new model_id widget, PD6).
@@ -1698,7 +1682,7 @@ def _apply_llm_slot_fill(
             temperature=0.7, max_new_tokens=slot_budget,
         )
     except Exception as exc:  # noqa: BLE001 -- loader/LLM varies
-        # NO-FALLBACK rip (2026-07-03): opt-in naming LLM failure = LOUD stop,
+        # NO-FALLBACK (2026-07-03): opt-in naming LLM failure = LOUD stop,
         # not a silent keep of the deterministic RNG-pool names.
         raise CastValidationLLMError(
             [("", f"llm_slot_fill naming generate_fn raised "
@@ -1840,13 +1824,12 @@ def _enforce_name_authority(
         clean = llm_write_description(
             generate_fn,
             slot=slot,
-            # THE RETRY KEEPS THE RECONCILED STORY CONTEXT. An earlier version
-            # stripped everything, and that was the wrong trade: the row was
-            # regenerated with no premise, no world and no plot, so the model
-            # could only invent generic filler -- which is then copied verbatim
-            # into the FLUX portrait prompt. It swapped a row that was wrong
-            # about WHO for a row that is about NOTHING, and permanently
-            # detached that character from the episode.
+            # THE RETRY KEEPS THE RECONCILED STORY CONTEXT. Stripping everything
+            # would regenerate the row with no premise, no world and no plot, so
+            # the model could only invent generic filler -- which is then copied
+            # verbatim into the FLUX portrait prompt. That swaps a row that was
+            # wrong about WHO for a row that is about NOTHING, and permanently
+            # detaches that character from the episode.
             #
             # The context is safe to keep because it is the reconciled text:
             # the superseded names are already gone from it. What is dropped is
@@ -1954,8 +1937,7 @@ def lock_cast(
     # The per-slot fill runs every description attempt via the shared
     # structured_call ladder. lock_cast feeds it `creative_fn` -- the
     # cast row carries audience-facing prose, so casting rides the
-    # creative plane. (S32 B3's technical-slot repair routing was
-    # retired in the Sprint 2A/2D structured_call conversion.)
+    # creative plane.
     generate_fn = creative_fn
 
     # llm_slot_fill (S6): name_mode decides whether an LLM Pass-1 renames the
@@ -2295,22 +2277,12 @@ def lock_cast(
             cast_seed=cast_seed, meta=meta,
         )
 
-    # Sprint 2 (a): the bark voice_preset + uniqueness invariants relocated to
-    # OTR_CastLock's exit. The writer no longer assigns voice_preset (CastLock
-    # replays it byte-identically after the freeze), so asserting v2/* here would
-    # fail on the now-empty rows. _assert_unique_bark_voices +
-    # _assert_voice_preset_invariant run in OTR_CastLock after it stamps voices.
-    # THE HYBRID LLM VOICE-FIT IS GONE (ripped 2026-08-18). The deterministic
-    # scorer in `_otr_voice_bank.assign_voice_for_slot` is the caster.
-    #
-    # It was removed rather than tuned because it had no information the scorer
-    # lacks: its prompt carried the character's gender / timbre / role / age and
-    # each card's age_band + timbre + style_tags -- exactly the four dimensions
-    # `_score()` already weights -- and per I-9 no character name and no
-    # description. Measured over 1711 ledgers it cast with 13 distinct voices at
-    # 96% top-5 where the scorer used 43 at 25%, chose card #0 of an
-    # alphabetically ordered list 62% of the time, and was the one unseeded step
-    # in a pipeline whose contract is seed-determinism.
+    # The bark voice_preset + uniqueness invariants run in OTR_CastLock after it
+    # stamps voices (_assert_unique_bark_voices +
+    # _assert_voice_preset_invariant), not here: the writer does not assign
+    # voice_preset (CastLock replays it byte-identically after the freeze), so
+    # asserting v2/* here would fail on the empty rows. The deterministic scorer
+    # in `_otr_voice_bank.assign_voice_for_slot` is the caster.
     #
     # `voice_cast_decision` is KEPT and stamped empty, deliberately. CastLock
     # still reads `meta.get("voice_cast_decision") or {}`, and every published
@@ -2363,11 +2335,11 @@ def lock_cast(
         # clamp unreachable and crashed the episode instead (2026-09-11).
         "num_characters_effective": int(num_characters),
         "lemmy_hit":              lemmy_hit,
-        # BOTH READ THE CARRIED DECISION -- this key used to re-derive the
-        # policy from `_source_bank_excludes_lemmy` all over again, a THIRD
-        # independent derivation of the same rule sitting a thousand lines from
-        # the first two. It could only ever express two of the four outcomes,
-        # so a forced include and a natural hit stamped identically.
+        # BOTH READ THE CARRIED DECISION -- re-deriving the policy from
+        # `_source_bank_excludes_lemmy` would be a THIRD independent
+        # derivation of the same rule, and it could only express two of the
+        # four outcomes, so a forced include and a natural hit would stamp
+        # identically.
         "lemmy_policy":           lemmy_decision.lemmy_policy,
         # THE RECEIPT THE LEGACY LANES NEVER HAD. `lemmy_hit` alone cannot say
         # whether the roll was SPENT: a harness forcing the cameo off and a
@@ -2406,11 +2378,11 @@ def lock_cast(
 def _row_is_announcer(row: dict) -> bool:
     """The ONE canonical "is this row the announcer" predicate
     (``_otr_cast_voice_coverage.is_announcer_cast_row``), re-exposed under
-    this module's own name. NOT re-implemented: this module used to carry a
-    hand-rolled duplicate of ``cast_lock._is_announcer_entry`` (import from
-    ``cast_lock`` is unsafe -- it already imports this module, a cycle), but
-    ``_otr_cast_voice_coverage`` imports neither, so it is the safe shared
-    home (kibitz r3, cursor: unify rather than grow a fourth near-duplicate).
+    this module's own name. NOT re-implemented: importing
+    ``cast_lock._is_announcer_entry`` is unsafe -- it already imports this
+    module, a cycle -- but ``_otr_cast_voice_coverage`` imports neither, so
+    it is the safe shared home (kibitz r3, cursor: unify rather than grow a
+    fourth near-duplicate).
 
     Relative-then-absolute fallback (matches ``_otr_voice_bank.bark_preset_
     gender``'s existing pattern): ``lock_cast``'s own dynamic-import path can

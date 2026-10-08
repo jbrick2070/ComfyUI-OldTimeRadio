@@ -102,17 +102,15 @@ VAE_ENV = "OTR_IDEOGRAM4_VAE"
 
 #: PRECISION LADDERS, NOT ONE HARDCODED BASENAME (2026-09-03).
 #:
-#: This engine used to demand exactly `ideogram4_nvfp4_mixed.safetensors`, and
-#: nvfp4 is a Blackwell format -- so an AMD, Mac or 3060 box that had installed
-#: the perfectly good fp8 or int8 build was still refused with
-#: "missing: ideogram4_nvfp4_mix...", a dead end unless the operator happened to
-#: know the four env overrides existed. The engine was never Blackwell-only;
-#: only its default was, and the refusal read as though the lane were.
+#: Demanding exactly `ideogram4_nvfp4_mixed.safetensors` would refuse an AMD,
+#: Mac or 3060 box that had installed the perfectly good fp8 or int8 build,
+#: because nvfp4 is a Blackwell format -- a dead end unless the operator
+#: happened to know the four env overrides existed. The engine is not
+#: Blackwell-only; only its default is.
 #:
 #: `Comfy-Org/Ideogram-4` is UNGATED. It publishes the two DIFFUSION slots in
 #: three precisions and the text encoder in two; the VAE is single. So the
-#: ladders below are 3 / 3 / 2 / 1, NOT "three precisions across four slots" --
-#: an earlier draft of this comment said that and it was never true.
+#: ladders below are 3 / 3 / 2 / 1, NOT "three precisions across four slots".
 #:
 #: THE CONSEQUENCE IS A REAL MIXED-PRECISION REQUIREMENT: there is no int8 text
 #: encoder, so a box holding only the int8 diffusion pair must still fetch an
@@ -155,11 +153,7 @@ _VAE_CANDIDATES = ("flux2-vae.safetensors",)
 
 #: (env var, candidate basenames, folder_paths category) per required artifact.
 #:
-#: (Four `_DEFAULT_*` aliases used to sit here, justified as "the name the error
-#: message leads with". That was false -- the refusal text is literal and the
-#: params path resolves through `resolve_all_artifacts()`, so nothing read them.
-#: Removed 2026-09-04, the same session that added them. `candidates[0]` is the
-#: lead name, and it needs no second spelling.)
+#: `candidates[0]` is the lead name, and it needs no second spelling.
 _ARTIFACTS = (
     (COND_UNET_ENV, _COND_UNET_CANDIDATES, "diffusion_models"),
     (UNCOND_UNET_ENV, _UNCOND_UNET_CANDIDATES, "diffusion_models"),
@@ -395,13 +389,11 @@ def _tidy(text: str) -> str:
     Every token is positive conditioning here, so stray punctuation is not
     merely untidy -- it is noise the encoder reads.
 
-    BOTH CAPTURING RULES BELOW USED TO REPLACE WITH A BARE U+0001 INSTEAD OF
-    THE ``\\1`` BACKREFERENCE (found 2026-08-26). Every match therefore DELETED
-    the captured punctuation and injected a C0 control character into the
-    prompt -- `"a warm revelation., sepia"` became
-    `"a warm revelation\\x01 sepia"`. It reached the model on EVERY route, and
-    the prompt refused six times in the 2026-08-26 sweep ends in exactly that
-    shape. Pinned by
+    BOTH CAPTURING RULES BELOW MUST REPLACE WITH THE ``\\1`` BACKREFERENCE,
+    NEVER A BARE U+0001: a bare control character DELETES the captured
+    punctuation and injects a C0 byte into the prompt -- `"a warm
+    revelation., sepia"` would become `"a warm revelation\\x01 sepia"` --
+    on EVERY route to the model. Pinned by
     ``test_tidy_preserves_punctuation_instead_of_injecting_a_control_character``.
 
     The first rule also EATS the following whitespace on purpose and re-emits a
@@ -474,11 +466,11 @@ def caption_route(prose: str, *, kind: str = "", role: str = "") -> str:
 def _wrapped_caption(aspect: str, description: str) -> dict:
     """The minimal caption: the vendor's keys, and nothing invented.
 
-    ``background`` IS EMPTY ON PURPOSE, and that is the second half of the
-    2026-08-26 fix. The old fallthrough put the IDENTICAL string into
-    ``high_level_description`` and ``background`` -- the input pasted into two
-    fields, which is not a deconstruction and merely told the model the same
-    thing twice. The honest alternative is not a richer guess: the composer emits
+    ``background`` IS EMPTY ON PURPOSE. Putting the IDENTICAL string into
+    ``high_level_description`` and ``background`` would paste the input into
+    two fields, which is not a deconstruction and merely tells the model the
+    same thing twice. The honest alternative is not a richer guess: the
+    composer emits
     a comma-joined five-layer string behind a style prefix, which is a
     convention, not a grammar, so any attempt to re-extract subject / setting /
     elements from it mis-fires. Leaving the slot empty invents no setting.
@@ -666,14 +658,14 @@ class Ideogram4LocalEngine:
     #: weight env var changes the still cache key -- otherwise a quant swap would
     #: silently serve stale cached stills.
     #:
-    #: BUMPED "1" -> "2" ON 2026-08-26 for the metadata routing above, and the
-    #: bump is REQUIRED rather than bookkeeping. The dispatcher's still cache key
-    #: is ``(role, object_id, prompt_hash, seed, engine_id, engine_version)``,
+    #: BUMP THIS WHEN THE CAPTION THIS ADAPTER BUILDS CHANGES (it is "2" since
+    #: 2026-08-26, for the metadata routing above); the bump is REQUIRED rather
+    #: than bookkeeping. The dispatcher's still cache key is
+    #: ``(role, object_id, prompt_hash, seed, engine_id, engine_version)``,
     #: and ``prompt_hash`` is computed from OTR's PROSE before this adapter ever
-    #: runs -- so a change that alters only the caption this adapter builds is
-    #: invisible to every other term. Without the bump, every still minted under
-    #: the old blind fallthrough would be served from cache forever and the fix
-    #: would never reach a rendered frame.
+    #: runs -- so a change that alters only the caption is invisible to every
+    #: other term, and without the bump stills minted under the old caption
+    #: would be served from cache forever.
     base_engine_version = "2"
 
     #: Terminal graph node: its IMAGE output is the still.
@@ -707,8 +699,8 @@ class Ideogram4LocalEngine:
                    for name, verified, cat in resolve_all_artifacts()
                    if not verified]
         if missing:
-            # NAME THE ALTERNATIVES. The refusal used to quote only the nvfp4
-            # basename, which reads as "this lane needs a Blackwell card" -- and
+            # NAME THE ALTERNATIVES. Quoting only the nvfp4 basename would read
+            # as "this lane needs a Blackwell card" -- and
             # that is false. Every precision below lives in the same UNGATED
             # Comfy-Org/Ideogram-4 repo and any of them satisfies this engine.
             raise EngineUnusable(

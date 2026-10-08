@@ -1,10 +1,9 @@
 """Final deterministic ledger scrub.
 
 This module owns only JSON/ledger shape, exact transport cleanup and cast
-binding. The spoken-safety scan it used to own was removed 2026-08-05 by
-operator directive (no content guardrails on generated episodes); it has no
-word-count, style, craft, visual-vocabulary, name-guessing, content, or
-story-quality policy.
+binding. It has no spoken-safety scan (operator directive 2026-08-05: no
+content guardrails on generated episodes), no word-count, style, craft,
+visual-vocabulary, name-guessing, content, or story-quality policy.
 """
 from __future__ import annotations
 
@@ -263,12 +262,11 @@ def scrub_ledger(ledger: Dict[str, Any]) -> ScrubResult:
         for finding in _shape_findings(ledger)
         if finding not in findings
     )
-    # The spoken-safety scan was REMOVED 2026-08-05 (operator directive: no
-    # content guardrails on generated episodes). It raised "safety_violation"
-    # findings which were BLOCKING, so a faithful adaptation failed the scrub on
-    # its own author's vocabulary. `safety_violations` stays on ScrubResult as a
-    # permanently-empty field so the dataclass contract and its `to_dict()`
-    # shape do not change for any existing reader.
+    # There is no spoken-safety scan (operator directive 2026-08-05: no
+    # content guardrails on generated episodes): a blocking scan would fail a
+    # faithful adaptation on its own author's vocabulary. `safety_violations`
+    # stays on ScrubResult as a permanently-empty field so the dataclass
+    # contract and its `to_dict()` shape do not change for any existing reader.
     safety_rows: List[dict] = []
 
     blocking_codes = {

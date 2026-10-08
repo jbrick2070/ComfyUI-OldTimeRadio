@@ -35,26 +35,8 @@ class MusicGenEngine:
     supports_external_generator = False  # MusicGen.generate binds no external Generator
     model_id = _MUSICGEN_MODEL_ID
     guidance_scale = 3.0                 # == music_musicgen_v1 profile default (pinned)
-    #: THE SHORT PROMPT IS NOW EVERY ENGINE'S PROMPT, so this engine no longer
-    #: asks for one. It carried `wants_brief_prompt = True` until 2026-09-13,
-    #: and the measurement behind that flag is what eventually retired it:
-    #: taken with this model's own T5 tokenizer, the pack's full cue prompt ran
-    #: 72-88 tokens against Meta's own 12-14 examples ("80s pop track with
-    #: bassy drums and synth"), on cues 8 and 12 seconds long.
-    #:
-    #: The operator's call was simply "everyone gets brief", so the fork went
-    #: and `_otr_music_prompt.compose_brief_engine_prompt` is the only engine
-    #: form; `stable_audio_theme` calls it unconditionally.
-    #:
-    #: A LOAD-BEARING CORRECTION, because the first version of this comment got
-    #: it backwards. It said the long form "never read `palette.idiom`, so the
-    #: engines taking it never heard the genre name or the tempo". The first
-    #: half is true of that function body and the second half does not follow:
-    #: the long form was instruments + anchor + ROW TEXT, and
-    #: `compose_music_prompt` appends the idiom on every branch, so the genre
-    #: and the BPM always arrived -- measured afterwards at 18 of 18 bank/cue
-    #: combinations. Nobody was missing the genre. The change is a taste call,
-    #: not a defect fix, and it should not be re-justified as one.
+    #: No prompt-form flag: every music engine receives the same brief
+    #: prompt (`_otr_music_prompt.compose_brief_engine_prompt`).
 
     def __init__(self):
         self._model = None
@@ -80,8 +62,8 @@ class MusicGenEngine:
         )
         # S4 platform-portability: EXPLICIT device (theme node threads the
         # CastLock ledger stamp as requested_device; default cuda = nv50
-        # baseline). The cuda->cpu waterfall is deleted -- a device the host
-        # cannot provide fails LOUD at .to(device).
+        # baseline); there is no auto-waterfall, so a device the host cannot
+        # provide fails LOUD at .to(device).
         device = getattr(self, "requested_device", None) or "cuda"
         # Branch on the KIND: a second card is stamped "cuda:1" and is still CUDA.
         dtype = torch.float16 if device.split(":", 1)[0] == "cuda" else torch.float32

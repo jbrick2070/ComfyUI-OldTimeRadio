@@ -73,9 +73,8 @@ except Exception:  # noqa: BLE001
 
 # C2 (build-or-NO-GO, default-OFF): the Z-Image-Turbo adapter -- a 2nd image
 # engine proving the model-agnostic layer holds >=2 engines. Cold-import clean.
-# IN-PROCESS since 2026-06-18 (see z_image_turbo.py header: "No sidecar") --
-# its registry row is requires_sidecar: False; do NOT "fix" it back to a
-# sidecar from this comment (the old cu128-sidecar wording misled). Separate
+# IN-PROCESS (see z_image_turbo.py header: "No sidecar") -- its registry
+# row is requires_sidecar: False; do NOT "fix" it into a sidecar. Separate
 # guard so a quirk in one adapter never blocks the other from registering.
 try:  # pragma: no cover - trivial guard
     from . import z_image_turbo as _z_image_turbo  # noqa: F401
@@ -98,16 +97,11 @@ except Exception:  # noqa: BLE001
 # exist. Its own guard so a quirk never blocks the others -- and proves the
 # "+ Add Custom Model" open-set story: the registry grows by dropping in an
 # adapter, no other edits.
-# (HiDream-I1 was UNREGISTERED 2026-06-29 (C3): a NotImplementedError dark
-# scaffold is no longer imported/selectable. Chroma1-HD was DROPPED 2026-06-18:
-# a de-restricted/uncensored FLUX finetune OTR will not ship a path to.)
+# Policy: OTR ships no path to a de-restricted/uncensored FLUX finetune.
 try:  # pragma: no cover - trivial guard
     from . import lumina_image as _lumina_image  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
-
-# (SD 3.5 Large was UNREGISTERED 2026-06-29 (C3): a NotImplementedError dark
-# scaffold is no longer imported/selectable.)
 
 # Ideogram 4 (LOCAL weights, 2026-08-22) -- the typography-first still engine for
 # the still_word card. OPT-IN (default_roles=()); z_image_turbo stays the shipped

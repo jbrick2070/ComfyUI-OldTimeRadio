@@ -10,12 +10,10 @@ Design (per Jeffrey's go-forward feedback 2026-05-30):
   * Optional style ``otr_crt``: green-CRT themed, for A/B QA only -- NOT default.
   * Speaker label coloring ONLY: the ``NAME:`` prefix is colored per speaker;
     the dialogue text stays white. No rainbow captions.
-  * There are NO sound-effect captions. The ``sfx`` speaker_role was removed
-    2026-07-01 (rip-sfx-broll) and a ledger still carrying one is an invariant
-    error (``_otr_ledger_freeze.py:97``); a line is music, announcer, or
-    character. ``_SPEECH_ROLES`` captions the latter two, so the older
-    "sparse bracketed ``[STATIC HISS]`` cue" note described a lane that no
-    longer exists.
+  * There are NO sound-effect captions: a ledger line carrying an ``sfx``
+    speaker_role is an invariant error (``_otr_ledger_freeze.py:97``); a line
+    is music, announcer, or character. ``_SPEECH_ROLES`` captions the latter
+    two.
   * PERFORMANCE DIRECTION IS SHOWN ON PURPOSE (operator ruling 2026-08-05).
     A caption burns the RAW ledger line, so a parenthetical like
     ``(forcefully winding the clock)`` appears on screen even though the voice
@@ -29,13 +27,9 @@ Design (per Jeffrey's go-forward feedback 2026-05-30):
     The same raw text is LOAD-BEARING on the visual side, which is the real
     reason the ledger keeps the line as written rather than stripping it
     upstream. It feeds (a) the still-image prompt
-    (``otr_meta_brief_image_prompt.py:1313``), (b) the MOTION CLAUSE that
-    directs i2v video -- the ripped ``_otr_motion_clause`` pass read raw
-    ``lines[].text`` and hands it to ``build_clause_messages``, under the
-    standing operator directive (recorded in that ripped module, and kept
-    ("the line drives the motion") -- and (c) the HUD / full-script print
-    (``video_engine.py:1311`` and ``:1962``). Stripping direction out of
-    ``lines[].text`` would quietly degrade stills AND motion, so it stays.
+    (``otr_meta_brief_image_prompt.py:1313``) and (b) the HUD / full-script
+    print (``video_engine.py:1311`` and ``:1962``). Stripping direction out of
+    ``lines[].text`` would quietly degrade the stills, so it stays.
     NOT covered by this ruling: a SOURCE CITATION or URL leaking into line text
     is a writer defect, not an easter egg, and is tracked separately.
   * SDH line rules: <=2 lines, <=44 chars/line, target <=17 CPS (hard cap 20),
@@ -382,9 +376,9 @@ TITLE_STYLE_NAME = "TITLE"
 TITLE_OUTLINE_W = 6
 TITLE_SHADOW = 2
 def _title_style_line(font_name: str | None = None) -> str:
-    """The hero title card's ASS style row. A FUNCTION rather than the module
-    constant it used to be, because the face is now resolved per platform (and
-    per ``OTR_CAPTION_MONO_FONT``) and a constant would freeze whatever the
+    """The hero title card's ASS style row. A FUNCTION rather than a module
+    constant, because the face is resolved per platform (and per
+    ``OTR_CAPTION_MONO_FONT``) and a constant would freeze whatever the
     server booted with.
 
     Hindi / CJK pass the row's script face so a native title does not tofu
@@ -560,11 +554,11 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
 
     st = STYLES.get(style)
     if st is None:
-        # Reachable, and it used to be silent: this (None, reason) becomes a
-        # ValueError in burn_captions_on_video, which the node caught and turned
-        # into a clean-master passthrough -- dropping the title with no error.
-        # With a PLANNED title that ValueError now REFUSES (an unclassified
-        # failure); only a probe-confirmed host capability gap passes through.
+        # Reachable: this (None, reason) becomes a ValueError in
+        # burn_captions_on_video. With a PLANNED title that ValueError
+        # REFUSES (an unclassified failure) rather than becoming a clean-master
+        # passthrough that drops the title with no error; only a probe-confirmed
+        # host capability gap passes through.
         return (None, f"unknown style {style!r}; choices: {sorted(STYLES)}")
     st = dict(st)
     wrap_policy = "word_split"
@@ -677,10 +671,10 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
                 f"Dialogue: 0,{ass_timecode(s)},{ass_timecode(e)},SDH,,0,0,0,,{disp}"
             )
 
-    # Reordered 2026-08-12: this used to bail before the title events were even
-    # considered, so an episode with no speech lines produced no .ass at all --
-    # which, once the title lives ONLY in ASS, is an episode with no title.
-    # Title-only output is valid ASS and is the correct answer here.
+    # Title events are considered BEFORE bailing: an episode with no speech
+    # lines would otherwise produce no .ass at all -- which, with the title
+    # living ONLY in ASS, is an episode with no title. Title-only output is
+    # valid ASS and is the correct answer here.
     if not events and not title_events:
         return (None, "no speech lines found in ledger (nothing to caption)")
 

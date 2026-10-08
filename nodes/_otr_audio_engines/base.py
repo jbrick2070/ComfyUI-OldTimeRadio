@@ -61,15 +61,14 @@ class AudioEngineAdapter:
     requires_flag: Optional[str] = None
     interface: str = "per_line"
     sample_rate: int = _DEFAULT_SR
-    # Voice-reference policy (model-agnostic dispatch -- replaces the old
-    # _OTR_CLONE_ENGINES name tuple). A voice-CLONING engine sets
-    # requires_voice_ref=True so the dispatch resolves a per-character reference
-    # WAV for it and, when none is available for a char_voice line, FAILS LOUD
-    # (no-fallback rip 2026-07-03 -- no bark fallback). voice_ref_kind documents
-    # what the reference is ("wav_path" for clip-cloning engines).
-    # missing_ref_fallback is retired: it stays None on every engine (a missing
-    # ref raises). Non-clone engines keep these defaults and are never sent down
-    # the ref-resolution path.
+    # Voice-reference policy (model-agnostic dispatch). A voice-CLONING engine
+    # sets requires_voice_ref=True so the dispatch resolves a per-character
+    # reference WAV for it and, when none is available for a char_voice line,
+    # FAILS LOUD (no bark fallback). voice_ref_kind documents what the
+    # reference is ("wav_path" for clip-cloning engines).
+    # missing_ref_fallback stays None on every engine (a missing ref raises).
+    # Non-clone engines keep these defaults and are never sent down the
+    # ref-resolution path.
     requires_voice_ref: bool = False
     voice_ref_kind: Optional[str] = None
     missing_ref_fallback: Optional[str] = None
@@ -124,16 +123,13 @@ def resolve_voice_ref_path(ref):
     (``models/TTS/refs/indextts2/x.wav``) and have to become an absolute path an
     ISOLATED WORKER can open regardless of its own cwd.
 
-    WHY THIS IS SHARED NOW. The cloning adapters (indextts2, chatterbox) each
-    carried a private copy that tried exactly ONE candidate --
-    ``<comfy_base>/models/<ref>`` -- and fell back to ``os.path.abspath(ref)``,
-    which is a cwd-relative path that generally does not exist. The voice node's
-    own ``_resolve_ref_to_disk`` meanwhile knew about three MORE places, notably
-    the ``C:\\ComfyUI-Models`` root the Comfy Desktop 1.0.4 model-path migration
-    introduced. So on a box whose refs live under the migrated root, the NODE's
-    existence check found the file and the ADAPTER's resolver did not: preflight
-    passed and the worker then failed to open a reference the check had just
-    confirmed. Two resolvers over one fact, disagreeing exactly where it hurts.
+    WHY THIS IS SHARED. Two resolvers over one fact disagreed exactly where it
+    hurts: the voice node's own ``_resolve_ref_to_disk`` knew about the
+    ``C:\\ComfyUI-Models`` root the Comfy Desktop 1.0.4 model-path migration
+    introduced, a cloning adapter's single-candidate resolver did not, so on a
+    box whose refs live under the migrated root the NODE's existence check
+    found the file, preflight passed, and the worker then failed to open a
+    reference the check had just confirmed.
 
     ORDER IS THE CONTRACT: an explicit models-root override wins because it is
     the provisioner's location authority. With no override, the historical
@@ -251,16 +247,12 @@ def pack_audio_batch(
     sr = int(sample_rate) if sample_rate else rates[0]
     mismatched = {r for r in rates if r != sr}
     if mismatched:
-        # RESAMPLE TO THE DECLARED RATE. This used to raise, and the raise cost a
-        # whole role's render AFTER every line had already been generated and
+        # RESAMPLE TO THE DECLARED RATE rather than raise: a raise here costs
+        # a whole role's render AFTER every line has already been generated and
         # paid for -- `OTRVoiceNodeBase.generate()` wraps the per-line loop in
-        # try/finally with no except, so it left the node and ended the prompt.
-        #
-        # IT HAS HAPPENED LIVE. `eda8590c` (2026-06-05) records a real cast
-        # crashing on exactly this message with rates [22050, 24000], and the fix
-        # then was the same one made here: resample to the primary rate. That fix
-        # lived at one caller and was retired with the branch that called it, so
-        # the hazard came back to a path nothing guarded.
+        # try/finally with no except, so it would leave the node and end the
+        # prompt. A real cast has crashed on exactly this message with rates
+        # [22050, 24000] (`eda8590c`, 2026-06-05).
         #
         # IT IS NOT A SILENT WRONG RENDER, which is the only thing that earns a
         # raise here. Resampling is deterministic and content-preserving: the

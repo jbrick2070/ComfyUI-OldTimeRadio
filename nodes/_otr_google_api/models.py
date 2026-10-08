@@ -33,31 +33,17 @@ GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT = "gemini-flash-lite-latest"
 #: 2026-08-10 catalog: `gemini-flash-latest`, `gemini-flash-lite-latest`,
 #: `gemini-pro-latest`, and `gemini-2.5-flash-native-audio-latest` (audio, not
 #: text). The three text pointers are what this lane offers, and nothing else.
-#:
-#: `gemini-pro-latest` is NEW here -- it was published and this pack simply was
-#: not offering it, so the evergreen sweep added a capability rather than only
-#: removing pins.
-#:
-#: The four concrete ids that used to live here -- gemini-3.5-flash,
-#: gemini-3.1-flash-lite, gemini-2.5-flash, gemini-2.5-pro -- were all LIVE in
-#: the same catalog run. They were dropped for being pins, not for being dead.
 GOOGLE_API_EVERGREEN_TEXT_MODELS = (
     "gemini-flash-latest",
     "gemini-flash-lite-latest",
     "gemini-pro-latest",
 )
 
-#: Retained name for the two tuples this lane used to expose. Both are now empty:
-#: every text model on this lane is evergreen. Kept rather than deleted so an
-#: importer gets an empty tuple instead of an ImportError, and so the reason is
-#: readable at the point someone goes looking for the pins.
+#: Empty by design: every text model on this lane is evergreen. The name is
+#: kept so an importer gets an empty tuple instead of an ImportError.
 GOOGLE_API_LEGACY_TEXT_MODELS: tuple[str, ...] = ()
-#: Also emptied by the evergreen sweep. `gemini-2.0-flash` and
-#: `gemini-2.0-flash-lite` had already been retired hours earlier for being GONE
-#: from Google's catalog; `gemini-2.5-flash` and `gemini-2.5-pro` were alive and
-#: were dropped for being PINS. Both retirements have the same root cause -- a
-#: concrete id is a promise about someone else's service that this file cannot
-#: keep.
+#: Also empty by design: a concrete id is a promise about someone else's
+#: service that this file cannot keep.
 GOOGLE_API_STABLE_TEXT_MODELS: tuple[str, ...] = ()
 
 def _dedupe(*groups: "tuple[str, ...]") -> "tuple[str, ...]":

@@ -101,10 +101,10 @@ class GenerationContextOverflowError(_CapacityError):
 class PromptContextOverflowError(_CapacityError):
     """A transport could not honour its caller's output contract.
 
-    Moved here from ``OTR_LedgerScriptWriter`` by A-4 so the retry ladder --
+    Lives here, not in ``OTR_LedgerScriptWriter``, so the retry ladder --
     which is documented pure and may not import the writer -- can name the
     type it is deciding about. The writer re-exports it, so
-    ``writer.PromptContextOverflowError`` is the same object it always was.
+    ``writer.PromptContextOverflowError`` is the same object.
 
     A-1 (2026-07-30): the output-limit raise carries the completion the model
     actually produced plus the token arithmetic, as FIELDS. Never in the
@@ -225,7 +225,7 @@ def fit_output_tokens(
 
     A prompt that cannot leave the minimum output room fails before the
     provider call.  A larger requested ceiling is normally reduced to the
-    remaining room; this prevents the old ``context_cap - requested`` math
+    remaining room; this prevents ``context_cap - requested`` math
     from deleting prompt context.  ``require_full`` is the opt-in contract for
     bounded patches whose complete requested output must fit or make no call.
     Unmarked callers preserve the historical clamping behavior.

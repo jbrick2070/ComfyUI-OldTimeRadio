@@ -178,13 +178,13 @@ class CleanTransaction:
     def reconcile(self) -> Dict[str, Any]:
         """Prove the window's rewrites, or roll them back and keep going.
 
-        BOTH arms are guarded, and the second one is the point. `_degrade` was
-        originally called from a bare `except`, so anything IT raised -- a
-        finalizer whose `restore_proof_state` threw, a ledger that would not
-        deep-copy -- propagated straight out of here to an unguarded call site
-        and killed the render. That is the Law 7 violation this module exists to
-        prevent, occurring inside its own rollback path, which is the last place
-        anyone would look for it.
+        BOTH arms are guarded, and the second one is the point. `_degrade` is
+        also called from the `except` arm, so anything IT raises -- a
+        finalizer whose `restore_proof_state` throws, a ledger that will not
+        deep-copy -- would propagate straight out of here to an unguarded call
+        site and kill the render. That is the Law 7 violation this module
+        exists to prevent, occurring inside its own rollback path, which is
+        the last place anyone would look for it.
 
         So the fallback has a fallback. If even degrading fails there is nothing
         left to try: say so as loudly as possible, hand back a receipt that

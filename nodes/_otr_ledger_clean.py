@@ -90,14 +90,13 @@ else:
     def _coerce_offset(value):
         """Accept the same index in whatever JSON type the model chose.
 
-        `strict=True` used to sit on these fields, so a model emitting `12.0`
+        `strict=True` on these fields would reject a model emitting `12.0`
         or `"12"` -- which a small local model routinely does for an integer
-        field -- failed validation, and a ValidationError fails the whole
-        `structured_call` attempt rather than dropping one span. It retried and
-        exhausted, reproducing the "detected, repaired zero" bug this pass was
-        fixed for. Found by a QA pass which noticed that
-        `_exact_interval`'s own float/string handling was unreachable dead code
-        because of it.
+        field -- and a ValidationError fails the whole `structured_call`
+        attempt rather than dropping one span. It would retry and exhaust,
+        reproducing the "detected, repaired zero" failure this pass exists to
+        fix, and `_exact_interval`'s own float/string handling would be
+        unreachable dead code.
 
         STILL REFUSES ANYTHING THAT IS NOT AN INDEX. 12.5 is not an index.
         `False` is not an index -- bool is an int subclass in Python, so it has
@@ -107,9 +106,9 @@ else:
         if value is None:
             return value
         if isinstance(value, bool):
-            # RAISED, NOT RETURNED. `strict=True` used to reject a bool for
-            # free; without it pydantic happily coerces False -> 0, which is a
-            # VALID index and would authorize an edit at the start of the line.
+            # RAISED, NOT RETURNED. Without `strict=True`, pydantic happily
+            # coerces False -> 0, which is a VALID index and would authorize an
+            # edit at the start of the line.
             # bool is an int subclass in Python, so this has to be refused by
             # name. A test covers exactly this input.
             raise ValueError("a boolean is not a character index")
@@ -159,9 +158,9 @@ def _as_char_index(value: Any) -> int | None:
     """A model's idea of an index, if it is usable as one.
 
     Accepts an int, an integral float and a numeric string, because a JSON
-    response from a small local model supplies all three for the same field.
-    The previous `type(start) is not int` rejected `12.0` and `"12"` outright
-    and dropped the whole finding with them.
+    response from a small local model supplies all three for the same field;
+    a strict int check would reject `12.0` and `"12"` outright and drop the
+    whole finding with them.
     """
     if isinstance(value, bool) or value is None:
         return None
@@ -240,8 +239,8 @@ def _whole_spoken_row(text: str, interval: tuple[int, int]) -> bool:
 
 
 def _merge_repair_spans(text: str, intervals: Sequence[tuple[int, int]]) -> tuple[_RepairSpan, ...]:
-    # A None interval means `_exact_interval` declined, and this used to unpack
-    # it and raise TypeError instead of producing no spans. The two
+    # A None interval means `_exact_interval` declined; unpacking it would
+    # raise TypeError instead of producing no spans. The two
     # `recover_unique=True` sites agree today, so a None cannot reach here --
     # but they are two sites, and a drift between them should degrade to
     # "unresolved" rather than to a traceback in the middle of a render.
@@ -794,12 +793,11 @@ def verify_context_landed(
 ) -> "dict[str, Any]":
     """Did the context we BUILT actually reach the prompt we SENT?
 
-    THIS IS THE CHECK THAT WOULD HAVE CAUGHT TODAY'S TWO BUGS, and they were
-    different bugs with the same shape:
+    THIS CHECK CATCHES TWO DIFFERENT BUGS WITH THE SAME SHAPE:
 
-      1. `arc_phase` / `beat_intent` were read off the wrong row, so the act
-         block was built EMPTY and every prompt shipped without it.
-      2. `where` was threaded into `_repair_prompt`'s signature and then
+      1. `arc_phase` / `beat_intent` read off the wrong row, so the act
+         block is built EMPTY and every prompt ships without it.
+      2. `where` threaded into `_repair_prompt`'s signature and then
          never rendered into the message body -- built, handed over, silently
          dropped on the floor.
 
@@ -1018,7 +1016,7 @@ def _judge_by_sentence(
 ) -> "tuple[list[dict[str, str]], bool]":
     """Ask about ONE SENTENCE at a time -- the smallest honest job.
 
-    The model no longer splits, counts, or transcribes: Python already knows
+    The model never splits, counts, or transcribes: Python already knows
     which sentence is being asked about, so the quote is exact by
     construction and the only thing left is the judgement itself. That is the
     same move that fixed the writer -- shrink the job, keep the prompt.
@@ -1539,13 +1537,12 @@ def _judge_row(
     class _NotSpeech(BaseModel):
         quote: str = Field(min_length=1)
         why: str = Field(default="", max_length=120)
-        # SAME COERCION AS THE AUTHORIZATION SCHEMA. b5a8ccaf relaxed
-        # `strict=True` on `_ComplaintSpan`'s offsets so a model emitting
-        # `12.0` or `"12"` no longer fails the whole structured call -- and
-        # left this twin strict, so the identical ValidationError could still
-        # exhaust the JUDGE, earlier in the ladder, before any recovery was
-        # reachable. Found by a contrarian review of the commit that fixed the
-        # other half. The judge prompt does not even ask for these offsets;
+        # SAME COERCION AS THE AUTHORIZATION SCHEMA (`_ComplaintSpan`'s
+        # offsets): a model emitting `12.0` or `"12"` must not fail the whole
+        # structured call, and a strict twin here would let the identical
+        # ValidationError exhaust the JUDGE, earlier in the ladder, before any
+        # recovery was reachable. The judge prompt does not even ask for these
+        # offsets;
         # they arrive volunteered, so refusing the whole answer over their TYPE
         # loses the quote as well, which is the part that matters.
         start_char: int | None = Field(default=None, ge=0)
@@ -1565,14 +1562,13 @@ def _judge_row(
     haystack = " ".join(text.split()).casefold()
 
     def _validate(_result: "_SpokenLineJudgement") -> "str | None":
-        # DELIBERATELY PERMISSIVE, and this is a correction of a real defect.
-        # The first cut REJECTED a reply whose quote was not in the line, and
-        # rejected a whole-line quote as a self-contradicted skim. Both are
-        # true faults -- but rejecting cost the ladder, and when the ladder
-        # exhausted the row lost its judge ENTIRELY and fell back to the
-        # pattern floor. Measured in the lab: a 2B tripped one of the two on
-        # most rows, so the strict version was quietly turning the model
-        # judge OFF on the very episodes it was built for.
+        # DELIBERATELY PERMISSIVE. A reply whose quote is not in the line, or a
+        # whole-line quote (a self-contradicted skim), is a true fault -- but
+        # rejecting it costs the ladder, and when the ladder exhausts the row
+        # loses its judge ENTIRELY and falls back to the pattern floor. Measured
+        # in the lab: a 2B tripped one of the two on most rows, so a strict
+        # version quietly turns the model judge OFF on the very episodes it was
+        # built for.
         #
         # A bad ENTRY is now dropped after the call instead of failing the
         # whole reply, which keeps every good finding in the same answer and

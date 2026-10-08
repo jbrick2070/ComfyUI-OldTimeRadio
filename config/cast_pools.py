@@ -1,12 +1,9 @@
 """
 config/cast_pools.py -- canonical name / voice / trait pools for cast contract.
 
-Lifted from v1.7:nodes/story_orchestrator.py:395-548 (the pre-LPL
-procedural cast generator) and relocated here as the single source of
-truth for the v2.0-alpha cast contract. The pre-LPL code is gone but
-its pools were curated over many runs and many bug fixes -- this
-module preserves every BUG-004 / FIX-3 / accent-ban comment verbatim
-because that commentary IS the spec.
+The single source of truth for the v2.0-alpha cast contract. The pools were
+curated over many runs and many bug fixes -- this module keeps every
+BUG-004 / FIX-3 / accent-ban comment because that commentary IS the spec.
 
 The cast contract LLM caller (nodes/_otr_casting.py) and the cast
 assembler both import from this module. Do NOT inline these pools at
@@ -267,13 +264,10 @@ for _genre, _nameset in _GENRE_NAME_SETS.items():
     }
 
 
-# The legacy procedural trait pools (GENDERS / AGE_BRACKETS / DEMEANORS /
-# ACCENTS) were removed 2026-08-28: zero in-repo readers. The ACCENTS lesson
-# survives the list it sat above and still binds casting: foreign Bark presets
-# (de_speaker, fr_speaker, ...) hallucinate foreign-language phonemes on
-# English text -- v1.1 "Test Signal" Lemmy (de_speaker_0) was unintelligible --
-# so every character uses en_speaker_* presets until Bark's multilingual
-# stability improves.
+# Foreign Bark presets (de_speaker, fr_speaker, ...) hallucinate
+# foreign-language phonemes on English text -- v1.1 "Test Signal" Lemmy
+# (de_speaker_0) was unintelligible -- so every character uses en_speaker_*
+# presets until Bark's multilingual stability improves.
 
 # Voice presets mapped by gender + vocal quality + language code.
 # English-native presets (en_speaker_*) have known vocal qualities.
@@ -501,18 +495,12 @@ def roll_lemmy() -> bool:
     never a seeded RNG -- the LEMMY cameo is a genuine surprise,
     decoupled from the C7 byte-identity seed.
 
-    History (BUG-LOCAL-260, 2026-05-23): a 2026-05-10 change routed
-    this roll through the cast contract's seeded random.Random so an
-    explicitly-seeded run was byte-reproducible end to end. But the
-    writer's `seed` widget ships a fixed value, and a fixed seed
-    reproduces ONE roll forever -- so a LEMMY-positive seed (42 was
-    one) cast LEMMY on 100% of runs and a LEMMY-negative seed on 0%.
-    A fixed seed can never yield the intended ~11%. Decoupling the
-    roll from the seed restores the rare cameo; the deliberate
-    trade-off is that LEMMY's hit is no longer reproducible from the
-    seed. Cast names, the announcer pick, and the style picker stay
-    fully seed-deterministic. Tests force a deterministic LEMMY via
-    the `force_lemmy` knob on assemble_pre_locked_rows.
+    A fixed seed reproduces ONE roll forever (the writer's `seed` widget
+    ships a fixed value), so a seed-routed roll would cast LEMMY on every run
+    or on none. The roll is therefore decoupled from the seed, and LEMMY's
+    hit is not reproducible from it. Cast names, the announcer pick, and the
+    style picker stay fully seed-deterministic. Tests force a deterministic
+    LEMMY via the `force_lemmy` knob on assemble_pre_locked_rows.
     """
     return _LEMMY_RNG_SYSTEM.random() < LEMMY_RATE
 

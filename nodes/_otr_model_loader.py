@@ -26,7 +26,7 @@ Public surface:
     Per-model context caps are resolved by
     _otr_model_catalog.resolve_context_cap (single source of truth); load_llm
     uses the caller-supplied context_cap when given and resolves through the
-    catalog otherwise. The old local MODEL_CONTEXT_CAPS table is gone.
+    catalog otherwise.
 
     make_generate_fn(cache_entry) -> GenerateFn
         Wraps a cache_entry into a chat-template-aware callable matching
@@ -258,7 +258,7 @@ def _publish_cache_entry_if_current(expected_epoch: int, fields: dict) -> bool:
 # streamer that make_generate_fn's shared TRANSFORMERS transport (below)
 # never wired in. NewsCuration/NewsCurationDeep (the two _run_with_timeout-
 # bound phases) go through make_generate_fn, so on the transformers lane an
-# abandoned worker previously ran to its FULL max_new_tokens budget before
+# abandoned worker would run to its FULL max_new_tokens budget before
 # its thread could unwind -- minutes, at slow token rates, of extra orphan
 # lifetime with nothing checking whether anyone was still waiting.
 #
@@ -269,10 +269,8 @@ def _publish_cache_entry_if_current(expected_epoch: int, fields: dict) -> bool:
 # back into them). _run_with_timeout COMPUTES one absolute monotonic deadline
 # BEFORE submitting its worker, the worker INSTALLS that same value and clears
 # it in its own finally, and the parent waits only the remaining duration.
-# (Corrected 2026-08-25: this comment used to say the deadline was set before
-# submission, while the code computed it inside the worker -- so the worker's
-# deadline outlived the parent's timeout by the scheduling delay. One shared
-# value removes the skew and makes this sentence true.) Both
+# One shared value, so there is no skew between the parent's timeout and
+# the worker's deadline. Both
 # user-facing transformers generate closures (make_generate_fn,
 # make_polish_generate_fn) check it via _DeadlineStoppingCriteria, cutting
 # an abandoned worker's remaining lifetime to ~1 token instead of the full
@@ -368,8 +366,7 @@ _REMOTE_CACHE_PROVIDERS = frozenset({"openrouter", "comfy_credits", "google_api"
 
 
 # ---------------------------------------------------------------------------
-# S30 B1b: MODEL_CONTEXT_CAPS static dict + DEFAULT_CONTEXT_CAP constant
-# DELETED. Context-cap resolution now goes through
+# Context-cap resolution goes through
 # nodes._otr_model_catalog.resolve_context_cap which returns a tiered
 # ContextCapVerdict (PASS for curated overrides, WARN for parsed
 # config.json, UNKNOWN for unresolved) and clamps everything against
@@ -488,32 +485,16 @@ def _plan_max_memory(
 
     OPERATOR DIRECTIVE 2026-09-06: "remove all caps, just let the system take
     up as much memory as it needs", and "no crawling". This function is kept
-    as the seam its callers and tests already reference; it no longer imposes
-    a budget.
+    as the seam its callers and tests already reference; it imposes no
+    budget.
 
-    WHAT WAS REMOVED, and why every one of these numbers was a liability:
-
-      * ``{0: "3.2GiB"}``  for a 2B-tagged id
-      * ``{0: "6.8GiB"}``  for a 9b/12b/e4b/4b-it-tagged id
-      * ``{0: total_vram - 2.5}`` above 12 GiB (the "Sovereignty Buffer")
-      * a ``"cpu": "32GiB"`` lane alongside each of them
-
-    The budgets were guesses keyed on a SUBSTRING OF THE MODEL NAME, and they
-    were priced as though everything quantizes to 4 bits. Both premises are
-    false, and the campaign paid for it three separate times on an 8 GB 4060:
-
-      * gemma-4-12b-it needs 6.95 GiB resident and was capped at 6.8 GiB. It
-        missed by 0.15 GiB, spilled to CPU, and wrote at 0.4 tok/s.
-      * gemma-4-E2B-it needs 6.01 GiB -- 5.12 GiB of it NON-quantizable
-        embeddings -- and was capped at 3.2 GiB because its name contains
-        "2b-it". It never emitted a token.
-      * gemma-4-E4B-it was pushed 41 of its 42 decoder layers onto the CPU and
-        wrote at 0.5 tok/s.
-
-    Each figure is measured from the row's own checkpoint header, not
-    estimated. A cap that forces a partial CPU placement does not save a
-    render; it converts a fast render into a useless one, because every
-    forward pass then pays a PCIe round trip per CPU-resident layer.
+    WHY NO CAP: per-model budgets were guesses keyed on a SUBSTRING OF THE
+    MODEL NAME and priced as though everything quantizes to 4 bits. Both
+    premises are false, and a cap that forces a partial CPU placement does not
+    save a render; it converts a fast render into a useless one, because every
+    forward pass then pays a PCIe round trip per CPU-resident layer (measured
+    on an 8 GB 4060 from each row's own checkpoint header: gemma-4-12b-it
+    needs 6.95 GiB resident, and a 6.8 GiB cap spilled it to CPU at 0.4 tok/s).
 
     WITH NO CAP THE OUTCOME IS BINARY AND HONEST. No ``max_memory`` means the
     caller sets no ``device_map`` either (it is only set when a budget
@@ -597,11 +578,11 @@ def _cpu_overflow_max_memory(total_vram: float, gpu_index: int = 0) -> dict:
     Used only after the underlying loader failed to place on the accelerator.
     Disk is omitted: OTR does not support disk offload.
 
-    THE CPU LANE IS SIZED FROM THIS MACHINE, not a constant. It used to say
-    "64GiB" on every box -- this developer's own 64 GB workstation made that
-    look true here, while a 16 GB-RAM box overcommitted and paged instead of
-    refusing cleanly (the 8 GB tier's real limit is system RAM -- see the
-    otr_8gb_ltx25_foley note in apple/LAUNCH_RECIPES.md). Now it is
+    THE CPU LANE IS SIZED FROM THIS MACHINE, not a constant: a flat "64GiB"
+    would look true on this developer's own 64 GB workstation, while a 16
+    GB-RAM box overcommitted and paged instead of refusing cleanly (the 8 GB
+    tier's real limit is system RAM -- see the otr_8gb_ltx25_foley note in
+    apple/LAUNCH_RECIPES.md). It is
     min(available, total) RAM minus a headroom, so Accelerate plans against
     what the box actually has and refuses a placement that cannot fit.
 
@@ -620,8 +601,8 @@ def _cpu_overflow_max_memory(total_vram: float, gpu_index: int = 0) -> dict:
     SELF-CONTAINED ON PURPOSE: tests exec this function from the AST in an
     empty namespace (test_nf4_explicit_cpu_offload), so the headroom lives
     in a local and psutil is imported inside -- no module-level names. When
-    psutil is missing or fails, the pre-fix "64GiB" returns: degraded open,
-    the old behavior, which never fires inside the ComfyUI venv that ships
+    psutil is missing or fails, the flat "64GiB" returns: degraded open,
+    which never fires inside the ComfyUI venv that ships
     psutil as a dependency.
     """
     gpu = max(1.0, float(total_vram) if total_vram else 1.0)
@@ -727,18 +708,18 @@ def _bug098_scan_linear4bit_devices(model) -> tuple[int, list[str]]:
     "could not verify", not as "verified fine", and fall through to the
     ``is_loaded_in_4bit`` flag as the remaining signal.
 
-    2026-08-25 (PBUG-20260825-04): this REPLACES a process-global
-    ``torch.cuda.memory_allocated()`` delta as the correctness predicate.
+    2026-08-25 (PBUG-20260825-04): the correctness predicate is the model's
+    own weights, NOT a process-global ``torch.cuda.memory_allocated()`` delta.
     That counter reflects the WHOLE process, not this call's own
     allocation -- a concurrent orphan worker (an abandoned
     NewsCuration/NewsCurationDeep timeout thread, left running because
     generation is not cancellable mid-token -- see
     ``story_orchestrator._run_with_timeout``) freeing its own tensors in
     the same wall-clock window can produce a negative or near-zero NET
-    delta even when THIS load fully succeeded. Confirmed live on an 8 GB
+    delta even when THIS load fully succeeded. Seen live on an 8 GB
     RTX 4060: ``linear4bit_count=592``, ``is_loaded_in_4bit=True``, and
-    every actual weight tensor really was on CUDA -- yet the old delta
-    check (``delta >= 0.0``) saw ``vram_delta=-0.00GiB`` and killed a
+    every actual weight tensor really was on CUDA -- yet a delta check
+    (``delta >= 0.0``) saw ``vram_delta=-0.00GiB`` and would have killed a
     working load. Asking the model directly is immune to whatever else the
     process's allocator is doing concurrently.
     """
@@ -1068,9 +1049,8 @@ def load_llm(
             )
 
         # S1 platform-portability (2026-07-10): resolve the EXPLICIT runtime
-        # policy (None = the nv50 16 GB baseline -- identical resolved
-        # values to the deleted auto machinery below). policy.device wins
-        # over the legacy `device` kwarg: one source of truth.
+        # policy (None = the nv50 16 GB baseline). policy.device wins over the
+        # `device` kwarg: one source of truth.
         from ._otr_shared.llm_policy import BASELINE_POLICY
         _policy = policy if policy is not None else BASELINE_POLICY
 
@@ -1079,16 +1059,14 @@ def load_llm(
         _policy = _policy_with_baked_quant(_policy, _stripped_model_id)
         device = _policy.device
         # THE WRITER LANDS ON THE GPU THE POLICY NAMES (2026-09-25). Every
-        # probe and placement below used to say device 0; once the policy
-        # admitted "cuda:N" (0c item 1) a second-GPU pick stopped crashing
-        # and started loading onto GPU 0 instead -- a silent wrong. Bare
+        # probe and placement below uses this index: a hardcoded device 0 would,
+        # once the policy admitted "cuda:N" (0c item 1), load a second-GPU pick
+        # onto GPU 0 instead -- a silent wrong. Bare
         # "cuda" is index 0, so every single-GPU box is byte-identical.
         _gpu_index = _cuda_index(device)
 
-        # S1: quantization is an EXPLICIT policy field. The legacy tag
-        # predicate (Obsidian profile + "4-bit"/"9b"/"12b"/"nemo"/...
-        # model-id substrings) is DELETED -- its resolved value for every
-        # production id was NF4, which is exactly the policy default.
+        # S1: quantization is an EXPLICIT policy field, never inferred from
+        # model-id substrings; the policy default is NF4.
         requested_quantized = _policy.quant_policy in ("bnb_nf4", "bnb_8bit")
 
         _weights_id = _otr_catalog.hf_weights_id(_stripped_model_id)
@@ -1233,19 +1211,17 @@ def load_llm(
 
         load_dtype = torch.bfloat16
 
-        # S1: attention implementation is an EXPLICIT policy field. The FA2
-        # auto-probe (distribution('flash-attn') + import) is DELETED -- on
-        # the Blackwell sm_120 / Windows / torch 2.10 baseline it always
-        # resolved to sdpa, which is the policy default. An FA2 wheel
-        # appearing later is honoured by setting llm_attn_impl explicitly,
-        # not by a probe. Still the single source of truth for
-        # `attn_implementation` in common_kwargs, logged on every load.
+        # S1: attention implementation is an EXPLICIT policy field, with no FA2
+        # auto-probe (on the Blackwell sm_120 / Windows / torch 2.10 baseline it
+        # always resolved to sdpa, the policy default). An FA2 wheel is honoured
+        # by setting llm_attn_impl explicitly, not by a probe. Single source
+        # of truth for `attn_implementation` in common_kwargs, logged on every
+        # load.
         attn_impl = _policy.attn_impl
         _runtime_log(f"[StoryOrchestrator] Attention selector (policy): attn_implementation={attn_impl}")
 
         # 4-bit / 8-bit quantization -- EXPLICIT policy, no model-id tag
-        # magic (S1; the "2bit"/"3bit" wing-ding upgrade + vram_safe_tags
-        # predicate are deleted with it). bitsandbytes missing while the
+        # magic (S1). bitsandbytes missing while the
         # policy requires it is a HARD FAIL: silently proceeding at
         # bfloat16 OOMs a 16 GB card at ~24 GiB -- the exact fallback
         # class BUG-LOCAL-098 exists to catch.
@@ -1265,16 +1241,14 @@ def load_llm(
                     "(roughly 4x its 4-bit size). NO silent bf16 fallback."
                 ) from _bnb_err
             # THIS GUARD IS THE WHOLE TEST, AND IT IS A RUNTIME ONE.
-            # It used to advise that "bnb lanes are OFF on ROCm/MPS/CPU tiers",
-            # and every non-CUDA JSON shipped quant_policy="none" on that
-            # sentence's authority. It was a POLICY, not a measurement, and it
-            # was expensive: it forced Qwen3.5-4B to 8.06 GiB unquantized on an
-            # 8 GB AMD card that a 2.90 GiB NF4 load would have fitted with
-            # room to spare -- the tier missed by 0.07 GiB for no hardware
-            # reason. The installed bitsandbytes (0.50.1) advertises cpu, cuda,
-            # hpu, mps, triton and xpu backends, so the premise was also stale.
+            # A blanket "bnb lanes are OFF on ROCm/MPS/CPU tiers" would be a
+            # POLICY, not a measurement, and an expensive one: it would force
+            # Qwen3.5-4B to 8.06 GiB unquantized on an 8 GB AMD card that a
+            # 2.90 GiB NF4 load fits with room to spare. The installed
+            # bitsandbytes (0.50.1) advertises cpu, cuda, hpu, mps, triton and
+            # xpu backends.
             #
-            # The non-CUDA JSONs now request bnb_nf4 like everyone else and let
+            # The non-CUDA JSONs request bnb_nf4 like everyone else and let
             # THIS import decide. Where bitsandbytes really is unavailable the
             # failure is loud and names the exact one-value fix, which is the
             # behaviour the operator asked for: find out what actually works
@@ -1409,17 +1383,16 @@ def load_llm(
                 if _gpu_index and "device_map" not in common_kwargs:
                     common_kwargs["device_map"] = {"": _gpu_index}
                 # REPORT THE PLACEMENT THAT WAS ACTUALLY REQUESTED, not the
-                # branch's name (2026-09-06). This line used to read
-                # "device_map=auto path" whenever the card was under 14.5 GiB,
-                # but device_map is only set above when max_memory is not None.
-                # A row whose id matches no size tag in _plan_max_memory gets
-                # max_memory=None, so NO device_map reaches from_pretrained and
-                # accelerate's auto dispatch never runs -- bitsandbytes places
-                # the whole model on one device instead. Both cases logged the
-                # same sentence, and this is the single line an operator greps
+                # branch's name (2026-09-06). device_map is only set above when
+                # max_memory is not None, so reporting "device_map=auto path"
+                # whenever the card is under 14.5 GiB would claim a dispatch
+                # that may not have happened: with max_memory=None no
+                # device_map reaches from_pretrained and accelerate's auto
+                # dispatch never runs -- bitsandbytes places the whole model on
+                # one device instead. This is the single line an operator greps
                 # after a multi-hour run to decide whether layers were
-                # offloaded. Claiming a dispatch that did not happen sends the
-                # next diagnosis to the wrong subsystem, which it did.
+                # offloaded, and claiming a dispatch that did not happen sends
+                # the next diagnosis to the wrong subsystem.
                 _placement = common_kwargs.get("device_map")
                 _runtime_log(
                     f"[StoryOrchestrator] sub-14.5 GiB path "
@@ -1516,9 +1489,9 @@ def load_llm(
                 # then Accelerate raised RuntimeError "Allocation on device 0
                 # would exceed allowed memory" (PyTorch user-supplied memory
                 # fraction). That is a REAL runtime failure, not a catalog
-                # estimate -- but the previous handler only caught ValueError
-                # "dispatched on the cpu", so the OOM was wrapped as
-                # load_llm failed and CPU overflow never ran. Catch the
+                # estimate -- and a handler that only caught ValueError
+                # "dispatched on the cpu" would wrap it as load_llm failed
+                # and CPU overflow would never run. Catch the
                 # runtime's own memory-placement exceptions and retry with
                 # an explicit CPU RAM lane. Disk stays disabled. Unrelated
                 # ValueError / RuntimeError still re-raises.
@@ -1890,16 +1863,12 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
             # Emptying the allocator returns free blocks. It does not establish
             # that this function or its caller released every model reference.
             #
-            # WHAT IT ACTUALLY COSTS -- and this paragraph was WRONG for a day,
-            # so read the correction rather than the original story. It said the
-            # pool RATCHETED across an episode's 8-12 writer reloads until the
-            # OS killed the process. It does not: `load_llm` runs a Zero-Prime
-            # wash before every load (:941), and `soft_empty_cache` DOES call
-            # `torch.mps.empty_cache()` on Metal, so the previous copy was
-            # already released before the next load.
-            #
-            # The measured truth is a 2x WINDOW, not a ratchet
-            # (PBUG-20260908-03 CORRECTION):
+            # WHAT IT ACTUALLY COSTS: a 2x WINDOW, not a ratchet. `load_llm`
+            # runs a Zero-Prime wash before every load (:941), and
+            # `soft_empty_cache` DOES call `torch.mps.empty_cache()` on Metal,
+            # so the previous copy is already released before the next load;
+            # the pool does not grow across an episode's 8-12 writer reloads.
+            # Measured (PBUG-20260908-03 CORRECTION):
             #
             #     model resident on mps          MPS 2056.5 MiB
             #     after model.to("cpu")          MPS 2056.5 MiB  <- still held,
@@ -1911,8 +1880,7 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
             # Step 1 makes a CPU copy and releases nothing, so the model sat
             # DOUBLE-COUNTED for the whole gap between stages -- which is
             # exactly the window the video models, Kokoro and StableAudio3 load
-            # into. This call collapses that window. The fix is right; the
-            # reasoning its commit gave was not.
+            # into. This call collapses that window.
             #
             # `model.to("cpu")` above is NOT redundant with this on unified
             # memory even though "cpu" is the same physical RAM -- it is what
@@ -1945,13 +1913,11 @@ def unload_llm() -> int:
     layer (this loader's `load_llm` still delegates back to them);
     the teardown ensures both surfaces are quiesced together.
 
-    S30 B4b: the three production importers (batch_bark_generator,
-    _otr_bark_lib, scene_sequencer) now import this `unload_llm`
-    directly rather than the orchestrator's `_unload_llm` (the
-    audit-miss BUG-LOCAL-226 fix). Story orchestrator's
+    Callers import this `unload_llm` directly rather than the
+    orchestrator's `_unload_llm` (BUG-LOCAL-226). Story orchestrator's
     `_generate_with_llm` also routes through `request_slot("technical",
-    ...)` to acquire its cache_entry; the RSS news path no longer
-    holds a parallel reference to the legacy cache.
+    ...)` to acquire its cache_entry; the RSS news path holds no parallel
+    reference to the legacy cache.
     """
     entry, new_epoch = _detach_and_invalidate_locked()
     _teardown_gpu_for_entry(entry)
@@ -2053,7 +2019,7 @@ def _assert_policy_admits_vram(
     ``LLMRuntimePolicy.cache_key()`` does not carry the ceiling, and is RIGHT
     not to -- admission does not shape
     the loaded artifact. But that means a resident model is reused on load
-    IDENTITY alone, so a model admitted under a permissive ceiling used to
+    IDENTITY alone, so a model admitted under a permissive ceiling would
     satisfy a stricter-ceiling request by cache hit. Gating the load alone
     cannot close that: the question is asked of the REQUEST, not of the cache.
     This mirrors the lane backstop, which was already placed correctly -- the
@@ -2294,8 +2260,8 @@ def request_slot(
 
     # Steps 3-5, HOISTED (A1, 2026-07-27): the context cap and THE policy
     # admission calculation, once, before every local-lane cache read and
-    # before every local-lane load. They used to sit below both cache-hit
-    # returns, so the ceiling could only ever gate a fresh TRANSFORMERS load
+    # before every local-lane load. Below either cache-hit return, the
+    # ceiling could only ever gate a fresh TRANSFORMERS load
     # -- see _assert_policy_admits_vram for why the reuse key cannot carry
     # the ceiling instead.
     _context_pin = _otr_catalog._hard_vram_context_limit()
@@ -2640,12 +2606,12 @@ def make_generate_fn(cache_entry: dict[str, Any]):
                 require_full=require_full_output or bounded_capacity,
             )
         except GenerationContextOverflowError as exc:
-            # THE TWO LOCAL TRANSPORTS MUST AGREE (2026-08-13). This used to
-            # raise a bare ModelLoaderError with NO phase for the exact
-            # condition OTR_LedgerScriptWriter raises as a phase-carrying
-            # PromptContextOverflowError. The ladder reads the PHASE to decide
-            # whether a failure is rerollable, so an identical runaway was
-            # rerollable on one transport and terminal on the other, purely
+            # THE TWO LOCAL TRANSPORTS MUST AGREE (2026-08-13). A bare
+            # ModelLoaderError with NO phase for the exact condition
+            # OTR_LedgerScriptWriter raises as a phase-carrying
+            # PromptContextOverflowError would make an identical runaway
+            # rerollable on one transport and terminal on the other (the ladder
+            # reads the PHASE to decide whether a failure is rerollable), purely
             # from which one the pass happened to take. The phase is read off
             # the error rather than assumed here, so a pre-call refusal that IS
             # retryable cannot be mislabelled by this line.
@@ -2847,12 +2813,12 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                 require_full=require_full_output or bounded_capacity,
             )
         except GenerationContextOverflowError as exc:
-            # THE TWO LOCAL TRANSPORTS MUST AGREE (2026-08-13). This used to
-            # raise a bare ModelLoaderError with NO phase for the exact
-            # condition OTR_LedgerScriptWriter raises as a phase-carrying
-            # PromptContextOverflowError. The ladder reads the PHASE to decide
-            # whether a failure is rerollable, so an identical runaway was
-            # rerollable on one transport and terminal on the other, purely
+            # THE TWO LOCAL TRANSPORTS MUST AGREE (2026-08-13). A bare
+            # ModelLoaderError with NO phase for the exact condition
+            # OTR_LedgerScriptWriter raises as a phase-carrying
+            # PromptContextOverflowError would make an identical runaway
+            # rerollable on one transport and terminal on the other (the ladder
+            # reads the PHASE to decide whether a failure is rerollable), purely
             # from which one the pass happened to take. The phase is read off
             # the error rather than assumed here, so a pre-call refusal that IS
             # retryable cannot be mislabelled by this line.

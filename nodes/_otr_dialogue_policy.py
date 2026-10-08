@@ -3,12 +3,10 @@
 from collections.abc import Sequence
 
 
-# Scoped to LEMMY by its own grammar, because the prompt is read as written.
-# The first sentence used to be the subjectless "Convey the Cockney accent
-# through phrasing, idiom, cadence, and rhythm", appended whenever Lemmy was
-# anywhere in the episode roster -- so the writer took it as a scene-wide
-# accent order and re-registered the whole ensemble. The spelling sentence was
-# always the point; the accent sentence was meant as its context.
+# Scoped to LEMMY by its own grammar, because the prompt is read as written:
+# a subjectless "Convey the Cockney accent ..." sentence is taken as a
+# scene-wide accent order and re-registers the whole ensemble. The spelling
+# sentence is the point; the accent sentence is its context.
 _COCKNEY_ORTHOGRAPHY_RULE = (
     "\n\nFor LEMMY's spoken lines only, convey his Cockney accent through "
     "phrasing, idiom, cadence, and rhythm. Every other character must retain "

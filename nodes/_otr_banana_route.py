@@ -24,13 +24,10 @@ render driver (after _apply_visual_safety_prompt) -- gated by:
 Env is read per call; on a RESIDENT server an env change needs a fresh boot
 (no widget exists by operator ruling -- no canonical-workflow change, ever).
 
-THE DEFAULT GRAPH NOW FEEDS THIS ROUTE (banner corrected 2026-08-28 -- the
-paragraph here described a retired graph for months): the shipped canonical
-selects `still_flat (16:9)` for all three roles, which MINTS STILLS from
-text prompts, so the route is live by default. The corpus agrees:
-`banana_route` appears in 320 ledgers and `still_flat` in 319 of them. The
-old text claimed the canonical ran procedural viz_* engines that mint no
-stills -- true once, long gone.
+THE DEFAULT GRAPH FEEDS THIS ROUTE: the shipped canonical selects
+`still_flat (16:9)` for all three roles, which MINTS STILLS from text
+prompts, so the route is live by default. The corpus agrees: `banana_route`
+appears in 320 ledgers and `still_flat` in 319 of them.
 
 Split-switch honesty: stills-on/video-off (or inverse) is a real capability
 only on t2v lanes. On i2v lanes the anchor still carries the look, so a split
@@ -60,8 +57,8 @@ card shapes are shielded, both composed by ``compose_still_word_prompt``:
   episode.
 
 Everywhere else quotes are decorative and are NOT shielded. A writer LLM
-styling an ordinary prompt as ``a man carrying a "revolver"`` used to have
-that revolver survive untransformed -- the route silently under-firing. So
+styling an ordinary prompt as ``a man carrying a "revolver"`` would otherwise
+have that revolver survive untransformed -- the route silently under-firing. So
 ``apply()`` takes ``shield_quoted_card_text``: the still dispatcher passes
 True only for objects stamped ``source == "still_word"``, and the video funnel
 passes False (no card composes on that lane -- a card's words travel in the
@@ -552,8 +549,8 @@ def cap_phrase_safe(text: str, max_chars: int,
 #: ``""`` is deliberately NOT here. ``raw is None`` below already covers
 #: "unset", so an empty or whitespace-only value is a MALFORMED knob -- in
 #: practice a launcher line with a trailing space -- and BUILD-SPEC section 1
-#: sends anything outside these two sets to the default plus one warning. A
-#: present-but-empty OTR_BANANA_INCLUDE_FIDELITY_BANKS used to read as TRUE and
+#: sends anything outside these two sets to the default plus one warning.
+#: Reading a present-but-empty OTR_BANANA_INCLUDE_FIDELITY_BANKS as TRUE would
 #: silently bananafy the shakespeare / public_domain lanes.
 _TRUE_TOKENS = frozenset({"1", "true", "yes", "on"})
 _FALSE_TOKENS = frozenset({"0", "false", "no", "off"})

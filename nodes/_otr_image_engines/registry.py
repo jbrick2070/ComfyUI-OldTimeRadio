@@ -119,12 +119,8 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["flux.1-dev"]},
-    # flux2_klein CAPABILITIES row REMOVED 2026-09-17: Klein stills ripped
-    # from the shipping image surface; the registry-consistency invariant
-    # forbids a row without a registered engine.
-    # hidream_i1 CAPABILITIES row REMOVED 2026-06-29 (C3): the dark scaffold
-    # (NotImplementedError render) is unregistered; the registry-consistency
-    # invariant forbids a row without a registered engine.
+    # The registry-consistency invariant forbids a CAPABILITIES row without a
+    # registered engine.
     # MEASURED 2026-06-18 on the 5080: the lumina2 split-file recipe stages the
     # Gemma-2 TE (4986 MB) then the 2.6B diffusion (4977 MB) sequentially; the
     # steady diffusion+VAE residency is ~7 GB (TE offloads before sampling) and
@@ -135,9 +131,6 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["lumina-image-2"]},
-    # sd35_large CAPABILITIES row REMOVED 2026-06-29 (C3): the dark scaffold
-    # (NotImplementedError render) is unregistered; the registry-consistency
-    # invariant forbids a row without a registered engine.
     # MEASURED 2026-06-18 on the 5080 (nvfp4 + qwen3-4b fp8 TE): the nvfp4
     # diffusion steady residency is ~4.3-5 GB (TE offloaded before sampling); the
     # transient TE+diffusion LOAD peak hit ~10 GB but ComfyUI manages it down.
@@ -214,9 +207,8 @@ __all__.append("CAPABILITIES")
 
 
 # ---------------------------------------------------------------------------
-# VALIDATED_ENGINES + validated_engine_names() REMOVED 2026-06-29 (C4 -- "registry
-# IS the menu"): there is NO validated-subset dropdown filter. Every REGISTERED
-# image engine is SELECTABLE; the per-role director COMBO is built from
-# all_engine_names() (validation is the operator's MANUAL process, never a code
-# gate). The "+ Add Custom Model" sentinel remains the escape hatch.
+# There is NO validated-subset dropdown filter (C4 -- "registry IS the menu"):
+# every REGISTERED image engine is SELECTABLE; the per-role director COMBO is
+# built from all_engine_names() (validation is the operator's MANUAL process,
+# never a code gate). The "+ Add Custom Model" sentinel is the escape hatch.
 # ---------------------------------------------------------------------------

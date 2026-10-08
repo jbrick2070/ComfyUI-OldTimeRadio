@@ -98,10 +98,10 @@ class FluxGen1ImageEngine:
             "seed": int(get("seed") or 0),
             "steps": _eint("OTR_FLUX_STEPS", 20),
             "cfg": _efloat("OTR_FLUX_CFG", 1.0),
-            # FluxGuidance embedding (BUG-411 restore): Flux.1-dev runs cfg=1.0
-            # and takes its richness/adherence from the guidance value baked into
-            # the conditioning by a FluxGuidance node -- the 6/5 pipeline applied
-            # 3.5 and the rewrite dropped it, flattening the look. Env-overridable.
+            # FluxGuidance embedding (BUG-411): Flux.1-dev runs cfg=1.0 and
+            # takes its richness/adherence from the guidance value baked into
+            # the conditioning by a FluxGuidance node (3.5 by default; omitting
+            # it flattens the look). Env-overridable.
             "guidance": _efloat("OTR_FLUX_GUIDANCE", 3.5),
             "sampler_name": otr_env.get("OTR_FLUX_SAMPLER", "euler"),
             "scheduler": otr_env.get("OTR_FLUX_SCHEDULER", "simple"),

@@ -60,13 +60,13 @@ _KOKORO_ONNX_REL_PATH = os.path.join("onnx", "model.onnx")
 KOKORO_ONNX_REPO_ID = "onnx-community/Kokoro-82M-v1.0-ONNX"
 
 
-# S4 platform-portability (2026-07-10): the cuda->mps->cpu auto-waterfall is
-# DELETED. The device is EXPLICIT: the voice node threads the CastLock ledger
-# stamp (meta.voice_device) onto the adapter as ``requested_device``; a
-# device the host cannot provide fails LOUD in KPipeline -- never a silent
-# downgrade to a 10x slower backend. The ONNX backend is CPU by design and says
-# so once at load (it is not a downgrade from anything: there is no ONNX-CUDA
-# path in the pack, and an 82M model runs ~6x realtime on CPU).
+# S4 platform-portability (2026-07-10): the device is EXPLICIT, never an
+# auto-waterfall. The voice node threads the CastLock ledger stamp
+# (meta.voice_device) onto the adapter as ``requested_device``; a device the
+# host cannot provide fails LOUD in KPipeline -- never a silent downgrade to a
+# 10x slower backend. The ONNX backend is CPU by design and says so once at
+# load (it is not a downgrade from anything: there is no ONNX-CUDA path in the
+# pack, and an 82M model runs ~6x realtime on CPU).
 
 
 def _kokoro_model_dir() -> str:
@@ -100,13 +100,9 @@ def _pick_announcer_voice(episode_seed, voice_override="random",
                           language="en") -> str:
     """One voice per episode, drawn the SAME way the voice bank draws it.
 
-    This used to run its own formula -- Random(f"{seed}_kokoro_announcer") --
-    while the bank drew with Random(sha1("kokoro_announcer_pick:<seed>")). Two
-    formulas over one pool means the ledger can name one announcer while the
-    render opens another, which is precisely the defect the shared
-    gender-agnostic selector was extracted to end on the character side.
-
-    Delegates to the bank so there is ONE draw. The local English formula
+    Two formulas over one pool would let the ledger name one announcer while
+    the render opens another, so the draw is delegated to the bank: there is
+    ONE draw. The local English formula
     survives only as the fallback for a bank that cannot be loaded at all --
     and ONLY on English. A non-English ledger must never render the British
     announcer pool (the English trapdoor).

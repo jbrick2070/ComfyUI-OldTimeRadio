@@ -56,7 +56,7 @@ _ROSTER_HEADINGS = (
 _END_OF_ROSTER = re.compile(r"^\s*(ACT\b|SCENE\b|PROLOGUE\b|FIRST ACT\b)", re.IGNORECASE)
 
 # "NAME, description" -- but also "NURSE to Juliet", which carries no comma and
-# was being dropped entirely, and a bare "ROMEO" with no description at all.
+# and must not be dropped, and a bare "ROMEO" with no description at all.
 _ENTRY_RE = re.compile(
     r"^(?P<name>[A-Z][A-Z' .\-]*[A-Z]|[A-Z])"
     r"\s*(?:,\s*(?P<desc>.+)|\s+(?P<desc2>[a-z].*))?$"

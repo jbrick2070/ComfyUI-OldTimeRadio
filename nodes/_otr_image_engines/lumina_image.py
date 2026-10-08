@@ -234,26 +234,19 @@ class LuminaImage2Engine:
             "vae_name": os.path.basename(otr_env.get(VAE_ENV, "") or _DEFAULT_VAE),
             "prompt": str(get("prompt") or ""),
             # The request's composed negative (pack style + per-object) wins;
-            # the env override stays for dev only. Before 2026-08-17 this read
-            # env ONLY, so the dispatcher's negative was computed and silently
-            # discarded on this lane (PBUG-20260817-01). Live here: cfg 4.0.
+            # the env override stays for dev only. Live here: cfg 4.0.
             # `is not None`, not `or`: an explicitly-empty override means
             # "render with no negative", and must not fall through to the
             # request. That override-precedence rule matches
             # z_image_turbo._resolve_negative -- but the EDGES DELIBERATELY DO
-            # NOT MATCH, and an earlier version of this comment wrongly claimed
-            # they did. `z_image_turbo._resolve_negative` ends
-            # `.strip() or _HYGIENE_NEGATIVE` (cited by SYMBOL: this comment used
-            # to say `z_image_turbo.py:117` and the 2026-08-17 overlay commit
-            # inserted lines above it, so the address was wrong within the hour);
-            # lumina has no hygiene floor and no strip,
-            # so an empty request negative reaches the encoder as "" and a
-            # whitespace-only one is passed verbatim. That gap is REACHABLE
-            # (`VISUAL_SAFETY_NEGATIVE_PROMPT` is "" and a pack may ship an
-            # empty negative_tail). The dispatcher USED to label exactly that case
-            # `_neg_source="engine_hygiene"`, which lumina does not honour; as of
-            # 2026-08-17 that arm reads `none_contributed` and describes
-            # composition only, so the receipt no longer claims a floor here.
+            # NOT MATCH. `z_image_turbo._resolve_negative` ends
+            # `.strip() or _HYGIENE_NEGATIVE`; lumina has no hygiene floor and
+            # no strip, so an empty request negative reaches the encoder as ""
+            # and a whitespace-only one is passed verbatim. That gap is
+            # REACHABLE (`VISUAL_SAFETY_NEGATIVE_PROMPT` is "" and a pack may
+            # ship an empty negative_tail). The dispatcher's `_neg_source` reads
+            # `none_contributed` for that case and describes composition only,
+            # so the receipt does not claim a floor here.
             # Whether this engine should grow its own floor is a RENDER
             # decision on a different model, not a comment fix; it is logged,
             # not folded in here.

@@ -16,20 +16,16 @@ Qwen / Mistral / GLM / Kimi / Perplexity). So this backend is, in shape,
     signed-in app session, or from `extra_data.api_key_comfy_org` on a
     headless POST /prompt (scripts/otr_api.py sends it). That node binds it
     here once per queue via `set_auth(...)`, tied to the prompt id;
-    `_bearer()` reads ONLY that. There is
-    no env var, no pack key file and no second resolver (rip
-    2026-09-19: the pack had three credential sources in two orders,
-    and the lane flag alone satisfied the gate). The logged-in
-    account's session bearer is never requested: the Comfy Registry
-    scan treats a third-party pack declaring that hidden input as
-    credential access and flags the version (PBUG-20260902-04).
+    `_bearer()` reads ONLY that. There is no env var, no pack key file and no
+    second resolver, so the lane flag alone cannot satisfy the gate. The
+    logged-in account's session bearer is never requested: the Comfy Registry
+    scan treats a third-party pack declaring that hidden input as credential
+    access and flags the version (PBUG-20260902-04).
   * Gate: the credential IS the gate. `load()` refuses a Comfy slot the
-    moment `_bearer()` is empty; no env flag can stand in for the key
-    (rip 2026-09-19 -- `comfy_credits_enabled()` was deleted with its
-    only caller). `OTR_ENABLE_COMFY_CREDITS` is read NOWHERE in
-    production any more: the slot pickers list the pinned catalog
-    unconditionally (e9a5b3cb, 2026-09-15); the pick plus the key is
-    the whole switch.
+    moment `_bearer()` is empty; no env flag can stand in for the key.
+    `OTR_ENABLE_COMFY_CREDITS` is read NOWHERE in production: the slot
+    pickers list the pinned catalog unconditionally; the pick plus the key
+    is the whole switch.
   * Endpoint: the Comfy API base + chat path are env-overridable
     (`OTR_COMFY_API_BASE` / `OTR_COMFY_CHAT_PATH`) so the operator
     confirms the exact proxy surface at the first credit-billed run
@@ -185,11 +181,10 @@ _COMFY_REASONING_LOW_REQUIRED = frozenset({COMFY_CLAUDE_SONNET_5})
 _COMFY_NO_TEMPERATURE = frozenset({COMFY_CLAUDE_SONNET_5})
 
 # NO TOKEN CAPS (operator, 2026-09-28: "no caps ... remove that whole
-# feature"; PBUG-20260928-02), the same as the OpenRouter lane. The per-run
-# ceiling had already killed a live 1-act here on 2026-09-15 by counting each
-# call's 16384 output allowance as spend; the OpenRouter lane then died the same
-# way twice. A request now carries no max_tokens -- ComfyUI's own OpenRouter node
-# posts to this same proxy without one -- so the model writes until it stops or
+# feature"; PBUG-20260928-02), the same as the OpenRouter lane: a per-run
+# ceiling that counts each call's output allowance as spend kills live runs.
+# A request carries no max_tokens -- ComfyUI's own OpenRouter node posts to
+# this same proxy without one -- so the model writes until it stops or
 # reaches its own limit, and prepaid credits plus the queue-time wallet check
 # are the money guard.
 #
@@ -478,9 +473,8 @@ def reset_run_budget() -> None:
 
 def _usage_tokens(body: dict) -> int:
     """Provider-reported tokens for one response; 0 when it reported none.
-    Never an estimate: counting the output allowance instead of the bill is
-    what made the old per-run ceiling kill runs the provider had barely
-    charged for."""
+    Never an estimate: counting the output allowance instead of the bill
+    would charge a run for tokens the provider had barely billed."""
     usage = body.get("usage") if isinstance(body, dict) else None
     if not isinstance(usage, dict):
         return 0

@@ -12,10 +12,10 @@ All three leave ``otr/obs`` alone: the published copy is the deliverable, and
 this module refuses to run at all unless that copy is proven to exist OUTSIDE
 the folder it is about to clean.
 
-WHY EVERY GUARD HERE EXISTS. The previous space-saver (``perfect_run_spacesaver``,
-2026-05-02) wiped the WRONG episode on its first day (BUG-LOCAL-014, commit
-``d2c2df81``) because it found its ledger by an mtime walk -- and that walker is
-still live as the ledger singleton's last-resort fallback. So the folder comes
+WHY EVERY GUARD HERE EXISTS. An earlier space-saver wiped the WRONG episode
+on its first day because it found its ledger by an mtime walk -- and that
+walker is still live as the ledger singleton's last-resort fallback. So the
+folder comes
 only from the in-flight singleton, and the ledger found for it must carry this
 run's delivery token: a ledger the walker wandered to from another run cannot.
 
