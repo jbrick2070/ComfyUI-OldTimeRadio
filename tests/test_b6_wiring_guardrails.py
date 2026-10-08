@@ -13,12 +13,6 @@ defend against:
    `creative_writing_model` / `technical_model` widget in
    INPUT_TYPES. Only OTR_LedgerScriptWriter is allowed to have
    widget-form model picks.
-5. test_slot_scheduler_transitions_match_dag            -- defense-
-   in-depth unit test of the writer's _SlotScheduler transition
-   counter (mirrors the B2b coverage at the wiring-test layer).
-6. test_writer_has_input_types_no_other_node_picks_model -- same as
-   #4 expressed as a parametrized sweep so each offending class
-   gets its own failure row.
 """
 
 from __future__ import annotations
@@ -153,7 +147,7 @@ def test_no_not_downloaded_suffix_in_meta_stamps():
 
 
 # ---------------------------------------------------------------------------
-# 4 + 6. No model widget outside the writer
+# 4. No model widget outside the writer
 # ---------------------------------------------------------------------------
 
 
@@ -275,49 +269,6 @@ def test_no_model_widget_outside_writer():
         "model-widget surface. Other nodes must use forceInput "
         "sockets:\n  " + "\n  ".join(offenders)
     )
-
-
-@pytest.mark.parametrize(
-    "key",
-    list(sorted(_MODEL_WIDGET_KEYS)),
-)
-def test_writer_has_input_types_no_other_node_picks_model(key):
-    """Parametrized sweep: for each known model-widget key, no class
-    other than OTR_LedgerScriptWriter may declare it as a widget.
-    Non-LLM media nodes (AudioGen, MusicGen) opt out via
-    NON_LLM_MODEL_WIDGET_OK = True.
-    """
-    offenders: list[str] = []
-    for path, cls in _classes_in_nodes_dir():
-        if cls.name == "OTR_LedgerScriptWriter":
-            continue
-        if _has_non_llm_opt_in(cls):
-            continue
-        method = _input_types_method(cls)
-        if method is None:
-            continue
-        for sub in ast.walk(method):
-            if not isinstance(sub, ast.Dict):
-                continue
-            for k, v in zip(sub.keys, sub.values):
-                if (
-                    isinstance(k, ast.Constant)
-                    and k.value == key
-                    and not _is_force_input_value(v)
-                ):
-                    offenders.append(
-                        f"{path.relative_to(PACK_ROOT).as_posix()}:"
-                        f"{getattr(k, 'lineno', '?')} [{cls.name}]"
-                    )
-    assert not offenders, (
-        f"S30 B6 violation: widget-form {key!r} declared outside the "
-        f"writer:\n  " + "\n  ".join(offenders)
-    )
-
-
-# ---------------------------------------------------------------------------
-# 5. test_slot_scheduler_transitions_match_dag
-# ---------------------------------------------------------------------------
 
 
 if __name__ == "__main__":
