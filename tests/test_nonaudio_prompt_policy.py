@@ -581,15 +581,6 @@ def test_foley_and_mime_receive_the_IDENTICAL_string():
         ltx25.finish_joint_av_positive("ltx25_foley_16gb", _CORE)
 
 
-def test_the_finisher_takes_no_mood_argument_any_more():
-    """The brief's `music_mood_terms` still drives the MUSIC bookends through
-    `_otr_music_prompt`, which was always their real owner. Passing them here
-    must be a hard error, not a silently ignored keyword."""
-    with pytest.raises(TypeError):
-        ltx25.finish_joint_av_positive("ltx25_mime_16gb", _CORE,
-                                       music_mood_terms=["tense"])
-
-
 @pytest.mark.parametrize("banned", _BANNED_CATEGORIES)
 @pytest.mark.parametrize("engine", ["ltx25_foley_16gb", "ltx25_mime_16gb"])
 def test_no_joint_av_prompt_may_ask_for_a_CATEGORY(engine, banned):

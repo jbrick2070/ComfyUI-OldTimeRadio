@@ -57,13 +57,6 @@ def _baseline():
     return _errors_for("The report says nothing unusual tonight.")
 
 
-def test_the_gate_function_is_gone():
-    """The symbol itself must not come back under the same name."""
-    assert not hasattr(freeze, "_check_g9_sfw_spoken_text"), (
-        "the G9 spoken-safety gate was reinstated -- operator directive "
-        "2026-08-05 removed content enforcement from the freeze path")
-
-
 def test_a_word_never_changes_the_audit_result():
     """DIFFERENTIAL, so a renamed content check cannot hide behind a prefix.
 

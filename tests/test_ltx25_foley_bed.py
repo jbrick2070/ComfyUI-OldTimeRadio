@@ -9,9 +9,8 @@ disagree -- because when they do, the failure is not an exception. It is a bed
 playing under the wrong picture, in a file that looks completely normal.
 
 NOT THE SFX BED. That was separately GENERATED effects from a dedicated model,
-ripped 2026-08-06 and staying dead (``tests/test_rip_sfx_bed_guard.py``). This
-is the video model's own output. Operator, 2026-08-26: *"sfx bed is different
-than foley bed, i won't get the two confused."*
+ripped 2026-08-06. This is the video model's own output. Operator, 2026-08-26:
+*"sfx bed is different than foley bed, i won't get the two confused."*
 
 CPU-safe and pure: no renders, no CUDA, no model loads. Every stem here is a
 handful of samples written to tmp.

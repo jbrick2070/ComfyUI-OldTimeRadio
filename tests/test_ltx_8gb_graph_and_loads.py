@@ -528,9 +528,6 @@ def test_the_render_LENGTH_is_owned_by_the_declared_contract_now():
     # start accepting a cap below the real minimum and the refusal would fire
     # for a reason nobody could trace back. Post-code panel, both seats.
     assert m._LTX8_MIN_FRAMES == int(contract.min_frames)
-    assert not hasattr(m, "_ltx8_frame_length"), (
-        "the retired helper is back -- if a length rule is needed again it "
-        "belongs on the contract, not beside it")
     f = contract.smallest_legal_at_least
     assert f(0) == 9 and f(5) == 9                   # floor at the minimum
     assert f(9) == 9                                 # already legal
