@@ -366,30 +366,6 @@ class WanInitImageMixin:
             return None
         return (os.path.basename(path), int(st.st_size), int(st.st_mtime_ns))
 
-    def _wan_session_receipts(self):
-        """``(label, token, receipt)`` for every file this beat's handles are.
-
-        Built from the adapter's OWN ``_loader_names()`` + ``_aux_loader_files()``
-        so a lane that adds a loader gets it in the identity for free rather
-        than needing this list edited -- the ``eng_wan_i2v`` VRAM-peak lesson
-        (a fix landed on one adapter and never reached its sibling) applied
-        before the fact.
-
-        RESOLVED THE WAY THE LOADER RESOLVES IT. The graphs hand their loader
-        nodes a BARE TOKEN which ComfyUI resolves through ``folder_paths``, so
-        the receipt is taken from ``_resolve_model_file_by_token`` -- the same
-        answer the loader will get. Using ``_resolve_model_file`` instead would
-        let a ``*_DIR`` override satisfy the identity while being invisible to
-        the loader that actually loads the weights."""
-        names = self._loader_names()
-        out = [("unet", names["unet"],
-                self._wan_file_receipt(self._ckpt_path() or ""))]
-        for (label, cats, name, _env) in self._aux_loader_files():
-            path = self._resolve_model_file_by_token(cats, name)
-            out.append((label, name,
-                        self._wan_file_receipt(path) if path else None))
-        return tuple(out)
-
     # ---- offline aux-loader file resolution (M6) ----
     def _resolve_model_file(self, categories, name, env_dir):
         """Full path of a model file: an explicit dir override (``env_dir``)
@@ -449,13 +425,6 @@ class WanInitImageMixin:
                 if os.path.exists(cand):
                     return cand
         return None
-
-    def _missing_loaders(self):
-        """(label, basename) for every required aux loader file absent on disk
-        (the UNET is checked separately by each engine's ``_installed``)."""
-        return [(label, name)
-                for (label, cats, name, env) in self._aux_loader_files()
-                if self._resolve_model_file(cats, name, env) is None]
 
     # ---- init image ----
     def _init_image_ref(self, request):
