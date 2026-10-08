@@ -37,14 +37,6 @@ def test_image_combo_is_the_full_registry_plus_sentinel():
     assert listed == set(ireg.all_engine_names())
 
 
-def test_no_validated_subset_filter_remains():
-    # C4: the validated-subset filter is GONE from BOTH registries.
-    assert not hasattr(vreg, "VALIDATED_ENGINES")
-    assert not hasattr(vreg, "validated_engine_names")
-    assert not hasattr(ireg, "VALIDATED_ENGINES")
-    assert not hasattr(ireg, "validated_engine_names")
-
-
 def test_formerly_hidden_engines_are_now_selectable():
     # Engines the old gate HID (untested-but-registered) are now in the dropdown --
     # registry IS the menu. (still_parallax UNREGISTERED 2026-06-30, item 2

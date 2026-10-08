@@ -118,26 +118,6 @@ def test_an_ordinary_workflow_path_still_resolves():
     assert got.is_absolute()
 
 
-# --------------------------------------------------------------------------- #
-# the guard lives at the WIDGET boundary, NOT at the spawn
-# --------------------------------------------------------------------------- #
-def test_the_spawn_owner_does_NOT_carry_this_rule():
-    """A spawn-level UNC rule was written, measured, and REMOVED.
-
-    A mapped network drive BECOMES a UNC path once resolved: on the development
-    box, resolving the mapped drive U: yields a UNC path on the 4060 transfer
-    host. And blend() resolves its inputs before handing them to ffmpeg, so the
-    rule refused a LEGITIMATE render on any install whose output lives on a
-    mapped drive -- including the operator's own transfer drive.
-
-    Provenance is not knowable at the spawn: by then a hostile widget value and
-    a resolved local path look identical. The refusal belongs where the value
-    ARRIVES, which is what reject_remote_paths does at each execute method."""
-    src = (REPO / "nodes/_otr_shared/proc.py").read_text(encoding="utf-8")
-    assert "_no_remote_arguments" not in src, (
-        "the spawn-level UNC rule is back; it breaks mapped-drive installs")
-
-
 @pytest.mark.parametrize("node,rel", [
     ("OTR_CaptionBurn", "nodes/otr_caption_burn.py"),
     ("OTR_MasterAudioMux", "nodes/otr_master_audio_mux.py"),

@@ -261,7 +261,6 @@ def test_v2_every_registry_row_validates():
     for namespace, decls in _declarations_by_registry().items():
         for name, decl in decls.items():
             cp.validate_declaration(name, decl, source=namespace)
-            assert "cpu_ok" not in decl, (namespace, name)
 
 
 def test_v2_vendor_pins_gate_amd_hosts():

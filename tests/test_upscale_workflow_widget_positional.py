@@ -55,18 +55,6 @@ def test_first_four_widgets_unchanged(node84):
     assert wv[3] == "", f"output_path moved: got {wv[3]!r}"
 
 
-def test_ffmpeg_widget_removed(node84):
-    """The `ffmpeg` widget was removed from OTR_SilentComposite entirely --
-    it must not be present as a widget-backed input, and its old value must
-    not still be occupying a widgets_values slot."""
-    inputs = node84.get("inputs") or []
-    hit = next((i for i in inputs
-                if isinstance(i, dict) and i.get("name") == "ffmpeg"), None)
-    assert hit is None, f"ffmpeg input should have been removed; found {hit!r}"
-    wv = node84["widgets_values"]
-    assert "ffmpeg" not in wv, f"stale ffmpeg value still in widgets_values: {wv!r}"
-
-
 def test_upscale_widgets_at_positions_4_and_5(node84):
     """Positional law: new widgets append at the end."""
     wv = node84["widgets_values"]

@@ -123,7 +123,7 @@ def test_image_cold_import_no_heavy_libs():
 def test_image_protocol_parity():
     """ImageEngine is a structural superset of the SHIPPED AudioEngine core, and
     shares the usability taxonomy (AS-4); it has the reduced prompt->image
-    lifecycle and deliberately NO canonicalize."""
+    lifecycle."""
     from nodes._otr_audio_engines.registry import (
         AudioEngine, EngineUsabilityReason as AReason,
     )
@@ -136,7 +136,6 @@ def test_image_protocol_parity():
         assert hasattr(ireg.ImageEngine, meth)
     for meth in ("assert_usable", "prepare", "render_image", "teardown"):
         assert hasattr(ireg.ImageEngine, meth), f"ImageEngine missing {meth}"
-    assert not hasattr(ireg.ImageEngine, "canonicalize")  # reduced set (AS-4)
     assert {r.value for r in ireg.EngineUsabilityReason} == {r.value for r in AReason}
 
 

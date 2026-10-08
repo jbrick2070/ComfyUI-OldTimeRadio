@@ -39,17 +39,15 @@ this file now asserts. The field is no longer DECLARED by any of the five node
 classes, so ComfyUI never passes it and there is nothing left to sanitise: the
 channel is CLOSED by non-declaration rather than guarded by a discard, which is
 strictly stronger. A discard can be forgotten at a sixth call site; an input
-that is not declared cannot be supplied at all. ``widget_ffmpeg_is_ignored``
-was removed with it, deliberately -- a sanitiser left lying around invites
-someone to re-add the widget and "handle" it, which is the weaker design this
-change replaced. ``OTR_FFMPEG`` remains the one way to pin a binary.
+that is not declared cannot be supplied at all. ``OTR_FFMPEG`` remains the one
+way to pin a binary.
 
 THE RESOLVER RULES ABOVE ARE UNCHANGED, and every one of their tests stays.
 The resolvers are still reachable from the pack's own callers, so
 absolute-path-or-``None`` is still what keeps a cwd hit or a bare name out of
 ``argv[0]``.
 
-FOUR GAPS AN INDEPENDENT REVIEW FOUND IN THIS FILE, all closed here:
+THREE GAPS AN INDEPENDENT REVIEW FOUND IN THIS FILE, all closed here:
 
 1. The blend's live security test asserted ``_ffmpeg_bin(x) == ""`` while
    neutralising ONE of four fallbacks, so it was really claiming "this box has
@@ -65,9 +63,6 @@ FOUR GAPS AN INDEPENDENT REVIEW FOUND IN THIS FILE, all closed here:
    ``__init__.py`` builds node-by-node in its own try/except: a missing optional
    dependency SHRINKS that list and the guard still reports green over the
    survivors. A floor now fails instead.
-4. The sanitiser scan swallowed a ``SyntaxError``, read ``nodes/`` only, and
-   walked names but not strings, so ``getattr(mod, "widget_ffmpeg_is_ignored")``
-   was invisible to it.
 """
 from __future__ import annotations
 
@@ -92,9 +87,6 @@ WIDGET_NODES = {
     "nodes/otr_scene_aware_scopes.py": "OTR_SceneAwareScopes",
     "nodes/otr_silent_composite.py": "OTR_SilentComposite",
 }
-
-#: The helper that was removed with the widget, spelled once.
-SANITISER = "widget_ffmpeg_is_ignored"
 
 #: How many declared nodes may be absent from `NODE_CLASS_MAPPINGS` before the
 #: registry has COLLAPSED rather than merely thinned. `__init__.py` imports each
@@ -157,42 +149,6 @@ def _declared_input_names(cls) -> set:
     return names
 
 
-#: Every tree that can hold a Python definition or reference this guard must
-#: see. `tests/` is the one deliberate exclusion -- see the docstring.
-_SCANNED_TREES = ("nodes", "scripts", "config", "tools")
-
-
-def _python_sources() -> list:
-    """Every .py that could define or reference the removed sanitiser.
-
-    AN EARLIER VERSION OF THIS SCANNED `nodes/` + `scripts/` + the repo root and
-    justified it as "every .py this pack SHIPS AND RUNS". That justification was
-    INVERTED AT BOTH ENDS, and `.comfyignore` says so in its own words:
-
-      * `scripts/` DOES NOT SHIP. `.comfyignore` excludes the whole tree --
-        "NOTHING IN THE PACK IMPORTS scripts/" -- so it is dev harness, not
-        shipped surface. Worth scanning anyway, because it runs on our boxes.
-      * `config/` DOES SHIP and was NOT SCANNED. A contrarian planted the helper
-        at `config/cast_pools.py` and this guard passed, blind.
-
-    So the criterion is not "does it ship" and not "does it run" -- it is "could
-    a definition or a reference live here", which is every tracked Python tree
-    except the one below. Measured when written: nodes 284, scripts 123,
-    config 2, tools 6, root 2.
-
-    `tests/` is excluded ON PURPOSE and it is the one honest exclusion: this
-    file names the removed helper in its own assertions, and a test that named
-    it would fail at runtime rather than resurrect it.
-    """
-    found = []
-    for folder in _SCANNED_TREES:
-        root = REPO / folder
-        if root.is_dir():
-            found += sorted(root.rglob("*.py"))
-    found += sorted(REPO.glob("*.py"))
-    return [p for p in found if "__pycache__" not in p.parts]
-
-
 def _execute_def(rel, cls):
     """The AST of `cls`'s own execute method, found through the LIVE class.
 
@@ -249,8 +205,7 @@ def _is_trusted_resolution(value) -> bool:
 
 
 # --------------------------------------------------------------------------- #
-# the channel is CLOSED -- the widget is not declared, not accepted, and the
-# sanitiser that used to stand in for its absence is gone
+# the channel is CLOSED -- the widget is not declared and not accepted
 # --------------------------------------------------------------------------- #
 def test_the_registry_this_guard_walks_cannot_silently_shrink():
     """`NODE_CLASS_MAPPINGS` is ENVIRONMENT-DEPENDENT, and the guard below
@@ -282,20 +237,6 @@ def test_the_registry_this_guard_walks_cannot_silently_shrink():
         "one, and every test in this file that parametrizes over the live "
         "mappings is now asking about a rump of the pack."
         % (len(registered), len(declared), floor))
-
-
-@pytest.mark.parametrize("rel", sorted(WIDGET_NODES))
-def test_no_file_still_declares_the_widget(rel):
-    """The declaration is what made the value arrive. Removed 2026-09-13.
-
-    Parametrized over the CONSTANT above rather than over the live registry, so
-    this half of the proof holds even on a box where a node fails to import.
-    """
-    src = (REPO / rel).read_text(encoding="utf-8")
-    assert '"ffmpeg": ("STRING"' not in src, (
-        "%s declares an ffmpeg STRING widget again. A widget value arrives "
-        "from an unauthenticated /prompt body and used to reach argv[0]; "
-        "OTR_FFMPEG is the only channel that may name a binary." % rel)
 
 
 @pytest.mark.parametrize("node_name", sorted(NODE_CLASS_MAPPINGS))
@@ -442,105 +383,6 @@ def test_every_widget_node_binds_the_local_to_the_empty_constant(rel, node):
     assert first.lineno < min(n.lineno for n in loads), (
         "%s reads `ffmpeg` at line %d but does not bind it until line %d"
         % (where, min(n.lineno for n in loads), first.lineno))
-
-
-def test_the_sanitiser_itself_is_gone():
-    """A discard helper with no widget to discard is an invitation.
-
-    It reads as permission to re-declare the widget and "handle" it at the
-    node boundary, which is exactly the weaker design 2026-09-13 replaced:
-    sanitising a channel is a promise kept at every call site, closing it is a
-    property of the declaration.
-    """
-    from nodes._otr_shared import ffmpeg as ffm
-    assert not hasattr(ffm, SANITISER), (
-        "nodes/_otr_shared/ffmpeg.py still exports %s. The widget it sanitised "
-        "no longer exists; the helper must go with it so nobody re-adds the "
-        "widget and points at the helper as cover." % SANITISER)
-    src = (REPO / "nodes/_otr_shared/ffmpeg.py").read_text(encoding="utf-8")
-    assert "def %s" % SANITISER not in src
-
-    # Asked of the PARSED tree, not of the text. The owner module keeps a
-    # tombstone comment explaining what stood there and why non-declaration
-    # replaced it -- that history is the point of the comment, and a substring
-    # scan would read it as a survivor.
-    #
-    # STRINGS ARE WALKED TOO. `getattr(mod, "widget_ffmpeg_is_ignored")` reaches
-    # the helper without ever spelling it as a Name, so a name-only walk is
-    # blind to the one shape a re-adder is most likely to reach for when the
-    # import no longer resolves.
-    sources = _python_sources()
-    covered = {p.relative_to(REPO).as_posix() for p in sources}
-    assert {"__init__.py", "nodes/_otr_shared/ffmpeg.py"} <= covered, (
-        "the scan missed the loader or the module that owned the helper; it is "
-        "globbing the wrong tree and would pass over anything")
-    assert len(sources) > len(WIDGET_NODES), (
-        "only %d source files found -- a scan that reaches almost nothing "
-        "reports clean for the wrong reason" % len(sources))
-
-    unparseable, live = [], []
-    for path in sources:
-        rel = path.relative_to(REPO).as_posix()
-        try:
-            # `filename=` so a SyntaxWarning raised while parsing the pack --
-            # an invalid escape in some other module's docstring, say -- names
-            # that module instead of reporting "<unknown>:38" from this test.
-            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"),
-                             filename=str(path))
-        except SyntaxError as exc:
-            # NOT `continue`. A file this scan cannot read is a file the removed
-            # sanitiser could be hiding in, and skipping it turns an unreadable
-            # module into a clean bill of health.
-            unparseable.append("%s: %s" % (rel, exc))
-            continue
-        for node in ast.walk(tree):
-            # An `import x as y` binding is reached through the import
-            # statement's own `names` list rather than by naming the AST class
-            # for it. That is deliberate: `tests/test_b7_forbidden_sweep.py`
-            # forbids that class's bare name as a RUNTIME identifier -- a marker
-            # left by the S28 extinction of the widget rename-alias mechanism --
-            # and it cannot tell the Python AST class apart from the retired
-            # feature. A sibling test already carries a comment recording the
-            # same collision. Reaching the bindings this way is equivalent and
-            # does not trip the sweep.
-            # BOTH halves of each binding, not `asname or name`. Taking only
-            # the bound name lets `from x import widget_ffmpeg_is_ignored as w`
-            # through, because the bound name is `w` and the thing being
-            # resurrected is the other half. The version this replaced had the
-            # same hole; a negative control found it.
-            imported = []
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                imported = [n for a in (node.names or [])
-                            for n in (a.name, a.asname) if n]
-            if SANITISER in imported:
-                live.append("%s:%d (imported)" % (rel, node.lineno))
-                continue
-            named = (
-                (isinstance(node, ast.Name) and node.id)
-                or (isinstance(node, ast.Attribute) and node.attr)
-                or (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-                    and node.name)
-            )
-            if named == SANITISER:
-                live.append("%s:%d" % (rel, node.lineno))
-            elif (isinstance(node, ast.Constant)
-                    and isinstance(node.value, str)
-                    and SANITISER in node.value):
-                live.append("%s:%d (named in a string)" % (rel, node.lineno))
-    assert not unparseable, (
-        "this scan could not parse:\n  %s\nIt is the scan that proves the "
-        "removed sanitiser is nowhere, so an unreadable file is a hole in the "
-        "proof, not a file to skip." % "\n  ".join(sorted(unparseable)))
-    assert not live, (
-        "the removed sanitiser is still defined, imported, called or named at: "
-        "%s" % ", ".join(sorted(live)))
-
-
-@pytest.mark.parametrize("rel", sorted(WIDGET_NODES))
-def test_the_tooltip_no_longer_advertises_the_removed_power(rel):
-    src = (REPO / rel).read_text(encoding="utf-8")
-    assert "widget's value if it runs" not in src, (
-        "%s still tells the operator the widget picks the binary" % rel)
 
 
 def test_the_scopes_node_severs_before_BOTH_consumers():

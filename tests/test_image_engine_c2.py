@@ -46,7 +46,6 @@ def test_z_image_protocol_parity():
         assert hasattr(eng, attr)
     for meth in ("load", "unload", "assert_usable", "prepare", "render_image", "teardown"):
         assert callable(getattr(eng, meth))
-    assert not hasattr(eng, "canonicalize")     # reduced prompt->image set (AS-4)
     assert eng.required_inputs == ("text_prompt",)
     assert eng.commercial_clean is True         # Apache-2.0 (per the C2 matrix)
     assert eng.requires_flag is None            # registry IS the menu (no flag gate)

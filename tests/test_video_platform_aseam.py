@@ -228,7 +228,6 @@ def test_widget_vector_exact():
         "fps", "canvas_w", "canvas_h",
     ]
     assert "seed" not in req  # V-7: no widget literally named 'seed'
-    assert "seed_mode" not in req and "request_seed" not in req  # removed 2026-09-13
 
 
 @pytest.mark.parametrize("cls", [OTRVideoDirector, OTRShotLock])

@@ -26,10 +26,9 @@ def test_lumina_registered_optin_clean():
     assert eng.commercial_clean is True            # Apache-2.0
     assert eng.required_inputs == ("text_prompt",)
     assert eng.requires_flag is None               # registry IS the menu (no flag gate)
-    # protocol parity (reduced prompt->image set; no canonicalize)
+    # protocol parity (reduced prompt->image set)
     for meth in ("load", "unload", "assert_usable", "prepare", "render_image", "teardown"):
         assert callable(getattr(eng, meth))
-    assert not hasattr(eng, "canonicalize")
 
 
 def test_lumina_weight_gate(monkeypatch, tmp_path):

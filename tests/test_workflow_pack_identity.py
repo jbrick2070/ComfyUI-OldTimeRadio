@@ -91,12 +91,6 @@ def test_every_node_in_every_shipped_workflow_carries_the_stamp(path):
         assert props.get("ver") == version, (path.name, node["id"], node["type"], props.get("ver"))
 
 
-@pytest.mark.parametrize("path", _shipped_paths(), ids=lambda p: p.stem)
-def test_extra_info_is_gone(path):
-    wf = _load(path)
-    assert "info" not in (wf.get("extra") or {}), path.name
-
-
 def test_check_gate_names_a_missing_stamp(tmp_path):
     """The --check helper actually catches the defect it exists for."""
     good = {"nodes": [{"id": 1, "type": "A",

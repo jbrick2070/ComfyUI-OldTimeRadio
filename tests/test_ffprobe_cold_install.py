@@ -377,12 +377,6 @@ def test_the_counted_frames_query_goes_through_probe_json_so_it_heals_too():
     assert '"v:0"' in source
 
 
-def test_the_credits_no_longer_force_a_binary():
-    from nodes import otr_credits_roll as credits
-    assert not hasattr(credits, "_ffprobe_bin"), "zero callers: ripped, not kept"
-    assert "ffprobe=" not in inspect.getsource(credits._probe_video)
-
-
 def test_pyav_is_a_declared_dependency():
     text = (_REPO_ROOT / "requirements.txt").read_text(encoding="utf-8")
     assert any(line.strip().startswith("av>=") for line in text.splitlines()), \

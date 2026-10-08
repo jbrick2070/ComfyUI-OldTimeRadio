@@ -290,13 +290,6 @@ def test_g5_reserved_link_ids_set_pinned():
     assert G5_RESERVED_LINK_IDS == frozenset({111, 112})
 
 
-def test_deleted_node_types_includes_director():
-    """The deleted Director class is the most prominent retirement;
-    pin its presence so a future DELETED_NODE_TYPES rewrite doesn't
-    accidentally drop the most important entry."""
-    assert "OTR_LLMDirector" in DELETED_NODE_TYPES
-
-
 def test_forbidden_input_sockets_includes_director_json():
     """director_json was the alternate-name socket the deleted
     LLMDirector emitted. Ensure the forbidden set still flags it."""

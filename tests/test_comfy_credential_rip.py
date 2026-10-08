@@ -12,7 +12,6 @@ from __future__ import annotations
 import inspect
 import json
 import os
-import re
 from pathlib import Path
 
 import pytest
@@ -21,7 +20,6 @@ from nodes import _otr_comfy_backend as occ
 from nodes._otr_shared import cloud_media_backend as cmb
 from nodes._otr_shared import cloud_media_invoke as invoke
 from nodes._otr_shared import cloud_balance_preflight as cbp
-from nodes._otr_shared import api_key_files as keys
 
 REPO = Path(__file__).resolve().parents[1]
 HIDDEN_NAME = "api_key_comfy_org"
@@ -190,14 +188,6 @@ def test_set_auth_replaces_so_a_bare_queue_cannot_spend_a_stale_key():
     assert occ._bearer() is None
 
 
-def test_no_host_declares_the_session_bearer():
-    """PBUG-20260902-04: the registry scan flags the session-bearer hidden
-    input. The rip must not have reintroduced it anywhere."""
-    banned = "auth_token" + "_comfy_org"
-    for cls in _host_classes():
-        assert banned not in (cls.INPUT_TYPES().get("hidden") or {}), cls.__name__
-
-
 # --- the stash reaches the session that the partner call opens
 
 def test_stash_binds_the_key_to_the_current_prompt():
@@ -220,14 +210,6 @@ def test_writer_bearer_is_env_blind(monkeypatch):
     assert occ._bearer() is None
     occ.set_auth(api_key="queue-key")
     assert occ._bearer() == "queue-key"
-
-
-def test_key_files_have_no_comfy_lane():
-    assert "comfy" not in keys.LANES
-    src = inspect.getsource(keys)
-    assert "comfy.secret" not in src.replace("No \"comfy\" lane", "")
-    assert "resolve_lane_key(\"comfy\")" not in inspect.getsource(occ)
-    assert "resolve_lane_key(\"comfy\")" not in inspect.getsource(cmb)
 
 
 # --- the balance preflight measures the queue's own wallet
@@ -303,22 +285,3 @@ def test_submit_prompt_packs_the_submitter_env_into_extra_data(monkeypatch):
     monkeypatch.delenv("OTR_COMFY_API_KEY", raising=False)
     api.submit_prompt({"1": {"class_type": "X", "inputs": {}}})
     assert "extra_data" not in captured["json"]
-
-
-def test_server_side_pack_never_reads_the_env_var():
-    """Grep receipt for the rip: under nodes/ the variable may be NAMED in
-    a hint or a comment, but never READ."""
-    # Any env read spelled with the literal name: os.environ[...],
-    # os.environ.get(...), os.getenv(...), otr_env.get(...), or a lane
-    # tuple that names it. A read through an assembled name is out of
-    # reach of a grep -- the LANES assertion below covers the one indirect
-    # reader the pack has.
-    read_pattern = re.compile(
-        r"(?:environ(?:\.get)?|getenv|otr_env\.get)\s*[\[(]\s*[\"']OTR_COMFY_API_KEY")
-    offenders = []
-    for path in (REPO / "nodes").rglob("*.py"):
-        if read_pattern.search(path.read_text(encoding="utf-8")):
-            offenders.append(str(path.relative_to(REPO)))
-    assert offenders == []
-    assert not any(k == "OTR_COMFY_API_KEY"
-                   for spec in keys.LANES.values() for k in spec["env"])

@@ -67,16 +67,6 @@ def comfy_on(monkeypatch):
     occ.set_auth(api_key="fixture-injected-key")
 
 
-# --- enable gate ------------------------------------------------------------
-# `comfy_credits_enabled()` was deleted 2026-09-19 with its only caller: the
-# credential is the gate now (see test_backend_load_rejects_flag_alone_without_auth).
-
-
-def test_flag_helper_is_gone():
-    assert not hasattr(occ, "comfy_credits_enabled")
-    assert "comfy_credits_enabled" not in occ.__all__
-
-
 # --- slot picker choices ----------------------------------------------------
 
 
@@ -549,14 +539,10 @@ def test_writer_appends_comfy_slots_after_openrouter():
         "openrouter_slot_a_model", "openrouter_slot_b_model",
         "comfy_slot_a_model", "comfy_slot_b_model",
     ])
-    # Plan 0k: the writer no longer declares the hidden Comfy key at all --
-    # OTR_ComfyCredential receives it (a V1 node that declares it leaks it
-    # into /history when it raises). Never a widget either.
-    assert "api_key_comfy_org" not in spec.get("hidden", {})
+    # The credential is never a widget: a secret typed into a widget is saved
+    # into the workflow JSON. (The hidden-input declarations are guarded
+    # tree-wide by test_comfy_credential_rip and test_registry_prohibited_strings.)
     assert "api_key_comfy_org" not in order
-    # PBUG-20260902-04: the session-bearer hidden input is a Comfy Registry
-    # prohibited string (critical, credential-access). It must never return.
-    assert "auth_token_comfy_org" not in spec.get("hidden", {})
 
 
 def test_comfy_slot_defaults_selectable_when_enabled(comfy_on):

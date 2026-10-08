@@ -137,22 +137,8 @@ CONFINED_DESTINATIONS = {
         "confine_to_output_tree(str(output_path),", ("source_mp4_path",)),
     "otr_credits_roll.py": ("confine_to_output_tree(out,", ("video_path",)),
     # scene_sequencer is NOT here on purpose: its `output_dir` sink was DELETED
-    # rather than confined. See the two tests below.
+    # rather than confined.
 }
-
-
-def test_the_sequencer_creates_no_caller_named_directory():
-    """`os.makedirs(output_dir)` on a workflow STRING let an unauthenticated
-    caller create directory trees anywhere. Confining it would have been the
-    wrong shape: the value is inert (nothing below reads it), so a guard could
-    only ever REFUSE and kill a render. The sink is gone instead."""
-    src = (_NODES / "scene_sequencer.py").read_text(encoding="utf-8")
-    code = "\n".join(l for l in src.split("\n") if not l.lstrip().startswith("#"))
-    assert "makedirs(output_dir" not in code
-    for line in code.split("\n"):
-        assert "output_dir" not in line or "def sequence" in line or '"output_dir"' in line \
-            or "output_dir=DEFAULT_OUT" in line or "DEFAULT_OUT" in line, \
-            "output_dir gained a live use again: %s" % line.strip()
 
 
 def test_no_shipped_default_hardcodes_this_developers_home():

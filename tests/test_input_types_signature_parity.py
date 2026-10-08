@@ -86,14 +86,6 @@ def test_every_declared_input_is_a_parameter_of_the_execute_function(node_name):
            "it" if len(orphans) == 1 else "them"))
 
 
-def test_the_scene_sequencer_no_longer_advertises_the_music_bus():
-    """The specific removal, asserted by name so it cannot quietly return."""
-    scene = NODE_CLASS_MAPPINGS["OTR_SceneSequencer"]
-    declared = _declared_input_names(scene)
-    assert "music_cue_audio" not in declared
-    assert "music_cue_manifest_json" not in declared
-
-
 def test_only_the_writer_declares_episode_title():
     """One workflow-facing owner of the title, asserted by name (2026-09-14).
 

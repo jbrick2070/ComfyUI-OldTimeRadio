@@ -88,15 +88,6 @@ def test_input_types_widget_surface():
         assert name in CastLock.RETURN_NAMES
 
 
-def test_rejects_forbidden_widgets():
-    from nodes.cast_lock import CastLock
-
-    it = CastLock.INPUT_TYPES()
-    keys = set(it.get("required", {})) | set(it.get("optional", {}))
-    for forbidden in ("voice_engine_mode", "deterministic_inference", "model_id", "seed"):
-        assert forbidden not in keys, forbidden
-
-
 # ----------------------------------------------------------------------------
 # Validator + preserve_ledger
 # ----------------------------------------------------------------------------

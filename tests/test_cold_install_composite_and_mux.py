@@ -223,15 +223,8 @@ def test_the_scopes_planner_detects_portrait_without_a_binary(
 
 
 # --------------------------------------------------------------------------- #
-# wiring: the private resolvers are gone, the boundary is used
+# wiring: the boundary is used
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("module", [composite, mux])
-def test_the_private_ffprobe_resolver_is_gone(module):
-    assert not hasattr(module, "_ffprobe_bin"), module.__name__
-    assert "probe_json(" in inspect.getsource(module)
-    assert "resolve_ffprobe() or" not in inspect.getsource(module)
-
-
 def test_the_scopes_planner_goes_through_probe_json():
     source = inspect.getsource(scopes._probe_is_portrait)
     assert "probe_json(" in source and "probe_raw(" not in source

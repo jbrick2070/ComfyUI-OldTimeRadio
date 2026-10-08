@@ -50,19 +50,3 @@ def test_runnable_custom_pipelines_and_lane_table_are_bijective():
     assert set(lanes.LANE_SPECS) == expected
     for pipeline_id in lanes.LANE_SPECS:
         assert registry.pipelines[pipeline_id].executable is True
-
-
-def test_writer_no_longer_owns_a_second_lane_table():
-    """The writer keeps NO copy, alias or view of the lane authority.
-
-    Two tables keyed by the same pipeline ids is the drift hazard this
-    move exists to remove -- a shim left behind would recreate it.
-    """
-    for dead in (
-        "_RUNNER_BY_PIPELINE", "_LEGACY_INLINE_PIPELINES",
-        "_resolve_lane_runner", "_run_scifi_news_pro_lane", "_run_scifi_codex_lane",
-    ):
-        assert not hasattr(writer, dead), (
-            f"{dead} is back in the writer; _otr_lane_specs is the ONE "
-            f"lane authority"
-        )

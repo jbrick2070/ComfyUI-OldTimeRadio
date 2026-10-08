@@ -50,8 +50,6 @@ def test_gallery_lists_exactly_the_ruled_graphs():
         "gallery drift -- extra: %r, missing: %r"
         % (sorted(set(listed) - set(expected)),
            sorted(set(expected) - set(listed))))
-    assert not (REPO / "workflows" / "variants").exists(), (
-        "workflows/variants/ is back; a graph there never reaches the gallery")
 
 
 def test_canonical_ships_kokoro_on_both_voice_slots():

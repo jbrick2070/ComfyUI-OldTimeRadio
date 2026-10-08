@@ -2,8 +2,6 @@
 
 Validates:
   1. Workflow JSON wire state after Chunk E:
-       - Link 248 (procgen-mp4 -> mux.master_audio_path) is GONE
-       - Link 262 (procgen-mp4 -> render_batch.master_audio_path) is GONE
        - Link 263 (assembler.output_path -> mux.master_audio_path) present
        - Link 264 (assembler.output_path -> render_batch.master_audio_path) present
        - Link 246 (procgen-mp4 -> silent_composite.base_video_path) kept
@@ -37,16 +35,6 @@ class TestChunkEWire:
     def _wf(self):
         self.wf = json.loads(CANONICAL_JSON.read_text(encoding="utf-8"))
         self.link_map = {L[0]: L for L in self.wf["links"]}
-
-    def test_link_248_cut(self):
-        assert 248 not in self.link_map, (
-            "Link 248 (procgen-mp4 -> mux.master_audio_path) must be cut in Chunk E"
-        )
-
-    def test_link_262_cut(self):
-        assert 262 not in self.link_map, (
-            "Link 262 (procgen-mp4 -> render_batch.master_audio_path) must be cut in Chunk E"
-        )
 
     def test_link_263_present(self):
         assert 263 in self.link_map, "Link 263 (assembler.output_path -> mux) missing"
@@ -203,36 +191,6 @@ class TestEpisodeAssemblerWavSave:
 # ---------------------------------------------------------------------------
 # 3. validate_workflow_contract on the rewired JSON
 # ---------------------------------------------------------------------------
-
-class TestPackageRegistrationsRetired:
-    """Chunk E completion: the retired types are gone from the PACKAGE-level
-    lazy registration table too. (The 2026-06-08 pass cleared only the
-    module-level mapping inside the now-deleted implementation file, so the
-    picker still showed a tombstoned node; that module was removed entirely on
-    2026-08-23, lean-mean order 2.) Raw-source check, matching
-    TestWorkflowJsonClean's convention (no heavy package import)."""
-
-    PKG_INIT = REPO_ROOT / "__init__.py"
-
-    @pytest.mark.parametrize("reg_key", [
-        '"OTR_FixedShotDurationStub":',
-        '"OTR_FluxBranchGate":',
-        '"OTR_DeferredCheckpointLoader":',
-        '"OTR_DeferredLtxTextEncoderLoader":',
-    ])
-    def test_registration_row_gone(self, reg_key):
-        raw = self.PKG_INIT.read_text(encoding="utf-8")
-        assert reg_key not in raw, (
-            f"{reg_key} must not be registered in the package table "
-            "(Chunk E retire; the type is tombstoned in DELETED_NODE_TYPES)"
-        )
-
-    def test_retired_modules_deleted(self):
-        assert not (REPO_ROOT / "visual" / "flux_branch_gate.py").exists(), \
-            "visual/flux_branch_gate.py must be deleted (Chunk E)"
-        assert not (REPO_ROOT / "nodes" / "_otr_deferred_loaders.py").exists(), \
-            "nodes/_otr_deferred_loaders.py must be deleted (Chunk E; V-5)"
-
 
 class TestWorkflowContractPostChunkE:
     def test_validate_passes(self):

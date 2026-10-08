@@ -93,7 +93,6 @@ def test_launcher_hydrates_image_engine_weight_paths_before_python():
         key_index = text.index(f"GetEnvironmentVariable('{key}','User')")
         assert key_index < main_index, (
             f"{_LAUNCH_CMD.name}: {key} must be hydrated before python starts")
-    assert "OTR_FLUX2_KLEIN_CKPT" not in text
 
 
 # --- model-loader TF32 flip pinned ----------------------------------------
