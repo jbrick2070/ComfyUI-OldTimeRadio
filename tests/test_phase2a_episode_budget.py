@@ -8,8 +8,6 @@ Covers (per script-writing-architecture synthesis §3 Phase 2A + §6.C/E/F/G):
   * Outline.beats cap raised 24 -> 32
   * Beat.arc_phase field accepts None + populated
   * validate_outline_against_budget each violator + clean pass
-  * EPISODE BUDGET prompt block renders when budget set (S28: budget
-    is now required — OutlineRequest without budget raises ValueError)
 
 Pure-Python. No GPU. No LLM. Unit-scope only.
 """
@@ -35,7 +33,6 @@ from nodes._otr_outline import (  # noqa: E402
     Beat,
     Outline,
     OutlineRequest,
-    _build_user_prompt,
     validate_outline_against_budget,
 )
 
@@ -194,38 +191,6 @@ class TestOutlineSchemaChanges:
                 "time_of_day": "midnight",
                 "beats": beats,
             })
-
-
-# ---------------------------------------------------------------------------
-# EPISODE BUDGET prompt block
-# ---------------------------------------------------------------------------
-
-
-class TestEpisodeBudgetPromptBlock:
-
-    # S28 cleanbreak (Rule C): removed test_block_omitted_when_budget_none.
-    # Pre-S28 it asserted the prompt omitted the EPISODE BUDGET block when
-    # budget was None. Post-S28 the OutlineRequest __post_init__ rejects a
-    # missing budget — see test_outline_request_rejects_missing_budget in
-    # the next class for the producer-contract enforcement test that
-    # replaces it.
-
-    def test_block_renders_as_nonbinding_plan(self):
-        eb = compute_episode_budget(3, True, 2)
-        req = OutlineRequest(
-            news_seed="seed", style="noir",
-            character_cast=("ALICE", "BOB"),
-            budget=eb,
-        )
-        prompt = _build_user_prompt(req)
-        assert "EPISODE PLAN:" in prompt
-        # THE WORD LINE IS GONE (2026-08-14). This assertion used to require
-        # "Requested spoken length: about 350 words" -- the word count
-        # physically reaching the model. Its absence is now the contract.
-        assert "Requested spoken length" not in prompt
-        assert "Target total dialogue length" not in prompt
-        assert "350" not in prompt
-        assert "Announcer beats: 2" in prompt
 
 
 # ---------------------------------------------------------------------------

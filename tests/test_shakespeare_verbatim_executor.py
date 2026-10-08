@@ -285,7 +285,7 @@ def _req():
     budget = B.compute_episode_budget(act_count=1, include_act_breaks=True, num_characters=2)
     return O.OutlineRequest(
         news_seed="seed", style="", character_cast=("MACBETH", "BANQUO"),
-        script_brief="brief", key_terms=(), cast_descriptions={},
+        script_brief="brief", cast_descriptions={},
         include_act_breaks=True, budget=budget, prior_macro="", prior_critique="",
         style_grammar="", story_engine="", work_title="Macbeth")
 

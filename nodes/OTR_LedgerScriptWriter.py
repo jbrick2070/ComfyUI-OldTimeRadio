@@ -4889,7 +4889,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             style=(contract.label if contract else ""),
             character_cast=character_cast,
             script_brief=script_brief,
-            key_terms=key_terms_tuple,
             cast_descriptions=cast_descriptions,
             include_act_breaks=bool(resolved.get("include_act_breaks", True)),
             budget=episode_budget,

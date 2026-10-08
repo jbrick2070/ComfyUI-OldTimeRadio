@@ -313,14 +313,14 @@ class OutlineRequest:
                              # OPTIONAL. news_interpreter's purpose-specific
                              # distillation of the article for script planning
                              # (premise arc, central tension, beat hooks).
-                             # When non-empty, the prompt routes through the
-                             # "Story brief" branch with a "develops this
-                             # brief" closing verb -- because the brief is a
+                             # When non-empty, the macro prompt routes through
+                             # the "Story brief" branch with a "develop this
+                             # brief" task verb -- because the brief is a
                              # distilled story plan, not raw factual material.
                              # When empty, the prompt falls back to news_seed
-                             # under the "Science story (the factual seed)"
-                             # label with the original "extrapolates from the
-                             # science story" verb. Commit 3 (news_interpreter
+                             # under the "Science story" label with the
+                             # "extrapolate dramatically from this story"
+                             # verb. Commit 3 (news_interpreter
                              # sprint, ADR docs/news_interpreter_adr.md);
                              # branch added in the post-sprint prompt
                              # tightening pass (2026-05-10).
@@ -339,13 +339,6 @@ class OutlineRequest:
                              # beat prompts so a divergent premise is planned with a
                              # non-"console standoff" engine. Empty (default) =>
                              # byte-identical prompt.
-    key_terms: tuple[str, ...] = ()
-                             # OPTIONAL. news_interpreter's verbatim
-                             # journalistic terms (people, places, technology)
-                             # the dialogue MUST surface. Injected into the
-                             # prompt as a "Required terms" line when non-
-                             # empty so the outline can plan beats that
-                             # naturally land them.
     # target_length field removed 2026-05-11 (post-Phase-3 cleanup
     # pass). The writer's target_length widget went with it; act-
     # count signal now flows via the `budget` field
@@ -362,10 +355,9 @@ class OutlineRequest:
     budget: object = None
                              # REQUIRED. _otr_episode_budget.EpisodeBudget
                              # built by OTR_LedgerScriptWriter via
-                             # compute_episode_budget. The outline prompt
-                             # always renders an "EPISODE BUDGET" block
-                             # and the post-pydantic pipeline always runs
-                             # the 8 Phase 2A validators. Validator #1
+                             # compute_episode_budget. The post-pydantic
+                             # pipeline always runs the 8 Phase 2A
+                             # validators. Validator #1
                              # (total word drift) is WARN-only at ±25%
                              # per §6.E.
                              #
@@ -418,9 +410,9 @@ class OutlineRequest:
                              # best-of-N selector sets per candidate (i>=1) to
                              # steer the outline toward a different dramatic
                              # approach (e.g. "open on the personal stake, not
-                             # the institutional threat"). Rendered by
-                             # _build_user_prompt ONLY when non-empty; empty
-                             # (the default, and candidate 0 / every
+                             # the institutional threat"). Rendered by the
+                             # macro and beat prompts ONLY when non-empty;
+                             # empty (the default, and candidate 0 / every
                              # non-selector call) => byte-identical prompt to
                              # the pre-selector pipeline. A prompt overlay
                              # only -- NOT in-place beat surgery.
@@ -555,102 +547,6 @@ Rules:
 - Premise extrapolates dramatically from the science story without contradicting it.
 - intent describes narrative purpose only; do not write dialogue text.
 """
-
-
-def _build_user_prompt(req: OutlineRequest) -> str:
-    # news_interpreter brief takes precedence over raw news_seed.
-    # When the writer has a script_brief from build_news_briefs, the
-    # prompt labels the source line as a brief (it already contains
-    # the distilled premise arc + central tension + beat hooks) and
-    # the closing verb says DEVELOPS the brief, not EXTRAPOLATES from
-    # raw material -- the dramatic extrapolation is already done.
-    # When the writer is on the graceful-degrade path (brief LLM call
-    # failed), the original "Science story (the factual seed)" label
-    # + "extrapolates" verb still apply to the raw RSS payload.
-    brief = req.script_brief.strip()
-    if brief:
-        source_line = f"Story brief: {brief}"
-        develop_verb = "develops this brief"
-    else:
-        source_line = f"Science story (the factual seed): {req.news_seed}"
-        develop_verb = "extrapolates from the science story"
-    parts = [
-        "Plan a science-fiction audio drama outline.",
-        "",
-        source_line,
-    ]
-    if req.key_terms:
-        terms_line = ", ".join(req.key_terms)
-        # The outline LLM writes intent + mood, not dialogue lines
-        # (the line composer does that). Right plane to address: the
-        # beats it plans must be ones that NATURALLY surface these
-        # terms when the line composer renders them. Post-assembly
-        # key_terms audit (commit 4) is what enforces presence in
-        # the finished dialogue.
-        parts.append(
-            f"Required terms (plan beats that surface these in "
-            f"dialogue): {terms_line}"
-        )
-    # Cast block: rich (per-character name + gender + description)
-    # when cast_descriptions is present, bare name list otherwise.
-    # Rich format gives the outline LLM enough character signal to
-    # plan beats that exploit each character's distinct personality
-    # + stakes; bare format is a back-compat fallback for tests +
-    # early-stage callers that pre-date the cast contract.
-    parts.append(_format_cast_block(req))
-    parts.append(f"Style: {req.style}")
-    # Item F parity with _build_macro_user_prompt. Production takes the macro
-    # path, but the test harnesses still exercise this builder, so leaving it
-    # unthreaded would let a green suite certify a prompt production never uses.
-    # Whitespace-collapsed inline rather than importing the composer's
-    # clean_one_line: this needs one line of normalization, and a new
-    # cross-module import on the outline hot path buys an import-cycle
-    # risk for nothing. A title carrying a newline would otherwise split
-    # this instruction across two prompt lines.
-    _work = " ".join(str(req.work_title or "").split())
-    if _work:
-        parts.append(
-            f"Adapted work: {_work} -- the setting must "
-            f"belong to this work and to no other."
-        )
-    # target_length structure line removed 2026-05-11 (post-Phase-3
-    # cleanup). The act-count signal now flows entirely through the
-    # EPISODE BUDGET block below (when `budget` is non-None); the
-    # include_act_breaks toggle drives music_inter_count inside the
-    # budget rather than appearing in its own prose line.
-    # Phase 2A (2026-05-11): EPISODE BUDGET block — the act topology.
-    # S28 cleanbreak: the `if budget_block:` guard was extinct — the
-    # producer (OTR_LedgerScriptWriter) always supplies a budget so
-    # _format_episode_budget_block always returns a non-empty string.
-    parts.append(_format_episode_budget_block(req))
-    parts.append("")
-
-    # THE "Target total dialogue length: ~N words" LINE WAS REMOVED HERE
-    # 2026-08-14, with its twin inside _format_episode_budget_block.
-    # Those two lines were the word count physically reaching the model.
-    # Do not reinstate either, in any wording: a length request in a
-    # prompt is a word-count authority however politely it is phrased,
-    # and the previous version hedged it ("guidance only") while still
-    # handing over the number.
-    # Best-of-N selector (2026-06-23): an optional structural-variation
-    # overlay. The selector sets req.diversity_hint per candidate (i>=1) to
-    # push each outline toward a different dramatic approach; candidate 0 and
-    # every non-selector call leave it "" so the prompt is byte-identical to
-    # the pre-selector pipeline. Rendered ONLY when non-empty.
-    diversity_hint = req.diversity_hint.strip()
-    if diversity_hint:
-        parts.extend([
-            f"Structural variation (take a different dramatic approach from "
-            f"the other candidates -- vary which stake opens the story, who "
-            f"drives the turn, and where the pressure lands): {diversity_hint}",
-            "",
-        ])
-    head = "\n".join(parts)
-    return (
-        f"{head}\n"
-        f"Build a dramatic outline that {develop_verb} in the chosen "
-        f"style. Return only the JSON outline."
-    )
 
 
 def _format_cast_block(req: OutlineRequest) -> str:
@@ -790,7 +686,7 @@ def _check_speaker_role_alignment() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2A (2026-05-11): episode budget rendering + validators
+# Phase 2A (2026-05-11): episode budget access + validators
 # ---------------------------------------------------------------------------
 
 
@@ -807,33 +703,6 @@ def _get_budget(req: "OutlineRequest"):
     if hasattr(b, "arc_phases") and hasattr(b, "per_phase_beats"):
         return b
     return None
-
-
-def _format_episode_budget_block(req: "OutlineRequest") -> str:
-    """Render the act topology. Carries NO length instruction of any kind."""
-    b = _get_budget(req)
-    if b is None:
-        return ""
-    arc_phases = list(b.arc_phases)
-    per_phase_beats = list(b.per_phase_beats)
-    lines = [
-        "EPISODE PLAN:",
-        (
-            f"- Structure: {b.act_count} act"
-            f"{'s' if b.act_count != 1 else ''} -> {', '.join(arc_phases)}"
-        ),
-        "- Voiced beats per phase: " + ", ".join(
-            f"{name} {count}"
-            for name, count in zip(arc_phases, per_phase_beats)
-        ),
-        f"- Music inter beats: {b.music_inter_count}",
-        f"- Announcer beats: {b.announcer_beats} (open + close)",
-        (
-            "- Every voiced beat must carry an arc_phase from: "
-            + ", ".join(arc_phases)
-        ),
-    ]
-    return "\n".join(lines)
 
 
 def validate_outline_against_budget(
@@ -905,10 +774,9 @@ def validate_outline_against_budget(
 # stage / one phase / one beat instead of poisoning the whole
 # outline. The three stage system prompts are the bank pack's
 # outline_macro/phase/beat_system seams (resolved in generate_outline).
-# The legacy single-call _SYSTEM_PROMPT + _build_user_prompt remain:
-# _SYSTEM_PROMPT is the router's object-identity sentinel for the plain
-# `outline` phase, and _build_user_prompt is the single-call builder the
-# tests still exercise; neither is the main path.
+# The legacy single-call _SYSTEM_PROMPT remains only as the router's
+# object-identity sentinel for the plain `outline` phase; it is not the main
+# path.
 
 # Stage 1 schema -- macro shape.
 class _MacroShape(BaseModel):
@@ -1003,10 +871,7 @@ def _build_macro_user_prompt(req: OutlineRequest) -> str:
     if _sg:
         parts.append(_sg)
     # Best-of-N / refine steering (2026-06-23): render req.diversity_hint in the
-    # REAL Path C macro prompt. The legacy _build_user_prompt (where the hint was
-    # first wired) is back-compat/test-only and never runs in production, so the
-    # hint was DEAD until now -- best-of-N candidates varied only by RNG seed.
-    # Empty hint => byte-identical to the pre-steer prompt.
+    # Path C macro prompt. Empty hint => byte-identical to the pre-steer prompt.
     _dh = req.diversity_hint.strip()
     if _dh:
         parts.append(
@@ -1160,8 +1025,7 @@ def _build_beat_user_prompt(
     if next_beat_speaker:
         parts.append(f"Next beat is spoken by: {next_beat_speaker}")
     # Best-of-N / refine steering (2026-06-23): render req.diversity_hint in the
-    # REAL Path C beat prompt (legacy _build_user_prompt is test-only). Empty =>
-    # byte-identical.
+    # Path C beat prompt. Empty => byte-identical.
     _dh = req.diversity_hint.strip()
     if _dh:
         parts.append(f"Structural variation: {_dh}")
