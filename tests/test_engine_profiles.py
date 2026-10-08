@@ -146,7 +146,6 @@ def _minimal_profile_row(**updates):
         "needs_ref_clip": False,
         "caps": {},
         "license_state": "clean",
-        "warn_text": "",
         "partner_row": "",
         "auth_required": True,
         "error_policy": "fail_loud",

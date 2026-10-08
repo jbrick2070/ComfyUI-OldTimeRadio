@@ -117,7 +117,6 @@ class EngineProfile(BaseModel):
     needs_ref_clip: bool = False     # reference-clip identity engines
     caps: dict = Field(default_factory=dict)
     license_state: str = ""          # blank -> derive from commercial_clean
-    warn_text: str = ""              # human-readable caveat for the row (informational)
 
     # --- Cloud-audio campaign 2026-07-03 (C1): declarative cloud-engine metadata
     # (additive; blank defaults keep every existing row valid). Populated only on

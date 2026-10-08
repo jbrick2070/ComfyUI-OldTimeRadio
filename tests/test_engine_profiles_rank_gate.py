@@ -76,15 +76,6 @@ def test_license_state_mirrors_commercial_clean_for_all_rows():
             assert p.commercial_clean is False
 
 
-def test_gated_engines_carry_warn_text():
-    r = _resolver()
-    for pid in ("char_indextts2_v1", "char_bark_v1", "announcer_bark_v1",
-                "music_musicgen_v1"):
-        p = r.get(pid)
-        assert p.license_state == "gated"
-        assert p.warn_text.strip(), pid
-
-
 def test_indextts2_runtime_is_oop_and_needs_ref_clip():
     r = _resolver()
     p = r.get("char_indextts2_v1")

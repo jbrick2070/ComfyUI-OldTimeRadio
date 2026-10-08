@@ -15,9 +15,8 @@
 # scope/logical default for the role -- distinct from the engine-level live
 # default, which stays on the legacy engine until promotion S6), runtime
 # (in_graph | oop_venv | cloud | direct_api), needs_ref_clip, caps, license_state
-# (clean|gated|unknown; blank = derive from commercial_clean), warn_text
-# (informational caveat text). license_state MIRRORS
-# commercial_clean here -- final license sign-off is Sprint 6, not an
+# (clean|gated|unknown; blank = derive from commercial_clean). license_state
+# MIRRORS commercial_clean here -- final license sign-off is Sprint 6, not an
 # unattended flip.
 
 profiles:
@@ -53,7 +52,6 @@ profiles:
     needs_ref_clip: false           # bark uses speaker presets, not a ref clip
     caps: {emotion_vector: false, duration_control: false}
     license_state: gated            # mirrors commercial_clean=false (verify S6)
-    warn_text: "Bark (Suno) weights: commercial terms unconfirmed. Local/personal use OK; verify Suno terms before commercial release."
 
   - profile_id: char_chatterbox_v1
     role: char_voice
@@ -80,7 +78,6 @@ profiles:
     needs_ref_clip: true
     caps: {emotion_vector: false, duration_control: false}
     license_state: clean
-    warn_text: ""
 
   - profile_id: char_indextts2_v1
     role: char_voice
@@ -128,8 +125,12 @@ profiles:
     runtime: oop_venv               # Path B isolated worker on Blackwell
     needs_ref_clip: true            # identity = reference clip only
     caps: {emotion_vector: true, duration_control: true}
+    # The weights carry the bilibili Model Use License (not Apache-2.0). Local
+    # and personal use is fine; commercial use is conditioned and
+    # community-ambiguous, so confirm with bilibili (indexspeech@bilibili.com)
+    # before a commercial release. Do not use them to train other commercial
+    # AI models.
     license_state: gated            # bilibili Model Use License (verify S6)
-    warn_text: "IndexTTS2 weights: bilibili Model Use License (not Apache-2.0). Local/personal use OK. Commercial use is conditioned + community-ambiguous -> verify with bilibili (indexspeech@bilibili.com) before commercial release. Do not use to train other commercial AI models."
 
   # --- announcer voice ---
   - profile_id: announcer_kokoro_v1
@@ -148,7 +149,6 @@ profiles:
     needs_ref_clip: false
     caps: {emotion_vector: false, duration_control: false}
     license_state: clean
-    warn_text: ""
 
   # --- character voice (opt-in 2026-06-19): kokoro as a FAST char voice. NOT the
   # char default (indextts2/bark stay default -> byte-identical); selected only
@@ -170,7 +170,6 @@ profiles:
     needs_ref_clip: false
     caps: {emotion_vector: false, duration_control: false}
     license_state: clean
-    warn_text: ""
 
   - profile_id: announcer_chatterbox_v1
     role: announcer_voice
@@ -188,7 +187,6 @@ profiles:
     needs_ref_clip: true
     caps: {emotion_vector: false, duration_control: false}
     license_state: clean
-    warn_text: ""
 
   # Bark as an announcer alternative (2026-08-24). Bark is preset-driven
   # (P2.2: no bank rows, ever -- see apple/TTS_VOICE_PREFLIGHT.md), so this
@@ -212,7 +210,6 @@ profiles:
     needs_ref_clip: false           # bark uses speaker presets, not a ref clip
     caps: {emotion_vector: false, duration_control: false}
     license_state: gated            # mirrors commercial_clean=false
-    warn_text: "Bark (Suno) weights: commercial terms unconfirmed. Local/personal use OK; verify Suno terms before commercial release."
 
   # --- music ---
   - profile_id: music_musicgen_v1
@@ -231,7 +228,6 @@ profiles:
     needs_ref_clip: false
     caps: {duration_control: true}
     license_state: gated            # CC-BY-NC (non-commercial)
-    warn_text: "MusicGen weights are CC-BY-NC (non-commercial). Do not ship MusicGen output commercially."
 
   - profile_id: music_stable_audio_v1
     role: music
@@ -249,7 +245,6 @@ profiles:
     needs_ref_clip: false
     caps: {duration_control: true}
     license_state: clean            # mirrors commercial_clean=true; plan flags revenue-cap review (S6)
-    warn_text: ""
 
   - profile_id: music_stable_audio_3_v1
     role: music
@@ -267,7 +262,6 @@ profiles:
     needs_ref_clip: false
     caps: {duration_control: true}
     license_state: clean            # SA3 community license: commercial OK (verify exact model S6)
-    warn_text: ""
 
   # --- cloud ElevenLabs voice (cloud-audio 2026-07-03; dropdown-opt-in, Comfy
   # Cloud via invoke_partner_node). NEVER a default (is_default false, high rank);
@@ -289,7 +283,6 @@ profiles:
     needs_ref_clip: false
     caps: {emotion_vector: false, duration_control: false}
     license_state: clean
-    warn_text: ""
     partner_row: cloud_elevenlabs_tts
     auth_required: true
     error_policy: fail_loud
@@ -310,7 +303,6 @@ profiles:
     needs_ref_clip: false
     caps: {emotion_vector: false, duration_control: false}
     license_state: clean
-    warn_text: ""
     partner_row: cloud_elevenlabs_tts
     auth_required: true
     error_policy: fail_loud
@@ -319,7 +311,8 @@ profiles:
   # Explicit-selection-only: runtime=direct_api is excluded from automatic rank
   # chains. Fail-loud, no local/cross-provider fallback. Voice identity is the
   # Google prebuilt voice name in provider_voice_id, resolved from google_tts
-  # bank entries by CastLock auto_registry.
+  # bank entries by CastLock auto_registry. Gemini TTS is a preview model and
+  # its voice stability may vary (hence use_cache on both rows).
   - profile_id: char_google_tts_v1
     role: char_voice
     engine: google_tts
@@ -336,7 +329,6 @@ profiles:
     needs_ref_clip: false
     caps: {emotion_vector: true, duration_control: false}
     license_state: clean
-    warn_text: "Google Gemini TTS is preview; voice stability may vary."
     partner_row: ""
     auth_required: true
     error_policy: fail_loud
@@ -358,7 +350,6 @@ profiles:
     needs_ref_clip: false
     caps: {emotion_vector: true, duration_control: false}
     license_state: clean
-    warn_text: "Google Gemini TTS is preview; voice stability may vary."
     partner_row: ""
     auth_required: true
     error_policy: fail_loud
@@ -385,7 +376,6 @@ profiles:
     needs_ref_clip: false
     caps: {emotion_vector: false, duration_control: true}   # provider-native duration
     license_state: clean
-    warn_text: ""
     partner_row: cloud_sonilo_music
     auth_required: true
     error_policy: fail_loud
@@ -394,6 +384,7 @@ profiles:
   # Explicit-selection-only: runtime=direct_api is excluded from automatic rank
   # chains. Lyria 3 Clip returns a fixed 30-second MP3; the adapter sends only
   # model/input to Google, decodes MP3 locally, and trims to the OTR cue length.
+  # Paid-only and currently a preview model.
   - profile_id: music_google_lyria_v1
     role: music
     engine: google_lyria
@@ -410,7 +401,6 @@ profiles:
     needs_ref_clip: false
     caps: {emotion_vector: false, duration_control: false}
     license_state: clean
-    warn_text: "Google Lyria 3 Clip is paid-only and currently preview; it returns fixed 30-second MP3 music clips."
     partner_row: ""
     auth_required: true
     error_policy: fail_loud
