@@ -548,11 +548,11 @@ _FRICTION_CELL = {
 
 #: Every friction word that means "a hosted service, not a download". ``none*``
 #: is the SAME KIND of thing as ``none`` -- a cloud lane no shipping profile
-#: selects yet -- and testing only for ``none`` sent cloud engines
+#: selects yet -- and testing only for ``none`` would send cloud engines
 #: (`cloud_seedance_2`, `cloud_vidu_q2_pro_fast_720p`, and others like them)
-#: into the catch-all below, so they printed under the heading "local
+#: into the catch-all below, so they would print under the heading "local
 #: diffusion" while their own cells read "key". The asterisk still marks the
-#: gap; it no longer moves them to the wrong table.
+#: gap; it does not move them to the wrong table.
 _HOSTED_WORDS = ("none", "none*")
 
 _GROUPS = (
@@ -1170,9 +1170,9 @@ def _profile_engines(profile_id: str) -> set:
     try:
         data = resolved_profile(profile_id, canonical)
     except ProfileError:
-        # Only "no such workflow", which is what the os.path.exists check this
-        # replaces was for. Anything else is a real fault and must not be swallowed
-        # into an empty set that reads as "this workflow selects no engines".
+        # Only "no such workflow" is tolerated. Anything else is a real
+        # fault and must not be swallowed into an empty set that reads as
+        # "this workflow selects no engines".
         return set()
     picked = set()
     for block in ("role_overrides", "slot_overrides"):

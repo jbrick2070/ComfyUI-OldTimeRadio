@@ -4,8 +4,7 @@ The generic theme-music surface for the opt-in v2 audio lane. It emits the three
 fixed cues (opening / closing / interstitial) the EpisodeAssembler consumes, and
 picks its engine from the shared audio-engine registry, dispatching FAIL-CLOSED:
 
-Every music engine is a self-contained ``clip`` engine (the legacy
-batch-delegation path was retired in the audio clean-break, 1c):
+Every music engine is a self-contained ``clip`` engine:
 
   * ``musicgen`` (``clip``; NOT the default -- see below) -> a per-cue prompt from the Meta brief
     (``_otr_music_prompt.compose_music_prompt``), a per-cue external seed
@@ -76,11 +75,10 @@ def floored_cue_silence(duration_s, rate):
     placement, caption span and assembly offset lands exactly where it would
     have -- the episode simply plays that stretch dry.
 
-    MODULE SCOPE ON PURPOSE. These were closures inside ``_render_clips``,
-    which made them untestable: the test written for this behaviour could not
-    import the real function, reimplemented its arithmetic inline, and
-    asserted that against itself -- a tautology that would have passed with
-    the floor deleted. A helper that cannot be reached by a test is a helper
+    MODULE SCOPE ON PURPOSE: a closure inside ``_render_clips`` cannot be
+    imported by a test, which would have to reimplement its arithmetic inline
+    and assert that against itself -- a tautology that would pass with the
+    floor deleted. A helper that cannot be reached by a test is a helper
     with no coverage.
     """
     import torch
@@ -113,8 +111,8 @@ class StableAudioTheme:
     FUNCTION = "generate"
     # 720-bakeoff C3: ONE padded AUDIO batch of ALL cues + the manifest that
     # maps each batch row back to a cue (opening / closing / interstitial,
-    # scifi_news_pro authored cues included). The old three-AUDIO opening/closing/
-    # interstitial surface is retired -- consumers slice by manifest sample_count.
+    # scifi_news_pro authored cues included). Consumers slice by manifest
+    # sample_count.
     RETURN_TYPES = ("AUDIO", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("cue_audio_clips", "cue_manifest_json", "render_log", "done")
     OUTPUT_NODE = False
@@ -471,10 +469,10 @@ class StableAudioTheme:
         else:
             # THE SERIAL PATH FLOORS TOO (2026-09-16 review). `fan_ok` requires
             # more than one cue, so an episode with a SINGLE cue -- an ordinary
-            # shape, not an edge case -- always came through here, where there
-            # was no try/except at all and `generate()` has only a `finally`.
-            # One refused bed therefore killed the whole render, TTS and all,
-            # on exactly the lane this work exists to protect.
+            # shape, not an edge case -- always comes through here, and
+            # `generate()` has only a `finally`: without this try/except one
+            # refused bed would kill the whole render, TTS and all, on exactly
+            # the lane this work exists to protect.
             for job in cue_jobs:
                 jid = job["job_id"]
                 try:

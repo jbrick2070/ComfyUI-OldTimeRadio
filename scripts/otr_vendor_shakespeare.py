@@ -98,9 +98,9 @@ def to_text(markup):
     every speaker label inline with its speech, and every line-anchored rule --
     the heading finder, the label counter -- as blind as it was on the raw HTML.
 
-    The parameter is `markup`, not `html`: it used to be `html`, which SHADOWED
-    the stdlib module of that name and turned `html.unescape(body)` into an
-    attribute lookup on a str.
+    The parameter is `markup`, not `html`: `html` would SHADOW the stdlib
+    module of that name and turn `html.unescape(body)` into an attribute
+    lookup on a str.
     """
     body = re.sub(r"(?is)<(script|style|template)\b.*?</\1>", " ", markup)
     body = re.sub(r"(?s)<!--.*?-->", " ", body)
@@ -313,22 +313,18 @@ _HEADING_LABEL = re.compile(
     r"(?i)^\s*(?:ESCENA|SCENA|SCÈNE|SCENE|ACTO|ATTO|ACT|ACTE)\b")
 
 #: AOZORA / TSUBOUCHI MARKS BY INDENT CLASS, NOT BY TYPE SIZE (measured
-#: 2026-09-19 on Romeo and Juliet, 42773_39853.html). The row was held on a
-#: recorded diagnosis that turned out to be wrong: it said this edition "sets
-#: stage business inline, in the same run as the dialogue, with no markup of
-#: its own". It does not. The page is CLEANLY marked -- it simply uses a
-#: vocabulary neither rule above knows:
+#: 2026-09-19 on Romeo and Juliet, 42773_39853.html). The page is CLEANLY
+#: marked -- it simply uses a vocabulary neither rule above knows:
 #:
 #:   <div class="burasage" ...>サン　　やい、グレゴリー、...</div>   dialogue
 #:   <div class="jisage_8" ...>...サンプソンとグレゴリーとが...出る。</div>  business
 #:   <div class="jisage_6"><h4>第一場　　ヱローナ。街上。</h4></div>       heading
 #:
-#: So NOTHING fired: no direction was stripped and no speaker was marked, and
-#: 95 marked dialogue lines in act 1 scene 1 collapsed into unattributed prose
-#: -- which is how a one-line part came to "absorb" the Prince's speech. The
-#: lesson the hold text drew is still the right one and is what measured this:
-#: count what the EDITION marks (95 burasage divs, 18 non-heading jisage divs),
-#: never what survived parsing.
+#: Without this rule NOTHING fires: no direction is stripped and no speaker
+#: is marked, and 95 marked dialogue lines in act 1 scene 1 collapse into
+#: unattributed prose -- which is how a one-line part came to "absorb" the
+#: Prince's speech. Count what the EDITION marks (95 burasage divs, 18
+#: non-heading jisage divs), never what survived parsing.
 #:
 #: The heading exemption is load-bearing for the same reason it is above:
 #: `extract` locates a scene BY the jisage_6/jisage_7 headings, so a blanket
@@ -337,18 +333,17 @@ _AOZORA_BUSINESS = re.compile(
     r'(?is)<div class="jisage_\d+"[^>]*>(?P<body>(?:(?!<h[1-6]\b).)*?)</div\s*>')
 
 #: ZHU SHENGHAO MARKS BY PARAGRAPH START PLUS AN IDEOGRAPHIC SPACE (measured
-#: 2026-09-19 against the fetched act page, not inherited from the hold note).
-#: This is the THIRD row in one day held on a diagnosis that was wrong about its
-#: own edition. The note said the edition "breaks no paragraph before a speaker,
-#: so five speeches land in the wrong mouth mid-line". It breaks one every time:
+#: 2026-09-19 against the fetched act page). The edition breaks a paragraph
+#: before every speaker:
 #:
 #:   <p>波　咱们都会齐了吗？</p>                     dialogue, speaker + U+3000
 #:   <div class="center">【衮斯，史纳格，波顿…上。</div>  block business
 #:   <div class="center"><span …>第三幕</span></div>     heading
 #:
-#: Nothing fired, so the pipeline fell back to heuristic plain-text parsing, and
-#: THAT is what merged the speeches. Counted on the page: 178 marked speeches
-#: across 19 names, against 0 that `mark_speakers` claimed.
+#: Without this rule nothing fires, so the pipeline falls back to heuristic
+#: plain-text parsing, and THAT merges the speeches. Counted on the page: 178
+#: marked speeches across 19 names, against 0 that `mark_speakers` claims
+#: without it.
 #:
 #: THE ABBREVIATION IS ONE OR TWO CHARACTERS, AND THAT IS THE TRAP. This edition
 #: abbreviates every character to their opening character -- 黑 is 黑美霞
@@ -625,10 +620,10 @@ def mark_speakers(markup):
             if name and _HEADING_LABEL.match(name):
                 # KEEP IT AS A PLAIN LINE, do not drop it. `extract` locates a
                 # scene BY this string and ends it at the next one, so deleting
-                # the heading is as fatal as marking it: the first cut dropped
-                # it and pt/hamlet 1.1 could not find `SCENA I` at all, while
-                # es/macbeth 1.3 lost the `ESCENA IV` that ends it and ran on
-                # into the next scene, collecting Duncan and Malcolm.
+                # the heading is as fatal as marking it: pt/hamlet 1.1 cannot
+                # find `SCENA I` at all, and es/macbeth 1.3 loses the
+                # `ESCENA IV` that ends it and runs on into the next scene,
+                # collecting Duncan and Malcolm.
                 return "\n" + name + "\n"
             if name and (len(name) > 1 or _CJK_CHAR.match(name)):
                 return "\n%s%s%s " % (SPEAKER_MARK, name, SPEAKER_MARK)
@@ -1365,7 +1360,7 @@ def write_rows(rows):
         io.open(dest, "w", encoding="utf-8", newline="\n").write(stored)
         digest = hashlib.sha256(stored.encode("utf-8")).hexdigest()
         # THE ROW IS REBUILT FROM SCRATCH, so a hand-curated key would be
-        # deleted by a routine re-vendor -- the same way a re-fetch used to
+        # deleted by a routine re-vendor -- the same way a re-fetch would
         # wipe the gender roster off a sidecar (`STAMPER_OWNED_SIDECAR_KEYS`).
         # The speaker map is curated by hand against the edition's labels and
         # the English sidecar; carry it forward, and let the reader re-check

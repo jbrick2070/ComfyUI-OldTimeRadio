@@ -28,14 +28,8 @@ Bypass mode (``bypass=True`` widget): copies source -> output verbatim
 with no procgen overlay. Useful for A/B comparison or when the procgen
 visual is unwanted (e.g. clean uplift for an external editor).
 
-**History note (2026-08-08):** the retired ``OTR_RTXUpscale`` node used
-to sit between OTR_SilentComposite and this node, taking a smaller
-composite canvas up to 1080p via an NVIDIA-only RTX VSR pass. That
-stage was ripped as part of queue item 8; the composite chain now
-delivers 1080p directly (via ``render.composite_w/h`` per profile), and
-per-clip model enhancement lives inside SilentComposite itself
-(``nodes/_otr_upscale_engines/`` -- device-selectable across vendors).
-This node's inputs are unchanged.
+Upscaling is upstream: the composite already arrives at 1080p, with per-clip
+model enhancement inside SilentComposite (``nodes/_otr_upscale_engines/``).
 """
 from __future__ import annotations
 
@@ -78,21 +72,15 @@ def _ffmpeg_bin(ffmpeg: str = "ffmpeg") -> str:
     straight into every subprocess here (decode, blend, bars), so a box whose
     ffmpeg is reachable only through OTR_FFMPEG blended nothing -- and no
     resolver copy existed for the guard to catch."""
-    # NEVER reflect the argument back (2026-09-04). This used to return
-    # `str(ffmpeg).strip()` when resolution found nothing, which handed an
-    # UNRESOLVED caller string straight to argv[0] -- so a rejected value
-    # came back through the fallback and was spawned anyway. "" means "this
-    # box has no ffmpeg", and blend() degrades on it by name.
+    # NEVER reflect the argument back: an UNRESOLVED caller string would reach
+    # argv[0]. "" means "this box has no ffmpeg", and blend() degrades on it
+    # by name.
     return resolve_ffmpeg(ffmpeg) or ""
 
 try:
     from ._otr_shared import ffprobe as _ffp  # noqa: E402
 except ImportError:  # pragma: no cover -- flat (sys.path) load
     from _otr_shared import ffprobe as _ffp  # type: ignore  # noqa: E402
-
-# NOTE: the SDH caption builder import (build_ass_from_ledger) was removed here in
-# the 2026-07-04 widget-audit Batch 3 -- captions migrated to node 86
-# OTR_CaptionBurn. This node no longer builds or burns captions.
 
 log = logging.getLogger(__name__)
 
@@ -137,12 +125,6 @@ def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
     return (_reject_filtergraph_syntax(p.name), str(p.parent))
 
 
-# SDH caption resolution (_resolve_captions_ass) was REMOVED here in the
-# 2026-07-04 widget-audit Batch 3: caption ownership migrated to node 86
-# OTR_CaptionBurn, which ports this same suffix-strip + sibling-audio ledger
-# resolution into its own _resolve_ledger_path. This node no longer resolves or
-# burns captions.
-
 # BUG-LOCAL-096 (2026-05-04 EVENING): default bumped from "lighten"
 # at 0.5 to "screen" at 1.0 to bring procgen colors at full intensity.
 # BUG-LOCAL-099 (2026-05-04 LATE EVENING): "screen" produced a global
@@ -168,8 +150,6 @@ def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
 _DEFAULT_BLEND_MODE = "screen"
 _DEFAULT_BLEND_OPACITY = 1.0
 _DEFAULT_GREEN_ONLY = True
-# SDH caption constants removed 2026-07-04 (widget-audit Batch 3): caption
-# ownership migrated to node 86 OTR_CaptionBurn (which defines its own).
 # BUG-LOCAL-103 (2026-05-04 LATE EVENING): pre-blend shadow crush.
 # Pixel inspection of a procgen mp4 dark region (signal_lost_echo_in_stasis
 # 0:22, 99% of frame is luminance < 32) showed the "black" background is
@@ -183,14 +163,10 @@ _DEFAULT_GREEN_ONLY = True
 # to leak. Threshold 18 = covers the 5-10 noise floor with margin while
 # preserving the 95-max green flecks of legit motion content. 0 disables.
 _DEFAULT_SHADOW_CRUSH = 18
-# BUG-LOCAL-102 (2026-05-04 LATE EVENING): expanded the dropdown to include
-# the popular ffmpeg blend filter modes so the BUG-099 tuning workflow can
-# A/B test all useful options without code edits. Pre-102 the dropdown only
-# accepted 5 modes (lighten, screen, addition, overlay, normal); the test
-# workflow Jeffrey wanted with 8 modes had 5 of them rejected as invalid
-# dropdown values (red text on the canvas). All 16 modes below are valid
-# ffmpeg blend=all_mode= values per ffmpeg filter docs. Sorted by usefulness
-# for OTR's overlay-on-upscale aesthetic, brightest-first then darken-tier.
+# BUG-LOCAL-102: the popular ffmpeg blend filter modes, so blend tuning can A/B
+# every useful option without code edits. All 16 modes below are valid ffmpeg
+# blend=all_mode= values per ffmpeg filter docs. Sorted by usefulness for
+# OTR's overlay-on-upscale aesthetic, brightest-first then darken-tier.
 _BLEND_MODE_CHOICES = [
     "lighten",       # default; max(A, B) per pixel
     "screen",        # 1 - (1-A)(1-B); always brighter
@@ -566,13 +542,7 @@ def _bars_strip_geom(w: int, h: int) -> "tuple[int, int, int, int]":
 
 def _probe_fps(path: Path, ffmpeg: str) -> float:
     """Source video fps via ffprobe (r_frame_rate). Defaults to 25.0 (the OTR
-    canonical) on any failure so the bars layer always has a sane rate.
-
-    The old binary spelling here was ``str(ffmpeg).replace("ffmpeg", "ffprobe")``
-    -- a blind string swap that never checked the result exists, and that
-    rewrote any directory named ``ffmpeg`` along the way. It also parsed the
-    rational rate a THIRD time, in a third dialect. Both jobs are the shared
-    boundary's now; the 25.0 fallback is still this node's own call."""
+    canonical) on any failure so the bars layer always has a sane rate."""
     try:
         doc = _ffp.probe_json(str(path), "stream=r_frame_rate",
                               select_streams="v:0", ffmpeg=ffmpeg, timeout=30)
@@ -724,9 +694,8 @@ class PostUpscaleProcgenBlend:
     ffmpeg -filter_complex blend. Audio passes through with ``-c:a copy``
     so the C7 byte-identity guarantee from per-clip-mux holds end-to-end.
 
-    The class name is historical: it read a standalone RTXUpscale stage
-    until queue item 8 (2026-08-08) ripped that node. Its input is now
-    SilentComposite's output directly. See the module docstring.
+    The ``PostUpscale`` in the class name is historical; its input is
+    SilentComposite's output directly.
     """
 
     DESCRIPTION = (
@@ -844,14 +813,6 @@ class PostUpscaleProcgenBlend:
                         "(0,255,0) collapses to (255,255,255)."
                     ),
                 }),
-                # SDH open captions REMOVED from node 93 (2026-07-04 widget-audit
-                # Batch 3): caption ownership migrated to node 86 OTR_CaptionBurn,
-                # which now sits AFTER this blend (chain 84 -> 93 -> 86 -> 95 -> 85).
-                # The blend no longer burns captions -- see blend() where
-                # captions_ass_path is pinned None. widgets_values is positional
-                # (BUG-LOCAL-097): the two tail caption widgets were removed
-                # together and the JSON widgets_values (13 -> 11) + the scopes
-                # input index (11 -> 9) were updated in the SAME commit.
                 # §4D scene-aware scopes (APPENDED LAST per BUG-LOCAL-097: a new
                 # input only ever goes at the end -- widgets_values is
                 # positional). Path to OTR_SceneAwareScopes' scopes_only.mp4.
@@ -908,17 +869,10 @@ class PostUpscaleProcgenBlend:
         audio_bars: str = "bottom",
     ):
         report_lines: list[str] = []
-        # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
-        # operator intent. Discarded HERE, at the node boundary, so no
-        # helper underneath can be handed it.
-        # The `ffmpeg` widget was REMOVED on 2026-09-13. It had been
-        # DEPRECATED and IGNORED since 2026-09-04, when a widget value was
-        # found to reach argv[0] over an unauthenticated /prompt request;
-        # the fix then was to discard it here, at the node boundary. The
-        # declaration is now gone, so ComfyUI never passes the field at
-        # all and there is nothing left to discard -- the channel is
-        # closed rather than sanitised. Everything below already saw ""
-        # for this name; OTR_FFMPEG remains the one way to pin a build.
+        # There is no `ffmpeg` widget: a widget value once reached argv[0] over
+        # an unauthenticated /prompt request, so the channel is closed rather
+        # than sanitised. Everything below sees ""; OTR_FFMPEG remains the one
+        # way to pin a build.
         ffmpeg = ""
         # These paths came from the workflow, so they are untrusted input.
         # A UNC value makes this machine authenticate to the host it names
@@ -1071,13 +1025,10 @@ class PostUpscaleProcgenBlend:
                 "unavailable (%s); proceeding", _exc,
             )
 
-        # SDH open captions were MIGRATED OUT of this blend to node 86
-        # OTR_CaptionBurn (2026-07-04 widget-audit Batch 3): CaptionBurn now runs
-        # AFTER this node (chain 84 -> 93 -> 86 -> 95 -> 85) and is the single
-        # caption owner. The blend therefore NEVER burns captions -- captions_ass_
-        # path stays None so the shared ffmpeg cmd builders take their no-caption
-        # path (bars two-pass and everything else byte-identical to the prior
-        # no-caption render).
+        # Captions are burned by node 86 OTR_CaptionBurn, which runs AFTER this
+        # node (chain 84 -> 93 -> 86 -> 95 -> 85) and is the single caption
+        # owner, so captions_ass_path stays None and the shared ffmpeg cmd
+        # builders take their no-caption path.
         captions_ass_path = None
 
         src_dims = _probe_dims(src, ffmpeg=ffmpeg)

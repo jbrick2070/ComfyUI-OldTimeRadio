@@ -209,11 +209,11 @@ except Exception as _otr_exc:  # noqa: BLE001 -- a voice is never worth a boot
 # model_management is first imported, which is AFTER custom-node prestartup
 # scripts run, so this is the last moment a node pack can influence it.
 #
-# Scoped to macOS, and asked WITHOUT IMPORTING TORCH (2026-09-26). This block
-# used to `import torch` on every platform just to ask whether MPS exists, and
-# ComfyUI prints "Torch already imported, torch should never be imported before
-# this point" whenever a prestartup script does that -- seen on every NVIDIA
-# boot. The platform answers the question: the sub-quadratic default is wrong
+# Scoped to macOS, and asked WITHOUT IMPORTING TORCH (2026-09-26). ComfyUI
+# prints "Torch already imported, torch should never be imported before this
+# point" whenever a prestartup script imports torch, which asking whether MPS
+# exists on every platform would do on every NVIDIA boot. The platform answers
+# the question: the sub-quadratic default is wrong
 # only on Metal, and on a Mac without a Metal device (CPU mode) PyTorch
 # attention is correct as well (the CPU row above: music with any attention),
 # so forcing it on darwin costs nothing there. Windows and Linux never enter the

@@ -153,12 +153,12 @@ def comfy_root() -> str:
 def models_root(comfy: str) -> str:
     """The models root, resolved by the PACK'S OWN authority.
 
-    DO NOT REIMPLEMENT THIS. The first version of this function checked the env
-    vars, then fell back to `<comfy>/models` if that directory existed -- and on
-    the reference machine it does exist and holds some things, so the guess won
-    and returned the wrong root. The real one is `C:\\ComfyUI-Models`. That is
-    precisely the trap the project rules call out: a plausible tree that is not
-    the tree, which makes a wrong answer look verified.
+    DO NOT REIMPLEMENT THIS. Checking the env vars and then guessing
+    `<comfy>/models` when that directory exists picks the wrong root on the
+    reference machine, where it exists and holds some things; the real one is
+    `C:\\ComfyUI-Models`. That is precisely the trap the project rules call
+    out: a plausible tree that is not the tree, which makes a wrong answer
+    look verified.
 
     `nodes/_otr_models_root.py::_models_root()` is the single owner of this
     question. Ask it, and only fall back when it cannot be imported at all.
@@ -254,9 +254,9 @@ def ensure_animatediff_pack(comfy: str) -> None:
     ANIMATEDIFF_PIN, and an existing git checkout must be AT that commit (a
     different commit is named and refused, never reset). A Manager install has
     no .git and cannot be verified, so it is accepted as PRESENT and said so.
-    This pack carries no patch to hash, and calling
-    a working Manager install absent used to make the provisioner clone into a
-    non-empty directory and report FAILED for it.
+    This pack carries no patch to hash, and calling a working Manager install
+    absent would make the provisioner clone into a non-empty directory and
+    report FAILED for it.
     """
     dest = os.path.join(comfy, "custom_nodes", ANIMATEDIFF_PACK_NAME)
     fresh = not os.path.isdir(dest) or not os.listdir(dest)
@@ -283,12 +283,12 @@ def install_node_packs(comfy: str) -> None:
     os.makedirs(cn, exist_ok=True)
     # ONE PACK. Every class the LTX lanes ask for -- ltx_8gb and ltx25_* --
     # ships with ComfyUI itself (measured from /object_info python_module
-    # 2026-09-25), and the 4060 published otr_8gb_video on a wiped box WITHOUT
-    # ComfyUI-LTXVideo on 2026-09-26 (TEST_WAVE B4). So the LTXVideo clone and
-    # its kornia pad patch are gone; a missing LTX class now means an old
-    # ComfyUI, and the engine says "update ComfyUI". AnimateDiff-Evolved stays:
-    # the animatediff lanes need its classes, and a lane without them used to
-    # die mid-episode with WrapperNodeMissing (PBUG-20260925-02).
+    # 2026-09-25; the 4060 published otr_8gb_video on a wiped box WITHOUT
+    # ComfyUI-LTXVideo, TEST_WAVE B4), so no LTXVideo clone is provisioned; a
+    # missing LTX class means an old ComfyUI, and the engine says "update
+    # ComfyUI". AnimateDiff-Evolved is provisioned: the animatediff lanes need
+    # its classes, and a lane without them dies mid-episode with
+    # WrapperNodeMissing (PBUG-20260925-02).
     ensure_animatediff_pack(comfy)
 
 
@@ -381,10 +381,10 @@ def warm_profile_writer_models(profile: dict, _snapshot_download=None) -> None:
     rows = {row.repo_id: row for row in catalog.CURATED_LLM_MODELS}
     cache_dir = os.path.join(os.environ["HF_HOME"], "hub")
     os.makedirs(cache_dir, exist_ok=True)
-    # THROUGH THE CATALOG, NOT AROUND IT (cursor QA on 8f8ccebb). This used
-    # to call snapshot_download(cache_dir=...) itself, so a provisioned box
-    # got its writer in the hub cache -- the layout the LLM folder change
-    # retired -- and the runtime then never created the folder. The catalog
+    # THROUGH THE CATALOG, NOT AROUND IT (cursor QA on 8f8ccebb): calling
+    # snapshot_download(cache_dir=...) directly would put a provisioned box's
+    # writer in the hub cache instead of the LLM folder, and the runtime would
+    # then never create the folder. The catalog
     # picks the destination (the LLM folder, or the hub when this box has no
     # models root), checks disk on that drive, writes the receipt, and skips
     # a model that is already complete in either layout.
@@ -1133,8 +1133,8 @@ def install_isolated_voice(comfy: str, name: str, pip_args: list) -> None:
              "torch", "torchaudio"], env=env)
     run([uv, "pip", "install", "-q"] + pip_args, env=env)
     # VERIFY WITH A REAL KERNEL LAUNCH, not an import. `import torch` succeeds
-    # on a build with no kernels for this card, so the old check reported OK
-    # for two venvs that then failed at render time. Launching one tiny kernel
+    # on a build with no kernels for this card, so an import check reports OK
+    # for a venv that then fails at render time. Launching one tiny kernel
     # turns that silent time-bomb into an install-time failure naming itself.
     probe = (
         "import torch; "
@@ -1531,12 +1531,9 @@ def profile_python_issue(profile: dict, version_info=None) -> str:
     # voices), so only 3.14+ has no kokoro backend packaged yet.
     if "kokoro" in voices and tuple(version_info[:2]) >= (3, 14):
         return (
-            # The third way out used to read "or the Bark-based otr_4060_floor
-            # profile". That profile sets no voice engine at all, so it INHERITS
-            # the canonical's kokoro and has this exact problem -- the advice sent
-            # the reader in a circle. Removed 2026-09-24 rather than repointed:
-            # naming a different profile means auditing which one really is
-            # Bark-based, and which voice a profile uses is the operator's call.
+            # No profile is named as a way out here: which voice a profile
+            # uses is the operator's call, and a profile that sets no voice
+            # engine INHERITS the canonical's kokoro and has this exact problem.
             "selected Kokoro voice has no backend packaged for Python 3.14 yet "
             "(kokoro needs <=3.12, kokoro-onnx needs <=3.13); use Python 3.13 "
             "(kokoro-onnx, CPU) or 3.12 (kokoro), or set a non-Kokoro voice "

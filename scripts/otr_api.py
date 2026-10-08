@@ -1,11 +1,5 @@
 """otr_api.py -- ComfyUI HTTP API helpers for OTR workflow JSONs.
 
-BUG-LOCAL-002 fix (2026-05-02). Replaces scripts/soak_operator.py and
-scripts/supersoaker.py, both of which carried stale `WV_*` positional
-widget indices that no longer matched the live OTR_LedgerScriptWriter node
-(`episode_title` and `num_characters` widgets were added later, shifting
-every downstream index off by 1-2 slots).
-
 This module exposes:
 
   * `load_workflow(path)` -- read a UI-format workflow JSON.
@@ -475,8 +469,8 @@ def patch_widget_by_name(
     # early here -- AFTER validation has accepted it -- prevents a literal
     # `null` from being written into the workflow's widgets_values slot.
     # Many ComfyUI core nodes treat `null` as a parser error rather than
-    # a default-fallback, so patching a value of `None` previously could
-    # crash the run at queue-time. Match the documented behavior in the
+    # a default-fallback, so patching a value of `None` could crash the run
+    # at queue-time. Match the documented behavior in the
     # _validate_widget_value docstring: None means "leave the slot alone".
     if value is None:
         return
@@ -751,22 +745,17 @@ _ERROR_TRACEBACK_FRAMES = 12
 def describe_execution_error(messages) -> str:
     """A readable diagnosis of a ComfyUI execution error.
 
-    REPLACES ``str(messages)[:500]``, which cost real diagnosis time twice on
-    2026-08-12. That truncation stringified the whole history payload -- a list
-    of ``[event_name, payload]`` pairs, most of it timestamps and cache lists --
-    and cut it at 500 characters, which landed INSIDE the traceback:
-
-        'traceback': ['  File "C
-
-    The node that died, the exception type, and every frame naming our code
-    were all past the cut. Both live writer failures therefore had to be
-    re-diagnosed out of an unrelated server log. A campaign leg costs minutes to
+    Pulls the named fields (the node that died, the exception type, the
+    traceback) out of the history payload instead of truncating its repr: the
+    payload is a list of ``[event_name, payload]`` pairs, mostly timestamps
+    and cache lists, so a 500-character cut lands INSIDE the traceback and
+    every frame naming our code is past it. A campaign leg costs minutes to
     hours, so a lost traceback is not a lost line -- it is a lost leg.
 
-    Pulls the named fields out instead of truncating a repr, and keeps the TAIL
-    of the traceback because that is where our frames are. Falls back to the old
-    behaviour for any payload shape it does not recognise: a diagnosis helper
-    must never be the reason a failure goes unreported.
+    Keeps the TAIL of the traceback because that is where our frames are.
+    Falls back to ``str(messages)[:500]`` for any payload shape it does not
+    recognise: a diagnosis helper must never be the reason a failure goes
+    unreported.
     """
     if not messages:
         return "execution error"
@@ -1068,18 +1057,17 @@ def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
     else:
         # Machine rows are built in memory rather than loaded through
         # load_profile(), so this is their production shape boundary. This is
-        # schema validation only, not the removed capability/VRAM gate below.
+        # schema validation only; there is no capability/VRAM gate (see below).
         profile = validate_profile_shape(profile, source="machine profile")
-    # CAPABILITY CROSS-VALIDATION REMOVED 2026-08-31, by operator directive:
-    # "I don't want to maintain any warning gate either", after "let's power
-    # through testing without inviting some artificial profile gate".
+    # NO CAPABILITY CROSS-VALIDATION (operator directive 2026-08-31: "I don't
+    # want to maintain any warning gate either", after "let's power through
+    # testing without inviting some artificial profile gate"). Refusing a
+    # profile's choices against each registry's enable-set BEFORE anything
+    # has tried them is backwards for a project that learns what works by
+    # running it. The standing rule is that an OOM is the only acceptable
+    # killer.
     #
-    # It compared a profile's choices against each registry's enable-set and
-    # refused combinations BEFORE anything had tried them -- which is backwards
-    # for a project that learns what works by running it. The standing rule is
-    # that an OOM is the only acceptable killer.
-    #
-    # The model now: the dropdown decides, the workflow runs it, and a real
+    # The model: the dropdown decides, the workflow runs it, and a real
     # failure is written into config/machine_classes.json under `known_limits`
     # -- the matrix is the RECORD, never the controller. The code does not
     # consult it for permission.

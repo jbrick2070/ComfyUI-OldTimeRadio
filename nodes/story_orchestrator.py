@@ -16,16 +16,13 @@ Two nodes:
      exit; downstream consumers read the ledger via
      FreezeCascade.script_json fanout.
 
-The legacy LLMDirector class was removed in voice-path-cleanbreak
-S2 (commit 249bc06). Voice and video paths share the L3 ledger as
-the single source of truth; there is no Director-shape projection
-anywhere in active code.
+Voice and video paths share the L3 ledger as the single source of truth;
+there is no Director-shape projection anywhere in active code.
 
 LLM runs via transformers (local GPU). THERE IS NO CONTENT SAFETY
-FILTER -- this line claimed one until 2026-09-23 and had been stale
-since the 2026-08-05 rip. No content check remains anywhere on the
-generation path: `validate_sfw` is a no-op, the G9 freeze gate is
-deleted, and `_otr_content_safety` has no importer outside tests.
+FILTER: no content check remains anywhere on the generation path
+(`validate_sfw` is a no-op, there is no G9 freeze gate, and
+`_otr_content_safety` has no importer outside tests).
 On an adaptation lane the author's own language is carried as written.
 
 v1.0  2026-04-04  Jeffrey Brick
@@ -39,27 +36,14 @@ import random
 import re
 import time
 
-# The Lemmy coin flip does NOT live here. `_LEMMY_RNG` / `_LEMMY_HISTORY` (and
-# the `SystemRandom` import that existed only for them) were removed
-# 2026-08-28: definition-only, with no reader anywhere. The live roll is in
-# `config/cast_pools.py` -- a different module object, so these were never the
-# same RNG the episode actually used.
+# The Lemmy coin flip does NOT live here: the live roll is in
+# `config/cast_pools.py`.
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
-# Project State (v1.4 Theme C) - series bible for cross-episode consistency.
-# (lean-mean order 5, 2026-08-23) `from .project_state import ProjectState`
-# was here -- imported and never used, the only repo reference to that module.
-# The node and module are retired; the import went with them.
 # Per-phase VRAM telemetry (v1.4 Theme C). CUDA-absent safe.
 from ._vram_log import vram_snapshot, vram_reset_peak
-# (`force_vram_offload` was dropped from this import 2026-08-28 and removed
-# from _vram_log altogether 2026-09-25 -- it never had a caller.)
-
-# Canonical OTR paths -- single source of truth for output locations.
-# (director_raw_dump_dir was deleted in voice-path-cleanbreak S23.1
-# with no live consumer remaining; no replacement import needed.)
 
 
 # Lazy heavy imports (Section 8) - torch, numpy, transformers inside methods/classes only
@@ -95,16 +79,6 @@ def _runtime_log(msg):
         # Narrowed from a bare `except:` so a KeyboardInterrupt / SystemExit
         # during the write propagates instead of being swallowed by the log.
         pass
-
-# (lean-mean 2026-08-22: the FIRST _truncate_at_sentence_boundary /
-# _tail_at_sentence_boundary bodies lived here and were permanently shadowed by
-# a later same-named pair ~2200 lines down -- which was itself uncalled. All
-# four are deleted. tests/test_no_duplicate_top_level_defs.py now refuses the
-# pattern, so it cannot come back silently the way it did here twice.)
-
-# (rip-sfx 2026-08-06: the [SFX:]-emitting _inject_scene_transitions body that
-# lived here was dead code -- permanently shadowed by a later same-named
-# function, itself also uncalled -- and both are deleted.)
 
 
 # -----------------------------------------------------------------------------
@@ -150,12 +124,8 @@ class _LLMTimeoutWorkflowPause(_LLMTimeout):
 
 
 import threading
-# `_TIMEOUT_CTX = threading.local()` was REMOVED 2026-08-28: its ONLY reader
-# was the deleted GemmaHeartbeatStreamer's put(), so the writes and cleanup in
-# `_run_with_timeout` had become write-only ceremony. The deadline the REAL
-# transports check is loader-owned -- `set_generation_deadline()` below, read
-# back by `_DeadlineStoppingCriteria` -- and that path is
-# untouched.
+# The deadline the REAL transports check is loader-owned --
+# `set_generation_deadline()` below, read back by `_DeadlineStoppingCriteria`.
 
 def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
     """Run fn() in a worker thread with a wall-clock timeout.
@@ -169,29 +139,26 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
     vram_reset_peak(phase_label)
 
     # ONE absolute deadline, computed BEFORE submit and shared by the worker
-    # and the parent. Previously the worker computed its own
-    # `time.time() + timeout_sec` AFTER being scheduled, while the parent's
-    # future.result(timeout=timeout_sec) started counting at submission -- so
-    # the worker's deadline outlived the parent's timeout by however long the
-    # executor took to start it, and an abandoned worker got a grace period
-    # nobody intended. monotonic, not time.time(): an epoch clock can step.
+    # and the parent. A deadline the worker computed itself AFTER being
+    # scheduled would outlive the parent's future.result(timeout=timeout_sec)
+    # (which counts from submission) by however long the executor took to
+    # start it, and an abandoned worker would get a grace period nobody
+    # intended. monotonic, not time.time(): an epoch clock can step.
     deadline = time.monotonic() + timeout_sec
 
     def _worker():
         # The loader-owned deadline is what the real transports check: the
         # transformers closures via _DeadlineStoppingCriteria, and the
         # backend via get_generation_deadline() + conditional streaming.
-        # (A thread-local mirror of this deadline was removed 2026-08-28
-        # with its only reader, the legacy GemmaHeartbeatStreamer.)
-        # Both now read the SAME monotonic value installed here.
+        # Both read the SAME monotonic value installed here.
         #
         # Not best-effort: a guard whose install can silently no-op is
         # worse than none (it claims protection that is not there), so a
         # failure here fails the call loudly rather than swallowing it.
         #
-        # Installation moved INSIDE the try so the finally owns cleanup for
-        # everything it sets -- previously an exception between the two
-        # assignments could leave one installed with no owner.
+        # Installation is INSIDE the try so the finally owns cleanup for
+        # everything it sets -- an exception between the two assignments
+        # must not leave one installed with no owner.
         try:
             _otr_loader_mod.set_generation_deadline(deadline)
             # A worker scheduled AFTER the budget already expired must not
@@ -312,67 +279,16 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
         executor.shutdown(wait=False)
 
 
-# -----------------------------------------------------------------------------
-# THE CAST-CONSOLIDATION CLUSTER WAS REMOVED 2026-08-28.
-#
-# Four functions (_norm_cast_key, _cast_names_should_merge, and the two
-# _consolidate_similar_cast_rows* entry points) that merged near-duplicate
-# cast rows -- LLOYD vs LLOYD KAPOOR, STANLEY vs STANLEARY. They fixed a
-# REAL bug (BUG-LOCAL-071/098, live on two consecutive runs in April 2026),
-# and the banner above them claimed the LPL writer's cast-lock path used
-# them. IT NEVER DID. Their only caller was the deleted LLMDirector.direct();
-# that whole legacy class was deleted on 2026-05-12 (249bc06c, Director
-# retirement).
-#
-# THE DEFECT IS NOT JUST UNOBSERVED, IT IS STRUCTURALLY IMPOSSIBLE NOW.
-# The old bug needed cast rows DERIVED from LLM dialogue tags; today the
-# cast is locked FIRST and the LLM is constrained to it, behind six
-# independent guards -- pool names against a taken_names set, duplicate
-# rejection in the cast validator, RuntimeErrors on duplicate names and on
-# a count mismatch, an OutlineFailedError reroll for invented speakers, and
-# a bare char_id_by_name subscript that raises rather than minting a row.
-#
-# MEASURED BEFORE DELETING: 1,987 frozen ledgers scanned with the shipped
-# merge rule -- ZERO hits, zero dangling char_id refs, zero duplicate names
-# or ids. A deliberately looser heuristic surfaced 57 pairs, and every one
-# was two real characters (mothers and daughters, siblings, LAB TECHNICIAN
-# 1/2) with different genders and different voices.
-#
-# AND WIRING IT WOULD HAVE BROKEN THE BUILD: a merge drops a cast row, so
-# non_announcer_count falls below the requested num_characters and the
-# assertion at OTR_LedgerScriptWriter.py:3999-4005 raises 'Cast lock count
-# mismatch' -- every render where it fired would die. The generalizable
-# lesson survives as BUG_BIBLE legacy_id BUG-LOCAL-068.
+# No cast-row merge step exists (near-duplicate rows such as LLOYD vs LLOYD
+# KAPOOR cannot arise: the cast is locked FIRST and the LLM is constrained to
+# it). Do not add one: a merge drops a cast row, so non_announcer_count falls
+# below the requested num_characters and the 'Cast lock count mismatch'
+# assertion in OTR_LedgerScriptWriter raises.
 
 
-# THE BARK PRESET-HEALTH CLUSTER WAS REMOVED 2026-08-28 -- the one C2 item
-# that was NOT ordinary dead code, resolved by verdict after an adversarial
-# kibitz review.
-#
-# `_bark_test_presets` / `_bark_health_check` / `_bark_health_check_for_cast`
-# were LIVE until the Director retirement (249bc06c, 2026-05-12) deleted
-# their only call site, silently orphaning a real safety check: nothing on
-# the current path validated that a Bark preset produces audible audio, and
-# the adversarial pass CONFIRMED a finite, nonempty, silent tensor passes
-# every downstream contract (pack, sequence, enhance, master, mux,
-# obs_publish) -- none of which tests audibility.
-#
-# THE SAFETY MIGRATED BEFORE THE DELETION, to the right seam:
-# BarkEngine.generate_voice now rejects empty / nonfinite /
-# peak-below-1e-4 output with BarkSilentOutputError, on every live
-# production Bark render, BEFORE downstream spend. Never a preset remap --
-# the deleted cluster's remapping behaviour is exactly what the no-fallback
-# rip forbids reintroducing.
-#
-# The tables went with it: `_VOICE_PROFILES` was a semantic duplicate of
-# config/cast_pools.py; `_ANNOUNCER_PRESETS` and `_LEMMY_PROFILE` were
-# stale, DIVERGENT copies of definitions that live elsewhere -- keeping a
-# wrong copy of a voice table is how a settled voice regresses.
-
-
-
-
-
+# Bark audibility is checked in BarkEngine.generate_voice, which rejects empty
+# / nonfinite / peak-below-1e-4 output with BarkSilentOutputError before any
+# downstream spend. Never a preset remap: the no-fallback rule forbids it.
 
 
 # -----------------------------------------------------------------------------
@@ -399,22 +315,9 @@ logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
 #   - Temperature capped at 0.55 for international presets (0.5 first lines)
 # -----------------------------------------------------------------------------
 
-# The `_FIRST_NAMES` / `_LAST_NAMES` pools were removed 2026-08-28:
-# definition-only, with no reader in production or tests. The LIVE name
-# pools are `config/cast_pools.py` (FIRST_NAMES_BY_GENDER /
+# The LIVE name pools are `config/cast_pools.py` (FIRST_NAMES_BY_GENDER /
 # FIRST_NAMES_BY_GENRE / LAST_NAMES), which is what casting actually draws
-# from -- these were a stale second copy, and their sibling trait pools had
-# already been removed for the same reason.
-
-# The procedural trait pools (_GENDERS / _AGE_BRACKETS / _DEMEANORS /
-# _VOICE_TRAITS) were removed 2026-08-28: definition-only, zero loads --
-# the cast-roll path they described no longer draws from this module.
-
-
-
-
-
-
+# from; this module keeps no second copy of them.
 
 
 # -----------------------------------------------------------------------------
@@ -496,19 +399,16 @@ def _fetch_full_article(url, timeout=20):
     except ImportError as exc:
         # A MISSING PACKAGE MUST NOT LOOK LIKE A PAYWALL.
         #
-        # This used to `return ""`, silently. The caller then logged "scrape
-        # blocked - RSS summary" and fell back to the RSS teaser, and the v4
-        # source floor eventually failed the run with "No science RSS candidate
-        # met the v4 source floor ... after inspecting 10 candidates" -- an error
-        # that blames the FEEDS for a package that was never installed.
+        # Returning "" silently would make the caller log "scrape blocked - RSS
+        # summary" and fall back to the RSS teaser, and the v4 source floor
+        # would eventually fail the run with "No science RSS candidate met the
+        # v4 source floor ... after inspecting 10 candidates" -- an error that
+        # blames the FEEDS for a package that was never installed.
         #
-        # Found 2026-07-14: bs4 was absent from the ComfyUI venv, so EVERY
-        # science article body had been "" for as long as that was true. Every
-        # science-sourced episode was written from a ~120-character headline
+        # With bs4 absent EVERY science article body is "", so every
+        # science-sourced episode is written from a ~120-character headline
         # teaser instead of the methodology and findings this function exists to
-        # fetch (a live probe after installing it returned 2,041 and 6,708
-        # characters from the same feed, in 0.3s). The degradation was total,
-        # permanent, and invisible.
+        # fetch. The degradation is total, permanent, and invisible.
         #
         # So say it once, LOUDLY, and record it so the floor's own failure
         # message can name the real cause instead of the feeds.
@@ -828,16 +728,15 @@ def _llm_rank_news_candidates(
             log.info("[NewsFetcher]   - %s", (r.get("headline") or "")[:80])
         return ranked
     except _LLMTimeoutWorkflowPause:
-        # 2026-08-25: this subtype's own docstring says "ComfyUI catches
-        # this at the node boundary and halts the queue cleanly" -- but the
-        # broad `except Exception` below used to catch it here FIRST and
-        # silently fall back to shuffle order,
-        # letting the main thread immediately start ANOTHER LLM load while
-        # this phase's orphan worker is still alive on GPU (generation is
-        # not cancellable mid-token -- _run_with_timeout abandons it, it
-        # does not stop it). That is exactly the window PBUG-20260825-04
-        # was found in. Re-raise unconditionally so the pause always
-        # reaches the node boundary.
+        # Re-raise unconditionally so the pause always reaches the node boundary
+        # (2026-08-25): this subtype's own docstring says "ComfyUI catches this
+        # at the node boundary and halts the queue cleanly", and the broad
+        # `except Exception` below would otherwise catch it here FIRST and
+        # silently fall back to shuffle order, letting the main thread
+        # immediately start ANOTHER LLM load while this phase's orphan worker is
+        # still alive on GPU (generation is not cancellable mid-token --
+        # _run_with_timeout abandons it, it does not stop it). That is exactly
+        # the window PBUG-20260825-04 was found in.
         raise
     except Exception as exc:  # noqa: BLE001 -- ranking is an enhancement, not a requirement
         log.warning("[NewsFetcher] LLM ranking failed (%s) - falling back to "
@@ -946,16 +845,15 @@ def _llm_rerank_with_bodies(
         )
         return [chosen] + rest
     except _LLMTimeoutWorkflowPause:
-        # 2026-08-25: this subtype's own docstring says "ComfyUI catches
-        # this at the node boundary and halts the queue cleanly" -- but the
-        # broad `except Exception` below used to catch it here FIRST and
-        # silently fall back to shuffle order,
-        # letting the main thread immediately start ANOTHER LLM load while
-        # this phase's orphan worker is still alive on GPU (generation is
-        # not cancellable mid-token -- _run_with_timeout abandons it, it
-        # does not stop it). That is exactly the window PBUG-20260825-04
-        # was found in. Re-raise unconditionally so the pause always
-        # reaches the node boundary.
+        # Re-raise unconditionally so the pause always reaches the node boundary
+        # (2026-08-25): this subtype's own docstring says "ComfyUI catches this
+        # at the node boundary and halts the queue cleanly", and the broad
+        # `except Exception` below would otherwise catch it here FIRST and
+        # silently fall back to shuffle order, letting the main thread
+        # immediately start ANOTHER LLM load while this phase's orphan worker is
+        # still alive on GPU (generation is not cancellable mid-token --
+        # _run_with_timeout abandons it, it does not stop it). That is exactly
+        # the window PBUG-20260825-04 was found in.
         raise
     except Exception as exc:  # noqa: BLE001 -- ranking is an enhancement, not a requirement
         log.warning(
@@ -1067,28 +965,19 @@ def _body_rerank_preview(text: str, limit: int = 800) -> str:
 def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
                          model_id=None,
                          *, policy=None):
-    # `optimization_profile` was removed from this signature 2026-08-28. It
-    # was threaded three levels deep -- here, then into the two LLM news-rank
-    # helpers -- and NEITHER receiver ever read it (AST-verified: zero Load
-    # references, zero onward forwards). The identically named writer widget
-    # that really does select a quantization profile is a different value on a
-    # different path and is untouched.
     """Fetch science stories from multiple RSS feeds in parallel.
 
-    2026-04-29: now also (a) filters out previously-used URLs via
-    config/news_history.json, (b) calls the LLM to rank remaining
-    candidates by narrative fit, and (c) records the chosen article to
-    history after selection.
+    Also (a) filters out previously-used URLs via config/news_history.json,
+    (b) calls the LLM to rank remaining candidates by narrative fit, and
+    (c) records the chosen article to history after selection.
 
-    Style-engine consolidation (2026-07-05): this stage runs BEFORE the
-    single style engine (which needs script_brief, not yet produced) --
-    ranking is style-agnostic by design; the `style` parameter and its
-    hardcoded "mission_control_procedural" fallback are removed entirely.
+    Ranking is style-agnostic by design: this stage runs BEFORE the single
+    style engine (which needs script_brief, not yet produced), so there is
+    no `style` parameter.
 
-    Original fast-path behaviour (shuffle + first-with-enough-body) is
-    preserved when model_id is None or LLM ranking fails -- the dedup
-    still works regardless. Shipped behind model_id so legacy callers
-    without it fall back to the simple path.
+    The fast path (shuffle + first-with-enough-body) is used when model_id
+    is None or LLM ranking fails -- the dedup still works regardless.
+    Callers without model_id fall back to the simple path.
 
     Uses ThreadPoolExecutor to hit all feeds simultaneously, dramatically
     reducing the wait time when feeds are slow or unresponsive. Each feed
@@ -1115,13 +1004,10 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
             # Wave 5: the bytes arrive through the bounded seam and feedparser
             # is handed a STRING. It never touches the network here.
             #
-            # What this replaced: `feedparser.parse(feed_url)` -- which does its
-            # own unbounded urllib fetch -- wrapped in a PROCESS-GLOBAL
-            # socket.setdefaulttimeout(7). That global was set and restored by
-            # every worker in a ~30-wide thread pool concurrently, so the
-            # timeout any given feed actually ran under was whatever another
-            # thread had most recently installed. It was never a per-feed
-            # timeout; it only looked like one.
+            # `feedparser.parse(feed_url)` would do its own unbounded urllib
+            # fetch, and a PROCESS-GLOBAL socket.setdefaulttimeout(7) set and
+            # restored by every worker in a ~30-wide thread pool is not a
+            # per-feed timeout: it is whatever another thread installed last.
             feed = feedparser.parse(fetch_feed(feed_url).text)
 
             for entry in feed.entries[:6]:
@@ -1197,21 +1083,19 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
 
     # 2026-04-29: history-aware deduplication + LLM-curated ranking.
     # 1) drop any candidate whose URL is in news_history.json (back-to-
-    #    back runs no longer pick the same Orion Flywheel article).
+    #    back runs do not pick the same article).
     # 2) shuffle the remaining pool to break feed-order bias.
     # 3) optionally call the LLM to rank top 5 by narrative fit for the
     #    requested style. This step adds ~10-30s of LLM time but
     #    the LLM is the same one NewsSummary will load anyway, so the
     #    NewsSummary phase that follows hits a cache HIT instead of
     #    paying the load cost twice.
-    # 2026-04-29 BUG-LOCAL-112: history-wipe restoration. The previous
-    # implementation had a comment admitting the reset was a "no-op" --
-    # if every URL in the fresh fetch was already in news_history.json,
-    # the filter emptied `pool` and the fall-through logged a warning
-    # but never restored the pool. Result: body-fetch saw 0 candidates,
-    # writer fell back to no-news, news-seeded plot was lost.
-    # Real fix: stash the unfiltered pool before filtering, restore it
-    # if the filter wipes everything. The history dedup still wins on
+    # 2026-04-29 BUG-LOCAL-112: history-wipe restoration. If every URL in
+    # the fresh fetch is already in news_history.json, the filter would
+    # empty `pool`: body-fetch would see 0 candidates, the writer would
+    # fall back to no-news, and the news-seeded plot would be lost. So
+    # the unfiltered pool is stashed before filtering and restored if the
+    # filter wipes everything. The history dedup still wins on
     # the typical day; the reset only fires when every fresh headline
     # is in history (which means the rolling cap is too small for the
     # user's run cadence and we'd rather repeat than starve).
@@ -1264,14 +1148,11 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
         pool = ranked + non_ranked
 
     # 2026-04-29 Option B: parallel body-fetch + LLM body-aware re-rank.
-    # Old behavior: serial walk-the-list, break at first candidate above
-    # the content floor. Time spent: only as long as candidate-1 fetch
-    # took. New behavior: body-fetch ALL top-N in parallel (network-
-    # bound, fast), then ask the LLM to re-pick using actual article
-    # text instead of just the headline. Total budget ~50s, comfortably
-    # under the 65s news-curation ceiling. The LLM stays warm for
-    # NewsSummary which fires next, so the re-rank's GPU time is not
-    # wasted.
+    # Body-fetch ALL top-N in parallel (network-bound, fast), then ask the
+    # LLM to re-pick using actual article text instead of just the
+    # headline. Total budget ~50s, comfortably under the 65s news-curation
+    # ceiling. The LLM stays warm for NewsSummary which fires next, so the
+    # re-rank's GPU time is not wasted.
     #
     # Thin content (<400 chars) gives the writer too little to
     # extrapolate from -- the story ends up generic rather than

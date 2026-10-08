@@ -5,26 +5,17 @@ ComfyUI venv python; the bank JSON hot-reloads (no restart).
 
   python scripts/_otr_mirror_clone_refs.py [--dry-run]
 
-IDEMPOTENT BY OWNERSHIP (rewritten 2026-08-16). It refreshes only the
-`(engine, voice_ref_id)` keys it generates, MERGING over what is already there,
-and passes every other row through untouched -- so a second run over its own
-output is byte-identical.
+IDEMPOTENT BY OWNERSHIP. It refreshes only the `(engine, voice_ref_id)` keys it
+generates, MERGING over what is already there, and passes every other row
+through untouched -- so a second run over its own output is byte-identical.
 
-OWNERSHIP HAD TO BE FIXED TWICE, and the second time is worth reading before
-trusting this script again. The original version dropped EVERY mirrored-engine row
-and rebuilt from the indextts2 rows, destroying anything it did not itself
-produce -- three announcer rows pinned by nine assertions. That was fixed at the
-ROW level: own only the keys you can recreate.
-
-It was still destroying data at the FIELD level, and the receipt could not see
-it. `mirrored=83 added=2 preserved-unmanaged=3` prints identically whether or not
-a field is lost, because it counts ROWS. A real run against the real bank showed
-the truth: `speaker_id` was stripped from all eight mirrored rows that had one
-(it was not on the seven-field allow-list, which was written before the field
-existed), and the hand-improved `cb_announcer_male` was reverted to the literal
-below. So ownership is now field-aware in both directions -- a mirror takes every
-field but its identity, and a row this script merely bootstraps is created only
-when it is missing.
+OWNERSHIP IS ROW-LEVEL AND FIELD-LEVEL. Own only the keys you can recreate
+(rebuilding every mirrored-engine row would destroy what the script did not
+itself produce, e.g. announcer rows pinned by assertions), and only the
+fields you can derive: a mirror takes every field but its identity, and a
+row this script merely bootstraps is created only when it is missing. The
+receipt (`mirrored=83 added=2 preserved-unmanaged=3`) counts ROWS, so it
+prints identically whether or not a field is lost.
 
 Regenerates:
   - the chatterbox char_voice rows (cb_*), one per indextts2 char_voice row
@@ -41,16 +32,16 @@ _MIRROR_ENGINES = ("chatterbox",)
 _PREFIX = {"chatterbox": "cb_"}
 
 #: The only two fields a mirror does NOT take from its source. Everything else
-#: rides along, and that is a deliberate reversal of the earlier allow-list.
+#: rides along.
 #:
-#: WHY AN ALLOW-LIST WAS WRONG. It named seven fields and the bank has since grown
-#: more, so every field added after it was written was SILENTLY DROPPED from all
-#: 83 mirrored rows on every run. `speaker_id` was the one that mattered: it
-#: records the real human behind a reference, and it exists because ref_path
-#: collision cannot catch two recordings of one person -- LibriVox's Mark F. Smith
-#: has a plain and a grandfatherly take in two different files. Without it one
-#: narrator can be cast as two characters in the same episode, on chatterbox
-#: only, which is a casting defect nobody would trace back to a generator.
+#: WHY A DENY-LIST, NOT AN ALLOW-LIST. An allow-list silently drops every
+#: field the bank grows after it was written. `speaker_id` is the one that
+#: matters: it records the real human behind a reference, and it exists
+#: because ref_path collision cannot catch two recordings of one person --
+#: LibriVox's Mark F. Smith has a plain and a grandfatherly take in two
+#: different files. Without it one narrator can be cast as two characters in
+#: the same episode, on chatterbox only, which is a casting defect nobody
+#: would trace back to a generator.
 #:
 #: A deny-list of exactly the identity pair is the right shape: a mirror IS its
 #: source, re-tagged, so any future bank field mirrors correctly without anyone
@@ -86,19 +77,15 @@ def _mirror_row(src, engine):
 def plan_rows(voices):
     """Pure planner: the FULL new voices list, plus what changed.
 
-    THE OWNERSHIP RULE, and why this was rewritten 2026-08-16. The original
-    version dropped EVERY mirrored-engine row and rebuilt from the indextts2
-    rows -- so any row it did not itself produce was destroyed. The bank had
-    since gained announcer rows it does not generate (`cb_announcer_female`
-    among them), each pinned by assertions, and a re-run invited by the word
-    "idempotent" would have deleted them.
-
-    A generator may only own the keys it can actually recreate -- and only the
-    FIELDS it can actually derive, which is the half the first repair missed. So
-    this MERGES its derived fields over its own `(engine, voice_ref_id)` keys,
-    leaves every other row and every field it does not produce untouched, and
-    appends genuinely new mirrors at the end. A second run over its own output is
-    byte-identical, which is what idempotent has to mean before the word is used.
+    THE OWNERSHIP RULE: a generator may only own the keys it can actually
+    recreate -- and only the FIELDS it can actually derive (rebuilding every
+    mirrored-engine row would delete rows it does not generate, such as
+    `cb_announcer_female`, each pinned by assertions). So this MERGES its
+    derived fields over its own `(engine, voice_ref_id)` keys, leaves every
+    other row and every field it does not produce untouched, and appends
+    genuinely new mirrors at the end. A second run over its own output is
+    byte-identical, which is what idempotent has to mean before the word is
+    used.
     """
     idx_char = [v for v in voices
                 if v["engine"] == "indextts2" and "char_voice" in v.get("roles", [])]
@@ -112,13 +99,12 @@ def plan_rows(voices):
     # One chatterbox announcer row off a real male CC0 ref, so announcer-via-
     # chatterbox is not dangling.
     #
-    # CREATED ONLY WHEN ABSENT, and that is the fix to the second thing this
-    # generator used to destroy. This row is a BOOTSTRAP, not a mirror -- it is
-    # hand-written here rather than derived from anything -- and the copy on disk
-    # had since been re-pointed at a better announcer reference with curated
-    # timbre and style tags. Refreshing it "in place" threw that away and put back
-    # the literal below. A generator may recreate a row it can derive; it may not
-    # overwrite a row somebody improved by hand.
+    # CREATED ONLY WHEN ABSENT. This row is a BOOTSTRAP, not a mirror -- it is
+    # hand-written here rather than derived from anything -- and the copy on
+    # disk may have been re-pointed at a better announcer reference with
+    # curated timbre and style tags. Refreshing it "in place" would throw that
+    # away and put back the literal below. A generator may recreate a row it
+    # can derive; it may not overwrite a row somebody improved by hand.
     ann_src = next((v for v in idx_char if v["voice_ref_id"] == _ANNOUNCER_REF_ID), None)
     if ann_src is not None and ("chatterbox", "cb_announcer_male") not in on_disk:
         mirrored.append({

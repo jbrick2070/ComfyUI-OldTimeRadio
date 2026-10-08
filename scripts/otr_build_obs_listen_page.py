@@ -42,19 +42,16 @@ BANK_LABEL = {
 def collect() -> list[dict]:
     # READ THE LEDGERS, DO NOT PARSE THE FILENAMES.
     #
-    # This used to derive the title, the timestamp and the episode directory
-    # from the obs filename. It has been failing on EVERY file since the
-    # 2026-09-03 rename: the timestamp regex is anchored at the end of the
-    # stem, and published names have carried `__<codes>_final` after the
-    # timestamp ever since -- so the match failed, `title` fell back to the raw
-    # filename, and the `EPISODES / stem` lookup found no ledger, which is why
-    # this page has shown no bank, no duration and no voices for weeks.
+    # Published obs names carry `__<codes>_final` after the timestamp and the
+    # naming format keeps changing (the two-word gloss lands next, operator
+    # 2026-09-18), so deriving the title, the timestamp and the episode
+    # directory from the filename fails: `title` falls back to the raw
+    # filename and the `EPISODES / stem` lookup finds no ledger, so the page
+    # shows no bank, no duration and no voices.
     #
-    # Rather than teach it a THIRD format -- the two-word gloss lands next
-    # (operator 2026-09-18) -- stop reading names altogether. Every fact this
-    # page wants is already in the ledger, including `meta.episode_title`,
-    # which is the NATIVE title and is what a listen page should show whatever
-    # the filename says.
+    # Every fact this page wants is already in the ledger, including
+    # `meta.episode_title`, which is the NATIVE title and is what a listen
+    # page should show whatever the filename says.
     by_file: dict[str, dict] = {}
     for ledger_path in EPISODES.glob("*/audio/*_ledger.json"):
         try:

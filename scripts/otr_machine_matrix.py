@@ -282,9 +282,8 @@ def load_profiles() -> list:
         # ONLY "no such workflow" is tolerated: `known_profile_ids` can name an id
         # whose file disappears between the listing and the read. Anything else is
         # a fault and must not be swallowed -- a bare `except Exception: continue`
-        # here silently dropped google_veo_low_1act and google_veo_low_3act from
-        # this table, and the doc's own count went from 9 experimental to 7 without
-        # a word.
+        # here would silently drop rows from this table, and the doc's own count
+        # would change without a word.
         try:
             d = resolved_profile(pid, canonical)
         except ProfileError:
@@ -426,11 +425,12 @@ def render() -> str:
     for row in classes:
         label = row.get("label", "?")
         # Read the ROW, never a profile it may not name. Every machine value
-        # lives in config/machine_classes.json now (operator, 2026-08-31: "no
-        # profiles in the code"), and no row carries `recommended`, so the old
-        # profile-linked branch printed "no profile yet" for ALL FOUR classes
-        # while the matrix held real, proven values. The front-door table of
-        # the guide told every newcomer that nothing runs anywhere.
+        # lives in config/machine_classes.json (operator, 2026-08-31: "no
+        # profiles in the code"), and no row carries `recommended`, so a
+        # profile-linked branch would print "no profile yet" for ALL FOUR
+        # classes while the matrix holds real, proven values -- and the
+        # front-door table of the guide would tell every newcomer that
+        # nothing runs anywhere.
         cells = merged_row(row)
         conf = (row.get("proof_summary")
                 or "`%s`, unproven" % cells.get("status", "draft"))

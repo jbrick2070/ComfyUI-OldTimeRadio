@@ -3,9 +3,7 @@
 Production-accurate VRAM measurement at varying prompt context lengths,
 running INSIDE ComfyUI via the same canonical loader surface
 (`_otr_model_loader.request_slot` + `make_generate_fn`) that real
-renders use. Replaces the earlier headless standalone script
-(`scripts/vram_context_test.py`), which loaded models outside ComfyUI
-and undercounted runtime overhead.
+renders use.
 
 Why an in-workflow node:
 
@@ -64,11 +62,6 @@ _FILLER_PARAGRAPH = (
 # Same model-id list the LLMScriptWriter dropdown exposes. Kept in sync
 # manually -- if the orchestrator dropdown gains/loses entries, mirror
 # them here so the test surface matches the production surface.
-# 2026-08-25: re-synced. This list had drifted badly -- it still named
-# Captain-Eris and MN-12B-Mag-Mell, pruned from the catalog on 2026-05-23,
-# and Qwen2.5-14B, pruned 2026-08-25. Three of its six entries were models
-# the catalog no longer offered, which is what "kept in sync manually"
-# decays into. The probe surface now matches the real curated local rows.
 _LLM_MODEL_CHOICES = [
     "mistralai/Mistral-Nemo-Instruct-2407",
     "google/gemma-4-E2B-it",
@@ -245,17 +238,13 @@ class VRAMContextTest:
                 }),
             },
             "optional": {
-                # `optimization_profile` was REMOVED 2026-08-28. Its tooltip
-                # said it "controls 4-bit NF4 vs full precision"; it did not.
-                # Every run loaded through the module-level BASELINE_POLICY and
-                # the selected value only labelled the receipt -- so every
-                # Pro-vs-Standard-vs-Obsidian comparison this diagnostic ever
-                # produced measured the SAME configuration three times under
-                # three names, which is worse than having no dial. Removing it
-                # cost no workflow migration: the node appears in no shipped
-                # graph. If real per-profile measurement is wanted later, the
-                # honest build varies `LLMRuntimePolicy(quant_policy=...)` at
-                # the `request_slot` call rather than re-adding a label.
+                # No `optimization_profile` widget: every run loads through the
+                # module-level BASELINE_POLICY, so such a dial would only label
+                # the receipt and every comparison would measure the SAME
+                # configuration under different names. If real per-profile
+                # measurement is wanted, the honest build varies
+                # `LLMRuntimePolicy(quant_policy=...)` at the `request_slot`
+                # call.
                 "measurement_label": ("STRING", {
                     "default": "",
                     "multiline": False,

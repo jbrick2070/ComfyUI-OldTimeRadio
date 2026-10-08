@@ -684,9 +684,8 @@ def _norm_punct(s: str) -> str:
     both sides fixes the whole class instead of one heading at a time. The
     author's text is never rewritten -- only the needle and a scratch copy.
     Every replacement is STRICTLY 1:1 so offsets in the normalized copy are
-    valid in the original. An em-dash rule ("--") was here and changed the
-    length, which tripped the guard below and silently fell back to raw text --
-    so DÉSIRÉE’S BABY went on failing for the very reason this function exists.
+    valid in the original (an em-dash rule would change the length, trip the
+    guard below and silently fall back to raw text).
     """
     return (s.replace("’", "'").replace("‘", "'")
              .replace("“", '"').replace("”", '"')
@@ -807,8 +806,7 @@ def write_manifest(vendored: list[dict]) -> None:
     Key set must match ``_otr_public_domain_sources._SOURCE_KEYS`` EXACTLY --
     the loader rejects unknown keys and requires every known one, so a drifted
     writer fails bank loading rather than degrading. ``visual_style_policy`` is
-    deliberately absent: it was ripped 2026-08-04 after shipping as a
-    schema-required field that no code read.
+    deliberately absent (no code reads it).
     """
     # SLOT ZERO IS ALREADY ON DISK AND MUST SURVIVE A REGENERATION. The real
     # Wells chapter was fetched and hash-verified separately (2026-08-03) after

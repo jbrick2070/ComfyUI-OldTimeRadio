@@ -57,10 +57,9 @@ ROOT_FILES = ["__init__.py", "prestartup_script.py"]
 #: candidate, because the repo has already ruled on it: a guard nobody calls
 #: that must stay ("deleting it would silently accept a loss nobody chose"), a
 #: declared contract shape, or -- the expensive one -- an unwired FIX for an
-#: OPEN production bug. On 2026-09-04 a 73-agent verification pass cleared
-#: fifteen such symbols as dead, because every agent searched the CODE for
-#: reachability and none of them read the rulings; a QA pass caught it before
-#: the commit. Reachability is not the only question. Permission is the other.
+#: OPEN production bug. Searching only the CODE for reachability clears such
+#: symbols as dead without reading the rulings. Reachability is not the only
+#: question. Permission is the other.
 PROTECTIVE_DOCS = [
     "apple/OTR_STANDING_RULINGS.md",
     "apple/PROD_BUG_LOG.md",
@@ -97,10 +96,8 @@ INERT_DECORATORS = {
 
 def _files():
     """Everything scanned. ``tests/`` is ALWAYS read -- the flag decides whether
-    it counts as a root or as code, never whether it is opened. (The first cut
-    skipped the directory entirely when tests were roots, so a symbol used only
-    by a test read as unreferenced: ``expected_category`` has five test callers
-    and was proposed for deletion.)"""
+    it counts as a root or as code, never whether it is opened (skipping it
+    would make a symbol used only by a test read as unreferenced)."""
     out = []
     for name in CODE_DIRS:
         out += sorted((ROOT / name).rglob("*.py"))

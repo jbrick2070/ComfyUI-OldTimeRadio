@@ -3,12 +3,12 @@
 Why this exists
 ---------------
 The `public_domain` and `shakespeare` banks are FIDELITY lanes: the episode must be
-true to the real work, inventing nothing. On 2026-08-03 both lanes were found to be
-running on placeholder fixtures -- the Wells fixture contained no Wells at all, just
-invented summary prose wrapped in genuine Project Gutenberg START/END markers, under
-which the bank stamped an H.G. Wells attribution; and all fourteen Shakespeare
-fixtures were 93-125 word collages of a scene several thousand words long. Authentic
-text here is a correctness requirement, not a quality nicety.
+true to the real work, inventing nothing. A placeholder fixture -- invented
+summary prose wrapped in genuine Project Gutenberg START/END markers (under
+which a bank would stamp a real author's attribution), or a 93-125 word
+collage of a scene several thousand words long -- is a failure of that
+contract. Authentic text here is a correctness requirement, not a quality
+nicety.
 
 Offline-first, by design
 ------------------------
@@ -20,7 +20,7 @@ bound to that hash, so a credit line can never outrun the bytes it claims to cit
 Fail-loud
 ---------
 Every failure raises. There is no silent fallback to a shorter body, a cached copy, or
-a summary: a bank running on unverified text is exactly the defect this replaces.
+a summary: a bank running on unverified text is the defect this prevents.
 
 Usage
 -----
@@ -193,11 +193,11 @@ def slice_folger_scene(body: str, *, act: int, scene: int, origin: str) -> str:
 def speakers_in_order(scene_text: str) -> list[str]:
     """Every speaking character in first-appearance order.
 
-    This is why `cast_hints` can be retired on the fidelity lanes: the people in a
-    scene are a fact OF the scene, not a hand-curated list that can disagree with
-    it. A curated list ordered ['Rosalind','Celia','Orlando'] is what dropped
-    Orlando -- the character the scene is about -- and let a writer substitute
-    Romeo from another play entirely.
+    This is why the fidelity lanes need no curated `cast_hints`: the people in
+    a scene are a fact OF the scene, not a hand-curated list that can disagree
+    with it. A curated list ordered ['Rosalind','Celia','Orlando'] is what
+    dropped Orlando -- the character the scene is about -- and let a writer
+    substitute Romeo from another play entirely.
     """
     found: list[str] = []
     for match in _SPEECH_PREFIX_RE.finditer(scene_text):
@@ -276,10 +276,9 @@ def write_source(
     # CARRY FORWARD WHAT THIS TOOL DOES NOT OWN -- but only while it is still
     # TRUE. The sidecar is shared property: the character roster and its ladder
     # stamp belong to `otr_stamp_character_genders.py`. This function rebuilds
-    # its dict from scratch and overwrites the file, so before this block a
-    # routine re-fetch silently deleted the gender roster and dropped that unit
-    # back to the blind 40/40/20 roll -- PBUG-20260815-04 reintroduced by the
-    # tool least likely to be suspected of it.
+    # its dict from scratch and overwrites the file, so without this block a
+    # routine re-fetch would silently delete the gender roster and drop that
+    # unit back to the blind 40/40/20 roll (PBUG-20260815-04).
     #
     # The roster's validity is bound to the TEXT it was read from, so it may
     # only survive a re-fetch that produced identical bytes. If the body moved,

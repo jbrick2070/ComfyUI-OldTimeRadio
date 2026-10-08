@@ -18,9 +18,7 @@ file updates the public listing with NO version bump and no publish.
 
 NO COUNTS ON THE CARD (operator, 2026-09-21): "better to leave things that
 can change like node count out of the image, not just a new number, make it
-future proof." The footer used to read "34 NODES / 5 STORY BANKS"; the pack
-declares 25 nodes, so it was wrong as well as rot-prone. It was removed
-rather than renumbered. Do not add a count back, here or to the art.
+future proof." Do not add a count back, here or to the art.
 """
 import math
 from PIL import Image, ImageDraw, ImageFont

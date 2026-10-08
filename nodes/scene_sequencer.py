@@ -15,9 +15,7 @@ Two nodes:
      and writes the master WAV.
 
 These nodes consume the L3 ledger produced by LedgerScriptWriter and
-emitted via the FreezeCascade.script_json fanout. The legacy parser-
-list / Director-shape inputs were removed in voice-path-cleanbreak
-S2-S8; forensic comments downstream mark the migration points.
+emitted via the FreezeCascade.script_json fanout.
 
 v1.0  2026-04-04  Jeffrey Brick
 v2.0  2026-05-13  voice-path-cleanbreak S23.4 (docstring scrub)
@@ -49,23 +47,18 @@ log = logging.getLogger("OTR")
 def _replay_master_audio(meta):
     """The frozen master, as an AUDIO batch, for a canonical replay.
 
-    PBUG-20260903-02. This used to return one second of silence -- a "DSP-safe
-    placeholder", on the reasoning that no mix is built on a replay because node
-    7 copies the frozen master onto disk. That reasoning missed a consumer:
-    the procgen visualizer renders ``len(audio) / sample_rate`` frames from THIS
-    wire, so it made a 1.00-second overlay, and `PostUpscaleProcgenBlend` then
-    truncated an 85.7-second episode to one second of picture. It published
-    green, with `obs_publish OK`, and the operator would have opened a broken
-    episode.
-
-    So the pass-through passes the REAL AUDIO through, which is what the name
-    always claimed. Every downstream consumer -- the enhance chain, the
-    visualizer, anything that measures duration -- then sees exactly what a
-    normal run sees, because it IS what a normal run produced.
+    PBUG-20260903-02. The pass-through passes the REAL AUDIO through: the
+    procgen visualizer renders ``len(audio) / sample_rate`` frames from THIS
+    wire, so a one-second placeholder would make a 1.00-second overlay and
+    `PostUpscaleProcgenBlend` would truncate an 85.7-second episode to one
+    second of picture, publishing green with `obs_publish OK`. Every
+    downstream consumer -- the enhance chain, the visualizer, anything that
+    measures duration -- then sees exactly what a normal run sees, because it
+    IS what a normal run produced.
 
     Falls back, loudly and in this order: silence of the master's true LENGTH
     (read from the WAV header, which costs nothing and keeps every duration
-    correct even if the samples cannot be read), then the old one-second batch.
+    correct even if the samples cannot be read), then a one-second batch.
     A fallback is named in the returned note so the leg log says which ran.
     """
     import torch as _torch
@@ -78,11 +71,10 @@ def _replay_master_audio(meta):
     bundle = str((meta or {}).get("replay_from") or "").strip()
     rel = str((meta or {}).get("replay_master_audio") or "").strip()
     # THE BUNDLE COMES FROM THE WIRE, SO REFUSE A REMOTE ONE BEFORE THE STAT
-    # (2026-09-05). `meta` is parsed from the `script_json` workflow STRING, and
-    # the join below was statted with no guard -- a UNC `replay_from` made this
-    # machine authenticate to the host the workflow named. This site was missed
-    # when the remote refusals went in elsewhere. A refusal takes the same loud
-    # fallback the missing-file case already takes.
+    # (2026-09-05). `meta` is parsed from the `script_json` workflow STRING, so
+    # statting the join below unguarded would let a UNC `replay_from` make this
+    # machine authenticate to the host the workflow named. A refusal takes the
+    # same loud fallback the missing-file case already takes.
     try:
         from ._otr_paths import is_remote_path as _is_remote_bundle
     except ImportError:  # pragma: no cover -- flat (sys.path) load
@@ -262,25 +254,6 @@ def _reconcile_active_music_manifest(manifest: dict | None, *, source: str):
     return receipt
 
 
-# THE INLINE BARK FALLBACK AND ITS PRIVATE HELPER CHAIN WERE REMOVED
-# 2026-08-28. `_generate_bark_for_line` had no production caller -- the
-# only mention of it in `sequence()` is a comment saying the fallback is
-# retired, and the shortfall branch RAISES instead of calling it. Its
-# own docstring already said 'has no live caller in the sequencer'.
-#
-# The three helpers went with it because each had exactly ONE external
-# caller and it was this function (the other references were recursion
-# and a comment). They were NOT shared with the live path: the comment
-# claiming shared-helper status was about regex PARITY with independent
-# copies in `_otr_bark_lib.py`, and `eng_bark.py` imports from there,
-# never from here.
-#
-# THE NO-FALLBACK CONTRACT IS UNAFFECTED. It is proved by
-# test_sequencer_ledger.py::test_sequencer_clip_shortfall_fails_loud,
-# which asserts the ValueError against sequence() directly and never
-# touches the deleted function.
-
-
 # -----------------------------------------------------------------------------
 # LOG CLEANUP - suppress urllib3/httpx cache-check spam from HuggingFace
 # -----------------------------------------------------------------------------
@@ -380,10 +353,9 @@ def _limit_peaks(waveform, ceiling: float, sample_rate: int):
             "engaged_fraction": 0.0, "rail_clipped_samples": 0}
     if n == 0 or ceiling <= 0.0:
         return waveform, idle
-    # A non-finite sample must stay LOCAL, as it did under the old rail: a NaN
-    # asks for no reduction and an inf for a finite, bounded one, so the
-    # cumulative-max release below can never carry NaN or inf to the end of
-    # the file (Sonnet QA 2026-09-11: one NaN used to NaN the whole tail).
+    # A non-finite sample must stay LOCAL: a NaN asks for no reduction and an
+    # inf for a finite, bounded one, so the cumulative-max release below can
+    # never carry NaN or inf to the end of the file.
     peak_track = np.nan_to_num(np.abs(flat).max(axis=0).astype(np.float64),
                                nan=0.0, posinf=1e6, neginf=1e6)
     if float(peak_track.max()) <= ceiling:
@@ -464,41 +436,37 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
     mux masters the foley-mixed stem (the foley route) -- see
     ``otr_master_audio_mux.mix_and_master`` for the hand-off.
 
-    WHY THIS REPLACED PEAK NORMALISATION (2026-08-19, PBUG-20260819-01,
-    panelled by Fable + Sonnet on the operator's instruction to confirm best
-    practice for YouTube). The old stage applied a fixed +4 dB makeup into a
-    tanh soft knee, then trimmed the PEAK to ``ceiling_dbfs``. Peak is the
-    wrong control for a platform that normalises by loudness: two files can
-    share a -1.0 dBFS peak and differ by 10 dB in LUFS. Measured across 8 real
-    masters spanning two months, that stage delivered a mean of **-9.87 LUFS
-    (std 0.41)**, roughly 4 dB hotter than target -- so every episode was
-    attenuated at playback while the limiting that bought the loudness stayed
-    in the audio.
+    WHY LUFS, NOT PEAK NORMALISATION (PBUG-20260819-01, panelled by Fable +
+    Sonnet on the operator's instruction to confirm best practice for
+    YouTube). Peak is the wrong control for a platform that normalises by
+    loudness: two files can share a -1.0 dBFS peak and differ by 10 dB in
+    LUFS. Peak normalisation delivered a mean of **-9.87 LUFS (std 0.41)**
+    across 8 real masters spanning two months, roughly 4 dB hotter than
+    target -- so every episode was attenuated at playback while the limiting
+    that bought the loudness stayed in the audio.
 
-    A TRAP RECORDED SO NOBODY REPEATS IT. Peak ceiling and delivered loudness
-    are NOT linearly related in the old algorithm, because it renormalised to
-    the ceiling BEFORE the tanh saturated: at ceiling -1.0 the limiter sits deep
-    in its knee; at -9.0 it barely engages. Measured on the real function, an
-    8 dB ceiling move produced a **10.3 dB** loudness move (-13.26 -> -23.58
-    LUFS). A blind fader A/B on this stage cannot predict its own delivered
-    level, so ``ceiling_dbfs`` must never be "tuned by ear".
+    THE CEILING IS NOT A LOUDNESS KNOB. In the peak-normalising stage this
+    replaced, an 8 dB ceiling move produced a **10.3 dB** loudness move
+    (-13.26 -> -23.58 LUFS), so a blind fader A/B on ``ceiling_dbfs`` could
+    not predict the delivered level and it must never be "tuned by ear".
+    Loudness is set by ``target_lufs``.
 
-    THE RAIL BECAME A LIMITER (2026-09-11). The peak rail below this gain used
-    to be a whole-file scale: any peak over the ceiling scaled the ENTIRE
-    master down until that one peak sat at the ceiling. moonlit_deception
-    shipped at -29.4 LUFS that way -- a clipped music burst at 9.6 s cost the
-    whole 113 s episode ~13 dB, dialogue included. `_limit_peaks` now takes
-    the overshoot out of the samples around each peak (look-ahead, fast
-    attack, 60 dB/s release) and leaves gain 1.0 everywhere else, so the
-    delivered loudness stays at target and the clip-to-clip balance survives
-    wherever the limiter is idle. The receipt says how hard it worked; a hard
-    day is logged as a MIX problem, never a failure.
+    THE PEAK STAGE IS A LIMITER, NOT A RAIL (2026-09-11). A whole-file scale
+    (any peak over the ceiling scaling the ENTIRE master down until that one
+    peak sat at the ceiling) lets one clipped music burst cost the whole
+    episode ~13 dB, dialogue included (moonlit_deception shipped at -29.4
+    LUFS that way). `_limit_peaks` takes the overshoot out of the samples
+    around each peak (look-ahead, fast attack, 60 dB/s release) and leaves
+    gain 1.0 everywhere else, so the delivered loudness stays at target and
+    the clip-to-clip balance survives wherever the limiter is idle. The
+    receipt says how hard it worked; a hard day is logged as a MIX problem,
+    never a failure.
 
     Fully deterministic (no RNG). Returns ``(waveform, info)``; ``info`` carries
     the measurement for the caller's log and any receipt.
 
-    ``makeup_db`` is retained ONLY for the fallback path below. It is no longer
-    the loudness engine.
+    ``makeup_db`` is used ONLY by the fallback path below; it is not the
+    loudness engine.
     """
     ceiling = 10.0 ** (ceiling_dbfs / 20.0)
     peak = waveform.abs().max()
@@ -542,9 +510,9 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
         # ceiling are attenuated, so one transient cannot set the level of
         # the whole episode. Idle on ordinary material (gain 1.0 everywhere).
         # The overshoot of the loudest sample above the ceiling after the FULL
-        # gain is exactly the reduction the limiter applies there -- the number
-        # the old rail used to scale the whole file by. Tracked across the
-        # correction passes below so the receipt says the total, not one pass.
+        # gain is exactly the reduction the limiter applies there. Tracked
+        # across the correction passes below so the receipt says the total,
+        # not one pass.
         peak_gained = float(torch.nan_to_num(
             waveform, nan=0.0, posinf=1e6, neginf=-1e6).abs().max())
         waveform, limiter = _limit_peaks(waveform, ceiling, sample_rate)
@@ -761,8 +729,8 @@ def _resample_audio(clip_np, src_rate, dst_rate):
     if src_rate == dst_rate:
         return clip_np.astype(np.float32)
 
-    # I-11: the prior GPU torchaudio fast path was removed so post-engine
-    # resampling stays on CPU and the audio baseline is determinism-stable.
+    # I-11: post-engine resampling stays on CPU (no GPU torchaudio fast
+    # path) so the audio baseline is determinism-stable.
 
     # CPU path: scipy polyphase (high quality, anti-aliased)
     g = math.gcd(int(dst_rate), int(src_rate))
@@ -786,31 +754,20 @@ def _resample_audio(clip_np, src_rate, dst_rate):
 #: audio goes to the episode's own dir resolved from the ledger, which is why
 #: `output_dir` does not appear anywhere below the signature.
 #:
-#: IT USED TO BE A HARDCODED `~/Documents/ComfyUI/output/otr/audio`, and that is
-#: this developer box's own layout baked into a shipped module (2026-09-05). On a
-#: registry install, on the 4060 (which sets `$OTR_OUTPUT_DIR`), or on any
-#: two-tree split it named a directory that ComfyUI does not use -- and the node
-#: then `os.makedirs`'d it on every render, silently creating an empty tree in a
-#: stranger's home folder. No test could see it: the suite runs on the one box
-#: where the guess happens to be true. A default that is only correct on the
-#: machine it was written on is a portability defect wearing a constant's
-#: clothes, and it is now the empty string, which means "the ledger decides".
+#: IT MUST STAY THE EMPTY STRING ("the ledger decides"): a hardcoded path such
+#: as `~/Documents/ComfyUI/output/otr/audio` is one developer box's own layout
+#: baked into a shipped module -- on a registry install, on the 4060 (which
+#: sets `$OTR_OUTPUT_DIR`), or on any two-tree split it names a directory that
+#: ComfyUI does not use. A default that is only correct on the machine it was
+#: written on is a portability defect wearing a constant's clothes.
 DEFAULT_OUT = ""
 
 
 # -----------------------------------------------------------------------------
 # Voice preset resolution: cast.voice_preset is the only source.
-# The legacy Director voice_map fallback + _voice_preset_for_character +
-# gender-aware grab-bag pools were deleted in voice-path-cleanbreak
-# 2026-05-12. Empty / non-v2 cast.voice_preset is a writer contract
-# violation -- the sequencer's clip-shortfall gate raises ValueError
-# (Gate 3 mirror); there is no inline-Bark fallback left to reach.
-
-
-
-
-
-
+# Empty / non-v2 cast.voice_preset is a writer contract violation -- the
+# sequencer's clip-shortfall gate raises ValueError (Gate 3 mirror); there
+# is no inline-Bark fallback to reach.
 
 
 def _verify_bus_clip_counts(
@@ -902,17 +859,15 @@ class SceneSequencer:
                     "tooltip": "Shift all dialogue clips on the timeline (ms). "
                                "Positive = delay, negative = advance."
                 }),
-                # THE MUSIC BUS IS NOT WIRED HERE, and these sockets are gone
-                # (2026-08-28). `music_cue_audio` / `music_cue_manifest_json`
-                # were DECLARED on this node but `sequence()` never accepted
-                # them -- commit 59286499 removed the signature, body and wires
-                # and left the declarations behind. Wiring either in the UI
-                # therefore raised TypeError on a node that advertised the
-                # input. The live bus is OTR_EpisodeAssembler (canonical node
-                # 7), fed by OTR_StableAudioTheme (node 83) over links 282/283;
-                # it declares both sockets and consumes them. The parity
-                # regression in tests/test_input_types_signature_parity.py is
-                # what keeps a declaration from outliving its parameter again.
+                # THE MUSIC BUS IS NOT WIRED HERE: `sequence()` accepts no
+                # `music_cue_audio` / `music_cue_manifest_json`, so declaring
+                # them would make wiring either in the UI raise TypeError on a
+                # node that advertised the input. The live bus is
+                # OTR_EpisodeAssembler (canonical node 7), fed by
+                # OTR_StableAudioTheme (node 83) over links 282/283; it declares
+                # both sockets and consumes them. The parity regression in
+                # tests/test_input_types_signature_parity.py is what keeps a
+                # declaration from outliving its parameter.
             },
         }
 
@@ -987,31 +942,24 @@ class SceneSequencer:
         # Read-side: parse the wire input as a v2 ledger dict.
         # load_ledger raises ValueError on the legacy parser-list shape;
         # Sequencer is in the loud-fail group (Pattern 1) -- bad wiring
-        # halts the run early. The legacy Director production_plan_json
-        # secondary input was deleted in voice-path-cleanbreak 2026-05-12 --
-        # its pacing overrides and voice_map were unused. The inlined pacing
-        # constants that replaced them were never read either and are gone:
-        # clips are laid end to end and only `dialogue_offset_ms` adds silence.
+        # halts the run early. Clips are laid end to end and only
+        # `dialogue_offset_ms` adds silence.
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
 
-        # THE `output_dir` MKDIR IS GONE (2026-09-05). It read
-        # `os.makedirs(output_dir, exist_ok=True)` on a value that came straight
-        # from a workflow STRING, so an unauthenticated `/prompt` caller created
-        # directory trees anywhere the ComfyUI user could write -- and with the
-        # widget left empty, which is how the canonical graph ships, it created
-        # a tree under a HARDCODED `~/Documents/ComfyUI/...` path that only
-        # exists on the box this module was written on.
+        # NO MKDIR OF `output_dir` HERE (2026-09-05). It is a value that comes
+        # straight from a workflow STRING, so creating it would let an
+        # unauthenticated `/prompt` caller create directory trees anywhere the
+        # ComfyUI user could write.
         #
-        # Deleting it is the whole fix, because the value is INERT: nothing
-        # below this line reads `output_dir`. The per-line audio goes to the
-        # episode's own directory resolved from the ledger, which is where every
-        # downstream stage looks. Confining the value instead would have been
-        # the wrong shape -- it would make an inert widget able to REFUSE and
-        # kill the render on any install whose output root is not this one's.
-        # The widget itself stays for now: it sits mid-list, and removing it
-        # re-indexes `widgets_values` and every later `dst_slot` across all 63
-        # workflows, which is not work to bundle with a security change.
+        # The value is INERT: nothing below this line reads `output_dir`. The
+        # per-line audio goes to the episode's own directory resolved from the
+        # ledger, which is where every downstream stage looks. Confining the
+        # value instead would be the wrong shape -- it would make an inert
+        # widget able to REFUSE and kill the render on any install whose
+        # output root is not this one's. The widget itself stays: it sits
+        # mid-list, and removing it re-indexes `widgets_values` and every
+        # later `dst_slot` across all 63 workflows.
 
         # Free LLM VRAM before TTS generation - Bark needs GPU headroom.
         # LLM is done by this point (script + plan already generated).
@@ -1081,16 +1029,14 @@ class SceneSequencer:
         _line_progress = NodeProgress(len(lines_to_render), "sequencer lines")
         for i, item in enumerate(lines_to_render):
             _line_progress.at(i)
-            # Ledger discriminator: speaker_role replaces the legacy
-            # parser-list "type" tag. Mapping:
+            # Ledger discriminator: speaker_role. Mapping:
             #   character / announcer  -> dialogue branch
             #   music_open / music_close / music_inter -> passthrough
             #     (no segment / no stamp -- Sequencer never handled
             #     music timing; EpisodeAssembler prepends opening_theme
             #     / closing_theme audio separately).
-            #   anything else -> RAISE (NO FALLBACKS, rip-sfx-broll
-            #     2026-07-01: the old silent default-to-dialogue path
-            #     let unknown roles ride the wrong bus; an old ledger
+            #   anything else -> RAISE (NO FALLBACKS: an unknown role
+            #     must not silently ride the dialogue bus; an old ledger
             #     carrying speaker_role="sfx" fails LOUD here).
             speaker_role = item.get("speaker_role") or ""
             if speaker_role in ("character", "announcer"):
@@ -1184,9 +1130,7 @@ class SceneSequencer:
                     # pre-rendered clip is a clip-count SHORTFALL (the voice nodes
                     # emitted fewer clips than there are dialogue lines) -- a
                     # pipeline defect. FAIL LOUD naming the line + the counts; never
-                    # silently inline-generate Bark filler. The old inline-Bark
-                    # fallback is RETIRED (_generate_bark_for_line is no longer
-                    # called from the sequencer).
+                    # silently inline-generate Bark filler.
                     raise ValueError(
                         f"SceneSequencer: no pre-rendered voice clip for dialogue "
                         f"line {item.get('line_id')!r} (character {character_name!r}, "
@@ -1218,8 +1162,8 @@ class SceneSequencer:
                 if item_type == "dialogue":
                     # v2 ledger: speaker_role is already authoritative
                     # on the input row. line_id is carried for the
-                    # line_id-keyed write-back below (Pattern 4) so
-                    # we no longer text-match.
+                    # line_id-keyed write-back below (Pattern 4), so
+                    # no text-matching is needed.
                     dialogue_positions.append({
                         "line_id": item.get("line_id"),
                         "speaker": _OTRLC.speaker_name(led, item),
@@ -1254,8 +1198,7 @@ class SceneSequencer:
         else:
             combined = np.zeros(int(sample_rate * 1), dtype=np.float32)
 
-        # No bed is added: the automatic room-tone layer was retired
-        # 2026-09-10 (clean audio). The scene bus is the supplied dialogue only.
+        # No bed is added: the scene bus is the supplied dialogue only.
         total_len = len(combined)
         total_sec = total_len / sample_rate
         _runtime_log(f"SceneSequencer: 1.0 Mix complete ({total_sec:.1f}s)")
@@ -1272,8 +1215,6 @@ class SceneSequencer:
         # we know audio drift slipped in.
         try:
             from . import _otr_ledger as _OTRL  # type: ignore
-            # S28 cleanbreak: dropped dead inline `from ._otr_paths
-            # import otr_episodes_root, otr_legacy_audio_dir`.
             _phase_ms = int((_time.time() - _phase_t0) * 1000)
             # BUG-LOCAL-021 (Phase G): use in-flight singleton, not mtime
             # walker. See _otr_ledger.in_flight_ledger_path docstring.
@@ -1313,11 +1254,6 @@ class SceneSequencer:
                         }
                         if _OTRL.patch_line_fields(_led, _line_id, _fields):
                             _matched += 1
-
-                    # (The sfx line write-back died with the sfx role,
-                    # rip-sfx-broll 2026-07-01; the S27 note about the
-                    # deleted ledger.sfx[] mirror walk lives in git
-                    # history.)
 
 
                     _gc = _OTRL.lookup_git_commit(
@@ -1397,9 +1333,8 @@ class EpisodeAssembler:
         ``OTR_LedgerScriptWriter`` and reaches this node inside the v2 ledger
         JSON that arrives on ``replay_descriptor`` -- canonical link 289, the
         freeze cascade's ``v2_ledger_json`` output, wired on all 17 shipped
-        graphs despite that input's narrow name. This node used to declare its
-        own ``episode_title`` widget for the same string; it is gone as of
-        2026-09-14 and the ledger answers instead.
+        graphs despite that input's narrow name. There is no ``episode_title``
+        widget for the same string: the ledger answers instead.
 
         Returns ``(title, source)`` from the one shared chain, so the log can
         say WHICH rung answered. An unwired or unparseable descriptor resolves
@@ -1542,14 +1477,11 @@ class EpisodeAssembler:
                 "scene_audio": ("AUDIO", {
                     "tooltip": "Sequenced dialogue audio stream from SceneSequencer."
                 }),
-                # `episode_title` stood here until 2026-09-14, defaulting to
-                # "The Last Frequency". Its own tooltip said the published
-                # title comes from the ledger and not from here, which is the
-                # description of a field that should not be on the panel: an
-                # operator who typed into it changed a log line and nothing
-                # else. The node now reads the title out of the ledger JSON
-                # already arriving on `replay_descriptor` (link 289), so the
-                # label and the published title can no longer disagree.
+                # No `episode_title` widget: the published title comes from
+                # the ledger, so a panel field would only change a log line.
+                # The node reads the title out of the ledger JSON already
+                # arriving on `replay_descriptor` (link 289), so the label and
+                # the published title cannot disagree.
                 # OTR_LedgerScriptWriter is the one workflow-facing owner.
             },
             "optional": {
@@ -1783,8 +1715,8 @@ class EpisodeAssembler:
         # Final loudness master (post-crossfade): measure integrated LUFS, apply
         # ONE linear gain to the delivery target, then a true-peak safety rail.
         # `sample_rate` is passed because the meter needs it, and `ceiling_dbfs`
-        # is passed EXPLICITLY rather than left to the silent default -- the old
-        # call site passed neither, which is how the ceiling became invisible.
+        # is passed EXPLICITLY rather than left to the silent default, so the
+        # ceiling stays visible at the call site.
         # Deterministic. Override the target with OTR_MASTER_TARGET_LUFS.
         # ON A FOLEY ROUTE THE DELIVERY GAIN MOVES, IT DOES NOT DISAPPEAR --
         # and getting that distinction wrong in either direction is a defect.
@@ -1797,8 +1729,8 @@ class EpisodeAssembler:
         #
         # BUT SIMPLY SKIPPING THE PASS WOULD BREAK TWO OTHER CONSUMERS. This
         # node's episode_audio output fans out to OTR_SignalLostVideo (node 12)
-        # and, when it is wired by hand, OTR_SceneAwareScopes -- which left
-        # the canonical 2026-09-13. Each receives the POST-LUFS
+        # and, when it is wired by hand, OTR_SceneAwareScopes (not in the
+        # canonical graph). Each receives the POST-LUFS
         # tensor today; skipping would make procgen and the scopes hotter on
         # foley episodes only, for no reason connected to the bed.
         #
@@ -1961,8 +1893,6 @@ class EpisodeAssembler:
         # clips[].start_s. Best-effort; failures are warned not raised.
         try:
             from . import _otr_ledger as _OTRL  # type: ignore
-            # S28 cleanbreak: dropped dead inline `from ._otr_paths
-            # import otr_episodes_root, otr_legacy_audio_dir`.
             _phase_ms = int((_time.time() - _phase_t0) * 1000)
             # BUG-LOCAL-021 (Phase G): use in-flight singleton, not mtime
             # walker. See _otr_ledger.in_flight_ledger_path docstring.
@@ -2240,18 +2170,15 @@ class EpisodeAssembler:
                                     _mc["dur_s"] = _dur_s
                                     _mc["start_s_space"] = "master_mix"
 
-                    # BUG-LOCAL-130 fix (2026-05-01): the music-line
-                    # mirror was previously nested inside the
-                    # `if _music_rows and segments:` block, so any
-                    # workflow ordering that left `segments` empty (or
-                    # any silent exception in the placement step
-                    # above) skipped the mirror entirely -- ledger.music
-                    # had valid opening/closing entries but
-                    # ledger.lines never got music_* mirror lines, so
-                    # VideoComposite saw no music timeline and the
-                    # audio bookend played without visual coverage.
-                    # Mirror now runs unconditionally on _music_rows
-                    # (filters per-row for valid start_s_space + dur_s).
+                    # BUG-LOCAL-130: the music-line mirror runs unconditionally
+                    # on _music_rows (filters per-row for valid start_s_space +
+                    # dur_s), NOT nested inside `if _music_rows and segments:`.
+                    # Any workflow ordering that left `segments` empty (or any
+                    # silent exception in the placement step above) would
+                    # otherwise skip the mirror entirely: ledger.music had valid
+                    # opening/closing entries but ledger.lines never got music_*
+                    # mirror lines, so VideoComposite saw no music timeline and
+                    # the audio bookend played without visual coverage.
                     if _music_rows:
                         # ROADMAP P0 step 4c (2026-04-30): mirror music
                         # cues into ledger.lines[] with speaker_role so
@@ -2277,27 +2204,19 @@ class EpisodeAssembler:
                         #       the timeline in chronological order
                         #       regardless of mirror sequence.
 
-                        # 2026-05-07 PM (BUG-LOCAL-117e): bumped from 7.0s
-                        # to 22.0s. Empirical mega-duration test on
-                        # 2026-05-07 PM rendered a 25s @ 832x480 LTX clip
-                        # cleanly on RTX 5080 16 GB + 64 GB RAM with no
-                        # temporal collapse and no identity drift (i2v
-                        # anchor + radio mechanical-scene content). 22s
-                        # leaves a 3s safety headroom under the 25s
-                        # observed ceiling, while letting opening +
-                        # closing themes flow as a single continuous
-                        # radio scene instead of being chopped into
-                        # 5s/7s chunklets that needed concat-stitching.
-                        # Combined with BUG-LOCAL-117d (ffmpeg boomerang)
-                        # the rendered clip is half-duration -> 11s, a
-                        # safe sample window with comfortable headroom.
-                        # Post-BUG-129b: music cues route to LTX (not
-                        # HuMo), so this cap is gated by LTX coherence,
-                        # not HuMo's 177-frame ceiling. See
-                        # the LTX hardware ceiling of 705 frames (28.16s;
-                        # once LTX_MAX_FRAMES in the retired batch_ltx_render)
-                        # and the clip_length
-                        # widget default (also 22.0s for parity).
+                        # BUG-LOCAL-117e (2026-05-07 PM): 22.0s. An empirical
+                        # mega-duration test rendered a 25s @ 832x480 LTX clip
+                        # cleanly on RTX 5080 16 GB + 64 GB RAM with no temporal
+                        # collapse and no identity drift (i2v anchor + radio
+                        # mechanical-scene content). 22s leaves a 3s safety
+                        # headroom under the 25s observed ceiling, while letting
+                        # opening + closing themes flow as a single continuous
+                        # radio scene instead of being chopped into 5s/7s
+                        # chunklets that needed concat-stitching. Music cues
+                        # route to LTX (not HuMo), so this cap is gated by LTX
+                        # coherence, not HuMo's 177-frame ceiling. See the LTX
+                        # hardware ceiling of 705 frames (28.16s) and the
+                        # clip_length widget default (also 22.0s for parity).
                         _MUSIC_MAX_CHUNK_DUR_S = 22.0
 
                         _lines_for_music = _led.get("lines") or []
@@ -2442,17 +2361,10 @@ class EpisodeAssembler:
                                 "[EpisodeAssembler] music mirror: "
                                 "appended=%d, chunked_cues=%d, "
                                 "stale_removed=%d, total_lines=%d "
-                                # THE BOOMERANG CLAUSE IS GONE (no-mirror step 6,
-                                # 2026-08-06). This line printed into the
-                                # operator's LIVE RUN that "BUG-LOCAL-117d
-                                # boomerang doubles the rendered half-clip back
-                                # to full audio duration" -- describing machinery
-                                # that was disarmed on 2026-08-02 and deleted on
-                                # 2026-08-06. A stale comment misleads a reader;
-                                # a stale LOG misleads the operator mid-render,
-                                # while they are deciding whether a leg is
-                                # behaving. Music beats past the chunk ceiling
-                                # are covered by chained forward segments now.
+                                # Music beats past the chunk ceiling are
+                                # covered by chained forward segments; keep
+                                # this log line describing only machinery
+                                # that exists.
                                 "(post-BUG-117e: music chunks <= %.1fs "
                                 "to fit the LTX 22B 25s safe envelope)",
                                 _appended_music, _chunked_cues,

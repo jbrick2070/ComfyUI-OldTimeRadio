@@ -169,8 +169,8 @@ _HEADING_SHAPED = re.compile(r"(?i)^(?:ACTO|ATTO|ACT|SCENA|ESCENA|SCENE)\b.{0,26
 #: NUMERAL MADE THE RULE FIRE ON NOTHING. A book sets its heading with a stop
 #: -- `ESCENA` over `V .`, `ACTO` over `PRIMERO .`, `ACTO` over `QUINTO ,` --
 #: and an end-anchored `[ \t]*$` rejects every one of them. Measured across the
-#: corpus's scanned volumes, the old form rejoined ZERO headings in either
-#: Spanish book, so every split heading in both was invisible to the scene
+#: corpus's scanned volumes, a bare-numeral form rejoins ZERO headings in either
+#: Spanish book, so every split heading in both would be invisible to the scene
 #: finder; tolerating the trailing stop rejoins 12 in the Clark volume and 19
 #: in the Macpherson. Both Portuguese volumes are unaffected at 0 before and 0
 #: after, which is what makes this safe to widen: the two scenes already
@@ -376,8 +376,8 @@ def _word_baselines(page) -> tuple[list, list]:
     exactly the characters that spell it. Measured across all five scanned
     volumes, 302,837 words, zero mismatches.
 
-    WHY NOT GEOMETRY. The first shipped version of this looked up glyphs by
-    the word's bounding box, and a word box is tall: it reaches into the
+    WHY NOT GEOMETRY. Looking glyphs up by the word's bounding box fails
+    because a word box is tall: it reaches into the
     printed row above. On Clark page 59 the word `que` (baseline 100.3)
     collected four characters of the line above (91.9) and took THEIR median,
     an 8.4 point error that moved it into the wrong row; on the same page
@@ -880,15 +880,14 @@ _ECHO_FLOOR = 3
 def recurring_headings(pages: list[str]) -> set[str]:
     """Heading-shaped lines the volume prints at a page edge again and again.
 
-    THE FOLIO TEST ALONE IS NOT ENOUGH, and leaving it alone rebuilt the very
-    bug that killed the rule before it. A running head is recognised here by
+    THE FOLIO TEST ALONE IS NOT ENOUGH. A running head is recognised here by
     carrying the page number, which is true of an echo -- and also true of a
     perfectly ordinary act-opening page that happens to print `ACTO PRIMEIRO`,
     a subtitle and a folio. That page's heading is the only copy in the book,
     and blanking it loses the act.
 
-    So the file's own principle is put back where it had been dropped: furniture
-    REPEATS and a heading does not. A line must clear both tests to be removed
+    So the file's own principle applies: furniture REPEATS and a heading does
+    not. A line must clear both tests to be removed
     -- printed at a page edge on several pages AND sitting beside a folio on
     this one. The real heading of the 1919 Rei Lear fails the second, a
     one-time act page fails the first, and the echo fails neither.
@@ -1202,10 +1201,10 @@ def speeches_from_span(span: str, roster: set[str]) -> list[tuple[str, str]]:
     span = _RUNNING_HEADER.sub(" ", span)
     span = _CYRILLIC_WORD.sub(" ", span)
     # REMOVE A BARE DIRECTION BEFORE ANY LABEL IS CLAIMED, not after. Dropping
-    # the (label, direction) PAIR afterwards was the first cut and it leaves the
-    # speakers on either side ADJACENT -- Kent, [direction], Kent becomes Kent,
-    # Kent -- which reads as a dropped speech and tripped the back-to-back
-    # guard five times in one scene. Deleting the line means the label is never
+    # the (label, direction) PAIR afterwards would leave the speakers on either
+    # side ADJACENT -- Kent, [direction], Kent becomes Kent, Kent -- which reads
+    # as a dropped speech and trips the back-to-back guard (five times in one
+    # scene). Deleting the line means the label is never
     # created and the two real speeches stay separated by nothing at all.
     span = "\n".join("" if _STAGE_OPENER.match(l.strip()) else l
                      for l in span.splitlines())
@@ -1335,7 +1334,7 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     # CLEARED ON ENTRY, NOT ON THE WAY TO THE ROSTER. A stale map from an
     # earlier call in the same process is a fold nobody declared for this
-    # scene, and every early return between here and the roster used to leave
+    # scene, and every early return between here and the roster would leave
     # one standing.
     FOLDS.clear()
 

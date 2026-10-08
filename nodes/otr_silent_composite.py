@@ -131,30 +131,23 @@ def _log_fingerprint_failure_once(engine_id, exc) -> None:
 def _ffmpeg_bin(ffmpeg: str) -> str:
     """The ffmpeg this box should run, or ``""`` when it has none.
 
-    HONOURS ``OTR_FFMPEG`` BEFORE PATH (2026-08-28). It did not, and that was
-    the mirror image of a bug the pack had already fixed once: the shared
-    ``_otr_shared/ffprobe.py`` resolver exists because only `otr_credits_roll`
-    honoured ``OTR_FFPROBE`` while every other caller trusted PATH. That
-    consolidation was scoped to the PROBE; the ENCODER kept the same hole here,
-    in `otr_caption_burn`, `otr_master_audio_mux` and `otr_silent_composite` --
-    which are the caption burn, the terminal audio mux and the silent-video
-    normalize, i.e. the LAST three stages of an episode.
+    HONOURS ``OTR_FFMPEG`` BEFORE PATH. The caption burn, the terminal audio
+    mux and the silent-video normalize (`otr_caption_burn`,
+    `otr_master_audio_mux`, `otr_silent_composite`) are the LAST three stages
+    of an episode. On a box where ffmpeg is reachable only through
+    ``OTR_FFMPEG`` -- the AMD/Mac/alternate-box case the variant workflows
+    exist for -- every earlier stage succeeds (the video engines all honour
+    the variable), so an encoder that trusted PATH would kill the episode at
+    the end, having spent the whole render.
 
-    So on a box where ffmpeg is reachable only through ``OTR_FFMPEG`` -- the
-    AMD/Mac/alternate-box case the variant workflows exist for -- every earlier
-    stage would succeed (the video engines all honour the variable) and the
-    episode would die at the end, having spent the whole render.
+    NO NODE WIDGET WINS: there is no `ffmpeg` widget, so what reaches here
+    is either nothing or a value a TRUSTED caller already resolved.
+    `OTR_FFMPEG` is the operator's channel and PATH the last resort. Do not
+    re-wire a widget to this: a widget value reaching argv[0] is the hole
+    this closes.
 
-    A NODE WIDGET NO LONGER WINS -- it no longer even arrives (2026-09-04).
-    Each execute method discards its `ffmpeg` widget before anything calls this,
-    so what reaches here is either nothing or a value a TRUSTED caller already
-    resolved. `OTR_FFMPEG` is the operator's channel and PATH the last resort.
-    Left as it was, the next reader would re-wire the widget to match this
-    paragraph and quietly reopen the hole.
-
-    ONE OWNER ANSWERS NOW (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
-    and the widget's own default literal ``"ffmpeg"`` is not a choice: with
-    ffmpeg on PATH that literal used to win here and the pin was never read.
+    ONE OWNER ANSWERS (``_otr_shared.ffmpeg.resolve_ffmpeg``), and a bare
+    ``"ffmpeg"`` literal is not a choice: it must not beat the pin.
     """
     try:
         from ._otr_shared.ffmpeg import resolve_ffmpeg
@@ -201,8 +194,7 @@ def probe_video(path: str) -> dict:
     streams = doc.get("streams") or []
     if not streams:
         return {}
-    # The shape this function has always answered: every value a STRING
-    # (the old default= writer printed text), parsed by the callers.
+    # Every value a STRING, parsed by the callers.
     return {str(k): str(v) for k, v in streams[0].items()}
 
 
@@ -449,29 +441,16 @@ def _probe_audio_duration(path):
         return 0.0
 
 
-#: `_CLIP_UNDERRUN_FRAC` and its `OTR_CLIP_UNDERRUN_FRAC` env read were removed
-#: 2026-08-28. Nothing had read either since the underrun check went TERMINAL
-#: (see the explanation below): a fractional "is this bad enough to mention"
-#: threshold cannot survive a rule where any shortfall is fatal. The env NAME
-#: still appears in tests/test_clip_fill.py ON PURPOSE -- that test sets the
-#: retired knob to prove it cannot weaken the terminal rule, which is a
-#: regression receipt, not a leftover.
+#: There is no fractional underrun threshold (and no `OTR_CLIP_UNDERRUN_FRAC`
+#: env read): the underrun check is TERMINAL, so any shortfall is fatal.
 
 
 class ClipUnderrunsItsBeat(RuntimeError):
     """A real clip is SHORTER than the beat it must cover, at composite time.
 
-    Terminal since 2026-08-02. This is the last place frames were reused to
-    cover audio, and it survived the engine-layer mirror rip precisely because
-    it lives in the assembler rather than in any adapter -- the mirror was
-    deleted from ``wrapper_bridge``, the boomerang retired in ``eng_ltx_video``,
-    and the composite went on stream-looping the same short clip.
-
-    Its own docstring named the real fix and called itself the interim: "the
-    real fix is phrase-chunking -- render the beat's correct duration so it
-    never underruns -- tracked as a follow-up; this is the safe interim
-    behavior." Coverage planning IS that follow-up and it is live, so the
-    interim can go.
+    Terminal: the composite is the last place frames could be reused to cover
+    audio (looping or holding), so any shortfall raises instead. Coverage
+    planning renders each beat's correct duration, so a clip never underruns.
     """
 
     def __init__(self, shot_id, engine_id, real, target):
@@ -488,19 +467,12 @@ class ClipUnderrunsItsBeat(RuntimeError):
 
 
 def _warn_clip_underrun(row, target_n):
-    """RAISES on a real clip shorter than its beat. Was a LOUD warning.
+    """RAISES on a real clip shorter than its beat.
 
-    The warning existed under a no-loud-fail rule, and it was honest about what
-    happened next: "the composite will HOLD the last frame for the rest of the
-    beat. A motion engine should loop/ping-pong-extend to the target." Both of
-    those remedies are now forbidden, which leaves nothing for a warning to warn
-    ABOUT -- the shortfall has no legal outcome, so it is terminal.
-
-    It also had a fractional threshold (``OTR_CLIP_UNDERRUN_FRAC``): only a clip
-    below some percentage of its beat was worth mentioning. That made sense when
-    the question was "is this bad enough to look at". It does not survive the
-    rule, because a one-frame shortfall is still 40 ms of audio with no original
-    video behind it. Any shortfall raises.
+    Both remedies (holding the last frame, looping or ping-pong-extending) are
+    forbidden, so a shortfall has no legal outcome and is terminal. There is no
+    fractional threshold: a one-frame shortfall is still 40 ms of audio with no
+    original video behind it. Any shortfall raises.
 
     A frame-DIRECTORY clip (the 3D alpha handoff) is exempt -- its frames are
     counted by its own dir encoder, not by this row's ``frame_count``.
@@ -615,12 +587,12 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
 
     def _floor_aligned(start_cursor, n):
         """Timeline-aligned floor slice start (production restore 2026-06-10):
-        gaps used to slice the procgen from frame 0 (the open repeated); the
-        OLD episodes ran the procgen CONTINUOUSLY underneath, so head gaps show
-        the radio open, inter-beat gaps the matching mid-roll, and the TAIL the
-        rolling-credits post-roll. Clamped so n frames remain. (The procgen may
-        run at a different fps than the composite -- ~4% drift at 24v25 -- an
-        acceptable skew for a background/credits roll.)"""
+        the procgen runs CONTINUOUSLY underneath (slicing from frame 0 would
+        repeat the open), so head gaps show the radio open, inter-beat gaps
+        the matching mid-roll, and the TAIL the rolling-credits post-roll.
+        Clamped so n frames remain. (The procgen may run at a different fps
+        than the composite -- ~4% drift at 24v25 -- an acceptable skew for a
+        background/credits roll.)"""
         if gap_src != "floor":
             return 0
         return min(int(start_cursor), max(0, ff - int(n)))
@@ -689,13 +661,10 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
         # the LAST drama clip on screen as the backdrop (operator 2026-06-17
         # "credits over the scene" look): a short clip loops, a long one plays
         # its head; fall back to the procgen END-slice / black when there is no
-        # real clip. NOTE (credits enrichment 2026-07-03): this fills only to the
-        # MASTER length; the credits POST-ROLL past the master (the old BUG-410
-        # floor-extend) is GONE -- the unified credits roll is now a SILENT tail
-        # appended LATE by OTR_CreditsRoll. It used to reproduce this
-        # looped-last-clip backdrop by re-reading the clip manifest; since
-        # 2026-07-29 (WIRE-W6) it freezes the final frame of the body video
-        # THIS function assembles, so the manifest has exactly one reader.
+        # real clip. NOTE: this fills only to the MASTER length; the credits
+        # POST-ROLL past the master is a SILENT tail appended LATE by
+        # OTR_CreditsRoll, which freezes the final frame of the body video THIS
+        # function assembles, so the manifest has exactly one reader.
         tail_n = int(target_total_frames) - cursor
         _clip_rows = [r for r in rows if r.get("exists") and r.get("path")]
         if positioned:
@@ -703,14 +672,12 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                           if _clip_rows else None)
         else:
             _last_clip = _clip_rows[-1] if _clip_rows else None
-        # THE LOOP IS NOW EARNED, NOT ASSUMED (no-mirror step 4, 2026-08-06).
-        #
-        # BLAST RADIUS, stated plainly: any episode whose tail is not PROVABLY
-        # the closing-theme window now gets floor/black where it used to get a
-        # looped last clip. That is a visible change to those episodes and it is
-        # the point -- the old behaviour could not tell the operator's one
-        # sanctioned reuse from a drama beat that simply ran short, because both
-        # look like "the video ended before the audio did".
+        # THE LOOP IS EARNED, NOT ASSUMED (no-mirror step 4, 2026-08-06): any
+        # episode whose tail is not PROVABLY the closing-theme window gets
+        # floor/black, never a looped last clip, because an unconditional loop
+        # cannot tell the operator's one sanctioned reuse from a drama beat
+        # that simply ran short -- both look like "the video ended before the
+        # audio did".
         if _last_clip is not None and closing_window_authorizes_loop(
                 manifest, cursor, target_total_frames):
             # The closing tail REUSES the last real row, so it must reuse that
@@ -725,11 +692,10 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                  delivery_scale_mode=_last_clip.get("delivery_scale_mode"))
         else:
             if _last_clip is not None:
-                # LOUD, because this is the case that used to loop and no longer
-                # does. An operator watching a black tail needs to know it was a
-                # refusal rather than a missing clip -- and needs the numbers, so
-                # a genuinely mis-derived window can be diagnosed from the log
-                # instead of by re-running the render.
+                # LOUD: an operator watching a black tail needs to know it was
+                # a refusal rather than a missing clip -- and needs the numbers,
+                # so a genuinely mis-derived window can be diagnosed from the
+                # log instead of by re-running the render.
                 log.warning(
                     "[OTR.composite] TAIL NOT LOOPED: %d frame(s) from cursor "
                     "%d to %s are not provably inside the closing-theme window "
@@ -870,12 +836,10 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
                 % (os.path.basename(seg_path), p.stderr.strip()[:200]))
         return
     if engine is None or engine.name == "off" or not sharpen:
-        # OBSERVABILITY (2026-08-09). A completed render used to say NOTHING
-        # about whether the upscale stage engaged: neither this branch nor the
-        # model branch logged, and the node's status string -- the only carrier
-        # of "upscale=<engine>@<device>" -- never reaches /history. A live
-        # 8-beat leg with upscale_engine='spandrel_esrgan' therefore finished
-        # green while leaving zero evidence either way, which is not a proof.
+        # OBSERVABILITY (2026-08-09). The node's status string -- the only
+        # carrier of "upscale=<engine>@<device>" -- never reaches /history, so
+        # without a log line a completed render leaves zero evidence whether
+        # the upscale stage engaged (green is not a proof).
         # Logged ONLY when an engine is actually selected, so the `off` default
         # emits nothing and its byte-identical path stays byte-identical.
         if engine is not None and engine.name != "off":
@@ -1320,16 +1284,11 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
                         "(closing-theme backdrop)"
                         % (target_total, base_total))
                 target_total = base_total
-        # CREDITS FLOOR-EXTEND RIPPED (credits enrichment 2026-07-03, BUG-410
-        # retired). This block USED to extend the composite PAST the master to
-        # the procgen floor's FULL frame count so ~20s of green rolling credits
-        # scrolled in silence after the closing theme (the second "credits
-        # organ", Fable BUILD-BREAKER #2). Under the silent-tail model the
+        # The composite ends at the MASTER length -- no floor-extend. The
         # unified credits roll is appended LATE as a SILENT tail by
-        # OTR_CreditsRoll (which since 2026-07-29 rides over the FROZEN FINAL
-        # FRAME of the body this function assembles, and DECLARES its duration
-        # to the credits-aware mux guard). The composite now ends at the MASTER
-        # length -- no floor-extend.
+        # OTR_CreditsRoll (which rides over the FROZEN FINAL FRAME of the body
+        # this function assembles, and DECLARES its duration to the
+        # credits-aware mux guard).
     segments, total = plan_timeline_segments(
         manifest, floor_available=floor_ok, floor_frames=floor_frames,
         target_total_frames=target_total, fps=fps)
@@ -1477,8 +1436,8 @@ class OTRSilentComposite:
             },
             "optional": {
                 "canvas_w": ("INT", {
-                    # Matches the shipped graph (1920x1080). The old 1472x832
-                    # default was a tier value that only some variants pin.
+                    # Matches the shipped graph (1920x1080); 1472x832 is a tier
+                    # value that only some variants pin.
                     "default": 1920, "min": 16, "max": 7680,
                     "tooltip": "Silent-composite canvas width (px). "
                                "Profile/platform-owned: variants pin it per "
@@ -1653,12 +1612,11 @@ class OTRSilentComposite:
                           otr_env.get("OTR_MESH_COMPOSITE_STYLE", "")))
             # 5. Engine identity + whatever model state that engine declares.
             #
-            # The engine is ASKED rather than special-cased. This block used to
-            # test `upscale_engine == "spandrel_esrgan"` and stat a hardcoded
-            # "RealESRGAN_x2plus.pth", which meant engine #2 would register,
-            # appear in the dropdown, run, and contribute NO model bytes to the
-            # cache key -- and it resolved the file differently from the loader
-            # besides. Both go away by asking the owner of the fact.
+            # The engine is ASKED rather than special-cased: special-casing one
+            # engine id and model file would let engine #2 register, appear in
+            # the dropdown, run, and contribute NO model bytes to the cache key
+            # -- and resolve the file differently from the loader besides. Ask
+            # the owner of the fact.
             parts.append(("engine", str(upscale_engine), str(upscale_device)))
             # ...but its MODEL BYTES only when the model can actually run. An
             # inactive stale engine must not become a dependency of a composite
@@ -1702,17 +1660,10 @@ class OTRSilentComposite:
                   output_path="", gate_in="",
                   clip_manifest_json="{}",
                   upscale_engine="off", upscale_device="cpu"):
-        # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
-        # operator intent. Discarded HERE, at the node boundary, so no
-        # helper underneath can be handed it.
-        # The `ffmpeg` widget was REMOVED on 2026-09-13. It had been
-        # DEPRECATED and IGNORED since 2026-09-04, when a widget value was
-        # found to reach argv[0] over an unauthenticated /prompt request;
-        # the fix then was to discard it here, at the node boundary. The
-        # declaration is now gone, so ComfyUI never passes the field at
-        # all and there is nothing left to discard -- the channel is
-        # closed rather than sanitised. Everything below already saw ""
-        # for this name; OTR_FFMPEG remains the one way to pin a build.
+        # There is no `ffmpeg` widget: a widget value once reached argv[0] over
+        # an unauthenticated /prompt request, so the channel is closed rather
+        # than sanitised. Everything below sees ""; OTR_FFMPEG remains the one
+        # way to pin a build.
         ffmpeg = ""
         # These paths came from the workflow, so they are untrusted input.
         # A UNC value makes this machine authenticate to the host it names

@@ -351,23 +351,7 @@ def plan_scope_frames(manifest, out_w, out_h, ffprobe="ffprobe",
 # --------------------------------------------------------------------------- #
 # Silent encoder (the floor's _encode_mp4 HARD-REQUIRES audio; this node needs
 # the -an variant matching the blend's input contract: yuv420p / CFR / 25fps).
-#
-# THE COPY IS GONE (2026-07-28). This module used to carry its own
-# ``_encode_silent_mp4`` -- the THIRD copy of the same encoder in the tree,
-# assembling a byte-for-byte identical ffmpeg command, and carrying every
-# defect the shared one was just fixed for: ``total`` accepted and never read,
-# the rawvideo ``-s`` built from the caller's w/h while the pipe carried
-# whatever the generator painted, no per-frame shape or dtype check, nvenc
-# selected with no minimum-canvas floor, and stderr on a PIPE read only after
-# the whole stream was written -- which deadlocks without raising, so the child
-# was never reaped and kept the output file open.
-#
-# It now calls ``_otr_shared.scope_draw.encode_silent_mp4``, which is exactly
-# the refactor that module's own docstring anticipated. The SEPARATION
-# INVARIANT is unharmed and points the other way: scope_draw must not import
-# the floor or the overlay NODE, and this node already imports
-# ``freq_bars_green`` from it. Hardening a third dialect instead would have
-# left three encoders to fix the next time one of them is wrong.
+# Encoding goes through ``_otr_shared.scope_draw.encode_silent_mp4``.
 # --------------------------------------------------------------------------- #
 # --------------------------------------------------------------------------- #
 # The node
@@ -431,17 +415,10 @@ class SceneAwareScopes:
     def render_scopes(self, clip_manifest_json, audio=None,
                       out_w=1920, out_h=1080,
                       landscape_bars="off"):
-        # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
-        # operator intent. Discarded HERE, at the node boundary, so no
-        # helper underneath can be handed it.
-        # The `ffmpeg` widget was REMOVED on 2026-09-13. It had been
-        # DEPRECATED and IGNORED since 2026-09-04, when a widget value was
-        # found to reach argv[0] over an unauthenticated /prompt request;
-        # the fix then was to discard it here, at the node boundary. The
-        # declaration is now gone, so ComfyUI never passes the field at
-        # all and there is nothing left to discard -- the channel is
-        # closed rather than sanitised. Everything below already saw ""
-        # for this name; OTR_FFMPEG remains the one way to pin a build.
+        # There is no `ffmpeg` widget: a widget value once reached argv[0] over
+        # an unauthenticated /prompt request, so the channel is closed rather
+        # than sanitised. Everything below sees ""; OTR_FFMPEG remains the one
+        # way to pin a build.
         ffmpeg = ""
         import json
         try:
@@ -453,14 +430,9 @@ class SceneAwareScopes:
                              "-- fail early rather than render an empty file.")
 
         # THE SCOPES MP4 IS A DURABLE EPISODE ASSET, so it is written under the
-        # episode that owns it (PBUG-20260911-03, 2026-09-11). It used to land in
-        # `episodes/_shared/tmp` -- the janitor-swept SCRATCH tier -- with an
-        # ambient system-temp fallback underneath it, so a retained
-        # deliverable sat in the one directory whose contract is "sweepable", and
-        # a fallback could put it outside the output tree entirely. That is the
-        # same defect the 2026-06-18 migration fixed for the per-beat clips
-        # (`otr_clips_dir`); this node was missed because it renders AFTER the
-        # manifest exists rather than inside render_driver.
+        # episode that owns it (PBUG-20260911-03): never in the janitor-swept
+        # SCRATCH tier (`episodes/_shared/tmp`), and never via an ambient
+        # system-temp fallback that could put it outside the output tree.
         #
         # `otr_composited_dir` is the validated per-episode authority. It RAISES
         # OtrPathContractError on an empty, reserved or traversing id, which is
@@ -491,10 +463,6 @@ class SceneAwareScopes:
 
         out_w, out_h = int(out_w), int(out_h)
         fps = 25  # HARD-LOCK 25 across planner / analysis / encode
-        # The seven lines that used to live here found ffmpeg, LOWER-CASED its
-        # basename, swapped ffmpeg->ffprobe and fell back to a bare literal.
-        # Lower-casing a path is fine on Windows and wrong anywhere else, and
-        # the fallback never consulted OTR_FFPROBE at all.
         probe = _ffp.resolve_ffprobe(ffmpeg=ffmpeg) or "ffprobe"
 
         plan, total = plan_scope_frames(manifest, out_w, out_h, ffprobe=probe,
@@ -579,10 +547,9 @@ class SceneAwareScopes:
         # `out_dir` was validated against the episode identity at entry. Create it
         # HERE, at the write, so a failed render never leaves an empty directory
         # behind -- and let a makedirs failure RAISE. There is deliberately no
-        # except branch: the old one caught everything and rerouted the write to
-        # the ambient system temp dir, which is the defect PBUG-20260911-03
-        # records. An asset that cannot be written under its own episode is a
-        # failed render, not a render to somewhere else.
+        # except branch: rerouting the write to the ambient system temp dir is
+        # the defect PBUG-20260911-03 records. An asset that cannot be written
+        # under its own episode is a failed render, not a render elsewhere.
         #
         # The timestamp keeps a re-run from clobbering the previous asset, and
         # the downstream OTR_PostUpscaleProcgenBlend consumes the RETURNED path

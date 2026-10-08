@@ -86,18 +86,14 @@ def _audit_deleted_types(wf: dict, source: str) -> "list[str]":
 def _load_otr_package():
     """Import the OTR package the way ComfyUI does -- BY PATH, not by name.
 
-    THIS IS THE WHOLE BUG. The package directory is ``ComfyUI-OldTimeRadio``
-    with a HYPHEN, so ``importlib.import_module("ComfyUI_OldTimeRadio")`` --
-    which is what this script used to do, after a dash->underscore rename --
-    can never resolve. ComfyUI itself loads the pack by path. The lookup was
-    therefore not merely fragile on a "bare venv sys.path issue" as the old
-    docstring claimed: it was PERMANENTLY UNSATISFIABLE, so the contract check
-    never ran ONCE, on any box, while the script still printed OK and exited 0.
+    The package directory is ``ComfyUI-OldTimeRadio`` with a HYPHEN, so
+    ``importlib.import_module("ComfyUI_OldTimeRadio")`` -- after a
+    dash->underscore rename -- can never resolve. ComfyUI itself loads the
+    pack by path. A by-name lookup is PERMANENTLY UNSATISFIABLE, so the
+    contract check would never run ONCE, on any box, while the script still
+    printed OK and exited 0.
 
-    Loading from ``__init__.py`` via spec_from_file_location is the technique
-    ``scripts/otr_macbeth_probe.py:load_otr_package`` already uses for exactly
-    this reason -- that probe had to route around this script's fail-open to
-    get a real contract check.
+    So the package is loaded from ``__init__.py`` via spec_from_file_location.
     """
     import importlib.util
 
@@ -130,12 +126,11 @@ def _run_validator_contract(wf: dict, source: str) -> "list[str]":
     NODE_CLASS_MAPPINGS from the OTR package.
 
     FAILS CLOSED. If the contract cannot be run, that is a PROBLEM and the
-    script exits non-zero. It used to print a SKIPPED line to stderr and
-    ``return []`` -- an empty problem list means "nothing wrong", so ``main()``
-    reported OK and exited 0 having validated nothing. This script's own
-    docstring advertises the contract check and calls itself callable from the
-    suite gate and CI, so a green that skipped the headline check is a lie to
-    every caller. Reproduced live and recorded in apple/HANDOFF_LOG.md."""
+    script exits non-zero: ``return []`` (an empty problem list means "nothing
+    wrong") would let ``main()`` report OK and exit 0 having validated
+    nothing. This script's own docstring advertises the contract check and
+    calls itself callable from the suite gate and CI, so a green that skipped
+    the headline check is a lie to every caller."""
     try:
         from nodes._workflow_validation import validate_workflow_contract
     except Exception as e:  # noqa: BLE001

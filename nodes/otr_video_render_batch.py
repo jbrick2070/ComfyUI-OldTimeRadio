@@ -4,9 +4,8 @@ video engines via :mod:`nodes._otr_video_engines.render_driver` (A-S7.5).
 Renders one REAL per-beat clip per shot from a ShotLock-planned ledger
 (``run_real_episode``) and emits a beat-ordered clip manifest for the downstream
 OTR_SilentComposite. Emits the structured render report as a JSON STRING.
-Model-agnostic: no model is "primary". The ``soak`` and ``single`` diagnostic
-harness modes were removed 2026-09-24 (only the canonical graph and its
-variants run; no rigs).
+Model-agnostic: no model is "primary". Only the canonical graph and its
+variants run (no diagnostic rigs).
 
 Cold-import clean (V-12): heavy work + the driver import are LAZY inside the
 FUNCTION; module scope imports only stdlib. UTF-8, no BOM, ASCII-only source.
@@ -158,9 +157,9 @@ def _beat_accounting(clips):
     """Pure: every manifest row counted ONCE as delivered, sanctioned or neither.
 
     SANCTIONED WINS (2026-10-01). A floored cloud beat shown as its scene still
-    is on disk AND sanctioned. The old arithmetic, ``len - delivered -
-    sanctioned``, counted such a row twice and went negative, so ``== 0``
-    failed and an honest degraded episode would have reported ``ok=False``.
+    is on disk AND sanctioned. Counting it in both buckets (``len - delivered -
+    sanctioned``) would go negative, so ``== 0`` would fail and an honest
+    degraded episode would report ``ok=False``.
     """
     from ._otr_shared import still_receipt as _receipt
     counts = {"delivered": 0, "sanctioned": 0, "unaccounted": 0}
@@ -184,10 +183,10 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
     + dropdown labels). An engine that emits no receipt stamps recipe=None
     (never drops the row). No I/O; unit-testable.
 
-    A GAP ROW IS NOT DELIVERED VIDEO (2026-08-26). Until now every manifest row
-    was projected into ``by_role`` / ``per_clip`` / the by-engine roll-up with
-    no reference to ``exists`` at all. That is harmless only while every planned
-    beat renders. This payload is the DURABLE MOTION RECEIPT
+    A GAP ROW IS NOT DELIVERED VIDEO (2026-08-26). Projecting every manifest
+    row into ``by_role`` / ``per_clip`` / the by-engine roll-up with no
+    reference to ``exists`` is harmless only while every planned beat renders.
+    This payload is the DURABLE MOTION RECEIPT
     ``OTR_CreditsRoll`` reads to state which engine rendered each beat, so
     billing a floored beat to an engine puts a claim on the credits card that no
     frame on screen supports. An all-refused episode -- which the operator ruled
@@ -195,15 +194,11 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
     floored picture -- would advertise a complete slate of rendered video while
     containing none of it.
 
-    **SANCTIONED GAPS REACH THIS FUNCTION, AND THE PATH IS LIVE.** This
-    docstring used to say the opposite, in bold, and it was true when written:
-    the accounting landed ahead of the control path that feeds it. That path
-    shipped on 2026-08-28 (C0-C7). ``render_driver.build_clip_manifest`` now
-    stamps gap rows with ``STATUS_SANCTIONED_GAP`` from
-    ``sanctioned_gap_beat_ids(led)``, those rows travel in
-    ``manifest["clips"]``, and ``is_sanctioned_gap(clip)`` sorts them here. A
-    bold instruction to disbelieve a finished path is worse than no comment,
-    which is why this paragraph was rewritten rather than deleted.
+    **SANCTIONED GAPS REACH THIS FUNCTION, AND THE PATH IS LIVE.**
+    ``render_driver.build_clip_manifest`` stamps gap rows with
+    ``STATUS_SANCTIONED_GAP`` from ``sanctioned_gap_beat_ids(led)``, those
+    rows travel in ``manifest["clips"]``, and ``is_sanctioned_gap(clip)``
+    sorts them here.
 
     THE GAPS ARE COUNTED, NEVER DROPPED. Silently omitting the refused beats
     would trade one untruth for another: a receipt that shows six delivered
@@ -228,10 +223,9 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
     # Undelivered WITHOUT a sanction: a real fault, kept apart so the success
     # predicate can tell a refused beat from a broken one.
     unsanctioned_gap_shot_ids: list = []
-    # WHY each sanctioned gap was floored (2026-09-17). Copper Taste stamped
-    # the shot ids and dropped the reason -- credits looked empty for razzle
-    # and the ledger had no ``cloud_floor`` left to read. Same length/order
-    # as ``sanctioned_gap_shot_ids``.
+    # WHY each sanctioned gap was floored (2026-09-17): the ledger has no
+    # ``cloud_floor`` left to read, so the credits need the reason carried
+    # here. Same length/order as ``sanctioned_gap_shot_ids``.
     sanctioned_gap_reasons: list = []
     for clip in (manifest or {}).get("clips") or []:
         # A SANCTIONED ROW IS SORTED HERE EVEN WHEN IT HAS A FILE (2026-10-01).
@@ -251,15 +245,12 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
             # which is where a plan belongs; a receipt records delivery.
             # C5 (2026-08-28): AN ABSENCE IS NOT A SANCTION.
             #
-            # This branch used to sweep EVERY undelivered row into the
-            # sanctioned-gap list, which was correct only while no gap row
-            # could arrive -- nothing upstream could mint one, so the only way
-            # to land here was this accounting's own path. Now that a refusal
-            # mints an explicit status, three different things reach this
-            # branch: a model refusal (sanctioned), a vanished clip, and a
-            # render that never ran. Counting them alike would let a crashed
-            # episode report itself publishable-degraded, which is precisely
-            # the laundering this control path exists to prevent.
+            # Three different things reach this branch: a model refusal
+            # (sanctioned), a vanished clip, and a render that never ran.
+            # Only an explicit refusal status is a sanction: counting the
+            # others alike would let a crashed episode report itself
+            # publishable-degraded, which is precisely the laundering this
+            # control path exists to prevent.
             if _receipt.is_sanctioned_gap(clip):
                 sid = str(clip.get("shot_id") or "?")
                 sanctioned_gap_shot_ids.append(sid)
@@ -350,12 +341,12 @@ def _stamp_render_engines_meta(manifest, vram_peak_mb):
     recipe receipt into the production-ledger meta so the episode treatment /
     credits sheet reports exactly which engine + recipe rendered each beat.
 
-    S2 durable-persistence contract (credits enrichment 2026-07-03): this
-    stamp was previously best-effort (bare ``led.save()`` -- but ``save()``
-    returns None on failure and never raises, so a miss was SILENT and the
-    MOTION credit line would be missing at OTR_CreditsRoll time). Now routed
-    through ``stamp_durable``: LOUD LedgerStampError on save failure in
-    production; test-mode injects in-memory only.
+    S2 durable-persistence contract (credits enrichment 2026-07-03): the
+    stamp goes through ``stamp_durable``, never a bare ``led.save()`` (which
+    returns None on failure and never raises, so a miss would be SILENT and
+    the MOTION credit line would be missing at OTR_CreditsRoll time): LOUD
+    LedgerStampError on save failure in production; test-mode injects
+    in-memory only.
 
     (This node already operates on the SINGLETON (not a wire-parsed local
     dict), so there is no local-to-singleton copy step here -- the payload is
@@ -477,8 +468,8 @@ class OTRVideoRenderBatch:
     def IS_CHANGED(cls, **kwargs):
         """Make the PROMPT COMPOSER part of this node's cache identity.
 
-        ComfyUI caches a node's result on its inputs alone, and this node had no
-        ``IS_CHANGED`` at all -- so a session that stayed resident across a code
+        ComfyUI caches a node's result on its inputs alone, so without an
+        ``IS_CHANGED`` a session that stayed resident across a code
         change would re-serve the clips it rendered under the OLD composer for
         an unchanged ledger, while the new code sat loaded and unused. That is
         invisible in every log: the run reports success and publishes the wrong
@@ -643,11 +634,11 @@ class OTRVideoRenderBatch:
         # fodder.
         # THE ROUTE LOCK, BEFORE the still-spine check (2026-07-25, kibitz
         # per-beat-stills r1 -- codex gpt-5.6-sol high + agy, independently).
-        # The spine used to be validated against the PICKED engine while the
-        # force-map rewrite (run_real_episode) and the radio-is-host redirect
-        # (build_request_from_shot, per shot) rewrote the engine AFTERWARDS --
-        # so a forced-route or announcer/music-HuMo beat validated its stills
-        # against one engine and rendered on another. Resolve first, validate
+        # The force-map rewrite (run_real_episode) and the radio-is-host
+        # redirect (build_request_from_shot, per shot) rewrite the engine AFTER
+        # the pick, so a spine validated against the PICKED engine would let a
+        # forced-route or announcer/music-HuMo beat validate its stills against
+        # one engine and render on another. Resolve first, validate
         # against the truth. Idempotent; run_real_episode calls it again.
         ledger = _rd.resolve_final_shot_engines(ledger)
         if _legacy_receipt_bypass_allowed(ledger):
@@ -693,12 +684,10 @@ class OTRVideoRenderBatch:
         # C4 (2026-08-28): SUCCESS IS "EVERY BEAT IS ACCOUNTED FOR", not
         # "at least one clip exists".
         #
-        # The old predicate could not express the operator's 2026-08-27 ruling
-        # that an all-refused episode still PUBLISHES: with every beat
-        # sanctioned, ``clip_count`` is legitimately 0 and the episode reported
-        # FAILURE. Nor could it catch the opposite error -- a render that
-        # delivered one clip and silently lost eight others passed, because one
-        # was more than none.
+        # "At least one clip" cannot express the operator's 2026-08-27 ruling
+        # that an all-refused episode still PUBLISHES (with every beat
+        # sanctioned, ``clip_count`` is legitimately 0), and it passes a render
+        # that delivered one clip and silently lost eight others.
         #
         # Both are the same missing idea: a beat is accounted for when it was
         # DELIVERED or when its absence was SANCTIONED. Anything else is an

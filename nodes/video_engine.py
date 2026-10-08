@@ -176,13 +176,11 @@ def _safe_episode_title_slug(episode_title, max_chars=40):
 def _mono_font_families():
     """Ordered ``(family, absolute paths, bare names)``, most preferred FIRST.
 
-    FAMILY-MAJOR, and that shape is the fix rather than a tidy-up. The list
-    used to be two flat tiers -- every absolute path, then every bare name --
-    which leaks preference ACROSS the tiers: an absolute Liberation hit
-    returned before the bare-name search for DejaVu ever ran, so a host with
-    system Liberation and DejaVu in a user font directory measured Liberation
-    while libass drew DejaVu. Grouping the absolute list by family fixed only
-    the within-tier half of that, and a QA pass caught the rest.
+    FAMILY-MAJOR on purpose: two flat tiers (every absolute path, then every
+    bare name) leak preference ACROSS the tiers -- an absolute Liberation hit
+    would return before the bare-name search for DejaVu ever ran, so a host
+    with system Liberation and DejaVu in a user font directory would measure
+    Liberation while libass drew DejaVu.
 
     Iterating family-major means a family's ENTIRE search -- its exact paths
     and then PIL's own recursive lookup -- completes before the next family is
@@ -622,8 +620,7 @@ def _resolve_title_timing(led, volume, fps, total_frames):
         non-finite killed the render before a single frame was drawn, in a
         code path neither _finite nor _finite_array covers. Returning None
         routes it through the same "value absent" handling the callers already
-        implement. Found and reproduced by the codex review lane, 2026-09-07,
-        after the cursor lane had corrected the audio-side guards.
+        implement.
         """
         try:
             v = float(x)
@@ -675,8 +672,8 @@ def _resolve_title_timing(led, volume, fps, total_frames):
             # FIX3 / BUG-LOCAL-404 guard: reaching the volume-envelope heuristic
             # means NO music_open line resolved AND no first-dialogue onset --
             # i.e. the lines carry no start_s (the audio-timing overlay is
-            # missing). That previously collapsed the card to ~1s SILENTLY;
-            # make it LOUD so a missing overlay can never quietly recur. The
+            # missing). That would collapse the card to ~1s, so it is LOUD: a
+            # missing overlay can never quietly recur. The
             # render_video overlay_audio_timing() call should keep this
             # unreachable on a normal run.
             end_f = _envelope_intro_end(volume, fps, cap)
@@ -760,11 +757,11 @@ def _title_reveal_progress(fi, w0, me, in_dock, reveal_frac=0.4):
     """BUG-LOCAL-409: decode/reveal progress for the hero title card.
 
     The reveal COMPLETES in the first ``reveal_frac`` of the ``[w0, me)`` window
-    and then HOLDS solid (p == 1.0) until the POP/dock -- previously it stretched
-    across the WHOLE window, so the title only resolved on the final frame (the
-    operator saw scramble for the entire duration). Returns p in [0.0, 1.0].
+    and then HOLDS solid (p == 1.0) until the POP/dock (stretching it across
+    the WHOLE window would resolve the title only on the final frame).
+    Returns p in [0.0, 1.0].
 
-    The implementation moved to ``_otr_title_card`` when the title gained a
+    The implementation lives in ``_otr_title_card`` because the title has a
     SECOND consumer (the ASS emitter downstream of the procgen blend). This name
     stays because it is the public one the tests and the renderer already use;
     there is exactly one implementation behind it, which is the point.
@@ -931,12 +928,12 @@ class _CRTRenderer:
         fi = max(0, min(int(fi), total - 1))
         # Every per-frame scalar below feeds int() conversions and PIL colour
         # arithmetic, neither of which survives a NaN. These come from the
-        # episode audio, so ONE non-finite sample anywhere upstream used to
-        # abort the whole encode -- measured 2026-09-07 on a Mac mini M4, where
-        # Stable Audio 3 on `mps` emitted NaN and this function died on
-        # `int((15 + vol * 25) * ...)` at the last step of a 14-minute render.
+        # episode audio, so ONE non-finite sample anywhere upstream would abort
+        # the whole encode (a Mac mini M4, where Stable Audio 3 on `mps` emitted
+        # NaN, died on `int((15 + vol * 25) * ...)` at the last step of a
+        # 14-minute render).
         #
-        # The audio-side fault is fixed at its source in stable_audio_theme.py.
+        # The audio side is guarded at its source in stable_audio_theme.py.
         # This guard is not a duplicate of that: a visual renderer should not be
         # able to CRASH on its input signal no matter which upstream engine
         # produced it, and a black-ish frame is a better answer than a lost
@@ -945,11 +942,7 @@ class _CRTRenderer:
         # `freq` and `wave` are ARRAYS and need the same treatment as the three
         # scalars: they feed `int()` and colour maths just as directly --
         # `int(freq[i] * self.h * 0.18)`, `int(255 * (1.0 - freq[i] * 0.6))`,
-        # `int(3 + freq[p % len(freq)] * 8)`. An earlier version of this guard
-        # wrapped only the scalars and claimed in its own comment to cover
-        # "five floats", leaving two crash surfaces open. Caught by an external
-        # CLI review of that commit, 2026-09-07 -- exactly the class of miss a
-        # second reader is for.
+        # `int(3 + freq[p % len(freq)] * 8)`.
         vol = _finite(self.volume[fi])
         freq = _finite_array(self.freqs[fi])
         wave = _finite_array(self.waves[fi])
@@ -1118,7 +1111,7 @@ class _CRTRenderer:
                   f"{mm:02d}:{ss:02d}", fill=CRT_DIM, font=self.f_sub)
 
     # -- Hero title card (#1: decode -> reveal -> POP -> dock) ----------
-    # The scramble alphabet moved to _otr_title_card with the decode itself, so
+    # The scramble alphabet lives in _otr_title_card with the decode itself, so
     # this name is an ALIAS, not a second copy -- two alphabets would silently
     # desynchronise the drawn frame from the planned one.
     _DECODE_GLYPHS = _OTRTC.DECODE_GLYPHS
@@ -1416,8 +1409,7 @@ class _CRTRenderer:
 # -----------------------------------------------------------------------------
 def _find_ffmpeg():
     """The pack's ONE ffmpeg answer (``_otr_shared.ffmpeg``): OTR_FFMPEG,
-    then PATH, then the Windows install dirs this renderer used to probe on
-    its own. ``None`` when the box has none."""
+    then PATH, then the Windows install dirs. ``None`` when the box has none."""
     try:
         from ._otr_shared.ffmpeg import resolve_ffmpeg
     except ImportError:  # pragma: no cover -- flat (sys.path) test import
@@ -1432,11 +1424,11 @@ def _check_nvenc(ffmpeg_path):
 
     ONE OWNER FOR THIS QUESTION (2026-08-30). The probe lives in
     `_otr_shared.encode_sink.has_nvenc` and is cached THERE, per binary
-    (kibitz r3, 2026-09-04). This function used to keep a second,
-    process-global cache in front of it, so the first binary's verdict was
-    handed back for every later one and the owner's per-binary key was never
-    consulted. It now delegates every call; only the log line is
-    de-duplicated. Safe when ffmpeg_path is None (returns False).
+    (kibitz r3, 2026-09-04). A second, process-global cache in front of it
+    would hand the first binary's verdict back for every later one, never
+    consulting the owner's per-binary key, so this function delegates every
+    call; only the log line is de-duplicated. Safe when ffmpeg_path is None
+    (returns False).
     """
     if not ffmpeg_path:
         if "" not in _NVENC_ANNOUNCED:
@@ -1464,12 +1456,10 @@ def _finite_array(seq, default: float = 0.0):
     when everything is already finite, so no caller sees a substituted array on
     the healthy path.
 
-    It is not allocation-free, and an earlier version of this docstring wrongly
-    claimed it was: ``np.isfinite`` builds a bool mask every frame, and
-    ``asarray(..., dtype=float)`` COPIES when the input is float32, which is the
-    normal dtype coming from the audio side. That is a per-frame cost worth
-    knowing about if this ever shows up in a profile. Correction supplied by the
-    CLI review lane, 2026-09-07.
+    It is not allocation-free: ``np.isfinite`` builds a bool mask every frame,
+    and ``asarray(..., dtype=float)`` COPIES when the input is float32, which is
+    the normal dtype coming from the audio side. That is a per-frame cost worth
+    knowing about if this ever shows up in a profile.
     """
     try:
         import numpy as _np
@@ -1698,21 +1688,18 @@ def _write_story_treatment(out_path, episode_title, led,
                             duration, W, H, fps, size_mb):
     """Save a complete episode treatment alongside the MP4.
 
-    v2 ledger consumer (2026-05-09): takes parsed ``led`` (v2 ledger
-    dict). Single parse at top of render_video.
+    v2 ledger consumer: takes parsed ``led`` (v2 ledger dict). Single parse
+    at top of render_video.
 
-    Voice-path-cleanbreak Sprint 6.3 (2026-05-12): signature changed
-    from `plan` (director-shaped intermediate dict) to explicit
-    `voice_assignments` + `style` + `genre` parameters. Caller derives
-    voice_assignments from led["cast"] via
+    Takes explicit `voice_assignments` + `style` + `genre` parameters. Caller
+    derives voice_assignments from led["cast"] via
     _otr_ledger_consumers.voice_assignments_from_cast.
 
-    Behavior change vs legacy: scene_break / environment / pause
-    item-types don't exist in the v2 ledger schema. The treatment
-    output loses scene-arc summary, scene headers, and environment
-    descriptions in the FULL SCRIPT section. Replaces with a flat
-    list of dialogue in ledger order. Cast block is enriched
-    from led.cast (which carries name + voice_preset per entry).
+    scene_break / environment / pause item-types don't exist in the v2 ledger
+    schema, so the FULL SCRIPT section is a flat list of dialogue in ledger
+    order (no scene-arc summary, scene headers, or environment descriptions).
+    Cast block is enriched from led.cast (which carries name + voice_preset
+    per entry).
     """
     try:
         import time as _t
@@ -1748,13 +1735,10 @@ def _write_story_treatment(out_path, episode_title, led,
         def _preset_for(char_name: str) -> str:
             return voices.get(char_name) or led_cast_lookup.get(char_name, "")
 
-        # Sprint 6.3: explicit `style` + `genre` parameters; no plan.get
-        # chain. Sprint C C3 (2026-05-15): the `or genre` fall-through is
-        # deleted alongside the retirement of the `meta.visual_plan.genre`
-        # stamp; treatment text now uses style first, generic descriptor
-        # otherwise. The `genre` parameter on this function is now
-        # dead-but-harmless (caller passes ""); Sprint G's orphan-parameter
-        # sweep will drop it.
+        # Treatment text uses style first, generic descriptor otherwise.
+        # There is no `or genre` fall-through (`meta.visual_plan.genre` is
+        # not stamped); the `genre` parameter on this function is
+        # dead-but-harmless (caller passes "").
         style = style or "audio drama"
         ts     = _t.strftime("%Y-%m-%d  %H:%M:%S")
         BAR    = "\u2500" * 64
@@ -1809,9 +1793,6 @@ def _write_story_treatment(out_path, episode_title, led,
         W_(f"  Sampling           :  {_g(gp, 'sampling')}")
         W_(f"  Optimization       :  {_g(gp, 'optimization_profile')}")
         W_(f"  Seed source        :  {_g(gp, 'seed_source')}")
-        # 2026-08-14: the "Target words" half is gone with the word
-        # authority; it was rendering "(not recorded)" into every
-        # _treatment.txt sidecar.
         W_(f"  Words              :  {_g(meta, 'total_word_count')} "
            f"(char {_g(meta, 'character_word_count')} / "
            f"announcer {_g(meta, 'announcer_word_count')})")
@@ -1843,12 +1824,10 @@ def _write_story_treatment(out_path, episode_title, led,
         # original_radio stamps "STORY ORIGIN"). Legacy default holds.
         _news_raw = (news_used or "").strip()
         _origin_label = "NEWS SEED"
-        # PARSED ONCE. This block used to call `_json.loads(_news_raw)` twice on
-        # the identical string -- once for the label, once for the headlines --
-        # so a malformed payload was decoded, discarded and re-decoded, and BOTH
-        # failures were swallowed by a bare `except: pass`. One parse, one
-        # log-continue: the card still renders on the legacy defaults, but the
-        # reason it fell back is now on the record instead of being invisible.
+        # PARSED ONCE: a single `_json.loads(_news_raw)` serves both the
+        # label and the headlines. One parse, one log-continue: the card still
+        # renders on the legacy defaults, and the reason it fell back is on
+        # the record instead of being invisible.
         _seeds = None
         _parse_failed = False
         if _news_raw.startswith("["):
@@ -2137,14 +2116,10 @@ class SignalLostVideoRenderer:
                     "default": "1920x1080",
                     "tooltip": "Procgen output resolution. 1920x1080 = delivery res for the final procgen blend (BUG-030 Phase B default). 832x480 was the prior default (rendered cheap, then upscaled with everything else; legacy mode). 1280x720 / 854x480 / 3840x2160 retained for one-off needs."
                 }),
-                # `episode_title` stood here until 2026-09-14. It was the
-                # FOURTH rung of the title chain, behind meta.episode_title,
-                # meta.title and led.title, so it could only win on a run whose
-                # ledger carried no title at all -- and three nodes declaring
-                # the same field left no answer to "which one do I type in".
-                # OTR_LedgerScriptWriter owns episode_title now; this node
-                # reads the ledger through _otr_shared/episode_title.py, whose
-                # timestamp last resort covers the case the widget used to.
+                # No `episode_title` widget here: OTR_LedgerScriptWriter owns
+                # episode_title, and this node reads the ledger through
+                # _otr_shared/episode_title.py, whose timestamp last resort
+                # covers a titleless ledger.
                 # APPENDED LAST (widgets_values is positional -- only ever
                 # append). v2 scene-aware path sets this False so the floor's
                 # in-frame scopes {2,3,5,6} (centre ring / particles /
@@ -2180,15 +2155,10 @@ class SignalLostVideoRenderer:
         # legacy-list at this point is upstream-wiring failure, not a
         # silent-degrade case.
         #
-        # Voice-path-cleanbreak Sprint 2 + Sprint 6 (2026-05-12).
-        # Sprint 2 deleted the production_plan_json socket and built
-        # a legacy-shape `plan` dict from meta so downstream plan.get()
-        # sites stayed source-stable. Sprint 6.3 deconstructs that
-        # intermediate dict: voice_assignments now derives from
-        # led["cast"] at render time (Sprint 6.2 helper); style + genre
-        # are unpacked into local variables. Helpers (
-        # _write_story_treatment) take voice_assignments/style/genre
-        # as separate parameters instead of a director-shaped plan dict.
+        # voice_assignments derives from led["cast"] at render time; style +
+        # genre are unpacked into local variables, and helpers
+        # (_write_story_treatment) take voice_assignments/style/genre as
+        # separate parameters.
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
         # FIX3 / BUG-LOCAL-404: the script_json from the freeze cascade is
@@ -2226,12 +2196,7 @@ class SignalLostVideoRenderer:
         #      in the chain for older ledgers loaded from disk)
         #   4. TIMESTAMP_LASTRESORT
         #
-        # THE WIDGET RUNG IS GONE (2026-09-14). This node used to declare its
-        # own `episode_title` and consult it between led.title and the
-        # timestamp. It was the FOURTH rung, so the ledger beat it on every run
-        # that carried a title at all; dropping it changes behaviour only where
-        # the ledger is titleless, and there the timestamp takes over. The
-        # writer's widget is now the one workflow-facing owner of this field.
+        # The writer's widget is the one workflow-facing owner of this field.
         from ._otr_shared.episode_title import (
             resolve_episode_title as _resolve_episode_title,
             title_candidates as _title_candidates,
@@ -2283,18 +2248,12 @@ class SignalLostVideoRenderer:
         _runtime_log("Video: Analysing audio (FFT + RMS)")
         volume, freqs, waves = _analyze_audio(audio_np, sr, total_frames, fps)
 
-        # THE POST-ROLL TELEMETRY HUD WAS REMOVED HERE (2026-09-01).
-        # This engine used to append its own credits card after the episode
-        # audio -- METADATA / NEWS SEED / SYSTEM TELEMETRY / a scrolling
-        # transcript. OTR_CreditsRoll (node 95 in the canonical workflow)
-        # superseded it in a0224438 and this was never taken out, so every
-        # episode carried TWO credits sequences back to back. It went
-        # unnoticed for months because the lane that shows it most plainly is
-        # rarely run.
-        #
-        # What this engine still owns is untouched: the procedural base video,
-        # the title-card plan, and the procgen mp4 that PostUpscaleProcgenBlend
-        # blends -- the `_silent_procgen_blended_` in every output filename.
+        # This engine appends NO credits card: OTR_CreditsRoll (node 95 in the
+        # canonical workflow) is the only credits sequence, and a second one
+        # here would play TWO credits sequences back to back. What this
+        # engine owns: the procedural base video, the title-card plan, and
+        # the procgen mp4 that PostUpscaleProcgenBlend blends -- the
+        # `_silent_procgen_blended_` in every output filename.
 
         # -- 3. Save audio to temp WAV for ffmpeg ---------------------
         import tempfile
@@ -2302,29 +2261,12 @@ class SignalLostVideoRenderer:
 
         tmp_wav = os.path.join(tempfile.gettempdir(), "otr_video_audio.wav")
         pcm = (audio_np * 32767).astype(np.int16)
-        # Credits-music loop RIPPED (credits enrichment 2026-07-03, silent-tail
-        # model). This base mp4's OWN audio track is stripped downstream by
+        # This base mp4's OWN audio track is stripped downstream by
         # OTR_SilentComposite (V-1); the delivered episode audio is the frozen
-        # master muxed on LAST, and the credits roll is now a SILENT tail
-        # rendered late by OTR_CreditsRoll (which drops the closing-cue-under-
-        # credits music by the operator's silent-tail decision). The HUD
-        # post-roll frames still render (the reduced dossier / transcript
-        # easter egg); its audio is simply silence so this base mp4's own audio
-        # length matches its video length.
-        #
-        # THE `closing_audio` INPUT IS GONE (operator ruling 2026-08-19). It was
-        # an "AUDIO" socket this node accepted and then discarded -- so wiring
-        # it up, expecting a closing sting under the credits, would have got
-        # silence and no explanation. Removing it also required renumbering two
-        # links in `workflows/otr_canonical.json`: it sat at input slot 1, and
-        # `script_json` / `news_used` followed it, so a naive deletion would
-        # have shifted both onto the wrong sockets.
-        #
-        # THE ENDING AUDIO IS UNAFFECTED and that was checked before removal:
-        # the credits tail is SILENT by the operator's own silent-tail ruling,
-        # and the real closing music is `closing_theme_audio` on the sequencer
-        # (a different input on a different node), while the delivered episode
-        # audio is the frozen master muxed on last.
+        # master muxed on LAST, and the credits roll is a SILENT tail rendered
+        # late by OTR_CreditsRoll (the operator's silent-tail decision). This
+        # node takes no closing audio: the real closing music is
+        # `closing_theme_audio` on the sequencer.
         pcm_out = pcm
         with wave_mod.open(tmp_wav, "w") as wf:
             wf.setnchannels(1)
@@ -2336,12 +2278,6 @@ class SignalLostVideoRenderer:
         # BUG-LOCAL-020 (Phase G, 2026-05-03): write the procgen mp4
         # INTO the per-episode pending workspace so it travels with
         # `Ledger.rename_episode` when the title is finalized below.
-        # Prior to this fix, the mp4 landed at the legacy flat
-        # `output/otr/audio/` which is OUTSIDE the per-episode tree --
-        # rename couldn't move it, BatchHumoRender's stem-swap looked
-        # for the ledger in the legacy dir, didn't find it (ledger had
-        # already been moved into the per-episode workspace by Phase B),
-        # and crashed with `derived ledger from .mp4 not found`.
         #
         # Strategy: read out_dir from the in-flight Ledger singleton
         # (which is `episodes/pending_<ts>/audio/` at this point).
@@ -2356,9 +2292,7 @@ class SignalLostVideoRenderer:
         except Exception as _exc:  # noqa: BLE001
             # No ledger, so no episode workspace: the render is scratch by
             # definition. _shared/tmp is the contract-compliant scratch tier
-            # (janitor-swept), resolved through ComfyUI's live output root --
-            # the old ~/Documents/ComfyUI/output/otr/audio fallback named this
-            # developer's own layout and broke on any other box.
+            # (janitor-swept), resolved through ComfyUI's live output root.
             try:
                 from . import _otr_paths as _OTRP  # type: ignore
             except ImportError:  # loaded with nodes/ on sys.path
@@ -2372,12 +2306,10 @@ class SignalLostVideoRenderer:
 
         ts = _time.strftime("%Y%m%d_%H%M%S")
 
-        # BUG-LOCAL-110 Layer 3 -- SUPERSEDED 2026-05-09 by the v2 ledger
-        # title chain at the top of render_video. The chain probes
-        # led.meta.episode_title -> led.meta.title -> led.title
-        # -> TIMESTAMP_LASTRESORT against the wire-input ledger, so the
-        # singleton-side preference is no longer needed. Slot 3 of the
-        # chain (`led.title`) covers the legacy writer's stamp.
+        # The title comes from the v2 ledger title chain at the top of
+        # render_video (led.meta.episode_title -> led.meta.title -> led.title
+        # -> TIMESTAMP_LASTRESORT, probed against the wire-input ledger), so no
+        # singleton-side preference is needed.
 
         # BUG-LOCAL-110 Layer 1 (2026-05-05, round-robin verified): slug
         # cleanup. Pipeline:
@@ -2477,14 +2409,12 @@ class SignalLostVideoRenderer:
                  out_path, size_mb, duration, total_encode_frames)
         _runtime_log(f"Video: DONE -- {os.path.basename(out_path)} ({size_mb:.1f} MB)")
 
-        # Forensic treatment engine-enrich RIPPED (credits enrichment
-        # 2026-07-03). This merge pulled render_engines / images from the
-        # singleton into the wire `led` for the credits sheet -- but node 12
-        # runs BEFORE the image dispatcher (91) and the video render batch (92),
-        # so at this point the singleton has NO post-render receipts yet: the
-        # merge only ever grafted stale/empty maps. The engine receipts are now
-        # rendered LATE from the DURABLE ledger in OTR_CreditsRoll. The treatment
-        # sidecar below keeps only the story facts that are true at node-12 time.
+        # The treatment sidecar below keeps only the story facts that are true
+        # at node-12 time: node 12 runs BEFORE the image dispatcher (91) and
+        # the video render batch (92), so the singleton has NO post-render
+        # receipts yet (merging render_engines / images from it would only
+        # graft stale/empty maps). The engine receipts are rendered LATE from
+        # the DURABLE ledger in OTR_CreditsRoll.
 
         # Write story treatment companion file. v2 ledger consumer:
         # pass parsed led + voice_assignments/style/genre (Sprint 6.3

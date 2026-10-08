@@ -11,8 +11,7 @@ script exists to replace claims with measurements before anyone vendors a line.
 
 Without ``--fetch`` it reports what the leads file already claims and opens
 nothing, so every lead it has not excluded comes back PARTIAL -- honest about
-having measured nothing. (It used to verdict the RIGHTS in that mode; rights
-verdict nothing now -- operator 2026-09-18.) With
+having measured nothing. (Rights verdict nothing -- operator 2026-09-18.) With
 ``--fetch`` it downloads each lead once into ``--cache`` and parses from local
 (re-scraping during parser iteration gets you blocked), then writes a JSON
 report plus a readable table.

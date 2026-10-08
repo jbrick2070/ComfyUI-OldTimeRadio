@@ -60,9 +60,8 @@ except ImportError:  # pragma: no cover -- flat test imports
 #: BUG 1 (2026-06-20): ``"character"`` is the CANONICAL writer speaker_role for a
 #: dialogue line (set in OTR_LedgerScriptWriter / _otr_outline, compared in
 #: _otr_anti_loop / _otr_ledger_reviewer). "char_voice"/"dialogue" stay as aliases.
-#: rip-sfx-broll (2026-07-01): the "sfx" entry + the _DEFAULT_VIDEO_ROLE
-#: fallback (retired_role_b) were REMOVED with their roles -- an unmapped
-#: speaker_role now FAILS LOUD in :func:`_video_role_for_line` (NO FALLBACKS).
+#: An unmapped speaker_role FAILS LOUD in :func:`_video_role_for_line`
+#: (NO FALLBACKS).
 SPEAKER_TO_VIDEO_ROLE = {
     "announcer": Role.ANNOUNCER_VISUAL.value,
     "music": Role.MUSIC_VISUAL.value,
@@ -194,12 +193,6 @@ def _appearance_for_char(ledger: dict, char_id: str) -> str:
         name = entry.get("name")
         base = str(name) if name else ""
     base = _strip_unrenderable_appearance(base)
-    # The opt-in outfit LOCK was ripped 2026-08-27 (operator: "outfits yeah i
-    # didnt even know we had outfits"). It was `OTR_OUTFIT_LOCK`, default OFF
-    # and set by no profile or launcher, so it never once ran -- and its call
-    # site was already guarded to return this same `base` untouched whenever
-    # the module was absent. Removing it is byte-identical by that guard's own
-    # design; appearance has always been exactly what the writer described.
     return base
 
 
@@ -391,12 +384,11 @@ def overlay_audio_timing(ledger: dict, strict: bool = False) -> dict:
             # THE ID AND ITS PATHS MOVE TOGETHER (2026-09-26). The rename moved
             # the whole per-episode directory and rebased the DURABLE ledger,
             # but the wire still points into the old directory -- imported
-            # replay stills most of all. Switching only the id here made every
-            # later check see "nothing renamed" and read paths that no longer
-            # exist (a replay failed with "9 imported image row(s) have no file
-            # on disk" while all 9 were present). Rebase with the walker the
-            # rename itself uses, in place, so the caller's object and the
-            # `lines` binding stay the ones the merge below writes through.
+            # replay stills most of all. Switching only the id here would make
+            # every later check see "nothing renamed" and read paths that no
+            # longer exist. Rebase with the walker the rename itself uses, in
+            # place, so the caller's object and the `lines` binding stay the
+            # ones the merge below writes through.
             _wire_id = str(ledger.get("episode_id") or "").strip()
             if _wire_id and _wire_id != disk_episode_id:
                 from .production_ledger import _rebase_episode_local_paths
@@ -623,26 +615,15 @@ def overlay_audio_timing(ledger: dict, strict: bool = False) -> dict:
 #: Seconds of picture for an act-break music bridge nothing timed.
 #: PBUG-20260829-16.
 #:
-#: Commit 59286499 ("rip interstitial audio insertion", 2026-07-22) removed the
-#: ``interstitial`` cue slot and with it the ONLY code that stamped ``start_s``
-#: and ``dur_s`` onto ``music_inter`` rows::
+#: Nothing stamps ``start_s``/``dur_s`` onto ``music_inter`` rows, yet the
+#: writer still plans the beats (``_otr_episode_budget``:
+#: ``music_inter_count = act_count - 1`` whenever ``include_act_breaks``).
+#: Such a row has no cue, no audio, no ``start_s`` and no ``dur_s`` -- it
+#: budgets to ZERO frames and the video stage refuses it, killing the whole
+#: episode 40+ minutes in.
 #:
-#:     -_CUE_SLOTS = ("opening", "closing", "interstitial")
-#:     -    _mrow["start_s"] = float(_p["start_s"])
-#:     -    _mrow["dur_s"]   = float(_p["dur_s"])
-#:
-#: The rip itself was deliberate and stands. What it did not do is re-home the
-#: ledger fields it stopped writing, and the writer kept planning the beats
-#: (``_otr_episode_budget``: ``music_inter_count = act_count - 1`` whenever
-#: ``include_act_breaks``). So every act break since has minted a row with no
-#: cue, no audio, no ``start_s`` and no ``dur_s`` -- it budgets to ZERO frames
-#: and the video stage refuses it, killing the whole episode 40+ minutes in.
-#: Measured across every ledger on this box: 742 carry ``music_inter`` rows and
-#: NONE has ever published.
-#:
-#: The value is not a taste call. The last correctly-timed bridge this repo
-#: produced was ``music_inter_01_001`` on 2026-07-21 -- the day before the rip --
-#: at ``dur_s=4.087``. This rounds it. The bridge is silent by design (see
+#: The value is not a taste call: 4.0 rounds the last correctly-timed bridge
+#: this repo produced (``dur_s=4.087``). The bridge is silent by design (see
 #: ``otr_master_audio_mux``: "it renders a picture and occupies no master-mix
 #: time at all"), so nothing but the picture's length depends on the number.
 MUSIC_BRIDGE_FALLBACK_DUR_S = 4.0
@@ -673,11 +654,7 @@ def _untimed_music_sentinels(lines) -> set:
     Only the mirror is a timeline segment. The sentinel must never become one,
     **regardless of whether a cue could supply it a duration** -- and a cue can,
     because the cue's ``anchor_line_id`` points at the SENTINEL, not the mirror.
-    An earlier fix here read that anchor and handed the sentinel the cue's
-    duration, which put 10.0 s + 8.0 s onto the timeline a second time on top of
-    the mirror that already carried it. The 4060 measured the result as an
-    18.93 s overshoot at the master mux. The sentinel did not need a number; it
-    needed to not be rendered.
+    The sentinel needs no duration; it needs to not be rendered.
 
     Detected by role rather than by cue id, because keying on the cue selects
     exactly the wrong row of the pair.
@@ -716,26 +693,18 @@ def _music_bridge_dur_s(line: dict):
     else still surfaces as the loud zero-frame warning rather than being
     papered over with a number nobody measured.
 
-    WIDENED 2026-08-31 FROM ``music_inter`` ALONE, which left a third case
-    falling through both guards and killing the leg:
+    Three untimed-music cases reach this guard:
 
       * an untimed ``music_open`` / ``music_close`` WITH a timed mirror is
         dropped by :func:`_untimed_music_sentinels` -- the mirror owns the
         timeline, and that is correct;
       * an untimed ``music_inter`` gets the bridge duration below;
-      * an untimed ``music_open`` / ``music_close`` with **NO** mirror got
-        NEITHER. It is not a sentinel (nothing mirrors it, so the filter cannot
-        see it as one) and it was not a bridge (wrong role), so it reached the
-        frame budget with ``dur_s=None``, budgeted to ZERO frames, and the
-        engine refused it at the VIDEO stage -- roughly seventy minutes in,
+      * an untimed ``music_open`` / ``music_close`` with **NO** mirror is
+        not a sentinel (nothing mirrors it, so the filter cannot see it as
+        one) and not a bridge (wrong role), so it gets the bridge duration
+        too: left at ``dur_s=None`` it budgets to ZERO frames and the
+        engine refuses it at the VIDEO stage -- roughly seventy minutes in,
         after the writer, cast, voices and the full audio master were done.
-
-    PROVEN ON REAL LEDGERS, not reasoned about. In
-    ``signal_lost_the_apprentices_number`` the sentinel filter dropped 0 rows
-    while ``shot_000_music`` (``music_open``) and ``shot_002_music``
-    (``music_close``) both resolved to an effective duration of ``None``. Six
-    recent ledgers carry no ``samples`` on ANY row, so the cumulative-samples
-    path never runs at all and every beat depends on ``dur_s``.
 
     Still not a raise, deliberately: an OOM is the only acceptable killer, and
     a bank with a genuinely silent beat must not be blocked by a budget helper.
@@ -841,8 +810,7 @@ def extract_beats(ledger: dict) -> list:
 #: opening theme plays over the episode head (audio starts at first-line
 #: start_s, typically ~8-10s in) but no ledger LINE covers that span, so the
 #: head fell to the procgen floor. A synthetic music_visual beat gives the
-#: open a REAL rendered scene on the music engine (the retired ltx_video lane
-#: at the time this was written).
+#: open a REAL rendered scene on the music engine.
 OPENING_MUSIC_BEAT_ID = "b000_music_open"
 _OPENING_MIN_S = 2.0
 
@@ -885,16 +853,6 @@ def compute_clip_budget(beats: list, fps: int) -> dict:
     no gap). When a beat carries only ``dur_s`` (no samples) it degrades to
     ``round(dur_s*fps)``. Returns ``{per_beat:{beat_id:frames}, total_frames}``.
     Pure; gated by the caller on ``audio_done``.
-
-    NARROWED 2026-08-28. It used to accept a ``policy`` dict it never read, and
-    to return a ``warnings`` list that was initialised empty and never appended
-    to on any path -- while the docstring advertised it and the caller dutifully
-    extended from it. An always-empty return key is a promise the function
-    cannot keep.
-
-    rip-sfx-broll (2026-07-01): the POOLING budget
-    (clip_mode / pool_n / character_render_count) was removed with the
-    retired_role_a / retired_role_b roles -- every beat renders per-beat.
     """
     fps = int(fps) if fps else 25
     sample_rate = 0
@@ -918,15 +876,14 @@ def compute_clip_budget(beats: list, fps: int) -> dict:
             dur = b.get("dur_s")
             frames = int(round(float(dur) * fps)) if dur else 0
             if frames < 1:
-                # PBUG-20260829-16: this used to be a silent 0. A beat with no
-                # frames cannot render, but nothing said so until the engine
-                # refused its own inputs at the VIDEO stage -- after the
-                # writer, voices, music and the full audio master were done.
-                # 72 minutes to learn that one beat had no duration. Say it
-                # HERE, where it is cheap and the beat is named. Still not a
-                # raise: an OOM-or-nothing operator directive governs the
-                # render path, and a bank with a genuinely silent beat must
-                # not be blocked by a budget helper.
+                # PBUG-20260829-16: a beat with no frames cannot render, and
+                # without this warning nothing said so until the engine refused
+                # its own inputs at the VIDEO stage -- after the writer, voices,
+                # music and the full audio master were done. Say it HERE, where
+                # it is cheap and the beat is named. Still not a raise: an
+                # OOM-or-nothing operator directive governs the render path, and
+                # a bank with a genuinely silent beat must not be blocked by a
+                # budget helper.
                 log.warning(
                     "[OTR_ShotLock] beat %r budgets to ZERO frames (dur_s=%r, "
                     "samples=%r). Any engine that needs a delivered target "
@@ -1051,16 +1008,13 @@ _M4_LINE_CONTEXT_CHARS = 240
 def _line_context(text) -> str:
     """The capped slice of the spoken line a silent lane's writer is shown.
 
-    ONE VALUE, TWO CONSUMERS, AND THAT IS THE WHOLE POINT (2026-08-27). The M4
-    payload used to send ``b["text"][:240]`` while the literal-line filter
-    tokenised the FULL line. On any line longer than the cap the model could
-    quote back, verbatim, exactly what it had been shown -- and the filter,
-    hunting the COMPLETE line's token run, would not match it. The quote sailed
-    into the prompt with no warning at all.
-
-    Not theoretical: measured over the real corpus, 295 of 7096 ledger lines
-    are over the cap, across 111 episodes. Found by the Codex panel lane and
-    reproduced before it was believed.
+    ONE VALUE, TWO CONSUMERS, AND THAT IS THE WHOLE POINT. The M4 payload
+    sends this slice and the literal-line filter compares against the SAME
+    slice. If the filter compared against the FULL line instead, then on any
+    line longer than the cap the model could quote back, verbatim, exactly
+    what it had been shown -- and the filter, hunting the COMPLETE line's
+    token run, would not match it. The quote would sail into the prompt with
+    no warning at all.
 
     Cut on a word boundary, so the last token is whole -- a half-word is a
     token the filter could never match anyway.
@@ -1085,8 +1039,7 @@ def _word_tokens(text) -> list:
     #: Typographic apostrophes fold to the ASCII one FIRST. Public-domain and
     #: Gutenberg source text is full of U+2019, and without this "I<U+2019>ll"
     #: tokenises as "i" + "ll" while an ASCII "I'll" stays one token -- so the
-    #: same words spelled two ways would not compare equal. Same defect class
-    #: as the ASCII-only pattern this replaced.
+    #: same words spelled two ways would not compare equal.
     folded = str(text or "").casefold()
     for _curly in ("’", "‘", "‚", "‛", "ʼ"):
         folded = folded.replace(_curly, "'")
@@ -1135,10 +1088,10 @@ def _deterministic_template(appearance: str, setting: str, beat_text: str) -> st
     return ", ".join(parts) if parts else setting
 
 
-# Person-anchor DETECTOR removed (operator directive 2026-07-04): no automated
-# person/face analyzer gates the talking-head prompt. The _subject_anchor below
-# is prompt COMPOSITION (it always leads with face/framing tokens); face QUALITY
-# is QA'd visually by the operator reviewing prompts, not grep-gated here.
+# No automated person/face analyzer gates the talking-head prompt (operator
+# directive 2026-07-04). The _subject_anchor below is prompt COMPOSITION (it
+# always leads with face/framing tokens); face QUALITY is QA'd visually by
+# the operator reviewing prompts, not grep-gated here.
 
 
 def _subject_anchor(appearance: str) -> str:
@@ -1203,11 +1156,9 @@ def _directive_token_budget(beat_count: int) -> int:
 def _classify_unparsed_reply(raw: str) -> str:
     """Name the SHAPE of a reply that did not yield a full batch.
 
-    `_parse_directives` returns {} for three unrelated causes and the old
-    warning called all of them "empty/unparseable", which is why this defect
-    survived weeks of green logs: the one word that would have identified it --
-    truncated -- was never printed. Truncation is the recoverable one (raise the
-    budget); the other two are not, so they must be told apart.
+    `_parse_directives` returns {} for three unrelated causes: truncation is
+    the recoverable one (raise the budget); the other two are not, so they
+    must be told apart.
     """
     txt = str(raw or "").strip()
     if not txt:
@@ -1321,21 +1272,17 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
     (``_repeats_the_line``), because an instruction is not an enforcement.
     """
     # THE ASK IS KINETIC AND LINE-DRIVEN (2026-08-27, operator: the action
-    # part of the prompt is inspired by the dialogue/story). The first cut
-    # asked for a "restrained facial expression", which told the writer to
-    # keep the body still -- on lanes whose entire value is motion. The
-    # scale-to-the-line language below is deliberately the same contract as
-    # the ripped `_otr_motion_clause.build_clause_messages` (its kinetic
-    # amendment), so the two derivation paths cannot drift apart in spirit.
+    # part of the prompt is inspired by the dialogue/story). It never asks for
+    # a "restrained facial expression", which tells the writer to keep the
+    # body still -- on lanes whose entire value is motion.
     #
-    # THE STORY CONTEXT IS PRIVATE EVIDENCE, NOT OUTPUT (2026-08-29). This
-    # builder used to `del meta` and hand the model nothing but the bare
-    # line, so the director staged motion with no stake in it -- a demand
-    # under threat and a weather report earned the same fidget. It now reads
-    # the episode logline and key objects from meta and each beat's
+    # THE STORY CONTEXT IS PRIVATE EVIDENCE, NOT OUTPUT (2026-08-29). The
+    # director stages motion with a stake in the story (a demand under threat
+    # and a weather report must not earn the same fidget), so this reads the
+    # episode logline and key objects from meta and each beat's
     # beat_intent/traits off the beat row (stamped by `extract_beats` from
     # the frozen line), all as INPUT-ONLY context: the response schema, the
-    # quote filter, and every ban below are unchanged.
+    # quote filter, and every ban below are unaffected by it.
     logline = str(((meta or {}).get("produced_story") or {})
                   .get("logline") or "").strip()
     key_objects = [str(o).strip() for o in (meta or {}).get("key_objects")
@@ -1538,10 +1485,10 @@ def derive_creative_directives(
                 if directives and all(bid in directives for bid in expected):
                     break
                 if attempt < max_reseed:
-                    # SAY WHICH FAILURE IT IS. The old wording -- "empty/
-                    # unparseable" -- covered three unrelated causes, so a
-                    # truncation read exactly like a refusal and the one number
-                    # that mattered (the budget) never appeared in any log.
+                    # SAY WHICH FAILURE IT IS: "empty/unparseable" covers three
+                    # unrelated causes, so a truncation would read exactly like
+                    # a refusal and the one number that matters (the budget)
+                    # would never appear in any log.
                     shape = _classify_unparsed_reply(raw)
                     detail = ("%s derivation for batch %s..; reseed %d/%d "
                               "(%d of %d beats parsed, reply %d chars, "
@@ -1668,10 +1615,9 @@ def derive_creative_directives(
             if not nonverbal:
                 text_prompt = f"{_subject_anchor(appearance)}, {text_prompt}"
             # FINISH the prompt (gap-audit F3, 2026-06-10): era tail (brief
-            # atmosphere/palette/lighting) + the film style tail, restored
-            # from the deleted legacy composer. MUST run before
-            # prompt_hash so the stored hash
-            # matches the rendered prompt. Fail-soft.
+            # atmosphere/palette/lighting) + the film style tail. MUST run
+            # before prompt_hash so the stored hash matches the rendered
+            # prompt. Fail-soft.
             try:
                 try:
                     from ._otr_story_brief_helpers import (  # type: ignore
@@ -1915,42 +1861,31 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
                 "silent v1 downgrade here is not an acceptable degradation."
                 % (beat.get("beat_id"),))
         shot["ghost_prompt"] = copy.deepcopy(_cast_ghost)
-        # HALF B: THE SAME SUBJECT VALUE THE DURABLE ROW WILL CARRY. The first
-        # cut stamped only the durable row, on the claim that the preflight
-        # validates through the v2 admission path and never reaches the kernel
-        # resolver. That claim was wrong: `build_request_from_shot` below OWNS
-        # the v3 branch that calls `finalize_ghost_prompt_v3`. Same absence rule
-        # as the sigil and the object above.
+        # HALF B: THE SAME SUBJECT VALUE THE DURABLE ROW WILL CARRY. The
+        # preflight does reach the kernel resolver: `build_request_from_shot`
+        # below OWNS the v3 branch that calls `finalize_ghost_prompt_v3`. Same
+        # absence rule as the sigil and the object above.
         #
-        # PARITY OF THE SUBJECT AND, SINCE 2026-09-12, OF THE KERNEL. This
-        # temporary shot is `shot_id = beat_id`; the durable row is
-        # `shot_<beat_id>`; the render driver used to look the ordinal up by
-        # exact shot id, so the preflight always resolved at ordinal 0 while
-        # the resolver cycles the PLACE by ordinal -- the same subject composed
-        # "in the archive" here and "in the yard" on the row. The preflight now
-        # carries `planned_ordinal` (stamped above) and the driver resolves
-        # both shots through `_planned_ordinal_for_shot`, and dialogue is
-        # joined on `line_id`; `tests/test_ghost_kernel_preflight_parity.py`
-        # compares the resolver inputs between the two.
+        # PARITY OF THE SUBJECT AND OF THE KERNEL. This temporary shot is
+        # `shot_id = beat_id`; the durable row is `shot_<beat_id>`; the resolver
+        # cycles the PLACE by ordinal, so both must resolve at the same ordinal
+        # or the same subject composes "in the archive" here and "in the yard"
+        # on the row. The preflight carries `planned_ordinal` (stamped above),
+        # the driver resolves both shots through `_planned_ordinal_for_shot`,
+        # and dialogue is joined on `line_id`;
+        # `tests/test_ghost_kernel_preflight_parity.py` compares the resolver
+        # inputs between the two.
         _cast_subject = (ghost_subjects or {}).get(str(beat.get("beat_id") or ""))
         if _cast_subject:
             shot["ghost_subject"] = str(_cast_subject)
 
     # ONE NARROW CATCH, AND NOTHING ELSE IS SWALLOWED (2026-07-29, WIRE-W2).
+    # A preflight that answers "fine" when it crashed is worse than no
+    # preflight, because the plan is then built on its silence.
     #
-    # This was three excepts deep and two of them were FAIL-OPEN: a
-    # non-deferrable `ValueError` and then a bare `except Exception` both
-    # logged a warning and `return`ed, so cast-time preflight silently passed
-    # a beat it had failed to check at all. A preflight that answers "fine"
-    # when it crashed is worse than no preflight, because the plan is then
-    # built on its silence.
-    #
-    # Deferrability is now DECLARED BY THE RAISE SITE, not guessed here.
-    # The old `_is_deferred_image_gap` substring-matched the message against
-    # four needles, and the LTX-I2V gap's wording matched none of them -- so
-    # ShotLock re-raised, plan-build died, and `ltx_video` came back NO_RENDER
-    # in the 2026-07-28 engine-coverage campaign. Any raise site that means
-    # "the image phase has not run yet" says so by TYPE.
+    # Deferrability is DECLARED BY THE RAISE SITE, not guessed here by
+    # matching the message text: any raise site that means "the image phase
+    # has not run yet" says so by TYPE.
     try:
         req = build_request_from_shot(
             shot, ledger, master_audio_path="", phase="cast_preflight")
@@ -2296,13 +2231,8 @@ def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
     ``frame_contract.PLANNING_CAP_ENGINES`` it NARROWS the contract this beat
     is partitioned against -- see :func:`frame_contract.effective_frame_contract`
     for why membership is a per-engine decision with a live proof attached
-    rather than a rollout. (This note has already gone stale twice: it once
-    read "why that allowlist is one engine long and why WAN must stay out of
-    it", then "it is three engines" once the retired ``wan_ti2v`` joined on
-    2026-08-02 when the no-mirror ruling removed the adapter-side ping-pong
-    that had made its ceiling harmless. ``wan_ti2v`` is gone with the rest of
-    the Wan lanes; :data:`frame_contract.PLANNING_CAP_ENGINES` is the live
-    membership, not this prose.)
+    rather than a rollout. :data:`frame_contract.PLANNING_CAP_ENGINES` is the
+    live membership.
     A default of 0 was proposed and rejected: it would let a caller that forgot
     the ceiling plan silently unpinned, which is the exact silent-fallback
     shape this build exists to remove. There is one caller; it passes the
@@ -2375,57 +2305,18 @@ def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
     plan = _cp.partition_beat(target, contract)
     _cp.validate_coverage_plan(plan, contract)
 
-    # HISTORY -- THE REFUSAL THAT USED TO LIVE HERE, kept because the reasoning
-    # is what makes the lift below safe to read. It was written 2026-07-26 by
-    # the chunk 7a QA panel and REMOVED 2026-07-29 once its prerequisite was
-    # built; the note after it says by what.
+    # A lane that REQUIRES an audio_ref generates its frames FROM that audio
+    # (HuMo animates a mouth against speech), so every segment of a split beat
+    # needs its own slice of that speech. Both sources a beat can have are
+    # sliced per segment: the FROZEN MASTER slice (WIRE-W4b narrows it to the
+    # segment's own render window, WIRE-W4c makes the trimmed tail silence
+    # rather than the next beat's speech) and a PER-LINE VOICE WAV (WIRE-W4e
+    # slices it from its own zero through the same
+    # `coverage_plan.segment_render_window` authority).
     #
-    # A lane that REQUIRES an audio_ref generates its
-    # frames FROM that audio -- HuMo animates a mouth against speech. Splitting
-    # such a beat into segments needs each segment to receive its own slice of
-    # that speech, and nothing in this build slices it: ``_voice_audio_for_line``
-    # takes a line and returns one path, with no segment index anywhere in its
-    # signature or its callers.
-    #
-    # So a split HuMo beat would hand EVERY segment the whole line from its
-    # start, and the assembled clip would speak the opening syllables three
-    # times over while the audio ran on. That is a sync defect that ships as a
-    # finished episode -- the exact failure class this build exists to remove,
-    # and worse than the refusal because nothing in the log would say so.
-    #
-    # Refusing here is not a new gate; it is the SAME refusal moved earlier and
-    # given a reason. ``humo_14B_169`` already raised ``MirrorExtensionForbidden``
-    # at render time for any beat past its 49-frame cap -- after the GPU work,
-    # with a message about mirroring. This one lands at plan time, names the
-    # beat, and says what is actually missing.
-    # THE REFUSAL ABOVE IS LIFTED (WIRE-W4e, 2026-07-29) BECAUSE ITS STATED
-    # PREREQUISITE NOW EXISTS. It read, in full:
-    #
-    #     "beat %s needs %d clips on %s ... but %s renders frames FROM its
-    #      audio_ref and nothing in this build slices that audio per segment
-    #      -- every segment would receive the whole line from its start and
-    #      the assembled beat would repeat the opening syllables. NO FALLBACK:
-    #      per-segment audio is the prerequisite, not a workaround."
-    #
-    # It was right, and it was right to name the prerequisite instead of
-    # inventing a workaround. That prerequisite is now built, for BOTH audio
-    # sources a beat can have:
-    #
-    #   * the FROZEN MASTER slice -- WIRE-W4b narrowed it to the segment's own
-    #     render window, and WIRE-W4c made the trimmed tail silence rather than
-    #     the next beat's speech (r4/A4).
-    #   * a PER-LINE VOICE WAV -- WIRE-W4e slices that too, from its own zero,
-    #     through the same `coverage_plan.segment_render_window` authority.
-    #
-    # A HuMo beat past its cap therefore renders as real multi-clip coverage
-    # now, each segment driven by its own slice of the line. This was the ONE
-    # thing standing between the audio-driven lanes and the 45-word run: the
-    # first campaign leg died here on `beat l001 needs 2 clips on humo (185
-    # frames, cap 177)`.
-    #
-    # If per-segment slicing is ever removed, restore this refusal rather than
-    # letting the beats through -- a split lip-synced beat with whole-line
-    # audio is a sync defect that SHIPS, and nothing downstream would say so.
+    # If per-segment slicing is ever removed, refuse here instead of letting
+    # the beats through -- a split lip-synced beat with whole-line audio is a
+    # sync defect that SHIPS, and nothing downstream would say so.
 
     shot["coverage_plan"] = plan.to_dict()
     # THE SIBLING RECEIPT (B3). Present only when the tier ceiling actually
@@ -2832,13 +2723,12 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
     ids = [spec["id"] for spec in specs]
     reason = ""
     for attempt in (1, 2):
-        # THE RETRY IS A DIFFERENT QUESTION, NOT THE SAME ONE ASKED TWICE.
-        # Attempt 2 used to re-send byte-identical text at temperature 0.1 --
-        # near greedy -- so a model that wrote a four-word leaf wrote it again
-        # and the batch fell to deterministic clauses having spent two
-        # generations to learn nothing. That is exactly how the clock-hand
-        # false positive cost two live episodes. Now the rejection reasons go
-        # back with the request and the sampler runs warmer.
+        # THE RETRY IS A DIFFERENT QUESTION, NOT THE SAME ONE ASKED TWICE: the
+        # rejection reasons go back with the request and the sampler runs
+        # warmer. Re-sending byte-identical text near greedy makes the model
+        # write the same four-word leaf again, and the batch falls to
+        # deterministic clauses having spent two generations to learn
+        # nothing (how the clock-hand false positive cost two live episodes).
         message = prompt
         temperature = _gsa.GHOST_BATCH_TEMPERATURE
         if attempt > 1 and reason:
@@ -3147,8 +3037,7 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
     #: every ``_stamp_coverage_plan`` call. For the engines in
     #: ``frame_contract.PLANNING_CAP_ENGINES`` it narrows what the partitioner
     #: may emit; for every other engine it is inert here and stays an
-    #: adapter-side native cap, which is what kept the retired 8GB WAN tier's
-    #: 17-frame contract from becoming 17-frame BEATS.
+    #: adapter-side native cap, which never shrinks the BEAT itself.
     max_render_frames = _planning_ceiling(policy)
     def engine_for(role):
         # Route-A: dedicated per-role video slot only (empty resolves empty /
@@ -3156,18 +3045,16 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
         #
         # EFFECTIVE FROM BIRTH (chunk 1b). Every consumer of this function --
         # the execution GROUPS, the cast-time preflight, and the shot ROWS --
-        # now mints the engine that will actually render. Previously the groups
-        # and rows carried the PICKED engine while the preflight quietly
-        # re-derived the effective one through its own private mirror, so a
-        # redirected bookend was validated as one engine and stamped as
-        # another. One resolution, three consumers, no divergence.
+        # mints the engine that will actually render, so a redirected bookend
+        # is never validated as one engine and stamped as another. One
+        # resolution, three consumers, no divergence.
         #
-        # THE RESOLUTION ITSELF MOVED OUT (2026-08-26) to
-        # ``_policy_engine_for_role``, because the PROMPT policy needs the same
-        # answer: ``derive_creative_directives`` decides whether a lane may
-        # carry the spoken line, and deciding that against a different engine
-        # than the one this function stamps is how a lane gets a prompt written
-        # for somebody else's adapter. Four consumers now, still one resolution.
+        # THE RESOLUTION ITSELF LIVES IN ``_policy_engine_for_role``, because
+        # the PROMPT policy needs the same answer:
+        # ``derive_creative_directives`` decides whether a lane may carry the
+        # spoken line, and deciding that against a different engine than the
+        # one this function stamps is how a lane gets a prompt written for
+        # somebody else's adapter. Four consumers, one resolution.
         return _policy_engine_for_role(policy, role)
 
     roles_present = []
@@ -3216,9 +3103,8 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
                     ghost_prompts, ghost_subjects,
                     planned_ordinal=planned_ordinal)
 
-    # rip-sfx-broll (2026-07-01): the pool_n_loop still/clip POOLING died with
-    # the retired_role_a / retired_role_b roles -- every beat renders
-    # per-beat with its own scene still (no still_pool_key stamping).
+    # Every beat renders per-beat with its own scene still (no
+    # still_pool_key stamping).
     shots = []
     for b in beats:
         cre = creative.get(b["beat_id"], {})
@@ -3245,7 +3131,7 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
             "engine_id": engine_for(b["role"]),
             "profile_id": "",
             "family": "",
-            # Schema-stable constant post-pooling-rip (every beat is per-beat).
+            # Schema-stable constant (every beat is per-beat).
             "strategy": {"mode": "unique_per_beat"},
             "request_seed": 0,
             "target_frame_count": int(budget["per_beat"].get(b["beat_id"], 0)),
@@ -3268,17 +3154,9 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
         # useless (r3): it must ride the durable ledger or it cannot support
         # replay, and the render boundary would have nothing to validate.
         #
-        # NO LONGER INERT (chunk 7a, 2026-07-26). This comment used to end
-        # "INERT TODAY BY CONSTRUCTION: every adapter still resolves to
-        # frame_contract.SINGLE_ONLY, whose ladder accepts any length, so every
-        # beat gets a one-segment plan that renders exactly as it does now."
-        # That was true for chunks 3b through 6 and stopped being true in the
-        # commit that gave all 31 adapters real ladders. A beat past its
-        # engine's cap now genuinely partitions into multiple clips here, and a
-        # beat off the quantum grid gets a render length its adapter accepts
-        # rather than the one the beat asked for. Left in place as a correction
-        # rather than deleted: a reader who remembers the old promise should
-        # find out here that it expired, not by trusting it.
+        # A beat past its engine's cap partitions into multiple clips here,
+        # and a beat off the quantum grid gets a render length its adapter
+        # accepts rather than the one the beat asked for.
         # BOUNDEDNESS FIRST, and separately (no-mirror 7.3). It is stamped by
         # its own function with its own early returns rather than folded into
         # the call below, because ``_stamp_coverage_plan`` returns early for a
@@ -3330,11 +3208,9 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
     for _cid, _bids in _demoted:
         # THE CAP ROUTED RATHER THAN REFUSING. Say so LOUDLY and by name: the
         # episode asked for more overheard faces than the house rule allows,
-        # and these characters were handed the cabinet instead. This is the
-        # remedy the rule's own message used to demand of the operator by hand
-        # ("give the other character(s) the cabinet"), now performed. It is a
-        # LOOK decision the operator must be able to see and reverse, so it is
-        # never silent.
+        # and these characters were handed the cabinet instead -- the remedy an
+        # operator would otherwise apply by hand. It is a LOOK decision the
+        # operator must be able to see and reverse, so it is never silent.
         log.warning(
             "[OTR_ShotLock] LOOK: %r speaks from the CABINET on %s -- the "
             "episode asked for more than %d overheard human face(s), so the "
@@ -3417,26 +3293,17 @@ class OTRShotLock:
                 }),
             },
             "optional": {
-                # `image_done` (an input socket) and `consistency_gate_warn_only`
-                # (a widget) were REMOVED 2026-08-28, safety-gated first:
+                # The image-before-video ordering gate is not an input here:
+                # it is canonical link 267, ImageGenDispatcher.image_done ->
+                # VideoRenderBatch.image_done, which bypasses ShotLock entirely.
+                # Do NOT wire Dispatcher -> ShotLock instead: ShotLock already
+                # feeds the Dispatcher its locked ledger and episode_id, so any
+                # edge back closes a 90 -> 91 -> 90 cycle.
                 #
-                # * image_done was a SUPERSEDED UNWIRED FIX. It promised the
-                #   image-before-video ordering gate, was unlinked in all 62
-                #   graphs carrying this node, and its parameter was never read
-                #   -- not even forwarded. The LIVE ordering mechanism is
-                #   canonical link 267, ImageGenDispatcher.image_done ->
-                #   VideoRenderBatch.image_done, which bypasses ShotLock
-                #   entirely. Do NOT wire Dispatcher -> ShotLock instead:
-                #   ShotLock already feeds the Dispatcher its locked ledger and
-                #   episode_id, so any edge back closes a 90 -> 91 -> 90 cycle.
-                #   Removing input index 3 moved gate_in (link 284) dst_slot
-                #   4 -> 3; repaired by identity in canonical, variants
-                #   regenerated.
-                # * consistency_gate_warn_only was displayed, forwarded one
-                #   hop, and deleted -- a knob controlling nothing. The helper
-                #   `derive_creative_directives` keeps its own parameter (a
-                #   direct-call test exercises both values); the NODE no longer
-                #   advertises a choice it does not honour.
+                # There is no `consistency_gate_warn_only` widget: the NODE does
+                # not advertise a choice it does not honour. The helper
+                # `derive_creative_directives` keeps its own parameter (a
+                # direct-call test exercises both values).
                 "gate_in": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -3604,8 +3471,8 @@ class OTRShotLock:
 
         creative, cre_warn = derive_creative_directives(
             beats, meta, led,
-            # The widget is gone; the helper keeps its parameter and the
-            # shipped value was always False.
+            # There is no widget for it; the helper keeps its parameter and the
+            # node always passes False.
             consistency_gate_warn_only=False,
             video_policy=policy,
         )

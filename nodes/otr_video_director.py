@@ -65,9 +65,9 @@ def _engine_for_role(resolved_video, effective_by_role, role):
     return _role_slots.engine_id_for_role(resolved_video, role)
 
 
-# Video-tiers (2026-07-20): the public-name resolver is the SINGLE source of truth
-# for the menu id <-> internal id mapping AND the legacy-alias table (moved out of
-# this module). Dep-free / cold-import clean.
+# Video-tiers (2026-07-20): the public-name resolver is the SINGLE source of
+# truth for the menu id <-> internal id mapping AND the legacy-alias table.
+# Dep-free / cold-import clean.
 from ._otr_shared.public_engines import (
     _INTERNAL_TO_PUBLIC,
     _LEGACY_ENGINE_ALIASES,
@@ -167,8 +167,8 @@ def _engine_id_from_pick(pick) -> str:
 
 #: Which role(s) each video slot must be compatible with (fail-closed filter).
 #: The ONE shared map (nodes/_otr_shared/role_slots.py). Three first-class video
-#: slots -- announcer / music / character (2026-07-03: the legacy catch-all
-#: video slot + its migration fallback were retired; character is its own slot).
+#: slots -- announcer / music / character (character is its own slot; there is
+#: no catch-all slot).
 VIDEO_SLOT_ROLES = _role_slots.VIDEO_SLOT_ROLES
 SEED_MODES = ("request_hash", "fixed")
 
@@ -532,7 +532,7 @@ class OTRVideoDirector:
         # an execution order. So a freeze taken at ShotLock can never inform the
         # image phase, and node 87 is the only point that can inform both.
         # Everything downstream consumes THIS map instead of re-deriving the
-        # route from ambient env (the four-mirror defect retired at chunk 1a).
+        # route from ambient env.
         from ._otr_shared import route_freeze as _rf
         routing_snapshot = _rf.routing_env_snapshot()
         effective_video = _rf.freeze_role_engines(
@@ -550,18 +550,10 @@ class OTRVideoDirector:
         # non-empty engine id this node hands downstream -- the per-slot PICKS
         # and the post-freeze EFFECTIVE map -- must be a REGISTERED video
         # engine, proven HERE, at the unique common ancestor, seconds into the
-        # graph. Until now the director deliberately skipped ids the registry
-        # did not know (`if engine_id in known:` above, the CW-1 carve-out),
-        # so a stale saved pick or a typo'd custom id sailed through and was
-        # caught one node later by OTR_ImageDirector's 3D granularity lock --
-        # whose message ("add requires_mesh_portrait=True/False") misdiagnoses
-        # a stale workflow as an adapter bug. Downstream of THAT guard,
-        # ShotLock / MetaBrief / the dispatcher tolerate unknown ids by
-        # design, so once the dormant-3D family (and the lock riding on it)
-        # retires in order 4, an unknown id would plan portraits and mint
-        # stills for minutes and then die mid-render at assert_usable -- the
-        # forbidden failure shape. Hence this boundary lands FIRST, additive,
-        # with the old guard untouched until this commit is pushed.
+        # graph. ShotLock / MetaBrief / the dispatcher tolerate unknown ids by
+        # design, so a stale saved pick or a typo'd custom id would otherwise
+        # plan portraits and mint stills for minutes and then die mid-render at
+        # assert_usable -- the forbidden failure shape.
         #
         # Scope, deliberately the UNION of picked and effective: a pick that
         # only renders because a force map happens to mask it is a booby trap

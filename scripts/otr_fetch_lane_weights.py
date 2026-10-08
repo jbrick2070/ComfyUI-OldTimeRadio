@@ -419,13 +419,12 @@ LANES = {
     ],
     # ~3.4 GB. THE MUSIC MODEL, and it blocks far more than a "music lane":
     # OTR_StableAudioTheme runs on the shared path, so a machine without this
-    # fails EVERY profile that reaches the music node -- eight consecutive lanes
-    # died here on 2026-08-31, about twelve minutes into each, after the script,
-    # cast and voices were already done.
+    # fails EVERY profile that reaches the music node, about twelve minutes
+    # in, after the script, cast and voices are already done.
     #
     # USE THE COMFY-ORG REPACKAGE, NOT STABILITY'S RAW REPO -- and note the
     # engine's own error message says exactly this ("fetch Comfy-Org/
-    # stable-audio-3"). Ignoring it cost a full soak round.
+    # stable-audio-3").
     #
     # The raw repo LOOKS right and fails at render time. Its checkpoint is
     # byte-identical (2,270,384,940 either way), but its text encoder is not:
@@ -442,10 +441,10 @@ LANES = {
     # from deep inside sd1_clip -- a message that names neither SA3 nor the
     # missing tokenizer. Both repos are ungated, so there is no reason to prefer
     # the raw one.
-    # ~19.3 GB. THE DEFAULT IMAGE ENGINE, and until 2026-08-31 it had no lane
-    # at all -- so every machine that followed the docs fetched video weights
-    # and then died at OTR_ImageGenDispatcher with 'z_image_turbo diffusion
-    # model not found'. It is the `image` value for EVERY class in the machine
+    # ~19.3 GB. THE DEFAULT IMAGE ENGINE: a machine without it fetches video
+    # weights and then dies at OTR_ImageGenDispatcher with 'z_image_turbo
+    # diffusion model not found'. It is the `image` value for EVERY class in
+    # the machine
     # matrix, so a missing image model fails far more lanes than a missing
     # video model does. bf16 is the universal choice: the adapter RANKS
     # installed z_image_turbo*.safetensors nvfp4 > fp8 > bf16, so a Blackwell
@@ -534,22 +533,15 @@ BUNDLES = {
 def models_root() -> str:
     """Where weights live, resolved in a way that cannot silently be wrong.
 
-    FOUND BY AN OUTSIDE TESTER ON ROCm/LINUX (issue #2, 2026-09-14), and the
-    docstring here used to say "never a hardcoded guess" directly above a
-    hardcoded Windows guess.
-
-    The old order tried to import the pack's models-root owner FIRST. That import needs ComfyUI's own `folder_paths`, which only exists
-    inside the running ComfyUI process -- so when this script is run standalone,
-    exactly as its own README invocation says to, the import raised, a bare
-    `except Exception` swallowed it, and the function returned
-    `C:\\ComfyUI-Models` on a machine that had never seen a C: drive. No error,
-    no warning; the tester only caught it because `--dry-run` printed a path
-    that made no sense on Ubuntu.
-
-    Two changes. An EXPLICIT environment setting now wins outright, because an
-    operator who names a path means it and should not be overridden by an import
-    that may or may not succeed. And the last resort announces itself on stderr
-    instead of pretending to be an answer.
+    Order: an EXPLICIT environment setting wins outright, because an operator
+    who names a path means it and should not be overridden by an import that
+    may or may not succeed; then the pack's models-root owner, which needs
+    ComfyUI's own `folder_paths` and so raises when this script is run
+    standalone, exactly as its own README invocation says to (a bare
+    `except Exception` must not turn that into a silent hardcoded
+    `C:\\ComfyUI-Models` on a machine that never saw a C: drive); then the
+    sibling `models/` of a ComfyUI checkout. The last resort announces itself
+    on stderr instead of pretending to be an answer.
     """
     for var in ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT"):
         explicit = os.environ.get(var)

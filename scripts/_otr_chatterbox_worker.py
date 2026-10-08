@@ -71,7 +71,7 @@ def main():
     try:
         # S4 platform-portability (2026-07-10): the device is EXPLICIT (the
         # adapter passes --device from the CastLock ledger stamp; default
-        # cuda = nv50 baseline). The old cuda->cpu waterfall is deleted --
+        # cuda = nv50 baseline). There is no cuda->cpu waterfall --
         # an unavailable device fails LOUD in from_pretrained.
         import argparse
         _ap = argparse.ArgumentParser()

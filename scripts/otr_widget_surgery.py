@@ -40,8 +40,8 @@ def repair_dst_slots(wf):
     """Set every link row's dst_slot to the slot that actually holds it.
 
     Returns every mutation as {"link": id, "from": (node, slot),
-    "to": (node, slot)} -- node AND slot, because a stale dst_node used to be
-    corrected in place and reported in nothing."""
+    "to": (node, slot)} -- node AND slot, because a stale dst_node corrected
+    in place and reported in nothing would be invisible."""
     links_by_id = {row[0]: row for row in wf.get("links", [])}
     repairs = []
     for node in wf.get("nodes", []):
@@ -84,9 +84,9 @@ def remove_widget(wf, node_type, widget_name):
         value_pos = names.index(widget_name)
         input_pos = desc_idx[value_pos]
 
-        # THE SAME REFUSAL reorder_widgets earned, for the same reason. An
-        # earlier cut skipped the pop when widgets_values was already short and
-        # then removed the descriptor anyway, widening a pre-existing mismatch
+        # THE SAME REFUSAL reorder_widgets earned, for the same reason:
+        # skipping the pop when widgets_values is already short and then
+        # removing the descriptor anyway would widen a pre-existing mismatch
         # by one with no error -- turning a graph that is merely inconsistent
         # into one that is confidently wrong.
         wv = node.get("widgets_values")
@@ -116,10 +116,8 @@ def remove_widget(wf, node_type, widget_name):
             "inputs_len": len(node.get("inputs") or []),
         })
     # Part 3, run here rather than left to the caller -- the same guarantee
-    # reorder_widgets gives. The asymmetry between the two was an oversight,
-    # not a design: remove_widget's docstring used to say "the caller runs
-    # repair_dst_slots for part 3", which is one forgotten line away from a
-    # link pointing at the wrong descriptor.
+    # reorder_widgets gives. Leaving it to the caller is one forgotten line
+    # away from a link pointing at the wrong descriptor.
     repairs = repair_dst_slots(wf)
     return touched, repairs
 
@@ -139,10 +137,9 @@ def reorder_widgets(wf, node_type, new_name_order):
     widget now sits there. That is invisible to a widget-count check and is
     exactly the class CLAUDE.md section 0 exists for.
 
-    An earlier docstring said this "leaves non-widget link sockets exactly
-    where they are", which is true and reads as a completeness guarantee it
-    never was: the sockets OUTSIDE the widget group do not move, but a linked
-    widget INSIDE it does.
+    Non-widget link sockets stay exactly where they are, which is not a
+    completeness guarantee: the sockets OUTSIDE the widget group do not move,
+    but a linked widget INSIDE it does.
 
     Returns (touched, repairs) so a caller can see what the repair did.
     """

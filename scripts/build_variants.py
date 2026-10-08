@@ -1,4 +1,4 @@
-"""Platform-variant generator -- the never-built GATE B "S3 emit_snapshot".
+"""Platform-variant generator -- GATE B "S3 emit_snapshot".
 
 Per the 2026-07-09 platform-portability final spec, section 1. An OFFLINE CLI
 (never a node): a platform variant = TWO artifacts generated together from
@@ -157,9 +157,9 @@ def _app_path() -> Path:
     scratch folder, and write into the real one."""
     return VARIANTS_DIR / APP_WORKFLOW_NAME
 
-#: EVERY GENERATED WORKFLOW GETS ITS OWN `id` (plan 0e). They all used to carry
-#: the canonical's, and the frontend decides "the same workflow, reloaded" by
-#: that id once a path matches. uuid5 of the file stem: stable across
+#: EVERY GENERATED WORKFLOW GETS ITS OWN `id` (plan 0e). The frontend decides
+#: "the same workflow, reloaded" by that id once a path matches, so variants
+#: must not share the canonical's. uuid5 of the file stem: stable across
 #: regenerations, distinct across files. The canonical keeps its own.
 _WORKFLOW_ID_NAMESPACE = uuid.uuid5(
     uuid.NAMESPACE_URL,
@@ -254,11 +254,11 @@ def build_app(canonical=None) -> dict:
     stamp_app_mode(app, "form", open_as_app=True)
     stamp_pack_identity(app, live_pack_version())
     return app
-#: EVERY LAUNCH RECIPE IN ONE GENERATED DOC (2026-09-25). They used to sit
-#: beside each graph as workflows/<variant>.launch.md: 24 near-identical files in
-#: the folder ComfyUI's template gallery reads, which is a folder for loadable
-#: graphs. The doc lives with the rest of the docs, and `--check` fails if a
-#: `.launch.md` comes back into workflows/.
+#: EVERY LAUNCH RECIPE IN ONE GENERATED DOC (2026-09-25). workflows/ is the
+#: folder ComfyUI's template gallery reads, which is a folder for loadable
+#: graphs, so no workflows/<variant>.launch.md is written there. The doc lives
+#: with the rest of the docs, and `--check` fails if a `.launch.md` comes
+#: back into workflows/.
 LAUNCH_RECIPES = REPO / "apple" / "LAUNCH_RECIPES.md"
 #: THE GALLERY THUMBNAIL (2026-09-25). ComfyUI's template gallery builds each
 #: custom-pack card with `mediaSubtype: "jpg"` hardcoded and requests
@@ -272,7 +272,7 @@ GALLERY_THUMB = REPO / "assets" / "otr_gallery_thumb.jpg"
 #: THE SHIPPING SET, DERIVED FROM THE MATRIX (2026-09-24). The rows in
 #: `config/workflow_matrix.json` that say `ships` are the only configs that emit a
 #: graph into `workflows/`. Edit that file and this follows; there is no
-#: second list to keep in step, which is the entire reason it moved out of here.
+#: second list to keep in step.
 #:
 #: Still an allow-list, deliberately, exactly as the hand-kept tuple was: a row
 #: has to say `ships` to reach a user, so a new row defaults to NOT shipping --
@@ -280,8 +280,6 @@ GALLERY_THUMB = REPO / "assets" / "otr_gallery_thumb.jpg"
 #:
 #: Kept as a module attribute because two readers import it by name:
 #: `otr_dropdown_matrix` and `tests/test_shipping_writer_pins`.
-#: `otr_tier_matrix` was the third and was retired 2026-09-24 -- its doc
-#: held per-workflow configuration, which the matrix itself now owns.
 SHIPPING_SET = shipping_ids()
 
 class EmitRefused(RuntimeError):
@@ -330,16 +328,16 @@ def _profile_id_from_stem(stem: str) -> str:
 def _committed_profile_ids() -> list[str]:
     """The ids `--all` emits: exactly what the matrix says ships.
 
-    THIS USED TO GLOB `config/profiles/*.json` AND INTERSECT WITH SHIPPING_SET,
-    which made the FOLDER decide what got emitted while the matrix only decided
-    what was allowed to. Two silent failures came out of that: a new matrix row
-    with no file twin was never emitted, and an emptied folder made `--all` emit
-    nothing and still exit 0. `--check` hid it, because it enumerates the
-    already-committed graphs in `workflows/` and never looks at the
-    source folder at all.
+    THE MATRIX, NOT THE FOLDER, DECIDES WHAT IS EMITTED. Globbing
+    `config/profiles/*.json` and intersecting with SHIPPING_SET would let the
+    FOLDER decide what got emitted while the matrix only decided what was
+    allowed to: a new matrix row with no file twin would never be emitted, and
+    an emptied folder would make `--all` emit nothing and still exit 0.
+    `--check` would hide it, because it enumerates the already-committed
+    graphs in `workflows/` and never looks at the source folder at all.
 
     `shipping_ids()` reads the matrix, so the enumeration and the allow-list are
-    now the same list rather than two that agreed by coincidence.
+    the same list rather than two that agree by coincidence.
     """
     out = list(shipping_ids())
     # Stem-collision guard (post-ship audit): a bare id X and a prefixed
@@ -519,9 +517,9 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
         "- ffmpeg on PATH (mac: ensure libx264 + aac encoders are in the "
         "build).",
         # Named ONLY when this profile actually selects the one engine that
-        # imports cairo (2026-09-12). Every recipe used to carry the line,
-        # including profiles pinned to the cairo-free viz_mxc_cpu -- an
-        # install step a tester would have paid for nothing.
+        # imports cairo (2026-09-12): a profile pinned to the cairo-free
+        # viz_mxc_cpu must not carry an install step a tester would pay for
+        # nothing.
         *(["- minimal Linux: libcairo2-dev + pkg-config, then `pip install "
            "pycairo` (this workflow selects `viz_mxc_mandala`)."]
           if "viz_mxc_mandala" in json.dumps(profile.get("role_overrides") or {})
@@ -668,8 +666,7 @@ def cmd_emit(profile_ids: list[str], explicit: bool) -> int:
 #: Run as SUBPROCESSES on purpose -- see `cmd_regenerate_docs`.
 DOC_GENERATORS = (
     # No README block: both generators only STRIP the old BEGIN/END markers and
-    # neither re-injects, and README.md carries no marker any more. The earlier
-    # label here claimed one and was written from an assumption.
+    # neither re-injects, and README.md carries no marker any more.
     ("apple/MACHINE_MATRIX.md", "otr_machine_matrix.py"),
     ("apple/DROPDOWN_MATRIX.md + apple/MACHINES.md", "otr_dropdown_matrix.py"),
 )
@@ -679,9 +676,9 @@ def cmd_regenerate_docs() -> int:
     """Rebuild every generated doc from the same matrix the variants came from.
 
     Operator: "when it's updated it updates the variants AND the documentation, all
-    at once". Before this, a matrix edit meant remembering three commands, and a
-    forgotten one left a doc disagreeing with the graphs until somebody noticed --
-    which is exactly how the retired tier doc froze four workflows behind.
+    at once". A matrix edit must not mean remembering three commands: a
+    forgotten one leaves a doc disagreeing with the graphs until somebody
+    notices.
 
     SUBPROCESSES, NOT IMPORTS, for three measured reasons. The generators use
     incompatible exit codes (3 means "degraded interpreter, refuse to write" for the
@@ -704,8 +701,7 @@ def cmd_regenerate_docs() -> int:
         path = REPO / "scripts" / script
         if not path.exists():
             # A FAILURE, not a note. A renamed or moved generator would otherwise do
-            # nothing quietly -- the same shape as the tier generator that sat dead
-            # for weeks while its doc froze four workflows behind.
+            # nothing quietly.
             failures.append((script, "not present"))
             print(f"  FAIL  {label} -- {script} is not present")
             continue

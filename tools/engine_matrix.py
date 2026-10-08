@@ -161,8 +161,7 @@ _DOC_CITATION = re.compile(r"(?:vram-recipe-lab/)?(?:apple|docs)/[A-Za-z0-9._-]+
 #: evidence that lives outside this pack. It cannot be checked from here -- the
 #: lab is not on a stranger's box, nor on every developer box -- so it renders
 #: as an external citation on every machine instead of resolving against this
-#: repo and reading MISSING (2026-09-25: the scan used to capture only the
-#: ``docs/...`` tail of ``eng_humo.py``'s lab citation).
+#: repo and reading MISSING.
 _EXTERNAL_PREFIX = "vram-recipe-lab/"
 
 #: Wording that marks a doc path as REFUTED rather than relied upon, so a
@@ -176,11 +175,11 @@ _REFUTES = re.compile(
 def _effective_canvas(engine, name):
     """The canvas this engine ACTUALLY renders at, and where that comes from.
 
-    The old matrix refused to print a local resolution ("printing a number the
-    code never promised"). That refusal is what let `wan_i2v` sit on the shared
-    1472x832 landscape default with no opinion of its own. The number IS
-    resolvable -- it is just resolved in three different places -- so this
-    function walks the same precedence the driver walks and NAMES the winner.
+    The number IS resolvable -- it is just resolved in three different
+    places -- so this function walks the same precedence the driver walks and
+    NAMES the winner. Refusing to print a resolution ("printing a number the
+    code never promised") would let an engine sit on the shared 1472x832
+    landscape default with no opinion of its own.
     """
     from nodes._otr_video_engines.render_driver import declared_render_canvas
 

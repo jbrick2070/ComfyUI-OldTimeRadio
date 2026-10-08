@@ -27,8 +27,6 @@ L2 scope:
 
 Stages that populate the ledger (in pipeline order):
   LedgerScriptWriter DONE -> cast (voice_presets) + lines + meta.visual_plan
-                             (replaces legacy ScriptWriter -> LLMDirector chain
-                             retired in voice-path-cleanbreak S2)
   SceneSequencer DONE  -> lines/music start_s + dur_s + beats (speaker turns)
   SignalLostVideo DONE -> episode_id (real title), final_audio_path,
                           final_video_path, total_episode_dur_s
@@ -119,8 +117,8 @@ _GIT_HEAD_CACHE: Optional[str] = None
 
 #: char_id values that are NOT cast characters (the announcer + music render
 #: contracts). A row carrying one of these is never coerced to "character".
-#: ("sfx" removed 2026-07-01, rip-sfx-broll -- old sfx ledgers fail loud at
-#: the freeze gate / role resolvers instead of riding a sentinel.)
+#: (No "sfx" entry: old sfx ledgers fail loud at the freeze gate / role
+#: resolvers instead of riding a sentinel.)
 _NON_CHARACTER_CHAR_ID_SENTINELS: frozenset = frozenset({
     "announcer", "music", "music_open", "music_close", "music_inter",
 })
@@ -196,23 +194,18 @@ def _default_out_dir(episode_id: Optional[str] = None) -> str:
 
     Path: ``<output>/otr/episodes/<episode_id>/audio/``.
 
-    History:
-      - 2026-04-26 PM BUG-LOCAL-067: moved from ``output/old_time_radio/``
-        to ``output/otr/audio/``.
-      - 2026-05-02 EVENING (Jeffrey directive: one-stop-shop): moved into
-        per-episode workspace ``output/otr/episodes/<ep>/audio/``. SignalLostVideo
-        finalizes the canonical episode_id; until then the dir is named
-        ``output/otr/episodes/pending_<ts>/audio/`` and gets renamed by
-        ``Ledger.rename_episode`` once the title is finalized.
+    Until SignalLostVideo finalizes the canonical episode_id the dir is named
+    ``output/otr/episodes/pending_<ts>/audio/``; ``Ledger.rename_episode``
+    renames it once the title is finalized.
     """
     ep = episode_id or ("pending_" + time.strftime("%Y%m%d_%H%M%S"))
-    # BUG-LOCAL-292: route through the shared resolver instead of a hardcoded
-    # ~/Documents path. comfy_output_dir() resolves OTR_OUTPUT_DIR env, else
-    # ComfyUI folder_paths, else a node-relative walk-up -- so the ledger lands
-    # under the SAME output/otr/episodes/<ep>/audio tree as portraits, the
-    # latest_ledger route, and every other _otr_paths consumer (no more
-    # Documents-vs-AppData split). Lazy import: _otr_paths is pure (no back-dep
-    # on this module), and importing at call time avoids any load-order risk.
+    # BUG-LOCAL-292: route through the shared resolver. comfy_output_dir()
+    # resolves OTR_OUTPUT_DIR env, else ComfyUI folder_paths, else a
+    # node-relative walk-up -- so the ledger lands under the SAME
+    # output/otr/episodes/<ep>/audio tree as portraits, the latest_ledger
+    # route, and every other _otr_paths consumer. Lazy import: _otr_paths is
+    # pure (no back-dep on this module), and importing at call time avoids
+    # any load-order risk.
     from ._otr_paths import otr_audio_dir
     return str(otr_audio_dir(ep))
 
@@ -285,10 +278,10 @@ def _safe_int(v: Any, default: int = 0) -> int:
 #
 # The disk merge (BUG-LOCAL-108) carries out-of-band DURABLE renderer
 # fields (wav/cache/timing/render stamps) forward from an earlier on-disk
-# ledger so an incremental re-save does not destroy them. Before this fix
-# that copy-forward was BLIND: an edited line, a re-authored music cue, or
-# a changed clip render request would keep the STALE render bytes from the
-# previous pass (wrong audio glued to new text). C1 gates the copy-forward
+# ledger so an incremental re-save does not destroy them. A BLIND
+# copy-forward would keep the STALE render bytes from a previous pass
+# for an edited line, a re-authored music cue, or a changed clip render
+# request (wrong audio glued to new text). C1 gates the copy-forward
 # on a per-row content IDENTITY: durable fields survive ONLY when identity
 # is unchanged; a changed identity invalidates them (dropped, never
 # resurrected). Identity is recomputed from CONTENT on both the in-memory
@@ -568,20 +561,19 @@ REPLAY_MANIFEST_SCHEMA = "otr_replay_bundle_v1"
 #: publish the previous run's telemetry as if it described this one.
 #:
 #: EVERY MEMBER MUST BE SOMETHING THE REPLAY ACTUALLY RE-STAMPS, and that is the
-#: whole rule (learned on the first live replay, 2026-09-03). `image_engines`
-#: was in this list and had to come out: the credits roll REQUIRES it
-#: (`otr_credits_roll._require(meta, "image_engines", "meta")`), and the only
-#: thing that stamps it is `OTR_ImageGenDispatcher` -- which a replay does not
-#: run, because a replay IMPORTS the source's stills instead of minting new
-#: ones. So clearing it guaranteed a `CreditsDataError` at mux time on every
-#: replay: eight clips rendered, sixteen minutes spent, and nothing published.
+#: whole rule. `image_engines` is deliberately NOT a member: the credits roll
+#: REQUIRES it (`otr_credits_roll._require(meta, "image_engines", "meta")`),
+#: and the only thing that stamps it is `OTR_ImageGenDispatcher` -- which a
+#: replay does not run, because a replay IMPORTS the source's stills instead
+#: of minting new ones. Clearing it would guarantee a `CreditsDataError` at
+#: mux time on every replay: the clips render and nothing publishes.
 #:
 #: Carrying it forward is not a stale value, it is the CORRECT one. The replay
 #: shows the imported stills, so the engines that made them are exactly the
-#: source's engines. (Verified on that live leg: the other six members --
-#: `render_engines`, `render_trace`, `render_trace_version`, `phase_ms`,
-#: `audio_motion_profile`, `paths` -- were all rebuilt by the replay, and
-#: `video_readiness` is a freeze-cascade diagnostic that nothing requires.)
+#: source's engines. (The other six members -- `render_engines`,
+#: `render_trace`, `render_trace_version`, `phase_ms`, `audio_motion_profile`,
+#: `paths` -- are all rebuilt by the replay, and `video_readiness` is a
+#: freeze-cascade diagnostic that nothing requires.)
 #:
 #: `asset_cleanup` (row 0b, 2026-09-25) is a per-run housekeeping choice, not
 #: story content: the writer's replay branch re-stamps it from THIS run's
@@ -679,8 +671,8 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
             raise ReplayBundleError("manifest lacks %r" % (key,))
     # THE LEDGER AND THE MASTER MUST BE AMONG THE FILES JUST VERIFIED
     # (2026-09-05). The loop above proved size, digest and leaf-ness for every
-    # row in files[]; these two keys used to be checked only for SHAPE, so a
-    # bundle could name a ledger that was never hashed -- swapped after
+    # row in files[]; checking these two keys only for SHAPE would let a
+    # bundle name a ledger that was never hashed -- swapped after
     # freezing, and the "verified" import would open it anyway. Membership is
     # case-folded to match the duplicate check above. The exporter always
     # lists both first, so no bundle the shipped tool produced is refused.
@@ -1071,16 +1063,14 @@ class Ledger:
         """Carry the publication receipt's episode id across a rename.
 
         THE RECEIPT IS AN EPISODE-LOCAL DURABLE POINTER, and this method
-        already owns rebasing every one of those onto the new identity -- it
-        just predates this particular field.
+        owns rebasing every one of those onto the new identity.
 
-        WHY IT MATTERS (live, 2026-08-15). The freeze stamps the publication
-        verdict while the episode is still `pending_<ts>`; this rename then
-        gives it its real slug. The terminal mux compares the receipt's episode
-        id against the live ledger's, found `pending_...` versus
-        `signal_lost_...`, read that as a STALE SINGLETON and withheld the OBS
-        copy -- on every episode, because every episode is renamed. Two
-        finished, correct episodes stayed unpublished.
+        WHY IT MATTERS. The freeze stamps the publication verdict while the
+        episode is still `pending_<ts>`; this rename then gives it its real
+        slug. The terminal mux compares the receipt's episode id against the
+        live ledger's; `pending_...` versus `signal_lost_...` reads as a STALE
+        SINGLETON and withholds the OBS copy -- on every episode, because
+        every episode is renamed.
 
         This does NOT re-decide anything. The verdict and its reasons are
         untouched; only the name the receipt files itself under moves, exactly
@@ -1134,15 +1124,6 @@ class Ledger:
         The durable path rewrite is required and fails loudly: continuing with
         pointers into the deleted pending directory creates a mechanically
         successful but false ledger. Sidecar renames remain best-effort.
-
-        BUG-LOCAL-108 history (2026-04-29 morning): prior implementation
-        only changed in-memory ``self.episode_id``. On-disk
-        ``pending_<ts>_ledger.json`` was left orphaned, next ``save()``
-        wrote a fresh file at the canonical path. Fields written by
-        audio nodes' schema-l3 helpers between LLMScriptWriter and
-        SignalLostVideo landed on the orphan and were silently lost.
-        Phase B (BUG-LOCAL-015) replaces that file-only-rename fallback
-        with a hard-fail + retry; treatment files are also renamed.
         """
         import time as _time
 
@@ -1241,7 +1222,7 @@ class Ledger:
             moved_dir = True
 
         # Step 2: rename the ledger file inside the (now-moved) audio dir to
-        # the canonical filename.  This used to be best-effort, but a failure
+        # the canonical filename.  This is not best-effort: a failure
         # here would make the required durable path rewrite impossible and the
         # next singleton save would silently drop out-of-band producer rows.
         old_ledger_path = os.path.join(
@@ -1374,18 +1355,15 @@ class Ledger:
     def set_cast(self, cast_rows: Iterable[Dict[str, Any]]) -> "Ledger":
         rows: List[Dict[str, Any]] = []
         for r in cast_rows or []:
-            # Cast field renamed 2026-05-10: description -> character_description.
-            # S26-B3 cleanbreak: legacy `description` input key dropped;
-            # callers MUST supply `character_description`.
+            # Callers MUST supply `character_description`; the legacy
+            # `description` input key is not read.
             cdesc = _safe_str(r.get("character_description")) or None
-            # Cast field added 2026-05-10: tts_model. Routing column
-            # that says which TTS family the voice_preset belongs to
-            # ("bark", "kokoro", future: "fish_speech", "cosyvoice", ...).
-            # Lets downstream consumers route by reading the field
-            # directly instead of pattern-matching the voice_preset
-            # prefix.
-            # S26-B3 cleanbreak: legacy voice_preset->tts_model derivation
-            # dropped; callers MUST supply tts_model explicitly.
+            # tts_model: routing column that says which TTS family the
+            # voice_preset belongs to ("bark", "kokoro", future: "fish_speech",
+            # "cosyvoice", ...). Lets downstream consumers route by reading
+            # the field directly instead of pattern-matching the voice_preset
+            # prefix. Callers MUST supply tts_model explicitly; it is not
+            # derived from voice_preset.
             tts_model = _safe_str(r.get("tts_model")) or None
             voice_preset = _safe_str(r.get("voice_preset")) or None
             # Cast field added 2026-05-10: voice_params. Model-
@@ -1680,14 +1658,7 @@ class Ledger:
         self._recompute_totals()
         return self
 
-    # set_sfx + apply_sfx_timings deleted S27 (cleanbreak-tail Item 2).
-    # The S25/CD-3 + S26-A3 sweep had already removed the sfx[] schema
-    # scaffold from the canonical ledger; these two methods were kept
-    # alive only to forward stale sfx rows from old on-disk ledger
-    # files back into memory at save time. Per S27 directive: old
-    # on-disk ledgers rebuild on next run. Zero current producers was
-    # the green light to delete, not the excuse to preserve. Audio
-    # writes flow through nodes/_otr_ledger.save_ledger_safe directly.
+    # Audio writes flow through nodes/_otr_ledger.save_ledger_safe directly.
 
     def set_music(self, music_rows: Iterable[Dict[str, Any]]) -> "Ledger":
         rows: List[Dict[str, Any]] = []
@@ -1698,10 +1669,9 @@ class Ledger:
                 "generation_prompt": _safe_str(r.get("generation_prompt")) or None,
                 # Authored cue-spec fields (S2 P1.1 / C1): CARRIED so the
                 # durable-field identity (cue_spec_sha256) survives an
-                # incremental re-save. Dropped before this fix -- set_music
-                # silently discarded placement / anchor_line_id /
-                # target_duration_s, so a re-authored cue could not be told
-                # apart from its predecessor and kept a stale rendered wav.
+                # incremental re-save. Dropping placement / anchor_line_id /
+                # target_duration_s would make a re-authored cue look like its
+                # predecessor and keep a stale rendered wav.
                 "anchor_line_id":    _safe_str(r.get("anchor_line_id")) or None,
                 "placement":         _safe_str(r.get("placement")) or None,
                 "target_duration_s": _safe_float(r.get("target_duration_s")),
@@ -1891,9 +1861,7 @@ class Ledger:
         Per-row fields preserved (keyed by line_id / cue_id):
           For each lines[i] / clips[i] / music[i]: copy forward any
           key present on disk that is missing or empty/null in the
-          in-mem row. (The ``sfx[]`` array was ripped 2026-07-01
-          rip-sfx-broll / S27; it is no longer a copied row shape --
-          see the ROW_KEYED map below.)
+          in-mem row.
         """
         try:
             # THROUGH `_long_path`, AND THIS ONE IS LOAD-BEARING FOR BUG-108.
@@ -1952,11 +1920,7 @@ class Ledger:
             in_mem["meta"] = in_mem_meta
 
         # Per-row merge. Keyed by line_id (lines, clips) or cue_id
-        # (music). "sfx": "cue_id" entry deleted S27 (cleanbreak-tail
-        # Item 2) -- the sfx[] schema scaffold was deleted in S26-A3
-        # and the ROW_KEYED entry was kept only to forward stale rows
-        # from old on-disk ledger files. Old ledgers rebuild on next
-        # run; the merge no longer tries to preserve a deleted shape.
+        # (music).
         ROW_KEYED = {
             "lines": "line_id",
             "clips": "line_id",
@@ -2159,20 +2123,16 @@ def assemble_script_text_from_ledger(led_data: dict) -> str:
     """Rebuild the writer's slot-0 `script_text` string from the
     canonical ledger lines.
 
-    Token format matches what `OTR_LedgerScriptWriter.run()` emitted per beat
-    before that in-loop list was removed (2026-08-28); this function is now
-    the only producer of the slot-0 transcript:
+    Token format (this function is the only producer of the slot-0
+    transcript):
       - character beat:  ``[VOICE: NAME, traits] <text>``
       - announcer beat:  ``[VOICE: ANNOUNCER, traits] <text>``
-      - music beat:      skipped (render contract, no transcript text;
-        the legacy ``[SFX: ...]`` token was removed 2026-07-01,
-        rip-sfx-broll)
+      - music beat:      skipped (render contract, no transcript text)
 
     Used as the post-loop authoritative source for slot-0 in BOTH the
     writer (after the news-wiring overlay patches `led.data['lines']`
     in place) and the reviewer (after the 3-pass review may have
-    rewritten line text). Pre-Tier-1, both callers shipped a stale
-    string that did not reflect those mutations.
+    rewritten line text).
 
     `led_data` is the in-memory dict that `Ledger.data` points at.
     Reads `led_data['cast']` for char_id -> name lookup. Empty / falsy
@@ -2215,8 +2175,7 @@ def assemble_script_text_from_ledger(led_data: dict) -> str:
             # By construction they carry text=="" (init stamps "" and
             # the composer loop writes "") so this branch is
             # unreachable for a fresh ledger; it exists to keep a
-            # stale text-bearing music row OUT of the transcript
-            # rather than emitting the retired [SFX:] token.
+            # stale text-bearing music row OUT of the transcript.
             continue
         else:
             # Unknown role: keep the text visible to downstream

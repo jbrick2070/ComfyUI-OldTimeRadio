@@ -251,8 +251,7 @@ ELEVATION_TO_RADIUS_RATIO = LEGACY_DEFAULT_ELEVATION / LEGACY_DEFAULT_RADIUS
 
 #: Target fraction of the vertical frame the mesh bbox height should fill.
 #: At the OLD flat radius=2.5 a longest-dim-1.0 (tall) mesh filled ~84% of the
-#: frame (a full top-to-bottom body, no headroom) -- the look-QA complaint
-#: this item fixes.
+#: frame (a full top-to-bottom body, no headroom) -- the look-QA complaint.
 DEFAULT_TARGET_HEIGHT_FRAC = 0.62
 
 #: A camera can never sit inside (or touching) the mesh.
@@ -399,7 +398,7 @@ def _paint_gradient_onto_meshes(bpy, meshes):
     @ v.co`` -- ``_normalize_meshes`` rewrote object loc/scale, so local
     ``v.co.z`` is NOT the centered height). Same vertex-colour mechanism the
     projection uses, so WORKBENCH VERTEX draws it. Returns the distinct-colour
-    count. Replaces the flat photo decal as the default surface."""
+    count. This is the default surface."""
     seen = set()
     for obj in meshes:
         mesh = getattr(obj, "data", None)
@@ -459,9 +458,9 @@ def _build_turntable(bpy, radius, elevation, frames, start_angle, arc_degrees):
     Mesh-improve item 2 (2026-06-30): the camera's vertical FOV is PINNED
     (sensor_fit='VERTICAL' + fixed lens/sensor-height, matching
     CAMERA_LENS_MM/CAMERA_SENSOR_HEIGHT_MM) so it is a fixed, known quantity
-    -- previously Blender's implicit AUTO sensor-fit made the vertical FOV
-    vary with the render's aspect ratio, which made the adaptive-radius trig
-    ill-defined."""
+    (Blender's implicit AUTO sensor-fit would make the vertical FOV vary with
+    the render's aspect ratio, which makes the adaptive-radius trig
+    ill-defined)."""
     scene = bpy.context.scene
     pivot = bpy.data.objects.new("otr_pivot", None)
     scene.collection.objects.link(pivot)

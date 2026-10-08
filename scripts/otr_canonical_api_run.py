@@ -164,8 +164,7 @@ def _apply_video_lane(workflow: dict, schemas: dict, lane: str) -> list[str]:
 def _apply_writer_shortcuts(workflow: dict, schemas: dict, args) -> list[str]:
     writer_id = _node_id_for(workflow, "OTR_LedgerScriptWriter")
     shortcuts: list[tuple[str, Any]] = []
-    # `--words` was removed 2026-08-14 with the target_words widget. Episode
-    # shape is set with --act-count below; length is an observation.
+    # Episode shape is set with --act-count below; length is an observation.
     if args.title is not None:
         shortcuts.append(("episode_title", args.title))
     if getattr(args, "replay_from", None):
@@ -353,20 +352,17 @@ def classify_timeout(running: int, pending: int) -> str:
 def _assert_profile_models_present(profile_name, schemas, offline=False) -> list:
     """Refuse in SECONDS what would otherwise fail seven minutes into a render.
 
-    On 2026-08-22 a Ghost domain-adapter leg ran the script pass, the whole
-    voice pass and part of the video pass before ``assert_usable`` reported
-    ``v3_sd15_adapter.ckpt`` missing -- the weight was on disk but under a root
-    the headless model-paths config does not name. The engine guard did its job
-    and failed closed; it simply could not do it until the first video beat.
-    The bench runners already confirm every model filename in /object_info
-    before submit (SPEC G1/O6); the canonical runner did not, so it does now.
+    The engine guard (``assert_usable``) fails closed but cannot do it until
+    the first video beat, after the script pass, the whole voice pass and part
+    of the video pass -- e.g. a weight on disk under a root the headless
+    model-paths config does not name. Like the bench runners (SPEC G1/O6),
+    this confirms every model filename in /object_info before submit.
 
     Returns the checked names. A profile with no ``preflight.required_models``
     is not an error -- most profiles do not declare any.
     """
-    # THE PROFILE IS A MATRIX ROW. This read `config/profiles/<id>.json` until
-    # that folder was retired, and from then on it found no file for any id
-    # and silently checked nothing (found 2026-09-25).
+    # THE PROFILE IS A MATRIX ROW, not a `config/profiles/<id>.json` file: such
+    # a read finds no file for any id and silently checks nothing.
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
     from nodes._otr_shared.capability_profiles import ProfileError, load_profile
@@ -424,8 +420,7 @@ def _assert_profile_models_present(profile_name, schemas, offline=False) -> list
         # reported FAIL by a `--dry-run --offline-schemas` validation sweep --
         # all three names, including two sitting under roots the yaml DOES
         # name -- and passed preflight cleanly against the live server
-        # moments later. The old message asserted "the running server cannot
-        # see", a claim it had not checked and, offline, could not.
+        # moments later.
         print(
             "[canonical-api] preflight: %d filename requirement(s) NOT checked "
             "-- %s. --offline-schemas has no server and no model-paths config, "
@@ -456,8 +451,8 @@ def episode_of_prompt(prompt_id: str) -> str | None:
     scan walks every string in the decoded history rather than a known output
     slot on purpose -- which node reports the path has changed twice, the id
     format has not. Decoding first matters for multilingual titles: raw JSON
-    may spell a native path as ``\\uXXXX`` escapes, and the old ASCII-only
-    expression could not name a successfully published Hindi or CJK episode.
+    may spell a native path as ``\\uXXXX`` escapes, which an ASCII-only
+    expression cannot name (a successfully published Hindi or CJK episode).
     """
     try:
         import requests
@@ -635,10 +630,10 @@ def main(argv: list[str] | None = None) -> int:
         # so is the whole point of this branch (2026-08-23). `--timeout`
         # defaults to 5400s; a full episode on the slowest video lane can
         # exceed that, so the observation window closes while the server is still at
-        # 98% GPU happily rendering beat 34. The old line printed
-        # "RESULT TIMEOUT" and exited 1 for BOTH that case and a genuinely dead
-        # render -- two opposite situations, one indistinguishable message, and
-        # the reader's natural conclusion is the wrong one.
+        # 98% GPU happily rendering beat 34. A bare "RESULT TIMEOUT" with exit 1
+        # for BOTH that case and a genuinely dead render would be two opposite
+        # situations behind one indistinguishable message, and the reader's
+        # natural conclusion is the wrong one.
         running, pending = queue_snapshot()
         verdict = classify_timeout(running, pending)
         if verdict == "still_running":
