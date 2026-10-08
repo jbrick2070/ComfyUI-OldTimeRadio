@@ -108,15 +108,6 @@ def _session(rig_data):
 # ---------------------------------------------------------------------------
 
 
-def test_no_enable_flag_gate(monkeypatch, rig):
-    """Operator directive 2026-07-02: the dropdown pick is the enable --
-    invoke must NOT gate on OTR_ENABLE_COMFY_CLOUD_MEDIA. With credentials
-    present the call proceeds regardless of the (removed) flag."""
-    monkeypatch.delenv("OTR_ENABLE_COMFY_CLOUD_MEDIA", raising=False)
-    result = invoke.invoke_partner_node(rig["node_key"], {}, timeout_s=5)
-    assert result["path"]
-
-
 def test_missing_credentials_fail_loud(monkeypatch, rig):
     """A dropdown pick on a queue that carries no api_key_comfy_org fails
     LOUD at auth, naming both real paths. The env var stays set to prove

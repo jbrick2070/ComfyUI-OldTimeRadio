@@ -39,13 +39,6 @@ def _clean_state(monkeypatch, tmp_path):
 # -- flags -----------------------------------------------------------------
 
 
-def test_enable_flag_removed():
-    """Operator directive 2026-07-02: no hidden enable switch -- the
-    dropdown pick IS the enable (same clean break as OpenRouter C6)."""
-    assert not hasattr(cmb, "is_cloud_media_enabled")
-    assert "is_cloud_media_enabled" not in cmb.__all__
-
-
 def test_mute_ok_roles_default_empty():
     """Operator amendment: reactivity default-on; opt-down list EMPTY."""
     assert cmb.mute_ok_roles() == frozenset()

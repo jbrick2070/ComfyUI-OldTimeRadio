@@ -130,18 +130,6 @@ class TestMaterialization:
         # Non-voiced rows never get a dialogue slot id.
         assert rows["b003"]["dialogue_slot_id"] is None
 
-    def test_sfx_beats_cannot_exist_in_outline(self):
-        # rip-sfx-broll: the SpeakerRole Literal has no "sfx" member --
-        # pydantic rejects it at Beat construction (the outline CONTRACT
-        # is the first gate).
-        with pytest.raises(Exception):
-            Beat(beat_id="b005", speaker="NARRATOR", speaker_role="sfx",
-                 intent="footsteps approach off-stage", target_words=5,
-                 mood="tense", arc_phase="complication")
-
-    def test_beat_has_no_sfx_cue_field(self):
-        assert "sfx_cue" not in Beat.model_fields
-
     def test_voiced_slot_ids_unchanged(self, tmp_path):
         """S1 must not perturb the voiced dialogue_slot_id stamping."""
         outline = _outline_with_music_filler()

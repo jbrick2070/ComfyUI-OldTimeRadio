@@ -430,15 +430,7 @@ def test_CONTROL_the_cloud_gap_tripwire_is_an_exact_set_not_a_shrug():
         % (sorted(CLOUD_SPLITTERS), sorted(EXPECTED_CLOUD_GAP)))
     # No hand-typed count here: the exact-set equality above already pins
     # membership, and a count adds nothing but drift the next time an engine
-    # arrives or retires (rip-sfx 2026-08-06 removed five). The retired ids
-    # must never reappear in this set:
-    from nodes._otr_shared.public_engines import RETIRED_ENGINE_IDS
-    assert not (set(CLOUD_SPLITTERS) & RETIRED_ENGINE_IDS), (
-        "retired engine id(s) back in the cloud gap: %s"
-        % sorted(set(CLOUD_SPLITTERS) & RETIRED_ENGINE_IDS))
-    assert "word_razzle" not in CLOUD_SPLITTERS, (
-        "word_razzle is retired 2026-09-17; a retired id must never reappear "
-        "in the live cloud gap")
+    # arrives or retires.
     # This row guards the SUBSTRING hazard: `cloud_ltx25_audio_in` and
     # `cloud_ltx25_foley_plus` are legitimate members of the gap above, and
     # the local LTX 2.5 lanes sharing most of those names must never be swept

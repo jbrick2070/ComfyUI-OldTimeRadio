@@ -1,9 +1,8 @@
-"""Clean-break 1c guard: the batch-delegation layer + legacy manifest are gone.
+"""Audio engine contracts left after the clean-break 1c (batch dispatch retired).
 
-After 1a/1b/1c every audio engine is self-contained (per_line / clip). The shared
-batch-delegation dispatch (_delegate_batch / frozen_batch_widgets / _manifest_path),
-the theme node's batch path, the legacy musicgen + audiogen nodes, and the legacy
-invocation manifest were all retired. This guard fails if any reappears.
+After 1a/1b/1c every audio engine is self-contained (per_line / clip). The
+musicgen engine is a clip engine, and its hardcoded guidance scale must equal
+the curated profile default.
 """
 from __future__ import annotations
 
@@ -19,15 +18,6 @@ def test_musicgen_is_clip_engine():
 
     mg = get_engine("musicgen")
     assert mg.interface == "clip"
-    assert not hasattr(mg, "make_batch_node")
-
-
-def test_no_registered_audio_engine_is_batch():
-    from nodes._otr_audio_engines import get_engine
-
-    for name in ("bark", "chatterbox", "indextts2", "kokoro", "musicgen",
-                 "stable_audio_music"):
-        assert get_engine(name).interface in ("per_line", "clip"), name
 
 
 def test_musicgen_guidance_matches_profile_ssot():

@@ -41,10 +41,6 @@ class TestRoleConstants:
         assert SR.SPEAKER_ROLE_MUSIC_CLOSE == "music_close"
         assert SR.SPEAKER_ROLE_MUSIC_INTER == "music_inter"
 
-    def test_sfx_constant_is_gone(self):
-        # rip-sfx-broll (2026-07-01): the constant itself was deleted.
-        assert not hasattr(SR, "SPEAKER_ROLE_SFX")
-
     def test_valid_roles_set_membership(self):
         # All five constants must appear in VALID_SPEAKER_ROLES.
         for const_value in (

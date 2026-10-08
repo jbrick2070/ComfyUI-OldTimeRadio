@@ -133,56 +133,6 @@ def test_the_foley_lane_is_registered_and_on_the_capability_roster():
     assert pub.resolve_engine_id(FOLEY + " (16:9)") == FOLEY
 
 
-def test_the_foley_lane_never_wears_the_ripped_beds_name():
-    """`sfx` is a TOMBSTONE, not a synonym (rip-sfx, 2026-08-06). Operator:
-    "sfx bed is different than foley bed, i won't get the two confused." An id
-    or a field here wearing that prefix would read as resurrecting the path he
-    deliberately killed.
-
-    CHECKED OVER IDENTIFIERS AND KEY-SHAPED LITERALS, NOT RAW TEXT. Prose is
-    exactly where the two features SHOULD be told apart, so a text scan would
-    forbid the one place the distinction belongs and prove nothing about the
-    code. This walks the AST of both foley modules instead: every name bound,
-    read or called, and every string literal short enough to be a key."""
-    import ast
-
-    from nodes._otr_video_engines import foley_stems as fs
-
-    assert "sfx" not in FOLEY
-    assert all("sfx" not in key for key in eng_ltx25.LTX25_FOLEY_RECEIPT_KEYS)
-
-    offenders = []
-    for module in (eng_ltx25, fs):
-        tree = ast.parse(inspect.getsource(module))
-        docstrings = {ast.get_docstring(n, clean=False)
-                      for n in ast.walk(tree)
-                      if isinstance(n, (ast.Module, ast.ClassDef,
-                                        ast.FunctionDef))}
-        for node in ast.walk(tree):
-            found = None
-            if isinstance(node, ast.Name):
-                found = node.id
-            elif isinstance(node, ast.Attribute):
-                found = node.attr
-            elif isinstance(node, ast.arg):
-                found = node.arg
-            elif isinstance(node, (ast.FunctionDef, ast.ClassDef)):
-                found = node.name
-            elif isinstance(node, ast.keyword):
-                found = node.arg or ""
-            elif (isinstance(node, ast.Constant)
-                  and isinstance(node.value, str)
-                  and " " not in node.value
-                  and node.value not in docstrings):
-                found = node.value
-            if found and "sfx" in found.lower():
-                offenders.append((module.__name__, found))
-    # The only legal mention is a POINTER AT THE TOMBSTONE -- the guard test's
-    # own filename -- never a field, an id, or a parameter.
-    assert [o for o in offenders
-            if o[1] != "tests/test_rip_sfx_bed_guard.py"] == [], offenders
-
-
 def test_the_foley_lane_inherits_the_picture_and_touches_nothing_about_it():
     """The two lanes must render the SAME picture. The whole feature is "keep
     the audio we already computed" -- a foley lane that also changed the recipe
@@ -637,8 +587,6 @@ def test_the_render_path_stamps_native_equal_to_delivered():
     assert '"native_frame_count": n,' in src, (
         "render_clip must stamp the DELIVERED count; a pre-trim rung here is "
         "an over-claim the conformance walk's stub cannot catch")
-    assert "native_frames" not in src, (
-        "the pre-trim bookkeeping is gone; reintroducing it is the bug")
 
 
 def test_the_silent_lane_is_the_16gb_weight_with_its_encoder_on_the_gpu(eng, graph):

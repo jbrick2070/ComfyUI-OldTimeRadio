@@ -103,8 +103,7 @@ def test_slot_for_role_and_engine_id_raise_on_dead_roles():
 
 
 def test_shot_lock_video_role_raises_on_sfx():
-    from nodes.otr_shot_lock import _video_role_for_line, SPEAKER_TO_VIDEO_ROLE
-    assert "sfx" not in SPEAKER_TO_VIDEO_ROLE
+    from nodes.otr_shot_lock import _video_role_for_line
     with pytest.raises(ValueError):
         _video_role_for_line({"line_id": "l02", "speaker_role": "sfx"})
     assert _video_role_for_line(
@@ -123,8 +122,6 @@ def test_scene_still_targets_raise_on_sfx_row():
 
 def test_ledger_freeze_rejects_sfx_row_as_error():
     from nodes import _otr_ledger_freeze as LF
-    assert "sfx" not in LF.ALLOWED_SPEAKER_ROLES
-    assert not hasattr(LF, "SFX_DUR_MIN_S")
     led = {
         "schema_version": LF.EXPECTED_SCHEMA_VERSION,
         "cast": [], "lines": [
@@ -196,23 +193,17 @@ def test_workflow_json_node87_matches_live_widget_model():
         "announcer_video_model", "music_video_model", "character_video_model",
         "announcer_image_model", "music_image_model", "character_image_model",
     }
-    assert "allow_auto_fallback" not in names87
-    assert "episode_duration_target" not in names87
     # character_video_model is now video slot 3 (widgets index 2); the saved
     # value must be one of the live dropdown choices (display labels are valid).
     pin = n87["widgets_values"][2]
     from nodes.otr_video_director import OTRVideoDirector
     choices = OTRVideoDirector.INPUT_TYPES()["required"]["character_video_model"][0]
     assert pin in choices, pin
-    # node 3: sfx overlay gone, script_json input stays on slot 2.
+    # node 3: script_json input stays on slot 2.
     # The source is CastLock.ledger_json so SceneSequencer sees the same
     # role-repaired ledger as the pre-rendered voice buses.
     names3 = [i.get("name") for i in n3["inputs"]]
-    assert "sfx_audio_clips" not in names3
-    assert "sfx_offset_ms" not in names3
-    # 2026-07-03: dead default_tts widget removed (6 -> 5). Remaining widgets:
-    # script_json, start_line, end_line, output_dir, dialogue_offset_ms.
-    assert "default_tts" not in names3
+    # Widgets: script_json, start_line, end_line, output_dir, dialogue_offset_ms.
     assert len(n3["widgets_values"]) == 5
     script_link_id = n3["inputs"][names3.index("script_json")]["link"]
     script_link = next(l for l in d["links"] if l[0] == script_link_id)

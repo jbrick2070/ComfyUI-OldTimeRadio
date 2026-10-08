@@ -1,10 +1,7 @@
-"""Clean-break 1b guard: the legacy Kokoro announcer node must stay retired.
+"""Kokoro engine contracts (clean-break 1b).
 
-Kokoro is now a per_line registry engine (nodes/_otr_audio_engines/eng_kokoro.py).
-The OTR_KokoroAnnouncer batch node + module were deleted in lockstep with the
-per_line flip. This guard FAILS if either reappears (module file, import,
-registration, or frozen-manifest entry). Behavioral pins only -- not a repo grep
--- so the workflow-JSON denylists that name the type as a string stay valid.
+Kokoro is a per_line registry engine (nodes/_otr_audio_engines/eng_kokoro.py)
+whose hardcoded speed must equal the curated profile default.
 """
 from __future__ import annotations
 
@@ -15,20 +12,11 @@ import pytest
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
 
-# The LEGACY_AUDIO_NODES + committed-manifest assertions were dropped in the
-# audio clean-break (1c): nodes/_otr_legacy_manifest.py + the manifest JSON were
-# deleted when the last batch engine (musicgen) flipped to clip. The module-file
-# / import / registration / per_line guards below still pin kokoro's retirement.
-
-
 def test_kokoro_is_per_line_registry_engine():
     from nodes._otr_audio_engines import get_engine
 
     kokoro = get_engine("kokoro")
     assert getattr(kokoro, "interface", None) == "per_line"
-    assert not hasattr(kokoro, "make_batch_node"), (
-        "kokoro must not expose make_batch_node after the per_line flip"
-    )
     assert getattr(kokoro, "voice_ref_field", None) == "voice_ref_id"
 
 

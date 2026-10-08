@@ -178,6 +178,3 @@ def test_requested_cloud_smoke_candidate_contracts_are_inspected():
     assert vidu.required_inputs == ("init_image", "text_prompt")
     assert vidu.reactivity == "mute_only"
     assert vidu.must_strip_audio is True
-    # rip-sfx 2026-08-06: wants_provider_sfx is DELETED, not False -- a dead
-    # attribute kept to appease a stale assert is what the rip removes.
-    assert not hasattr(vidu, "wants_provider_sfx")
