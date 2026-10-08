@@ -487,10 +487,8 @@ def _manifest(rows, fps=25):
 # independent review lanes found it in the same pass, and GO_FORWARD_PLAN had
 # tracked it as chunk 7c "still open" since 2026-07-27.
 #
-# `_should_loop_fill`'s own docstring named the replacement and called itself
-# interim: "the real fix is phrase-chunking -- render the beat's correct
-# duration so it never underruns -- tracked as a follow-up". Coverage planning
-# IS that follow-up and it is live, so a shortfall is now terminal.
+# Coverage planning renders the beat's correct duration so it never underruns,
+# so a shortfall is terminal.
 # --------------------------------------------------------------------------- #
 def test_a_short_clip_is_terminal_at_composite_time(monkeypatch):
     """The headline inversion: 17 frames against a 280-frame beat used to LOOP."""
@@ -534,16 +532,6 @@ def test_a_face_lane_is_no_longer_exempt(monkeypatch):
              "frame_count": 49, "target_frame_count": 280, "start_s": None}]
     with pytest.raises(sc.ClipUnderrunsItsBeat):
         sc.plan_timeline_segments(_manifest(rows))
-
-
-def test_should_loop_fill_is_a_named_no_op():
-    """Kept as a no-op rather than deleted at its call sites, so the retirement
-    is visible where the decision used to be made."""
-    from nodes import otr_silent_composite as sc
-    assert sc._should_loop_fill(
-        {"frame_count": 1, "target_frame_count": 999, "path": "x.mp4"},
-        999) is False
-    assert sc._should_loop_fill({}, 0) is False
 
 
 def test_a_clip_that_covers_its_beat_is_untouched(monkeypatch):

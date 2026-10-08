@@ -487,24 +487,7 @@ class ClipUnderrunsItsBeat(RuntimeError):
                int(target) - int(real)))
 
 
-def _should_loop_fill(row, target_n):
-    """RETIRED 2026-08-02 -- always False. See :class:`ClipUnderrunsItsBeat`.
-
-    Kept as a named no-op rather than deleted at its two call sites, so the
-    retirement is visible where the decision used to be made and the underrun
-    CHECK stays wired in one place.
-
-    What it did: a real clip shorter than its beat was stream-looped to fill,
-    except on ``audio_driven_face`` lanes, which held the last frame instead --
-    because looping a lip-synced mouth desyncs it from its own audio, and a
-    held frame at least fails honestly. Both branches covered audio with
-    something other than original video, which is the rule this closes.
-
-    Pure."""
-    return False
-
-
-def _warn_clip_underrun(row, target_n, *, will_loop=False):
+def _warn_clip_underrun(row, target_n):
     """RAISES on a real clip shorter than its beat. Was a LOUD warning.
 
     The warning existed under a no-loud-fail rule, and it was honest about what
@@ -521,9 +504,6 @@ def _warn_clip_underrun(row, target_n, *, will_loop=False):
 
     A frame-DIRECTORY clip (the 3D alpha handoff) is exempt -- its frames are
     counted by its own dir encoder, not by this row's ``frame_count``.
-
-    ``will_loop`` is vestigial and always False; the parameter stays so the two
-    call sites keep their shape while ``_should_loop_fill`` is a named no-op.
     """
     real = int((row or {}).get("frame_count") or 0)
     tgt = int(target_n or 0)
@@ -680,10 +660,9 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                     next_start, requested_n, timeline_end)
                 continue
             if r.get("exists") and r.get("path"):
-                _fill = _should_loop_fill(r, n)
-                _warn_clip_underrun(r, n, will_loop=_fill)
+                _warn_clip_underrun(r, n)
                 emit("clip", r.get("path"), n, 0, r.get("shot_id"),
-                     r.get("engine_id"), loop=_fill,
+                     r.get("engine_id"),
                      bg_still_path=r.get("bg_still_path"),
                      delivery_scale_mode=r.get("delivery_scale_mode"))
             else:
@@ -694,10 +673,9 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
         for r in rows:
             n = int(r.get("target_frame_count") or 0)
             if r.get("exists") and r.get("path"):
-                _fill = _should_loop_fill(r, n)
-                _warn_clip_underrun(r, n, will_loop=_fill)
+                _warn_clip_underrun(r, n)
                 emit("clip", r.get("path"), n, 0, r.get("shot_id"),
-                     r.get("engine_id"), loop=_fill,
+                     r.get("engine_id"),
                      bg_still_path=r.get("bg_still_path"),
                      delivery_scale_mode=r.get("delivery_scale_mode"))
             elif floor_available:
