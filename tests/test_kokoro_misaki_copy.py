@@ -63,10 +63,12 @@ def test_the_copy_is_the_files_its_provenance_names():
     for name, record in provenance["files"].items():
         assert _sha(COPY / name) == record["vendored_sha256"], name
     unchanged = [n for n, r in provenance["files"].items() if r["change"].startswith("none")]
-    assert sorted(unchanged) == ["LICENSE", "data/ja_words.txt", "num2kana.py", "transcription.py"]
-    for name in unchanged:
-        record = provenance["files"][name]
-        assert record["upstream_sha256"] == record["vendored_sha256"], name
+    assert sorted(unchanged) == ["LICENSE", "data/ja_words.txt"]
+    for name, record in provenance["files"].items():
+        # A byte copy hashes like upstream. A trimmed or altered file says so in
+        # its "change" and never carries upstream's hash as its own.
+        same_as_upstream = record["upstream_sha256"] == record["vendored_sha256"]
+        assert same_as_upstream == (name in unchanged), name
 
 
 def test_the_installed_misaki_is_the_one_the_copy_was_taken_from():

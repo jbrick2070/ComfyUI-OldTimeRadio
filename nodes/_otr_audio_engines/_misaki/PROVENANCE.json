@@ -1,11 +1,12 @@
 {
   "upstream": "misaki 0.9.4 (PyPI wheel, hexgrad, Apache-2.0)",
   "why": "Kokoro's torch pipeline phonemizes Mandarin with misaki's ZHG2P and Japanese with misaki's Cutlet; misaki does not install on Python 3.13, so the ONNX backend carries this copy.",
+  "trim_policy": "OTR's copy deletes upstream functions and constants that nothing in the pack calls; each deletion is named in that file's 'change'. upstream_sha256 is always misaki 0.9.4's own file and is never recomputed, so a trimmed file no longer equals upstream and only the rows whose change starts with 'none' are byte copies.",
   "files": {
     "transcription.py": {
       "upstream_sha256": "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32",
-      "vendored_sha256": "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32",
-      "change": "none (byte for byte); its own MIT notice is at the top"
+      "vendored_sha256": "f492697cb919c9f3446d94bc192c19fd9031cb4ceb651dfa4d76723035a03f7d",
+      "change": "trimmed: the module-level INITIALS and FINALS (key views of INITIAL_MAPPING and FINAL_MAPPING that nothing reads) are removed and a two-line OTR note is added after the header; every other line is upstream's; its own MIT notice is at the top"
     },
     "zh.py": {
       "upstream_sha256": "97d16aec581832845d2566cb24da2ba045d4552fb65a5017a6eac8feef654c81",
@@ -19,8 +20,8 @@
     },
     "num2kana.py": {
       "upstream_sha256": "26ca4b39ac7165104e53971bd2459df6466ff8140e1dac836a3bf1f9e811e2d2",
-      "vendored_sha256": "26ca4b39ac7165104e53971bd2459df6466ff8140e1dac836a3bf1f9e811e2d2",
-      "change": "none (byte for byte)"
+      "vendored_sha256": "f8a9c5adc11ce82e049b811a50b0ca2a3e645cf91f395fcc4930c20d38dea1b6",
+      "change": "trimmed: ConvertKanji and do_kanji_convert (kanji to arabic number; cutlet.py imports only Convert) are removed and a two-line OTR note is added after the header; every other line is upstream's"
     },
     "data/__init__.py": {
       "upstream_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

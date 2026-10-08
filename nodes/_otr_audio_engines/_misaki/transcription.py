@@ -1,5 +1,7 @@
 # ADAPTED from https://github.com/stefantaubert/pinyin-to-ipa/blob/master/src/pinyin_to_ipa/transcription.py
 # Original License: MIT
+# OTR: INITIALS and FINALS (key views of the two tables) are removed; nothing
+# reads them. Everything else is the upstream file.
 import itertools
 from typing import Dict, Generator, List, Optional, Tuple
 
@@ -41,8 +43,6 @@ INITIAL_MAPPING: Dict[str, List[Tuple[str, ...]]] = {
   # "w": [("w",)],
   # "y": [("j",), ("ɥ",)],
 }
-
-INITIALS = INITIAL_MAPPING.keys()
 
 # Note: Syllabic consonants may also arise as a result of weak syllable reduction. Syllabic nasal consonants are also heard in certain interjections; pronunciations of such words include [m], [n], [ŋ], [hm], [hŋ].
 SYLLABIC_CONSONANT_MAPPINGS: Dict[str, List[Tuple[str, ...]]] = {
@@ -117,8 +117,6 @@ FINAL_MAPPING: Dict[str, List[Tuple[str, ...]]] = {
   "üan": [("ɥ", "ɛ0", "n")],  # uan after y, j, q, or x ; # /
   "ün": [("y0", "n")],  # un after y, j, q, or x
 }
-
-FINALS = FINAL_MAPPING.keys()
 
 # Note: [ɻ̩ ~ ʐ̩], an apical retroflex voiced continuant
 #       in zhi, chi, shi, ri ([ʈʂɻ̩ ʈʂʰɻ̩ ʂɻ̩ ɻɻ̩]).

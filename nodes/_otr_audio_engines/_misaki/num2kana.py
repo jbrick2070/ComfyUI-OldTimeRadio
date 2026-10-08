@@ -1,5 +1,7 @@
 # COPIED from https://github.com/Greatdane/Convert-Numbers-to-Japanese/blob/master/Convert-Numbers-to-Japanese.py
 # Original License: MIT
+# OTR: ConvertKanji and do_kanji_convert (kanji to arabic number) are removed;
+# nothing in the pack calls them. Everything else is the upstream file.
 # Japanese Number Converter
 # - Currently using length functions - possible to use Recursive Functions? Difficult with the many exceptions
 # - Works up to 9 figures (999999999)
@@ -189,86 +191,6 @@ def split_Point(split_num,dict_choice):
     return Convert(split_num_a,dict_choice) + " " + key_dict[dict_choice]["."] + split_num_b_end
 
 
-def do_kanji_convert(convert_num):
-    # Converts kanji to arabic number
-
-    if convert_num == "零":
-        return 0
-
-    # First, needs to check for MAN 万 and OKU 億 kanji, as need to handle differently, splitting up the numbers at these intervals.
-    # key tells us whether we need to add or multiply the numbers, then we create a list of numbers in an order we need to add/multiply
-    key = []
-    numberList = []
-    y = ""
-    for x in convert_num:
-        if x == "万" or x == "億":
-            numberList.append(y)
-            key.append("times")
-            numberList.append(x)
-            key.append("plus")
-            y = ""
-        else:
-            y += x
-    if y != "":
-        numberList.append(y)
-
-    numberListConverted = []
-    baseNumber = ["一", "二", "三", "四", "五", "六", "七", "八", "九"]
-    linkNumber = ["十", "百", "千", "万", "億"]
-
-    # Converts the kanji number list to arabic numbers, using the 'base number' and 'link number' list above. For a link number, we would need to
-    # link with a base number
-    for noX in numberList:
-        count = len(noX)
-        result = 0
-        skip = 1
-        for x in reversed(noX):
-            addTo = 0
-            skip -= 1
-            count = count - 1
-            if skip == 1:
-                continue
-            if x in baseNumber:
-                for y, z in kanji_dict.items():
-                    if z == x:
-                        result += int(y)
-            elif x in linkNumber:
-                if noX[count - 1] in baseNumber and count > 0:
-                    for y, z in kanji_dict.items():
-                        if z == noX[count - 1]:
-                            tempNo = int(y)
-                            for y, z in kanji_dict.items():
-                                if z == x:
-                                    addTo += tempNo * int(y)
-                                    result += addTo
-                                    skip = 2
-                else:
-                    for y, z in kanji_dict.items():
-                        if z == x:
-                            result += int(y)
-        numberListConverted.append(int(result))
-
-    result = numberListConverted[0]
-    y = 0
-
-    # Iterate over the converted list, and either multiply/add as instructed in key list
-    for x in range(1,len(numberListConverted)):
-        if key[y] == "plus":
-            try:
-                if key[y+1] == "times":
-                    result = result + numberListConverted[x] * numberListConverted[x+1]
-                    y += 1
-                else:
-                    result += numberListConverted[x]
-            except IndexError:
-                result += numberListConverted[-1]
-                break
-        else:
-            result = result * numberListConverted[x]
-        y += 1
-
-    return result
-
 def Convert(convert_num, dict_choice='hiragana'):
     # Input formatting
     convert_num = str(convert_num)
@@ -304,15 +226,3 @@ def Convert(convert_num, dict_choice='hiragana'):
     else:
         result = remove_spaces(result)
     return result
-
-def ConvertKanji(convert_num):
-    if convert_num[0] in kanji_dict.values():
-        # Check to see if 点 (point) is in the input, and handle by splitting at 点, before and after is handled separately
-        if "点" in convert_num:
-            point = convert_num.find("点")
-            endNumber = ""
-            for x in convert_num[point+1:]:
-                endNumber += list(kanji_dict.keys())[list(kanji_dict.values()).index(x)]
-            return(str(do_kanji_convert(convert_num[0:point])) + "." + endNumber)
-        else:
-            return(str(do_kanji_convert(convert_num)))
