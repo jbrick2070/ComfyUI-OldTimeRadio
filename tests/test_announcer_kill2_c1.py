@@ -52,7 +52,6 @@ class TestStoryContract:
         assert c.story_engine == s["story_engine"]
         assert c.ending_mode == s["ending_mode"]
         assert c.ending_tag == s["ending_tag"]
-        assert c.ending_template == STYLE.ending_template_for(c.slug)
         assert c.grammar == STYLE.render_style_grammar(c.slug)
 
     def test_grammar_is_the_first_real_caller(self):
@@ -79,7 +78,7 @@ class TestStoryContract:
         # the constructor path tolerates empties directly.)
         c = STYLE.StoryContract(
             slug="", label="", sound_world="", story_engine="",
-            ending_mode="", ending_tag="", ending_template="", grammar="",
+            ending_mode="", ending_tag="", grammar="",
         )
         assert c.slug == ""
 

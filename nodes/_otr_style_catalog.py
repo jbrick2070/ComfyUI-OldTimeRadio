@@ -465,15 +465,14 @@ STYLE_CATALOG: List[Dict[str, str]] = [
 
 
 # ---------------------------------------------------------------------------
-# Ending taxonomy (2026-06-24) -- the CLIMAX-CLASS tag per style + its template
+# Ending taxonomy (2026-06-24) -- the CLIMAX-CLASS tag per style
 # ---------------------------------------------------------------------------
-# The climax's TYPE is one of the nine climax classes keyed in ENDING_TEMPLATES
-# below. `irreversible_choice` is no longer the universal climax -- it is just
-# ONE class, used only where a story genuinely earns a decisive choice. Each
-# style maps to exactly one ending_tag; ENDING_TEMPLATES holds the matching
-# final-beat instruction per class (ending_template_for). Every template steers
-# AWAY from machinery (console / countdown / self-destruct / kill-switch) and
-# TOWARD a human, on-mic ending.
+# The climax's TYPE is one of nine climax classes: irreversible_choice,
+# revelation, reversal, unresolved_final_sound, reconciliation,
+# bittersweet_parting, ironic_twist, quiet_acceptance, confession.
+# `irreversible_choice` is no longer the universal climax -- it is just ONE
+# class, used only where a story genuinely earns a decisive choice. Each style
+# maps to exactly one ending_tag (_ENDING_TAG_BY_SLUG below).
 
 
 def premise_texts(meta: Any) -> Tuple[str, ...]:
@@ -488,43 +487,6 @@ def premise_texts(meta: Any) -> Tuple[str, ...]:
                 if isinstance(source, Mapping) and source.get(field_name):
                     out.append(str(source.get(field_name)))
     return tuple(out)
-
-ENDING_TEMPLATES: Dict[str, str] = {
-    "irreversible_choice":
-        "The final beat is a decisive, irreversible CHOICE made on-mic between "
-        "the characters -- a human decision they must live with, about people and "
-        "stakes. NOT a machine action: no countdown, no self-destruct, no "
-        "console, no kill-switch.",
-    "revelation":
-        "The final beat lands a REVELATION -- a truth that reframes everything, "
-        "spoken or realized on-mic. End on the moment of understanding, not on "
-        "any device.",
-    "reversal":
-        "The final beat is a REVERSAL -- who holds the power, or who to trust, "
-        "flips. End on the turn itself, in dialogue, not on machinery.",
-    "unresolved_final_sound":
-        "Do NOT resolve. End on ONE telling sound and a line that leaves the "
-        "question open. No explanation, no device, no outcome stated.",
-    "reconciliation":
-        "The final beat is a RECONCILIATION -- two people close a distance "
-        "between them. End on the small human gesture (a word, a touch, a shared "
-        "silence), not on any action or machine.",
-    "bittersweet_parting":
-        "The final beat is a BITTERSWEET PARTING -- a goodbye, a torch passed, a "
-        "thing left behind. End on the quiet cost, not on a crisis or device.",
-    "ironic_twist":
-        "The final beat is an IRONIC TWIST -- the outcome curdles or rebounds in "
-        "a way the characters didn't intend. End on the irony, lightly, not on "
-        "machinery.",
-    "quiet_acceptance":
-        "The final beat is a QUIET ACCEPTANCE -- a character stops fighting and "
-        "makes peace with what is. A small, human decision. No machinery, no "
-        "countdown, no blowing anything up.",
-    "confession":
-        "The final beat is a CONFESSION -- a character finally admits the thing "
-        "they've hidden. End on the admission itself, on-mic, not on any action "
-        "or device.",
-}
 
 _DEFAULT_ENDING_TAG = "revelation"
 
@@ -644,14 +606,6 @@ _ENDING_TAG_BY_SLUG: Dict[str, str] = {
 # prose unchanged -- render_style_grammar reads it).
 for _s in STYLE_CATALOG:
     _s["ending_tag"] = _ENDING_TAG_BY_SLUG.get(_s["slug"], _DEFAULT_ENDING_TAG)
-
-
-def ending_template_for(slug: str) -> str:
-    """The concrete final-beat instruction for a style's climax class. Falls back
-    to the default tag's template for an unknown slug (never raises)."""
-    s = get_style(slug)
-    tag = (s or {}).get("ending_tag", _DEFAULT_ENDING_TAG)
-    return ENDING_TEMPLATES.get(tag, ENDING_TEMPLATES[_DEFAULT_ENDING_TAG])
 
 
 # ---------------------------------------------------------------------------
@@ -860,7 +814,6 @@ class StoryContract:
     story_engine: str
     ending_mode: str
     ending_tag: str
-    ending_template: str
     grammar: str
 
 
@@ -892,6 +845,5 @@ def build_story_contract(cast_seed: Any, script_brief: str, news_seed: str,
         story_engine=s.get("story_engine", ""),
         ending_mode=s.get("ending_mode", ""),
         ending_tag=s.get("ending_tag", ""),
-        ending_template=ending_template_for(slug),
         grammar=render_style_grammar(slug, sound_world=effective_sound_world),
     )

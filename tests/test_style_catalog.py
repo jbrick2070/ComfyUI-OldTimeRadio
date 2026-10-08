@@ -2,7 +2,7 @@
 deterministic selector (2026-06-24). Pure / CPU. UTF-8 no BOM, SFW.
 
 Chunk 1 (l12): climax_role param + climax-class validator (default-preserving).
-Chunk 2 (catalog): ending_tag per style + ENDING_TEMPLATES + validate_catalog.
+Chunk 2 (catalog): ending_tag per style.
 Chunk 3 (catalog): deterministic select_style.
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ class TestCatalogEndings:
         # shakespeare/public_domain source-deferential period styles).
         assert len(CAT.STYLE_CATALOG) == 104
         for s in CAT.STYLE_CATALOG:
-            assert s["ending_tag"] in CAT.ENDING_TEMPLATES
+            assert s["ending_tag"]
 
     def test_variety_and_irreversible_is_rare(self):
         used = {s["ending_tag"] for s in CAT.STYLE_CATALOG}
@@ -35,19 +35,6 @@ class TestCatalogEndings:
         n_irrev = sum(1 for s in CAT.STYLE_CATALOG
                       if s["ending_tag"] == "irreversible_choice")
         assert n_irrev <= 12                       # demoted from 100% to a sliver
-
-    def test_templates_steer_toward_human_on_mic_endings(self):
-        # The whole point: every template pulls toward a human, on-mic ending and
-        # away from machinery (the irreversible_choice one names the banned
-        # devices explicitly; the rest say "not on a device/machine/action").
-        _steer = ("not on", "no machinery", "on-mic", "no console", "no device",
-                  "do not resolve")
-        for tag, tmpl in CAT.ENDING_TEMPLATES.items():
-            low = tmpl.lower()
-            assert any(p in low for p in _steer), f"{tag} template lacks steering"
-
-    def test_ending_template_for_unknown_slug_defaults(self):
-        assert CAT.ending_template_for("no_such_style").strip()
 
     def test_ending_mode_prose_preserved(self):
         # The rename trap: render_style_grammar still reads ending_mode.

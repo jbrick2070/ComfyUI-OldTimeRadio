@@ -45,7 +45,7 @@ def _contract(sound_world="wind, static, a lonely carrier tone", slug="lost_sign
     return StoryContract(
         slug=slug, label="Lost Signal", sound_world=sound_world,
         story_engine="isolation", ending_mode="open", ending_tag="unresolved",
-        ending_template="", grammar="",
+        grammar="",
     )
 
 
