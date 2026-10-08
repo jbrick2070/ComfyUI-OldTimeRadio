@@ -2,9 +2,9 @@
 
 Two layers, deliberately separated:
 
-  * ``assert_determinism_env_ready()`` -- a pure ``os.environ`` check (no CUDA,
-    never ``cuda.is_initialized()`` per C-1) confirming the headless launcher
-    exported the determinism env BEFORE python/torch started.
+  * ``determinism_env_status()`` -- a pure ``os.environ`` inspection (no CUDA,
+    never ``cuda.is_initialized()`` per C-1) reporting whether the headless
+    launcher exported the determinism env BEFORE python/torch started.
   * ``deterministic_inference(seed)`` -- a SCOPED context manager that pins
     strict determinism (``use_deterministic_algorithms(True, warn_only=False)``
     + SDPA MATH backend) and seeds every RNG around ONE audio forward, then

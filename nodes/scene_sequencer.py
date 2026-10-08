@@ -799,11 +799,6 @@ DEFAULT_OUT = ""
 
 
 # -----------------------------------------------------------------------------
-# (BANNER CORRECTED 2026-08-28: this section header used to read "INLINE BARK
-# TTS - called by SceneSequencer for dynamic dialogue generation", advertising
-# as live a path whose removal is recorded in the tombstone near the top of
-# this file. Nothing here generates audio any more.)
-#
 # Voice preset resolution: cast.voice_preset is the only source.
 # The legacy Director voice_map fallback + _voice_preset_for_character +
 # gender-aware grab-bag pools were deleted in voice-path-cleanbreak

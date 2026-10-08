@@ -1,11 +1,11 @@
-# Headless copy of %APPDATA%\ComfyUI\extra_models_config.yaml (2026-06-12).
-# Why a copy: the Desktop yaml's desktop_extensions entry points at the OLD
-# v1 install (AppData\Local\Programs\ComfyUI\...) which no longer exists --
-# headless main.py crashes in execute_prestartup_script (FileNotFoundError).
-# This copy keeps the model dirs + the Documents custom_nodes mapping (the
-# wrapper packs: ComfyUI-AnimateDiff-Evolved, KJNodes, VideoHelperSuite, ...)
-# and drops the dead desktop_extensions section. If the Desktop app moves
-# again, refresh this file from the Desktop yaml.
+# Headless copy of %APPDATA%\ComfyUI\extra_models_config.yaml.
+# Why a copy: the Desktop yaml's desktop_extensions entry points at an install
+# that does not exist, and headless main.py crashes on it in
+# execute_prestartup_script (FileNotFoundError). This copy keeps the model dirs
+# + the Documents custom_nodes mapping (the wrapper packs:
+# ComfyUI-AnimateDiff-Evolved, KJNodes, VideoHelperSuite, ...) and omits the
+# desktop_extensions section. If the Desktop app moves, refresh this file from
+# the Desktop yaml.
 comfyui_desktop:
   is_default: true
   base_path: C:/Users/jeffr/Documents/ComfyUI
@@ -23,22 +23,13 @@ comfyui_desktop:
                 C:/ComfyUI-Models/unet
   embeddings: C:/ComfyUI-Models/embeddings/
   loras: C:/ComfyUI-Models/loras/
-  # TWO ROOTS ON PURPOSE (2026-08-19), and the second one is where the weights
-  # actually are. This key used to name ONLY C:/ComfyUI-Models/upscale_models/,
-  # which on this box contains a `.cache` directory and nothing else -- so the
-  # headless server's upscale model list was EMPTY (`/object_info`
-  # UpscaleModelLoader reported `options: []`, verified live), and the
-  # `spandrel_esrgan` upscale engine could never load the `real-esrgan-x2plus`
-  # its CAPABILITIES row requires. A lane that preflights clean and can never
-  # load its model is the wan_i2v killer, lesson L1, and it had gone unnoticed
-  # because nothing probes an upscaler's weights the way the video gates probe
-  # theirs.
-  #
-  # The three RealESRGAN weights live under the Documents models root -- the
-  # Desktop app's default location, which the C:/ComfyUI-Models migration moved
-  # every OTHER key away from and this one never followed. Listing both is
-  # additive: it can only turn a false negative into the truth, and it matches
-  # what `text_encoders` above already does with two roots.
+  # TWO ROOTS ON PURPOSE, and the second one is where the weights actually are.
+  # C:/ComfyUI-Models/upscale_models/ holds no weights on this box, so alone it
+  # leaves the headless UpscaleModelLoader list EMPTY and the `spandrel_esrgan`
+  # engine can never load the `real-esrgan-x2plus` its CAPABILITIES row
+  # requires. The three RealESRGAN weights live under the Documents models
+  # root (the Desktop app's default location). Listing both is additive: it can
+  # only turn a false negative into the truth, as `text_encoders` above does.
   upscale_models: |
        C:/ComfyUI-Models/upscale_models/
        C:/Users/jeffr/Documents/ComfyUI/models/upscale_models/
@@ -46,16 +37,12 @@ comfyui_desktop:
   # folder key latent_upscale_models (nodes_hunyuan.py); without this mapping
   # the LTX spatial upscaler enum is EMPTY on headless boots.
   latent_upscale_models: C:/ComfyUI-Models/latent_upscale_models/
-  # ADDED 2026-09-21. `animatediff_models` was the one folder key the
-  # C:/ComfyUI-Models migration never took, so on a headless boot the ONLY
-  # copy of the three motion modules was the one bundled inside
+  # `animatediff_models` and `sams` are mapped so every local model resolves
+  # from C:/ComfyUI-Models (operator: all local models belong there, on the
+  # PCIe 5 drive) instead of a copy bundled inside
   # custom_nodes/ComfyUI-AnimateDiff-Evolved/models/. The node registers both
   # that directory AND <models_dir>/animatediff_models (utils_model.py:343-344),
-  # and on this box the second resolves under Documents, which holds nothing --
-  # so the three shipping AnimateDiff graphs were reading their weights out of
-  # a node package instead of the models root. Operator, same day: all local
-  # models belong in C:/ComfyUI-Models, which is the PCIe 5 drive. `sams`
-  # joins for the same reason -- mapped in the Desktop yaml, absent here.
+  # and the second resolves under Documents, which holds nothing.
   animatediff_models: C:/ComfyUI-Models/animatediff_models/
   sams: C:/ComfyUI-Models/sams/
   vae: C:/ComfyUI-Models/vae/

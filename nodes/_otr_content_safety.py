@@ -3,19 +3,13 @@
 Three word lists (profanity, explicit weapons, explicit sexual/nudity) and a
 whole-word matcher. Nothing here judges, blocks, rewrites or refuses anything.
 
-THE REWRITE HALF IS GONE (2026-08-23, the lean-mean OPEN item). This module used
-to carry `propose_safety_patches` and `apply_safety_cleanup`: an LLM-driven pass
-that took a delivered spoken row matching one of these lists and REWROTE IT.
-That is precisely what the operator's 2026-08-03 directive forbids -- *"no
-violence or swearing guardrails, they just cause problems"* -- and on an
-adaptation lane it meant editing Shakespeare. The pass had already been unwired
-at its caller (`_otr_ledger_cleanup` stamps `safety.status = "retired"` on every
-path, so the ledger field keeps its owner) and `validate_sfw` had already been
-gutted to `return None`. What remained here was 165 lines of dormant rewrite
-machinery that anything could have re-armed, plus two bare `RuntimeError`s that
-would have killed a render if it ever ran.
+There is no rewrite or filtering pass: the operator's 2026-08-03 directive --
+*"no violence or swearing guardrails, they just cause problems"* -- forbids one,
+and on an adaptation lane it would mean editing Shakespeare.
+`_otr_ledger_cleanup` stamps `safety.status = "retired"` on every path, so the
+ledger field keeps its owner.
 
-WHY THE VOCABULARY SURVIVES THE MACHINERY. The directive bans FILTERING, not
+WHY THE VOCABULARY IS KEPT. The directive bans FILTERING, not
 knowing the words. `tests/test_bug_local_288_sfw_validator.py` keeps the whole
 retired list green on purpose -- every term must PASS a line -- and says why: a
 deleted test is silence, and silence is how a policy creeps back. Keeping the

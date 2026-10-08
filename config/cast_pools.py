@@ -114,11 +114,9 @@ LAST_NAMES = [
 # order is load-bearing for C7 -- pick_first_last draws rng.choice(FIRST_NAMES)),
 # so these buckets are ADDITIVE: a partition view, never a replacement.
 #
-# Classification policy: only clearly male- or female-coded names are tagged
-# male/female. Genuinely cross-cultural or ambiguous names (Quinn, Ren, Charlie,
-# Dao, ...) are "unisex" -- unisex is coherent with EITHER binary slot gender,
-# so it never triggers a (false) repair. This deliberately minimizes repairs to
-# the unambiguous mismatches that motivated the fix.
+# Classification policy: every name carries a definite male or female tag (the
+# "unisex" bucket is retired and stays empty -- see its note below), so the
+# repair pass always has an answer. Close calls are marked where assigned.
 # -----------------------------------------------------------------------------
 FIRST_NAMES_BY_GENDER: dict[str, list[str]] = {
     "male": [
@@ -180,27 +178,15 @@ FIRST_NAMES_BY_GENDER: dict[str, list[str]] = {
     # THAN DELETED -- `names_for_genre` and `_verify_name_buckets` both index
     # "unisex" by name, and the genre views iterate all three buckets.
     #
-    # WHY IT WENT (operator ruling 2026-08-15: "I don't trust it"). A "unisex"
-    # tag was the ONE value that told `_repair_ensemble_names` to stand down: it
-    # exempted a name from the coherence check on EITHER binary slot gender. So
-    # membership was a promise that the name genuinely works with a male or a
-    # female voice -- and 30 of 153 names, one draw in five, were riding that
-    # promise with nothing verifying it. ADRIAN sat there, and ADRIAN on a
-    # female slot is the "Miss McFiggins" defect the gender work exists to stop.
-    #
-    # The existing coherence assertions could never have caught it. Both read
-    # `assert gender_of_first_name(name) in (row["gender"], "unisex", "unknown")`
-    # (`tests/test_cast_llm_naming.py:189,204`), where "unisex" is an
-    # unconditional free pass -- the test encodes the very assumption that was
-    # unsafe. `tests/test_cast_invariants.py` R10 replaces it with a
-    # BEHAVIOURAL bar instead.
-    #
-    # Every name now carries a definite tag, so the repair always has an answer
-    # and nothing is exempt. Assignments are best-judgment, not sourced, and
-    # each is grouped above with its basis so a single call can be flipped
-    # without re-litigating the rest. "unknown" still exists for names outside
-    # the pool entirely (the LLM slot-fill path can invent one) and is still
-    # treated as un-repairable -- that is a separate hole, and a real one.
+    # Do not repopulate it (operator ruling 2026-08-15: "I don't trust it"): a
+    # "unisex" tag told `_repair_ensemble_names` to stand down on EITHER binary
+    # slot gender, a promise nothing verified. Every name carries a definite
+    # tag, so the repair always has an answer and nothing is exempt.
+    # Assignments are best-judgment, not sourced, and each is grouped above
+    # with its basis so a single call can be flipped without re-litigating the
+    # rest. "unknown" still exists for names outside the pool entirely (the
+    # LLM slot-fill path can invent one) and is still treated as un-repairable
+    # -- that is a separate hole, and a real one.
     "unisex": [],
 }
 

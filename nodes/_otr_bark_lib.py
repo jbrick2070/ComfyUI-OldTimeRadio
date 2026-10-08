@@ -871,22 +871,7 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
     return audio, sample_rate
 
 
-# Voice-path-cleanbreak 2026-05-12 (P3, commit 83d7f17): the OTR_BarkTTS
-# node class (BarkTTSNode) was deleted (legacy single-line node, unused
-# in any active workflow). The _load_bark loader remains because
-# batch_bark_generator.py imports it directly. Library-only module --
-# no node class, no NODE_CLASS_MAPPINGS.
-#
-# Voice-path-cleanbreak Sprint 7.2 (2026-05-12): module renamed
-# nodes/_bark_lib.py -> nodes/_otr_bark_lib.py per apple/conventions.md
-# (project-prefix discipline for private library modules).
-# Underscore prefix marks this as a private internal library; otr_
-# prefix scopes the name to this project; _lib suffix flags it as
-# library-only (no node class). Importers updated in lockstep:
-#   nodes/batch_bark_generator.py
-#   nodes/scene_sequencer.py (inline-Bark fallback)
-#   nodes/story_orchestrator.py (Bark health check + VRAM unload)
-#   tests/test_bark_ledger.py (patch target for _load_bark)
+# Library-only module: no node class, no NODE_CLASS_MAPPINGS.
 
 
 # ---------------------------------------------------------------------------

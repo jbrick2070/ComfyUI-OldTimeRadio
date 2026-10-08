@@ -70,12 +70,6 @@ SEED_MODES = ("request_hash", "fixed")
 DEFAULT_FRESH_CAP = 15
 
 
-# `_image_model_combo` was removed 2026-08-28: it built a dropdown this node
-# no longer declares. Image-MODEL selection lives in ONE place, OTR_VideoDirector
-# (operator 2026-06-18: "only in one place not two"), which has its own live
-# copy; this one fed no widget and had no production caller.
-
-
 def _registry_descriptors() -> list:
     """role_compat descriptors for every registered image engine."""
     descs = []
@@ -87,18 +81,6 @@ def _registry_descriptors() -> list:
             "required_inputs": tuple(getattr(eng, "required_inputs", ())),
         })
     return descs
-
-
-# (lean-mean order 4, 2026-08-23) `_is_3d_engine` and `three_d_locked_slots`
-# were here -- the dormant 3D granularity lock. See the module docstring for
-# the retirement record; the mesh-FODDER routing below is a different, LIVE
-# capability (requires_mesh_fodder, mesh_stage) and is untouched.
-
-
-#: `_ROLE_TO_VIDEO_SLOT` was removed 2026-08-28. It aliased
-#: `_otr_shared/role_slots.ROLE_TO_VIDEO_SLOT` "for any importer of this name"
-#: and there was no such importer -- the dispatcher defines its own identical
-#: alias. Import the shared map directly.
 
 
 def _is_mesh_fodder_engine(engine_id: str) -> bool:
