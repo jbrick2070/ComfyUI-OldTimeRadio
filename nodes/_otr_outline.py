@@ -343,15 +343,6 @@ class OutlineRequest:
     # pass). The writer's target_length widget went with it; act-
     # count signal now flows via the `budget` field
     # (EpisodeBudget from compute_episode_budget).
-    include_act_breaks: bool = True
-                             # OPTIONAL. Mirrors the writer's
-                             # include_act_breaks widget. Affects
-                             # whether the outline LLM is told to plan
-                             # music_inter beats. The EpisodeBudget
-                             # (when `budget` is non-None) is the
-                             # authoritative source for music_inter
-                             # count; this flag is the user-facing
-                             # toggle that drives it.
     budget: object = None
                              # REQUIRED. _otr_episode_budget.EpisodeBudget
                              # built by OTR_LedgerScriptWriter via

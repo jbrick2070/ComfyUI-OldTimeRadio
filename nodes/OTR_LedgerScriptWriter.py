@@ -4890,7 +4890,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             character_cast=character_cast,
             script_brief=script_brief,
             cast_descriptions=cast_descriptions,
-            include_act_breaks=bool(resolved.get("include_act_breaks", True)),
             budget=episode_budget,
             prior_macro="",
             prior_critique="",

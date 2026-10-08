@@ -286,7 +286,7 @@ def _req():
     return O.OutlineRequest(
         news_seed="seed", style="", character_cast=("MACBETH", "BANQUO"),
         script_brief="brief", cast_descriptions={},
-        include_act_breaks=True, budget=budget, prior_macro="", prior_critique="",
+        budget=budget, prior_macro="", prior_critique="",
         style_grammar="", story_engine="", work_title="Macbeth")
 
 
