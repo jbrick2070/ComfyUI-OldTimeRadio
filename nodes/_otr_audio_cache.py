@@ -24,7 +24,7 @@ import logging
 import os
 import tempfile
 from dataclasses import asdict, dataclass, fields as _dc_fields
-from typing import Iterable, List, Optional, Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 
@@ -177,9 +177,6 @@ class FileAudioCache:
         return os.path.join(self.cache_dir, f"{key}.json")
 
     # -- read --
-    def has(self, request) -> bool:
-        return os.path.exists(self._sidecar_path(self.key_for(request)))
-
     def get(self, request) -> Optional[AudioCacheRecord]:
         key = self.key_for(request)
         path = self._sidecar_path(key)
@@ -310,23 +307,6 @@ class FileAudioCache:
                 getattr(request, "cache_key", "?"), type(exc).__name__, exc,
             )
             return None
-
-    # -- scan --
-    def iter_records(self) -> Iterable[AudioCacheRecord]:
-        if not os.path.isdir(self.cache_dir):
-            return
-        for name in sorted(os.listdir(self.cache_dir)):
-            if not name.endswith(".json"):
-                continue
-            try:
-                with open(os.path.join(self.cache_dir, name), "r", encoding="utf-8") as fh:
-                    yield AudioCacheRecord.from_dict(json.load(fh))
-            except Exception:  # noqa: BLE001 -- skip an unreadable sidecar
-                continue
-
-    def releasable_records(self) -> List[AudioCacheRecord]:
-        """Records marked ``allowed_for_release`` (the release manifest, G0)."""
-        return [r for r in self.iter_records() if r.allowed_for_release]
 
     @staticmethod
     def _write_audio_atomic(audio, cache_dir: str, key: str) -> Tuple[str, str]:

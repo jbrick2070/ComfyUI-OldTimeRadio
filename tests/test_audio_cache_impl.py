@@ -1,8 +1,8 @@
 """Wave 1 / 1f -- FileAudioCache implementation + slim migration (G0).
 
 Headless. Exercises key derivation, sidecar round-trip, the schema-drift
-re-render rule, the release manifest scan, and the read-only ledger migration
-checks (which must never rewrite a legacy raw-delegation script).
+re-render rule, and the read-only ledger migration checks (which must never
+rewrite a legacy raw-delegation script).
 """
 from __future__ import annotations
 
@@ -66,9 +66,7 @@ def test_record_roundtrips_through_dict():
 def test_put_get_roundtrip(tmp_path):
     cache = FileAudioCache(str(tmp_path))
     req = _req()
-    assert cache.has(req) is False
     rec = cache.put(req, _audio(), allowed_for_release=True)
-    assert cache.has(req) is True
     got = cache.get(req)
     assert got is not None
     assert got.cache_key == req.cache_key
@@ -101,24 +99,6 @@ def test_version_drift_forces_rerender(tmp_path):
     # A reader targeting a different schema sees a miss (re-render).
     reader = FileAudioCache(str(tmp_path), request_schema_version="999")
     assert reader.get(req) is None
-
-
-# ----------------------------------------------------------------------------
-# Release manifest scan
-# ----------------------------------------------------------------------------
-def test_iter_and_releasable_records(tmp_path):
-    cache = FileAudioCache(str(tmp_path))
-    a, b = _req(char_id="a"), _req(char_id="b")
-    cache.put(a, _audio(4), allowed_for_release=True)
-    cache.put(b, _audio(4), allowed_for_release=False)
-    assert len(list(cache.iter_records())) == 2
-    releasable = cache.releasable_records()
-    assert [r.cache_key for r in releasable] == [a.cache_key]
-
-
-def test_iter_records_on_missing_dir_is_empty(tmp_path):
-    cache = FileAudioCache(str(tmp_path / "absent"))
-    assert list(cache.iter_records()) == []
 
 
 # ----------------------------------------------------------------------------
