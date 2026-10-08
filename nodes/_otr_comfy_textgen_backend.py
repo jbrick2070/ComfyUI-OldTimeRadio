@@ -47,11 +47,11 @@ WEIGHT_SIZE = 5_199_997_904
 WEIGHT_SHA256 = "efeca0fcad2f863e5ed0a75e3af952b72bc963604c1dda6d20aee87a32b17566"
 
 #: The working context this writer is qualified at. The decoder advertises a much
-#: larger native window (below); the working cap is what an 8 GB card is asked to
-#: hold, and a later probe decides whether it can rise. Kept separate on purpose so
-#: neither number is ever read as the other.
+#: larger native window, which :func:`load_native_writer` reads from the loaded
+#: decoder's config (no constant here carries it); the working cap is what an
+#: 8 GB card is asked to hold, and a later probe decides whether it can rise. The
+#: two are kept apart on purpose so neither number is ever read as the other.
 WORKING_CONTEXT_CAP = 8192
-NATIVE_CONTEXT_CAPACITY = 131072
 
 #: The larger Gemma 4 files Comfy-Org publishes at the same pinned revision, run by
 #: the same adapter (ComfyUI builds E4B through the same Gemma4Base as E2B; the 12B
