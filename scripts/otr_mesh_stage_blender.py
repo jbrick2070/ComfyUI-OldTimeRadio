@@ -202,53 +202,6 @@ def sample_image(pixels, width, height, u, t):
     return (float(pixels[idx]), float(pixels[idx + 1]), float(pixels[idx + 2]))
 
 
-def alpha_bbox_stats(width, height, alpha_top_origin_row_major):
-    """Pure: the tightest bounding box of non-transparent (alpha > 0) pixels
-    in a TOP-origin, row-major alpha channel of length width*height -- the
-    convention a proof script gets from ``PIL.Image.getchannel("A")``
-    (opposite of :func:`sample_image`'s Blender-native bottom-origin buffer;
-    this function is for MEASURING a rendered PNG frame, not sampling a
-    Blender in-memory image).
-
-    Mesh-improve item 2's MEASURABLE headroom contract (kibitz r1 point 2):
-    ``height_frac`` is the bbox height as a fraction of the frame height (the
-    "how much of the frame does the subject fill" number the camera's
-    ``target_frac`` knob controls); ``top_margin_px`` is the empty space
-    above the bbox (the headroom the operator asked for). Returns None when
-    every pixel is transparent (nothing rendered -- nothing to measure)."""
-    w, h = int(width), int(height)
-    a = alpha_top_origin_row_major
-    top = bottom = left = right = None
-    for y in range(h):
-        base = y * w
-        row_left = row_right = None
-        for x in range(w):
-            if a[base + x] > 0:
-                if row_left is None:
-                    row_left = x
-                row_right = x
-        if row_left is not None:
-            if top is None:
-                top = y
-            bottom = y
-            if left is None or row_left < left:
-                left = row_left
-            if right is None or row_right > right:
-                right = row_right
-    if top is None:
-        return None
-    bbox_h = bottom - top + 1
-    bbox_w = right - left + 1
-    return {
-        "bbox": (left, top, right, bottom),
-        "bbox_height_px": bbox_h,
-        "bbox_width_px": bbox_w,
-        "height_frac": bbox_h / float(h),
-        "top_margin_px": top,
-        "bottom_margin_px": h - 1 - bottom,
-    }
-
-
 #: Vertical sculpt-gradient endpoints (cool light over shadow). WORKBENCH VERTEX
 #: shading draws these per-vertex colours; per-poly smooth normals interpolate
 #: them into a soft ramp (the v1.1 "basic gradient" mesh texture).

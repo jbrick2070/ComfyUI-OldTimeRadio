@@ -748,50 +748,6 @@ def test_sample_image_nearest_and_flip():
     assert stage.sample_image(px, 2, 2, 1.0, 0.0) == (1.0, 1.0, 1.0)
 
 
-def test_alpha_bbox_stats_all_transparent_returns_none():
-    stage = _load_stage()
-    assert stage.alpha_bbox_stats(4, 4, [0] * 16) is None
-
-
-def test_alpha_bbox_stats_full_frame_opaque():
-    stage = _load_stage()
-    stats = stage.alpha_bbox_stats(4, 4, [255] * 16)
-    assert stats["bbox"] == (0, 0, 3, 3)
-    assert stats["height_frac"] == pytest.approx(1.0)
-    assert stats["top_margin_px"] == 0 and stats["bottom_margin_px"] == 0
-
-
-def test_alpha_bbox_stats_centered_block_has_headroom():
-    """Mesh-improve item 2's measurable contract: a small opaque block
-    centered in a taller frame reports headroom on both margins (top-origin:
-    row 0 is the TOP of the frame, matching PIL's getchannel("A") convention)."""
-    stage = _load_stage()
-    w, h = 8, 8
-    alpha = [0] * (w * h)
-    for y in (3, 4):
-        for x in range(2, 6):
-            alpha[y * w + x] = 255
-    stats = stage.alpha_bbox_stats(w, h, alpha)
-    assert stats["bbox"] == (2, 3, 5, 4)
-    assert stats["bbox_height_px"] == 2 and stats["bbox_width_px"] == 4
-    assert stats["height_frac"] == pytest.approx(2.0 / 8.0)
-    assert stats["top_margin_px"] == 3
-    assert stats["bottom_margin_px"] == 3
-
-
-def test_alpha_bbox_stats_asymmetric_shape_finds_true_extents():
-    """A single lit pixel at each of two known (x, y) corners is found
-    exactly -- proves the scan doesn't conflate the row range with the
-    column range."""
-    stage = _load_stage()
-    w, h = 5, 6
-    alpha = [0] * (w * h)
-    alpha[1 * w + 4] = 10           # row 1, rightmost column
-    alpha[4 * w + 0] = 10           # row 4, leftmost column
-    stats = stage.alpha_bbox_stats(w, h, alpha)
-    assert stats["bbox"] == (0, 1, 4, 4)
-
-
 def test_build_blender_cmd_portrait_and_arc_appended():
     # Legacy invocation (no portrait) is byte-identical -- no extra tokens.
     base = build_blender_cmd("C:/b.exe", "C:/m.glb", "C:/o", 3, 64, 64, 0)
