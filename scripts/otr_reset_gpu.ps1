@@ -5,9 +5,9 @@
 # assume a prior run cleaned up, and tear it down SELECTIVELY by CommandLine before
 # launching a fresh leg.
 #
-# This is NOT kill_otr_zombies.ps1. That script deliberately PRESERVES the process
-# owning port 8000 (it hunts orphan sidecars around a live server); section 4 needs
-# that server gone. Different jobs, both correct.
+# This is NOT kill_otr_zombies.ps1. That script only removes ORPHANED OTR sidecars
+# (worker pythons and ffmpeg whose parent is gone) and never touches a ComfyUI
+# server; section 4 needs the server itself gone. Different jobs, both correct.
 #
 # Usage (PowerShell):
 #   cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio

@@ -5,10 +5,13 @@
 #   1. It carries a positive OTR marker:
 #        * python/pythonw running an OTR worker script (scripts\_otr_*_worker.py,
 #          e.g. the Chatterbox and IndexTTS2 sidecars), or
-#        * ffmpeg whose command line names an OTR path (otr\episodes, otr\obs,
-#          the otr_* temp prefixes, or the pack folder).
+#        * ffmpeg -- ffmpeg.exe, or a versioned build such as imageio's
+#          ffmpeg-win-x86_64-v7.1.exe, which OTR falls back to -- whose command
+#          line names an OTR path (otr\episodes, otr\obs, an OTR temp folder or
+#          file such as otr_assemble_*, or the pack folder).
 #   2. Its parent is provably gone: the parent PID no longer exists, or Windows
-#      has reused that PID for a process created AFTER the child.
+#      has reused that PID for a process created AFTER the child. Creation
+#      times are compared in UTC, so a DST change cannot reorder them.
 #
 # Never a target: ComfyUI itself (Desktop or headless, any port), Claude / MCP
 # helper processes, and anything without an OTR marker. Nothing is selected on
@@ -50,17 +53,23 @@ $ComfyMarker = '(^|[\\/"\s])main\.py'
 # OTR sidecar worker scripts, e.g. scripts\_otr_chatterbox_worker.py.
 $WorkerMarker = '_otr_[A-Za-z0-9_]+_worker\.py'
 
-# Paths only OTR's ffmpeg calls write to or read from.
-$FfmpegMarker = '[\\/]otr[\\/](episodes|obs)[\\/]|otr_(ffmpeg|assemble|pcm_probe|cbx|idx2|mesh_tmp)_|ComfyUI-OldTimeRadio'
+# ffmpeg itself, or a versioned build such as imageio-ffmpeg's
+# ffmpeg-win-x86_64-v7.1.exe (nodes/_otr_shared/ffmpeg.py falls back to it).
+$FfmpegName = '^ffmpeg(-[^\\/]+)?\.exe$'
 
+# Paths only OTR's ffmpeg calls write to or read from.
+$FfmpegMarker = '[\\/]otr[\\/](episodes|obs)[\\/]|otr_(assemble|pcm_probe|cbx|idx2|mesh_tmp)_|ComfyUI-OldTimeRadio'
+
+# Always UTC: local wall-clock times repeat an hour at the DST fall-back, which
+# could make a live parent look younger than its child.
 function ConvertTo-OtrDate {
     param($Value)
     if ($null -eq $Value) { return $null }
-    if ($Value -is [datetime]) { return $Value }
+    if ($Value -is [datetime]) { return $Value.ToUniversalTime() }
     $text = [string]$Value
     if (-not $text) { return $null }
     try {
-        return [datetime]::Parse($text, [Globalization.CultureInfo]::InvariantCulture)
+        return [datetime]::Parse($text, [Globalization.CultureInfo]::InvariantCulture).ToUniversalTime()
     } catch {
         return $null
     }
@@ -134,7 +143,7 @@ function Select-OtrZombies {
         if ($name -match '^pythonw?\.exe$') {
             if ($cmd -match $ComfyMarker) { continue }
             if ($cmd -match $WorkerMarker) { $kind = 'otr-worker' }
-        } elseif ($name -match '^ffmpeg\.exe$') {
+        } elseif ($name -match $FfmpegName) {
             if ($cmd -match $FfmpegMarker) { $kind = 'otr-ffmpeg' }
         }
         if (-not $kind) { continue }
@@ -155,7 +164,13 @@ function Select-OtrZombies {
 # ---------------------------------------------------------------------------
 # Test mode: a mocked inventory in, the selection out, nothing terminated.
 # ---------------------------------------------------------------------------
-if ($InventoryPath) {
+if ($PSBoundParameters.ContainsKey('InventoryPath')) {
+    # Passing the parameter at all means test mode. An empty value is an
+    # error, never a silent fall-through to the live process table.
+    if (-not $InventoryPath) {
+        Write-Error "-InventoryPath was given without a file; nothing was selected or killed."
+        exit 2
+    }
     $selected = Select-OtrZombies (Get-FileInventory $InventoryPath)
     $rows = @()
     foreach ($t in $selected) { $rows += [pscustomobject]@{ PID = $t.PID; Kind = $t.Kind } }

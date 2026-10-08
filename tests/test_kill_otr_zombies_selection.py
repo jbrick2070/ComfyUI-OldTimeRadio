@@ -53,6 +53,10 @@ INVENTORY = [
     _proc(301, 996, "ffmpeg.exe", r"ffmpeg -y -i C:\Temp\otr_assemble_ab12\seg_001.mp4 -c copy out.mp4", "2026-10-08T09:20:00"),
     _proc(302, 994, "ffmpeg.exe", r"ffmpeg -i C:\Videos\holiday.mp4 out.mp4", "2026-10-08T09:20:00"),
     _proc(303, 100, "ffmpeg.exe", r"ffmpeg -i D:\ComfyUI\output\otr\episodes\ep1\a.wav b.wav", "2026-10-08T09:30:00"),
+    # imageio-ffmpeg's versioned build, which nodes/_otr_shared/ffmpeg.py falls
+    # back to: same rules as ffmpeg.exe -> TARGET when orphaned with an OTR path.
+    _proc(304, 992, "ffmpeg-win-x86_64-v7.1.exe",
+          r"ffmpeg-win-x86_64-v7.1.exe -i D:\ComfyUI\output\otr\episodes\ep2\b.wav c.wav", "2026-10-08T09:40:00"),
 ]
 
 
@@ -86,7 +90,34 @@ def test_selects_only_orphaned_otr_sidecars(tmp_path):
         201: "otr-worker",
         203: "otr-worker",
         301: "otr-ffmpeg",
+        304: "otr-ffmpeg",
     }
+
+
+def test_dst_fall_back_does_not_make_a_live_parent_look_younger(tmp_path):
+    # 2026-11-01, US Pacific fall-back: the parent started 01:50 PDT (08:50Z)
+    # and its child 01:20 PST (09:20Z). Compared as local wall-clock the
+    # parent looks 30 minutes YOUNGER -- a "recycled PID" -- and the live
+    # worker would be killed. Compared in UTC the parent is older: parented.
+    inventory = [
+        _proc(4, 0, "System", "", "2026-11-01T00:00:00Z"),
+        _proc(100, 4, "python.exe", PY + r' "C:\ComfyUI\main.py"', "2026-11-01T01:50:00-07:00"),
+        _proc(201, 100, "python.exe", PY + " " + PACK + r"\scripts\_otr_chatterbox_worker.py",
+              "2026-11-01T01:20:00-08:00"),
+    ]
+    assert _select(tmp_path, inventory) == {}
+
+
+def test_an_empty_inventory_path_is_an_error_not_live_mode():
+    result = subprocess.run(
+        [_powershell(), "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+         str(SCRIPT), "-InventoryPath", ""],
+        capture_output=True, text=True, timeout=60)
+    combined = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "SELECTED_JSON" not in combined
+    assert "Orphaned OTR sidecars" not in combined
+    assert "No orphaned OTR sidecars" not in combined
 
 
 def test_empty_inventory_selects_nothing(tmp_path):
@@ -109,5 +140,5 @@ def test_old_heuristics_are_gone():
     assert "-gt 10" not in src, "CPU-time targeting must not return"
     assert "LocalPort 8000" not in src, "a missing :8000 listener must not widen selection"
     # Test mode must exit before any Stop-Process call can run.
-    test_mode = src.index("if ($InventoryPath) {")
+    test_mode = src.index("if ($PSBoundParameters.ContainsKey('InventoryPath')) {")
     assert src.index("exit 0", test_mode) < src.index("Stop-Process")

@@ -9,7 +9,9 @@ Expected output:
     ±1.5% of the 11% target (99% confidence interval for n=10,000).
 
 This guards against:
-    - Accidental removal of _LEMMY_RNG_SYSTEM (config/cast_pools.py)
+    - Drift in the SystemRandom mechanism behind _LEMMY_RNG_SYSTEM
+      (config/cast_pools.py) -- re-simulated here, not imported, so this
+      cannot see that symbol being removed
     - Accidental threshold edits (e.g., 0.11 → 0.011)
     - Seed bleed-through from other RNGs
 """
