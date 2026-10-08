@@ -37,13 +37,11 @@ LOADER_BACKEND = "comfy_textgen"
 WEIGHT_CATEGORY = "text_encoders"
 WEIGHT_TOKEN = "gemma4_e2b_it_int8_convrot.safetensors"
 
-#: The upstream file's name, size and hash, read from the Hub API on 2026-09-26
-#: without a token (the repo is ungated). ``_otr_visual_assets._PINNED_SOURCES``
-#: owns the repo and the revision and carries the same row;
-#: tests/test_comfy_textgen_backend.py holds the two in agreement.
+#: The upstream file's name. ``_otr_visual_assets._PINNED_SOURCES`` owns the
+#: repo, the revision, the size and the sha256 (the download is verified against
+#: them there, not here) and carries the same row;
+#: tests/test_comfy_textgen_backend.py holds the two in agreement on the name.
 WEIGHT_FILENAME = "text_encoders/gemma4_e2b_it_int8_convrot.safetensors"
-WEIGHT_SIZE = 5_199_997_904
-WEIGHT_SHA256 = "efeca0fcad2f863e5ed0a75e3af952b72bc963604c1dda6d20aee87a32b17566"
 
 #: The working context this writer is qualified at. The decoder advertises a much
 #: larger native window, which :func:`load_native_writer` reads from the loaded
@@ -60,20 +58,19 @@ WORKING_CONTEXT_CAP = 8192
 MODEL_ID_E4B = "comfy_native:gemma4-e4b-it-int8-convrot"
 MODEL_ID_12B = "comfy_native:gemma4-12b-int8-convrot"
 
-#: Every Comfy-native writer: dropdown id -> (Hub filename, bytes, sha256), all
-#: under WEIGHT_CATEGORY. ``_otr_visual_assets._PINNED_SOURCES`` names the repo and
-#: revision and carries the same rows; a test holds them in agreement.
+#: Every Comfy-native writer: dropdown id -> Hub filename, all under
+#: WEIGHT_CATEGORY. ``_otr_visual_assets._PINNED_SOURCES`` names the repo and
+#: revision, carries the bytes and sha256 the download is verified against, and
+#: carries the same rows; a test holds the file names in agreement.
 NATIVE_WRITER_FILES = {
-    MODEL_ID: (WEIGHT_FILENAME, WEIGHT_SIZE, WEIGHT_SHA256),
-    MODEL_ID_E4B: ("text_encoders/gemma4_e4b_it_int8_convrot.safetensors", 8_090_965_702,
-                   "974d0c838ef4ac1a989b06ccb4e57691c21b6270dd8e345ffa7531f9388f117c"),
-    MODEL_ID_12B: ("text_encoders/gemma4_12b_int8_convrot.safetensors", 12_055_234_634,
-                   "bf77dc0b435c487a638909d8f2ccf5a7e4c9838e7bc56545ea6e251a603c5793"),
+    MODEL_ID: WEIGHT_FILENAME,
+    MODEL_ID_E4B: "text_encoders/gemma4_e4b_it_int8_convrot.safetensors",
+    MODEL_ID_12B: "text_encoders/gemma4_12b_int8_convrot.safetensors",
 }
 
 _WEIGHTS_BY_MODEL = {
     model_id: ((WEIGHT_CATEGORY, filename.rsplit("/", 1)[-1]),)
-    for model_id, (filename, _size, _sha256) in NATIVE_WRITER_FILES.items()
+    for model_id, filename in NATIVE_WRITER_FILES.items()
 }
 
 
