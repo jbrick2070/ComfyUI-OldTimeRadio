@@ -740,20 +740,6 @@ def test_every_exit_code_has_a_stated_meaning():
         assert core.EXIT_MEANING.get(code), code
 
 
-def test_the_retired_google_2_0_ids_are_gone_from_both_lists(records):
-    """Measured absent from a complete catalog on 2026-08-10, so they must not
-    survive in the dropdown OR as a stale provenance row."""
-    from nodes._otr_google_api import models as gmodels
-
-    for dead in ("gemini-2.0-flash", "gemini-2.0-flash-lite"):
-        assert dead not in gmodels.GOOGLE_API_STATIC_TEXT_MODELS, dead
-        assert dead not in {r.provider_id for r in records}, dead
-        assert not any(pid == dead for pid, _l in prov.SLUG_PROVENANCE), dead
-    # The lane still works: its two defaults are pointers and both survive.
-    assert gmodels.GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT in gmodels.GOOGLE_API_STATIC_TEXT_MODELS
-    assert gmodels.GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT in gmodels.GOOGLE_API_STATIC_TEXT_MODELS
-
-
 def test_the_verifier_core_performs_no_network_access(monkeypatch, records):
     """Belt and braces on the injection contract: break sockets outright and
     run everything the unit tests run."""

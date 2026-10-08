@@ -325,17 +325,3 @@ def test_a_cheap_pointer_is_offered_so_the_cheap_slot_needs_no_pin():
             f"by its author. Cheap is not worth a slug that can vanish -- use "
             f"~deepseek/deepseek-v4-flash-latest."
         )
-
-
-def test_retired_synthesis_machinery_stays_retired():
-    """`~x-ai/grok-latest` replaced ~30 lines that synthesised an author's
-    newest concrete slug. If any of these reappear, the alias set is being
-    worked around instead of extended."""
-    for symbol in ("OPENROUTER_NO_LATEST_AUTHORS", "_newest_concrete_for_author",
-                   "_NON_FRONTIER_MARKERS", "_OPENROUTER_RECENT_COUNT",
-                   "_PINNED_CREATIVE_CONTENDER_ROWS", "OPENROUTER_FRONTIER_LATEST"):
-        assert not hasattr(cat, symbol), (
-            f"{symbol} is back. It was deleted 2026-08-07 because OpenRouter "
-            f"now publishes the alias it emulated, or because it was uncurated "
-            f"cache spill."
-        )

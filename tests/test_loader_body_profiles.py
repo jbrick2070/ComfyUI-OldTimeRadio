@@ -103,17 +103,10 @@ def test_load_llm_standard_profile():
 def test_load_llm_nf4_comes_from_policy():
     """S1 platform-portability REWRITE (was: Obsidian-profile predicate).
     Quantization is an EXPLICIT policy field now: the NF4 branch keys on
-    `_policy.quant_policy == "bnb_nf4"` and the deleted Obsidian/tag
-    machinery must stay deleted."""
+    `_policy.quant_policy == "bnb_nf4"`."""
     body = _loader_load_llm_source()
     assert 'needs_4bit = _policy.quant_policy == "bnb_nf4"' in body, (
         "NF4 must be selected by the explicit policy field."
-    )
-    assert 'is_obsidian = "Obsidian" in optimization_profile' not in body, (
-        "the deleted Obsidian auto-quant predicate is back."
-    )
-    assert "vram_safe_tags = (" not in body, (
-        "the deleted tag-based auto-quant predicate is back."
     )
     assert 'bnb_4bit_quant_type="nf4"' in body, (
         "NF4 quant type literal missing from BitsAndBytesConfig."

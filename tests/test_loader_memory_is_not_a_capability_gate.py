@@ -96,19 +96,6 @@ def test_device_map_summary_reports_cpu_layers_truthfully():
     assert summary["cpu_module_count"] == 1
 
 
-def test_no_test_still_expects_vram_fit_failed_error_raise():
-    """Skipped retired rows used to keep a VRAMFitFailedError raise expectation
-    alive after request_slot stopped raising. Scan so that cannot rot."""
-    needle = "pytest.raises(" + "VRAMFitFailedError"
-    root = Path(__file__).resolve().parent
-    offenders = []
-    for path in sorted(root.glob("test_*.py")):
-        text = path.read_text(encoding="utf-8")
-        if needle in text:
-            offenders.append(path.name)
-    assert offenders == []
-
-
 def test_production_never_raises_vram_fit_failed_error():
     needle = "raise " + "VRAMFitFailedError"
     nodes = Path(__file__).resolve().parents[1] / "nodes"

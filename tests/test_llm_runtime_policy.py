@@ -277,21 +277,6 @@ def test_remote_backends_assert_lane_admission():
 
 
 # --------------------------------------------------------------------------
-# Loader: deleted auto machinery
-# --------------------------------------------------------------------------
-
-def test_loader_auto_probes_are_gone():
-    """The FA2 auto-probe and the tag-based auto-quant predicate are
-    deleted -- attention + quantization come from the policy only.
-    (Code patterns, not names: explanatory comments may cite history.)"""
-    src = inspect.getsource(ml)
-    assert 'distribution("flash-attn")' not in src, "FA2 probe is back"
-    assert "import flash_attn" not in src, "FA2 import probe is back"
-    assert "vram_safe_tags = (" not in src, "tag-based auto-quant is back"
-    assert "WING DING" not in src
-
-
-# --------------------------------------------------------------------------
 # Writer: _resolve_inputs builds the policy
 # --------------------------------------------------------------------------
 

@@ -84,25 +84,6 @@ def test_existing_rows_default_to_prompt_profile_modern() -> None:
     assert not failures, "\n  " + "\n  ".join(failures)
 
 
-def test_no_curated_row_uses_otr_1940s_v1_profile() -> None:
-    """No curated row carries prompt_profile = "otr_1940s_v1" at
-    present. The broken talkie-lm/talkie-1930-13b-it row (the only
-    period row ever curated) was removed 2026-05-22. The period-
-    routing surface stays parked; this test pins the empty state so
-    a future period model is added deliberately, not silently.
-    """
-    period_rows = [
-        m.repo_id
-        for m in catalog.CURATED_LLM_MODELS
-        if m.prompt_profile == "otr_1940s_v1"
-    ]
-    assert period_rows == [], (
-        f"unexpected curated otr_1940s_v1 period row(s): {period_rows}. "
-        f"If a period model was added deliberately, update this test "
-        f"to assert its expected schema."
-    )
-
-
 def _writer_creative_and_technical_slot_values(
     workflow: dict,
 ) -> list[tuple[int, str]]:

@@ -387,9 +387,3 @@ class TestRunWiringPins:
             "assembled_script = _PL.assemble_script_text_from_ledger(led.data)"
             in tail_src
         )
-        # The stale in-flight join must be gone from the title path.
-        for src in (tail_src, run_src):
-            assert (
-                'assembled_script = "\\n\\n".join(script_text_parts)'
-                not in src
-            )

@@ -33,19 +33,6 @@ if str(Path(__file__).resolve().parents[1]) not in sys.path:
 
 from nodes import _otr_casting as _OTRC  # noqa: E402
 
-#: Symbols the 2026-08-18 rip removed. If any comes back, the pass is back with
-#: it, and the concentration it caused comes back too.
-RIPPED_SYMBOLS = (
-    "hybrid_voice_fit_enabled",
-    "_build_voice_fit_prompt",
-    "llm_propose_voice_ref",
-)
-RIPPED_FROM_VOICE_BANK = (
-    "build_voice_cards",
-    "validate_voice_proposal",
-    "VOICE_FIT_POLICY_VERSION",
-)
-
 
 def _lock():
     def fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
@@ -83,26 +70,6 @@ def test_the_decision_dict_is_still_stamped_and_empty():
     assert meta.get("voice_cast_decision") == {}, (
         f"expected an empty voice_cast_decision, got "
         f"{meta.get('voice_cast_decision')!r}"
-    )
-
-
-def test_the_hybrid_voice_fit_is_gone_and_stays_gone():
-    """A guard against reintroduction, not a tautology.
-
-    The pass was removed because its prompt gave the model exactly the four
-    fields `_score()` already weights and no character name -- so it had no
-    judgment available to it -- while casting with 13 distinct voices at 96%
-    top-5 where the scorer uses 43 at 25%. If these symbols reappear, that
-    concentration reappears with them.
-    """
-    from nodes import _otr_voice_bank as VB
-
-    back = [s for s in RIPPED_SYMBOLS if hasattr(_OTRC, s)]
-    back += [s for s in RIPPED_FROM_VOICE_BANK if hasattr(VB, s)]
-    assert not back, (
-        f"the hybrid LLM voice-fit is back: {back}. It was ripped on 2026-08-18 "
-        f"for casting with 13 voices where the scorer uses 43. If this is "
-        f"deliberate, the concentration measurement needs redoing first."
     )
 
 

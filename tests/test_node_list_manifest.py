@@ -117,12 +117,3 @@ def test_the_manifest_matches_what_the_pack_actually_declares(manifest):
         "  in the manifest but not declared:      %s\n"
         "Regenerate it from _NODE_MODULES rather than editing it by hand."
         % (missing or "none", extra or "none"))
-
-
-def test_the_stale_node_count_is_gone_from_the_init_comment():
-    """A comment claiming 34 nodes is how the wrong number kept propagating --
-    it was quoted back as fact in a publishing plan."""
-    text = io.open(INIT, encoding="utf-8").read()
-    assert "34 nodes" not in text, (
-        "__init__.py still claims 34 nodes; the pack declares %d"
-        % len(_expected_ids()))

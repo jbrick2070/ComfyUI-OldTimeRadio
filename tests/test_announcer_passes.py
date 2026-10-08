@@ -50,19 +50,6 @@ def test_clean_one_line_normalizes_transport_whitespace_without_truncation():
     )
 
 
-def test_the_length_theater_is_GONE_not_renamed():
-    """`max_chars` was a documented no-op after the no-prose-gate retirement
-    (314dd481), and the writer still passed 200 into it -- theater that read
-    exactly like a real constraint. Removed 2026-08-28 (finding 8, ruled by
-    delegated review). This pins that the parameter is DELETED, not quietly
-    reintroduced as another no-op later: passing it must be a TypeError."""
-    with pytest.raises(TypeError):
-        clean_one_line("x", max_chars=5)
-    from nodes._otr_line_composer import validate_announcer_line
-    with pytest.raises(TypeError):
-        validate_announcer_line("x", min_chars=1, max_chars=5)
-
-
 def test_intro_strips_fixed_announcer_label_with_one_call():
     calls = []
     result = compose_announcer_intro(

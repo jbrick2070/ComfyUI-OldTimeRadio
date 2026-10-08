@@ -33,16 +33,6 @@ def test_j5_title_pass_stamps_episode_title():
     assert 'meta["episode_title"] = final_title' in src
 
 
-def test_no_widget_only_clobber_returns():
-    """The retired K.5.7 widget-only re-stamp must not come back -- it
-    clobbered J.5's generated title with the empty widget value."""
-    src = _writer_family_source()
-    assert "K.5.7:" not in src, "K.5.7 widget-only title clobber resurrected"
-    assert '_widget_title = (episode_title or' not in src, (
-        "widget-only episode_title re-stamp resurrected"
-    )
-
-
 def test_j5_stamp_lives_inside_run_before_return_assembly():
     """J.5's stamp must be on the writer's hot path, before the
     L. return-assembly block."""

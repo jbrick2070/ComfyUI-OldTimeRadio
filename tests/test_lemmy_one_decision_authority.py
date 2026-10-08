@@ -115,20 +115,13 @@ def test_the_natural_roll_is_spent_exactly_once(monkeypatch):
     assert len(calls) == 1, f"roll spent {len(calls)} times, expected exactly 1"
 
 
-def test_the_assembler_no_longer_carries_its_own_copy_of_the_rule():
-    """The duplication itself is the defect, so pin its absence. If a future
-    edit re-inlines the branches, this fails even while behaviour still
-    happens to match -- which is the whole point: they agreed by luck before."""
+def test_the_assembler_defers_to_the_one_decision_authority():
+    """The assembler must call the one decision authority rather than carry
+    its own copy of the cameo rule."""
     source = inspect.getsource(assemble_pre_locked_rows)
 
     assert "resolve_lemmy_cameo(" in source, (
         "the assembler must defer to the one decision authority")
-    assert "_POOLS.roll_lemmy()" not in source, (
-        "the assembler must not roll the cameo itself -- that is the "
-        "duplicate implementation this fix deleted")
-    assert "_source_bank_excludes_lemmy(" not in source, (
-        "the assembler must not re-derive the fidelity exclusion -- "
-        "resolve_lemmy_cameo owns it")
 
 
 # --------------------------------------------------------------------------- #

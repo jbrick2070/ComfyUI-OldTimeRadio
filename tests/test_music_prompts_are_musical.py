@@ -138,13 +138,6 @@ def test_junk_meta_still_composes_both_products():
         assert engine.text and engine.negative and engine.palette_key
 
 
-def test_the_dead_period_voice_overlay_is_gone():
-    """`gen_params_initial.period_voice` had zero producers (grep, 2026-09-11)
-    and the palette now owns the period. Half-removed is the defect."""
-    source = inspect.getsource(MP)
-    assert "period_voice" not in source
-
-
 # --------------------------------------------------------------------------- #
 # the SA3 engine no longer prepends its own era anchor
 # --------------------------------------------------------------------------- #

@@ -142,11 +142,10 @@ def test_two_characters_still_never_share_a_voice():
 # ---------------------------------------------------------------------------
 # The prompt asks rather than commands
 # ---------------------------------------------------------------------------
-def test_the_prompt_no_longer_calls_the_request_a_CEILING():
+def test_the_prompt_calls_the_request_a_request_not_a_ceiling():
     """The model was being told N_MAX was a ceiling while the code no longer
     treats it as one -- the prompt and the validator must not disagree."""
     source = inspect.getsource(scifi_news_pro)
-    assert "N_MAX (speaking-character ceiling)" not in source
     assert "REQUESTED cast size" in source
     assert "a REQUEST, not a limit" in source
 

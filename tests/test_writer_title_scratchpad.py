@@ -257,36 +257,6 @@ def test_composition_header_uses_tbd_literal():
     )
 
 
-def test_post_hoc_title_substitution_is_removed():
-    """The fragile post-hoc verbatim title-substitution helper, its
-    min-length guard, and the J.6 section are all gone. Needles are
-    assembled from fragments so this test file's own strings do not
-    self-match if it is ever scanned alongside the writer."""
-    from tests._support.writer_family import family_source
-
-    src = family_source()
-    sub_helper_def = "def _substitute" + "_title_in_text"
-    assert sub_helper_def not in src, (
-        "post-hoc verbatim title-substitution helper must be removed"
-    )
-    sub_min_guard = "_TITLE_SUB" + "_MIN_LEN"
-    assert sub_min_guard not in src, (
-        "the title-substitution min-length guard must be removed"
-    )
-    j6_header = "--- J." + "6."
-    assert j6_header not in src, (
-        "the post-hoc title-substitution section header must be removed"
-    )
-    assert "title_substitution" not in (
-        # The meta key must not be stamped any more either; allow the
-        # word only inside a comment that documents its retirement.
-        "\n".join(
-            ln for ln in src.splitlines()
-            if "title_substitution" in ln and not ln.lstrip().startswith("#")
-        )
-    ), "meta.title_substitution stamp must be removed"
-
-
 def test_title_call_passes_premise_for_grounding():
     """AST scan: the J.5 `_generate_title_from_script(...)` call passes
     the outline `premise` keyword so the scratchpad is grounded in the

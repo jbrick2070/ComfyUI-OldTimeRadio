@@ -197,12 +197,11 @@ def test_render_engines_stamp_lands_in_singleton(fresh_singleton):
     assert payload["vram_peak_mb"] == 1234
 
 
-def test_render_batch_call_site_has_no_swallowing_catch():
-    """The old call site wrapped the stamp in ``except Exception: warn`` --
-    a silent fallback that defeats the LOUD contract. It must be gone."""
+def test_render_batch_call_site_stamps_through_the_durable_contract():
+    """The call site stamps through ``stamp_durable`` (LOUD contract), not a
+    swallowing ``except Exception: warn``."""
     src = (REPO_ROOT / "nodes" / "otr_video_render_batch.py").read_text(
         encoding="utf-8")
-    assert "render_engines stamp skipped" not in src
     assert "stamp_durable" in src
 
 

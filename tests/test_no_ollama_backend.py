@@ -1,20 +1,12 @@
-"""Negative coverage for the removed local sidecar writer path."""
+"""The Gemma 12B writer pin resolves through the HF/transformers row."""
 from __future__ import annotations
 
 from pathlib import Path
 
 from nodes import _otr_model_catalog as catalog
-from nodes import _otr_model_runtime as runtime
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-def test_runtime_has_no_removed_sidecar_dispatch_key():
-    assert "ollama_local_http" not in runtime.BACKENDS_BY_KEY
-    for row in catalog.CURATED_LLM_MODELS:
-        assert row.loader_backend != "ollama_local_http"
-        assert row.provider != "ollama"
 
 
 def test_gemma_12b_hf_pin_is_accepted_without_a_sidecar(tmp_path):

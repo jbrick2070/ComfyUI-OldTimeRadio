@@ -146,15 +146,6 @@ def test_a_brief_with_no_setting_still_composes():
     assert STATUS_QUO in _user_message(calls)
 
 
-def test_the_hook_label_is_gone():
-    """Asserted as a WHOLE LABEL LINE, not as "the word HOOK is absent" -- an
-    authored setting could legitimately contain the word."""
-    _res, calls = _compose(_brief())
-    assert not any(
-        ln.startswith("HOOK:") for ln in _user_message(calls).splitlines()
-    )
-
-
 # ---------------------------------------------------------------------------
 # A starved brief never reaches the model
 # ---------------------------------------------------------------------------

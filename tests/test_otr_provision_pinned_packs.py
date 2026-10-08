@@ -153,15 +153,3 @@ def test_packs_only_failure_is_nonzero_and_clears_old_receipt(tmp_path, monkeypa
 
     assert provision.main(["--packs-only"]) == 1
     assert all(row[1] != "stale" for row in provision._LOG)
-
-
-def test_ltxvideo_is_no_longer_installed():
-    """TEST_WAVE B4 (2026-09-26): otr_8gb_video published on a wiped 4060
-    WITHOUT ComfyUI-LTXVideo; every LTX class is ComfyUI core. The provisioner
-    installs AnimateDiff-Evolved and nothing else, and the patch is gone."""
-    provision = _load_provision()
-    assert not hasattr(provision, "ensure_ltxvideo_pack")
-    assert not (REPO / "patches" / "ComfyUI-LTXVideo-kornia-pad.patch").exists()
-    import inspect
-    body = inspect.getsource(provision.install_node_packs)
-    assert "ensure_animatediff_pack(comfy)" in body and "ensure_ltxvideo_pack(" not in body

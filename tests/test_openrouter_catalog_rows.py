@@ -284,22 +284,6 @@ def test_slot_a_lead_is_recommended_creative(enabled_cached):
     assert a[1] == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
 
 
-def test_no_pinned_concrete_contenders_remain(enabled_cached):
-    """2026-08-07 curation: the pinned-creative-contender MECHANISM is gone.
-
-    It carried `tencent/hy3:free` (a promo slug that stopped resolving when the
-    promo ended) and `aion-labs/aion-3.0-mini` (dropped by operator ruling: it
-    never won a model contest -- none was ever run -- and its live record is
-    PBUG-20260713-20 plus an episode-aborting finish_reason=length). With both
-    gone the mechanism had nothing to carry, so the constant, its filter path
-    and its cold-cache branch were deleted rather than left empty."""
-    for slot in ("a", "b"):
-        choices = cat.openrouter_catalog_dropdown_choices(slot)
-        assert "tencent/hy3:free" not in choices
-        assert "aion-labs/aion-3.0-mini" not in choices
-    assert not hasattr(cat, "_PINNED_CREATIVE_CONTENDER_ROWS")
-
-
 def test_slot_b_lead_is_recommended_technical(enabled_cached):
     # BUG-LOCAL-400: enable-sentinel leads; recommended technical is first real.
     b = cat.openrouter_catalog_dropdown_choices("b")

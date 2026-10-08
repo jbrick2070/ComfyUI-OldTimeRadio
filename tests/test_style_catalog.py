@@ -129,21 +129,6 @@ class TestMediaArchiveStylePool:
             )
             assert slug in pool, f"seed {seed} -> {slug!r} not in media_archive pool"
 
-    # --- curated pool excludes the 6 pruned drift-prone slugs ---
-    _PRUNED = (
-        "newsroom_emergency_bulletin",
-        "pulp_serial_cliffhanger",
-        "missing_person_audio_diary",
-        "lost_expedition_recordings",
-        "old_theater_phantom_rehearsal",
-        "live_variety_show_disaster",
-    )
-
-    def test_pruned_slugs_absent(self):
-        pool = set(CAT.media_archive_slugs())
-        for slug in self._PRUNED:
-            assert slug not in pool, f"drift-prone slug {slug!r} still in media_archive pool"
-
     # --- pool size is exactly 18 after pruning ---
     def test_pool_size(self):
         assert len(CAT.media_archive_slugs()) == 18

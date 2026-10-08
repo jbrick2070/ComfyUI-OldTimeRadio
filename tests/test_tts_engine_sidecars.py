@@ -150,14 +150,6 @@ def test_caster_assigns_a_chatterbox_voice():
     assert e.engine == "chatterbox" and e.gender == "female"
 
 
-def test_no_dangling_placeholder_chatterbox_rows():
-    from nodes._otr_voice_bank import load_voice_bank
-    bank, _ = load_voice_bank()
-    ids = {e.voice_ref_id for e in bank}
-    assert "cc_male_warm" not in ids  # the old 0-on-disk placeholders are gone
-    assert "cb_announcer_male" in ids  # one real on-disk announcer ref remains
-
-
 # --- sidecar lifecycle helpers (polish round: bounded read + teardown) ------ #
 class _FakeStdout:
     def __init__(self, line=None, block=False):

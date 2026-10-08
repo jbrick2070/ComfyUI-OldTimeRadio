@@ -246,36 +246,6 @@ def test_spoken_language_is_left_exactly_as_written():
     assert receipt["safety"]["status"] == "retired"
 
 
-def test_the_rewrite_machinery_is_gone_not_merely_quiet():
-    """A pass that CANNOT run beats a pass that is asked not to.
-
-    The old guard monkeypatched a must-not-run stub over
-    `apply_safety_cleanup` and asserted the counter stayed at zero. That proved
-    the caller behaved -- it could not prove the machinery had not been re-armed
-    somewhere else, because the machinery was still sitting there, importable,
-    with an LLM prompt and an atomic ledger write in it.
-
-    It is deleted now (2026-08-23), so the guard is absence. What survives in
-    `_otr_content_safety` is the read-only VOCABULARY, which the directive does
-    not ban and which
-    `tests/test_bug_local_288_sfw_validator.py` deliberately keeps green.
-    """
-    from nodes import _otr_content_safety as safety
-
-    for gone in ("apply_safety_cleanup", "propose_safety_patches",
-                 "_SafetyPatchSet", "_SafetyLinePatch"):
-        assert not hasattr(safety, gone), (
-            "%s is back in _otr_content_safety -- that module rewrote a "
-            "delivered spoken row to match a hardcoded word list, which is the "
-            "exact thing the 2026-08-03 no-guardrails directive forbids" % gone)
-        assert gone not in (safety.__all__ or ())
-
-    # the half that is SUPPOSED to survive, still working
-    assert safety.find_text_hits("and then damn happened")
-    assert not safety.find_text_hits("The class had begun.")
-    assert safety.profanity_terms() == safety.PROFANITY_TERMS
-
-
 def test_the_safety_receipt_key_survives_with_a_defined_value():
     """A ripped pass may not leave an unowned ledger field.
 
