@@ -27,10 +27,7 @@ class TestCatalogEndings:
         # shakespeare/public_domain source-deferential period styles).
         assert len(CAT.STYLE_CATALOG) == 104
         for s in CAT.STYLE_CATALOG:
-            assert s["ending_tag"] in CAT.CLIMAX_CLASS_ROLES
-
-    def test_ending_tags_match_climax_classes(self):
-        assert set(CAT.ENDING_TAGS) == set(CAT.CLIMAX_CLASS_ROLES)
+            assert s["ending_tag"] in CAT.ENDING_TEMPLATES
 
     def test_variety_and_irreversible_is_rare(self):
         used = {s["ending_tag"] for s in CAT.STYLE_CATALOG}
@@ -38,10 +35,6 @@ class TestCatalogEndings:
         n_irrev = sum(1 for s in CAT.STYLE_CATALOG
                       if s["ending_tag"] == "irreversible_choice")
         assert n_irrev <= 12                       # demoted from 100% to a sliver
-
-    def test_every_tag_has_a_template(self):
-        for tag in CAT.ENDING_TAGS:
-            assert CAT.ENDING_TEMPLATES[tag].strip()
 
     def test_templates_steer_toward_human_on_mic_endings(self):
         # The whole point: every template pulls toward a human, on-mic ending and

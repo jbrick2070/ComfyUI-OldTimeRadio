@@ -270,19 +270,15 @@ def resolve_engine_for_role(image_policy, role):
     return fb, slot, slot != "character_image_model" and bool(fb)
 
 
-#: The four values `negative_source` may take. COMPOSITION ONLY -- see
-#: `negative_source_label`. Exported so a test can pin the vocabulary rather than
-#: re-typing it, because this enum has already drifted once unnoticed: the
-#: one-style-authority PLAN documented `env_override`, which never shipped.
-NEGATIVE_SOURCE_LABELS = ("pack+request", "pack", "request", "none_contributed")
-
-
 def negative_source_label(pack_negative, obj_negative) -> str:
     """Where THIS row's composed negative came from, and the one place that names it.
 
     Pure, and deliberately blind to the engine. It answers exactly one question --
     which of the two COMPOSITION inputs contributed -- so every value it can return
-    is verifiable from its own two arguments.
+    is verifiable from its own two arguments. The vocabulary is these four values
+    and nothing else: ``pack+request``, ``pack``, ``request``, ``none_contributed``
+    (COMPOSITION ONLY). It has already drifted once unnoticed -- the
+    one-style-authority PLAN documented ``env_override``, which never shipped.
 
     ITEM H (2026-08-17): the empty arm used to read `engine_hygiene`, a claim about
     what the ENGINE adds on top. That was wrong twice over. It was computed before

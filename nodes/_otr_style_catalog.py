@@ -467,25 +467,13 @@ STYLE_CATALOG: List[Dict[str, str]] = [
 # ---------------------------------------------------------------------------
 # Ending taxonomy (2026-06-24) -- the CLIMAX-CLASS tag per style + its template
 # ---------------------------------------------------------------------------
-# The climax's TYPE is one of the climax-class roles (CLIMAX_CLASS_ROLES in
-# _otr_story_quality_l12). `irreversible_choice` is no longer the universal
-# climax -- it is just ONE class, used only where a story genuinely earns a
-# decisive choice. Each style maps to exactly one ending_tag; the writer feeds
-# that tag as the climax role + injects the matching ENDING_TEMPLATES instruction
-# at the final character beat. Every template steers AWAY from machinery
-# (console / countdown / self-destruct / kill-switch) and TOWARD a human, on-mic
-# ending.
-CLIMAX_CLASS_ROLES = frozenset({
-    "irreversible_choice",
-    "revelation",
-    "reversal",
-    "unresolved_final_sound",
-    "reconciliation",
-    "bittersweet_parting",
-    "ironic_twist",
-    "quiet_acceptance",
-    "confession",
-})
+# The climax's TYPE is one of the nine climax classes keyed in ENDING_TEMPLATES
+# below. `irreversible_choice` is no longer the universal climax -- it is just
+# ONE class, used only where a story genuinely earns a decisive choice. Each
+# style maps to exactly one ending_tag; ENDING_TEMPLATES holds the matching
+# final-beat instruction per class (ending_template_for). Every template steers
+# AWAY from machinery (console / countdown / self-destruct / kill-switch) and
+# TOWARD a human, on-mic ending.
 
 
 def premise_texts(meta: Any) -> Tuple[str, ...]:
@@ -538,7 +526,6 @@ ENDING_TEMPLATES: Dict[str, str] = {
         "or device.",
 }
 
-ENDING_TAGS: tuple = tuple(ENDING_TEMPLATES.keys())
 _DEFAULT_ENDING_TAG = "revelation"
 
 # Per-style climax class. Deliberately VARIED so the climax stops being the same

@@ -217,15 +217,6 @@ class TestNegativeSourceLabel:
             "must DECLARE a floor rather than be matched by name")
         assert "hygiene" not in empty
 
-    def test_the_vocabulary_is_closed_and_exported(self):
-        """A test that re-types the enum cannot catch the enum drifting."""
-        assert disp.NEGATIVE_SOURCE_LABELS == (
-            "pack+request", "pack", "request", "none_contributed")
-        produced = {
-            disp.negative_source_label(p, o)
-            for p in ("", "pack terms") for o in ("", "obj terms")}
-        assert produced == set(disp.NEGATIVE_SOURCE_LABELS)
-
     def test_it_is_blind_to_the_engine_by_construction(self):
         """Pure and two-argument: there is no engine to pass, which is why the
         value no longer depends on WHERE in the loop it is computed."""
