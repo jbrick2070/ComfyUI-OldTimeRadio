@@ -1,9 +1,8 @@
-"""Sprint 1 -- declarative profile metadata + rank-chain fallback resolver.
+"""Declarative profile metadata: runtime and license_state.
 Headless; the only IO is loading the shipped YAML.
 
-These cover the NEW surface only; the legacy resolver behaviour stays pinned by
-test_engine_profiles.py (unchanged). The live byte-identical dispatch is NOT
-exercised here -- the rank chain is an auto-selection helper, not a rewire.
+These cover the metadata surface only; the resolver behaviour stays pinned by
+test_engine_profiles.py. The live byte-identical dispatch is NOT exercised here.
 """
 from __future__ import annotations
 
@@ -11,8 +10,6 @@ import pytest
 
 from nodes import _otr_engine_profiles as EP
 from nodes._otr_audio_engines import EngineUnusable, EngineUsabilityReason
-
-ROLES = ("char_voice", "announcer_voice", "music")
 
 
 def _resolver():
@@ -25,31 +22,8 @@ def test_every_profile_has_sprint1_metadata():
     r = _resolver()
     for pid in r.profile_ids():
         p = r.get(pid)
-        assert isinstance(p.rank, int)
-        assert isinstance(p.is_default, bool)
         assert p.runtime in EP._VALID_RUNTIMES
-        assert isinstance(p.needs_ref_clip, bool)
-        assert isinstance(p.caps, dict)
         assert p.license_state in EP._VALID_LICENSE_STATES
-
-
-def test_exactly_one_scope_default_per_role():
-    r = _resolver()
-    defaults = {
-        role: [p.engine for p in r.for_role(role) if p.is_default]
-        for role in ROLES
-    }
-    assert defaults["char_voice"] == ["indextts2"]
-    assert defaults["announcer_voice"] == ["kokoro"]
-    assert defaults["music"] == ["stable_audio_3"]
-
-
-def test_rank_chain_is_sorted_by_rank():
-    r = _resolver()
-    chain = [p.engine for p in r.rank_chain("char_voice")]
-    assert chain == ["indextts2", "chatterbox", "bark", "kokoro"]  # rank 1, 2, 3, 60
-    ranks = [p.rank for p in r.rank_chain("char_voice")]
-    assert ranks == sorted(ranks)
 
 
 def test_effective_license_state_blank_derivation():
@@ -74,13 +48,6 @@ def test_license_state_mirrors_commercial_clean_for_all_rows():
             assert p.commercial_clean is True
         elif p.license_state == "gated":
             assert p.commercial_clean is False
-
-
-def test_indextts2_runtime_is_oop_and_needs_ref_clip():
-    r = _resolver()
-    p = r.get("char_indextts2_v1")
-    assert p.runtime == "oop_venv"
-    assert p.needs_ref_clip is True
 
 
 def test_bad_runtime_rejected():

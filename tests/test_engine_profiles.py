@@ -116,16 +116,11 @@ def test_legacy_first_engines_pure_and_legacy_first():
     assert EP.legacy_first_engines("nonexistent_role") == []
 
 
-def test_direct_api_profiles_are_explicit_selection_only():
+def test_google_profiles_are_direct_api():
     r = EP.load_resolver()
     assert r.get("char_google_tts_v1").runtime == "direct_api"
     assert r.get("announcer_google_tts_v1").runtime == "direct_api"
     assert r.get("music_google_lyria_v1").runtime == "direct_api"
-    assert "google_tts" not in [p.engine for p in r.rank_chain("char_voice")]
-    assert "google_tts" not in [p.engine for p in r.rank_chain("announcer_voice")]
-    assert "google_lyria" not in [p.engine for p in r.rank_chain("music")]
-    assert "elevenlabs" not in [p.engine for p in r.rank_chain("char_voice")]
-    assert "cloud_elevenlabs" not in [p.engine for p in r.rank_chain("char_voice")]
 
 
 def _minimal_profile_row(**updates):
@@ -140,11 +135,7 @@ def _minimal_profile_row(**updates):
         "engine_impl_version": "1",
         "sample_rate": 24000,
         "requires_hf_token": False,
-        "rank": 50,
-        "is_default": False,
         "runtime": "direct_api",
-        "needs_ref_clip": False,
-        "caps": {},
         "license_state": "clean",
         "partner_row": "",
         "auth_required": True,

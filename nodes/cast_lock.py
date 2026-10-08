@@ -691,9 +691,9 @@ class CastLock:
             meta["voice_engine_roll"] = voice_roll
 
         # Concrete engines FIRST, then banks. `auto` is not a YAML engine --
-        # `voice_bank_for_engine("char_voice", "auto")` would climb rank_chain
-        # and land on indextts2/default, which is the opposite of the shipped
-        # Kokoro dropdown. 4a/4b inherit these stamps; they have no engine widget.
+        # `voice_bank_for_engine("char_voice", "auto")` refuses it -- so it is
+        # resolved to the shipped engine before any bank is derived.
+        # 4a/4b inherit these stamps; they have no engine widget.
         char_voice_engine, announcer_voice_engine = cast_voice_engines(
             char_voice_engine, announcer_voice_engine)
 

@@ -107,15 +107,11 @@ class EngineProfile(BaseModel):
     sample_rate: int = 0
     requires_hf_token: bool = False
 
-    # --- Sprint 1: declarative engine metadata (additive). Defaults keep the
-    # existing rows valid; the YAML populates them explicitly. These describe
-    # selection intent + licensing; they do NOT change the live byte-identical
-    # dispatch (which stays on the engine-level default until promotion S6). ---
-    rank: int = 100                  # fallback priority; lower = tried first
-    is_default: bool = False         # scope/logical default for the role
+    # --- Declarative engine metadata (additive). Defaults keep the existing
+    # rows valid; the YAML populates them explicitly. These describe the
+    # runtime tag + licensing; they do NOT change the live byte-identical
+    # dispatch. ---
     runtime: str = "in_graph"        # in_graph | oop_venv | cloud | direct_api
-    needs_ref_clip: bool = False     # reference-clip identity engines
-    caps: dict = Field(default_factory=dict)
     license_state: str = ""          # blank -> derive from commercial_clean
 
     # --- Cloud-audio campaign 2026-07-03 (C1): declarative cloud-engine metadata
@@ -260,22 +256,6 @@ class EngineProfileResolver:
                 f"'{profile.profile_id}' (allowed: {profile.allowed_voice_banks})",
             )
         return profile
-
-    def rank_chain(self, role: str) -> List["EngineProfile"]:
-        """LOCAL profiles serving ``role`` sorted by ``rank`` ascending (lowest
-        rank = highest priority), ``profile_id`` breaking ties for stability.
-
-        CLOUD and DIRECT-API profiles are EXCLUDED: this chain is the AUTOMATIC
-        auto-selection / fallback ladder, and paid/authenticated external
-        engines must never be picked automatically. They are reachable ONLY by
-        explicit dropdown/profile selection, which routes through
-        ``resolve_casting_plan`` (``profile_for``), not this chain.
-        """
-        local = [
-            p for p in self.for_role(role)
-            if p.runtime not in ("cloud", "direct_api")
-        ]
-        return sorted(local, key=lambda p: (p.rank, p.profile_id))
 
 
 # ---------------------------------------------------------------------------

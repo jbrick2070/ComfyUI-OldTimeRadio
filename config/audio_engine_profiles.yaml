@@ -10,20 +10,17 @@
 # with a NAMED error until that engine's deps/weights are installed (C-7);
 # model_path stays empty until F pins it.
 #
-# Sprint-1 declarative metadata (additive; never changes live byte-identical
-# dispatch): rank (fallback priority, lower = tried first), is_default (the
-# scope/logical default for the role -- distinct from the engine-level live
-# default, which stays on the legacy engine until promotion S6), runtime
-# (in_graph | oop_venv | cloud | direct_api), needs_ref_clip, caps, license_state
+# Declarative metadata (additive; never changes live byte-identical dispatch):
+# runtime (in_graph | oop_venv | cloud | direct_api) and license_state
 # (clean|gated|unknown; blank = derive from commercial_clean). license_state
 # MIRRORS commercial_clean here -- final license sign-off is Sprint 6, not an
 # unattended flip.
 
 profiles:
   # --- character voice ---
-  # Shipped default is indextts2 (engine default_roles + rank 1), PROMOTED
-  # 2026-06-04. The rank chain falls indextts2 -> chatterbox -> bark; bark stays
-  # selectable as a fully byte-identical in-graph fallback.
+  # Shipped default is indextts2 (engine default_roles), PROMOTED 2026-06-04;
+  # chatterbox and bark stay selectable, bark as a fully byte-identical in-graph
+  # engine.
   - profile_id: char_bark_v1
     role: char_voice
     engine: bark
@@ -46,11 +43,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    rank: 3                         # char fallback-only (never the scope default)
-    is_default: false
     runtime: in_graph
-    needs_ref_clip: false           # bark uses speaker presets, not a ref clip
-    caps: {emotion_vector: false, duration_control: false}
     license_state: gated            # mirrors commercial_clean=false (verify S6)
 
   - profile_id: char_chatterbox_v1
@@ -72,11 +65,7 @@ profiles:
     engine_impl_version: "2"
     sample_rate: 24000
     requires_hf_token: false
-    rank: 2                         # char rank-2 fallback (opt-in)
-    is_default: false
     runtime: oop_venv               # Path B isolated worker (MIT; pins own torch)
-    needs_ref_clip: true
-    caps: {emotion_vector: false, duration_control: false}
     license_state: clean
 
   - profile_id: char_indextts2_v1
@@ -120,11 +109,7 @@ profiles:
     engine_impl_version: "3"
     sample_rate: 22050
     requires_hf_token: false        # weights are downloadable; only commercial USE is gated
-    rank: 1                         # char scope default (rank-1)
-    is_default: true
     runtime: oop_venv               # Path B isolated worker on Blackwell
-    needs_ref_clip: true            # identity = reference clip only
-    caps: {emotion_vector: true, duration_control: true}
     # The weights carry the bilibili Model Use License (not Apache-2.0). Local
     # and personal use is fine; commercial use is conditioned and
     # community-ambiguous, so confirm with bilibili (indexspeech@bilibili.com)
@@ -143,11 +128,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    rank: 1                         # announcer scope default
-    is_default: true
     runtime: in_graph
-    needs_ref_clip: false
-    caps: {emotion_vector: false, duration_control: false}
     license_state: clean
 
   # --- character voice (opt-in 2026-06-19): kokoro as a FAST char voice. NOT the
@@ -164,11 +145,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    rank: 60                        # opt-in; indextts2/bark rank ahead
-    is_default: false
     runtime: in_graph
-    needs_ref_clip: false
-    caps: {emotion_vector: false, duration_control: false}
     license_state: clean
 
   - profile_id: announcer_chatterbox_v1
@@ -181,11 +158,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    rank: 2                         # announcer rank-2 (opt-in)
-    is_default: false
     runtime: oop_venv               # Path B isolated worker (MIT; pins own torch)
-    needs_ref_clip: true
-    caps: {emotion_vector: false, duration_control: false}
     license_state: clean
 
   # Bark as an announcer alternative (2026-08-24). Bark is preset-driven
@@ -204,11 +177,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    rank: 4                         # announcer fallback-only (never the scope default)
-    is_default: false
     runtime: in_graph
-    needs_ref_clip: false           # bark uses speaker presets, not a ref clip
-    caps: {emotion_vector: false, duration_control: false}
     license_state: gated            # mirrors commercial_clean=false
 
   # --- music ---
@@ -222,11 +191,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 32000
     requires_hf_token: false
-    rank: 2                         # music rank-2 fallback
-    is_default: false
     runtime: in_graph
-    needs_ref_clip: false
-    caps: {duration_control: true}
     license_state: gated            # CC-BY-NC (non-commercial)
 
   - profile_id: music_stable_audio_v1
@@ -239,11 +204,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: true         # stable-audio-open-1.0 weights are HF-gated
-    rank: 3                         # music rank-3 fallback (opt-in, HF-gated)
-    is_default: false
     runtime: in_graph
-    needs_ref_clip: false
-    caps: {duration_control: true}
     license_state: clean            # mirrors commercial_clean=true; plan flags revenue-cap review (S6)
 
   - profile_id: music_stable_audio_3_v1
@@ -256,16 +217,12 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: false        # Comfy-Org/stable-audio-3 is UNgated (free download)
-    rank: 1                         # music scope default
-    is_default: true
     runtime: in_graph
-    needs_ref_clip: false
-    caps: {duration_control: true}
     license_state: clean            # SA3 community license: commercial OK (verify exact model S6)
 
   # --- cloud ElevenLabs voice (cloud-audio 2026-07-03; dropdown-opt-in, Comfy
-  # Cloud via invoke_partner_node). NEVER a default (is_default false, high rank);
-  # fail-loud, no local fallback. Voice identity is the provider_voice_id on the
+  # Cloud via invoke_partner_node). NEVER a default; fail-loud, no local
+  # fallback. Voice identity is the provider_voice_id on the
   # cast entry (C3), resolved from the elevenlabs_cloud bank (S2 pool). ---
   - profile_id: char_elevenlabs_cloud_v1
     role: char_voice
@@ -277,11 +234,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: false
-    rank: 50                        # opt-in; local engines rank ahead
-    is_default: false
     runtime: cloud
-    needs_ref_clip: false
-    caps: {emotion_vector: false, duration_control: false}
     license_state: clean
     partner_row: cloud_elevenlabs_tts
     auth_required: true
@@ -297,19 +250,15 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: false
-    rank: 50
-    is_default: false
     runtime: cloud
-    needs_ref_clip: false
-    caps: {emotion_vector: false, duration_control: false}
     license_state: clean
     partner_row: cloud_elevenlabs_tts
     auth_required: true
     error_policy: fail_loud
 
   # --- direct Google Gemini TTS voice (BYO API key, not Comfy Partner cloud).
-  # Explicit-selection-only: runtime=direct_api is excluded from automatic rank
-  # chains. Fail-loud, no local/cross-provider fallback. Voice identity is the
+  # Explicit-selection-only: runtime=direct_api. Fail-loud, no
+  # local/cross-provider fallback. Voice identity is the
   # Google prebuilt voice name in provider_voice_id, resolved from google_tts
   # bank entries by CastLock auto_registry. Gemini TTS is a preview model and
   # its voice stability may vary (hence use_cache on both rows).
@@ -323,11 +272,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    rank: 50
-    is_default: false
     runtime: direct_api
-    needs_ref_clip: false
-    caps: {emotion_vector: true, duration_control: false}
     license_state: clean
     partner_row: ""
     auth_required: true
@@ -344,11 +289,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    rank: 50
-    is_default: false
     runtime: direct_api
-    needs_ref_clip: false
-    caps: {emotion_vector: true, duration_control: false}
     license_state: clean
     partner_row: ""
     auth_required: true
@@ -356,8 +297,8 @@ profiles:
     use_cache: true
 
   # --- cloud Sonilo MUSIC (cloud-audio S5, 2026-07-03; dropdown-opt-in, Comfy
-  # Cloud via invoke_partner_node). NEVER a default (is_default false, high rank);
-  # fail-loud, no local fallback. Provider-native duration; ONE music profile maps
+  # Cloud via invoke_partner_node). NEVER a default; fail-loud, no local
+  # fallback. Provider-native duration; ONE music profile maps
   # to all cue types (open/close/inter), stamped per-episode as meta.music_engine
   # (C9). ---
   - profile_id: music_sonilo_cloud_v1
@@ -370,19 +311,15 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: false
-    rank: 50                        # opt-in; local engines rank ahead
-    is_default: false
     runtime: cloud
-    needs_ref_clip: false
-    caps: {emotion_vector: false, duration_control: true}   # provider-native duration
     license_state: clean
     partner_row: cloud_sonilo_music
     auth_required: true
     error_policy: fail_loud
 
   # --- direct Google Lyria MUSIC (BYO API key, not Comfy Partner cloud).
-  # Explicit-selection-only: runtime=direct_api is excluded from automatic rank
-  # chains. Lyria 3 Clip returns a fixed 30-second MP3; the adapter sends only
+  # Explicit-selection-only: runtime=direct_api. Lyria 3 Clip returns a fixed
+  # 30-second MP3; the adapter sends only
   # model/input to Google, decodes MP3 locally, and trims to the OTR cue length.
   # Paid-only and currently a preview model.
   - profile_id: music_google_lyria_v1
@@ -395,11 +332,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: false
-    rank: 50
-    is_default: false
     runtime: direct_api
-    needs_ref_clip: false
-    caps: {emotion_vector: false, duration_control: false}
     license_state: clean
     partner_row: ""
     auth_required: true
