@@ -26,6 +26,8 @@ testing the historically-correct quantized case unchanged; the new
 """
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from nodes import _otr_model_loader as ml
@@ -371,7 +373,7 @@ def test_humo_fetch_lane_fetches_engine_default_unet():
     spec.loader.exec_module(fetcher)
 
     entries = fetcher.LANES["humo"]
-    landed = {fetcher.destination_name(row): fetcher.weight_spec(row)
+    landed = {os.path.basename(fetcher.destination_path("", row)): fetcher.weight_spec(row)
               for row in entries}
     assert eng_humo._HUMO_DEFAULT_UNET in landed, (
         "LANES['humo'] no longer fetches the engine default UNET "

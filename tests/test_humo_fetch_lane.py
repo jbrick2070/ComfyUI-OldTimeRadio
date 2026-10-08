@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import os
 import pathlib
 import re
 
@@ -30,7 +31,7 @@ def test_humo_lane_is_the_complete_engine_recipe(monkeypatch):
 
     fetcher = _load_fetcher()
     entries = fetcher.LANES["humo"]
-    fetched = {fetcher.destination_name(row) for row in entries}
+    fetched = {os.path.basename(fetcher.destination_path("", row)) for row in entries}
     loaded = set(HuMoEngine()._loader_names().values())
 
     assert fetched == loaded

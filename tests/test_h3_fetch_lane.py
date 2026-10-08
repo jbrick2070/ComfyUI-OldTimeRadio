@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import os
 import pathlib
 import re
 
@@ -102,7 +103,7 @@ def test_the_minimax_h3_bundle_is_the_complete_five_file_stack():
     union = {}
     for lane in fetcher.BUNDLES["minimax_h3"]:
         for row in fetcher.LANES[lane]:
-            union[fetcher.destination_name(row)] = fetcher.weight_spec(row)
+            union[os.path.basename(fetcher.destination_path("", row))] = fetcher.weight_spec(row)
     assert len(union) == 5
     assert sum(row.expected_bytes for row in union.values()) == 63_440_965_087
     assert round(sum(row.expected_bytes for row in union.values())
@@ -117,7 +118,7 @@ def test_a_bundle_fetches_a_shared_file_once(tmp_path, monkeypatch):
     monkeypatch.setattr(fetcher, "models_root", lambda: str(tmp_path))
     monkeypatch.setattr(fetcher, "fetch",
                         lambda entry, root, dry_run: fetched.append(
-                            fetcher.destination_name(entry)) or True)
+                            os.path.basename(fetcher.destination_path("", entry))) or True)
     monkeypatch.setattr("sys.argv", ["otr_fetch_lane_weights.py", "minimax_h3",
                                      "--dry-run"])
     assert fetcher.main() == 0
@@ -145,7 +146,7 @@ def test_each_h3_lane_is_exactly_its_engine_recipe(monkeypatch):
     fetcher = _fetcher()
     for lane, engine in (("minimax_h3_video", MiniMaxH3VideoEngine()),
                          ("minimax_h3_audio_in", MiniMaxH3AudioInEngine())):
-        fetched = {fetcher.destination_name(row) for row in fetcher.LANES[lane]}
+        fetched = {os.path.basename(fetcher.destination_path("", row)) for row in fetcher.LANES[lane]}
         loaded = {default for _label, _cats, default, _floor
                   in engine._weight_rows()}
         assert fetched == loaded, lane

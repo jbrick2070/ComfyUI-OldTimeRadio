@@ -613,14 +613,6 @@ def destination_path(root: str, entry) -> str:
                         spec.path_in_repo.rsplit("/", 1)[-1])
 
 
-def destination_name(entry) -> str:
-    """The exact basename ComfyUI will resolve after a successful fetch."""
-    spec = weight_spec(entry)
-    if spec.destination.endswith(_WEIGHT_SUFFIXES):
-        return os.path.basename(spec.destination)
-    return spec.path_in_repo.rsplit("/", 1)[-1]
-
-
 def _sha256_file(path: str) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as fh:

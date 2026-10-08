@@ -22,6 +22,7 @@ Offline: nothing here touches the network, a GPU or a real models folder.
 from __future__ import annotations
 
 import importlib.util
+import os
 import pathlib
 import sys
 from types import ModuleType, SimpleNamespace
@@ -203,7 +204,7 @@ def test_the_fetcher_lanes_are_the_planned_files_at_the_same_pins():
     provision = _load("scripts/otr_provision.py", "_otr_h3_parity_provision")
     for engine, lane in FETCH_LANE.items():
         rows = [fetcher.weight_spec(r) for r in fetcher.LANES[lane]]
-        keyed = {(r.destination.split("/", 1)[0], fetcher.destination_name(r)): r
+        keyed = {(r.destination.split("/", 1)[0], os.path.basename(fetcher.destination_path("", r))): r
                  for r in rows}
         assert set(keyed) == VA.planned_downloads({engine}), engine
         for key, row in keyed.items():

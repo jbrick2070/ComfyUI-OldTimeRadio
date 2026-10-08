@@ -14,6 +14,7 @@ both. These tests read both.
 from __future__ import annotations
 
 import importlib.util
+import os
 import pathlib
 
 import pytest
@@ -32,7 +33,7 @@ def _load_fetcher():
 
 def _filenames(fetcher, entries):
     """The basename each entry lands on disk as."""
-    return {fetcher.destination_name(entry) for entry in entries}
+    return {os.path.basename(fetcher.destination_path("", entry)) for entry in entries}
 
 
 def test_haunted_bundle_fetches_what_the_haunted_engine_declares():
