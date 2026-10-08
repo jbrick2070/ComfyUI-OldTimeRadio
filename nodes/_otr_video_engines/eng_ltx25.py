@@ -1016,7 +1016,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         it just called the loader twice.
         And the headroom it was supposed to buy does not exist to be bought:
         the lab's decomposition puts both VAEs at **0.0 GiB** at the peak
-        (:data:`ltx25_recipe.LTX25_PEAK_DECOMPOSITION_GIB`). Caught by the agy
+        (recorded in the :mod:`ltx25_recipe` docstring). Caught by the agy
         review lane, 2026-08-19, from a grounded read of the scheduler -- the
         driver had flagged it as a suspicion and could not settle it alone.
 
@@ -1281,7 +1281,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         AFTER, and the graph itself runs with ``free_after_use``. An earlier
         draft of this docstring said that staging is what lets the stack fit
         under the ceiling. **It is not, and the lab corrected it**
-        (:data:`ltx25_recipe.LTX25_PEAK_DECOMPOSITION_GIB`): the 14.48 GiB peak
+        (recorded in the :mod:`ltx25_recipe` docstring): the 14.48 GiB peak
         is 9.80 DiT weights + 3.20 activations + 1.48 allocator context, with
         the text encoder and both VAEs at ZERO, because ComfyUI has already
         spilled Gemma to system RAM by the time sampling starts. Freeing an

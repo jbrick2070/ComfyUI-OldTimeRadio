@@ -104,7 +104,6 @@ def test_both_vaes_match_and_the_audio_vae_really_is_loaded():
             if v.get("class_type") == "VAELoader"}
     assert R.LTX25_VIDEO_VAE in vaes
     assert R.LTX25_AUDIO_VAE in vaes
-    assert R.LTX25_AUDIO_VAE_REQUIRED_EVEN_WHEN_SILENT is True
 
     _k, empty_audio = _node(g, "LTXVEmptyLatentAudio")
     assert "audio_vae" in empty_audio["inputs"], (
@@ -180,7 +179,7 @@ def test_the_negative_prompt_is_empty():
 def test_the_anchor_node_is_ImgToVideoInplace_not_SetLatentNoiseMask():
     """The QA prose says SetLatentNoiseMask. The file that RAN says otherwise."""
     _doc, g = _graph()
-    _k, anchor = _node(g, R.LTX25_I2V_ANCHOR_NODE)
+    _k, anchor = _node(g, "LTXVImgToVideoInplace")
     assert anchor["inputs"]["strength"] == R.LTX25_I2V_ANCHOR_STRENGTH
     assert anchor["inputs"]["bypass"] is False
     assert "SetLatentNoiseMask" not in {
@@ -191,26 +190,29 @@ def test_the_anchor_node_is_ImgToVideoInplace_not_SetLatentNoiseMask():
 def test_the_scheduler_latent_comes_from_the_anchor_not_the_empty_latent():
     """CORRECTION the JSON forced. Wiring this to EmptyLTXVLatentVideo would
     hand the scheduler a latent with no still baked in, and the failure would
-    be wrong-but-running -- the worst kind."""
+    be wrong-but-running -- the worst kind. Compared against the graph the
+    engine really builds."""
     _doc, g = _graph()
-    sched_key, sched = _node(g, "LTXVScheduler")
-    src_key = sched["inputs"]["latent"][0]
-    assert g[src_key]["class_type"] == R.LTX25_SCHEDULER_LATENT_SOURCE, (
-        "scheduler latent now comes from %s" % g[src_key]["class_type"]
-    )
-    assert R.LTX25_SCHEDULER_LATENT_MUST_BE_CONNECTED is True
+    _k, sched = _node(g, "LTXVScheduler")
+    lab_source = g[sched["inputs"]["latent"][0]]["class_type"]
+    engine = eng_ltx25.Ltx25VideoEngine()
+    prod = engine._build_graph(
+        {"text_prompt": "probe", "seed": 42}, "still.png", 97, 832, 480)
+    prod_source = prod["sched"]["inputs"]["latent"].src
+    prod_class = engine._node_candidates()[prod[prod_source]["class"]][0]
+    assert prod_class == lab_source, (
+        "our scheduler latent comes from %s; the lab's comes from %s"
+        % (prod_class, lab_source))
 
 
 # --------------------------------------------------------------------------
-# Closed options stay closed
+# The stage-one golden stays one stage at the 97-frame rung
 # --------------------------------------------------------------------------
 
 def test_the_original_golden_remains_one_stage_but_production_selects_two_stage():
     """The old golden stays useful as stage-one evidence; it no longer bans
     the selected production refinement that the operator approved by eye."""
     _doc, g = _graph()
-    assert R.LTX25_MULTISHOT_ALLOWED is False
-    assert R.LTX25_INGRAPH_UPSCALE_ALLOWED is True
     classes = {v.get("class_type") for v in g.values()}
     upscalers = {c for c in classes if "Upscale" in c or "upscale" in c}
     assert not upscalers, "the golden graph grew an upscaler: %s" % upscalers
@@ -285,43 +287,3 @@ def test_the_entire_selected_stage_two_matches_the_lab_byte_for_byte_semanticall
         prod_inputs = dict(prod_spec["inputs"])
         assert normalize_value(prod_inputs, production=True) == normalize_value(
             lab_inputs, production=False), name
-
-
-def test_the_tiled_decode_knobs_match_the_lab_and_are_not_the_siblings():
-    """The decode knobs are RECIPE values and drift silently if left as
-    literals. A retired sibling lane decoded whole-clip at 4096/8 by
-    default; inheriting that by resemblance would change a measured recipe on
-    a lane with 0.02 GiB of headroom, and nothing would say so."""
-    _doc, g = _graph()
-    _k, dec = _node(g, "VAEDecodeTiled")
-    assert dec["inputs"]["tile_size"] == R.LTX25_DECODE_TILE_SIZE
-    assert dec["inputs"]["overlap"] == R.LTX25_DECODE_OVERLAP
-    assert dec["inputs"]["temporal_size"] == R.LTX25_DECODE_TEMPORAL_SIZE
-    assert dec["inputs"]["temporal_overlap"] == R.LTX25_DECODE_TEMPORAL_OVERLAP
-    assert R.LTX25_DECODE_TEMPORAL_SIZE != 4096, (
-        "4096 is a retired sibling lane's whole-clip default, not this "
-        "lane's recipe")
-
-
-def test_the_peak_decomposition_sums_to_the_observed_peak():
-    """The lab's correction, pinned: the 14.48 GiB peak is DiT weights plus
-    activations plus allocator context, with the encoder and VAEs at ZERO.
-
-    This is what makes 'aggressive staging will bring the peak down' false --
-    at the moment of the peak the encoder is not resident to free. Pinned as
-    arithmetic so the claim cannot rot into folklore."""
-    parts = R.LTX25_PEAK_DECOMPOSITION_GIB
-    assert parts["text_encoder"] == 0.0
-    assert parts["vaes"] == 0.0
-    assert abs(sum(parts.values()) - R.LTX25_LAB_OBSERVED_PEAK_GIB) < 0.005, (
-        "decomposition %r does not sum to the observed %r"
-        % (parts, R.LTX25_LAB_OBSERVED_PEAK_GIB))
-    assert R.LTX25_STAGING_REDUCES_PEAK is False
-
-
-def test_the_lab_vram_figure_is_recorded_but_not_used_as_qualification():
-    """CLAUDE.md 0A: a bench result may never be worded as qualification. The
-    number is kept for traceability; OUR envelope comes from our own smoke."""
-    doc, _ = _graph()
-    assert doc["contract"]["vram_ceiling_gb"] == R.LTX25_LAB_CLAMP_GIB
-    assert R.LTX25_LAB_OBSERVED_PEAK_GIB < R.LTX25_LAB_CLAMP_GIB

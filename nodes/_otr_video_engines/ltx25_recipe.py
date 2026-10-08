@@ -11,9 +11,18 @@ predecessor `otr_ltx_2_5_integration_handoff.md`. Reviewed against
 
 **THE LAB'S NUMBERS ARE LAB NUMBERS.** `CLAUDE.md` section 0A is explicit that a
 bench result "may never be worded as qualification" for OTR and must be
-re-proved through the canonical workflow. So the VRAM figure below is recorded
-as a lab observation and is NOT an envelope key, and the G4 envelope admission
+re-proved through the canonical workflow. So the VRAM figure the lab measured
+is a lab observation and is NOT an envelope key, and the G4 envelope admission
 still waits on OUR OWN solo smoke (G8).
+
+The lab's figure is a 14.48 GiB peak under a 14.5 GiB clamp: 9.80 GiB of DiT
+weights + 3.20 GiB of activations + 1.48 GiB of allocator context, with the text
+encoder and both VAEs at ZERO (Gemma was already evicted -- ComfyUI spills the
+encoder to system RAM before sampling on its own). So staging cannot shrink it:
+`free_after_use` and the residue-freer are hygiene against the writer LLM and
+the TTS stages earlier in the same process, not what makes this lane fit, and a
+smoke that OOMs is an upstream-residue or allocator-fragmentation finding to
+report, not a missing free() call.
 
 The `low`/`high` token in the public id is NO LONGER waiting -- that naming is
 settled and the `high` lanes are registered and shipping (corrected 2026-08-28;
@@ -42,7 +51,10 @@ from __future__ import annotations
 #: lanes (a second decode pass in eng_ltx25; measured cheap in the lab at
 #: <50 MB VRAM and <1 s, which is why it was affordable). It was named here
 #: before those lanes existed, and this comment described the decode as
-#: future work until 2026-08-28.
+#: future work until 2026-08-28. It is required even by the SILENT lane:
+#: ``LTXVEmptyLatentAudio`` takes it to MINT the audio latent the joint AV
+#: sampler consumes, so a silent lane still loads it and only skips
+#: ``LTXVAudioVAEDecode`` (see ``eng_ltx25._weight_paths``).
 LTX25_VIDEO_VAE = "ltx-2.5-video-vae-bf16.safetensors"
 LTX25_AUDIO_VAE = "ltx-2.5-audio-vae-bf16.safetensors"
 
@@ -51,16 +63,6 @@ LTX25_AUDIO_VAE = "ltx-2.5-audio-vae-bf16.safetensors"
 #: workflow use this exact filename.
 LTX25_UPSCALER_MODEL = (
     "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors")
-
-#: THE AUDIO VAE IS REQUIRED EVEN BY THE SILENT LANE, and this surprises people.
-#: ``LTXVEmptyLatentAudio`` (golden JSON node 12) takes ``audio_vae`` to MINT the
-#: audio latent, and ``LTXVConcatAVLatent`` (node 30) needs that latent to build
-#: the joint AV tensor the sampler consumes. So a silent lane still loads the
-#: audio VAE and still computes the audio side through all 8 steps -- it only
-#: skips ``LTXVAudioVAEDecode`` (node 34) at the end. This is exactly what
-#: the retired ``eng_ltx_av`` lane already did, and it means "we discard the
-#: audio" never meant "we avoid paying for it".
-LTX25_AUDIO_VAE_REQUIRED_EVEN_WHEN_SILENT = True
 
 # ---------------------------------------------------------------------------
 # Canvas and length
@@ -83,7 +85,10 @@ LTX25_RENDER_CANVAS_H = LTX25_CANVAS_H * 2
 #: 97 frames at 25 fps = 3.88 s, the standard OTR shot length. The temporal
 #: contract is `(97 - 1) % 8 == 0`, which the model's temporal downsampling
 #: requires. `CLAUDE.md` separately forbids raising the 97 trained-length cap,
-#: so this satisfies both constraints at once rather than by coincidence.
+#: so this satisfies both constraints at once rather than by coincidence. The
+#: lab's 161-frame multishot was REJECTED (it spikes to 18-20 GiB at this
+#: canvas); the replacement for multi-shot continuity is the first-frame anchor
+#: below.
 LTX25_FRAMES = 97
 LTX25_FPS = 25
 
@@ -147,28 +152,25 @@ LTX25_NEGATIVE_PROMPT = ""
 # Decode -- the tiled VAE knobs are RECIPE VALUES, not house defaults
 # ---------------------------------------------------------------------------
 
-#: ``VAEDecodeTiled`` (golden JSON node 33), verbatim. These live HERE rather
-#: than as literals in the adapter for one specific reason: the retired
-#: sibling ``eng_ltx_av`` decoded through an ENV-DRIVEN helper whose default was
-#: **4096 / 8** -- whole-clip, no temporal tiling -- and its comment praises
-#: that default for having no inter-tile seam. Copying that helper into this
-#: lane, which is the natural thing to do when modelling one adapter on
-#: another, would silently replace a measured recipe value with a different
-#: one on a lane that has 0.02 GiB of headroom. Whole-clip decode of 97 frames
-#: is exactly the kind of allocation that spends headroom this lane does not
-#: have.
+#: ``VAEDecodeTiled`` as the executable two-stage recipe has it, verbatim. There
+#: is ONE decode: after the refinement sampler, at the doubled canvas. (The
+#: lab's one-stage golden tiled its decode 33 frames with a 4-frame overlap;
+#: that decode is not in the shipping graph.)
 #:
-#: So: 33 frames per temporal tile with a 4-frame overlap, 512-pixel spatial
+#: These live HERE rather than as literals in the adapter for one specific
+#: reason: the retired sibling ``eng_ltx_av`` decoded through an ENV-DRIVEN
+#: helper whose default was **4096 / 8** -- whole-clip, no temporal tiling --
+#: and its comment praises that default for having no inter-tile seam. Copying
+#: that helper into this lane, which is the natural thing to do when modelling
+#: one adapter on another, would silently replace a measured recipe value with
+#: a different one on a lane that has 0.02 GiB of headroom. Whole-clip decode
+#: of 97 frames is exactly the kind of allocation that spends headroom this
+#: lane does not have.
+#:
+#: So: 64 frames per temporal tile with a 16-frame overlap, 512-pixel spatial
 #: tiles with 64 overlap, as measured. NOT env-overridable, because there is no
 #: number here an environment is entitled to move (the recipe is locked), and a
 #: knob that reaches nothing is worse than no knob.
-LTX25_DECODE_TILE_SIZE = 512
-LTX25_DECODE_OVERLAP = 64
-LTX25_DECODE_TEMPORAL_SIZE = 33
-LTX25_DECODE_TEMPORAL_OVERLAP = 4
-
-#: Terminal decode geometry from the executable two-stage recipe. There is one
-#: decode: after the refinement sampler, at the doubled canvas.
 LTX25_STAGE2_DECODE_TILE_SIZE = 512
 LTX25_STAGE2_DECODE_OVERLAP = 64
 LTX25_STAGE2_DECODE_TEMPORAL_SIZE = 64
@@ -304,83 +306,3 @@ LTX25_TWO_STAGE_RECIPE_ID = "ltx_2_5_two_stage"
 #: framing is "0.7 vs 1.0 has never been A/B'd on this model", not "the lab
 #: chose 1.0".
 LTX25_I2V_ANCHOR_STRENGTH = 1.0
-LTX25_I2V_ANCHOR_NODE = "LTXVImgToVideoInplace"
-
-#: The scheduler's ``latent`` port. CORRECTED AGAINST THE GOLDEN JSON: the prose
-#: says "connected to the EmptyLTXVLatentVideo output", but node 7 in the
-#: executable recipe takes ``latent: ["16", 0]`` -- the ImgToVideoInplace
-#: OUTPUT, which is itself fed by EmptyLTXVLatentVideo (node 11). On the I2V
-#: path those are not the same tensor, and wiring it to node 11 directly would
-#: hand the scheduler a latent with no still baked in.
-LTX25_SCHEDULER_LATENT_SOURCE = "LTXVImgToVideoInplace"
-
-# ---------------------------------------------------------------------------
-# Explicitly CLOSED options -- recorded so nobody re-opens them by accident
-# ---------------------------------------------------------------------------
-
-#: 161-frame multishot: REJECTED. Spikes to 18-20 GiB at this canvas. The
-#: replacement for multi-shot continuity is the first-frame anchor above.
-LTX25_MULTISHOT_ALLOWED = False
-
-#: In-graph 2x latent upscaling: SELECTED for the shipping HQ path. The former
-#: ban said decoding 1664x960x97 hard-OOMed; the lab subsequently ran exactly
-#: that graph and produced the accepted HQ video. Keep it in one graph so a
-#: canonical OTR render cannot publish while silently skipping refinement.
-LTX25_INGRAPH_UPSCALE_ALLOWED = True
-
-#: The scheduler's `latent` port MUST be connected to the empty/init latent.
-#: Left dangling it silently defaults to a 4096-token curve and ruins the motion
-#: shift maths -- a wrong-but-running failure, which is the worst kind. Pinned
-#: by test rather than trusted to review.
-LTX25_SCHEDULER_LATENT_MUST_BE_CONNECTED = True
-
-# ---------------------------------------------------------------------------
-# Lab observation -- NOT an OTR qualification
-# ---------------------------------------------------------------------------
-
-#: What the LAB measured for the locked recipe. Recorded for traceability and
-#: deliberately NOT used as an admission number: per `CLAUDE.md` 0A a bench
-#: result may never be worded as qualification, and this figure sits 0.02 GiB
-#: under the 14.5 clamp, which is far too tight to inherit on trust. OUR figure
-#: comes from the G8 solo smoke on OUR boot lane, and it is that figure -- not
-#: this one -- that fills the G4 envelope key.
-#:
-#: **THE PUBLIC TOKEN NO LONGER WAITS ON THIS (2026-08-19).** It used to, and
-#: the note said so. The operator then ruled the 4060 out entirely, which
-#: settles the naming by deleting the question rather than answering it: the
-#: lane is 5080-only, so `high` is what the token means and
-#: `ltx25_high_video` is registered. The envelope key still waits on the smoke.
-LTX25_LAB_OBSERVED_PEAK_GIB = 14.48
-LTX25_LAB_CLAMP_GIB = 14.5
-
-#: **WHERE THE 14.48 GiB ACTUALLY GOES, and why staging cannot shrink it**
-#: (lab correction, 2026-08-19 -- it overturned the driver's own framing).
-#:
-#: The peak decomposes as **9.80 GiB DiT weights + 3.20 GiB activations +
-#: 1.48 GiB allocator context**, with the text encoder and both VAEs at
-#: **ZERO**. It was measured with Gemma ALREADY evicted -- ComfyUI spills the
-#: encoder to system RAM before sampling on its own.
-#:
-#: SO THE OBVIOUS INFERENCE IS WRONG. "Load the encoder, free it, then load the
-#: transformer" does not buy headroom here, because at the moment of the peak
-#: the encoder was never resident in the first place. The adapter still runs
-#: `free_after_use` and still calls the canonical residue-freer, and both are
-#: worth keeping -- but as HYGIENE against residue from the writer LLM and the
-#: TTS stages EARLIER IN THE SAME PROCESS, not as the thing that makes this
-#: lane fit. It does not make it fit; the DiT and its activations do that on
-#: their own, with 0.02 GiB to spare.
-#:
-#: THE CONSEQUENCE FOR ANYONE READING A FAILING SMOKE: if this lane OOMs, the
-#: cause is upstream residue or allocator fragmentation, NOT a staging bug in
-#: the adapter, and the fix is not to add another free() call. Report it.
-LTX25_PEAK_DECOMPOSITION_GIB = {
-    "dit_weights": 9.80,
-    "activations": 3.20,
-    "allocator_context": 1.48,
-    "text_encoder": 0.0,
-    "vaes": 0.0,
-}
-
-#: Staging is hygiene, not headroom. Pinned as a constant so the claim has one
-#: home and a test can hold the adapter's comments to it.
-LTX25_STAGING_REDUCES_PEAK = False

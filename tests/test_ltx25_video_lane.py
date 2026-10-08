@@ -381,16 +381,15 @@ def test_the_anchor_is_ImgToVideoInplace_at_full_strength(graph):
 
 
 def test_the_scheduler_latent_comes_from_the_ANCHOR_not_the_empty_latent(graph):
-    """CORRECTED AGAINST THE RECIPE CONSTANT, deliberately -- not against the
+    """CORRECTED AGAINST THE GOLDEN FILE, deliberately -- not against the
     r2 coding plan, whose A1 bullet still says ``EmptyLTXVLatentVideo`` and is
     stale, and not against the sibling adapter, which wires its scheduler to
     the CONCAT output. Only one of the three is what the golden file does."""
     src = graph["sched"]["inputs"]["latent"]
     assert src.src == "i2v", (
-        "scheduler latent came from %r; the recipe pins %s"
-        % (src.src, R.LTX25_SCHEDULER_LATENT_SOURCE))
+        "scheduler latent came from %r; the golden file pins the i2v anchor"
+        % (src.src,))
     assert graph["i2v"]["class"] == "i2v"
-    assert R.LTX25_SCHEDULER_LATENT_MUST_BE_CONNECTED is True
 
 
 # --------------------------------------------------------------------------
@@ -538,7 +537,6 @@ def test_the_decode_knobs_come_from_the_recipe_not_the_sibling(graph):
 def test_the_selected_HQ_second_stage_is_wired_exactly(graph):
     """The three roles supply different stills/prompts; this shared topology
     must refine each role's own first-stage result without replacing either."""
-    assert R.LTX25_INGRAPH_UPSCALE_ALLOWED is True
     assert graph["upscale_loader"]["inputs"]["model_name"] == R.LTX25_UPSCALER_MODEL
     assert graph["latent_upscale"]["inputs"]["samples"].src == "separate"
     assert graph["refine_i2v"]["inputs"]["image"].src == "preprocess"
@@ -588,7 +586,6 @@ def test_the_video_vae_is_ONE_loader_matching_the_golden_recipe(graph):
                if spec["inputs"].get("vae_name") == R.LTX25_VIDEO_VAE]
     assert loaders == ["videovae"], (
         "the video VAE must be loaded exactly once: %r" % sorted(loaders))
-    assert R.LTX25_PEAK_DECOMPOSITION_GIB["vaes"] == 0.0
 
 
 def test_the_graph_is_acyclic_and_every_wire_resolves(graph):
