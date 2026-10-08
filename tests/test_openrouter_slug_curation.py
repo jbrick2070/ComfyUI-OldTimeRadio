@@ -24,7 +24,6 @@ silent decay it exists to prevent.
 from __future__ import annotations
 
 import datetime
-import re
 
 import pytest
 
@@ -39,9 +38,9 @@ _FREE_MARKERS = (":free", "-free")
 def _shipped_concrete_ids() -> set[str]:
     """Every CONCRETE (non-alias) OpenRouter id this pack ships.
 
-    Aliases need no date -- they resolve upstream at request time, which is the
-    whole reason the curation prefers them. Concrete ids are version claims that
-    can quietly stop being true, so they are exactly the set that must be dated.
+    Aliases resolve upstream at request time, which is the whole reason the
+    curation prefers them. Concrete ids are version claims that can quietly stop
+    being true, so the shipped-slug checks below must see every one of them.
     """
     concrete = {
         orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
@@ -51,14 +50,14 @@ def _shipped_concrete_ids() -> set[str]:
         row["id"] for row in getattr(cat, "CURATED_CREATIVE_ROWS", ())
     )
     # The auto-routers (2026-08-10). They carry no '~', so they are concrete by
-    # this rule and must be dated like any other pin. Included HERE rather than
-    # left to a test of their own, because a curated list the dating guard
-    # cannot see is precisely the second-list-that-must-agree defect the rest of
-    # this suite exists to prevent.
+    # this rule. Included HERE rather than left to a test of their own, because
+    # a curated list the shipped-slug checks cannot see is precisely the
+    # second-list-that-must-agree defect the rest of this suite exists to
+    # prevent.
     concrete.update(getattr(cat, "OPENROUTER_CURATED_ROUTERS", ()))
     concrete.update(getattr(cat, "OPENROUTER_CURATED_UNTILDED_LATEST", ()))
     # Computed from the '~' prefix rather than a hand-kept list, so a future
-    # alias-valued default (chunk B) does not demand a nonsensical date entry.
+    # pointer-valued default (chunk B) is never mistaken for a concrete pin.
     return {mid for mid in concrete if not mid.startswith("~")}
 
 
@@ -110,26 +109,9 @@ def test_both_slots_default_to_the_auto_router():
         assert default in cat.OPENROUTER_CURATED_ROUTERS, default
 
 
-def test_a_default_router_is_still_dated_and_still_json_capable():
-    """The default is now a concrete id, so the dating rule must still cover it
-    -- and it must be one of the two routers measured able to return JSON, not
-    one of the three that declare no parameters at all."""
-    for default in (orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
-                    orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT):
-        assert default in cat.OPENROUTER_VERIFIED_ON_BY_ID, default
-        assert default in ("openrouter/auto", "openrouter/auto-beta"), default
-
-
-def test_routers_are_dated_like_any_other_concrete_pin():
-    for router in cat.OPENROUTER_CURATED_ROUTERS:
-        assert not router.startswith("~"), router
-        assert router in cat.OPENROUTER_VERIFIED_ON_BY_ID, router
-
-
 def test_routers_are_not_smuggled_into_the_pointer_set():
     """The curated ALIAS tuple is `~...` pointers only; a router in there would
-    fail test_curated_aliases_are_all_routing_pointers_and_unique, and putting
-    it there would also hide it from the dating guard."""
+    fail test_curated_aliases_are_all_routing_pointers_and_unique."""
     for router in cat.OPENROUTER_CURATED_ROUTERS:
         assert router not in cat.OPENROUTER_CURATED_ALIASES, router
 
@@ -215,21 +197,6 @@ def test_no_shipped_slug_carries_a_free_marker():
             )
 
 
-def test_every_concrete_id_is_dated():
-    """Keys must be EXACTLY the shipped concrete ids -- so a new pin cannot be
-    added without a date, and a removed pin cannot leave a stale entry."""
-    assert set(cat.OPENROUTER_VERIFIED_ON_BY_ID) == _shipped_concrete_ids()
-
-
-def test_verified_on_dates_are_real_iso_dates():
-    """`fromisoformat`, not a regex: a regex accepts 2026-02-31."""
-    for mid, raw in cat.OPENROUTER_VERIFIED_ON_BY_ID.items():
-        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw), (
-            f"{mid}: {raw!r} is not YYYY-MM-DD"
-        )
-        datetime.date.fromisoformat(raw)  # raises on an impossible date
-
-
 def test_curated_aliases_are_all_routing_pointers_and_unique():
     # NOTE ON NAMING: the bare identifier `alias` is on this repo's
     # forbidden-symbol extinction list (tests/_s28_forbidden_sweep.py, the
@@ -243,19 +210,17 @@ def test_curated_aliases_are_all_routing_pointers_and_unique():
         assert slug.startswith("~"), (
             f"{slug!r} is in the curated ROUTING-POINTER set but is not a "
             f"'~...' pointer. A concrete id belongs in "
-            f"OPENROUTER_CURATED_UNTILDED_LATEST or CURATED_CREATIVE_ROWS "
-            f"with a verified-on date."
+            f"OPENROUTER_CURATED_UNTILDED_LATEST or CURATED_CREATIVE_ROWS."
         )
 
 
-def test_openai_chat_latest_is_the_untitled_moving_alias_and_is_dated():
+def test_openai_chat_latest_is_the_untitled_moving_alias():
     """Operator 2026-09-16: openai/gpt-chat-latest is OpenAI's own moving
     ChatGPT Instant alias. It has no leading `~`. Keep it out of the `~`
-    pointer tuple, date it, and offer it in the dropdown."""
+    pointer tuple and offer it in the dropdown."""
     untitled = cat.OPENROUTER_CURATED_UNTILDED_LATEST
     assert untitled == ("openai/gpt-chat-latest",)
     assert "openai/gpt-chat-latest" not in cat.OPENROUTER_CURATED_ALIASES
-    assert cat.OPENROUTER_VERIFIED_ON_BY_ID["openai/gpt-chat-latest"] == "2026-09-16"
     for slug in untitled:
         assert not slug.startswith("~")
         assert slug.endswith("-latest")

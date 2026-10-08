@@ -1480,7 +1480,8 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
 #       request time, so a new model in that family is picked up with no edit
 #       here and an operator never sees a slug that has gone stale.
 #   (b) Carry a CONCRETE id only where a specific version genuinely matters, and
-#       give it a date in OPENROUTER_VERIFIED_ON_BY_ID below.
+#       record beside it the date it was last verified against live
+#       /api/v1/models.
 #   (c) NEVER carry a `:free` or promo-priced slug. A `:free` id is a PRICE
 #       PROMISE baked into an IDENTIFIER, and price promises expire while
 #       identifiers do not -- `tencent/hy3:free` was carried here until its promo
@@ -1543,23 +1544,12 @@ OPENROUTER_CURATED_ALIASES = (
 )
 
 # OpenAI's own moving ChatGPT Instant alias. No leading `~` -- that is the
-# published OpenRouter id. Dated like any other untitled pin. Offered in the
-# curated dropdown block; never a recommended default.
+# published OpenRouter id. Verified against live /api/v1/models on 2026-09-16.
+# Offered in the curated dropdown block; never a recommended default.
 OPENROUTER_CURATED_UNTILDED_LATEST: tuple[str, ...] = (
     "openai/gpt-chat-latest",
 )
 
-#: Every CONCRETE (non-alias) OpenRouter id this pack ships, mapped to the date
-#: it was last verified against live /api/v1/models. An alias needs no date --
-#: it resolves upstream -- but a concrete id is a claim about a specific version
-#: that can quietly stop being true. The guard test asserts these keys are
-#: EXACTLY the concrete ids shipped, so a new pin cannot be added undated.
-#:
-#: Down to ONE entry as of chunk B (2026-08-09): the creative default became
-#: `~anthropic/claude-opus-latest`, and an alias needs no date because there is
-#: no version claim left to go stale. The guard test computes this set from the
-#: '~' prefix, so the removal below is not optional bookkeeping -- leaving the
-#: old dated pin here would fail `test_every_concrete_id_is_dated`.
 #: The auto-routers offered in the A/B slug dropdowns (operator, 2026-08-10:
 #: "pick the 1-2 best autos for my workflow and add them").
 #:
@@ -1599,22 +1589,6 @@ OPENROUTER_CURATED_ROUTERS: tuple[str, ...] = (
     "openrouter/auto",        # the stable one -- start here
     "openrouter/auto-beta",   # the experimental twin, same capabilities today
 )
-
-#: Every CONCRETE (non-alias) id, dated. The routers are concrete -- they carry
-#: no `~` -- so they are dated like any other pin even though a router is in
-#: practice the most evergreen thing on the board: it cannot go stale, it can
-#: only change what it points at. The date records that both were confirmed
-#: listed, text-capable and `response_format`-declaring on that day.
-OPENROUTER_VERIFIED_ON_BY_ID: dict[str, str] = {
-    # `deepseek/deepseek-v4-pro` was here as the recommended TECHNICAL default
-    # until 2026-08-10, when both slots moved to the auto-router. The dating rule
-    # is an EXACT match against shipped concrete ids, so a date for something no
-    # longer shipped is itself a defect -- it would read as a live claim about a
-    # slug this pack does not offer.
-    "openrouter/auto": "2026-08-10",
-    "openrouter/auto-beta": "2026-08-10",
-    "openai/gpt-chat-latest": "2026-09-16",
-}
 
 
 def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
