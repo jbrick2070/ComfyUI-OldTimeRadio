@@ -2,10 +2,9 @@
 
 WORDS ARE AN OBSERVATION HERE, AND ONLY AN OBSERVATION. This module never
 classifies the accepted story as near, far, under, over, passing or failing,
-and since 2026-08-14 it does not record a requested target either -- there is
-no longer one to record. It stamps canonical actual counts and text hashes,
-attributed to the lane that produced them. There is no retry, candidate,
-mutation, range, ratio, drift or rejection API.
+and it does not record a requested target either. It stamps canonical actual
+counts and text hashes, attributed to the lane that produced them. There is no
+retry, candidate, mutation, range, ratio, drift or rejection API.
 """
 from __future__ import annotations
 
@@ -24,13 +23,6 @@ class WordDeliveryError(ValueError):
     """Invalid requested-length metadata supplied by a producer."""
 
 
-# (lean-mean 2026-08-22) ``_positive_int`` was here and is DELETED. It validated
-# a REQUESTED word length -- and since 2026-08-14 nothing is requested up front,
-# so its only caller went with the word authority. The module docstring above
-# already says there is no target to record; this removes the last helper that
-# still existed to police one.
-
-
 def stamp_contract(
     meta: MutableMapping[str, Any],
     *,
@@ -38,15 +30,12 @@ def stamp_contract(
 ) -> dict[str, Any]:
     """Record WHO owns this episode's word accounting. No target.
 
-    2026-08-14: `target_words` and `planned_voiced_words` were removed with
-    the word authority. Nothing is requested up front any more, so there is
-    no target to persist and no planned per-beat allocation to record --
-    `Beat.target_words` no longer exists either.
+    Nothing is requested up front, so there is no target to persist and no
+    planned per-beat allocation to record.
 
-    The receipt survives because `owner` is genuinely read (the freeze
-    cascade attributes the actual counts to a lane) and because
-    `stamp_actual` fills the same dict with what the episode TURNED OUT to
-    be. Requested length left; observed length stayed.
+    The receipt exists because `owner` is genuinely read (the freeze cascade
+    attributes the actual counts to a lane) and because `stamp_actual` fills the
+    same dict with what the episode TURNED OUT to be.
     """
     if not isinstance(meta, MutableMapping):
         raise WordDeliveryError("ledger meta must be mutable")

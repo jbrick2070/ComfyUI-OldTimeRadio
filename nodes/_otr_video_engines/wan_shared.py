@@ -1,13 +1,10 @@
-"""Shared PURE helpers, originally factored for the two in-process Wan motion
-engines and now reused by every in-process motion adapter that needs the same
-mechanics.
+"""Shared PURE helpers for the in-process motion adapters that need the same
+image/aspect/dims/clip-contract mechanics but have DIFFERENT loaders, node
+candidates and graphs.
 
-``wan_i2v`` (14B I2V; ``WanImageToVideo`` graph) and ``wan_ti2v`` (5B TI2V;
-``Wan22ImageToVideoLatent`` graph) -- both since retired -- shared the SAME
-image/aspect/dims/clip-contract mechanics but had DIFFERENT loaders, node
-candidates and graphs. Per GO_FORWARD section 4A ("share only pure
-dims/aspect/materialize/canonicalize helpers; keep loaders + node candidates +
-graph SEPARATE") this module factors ONLY the pure helpers, via:
+Per GO_FORWARD section 4A ("share only pure dims/aspect/materialize/canonicalize
+helpers; keep loaders + node candidates + graph SEPARATE") this module factors
+ONLY the pure helpers, via:
 
 * the module-level M7 silent-clip-contract functions (``_parse_fps`` /
   ``ffprobe_clip_fields`` / ``validate_silent_clip_contract``) -- engine-agnostic
@@ -162,9 +159,8 @@ def ffprobe_counted_frames(path, *, ffprobe="ffprobe"):
     unreadable count is a failed verification, not a zero.
 
     An ``OSError`` that is not ``FileNotFoundError`` -- a permission block, a
-    corrupt binary -- used to escape this function raw; since 2026-08-23 it
-    arrives as GraphExecutionError like every other probe failure, for the
-    reason set out at length in :func:`ffprobe_clip_fields`.
+    corrupt binary -- arrives as GraphExecutionError like every other probe
+    failure, for the reason set out at length in :func:`ffprobe_clip_fields`.
     """
     from .._otr_shared import ffprobe as _ffp
 
@@ -593,14 +589,12 @@ class WanInitImageMixin:
             # "ping_pong"; ``native_frame_count`` is how many of the EMITTED
             # frames were really rendered.
             #
-            # EMITTED, not decoded (corrected 2026-08-06). This comment used to
-            # read "what the graph decoded", which disagreed with the adapters'
-            # own wording and never mattered while only WAN stamped the field --
-            # WAN emits exactly what it decodes, so the two readings coincide.
-            # They stop coinciding on a lane that trims internally, and the rule
-            # settles it: ``frame_count - native_frame_count`` is the count of
-            # MANUFACTURED frames, so a decoded-scope count would make that gap
-            # negative and meaningless. The count can never exceed the clip.
+            # EMITTED, not decoded: the two readings coincide while only WAN
+            # stamps the field (WAN emits exactly what it decodes), but not on a
+            # lane that trims internally, and the rule settles it:
+            # ``frame_count - native_frame_count`` is the count of MANUFACTURED
+            # frames, so a decoded-scope count would make that gap negative and
+            # meaningless. The count can never exceed the clip.
             # None on a raw that predates the stamp -- consumers use .get().
             "native_frame_count": raw.get("native_frame_count"),
             "extension_mode": raw.get("extension_mode"),

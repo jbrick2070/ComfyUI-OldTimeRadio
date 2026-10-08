@@ -33,10 +33,8 @@ contract). `motion_registers` values are budgeted at 240 chars at load
 ONE STYLE AUTHORITY (2026-08-17, PBUG-20260817-01): a pack also owns its own
 NEGATIVE (`negative_tail`) and this module owns the single derivation of the
 style TOKEN (`compact_style_cue`) and the single way it is applied
-(`prefix_style_cue`). Both used to live in `render_driver` serving video
-prompts only, while the negative lived hardcoded in `z_image_turbo` where it
-was style-blind and vetoed four of the nine packs on every mint. `negative_tail`
-is KNOWN-but-OPTIONAL rather than required so that FROZEN embedded packs, whose
+(`prefix_style_cue`), so a negative is never style-blind. `negative_tail` is
+KNOWN-but-OPTIONAL rather than required so that FROZEN embedded packs, whose
 sha256 receipt forbids injecting a default, still validate.
 
 The byte-identity contract: sci_fi_radio.json's fields are byte-identical to
@@ -117,9 +115,8 @@ _REQUIRED_FIELDS: "dict[str, type]" = {
 #: KNOWN-but-OPTIONAL fields: accepted when present, never demanded.
 #:
 #: `negative_tail` (2026-08-17, PBUG-20260817-01) is the pack's own NEGATIVE
-#: conditioning -- the style half of what `z_image_turbo` used to hardcode
-#: engine-side, where it was style-blind and vetoed four illustration-family
-#: packs on every mint.
+#: conditioning: the style half of the negative, which a style-blind engine-side
+#: negative cannot supply.
 #:
 #: It is OPTIONAL rather than required for one hard reason: `get_visual_style`
 #: re-validates `embedded_visual_style_pack` out of FROZEN ledgers and then
@@ -149,14 +146,12 @@ _REQUIRED_FIELDS: "dict[str, type]" = {
 #: the canonical bytes against the stored receipt, so a REQUIRED key would fail
 #: every pre-existing ledger and a compensating default would change the bytes
 #: and trip the sha instead.
-#: `portrait_look_talking` is RETIRED (2026-09-25, the talking-face still
-#: mode was ripped with the Kling Avatar engine, b118c377). No shipped pack
-#: carries it and nothing reads it. It stays KNOWN only so the
-#: `embedded_visual_style_pack` in every episode ledger minted before that day
-#: still validates on replay -- the same frozen-history reason as the two
-#: fields above, and for the same reason it is accepted as-is, never stripped
-#: or defaulted, since either would change the bytes the sha256 receipt pins.
-#: Found by Sonnet QA on b118c377.
+#: `portrait_look_talking` is LEGACY-ONLY: no shipped pack carries it and
+#: nothing reads it. It stays KNOWN only so the `embedded_visual_style_pack` in
+#: every episode ledger minted before 2026-09-25 still validates on replay --
+#: the same frozen-history reason as the two fields above, and for the same
+#: reason it is accepted as-is, never stripped or defaulted, since either would
+#: change the bytes the sha256 receipt pins.
 _OPTIONAL_FIELDS: "dict[str, type]" = {
     "negative_tail": str,
     "checkpoint": str,
@@ -657,13 +652,11 @@ def get_visual_style(meta: object) -> VisualStyle:
 
 #: The one place a style TOKEN is derived, and the one place it is applied.
 #:
-#: ONE STYLE AUTHORITY (2026-08-17): this pair used to live only in
-#: `render_driver` as `_compact_style_talking_cue` / `_prefix_video_style_cue`,
-#: serving video prompts. Stills reached the engines with their style only
-#: TAIL-appended by `finish_visual_prompt`, i.e. in the weakest position on
-#: models that weight early tokens. Both families now share this derivation --
-#: a second, disagreeing definition of "the style word" is the failure mode
-#: this consolidation exists to prevent.
+#: ONE STYLE AUTHORITY (2026-08-17): video and still prompts share this
+#: derivation, so the style can be applied at the FRONT (a style only
+#: TAIL-appended by `finish_visual_prompt` sits in the weakest position on
+#: models that weight early tokens), and a second, disagreeing definition of
+#: "the style word" is the failure mode this consolidation exists to prevent.
 
 
 def compact_style_cue(vstyle) -> str:

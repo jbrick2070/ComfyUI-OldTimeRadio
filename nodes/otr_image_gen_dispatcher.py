@@ -229,9 +229,8 @@ def resolve_seed_and_mode(
 #: ImageDirector slot per object ROLE (still-spine ST-3: the slots finally
 #: honored -- announcer stills render on the announcer slot, music/open stills
 #: on the music slot; character portraits + character-associated scene stills on
-#: the character slot). Renamed 2026-07-03: the old catch-all image slot
-#: is now character_image_model (retired_role_a + background roles were ripped
-#: 2026-07-01, so it serves only the character_video lane).
+#: the character slot). That slot, character_image_model, serves only the
+#: character_video lane.
 _ROLE_TO_IMAGE_SLOT = {
     "announcer_visual": "announcer_image_model",
     "music_visual": "music_image_model",
@@ -280,13 +279,15 @@ def negative_source_label(pack_negative, obj_negative) -> str:
     (COMPOSITION ONLY). It has already drifted once unnoticed -- the
     one-style-authority PLAN documented ``env_override``, which never shipped.
 
-    ITEM H (2026-08-17): the empty arm used to read `engine_hygiene`, a claim about
-    what the ENGINE adds on top. That was wrong twice over. It was computed before
-    `resolve_engine_for_role` picks an engine, so it asserted a property of an
-    engine not yet chosen -- accurate for `z_image_turbo` (which does end
-    `.strip() or _HYGIENE_NEGATIVE`) and false for `lumina_image` (no floor at all)
-    purely by coincidence. And it put two authorities in one value: composition
-    belongs to the dispatcher, the hygiene floor belongs to the engine.
+    ITEM H (2026-08-17): the empty arm is `none_contributed`, never
+    `engine_hygiene` (a claim about what the ENGINE adds on top), which would be
+    wrong twice over. It is computed before `resolve_engine_for_role` picks an
+    engine, so it would assert a property of an engine not yet chosen --
+    accurate for `z_image_turbo` (which does end
+    `.strip() or _HYGIENE_NEGATIVE`) and false for `lumina_image` (no floor at
+    all) purely by coincidence. And it would put two authorities in one value:
+    composition belongs to the dispatcher, the hygiene floor belongs to the
+    engine.
 
     Naming the empty case for what is actually known dissolves the ordering
     coupling entirely -- the answer no longer depends on the engine, so it does not
@@ -310,9 +311,9 @@ def negative_source_label(pack_negative, obj_negative) -> str:
     return "none_contributed"
 
 
-#: Excerpt half-width around a path-guard match. The old report was
-#: ``prompt[:60]``, which shows nothing useful when the offending character sits
-#: late in a long prompt -- the excerpt is centred on the match instead.
+#: Excerpt half-width around a path-guard match: a ``prompt[:60]`` report shows
+#: nothing useful when the offending character sits late in a long prompt, so
+#: the excerpt is centred on the match.
 _PATH_GUARD_EXCERPT_RADIUS = 90
 
 _DRIVE_ROOT_RE = _re.compile(r"^[A-Za-z]:[\/]")
@@ -337,13 +338,12 @@ def path_guard_arm(prompt: str) -> "dict | None":
     WHOLE-STRING CLASSIFICATION (2026-08-05). The guard exists because a
     prompt-STRING socket and a path-STRING socket must not be crossed, and a
     socket carries a WHOLE value: a crossed socket delivers a string that IS a
-    path, never prose that merely contains one. The old predicate was
-    ``os.sep in p or os.altsep in p or endswith(ext)``, and on Windows
-    ``os.altsep`` is ``/`` -- so "a black/white striped scarf" and "the corner
-    of 5th/Main" were refused and their beats rendered NO still. Two producers
-    grew local sanitizers to launder slashes out of prose, and the helper's own
-    comment conceded that laundering a REAL path turns a loud refusal into a
-    quiet garbled render. Both are removed with this change.
+    path, never prose that merely contains one. A bare separator test
+    (``os.sep in p or os.altsep in p or endswith(ext)``) is wrong: on Windows
+    ``os.altsep`` is ``/``, so "a black/white striped scarf" and "the corner of
+    5th/Main" would be refused and their beats render NO still. Laundering
+    slashes out of prose is wrong too: it turns a loud refusal of a REAL path
+    into a quiet garbled render.
 
     The arms are ORDERED, most specific first, and every one of them describes
     the ENTIRE string:
@@ -903,19 +903,18 @@ def merge_jump_still_requests(ledger, objects, required_scene_targets):
                 "like. NO GUESS." % beat)
         base = scene_by_beat.get(beat)
         if base is None:
-            # NO SILENT SKIP (2026-07-25 QA fix). This branch used to infer
-            # "no scene object and no required target means the lane consumes
-            # no still, so its segments need none" and drop the requests. That
-            # inference contradicted the still spine, which demands every
-            # STAMPED request back regardless -- so the episode died at the
-            # render boundary instead, with a message about a missing still
-            # nobody had decided to skip. The inference now happens ONCE, at
-            # the mint (``otr_shot_lock._lane_consumes_a_still``), using the
-            # spine's own predicate, so a still-less lane never carries
-            # requests to begin with. Arriving here therefore means the stamp
-            # and the image payload genuinely disagree about one beat, and
-            # guessing which is right is how a jump cut ends up rendering from
-            # nothing.
+            # NO SILENT SKIP (2026-07-25 QA fix). This branch must not infer "no
+            # scene object and no required target means the lane consumes no
+            # still, so its segments need none" and drop the requests: that
+            # contradicts the still spine, which demands every STAMPED request
+            # back regardless, so the episode would die at the render boundary
+            # with a message about a missing still nobody had decided to skip.
+            # The inference happens ONCE, at the mint
+            # (``otr_shot_lock._lane_consumes_a_still``), using the spine's own
+            # predicate, so a still-less lane never carries requests to begin
+            # with. Arriving here therefore means the stamp and the image
+            # payload genuinely disagree about one beat, and guessing which is
+            # right is how a jump cut ends up rendering from nothing.
             raise ImageRenderError(
                 "beat %s owes a jump-segment still (%s, segment %d) but the "
                 "image phase minted no scene still to derive it from%s. A jump "
@@ -1492,10 +1491,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     2026-07-10 -- the old "skipped on CPU" warning let an episode "succeed"
     with missing stills).
 
-    (The old downstream 3D HALT -- locked_3d_slots x per_beat -- was removed
-    with the dormant 3D family, lean-mean order 4, 2026-08-23. The director no
-    longer emits the field; a STALE policy that still carries it is simply
-    ignored, because the capability it guarded can no longer be declared.)
+    (A STALE policy that still carries the retired ``locked_3d_slots`` field is
+    simply ignored: the capability it guarded can no longer be declared.)
     """
     # S4 platform-portability (2026-07-10): a NON-EMPTY policy must be
     # version 2. A v1 policy means a stale OTR_ImageDirector emitted it --
@@ -1754,9 +1751,6 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         #
         # COMPOSITION ONLY, and the one place that names it is
         # `negative_source_label` -- read its docstring before changing a value.
-        # Item H (2026-08-17) renamed the empty arm off "engine_hygiene", which was
-        # a claim about the ENGINE made before `resolve_engine_for_role` below has
-        # chosen one.
         _neg_source = negative_source_label(_pack_negative, _obj_negative)
         if _styled_now:
             # Provenance: MetaBrief stamped its own prompt_hash upstream for its
@@ -1920,9 +1914,9 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 banana_on=_banana_on, banana_key=_banana_key,
                 source=str(obj.get("identity_prompt_source") or ""),
             ).prompt_hash
-        # RE-KEYED 2026-08-26. This used to fire on "no portrait row", which
-        # after the portrait-free lanes shipped is the NORMAL state on every
-        # still lane -- it would cry wolf ~5x per healthy episode while the
+        # RE-KEYED 2026-08-26. This must not fire on "no portrait row": after
+        # the portrait-free lanes shipped that is the NORMAL state on every
+        # still lane, and it would cry wolf ~5x per healthy episode while the
         # seed was correctly anchored. The real defect is an empty BASIS on an
         # object whose lane asked for a face. jump_segment keeps its own
         # missing-portrait signal below; it deliberately does NOT share the
@@ -1991,11 +1985,11 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                                 anchor=anchor_hash if reference_image else "",
                                 source_context_hash=source_context_hash)
         if key in cache_index:
-            # Cache HIT (pass-02 Gem-2): the hit must STILL materialize into
-            # the CURRENT episode's stills/ + append a fresh ledger row --
-            # the old `continue` silently left episode folders missing every
-            # reused still. A stale index entry (file gone) degrades to a
-            # fresh render below, LOUD.
+            # Cache HIT (pass-02 Gem-2): the hit must STILL materialize into the
+            # CURRENT episode's stills/ + append a fresh ledger row (a bare
+            # `continue` would silently leave episode folders missing every
+            # reused still). A stale index entry (file gone) degrades to a fresh
+            # render below, LOUD.
             hit_id = cache_index[key]
             src = ""
             ref_row = None
@@ -2122,10 +2116,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             ) from exc
         if gen_fn is None:
             # S0 portability (2026-07-10): a pending target with no way to
-            # render it is a HARD FAIL, never a silent skip. The old branch
-            # warned "skipped on CPU" and continued, so an episode could
-            # "succeed" with missing stills. Inject a gen_fn (tests) or
-            # dispatch via OTRImageGenDispatcher (in-process engine path).
+            # render it is a HARD FAIL, never a silent skip (a warn-and-continue
+            # would let an episode "succeed" with missing stills). Inject a
+            # gen_fn (tests) or dispatch via OTRImageGenDispatcher (in-process
+            # engine path).
             raise ImageRenderError(
                 f"{oid}: image target requires generation but no gen_fn was "
                 f"provided (engine '{engine_id}', role '{role}'). NO SILENT "
@@ -2300,16 +2294,15 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     "WITHOUT it (engine=%s seed=%s). prompt=%r",
                     miss.get("object_id"), ev.get("reason"),
                     ev.get("engine_id"), ev.get("seed"), ev.get("prompt"))
-                # THE ROW THE WHOLE CONTROL PATH WAS MISSING (2026-08-28).
-                # Until now a tolerated refusal was logged and then dropped:
-                # ``skip_evidence_by_oid`` is function-local and dies with this
-                # call, and the target never entered the receipt. So the ledger
-                # recorded a refusal NOWHERE, the still-spine validator later
-                # found no materialized still and killed the episode, and a
-                # 30-minute render died for a blemish the operator had already
-                # ruled survivable. The row below is the evidence every reader
-                # downstream needs, and it is stamped at the one place that
-                # actually knows the refusal happened.
+                # THE GAP ROW IS THE EVIDENCE (2026-08-28). A tolerated refusal
+                # must be recorded in the receipt: ``skip_evidence_by_oid`` is
+                # function-local and dies with this call, so without this row
+                # the ledger records a refusal NOWHERE, the still-spine
+                # validator later finds no materialized still and kills the
+                # episode -- a 30-minute render dying for a blemish the operator
+                # had already ruled survivable. The row below is the evidence
+                # every reader downstream needs, and it is stamped at the one
+                # place that actually knows the refusal happened.
                 #
                 # NO PATH AND NO CONTENT HASH, deliberately: nothing was
                 # produced, and a gap row carrying a path would let a reader
@@ -2335,11 +2328,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     "image_revision": rev,
                 })
         if missing_targets:
-            # THE RAISE CARRIES ITS OWN EVIDENCE (2026-08-04). It used to report
-            # only the object ids, while the reason sat in ``warnings`` -- which
-            # is stamped into the ledger BELOW this line and therefore died with
-            # the exception. A 320-word leg failed here and took its own
-            # explanation with it.
+            # THE RAISE CARRIES ITS OWN EVIDENCE (2026-08-04): the reason sits
+            # in ``warnings`` -- which is stamped into the ledger BELOW this
+            # line and therefore dies with the exception -- so the message must
+            # name more than the object ids.
             detail = []
             for miss in missing_targets:
                 part = "%s (%s" % (miss["object_id"], miss["status"])
@@ -2541,7 +2533,7 @@ def _inprocess_gen_fn(request):
     prepared = None
     prep = getattr(eng, "prepare", None)
     if callable(prep):
-        # S4: real host facts instead of the old (None, None, None).
+        # S4: real host facts.
         from ._otr_shared.host_caps import build_host_caps
         prepared = prep(build_host_caps(), {}, {})
     try:

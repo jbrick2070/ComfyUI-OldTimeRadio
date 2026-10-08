@@ -5,10 +5,9 @@ hidden ``API_KEY_COMFY_ORG`` input as an ordinary input value, and when that
 node RAISES, the executor formats every input value -- the key included --
 into the error record it writes to /history, /api/jobs and the websocket
 error event (ComfyUI v0.36.0 execution.py: get_input_data -> format_value ->
-current_inputs). Nine OTR nodes used to declare the key, and several refuse
-ON PURPOSE (the Workflow Validator's balance, asset and story gates), so an
-ordinary refusal published the key to anyone who can read the history -- on
-a pod bound to 0.0.0.0, anyone the proxy admits.
+current_inputs). So every node that declares the key and refuses ON PURPOSE (the
+Workflow Validator's balance, asset and story gates) would publish it to anyone
+who can read the history -- on a pod bound to 0.0.0.0, anyone the proxy admits.
 
 NOW ONLY THIS NODE DECLARES IT, AND IT CANNOT RAISE: all of its work sits in
 one try/except, and its only output is a fixed token that never carries the

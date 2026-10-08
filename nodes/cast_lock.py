@@ -167,10 +167,7 @@ def _recurring_character_key(entry) -> str:
 def _clear_stale_voice_identity(entry: dict) -> list:
     """Clear stale engine-specific identity from ONE cast row.
 
-    RENAMED 2026-09-24 from `_normalize_row_for_tier_switch`. There are no tiers
-    to switch between any more; what survives, and is the only reason this is
-    still here, is that a row re-cast onto a different engine must not keep one
-    field from the old one.
+    A row re-cast onto a different engine must not keep a field of the old one.
 
     Transactional in the only sense that matters here: the keys to remove are
     computed first and then removed together, so no caller can observe a row that
@@ -359,24 +356,17 @@ def _recurring_character_bank_ref(entry, engine, bank_entries, language):
     prevent; a reservation delivered without its file is the crash that presence
     check exists to prevent.
 
-    WHAT THIS DELIBERATELY NO LONGER CHECKS, stated because it is a real
-    reduction and not an oversight: the retired route subsystem gated its
-    indextts2 clone on a RUNTIME FINGERPRINT -- it hashed three files (the
-    adapter, the worker, and `_otr_resolved_request.py`, that last one because
-    the seed path is part of the rendering code), compared the result against
-    the value frozen at the 2026-08-18 audition, and demoted the voice to an
-    ordinary draw when any of them had moved since.
-    This resolver has no such gate; a reserved row is delivered on the strength
-    of being in the bank. That trade is intentional. The fingerprint produced
-    eighteen false demotions in nineteen commits (measured, and recorded in
-    `tests/test_stale_ledger_voice_guard_removed.py` until `83e6040d` pruned
-    that file), it silently substituted a stranger's voice as its failure
-    mode, and the operator's standing direction
-    is that a guard is legitimate only against a silent WRONG result -- which
-    this one caused rather than prevented. The residual risk is real and is
-    accepted: if the indextts2 adapter drifts far enough to change how that
-    reference clones, nothing here will notice, and the check is the operator's
-    ear on the next leg.
+    NO RUNTIME FINGERPRINT GATE, stated because it is a real reduction and not
+    an oversight: a reserved row is delivered on the strength of being in the
+    bank. That trade is intentional. A gate that hashed the adapter, the worker
+    and `_otr_resolved_request.py` against a frozen audition value produced
+    eighteen false demotions in nineteen commits (measured) and silently
+    substituted a stranger's voice as its failure mode; the operator's standing
+    direction is that a guard is legitimate only against a silent WRONG result
+    -- which that one caused rather than prevented. The residual risk is real
+    and is accepted: if the indextts2 adapter drifts far enough to change how
+    that reference clones, nothing here will notice, and the check is the
+    operator's ear on the next leg.
 
     No ledger field is written here and no qualification is consulted. The row
     either takes its assigned voice or takes the ordinary draw.
@@ -577,8 +567,7 @@ class CastLock:
                 }),
                 # S5 platform-portability (2026-07-10): explicit voice device
                 # (append-only; widget slot 5). Stamped as meta.voice_device
-                # (S4) so every voice adapter + theme music reads ONE truth;
-                # the per-adapter waterfalls are gone.
+                # (S4) so every voice adapter + theme music reads ONE truth.
                 # Core's host-detected vocabulary plus the legacy names. See
                 # nodes/_otr_shared/device_options.py for why both halves exist.
                 "voice_device": (_DEVOPTS.device_options(), {
@@ -703,9 +692,9 @@ class CastLock:
         # Sprint 2 (a): CastLock OWNS bark voice casting. The writer no longer
         # stamps voice_preset -- it persists cast_seed in meta.cast_contract and
         # CastLock replays the deterministic picker (byte-identical) and stamps
-        # the bark voices here, then runs the relocated voice invariants (Gate 1,
-        # formerly in lock_cast). Runs regardless of cast_voice_policy (the policy
-        # governs the clip-engine voice bank, not bark casting).
+        # the bark voices here, then runs the voice invariants (Gate 1). Runs
+        # regardless of cast_voice_policy (the policy governs the clip-engine
+        # voice bank, not bark casting).
         if language_iso == "en":
             self._assign_bark_voices(
                 cast, meta, report,
@@ -813,11 +802,8 @@ class CastLock:
     def _enforce_freeze_gate(meta) -> None:
         """Enforce the structural/safety freeze and recover writer VRAM.
 
-        Current freeze failures are only genuine ledger corruption --
-        STRUCTURAL, and nothing else. Spoken-safety block classes went with the
-        content-guardrail rip (2026-08-05); subjective quality block classes and
-        their escape hatch were retired before that. A missing verdict remains
-        compatible with legacy ledgers.
+        Freeze failures are only genuine ledger corruption -- STRUCTURAL, and
+        nothing else. A missing verdict remains compatible with legacy ledgers.
 
         If writer teardown reported an unload failure, attempt one defensive
         unload before the audio chain claims VRAM.
@@ -922,11 +908,11 @@ class CastLock:
             return
 
         # Count before any draw. A cast with more speakers than Bark has voices
-        # used to die in whichever draw ran dry -- a character's, or with ten
-        # news-lane characters the announcer's -- as "available_voices is
-        # empty", after the writer had run (2026-09-29, a 15-strong My Story
-        # cast). A rolled Bark never gets here with such a cast: the roll
-        # leaves it out (`_cast_gap`). One pinned by hand is told why.
+        # would otherwise die in whichever draw ran dry -- a character's, or
+        # with ten news-lane characters the announcer's -- as "available_voices
+        # is empty", after the writer had run. A rolled Bark never gets here
+        # with such a cast: the roll leaves it out (`_cast_gap`). One pinned by
+        # hand is told why.
         needed, available, whose = _bark_seats(cast, announcer_engine)
         if available and needed > available:
             raise _OTRCAST.CastingFailedError(
@@ -947,7 +933,7 @@ class CastLock:
         # Source banks are NOT married to TTS engines (operator 2026-09-16).
         # `pick_announcer()` may DEFAULT the announcer row to Kokoro; CastLock
         # still honors `announcer_voice_engine` on every bank. A bark request
-        # stamps a v2/* preset here. Refusing used to crash a live My Story
+        # stamps a v2/* preset here. Refusing would crash a live My Story
         # Bark listen at lock() after the writer finished.
         if content_owned:
             drawn = CastLock._draw_bark_characters(cast, meta, report)
@@ -1252,9 +1238,9 @@ class CastLock:
             OTR_AnnouncerVoice. This is a routing CORRECTION, not a fallback.
           * (FAIL LOUD) a non-ANNOUNCER character cast row with no voice_preset, OR
             a character LINE whose char_id matches no voiced cast row (a true
-            orphan), RAISES VoiceCastingError. The old fail-soft repairs
-            (synthesize a v2/en_speaker_* identity; reassign an orphan to another
-            character) are RETIRED -- a missing/orphan voice is a writer/casting
+            orphan), RAISES VoiceCastingError. There is no fail-soft repair (no
+            synthesized v2/en_speaker_* identity, no reassigning an orphan to
+            another character): a missing/orphan voice is a writer/casting
             defect the operator must fix, never papered over (no silent swap).
 
         Mutates line dicts in place for the announcer reroute only. Returns LOUD
@@ -1393,11 +1379,6 @@ class CastLock:
         # the bank on those, not just gender. Legacy ledgers without the stamp
         # fall back to the (empty) entry-level fields -> behavior unchanged.
         voice_slots = meta.get("cast_voice_slots") or {}
-        # The `voice_decisions` local that used to read
-        # `meta.voice_cast_decision` here was removed 2026-08-28: it was
-        # assigned and never used once the hybrid LLM voice-fit branch went
-        # (2026-08-18). The durable ledger KEY is untouched -- it is still
-        # stamped and still verified -- only this dead read is gone.
         # announcer_engine is the sentinel: the resolver never returns None for
         # it, while target_engine legitimately can be None (a preset-only bank).
         # Direct callers still pass the default "auto"; lock() already resolved.
@@ -1440,9 +1421,8 @@ class CastLock:
                 # first. A gender the row cannot serve at all is a different
                 # case and is handled in the draw loop below, where it borrows
                 # the same gender from English rather than taking whichever
-                # voice the row happens to have -- this comment used to say
-                # "never borrow English", and that policy is what put a
-                # woman's voice on Horatio (operator 2026-09-19).
+                # voice the row happens to have (operator 2026-09-19: a woman's
+                # voice on Horatio).
                 allow_voice_reuse = True
 
         announcer_ref = None
@@ -1540,10 +1520,10 @@ class CastLock:
             # the catalogue voice that table names for this engine, and everyone
             # else takes the normal seeded selection.
             #
-            # THE PIN IGNORES THE USED SET, exactly as the branch it replaced
-            # did. ANNOUNCER may already hold `bm_george` -- it is a shared
-            # catalogue row and both may have it. `_mark_used` runs AFTERWARDS so
-            # later ordinary rows still see it as spoken for.
+            # THE PIN IGNORES THE USED SET: ANNOUNCER may already hold
+            # `bm_george` -- it is a shared catalogue row and both may have it.
+            # `_mark_used` runs AFTERWARDS so later ordinary rows still see it
+            # as spoken for.
             _recurring_ref, _recurring_miss = _recurring_character_bank_ref(
                 entry, target_engine, bank_entries, language)
             if _recurring_ref is not None:
@@ -1570,36 +1550,27 @@ class CastLock:
             # id and never reach their own gender fallback. Fixing only those
             # left the real defect live -- a row recorded `woman` raised
             # VoiceCastingError here, was caught below, and took the
-            # gender-agnostic draw. (It also fed the hybrid voice-fit branch's
-            # validation until that branch was ripped on 2026-08-18; the scorer
-            # is now the only consumer.)
+            # gender-agnostic draw. The scorer is the only consumer.
             from ._otr_roster_gender import canonical_bank_gender
             gender = canonical_bank_gender(entry.get("gender"))
             # AN UNSTATED GENDER ON google_tts TAKES THE SEEDED DRAW (0j,
-            # operator 2026-09-25: "random genders and leave it nebulous").
-            # This used to refuse -- NO FALLBACK -- so a My Story character
-            # whose author never said a gender stopped the render on the
-            # Google lane while the same row took Kokoro's seeded,
-            # gender-agnostic draw below. Provider voices are gendered, so
-            # the pick is a coin the episode seed flips: deterministic, and
-            # _otr_my_story still leaves the gender empty on purpose. A
-            # stated MAN or WOMAN is still honoured with no cross-gender
-            # fallback (see the re-raise in the except below); `other`, which
-            # the Google catalogue carries no rows for, takes the draw too.
-            # THE HYBRID LLM VOICE-FIT BRANCH WAS HERE AND IS GONE (2026-08-18).
-            # It read meta.voice_cast_decision, re-validated the LLM's proposed
-            # voice_ref_id, and on success stamped it and `continue`d -- skipping
-            # the deterministic scorer below entirely. That is why the scorer
-            # handled only ~4% of production casting.
+            # operator 2026-09-25: "random genders and leave it nebulous"). A My
+            # Story character whose author never said a gender must not stop the
+            # render on the Google lane while the same row takes Kokoro's
+            # seeded, gender-agnostic draw below. Provider voices are gendered,
+            # so the pick is a coin the episode seed flips: deterministic, and
+            # _otr_my_story still leaves the gender empty on purpose. A stated
+            # MAN or WOMAN is still honoured with no cross-gender fallback (see
+            # the re-raise in the except below); `other`, which the Google
+            # catalogue carries no rows for, takes the draw too.
             #
-            # `meta.voice_cast_decision` is still STAMPED (empty) by the writer
-            # and still verified downstream, so a legacy ledger carrying real
-            # decisions loads without complaint -- its proposals are simply
-            # ignored now, and the scorer casts the row. That is the intended
-            # behaviour, not a fallback: the LLM had no information the scorer
-            # lacks. CastLock itself no longer reads the key at all (the dead
-            # local above went 2026-08-28); an earlier version of this comment
-            # said it did.
+            # There is no LLM voice-fit branch: the deterministic scorer casts
+            # every row. `meta.voice_cast_decision` is still STAMPED (empty) by
+            # the writer and still verified downstream, so a legacy ledger
+            # carrying real decisions loads without complaint -- its proposals
+            # are simply ignored, and the scorer casts the row. That is the
+            # intended behaviour, not a fallback: the LLM had no information the
+            # scorer lacks. CastLock itself does not read the key.
 
             # Prefer the writer's voice-fit slot (timbre/age_band); fall back to
             # any entry-level fields for legacy ledgers without the stamp.
@@ -1644,9 +1615,8 @@ class CastLock:
                 # never crosses a gender the story named. `other` -- a fifth
                 # of every writer roll, and a gender no Google voice carries --
                 # takes the same seeded gender-agnostic draw Kokoro gives it.
-                # Refusing it killed the first otr_google_still leg
-                # (2026-09-25, cast row c04) and would have killed about half
-                # of all three-character Google episodes.
+                # Refusing it would kill about half of all three-character
+                # Google episodes.
                 if target_engine == "google_tts" and gender in ("male", "female"):
                     raise
                 # BORROW THE GENDER FROM ENGLISH BEFORE GIVING UP ON IT
@@ -1695,13 +1665,13 @@ class CastLock:
                 )
                 # REUSE HER OWN LANGUAGE'S VOICE BEFORE TAKING A MAN'S. When
                 # the row DOES carry this gender but every one of them is
-                # already spoken for, the old path fell to the gender-agnostic
-                # draw -- a uniform pick over the whole language pool, most of
-                # which is the other gender. Measured on the default Spanish
-                # shape (3 voices, 3 rows, so reuse is off): the announcer
-                # takes `ef_dora`, and ANA -- a woman -- was stamped `em_alex`
-                # and presented MALE. That is the operator's own complaint
-                # inverted, in a language he has not heard yet.
+                # already spoken for, falling to the gender-agnostic draw is a
+                # uniform pick over the whole language pool, most of which is
+                # the other gender. Measured on the default Spanish shape (3
+                # voices, 3 rows, so reuse is off): the announcer takes
+                # `ef_dora`, and ANA -- a woman -- was stamped `em_alex` and
+                # presented MALE. That is the operator's own complaint inverted,
+                # in a language he has not heard yet.
                 #
                 # A woman sharing the narrator's voice is worse than two
                 # distinct women and far better than a woman with a man's
@@ -1767,13 +1737,12 @@ class CastLock:
                     )
                     continue
                 # The bank cannot serve this row's gender -- 'other' is 20% of
-                # every roll and the bank carries zero rows for it. Previously
-                # the row was reported "NOT cast" and left with NO voice_ref_id,
-                # and the render path then drew a gender-agnostic reference of
-                # its own. The ledger therefore did not name the voice that
-                # actually spoke. Stamp the SAME draw the render will make, so
-                # the ledger is complete and honest. This is a ledger fix, not a
-                # content gate: no refusal, no gender restriction.
+                # every roll and the bank carries zero rows for it. The render
+                # path draws a gender-agnostic reference of its own, so a row
+                # left with NO voice_ref_id would leave the ledger without the
+                # voice that actually spoke. Stamp the SAME draw the render will
+                # make, so the ledger is complete and honest. This is a ledger
+                # fix, not a content gate: no refusal, no gender restriction.
                 fallback_ref = gender_agnostic_fallback_ref(
                     bank_entries, engine=target_engine, char_id=char_id,
                     episode_seed=episode_seed, role="char_voice", used=used,
@@ -1918,11 +1887,11 @@ class CastLock:
             return 0
 
         # WHICH ROWS NAME A RECURRING CHARACTER -- and nothing more than that.
-        # This used to also ask the catalogue table for a voice and drop any row
-        # it could not answer for, which made it a SECOND resolver: when
-        # `_recurring_character_bank_ref` learned that a reserved bank row is an
-        # assignment, this filter did not, so on the clone engines the row was
-        # dropped here and the reserved scan never ran. One resolver decides.
+        # Asking the catalogue table for a voice here and dropping any row it
+        # cannot answer for would make this a SECOND resolver: a reserved bank
+        # row is an assignment too (`_recurring_character_bank_ref` knows it),
+        # so on the clone engines the row would be dropped here and the reserved
+        # scan would never run. One resolver decides.
         wanted = []
         for entry in cast:
             if not isinstance(entry, dict) or _is_announcer_entry(entry):
@@ -1982,10 +1951,9 @@ class CastLock:
         ledgers still need the explicit engine choice recorded so profiles like
         otr_cloud_lanes cannot silently drift back to a local voice route.
 
-        S4 platform-portability (2026-07-10): ``meta["voice_device"]`` rides
-        the ledger exactly like the engine stamps -- every downstream voice
-        adapter (and theme music) reads the SAME explicit device; the old
-        per-adapter cuda->mps->cpu waterfalls are gone.
+        S4 platform-portability (2026-07-10): ``meta["voice_device"]`` rides the
+        ledger exactly like the engine stamps -- every downstream voice adapter
+        (and theme music) reads the SAME explicit device.
         """
         meta = led.get("meta")
         if not isinstance(meta, dict):
@@ -2039,29 +2007,23 @@ class CastLock:
         entry["tts_model"] = str(getattr(ref, "engine", "") or "")
         entry["commercial_clean"] = _delivered_commercial_clean(entry, ref)
         # A kokoro / google / elevenlabs stamp must not keep a leftover Bark
-        # ``v2/`` preset. Lime 20260917 left Stomp/Tiptoe/Whiskers speaking
-        # kokoro while the ledger still named Bark, and the two CastLock
-        # tests that pin this were red at HEAD. Bark's own identity stays:
-        # when the stamped engine IS bark, ``voice_preset`` is the spoken
-        # id and is left alone (Lemmy's frozen v2/* beside a bark row).
+        # ``v2/`` preset (a row speaking kokoro while the ledger still names
+        # Bark is a wrong ledger). Bark's own identity stays: when the stamped
+        # engine IS bark, ``voice_preset`` is the spoken id and is left alone
+        # (Lemmy's frozen v2/* beside a bark row).
         #
-        # THIS INCLUDES LEMMY'S OWN STAMPS, and the question was
-        # settled by dates (2026-09-20). A 2026-08-16 test pinned the writer
-        # preset SURVIVING a chatterbox audition stamp; a 2026-09-01 portable
-        # bank test pinned it CLEARED on a kokoro one; the Lime clear of
-        # 2026-09-17 is the newest statement of intent. Two reviewers traced
-        # every consumer: only bark's dispatch USES `voice_preset` to choose
-        # a voice; kokoro reads `voice_ref_id`, the credits prefer
+        # THIS INCLUDES LEMMY'S OWN STAMPS (settled by dates, 2026-09-20: the
+        # newest statement of intent, the 2026-09-17 clear, wins). Two reviewers
+        # traced every consumer: only bark's dispatch USES `voice_preset` to
+        # choose a voice; kokoro reads `voice_ref_id`, the credits prefer
         # `voice_engine` / `voice_ref_id`, and no bark stage runs after a
-        # non-bark stamp inside one render. One more reader,
-        # found by the QA pass on the pushed diff: `_otr_voice_node_common`
-        # copies the field into every engine's resolved request, where it is
-        # part of the audio-cache key. So a non-bark row's key changes once,
-        # from the leftover `v2/...` to "", which is a single cache miss and
-        # a re-render of that line, never different audio. A preset kept on
-        # a row another engine speaks is a stale identity on the ledger and
-        # a stale cache key, so the newest rule wins everywhere and the
-        # 08-16 test was retired rather than carved around.
+        # non-bark stamp inside one render. One more reader:
+        # `_otr_voice_node_common` copies the field into every engine's resolved
+        # request, where it is part of the audio-cache key. So a non-bark row's
+        # key changes once, from the leftover `v2/...` to "", which is a single
+        # cache miss and a re-render of that line, never different audio. A
+        # preset kept on a row another engine speaks is a stale identity on the
+        # ledger and a stale cache key.
         if str(getattr(ref, "engine", "") or "") != "bark":
             leftover = str(entry.get("voice_preset") or "")
             if leftover.startswith("v2/"):

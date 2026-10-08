@@ -3,10 +3,9 @@
 OTR_BatchCharacterVoices (1a) and OTR_AnnouncerVoice (1b) share ONE dispatch
 contract: pick an engine from the registry, FAIL CLOSED, and render per line into
 the existing Bark AUDIO-batch contract -- with engine teardown in ``finally``
-BEFORE the ``done`` signal (I-7). The legacy batch-delegation path was retired in
-the audio clean-break (1c); every audio engine is now self-contained per_line /
-clip. This module holds that core so each node file declares only its role, its
-INPUT_TYPES, and its output names.
+BEFORE the ``done`` signal (I-7). Every audio engine is self-contained
+per_line / clip. This module holds that core so each node file declares only
+its role, its INPUT_TYPES, and its output names.
 
 The theme node (1c) is NOT built on this base: it has three AUDIO outputs and a
 ``clip`` interface, so it is self-contained.
@@ -61,12 +60,9 @@ def _resolve_ref_to_disk(ref_path):
     """Resolve a voice-bank ref_path (usually relative to the ComfyUI root, e.g.
     'models/TTS/refs/indextts2/ix_male_warm.wav') to an absolute path.
 
-    DELEGATES to the ONE shared resolver (Lemmy chunk B). It used to be a
-    SECOND, broader implementation of the same question -- this one knew about
-    the migrated ``C:\\ComfyUI-Models`` root and the adapters' private copies did
-    not, so this existence check could confirm a reference the worker then could
-    not open. The docstring even said it "mirrors the indextts2 adapter's own
-    resolution", which had stopped being true. One resolver, one answer.
+    DELEGATES to the ONE shared resolver (Lemmy chunk B): one resolver, one
+    answer, so this existence check can never confirm a reference the worker
+    then cannot open.
 
     Keeps ``None`` for an empty ref, because callers here distinguish "nothing
     asked for" from "asked for and not found"."""
@@ -105,10 +101,8 @@ def _resolve_ref_to_disk(ref_path):
 def sha256_of_file(path: str) -> "Optional[str]":
     """Hash a file, or None if it cannot be read. Never raises.
 
-    MOVED HERE 2026-09-24 from the deleted voice-route module. It was the one
-    generic thing in it -- an unreadable reference is a validation failure, not
-    a crash in the caller -- and the cache fingerprint below is now its only
-    consumer.
+    An unreadable reference is a validation failure, not a crash in the caller;
+    the cache fingerprint below is its only consumer.
     """
     import hashlib
     try:
@@ -142,9 +136,7 @@ def _is_announcer_row(entry) -> bool:
 def _bank_identity_fingerprint(engine, voice_ref_id):
     """Cache-key material for ONE bank identity, or ``None`` to fail open.
 
-    RENAMED from `_provisional_identity_fingerprint` on 2026-09-24. There is no
-    provisional tier any more; what it always actually did was fingerprint a
-    BANK ROW, and that is what the recurring-character rows need.
+    Fingerprints a BANK ROW, which is what the recurring-character rows need.
 
     WHY THE GRAPH CACHE HAS TO SEE THIS AT ALL. A cast row names a voice by ID.
     Swap the bytes under that id -- re-record a reference WAV, replace a kokoro
@@ -325,14 +317,12 @@ def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice",
             except Exception:  # noqa: BLE001 -- gender unservable; gender-agnostic below
                 entry = None
         if entry is None:
-            # THIRD copy of the same gender-agnostic draw, now folded onto the
-            # one selector the caster and the clone-ref path already share.
-            # It differed only in its seed suffix ('_provid' rather than
-            # '_anyref'), which is exactly the shape that lets two code paths
-            # name two different voices for one character -- the defect the
-            # shared selector was extracted to end. Same pool, same ordering,
-            # same char_id keying; the suffix is deliberately dropped so a
-            # cloud row and its local twin resolve to the SAME bank entry.
+            # The one selector the caster and the clone-ref path already share:
+            # a per-path seed suffix ('_provid' vs '_anyref') is exactly the
+            # shape that lets two code paths name two different voices for one
+            # character, so there is none -- same pool, same ordering, same
+            # char_id keying, and a cloud row and its local twin resolve to the
+            # SAME bank entry.
             from ._otr_voice_bank import gender_agnostic_fallback_ref
             entry = gender_agnostic_fallback_ref(
                 bank, engine=engine, char_id=str(cast.get("char_id") or ""),
@@ -765,12 +755,8 @@ def _persist_ledger_stamps(meta, stamps, log_) -> int:
     save_ledger_safe False counts). Never writes back the wire JSON --
     reload-before-save preserves prior roles' stamps (r2 MF#4).
 
-    IT REPORTS A COUNT, NOT A SET OF IDS. It used to fill a caller-supplied set
-    of the line_ids that did not persist, for a gate that raised when a proved
-    voice route's own receipt was the one that failed. That gate went with the
-    routes on 2026-09-24, and the set went with it rather than being left behind
-    as a parameter nothing reads -- a degraded stamp is telemetry again, which
-    is what it was before the route existed.
+    IT REPORTS A COUNT, NOT A SET OF IDS -- a degraded stamp is telemetry, not a
+    gate.
     """
     from ._otr_ledger import (
         in_flight_ledger_path, save_ledger_safe, stamp_per_line_audio_meta)
@@ -1080,10 +1066,9 @@ class OTRVoiceNodeBase:
         recurring rows' identity fields, the active render params, and -- for a
         local reference -- the actual BYTES.
 
-        REWRITTEN 2026-09-24. It used to fingerprint voice-ROUTE identity and
-        contract versions; that subsystem is gone and the rows are now selected
-        through the same `recurring_character_key` lookup casting itself uses,
-        so the two cannot drift apart about what a character is.
+        The rows are selected through the same `recurring_character_key` lookup
+        casting itself uses, so the two cannot drift apart about what a
+        character is.
 
         Three rules this obeys, all of them load-bearing:
 
@@ -1274,7 +1259,6 @@ class OTRVoiceNodeBase:
             # device (CastLock ledger stamp meta.voice_device; default cuda =
             # nv50 baseline) into the adapter as an attribute -- no signature
             # churn; adapters without a local device (cloud lanes) ignore it.
-            # The old per-adapter cuda->mps->cpu waterfalls are deleted.
             adapter.requested_device = _voice_device_from_ledger(
                 ledger_json, script_json)
             # Role threading (2026-08-24): a preset engine that serves more than
@@ -1594,11 +1578,10 @@ class OTRVoiceNodeBase:
                         params=line_params,
                         commercial_clean=profile.commercial_clean,
                     )
-                # THE SEED IS DERIVED BELOW, NOT HERE [QA-5]. It used to be
-                # computed at this point, before the block that resolves a
-                # fallback reference -- so a character-stable seed keyed here
-                # would key on the BLANK the request carried rather than on the
-                # voice the adapter actually clones. Reference first, seed after.
+                # THE SEED IS DERIVED BELOW, NOT HERE [QA-5]: it must key on the
+                # voice the adapter actually clones, not on the BLANK the
+                # request carried before the block that resolves a fallback
+                # reference. Reference first, seed after.
                 #
                 # Ref-clip resolution (no-fallback rip 2026-07-03): a voice-CLONING char
                 # engine (voice_ref_field == "voice_ref_path", e.g. indextts2 /
@@ -1662,14 +1645,14 @@ class OTRVoiceNodeBase:
                 # delivery version/state/source -> seed. Render_log line + runtime
                 # log mirror; this is the observability floor every later step
                 # (P0-zero, the audit, P3a durable stamping) builds on.
-                # BOTH READ THE CONTEXT [QA-4]. `_vec_state` used to call
-                # float() on the RAW stamped values -- before the adapter's own
-                # sanitation -- so a hand-edited ledger carrying a string where
-                # a number belongs raised ValueError out of the observability
-                # line and killed the render. THE LAW: a render degrades, never
-                # raises. The alpha and the emotion mass come from the same
-                # resolution the worker payload is built from, so the receipt
-                # can no longer describe a blend the engine did not use.
+                # BOTH READ THE CONTEXT [QA-4], never the RAW stamped values
+                # (before the adapter's own sanitation): a hand-edited ledger
+                # carrying a string where a number belongs must not raise
+                # ValueError out of the observability line and kill the render.
+                # THE LAW: a render degrades, never raises. The alpha and the
+                # emotion mass come from the same resolution the worker payload
+                # is built from, so the receipt cannot describe a blend the
+                # engine did not use.
                 _alpha = line_rt.alpha
                 _vec_state = line_rt.vector_state
                 _mass = line_rt.effective_mass
@@ -1700,9 +1683,9 @@ class OTRVoiceNodeBase:
                     log.info("[OTR voice P-OBS] %s", _pobs)
                 # NO-FALLBACK (operator 2026-07-03): a cloning engine that reached this
                 # line with no usable voice reference FAILS LOUD -- it never silently
-                # renders on bark. The old bark missing-ref net is retired; a missing
-                # reference is a casting/install defect the operator must fix, surfaced
-                # here as a NAMED EngineUnusable (MISSING_MODEL) naming the char/line.
+                # renders on bark. A missing reference is a casting/install
+                # defect the operator must fix, surfaced here as a NAMED
+                # EngineUnusable (MISSING_MODEL) naming the char/line.
                 if _engine_requires_voice_ref(adapter) and not voice_ref:
                     raise EngineUnusable(
                         engine, self.ROLE, EngineUsabilityReason.MISSING_MODEL,
@@ -1794,17 +1777,15 @@ class OTRVoiceNodeBase:
                     if j["job_id"] in outcome.results:
                         j["audio"] = outcome.results[j["job_id"]]
             else:
-                # THE SERIAL PATH FLOORS TOO (2026-09-16 review). It used to
-                # `break` on the first failure, which left every later miss
-                # with no audio AND no entry in `outcome_errors` -- so the
-                # commit walk found nothing to floor and hit the "never
-                # rendered line" raise instead. The floor was therefore
-                # unreachable for all but the first failure whenever fan-out
-                # is throttled to one worker (OTR_CLOUD_FANOUT=1) or a role
-                # has a single missing line: ordinary configurations, not
-                # edge cases. Each line is attempted on its own now, and only
-                # a stamped job-scoped verdict is survivable -- an ordinary
-                # crash still stops the walk exactly as before.
+                # THE SERIAL PATH FLOORS TOO (2026-09-16 review). Each line is
+                # attempted on its own, and only a stamped job-scoped verdict is
+                # survivable -- an ordinary crash still stops the walk. Never
+                # `break` on the first failure: that leaves every later miss
+                # with no audio AND no entry in `outcome_errors`, so the commit
+                # walk finds nothing to floor and hits the "never rendered line"
+                # raise (whenever fan-out is throttled to one worker,
+                # OTR_CLOUD_FANOUT=1, or a role has a single missing line:
+                # ordinary configurations, not edge cases).
                 for j in misses:
                     try:
                         j["audio"] = _forward_one_voice_line(adapter, engine, j)

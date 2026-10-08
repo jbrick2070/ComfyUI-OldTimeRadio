@@ -239,11 +239,8 @@ def build_source_wrapper(
 # ---------------------------------------------------------------------------
 
 
-# `compute_cache_key()` was REMOVED 2026-08-28 (dead-code audit). It was
-# definition-only: nothing called it, and its docstring's claim that the
-# result is stored at `ledger.meta.news.cache_key` was not true of any
-# live path. Removing an uncalled function cannot change behaviour; a
-# future cache key is written where its consumer lives.
+# No cache key is computed here; a future cache key is written where its
+# consumer lives.
 
 
 # ---------------------------------------------------------------------------
@@ -380,9 +377,7 @@ def build_news_briefs(
 
     Sprint 2A/2D: the structured brief call routes through the shared
     `structured_call` retry ladder (base -> structural retry -> typed
-    repair). The ladder subsumes the former hand-rolled 3-attempt loop
-    and bespoke repair branch. Two responsibilities stay in this
-    function:
+    repair). Two responsibilities stay in this function:
 
       * The retry ladder repairs malformed JSON/schema only.
       * Optional key terms are grounded deterministically after parsing;
@@ -450,7 +445,7 @@ def build_news_briefs(
     # LLM slot: technical -- structured JSON briefs,
     # routed through the shared ladder. The structural retry runs at
     # half the base temperature: strictly below base, never above (the
-    # Sprint 2B principle; the old loop RAISED it to base + 0.1).
+    # Sprint 2B principle).
     try:
         brief = structured_call(
             prompt=messages,

@@ -53,9 +53,7 @@ class WrapperNodeMissing(RuntimeError):
 
     Raised fail-closed and NAMED. It ESCALATES: the selected engine is the one
     that renders, and a missing wrapper node stops that beat by name rather
-    than sliding down a chain. (This docstring described a degrade "via the
-    engine fallback chain" until 2026-08-28 -- that chain was retired, and the
-    no-fallback rule is exactly what makes the named failure useful.)"""
+    than sliding down a chain."""
 
 
 class GraphExecutionError(RuntimeError):
@@ -203,13 +201,12 @@ def _resolve_value(val, results):
     """Resolve Wires in an input value to concrete node outputs (recursing
     containers); literals pass through. Wire is matched BEFORE generic tuple."""
     if isinstance(val, Wire):
-        # The LOOKUP has to be inside the guard too. It used to sit outside, so
-        # a source missing from ``results`` raised a bare KeyError instead of
-        # the NAMED GraphExecutionError this module promises -- and "a source
-        # went missing mid-graph" is exactly the failure class the beat-scoped
-        # loader hoist had to fix once already (segment 0's cleanup evicting a
-        # handle segment 1 still needed). Losing the name there costs the next
-        # person the diagnosis.
+        # The LOOKUP has to be inside the guard too, so a source missing from
+        # ``results`` raises the NAMED GraphExecutionError this module promises,
+        # not a bare KeyError -- "a source went missing mid-graph" is exactly
+        # the failure class the beat-scoped loader hoist had to fix once already
+        # (segment 0's cleanup evicting a handle segment 1 still needed). Losing
+        # the name there costs the next person the diagnosis.
         try:
             out = results[val.src]
         except KeyError:
@@ -739,38 +736,20 @@ def images_to_uint8(images):
     return np.ascontiguousarray(arr)
 
 
-# ``extend_frames_to_target`` -- THE PING-PONG / MIRROR EXTENDER -- WAS DELETED
-# HERE on 2026-08-02, under the operator's standing directive: "no mirrors, no
-# ping-pongs -- we need original video for every second of audio."
+# The operator's standing directive: "no mirrors, no ping-pongs -- we need
+# original video for every second of audio." A mirror cycle plays the back half
+# of the render in REVERSE: a mouth speaking backwards over forward speech on a
+# lip-synced lane, motion running backwards under dialogue on a scene lane. So
+# nothing here pads a short render: a beat the engine cannot render in one
+# affordable pass is SPLIT by coverage planning into multiple native segments,
+# each rendered forward, joined by chain or jump, and where a render still comes
+# up short the answer is TERMINAL and LOUD (:class:`MirrorExtensionForbidden`)
+# with the remedy named in the message -- route the beat, shorten the line, or
+# raise the tier's cap.
 #
-# What it did: tiled a short render into a mirror cycle
-# ``[0,1,..,N-1,N-2,..,1]`` and trimmed it to the beat length, so a beat the
-# engine could not afford in one pass was FILLED rather than left holding its
-# last frame. That solved a real bug (the 0.68s-then-freeze) and it was the
-# honest answer available in June, when the alternative was a frozen frame.
-#
-# Why it had to go rather than stay as an option: the back half of every cycle
-# is the render played in REVERSE. On a lip-synced lane that is a mouth speaking
-# backwards over forward speech. On a scene lane it is motion running backwards
-# under dialogue that keeps going forward. It ships as a finished episode either
-# way, and it looks like an artifact rather than a shot.
-#
-# WHAT OWNS THE PROBLEM NOW -- the field this rip had to fill. A beat the engine
-# cannot render in one affordable pass is SPLIT by coverage planning into
-# multiple native segments, each rendered forward, joined by chain or jump. That
-# is the replacement, and it is strictly better: every frame is original, and no
-# second of audio is covered by a frame that was already used. Where a render
-# still comes up short, the answer is now TERMINAL and LOUD
-# (:class:`MirrorExtensionForbidden`) with the remedy named in the message --
-# route the beat, shorten the line, or raise the tier's cap -- rather than a
-# quiet mirror nobody sees until the episode plays.
-#
-# The credits lane is untouched and never used this: it renders a black
-# background and called neither this nor the LTX boomerang -- which was itself
-# deleted on 2026-08-06, so there is no longer a second mirror to be untouched
-# by. The ONE sanctioned reuse left in the tree is the closing-theme BACKDROP,
-# and it is a COMPOSITE decision about a tail (gated on a manifest-declared
-# frame window), never anything an adapter does to its own frames.
+# The ONE sanctioned reuse in the tree is the closing-theme BACKDROP, a
+# COMPOSITE decision about a tail (gated on a manifest-declared frame window),
+# never anything an adapter does to its own frames.
 
 
 class MirrorExtensionForbidden(ValueError):
@@ -799,13 +778,10 @@ def fit_frames_to_target(frames, target_frame_count):
     hand back. A SHORT render is TERMINAL: :class:`MirrorExtensionForbidden`,
     with the remedy in the caller's message.
 
-    The ``allow_mirror`` parameter is GONE (2026-08-02). It defaulted to True and
-    had exactly one caller, which passed False -- so the mirror was already
-    unreachable in practice, and leaving the flag in place meant the next caller
-    could re-arm it by simply not thinking about it. The operator's directive is
-    unconditional ("no mirrors, no ping-pongs -- original video for every second
-    of audio"), so the capability is removed rather than defaulted off. A rule
-    enforced by a default is a rule with a hole in it.
+    No mirror/ping-pong option exists: the operator's directive is unconditional
+    ("no mirrors, no ping-pongs -- original video for every second of audio"),
+    so the capability is absent rather than defaulted off. A rule enforced by a
+    default is a rule with a hole in it.
 
     ``frames`` is the uint8 ``[N,H,W,C]`` array from :func:`images_to_uint8`;
     numpy is imported lazily (cold-import V-12). Pure; CPU-testable.
@@ -918,16 +894,9 @@ def ffmpeg_lavfi_floor_cmd(out_path, width, height, fps, frame_count,
     a libavfilter ``source`` (default a dark slate field). No input file is
     required, so this command always succeeds once it is REACHED.
 
-    "so the radio floor ALWAYS renders (the fallback-chain terminus)" ended this
-    docstring and is stale twice over (corrected lane 16, 2026-08-11): the
-    fallback chain was ripped 2026-07-02, and lanes 15-16 gave ``still_motion``
-    and ``still_pan`` ``_require_still``, so a missing still is now a REFUSAL on
-    three of the four cheap families rather than a black beat. ``still_flat`` is
-    the only caller that still reached this on a missing still.
-
-    LANE 17 RULED (2026-08-11): it took the refusal too, so NO registered
-    engine reaches this on a missing still any more. The command is KEPT for a
-    ``uses_still = False`` family that synthesises its own picture -- a
+    A missing still is a REFUSAL on every cheap family (never a black beat), so
+    NO registered engine reaches this on a missing still. The command is KEPT
+    for a ``uses_still = False`` family that synthesises its own picture -- a
     documented capability of the cheap shelf with no occupant today -- and
     `tests/test_video_cheap_render.py` asserts both that nothing reaches it and
     that it still works when something does."""
@@ -1259,17 +1228,12 @@ def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg",
             "asked to encode ZERO frames to %r -- there is no clip here to "
             "write or to prove. NO FALLBACK (a 0-frame beat is a planning bug "
             "upstream, not an empty video)." % out_path)
-    # A5-lite (2026-07-27): the SHAPE was checked and the dtype was not, while
-    # the docstring promised uint8. Not a live bug -- every producer feeds an
-    # exact-size uint8 buffer through images_to_uint8, and ffmpeg raises on a
-    # short write. The residual is a future wider-dtype caller: the rawvideo
-    # pipe is 8-bit, so float32 sends 4x the bytes for the same frames and
-    # ffmpeg consumes them as a different number of frames. The assert stays:
-    # it names the CAUSE at the point a caller can fix it, and it is cheaper
-    # and clearer than making the count check below diagnose a dtype mistake
-    # from an arithmetic mismatch. (The count is no longer taken from the
-    # array -- see proven_frame_count -- so that half of the 2026-07-27 note
-    # is now closed rather than merely documented.)
+    # Every producer feeds an exact-size uint8 buffer through images_to_uint8,
+    # so this guards a future wider-dtype caller: the rawvideo pipe is 8-bit, so
+    # float32 sends 4x the bytes for the same frames and ffmpeg consumes them as
+    # a different number of frames. The assert names the CAUSE at the point a
+    # caller can fix it, and it is cheaper and clearer than making the count
+    # check below diagnose a dtype mistake from an arithmetic mismatch.
     if frames.dtype != np.uint8:
         raise GraphExecutionError(
             "expected uint8 frames, got dtype %r (%d bytes per sample): the "
@@ -1279,12 +1243,11 @@ def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg",
             % (frames.dtype, frames.dtype.itemsize, frames.dtype.itemsize))
     b, h, w, _ = frames.shape
     # AN ODD CANVAS IS REFUSED HERE, BY NAME (2026-07-28). yuv420p subsamples
-    # chroma 2x2 and cannot encode an odd dimension at all, so the old
-    # even_dim() in the arg builder was not a courtesy -- it declared a size
-    # the pipe did not carry, and ffmpeg re-sliced every row. Measured:
-    # (5,63,47,3) wrote a 46x62 clip of skewed pixels and passed the frame
-    # count. Rounding here would repeat that mistake one level down; the fix
-    # belongs with whoever chose the canvas, which is why this names them.
+    # chroma 2x2 and cannot encode an odd dimension at all. Rounding to even
+    # here would declare a size the pipe does not carry, and ffmpeg would
+    # re-slice every row. Measured: (5,63,47,3) wrote a 46x62 clip of skewed
+    # pixels and passed the frame count. The fix belongs with whoever chose the
+    # canvas, which is why this names them.
     if h % 2 or w % 2:
         raise GraphExecutionError(
             "refusing to encode an ODD canvas %dx%d for %r: yuv420p cannot "

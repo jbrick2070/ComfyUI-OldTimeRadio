@@ -4,8 +4,8 @@ Captures POLICY only (V-6) and emits ONE ``image_policy_json`` STRING that
 ``OTR_MetaBriefImagePromptGen`` + ``OTR_ImageGenDispatcher`` consume.
 
 Image-MODEL selection lives in ONE place -- ``OTR_VideoDirector`` (operator
-2026-06-18: "only in one place not two"). This node no longer carries its own
-per-role image-model dropdowns; it reads the picks from the wired
+2026-06-18: "only in one place not two"). This node carries no per-role
+image-model dropdowns of its own; it reads the picks from the wired
 ``video_policy_json["image_models"]`` and owns only the per-role granularity, the
 fresh-mode cap, and the seed mode. A slot absent from the policy defaults to the
 gen-1 engine (``flux_gen1``) with a LOUD warning.
@@ -14,24 +14,11 @@ Role compatibility of each pick is still filtered at execute time via the SHARED
 ``role_compat.py`` (AS-1) -- a pick that does not fit its role fails closed
 (named error), never a silent Flux swap.
 
-The 3D granularity LOCK is GONE (lean-mean order 4, 2026-08-23). It hard-locked
-any slot whose paired video engine declared ``requires_mesh_portrait`` to
-``per_object`` -- and its own comment admitted it was DORMANT: the only
-declarers (triposg_talk / hunyuan3d_talk / trellis_talk) were unregistered on
-2026-06-29 and are now retired outright (files deleted, ids in
-RETIRED_ENGINE_IDS), so it returned an empty set on every real run. The
-capability field itself is removed from the video schemas in the same change,
-so nothing can silently re-arm it. Its unregistered-engine rejection half was
-not lost -- it MOVED upstream to OTR_VideoDirector's registry-membership
-boundary (order 3), which fails a stale/unknown id seconds in, with a truthful
-message. A 3D re-forward re-adds a capability + a lock DELIBERATELY, with its
-own arc; nothing here is a scaffold for one.
-
 ``video_policy_json`` is REQUIRED + fail-closed: the OTR_VideoDirector policy
 must be WIRED provider-before-consumer; an empty or malformed policy raises.
-(A hand-built policy string naming an unknown engine is no longer rejected
-HERE -- the director boundary owns membership now, and an out-of-contract
-graph that bypasses it fails at the render gate's assert_usable instead.)
+(A hand-built policy string naming an unknown engine is not rejected HERE -- the
+director boundary owns membership, and an out-of-contract graph that bypasses it
+fails at the render gate's assert_usable instead.)
 
 Determinism (V-7): NO widget named ``seed`` (use ``request_seed``); no
 ``model_id`` widget (V-11). Cold-import clean: module scope imports only
@@ -59,9 +46,7 @@ ADD_CUSTOM = "+ Add Custom Model"
 IMAGE_SLOT_ROLES = {
     "announcer_image_model": ("announcer_visual",),
     "music_image_model": ("music_visual",),
-    # rip-sfx-broll (2026-07-01): the character image slot is KEPT --
-    # character stills ride it; the retired_role_a / retired_role_b
-    # pairings died with those roles.
+    # The character image slot carries character stills.
     "character_image_model": ("character_video",),
 }
 SEED_MODES = ("request_hash", "fixed")
@@ -90,9 +75,7 @@ def _is_mesh_fodder_engine(engine_id: str) -> bool:
     TOLERANT by design: mesh-fodder routing is additive and opt-in, so an
     empty / unregistered / custom engine is simply NOT-fodder (False) -- it
     must never raise and block a normal episode. The capability is read off the
-    registered adapter, never an engine-name/family check. (The stricter
-    `_is_3d_engine` this used to contrast itself with was retired with the 3D
-    family, lean-mean order 4.)"""
+    registered adapter, never an engine-name/family check."""
     if not engine_id or not _vreg.is_registered(engine_id):
         return False
     return bool(getattr(_vreg.get_engine(engine_id), "requires_mesh_fodder",
@@ -122,11 +105,6 @@ def mesh_fodder_roles_from_video_policy(video_policy: dict) -> list:
         if _is_mesh_fodder_engine(engine_id):
             roles.add(role)
     return sorted(roles)
-
-
-# (lean-mean order 4, 2026-08-23) `enforce_3d_granularity_lock` was here.
-# Its dispatcher-side twin (the locked_3d_slots HALT) is removed in the same
-# change; the policy field they shared is no longer emitted.
 
 
 class OTRImageDirector:
@@ -336,8 +314,6 @@ class OTRImageDirector:
                 video_policy.get("routing_env_snapshot")
                 if isinstance(video_policy.get("routing_env_snapshot"), dict)
                 else {}),
-            # (The character {clip_mode, pool_n} passthrough died with the
-            # pooling rip, 2026-07-01 -- every beat is per-beat now.)
             # 3D image streams (2026-06-21): the IMAGE-prompt roles whose paired
             # video engine requires_mesh_fodder. MetaBrief forks those beats to a
             # clean mesh_fodder subject + a scene_background_plate (NOT one

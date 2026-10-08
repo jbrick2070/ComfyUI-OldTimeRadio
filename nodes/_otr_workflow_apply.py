@@ -150,7 +150,7 @@ _COMFY_SLOT_WIDGETS = frozenset({
 # the applier validates these widgets against the FULL registry, not the gated
 # display list. Mirrors the openrouter/comfy admissibility escapes above.
 _VIDEO_DIRECTOR_WIDGETS = frozenset({
-    # Three first-class video slots (2026-07-03: legacy catch-all video slot retired).
+    # Three first-class video slots.
     "announcer_video_model", "music_video_model", "character_video_model",
 })
 _IMAGE_DIRECTOR_WIDGETS = frozenset({
@@ -485,9 +485,8 @@ def resolved_profile(profile, canonical: dict, mapping: Optional[dict] = None,
     inherited writer is worse than the table it replaces -- so resolution happens
     HERE, after the render, where nothing it produces can be written back.
 
-    That ordering is the correction to a defect this replaced: a baseline block
-    merged resolved values on the way IN, so they reached `apply_profile` and were
-    emitted as pins, and an omitted key silently kept a stale value.
+    Resolving on the way IN would let resolved values reach `apply_profile` and
+    be emitted as pins, and an omitted key would silently keep a stale value.
 
     Returns a nested profile-shaped dict: `{"llm": {"creative_model": ...}, ...}`
     plus the row's own metadata.

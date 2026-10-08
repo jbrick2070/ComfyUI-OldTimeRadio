@@ -19,20 +19,14 @@ the heavy engine loads. V-4 / V-5: it NEVER calls ``unload_all_models``
 
 ``free_otr_pipeline_residue()`` is the single canonical residue-freer.
 
-CALLER LIST CORRECTED 2026-08-28. This paragraph named exactly two sites --
-``OTR_HuMoTierLoader.load()`` before the tier VRAM check, and
-``OTR_BatchHumoRender``'s inter-phase cleanup before Phase C -- and neither
-calls it any more; ``eng_humo.py`` now only MENTIONS it in a comment
-describing what its own detach-reclaim replaced. The function did not become
-less important, it became more general, and the docstring simply never caught
-up. Live callers today:
+Live callers today:
 
   * ``_otr_video_engines/render_driver.py`` -- pre-render, and the
     inter-engine reclaim between two beats on different engines, which is what
     keeps two heavy engines from co-residing on a 16 GB card.
   * ``_otr_video_engines/wrapper_bridge.py``.
 
-Verify with a grep before trusting this list too -- it has been wrong once.
+Verify with a grep before trusting this list; it can go stale.
 
 Every step is best-effort: a missing API on an older torch / Comfy
 combo, or a model that was never loaded, is a no-op, never a raise.

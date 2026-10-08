@@ -1,23 +1,17 @@
 """Live token heartbeat for long blocking generate() calls (leaf module).
 
-WHY THIS IS A SEPARATE MODULE NOW
----------------------------------
-The heartbeat streamer was written for the grammar-constrained transport and
-lived inside ``_otr_constrained_generate``. That module imports FROM
-``_otr_model_loader``, so the two other generate transports -- the shared one in
-``_otr_model_loader`` and the writer's own in ``OTR_LedgerScriptWriter`` -- could
-not reach it without an import cycle. They therefore ran with NO live view at
-all, which is exactly the pair that matters:
+WHY THIS IS A SEPARATE LEAF MODULE
+----------------------------------
+``_otr_constrained_generate`` imports FROM ``_otr_model_loader``, so the other
+generate transports -- the shared one in ``_otr_model_loader`` and the writer's
+own in ``OTR_LedgerScriptWriter`` -- could not reach a streamer defined there
+without an import cycle. The class therefore lives here, in a leaf that imports
+nothing from the pack, and every transport can attach it.
 
-On 2026-08-12 a P3 prose pass consumed its entire 14,191-token allowance without
-ever emitting a stop token, three times, ~20 minutes each. Nothing was visible
-while it happened. The failure was only legible afterwards, from a ceiling
-message. An operator watching a heartbeat would have seen it looping in the
-first thirty seconds -- "we used to have a log where you could see the LLM
-writing the story in real time" is the report that produced this module.
-
-So the class moved DOWN here, to a leaf that imports nothing from the pack, and
-every transport can attach it.
+A live view matters most on exactly those transports: a P3 prose pass can
+consume its entire token allowance without ever emitting a stop token, and the
+failure is otherwise legible only afterwards, from a ceiling message. An
+operator watching a heartbeat sees it looping in the first thirty seconds.
 
 IT CANNOT CHANGE WHAT THE MODEL WRITES. ``BaseStreamer`` is handed each
 newly-sampled token id after sampling; this implementation only reads. It never

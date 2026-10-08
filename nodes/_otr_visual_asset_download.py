@@ -12,13 +12,10 @@ SHA-256 are checked HERE, against the returned bytes, so a stale or poisoned
 library cache is still refused. It gains resume, retry, and the operator's token
 from whatever library the caller injected.
 
-THERE IS NO SOCKET LOOP HERE. ``download_verified`` was one -- an injected
-``open_stream`` and a read loop -- and was REMOVED 2026-10-08, with its tests,
-because nothing in production called it after the move to ``fetch_verified``.
-Shipping a bespoke downloader inside the package correlates with the Comfy
-Registry marking the version Flagged, and a Flagged version never resolves as
-``latest_version``, so ComfyUI Manager's default install button does not offer
-it.
+THERE IS NO SOCKET LOOP HERE, and none may be added back: shipping a bespoke
+downloader inside the package correlates with the Comfy Registry marking the
+version Flagged, and a Flagged version never resolves as ``latest_version``, so
+ComfyUI Manager's default install button does not offer it.
 """
 from __future__ import annotations
 
@@ -206,32 +203,23 @@ def fetch_verified(
     publish is an atomic no-clobber hard link (an ``O_EXCL`` copy where the
     filesystem cannot link), never an overwriting rename.
 
-    WHY THIS EXISTS (2026-09-07). The first transport, `download_verified`
-    (removed 2026-10-08), owned the bytes: it opened a socket through an injected
-    `open_stream` and looped. That is a bespoke downloader living in the shipped
-    package, and comparing four published zips showed the Comfy Registry security
-    scanner Flags exactly the versions that carry one -- alpha.25 added this
-    module's siblings and was Flagged while alpha.24 was Active; alpha.23 REMOVED
-    an indextts2 weight-fetcher plus a PowerShell installer and went Active while
-    alpha.22 was Flagged. Nine of fourteen versions are Flagged, and a Flagged
-    version does not resolve as `latest_version`, so Manager's default button
-    never offers it.
+    WHY THE TRANSPORT IS INJECTED (2026-09-07). A bespoke downloader living in
+    the shipped package is what the Comfy Registry security scanner Flags, and a
+    Flagged version does not resolve as `latest_version`, so Manager's default
+    button never offers it. The LLM lane downloads just as much and has never
+    been a differing file, because it goes through `huggingface_hub`. So `fetch`
+    is handed the same (spec, metadata) and returns a LOCAL PATH that some
+    library already produced; this function never owns the socket, and keeps
+    every guarantee:
 
-    The LLM lane downloads just as much and has never been a differing file,
-    because it goes through `huggingface_hub`. So `fetch` is handed the same
-    (spec, metadata) and returns a LOCAL PATH that some library already
-    produced; this function keeps every guarantee that made the hand-rolled
-    loop trustworthy and simply stops owning the socket:
-
-      * the caller's allowlist and pinned commit/sha256/size are still enforced,
-      * the destination lock and the no-clobber publish are unchanged,
+      * the caller's allowlist and pinned commit/sha256/size are enforced,
+      * the destination lock and the no-clobber publish apply,
       * the fetched bytes are hashed HERE, not trusted from the library, so a
         cache-poisoned or truncated file is still refused,
-      * an existing destination is still preserved untouched.
+      * an existing destination is preserved untouched.
 
-    It also gains what the loop could not have: resume and retry, and the
-    operator's HF token when one is set. The transfer that stalled for 50
-    seconds mid-way through 36.8 GB had neither.
+    The library also supplies resume and retry, and the operator's HF token when
+    one is set.
     """
     _validate(spec, metadata)
     spec = spec.copy()

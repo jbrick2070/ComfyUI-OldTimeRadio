@@ -75,10 +75,9 @@ _LEMMY_CAMEO_FORCE = {
 }
 
 
-#: Act count used when the widget value is missing or out of range. Three
-#: acts is the classic radio-drama shape (setup / complication / resolution)
-#: and was the previous auto-derived default for a normal-length episode.
-#: It is NOT derived from anything -- deriving it is what was removed.
+#: Act count used when the widget value is missing or out of range. Three acts
+#: is the classic radio-drama shape (setup / complication / resolution). It is
+#: NOT derived from anything.
 _DEFAULT_ACT_COUNT: int = 3
 
 #: Operator-facing act choices. Explicit 1..7 (7-act is a paid-length
@@ -179,11 +178,9 @@ def _resolve_inputs(
 
     Story: custom_premise verbatim > RSS auto-fetch.
 
-    Style-engine consolidation (2026-07-05): there is no `style` widget
-    input anymore. Every episode's style comes from exactly ONE call --
-    ``_otr_style_catalog.build_story_contract()`` -- made later in
-    ``run()`` once cast_seed and script_brief both exist. The old
-    three-way style_custom/combo/LLM-picker resolver is gone.
+    There is no `style` widget input: every episode's style comes from exactly
+    ONE call -- ``_otr_style_catalog.build_story_contract()`` -- made later in
+    ``run()`` once cast_seed and script_brief both exist.
     """
     # THE CAMEO KNOB IS VALIDATED FIRST, before any RSS fetch or source work.
     # EXACT membership, and a typo FAILS LOUD naming the three choices. The
@@ -218,15 +215,11 @@ def _resolve_inputs(
     _raw_num_characters = int(num_characters)
     num_characters = max(1, min(_FABLE2_MAX_CAST, _raw_num_characters))
 
-    # ACT COUNT IS THE ONLY LENGTH-SHAPED KNOB (operator directive
-    # 2026-08-14). The widget is an explicit 1..6 combo (narrowed from 1..8,
-    # PBUG-20260825-01). There is no
-    # 'auto' any more: 'auto' meant "derive the act count from
-    # target_words", and target_words no longer exists. Nor is the pick
-    # validated against a derived [default..max] band -- that band came
-    # from the word total too, which meant a word count could REFUSE an
-    # operator's act choice. An out-of-range value falls back to the
-    # default rather than failing the render.
+    # ACT COUNT IS THE ONLY LENGTH-SHAPED KNOB (operator directive 2026-08-14).
+    # The widget is an explicit 1..6 combo (PBUG-20260825-01). The pick is not
+    # validated against any derived band (a word count must never REFUSE an
+    # operator's act choice); an out-of-range value falls back to the default
+    # rather than failing the render.
     try:
         act_count_int = int(str(act_count).strip())
     except (TypeError, ValueError):
@@ -627,9 +620,8 @@ def _resolve_inputs(
         "seed_source":          seed_source,
         "num_characters":       num_characters,
         "episode_title":        (episode_title or "").strip(),
-        # S30 B2b: per-slot keys ONLY. The legacy `model_id` key is
-        # deleted outright; consumers route via creative_writing_model
-        # / technical_model. No "stamp both" hedge.
+        # S30 B2b: per-slot keys ONLY (no `model_id` key); consumers route via
+        # creative_writing_model / technical_model. No "stamp both" hedge.
         "creative_writing_model": creative_writing_model,
         "technical_model":        technical_model,
         # S1 platform-portability: the ONE frozen policy object threaded

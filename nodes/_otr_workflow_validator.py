@@ -83,9 +83,8 @@ def _queue_time_readiness_gates(prompt, unique_id, comfy_api_key=None):
     not trip the balance check, and a rolled lane's weights must download.
 
     ``comfy_api_key`` is this queue's own key -- the one OTR_ComfyCredential
-    bound for this prompt, the only Comfy credential since the 2026-09-19
-    rip -- so the balance check measures the wallet the run will actually
-    spend from.
+    bound for this prompt, the only Comfy credential -- so the balance check
+    measures the wallet the run will actually spend from.
 
     The episode language is settled next (2026-09-28): a language this run's
     voices cannot speak refuses before anything is spent, and a rolled one
@@ -102,11 +101,12 @@ def _queue_time_readiness_gates(prompt, unique_id, comfy_api_key=None):
 
 
 def _resolve_workflow_path(path: str) -> Path:
-    """GATE B S2 code-defect fix (2026-06-11, spec section 2 'verified ground
-    truth'): non-empty RELATIVE paths used to resolve against the process CWD
-    -- correct only by accident under ComfyUI Desktop and silently wrong for
-    headless runs launched from any other directory (`IS_CHANGED` then hashed
-    a phantom mtime=0, so on-disk edits never re-triggered validation).
+    """Resolve the workflow path (empty / relative / absolute) to a ``Path``.
+
+    Non-empty RELATIVE paths must not resolve against the process CWD: that is
+    correct only by accident under ComfyUI Desktop and silently wrong for
+    headless runs launched from any other directory (`IS_CHANGED` would hash a
+    phantom mtime=0, so on-disk edits never re-trigger validation).
 
     Resolution contract (shared by `_load_workflow` AND `IS_CHANGED`):
       * empty       -> the canonical `_DEFAULT_WORKFLOW_PATH` (explicit, logged
@@ -130,15 +130,12 @@ def _resolve_workflow_path(path: str) -> Path:
 
 
 def _load_workflow(path: str) -> dict[str, Any]:
-    # Sprint E E5 / H5: explicit empty-string fallback. The shipped
-    # workflow JSON ships the validator widget as "" (per the S29
-    # Phase 1 cleanbreak that removed hardcoded `C:/Users/jeffr/...`
-    # operator paths from the JSON surface). Pre-E5 this fell through
-    # to `_DEFAULT_WORKFLOW_PATH` silently with no log line, leaving
-    # soak diagnostics unable to tell whether the empty widget was
-    # intentional or a wiring error. Post-E5 the fallback is explicit
-    # and the resolved path is logged at INFO so the operator sees
-    # which file actually got validated.
+    # Explicit empty-string fallback (Sprint E E5 / H5). The shipped workflow
+    # JSON ships the validator widget as "" (no hardcoded operator paths on the
+    # JSON surface), so the fallback to `_DEFAULT_WORKFLOW_PATH` must be
+    # explicit and the resolved path logged at INFO: soak diagnostics have to
+    # tell an intentional empty widget from a wiring error, and the operator
+    # sees which file actually got validated.
     if not path:
         log.info(
             "OTR_WorkflowValidator: workflow_json_path widget empty; "
@@ -232,9 +229,9 @@ def widget_vector_drift(workflow: dict, ncm: dict) -> list[str]:
             expected = _expected_slot_count(cls.INPUT_TYPES() or {})
         except Exception as exc:  # noqa: BLE001
             # A NODE THAT CANNOT DESCRIBE ITS OWN INPUTS IS A DRIFT FINDING,
-            # NOT AN EXEMPTION (2026-09-04, kibitz r1, unanimous). This used to
-            # `continue`, which silently removed the node from the HARD GATE
-            # below -- so a broken INPUT_TYPES() let the gate report
+            # NOT AN EXEMPTION (2026-09-04, kibitz r1, unanimous). A `continue`
+            # here would silently remove the node from the HARD GATE below -- a
+            # broken INPUT_TYPES() would let the gate report
             # "widget_vector_drift=0" having never checked it. Every class that
             # reaches this line is one of OURS: third-party types were already
             # skipped at `cls is None` above, so there is no foreign-node cost
@@ -525,13 +522,12 @@ class WorkflowValidator:
             # A MISSING PROFILE LETS THE WORKFLOW RUN (operator, 2026-09-23:
             # "just let the workflow run").
             #
-            # This used to raise, which aborted the prompt before any model
-            # loaded. That was the wrong trade: the profile is METADATA about
-            # the host, and everything the render actually needs is already
-            # baked into the graph's own widget values by `build_variants`. So a
-            # missing or unreadable profile JSON cost the user their entire run
-            # to protect them from nothing -- there is no silent wrong render
-            # here, only an unperformed courtesy check.
+            # The profile is METADATA about the host, and everything the render
+            # actually needs is already baked into the graph's own widget values
+            # by `build_variants`. So a missing or unreadable profile JSON must
+            # not cost the user their entire run to protect them from nothing --
+            # there is no silent wrong render here, only an unperformed courtesy
+            # check.
             #
             # WHAT IS LOST when it cannot load, stated so nobody assumes
             # otherwise: the host-reality warnings below. A CUDA lane on a
@@ -576,21 +572,19 @@ class WorkflowValidator:
     def _host_reality_problems(self, profile, profile_id: str) -> list:
         """Every way this profile does not fit the machine it is running on.
 
-        Split out of ``_assert_stamp`` so the caller can skip it when the
-        profile could not be read while still running the drift tripwire. The
-        checks themselves are unchanged and still abort the prompt: a real
-        mismatch is worth the abort, because the alternative there IS a wrong
-        render on the wrong device.
+        Separate from ``_assert_stamp`` so the caller can skip it when the
+        profile could not be read while still running the drift tripwire. These
+        checks abort the prompt: a real mismatch is worth the abort, because the
+        alternative there IS a wrong render on the wrong device.
         """
         from ._otr_shared.boot_contracts import (
             BootContractError, assert_running_server, contract_for_profile,
         )
         host = self._detect_host()
         problems = []
-        # A SUGGESTION MUST BE SOMETHING THE USER CAN OPEN. This named
-        # `cpu_floor`, a lab rig that no longer exists, so every abort pointed
-        # at nothing (found 2026-09-25). A Mac with a live MPS device has its
-        # own shipped rows; everything else gets the canonical, which picks
+        # A SUGGESTION MUST BE SOMETHING THE USER CAN OPEN (a name that is not a
+        # shipped profile points at nothing). A Mac with a live MPS device has
+        # its own shipped rows; everything else gets the canonical, which picks
         # the device at run time.
         suggestion = ("otr_mac16_low"
                       if host["platform"] == "mac" and host.get("has_mps")
@@ -630,9 +624,9 @@ class WorkflowValidator:
                             profile_id: str, generated_by: str) -> str:
         """The drift tripwire and the runtime export.
 
-        Split out of ``_assert_stamp`` alongside ``_host_reality_problems`` so a
+        Separate from ``_assert_stamp``, like ``_host_reality_problems``, so a
         profile that cannot be read stops the courtesy checks WITHOUT stopping
-        this one. Unchanged otherwise.
+        this one.
         """
         # S5 drift tripwire: the stamped master_hash must MATCH the live
         # semantic hash of the workflow file (node types + links + the
@@ -661,8 +655,8 @@ class WorkflowValidator:
 
         # Runtime export -- EVERY execution, not "if unset" (a long-running
         # server persists env across prompts; stale values are overwritten).
-        # The VRAM OOM budget is owned by the operator's tier JSON now, so the
-        # validator no longer exports a ceiling -- only the active profile id.
+        # The VRAM OOM budget is owned by the operator's tier JSON, so the
+        # validator exports no ceiling -- only the active profile id.
         # No in-repo module reads these two exports (audited 2026-08-28); they
         # are OUTPUTS kept for external tooling and the same-process node packs
         # -- the env value is the only full-fidelity record of which workflow

@@ -42,16 +42,9 @@ class DeferredImageGapError(RenderError):
     and still fails LOUD, so introducing this type cannot quietly convert a
     real render failure into a soft one.
 
-    WHAT THIS REPLACED, and why the replacement is the whole point: ShotLock
-    used to decide deferrability by SUBSTRING-MATCHING the exception message
-    against four needles ("Missing still", "no radio_host_portrait FACE still",
-    "NO portrait in the ledger", "NO scene still in the ledger"). The LTX-I2V
-    gap says "LTX-I2V requires a minted scene still for beat %s; the image
-    phase produced no usable path" -- which matches none of them -- so ShotLock
-    re-raised, plan-build died, and node 91 never ran. That is the `ltx_video`
-    NO_RENDER of the 2026-07-28 engine-coverage campaign: an engine taken off
-    the air by a wording mismatch. A raise site now DECLARES what it is instead
-    of hoping a reader's substring list still covers its prose.
+    A raise site DECLARES what it is; ShotLock never infers deferrability by
+    matching the wording of an exception message, because a gap whose message
+    matches no needle dies at plan-build instead of deferring.
 
     NEVER raise this AFTER the image phase. A gap discovered at still-spine
     validation time means image generation actually failed, and deferring there

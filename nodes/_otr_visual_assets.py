@@ -386,20 +386,17 @@ def _custom_models(inputs):
 def _resolve_slot(inputs, slot, custom, kind):
     """The engine a slot selects, resolving the custom-model escape hatch.
 
-    THE SENTINEL USED TO BE AN UNCONDITIONAL REFUSAL HERE, and that was a real
-    defect: `otr_video_director` and `otr_image_director` BOTH support
-    ``+ Add Custom Model`` and resolve it through their ``custom_models_json``
-    widget, but this preflight rejected the run before either got the chance.
-    So the documented escape hatch worked in one half of the pipeline and was
-    hard-refused by the other -- an operator who declared a perfectly valid
-    custom engine could not start a render at all.
+    A declared custom engine must NOT be refused here: `otr_video_director` and
+    `otr_image_director` BOTH support ``+ Add Custom Model`` and resolve it
+    through their ``custom_models_json`` widget, so an unconditional refusal on
+    the sentinel would hard-refuse the documented escape hatch.
 
     A custom engine is simply not in `_COVERED`, so it flows on to the existing
     "automatic visual-weight coverage unavailable; existing adapter checks
     remain" note. That is the correct outcome: we cannot auto-download an engine
     we do not have an allowlisted manifest row for, and we must not pretend to.
     Refusing is still right when the sentinel is chosen and NOTHING declares it
-    -- that is an incomplete graph, and the message now says which slot.
+    -- that is an incomplete graph, and the message says which slot.
     """
     picked = _literal(inputs, slot)
     if picked and not picked.startswith(_ADD_CUSTOM):
@@ -761,13 +758,11 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         # `explicit` exactly as the Z-Image branch does with its own env keys.
         if sa3 is None:
             raise VisualAssetError("stable_audio_3 adapter resolution is unavailable")
-        # ASK THE ADAPTER, DO NOT READ ITS CONSTANT (2026-09-12). `_CKPT` used
-        # to BE the filename; it is now the operator's override and is EMPTY by
-        # default, because the engine picks between the base and post-trained
-        # checkpoints at load time. Reading the raw constant here asked the
-        # preflight to find a weight called "" and killed every render that did
-        # not set OTR_SA3_CKPT -- found by the first canonical leg after the
-        # change, which is exactly what legs are for.
+        # ASK THE ADAPTER, DO NOT READ ITS CONSTANT (2026-09-12). `_CKPT` is the
+        # operator's override and is EMPTY by default, because the engine picks
+        # between the base and post-trained checkpoints at load time. Reading
+        # the raw constant here would ask the preflight to find a weight called
+        # "" and kill every render that does not set OTR_SA3_CKPT.
         add("checkpoints", sa3.StableAudio3Engine.resolve_ckpt()[0],
             explicit=str((env or {}).get("OTR_SA3_CKPT") or ""))
         add("text_encoders", sa3._TENC,
@@ -959,21 +954,18 @@ def _pin_metadata(spec, *, hf_hub_url, get_hf_file_metadata):
 def _hf_fetch(spec, metadata, progress=None):
     """Fetch one allowlisted file through huggingface_hub; return its local path.
 
-    REPLACES A HAND-ROLLED urllib DOWNLOADER (2026-09-07), and the reason is not
-    tidiness. Diffing four published zips showed the Comfy Registry scanner
-    Flags precisely the versions that ship a bespoke fetcher: alpha.25 added
-    this module and was Flagged where alpha.24 was Active; alpha.23 REMOVED an
-    indextts2 weight-downloader and a PowerShell installer and went Active where
-    alpha.22 was Flagged. Nine of fourteen versions are Flagged, and a Flagged
-    version never resolves as `latest_version`, so Manager's default install
-    button does not offer it -- which is the single largest piece of friction in
-    the whole zero-friction campaign. The LLM lane moves just as many bytes and
-    has never been a differing file, because it goes through this same library.
+    NO HAND-ROLLED DOWNLOADER (2026-09-07), and the reason is not tidiness: the
+    Comfy Registry scanner Flags the versions that ship a bespoke fetcher, and a
+    Flagged version never resolves as `latest_version`, so Manager's default
+    install button does not offer it -- which is the single largest piece of
+    friction in the whole zero-friction campaign. The LLM lane moves just as
+    many bytes and has never been a differing file, because it goes through this
+    same library.
 
-    IT ALSO FIXES THREE REAL DEFECTS the loop could not:
-      * RESUME and RETRY. The planner used to print "no resume/retry" about
-        itself; a drop 11 GB into a 12 GB file restarted that file at zero, and
-        a real 50-second stall was measured mid-way through a 36.8 GB fetch.
+    WHAT THE LIBRARY ADDS over a bespoke loop:
+      * RESUME and RETRY. A drop 11 GB into a 12 GB file does not restart that
+        file at zero, and a real 50-second stall was measured mid-way through a
+        36.8 GB fetch.
       * THE OPERATOR'S TOKEN. `_pin_metadata` deliberately passes `token=False`
         for METADATA (pinning must not depend on a credential), which is why
         startup logs a resolved HF_TOKEN and the next line still warns

@@ -89,13 +89,11 @@ def _build_title_excerpt_set(
 ) -> dict:
     """Slice the assembled script into opening / middle / ending excerpts.
 
-    Sprint 3E (2026-05-25): the title pass used to receive one thin
-    head-of-script slice (`assembled_script[:3000]`), which on a long
-    episode is the opening act only -- the model titled the show off
-    the setup and never saw the climax or the ending. This helper
-    splits the script into three windows so the title prompt sees the
-    whole arc: how the episode opens, what happens in its middle, and
-    how it lands.
+    Sprint 3E (2026-05-25): the title prompt sees the whole arc, not a thin
+    head-of-script slice (on a long episode that is the opening act only, so the
+    model titled the show off the setup and never saw the climax or the ending).
+    This helper splits the script into three windows: how the episode opens,
+    what happens in its middle, and how it lands.
 
     Splits on the blank-line-delimited token blocks produced by the
     per-beat loop (each `[VOICE: ...]` block is one
@@ -265,10 +263,10 @@ def _generate_title_from_script(
     temperature: float | None = 0.85,
     premise: str = "",
     arc_verdict: str = "",
-    # QA F1 (2026-07-09): bank-aware title framing. The system prompt used to
-    # hardcode "sci-fi radio drama" for EVERY bank; the caller now threads the
-    # bank's banks.json `title_form_label` (first live consumer of that
-    # field). Default keeps legacy callers/self-tests byte-identical.
+    # QA F1 (2026-07-09): bank-aware title framing. The caller threads the
+    # bank's banks.json `title_form_label` into the system prompt (first live
+    # consumer of that field). The default keeps legacy callers/self-tests
+    # byte-identical.
     title_form_label: str = "sci-fi radio drama",
     # PBUG-20260815-05 (2026-08-19): the work this episode adapts, already
     # lane-gated by the caller. Default "" keeps every legacy caller and
@@ -434,9 +432,9 @@ def _generate_title_from_script(
 
     # A cloud creative slot carries no baseline (None): send no temperature
     # and let the provider apply the model's own default, exactly as
-    # compose_line does. Found by Sonnet QA on ba0a0e87: `float(None)` here,
-    # BEFORE the try below, killed every cloud-writer episode whose title was
-    # left blank -- which is the normal path, the title is minted at the end.
+    # compose_line does. `float(None)` here, BEFORE the try below, would kill
+    # every cloud-writer episode whose title was left blank -- which is the
+    # normal path, the title is minted at the end.
     clamped_temp = (None if temperature is None
                     else max(0.4, min(1.0, float(temperature))))
 
@@ -511,11 +509,9 @@ def _generate_title_from_script(
 def _resolve_cast_rng_seed() -> tuple[int, str]:
     """Return (seed, source) for the per-episode cast RNG.
 
-    BUG-LOCAL-269: the cast is no longer pinned by the `seed` widget.
-    A fixed `seed` reproduced ONE cast forever -- every episode opened
-    with the identical characters (seed 42 always rolled HAYES VANCE /
-    GULLIVER REEVES / JIMBO BLACK). Production now draws a fresh
-    OS-entropy seed each episode so the cast genuinely varies.
+    BUG-LOCAL-269: the cast is not pinned by the `seed` widget (a fixed `seed`
+    reproduced ONE cast forever). Production draws a fresh OS-entropy seed each
+    episode so the cast genuinely varies.
 
     The OTR_CAST_SEED environment variable forces a fixed seed -- used
     by the C7 audio byte-identity regression, which needs a
@@ -726,9 +722,8 @@ def _build_news_payload(
 
     1-element JSON array matching legacy article shape. seed_source flags
     whether the body came from a user-typed custom_premise or from the
-    RSS fetcher. (The old story_orchestrator:5141 pointer is stale --
-    kibitz r4 P5: real consumers are the FreezeCascade passthrough +
-    video_engine's HUD/treatment readers.)
+    RSS fetcher. Real consumers (kibitz r4 P5): the FreezeCascade passthrough +
+    video_engine's HUD/treatment readers.
 
     kibitz r2-r4 provenance surface: the three keyword args are
     DATA-DRIVEN extensions resolved by the caller (bank defaults +
@@ -775,13 +770,8 @@ def _stamp_story_style_receipt(meta: dict, *, contract,
 def _title_source_for_custom_override(source_bank_row: Any) -> str:
     """Return truthful custom-lane title provenance without changing ctx."""
     bank_id = str(getattr(source_bank_row, "source_bank_id", "") or "").strip()
-    # The special case that used to sit here returned the LEGACY literal
-    # `fable2_script_title` for this one lane (PBUG-20260712-05 preserved it
-    # when every custom runner was wrongly stamped with that lane's value).
-    # The 2026-08-16 rename made the legacy literal equal to what the generic
-    # branch already derives, so the branch was dead and is gone. Frozen
-    # ledgers keep their old `fable2_script_title` string on disk; nothing
-    # branches on this value, it is provenance telemetry.
+    # Frozen ledgers keep their old `fable2_script_title` string on disk;
+    # nothing branches on this value, it is provenance telemetry.
     if bank_id:
         return f"{bank_id}_script_title"
     return "custom_pipeline_script_title"
@@ -924,11 +914,10 @@ class WriterTailMixin:
         #  - The title is bound LATE, here, after the script exists.
         #    The per-line composer (section I) ran with `EPISODE_TITLE:
         #    TBD` in canon_header, so no provisional / outline title was
-        #    ever placed where a beat could speak it. There is no "old
-        #    title" baked into dialogue, so the fragile post-hoc
-        #    verbatim string substitution (the former section J.6) is
-        #    removed entirely -- it only caught verbatim quotes anyway
-        #    and let paraphrases slip through.
+        #    ever placed where a beat could speak it. There is no "old title"
+        #    baked into dialogue, so no post-hoc verbatim string substitution is
+        #    needed (it only caught verbatim quotes anyway and let paraphrases
+        #    slip through).
         #  - `_generate_title_from_script` is now a forced-scratchpad
         #    pass (3 physical details -> 3 candidate titles -> final
         #    TITLE: line) reading the whole-arc excerpt set, not a thin
@@ -951,12 +940,10 @@ class WriterTailMixin:
             )
         else:
             # kibitz r3 D4 (2026-07-09) ROOT-CAUSE FIX: assemble from the
-            # CANONICAL ledger. The writer's old in-loop token list never saw
-            # the I.5 outro overwrite (title regen was reading the
-            # deterministic PLACEHOLDER close) and would never have seen the
-            # I.4.9 intro rewrite. Same authority the slot-0 output uses
-            # (section L below). That list was removed outright 2026-08-28 --
-            # nothing ever read it, so "diagnostic-only" was generous.
+            # CANONICAL ledger, which sees the I.5 outro overwrite (title regen
+            # must not read the deterministic PLACEHOLDER close) and the I.4.9
+            # intro rewrite. Same authority the slot-0 output uses (section L
+            # below).
             assembled_script = _PL.assemble_script_text_from_ledger(led.data)
             # PBUG-20260815-05: anchor the title pass to the work it is
             # actually adapting. `identity_from_meta` is the SINGLE
@@ -1024,7 +1011,7 @@ class WriterTailMixin:
                     premise=outline.premise,
                     arc_verdict="",
                     # QA F1 (2026-07-09): bank-aware framing via banks.json
-                    # title_form_label (science value == the old hardcode).
+                    # title_form_label (science value == the default).
                     title_form_label=str(
                         (getattr(_source_bank_row, "defaults", {}) or {})
                         .get("title_form_label") or "sci-fi radio drama"
@@ -1070,15 +1057,12 @@ class WriterTailMixin:
         meta["gen_params_initial"] = {
             "act_count":            resolved["act_count"],
             "num_characters":       resolved["num_characters"],
-            # S30 B2b: the legacy `model_id` key is DELETED outright.
-            # Every consumer that previously read meta.gen_params_initial.
-            # model_id now reads creative_writing_model + technical_model
-            # explicitly (B3 onward).
+            # S30 B2b: no legacy `model_id` key; every consumer reads
+            # creative_writing_model + technical_model explicitly (B3 onward).
             "creative_writing_model": resolved["creative_writing_model"],
             "technical_model":        resolved["technical_model"],
             # Each model's own (temperature, top_p, top_k) baseline, or None
-            # for a cloud slot (provider default). Replaced the creativity /
-            # temperature / top_p stamp on 2026-09-25.
+            # for a cloud slot (provider default).
             "sampling": {
                 slot: (list(baseline) if baseline else None)
                 for slot, baseline in (
@@ -1169,9 +1153,6 @@ class WriterTailMixin:
                 "name keeps the native title", gloss_reason)
 
         # --- J.7. The announcer's WORK phrase becomes Python-owned ---------
-        # (J.6 is a TOMBSTONE -- the retired post-hoc title-substitution
-        # section, pinned removed by test_post_hoc_title_substitution_is_
-        # removed. Do not revive that label for new work.)
         # PBUG-20260817-04. The model was handed `WORK: a scene from Nonsense
         # Novels` -- by a seam that literally says "Use ONLY the WORK title
         # ...; invent none" -- and announced "The Adventure of the Purloined
@@ -1196,12 +1177,11 @@ class WriterTailMixin:
         # maps media_archive's `source_label` onto the SAME field, so an
         # ungated read announces "a scene from Now See Hear!" on 57% of that
         # lane -- a worse fidelity defect than the one being fixed.
-        # THE WHOLE BLOCK IS GUARDED, identity read included. An earlier
-        # version computed the identity OUTSIDE the try and took ten tail
-        # tests red: a synthetic or partial `meta` makes `identity_from_meta`
-        # raise, and an unprotected read there kills the writer tail on lanes
-        # that were never going to get a frame at all. Nothing about naming
-        # the work may ever be able to fail an episode.
+        # THE WHOLE BLOCK IS GUARDED, identity read included: a synthetic or
+        # partial `meta` makes `identity_from_meta` raise, and an unprotected
+        # read there kills the writer tail on lanes that were never going to get
+        # a frame at all. Nothing about naming the work may ever be able to fail
+        # an episode.
         try:
             # BOTH imports are local because `_run_writer_tail` is a SEPARATE
             # METHOD, not a closure over run() -- its docstring says it
@@ -1276,49 +1256,24 @@ class WriterTailMixin:
                     "keeping the composed announcer opening (LOUD).",
                     exc_info=True,
                 )
-        # Sprint 3E (2026-05-25): meta.title_substitution is retired.
-        # Late title binding means dialogue never carried a provisional
-        # title, so there is no post-hoc substitution to record. The
-        # former J.6 verbatim-substitution block and its title-swap
-        # helper were both removed in this sprint.
-        # `meta.perfect_run_spacesaver` was stamped here until 2026-09-13,
-        # when the widget that fed it was removed. It had been a no-op since
-        # 2026-08-08 and the flag was only ever written when the box was
-        # ticked, which the shipped graphs never did -- so no ledger this
-        # pack has produced carries the key, and nothing reads it.
 
         # K.5 -- voice-path-cleanbreak Sprint 2 + Sprint 6 (2026-05-12).
-        # Stamp the visual_plan + style fields that OTR_VideoPlan and
-        # OTR_SignalLostVideo previously read from
-        # OTR_LLMDirector.production_plan_json.
+        # Stamp the visual_plan + style fields the video lane reads.
         #
-        # Sprint 6 changes vs Sprint 2:
-        #   - genre: was hardcoded "audio drama"; now resolved from style
-        #     via _GENRE_BY_STYLE (S6.1). Style-specific genre strings
-        #     surface in the SignalLostVideo HUD and FLUX prompts.
-        #   - voice_assignments: was persisted to meta; now derived at
-        #     render time from led["cast"] via
-        #     _otr_ledger_consumers.voice_assignments_from_cast (S6.2).
-        #     Cast is the canonical source; persisting a derived view
-        #     invited drift.
-        #   - notes: was mirrored from character_description into both
-        #     portrait_prompt and notes; now portrait_prompt is the only
-        #     character description surface (S6.2).
+        # voice_assignments is NOT persisted to meta: it is derived at render
+        # time from led["cast"] via
+        # _otr_ledger_consumers.voice_assignments_from_cast (S6.2). Cast is the
+        # canonical source; persisting a derived view invites drift.
         #
-        # portrait_prompt is the cast row's character_description.
-        # (2026-06-10 gap-audit doc fix: the legacy compose_shot_prompt
-        # referenced here was DELETED with otr_video_plan.py; the live
-        # seam that appends era_tail + style_tail is now
-        # _otr_story_brief_helpers.finish_visual_prompt, called by
-        # ShotLock M4, the image-prompt deriver, and the render driver's
-        # scene composer.) This short, content-focused field is the right
-        # Tier-1 input. The 3-tier fallback in resolve_character_portrait
-        # already covers the empty case.
+        # portrait_prompt is the cast row's character_description and the only
+        # character description surface (S6.2). The seam that appends era_tail +
+        # style_tail is _otr_story_brief_helpers.finish_visual_prompt, called by
+        # ShotLock M4, the image-prompt deriver, and the render driver's scene
+        # composer, so this short, content-focused field is the right Tier-1
+        # input.
         #
-        # scenes is intentionally empty -- the writer doesn't emit
-        # scene-level visual blocking today. OTR_VideoPlan handles the
-        # empty list gracefully (extract_scenes returns [] and the
-        # caller drives the per-shot composition off beats instead).
+        # scenes is intentionally empty -- the writer doesn't emit scene-level
+        # visual blocking; the per-shot composition is driven off beats instead.
         _cast_rows = led.data.get("cast") or []
         _visual_chars = {}
         for _row in _cast_rows:
@@ -1351,14 +1306,14 @@ class WriterTailMixin:
         # Producer-owned banks already performed their fixed tail and only need
         # the writer-model unload here. Neither path judges story length or
         # quality and neither can author a replacement story.
-        # THE UNLOAD USED TO BE HERE AND IT WAS TOO EARLY (2026-09-08).
-        # `_otr_writer_vram`'s own docstring states the invariant -- "evict the
-        # writer LLM after the LAST LLM phase" -- but three more LLM phases run
-        # below this line: run_story_brief_reflection, run_ledger_clean /
-        # run_ledger_cleanup, and the cast-coverage repair. Each was appended to
-        # this tail after the unload was placed, and each got a fresh
-        # from_pretrained plus warmup because of it. The single unload now sits
-        # at the real boundary, after the last of them.
+        # THE UNLOAD IS NOT AT THIS POINT, BECAUSE IT WOULD BE TOO EARLY
+        # (2026-09-08). `_otr_writer_vram`'s own docstring states the invariant
+        # -- "evict the writer LLM after the LAST LLM phase" -- and three more
+        # LLM phases run below this line: run_story_brief_reflection,
+        # run_ledger_clean / run_ledger_cleanup, and the cast-coverage repair.
+        # Unloading here would give each of them a fresh from_pretrained plus
+        # warmup. The single unload sits at the real boundary, after the last of
+        # them.
         if ctx.run_story_spine:
             try:
                 from . import _otr_story_spine as _OTRSPINE
@@ -1368,9 +1323,7 @@ class WriterTailMixin:
 
         # The first structurally complete inline ledger is authoritative.
         # stamp_actual files the receipt at word_budget.actual_receipts[stage]
-        # AND merges it onto word_budget top-level; the old top-level
-        # meta.writer_word_delivery alias was a byte-equal duplicate and was
-        # retired 2026-08-28 (V4 finding 12).
+        # AND merges it onto word_budget top-level.
         _OTRWD.stamp_actual(
             led.data,
             stage="writer_final_rows",
@@ -1399,8 +1352,8 @@ class WriterTailMixin:
             )
         # POP THE MODEL BEFORE MERGING (PBUG-20260812-04). `visual_card` is the
         # only value in this delta that is not JSON -- it is a live
-        # `VisualStyleCardModel`, added by `run_story_brief_reflection` at
-        # `_otr_story_brief.py:643`. `meta.update()` put it straight into the
+        # `VisualStyleCardModel`, added by `run_story_brief_reflection` in
+        # `_otr_story_brief.py`. `meta.update()` put it straight into the
         # ledger, and although the serialized copy is written below as
         # `meta["visual_style_card"]`, the RAW MODEL stayed alongside it. The
         # very next `led.save()` then died:
@@ -1512,9 +1465,8 @@ class WriterTailMixin:
             )
         meta.update(_story_delta)
 
-        # (The unconditional reclaim that used to sit here was ALSO too early:
-        # run_ledger_clean and run_ledger_cleanup below both drive
-        # creative_generate_fn. Moved to the real boundary at the end of this
+        # (No reclaim here: run_ledger_clean and run_ledger_cleanup below both
+        # drive creative_generate_fn, so the reclaim waits for the end of this
         # function.)
 
         # Sprint D D2b: stamp creative slot identity into meta so
@@ -1565,28 +1517,22 @@ class WriterTailMixin:
         except Exception:  # noqa: BLE001 -- provenance must never break a run
             pass
 
-        # NOTE: meta.episode_title is stamped once, by the J.5
-        # post-composition title pass (meta["episode_title"] = final_title
-        # above). A Sprint-E "K.5.7" block used to re-stamp it here from
-        # the raw episode_title widget value -- which ran AFTER J.5 and
-        # clobbered the LLM-generated title with "" whenever the widget
-        # was left blank, so the video title chain fell to the timestamp
-        # last-resort (BUG-LOCAL-236). K.5.7 deleted 2026-05-20; J.5 is
-        # the single authority for the title.
+        # NOTE: meta.episode_title is stamped once, by the J.5 post-composition
+        # title pass (meta["episode_title"] = final_title above). Do not
+        # re-stamp it here from the raw episode_title widget value: that would
+        # run AFTER J.5 and clobber the LLM-generated title with "" whenever the
+        # widget is left blank, sending the video title chain to the timestamp
+        # last-resort (BUG-LOCAL-236). J.5 is the single authority for the
+        # title.
 
         # --- L. Assemble return values --------------------------------
         # Tier 1 fix #2 (2026-05-11): derive final script_text from the
         # CANONICAL ledger rows. Post-loop mutations (the news_close_brief
-        # announcer override in I.5) write to led.data["lines"] and were not
-        # mirrored into the writer's old in-loop token list, which is why the
-        # ledger is the source of truth for the slot-0 STRING output. That
-        # list is gone as of 2026-08-28; nothing read it.
-        # Sprint 3E (2026-05-25): the former J.6 post-hoc title
-        # substitution -- another such ledger-only mutation -- is gone
-        # (late title binding means no provisional title in dialogue).
-        # What follows is the one final producer boundary shared by every
-        # source bank: after every writer-side text mutation, before the lane
-        # finalizer's Phase-10 freeze.
+        # announcer override in I.5) write to led.data["lines"], so the ledger
+        # is the source of truth for the slot-0 STRING output. What follows is
+        # the one final producer boundary shared by every source bank: after
+        # every writer-side text mutation, before the lane finalizer's Phase-10
+        # freeze.
         #
         # Independent source banks wave 6: the LEDGER CLEANUP PASS. Every
         # downstream consumer reads FIELDS, so this boundary owes them a

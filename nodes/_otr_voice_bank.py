@@ -124,10 +124,9 @@ def reserved_voice_ref_ids(bank=None) -> frozenset:
     """Voice references that belong to ONE named character and nobody else.
 
     OWNED BY THE BANK ROW. A row whose ``reserved_for`` is non-empty is that
-    character's, and is excluded from every ordinary draw. This replaced a walk
-    over the casting policy's route records: the policy named the same three
-    rows, but it derived a property of a VOICE from a table about CASTING, so
-    the two could disagree and only one of them shipped in the bank file.
+    character's, and is excluded from every ordinary draw. Reservation is a
+    property of a VOICE, so it lives in the bank file, not in a table about
+    CASTING that could disagree with it.
 
     A RESERVATION IS AN EXCLUSION, NOT AN ASSIGNMENT. It does not give the owner
     his voice -- the recurring-character table does that, and it names SHARED
@@ -551,17 +550,16 @@ def accent_timbre_tags(accent, bank=None, engine="") -> Tuple[str, ...]:
     is drawn. An unmatchable accent must cost NOTHING, or "the bank could not
     help" silently becomes "we reshuffled your cast".
 
-    THE FIRST VERSION OF THIS CHECKED THE WHOLE BANK AND WAS WRONG. A word that
-    is real vocabulary on another engine -- `british`, which kokoro and the
-    cloud engines carry -- passed the check and perturbed the draw on
-    `indextts2`, which carries no british voice of either gender.
-    Measured: eight of twelve seeds moved. "Does any voice carry this tag" was
-    never the question; "can the pool this character draws from carry it" is,
-    and they differ whenever the bank is uneven across engines, which it always
-    is.
+    A BANK-WIDE CHECK IS WRONG. A word that is real vocabulary on another engine
+    -- `british`, which kokoro and the cloud engines carry -- would pass it and
+    perturb the draw on `indextts2`, which carries no british voice of either
+    gender (measured: eight of twelve seeds moved). "Does any voice carry this
+    tag" is not the question; "can the pool this character draws from carry it"
+    is, and they differ whenever the bank is uneven across engines, which it
+    always is.
 
-    Passing no ``engine`` keeps the old bank-wide behaviour and is only correct
-    when the caller has already narrowed ``bank``.
+    Passing no ``engine`` checks the whole bank and is only correct when the
+    caller has already narrowed ``bank``.
 
     An accent already spelled as a bank tag is honoured as itself, so the bank
     can grow a vocabulary without editing the alias table above.

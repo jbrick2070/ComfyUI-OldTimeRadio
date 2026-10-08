@@ -26,9 +26,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # Single-sourced vocabularies
 # ---------------------------------------------------------------------------
 
-#: The video families (the ``character_3d`` token was RETIRED with its family
-#: 2026-08-23, lean-mean order 4 -- zero live declarers; ``audio_conditioned_video``
-#: is the audio-in lane for audio-reactive scene motion / music).
+#: The video families (``audio_conditioned_video`` is the audio-in lane for
+#: audio-reactive scene motion / music).
 FAMILIES: tuple = (
     "audio_driven_face",
     "lipsync_overlay",
@@ -51,7 +50,6 @@ REQUIRED_INPUT_TOKENS: tuple = (
 #: Hard request-level requirements per family. ``static_image_gen`` requires
 #: text_prompt OR init_image (handled specially); the no-input families
 #: (static_motion / abstract) accept optional asset_refs but require nothing.
-#: (character_3d's row -- audio_ref + init_image -- retired with the family.)
 FAMILY_REQUIRED_INPUTS: dict = {
     "audio_driven_face": ("audio_ref", "init_image"),
     "lipsync_overlay": ("base_clip_ref", "audio_ref"),
@@ -108,10 +106,9 @@ class Canvas(_Forbid):
 
 
 class Strategy(_Forbid):
-    #: ``unique_per_beat`` (one clip per beat) -- the only live mode since the
-    #: the ``pool_n_loop`` pooling was removed 2026-07-01
-    #: (rip-sfx-broll). pool_key/pool_size are retained schema slots (always
-    #: None from ShotLock) so old serialized requests still parse.
+    #: ``unique_per_beat`` (one clip per beat) is the only live mode.
+    #: pool_key/pool_size are retained schema slots (always None from ShotLock)
+    #: so old serialized requests still parse.
     mode: str = "unique_per_beat"
     pool_key: Optional[str] = None
     pool_size: Optional[int] = None
@@ -163,9 +160,8 @@ class VideoRequest(_Forbid):
     #: Trace-only observability stamps (round-5 F2 prompt provenance +
     #: still-spine ST-4 init provenance). NEVER conditioning, never hashed
     #: into request identity; ``run_episode`` copies these onto trace rows.
-    #: A REAL field (W7-pre builder migration) because the model is
-    #: extra="forbid" -- the old top-level ``_prompt_*``/``_init_*`` keys
-    #: made every built request schema-invalid.
+    #: A REAL field because the model is extra="forbid": undeclared top-level
+    #: keys would make every built request schema-invalid.
     observability: dict = Field(default_factory=dict)
     #: THE STILL-IN LAB PEER'S PLATE (campaign item 2, 2026-09-02). Declared
     #: conditioning, deliberately -- the one thing ``observability`` may never
@@ -218,17 +214,10 @@ class VideoRequest(_Forbid):
 class ShotRow(_Forbid):
     """One row of ``ledger['video']['shots']``, as ``OTR_ShotLock`` stamps it.
 
-    B4 (2026-07-27): this model declares ``extra="forbid"`` and was missing
-    eight fields the producers genuinely write, so ``ShotRow(**real_row)``
-    raised on EVERY real ledger -- which made the "live safety net" other docs
-    cite unable to validate a single shipped episode, and would have turned any
-    future ``VideoLedgerSection.model_validate(ledger["video"])`` into a
-    hard-fail at whatever boundary first tried it.
-
-    The field list below was derived MECHANICALLY from the producers, not from
-    the bug report: the report also named ``beat_id``, and no producer stamps
-    one on a shot row -- ``source_line_ids`` carries the beat. It missed
-    ``jump_still_requests`` and ``motion_clause``, which are stamped.
+    This model declares ``extra="forbid"``, so ``ShotRow(**real_row)`` raises on
+    any field the producers write that is not listed here: the field list below
+    was derived MECHANICALLY from the producers. No producer stamps a
+    ``beat_id`` on a shot row -- ``source_line_ids`` carries the beat.
 
     ABSENCE IS LOAD-BEARING for four of these, so they default to ``None``
     rather than to an empty container: an unregistered engine gets NO
@@ -274,10 +263,8 @@ class ShotRow(_Forbid):
     #: for a lane that actually consumes a still. Empty == none owed.
     jump_still_requests: list[dict] = Field(default_factory=list)
     #: The per-beat motion clause object (text/model/fallback/source_hash).
-    #: LEGACY-ONLY as of 2026-08-27. The opt-in pass that wrote this was
-    #: ripped (it was default OFF and set by no profile, so no shipped ledger
-    #: outside a deliberate experiment carries it). The field is KEPT so an old
-    #: ledger that does carry it still validates; nothing writes or reads it.
+    #: LEGACY-ONLY: kept so an old ledger that does carry it still validates;
+    #: nothing writes or reads it.
     motion_clause: Optional[dict] = None
     #: Whether this shot's engine has a render ceiling a beat can OVERFLOW, as
     #: ``frame_contract.can_split`` answered it AT FREEZE TIME (no-mirror 7.3).

@@ -200,13 +200,10 @@ def _credits_font_policy(meta) -> str:
         return "latin_arial"
 
 
-# _story_style_receipt (and its _STORY_STYLE_STATUS_SCAFFOLD_OFF constant) were
-# DELETED here (2026-08-03; both QA lanes confirmed zero callers after the
-# display swap). If archive regeneration is ever built, the rescue recipe they
-# encoded is: visual_style falls back to legacy meta.style; source_bank has no
-# legacy twin and needs an explicit "legacy" placeholder. 676 of 1178 named
-# on-disk episodes predate the new stamps -- reviving old credits is an
-# OPERATOR decision, never a silent fallback.
+# If archive regeneration is ever built: visual_style falls back to legacy
+# meta.style; source_bank has no legacy twin and needs an explicit "legacy"
+# placeholder. 676 of 1178 named on-disk episodes predate the new stamps --
+# reviving old credits is an OPERATOR decision, never a silent fallback.
 
 
 # --------------------------------------------------------------------------- #
@@ -488,11 +485,8 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     if gp.get("num_characters") is not None:
         # A first-order dropdown (recipe card): how many characters were asked.
         writer_grid.append(("Characters:", str(gp.get("num_characters"))))
-    # 2026-08-14: this row used to be gated on `gp["target_words"]` and read
-    # "target N / actual M". target_words is gone, so the gate was always
-    # False and the OBSERVED counts stopped printing entirely -- a hole in
-    # the credits opened by removing the target. Length is an observation
-    # now, so the row reports what the episode actually was, unconditionally.
+    # This row is not gated on a requested target: length is an observation, so
+    # it reports what the episode actually was, unconditionally.
     if meta.get("total_word_count") is not None:
         writer_grid.append(("Words:", "%s (char %s / ann %s)" % (
             meta.get("total_word_count"),
@@ -526,13 +520,11 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         spine.append((chrome["subject_label"], str(produced["subject"])))
     # CONTENT PASS (operator ruling 2026-08-03: keep the UI, improve what it
     # says). The four dramatic_state rows (Question / A wants / B wants /
-    # Ending) are GONE from the scroll: they are derived BEFORE any dialogue
-    # exists, from the pre-generation brief, and the tempests_chart specimen
-    # scrolled them naming characters who are not in the delivered episode.
-    # They remain in the treatment file, which is a production document. In
-    # their place, the fields the post-script reflection derives FROM the
-    # aired story -- every one live-verified truthful on the 2026-08-03
-    # specimens:
+    # Ending) are NOT in the scroll: they are derived BEFORE any dialogue
+    # exists, from the pre-generation brief, so they can name characters who are
+    # not in the delivered episode. They live in the treatment file, which is a
+    # production document. The scroll shows instead the fields the post-script
+    # reflection derives FROM the aired story:
     if meta.get("story_brief"):
         spine.append(("Brief:", str(meta["story_brief"])))
     if meta.get("arc_shape"):
@@ -596,13 +588,13 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
                   "tag": "EPISODE // %s · SCENE 1" % title.upper(),
                   "lines": dialog}))
 
-    # SOURCE INTERCEPT (optional). CONTENT PASS 2026-08-03: this used to scroll
-    # news.script_brief -- the PRE-generation brief, which on the
-    # tempests_chart specimen still named the pitch cast the episode replaced.
-    # The intercept now carries the source's KEY TERMS: the true atoms the
-    # story was actually built from (for the original bank, the spark nouns;
-    # for source banks, the interpreter's extraction). Compact, truthful, and
-    # it reads like an intercept rather than a paragraph of stale prose.
+    # SOURCE INTERCEPT (optional). CONTENT PASS 2026-08-03: the intercept
+    # carries the source's KEY TERMS -- the true atoms the story was actually
+    # built from (for the original bank, the spark nouns; for source banks, the
+    # interpreter's extraction) -- not news.script_brief, the PRE-generation
+    # brief, which can still name a pitch cast the episode replaced. Compact,
+    # truthful, and it reads like an intercept rather than a paragraph of stale
+    # prose.
     _key_terms = news.get("key_terms")
     if isinstance(_key_terms, (list, tuple)) and _key_terms:
         flow.append(("intercept",
@@ -760,14 +752,12 @@ def _load_font(pt: int):
     2026-09-11): *"don't assume people have fonts installed. I'm open to some
     bad formatting as long as it doesn't crash."*
 
-    This REVERSES the earlier no-fallback policy ("a point-size-less bitmap
-    hero is unacceptable", Fable risk #3). That ruling optimised for the look
-    of the card; the operator's standing rule is that a leg which does not
-    reach ``otr/obs/`` did not pass, and today's bar is "as long as it doesn't
-    crash when it's not supposed to". On a machine with no matching font the
-    old behaviour killed a FULLY RENDERED episode at the credits -- the script,
-    cast, voices, audio master and every clip already paid for -- rather than
-    publishing it with an ugly title card. An ugly card ships; a
+    This is deliberate: the operator's standing rule is that a leg which does
+    not reach ``otr/obs/`` did not pass, and today's bar is "as long as it
+    doesn't crash when it's not supposed to". On a machine with no matching
+    font, raising would kill a FULLY RENDERED episode at the credits -- the
+    script, cast, voices, audio master and every clip already paid for -- rather
+    than publishing it with an ugly title card. An ugly card ships; a
     CreditsDataError ships nothing.
 
     The fallback is PIL's built-in bitmap font. It ignores ``pt``, so the hero
@@ -1269,16 +1259,12 @@ def _draw_models(d, x, y, m, w, h, note_lines=_NOTE_LINES_MAX, gaps=1.0):
 
     def _row(label, value, suffix=""):
         d.text((x, cur_y[0]), label, fill=_rgba(_GREEN, _A_LABEL), font=fbody)
-        # CLAMP (2026-07-28, the LANE 2 fan-out rider). This right-aligned
-        # block used to start at ``x + colw - width`` with no bound, so a value
-        # wider than the column began LEFT of the label and drew straight over
-        # it -- and a LANE 2 recipe receipt is ~90 characters against a layout
-        # sized for short engine ids. The annotation gives way first: an engine
-        # id that cannot be read is worse than a missing family suffix.
-        # The whole block is measured in fbody even though the suffix DRAWS in
-        # fmicro, which is the convention this row already used. It
-        # over-estimates the suffix, so the clamp errs toward more space, never
-        # less; correcting the measurement would move every existing row.
+        # CLAMP (2026-07-28, the LANE 2 fan-out rider). This right-aligned block
+        # must not start at ``x + colw - width`` unbounded: a value wider than
+        # the column would begin LEFT of the label and draw straight over it --
+        # and a LANE 2 recipe receipt is ~90 characters against a layout sized
+        # for short engine ids. The annotation gives way first: an engine id
+        # that cannot be read is worse than a missing family suffix.
         avail = colw - _fw(d, label, fbody) - gap
         if _fw(d, value + (("  " + suffix) if suffix else ""), fbody) > avail:
             if suffix:
@@ -1551,20 +1537,17 @@ def _credits_artifact_paths(video_path: str) -> tuple[str, str, str]:
         return legacy
 
     def fits(paths):
-        # PBUG-20260907-01. `joined + ".concat.txt"` and the mux's
-        # `_final.mp4` USED TO BE CHECKED HERE, and that made this whole
-        # function self-defeating: the compacted tuple keeps `joined` (only the
+        # PBUG-20260907-01. `joined + ".concat.txt"` and the mux's `_final.mp4`
+        # are NOT checked here: the compacted tuple keeps `joined` (only the
         # scratch files shrink), so whenever the overflow came from a
-        # joined-derived path, `fits(compact)` failed for exactly the same
-        # reason `fits(legacy)` did and the function silently returned the long
-        # names it was built to avoid. Measured on the 4060 with a 65-character
-        # id: scratch shrank 254 -> 190, while joined.concat.txt stayed 265 and
-        # joined_final.mp4 stayed 260, so legacy was returned every time.
+        # joined-derived path, `fits(compact)` would fail for exactly the same
+        # reason `fits(legacy)` does and the function would silently return the
+        # long names it was built to avoid.
         #
-        # Both now own their own budget -- `append_credits` builds the concat
-        # list through `compact_scratch`, and the mux compacts `_final.mp4`
-        # through `compact_artifact` -- so checking them here only forces this
-        # function to give up on paths it could otherwise fix.
+        # Both own their own budget -- `append_credits` builds the concat list
+        # through `compact_scratch`, and the mux compacts `_final.mp4` through
+        # `compact_artifact` -- so checking them here only forces this function
+        # to give up on paths it could otherwise fix.
         clip, backdrop, joined = paths
         generated = (clip, backdrop, joined, clip + ".base.png",
                      clip + ".scroll.png")
@@ -1627,23 +1610,18 @@ def compute_credits_duration_s(roll_px: int, view_h: int,
 def extract_final_frame(video_path: str, out_png: str) -> str:
     """The backdrop: the BODY VIDEO's own final frame, frozen.
 
-    REPLACES ``plan_backdrop`` (2026-07-29, WIRE-W6), which hunted the clip
-    manifest for the last loopable FILE clip and raised when it found none.
+    Uses the body video's own final frame instead of hunting the clip manifest
+    for a loopable FILE clip (``mesh_stage`` writes a frame directory rather
+    than an mp4, and ffmpeg ``-stream_loop -1 -i <dir>`` crashes, so an episode
+    rendered ENTIRELY by mesh_stage has no file clip at all and the terminal
+    node would refuse a whole finished episode).
 
-    THE DEFECT THAT KILLED: it excluded DIRECTORY clips, because ffmpeg
-    ``-stream_loop -1 -i <dir>`` crashes -- and ``mesh_stage`` writes a frame
-    directory rather than an mp4. So an episode rendered ENTIRELY by mesh_stage
-    had no file clip at all, and the terminal node of the graph refused the
-    whole finished episode. It rendered 7 of 7 shots and published nothing. Not
-    a regression -- true since 2026-07-03, and found by the 2026-07-28
-    engine-coverage campaign.
-
-    THE FIX IS TO STOP LOOKING THERE. ``otr_silent_composite`` has ALREADY
-    flattened every directory clip into the assembled body video by the time
-    this node runs, so the body video is a complete, always-present, always-mp4
-    record of the same pixels -- and it is already this node's own input. One
-    source instead of two. CreditsRoll no longer knows what a directory clip
-    is, and cannot be broken again by a new clip KIND it has never heard of.
+    ``otr_silent_composite`` has ALREADY flattened every directory clip into the
+    assembled body video by the time this node runs, so the body video is a
+    complete, always-present, always-mp4 record of the same pixels -- and it is
+    already this node's own input. One source instead of two. CreditsRoll does
+    not know what a directory clip is, and cannot be broken by a new clip KIND
+    it has never heard of.
 
     LOOK DELTA, STATED PLAINLY BECAUSE IT IS VISIBLE: the operator's 2026-06-17
     contract said the console rides over the last drama clip LOOPED. It now
@@ -1698,12 +1676,12 @@ def _ffmpeg_bin() -> str:
 def _probe_video(path: str) -> dict:
     """The source's dimensions, rate and duration, or CreditsDataError by name.
 
-    The credits policy is unchanged -- no measurement means no credits -- but
-    the measurement no longer insists on the ffprobe BINARY. A `_ffprobe_bin()`
-    used to raise here before the boundary was even asked, which on a cold
-    install (ffmpeg from the imageio wheel, no ffprobe) lost a fully rendered
-    episode at its LAST node. The boundary reads the file through PyAV when no
-    binary resolves, and refuses by name only when nothing can measure it.
+    No measurement means no credits, but the measurement does not insist on the
+    ffprobe BINARY: raising on a missing `_ffprobe_bin()` before the boundary is
+    even asked would lose a fully rendered episode at its LAST node on a cold
+    install (ffmpeg from the imageio wheel, no ffprobe). The boundary reads the
+    file through PyAV when no binary resolves, and refuses by name only when
+    nothing can measure it.
     """
     try:
         data = _ffp.probe_json(
@@ -1712,9 +1690,9 @@ def _probe_video(path: str) -> dict:
     except _ffp.FFprobeError as exc:
         raise CreditsDataError(f"ffprobe failed on {path!r}: {exc}")
     st = (data.get("streams") or [{}])[0]
-    # A rate of "0/0" used to raise ZeroDivisionError on this line. The shared
-    # parse answers "unknown" instead, and the canonical 25 stands in -- the
-    # same rate every other credits surface already assumes.
+    # A rate of "0/0" parses as unknown (no ZeroDivisionError), and the
+    # canonical 25 stands in -- the same rate every other credits surface
+    # already assumes.
     fps = _ffp.parse_rate(st.get("r_frame_rate")) or 25.0
     try:
         dur = float((data.get("format") or {}).get("duration") or 0.0)
@@ -1776,10 +1754,10 @@ def render_credits_clip(layout: dict, backdrop_path: str, out_path: str,
              f"crop={w}:{h},eq=brightness=-0.32,fps={fps}[bg];"
              f"[bg][1:v]overlay=0:0[b1];"
              # The crop y-expr scrolls per-frame (this ffmpeg evaluates crop x/y
-             # per frame; proven by the text-scroll test). The REAL fix is the
-             # classic-roll model above (roll_px = content_h + view_h): a large,
-             # length-independent travel so col 3 ALWAYS visibly rolls and nothing
-             # is clipped (the old overflow-only model left short episodes static).
+             # per frame; proven by the text-scroll test). The classic-roll
+             # model above (roll_px = content_h + view_h) gives a large,
+             # length-independent travel so col 3 ALWAYS visibly rolls and
+             # nothing is clipped.
              f"[2:v]crop=w={_sc(_COL3_W, h)}:h={view_h}:x=0:y='{yexpr}'[sc];"
              f"[b1][sc]overlay={col3_x}:{col3_y}[cv];"
              f"[cv]fade=t=in:st=0:d={_FADE_IN_S:.2f},"
@@ -1811,9 +1789,9 @@ def append_credits(body_path: str, credits_path: str, out_path: str) -> str:
         raise CreditsDataError(f"body video missing: {body_path!r}")
     if not os.path.exists(credits_path):
         raise CreditsDataError(f"credits clip missing: {credits_path!r}")
-    # PBUG-20260907-01. This was `out_path + ".concat.txt"`, which adds 11
-    # characters to an already-suffixed name and reached 265 units on a deep
-    # ComfyUI Desktop install -- past MAX_PATH, so the open() below raised
+    # PBUG-20260907-01. Not `out_path + ".concat.txt"`: that adds 11 characters
+    # to an already-suffixed name and reaches 265 units on a deep ComfyUI
+    # Desktop install -- past MAX_PATH, so the open() below raises
     # FileNotFoundError naming a directory that exists. Pure scratch: written
     # here, handed to ffmpeg's concat demuxer, deleted below, and identified by
     # nothing. Keeps its ordinary name wherever that fits.

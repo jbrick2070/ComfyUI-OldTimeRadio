@@ -17,11 +17,10 @@ Processing chain:
   5. Optional Haas-effect spatial widening (delay one channel); 0 = off
   6. Optional deterministic tape saturation / wow-flutter; "off" = off
   7. Optional mid-side stereo widening; 0 = no added width
-  (There is no normalisation step here. One used to be listed and it
-   never ran -- delivery level is set downstream, once, in LUFS by
-   scene_sequencer._master_loudness. Removed 2026-08-28.)
-  (Synthetic tape hiss was removed 2026-09-10 -- clean audio. No setting
-   adds noise to the signal.)
+  (There is no normalisation step here -- delivery level is set downstream,
+   once, in LUFS by scene_sequencer._master_loudness.)
+  (There is no synthetic tape hiss -- clean audio. No setting adds noise to
+   the signal.)
 
 All DSP is fully vectorized (no Python for-loops over samples).
 
@@ -142,18 +141,11 @@ def _stereo_decorrelate(waveform: torch.Tensor, amount: float = 0.15) -> torch.T
     return torch.cat([new_left, new_right], dim=1)
 
 
-# `_normalize()` (peak-normalise to a target dBFS) was REMOVED 2026-08-28.
-# It was DEFINED AND NEVER CALLED -- the only uncalled helper in this file,
-# while the other seven are all live -- and its widget went with it.
-#
-# It was not merely unused, it was SUPERSEDED. Delivery level is set once,
-# downstream, in LUFS by `scene_sequencer._master_loudness`. Peak and LUFS are
-# different questions (peak is energy, LUFS is perception) and this project
-# already chose LUFS and measured -14 as its target; the master mux says so in
-# its own words -- "a second implementation here would be a second delivery
-# level that drifts". This node had migrated from peak to LUFS and simply
-# never buried the corpse. Re-adding a peak normaliser here would compete with
-# the real one rather than restore a missing step.
+# No peak normaliser lives in this file: delivery level is set once, downstream,
+# in LUFS by `scene_sequencer._master_loudness` (peak is energy, LUFS is
+# perception, and this project chose LUFS and measured -14 as its target).
+# Re-adding a peak normaliser here would compete with the real one rather than
+# restore a missing step.
 
 
 def _apply_bass_warmth(waveform: torch.Tensor, sample_rate: int,
@@ -256,8 +248,8 @@ def _lowpass_16k(waveform: torch.Tensor, sample_rate: int,
 def _apply_tape_emulation(waveform: torch.Tensor, sample_rate: int, intensity_str: str) -> torch.Tensor:
     """Apply deterministic analog tape emulation (saturation, wow/flutter).
 
-    Synthetic tape hiss was removed 2026-09-10 (clean audio): no intensity
-    adds noise, so silence in is silence out at every setting.
+    No synthetic tape hiss (clean audio): no intensity adds noise, so silence in
+    is silence out at every setting.
     """
     if intensity_str == "off":
         return waveform
@@ -369,19 +361,12 @@ class AudioEnhance:
                                "this is an audible episode-facing choice, "
                                "not a technical knob."
                 }),
-                # `normalize_dbfs` was REMOVED 2026-08-28. It was inert TWICE
-                # over: nothing read the parameter, AND `_normalize()` -- the
-                # peak-normaliser it would have driven -- was never called by
-                # this node at all (the only uncalled helper in the file).
-                #
-                # It was also REDUNDANT, which is why wiring it would have been
-                # the wrong fix. Delivery level is set exactly once, downstream,
-                # by `scene_sequencer._master_loudness` -- "the only loudness
-                # algorithm in this repo ... the one that produced the measured
-                # -14 LUFS target", in the master mux's own words, which go on:
-                # "a second implementation here would be a second delivery level
-                # that drifts". This node had migrated from PEAK to LUFS
-                # normalisation and simply never buried the corpse.
+                # NO `normalize_dbfs` WIDGET. Delivery level is set exactly
+                # once, downstream, by `scene_sequencer._master_loudness` --
+                # "the only loudness algorithm in this repo ... the one that
+                # produced the measured -14 LUFS target", in the master mux's
+                # own words, which go on: "a second implementation here would be
+                # a second delivery level that drifts".
             },
         }
 
@@ -494,9 +479,6 @@ class AudioEnhance:
         try:
             import os as _os
             from . import _otr_ledger as _OTRL  # type: ignore
-            # S28 cleanbreak: dropped dead inline `from ._otr_paths import
-            # otr_episodes_root, otr_legacy_audio_dir`. Neither symbol was
-            # referenced here; the in-flight singleton resolves the path.
             _phase_ms = int((_time.time() - _phase_t0) * 1000)
             # BUG-LOCAL-021 (Phase G): use in-flight singleton, not mtime
             # walker. See _otr_ledger.in_flight_ledger_path docstring.

@@ -8,10 +8,9 @@ truncate the episode to the shorter stream and silently drop an audio tail); the
 silent composite is already built to the audio-derived frame budget, so a
 duration assertion (within 1/fps) runs BEFORE the mux to catch any drift.
 
-Replaces the legacy ``OTR_VideoComposite`` audio path (which re-encoded to AAC in
-its humo_concat mode and used ``-shortest``). Foley lanes optionally detect
-competing speech before mixing. Their VAD, Whisper and technical-slot models
-load lazily and release sequentially; no model is reserved across stages.
+Foley lanes optionally detect competing speech before mixing. Their VAD, Whisper
+and technical-slot models load lazily and release sequentially; no model is
+reserved across stages.
 
 Audio-identity is asserted by decoding both the muxed output's audio and the
 master to canonical PCM and comparing SHA-256 -- container-agnostic proof that
@@ -22,8 +21,9 @@ the episode and publishing it are two decisions, and only the second one is
 governed by the source's rights. The archival final is written for every
 episode that gets this far; the OBS copy -- the file the operator watches -- is
 made only when the ledger's publication-eligibility receipt says so. That rule
-used to be enforced upstream by refusing to freeze, which destroyed a finished
-render to prevent a copy; here it withholds the copy and keeps the render.
+is enforced here by withholding the copy and keeping the render, never by
+refusing to freeze upstream (which would destroy a finished render to prevent a
+copy).
 """
 from __future__ import annotations
 
@@ -73,30 +73,28 @@ log = logging.getLogger("OTR")
 def _ffmpeg_bin(ffmpeg: str) -> str:
     """The ffmpeg this box should run, or ``""`` when it has none.
 
-    HONOURS ``OTR_FFMPEG`` BEFORE PATH (2026-08-28). It did not, and that was
-    the mirror image of a bug the pack had already fixed once: the shared
-    ``_otr_shared/ffprobe.py`` resolver exists because only `otr_credits_roll`
-    honoured ``OTR_FFPROBE`` while every other caller trusted PATH. That
-    consolidation was scoped to the PROBE; the ENCODER kept the same hole here,
-    in `otr_caption_burn`, `otr_master_audio_mux` and `otr_silent_composite` --
-    which are the caption burn, the terminal audio mux and the silent-video
-    normalize, i.e. the LAST three stages of an episode.
+    HONOURS ``OTR_FFMPEG`` BEFORE PATH (2026-08-28), as the shared
+    ``_otr_shared/ffprobe.py`` resolver does for ``OTR_FFPROBE``: a caller that
+    trusts PATH alone is the hole that resolver exists to close. It applies to
+    `otr_caption_burn`, `otr_master_audio_mux` and `otr_silent_composite` -- the
+    caption burn, the terminal audio mux and the silent-video normalize, i.e.
+    the LAST three stages of an episode.
 
     So on a box where ffmpeg is reachable only through ``OTR_FFMPEG`` -- the
     AMD/Mac/alternate-box case the variant workflows exist for -- every earlier
     stage would succeed (the video engines all honour the variable) and the
     episode would die at the end, having spent the whole render.
 
-    A NODE WIDGET NO LONGER WINS -- it no longer even arrives (2026-09-04).
+    A NODE WIDGET DOES NOT WIN -- it does not even arrive (2026-09-04).
     Each execute method discards its `ffmpeg` widget before anything calls this,
     so what reaches here is either nothing or a value a TRUSTED caller already
     resolved. `OTR_FFMPEG` is the operator's channel and PATH the last resort.
     Left as it was, the next reader would re-wire the widget to match this
     paragraph and quietly reopen the hole.
 
-    ONE OWNER ANSWERS NOW (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
+    ONE OWNER ANSWERS (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
     and the widget's own default literal ``"ffmpeg"`` is not a choice: with
-    ffmpeg on PATH that literal used to win here and the pin was never read.
+    ffmpeg on PATH that literal would win here and the pin would never be read.
     """
     try:
         from ._otr_shared.ffmpeg import resolve_ffmpeg
@@ -247,21 +245,16 @@ def _canvas_preview(final_path: str, obs_copy) -> dict:
     return ui
 
 
-# `_count_audio_streams` was removed 2026-08-28: no caller anywhere. The
-# identically named helper in tests/test_credits_roll_spec.py is that test's
-# own local, not a consumer of this one.
-
-
 def audio_pcm_sha(path: str, ffmpeg: str = "ffmpeg") -> str:
     """SHA-256 of decoded s16le mono @24k -- codec/container-agnostic audio
     identity (same method the A-S2 mux probe used). '' on failure.
 
     Resolves its binary through :func:`_ffmpeg_bin` -- explicit argument, then
     ``OTR_FFMPEG``, then PATH -- so the fail-closed identity proof honours the
-    same resolution order the encode did. It used to call ``shutil.which``
-    directly, which meant that on an env-only install (ffmpeg reachable ONLY
-    via ``OTR_FFMPEG``) the mux encoded fine and then this returned '' --
-    failing a FINISHED episode at the last boundary.
+    same resolution order the encode did (calling ``shutil.which`` directly
+    would, on an env-only install -- ffmpeg reachable ONLY via ``OTR_FFMPEG`` --
+    let the mux encode fine and then return '', failing a FINISHED episode at
+    the last boundary).
     """
     fp = _ffmpeg_bin(ffmpeg)
     if not fp:
@@ -283,18 +276,14 @@ def duration_receipt_line(v_dur: float, a_dur: float, max_tail_s: float,
                           tail_src: str, tol: float) -> str:
     """The ``duration_check`` receipt line. Numbers in, one line out.
 
-    Pure ON PURPOSE, and extracted after the 4060 made the right criticism of
-    how this was first covered. The original test for PBUG-20260830-01 asserted
-    on the AST -- branch shape and string presence -- because reaching the real
-    branch needs ffprobe, two rendered media files and a full mux. That test was
-    mutation-verified and did detect the defect, but as the 4060 put it: a
-    source-shape assertion "proves the code is written correctly, not that it
-    runs correctly", cannot catch a behavioural regression that preserves the
-    shape, and goes red on a refactor that preserves the behaviour. Both are the
-    wrong failure mode for a receipt.
-
-    So the decision moved somewhere it can be CALLED. Three verdicts, and they
-    are three different claims that must never collapse into each other:
+    Pure ON PURPOSE, so the decision can be CALLED: reaching the real branch
+    (PBUG-20260830-01) needs ffprobe, two rendered media files and a full mux,
+    and a source-shape assertion on the AST "proves the code is written
+    correctly, not that it runs correctly" -- it cannot catch a behavioural
+    regression that preserves the shape, and goes red on a refactor that
+    preserves the behaviour. Both are the wrong failure mode for a receipt.
+    Three verdicts, and they are three different claims that must never collapse
+    into each other:
 
     ``UNPROVEN``
         ``_probe_float`` returns ``-1.0`` when nothing on the box can measure (no
@@ -340,10 +329,10 @@ def _credits_tail_ceiling() -> float:
     malformed, never fatal.
 
     This knob is read at the LAST node of the graph, after the whole episode has
-    rendered. It used to be a bare ``float(otr_env.get(...))``, so a single
-    typo in a server's launch environment (``45s``, ``forty-five``) killed a
-    finished episode at the finish line with an uncaught ValueError -- hours of
-    render lost to a value that only widens a sanity ceiling.
+    rendered. A bare ``float(otr_env.get(...))`` would let a single typo in a
+    server's launch environment (``45s``, ``forty-five``) kill a finished
+    episode at the finish line with an uncaught ValueError -- hours of render
+    lost to a value that only widens a sanity ceiling.
 
     That is the ``PBUG-20260723-02`` shape this build has now closed three times
     over: a knob exported at launch cannot bind work submitted to an
@@ -489,30 +478,24 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     max_tail_s = declared if declared > 0 else env_ceiling
     tail_src = "declared" if declared > 0 else "env_ceiling"
     if v_dur >= 0 and a_dur >= 0 and v_dur > a_dur + max_tail_s + tol:
-        # Print the EXCESS and the OVERAGE at full precision. The old message
-        # rendered the budget as "%.1f" -- so a declared tail of 75.1800s printed
-        # as "75.2s" next to an excess of 75.2293s, and the failure looked like it
+        # Print the EXCESS and the OVERAGE at full precision: rendering the
+        # budget as "%.1f" would print a declared tail of 75.1800s as "75.2s"
+        # next to an excess of 75.2293s, and the failure would look like it
         # violated a budget it was under. Never round the number the reader is
         # being asked to compare against.
         _excess = v_dur - a_dur
         # OPERATOR DIRECTIVE 2026-08-30: "don't kill a duration mismatch, just
-        # let it fly." THIS USED TO RAISE, and raising here is the most
-        # expensive refusal in the pipeline: by the time this runs the writer,
-        # the voices, the music, every video beat and the full audio master are
+        # let it fly." THIS MUST NOT RAISE: raising here is the most expensive
+        # refusal in the pipeline -- by the time this runs the writer, the
+        # voices, the music, every video beat and the full audio master are
         # already rendered. Refusing to mux discards a finished episode over a
         # length disagreement -- a consistency judgement, not a resource limit,
         # which is exactly the class the operator has ruled must never kill a
         # render. An OOM is the only killer.
         #
-        # Observed cost: a complete scifi_news_pro leg died here at the last
-        # step because the silent video ran 41.99s past the master audio, 18.87s
-        # beyond the credits-tail budget. Every frame of it was already on disk.
-        #
         # The number is still WORTH KNOWING -- a gross overshoot usually IS a
         # frame-budget bug upstream (PBUG-20260829-16's music-beat duration is a
-        # live example) -- so it is logged loudly, at full precision, with the
-        # same wording the exception carried. What changes is that it no longer
-        # throws the episode away to tell you.
+        # live example) -- so it is logged loudly, at full precision.
         log.warning(
             "[OTR_MasterAudioMux] DURATION MISMATCH (publishing anyway): silent "
             "video %.4fs exceeds master audio %.4fs by %.4fs, over the "
@@ -532,9 +515,8 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
         duration_receipt_line(v_dur, a_dur, max_tail_s, tail_src, tol))
 
     _poll_interrupt()
-    # UNCONDITIONAL master copy (rip-sfx bed, 2026-08-06): the SFX mix branch
-    # is retired; every episode takes the passthrough that already ran on every
-    # shipped episode.
+    # UNCONDITIONAL master copy (2026-08-06): there is no SFX mix branch; every
+    # episode takes the passthrough.
     report.append("audio_mode=master_copy")
     # mux-LAST: copy both streams, NO -shortest.
     cmd = [
@@ -546,9 +528,9 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
         out_path,
     ]
     assert "-shortest" not in cmd, "V-2: -shortest must never appear in the mux"
-    # V-1: the audio stream is COPIED, never re-encoded. The rip kept the
-    # passthrough branch; this assertion is what notices if a later edit swaps
-    # it for a re-encode (no behavioural test can tell the two apart).
+    # V-1: the audio stream is COPIED, never re-encoded. This assertion is what
+    # notices if a later edit swaps it for a re-encode (no behavioural test can
+    # tell the two apart).
     assert cmd[cmd.index("-c:a") + 1] == "copy", (
         "V-1: the terminal mux must pass the master audio through with "
         "-c:a copy, never re-encode")
@@ -880,15 +862,13 @@ def _compile_foley_master(master_audio_path: str, receipts_json: str,
     # any other role, and a bed quietly missing from half an episode must not
     # be invisible.
     #
-    # UNCONDITIONAL, INCLUDING AT ZERO (2026-08-30). This used to be gated on a
-    # non-zero count, which makes the number unreadable: the 4060 went looking
-    # for it to confirm the sentinel fix on 8 GB hardware and could only report
-    # ABSENT, which is not the same claim as ZERO and does not close the
-    # question it was asked to close. A counter that disappears at its most
-    # common value cannot be trusted at any value -- "I did not see it" and "it
-    # was fine" must not share a representation. The neighbouring counters stay
-    # conditional on purpose: they are exceptions worth noticing, while this one
-    # is a standing invariant somebody will come to verify.
+    # UNCONDITIONAL, INCLUDING AT ZERO (2026-08-30). Gating this on a non-zero
+    # count would make the number unreadable: an absent counter ("I did not see
+    # it") is not the same claim as ZERO ("it was fine"), and a counter that
+    # disappears at its most common value cannot be trusted at any value. The
+    # neighbouring counters stay conditional on purpose: they are exceptions
+    # worth noticing, while this one is a standing invariant somebody will come
+    # to verify.
     report.append("foley_unpositioned=%d (no master-mix slot; normal for "
                   "music_inter bridges)" % stats["unpositioned"])
     if stats["conform_notes"]:
@@ -1290,14 +1270,13 @@ def _assert_delivery_binding(intent, stem):
 #: earlier it would eat only the tail of `<id>_captioned_with_credits` and leave
 #: a stray `_captioned` behind.
 #:
-#: `_with_credits` ADDED 2026-09-07 (PBUG-20260907-01). Once
-#: `otr_credits_roll` may emit a compacted `<id>_with_credits.mp4` -- dropping
-#: the `_captioned` stage suffix so the path fits MAX_PATH -- this list was the
-#: only place that could no longer recover the episode id from it, which would
-#: have republished the episode under a stem that is not its id. Caught by
-#: `test_credits_paths_stdlib`, which extracts THIS tuple from the source and
-#: asserts the credits node's output suffix is a member. `_default_out` below
-#: already carried `_with_credits`; only this list lacked it.
+#: `_with_credits` is a member because `otr_credits_roll` may emit a compacted
+#: `<id>_with_credits.mp4` -- dropping the `_captioned` stage suffix so the path
+#: fits MAX_PATH -- and without it this list could not recover the episode id
+#: from that name, republishing the episode under a stem that is not its id
+#: (PBUG-20260907-01). `test_credits_paths_stdlib` extracts THIS tuple from the
+#: source and asserts the credits node's output suffix is a member.
+#: (`_default_out` below carries `_with_credits` too.)
 _PIPELINE_SUFFIXES = ("_silent_procgen_blended_captioned_with_credits",
                       "_procgen_blended_captioned_with_credits",
                       # Compacted AD/credits path (no procgen blend). If this
@@ -1360,8 +1339,8 @@ except ImportError:  # pragma: no cover -- flat import harnesses
 def _obs_basename(final: str) -> str:
     """The OPERATOR-FACING filename for the published episode.
 
-    THE ARCHIVAL NAME IS NOT THE WATCHING NAME (operator, 2026-09-03). The obs
-    copy used to inherit the archival stem verbatim, so every published episode
+    THE ARCHIVAL NAME IS NOT THE WATCHING NAME (operator, 2026-09-03).
+    Inheriting the archival stem verbatim would make every published episode
     read:
 
         signal_lost_<title>_<ts>_silent_procgen_blended_captioned_with_credits_final.mp4
@@ -1428,12 +1407,12 @@ def _obs_basename(final: str) -> str:
         def _code(dimension, value, fallback="none"):
             """One field: the short code for ``value``, sanitised.
 
-            NOTE THERE IS NO `_trim_engine` ANY MORE. It used to strip a
-            trailing `_video`/`_image` because the field position already
-            implies the role, but the shortcode table is keyed on the engine id
-            EXACTLY as the registry spells it -- `google_veo_video`,
-            `still_motion` -- so trimming first would turn a real id into one
-            the table has never heard of and spell the lane `unk`.
+            THERE IS NO `_trim_engine`, DELIBERATELY: stripping a trailing
+            `_video`/`_image` (the field position already implies the role)
+            would turn a real id into one the shortcode table has never heard
+            of, because the table is keyed on the engine id EXACTLY as the
+            registry spells it -- `google_veo_video`, `still_motion` -- and
+            spell the lane `unk`.
             """
             if not value:
                 return fallback
@@ -1514,12 +1493,11 @@ def _obs_basename(final: str) -> str:
             name = "%s__%s_final%s" % (shown, "__".join(fields), ext or ".mp4")
         return name
     except Exception as exc:  # noqa: BLE001 -- a publish never dies over a name.
-        # BUT IT SAYS SO. The first cut of this helper referenced `re` without
-        # importing it, and this except swallowed the NameError -- every publish
-        # "worked" while silently reverting to the old confusing name, with no
-        # trace anywhere. A test now covers that specific bug; this log covers
-        # the NEXT one, because every other fallback in this file already logs
-        # when it degrades and this one was the exception.
+        # BUT IT SAYS SO: a silent fallback here would hide a broken helper (a
+        # NameError from a missing import, say) behind a publish that "works"
+        # while reverting to the confusing archival name, with no trace
+        # anywhere. Every other fallback in this file already logs when it
+        # degrades.
         log.warning("[OTR_MasterAudioMux] descriptive obs name failed (%s: %s); "
                     "published under the archival name %s",
                     type(exc).__name__, exc, base)
@@ -1666,11 +1644,11 @@ class OTRMasterAudioMux:
                     ep = ep[: -len(suffix)]
             out_dir = episodes_root / ep
         os.makedirs(out_dir, exist_ok=True)
-        # PBUG-20260907-01. This was `os.path.join(out_dir, f"{stem}_final.mp4")`
-        # and measured 260 units on a ComfyUI Desktop install with a
-        # 65-character episode id -- Windows' MAX_PATH is 260 INCLUDING the NUL,
-        # so 260 already fails, and it fails as FileNotFoundError on a directory
-        # that exists.
+        # PBUG-20260907-01. A plain `os.path.join(out_dir, f"{stem}_final.mp4")`
+        # measures 260 units on a ComfyUI Desktop install with a 65-character
+        # episode id -- Windows' MAX_PATH is 260 INCLUDING the NUL, so 260
+        # already fails, and it fails as FileNotFoundError on a directory that
+        # exists.
         #
         # compact_artifact drops only the STAGE suffixes when the ordinary name
         # will not fit, so the deliverable becomes `<id>_final.mp4` (237) and
@@ -1902,13 +1880,13 @@ class OTRMasterAudioMux:
     def IS_CHANGED(cls, **kwargs):
         """Cache key: the manifest, the EPISODE, and its publication verdict.
 
-        THE OLD KEY COULD REUSE A PUBLISHED RESULT FOR A BLOCKED EPISODE. It
-        hashed ``clip_manifest_json`` alone -- a RETIRED connector that feeds
-        nothing -- so two runs with the same manifest looked identical to
-        ComfyUI's cache even when they were different episodes with different
-        rights. A cached node does not execute, and a mux that does not execute
-        cannot withhold anything: the receipt would say blocked and the earlier
-        run's published output would stand in for it.
+        THE KEY MUST NOT BE THE MANIFEST ALONE, OR IT REUSES A PUBLISHED RESULT
+        FOR A BLOCKED EPISODE. ``clip_manifest_json`` is a RETIRED connector
+        that feeds nothing, so two runs with the same manifest would look
+        identical to ComfyUI's cache even when they are different episodes with
+        different rights. A cached node does not execute, and a mux that does
+        not execute cannot withhold anything: the receipt would say blocked and
+        the earlier run's published output would stand in for it.
 
         Episode identity closes the cross-episode half; the eligibility digest
         closes the same-episode half, so re-freezing an episode after its rights
@@ -1922,7 +1900,7 @@ class OTRMasterAudioMux:
         remux and can never leak an unpublishable episode.
 
         Returns a SHA-256 hex string, not ``hash()``. Python salts string
-        hashing per interpreter, so the previous key silently changed at every
+        hashing per interpreter, so ``hash()`` would change the key at every
         server boot -- harmless while nothing depended on it, wrong the moment
         it gates a deliverable.
         """
@@ -1988,20 +1966,14 @@ class OTRMasterAudioMux:
             declared_credits_tail_s=0.0, clip_manifest_json="", fps=25,
             output_path="", video_policy_json="",
             foley_receipts_json="", script_json=None):
-        # ``clip_manifest_json`` is a RETIRED connector (rip-sfx 2026-08-06):
-        # still wired on the canonical graph and hashed by IS_CHANGED, but it
-        # feeds nothing -- the SFX bed compiler it once armed is deleted.
-        # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
-        # operator intent. Discarded HERE, at the node boundary, so no
-        # helper underneath can be handed it.
-        # The `ffmpeg` widget was REMOVED on 2026-09-13. It had been
-        # DEPRECATED and IGNORED since 2026-09-04, when a widget value was
-        # found to reach argv[0] over an unauthenticated /prompt request;
-        # the fix then was to discard it here, at the node boundary. The
-        # declaration is now gone, so ComfyUI never passes the field at
-        # all and there is nothing left to discard -- the channel is
-        # closed rather than sanitised. Everything below already saw ""
-        # for this name; OTR_FFMPEG remains the one way to pin a build.
+        # ``clip_manifest_json`` is a RETIRED connector: still wired on the
+        # canonical graph and hashed by IS_CHANGED, but it feeds nothing.
+        # B1 (2026-09-04): an `ffmpeg` widget value is UNTRUSTED /prompt input,
+        # not operator intent (a widget value could reach argv[0] over an
+        # unauthenticated /prompt request). The node declares no such widget, so
+        # ComfyUI never passes the field and the channel is closed rather than
+        # sanitised; everything below sees "" for this name. OTR_FFMPEG is the
+        # one way to pin a build.
         ffmpeg = ""
         # READ THE DELIVERY CONTRACT FIRST, BEFORE ANY WORK. A wire that is
         # connected but unreadable is a wiring fault, and learning that after
@@ -2190,28 +2162,23 @@ class OTRMasterAudioMux:
         except _Interrupted:
             raise
         except (ValueError, OSError) as exc:
-            # FAIL THE RUN. This node is TERMINAL -- it muxes the master audio and
-            # PUBLISHES the episode to obs. If it cannot, there IS no episode, and a
-            # render with no episode is a FAILED render.
+            # FAIL THE RUN. This node is TERMINAL -- it muxes the master audio
+            # and PUBLISHES the episode to obs. If it cannot, there IS no
+            # episode, and a render with no episode is a FAILED render.
             #
-            # This used to swallow the exception and RETURN an empty path plus an
-            # "error: ..." report string. That single line silently
-            # neutralized EVERY fail-closed gate in mux_master_audio() -- missing
-            # ffmpeg, missing silent video, missing master audio, the duration drift
-            # guard, the audio-SHA identity check. All of them raise ValueError BY
-            # DESIGN (the docstring: "raises ValueError on any gate failure (never
-            # produces a silently-wrong episode)"; one arm is even commented "never
-            # mask the fail-closed path"). Catching them here masked all of them:
-            # the graph completed, ComfyUI logged "Prompt executed", the harness
-            # recorded RESULT SUCCESS -- and no file existed.
-            #
-            # Live 2026-07-14, 420w scifi_codex re-leg (prompt 5ab3884b): the
-            # duration guard tripped on a ~1-frame concat rounding, this handler ate
-            # it, and the leg was recorded GREEN with nothing in otr\obs\. It would
-            # have entered the bake-off as a phantom episode. THE ONLY reason it was
-            # caught is the operator's standing law: confirm the asset on disk --
-            # API success is not proof. A node that cannot fail cannot be trusted,
-            # and a guard that cannot abort is not a guard.
+            # Swallowing the exception and RETURNING an empty path plus an
+            # "error: ..." report string would silently neutralize EVERY
+            # fail-closed gate in mux_master_audio() -- missing ffmpeg, missing
+            # silent video, missing master audio, the duration drift guard, the
+            # audio-SHA identity check. All of them raise ValueError BY DESIGN
+            # (the docstring: "raises ValueError on any gate failure (never
+            # produces a silently-wrong episode)"; one arm is even commented
+            # "never mask the fail-closed path"). Catching them here would mask
+            # all of them: the graph completes, ComfyUI logs "Prompt executed",
+            # the harness records RESULT SUCCESS -- and no file exists (a
+            # phantom episode). The operator's standing law: confirm the asset
+            # on disk -- API success is not proof. A node that cannot fail
+            # cannot be trusted, and a guard that cannot abort is not a guard.
             log.error("[OTR_MasterAudioMux] FAILED -- no episode published: %s", exc)
             raise
         for line in report:

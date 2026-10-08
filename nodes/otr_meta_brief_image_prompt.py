@@ -100,15 +100,14 @@ _NEUTRAL_PROMPT_TERMS = frozenset({
 def _ensure_gender_anchor(prompt: str, char: dict) -> str:
     """Add a cast-gender anchor when the prompt forgot one.
 
-    NORMALIZED (item 8, 2026-08-06). This used to compare the raw stored value
-    against ``("female","male")``. It lower-cased first, so title-case was never
-    the problem -- but `woman`, `man`, `m` and `f` are all live in the published
-    corpus and every one of them fell straight through UNANCHORED. Those rows
-    plainly state a gender; the equality test just could not hear it.
+    NORMALIZED (item 8, 2026-08-06): comparing the raw stored value against
+    ("female","male") is not enough -- `woman`, `man`, `m` and `f` are all live
+    in the published corpus and every one of them would fall straight through
+    UNANCHORED (those rows plainly state a gender; an equality test just cannot
+    hear it).
 
-    ``other`` (253 rows) previously got no anchor at all. It now gets a NEUTRAL
-    one, so an `other` row is anchored as a person rather than left to whatever
-    the image model infers from the prose.
+    ``other`` (253 rows) gets a NEUTRAL anchor, so an `other` row is anchored as
+    a person rather than left to whatever the image model infers from the prose.
 
     Still deliberately ADDITIVE and non-blocking: this function may not reject,
     rewrite or block a prompt (the contract at the portrait payload builder
@@ -137,16 +136,16 @@ def _ensure_gender_anchor(prompt: str, char: dict) -> str:
     return f"person, {text}"
 
 
-#: Shared portrait style anchor. Reworded 2026-06-10 (operator look-QA): the
-#: old "studio portrait, neutral lighting" framing read as an ACTOR in a
-#: recording booth; portraits must show the CHARACTER in character, in the
-#: story's world -- never a voice actor at a microphone.
+#: Shared portrait style anchor (operator look-QA 2026-06-10): portraits must
+#: show the CHARACTER in character, in the story's world -- never a voice actor
+#: at a microphone, and never a "studio portrait, neutral lighting" framing (it
+#: read as an ACTOR in a recording booth).
 # Round 5 operator notes (2026-06-10): the wider framing is a KEEPER ("this
-# week's portraits show more body -- better"), so it is now intentional
-# (three-quarter, not head-and-shoulders). The old "no microphone, not a
-# recording studio" NEGATIONS are gone -- negative phrasing plants those
-# tokens in the image embedding. Guidance stays in the LLM request; Python does
-# not filter the authored prompt vocabulary.
+# week's portraits show more body -- better"), so it is intentional
+# (three-quarter, not head-and-shoulders). There are no "no microphone, not a
+# recording studio" NEGATIONS: negative phrasing plants those tokens in the
+# image embedding. Guidance stays in the LLM request; Python does not filter the
+# authored prompt vocabulary.
 # GEOMETRY-vs-LOOK split (visual-style TOTAL COVERAGE chunk A1, 2026-07-05):
 # the *_GEOMETRY constants below are ENGINE-SAFETY framing contracts
 # (framing / headroom / face-visibility / mouth-safety) and NEVER move into
@@ -253,13 +252,10 @@ _RADIO_FACE_OVERT_KEYS = ("space", "orbital", "docking", "spacecraft", "starship
 #: Per-style negative populated on the object row (schemas.py negative_prompt;
 #: NO schema change). All three live styles (console_face / ltx_radio_mouth /
 #: radio_object) are pure radios with NO person in frame, so they SHARE
-#: NOTE (ONE STYLE AUTHORITY, 2026-08-17): these comments used to add that
-#: the still dispatcher had NO negative channel and that these constants
-#: were therefore cosmetic. That is no longer true -- the dispatcher now
-#: composes the pack negative with this per-object value and the
-#: negative-capable still engines honour it, so editing these strings is a
-#: BEHAVIOUR change, not bookkeeping. The positive-side guarantee still
-#: stands and is what the tests pin.
+#: NOTE (ONE STYLE AUTHORITY, 2026-08-17): the dispatcher composes the pack
+#: negative with this per-object value and the negative-capable still engines
+#: honour it, so editing these strings is a BEHAVIOUR change, not bookkeeping.
+#: The positive-side guarantee still stands and is what the tests pin.
 #: RADIO_CONSOLE_NEG (humans OUT). Facelessness rides the POSITIVE,
 #: so this is COSMETIC for the still engines -- facelessness rides the POSITIVE.
 RADIO_CONSOLE_NEG = "human, person, man, woman, human face, hands, arms, crowd"
@@ -316,8 +312,8 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
                             radio_host_style: str = "console_face",
                             vstyle=None) -> str:
     """FULL prompt for a radio-host still, dispatched by ``radio_host_style``
-    (renamed from ``style`` in chunk A1 -- r3: the visual-style pack now
-    travels as ``vstyle=``, so the DISPATCH arg needed a non-colliding name).
+    (the visual-style pack travels as ``vstyle=``, so the DISPATCH arg has a
+    non-colliding name).
 
     ``radio_host_style="console_face"``: an ANTHROPOMORPHIC RADIO CONSOLE (the
     brief-driven form) whose glowing dial forms an expressive face -- "the radio
@@ -852,8 +848,8 @@ _STILL_WORD_GENRE_KEYWORDS = (
     ("pulp", ("pulp", "adventure", "jungle", "ray gun", "monster", "horror",
               "crime", "mystery", "swashbuckling")),
 )
-#: SPLIT out of the old _STILL_WORD_CARD_STYLE: the genre-NEUTRAL legibility /
-#: composition tokens stay fixed; the per-episode lettering supplies the idiom.
+#: The genre-NEUTRAL legibility / composition tokens stay fixed; the per-episode
+#: lettering supplies the idiom.
 #: "filling the frame" is a literal instruction the model acts on; "clear space
 #: behind the words" is the counterweight to the grade's vignette.
 _STILL_WORD_LEGIBILITY_GUARD = (
@@ -1149,11 +1145,9 @@ def derive_scene_still_targets(lines, fps: int = 25,
     ShotLock). Returns ``(targets, warnings)``; each target is
     ``{beat_id, kind, role, source}``.
 
-    EVERY beat carries its OWN scene still (rip-sfx-broll 2026-07-01: the
-    pool_n_loop POOLING died with the retired_role_a /
-    retired_role_b roles -- there is no shared still pool any more).
-    An unmapped speaker_role FAILS LOUD (NO FALLBACKS; the old
-    _DEFAULT_VIDEO_ROLE fallthrough is gone).
+    EVERY beat carries its OWN scene still (there is no shared still pool). An
+    unmapped speaker_role FAILS LOUD (NO FALLBACKS; there is no default
+    video-role fallthrough).
 
     The OPEN comes from the same pure helper ShotLock uses
     (``derive_opening_music_beat``). That helper needs the first line's
@@ -1236,64 +1230,37 @@ def derive_scene_still_targets(lines, fps: int = 25,
         else:
             _add(bid, "scene_beat", role, "scene_role_map")
     if True:
-        # UNCONDITIONAL, and it was NOT until 2026-08-12.
-        #
-        # This read `not any(speaker_role == "music_open")` -- the SAME defect
-        # the closing branch below was just fixed for, one branch away. A
-        # pre-audio opening sentinel carrying its AUTHORED id suppressed the
-        # `music_opening_001` reservation meant to cover it, exactly as
-        # `shot_006_music` suppressed the closing one and killed `fastwan_8gb`.
-        #
-        # I asserted in the closing branch's comment, in PBUG-20260811-02 and in
-        # commit 3446af3f that THIS branch was already unconditional and that
-        # the closing one had drifted away from it. That was wrong: both were
-        # guarded, and the symmetry I claimed did not exist. A cross-check
-        # caught it. The two are symmetric NOW.
-        #
-        # No guard is needed: `_add` deduplicates by exact beat id through
-        # `seen`, so when the real line is present the ordinary per-beat row has
-        # already claimed the id and this call is a no-op.
+        # UNCONDITIONAL, with no guard: `_add` deduplicates by exact beat id
+        # through `seen`, so when the real line is present the ordinary per-beat
+        # row has already claimed the id and this call is a no-op. An explicit
+        # scan for an existing opening cue
+        # (`not any(speaker_role == "music_open")`) would suppress the
+        # reservation whenever a pre-audio opening sentinel carried its AUTHORED
+        # id -- the same defect the closing branch below documents
+        # (`shot_006_music` killing `fastwan_8gb`).
         #
         # THE OPENING OWES THE SAME RESERVATION THE CLOSING GETS BELOW, AND FOR
-        # THE SAME REASON. Found live, 2026-07-29, profile otr_w45_word_razzle.
-        #
+        # THE SAME REASON (found live, 2026-07-29, profile otr_w45_word_razzle).
         # The open target minted above carries the SYNTHETIC id
         # OPENING_MUSIC_BEAT_ID ("b000_music_open"). EpisodeAssembler then
         # mirrors the opening cue into ledger.lines with start_s=0.0, so by
         # ShotLock time derive_opening_music_beat returns None (0.0 is inside
         # the 2.0s head gap it requires) and NO synthetic beat is inserted --
         # the mirrored line becomes an ordinary beat named "music_opening_001".
-        # The producer was therefore the sole owner of a still for a beat id
-        # that no shot in the finished episode ever carries.
+        # The producer would therefore be the sole owner of a still for a beat
+        # id that no shot in the finished episode ever carries.
         #
-        # Render-side consumers USED TO paper the split over with a hardcoded
-        # alias (render_driver._canonical_visual_beat_id). It was applied
-        # INCONSISTENTLY, which is what made the split reachable two ways:
-        #   - merge_jump_still_requests does not canonicalize, so a JUMP
-        #     coverage plan on the opening beat asked for a jump-segment still
-        #     whose base scene still was filed under the other id, and the
-        #     episode died LOUD at the image boundary.
-        #   - mesh_stage hit the same split quietly: its plate was minted as
-        #     plate_b000_music_open, never joined to music_opening_001, and the
-        #     textured hero composited over the floor fallback instead.
-        # One state, two id spaces, and only some readers held the map.
-        #
-        # THE ALIAS IS NOW DELETED (PBUG-20260811-02, third and final swing).
-        # Every reader uses the shot's own beat id, so there is one id space and
-        # no map to hold. The reservation below is unchanged and still correct:
-        # it gives the positioned mirror a producer-owned target under the name
-        # it will actually have, which is exactly what the consumer now asks
-        # for. What changed is that a MISSED reservation is now a plain missing
-        # still rather than a silent join failure under a second name.
-        #
-        # Reserving the assembler's deterministic id gives that beat a
-        # producer-owned target under the name it will actually have. The b000
-        # target STAYS: when there is a real head gap and no mirrored opening
-        # cue, ShotLock does insert the synthetic beat and that target is the
-        # correct one. Which of the two gets used is decided downstream by
-        # which beat id the episode ends up with -- and now either answer has a
-        # still waiting for it. An unused still costs one render; a missing one
-        # reaches video dispatch too late to repair safely.
+        # Every reader uses the shot's own beat id (one id space, no alias map),
+        # so a MISSED reservation is a plain missing still, not a silent join
+        # failure under a second name. Reserving the assembler's deterministic
+        # id gives that beat a producer-owned target under the name it will
+        # actually have. The b000 target STAYS: when there is a real head gap
+        # and no mirrored opening cue, ShotLock does insert the synthetic beat
+        # and that target is the correct one. Which of the two gets used is
+        # decided downstream by which beat id the episode ends up with -- and
+        # either answer has a still waiting for it. An unused still costs one
+        # render; a missing one reaches video dispatch too late to repair
+        # safely.
         _add("music_opening_001", "scene_beat", "music_visual",
              "scene_open_pretiming")
     if include_synthetic_closing:
@@ -1306,13 +1273,13 @@ def derive_scene_still_targets(lines, fps: int = 25,
         # late to repair safely.
         #
         # UNCONDITIONAL, exactly like the opening reservation above (live fix
-        # 2026-08-12). This used to read
-        # `not any(speaker_role == "music_close")`, which asks a DIFFERENT
-        # question than the one that matters: it suppressed the reservation
-        # whenever ANY closing cue existed, including the pre-audio sentinel
-        # carrying its AUTHORED id (`shot_006_music`). The assembler then
-        # mirrored that cue under its own deterministic id, and the still for
-        # THAT id had never been minted. `fastwan_8gb` died on it:
+        # 2026-08-12): a guard of the form
+        # `not any(speaker_role == "music_close")` asks a DIFFERENT question
+        # than the one that matters -- it suppresses the reservation whenever
+        # ANY closing cue exists, including the pre-audio sentinel carrying its
+        # AUTHORED id (`shot_006_music`). The assembler then mirrors that cue
+        # under its own deterministic id, and the still for THAT id is never
+        # minted. `fastwan_8gb` died on it:
         #
         #   RenderError: still-spine handoff missing materialized scene still
         #   for shot shot_music_closing_001 beat music_closing_001
@@ -1321,9 +1288,9 @@ def derive_scene_still_targets(lines, fps: int = 25,
         # beat id through `seen`, so when the real `music_closing_001` line is
         # present the ordinary per-beat loop has already claimed the id and
         # this call is a no-op. An explicit scan would be a second copy of that
-        # policy, which is how the two branches drifted apart in the first
-        # place -- so the closing branch is now literally the opening branch's
-        # twin, and for the reason the opening one already gives.
+        # policy, which is how the two branches drifted apart in the first place
+        # -- so the closing branch is literally the opening branch's twin, and
+        # for the reason the opening one already gives.
         #
         # SCOPE, and it is the important half: this backstop can only ever
         # cover `_001`. `EpisodeAssembler` mints one row per chunk
@@ -1394,8 +1361,8 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
     for a head-and-shoulders shot (the head fits the short frame) while a portrait
     still keeps the three-quarter look -- both with explicit headroom so the top of
     the head is never cropped (operator framing catch 2026-06-17). Chunk A1: the
-    LLM-facing LOOK language (the old hard-coded "photographic and
-    period-consistent") comes from the pack's ``portrait_instruction_look``;
+    LLM-facing LOOK language comes from the pack's
+    ``portrait_instruction_look``;
     ``style`` is the resolved pack threaded from the entry (None => fail-loud
     resolve here)."""
     try:
@@ -1751,9 +1718,8 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
             f"char-scene: no appearance text for {cid}; still has NO identity "
             f"anchor (LOUD)")
     else:
-        # The twin laundering removed 2026-08-05 with its root fix: the guard
-        # now classifies the whole string, so a scarf described as "black/white"
-        # reaches the prompt as written instead of "black or white".
+        # No slash laundering here: the guard classifies the whole string, so a
+        # scarf described as "black/white" reaches the prompt as written.
         if _app[:40] not in prompt:
             prompt = f"{_app}, {prompt}"
     if style.image_grade_tail and style.image_grade_tail not in prompt:
@@ -2464,11 +2430,10 @@ class OTRMetaBriefImagePromptGen:
                     "multiline": True, "default": "{}", "forceInput": True,
                     "tooltip": "OTR_ImageDirector policy: granularity/seed + per-role still 'aspects' (so character stills match the selected video engine: portrait 832x1216 vs 16:9 832x480).",
                 }),
-                # `consistency_gate_warn_only` was REMOVED 2026-08-28: the
-                # node displayed a Boolean, forwarded it one hop, and the
-                # helper deleted it -- "the compatibility gate argument is
-                # ignored", in its own words. The helper keeps its parameter;
-                # the NODE stops advertising a dead choice.
+                # No `consistency_gate_warn_only` widget: the helper keeps its
+                # parameter but ignores the argument ("the compatibility gate
+                # argument is ignored", in its own words), so the NODE does not
+                # advertise a dead choice.
                 "gate_in": ("STRING", {
                     "multiline": True, "default": "", "forceInput": True,
                     "tooltip": "Optional ordering signal (opaque STRING).",
@@ -2543,7 +2508,7 @@ class OTRMetaBriefImagePromptGen:
             llm_fn = _resolve_writer_llm(meta, warnings)
         payload, warn2 = derive_image_prompts(
             cast, meta, llm_fn=llm_fn,
-            consistency_gate_warn_only=False,   # widget removed 2026-08-28
+            consistency_gate_warn_only=False,  # no widget; helper ignores it
             lines=lines,
             still_aspects=_still_aspects_from_policy(image_policy_json),
             mesh_fodder_roles=_mesh_fodder_roles_from_policy(image_policy_json),

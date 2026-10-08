@@ -1,7 +1,6 @@
 """OTR_CaptionBurn -- SDH open-caption burn for the NEW render path (CW-4 migration).
 
-The dedicated home for the SDH caption burn that used to live inside the legacy
-``OTR_PostUpscaleProcgenBlend`` (now being torn out). Sits BETWEEN
+The dedicated home for the SDH caption burn. Sits BETWEEN
 ``OTR_SilentComposite`` and the terminal ``OTR_MasterAudioMux``:
 
     SignalLostVideo -> SilentComposite -> [OTR_CaptionBurn] -> MasterAudioMux
@@ -11,7 +10,7 @@ It burns the SDH ``.ass`` (built by the surviving ``nodes/_otr_captions.py``
 audio (audio is added LAST by MasterAudioMux with ``-c:a copy``), so the
 byte-identical audio spine is untouched. Default-OFF ("clean master" is the
 default); enable via the ``burn_captions`` widget (set by the capability
-profiles -- the env-only enable path was CUT in the 2026-07-04 widget-audit).
+profiles; there is no env-only enable path).
 When OFF (or on any caption-build failure) it PASSES THE INPUT THROUGH
 unchanged -- CAPTIONS never block the deliverable.
 
@@ -74,9 +73,7 @@ class CaptionCapabilityGapError(ValueError):
         the "it's the Mac" story was a forecast rather than a finding.
       * MISCONFIGURATION -- an unknown caption style, a malformed title plan.
         Degrading these would ship untitled episodes forever in silence, which
-        is strictly worse than refusing, so they must keep refusing. A degrade
-        that caught every ValueError alike was written and reverted inside the
-        hour on exactly this point.
+        is strictly worse than refusing, so they must keep refusing.
       * PIPELINE DEFECT -- a missing input video, an unreadable ledger. The
         episode is broken; refusing is correct.
 
@@ -90,30 +87,28 @@ class CaptionCapabilityGapError(ValueError):
 def _ffmpeg_bin(ffmpeg: str) -> str:
     """The ffmpeg this box should run, or ``""`` when it has none.
 
-    HONOURS ``OTR_FFMPEG`` BEFORE PATH (2026-08-28). It did not, and that was
-    the mirror image of a bug the pack had already fixed once: the shared
-    ``_otr_shared/ffprobe.py`` resolver exists because only `otr_credits_roll`
-    honoured ``OTR_FFPROBE`` while every other caller trusted PATH. That
-    consolidation was scoped to the PROBE; the ENCODER kept the same hole here,
-    in `otr_caption_burn`, `otr_master_audio_mux` and `otr_silent_composite` --
-    which are the caption burn, the terminal audio mux and the silent-video
-    normalize, i.e. the LAST three stages of an episode.
+    HONOURS ``OTR_FFMPEG`` BEFORE PATH (2026-08-28), as the shared
+    ``_otr_shared/ffprobe.py`` resolver does for ``OTR_FFPROBE``: a caller that
+    trusts PATH alone is the hole that resolver exists to close. It applies to
+    `otr_caption_burn`, `otr_master_audio_mux` and `otr_silent_composite` -- the
+    caption burn, the terminal audio mux and the silent-video normalize, i.e.
+    the LAST three stages of an episode.
 
     So on a box where ffmpeg is reachable only through ``OTR_FFMPEG`` -- the
     AMD/Mac/alternate-box case the variant workflows exist for -- every earlier
     stage would succeed (the video engines all honour the variable) and the
     episode would die at the end, having spent the whole render.
 
-    A NODE WIDGET NO LONGER WINS -- it no longer even arrives (2026-09-04).
+    A NODE WIDGET DOES NOT WIN -- it does not even arrive (2026-09-04).
     Each execute method discards its `ffmpeg` widget before anything calls this,
     so what reaches here is either nothing or a value a TRUSTED caller already
     resolved. `OTR_FFMPEG` is the operator's channel and PATH the last resort.
     Left as it was, the next reader would re-wire the widget to match this
     paragraph and quietly reopen the hole.
 
-    ONE OWNER ANSWERS NOW (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
+    ONE OWNER ANSWERS (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
     and the widget's own default literal ``"ffmpeg"`` is not a choice: with
-    ffmpeg on PATH that literal used to win here and the pin was never read.
+    ffmpeg on PATH that literal would win here and the pin would never be read.
     """
     try:
         from ._otr_shared.ffmpeg import resolve_ffmpeg
@@ -524,17 +519,12 @@ class OTRCaptionBurn:
     def burn(self, video_path, burn_captions=True, caption_style=_DEFAULT_CAPTION_STYLE,
              fps=25, ledger_path="", output_path="", gate_in="",
              title_card_plan_json=""):
-        # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
-        # operator intent. Discarded HERE, at the node boundary, so no
-        # helper underneath can be handed it.
-        # The `ffmpeg` widget was REMOVED on 2026-09-13. It had been
-        # DEPRECATED and IGNORED since 2026-09-04, when a widget value was
-        # found to reach argv[0] over an unauthenticated /prompt request;
-        # the fix then was to discard it here, at the node boundary. The
-        # declaration is now gone, so ComfyUI never passes the field at
-        # all and there is nothing left to discard -- the channel is
-        # closed rather than sanitised. Everything below already saw ""
-        # for this name; OTR_FFMPEG remains the one way to pin a build.
+        # B1 (2026-09-04): an `ffmpeg` widget value is UNTRUSTED /prompt input,
+        # not operator intent (a widget value could reach argv[0] over an
+        # unauthenticated /prompt request). The node declares no such widget, so
+        # ComfyUI never passes the field and the channel is closed rather than
+        # sanitised; everything below sees "" for this name. OTR_FFMPEG is the
+        # one way to pin a build.
         ffmpeg = ""
         # These paths came from the workflow, so they are untrusted input.
         # A UNC value makes this machine authenticate to the host it names

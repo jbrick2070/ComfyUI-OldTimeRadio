@@ -65,80 +65,60 @@ G5_RESERVED_LINK_IDS = frozenset({111, 112})
 # workflow JSON. Listing them here means a stale workflow surfaces
 # at validation time rather than at runtime.
 DELETED_NODE_TYPES = frozenset({
-    # Lean-mean order 5 (2026-08-23): four registered PUBLIC/manual nodes
-    # retired -- none was in the canonical workflow, but a user-saved graph
-    # may name them, and that graph must fail LOUD with a migration message
-    # rather than dying on an unknown node.
+    # Manual public nodes: none is in the canonical workflow, but a user-saved
+    # graph may name them and must fail LOUD with a migration message, not die
+    # on an unknown node.
     "OTR_ProjectStateLoader",     # manual series-bible loader
     "OTR_VRAMGuardian",           # manual blanket unload (targeted levers won)
     "OTR_SaveToEpisodeWorkspace", # manual FLUX still sink (dispatcher owns stills)
     "OTR_VideoProbe",             # usable-engines report (/object_info + preflight)
-    # Lean-mean order 6 (2026-08-23): the five-node visual/ POC retired with
-    # its tree; the HF_TOKEN startup dependency moved to _otr_shared first.
+    # The five-node visual/ POC cluster.
     "OTR_VisualBridge",
     "OTR_VisualPoll",
     "OTR_VisualRenderer",
     "OTR_VisualPromptCoercion",
     "OTR_VisualExtractFluxPrompt",
-    "OTR_LLMDirector",            # deleted in S2 (commit 249bc06)
+    "OTR_LLMDirector",  # the Director that emitted production_plan_json
     "OTR_BarkTTS",                # legacy single-line node
     "OTR_SFXGenerator",           # legacy single-line node
     "OTR_VoiceRender",            # legacy aggregator
-    "OTR_BatchKokoroGenerator",   # replaced by OTR_KokoroAnnouncer
-    "OTR_PostAudioVideoPipeline", # S27: subprocess HuMo trigger, superseded in-graph by OTR_BatchHumoRender + the (now also removed) legacy compositor
-    "OTR_RTXUpscale",             # queue item 8 (2026-08-08): NVIDIA-only RTX-VSR upscale ripped in the same commit as the device-selectable upscale rebuild (nodes/_otr_upscale_engines/); D-2 codicil.
-    # CW-4 legacy render-path teardown (2026-06-07): the legacy in-graph
-    # compositor mixed audio with ffmpeg -shortest (forbidden by the
-    # frozen-audio spine). Replaced by SignalLostVideo -> OTR_SilentComposite
-    # -> OTR_MasterAudioMux (terminal mux, -c:a copy, no -shortest).
+    "OTR_BatchKokoroGenerator",
+    "OTR_PostAudioVideoPipeline",  # S27: subprocess HuMo trigger
+    "OTR_RTXUpscale",  # NVIDIA-only RTX-VSR upscale
+    # Legacy in-graph compositor (mixed audio with ffmpeg -shortest, which the
+    # frozen-audio spine forbids).
     "OTR_VideoComposite",
-    # CW cleanbreak (2026-06-08): the legacy in-graph BATCH render path is
-    # retired -- the FLUX/HuMo/LTX batch renderers + the VRAM-unload node +
-    # the LTX topology gate. Replaced by the model-agnostic video platform
-    # (OTR_VideoRenderBatch + the registry adapters). Tombstoned so a stale
-    # workflow JSON naming one of these fails loudly at validation.
+    # Legacy in-graph BATCH render path (FLUX/HuMo/LTX batch renderers, the
+    # VRAM-unload node, the LTX topology gate): a stale workflow JSON naming one
+    # fails loudly at validation.
     "OTR_BatchHumoRender",
     "OTR_BatchLTXRender",
     "OTR_BatchFluxRender",
     "OTR_BatchFluxPortraitRender",
     "OTR_UnloadAll",
     "OTR_LtxBranchGate",
-    # CW cleanbreak follow-up (2026-06-08): the HuMo tier loader only fed the
-    # deleted batch HuMo node; the in-process eng_humo adapter loads its own.
+    # HuMo tier loader (only fed the deleted batch HuMo node).
     "OTR_HuMoTierLoader",
-    # Lean-down 2026-05-29 (step 6): the dormant Story Room writers'-room
-    # cluster (Director / Editor / Story Room / Extract / Commit) was
-    # deleted. Tombstoned so a stale workflow JSON referencing one of
-    # them fails loudly at validation instead of at runtime.
+    # Dormant Story Room writers'-room cluster (Director / Editor / Story Room /
+    # Extract / Commit).
     "OTR_StoryRoom",
     "OTR_StoryRoomExtract",
     "OTR_StoryRoomCommit",
     "OTR_DirectorBrief",
     "OTR_EditorPass",
-    # Lean-down 2026-05-29 (step 12): temporary BUG-LOCAL-231 bisect
-    # STRING-emit node; deleted with its _bisect_flux_*.json graphs.
+    # Temporary BUG-LOCAL-231 bisect STRING-emit node.
     "OTR_BisectStringSource",
-    # Lean-down 2026-05-29 (step 7): the shadow-pass Stage 1 fan-out +
-    # best-of-N beat-selector diagnostic nodes were deleted with the
-    # shadow/fan-out cluster.
+    # Shadow-pass Stage 1 fan-out and best-of-N beat-selector diagnostic nodes.
     "OTR_Stage1FanOut",
     "OTR_BeatSelector",
-    # Chunk E cleanbreak (2026-06-08): legacy video-plan nodes superseded
-    # by the model-agnostic platform (OTR_ShotLock owns all budget/plan
-    # logic; OTR_VideoRenderBatch replaces the per-model batch renderers).
-    # Tombstoned so a stale workflow JSON naming these fails at validation.
-    "OTR_VideoPlan",           # superseded by OTR_ShotLock
-    "OTR_RenderPlan",          # superseded by OTR_ShotLock
-    "OTR_ShotDurationCalculator",  # old name, renamed to OTR_FixedShotDurationStub
-                                   # then fully superseded by ShotLock budget
-    "OTR_FixedShotDurationStub",   # stub replacement, now superseded
-    # Chunk E cleanbreak completion (2026-06-09): the legacy gate-bound
-    # loader shells + the FLUX topology gate are retired. V-5 (execution
-    # plan): ALL model loading is adapter-internal via comfy
-    # model_management -- no deferred-loader shell nodes survive. Their
-    # only consumers were the legacy FLUX/LTX batch chains deleted in the
-    # CW cleanbreak; the platform render path (OTR_VideoRenderBatch +
-    # registry adapters) loads everything inside the adapters.
+    # Legacy video-plan nodes (OTR_ShotLock owns all budget/plan logic).
+    "OTR_VideoPlan",
+    "OTR_RenderPlan",
+    "OTR_ShotDurationCalculator",
+    "OTR_FixedShotDurationStub",
+    # Gate-bound loader shells + the FLUX topology gate (V-5: ALL model loading
+    # is adapter-internal via comfy model_management; no deferred-loader shell
+    # nodes).
     "OTR_FluxBranchGate",              # legacy FLUX topology gate (Sprint H)
     "OTR_DeferredCheckpointLoader",    # gate-bound FLUX loader shell (V-5)
     "OTR_DeferredLtxTextEncoderLoader",  # gate-bound LTX loader shell (V-5)
@@ -154,9 +134,8 @@ FORBIDDEN_INPUT_SOCKETS = frozenset({
     "voice_map_json",         # Director's voice_assignments split-out
     "sfx_plan_json",          # Director's sfx_plan split-out
     "music_plan_json",        # Director's music_plan split-out
-    # rip-sfx-broll (2026-07-01): the SceneSequencer sfx overlay inputs
-    # were removed with the sfx subsystem (they were never wired to a
-    # producer). A stale workflow carrying them fails at validation.
+    # SceneSequencer sfx overlay inputs: a stale workflow carrying them fails at
+    # validation.
     "sfx_audio_clips",
     "sfx_offset_ms",
 })
@@ -355,8 +334,8 @@ def validate_workflow_contract(
                 f"dst_slot, type]."
             )
         link_ids.append(L[0])
-    # S16.5 (IMP-23): dedup duplicate-ID accumulator. An ID present
-    # 3 times reported as [42, 42] under the old manual loop.
+    # S16.5 (IMP-23): dedup duplicate-ID accumulator: an ID present 3 times is
+    # reported once.
     from collections import Counter
     counts = Counter(link_ids)
     dups = sorted(lid for lid, n in counts.items() if n > 1)
