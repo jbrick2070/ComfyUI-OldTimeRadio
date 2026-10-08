@@ -54,7 +54,6 @@ def test_cache_key_reflects_identity_fields():
 def test_record_roundtrips_through_dict():
     rec = record_from_request(
         _req(), audio_path="a.npy", audio_sha256="deadbeef",
-        allowed_for_release=True,
     )
     assert AudioCacheRecord.from_dict(rec.to_dict()) == rec
     assert rec.cache_key == _req().cache_key
@@ -66,13 +65,12 @@ def test_record_roundtrips_through_dict():
 def test_put_get_roundtrip(tmp_path):
     cache = FileAudioCache(str(tmp_path))
     req = _req()
-    rec = cache.put(req, _audio(), allowed_for_release=True)
+    rec = cache.put(req, _audio())
     got = cache.get(req)
     assert got is not None
     assert got.cache_key == req.cache_key
     assert got.audio_sha256 == rec.audio_sha256
     assert os.path.exists(rec.audio_path)
-    assert got.allowed_for_release is True
 
 
 def test_get_miss_returns_none(tmp_path):

@@ -13,8 +13,7 @@ Why one key and one record:
   * **One record.** :class:`AudioCacheRecord` is the canonical sidecar shape the
     cache writes and the Wave-0 cache-sidecar JSON schema mirrors, so the writer
     and the schema cannot drift.
-  * **Release facts (G0).** Every record carries ``allowed_for_release`` and
-    ``commercial_clean`` (I-8).
+  * **Release fact (G0).** Every record carries ``commercial_clean`` (I-8).
 """
 from __future__ import annotations
 
@@ -46,8 +45,8 @@ class AudioCacheRecord:
     produced it (I-6). ``request_schema_version`` drives slim migration (a record
     whose version != the build target is re-rendered, Wave 1f). The three
     ``*_version`` fields participate in IS_CHANGED so a projection/template bump
-    invalidates cleanly (E.5). ``allowed_for_release`` + ``commercial_clean``
-    record the audio's release standing (I-8).
+    invalidates cleanly (E.5). ``commercial_clean`` records the audio's
+    release standing (I-8).
     """
 
     cache_key: str
@@ -62,7 +61,6 @@ class AudioCacheRecord:
     actual_sample_rate: Optional[int] = None
     provider_model_id: str = ""
     commercial_clean: Optional[bool] = None
-    allowed_for_release: bool = False
     audio_path: str = ""
     audio_sha256: str = ""
     prepare_text_version: str = ""
@@ -76,7 +74,9 @@ class AudioCacheRecord:
     @classmethod
     def from_dict(cls, data: dict) -> "AudioCacheRecord":
         """Build from a (possibly forward-compatible) dict; unknown keys are
-        ignored so a newer sidecar on disk never crashes an older reader.
+        ignored so a newer sidecar on disk never crashes an older reader, and a
+        sidecar written before a field was dropped (``allowed_for_release``,
+        retired 2026-10-08: nothing read it) still loads.
         ``cache_key`` is required."""
         known = {f.name for f in _dc_fields(cls)}
         kwargs = {k: v for k, v in (data or {}).items() if k in known}
@@ -100,7 +100,6 @@ def record_from_request(
     *,
     audio_path: str = "",
     audio_sha256: str = "",
-    allowed_for_release: bool = False,
     prepare_text_version: str = "",
     delivery_projection_version: str = "",
     engine_prompt_template_version: str = "",
@@ -124,7 +123,6 @@ def record_from_request(
         actual_sample_rate=(int(actual_sample_rate) if actual_sample_rate is not None else None),
         provider_model_id=str(provider_model_id or ""),
         commercial_clean=getattr(request, "commercial_clean", None),
-        allowed_for_release=bool(allowed_for_release),
         audio_path=audio_path,
         audio_sha256=audio_sha256,
         prepare_text_version=prepare_text_version,
@@ -205,7 +203,6 @@ class FileAudioCache:
     # -- write --
     def put(
         self, request, audio, *,
-        allowed_for_release: bool = False,
         actual_sample_rate: Optional[int] = None,
         provider_model_id: str = "",
     ) -> AudioCacheRecord:
@@ -216,7 +213,6 @@ class FileAudioCache:
             request,
             audio_path=audio_path,
             audio_sha256=audio_sha,
-            allowed_for_release=allowed_for_release,
             prepare_text_version=_prepare_text_version(),
             delivery_projection_version=_delivery_projection_version(),
             engine_prompt_template_version="1",

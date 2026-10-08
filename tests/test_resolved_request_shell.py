@@ -73,12 +73,11 @@ def test_cache_key_changes_with_in_key_field():
 
 def test_cache_key_ignores_non_identity_fields():
     base = ResolvedVoiceRequest(role="character", char_id="c1")
-    # prepared_text (debug), engine_seed (derived), allowed_for_release (gate)
+    # prepared_text (debug) and engine_seed (derived)
     noisy = dataclasses.replace(
         base,
         prepared_text="the quick brown fox",
         engine_seed=999999,
-        allowed_for_release=True,
     )
     assert base.cache_key == noisy.cache_key
 

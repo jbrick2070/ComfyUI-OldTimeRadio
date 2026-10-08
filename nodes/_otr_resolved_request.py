@@ -5,8 +5,8 @@ integer-tick quantizer on top of this surface).
 Why this exists (plan invariants I-6, C-4):
   * **One frozen request == one cache key == one engine input.** The engine never
     sees a raw widget float -- it sees this object, whose ``cache_key`` is a
-    sha256 over the IN_KEY fields only. IGNORED fields (debug text, the derived
-    engine seed, the allowed-for-release boolean) never perturb identity.
+    sha256 over the IN_KEY fields only. IGNORED fields (debug text and the
+    derived engine seed) never perturb identity.
   * **One seed reduction.** ``_seed_to_int64`` is the single sha256->seed helper
     for every deterministic draw in the audio path, so legacy seeding, the
     per-line stable seed, and the per-engine generator all reduce identically.
@@ -106,11 +106,9 @@ IN_KEY_FIELDS: Tuple[str, ...] = (
     "cast_lock_revision", "stable_line_seed", "sample_rate", "channels",
     "quantized_params", "source_ref_sha256", "commercial_clean",
 )
-# Fields that are NOT identity: debug text, the derived engine seed, and the
-# allowed-for-release boolean (release standing is recorded, it is not
-# identity -- I-8).
+# Fields that are NOT identity: debug text and the derived engine seed.
 IGNORED_FIELDS: Tuple[str, ...] = (
-    "prepared_text", "engine_seed", "allowed_for_release",
+    "prepared_text", "engine_seed",
 )
 
 
@@ -146,10 +144,9 @@ class ResolvedVoiceRequest:
     source_ref_sha256: str = ""
     commercial_clean: Optional[bool] = None
     request_schema_version: str = REQUEST_SCHEMA_VERSION
-    # --- IGNORED (debug / derived / release standing -- never identity) ---
+    # --- IGNORED (debug / derived -- never identity) ---
     prepared_text: str = ""
     engine_seed: int = 0
-    allowed_for_release: bool = False
 
     def in_key_dict(self) -> dict:
         """The identity sub-dict (IN_KEY fields only)."""

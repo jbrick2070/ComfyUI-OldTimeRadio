@@ -1017,9 +1017,6 @@ def _finish_voice_line(job, *, role, clips, cache, cache_enabled, cache_stats,
                 try:
                     fresh_record = cache.put(
                         request, audio,
-                        allowed_for_release=(
-                            job["license_clean"]
-                        ),
                         actual_sample_rate=_got_sr,
                         provider_model_id=provider_model_id_stamp,
                     )
@@ -1328,8 +1325,7 @@ class OTRVoiceNodeBase:
             EngineUnusable, EngineUsabilityReason, pack_audio_batch,
         )
         from ._otr_engine_profiles import (
-            assert_model_available, assert_token_for_profile,
-            effective_license_state, require_resolver,
+            assert_model_available, assert_token_for_profile, require_resolver,
         )
         from ._otr_resolved_request import (
             _seed_to_int64, build_resolved_request, empty_audio_batch,
@@ -1747,10 +1743,6 @@ class OTRVoiceNodeBase:
                     "provider_model_id_stamp": provider_model_id_stamp,
                     "request": request,
                     "voice_preset": voice_preset,
-                    "license_clean": (
-                        cache_enabled
-                        and effective_license_state(profile) == "clean"
-                    ),
                     "_pobs": _pobs,
                     "_render_start": time.monotonic(),
                     "audio": None,

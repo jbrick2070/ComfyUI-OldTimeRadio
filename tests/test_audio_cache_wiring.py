@@ -118,7 +118,7 @@ def test_put_load_roundtrip(tmp_path):
     cache = FileAudioCache(str(tmp_path))
     req = _req()
     a = _audio()
-    cache.put(req, a, allowed_for_release=True, actual_sample_rate=24000,
+    cache.put(req, a, actual_sample_rate=24000,
               provider_model_id="gemini-2.5-flash-preview-tts")
     loaded = cache.load(req)
     assert loaded is not None
@@ -137,7 +137,7 @@ def test_load_returns_none_on_missing_sidecar(tmp_path):
 def test_load_returns_none_when_npy_missing(tmp_path):
     cache = FileAudioCache(str(tmp_path))
     req = _req()
-    cache.put(req, _audio(), allowed_for_release=True, actual_sample_rate=24000)
+    cache.put(req, _audio(), actual_sample_rate=24000)
     # Delete the .npy leaving the sidecar behind.
     key = cache_key_for(req)
     os.unlink(str(tmp_path / f"{key}.npy"))
@@ -147,7 +147,7 @@ def test_load_returns_none_when_npy_missing(tmp_path):
 def test_load_returns_none_on_sha_mismatch(tmp_path):
     cache = FileAudioCache(str(tmp_path))
     req = _req()
-    cache.put(req, _audio(), allowed_for_release=True, actual_sample_rate=24000)
+    cache.put(req, _audio(), actual_sample_rate=24000)
     key = cache_key_for(req)
     # Tamper the npy so the hash no longer matches.
     np.save(str(tmp_path / f"{key}.npy"), np.ones((1, 1, 16), dtype=np.float32))
@@ -157,7 +157,7 @@ def test_load_returns_none_on_sha_mismatch(tmp_path):
 def test_load_returns_none_on_rate_mismatch(tmp_path):
     cache = FileAudioCache(str(tmp_path))
     req = _req(sample_rate=24000)
-    cache.put(req, _audio(sr=24000), allowed_for_release=True, actual_sample_rate=24000)
+    cache.put(req, _audio(sr=24000), actual_sample_rate=24000)
     other = _req(sample_rate=22050)
     assert cache.load(other) is None
 
@@ -165,7 +165,7 @@ def test_load_returns_none_on_rate_mismatch(tmp_path):
 def test_load_returns_none_on_channels_mismatch(tmp_path):
     cache = FileAudioCache(str(tmp_path))
     req = _req(channels=1)
-    cache.put(req, _audio(channels=1), allowed_for_release=True, actual_sample_rate=24000)
+    cache.put(req, _audio(channels=1), actual_sample_rate=24000)
     other = _req(channels=2)
     assert cache.load(other) is None
 
@@ -173,7 +173,7 @@ def test_load_returns_none_on_channels_mismatch(tmp_path):
 def test_load_returns_none_on_cache_key_mismatch(tmp_path):
     cache = FileAudioCache(str(tmp_path))
     req = _req()
-    cache.put(req, _audio(), allowed_for_release=True, actual_sample_rate=24000)
+    cache.put(req, _audio(), actual_sample_rate=24000)
     key = cache_key_for(req)
     # Rewrite the sidecar to claim a different cache_key.
     sidecar = tmp_path / f"{key}.json"
@@ -190,7 +190,7 @@ def test_load_ignores_sidecar_audio_path_and_derives_from_cache_dir(tmp_path):
     turn a valid cache entry into a miss."""
     cache = FileAudioCache(str(tmp_path))
     req = _req()
-    cache.put(req, _audio(), allowed_for_release=True, actual_sample_rate=24000)
+    cache.put(req, _audio(), actual_sample_rate=24000)
     key = cache_key_for(req)
     sidecar = tmp_path / f"{key}.json"
     doc = json.loads(sidecar.read_text(encoding="utf-8"))
@@ -207,7 +207,7 @@ def test_load_survives_cache_dir_rename(tmp_path):
     old_dir.mkdir()
     cache = FileAudioCache(str(old_dir))
     req = _req()
-    cache.put(req, _audio(), allowed_for_release=True, actual_sample_rate=24000)
+    cache.put(req, _audio(), actual_sample_rate=24000)
     # Rename the whole cache dir.
     new_dir = tmp_path / "renamed_ep"
     old_dir.rename(new_dir)
@@ -231,7 +231,7 @@ def test_atomic_write_survives_partial_crash(monkeypatch, tmp_path):
 
     monkeypatch.setattr(np, "save", _boom)
     with pytest.raises(IOError):
-        cache.put(req, _audio(), allowed_for_release=True, actual_sample_rate=24000)
+        cache.put(req, _audio(), actual_sample_rate=24000)
     # No sidecar (sidecar is published LAST), no orphan .npy, no leftover .tmp.
     files = list(tmp_path.iterdir())
     for f in files:

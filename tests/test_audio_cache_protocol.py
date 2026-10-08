@@ -42,7 +42,7 @@ def test_record_is_frozen():
 def test_record_roundtrip_dict():
     rec = AudioCacheRecord(
         cache_key="k", engine_name="bark", sample_rate=24000,
-        commercial_clean=True, allowed_for_release=True,
+        commercial_clean=True,
     )
     d = rec.to_dict()
     assert d["cache_key"] == "k" and d["sample_rate"] == 24000
@@ -70,14 +70,12 @@ def test_record_from_request_maps_identity_fields():
     r = _req(voice_ref_id="vr_42")
     rec = record_from_request(
         r, audio_path="/x/a.wav", audio_sha256="deadbeef",
-        allowed_for_release=True,
     )
     assert rec.cache_key == r.cache_key
     assert rec.engine_name == "bark"
     assert rec.role == "char_voice"
     assert rec.voice_ref_id == "vr_42"
     assert rec.commercial_clean is True
-    assert rec.allowed_for_release is True
     assert rec.audio_path == "/x/a.wav"
     assert rec.request_schema_version == r.request_schema_version
 

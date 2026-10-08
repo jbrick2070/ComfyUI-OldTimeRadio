@@ -124,7 +124,6 @@ def test_real_record_to_dict_validates_against_sidecar_schema():
     )
     rec = record_from_request(
         req, audio_path="/x/a.wav", audio_sha256="ab" * 32,
-        allowed_for_release=True,
     )
     assert _validate(rec.to_dict(), schema)
     # A null voice_ref_id (the common char-voice case) must validate too.
