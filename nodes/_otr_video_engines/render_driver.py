@@ -131,8 +131,8 @@ _GOOGLE_PROVIDER_PROMPT_ENGINES = _GOOGLE_SILENT_TEXT_PROVIDERS
 #: here is "this engine reads an LTX-shaped scene prompt", not "this engine
 #: deserves motion". The non-LTX lanes need an engine-appropriate formatter
 #: instead; see BOOKEND_SCENE_PROMPT_KNOWN_RED, where they now sit with that
-#: reason written down rather than being handed a prompt that would violate
-#: their own documented directives.
+#: reason written down rather than being handed a prompt shaped for a
+#: different model.
 BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
     "ltx25_video",
     # THE LTX 2.5 TIERS. Same composer as the silent lane: a bookend prompt
@@ -206,26 +206,14 @@ BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN = frozenset({
 #: regression behind it". An entry here is a debt with an owner, and the roster
 #: test prints it on every run so it cannot go quiet. Emptying this dict --
 #: by fixing each lane or retiring it -- is the goal.
-#: A GATE EVERY ENTRY BELOW INHERITS, found by a test rather than remembered.
-#: Each engine carries two per-engine prompt-style overlay constants describing
-#: what its model wants from a prompt. They are STORED AND DELIBERATELY NOT
-#: WIRED -- a 2026-08-17 research decision, enforced by
-#: `tests/test_prompt_style_directives.py`, which fails if the constant names
-#: appear anywhere outside their owning engine modules. Acting on them is a
-#: separate, measured change gated on a fixed-seed A/B, because the still-prompt writer does not know its target
-#: engine: binding happens at dispatch and roles drift under OTR_FORCE_ENGINE_MAP.
-#:
-#: SO "give this lane a formatter shaped to its own model" IS NOT A FREE FIX.
-#: It is correct, and it lands behind that probe A/B, not before it.
 BOOKEND_SCENE_PROMPT_KNOWN_RED = {
     "ltx_8gb": "LTX-family but NOT on the LTX scene branch. OWED: confirm "
                "whether its prompt contract matches ltx25_video's closely enough "
                "to join BOOKEND_SCENE_PROMPT_ENGINES directly, or whether the "
                "8gb recipe needs its own shorter form.",
     "minimax_h3_video": "OWED: an engine-appropriate bookend formatter; it is "
-                        "not an LTX-shaped lane. See the note below on the "
-                        "stored-not-wired per-engine style overlays -- that "
-                        "gate applies to every entry in this dict.",
+                        "not an LTX-shaped lane, so the LTX motion register "
+                        "is the wrong shape for it.",
     "minimax_h3_audio_in": "Takes the bookend's scene still as <Picture 1> "
                            "since 2026-09-26 (operator: the audio-in lane with "
                            "a picture, like the LTX audio-in lanes). Its own "
@@ -264,8 +252,7 @@ BOOKEND_SCENE_PROMPT_KNOWN_RED = {
                                    "three otr_cloud_low workflows select for "
                                    "every visual role, bookends included -- so "
                                    "this debt is live on shipped workflows. "
-                                   "OWED: an engine-appropriate formatter, "
-                                   "behind the probe A/B above.",
+                                   "OWED: an engine-appropriate formatter.",
 }
 
 

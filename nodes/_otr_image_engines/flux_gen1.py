@@ -30,63 +30,6 @@ except ImportError:  # pragma: no cover -- flat test imports
 
 log = logging.getLogger("OTR.image.flux_gen1")
 
-#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
-#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
-#: in the docs dir -- deliberately named WITHOUT a path prefix, because
-#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
-#: and a phrasing doc is not frame evidence. The directive is the only half that
-#: may ever reach a model or a prompt; 240 chars, hard, pinned by
-#: ``tests/test_prompt_style_directives.py``.
-PROMPT_STYLE_DIRECTIVE = (
-    "State every requirement positively; exclusions have no effect at this "
-    "guidance. One flowing sentence, subject first. Prefer specific nouns over "
-    "stacked modifiers. Name lighting and lens facts plainly. No tag lists, no "
-    "weight syntax."
-)
-
-#: Humans only -- never injected, never sent to a model.
-PROMPT_STYLE_NOTES = """\
-CONFIG AS SHIPPED: FLUX.1-dev fp8, 20 steps, cfg 1.0 with a FluxGuidance
-embedding of 3.5. Guidance-distilled.
-
-WHY THE DIRECTIVE LEADS WITH "POSITIVELY". At cfg 1.0 there is no
-classifier-free-guidance branch, so the negative prompt is INERT -- it is not
-weak, it is not consulted. That is the single most consequential fact about
-phrasing for this engine, because the habit it breaks is universal: a writer who
-has learned to push a look away by naming what to avoid gets literally nothing
-here, silently, with no error and no receipt. The replacement is to name the
-desired condition affirmatively -- "even overcast light" rather than "not harsh
-light" -- which is why the directive spends its first clause on it and its last
-on the CLIP-lineage syntax that also buys nothing.
-
-The FluxGuidance embedding at 3.5 is a learned conditioning input, not a cfg
-scale, so raising it does not restore a negative channel. Nothing a prompt can
-say re-enables one.
-
-EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
-2026-08-15 ruling, the RSS precedent). This lane came back CONFIRMED on every
-clause, which is worth recording precisely because it is the least interesting
-outcome and the easiest to leave unwritten:
-  * Negatives: FLUX.1-dev is guidance-distilled and does not support them.
-    Published guidance is to replace them with affirmative description -- write
-    "clean, sharp background" rather than trying to exclude "blurry background".
-    That is the directive's first clause, arrived at independently.
-  * Subject-first: guides say FLUX wants natural language WITH THE SUBJECT FIRST.
-  * Weight syntax: FLUX ignores parenthetical weight modifiers entirely, so the
-    "no weight syntax" clause is not stylistic tidiness -- those characters buy
-    literally nothing and cost budget.
-  * Our FluxGuidance of 3.5 sits exactly on the published sweet spot (3.5-4.0), and
-    guides warn that SD-habit values of 7.0+ produce oversaturated, artifact-heavy
-    output on this architecture. Nothing to change; good to know the number is not
-    accidental.
-
-PROVENANCE: the DIRECTIVE was authored by the driver from this engine's shipped
-configuration plus the five directive rules in the RESEARCH doc, then checked
-against the external research above and found to agree on all four clauses. Still
-NOT a measured finding on OUR lane. Treat the string as a hypothesis until the
-probe A/B runs at a fixed seed.
-"""
-
 
 @register
 class FluxGen1ImageEngine:
