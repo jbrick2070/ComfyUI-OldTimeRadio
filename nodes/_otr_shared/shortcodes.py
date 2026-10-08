@@ -30,7 +30,10 @@ reaches a filename. Measure with the values the code actually writes.
 
     OPERATOR RULING: four characters, with one deliberate exception -- the
     writer LLM may use five, so a row can carry both family and parameter
-    count (`q354b` = Qwen 3.5 4B). See MAX_CODE_LEN_BY_DIMENSION.
+    count (`q354b` = Qwen 3.5 4B). The LLM appears exactly once in a name, so
+    the extra character costs one unit (the measured name sits at 215 of 250
+    with it). Do not widen this to a habit: every additional character is
+    spent on every episode forever.
 
 CODES ARE UNIQUE WITHIN A DIMENSION, NOT GLOBALLY. The name has fixed positional
 slots, so ``csd2`` may mean cloud_seedance_2 in the video slot and
@@ -47,10 +50,6 @@ is not a key: never resolve a code back to an engine to decide behaviour, and
 never store one where the full name belongs. It exists so a path fits.
 """
 from __future__ import annotations
-
-#: Sentinels that are UI affordances rather than engine choices. They never
-#: reach a filename, so they deliberately have no code.
-SENTINELS = ("+ Add Custom Model",)
 
 LLM = {
     "Qwen/Qwen3.5-4B": "q354b",
@@ -240,25 +239,6 @@ DIMENSIONS = {
     "music_gen": MUSIC_GEN,
     "upscaler": UPSCALER,
 }
-
-#: Default cap. Operator ruling 2026-09-07: four characters, and the arithmetic
-#: in the module docstring is computed against it.
-MAX_CODE_LEN = 4
-
-#: Per-dimension exceptions, granted deliberately and one at a time.
-#:
-#: ``llm`` is 5 because a writer row has to carry BOTH a family and a parameter
-#: count to be readable -- `q354b` says Qwen 3.5 4B, where a four-character
-#: `q354` drops the B and reads like a version number. The LLM appears exactly
-#: once in a name, so the extra character costs one unit, and the measured name
-#: sits at 215 of 250 with it. Do not widen this to a habit: every additional
-#: character is spent on every episode forever.
-MAX_CODE_LEN_BY_DIMENSION = {"llm": 5}
-
-
-def max_code_len(dimension: str) -> int:
-    """The cap that applies to ``dimension``."""
-    return MAX_CODE_LEN_BY_DIMENSION.get(dimension, MAX_CODE_LEN)
 
 
 def _bare(value: str) -> str:

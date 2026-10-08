@@ -24,24 +24,23 @@ from nodes._otr_shared import shortcodes as SC  # noqa: E402
 
 
 class TableShapeTests(unittest.TestCase):
+    #: Operator ruling 2026-09-07: four characters, except the writer LLM which
+    #: is allowed five. Every extra character is spent on every episode forever,
+    #: so a raised cap is added HERE, one dimension at a time, and nowhere else.
+    CAP_BY_DIMENSION = {"llm": 5}
+
     def test_no_code_exceeds_its_dimension_cap(self):
         """Four characters, except the writer LLM which is allowed five so a row
         can carry family AND parameter count (`q354b` = Qwen 3.5 4B). The
         exception is per dimension and deliberate, not a general relaxation."""
         for name, table in SC.DIMENSIONS.items():
-            cap = SC.max_code_len(name)
+            cap = self.CAP_BY_DIMENSION.get(name, 4)
             for value, code in table.items():
                 self.assertLessEqual(
                     len(code), cap,
                     "%s: %r -> %r is %d chars; the cap for %s is %d"
                     % (name, value, code, len(code), name, cap))
                 self.assertTrue(code, "%s: %r has an empty code" % (name, value))
-
-    def test_only_the_llm_dimension_has_a_raised_cap(self):
-        """Every extra character is spent on every episode forever, so the
-        exception list is asserted here rather than left to drift."""
-        self.assertEqual(SC.MAX_CODE_LEN, 4)
-        self.assertEqual(SC.MAX_CODE_LEN_BY_DIMENSION, {"llm": 5})
 
     def test_codes_are_unique_within_each_dimension(self):
         """Global uniqueness is NOT required -- the name is positional, so the
@@ -275,8 +274,8 @@ class CompletenessTests(unittest.TestCase):
                 continue
             for value in entry[0]:
                 text = str(value)
-                if text in SC.SENTINELS:
-                    continue
+                if text == "+ Add Custom Model":
+                    continue  # a UI affordance, never an engine; it reaches no filename
                 if SC.code_for(dimension, text) == "unk":
                     if dimension == "llm" and self._is_uncurated_llm(text):
                         # Cache-discovered CausalLMs are the custom-model
