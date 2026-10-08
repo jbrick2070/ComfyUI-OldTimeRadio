@@ -56,7 +56,6 @@ class TestVocabulary:
     def test_only_model_refusal_is_sanctionable(self):
         """Narrow on purpose -- widening this re-opens the gate it guards."""
         assert _receipt.SANCTIONABLE_SKIP_REASON == "model_refusal"
-        assert _receipt.RECEIPT_STATUSES == {"ok", "sanctioned_gap"}
 
 
 class TestGapPredicates:

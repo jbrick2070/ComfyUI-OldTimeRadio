@@ -48,11 +48,6 @@ STATUS_OK = "ok"
 #: The model refused this card; the episode continues without it.
 STATUS_SANCTIONED_GAP = "sanctioned_gap"
 
-#: Every legal value of a receipt row's ``status`` field. A reader that sees
-#: anything else is looking at a row minted by code that predates this module
-#: or by a bug, and should fail loudly rather than guess.
-RECEIPT_STATUSES = frozenset({STATUS_OK, STATUS_SANCTIONED_GAP})
-
 #: The single skip reason that may be converted into a sanctioned gap
 #: (operator ruling 2026-08-22). Kept here next to the statuses so the
 #: narrowness travels with the vocabulary instead of living only in a comment
