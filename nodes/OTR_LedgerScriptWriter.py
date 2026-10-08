@@ -373,8 +373,10 @@ the air for 84 lines across 30 episodes."""
 #
 # The hardcoded _MODEL_CHOICES list was deleted in B2a; both writer slots
 # now build their dropdown live from `_otr_model_catalog.dropdown_choices()`,
-# which scans the local HF cache and applies the [NOT DOWNLOADED] suffix
-# to curated entries not yet on disk. The single legacy "model_id" widget
+# which scans the local HF cache; labels carry a size/fit badge. The old
+# [NOT DOWNLOADED] / [LOCAL HF] download-state suffixes are no longer
+# applied, but _strip_label_suffix still strips them from older saved
+# workflows. The single legacy "model_id" widget
 # was replaced by `creative_writing_model` + `technical_model`; broadcast
 # as two STRING output sockets at the end of RETURN_NAMES.
 # ---------------------------------------------------------------------------
@@ -2169,6 +2171,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         _creative_default = (
             _slot_a_id if _remote_on else _otr_model_catalog.fresh_llm_option()
         )
+        # ONE live HF-cache scan per schema request: both writer widgets
+        # offer the same list, each as its own copy. Deliberately not
+        # cached across requests -- a model downloaded since the last
+        # refresh must appear on the next one.
+        _llm_choices = _otr_model_catalog.dropdown_choices()
         _slot_a_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("a")
         _slot_b_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("b")
         # Comfy Credits slot pickers (2026-06-01). Choices come from the
@@ -2565,13 +2572,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # the seed); this widget lets the operator force it.
                 # S30 B2a: single model_id widget replaced by two slots.
                 # The catalog dropdown_choices() call scans the local HF
-                # cache live and applies display-only suffixes such as
-                # [LOCAL HF] and [NOT DOWNLOADED]. Labels are
+                # cache live; its labels carry a display-only size/fit
+                # badge (older saved workflows may still hold the retired
+                # [LOCAL HF] / [NOT DOWNLOADED] suffixes). Labels are
                 # stripped via _otr_model_catalog._strip_label_suffix
                 # before any consumer / meta stamp gets the value -- raw
                 # widget strings never reach downstream nodes.
                 "creative_writing_model": (
-                    _otr_model_catalog.dropdown_choices(),
+                    list(_llm_choices),
                     {
                         "default": _creative_default,
                         "tooltip": (
@@ -2591,7 +2599,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     },
                 ),
                 "technical_model": (
-                    _otr_model_catalog.dropdown_choices(),
+                    list(_llm_choices),
                     {
                         # The BADGED label, not the bare repo id -- see the
                         # note on _creative_default above. Measured 2026-09-14:
