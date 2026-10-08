@@ -197,40 +197,21 @@ def log_story_brief_disposition(meta: Any, consumer_id: str, log: Any) -> str:
 # dedupe, no style presets (3-model panel consensus cuts).
 # ---------------------------------------------------------------------------
 
-# STAGE 3 (multi-modal story schema, 2026-07-05): the four tail constants
-# below are the EXTRACTION FIXTURE for the sci_fi_radio visual-style pack
-# (nodes/visual_styles/sci_fi_radio.json is pinned byte-identical to them by
-# tests/test_visual_styles_3a.py). PRODUCTION prompt composition reads the
-# PACK via _otr_visual_styles.get_visual_style(meta) -- an AST guard bans any
-# other production read of these names. They also back the legacy no-style
-# lane of get_era_tail (style=None) so pre-Stage-3 tests keep passing.
-
-#: Era-tail fallback when the brief is absent/failed/empty (legacy
-#: _DEFAULT_ERA_TAIL, otr_video_plan.py).
-ERA_TAIL_DEFAULT = "timeless cinematic aesthetic"
-
-#: The film aesthetic tail (legacy _DEFAULT_STYLE_TAIL, otr_video_plan.py).
-STYLE_TAIL_DEFAULT = ("cinematic, 35mm film look, subtle film grain, "
-                      "volumetric lighting")
-
-#: BUG-411 restore (2026-06-14): the 6/5 FLUX image pipeline
-#: (visual/batch_flux_render.py) appended a RICHER cinematic grade than the
-#: shared STYLE_TAIL_DEFAULT. The image-pipeline rewrite into
-#: _otr_image_engines dropped the "anamorphic lens, heavy vignette, muted color
-#: grade, sharp focus" grade descriptors (legacy _DEFAULT_STYLE_SUFFIX), which
-#: flattened the look. Re-added on the IMAGE STILL path ONLY
-#: (compose_still_prompt, after STYLE_TAIL_DEFAULT); the shared tail that LTX
-#: scene clips + character video (style_tail=True) use stays untouched.
-IMAGE_GRADE_TAIL = ("anamorphic lens, heavy vignette, muted color grade, "
-                    "sharp focus")
-
-#: BUG-411: the 6/5 radio bookend / radio stills carried a broadcast-distress
-#: identity suffix appended to every radio prompt (legacy _RADIO_PROMPT_SUFFIX);
-#: the "35mm film grain, broadcast-distressed" grade IS the lush distressed
-#: tint the operator wants back. Re-added to the radio scene stills
-#: (open/announcer/music) so they read as a distressed period broadcast still.
-RADIO_BROADCAST_TAIL = ("35mm film grain, broadcast-distressed cinematic "
-                        "aesthetic, centered composition")
+# STAGE 3 (multi-modal story schema, 2026-07-05): every tail below is a field
+# of the RESOLVED visual-style pack (nodes/visual_styles/<id>.json, read through
+# _otr_visual_styles.get_visual_style(meta)), never a constant of this module:
+# ``era_tail`` (the fallback when the brief is absent/failed/empty),
+# ``positive_tail`` (the film aesthetic), ``image_grade_tail`` and
+# ``broadcast_tail``.
+#
+# BUG-411 restore (2026-06-14) is why the last two exist: the 6/5 FLUX image
+# pipeline appended a RICHER cinematic grade ("anamorphic lens, heavy vignette,
+# muted color grade, sharp focus") than the shared positive tail, and a
+# broadcast-distress identity suffix ("35mm film grain, broadcast-distressed")
+# to every radio still, and the image-pipeline rewrite into _otr_image_engines
+# dropped both. They are re-added on the IMAGE STILL path ONLY
+# (compose_still_prompt, after the positive tail); the shared tail that LTX
+# scene clips + character video (style_tail=True) use stays untouched.
 
 #: The render-constraint clause the LTX scene prompts carry; preserved
 #: verbatim through max_chars trimming.
@@ -251,24 +232,22 @@ def _resolve_style(meta: Any, style: Any = None):
     return get_visual_style(meta)
 
 
-def get_era_tail(meta: Any, profile: str = "full", style: Any = None) -> str:
+def get_era_tail(meta: Any, profile: str = "full", *, style: Any) -> str:
     """The brief-derived era/aesthetic tail; NEVER empty*, never raises.
 
-    Stage 3: ``style`` is the RESOLVED VisualStyle whose ``era_tail``
-    replaces the :data:`ERA_TAIL_DEFAULT` fallback string EXACTLY --
-    including a pack-declared empty string ("never empty" is a
+    Stage 3: ``style`` (required) is the RESOLVED VisualStyle whose
+    ``era_tail`` is the fallback string when the brief gives nothing,
+    EXACTLY -- including a pack-declared empty string ("never empty" is a
     sci_fi_radio-pack property, not a helper invariant; r4 pin). This
     function does NO loader lookup itself (the composer entry resolves once
-    and passes the style down); ``style=None`` is the LEGACY lane and keeps
-    the byte-identical ERA_TAIL_DEFAULT fallback -- production composers
-    always pass ``style`` (AST-pinned).
+    and passes the style down).
 
     ``profile="full"`` (default; every pre-still-spine call site, behavior
     unchanged) ports the legacy ``_resolve_era_tail`` precedence (Sprint
     8.7): ``atmosphere_line`` -> ``visual_palette`` (top 3) -> v1
-    lighting+atmosphere (:func:`get_story_brief_lighting`) -> the
-    :data:`ERA_TAIL_DEFAULT` constant. v2 fields come through the canonical
-    brief reader; every failure path degrades, fail-soft.
+    lighting+atmosphere (:func:`get_story_brief_lighting`) -> the pack's
+    ``era_tail``. v2 fields come through the canonical brief reader; every
+    failure path degrades, fail-soft.
 
     ``profile="still"`` (still-spine ST-1): the TRIMMED tail for still-image
     prompts -- atmosphere line + palette top-2 + lighting and atmosphere terms, capped at
@@ -277,7 +256,7 @@ def get_era_tail(meta: Any, profile: str = "full", style: Any = None) -> str:
     palette color (e.g. Mars = red) comes through HERE by design -- the
     still profile trims the tail, never deletes it.
     """
-    _era_default = style.era_tail if style is not None else ERA_TAIL_DEFAULT
+    _era_default = style.era_tail
     atmosphere_line = ""
     palette: list[str] = []
     try:
@@ -414,15 +393,7 @@ def radio_form_from_meta(meta: Any) -> str:
 
 # Chunk A1 (visual-style TOTAL COVERAGE, 2026-07-05): the open-subject
 # TEMPLATES are pack-owned (VisualStyle.open_subjects, keys
-# {synthetic, announcer, default}, each a {form} template). These constants
-# are the sci_fi_radio EXTRACTION FIXTURES (r1 AG S1: inline literals
-# extracted FIRST) + the legacy no-style lane of get_open_subject --
-# production callers always pass style= (AST-pinned).
-OPEN_SUBJECT_SYNTHETIC_DEFAULT = ("{form} warming up on a table, glowing "
-                                  "dials and tubes, warm filament glow")
-OPEN_SUBJECT_ANNOUNCER_DEFAULT = ("{form} in a broadcast booth, glowing "
-                                  "warmly, lit dials and tubes")
-OPEN_SUBJECT_DEFAULT_DEFAULT = "{form} glowing warmly, vacuum tubes and dials"
+# {synthetic, announcer, default}, each a {form} template).
 
 
 def open_subject_key(role: str, synthetic: bool) -> str:
@@ -437,8 +408,7 @@ def open_subject_key(role: str, synthetic: bool) -> str:
     return "default"
 
 
-def get_open_subject(role: str, synthetic: bool, meta: Any = None,
-                     style: Any = None) -> str:
+def get_open_subject(role: str, synthetic: bool, meta: Any, style: Any) -> str:
     """The CONCRETE, FACELESS radio subject for an OPEN / bookend beat (r5b
     operator catch: image models render narrative loglines as murk -- opens lead
     with a picture, never a sentence).
@@ -447,28 +417,19 @@ def get_open_subject(role: str, synthetic: bool, meta: Any = None,
     :func:`radio_form_from_meta` (deterministic, no LLM), so a non-1940s brief no
     longer opens on the hardcoded 1940s set. FACELESS by contract -- ONLY HuMo
     gets a face; this still is what the audio-in engines / still_pan / still_flat
-    show for the bookends. Pure; never empty. ``meta`` optional (bare -> neutral
-    tube radio form).
+    show for the bookends. Pure; never empty. ``meta`` may be empty or None (bare
+    -> neutral tube radio form).
 
     Chunk A1: the subject TEMPLATE comes from the resolved ``style`` pack's
     ``open_subjects`` map -- ``synthetic`` -> key "synthetic", role
     "announcer_visual" -> key "announcer" (r4 AG M2), everything else -> key
     "default". The FORM stays a brief-axis value interpolated here (style x
-    form would double the authoring matrix). ``style=None`` is the LEGACY
-    fixture lane (the extracted constants above, byte-identical); production
-    callers pass the ALREADY-RESOLVED style (helpers never re-resolve --
-    r2 codex S1 + AG M3)."""
+    form would double the authoring matrix). ``style`` is required: callers
+    pass the ALREADY-RESOLVED style (helpers never re-resolve -- r2 codex S1 +
+    AG M3)."""
     form = radio_form_from_meta(meta or {})
     key = open_subject_key(role, synthetic)
-    if style is not None:
-        template = style.open_subjects[key]
-    else:
-        template = {
-            "synthetic": OPEN_SUBJECT_SYNTHETIC_DEFAULT,
-            "announcer": OPEN_SUBJECT_ANNOUNCER_DEFAULT,
-            "default": OPEN_SUBJECT_DEFAULT_DEFAULT,
-        }[key]
-    return template.format(form=form)
+    return style.open_subjects[key].format(form=form)
 
 
 #: Framing hints (layer 3 of the 5-layer still composer). The macro framing

@@ -11,19 +11,17 @@ Pins:
      budget; new-field non-empty rule (scene_instruction_look exempt);
      forbidden-terms lint over ALL new leaves; a v1 pack fails load LOUD
      naming the path + "upgrade to v2".
-  2. EXTRACTION FIXTURES: sci_fi_radio.json's v2 fields == the Python
-     fixture constants byte-for-byte (helpers open subjects; the motion
-     registers are pinned byte for byte in tests/test_visual_styles_a2.py).
-     The image-prompt module keeps no fixture: it reads the pack alone.
+  2. EXTRACTION FIXTURES: none remain in Python. The motion registers are
+     pinned byte for byte in tests/test_visual_styles_a2.py; the image-prompt
+     module and the brief helpers read the pack alone.
   3. SEAM BYTE-IDENTITY (the A1 build gate, r2 codex CUT: seam-level string
      equality, NOT full-episode): every re-routed composer's OUTPUT under a
      default meta equals its pack-composed expectation -- radio-host x3
      dispatch arms, open subjects x3, the LLM instruction texts, the
      deterministic portrait fallback.
   4. GEOMETRY guards: *_GEOMETRY constants carry no pack look vocabulary.
-  5. AST guards: no production reads of the open-subject defaults outside
-     get_open_subject's legacy lane; every production get_open_subject call
-     passes style=.
+  5. AST guard: the character request builders read the pack's instruction
+     look.
   6. Dormant-field pin: the 4 non-default packs carry the sci-fi default
      values for every NEW field (behavior identical to the tails-only v1
      delta until chunk B authors them).
@@ -175,20 +173,6 @@ class TestLoaderV2:
 
 
 # ---------------------------------------------------------------------------
-# 2. Extraction fixtures -- pack values == Python fixture constants
-# ---------------------------------------------------------------------------
-class TestExtractionFixtures:
-    def test_open_subjects(self):
-        s = vs.resolve_visual_style("sci_fi_radio")
-        assert s.open_subjects["synthetic"] == \
-            helpers.OPEN_SUBJECT_SYNTHETIC_DEFAULT
-        assert s.open_subjects["announcer"] == \
-            helpers.OPEN_SUBJECT_ANNOUNCER_DEFAULT
-        assert s.open_subjects["default"] == \
-            helpers.OPEN_SUBJECT_DEFAULT_DEFAULT
-
-
-# ---------------------------------------------------------------------------
 # 3. Seam byte-identity (default meta -> pre-change output)
 # ---------------------------------------------------------------------------
 class TestSeamByteIdentity:
@@ -243,8 +227,6 @@ class TestSeamByteIdentity:
         for role, syn, expected in cases:
             assert helpers.get_open_subject(role, syn, _META_BRIEF,
                                             style=s) == expected
-            assert helpers.get_open_subject(role, syn,
-                                            _META_BRIEF) == expected
 
     def test_llm_instruction_texts_byte_identical(self):
         s = vs.resolve_visual_style("sci_fi_radio")
@@ -302,11 +284,6 @@ class TestGeometryGuards:
 # 5. AST guards
 # ---------------------------------------------------------------------------
 _IMGP = _NODES / "otr_meta_brief_image_prompt.py"
-_HELPERS = _NODES / "_otr_story_brief_helpers.py"
-
-_OPEN_DEFAULTS = ("OPEN_SUBJECT_SYNTHETIC_DEFAULT",
-                  "OPEN_SUBJECT_ANNOUNCER_DEFAULT",
-                  "OPEN_SUBJECT_DEFAULT_DEFAULT")
 
 
 def _function_def(tree: ast.Module, name: str) -> ast.FunctionDef:
@@ -317,38 +294,6 @@ def _function_def(tree: ast.Module, name: str) -> ast.FunctionDef:
 
 
 class TestAstGuards:
-    def test_open_subject_defaults_read_only_in_get_open_subject(self):
-        tree = ast.parse(_HELPERS.read_text(encoding="utf-8"))
-        fn = _function_def(tree, "get_open_subject")
-        allowed = {n.lineno for n in ast.walk(fn)
-                   if isinstance(n, ast.Name) and n.id in _OPEN_DEFAULTS}
-        offenders = []
-        for node in ast.walk(tree):
-            if (isinstance(node, ast.Name)
-                    and isinstance(node.ctx, ast.Load)
-                    and node.id in _OPEN_DEFAULTS
-                    and node.lineno not in allowed):
-                offenders.append(f"{node.lineno}:{node.id}")
-        assert not offenders
-
-    def test_production_get_open_subject_callers_pass_style(self):
-        offenders = []
-        for path in _NODES.rglob("*.py"):
-            rel = path.relative_to(_NODES).as_posix()
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            for call in ast.walk(tree):
-                if not isinstance(call, ast.Call):
-                    continue
-                name = getattr(call.func, "id",
-                               getattr(call.func, "attr", ""))
-                if name != "get_open_subject":
-                    continue
-                if "style" not in {k.arg for k in call.keywords}:
-                    offenders.append(f"{rel}:{call.lineno}")
-        assert not offenders, (
-            f"production get_open_subject callers missing style=: "
-            f"{offenders}")
-
     def test_char_request_builders_read_pack_instruction_look(self):
         tree = ast.parse(_IMGP.read_text(encoding="utf-8"))
         fn = _function_def(tree, "_build_char_prompt_request")

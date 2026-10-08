@@ -146,12 +146,14 @@ class TestSurfaceDeltas:
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
     def test_open_subjects_delta(self, style_id):
         s = vs.resolve_visual_style(style_id)
+        d = vs.resolve_visual_style("sci_fi_radio")
         for role, syn in (("music_visual", True),
                           ("announcer_visual", False),
                           ("music_visual", False)):
             styled = helpers.get_open_subject(role, syn, _META_BRIEF,
                                               style=s)
-            default = helpers.get_open_subject(role, syn, _META_BRIEF)
+            default = helpers.get_open_subject(role, syn, _META_BRIEF,
+                                               style=d)
             assert styled != default
             # the brief-driven FORM survives inside the styled template
             assert helpers.radio_form_from_meta(_META_BRIEF) in styled

@@ -5,21 +5,16 @@ sci_fi_radio byte-identical chokepoint routing (STAGE3_SUBPLAN v5 FINAL,
 kibitz r1-r4 + Sonnet 3-lens fan-out).
 
 Pins:
-  1. EXTRACTION FIXTURE: nodes/visual_styles/sci_fi_radio.json tails ==
-     the _otr_story_brief_helpers constants, byte-for-byte.
-  2. Loader: lazy (zero import-time I/O), fail-loud matrix, sweep,
+  1. Loader: lazy (zero import-time I/O), fail-loud matrix, sweep,
      schema_version pin, style_id regex + path coordinate, load-time
      authored-vocabulary preservation, _clear_caches, deterministic list_style_ids
      with sci_fi_radio always a valid choice.
-  3. BYTE-IDENTITY MATRIX: default meta -> composed prompts identical to
-     constants-built expectations across era profiles + still kinds.
-  4. FAIL-LOUD: meta["visual_style"]=unknown raises UnknownVisualStyleError
+  2. DEFAULT-PACK MATRIX: default meta -> composed prompts carry the
+     sci_fi_radio pack's tails across era profiles + still kinds.
+  3. FAIL-LOUD: meta["visual_style"]=unknown raises UnknownVisualStyleError
      through every routed composer entry (no swallow).
-  5. AST GUARDS: (a) no production module reads the 4 tail constants
-     outside their definitions in _otr_story_brief_helpers.py; (b) no
-     visual-prompt seam wraps a style call in a bare except-Exception
-     (ImportError-only shims allowed); (c) production get_era_tail callers
-     pass style=.
+  4. AST GUARD: no visual-prompt seam wraps a style call in a bare
+     except-Exception (ImportError-only shims allowed).
 """
 from __future__ import annotations
 
@@ -37,9 +32,6 @@ _REPO = Path(__file__).resolve().parent.parent
 _NODES = _REPO / "nodes"
 _PACK = _NODES / "visual_styles" / "sci_fi_radio.json"
 
-_TAIL_NAMES = ("ERA_TAIL_DEFAULT", "STYLE_TAIL_DEFAULT",
-               "IMAGE_GRADE_TAIL", "RADIO_BROADCAST_TAIL")
-
 
 @pytest.fixture(autouse=True)
 def _fresh_registry():
@@ -49,27 +41,7 @@ def _fresh_registry():
 
 
 # ---------------------------------------------------------------------------
-# 1. Extraction fixture -- byte identity JSON <-> constants
-# ---------------------------------------------------------------------------
-class TestExtractionFixture:
-    def test_pack_tails_byte_identical_to_constants(self):
-        raw = json.loads(_PACK.read_text(encoding="utf-8"))
-        assert raw["positive_tail"] == helpers.STYLE_TAIL_DEFAULT
-        assert raw["image_grade_tail"] == helpers.IMAGE_GRADE_TAIL
-        assert raw["broadcast_tail"] == helpers.RADIO_BROADCAST_TAIL
-        assert raw["era_tail"] == helpers.ERA_TAIL_DEFAULT
-        assert raw["allow_radio_tails"] is True
-
-    def test_loaded_default_matches_constants(self):
-        style = vs.resolve_visual_style("sci_fi_radio")
-        assert style.positive_tail == helpers.STYLE_TAIL_DEFAULT
-        assert style.image_grade_tail == helpers.IMAGE_GRADE_TAIL
-        assert style.broadcast_tail == helpers.RADIO_BROADCAST_TAIL
-        assert style.era_tail == helpers.ERA_TAIL_DEFAULT
-
-
-# ---------------------------------------------------------------------------
-# 2. Loader contract
+# 1. Loader contract
 # ---------------------------------------------------------------------------
 class TestLoader:
     def test_lazy_no_import_time_io(self, monkeypatch):
@@ -188,7 +160,7 @@ class TestLoader:
 
 
 # ---------------------------------------------------------------------------
-# 3. Byte-identity matrix (default meta -> unchanged output)
+# 2. Default-pack matrix (default meta -> the sci_fi_radio pack's tails)
 # ---------------------------------------------------------------------------
 _META_EMPTY: dict = {}
 _META_BRIEF = {
@@ -201,18 +173,6 @@ _META_BRIEF = {
 
 
 class TestByteIdentityMatrix:
-    @pytest.mark.parametrize("profile", ["full", "still", "portrait"])
-    @pytest.mark.parametrize("meta", [_META_EMPTY, _META_BRIEF])
-    def test_get_era_tail_matrix(self, profile, meta):
-        legacy = helpers.get_era_tail(meta, profile=profile)
-        styled = helpers.get_era_tail(
-            meta, profile=profile,
-            style=vs.resolve_visual_style("sci_fi_radio"))
-        via_default = helpers.get_era_tail(meta, profile=profile,
-                                           style=None)
-        assert styled == legacy
-        assert via_default == legacy
-
     @pytest.mark.parametrize("kind,role", [
         ("scene_open", "music_visual"),
         ("scene_beat", "announcer_visual"),
@@ -224,18 +184,19 @@ class TestByteIdentityMatrix:
         ce = {"appearance": "a wiry engineer in a patched flight suit"}
         out = helpers.compose_still_prompt(
             meta, kind=kind, role=role, char_entry=ce)
-        # Reconstruct the expectation from the CONSTANTS (the fixture).
+        # The entry seam resolves the default pack; the threaded style must
+        # give the same string, and the pack's own tails must be in it.
+        style = vs.resolve_visual_style("sci_fi_radio")
         expected = helpers.compose_still_prompt(
-            meta, kind=kind, role=role, char_entry=ce,
-            style=vs.resolve_visual_style("sci_fi_radio"))
+            meta, kind=kind, role=role, char_entry=ce, style=style)
         assert out == expected
-        assert helpers.STYLE_TAIL_DEFAULT in out
+        assert style.positive_tail in out
         if kind not in ("portrait",):
-            assert helpers.IMAGE_GRADE_TAIL in out
+            assert style.image_grade_tail in out
         if kind in ("scene_open", "scene_beat"):
-            assert helpers.RADIO_BROADCAST_TAIL in out
+            assert style.broadcast_tail in out
         if kind == "scene_character":
-            assert helpers.RADIO_BROADCAST_TAIL not in out
+            assert style.broadcast_tail not in out
 
     @pytest.mark.parametrize("style_tail", [True, False])
     @pytest.mark.parametrize("era_profile", ["full", "still", "portrait"])
@@ -243,7 +204,8 @@ class TestByteIdentityMatrix:
         out = helpers.finish_visual_prompt(
             _META_BRIEF, "a glowing tube radio on a bench",
             style_tail=style_tail, era_profile=era_profile)
-        expected_tail_present = helpers.STYLE_TAIL_DEFAULT in out
+        positive_tail = vs.resolve_visual_style("sci_fi_radio").positive_tail
+        expected_tail_present = positive_tail in out
         assert expected_tail_present == style_tail
         assert out.startswith("a glowing tube radio on a bench")
 
@@ -254,11 +216,12 @@ class TestByteIdentityMatrix:
             {"visual_style": "no_such_style"}, "") == ""
 
     def test_radio_host_and_plate_and_mesh_unchanged(self):
+        grade = vs.resolve_visual_style("sci_fi_radio").image_grade_tail
         host = imgp.build_radio_host_prompt(_META_BRIEF, "portrait",
                                             radio_host_style="radio_object")
-        assert helpers.IMAGE_GRADE_TAIL in host
+        assert grade in host
         plate = imgp._compose_background_plate_prompt(_META_BRIEF, "mars post")
-        assert helpers.IMAGE_GRADE_TAIL in plate
+        assert grade in plate
         assert plate.endswith(helpers.NO_TEXT_CLAUSE)
         mesh = imgp._compose_mesh_fodder_prompt(
             _META_BRIEF, None, {}, "mars post", "music_visual")
@@ -266,7 +229,7 @@ class TestByteIdentityMatrix:
 
 
 # ---------------------------------------------------------------------------
-# 4. Fail-loud through the composer entries (no swallow)
+# 3. Fail-loud through the composer entries (no swallow)
 # ---------------------------------------------------------------------------
 _BAD_META = {"visual_style": "no_such_style"}
 
@@ -303,7 +266,7 @@ class TestFailLoudThroughComposers:
 
 
 # ---------------------------------------------------------------------------
-# 5. AST guards
+# 4. AST guard
 # ---------------------------------------------------------------------------
 _PROMPT_MODULES = [
     _NODES / "otr_meta_brief_image_prompt.py",
@@ -317,34 +280,7 @@ _STYLE_CALL_NAMES = {"finish_visual_prompt", "get_era_tail",
                      "_resolve_style", "resolve_visual_style"}
 
 
-def _production_py_files():
-    for p in _NODES.rglob("*.py"):
-        yield p
-
-
 class TestAstGuards:
-    def test_no_production_reads_of_tail_constants(self):
-        offenders = []
-        for path in _production_py_files():
-            rel = path.relative_to(_NODES).as_posix()
-            if rel == "_otr_story_brief_helpers.py":
-                continue  # definitions + the legacy no-style lane
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Name) and node.id in _TAIL_NAMES:
-                    offenders.append(f"{rel}:{node.lineno}:{node.id}")
-                elif isinstance(node, ast.ImportFrom):
-                    # loop var named `imp` NOT `alias` -- the B7 forbidden
-                    # sweep flags `alias` as a runtime marker (CW-6 gotcha).
-                    for imp in node.names:
-                        if imp.name in _TAIL_NAMES:
-                            offenders.append(
-                                f"{rel}:{node.lineno}:import {imp.name}")
-        assert not offenders, (
-            "production reads of the tail constants (must route through the "
-            f"visual-style pack): {offenders}"
-        )
-
     def test_no_bare_except_around_style_calls(self):
         offenders = []
         for path in _PROMPT_MODULES:
@@ -372,27 +308,4 @@ class TestAstGuards:
         assert not offenders, (
             "style calls must never be swallowed (no-fallback law): "
             f"{offenders}"
-        )
-
-    def test_production_get_era_tail_callers_pass_style(self):
-        # Every production get_era_tail call outside the helpers module
-        # itself must pass style= (the legacy no-style lane is tests-only).
-        offenders = []
-        for path in _production_py_files():
-            rel = path.relative_to(_NODES).as_posix()
-            if rel in ("_otr_story_brief_helpers.py",):
-                continue
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            for call in ast.walk(tree):
-                if not isinstance(call, ast.Call):
-                    continue
-                name = getattr(call.func, "id",
-                               getattr(call.func, "attr", ""))
-                if name != "get_era_tail":
-                    continue
-                kwargs = {k.arg for k in call.keywords}
-                if "style" not in kwargs:
-                    offenders.append(f"{rel}:{call.lineno}")
-        assert not offenders, (
-            f"production get_era_tail callers missing style=: {offenders}"
         )

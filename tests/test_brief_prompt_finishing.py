@@ -19,6 +19,11 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from nodes import _otr_story_brief_helpers as sbh  # noqa: E402
 from nodes import otr_meta_brief_image_prompt as mbp  # noqa: E402
+from nodes._otr_visual_styles import get_visual_style  # noqa: E402
+
+# The tails live on the resolved pack; a meta with no visual_style is the
+# sci_fi_radio default, which is what every meta below resolves to.
+_STYLE = get_visual_style({})
 
 
 _OK_META = {
@@ -57,9 +62,9 @@ def _prompt_only_lanes_get_a_still(monkeypatch, tmp_path):
 
 
 def test_era_tail_default_when_brief_absent():
-    assert sbh.get_era_tail({}) == sbh.ERA_TAIL_DEFAULT
-    assert sbh.get_era_tail({"story_brief_status": "failed"}) \
-        == sbh.ERA_TAIL_DEFAULT
+    assert sbh.get_era_tail({}, style=_STYLE) == _STYLE.era_tail
+    assert sbh.get_era_tail({"story_brief_status": "failed"}, style=_STYLE) \
+        == _STYLE.era_tail
 
 
 def test_failed_brief_still_finishes_a_valid_non_authoring_visual_prompt():
@@ -72,12 +77,12 @@ def test_failed_brief_still_finishes_a_valid_non_authoring_visual_prompt():
     }
     out = sbh.finish_visual_prompt(failed, "cinematic establishing shot")
     assert out.startswith("cinematic establishing shot")
-    assert sbh.ERA_TAIL_DEFAULT in out
-    assert sbh.STYLE_TAIL_DEFAULT in out
+    assert _STYLE.era_tail in out
+    assert _STYLE.positive_tail in out
 
 
 def test_era_tail_uses_v1_lighting_when_ok():
-    tail = sbh.get_era_tail(_OK_META)
+    tail = sbh.get_era_tail(_OK_META, style=_STYLE)
     assert "lantern glow" in tail and "uneasy" in tail
 
 
@@ -85,7 +90,7 @@ def test_finish_appends_era_and_style_tails():
     out = sbh.finish_visual_prompt(_OK_META, "a keeper at the rail")
     assert out.startswith("a keeper at the rail")
     assert "lantern glow" in out
-    assert sbh.STYLE_TAIL_DEFAULT.split(",")[1].strip() in out  # 35mm film look
+    assert _STYLE.positive_tail.split(",")[1].strip() in out  # 35mm film look
 
 
 def test_finish_empty_prompt_stays_empty():
@@ -205,7 +210,7 @@ def test_finish_era_profile_still_uses_trimmed_tail():
     out = sbh.finish_visual_prompt(_OK_META, "a keeper at the rail",
                                    style_tail=False, era_profile="still")
     assert out.startswith("a keeper at the rail")
-    tail = sbh.get_era_tail(_OK_META, profile="still")
+    tail = sbh.get_era_tail(_OK_META, profile="still", style=_STYLE)
     assert out.endswith(tail)
 
 
@@ -226,7 +231,7 @@ def test_ltx_scene_prompt_uses_still_profile_tail(monkeypatch):
         "visual_palette": ["rust red", "burnt orange", "deep crimson"],
         "atmosphere_line": "rust-red dust hangs over the flats",
     }
-    still_tail = sbh.get_era_tail(meta, profile="still")
+    still_tail = sbh.get_era_tail(meta, profile="still", style=_STYLE)
     ledger = {"meta": meta, "lines": []}
     shot = {"shot_id": "shot_b009", "source_line_ids": [],
             "role": "retired_role_a", "engine_id": "ltx25_video",
@@ -238,7 +243,7 @@ def test_ltx_scene_prompt_uses_still_profile_tail(monkeypatch):
     # end, so assert the still tail's HEAD made it in right after the clauses
     # and the full top-3 palette did NOT ride along whole).
     assert still_tail.split(",")[0] in p
-    full_tail = sbh.get_era_tail(meta, profile="full")
+    full_tail = sbh.get_era_tail(meta, profile="full", style=_STYLE)
     if full_tail != still_tail:
         assert full_tail not in p
 

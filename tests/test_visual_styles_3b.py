@@ -74,6 +74,9 @@ _META_BRIEF = {
     "episode_title": "Signal in the Dust",
 }
 
+#: The default pack: the tails every non-default pack is compared against.
+_DEFAULT = vs.resolve_visual_style("sci_fi_radio")
+
 
 def _meta_for(style_id: str) -> dict:
     m = dict(_META_BRIEF)
@@ -139,7 +142,7 @@ class TestForcedMetaDeltas:
         style = vs.resolve_visual_style(style_id)
         assert styled_out != default_out
         assert styled_out.endswith(style.positive_tail)
-        assert helpers.STYLE_TAIL_DEFAULT not in styled_out
+        assert _DEFAULT.positive_tail not in styled_out
 
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
     def test_compose_still_prompt_scene_beat_delta(self, style_id):
@@ -152,7 +155,7 @@ class TestForcedMetaDeltas:
         assert style.positive_tail in styled_out
         # allow_radio_tails=false on every non-default pack: the broadcast
         # tail (default OR pack) must be absent.
-        assert helpers.RADIO_BROADCAST_TAIL not in styled_out
+        assert _DEFAULT.broadcast_tail not in styled_out
         if style.broadcast_tail:
             assert style.broadcast_tail not in styled_out
 
@@ -176,8 +179,8 @@ class TestForcedMetaDeltas:
         style = vs.resolve_visual_style(style_id)
         d, s = _portrait(default_payload), _portrait(styled_payload)
         assert d != s
-        assert helpers.IMAGE_GRADE_TAIL in d
-        assert helpers.IMAGE_GRADE_TAIL not in s
+        assert _DEFAULT.image_grade_tail in d
+        assert _DEFAULT.image_grade_tail not in s
         if style.image_grade_tail:
             assert style.image_grade_tail in s
 
@@ -188,7 +191,7 @@ class TestForcedMetaDeltas:
         s = imgp.build_radio_host_prompt(_meta_for(style_id), "portrait",
                                          radio_host_style="radio_object")
         assert d != s
-        assert helpers.IMAGE_GRADE_TAIL not in s
+        assert _DEFAULT.image_grade_tail not in s
 
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
     def test_background_plate_and_mesh_delta(self, style_id):
@@ -212,7 +215,7 @@ class TestForcedMetaDeltas:
         style = vs.resolve_visual_style(style_id)
         assert style.positive_tail.split(",", 1)[0] in s_mesh
         assert style.positive_tail.split(",", 1)[0] in s_mesh_empty
-        if style.era_tail != helpers.ERA_TAIL_DEFAULT:
+        if style.era_tail != _DEFAULT.era_tail:
             assert d_mesh_empty != s_mesh_empty
         assert imgp.MESH_FODDER_POS_SCAFFOLD in d_mesh and \
             imgp.MESH_FODDER_POS_SCAFFOLD in s_mesh
@@ -225,10 +228,10 @@ class TestForcedMetaDeltas:
         s = imgp.compose_still_word_prompt(
             _meta_for(style_id), "character_video", line)
         style = vs.resolve_visual_style(style_id)
-        if style.image_grade_tail != helpers.IMAGE_GRADE_TAIL:
+        if style.image_grade_tail != _DEFAULT.image_grade_tail:
             assert d != s
         if not style.image_grade_tail:
-            assert helpers.IMAGE_GRADE_TAIL not in s
+            assert _DEFAULT.image_grade_tail not in s
 
 
 # ---------------------------------------------------------------------------
@@ -262,5 +265,5 @@ class TestHygiene:
         implicit = helpers.compose_still_prompt(
             dict(_META_BRIEF), kind="scene_beat", role="announcer_visual")
         assert forced == implicit
-        assert helpers.STYLE_TAIL_DEFAULT in implicit
-        assert helpers.RADIO_BROADCAST_TAIL in implicit
+        assert _DEFAULT.positive_tail in implicit
+        assert _DEFAULT.broadcast_tail in implicit

@@ -585,8 +585,8 @@ def test_passpm_no_llm_is_template_lane():
     assert c["text_prompt"].startswith(
         sl._subject_anchor("a tall weathered spacer with a scar"))
     assert _template in c["text_prompt"]
-    from nodes._otr_story_brief_helpers import STYLE_TAIL_DEFAULT
-    assert c["text_prompt"].endswith(STYLE_TAIL_DEFAULT)
+    from nodes._otr_visual_styles import get_visual_style
+    assert c["text_prompt"].endswith(get_visual_style(led["meta"]).positive_tail)
     assert c["prompt_hash"] == sl._content_hash(c["text_prompt"])
 
 

@@ -21,6 +21,11 @@ from __future__ import annotations
 import pytest
 
 from nodes import _otr_story_brief_helpers as helpers
+from nodes._otr_visual_styles import get_visual_style
+
+# The tails and the open-subject templates are fields of the resolved pack; a
+# meta with no visual_style (every meta below) is the sci_fi_radio default.
+_STYLE = get_visual_style({})
 
 
 def _meta_ok() -> dict:
@@ -47,19 +52,19 @@ class TestGetOpenSubject:
     # radio FORM (radio_form_from_meta), is FACELESS, and carries no hardcoded
     # 1940s. _meta_ok() maps to no keyword -> the neutral tube-radio default.
     def test_synthetic_open_wording(self):
-        s = helpers.get_open_subject("music_visual", True, _meta_ok())
+        s = helpers.get_open_subject("music_visual", True, _meta_ok(), _STYLE)
         assert s.startswith(helpers.radio_form_from_meta(_meta_ok()))
         assert "warming up" in s and "glowing dials and tubes" in s
         assert "1940s" not in s
 
     def test_announcer_wording(self):
-        s = helpers.get_open_subject("announcer_visual", False, _meta_ok())
+        s = helpers.get_open_subject("announcer_visual", False, _meta_ok(), _STYLE)
         assert s.startswith(helpers.radio_form_from_meta(_meta_ok()))
         assert "lit dials and tubes" in s
         assert "1940s" not in s
 
     def test_other_open_wording(self):
-        s = helpers.get_open_subject("music_visual", False, _meta_ok())
+        s = helpers.get_open_subject("music_visual", False, _meta_ok(), _STYLE)
         assert s.startswith(helpers.radio_form_from_meta(_meta_ok()))
         assert "glowing warmly" in s
         assert "1940s" not in s
@@ -67,18 +72,19 @@ class TestGetOpenSubject:
     def test_form_follows_brief(self):
         # A non-1940s brief drives the FORM (the whole point of the feature).
         space = {"story_brief_terms": {"setting": ["an orbital docking bay"]}}
-        s = helpers.get_open_subject("music_visual", True, space)
+        s = helpers.get_open_subject("music_visual", True, space, _STYLE)
         assert "space-station communications console" in s
 
     def test_synthetic_wins_over_role(self):
-        assert helpers.get_open_subject("announcer_visual", True, _meta_ok()) == \
-            helpers.get_open_subject("music_visual", True, _meta_ok())
+        assert helpers.get_open_subject(
+            "announcer_visual", True, _meta_ok(), _STYLE) == \
+            helpers.get_open_subject("music_visual", True, _meta_ok(), _STYLE)
 
     def test_pure_and_total(self):
-        # never raises, never empty, on any junk input (meta optional)
+        # never raises, never empty, on any junk input (meta may be None)
         for role in ("", None, "retired_role_a", 7):
             for syn in (True, False):
-                assert helpers.get_open_subject(role, syn)
+                assert helpers.get_open_subject(role, syn, None, _STYLE)
 
 
 class TestDriverParity:
@@ -103,7 +109,7 @@ class TestDriverParity:
     ])
     def test_still_prompt_leads_with_driver_subject(self, kind, role, synthetic):
         meta = _meta_ok()
-        subject = helpers.get_open_subject(role, synthetic, meta)
+        subject = helpers.get_open_subject(role, synthetic, meta, _STYLE)
         still = helpers.compose_still_prompt(
             meta, kind=kind, role=role, beat_id="b000")
         assert still.startswith(subject)
@@ -117,10 +123,11 @@ class TestDriverParity:
 class TestEraTailProfiles:
     def test_full_profile_unchanged_default(self):
         meta = _meta_ok()
-        assert helpers.get_era_tail(meta) == helpers.get_era_tail(meta, "full")
+        assert helpers.get_era_tail(meta, style=_STYLE) == \
+            helpers.get_era_tail(meta, "full", style=_STYLE)
 
     def test_still_profile_content(self):
-        tail = helpers.get_era_tail(_meta_ok(), profile="still")
+        tail = helpers.get_era_tail(_meta_ok(), profile="still", style=_STYLE)
         assert "thin red dust hangs in the dusk air" in tail
         assert "rust red" in tail and "burnt amber" in tail
         assert "steel grey" not in tail            # palette top-2 only
@@ -130,13 +137,13 @@ class TestEraTailProfiles:
     def test_still_profile_cap(self):
         meta = _meta_ok()
         meta["atmosphere_line"] = "x" * 60 + " " + "y" * 80
-        tail = helpers.get_era_tail(meta, profile="still")
+        tail = helpers.get_era_tail(meta, profile="still", style=_STYLE)
         assert len(tail) <= 120
         assert not tail.endswith(",")
 
     def test_still_profile_never_empty(self):
-        assert helpers.get_era_tail({}, profile="still") == \
-            helpers.ERA_TAIL_DEFAULT
+        assert helpers.get_era_tail({}, profile="still", style=_STYLE) == \
+            _STYLE.era_tail
 
 
 # ---------------------------------------------------------------------------
@@ -149,12 +156,12 @@ class TestComposeStillPrompt:
         meta = _meta_ok()
         p = helpers.compose_still_prompt(
             meta, kind="scene_open", role="music_visual", beat_id="b000")
-        subject = helpers.get_open_subject("music_visual", True, meta)
+        subject = helpers.get_open_subject("music_visual", True, meta, _STYLE)
         i_subj = p.find(subject)
         i_set = p.find("relay station, martian flats")
         i_frame = p.find(helpers.STILL_FRAMING_OPEN)
         i_tail = p.find("thin red dust")
-        i_style = p.find(helpers.STYLE_TAIL_DEFAULT)
+        i_style = p.find(_STYLE.positive_tail)
         assert -1 not in (i_subj, i_set, i_frame, i_tail, i_style)
         assert i_subj < i_set < i_frame < i_tail < i_style
 
@@ -185,7 +192,7 @@ class TestComposeStillPrompt:
     def test_never_empty_on_bare_meta(self):
         for kind in ("scene_open", "scene_beat", "portrait"):
             p = helpers.compose_still_prompt({}, kind=kind, role="")
-            assert p and helpers.STYLE_TAIL_DEFAULT in p
+            assert p and _STYLE.positive_tail in p
 
     def test_deterministic(self):
         a = helpers.compose_still_prompt(
@@ -200,10 +207,10 @@ class TestComposeStillPrompt:
         and BEFORE the no-text clause (layer order + no-text contract intact)."""
         p = helpers.compose_still_prompt(
             _meta_ok(), kind="scene_open", role="music_visual")
-        assert helpers.IMAGE_GRADE_TAIL in p
-        assert helpers.RADIO_BROADCAST_TAIL in p
-        assert p.find(helpers.STYLE_TAIL_DEFAULT) < p.find(helpers.IMAGE_GRADE_TAIL)
-        assert p.find(helpers.IMAGE_GRADE_TAIL) < p.find(helpers.RADIO_BROADCAST_TAIL)
+        assert _STYLE.image_grade_tail in p
+        assert _STYLE.broadcast_tail in p
+        assert p.find(_STYLE.positive_tail) < p.find(_STYLE.image_grade_tail)
+        assert p.find(_STYLE.image_grade_tail) < p.find(_STYLE.broadcast_tail)
         assert p.endswith(helpers.NO_TEXT_CLAUSE)
 
     def test_portrait_has_no_radio_broadcast_tail(self):
@@ -212,8 +219,8 @@ class TestComposeStillPrompt:
         p = helpers.compose_still_prompt(
             _meta_ok(), kind="portrait",
             char_entry={"portrait_prompt": "a weathered engineer"})
-        assert helpers.RADIO_BROADCAST_TAIL not in p
-        assert helpers.IMAGE_GRADE_TAIL not in p
+        assert _STYLE.broadcast_tail not in p
+        assert _STYLE.image_grade_tail not in p
 
     def test_scene_character_leads_with_character_wide(self):
         """BUG 1 (2026-06-20): a scene_character still leads with the CHARACTER's
@@ -228,7 +235,7 @@ class TestComposeStillPrompt:
         assert helpers.STILL_FRAMING_SCENE_CHARACTER in p
         assert helpers.STILL_FRAMING_PORTRAIT not in p
         assert p.endswith(helpers.NO_TEXT_CLAUSE)        # it IS a scene kind
-        assert helpers.IMAGE_GRADE_TAIL in p             # cinematic grade kept
+        assert _STYLE.image_grade_tail in p              # cinematic grade kept
 
     def test_scene_character_is_not_a_radio_booth(self):
         """BUG 1: the character SCENE still must NOT read as an on-air radio booth
@@ -237,7 +244,7 @@ class TestComposeStillPrompt:
         p = helpers.compose_still_prompt(
             _meta_ok(), kind="scene_character", role="character_video",
             char_entry={"appearance": "a stocky miner in a dust coat"})
-        assert helpers.RADIO_BROADCAST_TAIL not in p
+        assert _STYLE.broadcast_tail not in p
         assert "vintage radio set" not in p
 
     def test_scene_character_key_chain_and_fallback(self):
