@@ -148,21 +148,11 @@ def audit_episode_faces(beats):
       mid-line and cuts to themselves. The cabinet can take that cut; a face
       cannot.
 
-      (This clause used to say "from a different seed", which was not true when
-      written: the video seed was derived per SHOT, so every segment of one beat
-      sampled identically. Corrected 2026-08-02, and the seed is now genuinely
-      per segment -- see ``render_driver.build_request_from_shot``. Worth
-      recording because the false premise was doing real work here: it made the
-      cut sound self-evidently tolerable, when the actual behaviour was an
-      identical seed regenerating a near-identical opening pose at every cut.)
-
-      **THIS CLAUSE WARNS, IT DOES NOT REFUSE, and the correction landed the
-      same day the rule was written.** It was terminal for exactly as long as
-      it took to run the first live campaign, where it refused every HuMo
-      episode outright. Re-reading the operator's sentence is what changed it:
-      the remedy he gives is *"shorten the line, or let the cabinet speak it"*
-      -- a ROUTING instruction. Nothing in this build re-routes, so a terminal
-      check punished the operator for a direction the DIRECTOR made, on a beat
+      **THIS CLAUSE WARNS, IT DOES NOT REFUSE.** The remedy in the
+      operator's sentence is *"shorten the line, or let the cabinet speak
+      it"* -- a ROUTING instruction. Nothing in this build re-routes, so a
+      terminal check would punish the operator for a direction the DIRECTOR
+      made, on a beat
       the engine could otherwise render. Refusing an episode is only honest
       when the alternative is shipping a defect; here the alternative is a jump
       cut the operator can see and judge.

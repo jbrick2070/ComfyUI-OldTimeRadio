@@ -127,12 +127,6 @@ except Exception:  # noqa: BLE001
     pass
 
 
-# RETIRED 2026-08-23 (lean-mean order 4; unregistered since 2026-06-30):
-# still_parallax, the 2.5D depth-parallax engine. The source file is DELETED
-# and the id is tombstoned in RETIRED_ENGINE_IDS -- an alpha-era saved graph
-# naming it gets the named RetiredEngineError, never a silent resolve.
-# mesh_stage's fallback chain degrades directly to still_motion.
-
 # 0-E easy on-ramp (2026-06-11): mesh_stage -- the traditional local 3D
 # chain (portrait -> hy3d-2mv core-node mesh -> cached GLB -> pinned
 # portable Blender turntable stage -> straight-alpha frame directory).
@@ -147,22 +141,12 @@ except Exception:  # noqa: BLE001
     pass
 
 
-# RETIRED 2026-08-23 (lean-mean order 4; unregistered since 2026-06-29): the
-# dark 3D scaffolds triposg_talk / hunyuan3d_talk / trellis_talk
-# (eng_character_3d) and triposr (eng_triposr). Every render was
-# NotImplementedError, so the files are DELETED and all four ids are
-# tombstoned in RETIRED_ENGINE_IDS. A real 3D forward starts from a fresh
-# adapter + registration + CAPABILITIES row + removing its id from the
-# tombstone set, in ONE change -- not from resurrecting these scaffolds.
-
-
-# viz_green (renamed from "visualizer" 2026-06-30, item 2): the LOW-VRAM
-# ffmpeg-only procedural CRT scope engine -- audio-reactive scopes rendered AS
-# the per-beat picture (the resurrected full-colour video_engine look, via the
-# COPIED torch-free routines in _otr_shared/scope_draw.py; zero coupling to the
-# floor node / the SceneAwareScopes overlay). Selectable per role (registry IS
-# the menu; the historical OTR_ENABLE_VISUALIZER flag is vestigial). Old saved
-# graphs carrying "visualizer" resolve via otr_video_director's
+# viz_green: the LOW-VRAM ffmpeg-only procedural CRT scope engine --
+# audio-reactive scopes rendered AS the per-beat picture (the resurrected
+# full-colour video_engine look, via the COPIED torch-free routines in
+# _otr_shared/scope_draw.py; zero coupling to the floor node / the
+# SceneAwareScopes overlay). Selectable per role (registry IS the menu). Old
+# saved graphs carrying "visualizer" resolve via otr_video_director's
 # _LEGACY_ENGINE_ALIASES. Cold-import clean (V-12: soundfile/PIL lazy in
 # render_clip). Guarded so a packaging quirk never breaks the namespace import.
 try:  # pragma: no cover - trivial guard
@@ -170,12 +154,12 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# viz_mxc_cpu (2026-06-30): the OTR multi-colored ("mxc") rainbow visualizer -- the
-# creative replacement for the retired abstract floor. Pure numpy/PIL/ffmpeg (no GPU,
-# no shaders; runs on any box). AUDIO-OPTIONAL (required_inputs=()) so it fits every
-# role AND idles a procedural rainbow on silence (the no-image floor). Cold-import
-# clean (V-12: soundfile/PIL/scope_draw lazy in render_clip). Guarded so a packaging
-# quirk never breaks the namespace import. (viz_mxc_gpu shader tier is DEFERRED.)
+# viz_mxc_cpu (2026-06-30): the OTR multi-colored ("mxc") rainbow visualizer.
+# Pure numpy/PIL/ffmpeg (no GPU, no shaders; runs on any box). AUDIO-OPTIONAL
+# (required_inputs=()) so it fits every role AND idles a procedural rainbow on
+# silence (the no-image floor). Cold-import clean (V-12: soundfile/PIL/
+# scope_draw lazy in render_clip). Guarded so a packaging quirk never breaks
+# the namespace import. (viz_mxc_gpu shader tier is DEFERRED.)
 try:  # pragma: no cover - trivial guard
     from . import eng_viz_rainbow as _eng_viz_rainbow  # noqa: F401
 except Exception:  # noqa: BLE001
@@ -229,9 +213,6 @@ try:  # pragma: no cover - trivial guard
     from . import eng_google_veo_video as _eng_google_veo_video  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
-
-# (rip-sfx 2026-08-06: the eng_google_vid_sfx import block died with its
-# module -- the SFX-bed lane is retired, ids guarded via RETIRED_ENGINE_IDS.)
 
 
 # animatediff15_video (Ghost Signal, 2026-08-22): SD1.5 + the mm-p_0.5 v2 motion

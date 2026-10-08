@@ -1,7 +1,7 @@
 """Shared raised-razzle motion policy -- ONE owner for cloud and local.
 
-The July 3 living-poster default (gentle / mist / subtle parallax) is retired.
-A video lane moves. A hold belongs on still_word / still_flat. Artifact
+No living-poster default (gentle / mist / subtle parallax): a video lane moves.
+A hold belongs on still_word / still_flat. Artifact
 guards stay: whip pans, melting geometry, warped faces, drifting text.
 """
 from __future__ import annotations
@@ -54,8 +54,8 @@ def compose_positive(beat, *, override: str | None = None) -> str:
 def compose_negative(*parts: str) -> str:
     """Merge engine extras with the razzle artifact / no-hold terms.
 
-    ``OTR_CLOUD_RAZZLE_NEG`` replaces the razzle extras entirely -- same
-    as the old cloud adapter -- and does not silently re-append NEG_EXTRA.
+    ``OTR_CLOUD_RAZZLE_NEG`` replaces the razzle extras entirely and does not
+    silently re-append NEG_EXTRA.
     Caller-supplied ``parts`` (the LTX recipe negative) still merge.
     """
     env = otr_env.get(NEG_ENV, "").strip()

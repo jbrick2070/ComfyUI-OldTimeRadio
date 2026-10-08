@@ -199,8 +199,8 @@ class VideoEngineRegistry(EngineRegistry):
         cannot supply the engine's ``required_inputs`` (capability), or (fail-soft,
         for an engine with no declared inputs / an unknown role) the legacy ``roles``
         list does not list ``role``. Never silently resolves to another engine.
-        A RETIRED id raises :class:`RetiredEngineError` first (rip-sfx
-        2026-08-06) -- the NAMED policy refusal, not the generic message.
+        A RETIRED id raises :class:`RetiredEngineError` first -- the NAMED
+        policy refusal, not the generic message.
         Resolved for the guard only (idempotent on internal ids); the
         registration checks below still see the caller's name unchanged."""
         check_retired_engine(resolve_engine_id(name))
@@ -284,18 +284,14 @@ __all__.append("EngineCore")
 #   model_requirements     informational model-asset ids for the S5 wizard.
 # ---------------------------------------------------------------------------
 CAPABILITIES = {
-    # "abstract" + "station_card" rows REMOVED 2026-06-30 (C0 -- "registry IS the
-    # menu"): both engines were UNREGISTERED (abstract redundant with visualizer;
-    # station_card the broken black card), and the registry-consistency invariant
-    # forbids a CAPABILITIES row without a registered engine.
     "still_motion": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
-    # viz_green (renamed from "visualizer" 2026-06-30, item 2; old saved values
-    # resolve via otr_video_director._LEGACY_ENGINE_ALIASES).
+    # viz_green (old saved "visualizer" values resolve via
+    # otr_video_director._LEGACY_ENGINE_ALIASES).
     "viz_green": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
@@ -351,11 +347,11 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
-    # S0 portability (2026-07-10): the requirement label now names the artifact
+    # S0 portability (2026-07-10): the requirement label names the artifact
     # family the engine DEFAULT resolves (eng_humo._HUMO_DEFAULT_UNET = Kijai's
     # Wan2_1-HuMo-14B fp8-scaled UNET, fetched by the `humo` lane of
-    # scripts/otr_fetch_lane_weights.py). The old "HuMo-17B" label pointed fresh installs at Comfy-Org's
-    # differently-named file the engine never looks for.
+    # scripts/otr_fetch_lane_weights.py), not Comfy-Org's differently-named file
+    # the engine never looks for.
     "humo": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
@@ -390,8 +386,6 @@ CAPABILITIES = {
         "needs_fp8_te": True, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["HuMo-14B-KJ"]},
-    # still_parallax UNREGISTERED 2026-06-30 (item 2 rip-out): no CAPABILITIES
-    # row while dark -- see nodes/_otr_video_engines/__init__.py.
     # mesh_stage (0-E easy on-ramp): hy3d-2mv core-node mesher (in-process,
     # compile-free) + headless portable Blender stage. Blender renders AFTER the
     # BUG-291 reclaim barrier so the classes never co-reside. Tencent
@@ -437,12 +431,6 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["ltxv-2b-0.9.8-distilled"]},
-    # triposg_talk / triposr / hunyuan3d_talk / trellis_talk CAPABILITIES rows
-    # REMOVED 2026-06-29 (C3 -- "registry IS the menu"): these dark 3D scaffolds
-    # render NotImplementedError and are now UNREGISTERED, and the
-    # registry-consistency invariant forbids a CAPABILITIES row without a
-    # registered engine. Restore the row WITH the @register + package import in
-    # the SAME change when a real forward ships.
     # ltx25_video: LTX 2.5 Distilled I2V rendered SILENT, on the 16 GB mix4x8
     # DiT through stock loaders. cuda, no vendor gate: this lane SAMPLES a
     # VRAM peak for the receipt
@@ -578,7 +566,7 @@ CAPABILITIES = {
     # artifacts are FP16 and the profile pins dtype_policy="no_fp8_no_fp4" so
     # nothing silently opts them into ComfyUI's optional FP8/FP4 transformations.
     #
-    # THREE artifacts, where the retired siblings had two. The adapter is named
+    # THREE artifacts. The adapter is named
     # here so the S5 wizard asks for it; a haunted lane without it refuses to
     # render rather than quietly producing clean output.
     #
@@ -663,8 +651,8 @@ CAPABILITIES = {
         "device_backends": ["mps", "cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
-        # THREE artifacts as of 2026-09-09, not two. The third is an EXTERNAL
-        # DECODER, not an adapter: `vae-ft-mse-840000-ema-pruned` replaces the
+        # THREE artifacts. The third is an EXTERNAL DECODER, not an adapter:
+        # `vae-ft-mse-840000-ema-pruned` replaces the
         # VAE the checkpoint returns. A/B'd on the M4 with only the decoder
         # changed -- cleaner glass and foliage, less milky haze, judged by the
         # operator -- and it is MIT, more permissive than the other two.
@@ -759,21 +747,19 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
-    # (rip-sfx 2026-08-06: the five SFX-bed rows -- cloud_vidu_q2_pro_fast_720p_sfx
-    # and the four google_vid_sfx_* engines -- are RETIRED. Their ids live in
-    # nodes/_otr_shared/public_engines.RETIRED_ENGINE_IDS, consulted by
-    # check_retired_engine at every selection boundary; they must never return
-    # to this table.)
+    # Retired SFX-bed ids (cloud_vidu_q2_pro_fast_720p_sfx, google_vid_sfx_*)
+    # live in nodes/_otr_shared/public_engines.RETIRED_ENGINE_IDS, consulted by
+    # check_retired_engine at every selection boundary; they must never
+    # return to this table.
 }
 __all__.append("CAPABILITIES")
 
 
 # ---------------------------------------------------------------------------
-# VALIDATED_ENGINES + validated_engine_names() REMOVED 2026-06-29 (C4 -- "registry
-# IS the menu"): there is NO validated-subset dropdown filter. Every REGISTERED
-# engine is SELECTABLE; the per-role director COMBO is built from
-# all_engine_names() (validation is the operator's MANUAL process, never a code
-# gate). The "+ Add Custom Model" sentinel remains the escape hatch.
+# There is NO validated-subset dropdown filter ("registry IS the menu"):
+# every REGISTERED engine is SELECTABLE; the per-role director COMBO is built
+# from all_engine_names() (validation is the operator's MANUAL process, never
+# a code gate). The "+ Add Custom Model" sentinel remains the escape hatch.
 # ---------------------------------------------------------------------------
 
 

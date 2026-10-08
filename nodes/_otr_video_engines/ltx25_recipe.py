@@ -24,10 +24,8 @@ the TTS stages earlier in the same process, not what makes this lane fit, and a
 smoke that OOMs is an upstream-residue or allocator-fragmentation finding to
 report, not a missing free() call.
 
-The `low`/`high` token in the public id is NO LONGER waiting -- that naming is
-settled and the `high` lanes are registered and shipping (corrected 2026-08-28;
-this paragraph used to bundle the naming decision with the open envelope
-question, so a reader could not tell which half was still undecided).
+The `low`/`high` token in the public id is settled: the naming is decided and
+the `high` lanes are registered and shipping.
 
 **AND THE RECIPE IS NOT ON THE TABLE** (operator, standing rule, restated
 2026-08-19: *"no chasing vram recipes please... we are running on the Q3, that's
@@ -106,42 +104,37 @@ LTX25_STEPS = 8
 #: OOM against the 14.5 GiB clamp. So "turn the CFG up a little" is not a small
 #: change here. Leave them.
 #:
-#: **THE MECHANISM ORIGINALLY GIVEN FOR THAT WAS WRONG -- CORRECTED 2026-08-19.**
-#: This note used to say "CFG 1.0 evaluates batch size 1; any value above 1.0
-#: forces batch size 2". That is the ordinary ComfyUI behaviour
-#: (``comfy/samplers.py``: ``sampling_function`` sets ``uncond_ = None`` when
-#: ``cond_scale`` is close to 1.0) -- but **it does not apply to this recipe**,
-#: because the locked sampler is CFG++:
-#: ``sample_euler_ancestral_cfg_pp`` explicitly passes
+#: **THE ORDINARY COMFYUI RULE DOES NOT APPLY TO THIS RECIPE.** That rule
+#: ("CFG 1.0 evaluates batch size 1; any value above 1.0 forces batch size 2")
+#: is how ``comfy/samplers.py`` behaves (``sampling_function`` sets
+#: ``uncond_ = None`` when ``cond_scale`` is close to 1.0) -- but the locked
+#: sampler is CFG++: ``sample_euler_ancestral_cfg_pp`` explicitly passes
 #: ``disable_cfg1_optimization=True`` (``comfy/k_diffusion/sampling.py:1284``)
 #: and then CONSUMES ``uncond_denoised`` in its own derivative (``:1297``).
-#: So the unconditional branch is evaluated at CFG 1.0 on this lane, every step.
+#: So the unconditional branch is evaluated at CFG 1.0 on this lane, every
+#: step.
 #:
-#: THE NUMBER IS UNAFFECTED, THE REASONING IS NOT. The lab measured 14.48 GiB
-#: running THIS sampler, so whatever the true batching, the measurement already
-#: includes it. What was wrong was the explanation -- and it mattered, because
-#: it made an empty negative prompt look free (see ``LTX25_NEGATIVE_PROMPT``).
+#: The lab measured 14.48 GiB running THIS sampler, so whatever the true
+#: batching, the measurement already includes it. The mechanism still matters:
+#: believing the ordinary rule makes an empty negative prompt look free (see
+#: ``LTX25_NEGATIVE_PROMPT``).
 LTX25_CFG_VIDEO = 1.0
 LTX25_CFG_AUDIO = 1.0
 LTX25_CFG_MODALITY = 1.0
 
 #: The negative prompt TEXT is empty. That is the recipe and it is locked.
 #:
-#: **BUT THE NEGATIVE CONDITIONING IS NOT INERT, AND THIS NOTE USED TO SAY IT
-#: WAS -- CORRECTED 2026-08-19.** The old wording ("negative conditioning is
-#: INERT at CFG 1.0, so carrying one buys nothing and costs memory") is the
-#: ordinary ComfyUI rule, and it is FALSE for this recipe: the locked sampler
+#: **THE NEGATIVE CONDITIONING IS NOT INERT.** The ordinary ComfyUI rule
+#: ("negative conditioning is INERT at CFG 1.0, so carrying one buys nothing
+#: and costs memory") is FALSE for this recipe: the locked sampler
 #: ``euler_ancestral_cfg_pp`` forces ``disable_cfg1_optimization=True``
 #: (``comfy/k_diffusion/sampling.py:1284``) and uses ``uncond_denoised`` in its
 #: step derivative (``:1297``). The unconditional branch really is computed,
 #: every step, and it really does steer the result.
 #:
-#: WHY THE ERROR WAS EXPENSIVE. Believing the negative was inert made an
-#: obvious-looking optimisation available -- feed the POSITIVE conditioning
-#: into both guider slots and skip a whole 12B encode. It would have silently
-#: changed every render on this lane. It was proposed during the 2026-08-19
-#: OOM panel, survived one reviewer, and was killed by another that checked
-#: which sampler was actually selected. Do not re-propose it.
+#: So the obvious-looking optimisation -- feed the POSITIVE conditioning into
+#: both guider slots and skip a whole 12B encode -- would silently change every
+#: render on this lane. Do not propose it.
 #:
 #: WHAT REMAINS TRUE: the empty STRING is the locked recipe value, and "just
 #: add a negative to suppress X" is still unavailable -- not because the
@@ -158,14 +151,12 @@ LTX25_NEGATIVE_PROMPT = ""
 #: that decode is not in the shipping graph.)
 #:
 #: These live HERE rather than as literals in the adapter for one specific
-#: reason: the retired sibling ``eng_ltx_av`` decoded through an ENV-DRIVEN
-#: helper whose default was **4096 / 8** -- whole-clip, no temporal tiling --
-#: and its comment praises that default for having no inter-tile seam. Copying
-#: that helper into this lane, which is the natural thing to do when modelling
-#: one adapter on another, would silently replace a measured recipe value with
-#: a different one on a lane that has 0.02 GiB of headroom. Whole-clip decode
-#: of 97 frames is exactly the kind of allocation that spends headroom this
-#: lane does not have.
+#: reason: an ENV-DRIVEN decode helper whose default is **4096 / 8** --
+#: whole-clip, no temporal tiling, praised for having no inter-tile seam --
+#: is the natural thing to copy when modelling one adapter on another, and
+#: would silently replace a measured recipe value with a different one on a
+#: lane that has 0.02 GiB of headroom. Whole-clip decode of 97 frames is
+#: exactly the kind of allocation that spends headroom this lane does not have.
 #:
 #: So: 64 frames per temporal tile with a 16-frame overlap, 512-pixel spatial
 #: tiles with 64 overlap, as measured. NOT env-overridable, because there is no
@@ -222,8 +213,7 @@ LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP = 16
 #: The 4060 owns this watchdog: it is the portability surface and the only card
 #: here that reproduces the stall on demand.
 #:
-#: COMFYUI IS NOT THE ONE STREAMING IT -- corrected 2026-09-23. This paragraph
-#: said "ComfyUI streams the decode over PCIe", and that is wrong. The LTX
+#: COMFYUI IS NOT THE ONE STREAMING THE DECODE OVER PCIe. The LTX
 #: diffusion-VAE branch in `comfy/sd.py` sets ``disable_offload = True``, which
 #: is handed straight to ``force_full_load`` on the ``load_models_gpu`` call,
 #: so ComfyUI loads this VAE COMPLETELY and never streams it. A live 4060 log
@@ -269,34 +259,20 @@ LTX25_TWO_STAGE_RECIPE_ID = "ltx_2_5_two_stage"
 
 #: I2V first-frame anchor, via ``LTXVImgToVideoInplace`` at **strength 1.0**.
 #:
-#: CORRECTED AGAINST THE GOLDEN JSON. The lab's PROSE describes this as
-#: ``SetLatentNoiseMask`` with frame 0 at 0.0 and frames 1-96 at 1.0. The
-#: executable recipe
+#: The lab's PROSE describes this as ``SetLatentNoiseMask`` with frame 0 at 0.0
+#: and frames 1-96 at 1.0. The executable recipe
 #: (`vram-recipe-lab/recipes/ltx_2_5_golden_i2v_foley.json`, node 16) actually
 #: uses ``LTXVImgToVideoInplace`` with ``strength: 1.0, bypass: false``. The
 #: JSON is authoritative -- it is the file that ran. Same effect (frame 0 is
 #: pinned to the still), different node.
 #:
-#: THE NODE IS ALREADY KNOWN HERE, WHICH IS THE DE-RISK: the retired
-#: ``eng_ltx_av`` and ``eng_ltx_video`` lanes both wired ``LTXVImgToVideoInplace``
-#: already.
+#: 1.0 is a HARD anchor: it holds identity firmly at frame 0 and leaves frames
+#: 1..96 free, which is a different trade from a SOFT anchor (e.g. 0.7)
+#: applied across the clip ("strength 1.0 hard-pins the still").
 #:
-#: BUT AT A DIFFERENT STRENGTH, AND THAT IS THE ONE THING TO WATCH. The retired
-#: audio lane deliberately used **0.7, a SOFT anchor** ("a SOFT
-#: anchor so the audio can..."), and this file's own note at `:423` records why
-#: -- "strength 1.0 hard-pins the still". So 1.0 here is a HARDER anchor than
-#: that sibling lane used. It holds identity firmly at frame 0 and leaves frames
-#: 1..96 free, which is a different trade from a soft anchor applied across the
-#: clip (the retired ``eng_ltx_video``'s "i2v-anchor doctrine").
-#:
-#: **CORRECTED 2026-08-19: 1.0 IS THE NODE'S UNTOUCHED DEFAULT, NOT A
-#: MEASUREMENT.** This note previously said "adopted as the lab measured it",
-#: and the lab has since confirmed it measured nothing of the kind --
+#: **1.0 IS THE NODE'S UNTOUCHED DEFAULT, NOT A MEASUREMENT.**
 #: ``LTXVImgToVideoInplace`` ships ``strength`` defaulting to 1.0 and the
-#: recipe never touched the widget. So the difference from the sibling lane's
-#: 0.7 is NOT a deliberate opposing choice by two teams; it is one deliberate
-#: choice (0.7, ours, with a written reason) and one default nobody set. Read
-#: it that way before treating 1.0 as evidence of anything.
+#: recipe never touched the widget, so 1.0 is not evidence of anything.
 #:
 #: IT IS STILL WHAT SHIPS, and that is not laziness. A hard pin at frame 0 is
 #: the correct default for OTR's actual problem -- "a character's face changing

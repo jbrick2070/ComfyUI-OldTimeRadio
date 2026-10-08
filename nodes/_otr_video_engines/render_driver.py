@@ -63,24 +63,22 @@ except ImportError:  # pragma: no cover -- flat test imports
 
 _LOG = logging.getLogger("OTR.video.render_driver")
 
-# NO FALLBACKS (operator directive 2026-07-02): FLOOR_NAMES / UNIVERSAL_FLOOR /
-# SYNTH_FALLBACKS and the whole degrade-chain machinery were RIPPED (Sprint A,
-# E1). Engine failure = LOUD RenderError; still_motion remains a registered
-# SELECTABLE engine but has no floor role.
+# NO FALLBACKS (operator directive 2026-07-02): engine failure = LOUD
+# RenderError; still_motion is a registered SELECTABLE engine but has no
+# floor role.
 
 #: engine_id -> family (covers the A/cheap engines).
 ENGINE_FAMILY = {
     "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
     "still_motion": "static_motion",
-    # still_parallax UNREGISTERED 2026-06-30 (item 2 rip-out) -- removed here too.
-    # wan_i2v RETIRED 2026-08-26 and removed HERE too: engine_family()
-    # consults this static map BEFORE the live registry, so a stale row
-    # keeps answering "image_to_video" forever with no error path at all.
+    # Rows of retired engines must be removed HERE too: engine_family()
+    # consults this static map BEFORE the live registry, so a stale row keeps
+    # answering "image_to_video" forever with no error path at all.
     "mesh_stage": "image_to_video",
-    # "abstract" + "station_card" entries REMOVED 2026-06-30 (C0, engines retired);
-    # the "abstract" FAMILY name survives (viz_green) + is the engine_family() default.
-    "viz_green": "abstract", "still_pan": "static_image_gen",   # renamed from "visualizer" 2026-06-30, item 2
+    # The "abstract" FAMILY name (viz_green) is also the engine_family()
+    # default.
+    "viz_green": "abstract", "still_pan": "static_image_gen",
     "viz_mxc_cpu": "abstract",       # OTR rainbow visualizer (2026-06-30)
     "viz_mxc_mandala": "abstract",   # Cosmic Radio Mandala, pycairo (2026-06-30)
     "viz_camera": "abstract",        # Golden Flicker camera visualizer (2026-07-05)
@@ -97,9 +95,8 @@ _GOOGLE_SILENT_TEXT_PROVIDERS = frozenset({
     "google_veo_video",
     "google_omni_video",
 })
-#: rip-sfx (2026-08-06): the google_vid_sfx_* rows are retired, so every
-#: surviving Google provider is a silent text provider and the prompt-provider
-#: set narrows to the silent set.
+#: Every Google provider here is a silent text provider, so the
+#: prompt-provider set is the silent set.
 _GOOGLE_PROVIDER_PROMPT_ENGINES = _GOOGLE_SILENT_TEXT_PROVIDERS
 
 #: ENGINES THAT COMPOSE A SCENE PROMPT ON THE ANNOUNCER AND MUSIC BOOKENDS.
@@ -109,19 +106,7 @@ _GOOGLE_PROVIDER_PROMPT_ENGINES = _GOOGLE_SILENT_TEXT_PROVIDERS
 #: "a 1940s radio studio, on air sign illuminated, period broadcast set" -- with
 #: no motion clause, no style, and `prompt_source` never stamped.
 #:
-#: EXTRACTED FROM AN INLINE TUPLE 2026-09-03, AND THE EXTRACTION IS THE POINT.
-#: As an inline literal this list went stale three times. The LTX 2.5 foley and
-#: mime lanes were added 2026-08-26 with a comment describing the exact
-#: silent-degrade they had been suffering; the same comment was not read across
-#: to the other omissions. It still carried `wan_i2v`, an id RETIRED that same
-#: week and no longer in the registry at all, so that entry could never match a
-#: shot -- while `wan_ti2v`, its live replacement and three of the sixteen
-#: rotation lanes, was absent. The operator found it by watching:
-#: `signal_lost_whispers_in_the_park_20260903_101222` published with four of its
-#: eight beats on that static seed and he reported "basically no movement"
-#: (PBUG-20260903-06).
-#:
-#: `tests/test_bookend_scene_prompt_roster.py` now fails when a live text-driven
+#: `tests/test_bookend_scene_prompt_roster.py` fails when a live text-driven
 #: engine is missing from this set, and when a member is not a registered
 #: engine. A NAME is cheap to add and free to forget; a failing test is not.
 #: THIS BRANCH SPEAKS LTX. It passes the style pack's motion register through
@@ -158,11 +143,8 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
 #: the same authorities; letting the scene branch run would overwrite the
 #: positive and silently orphan the negative, which is why the condition below
 #: also carries `and not _ghost_composed`.
-#: (`animatediff15_video` and `animatediff15_v3_video` were in this set for one
-#: draft and are NOT registered -- tombstoned 2026-08-23. That is the same
-#: dead-id-reads-as-coverage defect this whole file exists to stop, reproduced
-#: inside its own fix and caught by review. The roster test now checks EVERY
-#: set for registration, not just the prompt set, so it cannot recur quietly.)
+#: A dead id reads as coverage, so the roster test checks EVERY set in this
+#: file for registration, not just the prompt set.
 BOOKEND_SCENE_PROMPT_SELF_COMPOSED = frozenset({
     "razzle_ltx_8gb",
     "animatediff15_v3_haunted_video",
@@ -259,12 +241,12 @@ BOOKEND_SCENE_PROMPT_KNOWN_RED = {
 class RenderFloorError(RuntimeError):
     """A radio-open beat rendered on the procgen/still floor instead of an LTX
     engine (BUG-LOCAL-413 strict mode -- see :func:`check_ltx_open_health`).
-    NOTE: despite the historical name, this has nothing to do with the deleted
-    fallback-chain floor machinery."""
+    NOTE: despite the historical name, this has nothing to do with any
+    fallback-chain floor."""
 
 
-# RenderError MOVED to the dependency-leaf `render_errors` (2026-07-29,
-# WIRE-W2) so `otr_shot_lock` can import DeferredImageGapError without
+# RenderError lives in the dependency-leaf `render_errors` so `otr_shot_lock`
+# can import DeferredImageGapError without
 # importing this module. Re-exported here, deliberately: every existing
 # `from .render_driver import RenderError` keeps working, and because it is a
 # re-export rather than a copy the class objects are IDENTICAL, so `except`
@@ -448,12 +430,12 @@ _DECLARED_CANVAS_GRID = 32
 def declared_render_canvas(engine_id):
     """The ``(w, h)`` an engine DECLARES it renders at, or ``None``.
 
-    THE DEFECT THIS CLOSES (O1). ``build_request_from_shot`` overwrites the
-    canvas to the shared landscape default for every non-face family, with
-    deliberate per-engine branches after it for ``ltx_video`` and
-    ``ltx_audio_in`` and NONE for ``ltx_8gb``. So the 8 GB tier rendered at
-    1472x832 -- 8.3x the pixels, on the tier that exists because 8 GB cannot
-    afford them -- while its own profile asked for 512x288.
+    WHY A DECLARATION. ``build_request_from_shot`` overwrites the canvas to
+    the shared landscape default for every non-face family, with deliberate
+    per-engine branches after it for ``ltx_video`` and ``ltx_audio_in`` and
+    NONE for ``ltx_8gb`` -- so without a declaration the 8 GB tier would
+    render at 1472x832, 8.3x the pixels, on the tier that exists because 8 GB
+    cannot afford them, while its own profile asked for 512x288.
 
     THE CANVAS IS READ FROM THE ADAPTER, NOT FROM THE LEDGER, and that is the
     whole point. The O1 canvas judgment enumerated five channels that name a
@@ -462,15 +444,14 @@ def declared_render_canvas(engine_id):
     engine "declares its render canvas STATICALLY ... not an env var, not a
     ledger read, not a fourth inline branch."
 
-    The first draft of this function DID read the ledger stamp, and the
-    pre-push panel killed it with a case the design had not considered: the
-    coverage-matrix harness routes ``ltx_8gb`` onto the CANONICAL workflow
-    through profile ``role_overrides`` and never copies a canvas, so a
-    ledger-read design inherits that workflow's 26:15 canvas and must either
-    pillarbox or refuse an episode that renders today. A declaration cannot be
-    displaced by where it is pointed. What the profile channel still owes is a
-    DRIFT GUARD, not authority -- a test pinning the profile's canvas equal to
-    the declaration, which is where that check now lives.
+    A ledger-read design would fail: the coverage-matrix harness routes
+    ``ltx_8gb`` onto the CANONICAL workflow through profile ``role_overrides``
+    and never copies a canvas, so it would inherit that workflow's 26:15
+    canvas and must either pillarbox or refuse an episode that renders today.
+    A declaration cannot be displaced by where it is pointed. What the profile
+    channel still owes is a DRIFT GUARD, not authority -- a test pinning the
+    profile's canvas equal to the declaration, which is where that check
+    lives.
 
     Validates the DECLARATION itself: positive and /32 on both axes. This is a
     code-integrity check in the shape of ``FrameContract.__post_init__``, not an
@@ -541,14 +522,12 @@ def build_request(shot, assets, frame_count, canvas=None):
     """A SCHEMA-VALID ``VideoRequest`` dict per shot (deterministic: the seed
     is keyed to the shot id so render-twice is identical -- V-7).
 
-    W7-pre builder migration (3D plan 7.0, code-verified gap): the emitted
-    dict passes ``VideoRequest.model_validate`` -- the old extras
-    ``init_w``/``init_h`` are GONE (the adapters' aspect hint defaulted to the
-    canvas dims anyway = an identity transform; hand-built requests may still
-    carry the hint, the builders just never emit it), ``role`` /
-    ``family_hint`` / ``profile_id`` are emitted, and observability stamps
-    ride the REAL ``observability`` field -- never top-level underscore
-    extras."""
+    The emitted dict passes ``VideoRequest.model_validate``: the builders
+    never emit the ``init_w``/``init_h`` extras (the adapters' aspect hint
+    defaults to the canvas dims anyway = an identity transform; hand-built
+    requests may still carry the hint), ``role`` / ``family_hint`` /
+    ``profile_id`` are emitted, and observability stamps ride the REAL
+    ``observability`` field -- never top-level underscore extras."""
     assets = assets or {}
     portrait = assets.get("init_image", "")
     audio = assets.get("audio_ref", "")
@@ -635,13 +614,6 @@ def slice_cache_key(master_hash, start_s, dur_s, *,
             int(sample_rate), int(channels), float(pad_tail_s or 0.0))
          ).encode("utf-8")
     ).hexdigest()[:16]
-
-
-# `curve_cache_key` was removed 2026-08-28. It was the exported key for the
-# W7 Rhubarb->ARKit CURVE cache -- a cache that was never built: no production
-# caller, no curve artifact on disk, and the 3D lane it belonged to is retired.
-# The audio SLICE half above (`slice_cache_key`, `SLICER_VERSION`) is live and
-# untouched; only the curve half was a public contract for nothing.
 
 
 def _slicer_ffmpeg_bin():
@@ -971,9 +943,9 @@ def _still_spine_materialize_row(row, stills_root):
         return ""
     root = os.path.abspath(str(stills_root))
     current = os.path.abspath(str(row.get("path") or "")) if row.get("path") else ""
-    # `os.path.abspath` PRESERVES a UNC spelling, so this `isfile` used to stat a
-    # host the ledger named -- an SMB session before the trust probe below is
-    # ever consulted (2026-09-05). The row comes from the workflow.
+    # `os.path.abspath` PRESERVES a UNC spelling, so a bare `isfile` here would
+    # stat a host the ledger named -- an SMB session before the trust probe
+    # below is ever consulted. The row comes from the workflow.
     try:
         from .._otr_paths import is_remote_path as _is_remote_row
     except ImportError:  # pragma: no cover -- flat (sys.path) load
@@ -1050,19 +1022,13 @@ def _still_spine_row_for_mesh(rows, beat_id, char_id):
     shares ONE subject across beats -- that breadth is the contract, and it is
     why this lookup is looser than the beat-exact scene lookup above.
 
-    What was NOT the contract: ``keys`` was built from four possibly-empty row
-    fields and probed with ``str(char_id or "") in keys``. A music beat probes
-    with ``char_id == ""`` and a mesh row stores ``char_id: ""``, so ``"" in
-    keys`` was True for EVERY mesh row and the loop returned the first one it
-    reached -- an answer to a question nobody asked. Measured on the failing
-    2026-08-12 leg's own rows: asking for ``b000_music_open`` returned
-    ``meshfodder_music_opening_001``.
-
-    That is why the still spine's SCENE half failed loud on the beat-id split
-    while the MESH half stayed quiet and served a plausible wrong image. Both
-    sides are guarded here -- emptiness is dropped from ``keys`` AND an empty
-    probe is refused -- because either one alone still lets absence match
-    absence.
+    ABSENCE MUST NOT MATCH ABSENCE. ``keys`` is built from four
+    possibly-empty row fields, and a music beat probes with ``char_id == ""``
+    while a mesh row stores ``char_id: ""`` -- so an unguarded ``"" in keys``
+    is True for EVERY mesh row and the loop returns the first one it reaches,
+    an answer to a question nobody asked. Both sides are guarded here --
+    emptiness is dropped from ``keys`` AND an empty probe is refused --
+    because either one alone still lets absence match absence.
     """
     cid = str(char_id or "").strip()
     bid = str(beat_id or "").strip()
@@ -1130,12 +1096,11 @@ def shot_is_sanctioned_gap(shot, gap_beats) -> bool:
     Keyed by ``_beat_id_for_shot``, the identity the still-spine validator
     uses, so the validator and ``run_episode`` cannot disagree about which
     beat a shot is. ShotLock's shot rows carry ``shot_id`` and
-    ``source_line_ids``, not ``beat_id``: the render loop used to read
-    ``shot.get("beat_id")``, found nothing on every real shot, and rendered a
-    beat the validator had waved through as a gap -- which then died in
-    ``cheap_families.render_clip`` on the missing still (overnight leg 07,
-    2026-09-29: Ideogram refused the music-opening still of a still_pan
-    episode). An explicit ``beat_id`` on the row is honoured too.
+    ``source_line_ids``, not ``beat_id``: reading ``shot.get("beat_id")``
+    finds nothing on every real shot and would render a beat the validator
+    had waved through as a gap -- which then dies in
+    ``cheap_families.render_clip`` on the missing still. An explicit
+    ``beat_id`` on the row is honoured too.
     """
     if not gap_beats:
         return False
@@ -1178,7 +1143,7 @@ def _still_spine_requires_scene(shot, engine_id, family):
         return True
     if family in _SCENE_INIT_FAMILIES:
         return True
-    if family == "audio_driven_face":  # (character_3d token retired 2026-08-23)
+    if family == "audio_driven_face":
         return False
     if "init_image" in _required_inputs_for_engine(engine_id, family):
         return True
@@ -1196,10 +1161,9 @@ def _jump_still_requests_for_shot(shot):
     Never re-derived (2026-07-25, chunk 4). ShotLock minted these ids from the
     beat_id it was building, and this end READS them off the durable row -- so
     recomputing an id here would be a second derivation of one string, which is
-    the mirror class chunk 1a collapsed. (This once said the id "passes through
-    ``_canonical_visual_beat_id`` on the way here". That translation was deleted
-    with PBUG-20260811-02: there is now exactly ONE id, the shot's own, which is
-    what makes the never-re-derive rule cheap to keep.) A stamp that exists but is shaped wrong is
+    the mirror class chunk 1a collapsed. There is exactly ONE id, the shot's
+    own, which is what makes the never-re-derive rule cheap to keep. A stamp
+    that exists but is shaped wrong is
     TERMINAL: this pass is the last gate before a GPU render, and a request it
     cannot read is a still it cannot prove.
     """
@@ -1355,13 +1319,11 @@ def jump_segment_still_path(ledger, shot, segment_index):
 def segment_render_frames(shot, segment_index):
     """How many frames segment ``segment_index`` renders, off the STAMPED plan.
 
-    The other half of "build one segment's request" (2026-07-26 QA panel). The
-    first draft of the per-segment seam swapped the init IMAGE and left the
-    LENGTH alone, so a request for segment 1 of a 120-frame beat carried the
-    init image of segment 1 and the frame count of the whole beat -- correct
-    picture, wrong duration, and the two disagreeing is precisely the shape
-    this build keeps having to remove. A segment's length is not derivable from
-    the shot row; it is in the plan, so it is read from the plan.
+    The other half of "build one segment's request": swapping only the init
+    IMAGE would leave the LENGTH at the whole beat's -- correct picture, wrong
+    duration, and the two disagreeing is precisely the shape this build keeps
+    having to remove. A segment's length is not derivable from the shot row;
+    it is in the plan, so it is read from the plan.
 
     Returns the beat's own ``target_frame_count`` only when the shot carries no
     plan at all -- which is every beat today. When a plan exists it answers
@@ -1447,11 +1409,11 @@ def validate_and_repair_still_spine(ledger):
     manifest_ids = _still_spine_manifest_object_ids(images)
     # SANCTIONED GAPS ARE NOT MISSING STILLS (2026-08-28). A model refusal is
     # recorded in the receipt as an explicit gap row, and the operator's
-    # 2026-08-22 ruling says the episode continues without that card. Before
-    # this, the refusal reached here as an ABSENCE and the per-shot raises
-    # below killed the whole episode -- which is how a 30-minute render died
-    # for one declined image. These beats are skipped here and skipped again
-    # in ``run_episode``; nothing is substituted and nothing is silent.
+    # 2026-08-22 ruling says the episode continues without that card. Read as
+    # an ABSENCE, the refusal would hit the per-shot raises below and kill the
+    # whole episode over one declined image. These beats are skipped here and
+    # skipped again in ``run_episode``; nothing is substituted and nothing is
+    # silent.
     gap_beats = sanctioned_gap_beat_ids(ledger)
     # Audio-reactive visualizers and portrait-only face lanes deliberately do
     # not consume scene stills.  Their image phase can therefore have no
@@ -1693,12 +1655,11 @@ def _planned_ordinal_for_shot(ledger, shot) -> int:
 def _beat_text_for_shot(ledger, shot) -> str:
     """The spoken text of the beat this shot renders, for CRUX RANKING only.
 
-    Ghost v3's ``resolve_crux_kernel`` used to pick the beat's subject by the
-    beat's POSITION -- ``key_objects[ordinal % len]`` -- so the beat about the
-    ledger drew ``pen`` because it was the third row, and swapping two beats
-    swapped the pictures with them (operator ruling 2026-09-03). Handing it the
-    beat's own words lets it RANK the episode's key_objects by which one the
-    beat actually refers to.
+    Ghost v3's ``resolve_crux_kernel`` RANKS the episode's key_objects by which
+    one the beat's own words actually refer to, rather than picking by the
+    beat's POSITION (``key_objects[ordinal % len]`` drew ``pen`` for the ledger
+    beat because it was the third row, and swapping two beats swapped the
+    pictures with them; operator ruling 2026-09-03).
 
     RANKING ONLY, and that distinction is the ruling's second rule. The
     candidate pool stays ``meta.key_objects``; this text never supplies a
@@ -1749,30 +1710,14 @@ def _beat_text_for_shot(ledger, shot) -> str:
 _OPENING_MUSIC_SUFFIX = "b000_music_open"
 
 
-# _canonical_visual_beat_id WAS HERE, AND ITS REMOVAL IS THE FIX FOR
-# PBUG-20260811-02. Do not reintroduce it, under any name.
-#
-# It rewrote a shot's beat id to ``b000_music_open`` whenever the id was
-# ``music_opening_001`` or the line looked like a mirrored music opener, so that
-# visual-asset lookups would find rows the image producer had keyed under the
-# SYNTHETIC id while the shot carried the POSITIONED one. That was a real fix
-# for a real split -- while the producer read the PRE-AUDIO ledger.
-#
-# Commit 3446af3f retargeted canonical link 255 so the producer reads ShotLock's
-# POST-AUDIO ledger, where EpisodeAssembler has already mirrored the cue into an
-# ordinary beat named ``music_opening_001``. From that moment the producer keyed
-# its rows under the positioned id and this rewrite pointed the consumer at an
-# id nothing minted any more -- so it did not fail to fire, it fired and moved
-# the mismatch from the closing beat to the opening one. The 2026-08-12
-# ``mesh_stage`` leg died on exactly that, with the plate it wanted sitting on
-# disk under the other name.
-#
-# THE AUTHORITATIVE ID IS THE EXACT BEAT ID IN SHOTLOCK'S FINAL EXECUTION PLAN,
-# and both halves already agree on it once nothing translates between them: a
-# positioned mirror carries its own ``music_<cue>_<NNN>`` line id, and a genuine
-# synthetic opener carries ``b000_music_open`` with empty ``source_line_ids``,
-# which ``_beat_id_for_shot`` recovers from the shot_id. Each resolves through
-# its own id.
+# BEAT IDS ARE NEVER TRANSLATED between the image producer and this consumer
+# (PBUG-20260811-02) -- do not reintroduce a canonical-visual-beat-id rewrite
+# under any name. THE AUTHORITATIVE ID IS THE EXACT BEAT ID IN SHOTLOCK'S
+# FINAL EXECUTION PLAN: a positioned mirror carries its own
+# ``music_<cue>_<NNN>`` line id, and a genuine synthetic opener carries
+# ``b000_music_open`` with empty ``source_line_ids``, which
+# ``_beat_id_for_shot`` recovers from the shot_id. Each resolves through its
+# own id.
 #
 # This is also the only shape that survives a chunked cue.
 # ``_MUSIC_MAX_CHUNK_DUR_S = 22.0`` means a long cue becomes ``_001``, ``_002``,
@@ -1780,14 +1725,13 @@ _OPENING_MUSIC_SUFFIX = "b000_music_open"
 # one-to-many. Removing the translation is what scales; a smarter mapping is not.
 
 
-#: 6/5 motion-centric LTX prompts (BUG-LOCAL-112, restored 2026-06-12 from the
-#: legacy ``batch_ltx_render._PROMPT_BY_ROLE``). The i2v anchor carries the LOOK
-#: from the FLUX still; the video prompt's ONLY job is MOTION. Design rules
-#: (MAD-verified): every sentence is a motion verb, NO set-dressing nouns, NO
-#: negation, total <= 240 chars, first motion verb within the first 140. The
-#: refactor had diluted these into ~185-char scene-DESCRIPTIVE "brief+beat"
-#: prompts ("a 1940s radio station studio, glowing warmly..."), which the model
-#: reads as "render this set" -> flat pans on the conditioned still.
+#: 6/5 motion-centric LTX prompts (BUG-LOCAL-112). The i2v anchor carries the
+#: LOOK from the FLUX still; the video prompt's ONLY job is MOTION. Design
+#: rules (MAD-verified): every sentence is a motion verb, NO set-dressing
+#: nouns, NO negation, total <= 240 chars, first motion verb within the first
+#: 140. Scene-DESCRIPTIVE ~185-char "brief+beat" prompts ("a 1940s radio
+#: station studio, glowing warmly...") read to the model as "render this set"
+#: -> flat pans on the conditioned still.
 # Chunk A2 (visual-style TOTAL COVERAGE, 2026-07-05): the console/music
 # motion VALUES are pack-owned (VisualStyle.motion_registers in
 # nodes/visual_styles/<style>.json, exact keys below) and
@@ -1822,10 +1766,10 @@ _LTX_MOTION_PROMPT_MAX = 240
 def _style_authority():
     """The shared style-token authority (`_otr_visual_styles`).
 
-    ONE STYLE AUTHORITY (2026-08-17): the derivation and the prepend used to
-    live here and served video prompts only. They now live in the style module
-    so the STILL path applies the identical token; two definitions of "the
-    style word" drifting apart is the defect this consolidation prevents.
+    ONE STYLE AUTHORITY (2026-08-17): the derivation and the prepend live in
+    the style module so the STILL path applies the identical token as video
+    prompts; two definitions of "the style word" drifting apart is the
+    defect this consolidation prevents.
     """
     try:
         from .._otr_visual_styles import (  # type: ignore
@@ -1877,17 +1821,12 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
     # A SYNTHETIC opening-music beat can carry an announcer_visual role (the
     # b000_music_open structure is definitive, NOT the role) -- check it first.
     # `shot_music_opening_001` IS THE SHAPE PRODUCTION MINTS, and it does not
-    # end with `b000_music_open`. Measured 2026-09-03 across every music_visual
-    # shot on disk: 100% are `shot_music_opening_001` / `shot_music_closing_001`
-    # and 0% match the legacy suffix, so this branch had stopped firing entirely
-    # and every cold open fell through to the flat `music_inter` register.
-    #
-    # THAT SILENTLY REVERTED A DECISION THE OPERATOR HAD ALREADY MADE. The note
-    # below records a GPU A/B that restored the dynamic open as the default
-    # ("moves ~9x more", operator: "moving grooving"). A naming drift then
-    # un-restored it without touching the line that expresses the choice --
-    # which is why the drift was invisible: nothing looked wrong, the register
-    # simply never got asked for.
+    # end with `b000_music_open` (100% of the music_visual shots on disk are
+    # `shot_music_opening_001` / `shot_music_closing_001`, 0% match the legacy
+    # suffix), so a suffix-only test would never fire and every cold open would
+    # fall through to the flat `music_inter` register -- silently reverting the
+    # operator's decision that the dynamic open is the default (the note below
+    # records the GPU A/B: "moves ~9x more", operator: "moving grooving").
     if (is_synthetic_open
             or sid.endswith(_OPENING_MUSIC_SUFFIX)
             or "music_opening" in sid):
@@ -1900,20 +1839,17 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
         # open is RESTORED as the default (operator "moving grooving"). music_inter
         # stays available via OTR_LTX_OPEN_MOTION_KEY=music_inter.
         _open_key = otr_env.get("OTR_LTX_OPEN_MOTION_KEY", "music_open")
-        # A2: membership check against the STATIC key set (the values moved
-        # to the style pack; the retired fixture dict is not consulted).
+        # A2: membership check against the STATIC key set (the values live in
+        # the style pack).
         return (_open_key if _open_key in _MOTION_REGISTER_KEYS
                 else "music_inter")
     if role == "announcer_visual":
         return "announcer"
     if role == "music_visual":
-        # "closing" DOES NOT CONTAIN "close" -- c-l-o-s-i-n-g. That one missing
-        # letter is why every sign-off in production selected `music_inter`.
-        # Production mints `shot_music_closing_001`; the token list below was
-        # written for an older id shape and matched none of it. Measured
-        # 2026-09-03 across the music_visual shots on disk: 100% are
-        # `shot_music_opening_001` / `shot_music_closing_001`, 0% match the old
-        # tokens. See the opening half above for the same drift.
+        # "closing" DOES NOT CONTAIN "close" -- c-l-o-s-i-n-g. Production mints
+        # `shot_music_closing_001` / `shot_music_opening_001` (100% of the
+        # music_visual shots on disk), so the token list below must match those
+        # id shapes; one missing letter sends every sign-off to `music_inter`.
         # TOKEN MEMBERSHIP, NOT SUBSTRING. `"tag"` is inside "montage" and
         # "stage", and substring matching on ids is exactly how `"close"`
         # silently stopped matching `"closing"` in the first place. Splitting on
@@ -1930,12 +1866,10 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
 #: Deterministic fallback for a CHARACTER face beat whose shot carries no M4
 #: creative prompt. It stays world-neutral; authored prompts are preserved.
 #:
-#: "SUBTLE" REMOVED 2026-09-03. PBUG-20260827-04 root-caused inert renders to
-#: damping adjectives in the authored prompts and named THIS STRING verbatim as
-#: one of the offenders ("a person speaking, subtle facial motion"). A sibling
-#: clause was rewritten at the time; this one was missed and the damping word
-#: stayed live. Telling a model to be subtle is
-#: telling it to hold still, which is the defect, not the safety rail.
+#: NO DAMPING WORDS ("subtle" in particular): PBUG-20260827-04 root-caused
+#: inert renders to damping adjectives in prompts ("a person speaking, subtle
+#: facial motion" was one). Telling a model to be subtle is telling it to
+#: hold still, which is the defect, not the safety rail.
 _CHAR_FACE_FALLBACK_PROMPT = (
     "close-up cinematic portrait of a person speaking, face centered, one clear "
     "change of expression, attire from the story world, dramatic film lighting")
@@ -1998,8 +1932,8 @@ def _stamp_prompt_meta(req, source, prompt, *, subsource="", beat=""):
     (round 5 F2): source enum (shared_video_prompting_engine|engine:<id>|env|brief+beat), sha8, char count --
     ``run_episode`` copies them onto the trace rows (durable in the node-92
     /history report) and one INFO line makes operator log review mechanical.
-    The W7-pre builder migration moved these off the top level: VideoRequest
-    is extra="forbid", so underscore extras made every request schema-invalid."""
+    They ride the observability dict, never the top level: VideoRequest is
+    extra="forbid", so underscore extras make every request schema-invalid."""
     sha8 = hashlib.sha256(str(prompt).encode("utf-8")).hexdigest()[:8]
     obs = req.setdefault("observability", {})
     obs["prompt_source"] = source
@@ -2148,14 +2082,10 @@ def _role_of_shot(shot) -> str:
     return role
 
 
-#: RADIO IS THE HOST (2026-06-30 HuMo-improve plan, reversing Route-A
-#: 2026-06-28). The Route-A workaround that animated a "radio-face" still as
-#: HuMo's init_image for the instrumental MUSIC bookend (formerly here as
-#: _RADIO_BOOKEND_IMAGE_DEFAULT / _radio_bookend_image()) is RETIRED: the
-#: operator eyeballed the result and got a generic human host, not a radio --
-#: confirming the original 2026-05-01 BUG-LOCAL-129 finding (HuMo's finetuned
-#: weights only animate a face) still holds. The replacement is a structural
-#: redirect (below), not another HuMo init-image trick.
+#: RADIO IS THE HOST: HuMo's finetuned weights only animate a face
+#: (BUG-LOCAL-129), and a radio-face init_image workaround rendered a generic
+#: human host, not a radio -- so bookends are redirected structurally (below),
+#: never fed to HuMo with an init-image trick.
 #:
 #: The engine every announcer_visual / music_visual beat is redirected to when
 #: it would otherwise dispatch a HuMo-family (audio_driven_face) engine: the
@@ -2339,12 +2269,11 @@ def _enforce_radio_is_host(shot):
     pattern as the OTR_FORCE_ENGINE_MAP override below) so an announcer_visual /
     music_visual beat can NEVER dispatch a local HuMo-family (audio_driven_face)
     engine: "the radio is the host", never a talking human face for the
-    bookends (operator 2026-05-01, re-affirmed 2026-06-30 after Route-A's HuMo
-    bookend workaround produced a generic face on eyeball -- see the
+    bookends (operator 2026-05-01, re-affirmed 2026-06-30 -- see the
     :data:`_NEVER_HUMO_REDIRECT_ENGINE` comment above).
 
-    Wires the previously-dormant :func:`nodes._otr_speaker_role.is_never_humo_role`
-    (defined 2026-05-01, zero callers until now) into REAL dispatch. A caught
+    Wires :func:`nodes._otr_speaker_role.is_never_humo_role` into REAL
+    dispatch. A caught
     pick is LOUDLY redirected to :data:`_NEVER_HUMO_REDIRECT_ENGINE` -- never a
     hard-fail: this is a structural POLICY correction applied BEFORE any render
     is attempted, not a render-time failure, so it does not touch the separate
@@ -2590,8 +2519,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # without the not-_requires_fodder guard this override would clobber the
         # clean fodder with the scene still and re-introduce the clay blob.
         _bid = _visual_beat_id
-        # (still_pool_key read removed 2026-07-01 with the pooling rip --
-        # every shot resolves its own per-beat still.)
+        # Every shot resolves its own per-beat still.
         _still = _still_index(ledger).get(str(_bid), "")
         if _still:
             init_image = _still
@@ -2662,10 +2590,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                     "FAILS LOUD in render_clip rather than painting a dark floor "
                     "(no fallbacks). Investigate the image phase for beat %s.",
                     _eng, _bid, _bid)
-    # Route-A's local HuMo-radio-face music-bookend workaround (2026-06-28) is
-    # RETIRED 2026-06-30 (see _enforce_radio_is_host above): a local HuMo
-    # music_visual beat redirects to _NEVER_HUMO_REDIRECT_ENGINE before
-    # _family is computed.
+    # A local HuMo music_visual beat redirects to _NEVER_HUMO_REDIRECT_ENGINE
+    # before _family is computed (see _enforce_radio_is_host above).
     # Partner/cloud avatar engines may still legitimately reach this point as
     # audio_driven_face; their own declared init_image requirement is honored by
     # the scene-still branch above.
@@ -2703,7 +2629,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             and ENGINE_FAMILY.get(str(shot.get("engine_id") or ""))
             == "audio_driven_face"):
         # The b002-class silent miss: a talking-head shot whose char_id has no
-        # portrait previously surfaced only as eng_humo's fail-closed error
+        # portrait would surface only as eng_humo's fail-closed error
         # mid-render. Warn at the JOIN so the gap is visible upstream.
         _LOG.warning("[OTR.render_driver] talking-head shot %s char_id=%r has "
                      "NO portrait-index entry -- HuMo will fail closed LOUD "
@@ -2773,28 +2699,19 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         bid = _beat_id_for_shot(shot)
         start_s = line.get("start_s")
         dur_s = line.get("dur_s")
-        # M3 delta (c): the SYNTHETIC opening-music beat (b000) has no ledger
-        # line, so the per-line start_s/dur_s are absent. The audio-reactive lanes
-        # (ltx_av_music + viz_green, which paints FROM the audio analysis)
-        # need the per-beat slice -- fall back to the SHOT row's start_s/dur_s for
-        # THOSE engines only, so every other engine keeps the line-backed slice
-        # path byte-identical. (2026-06-18 visualizer soak: b000_music_open reached
-        # the engine -- renamed viz_green 2026-06-30 -- with an empty audio_ref and
-        # failed LOUD without this.)
-        # AMBIENT-AUDIO lanes (ltx_av_music's audio_conditioned_video family + the
-        # viz_green scopes) condition on the master MIX, and ltx_av_music HARD-REQUIRES
-        # audio_ref -- without it _assert_family_inputs_satisfiable raises
-        # FamilyInputGap and the no-fallbacks rule CRASHES the episode (the
-        # 2026-06-22 music-beat bug: b006/b013 inter-music beats have no per-line
-        # timing). ShotRow is extra=forbid with NO start_s/dur_s, so the old
-        # shot.get('start_s') fallback was ALWAYS None. Synthesize a BOUNDED window
-        # from the beat's target_frame_count (its audio-derived length) at its
-        # cumulative timeline position -- NEVER the whole master (an episode-length
-        # WAV would blow up the audio encoder).
-        # Route-A's dedicated local HuMo-music-bookend theme-slice carve-out
-        # (2026-06-28) is RETIRED 2026-06-30: local HuMo bookends redirect to
-        # ltx_audio_in upstream. _uses_ambient_master_audio now owns the valid
-        # bookend audio lanes directly: ltx_audio_in/audio_conditioned_video,
+        # The SYNTHETIC opening-music beat (b000) and the inter-music beats have
+        # no ledger line, so the per-line start_s/dur_s are absent, and ShotRow
+        # is extra=forbid with NO start_s/dur_s to fall back on. AMBIENT-AUDIO
+        # lanes (the audio_conditioned_video family + the viz_green scopes,
+        # which paint FROM the audio analysis) condition on the master MIX and
+        # HARD-REQUIRE audio_ref -- without it _assert_family_inputs_satisfiable
+        # raises FamilyInputGap and the no-fallbacks rule CRASHES the episode.
+        # So for THOSE engines only, synthesize a BOUNDED window from the beat's
+        # target_frame_count (its audio-derived length) at its cumulative
+        # timeline position -- NEVER the whole master (an episode-length WAV
+        # would blow up the audio encoder); every other engine keeps the
+        # line-backed slice path byte-identical. _uses_ambient_master_audio owns
+        # the valid bookend audio lanes: ltx_audio_in/audio_conditioned_video,
         # visualizers, and Partner/cloud avatar engines.
         if ((start_s is None or dur_s is None)
                 and _uses_ambient_master_audio(
@@ -2813,10 +2730,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         if (start_s is not None and dur_s is not None
                 and float(dur_s) > 0):
             # PER-SEGMENT, NOT PER-BEAT, ON A MULTI-CLIP BEAT (WIRE-W4b,
-            # 2026-07-29). Every segment used to be handed the WHOLE beat's
-            # slice, so a 3-segment HuMo beat rendered three clips all
-            # lip-syncing to the same waveform from the top -- an assembled
-            # beat that says the opening of the line three times. The window
+            # 2026-07-29). Handing every segment the WHOLE beat's slice would
+            # make a 3-segment HuMo beat render three clips all lip-syncing to
+            # the same waveform from the top -- an assembled beat that says the
+            # opening of the line three times. The window
             # arithmetic lives in ``coverage_plan.segment_render_window``
             # (pure, CPU-tested, and it is the RENDER window, so a chained
             # successor's dropped head frame gets its own audio too); the only
@@ -2925,9 +2842,6 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # default "none" stamp (init_image is empty) would HIDE that we refused
         # to mesh the scene still; surface it explicitly (mirrors i2v above).
         req["observability"]["init_source"] = "missing_mesh_fodder"
-        # (The separate `mesh_fodder_missing` boolean was removed 2026-08-28:
-        # it restated the durable `init_source` stamp on the same line, and
-        # only a direct-builder test ever read it.)
     else:
         req["observability"]["init_source"] = (init_source if init_image
                                                else "none")
@@ -3014,11 +2928,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # and the trailing clause it engineered and expects to survive. The banana
     # funnel further down re-caps to that published number, preserves that
     # published clause, and does nothing else. A branch that publishes NOTHING
-    # is never capped -- which is the whole point: the funnel used to cap every
-    # branch at `max(188, pre_transform_length)`, so branches that had promised
+    # is never capped -- which is the whole point: capping every branch at
+    # `max(188, pre_transform_length)` would hand branches that had promised
     # nothing (the operator's verbatim OTR_LTX_RADIO_PROMPT override, the M4
     # wall and its engineered composition tail, the 298-char announcer talking
-    # prompt) were handed zero headroom and lost their tails to any growth.
+    # prompt) zero headroom, and they would lose their tails to any growth.
     # Publish INSIDE the sub-path that composed the prompt, never at a shared
     # assignment -- a sibling sub-path must not inherit a budget or a clause it
     # never authored.
@@ -3219,11 +3133,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _shot_role, shot.get("shot_id"), _g_synthetic)
         _g_pack_register = (_vstyle.motion_registers[_g_motion_key]
                             if _g_motion_key else "")
-        # The optional motion-clause pass was ripped 2026-08-27 (it was opt-in,
-        # default OFF, set by no profile, and the Ghost lane was excluded from
-        # it by capability anyway). Ghost resolves its action through the
-        # pack register / beat intent / neutral-action chain, which is what
-        # every production episode already did.
+        # There is no motion-clause pass: Ghost resolves its action through the
+        # pack register / beat intent / neutral-action chain.
         _g_clause = None
         _g_sigil = str(shot.get("subject_sigil") or "")
         # A CHARACTER BEAT WITHOUT ITS DURABLE SIGIL IS A GAP, NOT A DEFAULT.
@@ -3309,12 +3220,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # PER-LANE PROMPT DISPATCH (Option B, operator ruling 2026-08-27).
     # ===================================================================== #
     #
-    # THE DEFECT THIS FIXES. Every lane used to compose its prompt as
-    # ``get("text_prompt") or <the lane's motion default>``, and ShotLock
-    # populates ``text_prompt`` unconditionally for every character beat -- so
-    # the per-lane motion prompts committed in 65538f41 lived on the dead side
-    # of that ``or`` and never once rendered. The live H3 leg of 2026-08-27
-    # proved it from production: every character beat logged ``source=m4``.
+    # WHY NOT ``get("text_prompt") or <the lane's motion default>``: ShotLock
+    # populates ``text_prompt`` unconditionally for every character beat, so a
+    # per-lane motion prompt would live on the dead side of that ``or`` and
+    # never render.
     #
     # THE RULE: one path per lane, always active. No flag, no shadow state, no
     # legacy route. A lane that declares its OWN ``compose_prompt`` composes
@@ -3441,10 +3350,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # (2026-08-28). `_prefix_video_style_cue` PREPENDS, and the two H3
         # lanes require `H3_REFERENCE_OPENER` verbatim as the FIRST thing in
         # the prompt -- the official one-image I2VA grammar. Prepending the cue
-        # made "must begin exactly" false on every non-default style pack:
-        # proven on the anime pack, where the prompt became "anime style. For
-        # the target video, ...". `eng_minimax_h3.py` already documented these
-        # lanes as exempt from the prefix; nothing implemented it.
+        # would make "must begin exactly" false on every non-default style pack
+        # (on the anime pack the prompt became "anime style. For the target
+        # video, ...").
         #
         # The cue is SEATED AFTER THE OPENER rather than dropped, so both
         # contracts hold at once -- an exemption would silently lose the pack's
@@ -3497,9 +3405,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         if _prompt_char_budget is not None:
             _prompt_char_budget += len(text_prompt) - _pre_cue_chars
         req["text_prompt"] = text_prompt
-        # "shared_video_prompting_engine", not the old undefined "m4": this is the prompt
-        # ShotLock composes and EVERY lane shares unless it declares its own
-        # compose_prompt. Reads against "engine:<id>" in the same log.
+        # "shared_video_prompting_engine": this is the prompt ShotLock composes
+        # and EVERY lane shares unless it declares its own compose_prompt. Reads
+        # against "engine:<id>" in the same log.
         _stamp_prompt_meta(req, "shared_video_prompting_engine", text_prompt,
                            subsource=str(creative.get("source") or ""),
                            beat=_beat_id_for_shot(shot))
@@ -3517,8 +3425,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # note above. Only the LOG differs by phase: the fallback prompt
             # below is what the preflight request carries either way. The
             # engine is named because this line fires for every face lane, not
-            # only HuMo, and the old wording sent a 2026-09-26 diagnosis of the
-            # H3 audio-in lane off to the HuMo seam.
+            # only HuMo (a HuMo-only wording sends an H3 audio-in diagnosis off
+            # to the HuMo seam).
             if phase == "cast_preflight":
                 _LOG.info(
                     "[OTR.render_driver] character face beat %s on %r has no "
@@ -3542,8 +3450,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _stamp_prompt_meta(req, "default", _default_prompt,
                                beat=_beat_id_for_shot(shot))
     # SCENE PROMPTS for text-driven engines (gap-audit fix F2, roundtable-
-    # hardened, 2026-06-10). Any ltx_video /
-    # wan_i2v shot with NO writer creative prompt gets a prompt grounded in
+    # hardened, 2026-06-10). Any text-driven-engine shot with NO writer
+    # creative prompt gets a prompt grounded in
     # THE EPISODE'S OWN BRIEF -- the source of the old episodes' scenic,
     # varied opens -- finished with the brief's era tail under the LTX char
     # budget. Covers ALL roles (announcer/music opens AND character),
@@ -3569,16 +3477,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _strict_text_only = _is_strict_text_only_engine(_engine_id)
     _google_text_provider = _engine_id in _GOOGLE_SILENT_TEXT_PROVIDERS
     _google_prompt_provider = _engine_id in _GOOGLE_PROVIDER_PROMPT_ENGINES
-    # THE MEMBERSHIP TEST IS A NAMED SET NOW, not an inline literal. The list
-    # this replaced went stale three times: the LTX 2.5 foley and mime lanes
-    # were added 2026-08-26 with a comment describing the exact silent degrade
-    # they had been suffering -- "the beat shipped `build_request`'s hardcoded
-    # 'a 1940s radio studio' default with `prompt_source` never stamped" -- and
-    # that reasoning was never carried across to `ltx_8gb` or either
-    # `minimax_h3` lane. It also still carried
-    # `wan_i2v`, retired the same week and absent from the registry, so that
-    # entry could not match a shot. `tests/test_bookend_scene_prompt_roster.py`
-    # is what stops the fourth occurrence.
+    # THE MEMBERSHIP TEST IS A NAMED SET, not an inline literal: an inline list
+    # goes stale, and a lane left off it silently degrades -- "the beat shipped
+    # `build_request`'s hardcoded 'a 1940s radio studio' default with
+    # `prompt_source` never stamped".
+    # `tests/test_bookend_scene_prompt_roster.py` is what stops that recurring.
     if ((_engine_id in BOOKEND_SCENE_PROMPT_ENGINES
             or _google_prompt_provider
             or _strict_text_only)
@@ -3614,17 +3517,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # 6/5 MOTION-CENTRIC restoration (BUG-LOCAL-112): the announcer /
             # music radio-console beats render a MOTION-ONLY prompt. The i2v
             # anchor carries the LOOK from the FLUX still, so the prompt's only
-            # job is to MOVE. The refactor had led with a scene-DESCRIPTIVE
-            # subject ("a 1940s radio station studio, glowing warmly...") which
-            # the model reads as "render this set" -> flat pans on the
-            # conditioned still. An optional short atmosphere fragment appends
+            # job is to MOVE. Leading with a scene-DESCRIPTIVE subject ("a 1940s
+            # radio station studio, glowing warmly...") reads to the model as
+            # "render this set" -> flat pans on the conditioned still. An
+            # optional short atmosphere fragment appends
             # AFTER the motion verbs, dropped if it breaks the 240-char budget.
             _motion_key = _ltx_motion_role_key(
                 _shot_role, shot.get("shot_id"), _is_synthetic_open)
             # Chunk A2: the motion VALUE comes from the style pack (exact-key
-            # indexing -- the loader guarantees the 4 console keys, and the
-            # old silent `or ...["announcer"]` fallback is RETIRED per r2
-            # codex S3: a missing key raises LOUD, never remaps to announcer).
+            # indexing -- the loader guarantees the 4 console keys; a missing
+            # key raises LOUD, never remaps to announcer).
             scene_prompt = _vstyle.motion_registers[_motion_key]
             _field_source = "motion_registers:%s" % _motion_key
             _meta = (ledger or {}).get("meta") or {}
@@ -3704,24 +3606,17 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # Non-open text-engine roles keep the brief
             # logline core + beat clauses; the announcer/music OPEN roles use
             # the motion-centric branch above (the i2v still carries the look).
-            # THE CORE TAKES ITS SHIPPED 90 CHARS. The variable budget that
-            # used to live here existed solely to make room for the opt-in
-            # motion clause, which was ripped 2026-08-27; with no clause to
-            # accommodate, `get_story_brief_ltx`'s own default is the whole
-            # answer and the arithmetic that shrank it has nothing to shrink
-            # for. This is the value the non-override path always used, so
-            # every production render is byte-identical across the rip.
+            # THE CORE TAKES ITS SHIPPED 90 CHARS: there is no motion
+            # clause to make room for, so `get_story_brief_ltx`'s own
+            # default is the whole answer.
             core = get_story_brief_ltx(_meta, max_chars=90)
             if not core:
                 _setting = _term_join("setting", 2)
                 core = ("cinematic establishing shot"
                         + (f", {_setting}" if _setting else ""))
-            # ONE PATH. The override branch that used to sit here belonged to
-            # the ripped motion-clause pass; with that gone this is the only
-            # composition, and it is the one every production render already
-            # took. "no on-screen text" stays last -- the P4 probe observed
-            # on-video text hallucination on this lane, so the steer is not
-            # optional decoration.
+            # ONE PATH: this is the only composition. "no on-screen text"
+            # stays last -- the P4 probe observed on-video text hallucination
+            # on this lane, so the steer is not optional decoration.
             clauses = list(_beat_clauses(line, shot.get("shot_id")))
             clauses.extend(["slow cinematic camera drift", "no on-screen text"])
             scene_prompt = finish_visual_prompt(
@@ -3785,41 +3680,40 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             from eng_ltx25 import (  # type: ignore
                 finish_joint_av_positive, identity_leaks_in,
                 joint_av_prompt_is_finished, sounds_named_in)
-        # NO MOOD READ ANY MORE (operator, 2026-08-28). Mime used to lead its
-        # tail with the brief's music_mood_terms and ask for "instrumental
-        # scene score" -- a CATEGORY, which is precisely the defect that made
-        # the foley bed choose voices. The operator collapsed the two lanes to
-        # one prompt: "foley / mime same thing, they use the new foley
-        # prompting ... the only difference between foley and mime is the mux
-        # layer". The brief's mood terms still drive the MUSIC bookends through
-        # `_otr_music_prompt`, which was always their real owner.
+        # NO MOOD READ HERE (operator, 2026-08-28): leading the tail with the
+        # brief's music_mood_terms and asking for "instrumental scene score" is
+        # a CATEGORY, which is precisely the defect that made the foley bed
+        # choose voices. The operator collapsed the two lanes to one prompt:
+        # "foley / mime same thing, they use the new foley prompting ... the
+        # only difference between foley and mime is the mux layer". The brief's
+        # mood terms drive the MUSIC bookends through `_otr_music_prompt`, which
+        # is their real owner.
         _jav_before = str(req.get("text_prompt") or "")
         _jav_after = finish_joint_av_positive(_jav_engine, _jav_before)
-        # THE PROTECTION IS UNCONDITIONAL, THE MUTATION IS NOT (2026-08-27,
-        # found independently by two panel lanes). These two lines used to sit
-        # inside the `!=` branch below, so a prompt that ALREADY carried its
-        # suffix -- an idempotent re-entry, or a pre-finished fixture -- took
-        # the no-change path and left the scene branch's published 188-char
-        # budget standing. The banana re-cap would then trim the prompt back to
-        # 188 and throw away the mandatory non-speech tail, which is the one
-        # clause the whole seam exists to protect. A lane that keeps its audio
-        # owes that tail whether or not THIS call is what appended it.
+        # THE PROTECTION IS UNCONDITIONAL, THE MUTATION IS NOT. These two lines
+        # sit OUTSIDE the `!=` branch below: a prompt that ALREADY carries its
+        # suffix -- an idempotent re-entry, or a pre-finished fixture -- takes
+        # the no-change path, and would otherwise leave the scene branch's
+        # published 188-char budget standing. The banana re-cap would then trim
+        # the prompt back to 188 and throw away the mandatory non-speech tail,
+        # which is the one clause the whole seam exists to protect. A lane that
+        # keeps its audio owes that tail whether or not THIS call is what
+        # appended it.
         _prompt_char_budget = None
         _prompt_protected_clause = None
         _jav_obs = req.setdefault("observability", {})
-        # THE RECEIPT HAS TO BE PROVABLE, NOT ASSERTED (r3 finding, 2026-08-28).
-        # This field used to be stamped "finished" unconditionally, so a prompt
-        # that came back WITHOUT a sound frame -- an operator override already
-        # ending in the no-voice clause, say -- still reported finished. That is
-        # a false claim in the one field used to prove the lane received its
-        # audio requirement, and evidence in this repo is cited by hash.
+        # THE RECEIPT HAS TO BE PROVABLE, NOT ASSERTED. This field is not
+        # stamped "finished" unconditionally: a prompt that came back WITHOUT a
+        # sound frame -- an operator override already ending in the no-voice
+        # clause, say -- would otherwise report finished, a false claim in the
+        # one field used to prove the lane received its audio requirement
+        # (evidence in this repo is cited by hash).
         # `joint_av_prompt_is_finished` is the one owner of that judgement
-        # since the 2026-08-29 golden-shape reordering (sound frame PRESENT
-        # plus the no-voice clause LAST -- the frame-and-clause pair is no
-        # longer contiguous at the tail on a normally composed prompt), and
-        # the sounds receipt reads the FINISHED string by phrase membership,
-        # because the composer now seats the sounds itself and a cue re-scan
-        # would match the phrases' own words.
+        # (sound frame PRESENT plus the no-voice clause LAST -- the
+        # frame-and-clause pair is not contiguous at the tail on a normally
+        # composed prompt), and the sounds receipt reads the FINISHED string by
+        # phrase membership, because the composer seats the sounds itself and a
+        # cue re-scan would match the phrases' own words.
         _jav_ok = joint_av_prompt_is_finished(_jav_after)
         _jav_obs["joint_av_prompt"] = "finished" if _jav_ok else "UNFINISHED"
         _jav_obs["joint_av_sounds"] = sounds_named_in(_jav_after)
@@ -3954,11 +3848,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _bobs.update(_banana_off_receipt(_banana_prompt, variety_key=_bkey))
     req_hash = (shot.get("render_request_hash")
                 or (shot.get("cache_keys") or {}).get("request_hash"))
-    # PER SEGMENT, not per shot (2026-08-02). The seed was derived from the
-    # request hash and the shot id alone, so every segment of a multi-clip beat
-    # sampled from the SAME seed. HuMo starts each call from fresh noise and
-    # carries no motion state, so an identical seed plus an identical reference
-    # portrait regenerates a near-identical opening -- which is precisely the
+    # PER SEGMENT, not per shot (2026-08-02). A seed derived from the request
+    # hash and the shot id alone would give every segment of a multi-clip beat
+    # the SAME seed. HuMo starts each call from fresh noise and carries no
+    # motion state, so an identical seed plus an identical reference portrait
+    # regenerates a near-identical opening -- which is precisely the
     # snap-back-to-the-same-pose signature at every cut.
     #
     # External research (2026-08-02, HuMo/LTX report, grade A): a fixed seed
@@ -3976,11 +3870,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _video_seed = _seed_from_hash(req_hash, "%s#seg%d"
                                       % (shot.get("shot_id"), _seg_index))
     req["seed_bundle"] = {"request_seed": _video_seed}
-    # `video_seed_segment_index` was removed 2026-08-28. It was never projected
-    # into the durable trace, and it would have MISLED if it were: multi-segment
-    # requests are rebuilt per segment, so this original request's index 0 is
-    # not the segment a reader would be looking at. The per-segment rows carry
-    # their own `segment_index`, which is the honest one.
+    # The request carries no segment index: multi-segment requests are rebuilt
+    # per segment, so this original request's index 0 is not the segment a
+    # reader would be looking at. The per-segment rows carry their own
+    # `segment_index`, which is the honest one.
     # Operator 2026-06-12: surface the per-beat LTX/video sampler seed (the
     # deterministic request-hash seed the engines render with) in the trace so
     # future renders are apples-to-apples with the 6/5 baseline.
@@ -4096,9 +3989,8 @@ def _render_one(engine_name, request, *, host_caps=None, profile=None,
 
     S4 platform-portability (2026-07-10): ``host_caps``/``profile`` carry
     REAL host facts (build_host_caps) + the ledger-stamped v2 device/dtype
-    policy down to the adapter boundary -- the empty-dict boundary here was
-    the campaign's most consequential wiring catch. ``None`` (direct debug
-    callers) degrades to the old empty dicts.
+    policy down to the adapter boundary. ``None`` (direct debug callers)
+    degrades to empty dicts.
 
     CHUNK 5 (2026-07-26): the prepare/teardown bracket now belongs to a
     :class:`beat_session.BeatSession`. ``segment`` is a
@@ -4112,14 +4004,13 @@ def _render_one(engine_name, request, *, host_caps=None, profile=None,
 
     Passing no session keeps the historical bracket: one prepare, one render,
     one teardown, in that order, with teardown gated on handles having been
-    taken. ONE deliberate delta -- ``prepare`` now receives a populated
-    ``session_ctx`` (``beat_id``/``segment_count``/``multi_clip``) where it
-    used to receive ``{}``, so an adapter can size for four clips before it
-    loads. Every shipped adapter accepts and ignores that argument today."""
+    taken. ``prepare`` receives a populated ``session_ctx``
+    (``beat_id``/``segment_count``/``multi_clip``), so an adapter can size for
+    four clips before it loads."""
     _assert_family_inputs_satisfiable(engine_name, request)
     # A RETIRED id must fail with the NAMED policy error BEFORE the generic
     # not-registered LookupError -- this is the boundary the shipped
-    # /otr/video_render_single HTTP endpoint reaches (rip-sfx 2026-08-06).
+    # /otr/video_render_single HTTP endpoint reaches.
     # Resolved FOR THE GUARD ONLY (idempotent on internal ids), so a future
     # retired id that also carries a public alias cannot slip past; the
     # registry checks below still see the caller's own name unchanged.
@@ -4496,11 +4387,11 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         # profile), so it is used as-is rather than rebuilt -- rebuilding it
         # here would be a second derivation of one request.
         #
-        # The predicate was ``is_multi_clip`` until 2026-08-02, which asked the
-        # wrong question: a ONE-segment plan still owes a tail trim whenever its
-        # length was rounded up to a legal rung, and the trim is the coverage
-        # assembler's job. Such beats came down here and kept their surplus
-        # frames, so the video outran its audio. See
+        # The predicate is ``requires_coverage_execution``, not
+        # ``is_multi_clip``: a ONE-segment plan still owes a tail trim whenever
+        # its length was rounded up to a legal rung, and the trim is the
+        # coverage assembler's job. A beat that came down here would keep its
+        # surplus frames, so the video would outrun its audio. See
         # ``CoveragePlan.requires_coverage_execution`` for why the question is
         # what the plan OWES rather than how many pieces it is in.
         single = request if request is not None else request_builder(
@@ -4518,7 +4409,7 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     engine_id = str(shot.get("engine_id") or "")
     # Multi-clip session creation is its own ingress (a frozen ledger may carry
     # a stale engine id): a RETIRED id gets the NAMED refusal, never the
-    # generic not-registered error (rip-sfx 2026-08-06). Resolved for the
+    # generic not-registered error. Resolved for the
     # guard only -- idempotent on the internal ids real ledgers carry.
     from .._otr_shared.public_engines import (
         check_retired_engine, resolve_engine_id)
@@ -4554,14 +4445,14 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # The builder is not cheap and it is not pure: it resolves stills off the
     # ledger and it SHELLS OUT TO FFMPEG to cut each segment's conditioning
     # WAV out of the frozen master. Run inside the session, that filesystem
-    # and subprocess work happened while the cross-process GPU lease was held
-    # and a 14B UNET sat resident -- once per segment, between renders. The
+    # and subprocess work would happen while the cross-process GPU lease is held
+    # and a 14B UNET sits resident -- once per segment, between renders. The
     # lease is the scarcest thing this build owns; nothing that does not need
     # the GPU should be inside it.
     #
     # It is also where a bad request SHOULD surface. A builder that raises on
-    # segment 2 used to do it after two renders and a 6 GiB load; now the beat
-    # refuses before anything is taken.
+    # segment 2 would do it after two renders and a 6 GiB load; prebuilt, the
+    # beat refuses before anything is taken.
     #
     # The CHAIN's terminal-frame substitution deliberately stays in the loop:
     # segment N's init image is segment N-1's last rendered frame, which does
@@ -4612,8 +4503,7 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # ``coverage_planned`` is passed EXPLICITLY rather than inferred from the
     # segment count. Reaching this function at all means the plan owes coverage
     # work, and a one-segment plan carrying a tail trim owes exactly that --
-    # but ``segment_count > 1`` would call it single-clip and route it to the
-    # ping-pong path.
+    # but ``segment_count > 1`` would call it single-clip.
     # THE WEIGHT FLOOR RUNS BEFORE THE SESSION OPENS, NOT INSIDE _render_one
     # (agy review). BeatSession.open() calls engine.prepare(), which hoists the
     # loaders -- i.e. it puts the weights in memory. On a coverage beat that
@@ -5102,8 +4992,9 @@ def _cloud_floor_reason(sid, errors, shot=None):
     could easily get a failed output; a failed output on a cloud video or
     still should not break the system"). A provider timing out, returning a
     corrupt file, losing a job or rejecting one request tells us exactly as
-    much about the NEXT beat as a content refusal does: nothing. Every one of
-    them used to abort the episode and discard every clip already paid for.
+    much about the NEXT beat as a content refusal does: nothing. Without the
+    floor, every one of them would abort the episode and discard every clip
+    already paid for.
 
     THREE GATES, ALL OF WHICH MUST HOLD:
       * the shot's engine is a CLOUD engine -- a local fault is a local fault
@@ -5209,7 +5100,8 @@ def _render_still_floor(shot, ledger, *, host_caps=None, profile=None,
 
 
 #: What the log says for each floorable cloud verdict, in the operator's
-#: terms rather than the taxonomy's. Every one of these used to end the run.
+#: terms rather than the taxonomy's. Without the floor, each of these would
+#: end the run.
 _CLOUD_FLOOR_WHY = {
     "content_refused": ("the provider's policy gate REFUSED this prompt, and "
                         "no retry changes that verdict."),
@@ -5852,10 +5744,10 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
 def _log_if_legacy_render_plan_present(ledger):
     """Do not let story-QA render_plan metadata drop real episode shots.
 
-    ``meta.render_plan`` was introduced for the retired/separate HuMo batch as
-    a cost/attention filter. The generic episode renderer is now the visible
-    delivery path, so every ShotLock row must render; otherwise a voiced line
-    can fall through to the procgen floor while its audio/caption still plays.
+    ``meta.render_plan`` (a cost/attention filter from the separate HuMo
+    batch) is IGNORED by the episode renderer, which only logs it: every
+    ShotLock row must render; otherwise a voiced line can fall through to the
+    procgen floor while its audio/caption still plays.
     """
     meta = (ledger or {}).get("meta") or {}
     plan = meta.get("render_plan") or {}
@@ -6197,13 +6089,12 @@ def assert_coverage_plans(ledger):
             # provenance can still be held to the ledger: the ceiling it was
             # planned under, and the engine it was planned FOR.
             #
-            # THE ENGINE HALF WAS MISSING (2026-07-27, post-code panel, two
-            # seats independently, each with a live repro). Comparing only the
-            # ceiling let a stale ltx_8gb receipt ride a shot whose engine had
-            # been swapped to something unregistered: same ceiling, no
-            # contract to re-derive, and the fall-through validated the plan
-            # arithmetic-only -- a plan built for an 8n+1 ladder accepted for
-            # an engine never checked against any length. The registered-engine
+            # THE ENGINE HALF IS REQUIRED: comparing only the ceiling would let
+            # a stale ltx_8gb receipt ride a shot whose engine had been swapped
+            # to something unregistered (same ceiling, no contract to re-derive,
+            # and the fall-through would validate the plan arithmetic-only -- a
+            # plan built for an 8n+1 ladder accepted for an engine never checked
+            # against any length).
             # branch above compares the whole receipt, engine id included; this
             # branch has to say the same thing with less information.
             if str(stamped.get("engine_id") or "") != engine_id:
@@ -6245,17 +6136,15 @@ def resolve_final_shot_engines(ledger):
     returns, ``shot["engine_id"]`` / ``shot["family"]`` are the engine that
     will actually render the beat.
 
-    WHY THIS EXISTS (2026-07-25, kibitz per-beat-stills r1; codex
-    ``gpt-5.6-sol`` high and agy ``Gemini 3.6 Flash (High)`` found the same
-    ordering defect independently, and the judge's anchor had it too):
-    ``otr_video_render_batch`` validated the still spine BEFORE either
-    mutation had run -- ``apply_engine_override`` fires inside
-    :func:`run_real_episode`, and ``_enforce_radio_is_host`` fires per shot
-    inside :func:`build_request_from_shot`, which is later still. So with a
-    force map set, or on any announcer/music beat whose picked engine is a
-    local HuMo, **the spine was validated against the PICKED engine and the
-    beat was rendered by a DIFFERENT one** -- the aspect/geometry mismatch
-    class this whole still-plans build exists to close.
+    WHY THIS EXISTS: ``otr_video_render_batch`` validates the still spine, and
+    that must happen AFTER both engine mutations -- ``apply_engine_override``
+    fires inside :func:`run_real_episode`, and ``_enforce_radio_is_host``
+    fires per shot inside :func:`build_request_from_shot`, which is later
+    still. Validated before them, with a force map set or on any
+    announcer/music beat whose picked engine is a local HuMo, **the spine is
+    checked against the PICKED engine and the beat is rendered by a
+    DIFFERENT one** -- the aspect/geometry mismatch class this whole
+    still-plans build exists to close.
 
     Calling this before ``validate_and_repair_still_spine`` makes the spine
     check see the real routing. It is IDEMPOTENT by construction -- the
@@ -6309,16 +6198,15 @@ def apply_engine_override(ledger):
     LOUD -- there is no degrade to a floor. Returns the (possibly
     rewritten) ledger.
 
-    FAIL CLOSED ON A MALFORMED MAP (2026-07-25, kibitz per-beat-stills r1 --
-    codex ``gpt-5.6-sol`` high and agy reached this independently, judge
-    concurring). This used to log ``IGNORED (parse)`` and render the UNFORCED
-    plan, which is a silent fallback: the operator asks for a forced-route
-    episode, gets an ordinary one, and the only trace is a warning line in a
-    long log. It is worse for the still spine specifically -- the spine is
-    validated against whatever routing this function leaves behind, so a
-    swallowed parse error means stills were minted for engines that are not
-    the ones that render. A malformed ``OTR_FORCE_ENGINE_MAP`` is operator
-    misconfiguration and it is now terminal, before any GPU time is spent."""
+    FAIL CLOSED ON A MALFORMED MAP. Ignoring it (logging ``IGNORED (parse)``
+    and rendering the UNFORCED plan) would be a silent fallback: the
+    operator asks for a forced-route episode, gets an ordinary one, and the
+    only trace is a warning line in a long log. It is worse for the still
+    spine specifically -- the spine is validated against whatever routing
+    this function leaves behind, so a swallowed parse error means stills
+    minted for engines that are not the ones that render. A malformed
+    ``OTR_FORCE_ENGINE_MAP`` is operator misconfiguration and it is terminal,
+    before any GPU time is spent."""
     spec = otr_env.get("OTR_FORCE_ENGINE_MAP", "").strip()
     if not spec:
         return ledger

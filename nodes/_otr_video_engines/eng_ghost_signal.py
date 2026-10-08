@@ -88,7 +88,7 @@ GHOST_CHECKPOINT_MIN_BYTES = 2_000_000_000
 GHOST_MOTION_MIN_BYTES = 1_700_000_000
 
 #: THE NATIVE CANVAS. Fixed, full-frame 16:9, and legal on the live OTR /32
-#: canvas law on BOTH axes -- which the retired 384x216 was not (216 % 32 != 0).
+#: canvas law on BOTH axes.
 GHOST_CANVAS_W = 512
 GHOST_CANVAS_H = 288
 
@@ -195,12 +195,8 @@ GHOST_SOURCE_FLOOR = 16
 #:
 #: SO THE DECISION WAS THE DELIVERY RATE, AND THE CADENCE WAS ITS ARITHMETIC.
 #: 25 fps was chosen deliberately; hold 2 is simply what reaches 25 from 12.5,
-#: and the motion-speed consequence was never separately examined. Both of the
-#: readings this file briefly carried were wrong: an r1 reviewer searched the
-#: coding plan and bug log, found no rationale, and inferred nobody had chosen
-#: anything -- absence of a record is not absence of a decision -- while the
-#: correction that followed treated the CADENCE as the thing decided. Neither.
-#: The target was decided; the cadence rode along.
+#: and the motion-speed consequence was never separately examined. The target
+#: was decided; the cadence rode along.
 #:
 #: THAT IS WHY HOLD 3 DOES NOT CONTRADICT THE ORIGINAL DECISION. Delivery stays
 #: at exactly 25 fps -- the whole point of `U = ceil(T/hold)` is that T is
@@ -210,10 +206,11 @@ GHOST_SOURCE_FLOOR = 16
 #:
 #: The knob is `OTR_GHOST_HOLD_FACTOR` below -- unset is unchanged, so the
 #: golden cadence stays byte-identical unless someone deliberately asks for
-#: another, and no engine id is registered to find out whether 3 is better. Flipping this constant instead turned 20 tests red, correctly:
+#: another, and no engine id is registered to find out whether 3 is better.
 #: `test_the_golden_lane_still_declares_hold_2` and
 #: `test_hold2_is_byte_identical_to_the_pre_seam_arithmetic` (17 frame counts,
-#: recomputed from first principles) pin hold-2 as the GOLDEN CONTRACT.
+#: recomputed from first principles) pin hold-2 as the GOLDEN CONTRACT, so
+#: flipping this constant is the wrong lever.
 #:
 #: WHAT THE KNOB ACTUALLY CHANGES, stated without a training-rate claim.
 #: At hold 2 the lane generates **12.5 unique source positions per displayed
@@ -222,16 +219,13 @@ GHOST_SOURCE_FLOOR = 16
 #: asked for: *"almost 100% certain it's rendering way too fast for human
 #: eyes."* That framing is arithmetic and needs nothing else to be true.
 #:
-#: AN EARLIER VERSION OF THIS COMMENT ASSERTED MORE THAN IT COULD PROVE. It
-#: claimed the SD1.5 motion modules are trained at 8 fps, so a 16-frame window
-#: IS two seconds of motion, so hold 2 runs "1.56x faster than trained" and
-#: hold 3 is "1.04x, native". One reviewer confirmed 8 fps from published
-#: guides; a second pointed out those cite a RECOMMENDED output rate, that the
-#: upstream dataset samples 16 frames at a CONFIGURABLE stride, and that this
-#: lane feeds no fps into AnimateDiff or the sampler at all -- so no training
-#: timebase is established and the ratios were dressed-up convention. The
-#: experiment is unchanged and still worth running; only the justification
-#: needed to stop overclaiming.
+#: NO TRAINING-RATE CLAIM IS ESTABLISHED. The argument that the SD1.5 motion
+#: modules are trained at 8 fps, so hold 2 runs "1.56x faster than trained"
+#: and hold 3 is "1.04x, native", is not proven: published guides cite a
+#: RECOMMENDED output rate, the upstream dataset samples 16 frames at a
+#: CONFIGURABLE stride, and this lane feeds no fps into AnimateDiff or the
+#: sampler at all, so no training timebase is established. The experiment is
+#: still worth running; the justification is the arithmetic above.
 #:
 #: What moves with it, separated by how well each is actually evidenced:
 #:   * MEASURED: motion plays at the rate the model was trained to draw
@@ -243,9 +237,8 @@ GHOST_SOURCE_FLOOR = 16
 #:   * HYPOTHESIS ONLY, riding the same A/B: that fewer windows also reduces
 #:     pyramid-fusion damping and therefore helps "bland" by a second mechanism.
 #:     Architecturally plausible -- the fuse does blend overlapping-window
-#:     predictions -- but NOTHING in this repo has ever measured it, and an
-#:     earlier draft of this comment asserted it as a third proven win. It is
-#:     not. `GHOST_CONTEXT_OVERLAP` stays put: overlap operates in U-space and
+#:     predictions -- but NOTHING in this repo has ever measured it.
+#:     `GHOST_CONTEXT_OVERLAP` stays put: overlap operates in U-space and
 #:     the 4/16 ratio is unchanged by hold, so moving it would only confound the
 #:     A/B.
 #: The cost is coarseness: each source frame would be shown three times rather
@@ -253,9 +246,9 @@ GHOST_SOURCE_FLOOR = 16
 #: "way too fast for human eyes" -- which is exactly what 1.56x predicts.
 #:
 #: 25/3 is not an integer rate, which is why `source_fps` below is DERIVED
-#: rather than asserted. That derivation IS applied -- at hold 2 it yields the
-#: same 12.5 the literal used to assert, so it changes nothing today and stops
-#: the receipt lying the moment a peer runs a different hold.
+#: rather than asserted. At hold 2 the derivation yields 12.5, so it changes
+#: nothing today and stops the receipt lying the moment a peer runs a
+#: different hold.
 GHOST_DEFAULT_HOLD = 2
 
 #: THE MODULE-LEVEL source rate: the DEFAULT lane's rate, and nothing more.
@@ -333,21 +326,14 @@ GHOST_NODE_CANDIDATES = {
 #: bytes of ComfyUI's OWN estimate (`comfy/sd.py::memory_used_decode`, which is
 #: `2178 * latent_h * latent_w * 64 * dtype_size` and deliberately generous).
 #:
-#: A BUDGET, NOT A FRAME COUNT. The first cut of this was the constant 4. A
-#: later cut replaced it with this budget on the belief that the Mac profile's
-#: 832x480 canvas meant an 832x480 DECODE, 2.7x the NVIDIA pixels -- that
-#: belief was WRONG, and the Mac's own log said so: every decode line on the
-#: passing 2026-09-13 leg reads `36x64 latent`, i.e. 512x288. The profile's
-#: canvas is the composite canvas; this engine family renders at its fixed
-#: size. So the constant was right for the decode all along.
-#:
-#: The budget stays anyway, for the reason that survives the correction: it
-#: is derived from the latent that is actually being decoded, so it does the
-#: right thing whether or not the author knew the canvas -- which, measured,
-#: the author did not. At 36x64 and 4 bytes it yields 4, matching the old
-#: constant; at a bigger latent it shrinks; when the latent cannot be read it
-#: is 1. 5 GiB is CHOSEN, not measured. The live proof: 8/8 decode calls clean
-#: on the 16 GB M4, 65 min, zero OOM, at chunks of 4.
+#: A BUDGET, NOT A FRAME COUNT: it is derived from the latent that is actually
+#: being decoded, so it does the right thing whether or not the canvas is
+#: known. (The profile's canvas is the composite canvas; this engine family
+#: renders at its fixed size -- every decode line on the passing 2026-09-13 leg
+#: reads `36x64 latent`, i.e. 512x288.) At 36x64 and 4 bytes it yields 4; at a
+#: bigger latent it shrinks; when the latent cannot be read it is 1. 5 GiB is
+#: CHOSEN, not measured. The live proof: 8/8 decode calls clean on the 16 GB
+#: M4, 65 min, zero OOM, at chunks of 4.
 GHOST_MPS_DECODE_BUDGET_BYTES = 5 * 1024 ** 3
 
 #: What to use when the latent cannot be measured: one frame. The conservative
@@ -567,10 +553,8 @@ def ghost_cadence_receipts(target_frame_count, source_request=None,
 # The adapter.
 # --------------------------------------------------------------------------- #
 
-# UNREGISTERED 2026-08-23. `animatediff15_video` is tombstoned in
-# RETIRED_ENGINE_IDS -- it carried this lane's published proof, so a saved graph
-# naming it earns the named refusal rather than "not registered". The CLASS is
-# the whole Ghost implementation and the surviving lane inherits it.
+# UNREGISTERED: `animatediff15_video` is tombstoned in RETIRED_ENGINE_IDS. The
+# CLASS is the whole Ghost implementation and the surviving lane inherits it.
 class GhostSignalEngine(_MC.MotionEngineBase):
     """``animatediff15_video`` -- AnimateDiff Ghost Signal."""
 
@@ -710,12 +694,10 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     delivery_scale_mode = GHOST_DELIVERY_SCALE_MODE
 
     #: WHERE THE BEAT'S MOTION COMES FROM. A prompt-owned lane has no still to
-    #: inherit movement from, so it has to name its motion authority. Since
-    #: Prompt v2 (2026-08-22) that authority is the DRAWABLE LEAF stamped on the
-    #: durable row by ShotLock -- one authored visual per beat, carrying the
-    #: movement -- and this lane is explicitly excluded from the optional
-    #: ripped `_otr_motion_clause` pass, whose result it ignored. Declared rather
-    #: than inferred because G3.7 asks the lane, not the reader.
+    #: inherit movement from, so it has to name its motion authority. That
+    #: authority is the DRAWABLE LEAF stamped on the durable row by ShotLock --
+    #: one authored visual per beat, carrying the movement. Declared rather than
+    #: inferred because G3.7 asks the lane, not the reader.
     motion_source = "ledger_ghost_drawable_beat"
 
     #: WHERE THE NEGATIVE ACTUALLY LANDS. Not decoration: it names the real graph
@@ -1098,13 +1080,12 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         ``unload_all_models``. The staged reclaim seam may detach loaded
         patchers; that is a different act from evicting the world.
 
-        THIS IS THIS ENGINE'S OWN CHOICE, NOT A RULE IT INHERITS. It used to
-        cite V-4 as the authority; the blanket prohibition in
-        ``MotionEngineBase._detach_patchers`` was struck by the operator on
-        2026-09-22 (the pipeline finishes voices and music before video starts,
-        so there is nothing for it to protect). Ghost Signal still declines the
-        bigger hammer because precise teardown is correct HERE, which is a
-        different statement from nobody being allowed it.
+        THIS IS THIS ENGINE'S OWN CHOICE, NOT A RULE IT INHERITS: the blanket
+        prohibition in ``MotionEngineBase._detach_patchers`` was struck by the
+        operator on 2026-09-22 (the pipeline finishes voices and music before
+        video starts, so there is nothing for it to protect). Ghost Signal
+        still declines the bigger hammer because precise teardown is correct
+        HERE, which is a different statement from nobody being allowed it.
         """
         self._classes = None
         self._artifacts = None
@@ -1261,15 +1242,10 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             # kills the render process and is re-runnable, which is an
             # annoyance and not a reason to refuse work.
             #
-            # WRITTEN AFTER SHIPPING IT THE OTHER WAY (2026-09-09). This branch
-            # refused unconditionally, and `_physical_ram_mb` was POSIX-only,
-            # so on BOTH of the operator's Windows boxes the lane raised on the
-            # first beat of every render -- a Mac guard that deleted a working
-            # Windows lane, which is the exact failure CLAUDE.md section 0B
-            # exists to prevent. The probe now covers Windows too, so this
-            # branch should be unreachable there; it stays scoped anyway,
-            # because a guard whose rationale names one platform must not fire
-            # on the platform it does not describe.
+            # A guard whose rationale names one platform must not fire on
+            # the platform it does not describe (CLAUDE.md section 0B). The
+            # RAM probe covers Windows too, so this branch should be
+            # unreachable there; it stays scoped anyway.
             if _MC._unified_memory_backend():
                 raise EngineUnusable(
                     self.name, self.family,

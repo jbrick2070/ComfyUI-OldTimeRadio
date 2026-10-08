@@ -1,7 +1,7 @@
 r"""``viz_mxc_cpu`` -- the OTR multi-colored ("mxc") audio-reactive visualizer.
 
-The creative RAINBOW replacement for the retired ``abstract`` floor (operator
-2026-06-30, kibitz-hardened). Pure numpy + PIL + ffmpeg -- runs on ANY box
+The creative RAINBOW visualizer (operator 2026-06-30, kibitz-hardened). Pure
+numpy + PIL + ffmpeg -- runs on ANY box
 (AMD / Mac / Intel), no GPU, no shaders (the operator constraint). A vintage
 radio-dial / SIGNAL-SPECTRUM sweep in a MUTED rainbow on a dark noir field with
 the same CRT scanlines + vignette + film grain as ``visualizer`` (the OTR
@@ -9,7 +9,7 @@ mystique), painted via :func:`nodes._otr_shared.scope_draw.paint_rainbow_frame`.
 
 AUDIO-OPTIONAL (``required_inputs=()``): reacts to audio where present
 (announcer/music/character) and idles a procedural rainbow on silence -- so it is
-ALSO the no-image floor for retired_role_a/background (fits every role by capability,
+ALSO the no-image floor for background (fits every role by capability,
 C2). ``accepts_still=False`` -> it mints NO still, so it never triggers an image
 model on a non-audio slot. has_audio is always False (only OTR_MasterAudioMux adds
 audio, test_audio_byte_identical invariant). NO FALLBACKS (fallback_engine=None);

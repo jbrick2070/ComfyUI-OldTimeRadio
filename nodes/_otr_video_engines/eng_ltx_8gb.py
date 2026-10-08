@@ -2,16 +2,16 @@
 
 The 8GB-tier LTX sibling. It animates a still into motion on the OFFICIAL LTX-Video
 **0.9.8 distilled 2B** all-in-one checkpoint (`ltxv-2b-0.9.8-distilled.safetensors`),
-NOT the retired LTX-2.3 22B stack and NOT the forbidden
-original `ltx-video-2b-v0.9.safetensors`. It is its own adapter/recipe: the 0.9.8
+NOT the forbidden original `ltx-video-2b-v0.9.safetensors`. It is its own
+adapter/recipe: the 0.9.8
 graph was captured from a LIVE `/object_info` + a functional in-process smoke on the
 5080 (2026-07-20).
 
 The 0.9.8 all-in-one checkpoint carries MODEL + the video VAE **embedded** (no
 separate VAE fetch); it has **no text encoder**, so the T5 is the shared
-`t5xxl_fp16.safetensors` loaded through a separate `CLIPLoader` (type `ltxv`). Since
-recipe v3 (2026-09-26) it runs on the GPU (`device='default'`), which ComfyUI's dynamic
-VRAM stages it onto; Apple Silicon keeps the CPU until the lane is proven there.
+`t5xxl_fp16.safetensors` loaded through a separate `CLIPLoader` (type `ltxv`).
+It runs on the GPU (`device='default'`), which ComfyUI's dynamic VRAM stages
+it onto; Apple Silicon keeps the CPU until the lane is proven there.
 The graph (discovery-verified):
 
   CheckpointLoaderSimple(0.9.8) -> MODEL(+embedded VAE)
@@ -24,20 +24,17 @@ The graph (discovery-verified):
   SamplerCustom(model,cfg,pos,neg,sampler,sigmas,latent) -> LATENT
   VAEDecode / VAEDecodeTiled -> IMAGE
 
-Single-pass, NO upscaler (the 8GB routes stay single-pass; the internal x2 latent
-upscaler was the retired 16GB LTX 2.3 route only). SILENT output (V-1); OTR master audio is
+Single-pass, NO upscaler (the 8GB routes stay single-pass). SILENT output
+(V-1); OTR master audio is
 muxed later by OTR_MasterAudioMux. Length is LTX's 8n+1 rule (min 9): an ask off
 that grid renders the next legal rung UP and the surplus is TRIMMED in real
 frames, so every frame delivered is a rendered frame in order. An ask this
 engine cannot reach -- past its declared 161 or past ``OTR_LTX_8GB_MAX_FRAMES``
--- is REFUSED before anything is staged. There is no ping-pong on this lane
-(deleted B4, 2026-07-27): padding a short render back up to the ask let a
-render that did not happen pass the plan-vs-output count gate, and on a
-``strict_first_frame`` lane the next chained segment would have begun on a
-mirrored frame. (The trailing "WAN keeps its extension -- it renders short on
-purpose" is HISTORY: WAN's ping-pong was deleted under the operator's no-mirror
-ruling and it now refuses such a beat rather than padding it. There is no
-extension left on any lane.)
+-- is REFUSED before anything is staged. There is no ping-pong on this lane:
+padding a short render back up to the ask would let a render that did not
+happen pass the plan-vs-output count gate, and on a ``strict_first_frame``
+lane the next chained segment would begin on a mirrored frame. No lane
+extends a short render (the operator's no-mirror ruling).
 
 Registered as a NORMAL selectable row: ``requires_flag=None``, empty ``default_roles``
 (selectable, not a default). ORDINARY preflight ONLY -- checkpoint + T5 present +
@@ -562,23 +559,13 @@ def _file_receipt(path):
     return (os.path.basename(path), int(st.st_size), int(st.st_mtime_ns))
 
 
-# ``_ltx8_frame_length`` LIVED HERE and is DELETED (B4, 2026-07-27).
-#
-# It snapped an ask DOWN to the nearest legal 8n+1 length and clamped it to the
-# env cap, which is exactly why the CLIP-FILL ping-pong existed: something had
-# to put the missing frames back. Removing the pad without removing the
-# snap-down would have shipped a short clip instead.
-#
-# Its two jobs now have explicit owners, which is the whole point of retiring
-# it rather than leaving it dead:
-#   * the LADDER is owned by ``Ltx8gbEngine.frame_contract`` --
-#     ``smallest_legal_at_least`` walks the same 9 + 8k rungs the coverage
-#     planner partitions against, so the adapter and the planner cannot
-#     disagree about what a legal length is. It snaps UP, and ``render_clip``
-#     trims the surplus in REAL frames.
-#   * the CAP is owned by an explicit refusal in ``render_clip``, before
-#     anything is staged. An ask the engine cannot reach is an error, not a
-#     number to quietly shrink.
+# Length ownership: the LADDER is owned by ``Ltx8gbEngine.frame_contract``
+# (``smallest_legal_at_least`` walks the same 9 + 8k rungs the coverage planner
+# partitions against, so the adapter and the planner cannot disagree about what
+# a legal length is; it snaps UP, and ``render_clip`` trims the surplus in REAL
+# frames). The CAP is owned by an explicit refusal in ``render_clip``, before
+# anything is staged: an ask the engine cannot reach is an error, not a number
+# to quietly shrink.
 
 
 #: S1 (2026-07-25) per-model still plan for ltx_8gb (spec section 3,
@@ -680,7 +667,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     )
     # LTX-Video 0.9.x Open Weights License (Lightricks; HF license:other) -- commercial
     # use permitted below the revenue threshold (same revenue-capped community model
-    # already treated as clean elsewhere; same LTX family as the retired 22B lanes).
+    # already treated as clean elsewhere).
     # NOTE: commercial_clean is NOT a selection gate -- it is a declared licensing
     # fact that nothing gates on. Operator confirms at license review.
     commercial_clean = True
@@ -708,12 +695,10 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         everywhere (the offline invariant -- no runtime fetch).
 
         DELEGATES to :meth:`_loader_token_path`, which is the ONE place the
-        explicit-override-vs-token question is decided. It used to short-circuit
-        on ``OTR_LTX_8GB_CKPT`` after a bare existence check, which made this the
-        SECOND authority on which file is the checkpoint -- and the one
-        ``assert_usable`` consulted, so the whole single-clip path (the common
-        case) validated one file while ``_build_graph`` handed the loader a bare
-        basename that resolves to another. Two resolvers over one fact.
+        explicit-override-vs-token question is decided. A second resolver
+        (an early return on ``OTR_LTX_8GB_CKPT``) would make ``assert_usable``
+        validate one file while ``_build_graph`` hands the loader a bare
+        basename that resolves to another: two resolvers over one fact.
 
         Consequence worth knowing: unlike its five sibling adapters' ``_ckpt_path``,
         this one can RAISE ``EngineUnusable`` -- because this is the only adapter
@@ -918,7 +903,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             return False
         # FAIL CLOSED under the consent act. Outside it this var is never
         # parsed at all; inside it, it is a MEASUREMENT INPUT, and anything
-        # unrecognised used to collapse to False -- so a sweep could mistype
+        # unrecognised must not collapse to False -- a sweep could mistype
         # the knob it was varying, decode untiled, and stamp a receipt saying
         # it had measured tiled. Same rule as `_config_number`: one bad value
         # stops the sweep instead of quietly becoming a third configuration.
@@ -956,10 +941,10 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         """The FROZEN negative conditioning (B6).
 
         The per-shot ``negative_prompt`` on the request still wins over this --
-        that is the director's channel and it travels with the work. What is
-        gone is the ``os.environ`` fallback: it made two boxes render visibly
+        that is the director's channel and it travels with the work. There is
+        NO ``os.environ`` fallback: it would make two boxes render visibly
         different clips from the same episode while both stamped the same
-        recipe receipt, which is the whole defect this chunk closes."""
+        recipe receipt."""
         frozen = str(LTX8_RECIPE["negative"])
         if not _prequalification_active():
             return frozen
@@ -1011,11 +996,9 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     def _config_number(self, env, dflt, lo, hi, cast):
         """Parse + RANGE-CHECK one numeric env knob, or fail CLOSED by name.
 
-        THE ONE implementation, deliberately. It used to be a closure inside
-        ``_resolve_render_config`` while ``_decode_inputs`` carried a second,
-        quieter copy that swallowed a bad value and silently substituted the
-        default -- so the tile geometry was the single knob on this adapter
-        that failed OPEN. A sweep could then mistype the value it was
+        THE ONE implementation, deliberately. A second, quieter copy that
+        swallowed a bad value and silently substituted the default would make
+        that knob fail OPEN: a sweep could mistype the value it was
         measuring, render at something else, and stamp a receipt saying it had
         measured it. Two implementations of one rule is how that happens; one
         is the fix."""
@@ -1193,20 +1176,19 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     def _assert_checkpoint_integrity(self, ckpt):
         """The 4 GiB checkpoint floor -- the ONE place it lives (B1b).
 
-        It used to live inline in ``assert_usable``, and that was sound only
-        while the weights loaded inside ``render_clip``. ``assert_usable`` runs
-        PER SEGMENT inside ``render_driver._render_one``, which is AFTER
-        ``BeatSession`` has opened the session -- so once B1b moved the real
-        ``CheckpointLoaderSimple`` execution into ``prepare()``, the load
-        overtook the only size check in the adapter. A truncated or wrong file
-        would reach the loader first and the operator would get a deep loader
-        traceback instead of the named refusal that tells them to re-fetch.
-        ``resolve_session_config`` does not close this: it proves the file
-        EXISTS and takes its receipt, never its size.
+        Called from BOTH ``assert_usable`` and ``prepare()``. ``assert_usable``
+        runs PER SEGMENT inside ``render_driver._render_one``, which is AFTER
+        ``BeatSession`` has opened the session -- and the real
+        ``CheckpointLoaderSimple`` execution happens in ``prepare()``, so
+        without the ``prepare()`` call the load would overtake the only size
+        check in the adapter: a truncated or wrong file would reach the loader
+        first and the operator would get a deep loader traceback instead of the
+        named refusal that tells them to re-fetch. ``resolve_session_config``
+        does not close this: it proves the file EXISTS and takes its receipt,
+        never its size.
 
-        Same reason code, same message, same ordering -- it still fires after
-        the missing-file verdict and before the T5 verdict. The only change is
-        that ``prepare()`` calls it too, before it loads anything."""
+        In ``assert_usable`` it fires after the missing-file verdict and before
+        the T5 verdict; ``prepare()`` calls it before it loads anything."""
         try:
             size = os.path.getsize(ckpt)
         except OSError:
@@ -1331,11 +1313,10 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # mistyped value stops a sweep instead of being quietly replaced by the
         # default it was meant to be measured against.
         #
-        # ``_tile_geometry`` is the ONE implementation (LANE 2). It used to be a
-        # closure here, and ``_recipe_departures`` would have needed a second
-        # copy to report what a sweep cell actually decoded with -- which is how
-        # this adapter grew two range checks with opposite failure modes the
-        # first time (B6 finding 4).
+        # ``_tile_geometry`` is the ONE implementation (LANE 2): both this
+        # decode and ``_recipe_departures`` (which reports what a sweep cell
+        # actually decoded with) go through it, so no second copy can grow a
+        # range check with the opposite failure mode.
         _i = self._tile_geometry
         base.update({
             "tile_size": _i("vae_tile"),
@@ -1368,11 +1349,10 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         get = request.get if isinstance(request, dict) else (
             lambda k, d=None: getattr(request, k, d))
         cfg = self._resolve_render_config()
-        # MOTION BAKED IN (2026-08-27). Was "subtle natural motion, cinematic
-        # light" -- the damping instruction the 2026-08-17 kinetic amendment
-        # killed, still shipping here. This lane speaks the LTX prompt dialect,
-        # so: a named action, and the light kept because this lane's prompt
-        # carries its own look.
+        # MOTION BAKED IN (2026-08-27): no damping instruction (the 2026-08-17
+        # kinetic amendment). This lane speaks the LTX prompt dialect, so: a
+        # named action, and the light kept because this lane's prompt carries
+        # its own look.
         # `_compose_positive` is the seam a sibling (razzle_ltx_8gb) overrides;
         # a local variable here would make that override impossible.
         positive = self._compose_positive(request)
@@ -1822,31 +1802,19 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 bucket.append(model)
                 seen.add(id(model))
         frames = _wb.images_to_uint8(images)
-        # THE PING-PONG IS GONE (B4, 2026-07-27), and these two invariants are
-        # what it was standing in front of.
-        #
-        # It used to mirror-extend a short render up to the ask. That let a
-        # render the engine could not actually deliver PASS the plan-vs-output
-        # count gate (``render_driver``'s ``got != segment.render_frames``)
-        # wearing the right number: part real motion, part mirrored frames, and
-        # on this lane -- which declares ``strict_first_frame`` -- the next
-        # chained segment would begin on a MIRRORED tail frame.
-        #
-        # The old closing clause -- "WAN keeps its extension: it renders short ON
-        # PURPOSE and fills the beat with it, the shipped 8GB tier contract
-        # (PBUG-20260723-02)" -- EXPIRED on 2026-08-02. WAN's ping-pong was
-        # deleted under the no-mirror ruling and ``wan_ti2v`` was added to
-        # ``PLANNING_CAP_ENGINES`` so the planner splits those beats into
-        # affordable native segments instead. This lane was never the exception;
-        # it was simply first.
+        # NO PING-PONG: a short render is never mirror-extended up to the ask.
+        # That would let a render the engine could not actually deliver PASS the
+        # plan-vs-output count gate (``render_driver``'s ``got !=
+        # segment.render_frames``) wearing the right number: part real motion,
+        # part mirrored frames, and on this lane -- which declares
+        # ``strict_first_frame`` -- the next chained segment would begin on a
+        # MIRRORED tail frame. So these two invariants stand.
         #
         # 1. THE PIPELINE INVARIANT. The graph was asked for exactly ``length``
-        #    frames, so anything else is an under-delivery that the pad used to
-        #    absorb for ANY reason, not just a cap disagreement. Deleting the
-        #    pad without this would send a short clip on to the composite,
-        #    which loop-fills it with the warning suppressed -- trading a
-        #    logged mirror for a silent jump-cut repeat. Found by the pre-code
-        #    panel, and it is the reason this block is not simply deleted.
+        #    frames, so anything else is an under-delivery, whatever the reason
+        #    (not just a cap disagreement). Padding it would send a short
+        #    clip on to the composite, which loop-fills it with the warning
+        #    suppressed -- trading a logged mirror for a silent jump-cut repeat.
         n_native = len(frames)
         if n_native != length:
             raise _wb.GraphExecutionError(

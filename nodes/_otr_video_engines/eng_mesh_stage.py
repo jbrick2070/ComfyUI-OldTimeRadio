@@ -87,13 +87,11 @@ STAGE_SCRIPT = os.path.join(_REPO_ROOT, "scripts", "otr_mesh_stage_blender.py")
 MESHER_ID = "hy3d2mv"
 MESHER_VERSION = "1"
 
-#: E-6 canvas contract: the proven look-QA landscape canvas, and since lane 10
-#: (2026-08-11) the lane's DECLARED ``render_canvas`` -- see
-#: ``MeshStageEngine.render_canvas``. It used to be reachable only through an
-#: inline 832x480 sniff inside ``render_clip``; a declaration is applied LAST by
-#: ``build_request_from_shot`` and by ``render_single``, so it overrules the
-#: driver default, the ledger and the env on every request-building path
-#: instead of on the one path that happened to run (lesson L2).
+#: E-6 canvas contract: the proven look-QA landscape canvas, and the lane's
+#: DECLARED ``render_canvas`` -- see ``MeshStageEngine.render_canvas``. A
+#: declaration is applied LAST by ``build_request_from_shot`` and by
+#: ``render_single``, so it overrules the driver default, the ledger and the env
+#: on every request-building path (lesson L2).
 DEFAULT_W = 1472
 DEFAULT_H = 832
 
@@ -385,41 +383,29 @@ class MeshStageEngine(_CheapFamilyBase):
     #: Any future single-image-subject 3D mesher declares it too.
     requires_mesh_fodder = True
     fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
-    #: THE DECLARED CANVAS (lane 10, 2026-08-11 -- lesson L2). 1472x832 is what
-    #: this lane has always rendered; what it did NOT have was a way to say so.
-    #: The size was chosen by an inline sniff in ``render_clip`` -- "if the
-    #: request says 832x480 and carries no explicit canvas, make it 1472x832" --
-    #: which is the same shape lane 7 deleted: an inline branch that a
-    #: declaration overrules anyway, on the one code path that happened to run.
-    #:
-    #: It describes the RUNTIME, not a preference: Blender is told exactly these
-    #: dimensions (``build_blender_cmd`` -w/-h) and ``validate_frame_dir``
-    #: REFUSES a published frame whose PIL size is anything else, so the
-    #: declaration and the pixels on disk cannot disagree without a raise.
+    #: THE DECLARED CANVAS (lesson L2): 1472x832 -- this declaration is
+    #: where the numbers live. It describes the RUNTIME, not a preference:
+    #: Blender is told exactly these dimensions (``build_blender_cmd`` -w/-h)
+    #: and ``validate_frame_dir`` REFUSES a published frame whose PIL size is
+    #: anything else, so the declaration and the pixels on disk cannot
+    #: disagree without a raise.
     #:
     #: /32-legal on both axes (1472 = 46*32, 832 = 26*32). The /64 rule of
     #: lesson L13 does not reach this lane -- there is no halved stage and no
     #: fixed-x2 upsampler here, the frames come out of Blender at full size --
     #: though 1472x832 happens to satisfy it anyway.
     #:
-    #: This declaration is where the numbers live. The lane's old experiment
-    #: rig (``otr_w45_mesh_stage``) carried the same values and went with the
-    #: retired rigs folder on 2026-09-24; mesh_stage has no workflow-matrix row.
-    #:
-    #: **That profile channel is NOT dead, and the corpus wording that calls it
-    #: "read by nothing" is wrong** (traced end to end 2026-08-11, lane 11's
-    #: opening check): ``_otr_workflow_apply`` flattens ``render.canvas_w/h``
-    #: into the node-87 ``OTR_VideoDirector`` widgets -- regenerating this
-    #: lane's variant moved them from ``25, 832, 480`` to ``25, 1472, 832`` --
-    #: and ``otr_video_director`` turns those widgets into ``request["canvas"]``.
-    #: What actually happens is that ``build_request_from_shot`` then OVERWRITES
-    #: the request canvas to the landscape default for every non-face family,
-    #: and this declaration overrules that in turn. So the profile number is
-    #: read, carried, and then twice overruled -- which has the same OUTCOME as
-    #: a dead channel and a completely different failure mode, because an
-    #: operator editing it sees the widget change and concludes it took effect.
-    #: It is a DRIFT GUARD here: it must agree with this declaration, and the
-    #: agreement is asserted rather than assumed.
+    #: The workflow-profile channel (``render.canvas_w/h``) is NOT dead:
+    #: ``_otr_workflow_apply`` flattens it into the node-87
+    #: ``OTR_VideoDirector`` widgets, and ``otr_video_director`` turns those
+    #: widgets into ``request["canvas"]``. ``build_request_from_shot`` then
+    #: OVERWRITES the request canvas to the landscape default for every
+    #: non-face family, and this declaration overrules that in turn. So the
+    #: profile number is read, carried, and then twice overruled -- which has
+    #: the same OUTCOME as a dead channel and a completely different failure
+    #: mode, because an operator editing it sees the widget change and
+    #: concludes it took effect. It is a DRIFT GUARD here: it must agree with
+    #: this declaration, and the agreement is asserted rather than assumed.
     render_canvas = (DEFAULT_W, DEFAULT_H)
 
     _selftest_passed = False            # E-6: cube probe gates the first use
@@ -446,24 +432,14 @@ class MeshStageEngine(_CheapFamilyBase):
         ``folder_paths``, then the historical directory list, then THIS BOX's
         configured models root.
 
-        LESSON L1 / Bug Bible 12.88 (lane 10, 2026-08-11), and note carefully
-        WHICH HALF was broken -- the first write-up of this got it wrong.
-
-        This walked a hardcoded ``<comfy_root>/models/checkpoints`` plus an
-        ``HF_HOME`` sibling and never consulted ``folder_paths``. **Under the
-        launcher that was ENOUGH and this lane rendered fine**: the soak
-        launcher sets ``HF_HOME=C:\\ComfyUI-Models\\huggingface``, whose sibling
-        probe is ``C:\\ComfyUI-Models\\checkpoints`` -- exactly where the weight
-        lives. 3D has been rendering since June on that path and the resolver
-        was byte-identical then (verified by diffing ``37254f39``).
-
-        What was genuinely broken is 12.88's actual subject: "is this weight on
-        this box?" had no answer OFF the runtime. In a bare shell -- the CPU
-        suite, the preflight matrix, any doctor/"is this lane installed?" tool
-        -- ``HF_HOME`` is unset, the comfy-root join does not exist on a box
-        that keeps models elsewhere, and the probe returns a confident wrong NO.
-        A checkpoint registered only through ``extra_model_paths.yaml`` was also
-        invisible even in-process, because ``folder_paths`` was never asked.
+        LESSON L1 / Bug Bible 12.88: "is this weight on this box?" must have
+        an answer OFF the runtime too. In a bare shell -- the CPU suite, the
+        preflight matrix, any doctor/"is this lane installed?" tool --
+        ``HF_HOME`` is unset, a hardcoded ``<comfy_root>/models/checkpoints``
+        join does not exist on a box that keeps models elsewhere, and the
+        probe would return a confident wrong NO. A checkpoint registered only
+        through ``extra_model_paths.yaml`` is invisible without
+        ``folder_paths``.
 
         The probe order is ADDITIVE BY CONSTRUCTION: every prior probe still
         wins, and ``model_type_dir("checkpoints")`` -- the pack's ONE owner of
@@ -511,19 +487,19 @@ class MeshStageEngine(_CheapFamilyBase):
         return os.path.exists(self._ckpt_path())
 
     def _cache_root(self):
-        # ONE read: the old shape asked `.get` and then subscripted the same
-        # name, which raises KeyError if the knob is unset between the two.
+        # ONE read: asking `.get` and then subscripting the same name would
+        # raise KeyError if the knob is unset between the two.
         pinned = otr_env.get("OTR_MESH_CACHE_DIR")
         if pinned:
             return pinned
         # The mesh cache MUST live under ComfyUI's CONFIGURED output dir -- core
         # SaveGLB resolves filename_prefix through folder_paths.get_save_image_path
         # and REFUSES any path outside the active output folder. The headless
-        # launcher pins --output-directory to the Documents tree, so the old
-        # hardcoded <comfy_install>/output was a DIFFERENT tree -> SaveGLB raised
-        # "Saving image outside the output folder is not allowed" -> mesh_stage
-        # fell back to still_parallax (2026-06-12 catch). Honor the configured
-        # output (folder_paths), then OTR_OUTPUT_DIR, then the install default.
+        # launcher pins --output-directory to the Documents tree, so a
+        # hardcoded <comfy_install>/output would be a DIFFERENT tree and SaveGLB
+        # would raise "Saving image outside the output folder is not allowed".
+        # Honor the configured output (folder_paths), then OTR_OUTPUT_DIR, then
+        # the install default.
         out = ""
         try:
             import folder_paths  # type: ignore  # ComfyUI runtime
@@ -752,11 +728,11 @@ class MeshStageEngine(_CheapFamilyBase):
         (``char_id`` for characters, ``object_id`` for story artifacts) from the
         request, falling back to ``char_id``, then ``"uncast"``.
 
-        3D image streams (2026-06-21): generalizes the old ``char_id``-only
-        lookup so a non-character (announcer/music story-object) beat caches
-        under its OWN id instead of the misleading shared ``"uncast"``. The init
-        image is now the STABLE per-subject mesh_fodder still (render_driver
-        chunk 2), so this id + the fodder content-hash give per-subject reuse."""
+        Non-character (announcer/music story-object) beats cache under
+        their OWN id instead of the misleading shared ``"uncast"``. The init
+        image is the STABLE per-subject mesh_fodder still (render_driver
+        chunk 2), so this id + the fodder content-hash give per-subject
+        reuse."""
         get = self._get(request)
         cond = get("conditioning_refs") or {}
         c_get = cond.get if isinstance(cond, dict) else (
@@ -846,12 +822,10 @@ class MeshStageEngine(_CheapFamilyBase):
         turntable stage -> validate -> ATOMIC publish -> directory clip."""
         get = self._get(request)
         # The canvas comes from the REQUEST, which the ``render_canvas``
-        # declaration has already decided (lane 10): the inline "if the request
-        # looks like 832x480 and carries no explicit canvas, rewrite it to
-        # 1472x832" sniff that used to live here is gone. It only ever fired on
-        # the paths that reached this function, it could not be read by
-        # admission or by the still/composite sizing, and a declaration
-        # overrules it everywhere anyway.
+        # declaration has already decided (lane 10): there is no inline size
+        # sniff here, because it would only fire on the paths that reach this
+        # function and could not be read by admission or by the still/composite
+        # sizing.
         w, h, fps = self._canvas_dims(request)
         n = self._frame_count(request, fps)
         still = self._still_path(request)

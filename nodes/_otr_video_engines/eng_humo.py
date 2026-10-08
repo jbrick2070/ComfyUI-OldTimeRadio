@@ -74,44 +74,29 @@ _HUMO_MIN_FRAMES = 33          # below this has hung this hardware (legacy floor
 _HUMO_MAX_FRAMES = 177         # last empirically verified ceiling at 480x832 fp8
 # THE 14B CAP, UNIFIED ACROSS ORIENTATIONS (2026-08-02).
 #
-# WHAT IT USED TO SAY, and why it is gone: "the 14B fp8 tier rides ~15.9 GB at
-# 832x480 ... 49 (4n+1) is the bakeoff-proven safe length" (citing a bakeoff
-# receipt). Two things were wrong with that.
+# One cap serves both orientations: HuMo/Wan use square patch `[1,2,2]`, a
+# GLOBAL attention window `[-1,-1]`, and RoPE reshaped to `f*h*w`, so 480x832
+# and 832x480 both yield a 1,560-token DiT grid per latent time. Swapping
+# height and width changes positional VALUES, not allocation SIZES (external
+# research, 2026-08-02, grade A); there is no published counterexample and no
+# mechanism for an orientation-dependent frame cap.
 #
-#   1. THE CITED RECEIPT IS NOT IN THIS REPO. That bakeoff receipt has never
-#      existed here -- only the scripts that would have produced it.
-#      A number nobody can check gated the heaviest engine, and it asserted
-#      15.9 GB against a 14.5 GB working ceiling, which is a breach on its face.
-#   2. IT APPLIED TO ONE ORIENTATION ONLY. The same checkpoint ran uncapped to
-#      177 in PORTRAIT and was pinned to 49 in LANDSCAPE -- at an identical
-#      399,360 pixels. External research (2026-08-02, grade A) settles the
-#      architecture: HuMo/Wan use square patch `[1,2,2]`, a GLOBAL attention
-#      window `[-1,-1]`, and RoPE reshaped to `f*h*w`, so 480x832 and 832x480
-#      both yield a 1,560-token DiT grid per latent time. Swapping height and
-#      width changes positional VALUES, not allocation SIZES. There is no
-#      published counterexample and no mechanism for a 3.6x frame-cap ratio.
-#
-# So the orientation split was never physics. Both 14B routes now share ONE cap.
-#
-# WHY 97, and not 177 or 49. 97 is the length HuMo was TRAINED at, and its
-# authors warn that longer generation may degrade -- a quality bound with a real
-# citation, which is more than either previous number had. It also moves each
-# route in its safe direction: portrait comes DOWN from an unqualified 177, and
-# landscape comes UP from a cap whose evidence is missing.
+# WHY 97. 97 is the length HuMo was TRAINED at, and its authors warn that
+# longer generation may degrade -- a quality bound with a real citation.
 #
 # WHAT IS STILL OWED. 97 is a QUALITY-supported target, not a measured memory
 # ceiling -- nobody has published a peak for this checkpoint on a 16 GB card at
-# either orientation. This engine now carries a `VramPeakProbe` (it was the only
-# heavy lane without one), so the paired ladder 49/65/81/97 in BOTH orientations
-# can finally be measured on this box. The prediction is that the two
-# orientations match at every rung; if they do not, the defect is in tiling or
+# either orientation. This engine carries a `VramPeakProbe`, so the paired
+# ladder 49/65/81/97 in BOTH orientations can be measured on this box. The
+# prediction is that the two orientations match at every rung; if they do
+# not, the defect is in tiling or
 # kernel selection, not in the model. Until that ladder runs, this number is a
 # reasoned bound, and it says so.
 #
 # env override: OTR_HUMO_14B_SAFE_FRAMES.
 _HUMO_14B_SAFE_RENDER_FRAMES = 97
-# (HuMo render dims live in _otr_shared.aspect now -- portrait 480x832 / wide
-# 832x480 -- selected by each engine's render_aspect, so the constants moved out.)
+# (HuMo render dims live in _otr_shared.aspect -- portrait 480x832 / wide
+# 832x480 -- selected by each engine's render_aspect.)
 # An ASCII negative (CLAUDE.md: ASCII-only source). HuMo's best negative is the
 # ByteDance Chinese default; set OTR_HUMO_NEGATIVE to it on the box to match the
 # legacy template exactly.
@@ -249,20 +234,17 @@ class HuMoEngine(_MC.MotionEngineBase):
     #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` above -- audio-
     #: driven-face with portrait REQUIRED).
     still_plan = _HUMO_STILL_PLAN
-    # RADIO IS THE HOST (reversal of Route-A 2026-06-28, operator 2026-06-30):
-    # HuMo's finetuned weights only animate a FACE. Route-A had added
-    # announcer_visual/music_visual here + a radio-face-still workaround
-    # (render_driver._radio_bookend_image, since REMOVED) so the operator could
-    # pick HuMo for the music/announcer bookends; the eyeballed render showed a
-    # generic human host, not a radio -- confirming the ORIGINAL 2026-05-01
-    # BUG-LOCAL-129 finding (nodes/_otr_speaker_role.py) still holds. HuMo now
-    # serves ONLY character_video (real dialogue lip-sync). This tuple is
+    # RADIO IS THE HOST: HuMo's finetuned weights only animate a FACE (an
+    # eyeballed render of a music/announcer bookend showed a generic human host,
+    # not a radio -- BUG-LOCAL-129, nodes/_otr_speaker_role.py), so HuMo serves
+    # ONLY character_video (real dialogue lip-sync). This tuple is
     # UI-SORT/self-description metadata only (role_compat.engine_fits_role is
-    # capability-only and does not consult it -- see registry.VideoEngineRegistry
-    # docstring); the actual hard gate is render_driver._enforce_radio_is_host,
-    # which wires the previously-dormant _otr_speaker_role.is_never_humo_role
-    # into real dispatch and redirects any announcer_visual/music_visual +
-    # audio_driven_face pick to render_driver._NEVER_HUMO_REDIRECT_ENGINE.
+    # capability-only and does not consult it -- see the
+    # registry.VideoEngineRegistry docstring); the actual hard gate is
+    # render_driver._enforce_radio_is_host, which wires
+    # _otr_speaker_role.is_never_humo_role into real dispatch and redirects any
+    # announcer_visual/music_visual + audio_driven_face pick to
+    # render_driver._NEVER_HUMO_REDIRECT_ENGINE.
     roles = ("character_video",)
     default_roles = ()
     required_inputs = ("audio_ref", "init_image")
@@ -335,8 +317,8 @@ class HuMoEngine(_MC.MotionEngineBase):
         shipped wan_i2v dead. Two copies of the same chain was also two places
         to fix it, so there is now one.
         """
-        # ONE read, not two. The old shape asked `.get` and then subscripted the
-        # same name, so a knob unset between the two lines raised KeyError on a
+        # ONE read, not two: asking `.get` and then subscripting the same name
+        # would raise KeyError if a knob were unset between the two lines, on a
         # path whose whole job is to answer "is this pinned".
         explicit = otr_env.get(env_explicit) if env_explicit else None
         if explicit:
@@ -509,7 +491,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         the session have to agree about that: a session that hoisted a ``lora``
         node the graph never defines would wire a handle nothing reads, and one
         that skipped a node the graph DOES define would let it reload every
-        segment. This used to be spelled out inside ``_build_graph`` alone."""
+        segment."""
         return (not lora_name) or str(lora_name).strip().lower() in (
             "none", "skip", "off")
 
@@ -542,8 +524,7 @@ class HuMoEngine(_MC.MotionEngineBase):
 
     def session_identity(self):
         """What this adapter's HANDLES are. ``BeatSession`` refuses a
-        multi-segment beat without it -- which is why all three HuMo lanes came
-        back NO_RENDER on the 2026-07-28 campaign.
+        multi-segment beat without it.
 
         It carries the engine name (which is what picks the tier's steps, cfg
         and native dims), every loader file's token AND receipt, and whether
@@ -964,34 +945,24 @@ class HuMoEngine(_MC.MotionEngineBase):
         # NO MIRROR ON A LIP-SYNCED LANE (operator directive 2026-07-25: "lip
         # sync needs continuity, no render backwards, that doesn't work").
         # HuMo is ``audio_driven_face`` -- its whole output is a mouth driven by
-        # this beat's speech. ``fit_frames_to_target`` used to mirror-extend a
-        # SHORT capped render up to the audio target, and the back half of that
-        # mirror cycle is the render in REVERSE, so a capped 14B beat longer
-        # than the cap shipped a face that speaks forwards and then unspeaks
-        # backwards, in time with forward audio. Trimming is still fine (it
-        # never reverses time); a SHORT render is now TERMINAL and LOUD, with
-        # the remedy in the message. This can fail a beat that previously
-        # "succeeded" -- those episodes had backwards lip sync.
-        # THE GUARD IS UNCONDITIONAL (S8b item 3, lane 3, 2026-08-11).
+        # this beat's speech, and the back half of a mirror cycle is the render
+        # in REVERSE: a face that speaks forwards and then unspeaks backwards,
+        # in time with forward audio. Trimming is fine (it never reverses time);
+        # a SHORT render is TERMINAL and LOUD, with the remedy in the message.
+        # This can fail a beat that would otherwise "succeed" -- with backwards
+        # lip sync, or a face that stopped moving while the line kept going.
         #
-        # It used to read ``if cap is not None and target_fc > 0``, which made
-        # the HONESTY check conditional on a VRAM knob -- two unrelated
-        # questions sharing one branch. An uncapped tier (`humo_1.7B`,
-        # `humo_1.7B_169`, `humo`) declares ``safe_render_frames = None``, so it
-        # skipped the exact fit entirely: a beat asking for more than the
-        # 177-frame ceiling rendered 177 and returned them stamped
+        # THE GUARD IS UNCONDITIONAL: whether a cap is involved must not decide
+        # whether the HONESTY check runs (two unrelated questions). An uncapped
+        # tier (`humo_1.7B`, `humo_1.7B_169`, `humo`) declares
+        # ``safe_render_frames = None`` yet can still return fewer frames than
+        # the audio target, which would otherwise ship stamped
         # ``extension_mode: "none"`` with ``native_frame_count == frame_count``
-        # -- indistinguishable from an honest clip on any path that reaches
-        # ``render_shot`` without a stamped coverage plan. The video simply ran
-        # out before the audio, and nothing said so.
+        # -- indistinguishable from an honest clip.
         #
         # ``fit_frames_to_target`` TRIMS a long render (always safe, never
         # reverses time) and RAISES on a short one. Both answers are right for
         # every tier; only the message needs to know whether a cap was involved.
-        #
-        # This can fail a beat that previously "succeeded" -- the same trade the
-        # 14B took on 2026-07-25. Those episodes shipped a face that stopped
-        # moving while the line kept going.
         if target_fc > 0:
             try:
                 frames = _wb.fit_frames_to_target(
@@ -1066,17 +1037,15 @@ class HuMoEngine(_MC.MotionEngineBase):
         return {"out_path": path, "frame_count": n,
                 "native_frame_count": n,
                 "extension_mode": "none",
-                # THE MANIFEST ROW, FILLED (S8b item 6, lane 2, 2026-08-11).
-                # ``render_peak`` has been MEASURED and LOGGED a few lines up
-                # since 2026-08-06 and then dropped on the floor, so every HuMo
-                # clip reached the ledger with vram_peak_mb / recipe / quant /
-                # render_canvas null -- and `render_driver` fell back to an
-                # INSTANTANEOUS VRAM read, which is a sample at an arbitrary
-                # moment wearing the name of a peak. S2's envelope work is built
-                # on these numbers, so a plausible wrong one is worse here than
-                # a missing one. The WAN lanes closed the same gap at
-                # eng_wan_ti2v.py; this mirrors it, and ONE stamp serves all
-                # four registered HuMo tiers because they share this return.
+                # THE MANIFEST ROW, FILLED. ``render_peak`` is MEASURED and
+                # LOGGED a few lines up and stamped here; without it every
+                # HuMo clip would reach the ledger with vram_peak_mb / recipe /
+                # quant / render_canvas null, and `render_driver` would fall
+                # back to an INSTANTANEOUS VRAM read, which is a sample at an
+                # arbitrary moment wearing the name of a peak. S2's envelope
+                # work is built on these numbers, so a plausible wrong one is
+                # worse here than a missing one. ONE stamp serves all four
+                # registered HuMo tiers because they share this return.
                 "vram_peak_mb": int(render_peak) if render_peak is not None else None,
                 "recipe": self._recipe_receipt(),
                 **self._clip_telemetry(width, height)}
@@ -1259,16 +1228,8 @@ class HuMo17BEngine(HuMoEngine):
     2026-06-17). Shares roles / required_inputs / requires_flag / the in-process
     graph topology with the 14B base; only the tier config differs.
 
-    "Degrades on to the zero-VRAM still floor (humo -> humo_1.7B ->
-    still_motion)" USED TO END THIS DOCSTRING, four lines above
-    ``fallback_engine = None``. It has been false since NO FALLBACKS (operator
-    2026-07-02) ripped ``UNIVERSAL_FLOOR`` / ``FLOOR_NAMES`` /
-    ``make_fallback_of``: this tier degrades onto NOTHING and a failed beat
-    fails the episode LOUD. Corrected in lane 15 (2026-08-11), which had to
-    grep that chain's machinery to prove it was gone before ``still_motion``
-    could stop painting a black beat on a missing still -- and found this
-    sentence still asserting the opposite one file over. A docstring
-    contradicting the attribute below it is the defect lesson L6 is about."""
+    This tier degrades onto NOTHING (NO FALLBACKS, operator 2026-07-02): a
+    failed beat fails the episode LOUD."""
 
     name = "humo_1.7B"
     engine_version = "1"
@@ -1383,12 +1344,11 @@ class HuMo14BLandscapeEngine(HuMoEngine):
 
     name = "humo_14B_169"
     render_aspect = "wide"
-    #: THE CANVAS, DECLARED (lane 2, 2026-08-11). This tier's request was being
-    #: rewritten to the 1472x832 landscape default while the graph rendered
-    #: 832x480 -- a 3.07x pixel disagreement, harmless ONLY because
-    #: ``_aspect_plan``'s output is never read by ``_build_graph``. It becomes a
-    #: real error the moment admission, still sizing or composite scaling
-    #: trusts ``request.canvas``, and S2's admission work is exactly that.
+    #: THE CANVAS, DECLARED. Without it this tier's request is rewritten to the
+    #: 1472x832 landscape default while the graph renders 832x480 -- a 3.07x
+    #: pixel disagreement, harmless ONLY because ``_aspect_plan``'s output is
+    #: never read by ``_build_graph``. It becomes a real error the moment
+    #: admission, still sizing or composite scaling trusts ``request.canvas``.
     #:
     #: 832x480 is not a preference, it is where the hero cast was MEASURED:
     #: 13.06 GiB warm / 13.17 cold at 832x480x97 with a 2.9 GiB reserve, since
@@ -1399,11 +1359,9 @@ class HuMo14BLandscapeEngine(HuMoEngine):
     #: See :meth:`HuMoEngine._native_dims` for why OTR_HUMO_WIDTH/HEIGHT now
     #: refuse rather than silently win on a declaring tier.
     render_canvas = (832, 480)
-    #: No boot contract (2026-09-26). HuMo runs on any GPU boot, as it always
-    #: shipped; the measured 2.9 GiB reserve contract it could also run under
-    #: was retired by the operator's no-reserve rule. On a stock boot this lane
-    #: measured 14.98 GiB at 832x480x97; an out-of-memory is recorded, not
-    #: pre-empted.
+    #: No boot contract: HuMo runs on any GPU boot (the operator's no-reserve
+    #: rule). On a stock boot this lane measured 14.98 GiB at 832x480x97; an
+    #: out-of-memory is recorded, not pre-empted.
     #: S1b per-model still plan (see ``_HUMO_169_STILL_PLAN`` -- the LANDSCAPE
     #: HuMo plan). ``render_aspect="wide"`` drives portraits WIDE via
     #: ``resolve_row_aspect``, and the plan's portrait row carries the WIDE

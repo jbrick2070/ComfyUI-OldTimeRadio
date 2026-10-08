@@ -15,7 +15,7 @@ joeygambino/LTX-2.5-Quantized, which serves them anonymously.
   the same mix4x8 DiT the 16 GB foley and mime lanes load.
 * The foley lanes KEEP it: the audio latent is decoded to a WAV SIDECAR and mixed
   with the episode master at that same mux, at a fixed 0.50 / 0.50 (operator,
-  2026-08-29; raised from 0.20 / 0.80). The per-segment mp4s stay silent and
+  2026-08-29). The per-segment mp4s stay silent and
   prove it; the BEAT clip additionally gains an AAC preview of the same audio at
   assembly (see the FoleyPlus class docstring), which the silent composite
   strips -- so the mux remains the only node that puts audio into the EPISODE.
@@ -122,28 +122,20 @@ LTX25_RESERVED_SIBLING_IDS = ()
 #: which carry `quant_mixed_hi_layers: 386` on the one and nothing on the
 #: other. So it is not a speed-versus-precision trade: the same format family,
 #: strictly more precision, and it happened to be fastest too. The 1.2 GB it
-#: costs over w4a8 used to matter because the DiT had to share the card with
-#: the decode; it does not now that `_make_room_for_decode` evicts first.
+#: costs over w4a8 does not matter now that `_make_room_for_decode` evicts
+#: first (the DiT no longer has to share the card with the decode).
 LTX25_NATIVE_DIT_16GB = "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors"
 LTX25_NATIVE_DIT_BLACKWELL = "LTX25-distilled-DiT-comfy-nvfp4.safetensors"
-#: 24 GB, ANY modern NVIDIA. NOT fp8_e4m3fn, which this lane shipped pointing
-#: at and which DOES NOT EXIST.
-#:
-#: The publisher's own MANIFEST.json still advertises
+#: 24 GB, ANY modern NVIDIA: int8. NOT fp8_e4m3fn -- the publisher's own
+#: MANIFEST.json still advertises
 #: ``LTX25-distilled-DiT-comfy-fp8_e4m3fn.safetensors`` at 21.48 GB, noted
 #: "24 GB+, widest GPU support", with a sha256 -- and the repository does not
 #: contain it. A stat returns exists=false and a find for ``*fp8*`` returns
 #: nothing. The lineup was revised (fp8 dropped; int8 and two mix4x8 builds
-#: added) and the manifest was never updated. This lane was built from that
-#: manifest, so it was registered pointing at a file nobody can download.
+#: added) and the manifest was never updated, so a pin built from it points at
+#: a file nobody can download.
 #:
 #: int8, AND IT WAS PICKED BY RUNNING IT, not by arithmetic.
-#:
-#: An earlier version of this comment reasoned that int8 "lands near 26.5 GB
-#: and does NOT fit a 24 GB card ... int8 is a 32 GB-class file". That was an
-#: estimate stated as a fact, and the operator rejected it on exactly those
-#: grounds -- "says who, did it crash, did we test on a 24 GB machine". It had
-#: not been run and we had not.
 #:
 #: MEASURED on a rented RTX 4090 (24,564 MiB, Ada, clean box, nothing else on
 #: the card), one 97-frame clip through this lane's own graph:
@@ -198,9 +190,9 @@ def _encoder_cache_enabled():
         not in _CACHE_DISABLE_TOKENS
 
 
-#: Moved to ``motion_common.copy_conditioning`` on 2026-09-26, when the 8 GB
-#: LTX lane began reusing conditioning too; the name stays for this module's
-#: encoder cache and its tests.
+#: Alias of ``motion_common.copy_conditioning`` (the 8 GB LTX lane reuses
+#: conditioning too); the name stays for this module's encoder cache and its
+#: tests.
 _copy_conditioning = _MC.copy_conditioning
 
 def _resolve(folder, name):
@@ -909,18 +901,18 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         The DiT and both VAEs are loaded by their loader nodes inside the
         graph, so ``free_after_use`` can drop each one after its last consumer.
 
-        THE TEXT ENCODER IS NO LONGER ALWAYS ONE OF THEM, and this docstring
-        said it was. Since the episode-scoped cache (2026-08-20) the ``te``
-        loader runs only on a cache MISS -- once per EPISODE rather than once
-        per shot. On a HIT the handle arrives as an ``external_results`` entry
-        and no loader node exists in the graph at all.
+        THE TEXT ENCODER IS NOT ALWAYS ONE OF THEM. With the episode-scoped
+        cache the ``te`` loader runs only on a cache MISS -- once per EPISODE
+        rather than once per shot. On a HIT the handle arrives as an
+        ``external_results`` entry and no loader node exists in the graph at
+        all.
 
-        **The VRAM story, updated 2026-09-26:** the encoder now asks for the
-        accelerator (see ``_native_te_device``), and ComfyUI unloads it before
-        the DiT samples, so the sampling peak is still the DiT's -- measured
-        16,080 MB on the RTX 5080 against 16,065 MB with the old CPU pin. The
-        lab's decomposition still holds for the sampler: this lane fits because
-        the DiT is 9.80 GiB of a 14.48 GiB peak, not because of the encoder.
+        **The VRAM story:** the encoder asks for the accelerator (see
+        ``_native_te_device``), and ComfyUI unloads it before the DiT samples,
+        so the sampling peak is still the DiT's -- measured 16,080 MB on the
+        RTX 5080 against 16,065 MB with a CPU pin. The lab's decomposition
+        still holds for the sampler: this lane fits because the DiT is 9.80 GiB
+        of a 14.48 GiB peak, not because of the encoder.
         """
         from . import wrapper_bridge as _wb
         self._classes = _wb.resolve_graph_classes(self._node_candidates())
@@ -950,22 +942,19 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         ONLY video decode at 1664x960. ONE ``VAELoader`` feeds both anchors,
         the upscaler, and the final decode (lab node 2).
 
-        A DRAFT OF THIS ADAPTER SPLIT THAT LOADER IN TWO AND IT WAS CUT, which
-        is worth recording because the split looks obviously right and is not.
-        The idea, inherited by resemblance from an earlier LTX audio lane, was that a
-        separate encode-side node would let ``free_after_use`` drop the VAE the
-        moment the still is planted, before the sampler's activation peak. It
-        does not. ``wrapper_bridge._topo_order`` is Kahn's algorithm with ties
-        broken on sorted node id, and a ``VAELoader`` has NO dependencies -- so
-        the decode-side copy is scheduled in the FIRST batch regardless, and
+        ONE ``VAELoader`` IS DELIBERATE: splitting it in two looks obviously
+        right and is not. The idea was that a separate encode-side node would
+        let ``free_after_use`` drop the VAE the moment the still is planted,
+        before the sampler's activation peak. It does not.
+        ``wrapper_bridge._topo_order`` is Kahn's algorithm with ties broken on
+        sorted node id, and a ``VAELoader`` has NO dependencies -- so the
+        decode-side copy is scheduled in the FIRST batch regardless, and
         ``free_after_use`` cannot release it until its only consumer, the
-        decode, has run at the very end. The split therefore moved nothing;
-        it just called the loader twice.
-        And the headroom it was supposed to buy does not exist to be bought:
-        the lab's decomposition puts both VAEs at **0.0 GiB** at the peak
-        (recorded in the :mod:`ltx25_recipe` docstring). Caught by the agy
-        review lane, 2026-08-19, from a grounded read of the scheduler -- the
-        driver had flagged it as a suspicion and could not settle it alone.
+        decode, has run at the very end. The split would move nothing; it
+        would just call the loader twice. And the headroom it was supposed to
+        buy does not exist to be bought: the lab's decomposition puts both
+        VAEs at **0.0 GiB** at the peak (recorded in the :mod:`ltx25_recipe`
+        docstring).
 
         THE TWO PLACES THE LAB'S PROSE DISAGREES WITH ITS OWN FILE are both
         wired the FILE's way, because the file is what ran:
@@ -1024,9 +1013,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             # --- conditioning ---
             # The negative TEXT is empty; that is the locked recipe value.
             #
-            # THE NEGATIVE CONDITIONING IS *NOT* INERT, and this comment used to
-            # claim it was (corrected 2026-08-19). The ordinary ComfyUI rule --
-            # cfg 1.0 elides the uncond -- does NOT hold here, because the
+            # THE NEGATIVE CONDITIONING IS *NOT* INERT. The ordinary
+            # ComfyUI rule -- cfg 1.0 elides the uncond -- does NOT hold here,
+            # because the
             # locked sampler `euler_ancestral_cfg_pp` forces
             # `disable_cfg1_optimization=True` and consumes `uncond_denoised`
             # in its own step derivative. The unconditional branch is computed
@@ -1105,11 +1094,10 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             # The lab measured any higher value pushing past 16 GiB -- an
             # instant OOM against the 14.5 GiB clamp. Leave them.
             #
-            # The "cfg 1.0 means batch size 1" reasoning this comment used to
-            # give is WRONG for this recipe (corrected 2026-08-19): the CFG++
-            # sampler evaluates the uncond branch anyway. The measured 14.48 GiB
-            # already includes whatever that costs; it was the EXPLANATION that
-            # was wrong, not the number. See ltx25_recipe.LTX25_CFG_VIDEO.
+            # The "cfg 1.0 means batch size 1" explanation does NOT hold for
+            # this recipe: the CFG++ sampler evaluates the uncond branch anyway,
+            # and the measured 14.48 GiB already includes whatever that costs.
+            # See ltx25_recipe.LTX25_CFG_VIDEO.
             "guider": {"class": "guider", "inputs": {
                 "model": W("modality", 0),
                 "positive": W("cond", 0), "negative": W("cond", 1),
@@ -1173,13 +1161,10 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
 
     # ---- the two Chunk B seams (2026-08-26) ----
     #
-    # THE MODULE DOCSTRING USED TO SAY THERE IS NO HOOK, and it was right to at
-    # the time: "a subclass hook designed today would be a doorway into a wing
-    # with no foundation". The foundation now exists (the foley bed mixes at
-    # ``OTR_MasterAudioMux``, which runs AFTER video), so these two exist -- and
-    # they are deliberately the SMALLEST pair that lets a sibling keep the
-    # model's own audio without copying either ``_build_graph`` or the
-    # 200-line ``render_clip``.
+    # These two exist because the foley bed mixes at ``OTR_MasterAudioMux``,
+    # which runs AFTER video -- and they are deliberately the SMALLEST pair that
+    # lets a sibling keep the model's own audio without copying either
+    # ``_build_graph`` or the 200-line ``render_clip``.
     #
     # BOTH ARE NO-OPS HERE. ``ltx25_video`` stays byte-identical in behaviour:
     # the first returns nothing and the second returns an empty dict, so the
@@ -1347,11 +1332,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         # ``keep`` holds the two MODEL nodes (retained for V-4 teardown) and the
         # terminal.
         #
-        # THE TEXT ENCODER'S FATE NOW DEPENDS ON THE CACHE, and this comment
-        # used to say flatly that it "is dropped by its last consumer" -- true
-        # before the episode cache and false after. On a MISS the ``te`` node is
-        # in the graph and IS dropped from ``results`` once ``pos`` and ``neg``
-        # have consumed it, exactly as before -- but ``_harvest`` has already
+        # THE TEXT ENCODER'S FATE DEPENDS ON THE CACHE. On a MISS the
+        # ``te`` node is in the graph and IS dropped from ``results`` once
+        # ``pos`` and ``neg`` have consumed it -- but ``_harvest`` has already
         # taken a reference, so the object survives to be published. On a HIT
         # the node is not in the graph at all; the handle arrives as an
         # external, and ``run_graph`` adds every external to ``keep``, so
@@ -1632,28 +1615,17 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
 
     #: MEASURED on the 4060: 8188 MiB total, 7399 MB free with the card
     #: otherwise empty -- so a CUDA context and the desktop hold ~789 MB that
-    #: `mem_get_info` never offers us. There used to be a
-    #: `_VRAM_CONTEXT_RESERVE_MB = 300` here; nothing ever read it. It existed
-    #: to pad a refusal, and refusing on a predicted number was removed the
-    #: same day, so it is deleted rather than left looking load-bearing. The
-    #: measurement is the part worth keeping.
 
     def _free_vram_after_eviction_mb(self, floor_mb):
         """Free VRAM after the eviction: ONE reading (operator 2026-09-26).
 
-        This used to poll -- up to twelve 1 s reads until the figure rose and
-        then held -- because on 2026-09-23 the 4060 was still handing memory
-        back for about three seconds after ``reset_cast_buffers()`` returned
-        (6469 -> 4421 -> 2821 -> 821 -> 789 MiB at 1 s sampling). By
-        2026-09-26 every settle line on both boxes read "never moved": four
-        identical readings from 0.0 s (the 4060's ltx25_foley_16gb A/B, the
-        5080's ltx25_video legs). The release lands before the first read, so
-        the loop spent 3 s a clip waiting on a figure that only decides what
-        gets LOGGED -- the info line, or one of the warnings after it. Nothing
-        shortens, skips or refuses the decode on it (operator ruling: only an
-        OOM decides). An early reading can only under-report there, which at
-        worst logs a "decode starts short" warning a settled reading would not
-        have (Composer QA on 6b112bf9).
+        No polling: the release lands before the first read (every settle
+        line on both boxes read "never moved"), and the figure only decides
+        what gets LOGGED -- the info line, or one of the warnings after it.
+        Nothing shortens, skips or refuses the decode on it (operator ruling:
+        only an OOM decides). An early reading can only under-report there,
+        which at worst logs a "decode starts short" warning a settled
+        reading would not have.
 
         An unreadable card reports ``floor_mb``, the pre-eviction reading,
         rather than None."""
@@ -1682,13 +1654,11 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             decode, after this eviction           34.7 s
             whole two-stage render               196.3 s, foley muxed
 
-        WHAT ACTUALLY HOLDS THE MEMORY, corrected 2026-09-23 after a Fable
-        review refuted the first explanation written here. `unload_all_models`
-        DOES own a staged model: `detach()` -> the dynamic `unpatch_model`
-        override (`comfy/model_patcher.py:2132`) -> `partially_unload_ram(1e32)`
-        for the pinned host memory and `partially_unload(None, 1e32)` ->
-        `vbar.free_memory(1e32)` for the staged VRAM. The earlier claim that it
-        "never owned the staged weights" was wrong.
+        WHAT ACTUALLY HOLDS THE MEMORY. `unload_all_models` DOES own a staged
+        model: `detach()` -> the dynamic `unpatch_model` override
+        (`comfy/model_patcher.py:2132`) -> `partially_unload_ram(1e32)` for the
+        pinned host memory and `partially_unload(None, 1e32)` ->
+        `vbar.free_memory(1e32)` for the staged VRAM.
 
         What it does NOT own is the aimdo CAST BUFFERS -- one reservation per
         offload stream in `STREAM_AIMDO_CAST_BUFFERS`, which grows and never
@@ -1779,35 +1749,24 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         # flagging and dying for VRAM measurements, an OOM is the final
         # determinant."
         #
-        # THIS FUNCTION EARNED THAT RULING. A predicted-shortfall refusal
-        # shipped here and was wrong three times in one afternoon, every time
-        # in the pessimistic direction:
-        #   * `need` was 8300 MB against a card holding 8188 MiB in TOTAL, so
-        #     it refused an empty 4060 -- unsatisfiable by arithmetic.
-        #   * it read `after_mb` before the release had landed and saw 4940 MB
-        #     when the settled figure one second later was ~7399 MB,
-        #     under-reporting its own success by 2.5 GB.
-        #   * so it refused a decode having just freed 5.7 GB, and we never
-        #     learned whether that decode would have worked.
-        #
         # THE ASYMMETRY IS THE WHOLE ARGUMENT. A real OOM names the allocation
         # that failed and the size it wanted: ground truth, and it says exactly
         # how far to shrink a tile. A numeric refusal produces a number the
-        # guard invented about a render that never ran. And the expensive
-        # failure this guard was built against -- the 968 s thrash -- was
-        # residency, which the eviction above now fixes; it was never an OOM.
+        # guard invented about a render that never ran (a predicted-shortfall
+        # refusal here was wrong three times in one afternoon, always in the
+        # pessimistic direction). And the expensive failure this guard was built
+        # against -- the 968 s thrash -- was residency, which the eviction above
+        # fixes; it was never an OOM.
         #
         # So this is a WARNING and nothing more. The decode proceeds, and CUDA
         # gets to answer.
-        # AN UNREACHABLE NEED IS NOT A SHORTFALL (2026-09-23, found by a
-        # contrarian review of this very rewrite). `need` is 8300 MB, measured
+        #
+        # AN UNREACHABLE NEED IS NOT A SHORTFALL. `need` is 8300 MB, measured
         # on a free 16 GB card. A 4060 holds 8188 MiB in TOTAL, so on that card
-        # `after_mb >= need` can never be true and this warning fired on EVERY
-        # successful eviction -- including the one that returned 5.7 GB. The
-        # rewrite above exists to stop a wrong number misdirecting a diagnosis,
-        # and then graded the right number against an impossible bar, which
-        # reads as failure just the same. Same defect as the refusal this
-        # ruling removed, wearing a warning's clothes.
+        # `after_mb >= need` can never be true and the warning would fire on
+        # EVERY successful eviction -- including the one that returned 5.7 GB.
+        # Grading the right number against an impossible bar reads as failure
+        # just the same as a wrong number would.
         if total_mb is not None and need > total_mb:
             _LOG.warning(
                 "[OTR video] %s: this card cannot reach the measured need at "
@@ -1891,12 +1850,11 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
     graph, same 97-frame rung -- plus the one thing that lane throws away: the
     audio latent at ``refine_separate`` slot 1. It is decoded to a WAV sidecar
     and mixed WITH the episode master at ``OTR_MasterAudioMux``, at the fixed
-    0.50 / 0.50 the operator ruled on 2026-08-29 (raised from the 2026-08-26
-    0.20 / 0.80 after the bed proved inaudible by ear).
+    0.50 / 0.50 the operator ruled on 2026-08-29.
 
     THIS IS NOT THE SFX BED AND THE TWO MUST NEVER BE CONFLATED. The SFX bed
-    was separately GENERATED effects from a dedicated model; it was ripped on
-    2026-08-06 and is staying dead. This is the video model's OWN output --
+    was separately GENERATED effects from a dedicated model, and that lane is
+    retired. This is the video model's OWN output --
     footsteps, room tone and a score computed for the exact picture it is
     rendering, which is the whole reason a joint AV model earns its keep.
     Operator: *"sfx bed is different than foley bed, i won't get the two
@@ -2296,10 +2254,9 @@ _MAX_NAMED_SOUNDS = 3
 _SOUND_LEXICON = (
     # THE IMPACT ROW SITS FIRST, and first is the point: an impact is the
     # loudest, most beat-defining sound an action makes, and priority is
-    # lexicon order. This row is also the 2026-08-29 fix for the desk-slam
-    # defect: "slams his fist on the desk" used to name WOOD SCRAPING (the
-    # old chair/table/desk row matched the noun, unconditionally) -- an
-    # impact must never become furniture dragging.
+    # lexicon order. This row also keeps "slams his fist on the desk" from
+    # naming WOOD SCRAPING (a furniture noun alone must not pick the scraping
+    # row): an impact must never become furniture dragging.
     # "thump" is NOT a cue: leading-boundary it matches "thumping", which
     # prose uses for a HEARTBEAT far more often than for a blow -- the same
     # wrong-cue class as the desk row above. "pound" is kept as the judged
@@ -2354,11 +2311,11 @@ _SOUND_LEXICON = (
     # is recorded as an open design item, not smuggled in here.
     (("horse", "hoof", "hooves"), "hooves striking stone"),
     (("crowd", "street", "market", "platform"), "a crowd murmuring far off"),
-    # SCRAPING NEEDS A DRAG VERB NOW (operator ruling 2026-08-29). The old
-    # row fired on the FURNITURE NOUNS ("chair", "table", "desk", ...), so
-    # any beat set at a desk asked for wood scraping whatever the action
-    # was -- including a fist slam, which the impact row above now owns.
-    # Scraping is a real sound only when something is actually dragged.
+    # SCRAPING NEEDS A DRAG VERB (operator ruling 2026-08-29). A row firing on
+    # the FURNITURE NOUNS ("chair", "table", "desk", ...) would make any beat
+    # set at a desk ask for wood scraping whatever the action was -- including
+    # a fist slam, which the impact row above owns. Scraping is a real sound
+    # only when something is actually dragged.
     # Leading-boundary audit: "drags/dragged/dragging", "scrapes/scraping",
     # "shoves/shoved", "slides/sliding" all match; "landslide" does not
     # (no word boundary before "slide"). Known accepted edge: "dragon"
@@ -2379,12 +2336,12 @@ _CUE_PATTERNS = {cue: re.compile(r"\b" + re.escape(cue))
 #: would reinstate exactly the defect this table exists to remove, so the
 #: fallback is concrete: the quietest sound a present body makes.
 #:
-#: ONE CUE, NOT THREE (r3 finding, 2026-08-28). The fallback used to name cloth
-#: AND footsteps AND objects striking wood. One latent decodes the picture and
-#: the audio from this string, so three simultaneous events are three
-#: instructions to the PICTURE as well -- on a beat whose action matched
-#: nothing, which is precisely the beat least likely to contain them. A single
-#: conservative cue cannot invent a walk or a dropped object.
+#: ONE CUE, NOT THREE. One latent decodes the picture and the audio from this
+#: string, so three simultaneous events (cloth, footsteps, objects striking
+#: wood) are three instructions to the PICTURE as well -- on a beat whose
+#: action matched nothing, which is precisely the beat least likely to
+#: contain them. A single conservative cue cannot invent a walk or a dropped
+#: object.
 _FALLBACK_SOUNDS = ("cloth shifting as the body settles",)
 
 
@@ -2471,9 +2428,9 @@ def named_sounds_for(positive):
 def _join_sounds(sounds):
     """``a, b, c`` -- a TAG LIST, deliberately not prose.
 
-    This used to render "a, b and c", which reads as a sentence fragment and
-    is exactly the shape this lane has been caught speaking aloud. A bare
-    comma list conditions the same and scans as a caption.
+    "a, b and c" reads as a sentence fragment and is exactly the shape this
+    lane has been caught speaking aloud. A bare comma list conditions the
+    same and scans as a caption.
     """
     return ", ".join(sounds)
 
@@ -2516,10 +2473,10 @@ def joint_av_prompt_is_finished(text):
     somewhere in the string (proving sounds were actually seated -- a bare
     no-voice tail proves nothing, which is the r3 false-receipt finding of
     2026-08-28), and the no-voice clause is the FINAL clause (its position is
-    part of what works on this model). This replaces the old check that the
-    frame-plus-clause pair sat contiguously at the tail: since the 2026-08-29
+    part of what works on this model). The frame-plus-clause pair is NOT
+    required to sit contiguously at the tail: since the 2026-08-29
     golden-shape ruling the sounds and the frame sit BEFORE the camera clause,
-    with only the no-voice clause at the very end, so the pair is no longer
+    with only the no-voice clause at the very end, so the pair is not
     contiguous on a correctly finished prompt. Pure.
     """
     body = str(text or "")
@@ -2531,10 +2488,9 @@ def joint_av_prompt_is_finished(text):
 def sounds_named_in(text):
     """Which lexicon sound phrases a FINISHED prompt actually carries. Pure.
 
-    The observability receipt used to re-run ``named_sounds_for`` over the
-    pre-finish string, which was honest when sounds were appended at the
-    finish seam. Now that the composers seat the sounds themselves, the
-    receipt must read the final string -- and it must match PHRASES, not
+    The observability receipt must read the FINISHED string, because the
+    composers seat the sounds themselves (re-running ``named_sounds_for`` over
+    the pre-finish string would miss them) -- and it must match PHRASES, not
     cues, because the phrases themselves contain cue words ("papers rustling
     violently" contains "papers") and a cue scan over a finished prompt
     re-matches its own output.
@@ -2635,8 +2591,8 @@ def finish_joint_av_positive(engine_id, positive):
 
 #: Framing each silent LTX 2.5 lane carries FOR ITSELF. The driver's generic
 #: ``startswith("ltx")`` suffix is skipped for a lane that composes its own
-#: prompt, so this has to live here -- and it deliberately drops the old
-#: "stable centered subject", which on a lane with no mouth to protect was an
+#: prompt, so this has to live here -- and it deliberately omits "stable
+#: centered subject", which on a lane with no mouth to protect would be an
 #: instruction to hold still.
 _LTX25_FRAMING = ("full face clearly visible, generous headroom, "
                   "the subject in real motion")
@@ -2836,12 +2792,11 @@ def compose_ltx25_mime(self, inputs):
     belongs to ``finish_joint_av_positive`` alone.
 
     AND IT IS THE SAME SHAPE FOLEY GETS, verbatim (operator, 2026-08-27:
-    *"the only difference between foley and mime is the mux layer"*). This lane
-    used to receive a mood-led request for "instrumental scene score" -- a
-    CATEGORY, which left the model to pick the sound and, with a person in
-    frame, it picked voices. The PICTURE is still this lane's own: a mime beat
-    plays larger and holds its endpoint, which is what the two formatters
-    genuinely differ on.
+    *"the only difference between foley and mime is the mux layer"*). A
+    mood-led request for "instrumental scene score" would be a CATEGORY, which
+    leaves the model to pick the sound and, with a person in frame, it picks
+    voices. The PICTURE is still this lane's own: a mime beat plays larger and
+    holds its endpoint, which is what the two formatters genuinely differ on.
     """
     core = _ltx25_joint_av_core(inputs)
     if not core:
@@ -2975,17 +2930,15 @@ class Ltx25NativeAudioInMixin:
        nothing to sync TO. It is the weaker value here: modality guidance
        STRENGTHENS the cross-modal coupling.
 
-       IT DOES NOT CREATE IT, and an earlier draft of this docstring said
-       it did. `a2v_cross_attn` and `v2a_cross_attn` both default to
-       enabled (`comfy/ldm/lightricks/av_model.py`); scale 1.0 disables
-       only the EXTRA guidance pass, not the attention. So 1.0 is a
+       IT DOES NOT CREATE IT. `a2v_cross_attn` and `v2a_cross_attn` both
+       default to enabled (`comfy/ldm/lightricks/av_model.py`); scale 1.0
+       disables only the EXTRA guidance pass, not the attention. So 1.0 is a
        defensible shipping value for this lane and is the fallback if the
-       16 GB tier turns out not to afford the extra pass. Corrected by a
-       codex review.
+       16 GB tier turns out not to afford the extra pass.
 
-    THE FIRST DESIGN SWAPPED THE CLASS BEHIND THE ``emptyaudio`` KEY and let
-    ``concat`` read the encoder directly. That is what a reader expects to
-    work, and it does not. ``LTXVEmptyLatentAudio`` is TOLD the frame count
+    SWAPPING THE CLASS BEHIND THE ``emptyaudio`` KEY and letting ``concat``
+    read the encoder directly is what a reader expects to work, and it does
+    not. ``LTXVEmptyLatentAudio`` is TOLD the frame count
     and returns exactly ``round(frames / fps * latents_per_second)`` latents;
     ``LTXVAudioVAEEncode`` returns whatever its own mel and downsample
     rounding produce for the waveform it was handed. MEASURED on a live pod
@@ -3117,9 +3070,8 @@ class Ltx25NativeAudioInMixin:
         (`fit_audio` leaves the padded latent tail unmasked) and it is trimmed
         off the decoded output by ``_write_foley_stem`` anyway.
 
-        This also covers the case that deleting the old waveform helper lost:
-        a reference much SHORTER than the clip used to be cropped to zero
-        samples and raise inside the encoder. Found by a codex review.
+        This also covers a reference much SHORTER than the clip, which would
+        otherwise be cropped to zero samples and raise inside the encoder.
 
         EXACT WHEN THE FILE'S RATE IS THE VAE'S INPUT RATE, which it is on
         this path -- the driver writes 44.1 kHz slices and the LTX audio VAE

@@ -78,8 +78,7 @@ GHOST_PROMPT_VERSION_V2 = "ghost_signal_v2"
 #: RENDER path composes the byte-identical prompt it did before; only the
 #: admission check moved, and a receipt version that forces every cached
 #: Ghost row to re-render for an unchanged prompt would be a lie in the
-#: other direction. (A first draft bumped to v3.2 on the belief that
-#: production lines were never matched; cursor's hardening pass refuted it.)
+#: other direction.
 GHOST_PROMPT_VERSION_V3 = "ghost_signal_v3.1"
 
 #: ``prompt_source`` for :func:`render_driver._stamp_prompt_meta`.
@@ -89,13 +88,6 @@ GHOST_PROMPT_SOURCE = "ghost_signal"
 #: is never touched). 320 leaves the banana route room to substitute one prop
 #: without the common funnel ever having to cut a protected clause.
 GHOST_PROMPT_MAX_CHARS = 320
-
-#: `GHOST_PROMPT_TARGET_LOW` / `_HIGH` (260/280) were removed 2026-08-28. They
-#: were exported and described as "a target the composer aims at", and no
-#: composer ever compared anything to them -- both `compose_ghost_prompt` and
-#: its v2 sibling trim against GHOST_PROMPT_MAX_CHARS alone. A quality target
-#: nothing pursues reads like a contract and is not one. Removing the constants
-#: changes no prompt bytes and therefore no persisted request hash.
 
 #: The negative's own ceiling, same number, same phrase-safe rule.
 GHOST_NEGATIVE_MAX_CHARS = 320
@@ -516,10 +508,9 @@ def distill_sigil_components(cast_row, *, episode_seed, char_id,
                              style_id) -> dict:
     """The BUCKET CHOICES behind a sigil, before they are joined and trimmed.
 
-    Split out for Prompt v2 (2026-08-22) and shared with
-    :func:`distill_subject_sigil`, which joins exactly what this returns -- so
-    the durable sigil stays byte-stable while v2 can select a NON-FACE subset
-    of the same distillation.
+    Shared with :func:`distill_subject_sigil`, which joins exactly what this
+    returns -- so the durable sigil stays byte-stable while v2 can select a
+    NON-FACE subset of the same distillation.
 
     THE JOIN IS WHERE THE INFORMATION WAS LOST. The 110-character sigil ceiling
     lands on the LAST bucket, so reading a prop back out of the finished string
@@ -641,14 +632,13 @@ def resolve_action(role, *, motion_clause=None, pack_motion_fallback="",
 
     Every step is pack- or ledger-derived and credit-free.
 
-    STEP 3 NO LONGER COPIES AN UNMAPPED INTENT (Prompt v2, 2026-08-22). It used
-    to emit ``"moves with " + the first six regex words``, which is how a
-    published lane came to say *"moves with erin risks exposure by transmitting
-    a"*: a cast name in the picture and a sentence with no end. A beat intent is
-    free text a writer wrote for a human, not a camera instruction -- an unknown
-    one now falls through to a complete checked-in action rather than shipping
-    a fragment of it. Prompt v2 replaces this whole slot with an authored
-    drawable leaf; this repair exists so a LEGACY row replaying through the v1
+    STEP 3 NEVER COPIES AN UNMAPPED INTENT. A beat intent is free text a
+    writer wrote for a human, not a camera instruction -- copying its first
+    six words behind ``"moves with "`` ships a fragment (*"moves with erin
+    risks exposure by transmitting a"*: a cast name in the picture and a
+    sentence with no end). An unknown one falls through to a complete
+    checked-in action. Prompt v2 replaces this whole slot with an authored
+    drawable leaf; this rule exists so a LEGACY row replaying through the v1
     compatibility path cannot reproduce the fragment either.
     """
     clause = _normalize_ws(motion_clause)
@@ -871,10 +861,10 @@ def compose_ghost_prompt(*, role, style, subject_sigil="", motion_clause=None,
     }
 
 
-#: The v2 ordered slots, and there are only four. Everything v1 emitted from
-#: the ledger's raw surfaces -- the beat intent, the traits, the arc phase, the
-#: pack motion register -- is gone: an authored drawable leaf replaces all of
-#: it, and re-adding any of them would be re-adding the defect.
+#: The v2 ordered slots, and there are only four. The ledger's raw surfaces
+#: (the beat intent, the traits, the arc phase, the pack motion register) are
+#: NOT emitted: an authored drawable leaf carries all of it, and re-adding
+#: any of them would be re-adding the defect.
 GHOST_V2_SLOTS = ("pack_cue", "motif", "leaf", "law")
 
 

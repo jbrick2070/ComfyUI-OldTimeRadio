@@ -150,31 +150,19 @@ class BeatSession:
     def session_ctx(self):
         """The dict handed to ``prepare``.
 
-        It was ``{}`` at every call site before this chunk. An adapter that
-        wants to size a KV cache, pre-allocate, or simply log honestly needs
-        to know it is about to render four clips rather than one -- and it
-        must learn that BEFORE it loads, which is the only reason this is a
-        prepare-time argument rather than a render-time one.
+        An adapter that wants to size a KV cache, pre-allocate, or simply log
+        honestly needs to know it is about to render four clips rather than
+        one -- and it must learn that BEFORE it loads, which is the only
+        reason this is a prepare-time argument rather than a render-time one.
 
-        ``multi_clip`` MEANS "coverage-planned", not "more than one segment"
-        (corrected 2026-08-02). ``WanTi2vEngine.render_clip`` branches on it to
-        choose ``_planned_length`` over ``_floor_length``.
-
-        THE ORIGINAL STAKES ARE HISTORY, and the distinction outlived them. The
-        clip-fill path selected when False used to PING-PONG-EXTEND a short
-        render, so deriving the flag from ``segment_count > 1`` would have routed
-        a one-segment coverage plan carrying a tail trim straight into the mirror
-        the operator ruled out. That mirror is now DELETED -- a short render on
-        an audio-synced lane is terminal and loud (``MirrorExtensionForbidden``),
-        and the LTX boomerang went with it on 2026-08-06.
-
-        The flag is still passed in rather than derived, because the two
-        questions remain genuinely different: a one-segment plan IS
-        coverage-planned, and the length authority it deserves is the plan's, not
-        the adapter's floor. What changed is the consequence of getting it wrong
-        -- a loud refusal instead of a silent mirror. It falls back to the
-        segment count only when a caller does not say, which is what every
-        pre-existing caller meant.
+        ``multi_clip`` MEANS "coverage-planned", not "more than one segment".
+        It is passed in rather than derived because the two questions are
+        genuinely different: a one-segment plan IS coverage-planned, and the
+        length authority it deserves is the plan's, not the adapter's floor.
+        A short render on an audio-synced lane is terminal and loud
+        (``MirrorExtensionForbidden``), so a wrong flag costs a loud refusal,
+        never a silent mirror. It falls back to the segment count only when a
+        caller does not say, which is what every pre-existing caller meant.
         """
         planned = (self.coverage_planned if self.coverage_planned is not None
                    else self.is_multi_segment)

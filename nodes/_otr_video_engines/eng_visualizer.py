@@ -1,6 +1,6 @@
 r"""``viz_green`` -- the low-VRAM, ffmpeg-only procedural CRT scope video engine
-(renamed from ``visualizer`` 2026-06-30, item 2 -- companion to viz_mxc_cpu /
-viz_mxc_mandala; old saved graphs resolve via _LEGACY_ENGINE_ALIASES).
+(companion to viz_mxc_cpu / viz_mxc_mandala; old saved graphs naming
+``visualizer`` resolve via _LEGACY_ENGINE_ALIASES).
 
 Audio-reactive CRT scopes (frequency ring + orbiting green/cyan/amber particles +
 geometric grid + mirrored waveform + freq bars + CRT post) rendered AS a per-beat
@@ -20,8 +20,8 @@ OTR_MasterAudioMux adds audio (test_audio_byte_identical invariant). NO FALLBACK
 (fallback_engine=None); assert_usable fails LOUD. Cold-import clean (V-12: soundfile
 / PIL / scope_draw imported lazily inside render_clip). UTF-8, no BOM, ASCII source.
 
-Config (env): the historical ``OTR_ENABLE_VISUALIZER`` flag is vestigial (registry
-IS the menu; no flag gate); ``OTR_FFMPEG`` ffmpeg path is still read.
+Config (env): no enable flag (registry IS the menu); ``OTR_FFMPEG`` ffmpeg
+path is read.
 """
 from __future__ import annotations
 
@@ -153,12 +153,10 @@ class VisualizerEngine:
                 "viz_green needs ffmpeg on PATH (or set OTR_FFMPEG)", kind="video")
         # NOTE: audio_ref is NOT gated here. The per-beat audio is SLICED at
         # render time, so the assert_usable request_template carries an empty
-        # audio_ref for music/announcer beats (mirrors the retired eng_ltx_av
-        # lane, which also audio-conditioned but did not gate audio_ref
-        # pre-render). render_clip is
-        # the LOUD audio gate -- a beat that truly has no audio fails the episode
-        # there (no fallbacks). (Fixed after the 2026-06-18 visualizer soak: the
-        # old check aborted shot_b000_music_open before render.)
+        # audio_ref for music/announcer beats (gating it pre-render would
+        # abort a valid music/announcer beat before render). render_clip is the
+        # LOUD audio gate -- a beat that truly has no audio fails the episode
+        # there (no fallbacks).
         return self.name
 
     # ---- pure helpers (CPU-testable) ----

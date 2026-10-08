@@ -4,12 +4,11 @@ A foley stem is the audio LTX 2.5 already computes while it renders a clip --
 footsteps, room tone, a score written for the exact picture on screen -- kept
 instead of discarded and written beside the clip as a 16-bit PCM WAV. It is
 mixed UNDER the frozen episode master at ``OTR_MasterAudioMux``, at the fixed
-0.50 foley / 0.50 master the operator ruled on 2026-08-29 (raised from the
-2026-08-26 0.20 / 0.80 after the bed proved inaudible by ear).
+0.50 foley / 0.50 master the operator ruled on 2026-08-29.
 
 THIS IS NOT THE SFX BED. The SFX bed was separately GENERATED effects from a
-dedicated model; it was ripped on 2026-08-06 and is staying dead (its engine
-ids still fail closed through ``RETIRED_ENGINE_IDS``). Nothing here is
+dedicated model, and that lane is retired (its engine ids still fail closed
+through ``RETIRED_ENGINE_IDS``). Nothing here is
 restored from it, no constant is inherited from it, and every field name in this
 module is ``foley_`` for exactly that reason. Operator, 2026-08-26: *"sfx bed is
 different than foley bed, i won't get the two confused."*
@@ -35,16 +34,13 @@ import wave
 
 _LOG = logging.getLogger("OTR.foley")
 
-#: THE FIXED MIX -- an operator ruling, not a knob. RAISED TO 0.50 / 0.50 BY
-#: THE OPERATOR 2026-08-29 (*"let have foley ab 5050 split"*), superseding the
-#: 2026-08-26 0.20 / 0.80 ruling, after the published episode
-#: ``signal_lost_blood_and_the_broken_crown_20260828_203439`` proved the bed
-#: inaudible by ear: raw stems measured 10-40 dB under the lab's golden
-#: reference renders, and 0.20 under a full master buried what remained.
-#: The ratio change is +7.96 dB on the bed and -4.08 dB on the programme --
-#: +12.04 dB of relative lift -- and the final ``_master_loudness`` delivery
-#: pass (-14 LUFS, -1 dBFS rail) restores overall level afterwards, so the
-#: change moves the BALANCE, not the loudness.
+#: THE FIXED MIX -- an operator ruling, not a knob: 0.50 / 0.50 (operator
+#: 2026-08-29: *"let have foley ab 5050 split"*). The published episode
+#: ``signal_lost_blood_and_the_broken_crown_20260828_203439`` proved a 0.20 /
+#: 0.80 bed inaudible by ear: raw stems measure 10-40 dB under the lab's golden
+#: reference renders, and 0.20 under a full master buries what remains. The
+#: final ``_master_loudness`` delivery pass (-14 LUFS, -1 dBFS rail) restores
+#: overall level afterwards, so this mix moves the BALANCE, not the loudness.
 #:
 #: Linear coefficients applied to the FULL master (dialogue, procedural room
 #: tone, themes and music cues together), because ``OTR_EpisodeAssembler``
@@ -56,10 +52,6 @@ _LOG = logging.getLogger("OTR.foley")
 #: THE MASTER IS NOT ATTENUATED BY THE FOLEY'S PRESENCE. Voice holds its gain
 #: whether or not a stem exists for a given beat, so a beat with no foley does
 #: not get louder than its neighbours.
-#:
-#: NOT the retired SFX bed's 0.45, and the difference is the point rather than
-#: an accident: this bed plays UNDER dialogue continuously, where that one
-#: played in the gaps.
 FOLEY_GAIN = 0.50
 MASTER_GAIN_UNDER_FOLEY = 0.50
 
@@ -91,39 +83,31 @@ FOLEY_RECEIPT_KEYS = (
 #:   globally would silence the entire episode.
 #:
 #: THE TTS AND MUSIC FOR A MIME BEAT ARE STILL GENERATED, and then multiplied
-#: by zero. That waste is deliberate (RULING 4, superseding the 2026-08-10
-#: "mime generates no TTS" brief): nothing has to happen before the master
-#: freezes, because nothing is being REPLACED -- the master is simply
+#: by zero. That waste is deliberate (RULING 4): nothing has to happen
+#: before the master freezes, because nothing is being REPLACED -- the
+#: master is simply
 #: attenuated to zero in that window at mux time, exactly as foley
 #: attenuates it to 0.50. Same pipeline, same code path, one different
 #: constant. It deletes a whole node and an execution-order inversion.
 #: RE-AFFIRMED BY THE OPERATOR 2026-08-28, in his words: *"mime should have
 #: the native audio 'foley' layer at 100% and do not use the TTS / music /
 #: announcer audio."* That is exactly the row below, and it is recorded here
-#: because the mime gains were questioned twice in one night -- once while
-#: hunting a vocalization defect, and once while considering retiring mime's
-#: audio entirely. BOTH are answered: the native audio STAYS at 1.00, and the
-#: programme (TTS, music cues, announcer) STAYS at 0.00 inside mime windows.
-#: Do not propose dropping mime's generated audio; the operator wants it.
-#: EVERY LANE THAT HARVESTS A FOLEY BED MUST HAVE A ROW HERE, AND SEVERAL DID
-#: NOT (2026-09-23). Membership of this table is not a mixing preference; it is
-#: how `is_foley_route` decides an episode is a foley episode at all. A lane
-#: that is absent renders its foley per beat, writes its durable stem, and then
-#: the episode master never mixes it:
-#:
-#:   scene_sequencer:1792  is_foley_route -> False
-#:   scene_sequencer:1960  so no MASTER_WAV_PRE_LOUDNESS stamp is written
-#:   master_audio_mux:1879 `_foley_route(...) or _master_wav_owes_a_delivery_gain(...)`
-#:                         -- both False, so _compile_foley_master never runs
-#:
-#: and because `canonicalize_video` strips beat audio (V-1: only
-#: OTR_MasterAudioMux ever adds audio), the delivered episode is SILENT of
-#: foley. The lane looks healthy the whole way: the beat mp4 has sound in it,
-#: the stem is on disk, nothing fails, and the receipt says the render
-#: succeeded.
-#:
+#: announcer audio."* That is exactly the row below: the native audio STAYS at
+#: 1.00, and the programme (TTS, music cues, announcer) STAYS at 0.00 inside
+#: mime windows. Do not propose dropping mime's generated audio; the operator
+#: wants it.
+#: EVERY LANE THAT HARVESTS A FOLEY BED MUST HAVE A ROW HERE. Membership of
+#: this table is not a mixing preference; it is how `is_foley_route` decides an
+#: episode is a foley episode at all. A lane that is absent renders its foley
+#: per beat, writes its durable stem, and then the episode master never mixes
+#: it (`is_foley_route` is False, so no MASTER_WAV_PRE_LOUDNESS stamp is
+#: written and `_compile_foley_master` never runs); and because
+#: `canonicalize_video` strips beat audio (V-1: only OTR_MasterAudioMux ever
+#: adds audio), the delivered episode is SILENT of foley. The lane looks
+#: healthy the whole way: the beat mp4 has sound in it, the stem is on disk,
+#: nothing fails, and the receipt says the render succeeded.
 #: The missing rows were tier lanes. Every foley tier subclasses
-#: `Ltx25FoleyPlusEngine` and harvests exactly as it does, so it takes exactly
+#: Every foley tier subclasses
 #: its gains -- and joins `GLOBAL_MASTER_GAIN_LANES` below for the same reason,
 #: because a lane that mixes like foley and ducks like foley is foley at a
 #: different weight. Leaving one out would duck the master only inside its own
@@ -171,9 +155,8 @@ FOLEY_LANE_GAINS = {
 #: with one mime role would go silent entirely. Every foley variant therefore
 #: belongs here and mime never does.
 #:
-#: This note used to say "exactly one lane does this" while the set already
-#: held two, and the count was wrong again the moment the tier lanes were
-#: added. A membership rule survives the next addition; a tally does not.
+#: Keep it a membership rule, never a tally: a rule survives the next
+#: addition; a count does not.
 GLOBAL_MASTER_GAIN_LANES = frozenset({
     "ltx25_foley_16gb",
     "ltx25_foley_24gb",
@@ -181,12 +164,11 @@ GLOBAL_MASTER_GAIN_LANES = frozenset({
     "cloud_ltx25_foley_plus",
 })
 
-#: `FOLEY_ENGINE_ID` / `MIME_ENGINE_ID` were removed 2026-08-28. Their comment
-#: claimed "three call sites already read" them and there were none: every
-#: routing and mixing decision keys off :data:`FOLEY_LANE_GAINS` membership and
-#: resolved engine ids, never a bare scalar comparison -- which is the point
-#: `is_foley_route` makes below. A false scalar authority sitting over a live
-#: table is exactly what sends the next reader to the wrong place.
+#: There is no scalar FOLEY/MIME engine-id constant: every routing and mixing
+#: decision keys off :data:`FOLEY_LANE_GAINS` membership and resolved engine
+#: ids, never a bare scalar comparison -- which is the point `is_foley_route`
+#: makes below. A scalar authority sitting over a live table is exactly what
+#: sends the next reader to the wrong place.
 
 
 def _ffmpeg_bin() -> str:
@@ -884,11 +866,9 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
 
         # A ROW WITH NO POSITION IS SKIPPED, NOT GUESSED AT AND NOT FATAL.
         #
-        # THIS WAS A HARD FAILURE UNTIL A LIVE LEG KILLED AN EPISODE WITH IT
-        # (2026-08-26, 3h17m of render lost at the very last node). The guard's
-        # reasoning was right and is kept: position zero would stack every
-        # unplaced bed on top of the opening, so a position is never invented.
-        # What was wrong was treating "no position" as impossible.
+        # A position is never invented (position zero would stack every unplaced
+        # bed on top of the opening), and "no position" is not impossible, so it
+        # must not be fatal either.
         #
         # IT IS ROUTINE. A `music_inter` beat is a video-only bridge -- ledger
         # b006 of that episode reads `start_s=None, dur_s=None, text=''`,

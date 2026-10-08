@@ -145,10 +145,9 @@ def clip_rows_by_shot(manifest):
     once -- and which of the two got graded depended on file order. Here the
     FIRST occurrence wins and the duplicate is left for ``RULE_MANIFEST_SHAPE``
     to report: a duplicate is a defect to name, never a conflict to resolve
-    quietly. That rule HAS landed -- ``grade_manifest_shape()`` detects
-    duplicate shot ids and ``grade_episode()`` calls it -- so the duplicate is
-    reported rather than silently tolerated. (This paragraph said "NOT YET
-    LANDED" until 2026-08-28.) The change here is only WHICH of the two rows
+    quietly. ``grade_manifest_shape()`` detects duplicate shot ids and
+    ``grade_episode()`` calls it, so the duplicate is reported rather than
+    silently tolerated. The change here is only WHICH of the two rows
     gets graded, and both regimes are audit-only.
 
     **It crashed on a non-record.** ``r.get`` on a list, a string or a number
@@ -851,9 +850,7 @@ def grade_no_mirror(ledger, manifest):
             # That rule owns silence on a MULTI-segment plan ("declares no
             # extension_mode"), so reporting it here too produced TWO findings
             # for ONE missing field -- the boundary this pair exists to keep.
-            # ``""`` is silence in both rules now; it used to be silence here
-            # and "cannot interpret" there, which is one defect wearing two
-            # contradictory classifications.
+            # ``""`` is silence in both rules.
             if versioned and is_video and len(_plan_segments(shot)) <= 1:
                 findings.append(_finding(
                     RULE_NO_MIRROR, shot_id,
@@ -863,21 +860,16 @@ def grade_no_mirror(ledger, manifest):
                     % (row.get("engine_id"),)))
             continue
         # FROM HERE THE ROW HAS SPOKEN, AND WHAT IT SAID IS JUDGED WHATEVER ITS
-        # TYPE IS. The ``type`` exemption used to sit above this, skipping the
-        # ban entirely for any non-"video" string -- so a row stamped
-        # ``type="still"`` with ``extension_mode="ping_pong"`` passed clean. It
-        # also opened a REGRESSION: ``grade_multiclip_honesty`` now stands down
-        # on a known non-deliverable mode expecting this rule to catch it, and
-        # on a non-video row NEITHER rule fired, where the honesty rule alone
-        # used to. A declaration of padding is a violation on its face; only the
+        # TYPE IS: ``grade_multiclip_honesty`` stands down on a known
+        # non-deliverable mode expecting this rule to catch it, so a type
+        # exemption here would leave a non-video row with NEITHER rule firing.
+        # A declaration of padding is a violation on its face; only the
         # questions about SILENCE need to know what kind of clip this is.
         if not isinstance(mode, str) or mode not in KNOWN_EXTENSION_MODES:
-            # SAY WHAT IS TRUE. This used to deliver the "no clip may carry
-            # manufactured frames" verdict for an UNINTERPRETABLE mode -- which
-            # asserts a fact the grader has just admitted it cannot establish.
-            # On a single-segment beat that misworded line was the ONLY finding,
-            # so an operator was told the lane padded when what actually
-            # happened is that nobody can tell. Still fail-closed; only honest.
+            # SAY WHAT IS TRUE: an UNINTERPRETABLE mode must not get the
+            # "no clip may carry manufactured frames" verdict, which asserts a
+            # fact the grader has just admitted it cannot establish. Still
+            # fail-closed; only honest.
             findings.append(_finding(
                 RULE_NO_MIRROR, shot_id,
                 "%r declares extension_mode=%r, which is not a mode this "
@@ -955,12 +947,12 @@ def grade_episode(ledger, manifest):
     grader that raised on the first problem would hide the rest.
 
     SHAPE FIRST, AND A SHAPE DEFECT SUPPRESSES THE RULES THAT WOULD CASCADE.
-    One malformed manifest row used to make every semantic rule report its own
-    confused version of the same problem; now it produces one named
-    ``manifest_shape`` finding and the manifest-dependent rules stand down. The
-    LEDGER-only rule keeps running either way, because a broken manifest says
-    nothing about whether the route was frozen correctly -- and it is now safe
-    to run, which it was not before ``_shots`` began filtering non-records."""
+    One malformed manifest row produces one named ``manifest_shape`` finding
+    and the manifest-dependent rules stand down, rather than each reporting
+    its own confused version of the same problem. The LEDGER-only rule keeps
+    running either way, because a broken manifest says nothing about whether
+    the route was frozen correctly (it is safe to run: ``_shots`` filters
+    non-records)."""
     shape = grade_ledger_shape(ledger) + grade_manifest_shape(manifest)
     findings = list(shape) + grade_frozen_route(ledger)
     if shape:

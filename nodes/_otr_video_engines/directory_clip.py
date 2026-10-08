@@ -41,21 +41,19 @@ FRAME_MAGIC = {
 def prove_frame_is_a_silent_image(path):
     """PROVE from a frame's own BYTES that it is a PNG/EXR still image.
 
-    THE V-1 AUDIO LAW FOR A DIRECTORY CLIP (lane 10, 2026-08-11 -- lesson L4).
-    Every other lane delivers an mp4 and proves its silence by ffprobing the
-    emitted file for audio streams (``wan_shared.validate_silent_clip_contract``).
-    A directory clip has no container to probe, and the old contract's audio
-    check read ``has_audio is not False`` off the dict THE ADAPTER ITSELF WROTE
-    -- a declaration checking a declaration, which is the exact thing L4 exists
-    to forbid.
+    THE V-1 AUDIO LAW FOR A DIRECTORY CLIP (lesson L4). Every other lane
+    delivers an mp4 and proves its silence by ffprobing the emitted file for
+    audio streams (``wan_shared.validate_silent_clip_contract``). A directory
+    clip has no container to probe, and a ``has_audio`` read off the dict THE
+    ADAPTER ITSELF WROTE would be a declaration checking a declaration, which
+    is the exact thing L4 exists to forbid.
 
-    The structural fact that replaces it: a PNG and an EXR are still-image
-    formats with no audio stream to carry, so a directory whose every frame is
-    PROVED to be one of them is silent by construction rather than by
-    assertion. The proof has to be the BYTES, because ``list_directory_frames``
-    selects frames by filename extension -- so before this, a file named
-    ``0001.png`` containing an mp4, a WAV, or anything else at all counted as a
-    frame and shipped as proof of silence.
+    A PNG and an EXR are still-image formats with no audio stream to carry, so
+    a directory whose every frame is PROVED to be one of them is silent by
+    construction rather than by assertion. The proof has to be the BYTES,
+    because ``list_directory_frames`` selects frames by filename extension: a
+    file named ``0001.png`` containing an mp4, a WAV, or anything else at all
+    would otherwise count as a frame and ship as proof of silence.
 
     Raises ``ValueError`` naming the offending file; returns the matched
     extension on success. Reads only the leading magic bytes, so proving a

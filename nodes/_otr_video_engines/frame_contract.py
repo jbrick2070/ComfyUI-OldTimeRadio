@@ -18,15 +18,13 @@ loading a model:
   Engines without strict first-frame support get a JUMP CUT, which is legal and
   honest; silently pretending they chain is neither.
 
-EVERY ENGINE GETS THE SAME TERMS (chunk 7a, 2026-07-26). This module used to
-open with "EVERY ADAPTER IS ``single_only`` UNTIL IT PROVES OTHERWISE" and
-carried a ``supports_multi_clip`` flag that each adapter had to set for itself.
-The operator ended that design: "this architecture should work with all video
-and still models. There's no gate with opt in or opt out. If there is, we need
-to remove that. Everything gets an equal term... I don't like any hidden
-opt-ins. It either works or it fails."
+EVERY ENGINE GETS THE SAME TERMS (operator ruling, 2026-07-26): "this
+architecture should work with all video and still models. There's no gate
+with opt in or opt out. If there is, we need to remove that. Everything gets
+an equal term... I don't like any hidden opt-ins. It either works or it
+fails."
 
-So the flag is gone and multi-clip is universal. What an adapter must still
+So multi-clip is universal, with no per-adapter flag. What an adapter must still
 EARN, per engine and from evidence, is the CHAIN -- see :data:`CONTINUITY_MODES`
 below. An engine that cannot prove first-frame lock gets an honest jump cut,
 which is legal; it does not get a pretended seam.
@@ -86,19 +84,17 @@ class FrameContract:
         expressed in seconds MUST be multiplied by :attr:`native_fps` at the
         declaration site -- and by the CANVAS rate, never the model's. Veo's
         4/6/8 s menu declares ``(100, 150, 200)``: 25 fps, not Veo's own 24.
-        (This paragraph taught ``(96, 144, 192)`` until 2026-08-12, which is
-        the exact value the chunk-7a QA panel had already corrected in
-        ``eng_google_veo_video`` on 2026-07-26 and which
-        ``tests/test_engine_contract_roster.py`` asserts is wrong. Every 24 fps
-        lane is delivered at 25 -- Veo by the provider-side duration-preserving
-        resample in ``cloud_media_canonical``, MiniMax H3 by its own index map
-        before the encoder -- so a menu counted at 24 lists lengths nothing
-        downstream can ever produce, and a contract listing them refuses every
-        real beat. It is the first thing an adapter author reads, so it now
-        matches the code.) The field was named ``discrete_durations`` until
-        2026-07-26; it was renamed because the old name invited exactly that
-        seconds-for-frames substitution, and a validator cannot catch it --
-        ``(4, 6, 8)`` is a perfectly well-formed frame menu, just a wrong one.
+        Counting at 24 (``(96, 144, 192)``) is the known error:
+        ``tests/test_engine_contract_roster.py`` asserts it is wrong. Every
+        24 fps lane is delivered at 25 -- Veo by the provider-side
+        duration-preserving resample in ``cloud_media_canonical``, MiniMax H3
+        by its own index map before the encoder -- so a menu counted at 24
+        lists lengths nothing downstream can ever produce, and a contract
+        listing them refuses every real beat. The field is named
+        ``discrete_frames`` because a seconds-flavoured name invites exactly
+        that seconds-for-frames substitution, and a validator cannot catch it
+        -- ``(4, 6, 8)`` is a perfectly well-formed frame menu, just a wrong
+        one.
     ``native_fps``
         The frame rate these frame numbers are expressed at, or ``0`` for an
         engine that renders at whatever the canvas asks for. Static and
@@ -228,12 +224,11 @@ def frame_contract_for(engine) -> FrameContract:
 def can_split(engine) -> bool:
     """True iff a beat could ever need more than one clip on this adapter.
 
-    REPLACES ``supports_multi_clip(engine)`` (chunk 7a, 2026-07-26), which read
-    a per-adapter opt-in flag that no longer exists. The question is no longer
-    "did this engine volunteer" -- every engine is in -- but the strictly
-    arithmetic "does this engine have a ceiling to exceed". An unbounded engine
-    (the visualizers, the still families, mesh_stage) accepts any length, so no
-    beat can ever overflow one render and no split can ever be needed.
+    The question is the strictly arithmetic "does this engine have a ceiling
+    to exceed" -- not "did this engine volunteer": every engine is in. An
+    unbounded engine (the visualizers, the still families, mesh_stage) accepts
+    any length, so no beat can ever overflow one render and no split can ever
+    be needed.
     """
     contract = frame_contract_for(engine)
     return bool(contract.max_frames or contract.discrete_frames)
@@ -371,9 +366,7 @@ def coverage_contract_receipt(engine_id, contract, max_render_frames):
     ``contract`` MUST be the adapter's DECLARED contract, never one already
     narrowed by :func:`effective_frame_contract`. A narrowed contract narrows
     to itself, compares equal, and returns ``None`` -- the receipt then
-    silently never exists and the render boundary has nothing to check. The
-    first draft of the stamp site made exactly that mistake by rebinding one
-    variable.
+    silently never exists and the render boundary has nothing to check.
     """
     ceiling = normalized_planning_ceiling(max_render_frames)
     effective = effective_frame_contract(engine_id, contract, ceiling)

@@ -15,7 +15,7 @@ Four rows from the S0 pin table, invoked through the S0 bridge
 S3-CORE SCOPE: rows REGISTER unconditionally (registry-IS-the-menu C6) with
 empty ``default_roles`` -- selectable, NEVER automatic. Operator directive
 2026-07-02: the DROPDOWN PICK is the enable (no OTR_ENABLE_COMFY_CLOUD_MEDIA
-hidden switch -- same clean break as the OpenRouter C6 flag removal); a pick
+hidden switch); a pick
 without credentials fails LOUD at auth resolution. ``assert_usable`` fails
 CLOSED (EngineUnusable) unless ffmpeg is present (the canonicalizer strips
 provider audio) and the pin row is OK. The reactive
@@ -131,13 +131,11 @@ _SEEDANCE_SMOOTH_MOTION_CLAUSE = (
     "pans, handheld shake, sudden reframing, jump cuts, or rapid zooms. "
     f"{_SEEDANCE_SMOOTH_MARKER}")
 _SEEDANCE_PROMPT_VARIANT = "seedance_action_v2"
-#: ARTIFACT GUARDS ONLY (2026-08-27). Two entries were removed because they
-#: were DAMPING rather than protection: "aggressively"->"subtly" (and "subtly"
-#: is precisely the word PBUG-20260827-04 banned) and "dynamic dolly
-#: push"->"slow controlled dolly push", which would have quietly undone the new
-#: motion envelope on every Seedance render. What remains guards against real,
-#: documented failure modes on this family -- whip pans, rapid zooms, handheld
-#: shake and blown highlights -- and those are kept verbatim.
+#: ARTIFACT GUARDS ONLY. No DAMPING substitutions belong here ("subtly" is
+#: banned by PBUG-20260827-04, and "dynamic dolly push"->"slow controlled
+#: dolly push" would quietly undo the motion envelope on every Seedance
+#: render). What is listed guards against real, documented failure modes on
+#: this family -- whip pans, rapid zooms, handheld shake and blown highlights.
 _SEEDANCE_PROMPT_SOFTENERS = (
     ("handheld_dolly",
      re.compile(r"\bhandheld\s+dolly\b", re.IGNORECASE),
@@ -168,19 +166,13 @@ _WAN_MODEL_ALIASES = {
 _WAN_RESOLUTIONS = ("720P", "1080P")
 _WAN_SMOOTH_MARKER = (
     "Stable first-frame motion; preserve composition and move continuously.")
-#: MOTION RAISED, ARTIFACT GUARDS KEPT (2026-08-27). Only one word changed in
-#: substance: "slow" became purposeful subject movement. The long exclusion
-#: list stays exactly as it is -- whip pans, melting geometry, warped faces,
-#: drifting text and pillarbox bars are ARTIFACT guards on a cloud i2v model,
-#: not motion damping, and stripping them to chase movement would trade a
-#: still-looking render for a broken one. The distinction matters: "slow"
-#: describes how the SUBJECT moves; the exclusions describe how the CAMERA and
-#: the geometry must not fail.
-#: MOTION RAISED, ARTIFACT GUARDS KEPT (2026-08-27, Option B). "gentle
-#: parallax" was the only damping phrase here and is replaced by the budget the
-#: operator's matrix names: one purposeful action arc, an endpoint, an optional
-#: reaction, one camera behaviour. Every geometry and negative guard below is
-#: preserved verbatim -- melting geometry and warped faces are failure modes.
+#: MOTION RAISED, ARTIFACT GUARDS KEPT. The motion budget is the operator
+#: matrix's: one purposeful action arc, an endpoint, an optional reaction,
+#: one camera behaviour. The long exclusion list is ARTIFACT guards on a
+#: cloud i2v model -- whip pans, melting geometry, warped faces, drifting
+#: text and pillarbox bars are failure modes, not motion damping, and
+#: stripping them to chase movement would trade a still-looking render for a
+#: broken one.
 _WAN_SMOOTH_MOTION_CLAUSE = (
     "Generate one continuous shot from the first frame. Preserve the "
     "first-frame subject, composition, aspect ratio, lighting, and visual "

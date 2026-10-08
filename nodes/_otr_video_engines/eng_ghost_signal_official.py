@@ -2,9 +2,7 @@
 
 ADDITIVE, NOT A REPLACEMENT (operator, 2026-08-22: *"we clone the current
 ghost's lane so if it doesn't work we have our golden ghost untouched"*, and
-*"a peer lane"*). ``animatediff15_video`` is unchanged, still default, still the
-lane that rendered the published episode. These two sit BESIDE it in the
-dropdown and are chosen the same way any other lane is.
+*"a peer lane"*).
 
 WHY THEY EXIST -- TWO REASONS, AND THE FIRST IS A BLOCKER
 ---------------------------------------------------------

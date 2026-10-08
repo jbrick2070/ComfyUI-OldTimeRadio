@@ -274,9 +274,8 @@ class VramPeakProbe:
 # render within the live VRAM budget from a ZERO-COST mem_get_info read + a cost
 # model -- NEVER react-to-OOM (a CUDA OOM inside ComfyUI's long-lived process
 # corrupts the caching allocator, so OOM is a bug to AVOID, never a control
-# signal). Replaced a hard 17-frame "8GB floor" that froze every clip to
-# 0.68s. Pure given its inputs (free VRAM is read by the caller and passed in),
-# so the math is CPU-testable without a GPU.
+# signal). Pure given its inputs (free VRAM is read by the caller and passed
+# in), so the math is CPU-testable without a GPU.
 # --------------------------------------------------------------------------- #
 
 #: Telemetry reference resolution the per-frame cost is measured at (a 5B video
@@ -293,9 +292,7 @@ _FRAME_COST_REF_PIXELS = 1472 * 832
 #:
 #: EMPTY, AND THAT CHANGES NOTHING TODAY. :data:`QUALIFIED_COST_ROWS` is empty,
 #: so ``cost_row_may_refuse`` is False for every engine and no row can refuse a
-#: render. The only row this table ever carried belonged to a lane that has been
-#: removed; its figure lives on as :data:`_DEFAULT_FRAME_COST`, which every
-#: engine was already priced at.
+#: render.
 FRAME_COST_MODEL = {}
 #: Fallback cost row for an engine not in :data:`FRAME_COST_MODEL`: a
 #: conservative seed measured on a 5B video lane at the reference resolution.
@@ -305,19 +302,14 @@ _DEFAULT_FRAME_COST = (7000.0, 185.0)
 #: carry. It is the LOWER BOUND handed to ``quantize_frames_4n1``; it is NOT an
 #: override of the VRAM budget.
 #:
-#: CORRECTED 2026-08-01 (kibitz r4, verified against this file). This comment used
-#: to claim "the floor WINS over the budget (if the floor itself OOMs, the
-#: render-window NVML probe catches it LOUD)". BOTH HALVES WERE FALSE, and the
-#: pair of them nearly bought a real defect:
-#:   * The floor does NOT win. ``compute_real_frame_budget`` raises
-#:     :class:`MotionBudgetError` whenever ``affordable < snapped``, and ``snapped``
-#:     carries the floor -- so an unaffordable floor REFUSES the render rather than
-#:     rendering short.
-#:   * ``VramPeakProbe`` catches nothing. Its own contract above is explicit:
-#:     "there is no ceiling assert -- the peak is sampled + logged, never enforced."
-#: A plan written against the old wording proposed bypassing the refusal on the
-#: strength of a probe that would not have caught the resulting CUDA OOM. Preflight
-#: refusal is the ONLY guard on this path; keep it that way.
+#: THE FLOOR DOES NOT WIN OVER THE BUDGET. ``compute_real_frame_budget``
+#: raises :class:`MotionBudgetError` whenever ``affordable < snapped``, and
+#: ``snapped`` carries the floor -- so an unaffordable floor REFUSES the render
+#: rather than rendering short. And ``VramPeakProbe`` catches nothing: its own
+#: contract above is explicit ("there is no ceiling assert -- the peak is
+#: sampled + logged, never enforced"), so bypassing the refusal would leave a
+#: CUDA OOM uncaught. Preflight refusal is the ONLY guard on this path; keep
+#: it that way.
 #:
 #: NOTE ``snapped`` CAN fall below the floor: ``quantize_frames_4n1`` applies
 #: ``max_frames`` AFTER the minimum, so a target under the floor stays under it.
@@ -686,8 +678,8 @@ def copy_conditioning(out):
     """Hand out a PRIVATE outer list and metadata dicts; share the tensor.
 
     For a lane that reuses a CONDITIONING output across renders (the LTX 2.5
-    episode encoder cache; the 8 GB LTX lane's conditioning cache). Moved here
-    from ``eng_ltx25`` on 2026-09-26 so both hand out the same copy.
+    episode encoder cache; the 8 GB LTX lane's conditioning cache). Shared so
+    both hand out the same copy.
 
     Verified during the 2026-08-20 arc: nothing on the LTX graphs mutates a
     conditioning in place -- ``LTXVConditioning`` goes through
@@ -810,12 +802,10 @@ def _loader_filenames(engine_name):
     asset-id list and its entries are not filenames -- ``ltx_8gb`` declares
     ``["ltxv-2b-0.9.8-distilled"]`` while its loader consumes
     ``ltxv-2b-0.9.8-distilled.safetensors`` and a T5 encoder.
-    A cursor review caught the first version of this reading the wizard tokens,
-    which meant ``folder_paths`` resolved nothing, which meant the guard
-    fail-opened on the ONE engine that had just killed the machine. The tests
-    passed anyway because they only exercised the pure arithmetic, never the
-    resolver -- so this function now has its own, and they run against the real
-    adapters.
+    Reading the wizard tokens instead would make ``folder_paths`` resolve
+    nothing, and the guard would fail-open on the ONE engine that had just
+    killed the machine; pure-arithmetic tests would not notice, so the
+    resolver is tested against the real adapters.
 
     DUCK-TYPED AND DELIBERATELY NARROW. There is no uniform weight-name surface
     across 33 video adapters, so this reads the two that exist today
@@ -892,9 +882,9 @@ def resolved_weight_mb(engine_name):
     """PEAK concurrent residency (MiB) of ``engine_name``'s loader artifacts,
     or ``None`` when they cannot all be resolved.
 
-    NOT the sum. The first version of this summed every artifact and that was
-    WRONG in the one direction a guard must never be wrong: it refused
-    ``ltx_8gb``, which is proven working on this exact host. LTX declares
+    NOT the sum. Summing every artifact is WRONG in the one direction a guard
+    must never be wrong: it would refuse ``ltx_8gb``, which is proven working
+    on this exact host. LTX declares
     16.1 GB of artifacts and runs fine in a 11.8 GiB budget, because its 9.8 GB
     T5 encoder loads, encodes, and UNLOADS before the 6.3 GB checkpoint is
     touched. They are never resident together, so their sum is a number that
@@ -1108,12 +1098,10 @@ def assert_frame_affordable(free_vram_mb_value, frame_count, canvas_w,
 
 def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
                               canvas_w, canvas_h, engine_name):
-    """S4 platform-portability REWRITE (2026-07-10): the frame budget is the
+    """S4 platform-portability (2026-07-10): the frame budget is the
     STATIC widget value -- geometry only (engine motion floor + 4n+1 snap),
-    NEVER a VRAM-adaptive resize. The pre-S4 version silently shrank
-    tight-VRAM clips toward the floor (output length varied with host state
-    -- exactly the auto-adapt class this campaign kills; the clip-fill era
-    is superseded by the per-tier frame_budget widget).
+    NEVER a VRAM-adaptive resize (output length must not vary with host
+    state -- exactly the auto-adapt class this campaign kills).
 
     The cost model (``vram ~= overhead + per_frame_at_res * frames``,
     ``budget = free * margin``) is KEPT as a fail-loud PREDICTION: if the
@@ -1327,8 +1315,8 @@ class MotionEngineBase:
     #: role's SELECTED image (init still) by default -- the image dispatcher reads
     #: this ONE capability to decide whether to mint the still, so a new video engine
     #: gets the chosen image automatically with NO per-engine whitelist ("one and
-    #: done"). Audio-only lanes (the retired ltx_av_music) override to False; the
-    #: pure procedural floors (visualizer / abstract) declare False too.
+    #: done"). Audio-only lanes override to False; the pure procedural floors
+    #: (the viz_* family) declare False too.
     #: ``ltx_8gb`` inherits True here, which is what lets a flux2/flux still
     #: drive a silent LTX i2v clip. Plain attr
     #: (cold-import clean).
@@ -1363,31 +1351,19 @@ class MotionEngineBase:
         2026-07-24) so an engine can read its tier's ``max_render_frames``
         ceiling at render time. Read-only; never mutated.
 
-        ``session_ctx`` IS RETURNED IN ``prepared`` (2026-08-01). It used to be
-        accepted and DROPPED, which is a regression the multi-clip work
-        introduced and which took a live campaign to surface:
+        ``session_ctx`` IS RETURNED IN ``prepared``. ``BeatSession`` passes it
+        in (``beat_session.py``) because it is the ONLY channel that tells
+        ``render_clip`` whether its output will be concatenated with other
+        segments into one beat -- a coverage-planned segment's request is
+        shaped exactly like a single-clip beat's. If it were dropped,
+        ``prepared["session_ctx"]`` would be absent and every consumer reading
+        ``multi_clip`` would see nothing and take the single-clip branch.
 
-        * ``BeatSession`` passes it in (``beat_session.py:165-167``) because it
-          is the ONLY channel that tells ``render_clip`` whether its output will
-          be concatenated with other segments into one beat -- a coverage-planned
-          segment's request is shaped exactly like a single-clip beat's.
-        * Dropping it left ``prepared["session_ctx"]`` absent, so every consumer
-          reading ``multi_clip`` saw nothing and took the single-clip branch.
-        * ``eng_wan_ti2v`` and ``eng_humo`` each re-added it LOCALLY and worked;
-          ``ltx_video`` / ``ltx_8gb`` / ``ltx_av`` / ``wan_i2v`` never did, so
-          ``ltx_video``'s loop-fill enabled the boomerang on a beat whose length a
-          coverage plan had already decided.
-        * ``ltx_video`` last delivered episode clips 2026-07-06; the beat session
-          landed 2026-07-25 (``4fa992e6`` / ``e90dedf1``). It worked before
-          multi-clip existed, which is exactly why "it always worked" and "it
-          fails now" are both true.
-
-        THE BASE OWNS THIS, not each adapter. Two adapters carrying a private
-        workaround for a shared-base gap is how the sibling adapters were left
-        broken in the first place -- the same failure class as the ``eng_wan_i2v``
-        VRAM-peak lesson. A single-clip render (``render_single``) never opens a
-        ``BeatSession``, so it passes ``None`` and gets ``{}`` here: absent and
-        empty must stay indistinguishable to callers."""
+        THE BASE OWNS THIS, not each adapter: a private per-adapter
+        workaround for a shared-base gap is how sibling adapters get left
+        broken. A single-clip render (``render_single``) never opens a
+        ``BeatSession``, so it passes ``None`` and gets ``{}`` here: absent
+        and empty must stay indistinguishable to callers."""
         self._active_profile = dict(profile or {})
         lease = _GR.acquire(
             timeout_s=float(otr_env.get("OTR_GPU_LEASE_TIMEOUT_S", "120")))
@@ -1410,12 +1386,10 @@ class MotionEngineBase:
         profile -> director widget -> ledger -> here. Never raises; a malformed
         stamp reads as unpinned rather than failing a render.
 
-        DELEGATES TO THE ONE NORMALIZER (2026-07-27, B3 post-code panel).
-        This used to be a third hand-copied ``max(0, int(x or 0))``, alongside
-        the ledger stamp and the planner. They agreed only because someone
-        copied carefully; the whole point of B3's single helper is that the
-        adapter-side cap and the planned ceiling can never read the same stamp
-        differently.
+        DELEGATES TO THE ONE NORMALIZER (B3), so the adapter-side cap, the
+        ledger stamp and the planner can never read the same stamp
+        differently -- hand-copied ``max(0, int(x or 0))`` agree only because
+        someone copied carefully.
         """
         try:
             from . import frame_contract as _fc  # type: ignore
@@ -1431,14 +1405,13 @@ class MotionEngineBase:
         Idempotent + never raises out of teardown. NEVER ``unload_all_models``
         (V-4 / V-5).
 
-        THE LEASE RELEASE SITS IN A ``finally`` (2026-07-26, chunk-5 QA panel,
-        agy Gemini 3.6 Flash High; grounded and confirmed). ``_detach_patchers``
-        is guarded per patcher, but ``unload()`` is OVERRIDDEN per engine, and
-        an override that raises used to leave this method before the release --
-        stranding the shared single-heavy-engine lease in global state. The NEXT
-        episode then blocks on ``acquire`` for its full 120s timeout and fails
-        for a reason that has nothing to do with it. Reclaim is best-effort;
-        the lease is not."""
+        THE LEASE RELEASE SITS IN A ``finally``. ``_detach_patchers`` is
+        guarded per patcher, but ``unload()`` is OVERRIDDEN per engine, and an
+        override that raises would otherwise leave this method before the
+        release -- stranding the shared single-heavy-engine lease in global
+        state. The NEXT episode then blocks on ``acquire`` for its full 120s
+        timeout and fails for a reason that has nothing to do with it.
+        Reclaim is best-effort; the lease is not."""
         lease = (prepared or {}).get("lease")
         had_lease = lease is not None
         try:
@@ -1455,27 +1428,18 @@ class MotionEngineBase:
         ``patcher.detach(unpatch_all=True)`` and clear strong refs. Guarded +
         idempotent; a no-op on the CPU box where nothing was tracked.
 
-        THE "NEVER ``unload_all_models()``" CLAUSE IS STRUCK (operator, 2026-09-22):
-        *"we can unload because by the time we get to video we don't need tts
-        etc anymore"*, and *"remove that constraint"*. The rule was written to
-        protect other stages' resident models from a video engine's teardown,
-        and the pipeline order makes that protection empty -- story, voices and
-        music have all finished before a single frame is rendered.
-
-        It also contradicted the rest of this repo, which was the tell. The LLM
-        loader has called ``unload_all_models()`` + ``soft_empty_cache()``
-        before every load since long before this docstring
-        (`_otr_model_loader.py:1066`, the "Zero-Prime wash"), `_vram_log.py:165`
-        calls it too, and PBUG-20260908-03's CORRECTION measured that wash
-        working exactly as intended. A prohibition that the same tree violates
-        in two places is a local habit wearing an invariant's clothes.
+        THE OPERATOR STRUCK THE "NEVER ``unload_all_models()``" CLAUSE
+        (2026-09-22): *"we can unload because by the time we get to video we
+        don't need tts etc anymore"*, and *"remove that constraint"*. The rule
+        protected other stages' resident models from a video engine's
+        teardown, and the pipeline order makes that protection empty -- story,
+        voices and music have all finished before a single frame is rendered.
 
         Detaching tracked patchers is still the RIGHT default here, because it
         is precise: it releases what this engine loaded and leaves everything
-        else alone. What is gone is the ban on the bigger hammer when a lane
-        genuinely needs the whole card -- which the 16 GB LTX 2.5 decode does
-        (measured 2026-09-22: 30.0 s on a free card, unfinished at 412 s
-        with 11 GB occupied)."""
+        else alone. A lane that genuinely needs the whole card may use the
+        bigger hammer -- the 16 GB LTX 2.5 decode does (measured 2026-09-22:
+        30.0 s on a free card, unfinished at 412 s with 11 GB occupied)."""
         for patcher in list((prepared or {}).get("patchers") or []):
             try:
                 detach = getattr(patcher, "detach", None)

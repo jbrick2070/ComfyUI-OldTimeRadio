@@ -377,13 +377,12 @@ _BOILERPLATE_WORDS = frozenset({
 #: Human tokens forbidden in ``object`` and ``signal`` leaves. Absence of a
 #: person is expressed by choosing a non-human subject, never by asking for it.
 #:
-#: BODY PARTS ARE NOT ON THIS LIST, and a live leg is why (2026-08-22). It used
-#: to carry hand/hands/arm/arms/shoulder/shoulders, and it rejected
-#: *"the silver ledger sits on a desk as a clock hand ticks"* -- a CLOCK hand --
-#: which killed the whole batch and dropped the episode to deterministic
-#: clauses. It also rejected *"the radio dial turns as a hand adjusts the
-#: knob"*, which is the archival-documentary look the operator ranked SECOND
-#: out of five arms.
+#: BODY PARTS ARE NOT ON THIS LIST: hand/hands/arm/arms/shoulder/shoulders
+#: would reject *"the silver ledger sits on a desk as a clock hand ticks"*
+#: -- a CLOCK hand -- and *"the radio dial turns as a hand adjusts the knob"*
+#: (the archival-documentary look the operator ranked SECOND out of five
+#: arms), and one rejection kills the whole batch and drops the episode to
+#: deterministic clauses.
 #:
 #: What these modes owe is that no FULL FIGURE dominates the shot. They do not
 #: owe a frame with no people in it anywhere, and a word list that cannot tell
@@ -393,9 +392,8 @@ _HUMAN_WORDS = frozenset({
     "boy", "girl", "child", "children", "crowd", "figure", "figures",
     "silhouette", "silhouettes", "portrait", "someone", "somebody",
     "stranger", "lady", "gentleman", "guy",
-    # PRONOUNS BELONG HERE and were dropped by mistake when the body parts
-    # went. "he turns the dial slowly in darkness" is a person request and was
-    # passing object mode.
+    # PRONOUNS BELONG HERE: "he turns the dial slowly in darkness" is a person
+    # request and must not pass object mode.
     "he", "she", "they", "him", "her", "them",
 })
 
@@ -414,12 +412,12 @@ _HUMAN_WORDS = frozenset({
 #:
 #: NOT a taste judgement. A leaf may still describe light, shadow or movement;
 #: it may not make the ABSENCE OF A SUBJECT its subject.
-#: `grain`, `noise`, `geometry` and `geometric` were REMOVED after the panel
-#: read them: a sack of grain, wood grain on a desk and a sudden noise are all
-#: concrete, and whole-word rejection killed the batch for them. What stays is
+#: `grain`, `noise`, `geometry` and `geometric` are deliberately NOT here: a
+#: sack of grain, wood grain on a desk and a sudden noise are all concrete,
+#: and whole-word rejection would kill the batch for them. What is listed is
 #: the vocabulary actually measured painting mush -- static, waveforms,
 #: gradients, raw texture and pixels -- plus `emblem` and `field`, which the
-#: receipt named as mush-makers and which nothing had been banning.
+#: receipt named as mush-makers.
 _ABSTRACT_SUBJECT_WORDS = frozenset({
     "static", "waveform", "waveforms", "gradient", "gradients", "texture",
     "textures", "abstraction", "abstract", "pixels", "pixelation",
@@ -476,7 +474,7 @@ def sanitize_intent(beat_intent, names=()) -> str:
 
     Names removed, field labels removed, second person removed, punctuation
     normalized, and the result bounded. It is a HINT about what happens in the
-    beat, never a sentence to copy -- v1's whole defect was copying it.
+    beat, never a sentence to copy.
     """
     text = strip_cast_names(beat_intent, names)
     text = _FIELD_LABEL_RE.sub(" ", text)
@@ -619,9 +617,8 @@ MOTIF_FALLBACK_POOLS = {
 #: A Ghost bookend with an empty motif is invalid, which is why these are
 #: constants rather than an optional derivation.
 #:
-#: They used to read "radio dial emblem" and "broadcast waveform signal". An
-#: emblem is not a thing and a waveform is a graph, and the bookends rendered as
-#: texture accordingly. A bakelite radio set is a thing.
+#: Each motif must be a THING: an emblem is not a thing and a waveform is a
+#: graph (both rendered as texture); a bakelite radio set is a thing.
 GHOST_BOOKEND_MOTIFS = {
     ("announcer_visual", "object"): "a bakelite radio set",
     ("announcer_visual", "signal"): "a glowing radio dial",
@@ -638,10 +635,10 @@ def _first_allowlisted(phrases, vocabulary) -> str:
     a prompt that is supposed to have left all of that behind.
     """
     allowed = frozenset(vocabulary)
-    # SOURCE ORDER, WHICH IS WHAT THE DOCSTRING PROMISED. The loop used to walk
-    # the VOCABULARY and ask whether the phrase contained each entry, so a
-    # phrase naming two allowed colours returned whichever came first in the
-    # checked-in tuple rather than the one the cast row led with.
+    # SOURCE ORDER, WHICH IS WHAT THE DOCSTRING PROMISES: the loop walks the
+    # PHRASES, not the VOCABULARY, so a phrase naming two allowed colours
+    # returns the one the cast row led with rather than whichever came first
+    # in the checked-in tuple.
     for phrase in phrases:
         for word in _WORD_RE.findall(str(phrase or "").lower()):
             if word in allowed:
@@ -938,14 +935,13 @@ class _AmbiguousSubject:
     THE HOOK MUST NOT DECIDE, because it cannot know what it is decoding: it
     runs on every object the decoder builds -- the envelope, a legacy row, an
     opted-in row -- and only the row logic in `parse_batch_response` knows
-    which is which. The first cut of Half B DROPPED the key here, so a
-    duplicated ``subject`` on the ENVELOPE slipped past the "exactly one key
-    'shots'" check, and a duplicated one on a LEGACY row slipped past the
-    strict field set that correctly rejects a single one. The round-3
-    contrarian reproduced both. So the hook now preserves the fact of the
-    duplicate as this sentinel and leaves the verdict to the code that has the
-    context: an envelope check still sees an extra key; a legacy row still sees
-    an extra field; only an opted-in row treats it as "no pick".
+    which is which. Dropping the key here would let a duplicated ``subject`` on
+    the ENVELOPE slip past the "exactly one key 'shots'" check, and a duplicated
+    one on a LEGACY row slip past the strict field set that correctly rejects a
+    single one. So the hook preserves the fact of the duplicate as this sentinel
+    and leaves the verdict to the code that has the context: an envelope check
+    still sees an extra key; a legacy row still sees an extra field; only an
+    opted-in row treats it as "no pick".
     """
 
     __slots__ = ()
@@ -1967,11 +1963,10 @@ def _beat_object_stance(beat_text: str, obj: str) -> str:
     * ``negated`` -- mentioned, but EVERY mention sits inside a negation.
     * ``absent``  -- not mentioned at all.
 
-    Split out of the boolean above for Half B (2026-09-11): the authored tier
-    admits a subject the dialogue never mentions (that is the 74% of beats the
-    tier exists for), but must REFUSE one the dialogue explicitly negates --
-    "it isn't a truck" ranked as ``truck`` is the b002 defect wearing the
-    author's clothes. The boolean collapsed those two into ``False``.
+    Three-way rather than boolean: the authored tier admits a subject the
+    dialogue never mentions (that is the 74% of beats the tier exists for),
+    but must REFUSE one the dialogue explicitly negates -- "it isn't a truck"
+    ranked as ``truck`` is the b002 defect wearing the author's clothes.
     """
     text = " ".join(str(beat_text or "").lower().split())
     head = " ".join(str(obj or "").lower().split())
@@ -2070,12 +2065,11 @@ def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="",
         # as it does for an over-long pair below.
         if place.casefold() == subject.casefold():
             return subject
-        # THE CONNECTOR FOLLOWS THE PLACE (2026-09-05). This used to be a fixed
-        # "in the", which composed "a spinning turntable in the riverbank" --
-        # right for the enclosure that most brief settings are, wrong for every
-        # surface and every point. `place_preposition` returns the whole
-        # connector, article included, and an empty one when the place already
-        # brought its own preposition.
+        # THE CONNECTOR FOLLOWS THE PLACE: a fixed "in the" would compose
+        # "a spinning turntable in the riverbank" -- right for the enclosure
+        # that most brief settings are, wrong for every surface and every point.
+        # `place_preposition` returns the whole connector, article included, and
+        # an empty one when the place already brought its own preposition.
         connector = place_preposition(place)
         pair = ("%s %s" % (subject, place) if not connector
                 else "%s %s %s" % (subject, connector, place))
@@ -2117,9 +2111,7 @@ def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="",
         # THE RULING'S ORDER, IN THE RULING'S WORDS: "the PHYSICAL ARTIFACTS in
         # the story, and ESPECIALLY IF REFERRED TO IN THE BEAT". So a clean
         # reference in the dialogue wins FIRST -- it is the strongest evidence
-        # there is, and it is measured to exist on 26.3% of beats. The first
-        # cut of Half B put the author's pick above this and inverted the
-        # operator's stated preference; the round-2 contrarian caught it.
+        # there is, and it is measured to exist on 26.3% of beats.
         referenced = [obj for obj in objects
                       if _beat_mentions_object(beat_text, obj)]
         if referenced:
@@ -2261,13 +2253,11 @@ def ghost_prompt_signature(*, role, style, mode, motif_cue, drawable_beat,
                            ledger_meta=None, banana_enabled=None) -> str:
     """The uniqueness key for one Ghost v2 beat: its FINALIZED positive prompt.
 
-    WHY THE LEAF WAS THE WRONG KEY (the 2026-09-05 defect). Four slots make the
-    picture -- style cue, motif, leaf and mode law -- and the duplicate check
-    read only the leaf (`key = leaf.casefold()`, `otr_shot_lock.py`). Two beats
-    carrying the same leaf under DIFFERENT motifs render different pictures and
-    were rejected anyway, so a forced-lane leg lost all 18 authored prompts to
-    deterministic clauses on both attempts. Growing the pool could not fix a
-    check that was looking at a quarter of the frame.
+    WHY THE LEAF IS THE WRONG KEY. Four slots make the picture -- style cue,
+    motif, leaf and mode law -- so a duplicate check on the leaf alone would
+    reject two beats carrying the same leaf under DIFFERENT motifs, which
+    render different pictures; growing the pool could not fix a check that
+    looks at a quarter of the frame.
 
     IT IS THE ADMISSION PROMPT, NOT THE RENDER PROMPT, and the difference is
     worth stating because the obvious "simplification" is wrong. The render
@@ -2424,7 +2414,7 @@ def finalize_ghost_prompt_v2(*, role, style, mode, motif_cue, drawable_beat,
 #: being drawn, which is worse than dropping a clause that only decorated it.
 #: The kernel's SETTING half is the last resort and is dropped as one piece.
 #:
-#: TRAILING STYLE GOES FIRST, AND MOTION MOVED BEHIND VANTAGE (2026-09-03).
+#: TRAILING STYLE GOES FIRST, AND MOTION GOES BEHIND VANTAGE (2026-09-03).
 #: Two deliberate placements, both from the operator's ruling that the budget
 #: buys "visual style - key objects per beat story - + movement":
 #:
@@ -2432,12 +2422,11 @@ def finalize_ghost_prompt_v2(*, role, style, mode, motif_cue, drawable_beat,
 #:   surrendered. Adding it must never cost a slot that was already earning its
 #:   place; if the prompt is tight, the prompt simply reverts to what it emitted
 #:   before this clause existed.
-#: * `motion` used to be dropped SECOND, which was harmless only because the
-#:   ladder never fired -- v3 measures ~32 tokens against a target of 69. This
-#:   clause lengthens prompts and could make it fire for the first time, and
-#:   deleting movement before framing directly contradicts the ruling. Framing
-#:   (`vantage`) is the cheaper loss: the shot still moves, it is just less
-#:   precisely staged.
+#: * `motion` is dropped AFTER `vantage`. v3 measures ~32 tokens against a
+#:   target of 69, so the ladder rarely fires, but the trailing clause lengthens
+#:   prompts and could make it fire, and deleting movement before framing
+#:   directly contradicts the ruling. Framing (`vantage`) is the cheaper loss:
+#:   the shot still moves, it is just less precisely staged.
 GHOST_V3_DROP_ORDER = ("trailing_style", "light", "vantage", "motion",
                        "kernel_setting")
 

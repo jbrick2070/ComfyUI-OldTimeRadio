@@ -272,10 +272,8 @@ H3_RECIPE_RECEIPT = "minimax_h3_fl2va_int8_res_multistep_20step_v1"
 
 #: Written in THIS ENGINE'S OWN DIALECT (2026-08-27, motion bake-in): the
 #: directive above demands the subject, then ONE action and its speed, as
-#: flowing prose -- never a keyword list. The old value ("subtle natural
-#: motion, cinematic light") was a keyword list, carried the damping word
-#: "subtle", and named no action at all -- it violated the directive it sits
-#: forty lines under. No speech words: this default serves the SILENT lane.
+#: flowing prose -- never a keyword list, never a damping word like "subtle",
+#: always a named action. No speech words: this default serves the SILENT lane.
 _H3_DEFAULT_PROMPT = ("the subject crosses the frame with steady purpose, "
                       "one hand raised in emphasis")
 
@@ -302,8 +300,7 @@ _H3_STILL_PLAN = (
                  # paraphrases one silently asks the image producer for a
                  # different shot than the plan claims, and
                  # tests/test_still_plan_layer2_parity.py compares them for
-                 # EQUALITY for exactly that reason. (The first draft of this
-                 # row dropped "16:9" and was caught by it.)
+                 # EQUALITY for exactly that reason.
                  framing_geometry=(
                      "cinematic medium shot, the character framed within a "
                      "wide 16:9 environment, full head and shoulders with "
@@ -1195,14 +1192,13 @@ except ImportError:  # pragma: no cover -- flat test imports
 
 
 #: THE OFFICIAL ONE-IMAGE I2VA REFERENCE LINE, required verbatim as the FIRST
-#: thing in an H3 prompt. Pinned here because it was not previously in this
-#: file at all. See also: `render_driver._style_cue_after_pinned_opener` seats
-#: the style cue AFTER this opener instead of prefixing it, which would
-#: otherwise push text in front of the opener and make "must begin exactly"
-#: false on any non-default style pack. That was a live defect until
-#: 2026-08-28: this comment claimed an exemption that nothing implemented, and
-#: the anime pack demonstrably produced "anime style. For the target video, ...".
-#: The cue is seated rather than dropped so the pack's look is not lost here.
+#: thing in an H3 prompt. See also:
+#: `render_driver._style_cue_after_pinned_opener` seats the style cue AFTER
+#: this opener instead of prefixing it, which would otherwise push text in
+#: front of the opener and make "must begin exactly" false on any non-default
+#: style pack (the anime pack would produce "anime style. For the target
+#: video, ..."). The cue is seated rather than dropped so the pack's look is
+#: not lost here.
 H3_REFERENCE_OPENER = (
     "For the target video, at 0.00 seconds into the target video, "
     "<Picture 1> (from [Shot 1]) is fully referenced."
@@ -1211,8 +1207,7 @@ H3_REFERENCE_OPENER = (
 def compose_minimax_h3_video(self, inputs):
     """`minimax_h3_video` -- silent. The official one-image I2VA grammar.
 
-    The opener is REQUIRED VERBATIM and is pinned here because it did not exist
-    in this file before: the old default said "the subject crosses the frame".
+    The opener is REQUIRED VERBATIM and is pinned here.
     Exactly one <Picture 1>, and NO dialogue, <Audio, overall_soundscape or
     non_diegetic_music -- omitting the audio fields is the correct silent-lane
     behaviour; emitting "N/A" is not.

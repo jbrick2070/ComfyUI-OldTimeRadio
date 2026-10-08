@@ -162,33 +162,19 @@ def join_mode_for(contract: FrameContract, target_visible_frames: int) -> str:
     interpolation endpoints (Veo ``lastFrame``) do not lock frame 0, so those
     lanes jump-cut rather than pretend.
 
-    THE OPT-IN IS GONE (chunk 7a, 2026-07-26). This used to open with
-    ``if not contract.supports_multi_clip: return JOIN_SINGLE`` -- every engine
-    was single_only until it individually proved otherwise. The operator's
-    ruling ended that: "there's no gate with opt in or opt out... I don't like
-    any hidden opt-ins. It either works or it fails."
-
-    The half-measure was worse than either end state, and a QA panel proved it
-    on real code: once engines declared real ceilings while the opt-in stayed
-    shut, an ordinary 8-second beat on a lane with a low frame ceiling
-    (max 177 frames) had no legal single render AND no multi-clip escape, so
-    ``partition_beat`` refused and took the whole episode's plan-build down
-    with it. Declaring a ceiling
-    without granting the second clip removes the fallback and withholds the
-    replacement. The two belong in one change.
+    There is NO per-engine opt-in gate for multi-clip (operator ruling:
+    "there's no gate with opt in or opt out... I don't like any hidden
+    opt-ins. It either works or it fails.").
     """
     target = int(target_visible_frames)
     if contract.is_legal_length(target):
         return JOIN_SINGLE
     # Fits inside ONE render but not on the ladder -- still one clip, with the
-    # tail trim covering the remainder. The existence check is load-bearing
-    # (2026-07-25 QA): this used to return SINGLE whenever the target was
-    # merely <= max_frames, but the smallest legal length AT OR ABOVE the
-    # target can still exceed the ceiling. A min=1 quantum=2 max=12 engine
-    # asked for 12 frames has no single legal render (the ladder is odd:
-    # 1,3,..,11) yet 11 + 1 covers it exactly as two clips -- and the old test
-    # declared it SINGLE, then refused it. Found by a differential sweep after
-    # the first two math fixes, missed by the panel.
+    # tail trim covering the remainder. The existence check is load-bearing:
+    # being <= max_frames is not enough, because the smallest legal length AT
+    # OR ABOVE the target can still exceed the ceiling. A min=1 quantum=2
+    # max=12 engine asked for 12 frames has no single legal render (the ladder
+    # is odd: 1,3,..,11) yet 11 + 1 covers it exactly as two clips.
     if contract.allow_tail_trim \
             and contract.smallest_legal_at_least(target) is not None:
         return JOIN_SINGLE
@@ -338,41 +324,39 @@ def partition_beat(target_visible_frames, contract, *, join_mode=None,
     splitter = (_discrete_partition if contract.discrete_frames
                 else _ladder_partition)
 
-    # ONE WALK, AND THE LOWEST COUNT WINS (W1, 2026-07-29). Each count gets
-    # both of its chances -- an exact cover first, then a TRIMMED total the
-    # contract already permits -- before the search advances.
+    # ONE WALK, AND THE LOWEST COUNT WINS. Each count gets both of its
+    # chances -- an exact cover first, then a TRIMMED total the contract already
+    # permits -- before the search advances.
     #
-    # This used to be TWO walks. The first tried an exact cover at every count
-    # from 2 to ``max_segments``; only once that entire walk failed did a
-    # second walk start again at count 2 looking for a trimmed one. So an
-    # exact cover at a HIGH count always beat a trimmed cover at a LOW one,
-    # which contradicts the count-first contract stated at the top of this
-    # module -- and it cost real renders. A 184-frame HuMo beat (33 + 4k
-    # ladder, jump cut, tail trim allowed) planned ``[85, 33, 33, 33]``:
-    # ``c`` segments reach totals congruent to ``c`` modulo 4, so an exact
-    # cover of 184 needs a count divisible by 4, and the first is FOUR. All
-    # the while ``[153, 33]`` with two frames trimmed was legal at count 2.
-    # Four model loads, four renders and four seams, to avoid discarding two
-    # frames the beat audio never asked for.
+    # Two separate walks (exact covers at every count first, trimmed ones only
+    # after that whole walk failed) would let an exact cover at a HIGH count
+    # always beat a trimmed cover at a LOW one, which contradicts the
+    # count-first contract stated at the top of this module -- and costs real
+    # renders. A 184-frame HuMo beat (33 + 4k ladder, jump cut, tail trim
+    # allowed) would plan ``[85, 33, 33, 33]``: ``c`` segments reach totals
+    # congruent to ``c`` modulo 4, so an exact cover of 184 needs a count
+    # divisible by 4, and the first is FOUR. All the while ``[153, 33]`` with
+    # two frames trimmed is legal at count 2: four model loads, four renders
+    # and four seams, to avoid discarding two frames the beat audio never asked
+    # for.
     #
     # A trim is not a last resort to be reached once the ladder is exhausted.
     # It is part of what a given COUNT can do, and the adapter said so itself
     # by declaring ``allow_tail_trim``.
     #
-    # WHAT THIS DELIBERATELY DOES NOT DO: bound the trim. A pre-push fan-out
-    # asked whether a low count should ever be refused for discarding too
-    # much, and built the case -- covering 1019 frames from a ``(10, 999)``
-    # discrete menu, two segments give ``[999, 999]`` and throw away 979
-    # frames where three give ``[999, 10, 10]`` exactly. A bound was written
-    # and MEASURED, and it cost more than it saved: on a ``min=4 max=12
-    # quantum=8`` ladder it turned ``[12, 12]`` into ``[12, 4, 4]`` -- a third
-    # render, a third model load and a third seam, to recover four frames --
-    # and it did that to 4,885 cases across the sweep grid. No contract in
-    # this tree has a menu gap wide enough to produce the pathological case
-    # (the widest shipped menus are Veo's 100/150/200 and Pixverse's 125/200,
-    # whose worst trim is 25 frames), so the bound was reverted and the
-    # observation filed instead. Revisit if an adapter ever declares a menu
-    # whose largest entry dwarfs its smallest.
+    # WHAT THIS DELIBERATELY DOES NOT DO: bound the trim (refuse a low count for
+    # discarding too much). The case for a bound is real: covering 1019 frames
+    # from a ``(10, 999)`` discrete menu, two segments give ``[999, 999]`` and
+    # throw away 979 frames where three give ``[999, 10, 10]`` exactly. But a
+    # bound was written and MEASURED, and it cost more than it saved: on a
+    # ``min=4 max=12 quantum=8`` ladder it turned ``[12, 12]`` into
+    # ``[12, 4, 4]`` -- a third render, a third model load and a third seam, to
+    # recover four frames -- and it did that to 4,885 cases across the sweep
+    # grid. No contract in this tree has a menu gap wide enough to produce the
+    # pathological case (the widest shipped menus are Veo's 100/150/200 and
+    # Pixverse's 125/200, whose worst trim is 25 frames), so there is no bound.
+    # Revisit if an adapter ever declares a menu whose largest entry dwarfs its
+    # smallest.
     for count in range(2, int(max_segments) + 1):
         required = target + drop * (count - 1)
 
@@ -385,16 +369,13 @@ def partition_beat(target_visible_frames, contract, *, join_mode=None,
 
         # ---- no exact cover at this count; trim the tail ------------------ #
         #
-        # THE SEARCH RANGE IS DERIVED, NOT GUESSED (2026-07-25 QA fix). This
-        # used to try only ``extra in range(1, quantum + 1)``, on the
-        # assumption that any shortfall could be bridged within one quantum
-        # step. That is false whenever ``count * min_frames`` overshoots the
-        # required total by more than one step -- which happens routinely just
-        # above ``max_frames`` when ``min_frames`` is large relative to the
-        # gap. An adversarial sweep found 832 beats that WERE coverable by
-        # trimming and were refused anyway. Smallest repro: min=4 max=5
-        # quantum=1 target=6, where [4, 4] with a 2-frame tail trim is a
-        # perfectly legal cover.
+        # THE SEARCH RANGE IS DERIVED, NOT GUESSED. Trying only ``extra in
+        # range(1, quantum + 1)`` would assume any shortfall can be bridged
+        # within one quantum step. That is false whenever ``count * min_frames``
+        # overshoots the required total by more than one step -- which happens
+        # routinely just above ``max_frames`` when ``min_frames`` is large
+        # relative to the gap. Smallest repro: min=4 max=5 quantum=1 target=6,
+        # where [4, 4] with a 2-frame tail trim is a perfectly legal cover.
         #
         # The honest range comes from the ladder itself: for a given segment
         # count the total render must be congruent to ``count * min_frames``
@@ -492,11 +473,9 @@ def validate_coverage_plan(plan: CoveragePlan, contract):
                     % (seg.index, seg.render_frames, contract.min_frames,
                        contract.max_frames, contract.quantum,
                        contract.discrete_frames))
-        # THE OPT-IN CHECK LIVED HERE (removed chunk 7a, 2026-07-26). It read
-        # ``if plan.is_multi_clip and not contract.supports_multi_clip: raise``.
-        # Multi-clip is now universal, so there is nothing left to opt in to --
-        # what an adapter still has to earn is the CHAIN, and that is the next
-        # check, gated on a continuity mode it must declare and prove.
+        # Multi-clip needs no opt-in. What an adapter still has to earn is the
+        # CHAIN, and that is the next check, gated on a continuity mode it must
+        # declare and prove.
         if plan.join_mode == JOIN_CHAIN \
                 and contract.continuity != CONTINUITY_STRICT_FIRST_FRAME:
             raise CoveragePlanError(
@@ -524,14 +503,9 @@ def validate_coverage_plan(plan: CoveragePlan, contract):
 # ONE AUTHORITY, THREE CONSUMERS, NO RE-DERIVATION. OTR_ShotLock mints these
 # rows and stamps them durably on the shot; the image dispatcher and the still
 # spine READ them off the ledger rather than recomputing an id from a beat id.
-# That is deliberate, and the conclusion outlived its own premise. The premise
-# used to be that the beat id a SHOT renders and the beat id an image OBJECT was
-# keyed under passed through a canonicalizing remap, so two independent
-# derivations were two chances to disagree about one string -- the mirror class
-# chunk 1a collapsed for routing. THAT REMAP IS GONE (PBUG-20260811-02): the
-# shot's own beat id is the producer's key, full stop. Reading the durable row
-# is now the only way to disagree with nobody, so the rule stands harder than
-# when a translation still stood between the two ends.
+# That is deliberate: two independent derivations of one string are two
+# chances to disagree, and reading the durable row is the only way to
+# disagree with nobody.
 
 @dataclass(frozen=True)
 class SegmentAudioWindow:

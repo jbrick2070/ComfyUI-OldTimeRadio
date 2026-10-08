@@ -230,11 +230,9 @@ class GhostSignalLightningEngine(GhostSignalEngine):
     #: ragged 3-3-3-4. That objection does not reach hold 3. Measured on the
     #: real selector, hold 3 emits runs of exactly 3 with one short tail of
     #: ``T % 3``: a 250-frame beat is 83 runs of 3 plus a 1-frame tail, and a
-    #: 320-frame beat is 106 runs of 3 plus a 2-frame tail. (This comment gave
-    #: T=320's counts as if they were T=250's until 2026-09-09 -- the claim was
-    #: right, the numbers were on the wrong beat.
-    #: ``test_the_lane_runs_at_hold_3_by_operator_ruling`` now asserts both
-    #: cases and the general rule.) So it is uniform 8.33, not ragged 8, with
+    #: 320-frame beat is 106 runs of 3 plus a 2-frame tail
+    #: (``test_the_lane_runs_at_hold_3_by_operator_ruling`` asserts both cases
+    #: and the general rule). So it is uniform 8.33, not ragged 8, with
     #: the tail already carried truthfully as ``cadence_tail_trim``. The
     #: training-rate argument was never weighed in 2026-08-22 at all.
     #:
