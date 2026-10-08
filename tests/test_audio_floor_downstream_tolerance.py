@@ -87,11 +87,6 @@ def test_floor_text_uses_spoken_words_not_the_engine_wrapper():
     assert voice._floor_text({"prepared": None}) == ""
 
 
-def test_voice_floor_is_a_recognized_optional_ledger_string():
-    from nodes._otr_ledger_consumers import _OPTIONAL_STRING_FIELDS
-    assert "voice_floor" in _OPTIONAL_STRING_FIELDS
-
-
 # --------------------------------------------------------------------------- #
 # the consumers
 # --------------------------------------------------------------------------- #

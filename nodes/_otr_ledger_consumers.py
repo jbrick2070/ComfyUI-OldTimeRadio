@@ -199,37 +199,6 @@ def voice_assignments_from_cast(led: dict) -> dict:
     return out
 
 
-# S18.2 (IMP-20 part 2): post-freeze writeback §6.16 audit walker.
-# Optional string fields per _otr_ledger_freeze.py lines 37-39 must
-# be "" when unset, never null. Freeze enforces this at freeze time
-# but consumers (Bark, MusicGen, SignalLostVideo) stamp fields AFTER
-# freeze; nothing was re-validating until this walker. Promote to
-# strict=True per consumer once the per-consumer violation count
-# stays at zero for two full pipeline runs.
-# rip-sfx-broll (2026-07-01): the sfx_* writeback fields
-# (sfx_wav_path / sfx_engine / sfx_type / sfx_render_status) and
-# ALLOWED_SFX_RENDER_STATUS were DELETED with the sfx subsystem --
-# their producing nodes (AudioGen / ProcSFX) were retired long ago.
-_OPTIONAL_STRING_FIELDS = (
-    "audio_wav_path",
-    "audio_cache_key",
-    "audio_sha256",
-    "provider_model_id",
-    "music_wav_path",
-    "music_cache_key",
-    "video_clip_path",
-    "tts_skip_reason",
-    # Audio floor, 2026-09-16: a provider-refused line keeps its slot as
-    # silence. The flag is what tells a reader generated_dur_s is an estimate
-    # and that no take exists. Skip-when-empty; never null.
-    "voice_floor",
-    # S25/MG-3 (BUG-LOCAL-213). MusicGen parity field. The enum below
-    # documents its legal values; NOTHING enforces them at runtime since
-    # the post-freeze writeback auditor was deleted 2026-08-19.
-    "music_render_status",
-)
-
-
 # S25/MG-3 (BUG-LOCAL-213). Enum the music writeback may stamp.
 #
 # DOCUMENTATION ONLY SINCE 2026-08-19. Its sole consumer was

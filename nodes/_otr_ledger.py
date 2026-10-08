@@ -835,8 +835,6 @@ def stamp_per_line_audio_meta(
     New optional kwargs (cloud-audio-cache chunk 2, 2026-08-08):
     ``audio_cache_key`` / ``audio_sha256`` / ``provider_model_id`` are the
     per-line provenance for the FileAudioCache hit/miss on this line.
-    ``_OPTIONAL_STRING_FIELDS`` in _otr_ledger_consumers recognizes them
-    for the post-freeze null-shape audit.
 
     New optional kwargs (audio floor, 2026-09-16): ``voice_floor`` names the
     provider verdict behind a line the provider never delivered, and
