@@ -181,17 +181,8 @@ RECIPE_LTX8_I2V = "ltx098_distilled_2b_i2v_single_pass_v5"
 #: frozen recipe no matter how the server booted.
 PREQUALIFICATION_ENV = "OTR_LTX_8GB_PREQUALIFICATION"
 
-#: What a MEASUREMENT run stamps onto its clips instead of the frozen name.
-#: See ``recipe_receipt`` -- a sweep's artifacts must be distinguishable from
-#: production's in the durable ledger, because they are not the same recipe.
-#:
-#: SOURCED, not spelled (LANE 2): any other adapter sharing this mechanism
-#: stamps the same mark through its own lane, and two literals with one value
-#: is how a ledger grows two dialects. ``recipe_departures`` owns the format
-#: for every adapter.
-PREQUALIFICATION_RECIPE_SUFFIX = _RD.PREQUALIFICATION_SUFFIX
-
-#: THE FROZEN ltx_8gb RECIPE, v1 (B6, 2026-07-27).
+#: THE FROZEN ltx_8gb RECIPE (B6, 2026-07-27): one versioned dict per recipe,
+#: and ``LTX8_RECIPE`` below names the active one.
 #:
 #: WHY IT EXISTS. The profile schema accepts only `device_policy`,
 #: `dtype_policy` and `max_render_frames`, so this tier's real levers -- T5
@@ -201,17 +192,15 @@ PREQUALIFICATION_RECIPE_SUFFIX = _RD.PREQUALIFICATION_SUFFIX
 #: `launch.env` can never reach it and `otr_8gb_ltx.json`'s is empty. The
 #: tier's recipe was therefore whatever the server happened to boot with.
 #: Code binds on every leg regardless -- that is the whole point of that PBUG's
-#: Bible rule, and this dict is it.
+#: Bible rule, and these dicts are it.
 #:
-#: WHAT v1 IS, STATED HONESTLY. These are TODAY'S SHIPPED DEFAULTS, not a
-#: measured selection. The judgment orders "build mechanics first, MEASURE
-#: second, freeze third", and no measurement has happened -- prequalification
-#: is the next step. Freezing them now is behaviour-preserving on any box that
-#: did not set the env vars, and it is reversible: prequalification measures
-#: and produces v2. Each value already has a recorded reason -- the T5 offloads
-#: to CPU because `t5xxl_fp16` alone is ~9 GB (load-bearing, not an
-#: optimisation), and tiled VAE is OFF because core `VAEDecode` handles the
-#: 8 GB peak at the smoke canvas.
+#: v1 was TODAY'S SHIPPED DEFAULTS, not a measured selection ("build mechanics
+#: first, MEASURE second, freeze third"): v2's values with `tiled_vae` False.
+#: Each value already had a recorded reason -- the T5 offloads to CPU because
+#: `t5xxl_fp16` alone is ~9 GB (load-bearing, not an optimisation), and tiled
+#: VAE was OFF because core `VAEDecode` handles the 8 GB peak at the smoke
+#: canvas. Its dict is not carried: no code reads it, and the `..._v1` receipt
+#: string on disk names it.
 #:
 #: `max_frames` IS DELIBERATELY NOT HERE. It is a render-length CEILING, not a
 #: recipe knob: B3 gave the tier ceiling its own profile -> ledger channel and
@@ -219,32 +208,6 @@ PREQUALIFICATION_RECIPE_SUFFIX = _RD.PREQUALIFICATION_SUFFIX
 #: disagreement terminal. Folding it in would silence that refusal, and
 #: `test_an_ask_ABOVE_the_cap_is_refused_before_anything_is_staged` is the
 #: trip-wire that catches anyone trying.
-LTX8_RECIPE_V1 = {
-    "steps": 8,
-    "cfg": 1.0,
-    "max_shift": 2.05,
-    "base_shift": 0.95,
-    "terminal": 0.1,
-    "sampler": "euler",
-    "t5_device": "cpu",
-    "tiled_vae": False,
-    #: The negative conditioning text. A RENDER INPUT, so it belongs here for
-    #: the same reason the samplers do: read from `os.environ` it made two
-    #: boxes produce visibly different clips that both stamped the same recipe
-    #: receipt. A per-shot `negative_prompt` on the request still wins -- that
-    #: is the director's channel, and it travels WITH the work rather than with
-    #: the server's boot.
-    "negative": _LTX8_DEFAULT_NEGATIVE,
-    #: The tiled-decode geometry. Only consumed while `tiled_vae` is True, so
-    #: these are inert today -- and that is exactly why they are frozen NOW:
-    #: the day a measured v2 flips tiled decode on, four env-driven render
-    #: inputs would otherwise come live again with no demotion notice and no
-    #: receipt, quietly re-opening the hole this chunk closed.
-    "vae_tile": 512,
-    "vae_overlap": 64,
-    "vae_temporal": 16,
-    "vae_temporal_overlap": 8,
-}
 
 #: THE ACTIVE ltx_8gb RECIPE, v2 -- MEASURED, 2026-07-27 (prequalification).
 #:
@@ -282,10 +245,10 @@ LTX8_RECIPE_V1 = {
 #: support is the RANKING, which is what selects a recipe. A clamped
 #: confirmation of the winner is still owed -- see GO_FORWARD.
 #:
-#: v1 IS KEPT, NOT EDITED. Receipts stamped `..._v1` are on disk in this
-#: repo's own episode tree; a v1 dict that had been mutated into v2's values
-#: would make those receipts uninterpretable and would quietly rewrite what
-#: the regression fixtures pin.
+#: THE VERSIONED DICTS ARE NOT EDITED IN PLACE. Receipts stamped `..._v2` are
+#: on disk in this repo's own episode tree; a v2 dict that had been mutated
+#: into a later version's values would make those receipts uninterpretable
+#: and would quietly rewrite what the regression fixtures pin.
 LTX8_RECIPE_V2 = {
     "steps": 8,
     "cfg": 1.0,
@@ -295,7 +258,16 @@ LTX8_RECIPE_V2 = {
     "sampler": "euler",
     "t5_device": "cpu",
     "tiled_vae": True,
+    #: The negative conditioning text. A RENDER INPUT, so it belongs here for
+    #: the same reason the samplers do: read from `os.environ` it made two
+    #: boxes produce visibly different clips that both stamped the same recipe
+    #: receipt. A per-shot `negative_prompt` on the request still wins -- that
+    #: is the director's channel, and it travels WITH the work rather than with
+    #: the server's boot.
     "negative": _LTX8_DEFAULT_NEGATIVE,
+    #: The tiled-decode geometry, frozen with the rest: four env-driven render
+    #: inputs would otherwise come live again with no demotion notice and no
+    #: receipt, quietly re-opening the hole this chunk closed.
     "vae_tile": 512,
     "vae_overlap": 64,
     "vae_temporal": 16,
@@ -428,7 +400,7 @@ LTX8_RECIPE_V5 = dict(LTX8_RECIPE_V4, schedule=_SCHEDULE_LTXV_SCHEDULER,
 
 #: THE ONE NAME EVERY CONSUMER READS. Bumping a recipe is repointing this and
 #: the version inside `RECIPE_LTX8_I2V` -- never editing a versioned dict in
-#: place. Kept as a separate binding so `LTX8_RECIPE_V1` and `_V2` stay
+#: place. Kept as a separate binding so the older versioned dicts stay
 #: readable as history.
 LTX8_RECIPE = LTX8_RECIPE_V5
 

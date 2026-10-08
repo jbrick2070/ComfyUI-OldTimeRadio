@@ -33,8 +33,6 @@ NEG_EXTRA = (
     "illegible words, garbled text, flickering letters, "
     "static hold, frozen frame, no motion")
 
-BANNED_DAMPING = ("subtle", "gentle", "drifting mist", "soft neon")
-
 
 def motion_clause(override: str | None = None) -> str:
     """Env override, then the raised default. Empty override is ignored."""
@@ -65,8 +63,3 @@ def compose_negative(*parts: str) -> str:
     head = ", ".join(str(p).strip() for p in parts if str(p or "").strip())
     return visual_safety_negative(
         ", ".join(p for p in (head, extra) if p))
-
-
-def damping_hits(text: str) -> tuple[str, ...]:
-    lowered = str(text or "").lower()
-    return tuple(token for token in BANNED_DAMPING if token in lowered)

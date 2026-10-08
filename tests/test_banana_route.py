@@ -637,7 +637,6 @@ def test_no_source_term_matches_otr_composition_constants():
 
     constants = ["cinematic establishing shot",
                  rd._CHAR_FACE_FALLBACK_PROMPT]
-    constants.extend(rd._LTX_MOTION_PROMPT_BY_ROLE.values())
     constants.extend(rd._INTENT_CLAUSES.values())
     constants.extend(rd._ARC_CLAUSES.values())
     for name in vreg.all_engine_names():
@@ -645,9 +644,10 @@ def test_no_source_term_matches_otr_composition_constants():
         for row_ in plan:
             geometry = getattr(row_, "framing_geometry", "") or ""
             constants.append(str(geometry))
-    # ALL NINE style packs, not just the sci_fi_radio fixture (Sonnet QA):
-    # motion registers / grade tails / era tails are freely authored per pack,
-    # and a future pack edit must not silently collide with the table.
+    # ALL NINE style packs (Sonnet QA): the motion registers (sci_fi_radio's
+    # are the LTX console motion prompts) / grade tails / era tails are freely
+    # authored per pack, and a future pack edit must not silently collide with
+    # the table.
     import json
     import pathlib
     packs_dir = (pathlib.Path(__file__).resolve().parent.parent

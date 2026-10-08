@@ -501,41 +501,6 @@ def latent_ceiling_for_host(canvas_w, canvas_h, ram_mb=None):
     return max(1, int(scaled))
 
 
-def _available_ram_mb():
-    """Physically FREE + inactive RAM in MB, or ``None``.
-
-    NOT used by ``latent_ceiling_for_host`` -- see the note there for the
-    measurement that ruled it out. Kept because the live-pressure problem is
-    real and whoever takes it will need this.
-
-    ``vm_stat`` is parsed rather than trusted wholesale: free pages alone
-    understate what is reclaimable, so inactive and speculative pages count
-    too. Returns ``None`` on anything unexpected, and the caller then falls back
-    to total RAM -- never to "unlimited".
-    """
-    import re
-    from .._otr_shared import proc as otr_proc
-    try:
-        out = otr_proc.run(["vm_stat"], capture_output=True, text=True,
-                           timeout=5)
-    except Exception:  # noqa: BLE001 -- not macOS, vm_stat absent, or refused
-        return None
-    if out.returncode != 0 or not out.stdout:
-        return None
-    page = 4096
-    m = re.search(r"page size of (\d+) bytes", out.stdout)
-    if m:
-        page = int(m.group(1))
-    pages = 0
-    for label in ("Pages free", "Pages inactive", "Pages speculative"):
-        m = re.search(re.escape(label) + r":\s+(\d+)", out.stdout)
-        if m:
-            pages += int(m.group(1))
-    if not pages:
-        return None
-    return int(pages * page / (1024 * 1024))
-
-
 def _physical_ram_mb():
     """Physical RAM in MB, or ``None``. Physical, not Metal working set: see
     ``unified_memory_budget_mb`` for why that distinction is load-bearing.
@@ -1340,8 +1305,9 @@ class MotionEngineBase:
 
     You are only called for ``character_video``. Announcer and music beats carry
     no authored leaves at all, so they keep the shared radio motion registers --
-    edit those in ``render_driver._LTX_MOTION_PROMPT_BY_ROLE`` if a bookend
-    needs different movement.
+    edit those in the style pack's ``motion_registers``
+    (``nodes/visual_styles/<style>.json``) if a bookend needs different
+    movement.
     """
 
     declared_isolation = ISOLATION_IN_PROCESS

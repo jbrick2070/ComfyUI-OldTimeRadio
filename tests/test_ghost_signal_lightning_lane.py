@@ -481,13 +481,6 @@ def _overlaps(windows):
             for i in range(1, len(windows))}
 
 
-def test_the_window_count_formula_matches_the_real_scheduler():
-    """The claim "rounding up is free" rests entirely on this, so it is checked
-    against the algorithm rather than asserted."""
-    for n in range(1, 400):
-        assert gs.ghost_context_window_count(n) == len(_upstream_windows(n)), n
-
-
 def test_rounding_up_to_a_legal_count_never_adds_a_window():
     """THE WHOLE ARGUMENT. ``sampling.py`` invokes the model once per window on
     that window's slice, so sampler cost tracks the window COUNT, not the latent
@@ -979,17 +972,13 @@ def test_a_machine_too_small_for_the_weights_gets_no_ceiling_at_all(eng):
 
 
 def test_the_ceiling_does_not_collapse_while_a_render_is_resident():
-    """WHY THE LIVE-MEMORY SIGNAL WAS REJECTED, pinned so it is not re-added.
-    Review asked for live availability instead of total RAM. Implemented and
-    measured, this host reported 1344 MB available mid-episode -- because the
-    lane's own ~4.6 GB was already resident. Subtracting the fixed cost from a
-    figure that has already paid it double-counts, and every beat after the
-    first would be refused."""
+    """The ceiling reads TOTAL physical RAM, not live availability. Review
+    asked for availability; implemented and measured, this host reported
+    1344 MB available mid-episode -- because the lane's own ~4.6 GB was
+    already resident. Subtracting the fixed cost from a figure that has
+    already paid it double-counts, and every beat after the first would be
+    refused. So the value must not move just because the machine is busy."""
     from nodes._otr_video_engines import motion_common as mc
-    import inspect
-    src = inspect.getsource(mc.latent_ceiling_for_host)
-    assert "_available_ram_mb()" not in src.split("def _available_ram_mb")[0]
-    # And the value must not move just because the machine is busy.
     assert (mc.latent_ceiling_for_host(512, 288)
             == mc.latent_ceiling_for_host(512, 288)), "must be reproducible"
 

@@ -20,7 +20,7 @@ Pins:
      the 4 scene-family image objects + the motion-lane request
      observability; prompt text + sha stamps unchanged; the trace-copy
      allowlist carries the new keys.
-  4. AST guards: zero production Loads of the retired motion fixture.
+  4. AST guards: the trace-copy allowlist and the no-swallow style lookup.
 """
 from __future__ import annotations
 
@@ -50,6 +50,26 @@ _META_BRIEF = {
 }
 _CHAR = {"char_id": "c01", "name": "MARGOT",
          "appearance": "a wiry engineer in a patched flight suit"}
+
+#: The sci_fi_radio pack's console/music motion registers, pinned byte for
+#: byte (the pack, nodes/visual_styles/sci_fi_radio.json, is what production
+#: reads; this is the golden it must keep rendering).
+_SCI_FI_MOTION = {
+    "announcer": ("Continuous shot, same console throughout. Tuning dial needle "
+                  "sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille "
+                  "trembles. Dust motes drift. Slow steady dolly forward."),
+    "music_open": ("Continuous shot, same console throughout. Dial races across "
+                   "frequencies. Tube filaments ignite from cold to fierce "
+                   "white. Speaker grille shudders with the music. Steady dolly "
+                   "push forward."),
+    "music_close": ("Continuous shot, same console throughout. Dial settles. "
+                    "Tube filaments cool from white through deep amber. Smoke "
+                    "trails from cooling tubes. Slow dolly pull back."),
+    "music_inter": ("Continuous shot, same console throughout. Dial steady, "
+                    "glowing. Oscilloscope dances to the rhythm. VU meters "
+                    "bounce. Tubes pulse with the bass. Slow orbit around the "
+                    "speaker."),
+}
 
 
 @pytest.fixture(autouse=True)
@@ -89,7 +109,7 @@ def _shot(sid="shot_b000_music_open", role="music_visual", sids=None):
 
 def _expected_motion(key, meta=_META_BRIEF):
     # fixture-composed expectation: register + one atmosphere fragment
-    base = rd._LTX_MOTION_PROMPT_BY_ROLE[key]
+    base = _SCI_FI_MOTION[key]
     atmo = ", ".join([str(t).strip() for t in
                       (meta.get("story_brief_terms", {})
                        .get("atmosphere") or [])if str(t).strip()][:1])
@@ -292,20 +312,6 @@ _RD = _NODES / "_otr_video_engines" / "render_driver.py"
 
 
 class TestAstGuards:
-    def test_no_production_loads_of_the_motion_fixture(self):
-        offenders = []
-        for path in _NODES.rglob("*.py"):
-            rel = path.relative_to(_NODES).as_posix()
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if (isinstance(node, ast.Name)
-                        and isinstance(node.ctx, ast.Load)
-                        and node.id == "_LTX_MOTION_PROMPT_BY_ROLE"):
-                    offenders.append(f"{rel}:{node.lineno}")
-        assert not offenders, (
-            f"production loads of the retired motion fixture (route through "
-            f"the pack motion_registers): {offenders}")
-
     def test_trace_allowlist_carries_the_provenance_keys(self):
         src = _RD.read_text(encoding="utf-8")
         assert '"visual_style", "prompt_field_source"' in src, (

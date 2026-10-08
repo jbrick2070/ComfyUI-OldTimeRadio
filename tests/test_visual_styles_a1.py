@@ -12,9 +12,9 @@ Pins:
      forbidden-terms lint over ALL new leaves; a v1 pack fails load LOUD
      naming the path + "upgrade to v2".
   2. EXTRACTION FIXTURES: sci_fi_radio.json's v2 fields == the Python
-     fixture constants byte-for-byte (helpers open subjects, render_driver
-     motion registers). The image-prompt module keeps no fixture: it reads
-     the pack alone.
+     fixture constants byte-for-byte (helpers open subjects; the motion
+     registers are pinned byte for byte in tests/test_visual_styles_a2.py).
+     The image-prompt module keeps no fixture: it reads the pack alone.
   3. SEAM BYTE-IDENTITY (the A1 build gate, r2 codex CUT: seam-level string
      equality, NOT full-episode): every re-routed composer's OUTPUT under a
      default meta equals its pack-composed expectation -- radio-host x3
@@ -41,7 +41,6 @@ import pytest
 from nodes import _otr_story_brief_helpers as helpers
 from nodes import _otr_visual_styles as vs
 from nodes import otr_meta_brief_image_prompt as imgp
-from nodes._otr_video_engines import render_driver as rd
 
 _REPO = Path(__file__).resolve().parent.parent
 _NODES = _REPO / "nodes"
@@ -187,12 +186,6 @@ class TestExtractionFixtures:
             helpers.OPEN_SUBJECT_ANNOUNCER_DEFAULT
         assert s.open_subjects["default"] == \
             helpers.OPEN_SUBJECT_DEFAULT_DEFAULT
-
-    def test_motion_registers_match_render_driver(self):
-        # A2 consumes these; A1 pins the extraction so the values can never
-        # drift from the live console-motion register before the re-route.
-        s = vs.resolve_visual_style("sci_fi_radio")
-        assert dict(s.motion_registers) == rd._LTX_MOTION_PROMPT_BY_ROLE
 
 
 # ---------------------------------------------------------------------------

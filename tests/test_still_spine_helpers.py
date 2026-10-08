@@ -91,9 +91,9 @@ class TestDriverParity:
         import inspect
         from nodes._otr_video_engines import render_driver as rd
         src = inspect.getsource(rd)
-        # the OPEN video prompt is built from the motion templates ...
-        assert "_LTX_MOTION_PROMPT_BY_ROLE" in src
-        # ... and the moved set-subject literal never survives inline here
+        # the moved set-subject literal never survives inline here (the OPEN
+        # video prompt itself is the pack's motion register; see
+        # tests/test_visual_styles_a2.py)
         assert "warming up on a wooden" not in src
 
     @pytest.mark.parametrize("kind,role,synthetic", [

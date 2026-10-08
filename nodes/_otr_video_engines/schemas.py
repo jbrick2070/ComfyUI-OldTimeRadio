@@ -256,15 +256,6 @@ class VideoProfileRow(_Forbid):
     # above, 2026-08-23.)
 
 
-class ExecutionGroup(_Forbid):
-    group_id: str
-    kind: str = "consumer"         # provider | consumer
-    engine_id: str = ""
-    profile_id: str = ""
-    depends_on: list[str] = Field(default_factory=list)
-    produces_base_for: list[str] = Field(default_factory=list)
-
-
 class ShotRow(_Forbid):
     """One row of ``ledger['video']['shots']``, as ``OTR_ShotLock`` stamps it.
 

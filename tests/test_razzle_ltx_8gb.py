@@ -10,7 +10,6 @@ from nodes._otr_shared import shortcodes as SC
 from nodes._otr_video_engines import eng_ltx_8gb as lx
 from nodes._otr_video_engines import eng_razzle_ltx_8gb as rlx
 from nodes._otr_video_engines import frame_contract as fc
-from nodes._otr_video_engines import razzle_prompt as rp
 from nodes._otr_video_engines import registry as vreg
 
 
@@ -44,7 +43,9 @@ def test_positive_leads_with_raised_motion():
     assert "full, decisive action" in lowered
     assert "purposeful camera" in lowered
     assert "a glowing radio on a bench" in prompt
-    assert rp.damping_hits(prompt) == ()
+    # damping words tell the model to hold still (PBUG-20260827-04)
+    for damping in ("subtle", "gentle", "drifting mist", "soft neon"):
+        assert damping not in lowered, damping
 
 
 def test_negative_merges_ltx_recipe_and_razzle_extras():

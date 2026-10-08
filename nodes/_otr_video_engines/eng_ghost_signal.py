@@ -491,23 +491,6 @@ def ghost_legal_source_count(n,
     return length + steps * stride
 
 
-def ghost_context_window_count(n,
-                               length=GHOST_CONTEXT_LENGTH,
-                               stride=GHOST_CONTEXT_STRIDE) -> int:
-    """How many windows ``create_windows_static_standard`` emits for ``n``.
-
-    Kept beside the aligner because the claim "rounding up is free" is only
-    true if these two agree, and a test asserts they do across a wide sweep
-    against the REAL upstream function rather than against this arithmetic.
-    """
-    n = int(n)
-    length = int(length)
-    stride = max(1, int(stride))
-    if n <= length:
-        return 1
-    return -((length - n) // stride) + 1
-
-
 def ghost_hold_selector(target_frame_count, hold=GHOST_DEFAULT_HOLD) -> list:
     """The delivered-index -> source-index map: ``[0]*hold + [1]*hold ...[:T]``.
 

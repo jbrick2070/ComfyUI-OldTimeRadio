@@ -24,6 +24,7 @@ from __future__ import annotations
 import pytest
 
 from nodes._otr_video_engines import eng_ltx_8gb as m
+from nodes._otr_video_engines import recipe_departures as rdep
 from nodes._otr_video_engines.registry import (
     EngineUnusable, EngineUsabilityReason,
 )
@@ -85,21 +86,20 @@ def test_the_two_load_bearing_values_are_pinned_BY_VALUE(eng, monkeypatch):
     assert eng._tiled_vae() is True
 
 
-def test_v1_is_preserved_unmutated_so_its_receipts_stay_interpretable():
-    """Episodes stamped ``..._v1`` exist on disk in this repo's own tree. A v1
-    dict edited into v2's values would make those receipts describe a render
-    that never happened -- so v1 is kept, not overwritten, and a future v3 adds
-    a dict rather than mutating one."""
-    assert m.LTX8_RECIPE_V1["tiled_vae"] is False   # what v1 actually shipped
-    assert m.LTX8_RECIPE_V1["t5_device"] == "cpu"
+def test_recipe_versions_are_kept_unmutated_so_receipts_stay_interpretable():
+    """Episodes stamped ``..._v2`` and later exist on disk in this repo's own
+    tree. A v2 dict edited into a later version's values would make those
+    receipts describe a render that never happened -- so each version is kept,
+    not overwritten, and a future version adds a dict rather than mutating
+    one."""
     assert m.LTX8_RECIPE_V2["t5_device"] == "cpu"   # what v2 actually shipped
     assert m.LTX8_RECIPE_V2["tiled_vae"] is True
     assert m.LTX8_RECIPE is m.LTX8_RECIPE_V5
-    assert len({id(m.LTX8_RECIPE_V1), id(m.LTX8_RECIPE_V2), id(m.LTX8_RECIPE_V3),
-                id(m.LTX8_RECIPE_V4), id(m.LTX8_RECIPE_V5)}) == 5
+    assert len({id(m.LTX8_RECIPE_V2), id(m.LTX8_RECIPE_V3),
+                id(m.LTX8_RECIPE_V4), id(m.LTX8_RECIPE_V5)}) == 4
     # Same key set, or they are not comparable as recipe versions; v3 differs
     # from v2 in the T5 placement only.
-    assert set(m.LTX8_RECIPE_V1) == set(m.LTX8_RECIPE_V2) == set(m.LTX8_RECIPE_V3)
+    assert set(m.LTX8_RECIPE_V2) == set(m.LTX8_RECIPE_V3)
     assert {k for k in m.LTX8_RECIPE_V3
             if m.LTX8_RECIPE_V3[k] != m.LTX8_RECIPE_V2[k]} == {"t5_device"}
     # v4 ADDS the two canonical knobs, and of what v3 had changes only the
@@ -241,7 +241,7 @@ def test_both_legs_return_the_SAME_KEY_SET(eng, monkeypatch):
     """A return shape that varies by mode gives the next reader a KeyError that
     reproduces only under prequalification. ``t5_device``/``tiled_vae`` live in
     the recipe dict but are owned by their own accessors, so a bare
-    ``dict(LTX8_RECIPE_V1)`` here would leak them onto one leg only."""
+    ``dict(LTX8_RECIPE)`` here would leak them onto one leg only."""
     production = set(eng._resolve_render_config())
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     assert set(eng._resolve_render_config()) == production
@@ -379,7 +379,7 @@ def test_a_MEASUREMENT_leg_stamps_a_receipt_of_its_own(eng, monkeypatch):
     receipt = m.recipe_receipt()
     assert receipt != m.RECIPE_LTX8_I2V
     assert receipt.startswith(m.RECIPE_LTX8_I2V)     # still greppable as v1
-    assert m.PREQUALIFICATION_RECIPE_SUFFIX in receipt
+    assert rdep.PREQUALIFICATION_SUFFIX in receipt
 
 
 def test_the_marked_receipt_reaches_the_session_config_and_the_identity(
@@ -621,7 +621,7 @@ def test_a_cell_that_moved_NOTHING_still_marks_itself(eng, monkeypatch):
     # B6's contract is unchanged: a measurement run marks its own artifacts.
     monkeypatch.setenv(m.PREQUALIFICATION_ENV, "1")
     assert eng._recipe_receipt() == \
-        m.RECIPE_LTX8_I2V + m.PREQUALIFICATION_RECIPE_SUFFIX
+        m.RECIPE_LTX8_I2V + rdep.PREQUALIFICATION_SUFFIX
 
 
 def test_re_exporting_a_knob_at_its_FROZEN_value_is_not_a_departure(

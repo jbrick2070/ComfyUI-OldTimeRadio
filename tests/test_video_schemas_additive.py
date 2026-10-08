@@ -129,9 +129,3 @@ def test_static_image_gen_requires_text_or_init_image():
     assert _req(
         family_hint="static_image_gen", asset_refs={"init_image": "x.png"}
     ).family_hint == "static_image_gen"
-
-
-def test_execution_group_defaults_to_consumer():
-    g = sc.ExecutionGroup(group_id="g1")
-    assert g.kind == "consumer"
-    assert g.depends_on == [] and g.produces_base_for == []
