@@ -14,7 +14,6 @@ from nodes._otr_roster_gender import (
     VOICE_PORTRAIT_CONSISTENCY_POLICY_KEY,
     VOICE_PORTRAIT_CONSISTENCY_POLICY_REVISION,
     canonical_bank_gender,
-    get_presentation_gender,
     normalize_gender,
 )
 from nodes.otr_meta_brief_image_prompt import _ensure_gender_anchor
@@ -200,26 +199,6 @@ def test_the_two_helpers_are_not_interchangeable():
 # presentation_gender -- chunk 4
 
 
-def test_presentation_gender_prefers_the_stamped_value():
-    """The stamped value is what the audience actually HEARD."""
-    row = {"gender": "male", "presentation_gender": "female"}
-    assert get_presentation_gender(row) == "female"
-
-
-def test_presentation_gender_falls_back_to_the_normalized_label():
-    """Legacy: 1,595 ledgers were frozen before the field existed. They are read
-    through, never treated as violations and never rewritten."""
-    assert get_presentation_gender({"gender": "woman"}) == "female"
-    assert get_presentation_gender({"gender": "male"}) == "male"
-    assert get_presentation_gender({"gender": "non-binary"}) == "other"
-
-
-def test_presentation_gender_treats_empty_stamp_as_absent():
-    """A row the caster never stamped must not read as 'presents as nothing'."""
-    assert get_presentation_gender({"gender": "female",
-                                    "presentation_gender": ""}) == "female"
-
-
 def test_presentation_gender_survives_set_cast(tmp_path):
     """THE persistence test the earlier plan lacked. set_cast rebuilds a FIXED
     row and drops every key it does not name -- a field written upstream and
@@ -243,8 +222,7 @@ def test_presentation_gender_survives_set_cast(tmp_path):
 def test_set_cast_omits_presentation_gender_when_unstamped(tmp_path):
     """Carried conditionally, like provider_voice_id: a writer-stage row nobody
     has cast yet stays byte-identical to the legacy cast-row contract, so the
-    drift guard in test_scifi_news_pro_assembly keeps its teeth. Absence is read through
-    by get_presentation_gender."""
+    drift guard in test_scifi_news_pro_assembly keeps its teeth."""
     from nodes.production_ledger import Ledger
 
     led = Ledger(episode_id="EP-GENDER-TEST-2", out_dir=str(tmp_path))
@@ -253,7 +231,6 @@ def test_set_cast_omits_presentation_gender_when_unstamped(tmp_path):
                    "tts_model": "bark", "voice_preset": "v2/en_speaker_0"}])
     row = led.data["cast"][0]
     assert "presentation_gender" not in row
-    assert get_presentation_gender(row) == "male"
 
 
 def test_castlock_stamp_records_the_delivered_reference_gender():

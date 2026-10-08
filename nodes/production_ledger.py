@@ -1422,10 +1422,8 @@ class Ledger:
             # Carried CONDITIONALLY, on the same reasoning as provider_voice_id
             # below: a writer-stage row that nobody has cast yet stays
             # byte-identical to the legacy contract, so the cast-row drift guard
-            # keeps its teeth. Absence is read through by
-            # _otr_roster_gender.get_presentation_gender, which falls back to the
-            # row's normalized label -- which is also what makes the 1,595
-            # pre-field ledgers readable rather than violations.
+            # keeps its teeth. The 1,595 ledgers frozen before the field existed
+            # carry none, so a row without it is expected, not an error.
             pg = _safe_str(r.get("presentation_gender"))
             if pg:
                 row["presentation_gender"] = pg
