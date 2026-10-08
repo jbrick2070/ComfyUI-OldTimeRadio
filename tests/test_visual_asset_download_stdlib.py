@@ -51,7 +51,6 @@ class FetchVerifiedTests(unittest.TestCase):
             "commit": "a" * 40,
             "sha256": hashlib.sha256(self.body).hexdigest(),
             "size": len(self.body),
-            "url": "https://huggingface.co/Comfy-Org/fixture/resolve/main/blob.safetensors",
         }
 
     def invoke(self, **kwargs):
@@ -93,7 +92,6 @@ class FetchVerifiedTests(unittest.TestCase):
         # No URL is returned in a receipt (a signed one must never reach a log),
         # and the .lock file deliberately persists: its existence is not a lock.
         self.assertNotIn("url", receipt)
-        self.assertNotIn(self.metadata["url"], str(receipt))
         self.assertTrue(
             self.destination.with_name(self.destination.name + ".lock").exists())
 
@@ -145,17 +143,13 @@ class FetchVerifiedTests(unittest.TestCase):
             ("size", True), ("size", 0), ("size", -1), ("size", 2.0),
             ("commit", "a" * 39), ("commit", "g" * 40),
             ("sha256", "a" * 63), ("sha256", "g" * 64),
-            ("url", "http://example.invalid/file"), ("url", "https://"),
-            ("url", "https://user:secret@example.invalid/file"),
-            ("url", "https://example.invalid/file#secret"),
         ]
         for key, value in invalid:
             with self.subTest(key=key, value_type=type(value).__name__):
                 metadata = dict(self.metadata, **{key: value})
-                with self.assertRaises(ValueError) as caught:
+                with self.assertRaises(ValueError):
                     download.fetch_verified(self.spec, self.destination, metadata,
                                             fetch=self._forbidden_fetch)
-                self.assertNotIn("secret", str(caught.exception))
         self.assertFalse(self.destination.exists())
 
     def test_cancellation_is_honoured_before_any_publish(self):

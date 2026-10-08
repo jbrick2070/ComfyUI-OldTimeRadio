@@ -259,10 +259,7 @@ def test_a_pinned_source_is_asked_for_its_own_revision_once():
     revision, size, sha256 = PINNED[ENCODER]
     hub = _Hub(commit_hash=revision, etag=sha256, size=size)
     metadata = hub.pin(_h3_spec())
-    assert metadata == {
-        "commit": revision, "sha256": sha256, "size": size,
-        "url": "https://huggingface.co/%s/resolve/%s/text_encoders/%s"
-               % (REPO_ID, revision, ENCODER)}
+    assert metadata == {"commit": revision, "sha256": sha256, "size": size}
     assert hub.head.call_count == 1
     assert hub.head.call_args.kwargs == {"token": False, "timeout": 30}
     # HEAD is never asked: every URL built names the pinned revision.

@@ -440,7 +440,8 @@ class MetadataTests(NoNetworkTestCase):
         self.assertEqual(metadata["commit"], "a" * 40)
         self.assertEqual(metadata["sha256"], "b" * 64)
         self.assertEqual(metadata["size"], 19)
-        self.assertIn("/resolve/" + "a" * 40 + "/", metadata["url"])
+        # The recheck is made AT the pinned commit, never at a moving ref.
+        self.assertEqual(self.hub_url.call_args_list[-1].kwargs["revision"], "a" * 40)
         self.assertEqual(self.head.call_count, 2)
         self.assertTrue(all(call.kwargs == {"token": False, "timeout": 30}
                             for call in self.head.call_args_list))

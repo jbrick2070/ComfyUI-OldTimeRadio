@@ -916,8 +916,9 @@ def _pin_metadata(spec, *, hf_hub_url, get_hf_file_metadata):
 
     The server's 64-hex LFS etag is the expected content SHA-256. A git blob
     etag, missing size, gated source or changing metadata is a hard refusal.
-    No credential is requested/read. The GET uses the pinned Hub URL so a CDN
-    URL obtained before other large transfers cannot expire in our queue.
+    No credential is requested/read. The transfer itself is pinned to the
+    verified commit (``_hf_fetch`` passes it as ``revision``), so a branch that
+    moves while a file waits in our queue cannot change what is fetched.
 
     A spec from ``_PINNED_SOURCES`` carries its own ``revision``, ``size`` and
     ``sha256``: HEAD is never asked, one metadata call is made at that
@@ -941,7 +942,7 @@ def _pin_metadata(spec, *, hf_hub_url, get_hf_file_metadata):
                 % (revision, spec["repo_id"], spec["filename"], spec["size"],
                    spec["sha256"]))
         return {"commit": revision.lower(), "sha256": spec["sha256"].lower(),
-                "size": spec["size"], "url": pinned_url}
+                "size": spec["size"]}
     url = hf_hub_url(spec["repo_id"], spec["filename"], endpoint="https://huggingface.co")
     first = get_hf_file_metadata(url, token=False, timeout=30)
     commit = first.commit_hash
@@ -955,7 +956,7 @@ def _pin_metadata(spec, *, hf_hub_url, get_hf_file_metadata):
             or not re.fullmatch(r"[0-9a-fA-F]{64}", pinned.etag)
             or type(pinned.size) is not int or pinned.size <= 0):
         raise VisualAssetError("visual weight metadata lacks stable exact size/content SHA-256")
-    return {"commit": commit, "sha256": pinned.etag, "size": pinned.size, "url": pinned_url}
+    return {"commit": commit, "sha256": pinned.etag, "size": pinned.size}
 
 
 def _hf_fetch(spec, metadata, progress=None):

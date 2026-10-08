@@ -2,8 +2,9 @@
 
 The caller owns metadata discovery, source allowlisting, native path resolution,
 and the network transport. This module never imports ComfyUI/model code and has
-no default network callable. No URL is logged or returned in receipts.
-Transport/cancellation exceptions propagate unchanged to the caller.
+no default network callable. No URL passes through it, so none is logged or
+returned in receipts. Transport/cancellation exceptions propagate unchanged to
+the caller.
 
 ``fetch_verified`` (2026-09-07) takes an injected ``fetch`` that returns a LOCAL
 PATH some library has already produced, and verifies that: the pinned size and
@@ -28,7 +29,6 @@ from pathlib import Path
 import re
 import shutil
 import sys
-from urllib.parse import urlsplit
 
 
 DISK_MARGIN_BYTES = 512 * 1024 * 1024
@@ -63,28 +63,12 @@ def _validate(spec, metadata):
             r"[0-9a-fA-F]{%d}" % length, value
         ):
             raise ValueError("metadata " + key + " must be exact hexadecimal")
-    url = metadata.get("url")
-    try:
-        parsed = urlsplit(url) if isinstance(url, str) else None
-        valid_url = (
-            parsed is not None
-            and parsed.scheme == "https"
-            and bool(parsed.hostname)
-            and parsed.username is None
-            and parsed.password is None
-            and not parsed.fragment
-        )
-    except ValueError:
-        valid_url = False
-    if not valid_url:
-        # Never interpolate an invalid/signed URL into an exception.
-        raise ValueError("metadata url must be an HTTPS URL without userinfo or fragment")
 
 
 def _check_cancel(cancel):
     # Comfy's interrupt check raises; a simple boolean test seam also works.
     if cancel is not None and cancel():
-        raise DownloadCancelled("visual asset download cancelled; resume unsupported")
+        raise DownloadCancelled("visual asset download cancelled")
 
 
 @contextmanager
@@ -154,8 +138,10 @@ def _publish_link(source: Path, destination: Path) -> bool:
     ``os.link`` is used rather than replace/rename because it is atomically
     NO-CLOBBER: an uncooperative writer that raced us keeps its final. On a
     filesystem or volume that cannot hard-link -- the fetched file may live in
-    another cache root entirely -- it falls back to a copy through this call's
-    own temporary, so the failure mode is extra bytes, never a partial final.
+    another cache root entirely -- it falls back to an exclusive-create copy
+    (``O_CREAT | O_EXCL``) written straight into ``destination``. That keeps the
+    no-clobber guarantee, and the copy is unlinked on any error so no partial
+    final is left behind; the comment below names the one residual exposure.
     """
     try:
         os.link(source, destination)
