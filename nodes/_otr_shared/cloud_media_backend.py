@@ -101,7 +101,6 @@ class CloudErrorCode(str, enum.Enum):
     MALFORMED_CONFIG = "malformed_config"
     UNSUPPORTED_SCHEMA = "unsupported_schema"
     INCOMPATIBLE_PROFILE = "incompatible_profile"
-    GATED_BY_FLAG = "gated_by_flag"
     AUTH = "auth"
     BUDGET = "budget"
     RETRYABLE_TRANSPORT = "retryable_transport"
@@ -274,7 +273,7 @@ JOB_SCOPED_CODES = frozenset({
 #: beat and publish an empty episode as "degraded", which is the laundering
 #: the sanctioned-gap channel exists to prevent -- so they stay LOUD.
 #: ``BUDGET`` is loud in its own way (it halts and floors what it already
-#: paid for); ``AUTH`` and the four config codes mean nothing will ever
+#: paid for); ``AUTH`` and the three config codes mean nothing will ever
 #: render and the operator must fix the key or the config.
 #: ``INTERRUPTED`` is deliberately in NEITHER set: a cancel is the operator
 #: saying stop, and turning that into 40 floored beats would be obscene.
@@ -284,7 +283,6 @@ RUN_SCOPED_CODES = frozenset({
     CloudErrorCode.MALFORMED_CONFIG,
     CloudErrorCode.UNSUPPORTED_SCHEMA,
     CloudErrorCode.INCOMPATIBLE_PROFILE,
-    CloudErrorCode.GATED_BY_FLAG,
 })
 
 

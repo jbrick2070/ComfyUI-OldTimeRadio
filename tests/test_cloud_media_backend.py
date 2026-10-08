@@ -345,7 +345,7 @@ def test_is_cloud_budget_error_walks_cause_chain():
 def test_error_codes_canonical_spelling():
     expected = {
         "malformed_config", "unsupported_schema", "incompatible_profile",
-        "gated_by_flag", "auth", "budget", "retryable_transport",
+        "auth", "budget", "retryable_transport",
         "provider_rejected", "content_refused", "timeout", "interrupted",
         "corrupt_output", "orphaned_job",
     }

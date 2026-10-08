@@ -779,7 +779,6 @@ _RELEASE_CODES = frozenset({
     CloudErrorCode.UNSUPPORTED_SCHEMA,
     CloudErrorCode.MALFORMED_CONFIG,
     CloudErrorCode.INCOMPATIBLE_PROFILE,
-    CloudErrorCode.GATED_BY_FLAG,
 })
 
 
