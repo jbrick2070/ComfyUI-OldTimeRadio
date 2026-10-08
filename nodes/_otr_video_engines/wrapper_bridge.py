@@ -755,9 +755,9 @@ def images_to_uint8(images):
 class MirrorExtensionForbidden(ValueError):
     """A short render on an AUDIO-SYNCED lane cannot be mirror-extended.
 
-    Raised by :func:`fit_frames_to_target` when ``allow_mirror=False`` and the
-    render is shorter than the audio target. Carries the numbers so the caller
-    can name the tier and the remedy.
+    Raised by :func:`fit_frames_to_target` when the render is shorter than the
+    audio target. Carries the numbers so the caller can name the tier and the
+    remedy.
     """
 
     def __init__(self, rendered, target):
