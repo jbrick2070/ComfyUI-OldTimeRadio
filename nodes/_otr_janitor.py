@@ -107,6 +107,34 @@ def _entry_mtime(p: Path) -> float:
     return newest
 
 
+def _entry_is_fresh(p: Path, cutoff: float) -> bool:
+    """``_entry_mtime(p) > cutoff``, without walking the whole tree.
+
+    Same verdict under every error rule: an unstat-able entry compares
+    "now" against the cutoff (so a zero or negative max age still makes it
+    stale -- it is not unconditionally fresh), an unstat-able child is
+    skipped, and a walk that errors keeps what it already saw. The one
+    difference is that a directory walk stops at the first child newer
+    than the cutoff instead of stat-ing everything under it.
+    """
+    try:
+        if p.stat().st_mtime > cutoff:
+            return True
+    except OSError:
+        return time.time() > cutoff
+    if p.is_dir():
+        try:
+            for child in p.rglob("*"):
+                try:
+                    if child.stat().st_mtime > cutoff:
+                        return True
+                except OSError:
+                    continue
+        except OSError:
+            pass
+    return False
+
+
 def sweep_shared_tmp(max_age_seconds: float | None = None,
                      dry_run: bool = False) -> TmpSweepReport:
     """Delete stale top-level entries under ``episodes/_shared/tmp``.
@@ -134,7 +162,7 @@ def sweep_shared_tmp(max_age_seconds: float | None = None,
         cutoff = time.time() - float(max_age_seconds)
         for entry in tmp_root.iterdir():
             report.scanned += 1
-            if _entry_mtime(entry) > cutoff:
+            if _entry_is_fresh(entry, cutoff):
                 report.skipped_young.append(str(entry))
                 continue
             if dry_run:
