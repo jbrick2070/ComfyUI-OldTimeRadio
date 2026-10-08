@@ -2074,8 +2074,9 @@ place.
 
 **So there is nothing queued here, and the module must NOT be deleted.** That
 inverted test is the tripwire that makes a re-armed content filter fail loudly;
-removing the module removes the guard. Reasoning and the wider dead-symbol
-sweep were recorded 2026-08-22.
+the module itself still holds the read-only vocabulary that
+`tests/test_bug_local_288_sfw_validator.py` keeps green. Reasoning and the
+wider dead-symbol sweep were recorded 2026-08-22.
 
 ## Standing operator directives (hard)
 
@@ -2155,9 +2156,10 @@ box as the repo, and two of CLAUDE.md's assumptions do not hold:
   coding.
 - **SFX: RETIRED and RIPPED (operator ruling 2026-08-06, "rip out SFX 100%";
   executed `9eb6ede1`).** The five
-  bed engines are deregistered and barred via `RETIRED_ENGINE_IDS`, the bed
-  compiler and mux mix branch are deleted, and
-  `tests/test_rip_sfx_bed_guard.py` trips on any surface creeping back.
+  bed engines are deregistered and barred via `RETIRED_ENGINE_IDS` (a stale
+  selection still fails closed with the named error), the bed compiler and mux
+  mix branch are deleted, and `tests/test_rip_sfx_bed_guard.py` pins the one
+  surviving surface, the retired `clip_manifest_json` connector.
   Reviving SFX is a NEW design against the post-rip tree; the old design docs
   in `ROADMAP.md` are the historical record only.
 

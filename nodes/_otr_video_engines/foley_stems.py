@@ -8,8 +8,8 @@ mixed UNDER the frozen episode master at ``OTR_MasterAudioMux``, at the fixed
 2026-08-26 0.20 / 0.80 after the bed proved inaudible by ear).
 
 THIS IS NOT THE SFX BED. The SFX bed was separately GENERATED effects from a
-dedicated model; it was ripped on 2026-08-06 and is staying dead, and
-``tests/test_rip_sfx_bed_guard.py`` exists to keep it that way. Nothing here is
+dedicated model; it was ripped on 2026-08-06 and is staying dead (its engine
+ids still fail closed through ``RETIRED_ENGINE_IDS``). Nothing here is
 restored from it, no constant is inherited from it, and every field name in this
 module is ``foley_`` for exactly that reason. Operator, 2026-08-26: *"sfx bed is
 different than foley bed, i won't get the two confused."*

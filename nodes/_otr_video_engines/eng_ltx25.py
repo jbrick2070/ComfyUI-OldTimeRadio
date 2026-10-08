@@ -1900,8 +1900,7 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
     footsteps, room tone and a score computed for the exact picture it is
     rendering, which is the whole reason a joint AV model earns its keep.
     Operator: *"sfx bed is different than foley bed, i won't get the two
-    confused."* Every field here is ``foley_``; ``sfx_`` is guarded by
-    ``tests/test_rip_sfx_bed_guard.py``.
+    confused."* Every field here is ``foley_``, never ``sfx_``.
 
     THE DECODE IS A SECOND GRAPH, AND THAT IS A VRAM CONTRACT RATHER THAN A
     STYLE CHOICE. Wiring ``LTXVAudioVAEDecode`` into ``_build_graph`` would
