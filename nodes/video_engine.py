@@ -1077,9 +1077,12 @@ class _CRTRenderer:
         img = Image.alpha_composite(img.convert("RGBA"),
                                      self._scanlines).convert("RGB")
 
+        # In place on arrays this frame owns (np.array() copies the image,
+        # the noise is freshly drawn): no full-frame temporary per step.
         arr = np.array(img, dtype=np.float32)
         arr *= self._vignette[:, :, np.newaxis]
-        img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+        np.clip(arr, 0, 255, out=arr)
+        img = Image.fromarray(arr.astype(np.uint8))
 
         if vol > 0.3:
             arr = np.array(img, dtype=np.int16)
@@ -1088,7 +1091,8 @@ class _CRTRenderer:
             # deterministic per (title, fi).
             noise = self._rng(fi, "noise").integers(
                 -intensity, intensity + 1, size=arr.shape, dtype=np.int16)
-            arr = np.clip(arr + noise, 0, 255)
+            arr += noise
+            np.clip(arr, 0, 255, out=arr)
             img = Image.fromarray(arr.astype(np.uint8))
 
         # -- 1. SECTION-1 TEXT / HERO CARD (drawn AFTER the vignette) -
