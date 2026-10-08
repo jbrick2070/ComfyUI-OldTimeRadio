@@ -1,5 +1,5 @@
-"""Sprint 1 -- declarative profile metadata + rank-chain fallback resolver +
-three-state commercial gate. Headless; the only IO is loading the shipped YAML.
+"""Sprint 1 -- declarative profile metadata + rank-chain fallback resolver.
+Headless; the only IO is loading the shipped YAML.
 
 These cover the NEW surface only; the legacy resolver behaviour stays pinned by
 test_engine_profiles.py (unchanged). The live byte-identical dispatch is NOT
@@ -52,13 +52,6 @@ def test_rank_chain_is_sorted_by_rank():
     assert ranks == sorted(ranks)
 
 
-def test_gate_state_maps_three_ways():
-    r = _resolver()
-    assert EP.gate_state(r.get("announcer_kokoro_v1")) == "clean"
-    assert EP.gate_state(r.get("music_musicgen_v1")) == "warn"
-    assert EP.gate_state(r.get("char_indextts2_v1")) == "warn"
-
-
 def test_effective_license_state_blank_derivation():
     p_clean = EP.EngineProfile(
         profile_id="x", role="music", engine="stable_audio_3",
@@ -99,16 +92,6 @@ def test_indextts2_runtime_is_oop_and_needs_ref_clip():
     assert p.needs_ref_clip is True
 
 
-def test_unknown_license_state_gates_stop():
-    # A synthetic 'unknown' profile fails closed at the gate (stop), proving the
-    # third state even though no shipped row uses it yet.
-    p = EP.EngineProfile(
-        profile_id="x", role="music", engine="musicgen",
-        commercial_clean=False, license_state="unknown",
-    )
-    assert EP.gate_state(p) == "stop"
-
-
 def test_bad_runtime_rejected():
     with pytest.raises(Exception):
         EP.EngineProfile(
@@ -123,14 +106,6 @@ def test_bad_license_state_rejected():
             profile_id="x", role="music", engine="musicgen",
             commercial_clean=False, license_state="maybe",
         )
-
-
-def test_engine_warning_only_for_gated():
-    r = _resolver()
-    assert EP.engine_warning(r.get("announcer_kokoro_v1")) == ""   # clean
-    w = EP.engine_warning(r.get("char_indextts2_v1"))
-    assert "bilibili" in w.lower()
-    assert EP.engine_warning(r.get("music_musicgen_v1"))           # non-empty
 
 
 if __name__ == "__main__":

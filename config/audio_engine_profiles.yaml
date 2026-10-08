@@ -16,7 +16,7 @@
 # default, which stays on the legacy engine until promotion S6), runtime
 # (in_graph | oop_venv | cloud | direct_api), needs_ref_clip, caps, license_state
 # (clean|gated|unknown; blank = derive from commercial_clean), warn_text
-# (non-blocking notice emitted when gated). license_state MIRRORS
+# (informational caveat text). license_state MIRRORS
 # commercial_clean here -- final license sign-off is Sprint 6, not an
 # unattended flip.
 

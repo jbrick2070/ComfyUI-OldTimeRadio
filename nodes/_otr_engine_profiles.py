@@ -117,7 +117,7 @@ class EngineProfile(BaseModel):
     needs_ref_clip: bool = False     # reference-clip identity engines
     caps: dict = Field(default_factory=dict)
     license_state: str = ""          # blank -> derive from commercial_clean
-    warn_text: str = ""              # non-blocking notice emitted when gated
+    warn_text: str = ""              # human-readable caveat for the row (informational)
 
     # --- Cloud-audio campaign 2026-07-03 (C1): declarative cloud-engine metadata
     # (additive; blank defaults keep every existing row valid). Populated only on
@@ -204,33 +204,6 @@ def effective_license_state(profile: "EngineProfile") -> str:
     if profile.license_state:
         return profile.license_state
     return "clean" if profile.commercial_clean else "gated"
-
-
-def gate_state(profile: "EngineProfile") -> str:
-    """Three-state commercial gate for a profile: 'clean' | 'warn' | 'stop'.
-
-    Mirrors :mod:`nodes._otr_release_gate`: clean ships silently, gated ('warn')
-    renders with a non-blocking notice, unknown ('stop') is fail-closed.
-    """
-    state = effective_license_state(profile)
-    if state == "clean":
-        return "clean"
-    if state == "gated":
-        return "warn"
-    return "stop"
-
-
-def engine_warning(profile: "EngineProfile") -> str:
-    """The non-blocking notice to surface for a gated profile at episode start,
-    or '' when the engine is clean. A 'stop'-state engine yields no warning --
-    it is refused by the resolver upstream, not warned-and-shipped.
-    """
-    if gate_state(profile) == "warn":
-        return profile.warn_text or (
-            f"{profile.engine}: known-gated (license_state=gated) -- "
-            f"non-blocking notice; verify before commercial release."
-        )
-    return ""
 
 
 class EngineProfileResolver:
