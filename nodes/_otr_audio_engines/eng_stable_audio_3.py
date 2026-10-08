@@ -74,8 +74,8 @@ _CLIP_TYPE = otr_env.get("OTR_SA3_CLIP_TYPE", "stable_audio")
 # BUG-408 (2026-06): SA3 wants genre + instrumentation, a real negative
 # prompt, and a multi-second STRUCTURAL context (seconds_total) to sound like
 # music rather than a 4-12 s texture. It gets NO production anchor (2026-09-11):
-# "analog tape warmth" and a negative pushing "AWAY from a clean modern sound"
-# are the radio-hiss texture the operator withdrew ("make them more musical").
+# a vintage-radio-hiss texture in the prompt and a negative pushing away from a
+# clean modern sound is what the operator withdrew ("make them more musical").
 # The genre and tempo come from the STORY through the shared composer --
 # `_otr_music_prompt.compose_brief_engine_prompt`, the only engine form there
 # is and so the same text every other music engine receives; this adapter

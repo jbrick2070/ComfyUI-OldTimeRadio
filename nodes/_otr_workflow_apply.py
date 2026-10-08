@@ -896,8 +896,7 @@ CREATIVE_WHITELIST = frozenset({
     # A FORCING PROFILE MUST STAY ENGLISH. Nothing in this whitelist lets a
     # profile set a language -- profiles go through apply_profile, which only
     # touches its own managed widget map -- and the Lemmy audition profiles
-    # rely on that: a Spanish always-include is a silent no-op, pinned by
-    # tests/test_lemmy_language_exclusion.py.
+    # rely on that: a Spanish always-include is a silent no-op.
     "episode_language",
     # Google BYO API concrete model pickers bind the virtual google_api:slot-a/b
     # LLM rows. They are content/model-selection widgets on the writer, not
