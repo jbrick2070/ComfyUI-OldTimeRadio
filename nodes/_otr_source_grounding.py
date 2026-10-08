@@ -302,8 +302,7 @@ def select_grounding(
     # That produced unsorted, duplicated starts and could INVERT the arc -- a
     # later beat quoting earlier material than an earlier beat. Roughly 741
     # (length, beat-count) pairs in the ordinary short-story band hit it, and
-    # deterministically. `_otr_source_document._window_bounds` already decides
-    # this once, up front; this module had diverged from that pattern.
+    # deterministically.
     collapse = (total // count) < MIN_WINDOW_CHARS
 
     for index, key in enumerate(keys):

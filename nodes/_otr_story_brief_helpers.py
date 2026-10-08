@@ -434,7 +434,8 @@ def get_open_subject(role: str, synthetic: bool, meta: Any, style: Any) -> str:
 
 #: Framing hints (layer 3 of the 5-layer still composer). The macro framing
 #: is the 6/5 look the operator wants back; the portrait framing matches the
-#: round-5 three-quarter STYLE_ANCHOR decision ("more body -- better").
+#: round-5 three-quarter portrait decision ("more body -- better"; see
+#: PORTRAIT_GEOMETRY in otr_meta_brief_image_prompt.py).
 STILL_FRAMING_OPEN = "full-frame macro, centered subject"
 STILL_FRAMING_PORTRAIT = ("three-quarter framing, full head and shoulders with "
                           "clear headroom above, face unobstructed")

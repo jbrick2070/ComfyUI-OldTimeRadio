@@ -129,7 +129,7 @@ class SourceSpan(_Transient):
     ``text`` is carried so a consumer can use the span without holding the
     document, but the factory always slices it FROM the body, so text and
     offsets cannot disagree. Build spans with ``SourceDocument.span`` /
-    ``_make_span``; a hand-built span is verifiable with ``verify_span``.
+    ``_make_span``; a hand-built span is not checked against any body.
 
     The repr carries offsets and role only -- a span can hold thousands of
     words, and a log line is not where they belong.
