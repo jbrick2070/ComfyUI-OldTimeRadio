@@ -24,7 +24,8 @@ windows covering the whole body plus role-tagged evidence spans, and nothing in
 the pipeline ever constructed it -- ``_otr_source_grounding`` imports only
 ``SourceDocument``, ``SourceSpan`` and the private helpers, and reimplements its
 own region logic. Three independent reviewers confirmed no production consumer.
-Its version constant and evidence markers went with it.
+Its version constant and evidence markers went with it; its tiling check,
+``_assert_tiles``, was left behind and removed 2026-10-08.
 
 Nothing here loads a model, touches the GPU, reads the network, or imports
 anything heavy. Selection is deterministic: same body in, same spans out.
@@ -33,7 +34,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Sequence
 
 # Bump NORMALIZATION_VERSION when the canonical body bytes for an unchanged
 # source would change -- that invalidates every stored offset and hash.
@@ -67,7 +67,7 @@ def _count_quoted_spans(text: str) -> int:
 
 
 class SourceDocumentError(RuntimeError):
-    """A source document or overview could not be built or validated (loud)."""
+    """A source document could not be built or validated (loud)."""
 
 
 def canonical_body_sha256(body: str) -> str:
@@ -180,36 +180,6 @@ def _make_span(body: str, start: int, end: int, *, role: str = "") -> SourceSpan
         )
     return SourceSpan(
         start_char=start, end_char=end, text=body[start:end], role=role)
-
-
-def _assert_tiles(windows: Sequence[SourceSpan], total: int) -> None:
-    """Refuse anything that is not a true ordered tiling of [0, total).
-
-    Summing window lengths is NOT enough: a gap and an overlap of equal size
-    cancel out and a body could be mis-covered while the total looked right.
-    Check the actual boundaries.
-    """
-    if not windows:
-        raise SourceDocumentError("overview produced no windows")
-    if windows[0].start_char != 0:
-        raise SourceDocumentError(
-            f"coverage starts at {windows[0].start_char}, not 0")
-    cursor = 0
-    for window in windows:
-        if window.end_char <= window.start_char:
-            raise SourceDocumentError(
-                f"window [{window.start_char}:{window.end_char}] is empty "
-                f"or inverted"
-            )
-        if window.start_char != cursor:
-            raise SourceDocumentError(
-                f"coverage breaks at {cursor}: next window starts at "
-                f"{window.start_char} ({'gap' if window.start_char > cursor else 'overlap'})"
-            )
-        cursor = window.end_char
-    if cursor != total:
-        raise SourceDocumentError(
-            f"coverage ends at {cursor}, not {total}")
 
 
 class SourceDocument(_Transient):

@@ -1,4 +1,4 @@
-"""Chunk 1 of the source-grounding build: uncapped document + overview.
+"""Chunk 1 of the source-grounding build: the uncapped document.
 
 The defect these pin: the pre-outline authors read a 12,000-character PREFIX
 of a body that can run 25,200 words, while the packs told them to be faithful
@@ -119,15 +119,6 @@ def test_document_refuses_out_of_range_span():
 
 
 # ---------------------------------------------------------------------------
-# overview: total coverage, deterministic, body-free receipts
-# ---------------------------------------------------------------------------
-
-def _doc(words: int = 4000) -> osd.SourceDocument:
-    body = " ".join(f"w{i}" for i in range(words))
-    return osd.build_source_document(body, source_ref="unit:one")
-
-
-# ---------------------------------------------------------------------------
 # the body must not escape through repr -- logs, tracebacks, f-strings
 # ---------------------------------------------------------------------------
 
@@ -226,7 +217,7 @@ def test_the_transient_artifacts_are_immutable():
 
 
 # ---------------------------------------------------------------------------
-# identity cannot be skipped, and tiling is checked at the boundaries
+# identity cannot be skipped
 # ---------------------------------------------------------------------------
 
 def test_a_document_cannot_be_built_without_identity():
@@ -242,31 +233,6 @@ def test_a_document_refuses_a_hash_that_is_not_its_own():
             body_sha256=osd.canonical_body_sha256("a different body"),
             normalization_version=osd.NORMALIZATION_VERSION,
         )
-
-
-def test_coverage_check_catches_a_gap_that_a_length_sum_would_miss():
-    # A gap and an overlap of equal size cancel out in a total; the boundary
-    # check is what actually proves a tiling.
-    doc = _doc()
-    body = doc.canonical_body
-    gapped = (
-        osd.SourceSpan(0, 10, body[0:10]),
-        osd.SourceSpan(20, 20 + (len(body) - 10), body[20:20 + len(body) - 10]),
-    )
-    assert sum(w.char_count for w in gapped) == doc.char_count
-    with pytest.raises(osd.SourceDocumentError):
-        osd._assert_tiles(gapped, doc.char_count)
-
-
-def test_coverage_check_catches_an_overlap():
-    doc = _doc()
-    body = doc.canonical_body
-    overlapping = (
-        osd.SourceSpan(0, 100, body[0:100]),
-        osd.SourceSpan(50, len(body), body[50:]),
-    )
-    with pytest.raises(osd.SourceDocumentError):
-        osd._assert_tiles(overlapping, doc.char_count)
 
 
 # ---------------------------------------------------------------------------
