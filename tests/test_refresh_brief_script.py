@@ -10,11 +10,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from nodes._otr_shared.capability_profiles import shipping_ids
+
 ROOT = Path(__file__).resolve().parents[1]
 BRIEF = ROOT / ".cursor" / "skills" / "refresh" / "scripts" / "brief.py"
-
-sys.path.insert(0, str(ROOT))
-from nodes._otr_shared.capability_profiles import shipping_ids  # noqa: E402
 
 
 def test_brief_runs_outside_the_repo_and_counts_the_shipping_set(tmp_path):
