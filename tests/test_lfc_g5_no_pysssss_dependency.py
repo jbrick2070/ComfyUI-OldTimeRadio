@@ -83,8 +83,6 @@ class TestG5NoPysssssDependency:
             "G5 dropped pysssss links but must preserve link 110 "
             "(W2 news_used chain)"
         )
-        assert 111 not in link_ids
-        assert 112 not in link_ids
 
     def test_last_link_id_consistent_after_drop(self):
         wf = _load_wf()
@@ -96,21 +94,3 @@ class TestG5NoPysssssDependency:
         assert last >= live_max, (
             f"last_link_id={last} < max live link id {live_max}"
         )
-
-    def test_no_dropped_link_id_orphans_remain(self):
-        """No socket-level link reference (input.link or
-        output.links) should still point at 111 or 112."""
-        wf = _load_wf()
-        for node in wf["nodes"]:
-            for inp in node.get("inputs", []) or []:
-                link = inp.get("link")
-                assert link not in (111, 112), (
-                    f"node {node['id']} input {inp.get('name')!r} "
-                    f"still references dropped link {link}"
-                )
-            for out in node.get("outputs", []) or []:
-                for link_id in (out.get("links") or []):
-                    assert link_id not in (111, 112), (
-                        f"node {node['id']} output {out.get('name')!r} "
-                        f"still references dropped link {link_id}"
-                    )

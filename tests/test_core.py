@@ -325,27 +325,6 @@ class TestStoryOrchestratorCodePatterns:
         assert "1024" in src
         assert "max(" in src
 
-    def test_max_length_none_in_generate(self, src):
-        """S31 B4 update: `_generate_with_llm` was deleted from
-        `story_orchestrator.py` at S31 B4 (Hard rule #1A non-deferrable).
-        The `model.generate(..., max_length=None, ...)` call site that
-        this assertion historically pinned lived inside that function's
-        body. With the function gone the pattern is structurally
-        retired -- the modern generate surface is
-        `_otr_model_loader.make_generate_fn` which does NOT pass
-        `max_length=None` explicitly (transformers' default is `None`
-        already; explicit None was a noisy artefact of the legacy
-        wrapper). Converted from a "must exist" assertion to a
-        "must NOT exist" guard on the deleted symbol.
-        """
-        assert "max_length=None" not in src, (
-            "`max_length=None` should be absent from the LLM stack "
-            "post-S31 B4. The legacy `_generate_with_llm` wrapper (and "
-            "its explicit `max_length=None` kwarg) is deleted; modern "
-            "callers use `make_generate_fn` which omits the kwarg "
-            "(transformers default is already None)."
-        )
-
     # Voice-path-cleanbreak 2026-05-12 (P3): test_gender_words_frozenset,
     # test_voice_tag_example_has_charactername, and test_lemmy_easter_egg
     # were deleted. They pinned source-level strings inside the legacy

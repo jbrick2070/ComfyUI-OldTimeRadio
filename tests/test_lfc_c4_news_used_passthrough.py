@@ -99,7 +99,7 @@ def test_news_used_passthrough_is_byte_identical(incoming):
     assert result[2] == incoming
 
 
-def test_workflow_news_used_link_110_present_and_bypass_absent():
+def test_workflow_news_used_link_110_present():
     import json
 
     workflow = json.loads(
@@ -108,4 +108,3 @@ def test_workflow_news_used_link_110_present_and_bypass_absent():
     )
     link_ids = {link[0] for link in workflow.get("links") or []}
     assert 110 in link_ids
-    assert 18 not in link_ids

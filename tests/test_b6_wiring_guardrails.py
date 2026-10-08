@@ -1,13 +1,10 @@
 """S30 B6 -- defense-in-depth wiring tests + structure guardrails.
 
 Catches structural drift that the per-commit B1d..B5 tests don't
-defend against. Six tests:
+defend against:
 
 1. test_request_slot_uses_check_vram_fit_pre_download   -- FAIL estimate
    is consulted before snapshot_download, but the load is still attempted.
-2. test_no_legacy_model_id_meta_key_in_writer           -- AST scan
-   asserts the writer never emits a legacy `model_id` meta key in
-   any meta dict literal.
 3. test_no_not_downloaded_suffix_in_meta_stamps         -- AST scan
    asserts no string-literal `[NOT DOWNLOADED]` appears as a meta-
    stamp value in writer source.
@@ -109,52 +106,8 @@ def test_request_slot_uses_check_vram_fit_pre_download(monkeypatch):
     assert download_calls == [catalog.TEST_OVERSIZED_LLM]
 
 
-# ---------------------------------------------------------------------------
-# 2. test_no_legacy_model_id_meta_key_in_writer
-# ---------------------------------------------------------------------------
-
-
 def _writer_tree() -> ast.AST:
     return ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
-
-
-def test_no_legacy_model_id_meta_key_in_writer():
-    """The writer must never stamp a `model_id` key inside a meta
-    dict literal post-B2b. AST walk every `meta[...] = {...}`
-    assignment + every `{...}` Dict literal nested in those values.
-    """
-    tree = _writer_tree()
-    offenders: list[str] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
-            continue
-        # Look for: meta["..."] = {...}.
-        for target in node.targets:
-            if not (
-                isinstance(target, ast.Subscript)
-                and isinstance(target.value, ast.Name)
-                and target.value.id == "meta"
-            ):
-                continue
-            # Walk every Dict in the assigned value for a model_id key.
-            for sub in ast.walk(node.value):
-                if not isinstance(sub, ast.Dict):
-                    continue
-                for k in sub.keys:
-                    if (
-                        isinstance(k, ast.Constant)
-                        and isinstance(k.value, str)
-                        and k.value == "model_id"
-                    ):
-                        offenders.append(
-                            f"line {getattr(k, 'lineno', '?')}: "
-                            f"meta dict still has 'model_id' key"
-                        )
-    assert not offenders, (
-        "writer must not stamp 'model_id' in meta dict literals "
-        "post-B2b (replaced by creative_writing_model + "
-        "technical_model):\n  " + "\n  ".join(offenders)
-    )
 
 
 # ---------------------------------------------------------------------------

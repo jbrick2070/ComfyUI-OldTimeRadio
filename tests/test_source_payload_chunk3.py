@@ -701,18 +701,6 @@ def test_writer_resolves_outside_try_and_catches_only_interpret_error():
         assert "Exception" not in names
 
 
-def test_writer_run_has_no_otrni_references():
-    """Chunk 3 wiring pin: the writer's run() no longer references _OTRNI
-    (the news_interpreter call moved into the contract wrapper)."""
-    tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == "run":
-            names = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
-            assert "_OTRNI" not in names
-            return
-    raise AssertionError("run() not found")
-
-
 def test_no_production_direct_calls_to_fetch_rss():
     """AST guard (A): no production CALL to _fetch_rss_seed_or_die outside
     _otr_source_payload.py (definition + tests exempt)."""

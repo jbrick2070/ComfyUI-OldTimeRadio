@@ -63,10 +63,7 @@ def test_check5_catches_widget_name():
 def test_check5_catches_title():
     """A node.title set to a FORBIDDEN name (exact match) trips check 5.
 
-    Substring-in-title hits (e.g. "Video Plan (wired from Director)")
-    are caught by tests/test_workflow_director_freedom.py via regex
-    scan; that's a different + broader surface guard. This test
-    pins the exact-match contract that the validator promises.
+    This test pins the exact-match contract that the validator promises.
     """
     wf = {
         "nodes": [

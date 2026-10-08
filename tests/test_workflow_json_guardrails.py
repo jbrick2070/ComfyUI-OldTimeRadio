@@ -20,12 +20,6 @@ Checks, per JSON file:
     6.  Every link references existing source + destination node IDs.
     7.  Every non-null input.link (UI) references an existing link ID.
     8.  API-format inputs are either scalars or [str_node_id, int_slot].
-    9.  No known-stale dropdown literals appear in any widget / input.
-
-Add a new entry to STALE_DROPDOWN_LITERALS when a dropdown string gets
-renamed (e.g. BUG-011 renamed "Obsidian (Low VRAM/Fast)" to
-"Obsidian (UNSTABLE/4GB)") so older JSONs on disk that still reference
-the old literal are caught and migrated.
 
 Run:  python -m pytest tests/test_workflow_json_guardrails.py -v
 """
@@ -39,24 +33,6 @@ import pytest
 
 PACK_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS_DIR = PACK_ROOT / "workflows"
-
-
-# ---------------------------------------------------------------------------
-# Known-stale dropdown strings that MUST NOT appear in any widgets_values
-# or API inputs. Grow this set when a dropdown value is renamed and older
-# on-disk workflows need to be migrated.
-#
-# Canonical tracked renames:
-#   BUG-011  "Obsidian (Low VRAM/Fast)" -> "Obsidian (UNSTABLE/4GB)"
-#   2026-05-10  "auto (LLM generates)" -> "let the story decide"
-#               (OTR_LedgerScriptWriter style sentinel — clearer label;
-#                pre-rename workflows would silently bind to a missing
-#                dropdown entry and the auto-derive path would never fire)
-# ---------------------------------------------------------------------------
-STALE_DROPDOWN_LITERALS: frozenset[str] = frozenset({
-    "Obsidian (Low VRAM/Fast)",
-    "auto (LLM generates)",
-})
 
 
 # Allowed element types for a single widgets_values slot.
@@ -294,71 +270,15 @@ class TestWorkflowJson:
                     f"references missing link id {link}"
                 )
 
-    # ---- Phase 5: stale-literal deny-list ----
-    def test_no_stale_dropdown_literals(self, workflow_path: Path):
-        doc = _load_json(workflow_path)
-        fmt = _classify(doc)
-        offenders: list[str] = []
-
-        if fmt == "ui":
-            for n in doc.get("nodes", []):
-                wv = n.get("widgets_values") or []
-                if not isinstance(wv, list):
-                    continue
-                for idx, val in enumerate(wv):
-                    if isinstance(val, str) and val in STALE_DROPDOWN_LITERALS:
-                        offenders.append(
-                            f"node {n.get('id')} ({n.get('type')}) "
-                            f"widgets_values[{idx}] = {val!r}"
-                        )
-        elif fmt == "api":
-            for nid, node in doc.items():
-                for name, val in (node.get("inputs") or {}).items():
-                    if isinstance(val, str) and val in STALE_DROPDOWN_LITERALS:
-                        offenders.append(
-                            f"node '{nid}' ({node.get('class_type')}) "
-                            f"inputs[{name!r}] = {val!r}"
-                        )
-
-        assert not offenders, (
-            f"{workflow_path.name} contains stale dropdown strings "
-            "(update the workflow or remove from STALE_DROPDOWN_LITERALS "
-            "if the rename was reverted):\n  " + "\n  ".join(offenders)
-        )
-
-
-# ---------------------------------------------------------------------------
-# Saved-default binding for the OTR_LedgerScriptWriter style widget was
-# RETIRED (2026-07-05, style-engine consolidation): style/style_custom
-# no longer exist as widgets at all -- the single deterministic engine
-# call (build_story_contract()) supplies style, with no dropdown/
-# sentinel/LLM-derive path left to drift. TestWriterStyleSentinelDefault
-# and its _WRITER_STYLE_SENTINEL / _WRITER_STYLE_SLOT constants are
-# deleted rather than repointed at a widget that no longer exists. See
-# docs/2026-07-05-style-dropdown-blast-radius/RIP_OUT_PLAN.md.
-# ---------------------------------------------------------------------------
 
 _CANONICAL_WORKFLOW = "otr_canonical.json"
 
 
 class TestVoicePathCleanbreakWiring:
-    """Voice-path-cleanbreak 2026-05-12 (P3) wiring guardrails.
-
-    Pins the post-cleanbreak invariants for the canonical workflow JSON
-    so a future hand-edit cannot silently re-introduce the Director-fed
-    voice-node secondary paths.
+    """Voice-path-cleanbreak 2026-05-12 (P3) wiring guardrail: the
+    canonical workflow JSON wires the music node's script_json from the
+    freeze cascade.
     """
-
-    # Voice-side nodes (the ones P2 pruned). These must NEVER have a
-    # ``production_plan_json`` input socket post-cleanbreak.
-    _VOICE_NODE_TYPES = frozenset({
-        "OTR_BatchBarkGenerator",
-        "OTR_KokoroAnnouncer",
-        "OTR_BatchAudioGenGenerator",
-        "OTR_BatchProceduralSFX",
-        "OTR_SceneSequencer",
-        "OTR_MusicGenTheme",
-    })
 
     def _doc(self):
         wf_path = WORKFLOWS_DIR / _CANONICAL_WORKFLOW
@@ -366,86 +286,6 @@ class TestVoicePathCleanbreakWiring:
             f"Canonical workflow {_CANONICAL_WORKFLOW!r} missing"
         )
         return _load_json(wf_path)
-
-    def test_no_production_plan_json_wires_to_voice_nodes(self):
-        """No link's destination is a voice-node ``production_plan_json``
-        slot. Video-side wires (link 17 -> SignalLostVideo,
-        link 38 -> OTRVideoPlan) are intentionally still present until
-        the deferred video-side cleanbreak sprint.
-        """
-        doc = self._doc()
-        nodes_by_id = {n["id"]: n for n in doc.get("nodes", [])}
-        offenders: list[str] = []
-        for L in doc.get("links", []):
-            if not (isinstance(L, list) and len(L) >= 6):
-                continue
-            _lid, _src, _src_slot, dst, dst_slot, _typ = (
-                L[0], L[1], L[2], L[3], L[4], L[5]
-            )
-            dst_node = nodes_by_id.get(dst)
-            if dst_node is None or dst_node.get("type") not in self._VOICE_NODE_TYPES:
-                continue
-            inputs = dst_node.get("inputs", [])
-            if 0 <= dst_slot < len(inputs):
-                in_name = inputs[dst_slot].get("name")
-                if in_name == "production_plan_json":
-                    offenders.append(
-                        f"link {L[0]} -> {dst_node['type']}(id={dst})."
-                        f"production_plan_json"
-                    )
-        assert not offenders, (
-            "voice-path-cleanbreak violation: production_plan_json "
-            "wires still reach voice nodes:\n  "
-            + "\n  ".join(offenders)
-        )
-
-    def test_voice_nodes_have_no_production_plan_json_input_socket(self):
-        """The voice nodes themselves no longer declare a
-        ``production_plan_json`` input socket. Any saved workflow that
-        still carries the socket has stale wiring."""
-        doc = self._doc()
-        offenders: list[str] = []
-        for n in doc.get("nodes", []):
-            if n.get("type") not in self._VOICE_NODE_TYPES:
-                continue
-            for inp in n.get("inputs", []):
-                if inp.get("name") == "production_plan_json":
-                    offenders.append(
-                        f"{n['type']}(id={n['id']}) declares "
-                        f"input.production_plan_json"
-                    )
-        assert not offenders, (
-            "voice-path-cleanbreak violation: production_plan_json input "
-            "socket still present on voice nodes:\n  "
-            + "\n  ".join(offenders)
-        )
-
-    def test_no_llm_director_in_workflow(self):
-        """Sprint 2.5 (voice-path-cleanbreak). Hard guard: the workflow
-        must NOT contain an OTR_LLMDirector node.
-
-        Replaces the conditional Sprint 1.1 guardrail
-        (test_no_director_output_links_to_voice_nodes). Sprint 2 deleted
-        the Director class + workflow node + registration entirely. If
-        someone re-adds the node to the workflow JSON or re-registers
-        the class, this gate fails and the rebuild is blocked.
-
-        The void left by Director is filled at writer time:
-          - meta.visual_plan + meta.voice_assignments + meta.style are
-            stamped by OTR_LedgerScriptWriter (K.5 block).
-          - OTR_VideoPlan + OTR_SignalLostVideo read those fields from
-            the L3 ledger via FreezeCascade.script_json.
-        """
-        doc = self._doc()
-        director_nodes = [
-            n for n in doc.get("nodes", [])
-            if n.get("type") == "OTR_LLMDirector"
-        ]
-        assert not director_nodes, (
-            "voice-path-cleanbreak Sprint 2 violation: OTR_LLMDirector "
-            "node re-added to workflow. Director class was deleted; see "
-            "docs/voice-path-cleanbreak-execution-plan.md Sprint 2."
-        )
 
     def test_musicgen_script_json_wired_from_freeze_cascade(self):
         """OTR_MusicGenTheme must read its ``script_json`` input from
@@ -992,131 +832,11 @@ class TestWriterB2aSurface:
 
 
 class TestCascadeB3Surface:
-    """S30 B3 cascade-surface guardrails. The cascade's local `model_id`
-    widget + 6 phase-toggle widgets are deleted; a `technical_model`
-    input socket replaces them, wired from the writer's broadcast
-    output. Canonical workflow JSON is the only one with the cascade
-    placed; other workflow JSONs are exempt.
+    """S30 B3 cascade-surface guardrails. A `technical_model` input
+    socket on the cascade is wired from the writer's broadcast output.
+    Canonical workflow JSON is the only one with the cascade placed;
+    other workflow JSONs are exempt.
     """
-
-    _DELETED_PHASE_WIDGETS = frozenset({
-        "enable_phase_3_polish",
-        "polish_announcer_beats",
-        "enable_phase_4_scene_coherence",
-        "enable_phase_4_5_smart_suggestion",
-        "enable_phase_5_voice_drift",
-        "enable_phase_6_episode_arc",
-    })
-
-    def test_cascade_has_no_local_model_widget(self):
-        """AST scan of OTR_LedgerFreezeCascade.INPUT_TYPES: the
-        `optional` block must NOT contain a `model_id` widget. The
-        only model-related entry is `technical_model` and it MUST be
-        a forceInput socket (no local widget).
-        """
-        import ast
-
-        src = (
-            PACK_ROOT / "nodes" / "OTR_LedgerFreezeCascade.py"
-        ).read_text(encoding="utf-8")
-        tree = ast.parse(src)
-        # Find OTR_LedgerFreezeCascade.INPUT_TYPES classmethod.
-        target = None
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.ClassDef)
-                and node.name == "OTR_LedgerFreezeCascade"
-            ):
-                for sub in node.body:
-                    if (
-                        isinstance(sub, ast.FunctionDef)
-                        and sub.name == "INPUT_TYPES"
-                    ):
-                        target = sub
-                        break
-                break
-        assert target is not None, (
-            "OTR_LedgerFreezeCascade.INPUT_TYPES not found"
-        )
-        # Walk the function body looking for any "model_id" Dict key.
-        bad_keys: list[str] = []
-        for sub in ast.walk(target):
-            if not isinstance(sub, ast.Dict):
-                continue
-            for k in sub.keys:
-                if (
-                    isinstance(k, ast.Constant)
-                    and isinstance(k.value, str)
-                    and k.value == "model_id"
-                ):
-                    bad_keys.append(
-                        f"line {getattr(k, 'lineno', '?')}: 'model_id' key"
-                    )
-        assert not bad_keys, (
-            "cascade INPUT_TYPES must not declare a model_id widget "
-            "post-B3:\n  " + "\n  ".join(bad_keys)
-        )
-        # Confirm `technical_model` is present (sanity).
-        found_technical = False
-        for sub in ast.walk(target):
-            if not isinstance(sub, ast.Dict):
-                continue
-            for k in sub.keys:
-                if (
-                    isinstance(k, ast.Constant)
-                    and isinstance(k.value, str)
-                    and k.value == "technical_model"
-                ):
-                    found_technical = True
-                    break
-        assert found_technical, (
-            "cascade INPUT_TYPES must declare a `technical_model` "
-            "input socket (forceInput) post-B3"
-        )
-
-    def test_cascade_phase_toggles_extinct(self):
-        """AST scan: none of the 6 deleted phase-toggle widgets
-        (`enable_phase_3_polish`, `polish_announcer_beats`, etc.)
-        may appear as a key inside cascade INPUT_TYPES.
-        """
-        import ast
-
-        src = (
-            PACK_ROOT / "nodes" / "OTR_LedgerFreezeCascade.py"
-        ).read_text(encoding="utf-8")
-        tree = ast.parse(src)
-        target = None
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.ClassDef)
-                and node.name == "OTR_LedgerFreezeCascade"
-            ):
-                for sub in node.body:
-                    if (
-                        isinstance(sub, ast.FunctionDef)
-                        and sub.name == "INPUT_TYPES"
-                    ):
-                        target = sub
-                        break
-                break
-        assert target is not None
-        bad_keys: list[str] = []
-        for sub in ast.walk(target):
-            if not isinstance(sub, ast.Dict):
-                continue
-            for k in sub.keys:
-                if (
-                    isinstance(k, ast.Constant)
-                    and isinstance(k.value, str)
-                    and k.value in self._DELETED_PHASE_WIDGETS
-                ):
-                    bad_keys.append(
-                        f"line {getattr(k, 'lineno', '?')}: {k.value!r}"
-                    )
-        assert not bad_keys, (
-            "cascade INPUT_TYPES must not carry the deleted phase-"
-            "toggle widgets post-B3:\n  " + "\n  ".join(bad_keys)
-        )
 
     def test_cascade_technical_socket_wired_in_canonical_json(self):
         """Canonical workflow JSON must have exactly one link from

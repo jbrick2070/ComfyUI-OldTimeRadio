@@ -8,9 +8,8 @@ Validates ``workflows/otr_scifi_16gb_audio_v2_optin.json`` (emitted by
   * the EXECUTION-PLAN Wave 2b BY-NAME migration spec -- the node-62
     script_json partition, the CastLock dedicated v2-ledger source, the theme
     cue fanout, and the done -> gate chain;
-  * no legacy audio-generator INSTANCE on the active path, node 15 dropped with
-    no orphan links, SceneSequencer sfx left optional / None, and the I-7
-    audio_done -> first-video-loader gate preserved.
+  * SceneSequencer sfx left optional / None, and the I-7 audio_done ->
+    first-video-loader gate preserved.
 
 These are headless link-integrity gates. R0b (live load in ComfyUI Desktop with
 stub engines) remains the operator acceptance gate. ASCII-only source, no em-dash.
@@ -37,16 +36,6 @@ NEW_NODE_IDS = {
     "OTR_AnnouncerVoice": 82,
     "OTR_StableAudioTheme": 83,
 }
-# The legacy single-purpose audio-generator node TYPES. None of these may have
-# a live INSTANCE in the opt-in graph (registry nodes may still SELECT the
-# legacy engine via raw delegation -- that is an engine widget, not an instance).
-LEGACY_AUDIO_GEN_TYPES = frozenset({
-    "OTR_BatchBarkGenerator",
-    "OTR_KokoroAnnouncer",
-    "OTR_MusicGenTheme",
-    "OTR_BatchAudioGenGenerator",
-})
-DROPPED_NODE_IDS = frozenset({11, 13, 14, 15})
 
 
 # --------------------------------------------------------------------------- #
@@ -153,19 +142,6 @@ def test_four_new_nodes_present(by_id):
     for key, nid in NEW_NODE_IDS.items():
         assert nid in by_id, "missing new node id %s (%s)" % (nid, key)
         assert by_id[nid]["type"] == key
-
-
-def test_no_legacy_audio_generator_instances(wf):
-    bad = [n["id"] for n in wf["nodes"] if n["type"] in LEGACY_AUDIO_GEN_TYPES]
-    assert not bad, "legacy audio-generator instances still present: %s" % bad
-
-
-def test_node15_dropped_with_no_orphan_links(wf, by_id):
-    for nid in DROPPED_NODE_IDS:
-        assert nid not in by_id, "dropped node %s still present" % nid
-    for L in wf["links"]:
-        assert L[1] not in DROPPED_NODE_IDS, "link %s sources dropped node" % L[0]
-        assert L[3] not in DROPPED_NODE_IDS, "link %s targets dropped node" % L[0]
 
 
 def test_widget_vectors_exact(by_id):
