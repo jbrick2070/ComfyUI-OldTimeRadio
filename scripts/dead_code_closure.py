@@ -21,10 +21,7 @@ So this walks the graph instead of the list:
   4. A node a protective doc or module speaks for (see PROTECTIVE_DOCS) is
      never removed from the model. It stays live, so everything IT mentions
      stays reachable, and it is reported in its own section for a human to
-     read the ruling. (Protection used to be applied only to the printed
-     result, after the sweep, so the dependencies of a protected symbol --
-     CanonicalImage under the ruled-on ImageLedgerSection -- were printed as
-     removable.)
+     read the ruling.
 
 KNOWN LIMITS, both in the safe direction (dead code missed, never live code
 proposed): this peels unmentioned leaves rather than computing reachability
@@ -70,17 +67,9 @@ PROTECTIVE_DOCS = [
     "CLAUDE.md",
 ]
 
-#: Whole modules a ruling protects wholesale, which no per-name scan can see.
-#: The ruling for the first one is literal: "every symbol in
-#: _otr_scifi_p0_contract stays untouched because that module is the subject of
-#: the finding above -- deleting p0_contract_instruction would destroy the
-#: evidence for it", and PROD_BUG_LOG ties p0_source_char_budget to OPEN bug
-#: PBUG-20260729-03 as the diagnosed-but-unwired fix.
-PROTECTED_MODULES = {
-    "nodes/_otr_scifi_p0_contract.py":
-        "OTR_STANDING_RULINGS: every symbol stays -- it is the evidence for "
-        "OPEN PBUG-20260729-03, whose fix is unwired in this module",
-}
+#: Whole modules a ruling protects wholesale, which no per-name scan can see:
+#: {repo-relative path: the ruling that protects it}. None today.
+PROTECTED_MODULES = {}
 
 #: Names ComfyUI or a launcher reaches without a Python reference to them.
 DYNAMIC_HINTS = {
