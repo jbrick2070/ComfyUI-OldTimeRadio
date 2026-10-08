@@ -93,9 +93,6 @@ ENGINE_FAMILY = {
     "cloud_ltx25_audio_in": "audio_conditioned_video",
 }
 
-#: The M1 frozen master-audio PCM marker a frozen ledger carries (the decision
-#: layer must never touch audio).
-FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 _GOOGLE_SILENT_TEXT_PROVIDERS = frozenset({
     "google_veo_video",
     "google_omni_video",
@@ -454,13 +451,6 @@ def _required_inputs_for_engine(engine_name, fam=None):
         required.update(str(t) for t in (
             getattr(_vreg.get_engine(name), "required_inputs", ()) or ()))
     return tuple(t for t in REQUIRED_INPUT_TOKENS if t in required)
-
-
-def build_full_ledger(section):
-    """Wrap a video section in a full ledger with a FROZEN audio section."""
-    return {"audio": {"master_audio_sha256": FROZEN_AUDIO_SHA,
-                      "ledger_frozen": True},
-            "video": section}
 
 
 #: The latent-grid divisor every declared render canvas must respect. The
@@ -7400,11 +7390,10 @@ def build_clip_manifest(result, *, episode_id=""):
 
 __all__ = [
     "ENGINE_FAMILY",
-    "FROZEN_AUDIO_SHA",
     "RenderError", "RenderFloorError",
     "FamilyInputGap",
     "classify_failure", "engine_family",
-    "build_full_ledger", "build_request",
+    "build_request",
     "build_request_from_shot", "_slice_master_audio",
     "SLICER_VERSION", "slice_cache_key",
     "run_real_episode", "build_clip_manifest", "persist_episode_clips",

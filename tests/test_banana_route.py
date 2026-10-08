@@ -714,9 +714,8 @@ def test_zero_match_prompt_receipt_is_honest():
 # --------------------------------------------------------------------------- #
 
 def _music_open_ledger(bank="original"):
-    from nodes._otr_video_engines import render_driver as rd
     return {
-        "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA,
+        "audio": {"master_audio_sha256": "21aa71f6a4e5master_audio_pcm_marker",
                   "ledger_frozen": True},
         "meta": {
             "visual_style": "video_art",

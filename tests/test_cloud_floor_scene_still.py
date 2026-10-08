@@ -28,6 +28,10 @@ from nodes._otr_video_engines import render_driver as rd
 _HAS_FFMPEG = bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))
 needs_ffmpeg = pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
 
+#: The master-audio marker a frozen test ledger carries (the video phase must
+#: never touch audio).
+_FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
+
 
 # --------------------------------------------------------------------------- #
 # stub cloud engines
@@ -129,7 +133,9 @@ def _ledger(tmp_path, engines_by_index, *, with_stills=True):
                 "kind": "scene_beat", "beat_id": bid,
                 "path": _bright_still(tmp_path / ("scene_%s.png" % bid)),
             })
-    led = rd.build_full_ledger({"video_revision": 1, "fps": 25, "shots": shots})
+    led = {"audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
+                     "ledger_frozen": True},
+           "video": {"video_revision": 1, "fps": 25, "shots": shots}}
     led["images"] = {"images": images}
     return led
 
@@ -367,15 +373,18 @@ def _floor_manifest(tmp_path):
     clip.write_bytes(b"x")
     ok = tmp_path / "ok.mp4"
     ok.write_bytes(b"x")
-    led = rd.build_full_ledger({"video_revision": 1, "fps": 25, "shots": [
-        {"shot_id": "shot_b000", "role": "character_video",
-         "engine_id": "cloud_vidu_q2_pro_fast_720p", "target_frame_count": 25},
-        dict(rd._stamp_cloud_floor_shot(
-            {"shot_id": "shot_b001", "role": "character_video",
-             "engine_id": "cloud_vidu_q2_pro_fast_720p",
-             "target_frame_count": 25}, "timeout"),
-            floor_render="still_pan"),
-    ]})
+    led = {"audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
+                     "ledger_frozen": True},
+           "video": {"video_revision": 1, "fps": 25, "shots": [
+               {"shot_id": "shot_b000", "role": "character_video",
+                "engine_id": "cloud_vidu_q2_pro_fast_720p",
+                "target_frame_count": 25},
+               dict(rd._stamp_cloud_floor_shot(
+                   {"shot_id": "shot_b001", "role": "character_video",
+                    "engine_id": "cloud_vidu_q2_pro_fast_720p",
+                    "target_frame_count": 25}, "timeout"),
+                   floor_render="still_pan"),
+           ]}}
     result = {"ledger": led, "clips": {
         "shot_b000": {"engine_id": "cloud_vidu_q2_pro_fast_720p",
                       "frame_count": 25, "path": str(ok)},

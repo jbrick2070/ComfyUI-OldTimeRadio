@@ -1,8 +1,7 @@
 """Additive CPU coverage for the in-process render driver (A-S7.5).
 
 New, self-contained tests complementing tests/test_video_render_driver.py. The
-pure helpers (engine_family / build_full_ledger
-/ classify_failure kind map) plus a CPU exercise of
+pure helpers (engine_family / classify_failure kind map) plus a CPU exercise of
 the REAL render loop (run_episode) driven by STUB engines registered into a
 snapshot/restore registry: it proves a HARD failure RAISES LOUD (NO FALLBACKS --
 2026-07-02 directive; no engine swap, no still floor), the frozen audio section is
@@ -20,6 +19,11 @@ from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import render_driver as rd
 
 
+#: The master-audio marker a frozen test ledger carries (the video phase must
+#: never touch audio).
+_FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
+
+
 # --------------------------------------------------------------------------- #
 # pure helpers
 # --------------------------------------------------------------------------- #
@@ -29,14 +33,6 @@ def test_engine_family_known_and_unknown():
     assert rd.engine_family("totally_unknown_xyz") == "abstract"
     assert rd.engine_family("totally_unknown_xyz", default="static_motion") == (
         "static_motion")
-
-
-def test_build_full_ledger_freezes_audio():
-    section = {"video_revision": 1, "shots": []}
-    led = rd.build_full_ledger(section)
-    assert led["audio"]["master_audio_sha256"] == rd.FROZEN_AUDIO_SHA
-    assert led["audio"]["ledger_frozen"] is True
-    assert led["video"] is section
 
 
 def test_classify_failure_specific_kind_mappings():
@@ -124,7 +120,9 @@ def _two_shot_ledger():
          "engine_id": "stub_fail", "family": "abstract", "group_id": "g1",
          "target_frame_count": 25, "degradation_trail": []},
     ]}
-    return rd.build_full_ledger(section)
+    return {"audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
+                      "ledger_frozen": True},
+            "video": section}
 
 
 def test_run_episode_fails_loud_no_fallback(stub_registry):
@@ -134,7 +132,7 @@ def test_run_episode_fails_loud_no_fallback(stub_registry):
     ledger = _two_shot_ledger()
     with pytest.raises(rd.RenderError):
         rd.run_episode(ledger)
-    assert ledger["audio"]["master_audio_sha256"] == rd.FROZEN_AUDIO_SHA
+    assert ledger["audio"]["master_audio_sha256"] == _FROZEN_AUDIO_SHA
 
 
 def test_run_episode_does_not_mutate_input_ledger(stub_registry):
@@ -172,7 +170,7 @@ def _real_ledger():
     timing), an OTR_ImageGenDispatcher images write-back (portrait per char),
     and two shots whose engine is the recording stub."""
     return {
-        "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA, "ledger_frozen": True},
+        "audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA, "ledger_frozen": True},
         "lines": [
             {"line_id": "b001", "char_id": "announcer", "speaker_role": "announcer",
              "start_s": 0.0, "dur_s": 2.0, "bark_wav_path": "X:/a/seg_b001.wav"},
@@ -245,7 +243,7 @@ def _still_pan_opener_ledger():
     present (kind scene_open, beat_id b000_music_open) -- the real opener shape
     from a live render (signal_lost_..._171037)."""
     return {
-        "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA, "ledger_frozen": True},
+        "audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA, "ledger_frozen": True},
         "lines": [
             {"line_id": "b000_music_open", "char_id": "",
              "speaker_role": "music_open", "start_s": 0.0, "dur_s": 9.5},
@@ -407,7 +405,7 @@ def test_run_real_episode_per_shot_requests_audio_frozen(record_registry):
     assert seen["shot_b002"]["audio_ref"] == {"path": "X:/a/seg_b002.wav"}
     assert seen["shot_b001"]["timing"]["target_frame_count"] == 50
     # frozen audio section byte-identical; input ledger not mutated
-    assert res["ledger"]["audio"]["master_audio_sha256"] == rd.FROZEN_AUDIO_SHA
+    assert res["ledger"]["audio"]["master_audio_sha256"] == _FROZEN_AUDIO_SHA
     assert led["video"]["shots"][0]["engine_id"] == "stub_record"
     assert "runtime_fallback_decisions" not in led["video"]
 
@@ -728,7 +726,7 @@ def _audio_face_ledger():
     init_image pair, so every assertion keeps its meaning on a family that can
     actually render.)"""
     return {
-        "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA,
+        "audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
                   "ledger_frozen": True},
         "lines": [
             {"line_id": "b010", "char_id": "c07", "speaker_role": "character",
@@ -790,7 +788,7 @@ def test_google_veo_request_prunes_audio_but_keeps_scene_still():
     from nodes._otr_video_engines.schemas import VideoRequest
 
     led = {
-        "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA,
+        "audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
                   "ledger_frozen": True},
         "lines": [
             {"line_id": "b010", "char_id": "c07", "speaker_role": "character",
@@ -866,7 +864,7 @@ def test_family_changing_failure_is_loud_no_prune(stub_registry):
             raise RuntimeError("3d forward unavailable")
 
     vreg.register(_Stub3DFail())
-    led = rd.build_full_ledger({
+    section = {
         "video_revision": 1, "fps": 25,
         "execution_groups": [
             {"group_id": "grp_bg", "kind": "provider", "engine_id": "ltx25_video",
@@ -881,21 +879,24 @@ def test_family_changing_failure_is_loud_no_prune(stub_registry):
              "engine_id": "stub_3d_fail", "family": "character_3d",
              "group_id": "grp_char", "target_frame_count": 25,
              "degradation_trail": []},
-        ]})
+        ]}
+    led = {"audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
+                     "ledger_frozen": True},
+           "video": section}
     with pytest.raises(rd.RenderError):
         rd.run_episode(
             led, assets={"init_image": "p.png", "audio_ref": "a.wav"})
     # the input fixture is untouched (deep-copy transaction)
     assert [g["group_id"] for g in led["video"]["execution_groups"]] \
         == ["grp_bg", "grp_char"]
-    assert led["audio"]["master_audio_sha256"] == rd.FROZEN_AUDIO_SHA
+    assert led["audio"]["master_audio_sha256"] == _FROZEN_AUDIO_SHA
 
 
 def test_engine_failure_raises_loud(stub_registry):
     """A failing engine RAISES (no within-family fallback either, operator
     2026-06-16) -- the episode fails loud rather than swapping stub_fail ->
     stub_ok, and the execution groups are never touched."""
-    led = rd.build_full_ledger({
+    section = {
         "video_revision": 1, "fps": 25,
         "execution_groups": [
             {"group_id": "g0", "kind": "consumer", "engine_id": "stub_fail",
@@ -906,7 +907,10 @@ def test_engine_failure_raises_loud(stub_registry):
              "role": "retired_role_b", "engine_id": "stub_fail",
              "family": "abstract", "group_id": "g0",
              "target_frame_count": 25, "degradation_trail": []},
-        ]})
+        ]}
+    led = {"audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
+                     "ledger_frozen": True},
+           "video": section}
     with pytest.raises(rd.RenderError):
         rd.run_episode(led)
 
@@ -1115,7 +1119,9 @@ def _cloud_ledger(refused_index, n=3):
             "family": "abstract", "group_id": "g%d" % i,
             "target_frame_count": 25, "degradation_trail": [],
         })
-    led = rd.build_full_ledger({"video_revision": 1, "fps": 25, "shots": shots})
+    led = {"audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
+                     "ledger_frozen": True},
+           "video": {"video_revision": 1, "fps": 25, "shots": shots}}
     led["images"] = {"images": [
         {"kind": "scene_beat", "beat_id": rd._beat_id_for_shot(s),
          "path": _scene_still()} for s in shots]}
@@ -1147,7 +1153,7 @@ def test_content_refusal_floors_one_beat_and_the_episode_survives(
     # The refused beat is shown as its own scene still, never as black.
     assert out["clips"]["shot_0001"]["engine_id"] == "still_pan"
     assert shots[1]["floor_render"] == "still_pan"
-    assert out["ledger"]["audio"]["master_audio_sha256"] == rd.FROZEN_AUDIO_SHA
+    assert out["ledger"]["audio"]["master_audio_sha256"] == _FROZEN_AUDIO_SHA
 
 
 def test_content_refusal_floors_on_the_serial_path_too(

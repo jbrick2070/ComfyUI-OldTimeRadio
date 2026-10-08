@@ -396,7 +396,7 @@ def test_seedance_two_second_ledger_beat_requests_minimum_and_16x9(
     }
     ledger = {
         "audio": {
-            "master_audio_sha256": rd.FROZEN_AUDIO_SHA,
+            "master_audio_sha256": "21aa71f6a4e5master_audio_pcm_marker",
             "ledger_frozen": True,
         },
         "meta": {"visual_style": "sci_fi_radio"},

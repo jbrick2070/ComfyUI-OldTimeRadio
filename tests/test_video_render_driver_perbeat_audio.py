@@ -38,6 +38,10 @@ from nodes.scene_sequencer import (
     _stamp_master_audio_identity,
 )
 
+#: The master-audio marker a frozen test ledger carries (the video phase must
+#: never touch audio).
+_FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
+
 
 # --------------------------------------------------------------------------- #
 # Helpers
@@ -60,7 +64,7 @@ def _ledger_with_line(beat_id, *, char_id="c01", wav_path="",
     if portrait_path:
         images = [{"object_id": char_id, "path": portrait_path}]
     return {
-        "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA,
+        "audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
                   "ledger_frozen": True},
         "video": {"video_revision": 1, "shots": []},
         "lines": [line],
@@ -424,7 +428,7 @@ class TestSliceCurveCacheKeySplit:
                 rd.build_request_from_shot(shot, ledger,
                                            master_audio_path="/fake/m.mp4")
         assert m.call_count == 1
-        assert m.call_args.kwargs.get("master_hash") == rd.FROZEN_AUDIO_SHA
+        assert m.call_args.kwargs.get("master_hash") == _FROZEN_AUDIO_SHA
 
 
 # --------------------------------------------------------------------------- #
@@ -464,7 +468,7 @@ class TestBuildRequestFromShotPerBeatAudio:
         # for a coverage-planned segment's TRIMMED tail and nothing else, so
         # this majority path must keep asking for a plain interval.
         m.assert_called_once_with(master, 2.0, 4.5,
-                                  master_hash=rd.FROZEN_AUDIO_SHA,
+                                  master_hash=_FROZEN_AUDIO_SHA,
                                   pad_tail_s=0.0)
         assert req["audio_ref"] == {"path": sliced}
 
@@ -481,7 +485,7 @@ class TestBuildRequestFromShotPerBeatAudio:
         """If line has no start_s/dur_s, slice is NOT called (LOUD warning)."""
         # patch isfile so the master "exists" without creating a real file
         ledger = {
-            "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA, "ledger_frozen": True},
+            "audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA, "ledger_frozen": True},
             "video": {"video_revision": 1, "shots": []},
             "lines": [{"line_id": "b004", "char_id": "c01"}],
             "images": {"images": []},
@@ -563,7 +567,7 @@ class TestBuildRequestFromShotPerBeatAudio:
             req = rd.build_request_from_shot(shot, ledger,
                                              master_audio_path=master)
         m.assert_called_once_with(master, 9.5, 9.40375,
-                                  master_hash=rd.FROZEN_AUDIO_SHA,
+                                  master_hash=_FROZEN_AUDIO_SHA,
                                   pad_tail_s=0.0)
         assert req["audio_ref"] == {"path": sliced}
         assert req["asset_refs"]["init_image"] == str(portrait), (
@@ -584,7 +588,7 @@ class TestRunRealEpisodeMasterAudioPath:
         import functools
 
         ledger = {
-            "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA,
+            "audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
                       "ledger_frozen": True},
             "video": {"video_revision": 1, "shots": []},
             "lines": [{"line_id": "b001", "start_s": 1.0, "dur_s": 2.0}],

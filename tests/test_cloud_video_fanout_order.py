@@ -19,6 +19,10 @@ from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import render_driver as rd
 
 
+#: The master-audio marker a frozen test ledger carries (the video phase must
+#: never touch audio).
+_FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
+
 _FINISH = []
 _LOCK = threading.Lock()
 
@@ -112,9 +116,9 @@ def _ledger(*engine_ids):
             "target_frame_count": 25,
             "degradation_trail": [],
         })
-    return rd.build_full_ledger({
-        "video_revision": 1, "fps": 25, "shots": shots,
-    })
+    return {"audio": {"master_audio_sha256": _FROZEN_AUDIO_SHA,
+                      "ledger_frozen": True},
+            "video": {"video_revision": 1, "fps": 25, "shots": shots}}
 
 
 @pytest.fixture(autouse=True)
