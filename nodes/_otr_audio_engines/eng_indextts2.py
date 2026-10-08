@@ -303,19 +303,6 @@ class IndexTTS2Engine:
                     pass
 
     # ---- emotion + text (adapter-side; sent to the worker) ----
-    def emo_list(self, delivery_vector):
-        """8-dim delivery vector -> IndexTTS2 Emo-Vector order list. Robust to a
-        malformed (hand-editable) stamped vector: a non-dict or non-numeric value
-        -> 0.0, every value clamped to 0..1, so an out-of-contract ledger never
-        crashes the render or sends bad values to the worker (PD1).
-
-        This is the PRE-ALPHA, PRE-CAP projection. The list that actually
-        reaches the worker comes from :meth:`emotion_payload`, which applies the
-        effective-mass ceiling on top."""
-        from .._otr_delivery_vector import EMOTIONS
-        safe = sanitize_delivery_vector(delivery_vector)
-        return [safe[e] for e in EMOTIONS]
-
     def prepare_text(self, text, delivery_vector=None):
         """Engine-neutral clean spoken text; audio direction rides the emo-vector,
         not the words."""

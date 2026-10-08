@@ -337,16 +337,6 @@ def test_announcer_clone_engine_fails_loud_without_ref():
 
 
 # --- delivery-vector wiring: robust projections (QA roundtable) ------------ #
-def test_emo_list_robust_to_malformed_vectors():
-    from nodes._otr_audio_engines import get_engine
-    idx = get_engine("indextts2")
-    assert idx.emo_list(None) == [0.0] * 8          # None -> flat
-    assert idx.emo_list("nope") == [0.0] * 8        # non-dict -> flat
-    # non-numeric + out-of-range + NaN-ish are coerced + clamped, never crash
-    out = idx.emo_list({"happy": "very", "angry": 99, "sad": -4, "calm": 0.5})
-    assert len(out) == 8 and all(0.0 <= v <= 1.0 for v in out)
-
-
 def test_chatterbox_project_robust_to_malformed_vectors():
     from nodes._otr_audio_engines import get_engine
     cbx = get_engine("chatterbox")
