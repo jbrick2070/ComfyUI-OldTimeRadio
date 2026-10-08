@@ -231,10 +231,6 @@ def test_spoken_language_is_left_exactly_as_written():
     delivered row. Operator directive 2026-08-05 removed content guardrails
     from the generation path, so the cleanup must now leave the line alone. It
     is inverted rather than deleted so a re-armed repair pass fails loudly.
-
-    2026-08-23: it no longer needs to patch a must-not-run stub over
-    `apply_safety_cleanup`, because that function no longer exists -- see
-    `test_the_rewrite_machinery_is_gone_not_merely_quiet` below.
     """
     ledger = _complete_ledger()
     original = "The damn lamp has not turned since Tuesday."

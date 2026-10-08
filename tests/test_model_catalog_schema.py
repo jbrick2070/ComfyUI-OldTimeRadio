@@ -1,16 +1,12 @@
 """Sprint D D1a -- CuratedModel schema extension + workflow guardrail.
 
-Four assertions per v3 plan:
+What it pins:
 
   test_curated_model_has_extended_fields
       The dataclass carries the 6 new D1a fields.
 
   test_existing_rows_default_to_prompt_profile_modern
       Every pre-D1a row backfills with prompt_profile = "modern".
-
-  test_no_curated_row_uses_otr_1940s_v1_profile
-      No curated row uses the period profile (the talkie row was
-      removed 2026-05-22; the period-routing surface stays parked).
 
   test_default_workflow_only_binds_mit_equivalent_rows_to_creative_slot
       The shipped default workflow JSON's writer-node widgets_values
