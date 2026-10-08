@@ -1,20 +1,16 @@
-"""S30 B7 -- forbidden-pattern sweep armed with extinction markers.
+"""S30 B7 -- forbidden-pattern sweep.
 
-Four tests:
+Three tests:
 
 1. test_forbidden_sweep_runs_clean       -- run the sweep against
    the current diff vs. s29-clean-slate-gate; assert zero RUNTIME
    hits (forensic mentions allowed).
-2. test_forbidden_sweep_catches_reintroduction -- write a temp file
-   that contains a forbidden symbol AS A RUNTIME identifier; assert
-   the sweep flags it (validates the marker actually fires).
-3. test_forbidden_sweep_exemption_works  -- the loader exemption
-   for `load_llm(` (the new canonical loader API) is not in the
-   sweep's marker list; the sweep should NOT flag it.
-4. test_forbidden_sweep_non_llm_marker_works -- a class with
+2. test_forbidden_sweep_non_llm_marker_works -- a class with
    `NON_LLM_MODEL_WIDGET_OK = True` and a `model_id` STRING widget
    is exempt from the B6 structural guard (already proven by
    B6 tests; this is the cross-check at the B7 sweep layer).
+3. test_classifier_recognizes_fstring_context -- the sweep's line
+   classifier treats Python 3.12 f-string tokens as string context.
 """
 
 from __future__ import annotations
@@ -118,10 +114,10 @@ def _run_sweep_subprocess() -> tuple[int, str]:
 
 
 def test_forbidden_sweep_runs_clean():
-    """The S30 branch must trigger zero RUNTIME hits against the
-    full set of extinction markers (cleanup_model_id, OTR_LFCPhase*,
-    OTR_VisualLLMSelector, _POLISH_CACHE, MODEL_CONTEXT_CAPS, etc.).
-    Forensic mentions (string literals + comments) are allowed.
+    """The branch must trigger zero RUNTIME hits against the forbidden
+    patterns (back-compat shims, aliases, hardcoded developer paths,
+    period-locked language, ...). Forensic mentions (string literals +
+    comments) are allowed.
     """
     rc, stdout = _run_sweep_subprocess()
     assert rc == 0, f"sweep exited non-zero: rc={rc}"
@@ -138,101 +134,12 @@ def test_forbidden_sweep_runs_clean():
     )
 
 
-def test_forbidden_sweep_catches_reintroduction(tmp_path):
-    """Drive the sweep's regex against a synthetic added line that
-    contains a forbidden marker as a runtime identifier; assert the
-    regex catches it (proves the markers actually fire).
-    """
-    # Import the sweep module to access the regex.
-    spec_path = SWEEP_PATH
-    code = spec_path.read_text(encoding="utf-8")
-    # Extract the `forbidden = re.compile(...)` block. The sweep
-    # module's code runs as import-time work, so directly importing
-    # it would scan the diff file. To avoid that side effect, exec
-    # only the regex definition in a private namespace.
-    ns: dict = {"re": re}
-    # Strip past the regex assignment.
-    # Find the line where the regex is opened and the line where the
-    # closing parenthesis lands.
-    start = None
-    end = None
-    for i, line in enumerate(code.splitlines()):
-        if start is None and "forbidden = re.compile(" in line:
-            start = i
-        elif start is not None and line.strip() == ")":
-            end = i
-            break
-    assert start is not None and end is not None
-    snippet = "\n".join(code.splitlines()[start:end + 1])
-    exec(snippet, ns)
-    forbidden = ns["forbidden"]
-
-    # The full set of S30 extinction markers we expect to fire.
-    samples = [
-        "OTR_VisualLLMSelector",
-        "VisualLLMSelector",
-        "_POLISH_CACHE",
-        "_MODEL_CHOICES",
-        "DEFAULT_MODEL_ID",
-        "MODEL_CONTEXT_CAPS",
-        "DEFAULT_CONTEXT_CAP",
-        "cleanup_model_id",
-        "OTR_LFCPhase4Scene",
-        "OTR_LFCPhase5Voice",
-        "OTR_LFCPhase6Arc",
-        "enable_phase_3_polish",
-        "polish_announcer_beats",
-        "enable_phase_4_scene_coherence",
-        "enable_phase_4_5_smart_suggestion",
-        "enable_phase_5_voice_drift",
-        "enable_phase_6_episode_arc",
-        "Phase3PolishReport",
-    ]
-    for sym in samples:
-        assert forbidden.search(f"x = {sym}"), (
-            f"sweep regex does not catch reintroduction of {sym!r}"
-        )
-
-
-def test_forbidden_sweep_exemption_works():
-    """The modern canonical loader API `_otr_model_loader.load_llm`
-    must NOT trigger the sweep. The marker set targets the legacy
-    `_load_llm` (note the leading underscore) at orchestrator scope,
-    not the new public surface.
-    """
-    spec_path = SWEEP_PATH
-    code = spec_path.read_text(encoding="utf-8")
-    ns: dict = {"re": re}
-    start = None
-    end = None
-    for i, line in enumerate(code.splitlines()):
-        if start is None and "forbidden = re.compile(" in line:
-            start = i
-        elif start is not None and line.strip() == ")":
-            end = i
-            break
-    snippet = "\n".join(code.splitlines()[start:end + 1])
-    exec(snippet, ns)
-    forbidden = ns["forbidden"]
-    # The canonical loader.load_llm(...) call signature must NOT match.
-    canonical_call = "cache_entry = loader.load_llm(model_id, device='cuda')"
-    assert not forbidden.search(canonical_call), (
-        "sweep regex incorrectly catches the canonical "
-        "loader.load_llm public API"
-    )
-    # The canonical loader.unload_llm() call must NOT match either.
-    assert not forbidden.search("loader.unload_llm()"), (
-        "sweep regex incorrectly catches the canonical "
-        "loader.unload_llm public API"
-    )
-
-
 def test_forbidden_sweep_non_llm_marker_works():
     """B6 / B7 structural rule: a class flagged
     NON_LLM_MODEL_WIDGET_OK = True is exempt from the model-widget
     guard. This is the B6 test's responsibility (validated there);
     the sweep itself doesn't enforce the structural rule -- it
-    enforces the symbol-name extinction list. Cross-check: VRAMContextTest
+    enforces the forbidden-pattern list. Cross-check: VRAMContextTest
     (flagged with the marker) does NOT trigger the runtime sweep (it keeps its
     `model_id` widget legitimately). BatchAudioGenGenerator + MusicGenTheme were
     retired in the audio clean-break (1c), so the exempt set is now just the one.

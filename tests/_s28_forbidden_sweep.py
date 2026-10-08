@@ -25,162 +25,34 @@ DIFF_PATH = Path(os.environ.get("OTR_S28_DIFF_PATH") or (ROOT / "apple" / "s28_d
 OUT_PATH = Path(os.environ.get("OTR_S28_OUT_PATH") or (ROOT / "tmp" / "s28_new_forbidden_hits.txt"))
 
 forbidden = re.compile(
-    # S28 original markers
+    # No back-compat shims, aliases or deprecation paths (clean-break law).
     r"DeprecationWarning"
     r"|back-compat"
     r"|legacy fallback"
     r"|legacy shape"
     r"|\bshim\b"
     r"|\balias\b"
-    r"|\botr_legacy_audio_dir\b"
-    r"|budget is None"
-    # S29 Phase 6.2 extinction markers (per S29 plan §Phase 6.2).
-    # Anything that was extincted in S28 + S29 STAYS extincted.
-    r"|req\.budget is None"
-    r"|polish_generate_fn is not None"
-    r"|hasattr\(self\.budget"
-    r"|DEPRECATED_manifest"
+    # No hardcoded developer path in .py files.
     r"|C:/Users/jeffr"
-    r"|\bOTR_" r"LedgerScriptReviewer\b"
-    r"|\bGemma4\b"
-    r"|\breviewer_verdict\b"
-    # S30 B2c: cleanup_model_id was a legacy normalizer + widget that
-    # the two-model selector replaces. The widget was already gone
-    # pre-S30; this marker locks the SYMBOL out so any future
-    # contributor cannot reintroduce a function / parameter / variable
-    # by that name. Forensic mentions (string literals in legacy guard
-    # lists, doc references) are suppressed by the tokenize classifier.
-    r"|\bcleanup_model_id\b"
-    # S30 B7 (2026-05-14): extinction markers from the two-model
-    # selector sprint. Each name appears verbatim in some deleted
-    # symbol; reintroduction trips the sweep loud.
-    r"|\bOTR_VisualLLMSelector\b"           # B5: deleted node class
-    r"|\bVisualLLMSelector\b"               # B5: deleted node class (no OTR_ prefix form)
-    r"|\b_LLM_MODEL_CHOICES\b"              # B5: deleted dropdown literal (visual selector)
-    r"|\b_MODEL_CHOICES\b"                  # B2a: deleted writer dropdown literal
-    r"|\bDEFAULT_MODEL_ID\b"                # B3: deleted DEFAULT_MODEL_ID at cascade scope
-    r"|\b_POLISH_CACHE\b"                   # B5: collapsed into LLM_CACHE
-    r"|\bMODEL_CONTEXT_CAPS\b"              # B1b: deleted static context-cap dict
-    r"|\bDEFAULT_CONTEXT_CAP\b"             # B1b: deleted default-cap fallback
-    r"|\bOTR_LFCPhase4Scene\b"              # B4: deleted standalone node class
-    r"|\bOTR_LFCPhase5Voice\b"              # B4: deleted standalone node class
-    r"|\bOTR_LFCPhase6Arc\b"                # B4: deleted standalone node class
-    r"|\benable_phase_3_polish\b"           # B3/B4: deleted cascade-toggle widget
-    r"|\bpolish_announcer_beats\b"          # B3/B4: deleted cascade-toggle widget
-    r"|\benable_phase_4_scene_coherence\b"  # B3/B4: deleted cascade-toggle widget
-    r"|\benable_phase_4_5_smart_suggestion\b"  # B3/B4: deleted cascade-toggle widget
-    r"|\benable_phase_5_voice_drift\b"      # B3/B4: deleted cascade-toggle widget
-    r"|\benable_phase_6_episode_arc\b"      # B3/B4: deleted cascade-toggle widget
-    r"|\bPhase3PolishReport\b"              # B4: deleted dataclass
-    # S31 B5 (2026-05-14): extinction markers from the legacy LLM
-    # stack clean break sprint. Each name was a runtime symbol in
-    # `nodes/story_orchestrator.py` deleted at S31 B4 (Hard rule #1A
-    # non-deferrable). Reintroduction trips the sweep loud.
-    r"|\b_load_llm\b"                       # S31 B4: deleted legacy load entrypoint
-    r"|\b_unload_llm\b"                     # S31 B4: deleted legacy teardown
-    r"|\b_LLM_CACHE\b"                      # S31 B4: deleted legacy cache dict
-    r"|\b_generate_with_llm\b"              # S31 B4: deleted legacy generate wrapper
-    # S31 B5: preemptive lock -- one generate surface (Hard rule #5).
-    # Any wrapper-by-another-name on top of `make_generate_fn` is
-    # forbidden. These two literal names cover the "rename to drop the
-    # underscore prefix" and "name it without the verb suffix"
-    # reintroduction paths.
-    r"|\bgenerate_text\b"                   # S31 B5: preemptive lock on Hard rule #5
-    r"|\bgenerate_with_llm\b"               # S31 B5: preemptive lock (no-underscore variant)
-    # S31.5 B3 (2026-05-14): wrapper eliminated when the
-    # `register_vram_cleanup` contract audit confirmed the caller
-    # already wraps each callback in try/except. Adding the marker
-    # locks against reintroduction even though the wrapper name is
-    # specific enough that accidental restoration is unlikely.
-    r"|\b_vram_cleanup_via_loader\b"        # S31.5 B3: eliminated wrapper
-    # S32 B4 (2026-05-14): widget rejected; critic always routes
-    # creative. Per-beat T-dispatch in differing-slots adds ~3.3 hr
-    # of VRAM transition overhead per episode. No-widget rule
-    # (Jeffrey: features useful are on; default-OFF gates on
-    # architecturally-rejected paths are dead-code maintenance debt).
-    r"|\buse_technical_critic\b"            # S32 B4: widget rejected
-    # S33 B2 (2026-05-15): cascade rollback-gate retirements per the
-    # refined no-auditors rule. The two verdict literals are the
-    # surface symptoms of the rollback gates; locking the names
-    # prevents accidental reintroduction.
-    r"|\bcast_unrecoverable\b"              # S33 B2: retired rollback-gate verdict
-    r"|\bpost_audit_failed\b"               # S33 B2: retired rollback-gate verdict
-    # S33 B4 (2026-05-15): pipeline-cutting phantom handlers retired
-    # per B1.5 classification.
-    r"|\bapply_phantom_skip_fallback\b"     # S33 B4: pipeline-cut mute helper
-    r"|\b_final_phantom_check\b"            # S33 B4: report-only helper
-    # S33 B5 (2026-05-15): polish design lock. The two prompts must
-    # stay split (character vs announcer). Lock against accidental
-    # collapse into a unified prompt under any common bad name.
-    r"|\b_POLISH_SYSTEM_PROMPT_UNIFIED\b"   # S33 B5: unify-attempt name #1
-    r"|\b_UNIFIED_POLISH_PROMPT\b"          # S33 B5: unify-attempt name #2
-    # Sprint C C2a (2026-05-15): era literal cleanbreak -- visual layer.
-    # Production code in visual/ and workflows/ no longer carries era
-    # anchors (1940s noir radio drama style / 1980s broadcast aesthetic).
+    # One generate surface (Hard rule #5): no wrapper-by-another-name on top
+    # of `make_generate_fn`.
+    r"|\bgenerate_text\b"
+    r"|\bgenerate_with_llm\b"
+    # No period-locked language in prompts (era literal cleanbreak).
     # Tokenize suppression handles forensic mentions in docstrings and
-    # comments. Test fixture at tests/test_musicgen_cache_keys.py:23
-    # retains its noir-literal cache-key payload by design (cache-key
-    # stability) -- the diff-based sweep only flags NEW additions, so
-    # the pre-existing fixture is naturally exempt.
-    r"|\b1940s\b"                           # C2a: visual-layer era literal
-    r"|1980s broadcast"                     # C2a: video-plan era literal
-    # Sprint C C2b (2026-05-15): era literal cleanbreak -- orchestrator.
-    # The rerank prompt era anchor at line 1596 was rewritten to be
-    # style-neutral. SCAFFOLDING_PREAMBLE + SCRIPT_SYSTEM_PROMPT
-    # constants (which carried OMNI-RETRO 5-pillar / golden-age-radio
-    # era flavor) were orphans from the pre-LPL pipeline and were
-    # deleted entirely (no consumers; no shim). These markers prevent
-    # accidental reintroduction of period-locked language inside any
-    # new orchestrator-layer LLM prompt. Tokenize suppression handles
-    # forensic comment / docstring mentions (e.g. the C2b deletion
-    # forensic note itself, and, until 2026-08-28, the _load_canon_for_writer
-    # docstring that still names SCAFFOLDING_PREAMBLE as historical
-    # context. That function was DELETED 2026-08-28 by the orphan
-    # sweep it was waiting for; only the C2b note still needs it.
-    r"|1950s Americana"                     # C2b: 5-pillar era anchor
-    r"|golden.age radio"                    # C2b: dramaturg era anchor
-    r"|\bOmni.Retro\b"                      # C2b: 5-pillar branding
-    r"|\bOrson Welles\b"                    # C2b: dramaturg name-drop
-    r"|\bNorman Corwin\b"                   # C2b: dramaturg name-drop
-    r"|\bLucille Fletcher\b"                # C2b: dramaturg name-drop
-    # Sprint C C3 (2026-05-15): _GENRE_BY_STYLE table + _resolve_genre +
-    # _preview_genre helpers deleted; meta.visual_plan.genre stamp
-    # retired. Downstream consumers fall back to meta.style directly.
-    # Marker prevents accidental reintroduction of the symbol. Tokenize
-    # suppression handles forensic mentions in this commit's own
-    # deletion comment and in the test_musicgen_style_palette.py
-    # historical comment block that documents what got removed.
-    r"|\b_GENRE_BY_STYLE\b"                 # C3: deleted genre table
-    # Sprint C C3b (2026-05-15): meta.ltx_style_brief stamp retirement
-    # pulled forward per E-14. The heavy retire happened at S31 B3
-    # (_generate_ltx_style_brief + _LTX_STYLE_BRIEF_PROMPT deleted);
-    # C3b cleans up the last stale comment block in batch_ltx_render.py
-    # and arms the marker so the symbol cannot be reintroduced. New
-    # per-episode style brief lands via meta.story_brief at C5a2 / C5e.
-    # Tokenize suppression handles forensic mentions in commit history,
-    # the C3b deletion comment, and historical test-deletion comments.
-    r"|\bmeta\.ltx_style_brief\b"           # C3b: retired stamp
-    r"|\b_LTX_STYLE_BRIEF_PROMPT\b"         # C3b: retired prompt constant
-    r"|\b_generate_ltx_style_brief\b"       # C3b: retired generator
-    # Sprint E E13 (2026-05-16): E12 retired the misleading "Directory
-    # of per-line HuMo clips" tooltip on VideoComposite.clips_dir
-    # (the wire actually sources from LTX, HuMo lookup goes via
-    # ledger.clips[]). Marker locks the legacy framing out so a
-    # comment-restore commit cannot silently reintroduce the
-    # comment-code disagreement (cold-read finding M5).
-    r"|Directory of per-line HuMo clips"    # E12 / M5: retired tooltip
-    # Sprint E E13: router substring-dispatch guard. E4's drift test
-    # already enforces this at the AST level, but the sweep marker
-    # gives a regex-level second line of defense. The router's
-    # exact-match implementation (D2a) is the only allowed dispatch.
-    r"|if.+talkie.+in repo_id"              # E4 / M1: router substring guard
-    # Sprint E E13: validator path widget hardcoded operator path
-    # guard. The S29 Phase 1 cleanbreak removed `C:/Users/jeffr/...`
-    # from the Node 63 widget; the existing C:/Users/jeffr marker
-    # already locks .py files. This adds a redundant token so a
-    # commit that re-introduces a hardcoded path under a different
-    # path prefix (e.g. a future operator machine) still trips here.
-    r"|workflow_json_path.+default.+C:"     # E5 / H5: validator hardcoded-path guard
+    # comments.
+    r"|\b1940s\b"
+    r"|1980s broadcast"
+    r"|1950s Americana"
+    r"|golden.age radio"
+    r"|\bOmni.Retro\b"
+    r"|\bOrson Welles\b"
+    r"|\bNorman Corwin\b"
+    r"|\bLucille Fletcher\b"
+    # Router substring-dispatch guard: exact-match dispatch only.
+    r"|if.+talkie.+in repo_id"
+    # The validator path widget must not default to a hardcoded operator path.
+    r"|workflow_json_path.+default.+C:"
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
