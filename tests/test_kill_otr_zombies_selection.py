@@ -60,6 +60,15 @@ INVENTORY = [
     # A real worker launched with -u from a quoted path with spaces -> TARGET.
     _proc(210, 989, "python.exe", PY + r' -u "C:\Program Files\OTR Pack\scripts\_otr_indextts2_worker.py" --model-dir m',
           "2026-10-08T09:00:00"),
+    # Only no-value flags, -X/-W with a value, and `--` may sit between the
+    # interpreter and the worker; a quoted bare worker name (cwd launch) counts.
+    _proc(212, 986, "python.exe", PY + " -X utf8 " + PACK + r"\scripts\_otr_chatterbox_worker.py",
+          "2026-10-08T09:00:00"),
+    _proc(213, 985, "python.exe", PY + " -- " + PACK + r"\scripts\_otr_chatterbox_worker.py",
+          "2026-10-08T09:00:00"),
+    _proc(214, 984, "python.exe", PY + ' "_otr_indextts2_worker.py" --device cpu', "2026-10-08T09:00:00"),
+    # -m runs a MODULE named that, not the worker script -> never a target.
+    _proc(215, 983, "python.exe", PY + " -m _otr_chatterbox_worker.py", "2026-10-08T09:00:00"),
     # Path markers start at a segment boundary: neither of these is OTR's.
     _proc(305, 988, "ffmpeg.exe", r"ffmpeg -i C:\Videos\not_otr_cbx_report.wav out.mp4", "2026-10-08T09:20:00"),
     _proc(306, 987, "ffmpeg.exe", r"ffmpeg -i D:\backup\ComfyUI-OldTimeRadio-old\a.wav b.wav", "2026-10-08T09:20:00"),
@@ -67,6 +76,11 @@ INVENTORY = [
     # back to: same rules as ffmpeg.exe -> TARGET when orphaned with an OTR path.
     _proc(304, 992, "ffmpeg-win-x86_64-v7.1.exe",
           r"ffmpeg-win-x86_64-v7.1.exe -i D:\ComfyUI\output\otr\episodes\ep2\b.wav c.wav", "2026-10-08T09:40:00"),
+    # Any ffmpeg* build (proc.py's own prefix rule), e.g. a pinned OTR_FFMPEG;
+    # ffprobe is never an ffmpeg target, even on an OTR path.
+    _proc(307, 982, "ffmpeg7.exe", r"ffmpeg7 -i D:\ComfyUI\output\otr\obs\ep3.mp4 -c copy x.mp4",
+          "2026-10-08T09:40:00"),
+    _proc(308, 981, "ffprobe.exe", r"ffprobe D:\ComfyUI\output\otr\obs\ep3.mp4", "2026-10-08T09:40:00"),
 ]
 
 
@@ -100,8 +114,12 @@ def test_selects_only_orphaned_otr_sidecars(tmp_path):
         201: "otr-worker",
         203: "otr-worker",
         210: "otr-worker",
+        212: "otr-worker",
+        213: "otr-worker",
+        214: "otr-worker",
         301: "otr-ffmpeg",
         304: "otr-ffmpeg",
+        307: "otr-ffmpeg",
     }
 
 
@@ -110,6 +128,8 @@ def test_dst_fall_back_does_not_make_a_live_parent_look_younger(tmp_path):
     # and its child 01:20 PST (09:20Z). Compared as local wall-clock the
     # parent looks 30 minutes YOUNGER -- a "recycled PID" -- and the live
     # worker would be killed. Compared in UTC the parent is older: parented.
+    # (The pre-fix script only reverses this pair on a US-Pacific clock; on
+    # other zones the test still pins the correct answer.)
     inventory = [
         _proc(4, 0, "System", "", "2026-11-01T00:00:00Z"),
         _proc(100, 4, "python.exe", PY + r' "C:\ComfyUI\main.py"', "2026-11-01T01:50:00-07:00"),
@@ -125,7 +145,7 @@ def test_an_empty_inventory_path_is_an_error_not_live_mode():
          str(SCRIPT), "-InventoryPath", ""],
         capture_output=True, text=True, timeout=60)
     combined = result.stdout + result.stderr
-    assert result.returncode != 0
+    assert result.returncode == 2, combined
     assert "SELECTED_JSON" not in combined
     assert "Orphaned OTR sidecars" not in combined
     assert "No orphaned OTR sidecars" not in combined

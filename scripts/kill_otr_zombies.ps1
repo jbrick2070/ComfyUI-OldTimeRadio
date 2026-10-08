@@ -31,7 +31,9 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\kill_otr_zombies.ps1 -InventoryPath inv.json
 # reads a JSON array of {ProcessId, ParentProcessId, Name, CommandLine,
 # CreationDate} records instead of the live process table and prints the
-# selection as one "SELECTED_JSON: [...]" line.
+# selection as one "SELECTED_JSON: [...]" line. Give CreationDate an offset or
+# a Z: a naive time is read as THIS machine's local time, and one inside the
+# DST fall-back hour is ambiguous (live CIM times carry their own UTC basis).
 
 param(
     [switch]$Force,
@@ -54,13 +56,16 @@ $ComfyMarker = '(^|[\\/"\s])main\.py'
 
 # OTR sidecar workers, e.g. scripts\_otr_chatterbox_worker.py, AS THE SCRIPT
 # python runs: OTR launches them as [python, worker, args...], so the worker is
-# the first argument after the interpreter (simple -X flags like -u allowed,
-# quoted or bare path). `python pylint.py ..\_otr_x_worker.py` does not match.
-$WorkerMarker = '^\s*(?:"[^"]*"|\S+)\s+(?:-[A-Za-z]+\s+)*(?:"[^"]*[\\/]_otr_[A-Za-z0-9_]+_worker\.py"|(?:\S*[\\/])?_otr_[A-Za-z0-9_]+_worker\.py)(?:\s|$)'
+# the first argument after the interpreter. Allowed in between: python's
+# no-value flags (-u, -B, -I, ...), -X/-W with their value, and `--`. -c, -m
+# and -V never pass, because then python is not running a worker script.
+# `python pylint.py ..\_otr_x_worker.py` does not match.
+$WorkerMarker = '^\s*(?:"[^"]*"|\S+)\s+(?:(?:-[bBdEiIOPqRsSuvx]+|-[XW]\s*\S+)\s+)*(?:--\s+)?(?:"(?:[^"]*[\\/])?_otr_[A-Za-z0-9_]+_worker\.py"|(?:\S*[\\/])?_otr_[A-Za-z0-9_]+_worker\.py)(?:\s|$)'
 
-# ffmpeg itself, or a versioned build such as imageio-ffmpeg's
-# ffmpeg-win-x86_64-v7.1.exe (nodes/_otr_shared/ffmpeg.py falls back to it).
-$FfmpegName = '^ffmpeg(-[^\\/]+)?\.exe$'
+# Any ffmpeg* build, the same prefix rule nodes/_otr_shared/proc.py allows:
+# ffmpeg.exe, imageio-ffmpeg's ffmpeg-win-x86_64-v7.1.exe (ffmpeg.py falls back
+# to it) or a pinned OTR_FFMPEG such as ffmpeg7.exe. ffprobe/ffplay never match.
+$FfmpegName = '^ffmpeg[^\\/]*\.exe$'
 
 # Paths only OTR's ffmpeg calls write to or read from. Every marker starts at a
 # path-segment boundary, so `not_otr_cbx_report.wav` or a folder merely
@@ -175,7 +180,9 @@ if ($PSBoundParameters.ContainsKey('InventoryPath')) {
     # Passing the parameter at all means test mode. An empty value is an
     # error, never a silent fall-through to the live process table.
     if (-not $InventoryPath) {
-        Write-Error "-InventoryPath was given without a file; nothing was selected or killed."
+        # Plain stderr, not Write-Error: under ErrorActionPreference=Stop that
+        # throws and the script would exit 1, never reaching this exit 2.
+        [Console]::Error.WriteLine("-InventoryPath was given without a file; nothing was selected or killed.")
         exit 2
     }
     $selected = Select-OtrZombies (Get-FileInventory $InventoryPath)
