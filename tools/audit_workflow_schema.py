@@ -141,37 +141,6 @@ def audit_file(p: Path, fix: bool = False) -> tuple[list[str], bool]:
     return issues, fixed
 
 
-# ---------------------------------------------------------------------------
-# Sprint D D3 -- default-workflow creative-binding license-equivalence gate
-# ---------------------------------------------------------------------------
-
-
-class WorkflowSchemaError(RuntimeError):
-    """Raised when a default-shipped workflow JSON violates a
-    Sprint D D3 license-equivalence or prompt-profile gate."""
-
-
-def _strip_badge(value: str) -> str:
-    """Drop the picker's VRAM badge from a saved widget value.
-
-    Deliberately NOT taken from ``catalog_module``: that parameter exists so
-    tests can inject a FAKE catalog, and a fake has rows but no label helpers.
-    Reaching through it for the stripper broke exactly that injection. The
-    badge is a label convention, so it is stripped here, and the real
-    catalog's implementation is preferred when it can be imported.
-    """
-    s = str(value or "")
-    try:
-        import sys as _sys
-        repo_root = Path(__file__).resolve().parent.parent
-        if str(repo_root) not in _sys.path:
-            _sys.path.insert(0, str(repo_root))
-        from nodes import _otr_model_catalog as _cat  # noqa: PLC0415
-        return _cat._strip_label_suffix(s)
-    except Exception:  # noqa: BLE001 -- an audit tool must not die on import
-        return s.rsplit(" (", 1)[0].rstrip() if s.endswith(")") and " (" in s else s
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)

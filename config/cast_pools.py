@@ -531,12 +531,6 @@ def roll_lemmy() -> bool:
     return _LEMMY_RNG_SYSTEM.random() < LEMMY_RATE
 
 
-# Back-compat alias: some code expects `_LEMMY_RNG` as a module
-# attribute. Today both story_orchestrator.py:33 and any external
-# reference resolve to the SystemRandom one (the unseeded path).
-_LEMMY_RNG = _LEMMY_RNG_SYSTEM
-
-
 def pick_announcer(rng: random.Random) -> dict:
     """Return an announcer cast row using a Kokoro voice preset.
 

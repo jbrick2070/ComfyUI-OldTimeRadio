@@ -32,8 +32,8 @@ download. That column is the one the shipped JSON's whole design turns on, and
 it cannot drift from what actually happens on a first run.
 
 Usage:
-    python scripts/otr_dropdown_matrix.py            # write doc + README block
-    python scripts/otr_dropdown_matrix.py --check    # fail if either is stale
+    python scripts/otr_dropdown_matrix.py            # write the docs; README carries no copy
+    python scripts/otr_dropdown_matrix.py --check    # fail if anything is stale
 """
 from __future__ import annotations
 
@@ -600,36 +600,6 @@ def render_table(rows: list, machines=MACHINES) -> str:
     return "".join(out)
 
 
-_README_LEGEND = """
-**Reading these tables.** The canonical ships `viz_mxc_cpu` / `viz_green` /
-`viz_camera` for video, `z_image_turbo` for images (dormant -- those three video
-lanes consume no still), `kokoro` on both voice slots, `stable_audio_3` for
-music and `Qwen/Qwen3.5-4B` as the writer. Every one of them is **auto** or
-**nothing**: a default run downloads no manual file.
-
-*How you get it.* **auto** -- fetched on first use, no account.
-**GATED** -- fetches itself once you have accepted the licence on the model page
-and set `HF_TOKEN`. **manual** -- you place the file yourself;
-the manual-weights table in [apple/MACHINES.md](apple/MACHINES.md) names each
-one, the repository it comes from and the folder it goes in. **none** -- a hosted service, no
-weights. **own installer** -- its own install script rather than the model
-provisioner; **(Windows)** marks the three whose installer is PowerShell with no
-shell twin yet. **nothing** -- pure code. Sizes are GiB, from the real artifact
-bytes in the fetch manifests.
-
-*What a machine cell says.* **proven** -- a published episode used it on that
-machine. measured -- it ran there in a lab test, but no episode has used it.
-fits -- nothing blocks it and the arithmetic says it fits; nobody has run it.
-**tight** -- fits with little to spare. **OOM** -- expect to exhaust memory.
-**no** -- it will not fit. key -- hosted; see the README heading. Google and
-OpenRouter use two files. Comfy Cloud: sign into the app. not offered --
-absent from that machine's dropdown because nobody has proven it there,
-which is a statement about receipts and **not about your hardware**.
-
-**On a Mac, OOM means a hard machine reboot, not a failed render** -- unified
-memory has no separate pool to exhaust. Read the Mac column before you pick.
-"""
-
 _LEGEND = """
 **How you get the weights.** Two things do the fetching for an **auto** row, and
 neither of them is a script you have to run: the engine's own library pulls it
@@ -1154,8 +1124,8 @@ def render_apple(rows: list) -> str:
         L.append("\n")
 
     L.append("## What the words mean\n\n")
-    # The legend is shared with apple/DROPDOWN_MATRIX.md and the README block,
-    # where apple/MODEL_ASSET_INDEX.md is a live relative link. Here it is not:
+    # The legend is shared with apple/DROPDOWN_MATRIX.md, where
+    # apple/MODEL_ASSET_INDEX.md is a live relative link. Here it is not:
     # .comfyignore excludes docs/ from the bundle, so a shipped reader following
     # that pointer finds nothing -- and the weights table above answers the question
     # better anyway, with a repository and a destination folder per file.
@@ -1230,23 +1200,7 @@ def _profile_engines(profile_id: str) -> set:
     return resolved
 
 
-def render_readme_block(rows: list) -> str:
-    """The README injection -- the three machines a stranger is likely on.
-
-    The legend goes ABOVE the tables and is the SHORT one. The long `_LEGEND`
-    is written for the full five-machine rendering: against the README's own
-    cells it defines three marks that never appear here (`**?**`, `too slow`,
-    `*no lane*`), leaves the three most common ones undefined (`key` alone
-    appears 57 times), and spends two paragraphs on an AMD column this
-    rendering does not have. It stays in the docs that do render those.
-    """
-    machines = [m for m in MACHINES if m["key"] in ("nv8", "nv16", "mac16")]
-    return ("%s\n\n%s\n\n%s\n%s\n" % (
-        _BEGIN, _README_LEGEND.strip(), render_table(rows, machines).strip(),
-        _END))
-
-
-def inject_readme(block: str, write: bool) -> bool:
+def inject_readme(write: bool) -> bool:
     """REMOVE the dropdown block from README. True if README already has none.
 
     It WAS injected, and the reasoning was sound: one generated answer beats two
@@ -1288,7 +1242,6 @@ def main(argv=None) -> int:
         return 2
 
     doc = render_doc(rows)
-    block = render_readme_block(rows)
     apple = render_apple(rows)
     current = io.open(_DOC, encoding="utf-8").read() if os.path.exists(_DOC) else None
     current_apple = (io.open(_APPLE, encoding="utf-8").read()
@@ -1300,7 +1253,7 @@ def main(argv=None) -> int:
             stale.append("apple/DROPDOWN_MATRIX.md")
         if current_apple != apple:
             stale.append("apple/MACHINES.md")
-        if not inject_readme(block, write=False):
+        if not inject_readme(write=False):
             stale.append("README's dropdown-matrix block")
         if stale:
             print("STALE: " + ", ".join(stale))
@@ -1314,7 +1267,7 @@ def main(argv=None) -> int:
     io.open(_DOC, "w", encoding="utf-8", newline="\n").write(doc)
     os.makedirs(os.path.dirname(_APPLE), exist_ok=True)
     io.open(_APPLE, "w", encoding="utf-8", newline="\n").write(apple)
-    inject_readme(block, write=True)
+    inject_readme(write=True)
     print("wrote %s (%d bytes) and %s (%d bytes), README carries no copy; "
           "%d engines" % (os.path.relpath(_DOC, _REPO), len(doc),
                           os.path.relpath(_APPLE, _REPO), len(apple), len(rows)))

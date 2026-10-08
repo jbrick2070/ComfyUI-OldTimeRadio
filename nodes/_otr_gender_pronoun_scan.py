@@ -295,7 +295,6 @@ def scan_gender(
 
     male = female = 0
     mentions = 0
-    reasons = []
 
     for form in forms:
         pattern = re.compile(r"\b" + re.escape(form) + r"\b", re.IGNORECASE)
@@ -325,8 +324,6 @@ def scan_gender(
             ", ".join(repr(f) for f in forms) or "no usable mention form",
         )
     )
-    if reasons:
-        evidence += " (" + "; ".join(reasons) + ")"
     if not decided:
         evidence += "; DECLINED -- below the floor of %d or the %.1fx margin" % (
             SCORE_FLOOR, DOMINANCE_RATIO,

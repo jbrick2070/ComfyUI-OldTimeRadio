@@ -994,29 +994,6 @@ def _deal_voice_menu(cast_size: int, taken: "set[str] | None" = None) -> VoiceMe
 # model validators)
 # ---------------------------------------------------------------------------
 
-def _make_dossier_validator(digest: str):
-    """Copy-never-invent gate: every allowed number must appear verbatim
-    in the capped source digest; every named entity's CONTENT TOKENS must
-    all appear there (word-boundary). Token-level for entities because a
-    faithful extraction may reorder a phrase -- the second S1b live smoke
-    (2026-07-10) killed a grounded dossier over "Amsterdam's canals" vs
-    the story's "the canals of Amsterdam". Typographic apostrophes are
-    normalized; possessive 's is stripped before the token check."""
-    hay = _norm_ws(digest).casefold().replace("’", "'")
-
-    def _check(m: DossierLLM) -> "str | None":
-        # Neither entities nor numbers open a retry here: unverifiable
-        # ones are DROPPED by _filter_dossier_entities after the call
-        # (28th + 30th live smokes 2026-07-10: world-knowledge
-        # expansions and converted figures are unbounded; no structural retry can
-        # fix knowledge). Delete-only filtering keeps the anti-invention
-        # property -- dropping an allowed number only SHRINKS what the
-        # factual read may speak.
-        return None
-
-    return _check
-
-
 def _entity_in_source(ent: str, hay: str, hay_words: "set[str]") -> bool:
     for tok in _norm_ws(ent).replace("’", "'").split():
         tok = tok.strip(".,;:!?'\"()").casefold()
@@ -1974,13 +1951,15 @@ def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
             # NOT make_dispatching_repair_factory(): its typed prompts all
             # demand "ONE valid JSON object" -- see _dossier_section_repair.
             repair_prompt_factory=_dossier_section_repair,
-            post_validator=_make_dossier_validator(digest),
+            # No post_validator: unverifiable entities and numbers never open
+            # a retry (world knowledge cannot be fixed by retrying). They are
+            # DROPPED after the call by _filter_dossier_entities, which keeps
+            # the copy-never-invent property delete-only.
             max_new_tokens=_MAX_NEW_TOKENS["dossier"],
             helper_name="scifi_news_pro_dossier",
             # Python assembles the object; the model only writes labelled
             # bullets. Everything else about this call -- schema, tolerant
-            # validation, post_validator, the 3-rung ladder, the typed repair
-            # -- is unchanged.
+            # validation, the 3-rung ladder, the typed repair -- is unchanged.
             text_parser=parse_dossier_sections,
         )
     except StructuredCallFailedError as exc:

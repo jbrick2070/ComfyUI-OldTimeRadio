@@ -9,7 +9,7 @@ Expected output:
     ±1.5% of the 11% target (99% confidence interval for n=10,000).
 
 This guards against:
-    - Accidental removal of _LEMMY_RNG
+    - Accidental removal of _LEMMY_RNG_SYSTEM (config/cast_pools.py)
     - Accidental threshold edits (e.g., 0.11 → 0.011)
     - Seed bleed-through from other RNGs
 """
@@ -36,7 +36,7 @@ def main():
         print("  STATUS: PASS — Lemmy 11% is statistically intact")
         return 0
     else:
-        print("  STATUS: FAIL — RNG is biased, investigate _LEMMY_RNG and threshold")
+        print("  STATUS: FAIL — RNG is biased, investigate _LEMMY_RNG_SYSTEM and LEMMY_RATE in config/cast_pools.py")
         return 1
 
 
