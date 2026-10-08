@@ -279,30 +279,6 @@ def test_a_repair_reports_a_stale_node_as_well_as_a_stale_slot():
     assert ws.verify(wf, "after") == []
 
 
-def test_rename_widget_changes_the_name_and_nothing_else():
-    """rename_widget had no coverage at all, and the next window is told to use
-    display_name INSTEAD of renaming -- so if this function is ever reached, it
-    will be by someone who decided to rename anyway. It should at least be
-    provably narrow: the name changes, the position does not, and no link moves.
-    """
-    ws = _tool()
-    wf = _canonical()
-    node = next(n for n in wf["nodes"] if n.get("type") == "OTR_LedgerScriptWriter")
-    before_order = ws.widget_names(node)
-    before_values = list(node["widgets_values"])
-    before_links = {r[0]: list(r) for r in wf["links"]}
-
-    touched = ws.rename_widget(wf, "OTR_LedgerScriptWriter", "lemmy_cameo", "cameo_roll")
-
-    assert touched, "lemmy_cameo is no longer on the writer"
-    after = next(n for n in wf["nodes"] if n.get("type") == "OTR_LedgerScriptWriter")
-    names = ws.widget_names(after)
-    assert names == ["cameo_roll" if n == "lemmy_cameo" else n for n in before_order]
-    assert after["widgets_values"] == before_values, "a rename moved a value"
-    assert {r[0]: list(r) for r in wf["links"]} == before_links, "a rename moved a link"
-    assert ws.verify(wf, "after-rename") == []
-
-
 def test_save_preserves_each_file_s_own_shape(tmp_path):
     """The canonical is pretty-printed and the variants are single-line. save()
     takes a `compact` flag and a caller who passes the wrong one rewrites the

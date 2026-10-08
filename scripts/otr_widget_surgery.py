@@ -182,27 +182,6 @@ def reorder_widgets(wf, node_type, new_name_order):
     return touched, repairs
 
 
-def rename_widget(wf, node_type, old_name, new_name):
-    """Rename a widget in place -- descriptor name, localized_name and the
-    widget.name backref. Position, values and links are all untouched."""
-    touched = []
-    for node in wf.get("nodes", []):
-        if node.get("type") != node_type:
-            continue
-        for inp in node.get("inputs") or []:
-            w = inp.get("widget") or {}
-            if w.get("name") != old_name:
-                continue
-            w["name"] = new_name
-            if inp.get("name") == old_name:
-                inp["name"] = new_name
-            if inp.get("localized_name") == old_name:
-                inp["localized_name"] = new_name
-            touched.append({"node_id": node["id"], "from": old_name,
-                            "to": new_name})
-    return touched
-
-
 def load(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
