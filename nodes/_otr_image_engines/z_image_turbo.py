@@ -288,21 +288,6 @@ class ZImageTurboEngine:
             "reference_height": _eint("OTR_PORTRAIT_REF_HEIGHT", 768),
         }
 
-    def _diagnostic_zimage_params(self, request):
-        """Build params for the permanent rejected-reference A/B only.
-
-        The production ``render_image`` path never calls this method. Keeping
-        the opt-in on a separately named private diagnostic boundary prevents a
-        direct render request from bypassing ``accepts_reference_image=False``.
-        """
-        get = request.get if isinstance(request, dict) else (
-            lambda k, d=None: getattr(request, k, d))
-        params = self._zimage_params(request)
-        return dict(
-            params,
-            reference_image=str(get("reference_image") or ""),
-        )
-
     def _node_candidates(self, params=None):
         """Ordered ComfyUI node-class candidates per graph node. The latent node
         is VERIFY-AT-BUILD (16-ch SD3 vs 4-ch) -> env-selected, candidate-ordered."""
