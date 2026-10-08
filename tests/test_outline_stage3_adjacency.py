@@ -146,7 +146,7 @@ class TestBeatPromptAdjacency:
 
     def test_all_three_adjacency_lines_render_for_a_middle_beat(self):
         prompt = _build_beat_user_prompt(
-            _request(("ALICE", "BOB")), _MACRO, "complication", "ALICE",
+            _MACRO, "complication", "ALICE",
             (1, 4),
             previous_beat_intent="establish the strange reading",
             next_beat_speaker="BOB",
@@ -162,7 +162,7 @@ class TestBeatPromptAdjacency:
         # No previous neighbour -> NO "Previous beat intent" line at
         # all. Never an empty value, never the literal "None".
         prompt = _build_beat_user_prompt(
-            _request(("ALICE", "BOB")), _MACRO, "setup", "ALICE",
+            _MACRO, "setup", "ALICE",
             (0, 4),
             previous_beat_intent=None,
             next_beat_speaker="BOB",
@@ -175,7 +175,7 @@ class TestBeatPromptAdjacency:
 
     def test_last_beat_omits_next_line_entirely(self):
         prompt = _build_beat_user_prompt(
-            _request(("ALICE", "BOB")), _MACRO, "resolution", "BOB",
+            _MACRO, "resolution", "BOB",
             (3, 4),
             previous_beat_intent="land the consequence",
             next_beat_speaker=None,
@@ -189,7 +189,7 @@ class TestBeatPromptAdjacency:
         # A single-beat outline (no previous, no next) renders neither
         # adjacency line -- the phase summary still appears.
         prompt = _build_beat_user_prompt(
-            _request(("ALICE",)), _MACRO, "scene", "ALICE",
+            _MACRO, "scene", "ALICE",
             (0, 1),
             previous_beat_intent=None,
             next_beat_speaker=None,

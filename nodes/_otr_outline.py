@@ -395,33 +395,6 @@ class OutlineRequest:
                              #
                              # Wired by OTR_LedgerScriptWriter D.5
                              # post-cast-lock (2026-05-10 follow-up).
-    diversity_hint: str = ""
-                             # OPTIONAL (best-of-N selector, 2026-06-23). A
-                             # short STRUCTURAL-variation instruction the
-                             # best-of-N selector sets per candidate (i>=1) to
-                             # steer the outline toward a different dramatic
-                             # approach (e.g. "open on the personal stake, not
-                             # the institutional threat"). Rendered by the
-                             # macro and beat prompts ONLY when non-empty;
-                             # empty (the default, and candidate 0 / every
-                             # non-selector call) => byte-identical prompt to
-                             # the pre-selector pipeline. A prompt overlay
-                             # only -- NOT in-place beat surgery.
-    prior_critique: str = ""
-                             # OPTIONAL (refine loop v1, 2026-06-23). A short,
-                             # normalized STRUCTURAL weakness from the prior
-                             # refine pass's grader (sanitized via
-                             # _otr_story_select.critique_to_hint), rendered into
-                             # the MACRO + BEAT Path C prompts to steer a
-                             # REVISION of the prior story. SEPARATE from
-                             # diversity_hint (that stays v0 best-of-N steering).
-                             # Empty (default) => byte-identical prompt.
-    prior_macro: str = ""
-                             # OPTIONAL (refine loop v1). A digest of the PRIOR
-                             # winner's macro shape (Title/Premise/Setting + raw
-                             # beat intents) so the MACRO prompt REVISES the
-                             # existing spine instead of starting from scratch.
-                             # Empty (default) => byte-identical prompt.
     work_title: str = ""
                              # OPTIONAL (item F, 2026-08-17). The adapted work's
                              # title on the fidelity lanes. Rendered by BOTH
@@ -861,31 +834,6 @@ def _build_macro_user_prompt(req: OutlineRequest) -> str:
     _sg = req.style_grammar.strip()
     if _sg:
         parts.append(_sg)
-    # Best-of-N / refine steering (2026-06-23): render req.diversity_hint in the
-    # Path C macro prompt. Empty hint => byte-identical to the pre-steer prompt.
-    _dh = req.diversity_hint.strip()
-    if _dh:
-        parts.append(
-            f"Structural variation (take a different dramatic approach -- vary "
-            f"the premise angle, the central stake, and who drives the turn): "
-            f"{_dh}"
-        )
-    # Refine loop (v1, 2026-06-23): REVISE the prior story's spine rather than
-    # start from scratch. Empty prior_macro => byte-identical.
-    _pm = req.prior_macro.strip()
-    if _pm:
-        _pc = req.prior_critique.strip()
-        if _pc:
-            parts.append(
-                "Current premise/arc to REVISE (keep what works; change the "
-                "premise/arc only if the weakness is structural):\n"
-                f"{_pm}\nBiggest weakness to fix: {_pc}"
-            )
-        else:
-            parts.append(
-                "Current premise/arc to REVISE (improve the structure while "
-                f"preserving the prior spine):\n{_pm}"
-            )
     parts.extend([
         "",
         f"Task: {verb}. Return only the JSON object.",
@@ -953,7 +901,6 @@ def _phase_summary(phase_name: str) -> str:
 
 
 def _build_beat_user_prompt(
-    req: OutlineRequest,
     macro: _MacroShape,
     phase_name: str,
     beat_speaker: str,
@@ -1015,16 +962,6 @@ def _build_beat_user_prompt(
         parts.append(f"Previous beat intent: {previous_beat_intent}")
     if next_beat_speaker:
         parts.append(f"Next beat is spoken by: {next_beat_speaker}")
-    # Best-of-N / refine steering (2026-06-23): render req.diversity_hint in the
-    # Path C beat prompt. Empty => byte-identical.
-    _dh = req.diversity_hint.strip()
-    if _dh:
-        parts.append(f"Structural variation: {_dh}")
-    # Refine loop (v1): steer this beat to address the prior pass's weakness.
-    # Empty prior_critique => byte-identical.
-    _pc = req.prior_critique.strip()
-    if _pc:
-        parts.append(f"Address this weakness: {_pc}")
     if verbatim_text is not None:
         # The verbatim executor: this beat's words are the source's own and
         # already decided. The invention-lane task below tells every beat to
@@ -1780,7 +1717,7 @@ def generate_outline(
                 sum(len(s.beats) for s in phase_skeletons[:phase_idx]) + beat_idx
             )
             beat_user = _build_beat_user_prompt(
-                req, macro, phase_name, beat_seed.speaker,
+                macro, phase_name, beat_seed.speaker,
                 (beat_idx, n_beats),
                 previous_beat_intent=previous_beat_intent,
                 next_beat_speaker=next_beat_speaker,

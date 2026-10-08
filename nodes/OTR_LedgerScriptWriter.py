@@ -4891,8 +4891,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             script_brief=script_brief,
             cast_descriptions=cast_descriptions,
             budget=episode_budget,
-            prior_macro="",
-            prior_critique="",
             style_grammar=(contract.grammar if contract else ""),
             story_engine=(contract.story_engine if contract else ""),
             work_title=_work_title,
