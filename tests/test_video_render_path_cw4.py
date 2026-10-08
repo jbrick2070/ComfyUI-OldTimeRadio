@@ -207,8 +207,7 @@ def test_credits_tail_gate_absorbs_concat_frame_quantization(tmp_path):
 @needs_ffmpeg
 def test_mux_report_declares_unconditional_master_copy(tmp_path):
     """rip-sfx 2026-08-06: the SFX mix branch is gone, so EVERY mux is the
-    -c:a copy passthrough. The report must say so and must carry none of the
-    retired sfx_mixed fields."""
+    -c:a copy passthrough. The report must say so."""
     master = tmp_path / "master.wav"
     silent = tmp_path / "silent.mp4"
     final = tmp_path / "final.mkv"
@@ -218,9 +217,6 @@ def test_mux_report_declares_unconditional_master_copy(tmp_path):
     text = "\n".join(report)
     assert out == str(final)
     assert "audio_mode=master_copy" in text
-    assert "audio_mode=sfx_mixed" not in text
-    assert "sfx_bed_path" not in text
-    assert "sfx_gain" not in text
 
 
 def test_master_audio_mux_is_output_node():

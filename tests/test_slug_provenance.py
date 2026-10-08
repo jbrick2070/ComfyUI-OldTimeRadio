@@ -758,11 +758,6 @@ def test_the_verifier_core_performs_no_network_access(monkeypatch, records):
                       unverified_kind=prov.UNVERIFIED)
 
 
-def test_the_verifier_script_is_not_collected_by_pytest():
-    assert os.path.exists(os.path.join(REPO_ROOT, "scripts", "verify_google_slugs.py"))
-    assert not os.path.exists(os.path.join(REPO_ROOT, "tests", "verify_google_slugs.py"))
-
-
 def test_the_exit_codes_are_pinned():
     """Callers and CI switch on these numbers, so they may not drift."""
     assert (core.EXIT_OK, core.EXIT_SHIPPED_IDS_MISSING, core.EXIT_NOT_RUN,

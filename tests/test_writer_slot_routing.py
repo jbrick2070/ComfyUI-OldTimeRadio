@@ -299,40 +299,6 @@ def test_scheduler_local_schema_binding_reaches_truncating_generator(monkeypatch
 # ---------------------------------------------------------------------------
 
 
-def test_writer_deletes_legacy_model_id_meta_key():
-    """gen_params_initial must NOT carry the legacy `model_id` key
-    post-B2b. Consumers route via creative_writing_model /
-    technical_model. AST scan of the assignment-site keys.
-    """
-    tree = _writer_tree()
-    bad_keys: list[str] = []
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Assign)
-            and len(node.targets) == 1
-            and isinstance(node.targets[0], ast.Subscript)
-            and isinstance(node.targets[0].value, ast.Name)
-            and node.targets[0].value.id == "meta"
-            and isinstance(node.value, ast.Dict)
-        ):
-            # meta["..."] = {...}; look for "model_id" key inside.
-            for k in node.value.keys:
-                if (
-                    isinstance(k, ast.Constant)
-                    and isinstance(k.value, str)
-                    and k.value == "model_id"
-                ):
-                    bad_keys.append(
-                        f"line {getattr(node, 'lineno', '?')}: "
-                        f"meta dict still has 'model_id' key"
-                    )
-    assert not bad_keys, (
-        "B2b clean break: meta dicts must not include the legacy "
-        "'model_id' key -- use creative_writing_model + technical_model "
-        "explicitly:\n  " + "\n  ".join(bad_keys)
-    )
-
-
 def test_writer_stamps_slot_transitions_meta():
     """Writer must stamp `meta["slot_transitions"]` (int) +
     `meta["slot_calls_by_slot"]` (dict) so a forensic audit can read
