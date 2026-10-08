@@ -19,14 +19,6 @@ This module owns the artifact that fixes that, deterministic and model-free:
     ``meta``, the ledger, or a prompt receipt -- receipts carry offsets and
     hashes, never body text.
 
-``SourceOverview`` LIVED HERE and was REMOVED 2026-09-05. It built deterministic
-windows covering the whole body plus role-tagged evidence spans, and nothing in
-the pipeline ever constructed it -- ``_otr_source_grounding`` imports only
-``SourceDocument``, ``SourceSpan`` and the private helpers, and reimplements its
-own region logic. Three independent reviewers confirmed no production consumer.
-Its version constant and evidence markers went with it; its tiling check,
-``_assert_tiles``, was left behind and removed 2026-10-08.
-
 Nothing here loads a model, touches the GPU, reads the network, or imports
 anything heavy. Selection is deterministic: same body in, same spans out.
 """
