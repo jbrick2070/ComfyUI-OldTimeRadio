@@ -27,7 +27,6 @@ log = logging.getLogger("OTR.freeze_cascade")
 __all__ = [
     "FreezeDisposition",
     "run_freeze_cascade",
-    "all_phase_passes",
     "build_phase_telemetry",
 ]
 
@@ -423,27 +422,6 @@ def build_phase_telemetry(meta: dict) -> list:
     for rec in out:
         rec.pop("started_at", None)
     return out
-
-
-def all_phase_passes(meta: dict) -> list:
-    """Return the chronological concatenation of phase records across
-    all three buckets (audit_passes + cleanup_passes + readiness_passes).
-
-    Soak diagnostics and tests that want "every cascade phase record
-    in order" call this instead of indexing a single bucket. Records
-    are sorted by `started_at` ISO timestamp so the merged list
-    reflects actual run order regardless of bucket.
-
-    Best-effort: a malformed bucket (not a list) is skipped silently
-    -- the gap-audit invariant will have already flagged the type.
-    """
-    merged: list = []
-    for bucket_key in ("audit_passes", "cleanup_passes", "readiness_passes"):
-        bucket = meta.get(bucket_key)
-        if isinstance(bucket, list):
-            merged.extend(rec for rec in bucket if isinstance(rec, dict))
-    merged.sort(key=lambda r: r.get("started_at", ""))
-    return merged
 
 
 def _stamp_phase_record(

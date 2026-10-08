@@ -320,11 +320,8 @@ class GoogleImageEngine:
         return str(asset.path)
 
 
-GoogleImage = GoogleImageEngine()
-
 __all__ = [
     "DEFAULT_MODEL",
-    "GoogleImage",
     "GoogleImageEngine",
     "REQUEST_MIME_TYPES",
     "SUPPORTED_ASPECTS",

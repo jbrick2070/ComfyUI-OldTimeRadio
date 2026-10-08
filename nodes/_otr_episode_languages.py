@@ -31,7 +31,6 @@ log = logging.getLogger("OTR")
 __all__ = [
     "OFF_LABEL",
     "ROLL_LABEL",
-    "WIDGET_NAME",
     "EpisodeLanguageError",
     "LanguageRow",
     "LanguageResolution",
@@ -70,7 +69,6 @@ OFF_LABEL = "Off"
 #: the writer can recognise it before the replay shortcut without touching
 #: the roll module (a replay must never reach the rolls).
 ROLL_LABEL = "roll (any language)"
-WIDGET_NAME = "episode_language"
 REGISTRY_ID = "episode_languages"
 _SCHEMA_VERSION = 1
 ENGLISH_LABEL = "English"

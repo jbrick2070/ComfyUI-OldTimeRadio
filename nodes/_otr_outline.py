@@ -51,7 +51,6 @@ __all__ = [
     "OutlineRequest",
     "OutlineFailedError",
     "generate_outline",
-    "OutlineBudgetViolation",
     "validate_outline_against_budget",
     "stamp_dialogue_slot_ids",  # Sprint 1 keystone (2026-05-28)
 ]
@@ -793,14 +792,6 @@ def _check_speaker_role_alignment() -> None:
 # ---------------------------------------------------------------------------
 # Phase 2A (2026-05-11): episode budget rendering + validators
 # ---------------------------------------------------------------------------
-
-
-class OutlineBudgetViolation(ValueError):
-    """Structured signal raised by validate_outline_against_budget on a
-    hard violation. Carried as the error string into the reroll-then-
-    repair loop. Inherits from ValueError so any defensive `except
-    ValueError` clause doesn't drop the signal.
-    """
 
 
 def _get_budget(req: "OutlineRequest"):

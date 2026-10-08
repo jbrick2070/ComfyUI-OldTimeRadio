@@ -182,42 +182,6 @@ def comfy_output_dir() -> Path:
     return Path.cwd() / "output"
 
 
-def comfy_models_dir() -> Path:
-    """Return the ComfyUI models root.
-
-    Used by visual backends (FLUX anchor, PuLID portrait, the video
-    engines) to find pre-quantized weights without hardcoding
-    Jeffrey's personal path. Resolution order:
-
-      1. ``OTR_MODELS_DIR`` env var (explicit override; cloud / 8GB
-         tier deployments can park weights anywhere).
-      2. ``folder_paths.models_dir`` (ComfyUI's API; respects
-         ``--extra-model-paths-config``).
-      3. Walk up: ``<repo>/../../../models``.
-      4. ``Path.cwd() / "models"``.
-    """
-    env_override = otr_env.get("OTR_MODELS_DIR")
-    if env_override:
-        return Path(env_override).expanduser()
-
-    try:
-        import folder_paths  # type: ignore
-
-        api_dir = getattr(folder_paths, "models_dir", None)
-        if api_dir:
-            return Path(api_dir)
-    except ImportError:
-        pass
-    except Exception:
-        pass
-
-    walkup = Path(__file__).resolve().parents[3] / "models"
-    if walkup.parent.exists():
-        return walkup
-
-    return Path.cwd() / "models"
-
-
 def comfy_input_dir() -> Path:
     """Return the ComfyUI input root.
 
@@ -852,7 +816,6 @@ __all__ = [
     "pin_output_dir_from_comfy",
     "comfy_output_dir",
     "comfy_input_dir",
-    "comfy_models_dir",
     "OtrPathContractError",
     "reject_remote_path",
     "reject_remote_paths",
