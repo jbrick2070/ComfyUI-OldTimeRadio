@@ -33,7 +33,10 @@ stand on is proven here against this engine's REAL graph, ahead of the wiring,
 by `test_the_forward_runs_with_the_checkpoint_supplied_EXTERNALLY`.
 
 Fakes + a real ffmpeg encode, the idiom already proven in
-`tests/test_video_motion_forward.py`. ffmpeg-running tests skip cleanly.
+`tests/test_video_motion_forward.py`. ffmpeg-running tests skip cleanly. The
+identity and load-count tests replace the encode and the probe with
+`_stub_media` and need no ffmpeg; the media-contract and native-frame cases
+keep the real one.
 UTF-8, no BOM, ASCII-only source.
 """
 
@@ -153,6 +156,29 @@ def _request(init_png, frames=9):
             "canvas": {"w": 512, "h": 288, "fps": 25, "aspect_policy": "pad"},
             "timing": {"target_frame_count": frames},
             "seed_bundle": {"request_seed": 7}}
+
+
+def _stub_media(monkeypatch):
+    """Take ffmpeg and ffprobe out of a ``render_clip`` call.
+
+    For the identity and load-count tests, which count node executions and
+    patcher handles and never look at the clip. The encode becomes a
+    placeholder file and the probe a contract-valid report that the REAL
+    ``validate_silent_clip_contract`` still checks; the graph run, the patcher
+    harvest, the frame-length checks and the tail trim stay real. The
+    media-contract and native-frame cases keep the real encode."""
+    def _encode(frames, out_path, fps, **_kw):
+        pathlib.Path(out_path).write_bytes(b"placeholder")
+        return out_path, len(frames)
+
+    def _probe(path, **_kw):
+        return {"codec_types": ["video"], "video_codec": "h264",
+                "pix_fmt": "yuv420p", "color_space": "bt709",
+                "color_primaries": "bt709", "color_transfer": "bt709",
+                "fps": Ltx8gbEngine.target_fps}
+
+    monkeypatch.setattr(wb, "encode_frames_to_silent_mp4", _encode)
+    monkeypatch.setattr(m, "ffprobe_clip_fields", _probe)
 
 
 # --- the node classes the graph resolves ----------------------------------- #
@@ -591,13 +617,14 @@ def test_render_clip_produces_a_silent_bt709_clip_with_its_receipt(staged):
             path.unlink(missing_ok=True)
 
 
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_the_patcher_harvest_keeps_what_teardown_must_detach(staged):
+def test_the_patcher_harvest_keeps_what_teardown_must_detach(staged,
+                                                             monkeypatch):
     """`teardown` detaches exactly what `render_clip` put in
     `prepared["patchers"]`. Anything that stops being harvested stops being
     detached -- and a MODEL patcher that is never detached holds VRAM for the
     life of the ComfyUI process. Two distinct handles today: the checkpoint's
     MODEL and the per-render ModelSamplingLTXV clone."""
+    _stub_media(monkeypatch)
     np = pytest.importorskip("numpy")
     eng = Ltx8gbEngine()
     eng._classes = _ltx8_fakes(np, _Counter(), n=9)
@@ -614,8 +641,8 @@ def test_the_patcher_harvest_keeps_what_teardown_must_detach(staged):
             path.unlink(missing_ok=True)
 
 
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_the_harvest_registers_a_REUSED_handle_exactly_once(staged):
+def test_the_harvest_registers_a_REUSED_handle_exactly_once(staged,
+                                                            monkeypatch):
     """The `seen` id-dedupe, driven under the condition the hoist creates.
 
     Today every render builds its own checkpoint object, so a broken dedupe
@@ -628,6 +655,7 @@ def test_the_harvest_registers_a_REUSED_handle_exactly_once(staged):
     per-render ModelSampling clones, because `teardown` detaches every entry
     and detaching one patcher three times is not a no-op.
     """
+    _stub_media(monkeypatch)
     np = pytest.importorskip("numpy")
     shared = _FakeModel("ckpt")
     fakes = _ltx8_fakes(np, _Counter(), n=9)
@@ -649,7 +677,6 @@ def test_the_harvest_registers_a_REUSED_handle_exactly_once(staged):
             p.unlink(missing_ok=True)
 
 
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
 def test_THE_LOAD_COUNT_every_render_reloads_the_checkpoint_today(staged,
                                                                  monkeypatch):
     """The defect, stated as a number -- and a CONTROL on B1b, not an observer
@@ -677,6 +704,7 @@ def test_THE_LOAD_COUNT_every_render_reloads_the_checkpoint_today(staged,
     at the end of this file.
     """
     monkeypatch.setenv(m._CONDITIONING_CACHE_ENV, "0")
+    _stub_media(monkeypatch)
     np = pytest.importorskip("numpy")
     counter = _Counter()
     eng = Ltx8gbEngine()
@@ -785,11 +813,13 @@ class _Rig:
 def hoistable(tmp_path, monkeypatch):
     """An engine that can actually run `prepare()` on a box with no ComfyUI.
 
-    Three substitutions, each deliberate and each leaving the code under test
+    Four substitutions, each deliberate and each leaving the code under test
     intact: model files resolve inside `tmp_path` through the same
     `_resolve_model_file` seam the session-config suite uses; node classes come
-    back as fakes so `load()` does not need a live ComfyUI registry; and the
-    GPU lease is recorded rather than taken.
+    back as fakes so `load()` does not need a live ComfyUI registry; the
+    GPU lease is recorded rather than taken; and ffmpeg/ffprobe are replaced
+    (`_stub_media`), because the render tests that use this rig count loads
+    and handles and never look at the clip.
 
     The 4 GiB checkpoint floor is lowered to 1 KiB so a fixture does not have
     to write 4 GiB. Its VALUE is not what these tests are about -- its POSITION
@@ -811,6 +841,7 @@ def hoistable(tmp_path, monkeypatch):
     monkeypatch.setattr(mc._GR, "acquire", lease.acquire)
     monkeypatch.setattr(mc._GR, "release", lease.release)
     monkeypatch.setattr(mc._GR, "wait_until_stable", lease.wait_until_stable)
+    _stub_media(monkeypatch)
 
     eng = Ltx8gbEngine()
     monkeypatch.setattr(
@@ -820,7 +851,6 @@ def hoistable(tmp_path, monkeypatch):
     return _Rig(eng, counter, fakes, lease, ckpt)
 
 
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
 def test_prepare_loads_the_checkpoint_ONCE_for_the_whole_beat(hoistable, staged):
     """THE PAYOFF, and the debt the pre-hoist net named and could not pay.
 
@@ -861,7 +891,6 @@ def test_prepare_loads_the_checkpoint_ONCE_for_the_whole_beat(hoistable, staged)
         rig.eng.teardown(prepared)
 
 
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
 def test_the_hoisted_checkpoint_is_harvested_in_prepare_and_detached_once(
         hoistable, staged):
     """A hoisted MODEL that nothing harvests is VRAM held for the life of the
@@ -1453,13 +1482,13 @@ def test_a_graph_that_DIES_publishes_nothing(staged, monkeypatch):
     assert not eng._conditioning_cache
 
 
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
 def test_three_segments_of_one_beat_load_the_T5_ONCE(staged, monkeypatch):
     """THE FIX, as a number, through the real `render_clip`: three segments of
     one beat, one T5 load and one encode each for the positive and negative,
     three real renders. This is the wiring proof too -- it goes red if
     `render_clip` stops asking the cache or stops handing it what it
     encoded."""
+    _stub_media(monkeypatch)
     np = pytest.importorskip("numpy")
     counter = _Counter()
     eng = Ltx8gbEngine()
