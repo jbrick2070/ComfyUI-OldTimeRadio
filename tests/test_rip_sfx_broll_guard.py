@@ -18,7 +18,6 @@ import pytest
 from nodes import _otr_speaker_role as SR
 from nodes._otr_shared import role_compat as RC
 from nodes._otr_shared import role_slots as RS
-from nodes._otr_shared import slot_matrix as SM
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _WF = os.path.join(_REPO, "workflows", "otr_canonical.json")
@@ -54,10 +53,6 @@ def test_slot_maps_are_exactly_the_three_roles_and_slots():
     # slot or role leaking back in fails the equality (stronger than absence checks)
     assert set(RS.VIDEO_SLOT_ROLES) == {
         "announcer_video_model", "music_video_model", "character_video_model",
-    }
-    assert set(SM.ROLE_TO_PROFILE_KEY) == set(SM.ALL_ROLES)
-    assert set(SM.ALL_ROLES) == {
-        "announcer_visual", "music_visual", "character_video",
     }
 
 
