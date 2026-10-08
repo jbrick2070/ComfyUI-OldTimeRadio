@@ -1,4 +1,4 @@
-"""Declarative profile metadata: runtime and license_state.
+"""Declarative profile metadata: license_state.
 Headless; the only IO is loading the shipped YAML.
 
 These cover the metadata surface only; the resolver behaviour stays pinned by
@@ -18,11 +18,10 @@ def _resolver():
     return r
 
 
-def test_every_profile_has_sprint1_metadata():
+def test_every_profile_has_a_valid_license_state():
     r = _resolver()
     for pid in r.profile_ids():
         p = r.get(pid)
-        assert p.runtime in EP._VALID_RUNTIMES
         assert p.license_state in EP._VALID_LICENSE_STATES
 
 
@@ -48,14 +47,6 @@ def test_license_state_mirrors_commercial_clean_for_all_rows():
             assert p.commercial_clean is True
         elif p.license_state == "gated":
             assert p.commercial_clean is False
-
-
-def test_bad_runtime_rejected():
-    with pytest.raises(Exception):
-        EP.EngineProfile(
-            profile_id="x", role="music", engine="musicgen",
-            commercial_clean=False, runtime="cloud",
-        )
 
 
 def test_bad_license_state_rejected():

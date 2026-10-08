@@ -10,11 +10,9 @@
 # with a NAMED error until that engine's deps/weights are installed (C-7);
 # model_path stays empty until F pins it.
 #
-# Declarative metadata (additive; never changes live byte-identical dispatch):
-# runtime (in_graph | oop_venv | cloud | direct_api) and license_state
-# (clean|gated|unknown; blank = derive from commercial_clean). license_state
-# MIRRORS commercial_clean here -- final license sign-off is Sprint 6, not an
-# unattended flip.
+# license_state (clean|gated|unknown; blank = derive from commercial_clean) is
+# declarative metadata and never changes dispatch. It MIRRORS commercial_clean
+# here -- final license sign-off is Sprint 6, not an unattended flip.
 
 profiles:
   # --- character voice ---
@@ -43,7 +41,6 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    runtime: in_graph
     license_state: gated            # mirrors commercial_clean=false (verify S6)
 
   - profile_id: char_chatterbox_v1
@@ -65,7 +62,6 @@ profiles:
     engine_impl_version: "2"
     sample_rate: 24000
     requires_hf_token: false
-    runtime: oop_venv               # Path B isolated worker (MIT; pins own torch)
     license_state: clean
 
   - profile_id: char_indextts2_v1
@@ -109,7 +105,6 @@ profiles:
     engine_impl_version: "3"
     sample_rate: 22050
     requires_hf_token: false        # weights are downloadable; only commercial USE is gated
-    runtime: oop_venv               # Path B isolated worker on Blackwell
     # The weights carry the bilibili Model Use License (not Apache-2.0). Local
     # and personal use is fine; commercial use is conditioned and
     # community-ambiguous, so confirm with bilibili (indexspeech@bilibili.com)
@@ -128,7 +123,6 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    runtime: in_graph
     license_state: clean
 
   # --- character voice (opt-in 2026-06-19): kokoro as a FAST char voice. NOT the
@@ -145,7 +139,6 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    runtime: in_graph
     license_state: clean
 
   - profile_id: announcer_chatterbox_v1
@@ -158,7 +151,6 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    runtime: oop_venv               # Path B isolated worker (MIT; pins own torch)
     license_state: clean
 
   # Bark as an announcer alternative (2026-08-24). Bark is preset-driven
@@ -177,7 +169,6 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    runtime: in_graph
     license_state: gated            # mirrors commercial_clean=false
 
   # --- music ---
@@ -191,7 +182,6 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 32000
     requires_hf_token: false
-    runtime: in_graph
     license_state: gated            # CC-BY-NC (non-commercial)
 
   - profile_id: music_stable_audio_v1
@@ -204,7 +194,6 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: true         # stable-audio-open-1.0 weights are HF-gated
-    runtime: in_graph
     license_state: clean            # mirrors commercial_clean=true; plan flags revenue-cap review (S6)
 
   - profile_id: music_stable_audio_3_v1
@@ -217,7 +206,6 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: false        # Comfy-Org/stable-audio-3 is UNgated (free download)
-    runtime: in_graph
     license_state: clean            # SA3 community license: commercial OK (verify exact model S6)
 
   # --- cloud ElevenLabs voice (cloud-audio 2026-07-03; dropdown-opt-in, Comfy
@@ -234,11 +222,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: false
-    runtime: cloud
     license_state: clean
-    partner_row: cloud_elevenlabs_tts
-    auth_required: true
-    error_policy: fail_loud
 
   - profile_id: announcer_elevenlabs_cloud_v1
     role: announcer_voice
@@ -250,18 +234,14 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: false
-    runtime: cloud
     license_state: clean
-    partner_row: cloud_elevenlabs_tts
-    auth_required: true
-    error_policy: fail_loud
 
   # --- direct Google Gemini TTS voice (BYO API key, not Comfy Partner cloud).
-  # Explicit-selection-only: runtime=direct_api. Fail-loud, no
-  # local/cross-provider fallback. Voice identity is the
-  # Google prebuilt voice name in provider_voice_id, resolved from google_tts
-  # bank entries by CastLock auto_registry. Gemini TTS is a preview model and
-  # its voice stability may vary (hence use_cache on both rows).
+  # Explicit-selection-only. Fail-loud, no local/cross-provider fallback.
+  # Voice identity is the Google prebuilt voice name in provider_voice_id,
+  # resolved from google_tts bank entries by CastLock auto_registry. Gemini TTS
+  # is a preview model and its voice stability may vary (hence use_cache on
+  # both rows).
   - profile_id: char_google_tts_v1
     role: char_voice
     engine: google_tts
@@ -272,11 +252,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    runtime: direct_api
     license_state: clean
-    partner_row: ""
-    auth_required: true
-    error_policy: fail_loud
     use_cache: true
 
   - profile_id: announcer_google_tts_v1
@@ -289,11 +265,7 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 24000
     requires_hf_token: false
-    runtime: direct_api
     license_state: clean
-    partner_row: ""
-    auth_required: true
-    error_policy: fail_loud
     use_cache: true
 
   # --- cloud Sonilo MUSIC (cloud-audio S5, 2026-07-03; dropdown-opt-in, Comfy
@@ -311,17 +283,12 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: false
-    runtime: cloud
     license_state: clean
-    partner_row: cloud_sonilo_music
-    auth_required: true
-    error_policy: fail_loud
 
   # --- direct Google Lyria MUSIC (BYO API key, not Comfy Partner cloud).
-  # Explicit-selection-only: runtime=direct_api. Lyria 3 Clip returns a fixed
-  # 30-second MP3; the adapter sends only
-  # model/input to Google, decodes MP3 locally, and trims to the OTR cue length.
-  # Paid-only and currently a preview model.
+  # Explicit-selection-only. Lyria 3 Clip returns a fixed 30-second MP3; the
+  # adapter sends only model/input to Google, decodes MP3 locally, and trims to
+  # the OTR cue length. Paid-only and currently a preview model.
   - profile_id: music_google_lyria_v1
     role: music
     engine: google_lyria
@@ -332,8 +299,4 @@ profiles:
     engine_impl_version: "1"
     sample_rate: 44100
     requires_hf_token: false
-    runtime: direct_api
     license_state: clean
-    partner_row: ""
-    auth_required: true
-    error_policy: fail_loud

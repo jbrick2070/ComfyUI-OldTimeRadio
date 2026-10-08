@@ -283,8 +283,7 @@ CAPABILITIES = {
                "practical_without_gpu": True, "sidecar_conditional": False,
                "model_requirements": []},
     # Direct Google/Gemini BYO API: no local model/sidecar/GPU and not a Comfy
-    # Partner node. Auth/cost/fail-loud behavior is enforced by the adapter and
-    # direct_api profile metadata.
+    # Partner node. Auth/cost/fail-loud behavior is enforced by the adapter.
     "google_tts": {"required_toolchain": None, "requires_sidecar": False,
                    "device_backends": ["cuda", "cpu", "mps"],
                    "requires_vendor": None,

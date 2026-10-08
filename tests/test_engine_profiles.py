@@ -1,22 +1,13 @@
 """Tests for the engine-profile resolver + YAML (piece 8 / D5)."""
-import hashlib
-import pathlib
-
 import pytest
 
 from nodes._otr_audio_engines import EngineUsabilityReason, EngineUnusable, engines_for_role
 from nodes import _otr_engine_profiles as EP
 
-PROFILES_YAML = (
-    pathlib.Path(__file__).resolve().parent.parent / "config" / "audio_engine_profiles.yaml"
-)
 
-
-def test_load_resolver_and_source_hash():
+def test_load_resolver_profile_ids():
     r = EP.load_resolver()
     assert r is not None
-    text = PROFILES_YAML.read_text(encoding="utf-8")
-    assert r.source_sha256 == hashlib.sha256(text.encode("utf-8")).hexdigest()
     assert set(r.profile_ids()) == {
         "char_bark_v1", "char_chatterbox_v1", "char_indextts2_v1",
         "char_kokoro_v1",
@@ -114,52 +105,6 @@ def test_legacy_first_engines_pure_and_legacy_first():
     assert EP.legacy_first_engines("char_voice").index("cloud_elevenlabs") < \
         EP.legacy_first_engines("char_voice").index("google_tts")
     assert EP.legacy_first_engines("nonexistent_role") == []
-
-
-def test_google_profiles_are_direct_api():
-    r = EP.load_resolver()
-    assert r.get("char_google_tts_v1").runtime == "direct_api"
-    assert r.get("announcer_google_tts_v1").runtime == "direct_api"
-    assert r.get("music_google_lyria_v1").runtime == "direct_api"
-
-
-def _minimal_profile_row(**updates):
-    row = {
-        "profile_id": "x",
-        "role": "char_voice",
-        "engine": "google_tts",
-        "commercial_clean": True,
-        "model_path": "",
-        "default_params": {},
-        "allowed_voice_banks": ["google_tts"],
-        "engine_impl_version": "1",
-        "sample_rate": 24000,
-        "requires_hf_token": False,
-        "runtime": "direct_api",
-        "license_state": "clean",
-        "partner_row": "",
-        "auth_required": True,
-        "error_policy": "fail_loud",
-    }
-    row.update(updates)
-    return row
-
-
-def test_direct_api_validation_contract():
-    assert EP.EngineProfile.model_validate(_minimal_profile_row()).runtime == "direct_api"
-    with pytest.raises(ValueError, match="auth_required"):
-        EP.EngineProfile.model_validate(_minimal_profile_row(auth_required=False))
-    with pytest.raises(ValueError, match="partner_row"):
-        EP.EngineProfile.model_validate(_minimal_profile_row(partner_row="cloud_row"))
-    with pytest.raises(ValueError, match="error_policy"):
-        EP.EngineProfile.model_validate(_minimal_profile_row(error_policy=""))
-
-
-def test_cloud_validation_still_requires_partner_row():
-    with pytest.raises(ValueError, match="runtime=cloud requires a partner_row"):
-        EP.EngineProfile.model_validate(
-            _minimal_profile_row(runtime="cloud")
-        )
 
 
 def test_bad_config_is_exception_wrapped(monkeypatch, tmp_path):

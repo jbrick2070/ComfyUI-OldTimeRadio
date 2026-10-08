@@ -141,7 +141,7 @@ def _selected_model() -> str:
 def _models_to_try(model: str, *, allow_retry: bool = True) -> tuple[str, ...]:
     # Cache-active callers pass allow_retry=False to force single-model runs so
     # a fallback model cannot silently produce audio cached under the requested
-    # model's key. Matches the profile error_policy: fail_loud.
+    # model's key.
     if not allow_retry:
         return (model,)
     configured = str(otr_env.get("OTR_GOOGLE_TTS_RETRY_MODELS") or "").strip()

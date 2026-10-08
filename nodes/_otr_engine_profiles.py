@@ -35,15 +35,7 @@ log = logging.getLogger("OTR")
 
 _PROFILES_FILENAME = "audio_engine_profiles.yaml"
 
-# Sprint 1: validated value sets for the new declarative profile metadata.
-# "cloud" (cloud-audio campaign 2026-07-03, C1): a partner-node engine invoked via
-# invoke_partner_node (ElevenLabs TTS / Sonilo music) -- dispatch runs through the
-# adapter, not profile.runtime, but the runtime tag must validate. "direct_api"
-# is a BYO-key provider call made directly by an adapter (not a Partner node).
-_VALID_RUNTIMES = {"in_graph", "oop_venv", "cloud", "direct_api"}
 _VALID_LICENSE_STATES = {"", "clean", "gated", "unknown"}
-# error_policy for cloud engines -- fail-loud, never a silent local fallback.
-_VALID_ERROR_POLICIES = {"", "fail_loud"}
 
 # Hardcoded engine order per role for INPUT_TYPES (C-5: never empty combo, stable
 # across flags, no IO). Index 0 is the shipped default for the role: char_voice and
@@ -107,22 +99,8 @@ class EngineProfile(BaseModel):
     sample_rate: int = 0
     requires_hf_token: bool = False
 
-    # --- Declarative engine metadata (additive). Defaults keep the existing
-    # rows valid; the YAML populates them explicitly. These describe the
-    # runtime tag + licensing; they do NOT change the live byte-identical
-    # dispatch. ---
-    runtime: str = "in_graph"        # in_graph | oop_venv | cloud | direct_api
+    # Declarative licensing metadata; it never changes dispatch.
     license_state: str = ""          # blank -> derive from commercial_clean
-
-    # --- Cloud-audio campaign 2026-07-03 (C1): declarative cloud-engine metadata
-    # (additive; blank defaults keep every existing row valid). Populated only on
-    # runtime="cloud" profiles (ElevenLabs TTS / Sonilo music). These describe the
-    # partner-node invoke contract; they do NOT change the byte-identical default
-    # dispatch (the cloud engine is dropdown-opt-in, never a default). ---
-    partner_row: str = ""            # pinned partner_nodes.yaml key (e.g. cloud_elevenlabs_tts)
-    required_param_defaults: dict = Field(default_factory=dict)
-    auth_required: bool = False      # cloud engines need the queue's api_key_comfy_org (fail-loud)
-    error_policy: str = ""           # "" | fail_loud (cloud = fail_loud, no local fallback)
 
     # --- Cloud-audio-cache chunk 2 (2026-08-08): content-addressed replay
     # activation. When True, the per-line voice dispatcher runs FileAudioCache
@@ -148,47 +126,12 @@ class EngineProfile(BaseModel):
     character_stable_seed: bool = False
 
     @model_validator(mode="after")
-    def _validate_metadata(self):
-        if self.runtime not in _VALID_RUNTIMES:
-            raise ValueError(
-                f"profile '{self.profile_id}': runtime '{self.runtime}' not in "
-                f"{sorted(_VALID_RUNTIMES)}"
-            )
+    def _validate_license_state(self):
         if self.license_state not in _VALID_LICENSE_STATES:
             raise ValueError(
                 f"profile '{self.profile_id}': license_state "
                 f"'{self.license_state}' not in {sorted(_VALID_LICENSE_STATES)}"
             )
-        if self.error_policy not in _VALID_ERROR_POLICIES:
-            raise ValueError(
-                f"profile '{self.profile_id}': error_policy "
-                f"'{self.error_policy}' not in {sorted(_VALID_ERROR_POLICIES)}"
-            )
-        # cloud runtime demands the fail-loud contract + a partner row.
-        if self.runtime == "cloud":
-            if self.error_policy != "fail_loud":
-                raise ValueError(
-                    f"profile '{self.profile_id}': runtime=cloud requires "
-                    f"error_policy=fail_loud (no silent local fallback)")
-            if not self.partner_row:
-                raise ValueError(
-                    f"profile '{self.profile_id}': runtime=cloud requires a "
-                    f"partner_row (the pinned partner_nodes.yaml key)")
-        # direct_api runtime is explicit-selection-only BYO-provider access. It
-        # must be fail-loud, authenticated, and must not claim a Partner row.
-        if self.runtime == "direct_api":
-            if self.error_policy != "fail_loud":
-                raise ValueError(
-                    f"profile '{self.profile_id}': runtime=direct_api requires "
-                    f"error_policy=fail_loud (no silent local fallback)")
-            if not self.auth_required:
-                raise ValueError(
-                    f"profile '{self.profile_id}': runtime=direct_api requires "
-                    f"auth_required=true")
-            if self.partner_row:
-                raise ValueError(
-                    f"profile '{self.profile_id}': runtime=direct_api requires "
-                    f"partner_row='' (direct APIs are not Partner nodes)")
         return self
 
 
@@ -206,9 +149,8 @@ class EngineProfileResolver:
 
     VERSION = "1"
 
-    def __init__(self, profiles: Dict[str, EngineProfile], source_sha256: str):
+    def __init__(self, profiles: Dict[str, EngineProfile]):
         self._by_id = dict(profiles)
-        self.source_sha256 = source_sha256
 
     def profile_ids(self) -> List[str]:
         return sorted(self._by_id)
@@ -289,7 +231,7 @@ def _resolver_from_text(text: str) -> EngineProfileResolver:
         if profile.profile_id in by_id:
             raise ValueError(f"duplicate profile_id '{profile.profile_id}'")
         by_id[profile.profile_id] = profile
-    resolver = EngineProfileResolver(by_id, sha)
+    resolver = EngineProfileResolver(by_id)
     _RESOLVER_CACHE[sha] = resolver
     return resolver
 
