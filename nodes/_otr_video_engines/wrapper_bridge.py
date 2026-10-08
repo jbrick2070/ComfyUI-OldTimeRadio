@@ -1180,7 +1180,8 @@ def run_ffmpeg(cmd):
     return cmd
 
 
-def proven_frame_count(out_path, declared, *, ffprobe="ffprobe"):
+def proven_frame_count(out_path, declared, *, ffprobe="ffprobe",
+                       preprobed_fields=None):
     """How many frames the CLIP ON DISK holds -- not how many were piped at it.
 
     ``encode_frames_to_silent_mp4`` used to return ``len(frames)``, the length
@@ -1207,9 +1208,17 @@ def proven_frame_count(out_path, declared, *, ffprobe="ffprobe"):
     2026-07-28 -- header 37-45ms per clip (that is the ffprobe process, not the
     counting), decode 43-132ms, against real beat renders of 744-842 SECONDS in
     the 2026-07-27 ltx sweep. The cost was never the reason not to do this.
+
+    ``preprobed_fields`` is for a caller that has JUST run
+    ``ffprobe_clip_fields`` on this same finished file with the same
+    ``ffprobe``: it hands that result in instead of paying for an identical
+    second probe. ``None`` (omitted) probes here. An empty mapping is a real
+    answer -- probed, no count -- and goes straight to the decode.
     """
     from . import wan_shared as _ws
-    counted = _ws.ffprobe_clip_fields(out_path, ffprobe=ffprobe).get("nb_frames")
+    if preprobed_fields is None:
+        preprobed_fields = _ws.ffprobe_clip_fields(out_path, ffprobe=ffprobe)
+    counted = preprobed_fields.get("nb_frames")
     how = "the container's own count"
     if counted is None:
         counted = _ws.ffprobe_counted_frames(out_path, ffprobe=ffprobe)

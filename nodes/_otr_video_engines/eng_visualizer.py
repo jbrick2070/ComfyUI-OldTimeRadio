@@ -289,8 +289,9 @@ class VisualizerEngine:
         # gate could not see them either -- it grepped two literal call
         # spellings and this is a third. frame_count is the integer timing
         # authority, and it was the pre-computed loop bound, self-declared.
-        validate_silent_clip_contract(ffprobe_clip_fields(out_path), fps)
-        proven = proven_frame_count(out_path, total)
+        fields = ffprobe_clip_fields(out_path)
+        validate_silent_clip_contract(fields, fps)
+        proven = proven_frame_count(out_path, total, preprobed_fields=fields)
         if not otr_env.get("OTR_TEST_MODE"):
             _LOG.info("[OTR video] viz_green %dx%d x%d frames -> %s",
                       w, h, proven, out_path)
