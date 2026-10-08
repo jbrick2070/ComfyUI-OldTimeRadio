@@ -30,7 +30,3 @@ ROLE_TO_PROFILE_KEY: dict = {
 
 #: The role_compat role tokens, in canonical order.
 ALL_ROLES: tuple = tuple(ROLE_TO_PROFILE_KEY.keys())
-
-#: The three per-role IMAGE override keys (announcer / music / character image --
-#: the character image slot carries the character stills).
-IMAGE_KEYS: tuple = ("announcer_image", "music_image", "character_image")

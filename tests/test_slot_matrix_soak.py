@@ -28,7 +28,6 @@ import pytest
 import nodes._otr_video_engines  # noqa: F401  (self-registers every engine)
 from nodes import _otr_workflow_apply as wa
 from nodes._otr_shared import role_compat as rc
-from nodes._otr_shared import slot_matrix as sm
 from nodes._otr_shared.capability_profiles import load_profile
 from nodes._otr_video_engines import registry as vreg
 
@@ -60,12 +59,6 @@ def _load_canonical() -> dict:
 # --------------------------------------------------------------------------- #
 # all-slots applied to the REAL workflow JSON
 # --------------------------------------------------------------------------- #
-
-
-def test_image_keys_are_exactly_the_three():
-    # 2026-07-04 rename: the third image role key is character_image (guards the
-    # silent-drop path in build_all_role_profile).
-    assert sm.IMAGE_KEYS == ("announcer_image", "music_image", "character_image")
 
 
 def test_canonical_json_character_granularity_widget():
