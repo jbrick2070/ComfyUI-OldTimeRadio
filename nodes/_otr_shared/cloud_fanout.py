@@ -15,14 +15,13 @@ except ImportError:  # pragma: no cover -- flat test imports
 
 
 class CloudFanoutError(RuntimeError):
-    """A ready-queue that never drained, or an item with no id."""
+    """An item with no id."""
 
 
 @dataclass
 class FanoutOutcome:
     results: dict = field(default_factory=dict)
     errors: dict = field(default_factory=dict)
-    stuck_ids: list = field(default_factory=list)
     halted_ids: list = field(default_factory=list)
 
 
@@ -95,16 +94,15 @@ def run_cloud_fanout(
     *,
     item_id,
     execute,
-    predecessors=None,
     workers=None,
     prompt_id=None,
     on_item_done=None,
 ):
     """Request many provider jobs; collect by id.
 
-    ``execute(item)`` runs in a worker. ``predecessors(item)`` returns
-    ids that must SUCCEED first (default empty -- every cheap Vidu /
-    Luma still / ElevenLabs line is ready at t=0).
+    ``execute(item)`` runs in a worker. Every item is ready at t=0 -- every
+    cheap Vidu / Luma still / ElevenLabs line -- and at most ``workers`` of
+    them are in flight at once.
 
     Results and errors are keyed by id. The caller walks the original
     ``items`` order to commit or to raise the first error, so a clip
@@ -119,7 +117,6 @@ def run_cloud_fanout(
         return FanoutOutcome()
     n_workers = cloud_fanout_workers() if workers is None else int(workers)
     n_workers = max(1, min(n_workers, len(items)))
-    pred_fn = predecessors or (lambda _item: ())
 
     def _pid(item):
         sid = str(item_id(item) or "").strip()
@@ -129,27 +126,17 @@ def run_cloud_fanout(
 
     pending = list(items)
     submitted = set()
-    finished_ok = set()
     results = {}
     errors = {}
     futs = {}
     halt_submit = False
-
-    def _ready():
-        ready = []
-        for item in pending:
-            deps = tuple(
-                str(p) for p in (pred_fn(item) or ()) if p not in (None, ""))
-            if all(d in finished_ok for d in deps):
-                ready.append(item)
-        return ready
 
     def _submit(pool):
         from .cloud_media_invoke import bind_prompt_id
 
         if halt_submit:
             return
-        for item in _ready():
+        for item in pending:
             # Keep only n_workers in flight. Submitting the whole ready
             # set at t=0 queues every remaining beat, so a spend-cap
             # refusal cannot stop the rest (live 2026-09-16: hundreds of
@@ -181,7 +168,6 @@ def run_cloud_fanout(
                 pending = [s for s in pending if _pid(s) != sid]
                 try:
                     results[sid] = fut.result()
-                    finished_ok.add(sid)
                 except Exception as exc:  # noqa: BLE001 -- raise in caller order
                     errors[sid] = exc
                     from .cloud_media_backend import is_cloud_budget_error
@@ -191,10 +177,10 @@ def run_cloud_fanout(
                     on_item_done(item)
             _submit(pool)
 
-    leftover = [_pid(s) for s in pending]
+    # Every item is ready at t=0, so the only way an item is still pending
+    # here is that a spend-cap refusal stopped the submits before its turn.
     if halt_submit:
         return FanoutOutcome(
-            results=results, errors=errors, stuck_ids=[],
-            halted_ids=leftover)
-    return FanoutOutcome(
-        results=results, errors=errors, stuck_ids=leftover)
+            results=results, errors=errors,
+            halted_ids=[_pid(s) for s in pending])
+    return FanoutOutcome(results=results, errors=errors)

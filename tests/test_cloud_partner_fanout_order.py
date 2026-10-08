@@ -33,7 +33,6 @@ def test_run_cloud_fanout_finishes_out_of_order_returns_in_item_order():
     assert finish[0] == "c", finish
     assert [out.results[i] for i in items] == ["A", "B", "C"]
     assert out.errors == {}
-    assert out.stuck_ids == []
 
 
 def test_run_cloud_fanout_keeps_first_item_error_while_later_jobs_land():
@@ -95,7 +94,6 @@ def test_run_cloud_fanout_halts_remaining_on_budget_error():
     assert "a" in out.errors
     assert cmb.is_cloud_budget_error(out.errors["a"])
     assert out.halted_ids == ["b", "c"]
-    assert out.stuck_ids == []
     assert out.results == {}
 
 
@@ -118,7 +116,6 @@ def test_run_cloud_fanout_workers_gt1_does_not_submit_after_budget():
     assert "c" not in started and "d" not in started, started
     assert set(out.halted_ids) == {"c", "d"}
     assert "a" in out.errors
-    assert out.stuck_ids == []
 
 
 def test_cloud_budget_floor_sid_sees_wrapped_render_error():

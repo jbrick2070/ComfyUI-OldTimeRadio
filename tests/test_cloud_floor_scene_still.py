@@ -448,9 +448,9 @@ def test_every_cloud_floor_site_in_run_episode_renders_the_still():
     stamps = body.count("_stamp_cloud_floor_shot(") + body.count(
         "_stamp_budget_floor_shot(")
     committed = body.count("_commit_still_floor(")
-    # Every stamped floor (job, predecessor, budget; both walks) is committed
-    # through the still floor -- one definition plus one call per stamp.
-    assert stamps >= 7
+    # Every stamped floor (job, budget; both walks) is committed through the
+    # still floor -- one definition plus one call per stamp.
+    assert stamps >= 5
     assert committed == stamps + 1
 
 

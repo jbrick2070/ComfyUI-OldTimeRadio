@@ -224,7 +224,7 @@ def test_mixed_local_and_cloud_stays_serial(stub_registry, monkeypatch):
 
 def test_intra_beat_chain_still_allows_episode_fanout():
     """CHAIN last-frame starts stay serial INSIDE that beat. Other beats
-    can still fly -- that is the later cloud parallel path."""
+    can still fly -- that is the cloud parallel path."""
     section = {
         "shots": [
             {"engine_id": "cloud_vidu_q2_pro_fast_720p", "beat_id": "b0",
@@ -234,49 +234,6 @@ def test_intra_beat_chain_still_allows_episode_fanout():
         ],
     }
     assert rd._should_fanout_cloud_episode(section, set()) is True
-
-
-def test_cross_beat_last_frame_waits_on_the_predecessor():
-    """When first-to-last is added later: fire everyone whose first frame
-    is already on disk; hold the beat that starts on another clip's last
-    frame until that clip lands. Driven through ``run_cloud_fanout``, the
-    ready-queue ``run_episode`` itself uses, with the driver's own
-    ``cloud_frame_predecessors`` as the dependency source."""
-    a = {"shot_id": "shot_a", "engine_id": "cloud_vidu_q2_pro_fast_720p"}
-    b = {"shot_id": "shot_b", "engine_id": "cloud_vidu_q2_pro_fast_720p",
-         "starts_on_last_frame_of": "shot_a"}
-    c = {"shot_id": "shot_c", "engine_id": "cloud_vidu_q2_pro_fast_720p"}
-    assert rd.cloud_frame_predecessors(a) == ()
-    assert rd.cloud_frame_predecessors(b) == ("shot_a",)
-
-    started = []
-    started_lock = threading.Lock()
-    b_started = threading.Event()
-    c_started = threading.Event()
-
-    def execute(shot):
-        sid = shot["shot_id"]
-        with started_lock:
-            started.append(sid)
-        if sid == "shot_a":
-            # The independent beat is in flight beside A (wave 1), and a
-            # dependent that was fired at t=0 would have shown itself by now.
-            assert c_started.wait(5), "independent beat was not fired in wave 1"
-            assert not b_started.wait(0.15), (
-                "dependent beat started before its predecessor landed")
-        elif sid == "shot_b":
-            b_started.set()
-        else:
-            c_started.set()
-        return sid
-
-    out = cf.run_cloud_fanout(
-        [a, b, c], item_id=lambda s: s["shot_id"], execute=execute,
-        predecessors=rd.cloud_frame_predecessors, workers=3)
-    assert out.errors == {}
-    assert out.stuck_ids == []
-    assert sorted(out.results) == ["shot_a", "shot_b", "shot_c"]
-    assert started.index("shot_b") > started.index("shot_a")
 
 
 def test_jump_and_single_cloud_shots_may_fanout():
@@ -310,46 +267,6 @@ def test_first_ledger_failure_wins_even_if_a_later_clip_already_landed(
     assert "shot_0001" in _FINISH
 
 
-def test_run_episode_holds_a_last_frame_dependent_until_the_pred_lands(
-        stub_registry, monkeypatch):
-    """The later first-to-last path: B cannot even START until A has
-    landed. Independent C still flies in wave 1."""
-    monkeypatch.delenv("OTR_CLOUD_VIDEO_FANOUT", raising=False)
-    started = []
-    started_lock = threading.Lock()
-    a_done = threading.Event()
-
-    class _ChainStub(_CloudFanStub):
-        name = "cloud_fanout_readyq"
-
-        def render_clip(self, request, prepared):
-            sid = str(request.get("shot_id") or "")
-            with started_lock:
-                started.append(sid)
-            if sid == "shot_0001":
-                assert a_done.is_set(), (
-                    "dependent beat started before its predecessor landed")
-            if sid == "shot_0000":
-                time.sleep(0.12)
-                a_done.set()
-            with _LOCK:
-                _FINISH.append(sid)
-            return {"raw": True}
-
-    inst = _ChainStub()
-    vreg.register(inst)
-    ledger = _ledger(
-        "cloud_fanout_readyq", "cloud_fanout_readyq", "cloud_fanout_readyq")
-    ledger["video"]["shots"][1]["starts_on_last_frame_of"] = "shot_0000"
-    out = rd.run_episode(ledger)
-    assert "shot_0000" in started
-    assert "shot_0001" in started
-    assert "shot_0002" in started
-    assert started.index("shot_0001") > started.index("shot_0000")
-    assert list(out["clips"]) == ["shot_0000", "shot_0001", "shot_0002"]
-    assert _FINISH[0] in ("shot_0002", "shot_0000")
-
-
 def test_sanctioned_gap_beat_is_not_submitted_on_fanout(
         stub_registry, monkeypatch):
     """Gap beats stay in the ledger and never enter the pool."""
@@ -367,15 +284,6 @@ def test_sanctioned_gap_beat_is_not_submitted_on_fanout(
     assert list(out["clips"]) == ["shot_0000", "shot_0002"]
     assert [s["shot_id"] for s in out["ledger"]["video"]["shots"]] == [
         "shot_0000", "shot_0001", "shot_0002"]
-
-
-def test_ready_queue_cycle_is_loud(stub_registry, monkeypatch):
-    monkeypatch.delenv("OTR_CLOUD_VIDEO_FANOUT", raising=False)
-    ledger = _ledger("cloud_fanout_stub", "cloud_fanout_stub")
-    ledger["video"]["shots"][0]["starts_on_last_frame_of"] = "shot_0001"
-    ledger["video"]["shots"][1]["starts_on_last_frame_of"] = "shot_0000"
-    with pytest.raises(rd.RenderError, match="never became ready"):
-        rd.run_episode(ledger)
 
 
 def test_fanout_workers_bind_the_comfy_prompt_id(stub_registry, monkeypatch):

@@ -441,9 +441,6 @@ class StableAudioTheme:
                 execute=_forward_one_music_cue,
                 workers=min(workers, len(cue_jobs)),
                 prompt_id=snapshot_prompt_id())
-            if outcome.stuck_ids and not outcome.errors:
-                raise RuntimeError(
-                    "cloud music fan-out stuck: %s" % outcome.stuck_ids)
             for job in cue_jobs:
                 jid = job["job_id"]
                 if jid in outcome.errors:

@@ -1448,10 +1448,6 @@ def _flush_pending_cloud_stills(pending, ctx):
         execute=lambda j: _render_still_pixels(j, ctx),
         workers=workers,
         prompt_id=snapshot_prompt_id())
-    if outcome.stuck_ids and not outcome.errors:
-        raise ImageRenderError(
-            "cloud still fan-out stuck; stills never became ready: %s"
-            % outcome.stuck_ids)
     for job in jobs:
         oid = job["oid"]
         if oid in outcome.errors:

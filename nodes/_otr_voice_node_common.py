@@ -1797,9 +1797,6 @@ class OTRVoiceNodeBase:
                     workers=min(workers, len(misses)),
                     prompt_id=snapshot_prompt_id(),
                     on_item_done=lambda _job: _line_progress.step())
-                if outcome.stuck_ids and not outcome.errors:
-                    raise RuntimeError(
-                        "cloud TTS fan-out stuck: %s" % outcome.stuck_ids)
                 outcome_errors = outcome.errors
                 for j in misses:
                     if j["job_id"] in outcome.results:
