@@ -353,24 +353,6 @@ class LineRequest:
     # correct pronouns/title (kills the "Mister <female>"-class mismatch).
     # Empty string -> no PRONOUNS directive (legacy callers unaffected).
     speaker_gender: str = ""
-    # Story-quality LIFT L1/L2 (2026-06-23) -- deterministic upstream beat
-    # shaping. beat_role = the dramatic FUNCTION of this beat (setup / pressure
-    # / personal_stake / irreversible_choice / consequence); conflict_object +
-    # conflict_type = the premise-anchored, Python-chosen specifics that replace
-    # the generic "console/lever" standoff. Populated ONLY when
-    # OTR_STORY_QUALITY_L12 is on (writer-side sq dict). Empty default => the
-    # DRAMATIC FRAME render below is byte-identical to the pre-LIFT prompt.
-    beat_role: str = ""
-    conflict_object: str = ""
-    conflict_type: str = ""
-    # Story-grammar build (2026-06-24, C4) -- the concrete final-beat ENDING
-    # instruction for this episode's style climax class (revelation / reversal /
-    # confession / quiet_acceptance / ...). Set by the writer ONLY on the
-    # climax-class (final character) beat when OTR_ENABLE_STYLE_GRAMMAR is on;
-    # empty on every other beat and whenever the lever is off => the ENDING
-    # render below is dropped => byte-identical to the pre-grammar prompt. This
-    # is the single behavioral injection of the style grammar.
-    ending_template: str = ""
     # Multilingual one-switch: the row-owned native authoring instruction.
     # Empty for English/legacy so every existing prompt stays byte-identical.
     language_instruction: str = ""
@@ -740,25 +722,10 @@ def _build_user_prompt(req: LineRequest) -> str:
                 "  Places, agencies, things: "
                 + ", ".join(sorted(req.allowed_things))
             )
-        # KILL 1 (2026-06-24 assumption-audit): when this beat carries a
-        # premise-anchored conflict_object (the grounding lever is on), DROP the
-        # "generic control-room roles are fine" license -- it actively invited
-        # the "mission control / the console" sameness. Steer to the named
-        # entities + this scene's conflict instead. conflict_object is empty
-        # whenever the lever is off => the original license renders => byte-
-        # identical.
-        if req.conflict_object:
-            parts.append(
-                "Use only the named entities above and this scene's specific "
-                "conflict; do not invent any other proper name, and do not "
-                'retreat to generic control-room roles ("the tech", "the lab", '
-                '"mission control").'
-            )
-        else:
-            parts.append(
-                'Generic roles ("the tech", "the lab", "mission control") '
-                "are fine. Do not invent any other proper name."
-            )
+        parts.append(
+            'Generic roles ("the tech", "the lab", "mission control") '
+            "are fine. Do not invent any other proper name."
+        )
 
     # CAST replaces single-speaker CHARACTER when all_voice_cards is
     # threaded. Falls back to the speaker-only voice card on legacy
@@ -860,49 +827,6 @@ def _build_user_prompt(req: LineRequest) -> str:
         _this_beat_lines.append(f"  Subtext:   {req.beat_subtext}")
     if 1 <= req.beat_tension <= 5:
         _this_beat_lines.append(f"  Tension:   {req.beat_tension}/5")
-    # Story-quality LIFT L1/L2 (2026-06-23). Premise-anchored conflict + the
-    # beat's dramatic FUNCTION, rendered ONLY when populated (the writer fills
-    # these from the sq dict iff OTR_STORY_QUALITY_L12 is on) -- so the block is
-    # byte-identical to the pre-LIFT prompt whenever the lever is off.
-    if req.conflict_object:
-        _co_line = f"  Conflict over: {req.conflict_object}"
-        if req.conflict_type:
-            _co_line += f" -- {req.conflict_type}"
-        _this_beat_lines.append(_co_line)
-    if req.beat_role == "irreversible_choice":
-        _this_beat_lines.append(
-            "  Beat function: the IRREVERSIBLE CHOICE -- the decisive moment "
-            "happens HERE, on-stage, in this line. Do NOT defer it to a later "
-            "beat or let it be narrated after the fact."
-        )
-    elif req.beat_role == "personal_stake":
-        _this_beat_lines.append(
-            "  Beat function: PERSONAL STAKE -- make what this costs THIS "
-            "character concrete and personal, not abstract or procedural."
-        )
-    elif req.beat_role == "setup":
-        _this_beat_lines.append(
-            "  Beat function: SETUP -- establish the specific situation; do "
-            "not jump to threats or countdowns."
-        )
-    elif req.beat_role == "pressure":
-        _this_beat_lines.append(
-            "  Beat function: PRESSURE -- raise the stake through the specific "
-            "conflict above, not through a generic alarm or timer."
-        )
-    elif req.beat_role == "consequence":
-        _this_beat_lines.append(
-            "  Beat function: CONSEQUENCE -- show what the choice changed."
-        )
-    # Story-grammar build (2026-06-24, C4) -- the style-selected ENDING shape for
-    # the climax (final character) beat. Rendered ONLY when the writer populated
-    # it (OTR_ENABLE_STYLE_GRAMMAR on, and only on the climax beat), so the block
-    # is byte-identical to the pre-grammar prompt whenever the lever is off. This
-    # carries the on-mic ending instruction for the non-irreversible climax
-    # classes (revelation / reversal / confession / quiet_acceptance / ...), which
-    # the beat_role chain above deliberately does not render a function line for.
-    if req.ending_template:
-        _this_beat_lines.append(f"  Ending: {req.ending_template}")
     if _sqv2_deflect:
         _this_beat_lines.append(
             "  Play it indirectly: this line IS the deflection -- do NOT state "
@@ -1021,20 +945,11 @@ def _build_user_prompt(req: LineRequest) -> str:
         indirect += " The situation must be different after this line."
     parts.append(indirect)
     # Grounding context guides the first authoring call; it is never a post-hoc vocabulary gate.
-    if req.conflict_object:
-        parts.append(
-            "Ground this line in this scene's premise and the specific "
-            f"conflict over {req.conflict_object}; do not invent people, "
-            "places, or objects the premise does not imply, and do not "
-            "retreat to generic control-room machinery (consoles, levers, "
-            "fuel cells, reactors). Keep it natural and speakable aloud."
-        )
-    else:
-        parts.append(
-            "Ground this line in the news facts and this scene's premise; "
-            "do not invent people, places, or objects the news does not "
-            "imply. Keep it natural and speakable aloud."
-        )
+    parts.append(
+        "Ground this line in the news facts and this scene's premise; "
+        "do not invent people, places, or objects the news does not "
+        "imply. Keep it natural and speakable aloud."
+    )
     language_instruction = str(req.language_instruction or "").strip()
     if language_instruction:
         parts.append(language_instruction)
