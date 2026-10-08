@@ -14,9 +14,23 @@ So this walks the graph instead of the list:
      node. Its EDGES are every name its own body mentions.
   2. Module-level code, ``__all__``, the node-class contract and everything
      under ``tests/`` are ROOTS -- they run, or they are the contract.
-  3. A node reachable from no root is dead. Remove it from the model and
-     re-run: its edges disappear, which can strand the next node. Repeat until
-     nothing changes. That fixpoint is the chain.
+  3. A node that nothing still in the model mentions -- no root and no other
+     live node -- is dead. Remove it from the model and re-run: its edges
+     disappear, which can strand the next node. Repeat until nothing changes.
+     That fixpoint is the chain.
+  4. A node a protective doc or module speaks for (see PROTECTIVE_DOCS) is
+     never removed from the model. It stays live, so everything IT mentions
+     stays reachable, and it is reported in its own section for a human to
+     read the ruling. (Protection used to be applied only to the printed
+     result, after the sweep, so the dependencies of a protected symbol --
+     CanonicalImage under the ruled-on ImageLedgerSection -- were printed as
+     removable.)
+
+KNOWN LIMITS, both in the safe direction (dead code missed, never live code
+proposed): this peels unmentioned leaves rather than computing reachability
+from the roots, so two dead functions that mention each other keep each other
+alive; and edges are bare names, so a dead ``helper`` here is kept alive by any
+live ``helper`` -- or the string "helper" -- anywhere in the scanned tree.
 
 READ-ONLY. It prints candidates; a human deletes. It is deliberately
 conservative and says where it is blind: a name reached by ``getattr``, a
@@ -190,9 +204,17 @@ def build(include_tests: bool):
     return definitions, edges, root_names, by_name
 
 
-def sweep(include_tests: bool):
+def sweep(include_tests: bool, is_protected=None):
+    """Peel unmentioned definitions to a fixpoint.
+
+    ``is_protected(rel, name)`` returns the doc that speaks for a symbol, or a
+    falsy value. A protected definition is never marked dead: it stays in the
+    model, so its own edges keep its dependencies mentioned. It is returned in
+    ``flagged`` (key -> doc) the first round nothing mentions it.
+    """
     definitions, edges, root_names, _by_name = build(include_tests)
     dead: set = set()
+    flagged: dict = {}
     rounds: list = []
     while True:
         mentioned = set(root_names)
@@ -200,16 +222,23 @@ def sweep(include_tests: bool):
             if key not in dead:
                 mentioned |= names
         newly = set()
-        for key, (_rel, name, _lineno, _kind) in definitions.items():
-            if key in dead or name in DYNAMIC_HINTS or name.startswith("__"):
+        for key, (rel, name, _lineno, _kind) in definitions.items():
+            if key in dead or key in flagged:
                 continue
-            if name not in mentioned:
+            if name in DYNAMIC_HINTS or name.startswith("__"):
+                continue
+            if name in mentioned:
+                continue
+            doc = is_protected(rel, name) if is_protected else None
+            if doc:
+                flagged[key] = doc
+            else:
                 newly.add(key)
         if not newly:
             break
         rounds.append(sorted(newly))
         dead |= newly
-    return definitions, rounds
+    return definitions, rounds, flagged
 
 
 def protected_names() -> dict:
@@ -225,23 +254,25 @@ def protected_names() -> dict:
     return out
 
 
+def protection_check():
+    """The ``is_protected(rel, name)`` callable :func:`sweep` applies."""
+    guarded = protected_names()
+
+    def is_protected(rel, name):
+        return PROTECTED_MODULES.get(rel) or guarded.get(name)
+
+    return is_protected
+
+
 def main() -> int:
     include_tests = "--include-tests" in sys.argv[1:]
-    definitions, rounds = sweep(include_tests)
+    definitions, rounds, flagged_map = sweep(include_tests, protection_check())
     total = sum(len(batch) for batch in rounds)
     scope = "nodes/ + scripts/ + roots"
     scope += "; tests/ scanned as code" if include_tests else "; tests/ are ROOTS"
     print("transitive dead-code candidates: %d over %d round(s) [%s]\n"
           % (total, len(rounds), scope))
-    guarded = protected_names()
-    flagged = []
-    for batch in rounds:
-        for key in list(batch):
-            rel, name = definitions[key][0], definitions[key][1]
-            doc = PROTECTED_MODULES.get(rel) or guarded.get(name)
-            if doc:
-                flagged.append((key, doc))
-                batch.remove(key)
+    flagged = list(flagged_map.items())
     for index, batch in enumerate(rounds, 1):
         if index == 1:
             label = "directly unreferenced"
