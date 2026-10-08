@@ -133,7 +133,7 @@ _GENDER_TOKENS: dict = {
 #: Bumped when the voice/portrait consistency CONTRACT changes -- never per run.
 #: `cast_lock_revision` cannot serve this: it increments every time the node
 #: executes, so it cannot tell a policy-era ledger from a pre-policy one. Nor can
-#: "is `presentation_gender` present?", which cannot distinguish POLICY ABSENT
+#: "is some per-row stamp present?", which cannot distinguish POLICY ABSENT
 #: from FIELD DROPPED -- exactly the ambiguity that let the spoken-citation
 #: receipt regress unnoticed. Absence of the stamp means legacy, always.
 VOICE_PORTRAIT_CONSISTENCY_POLICY_REVISION = 1

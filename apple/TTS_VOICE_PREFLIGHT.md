@@ -118,9 +118,10 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   `otr_bark_announcer_acceptance`, bank `original`): `RESULT SUCCESS`,
   `obs_publish OK`, published file confirmed on disk. Ledger's ANNOUNCER
   row: `tts_model="bark"`, `voice_preset="v2/en_speaker_2"`, `voice_ref_id=""`
-  (cleared), `presentation_gender="female"` matching the delivered preset
-  (gender coherence held, not just the pre-draw request). No longer a
-  follow-up -- this is a shipped, live-proven capability.
+  (cleared), and `presentation_gender="female"` (a ledger field since retired:
+  nothing read it) matching the delivered preset (gender coherence held, not
+  just the pre-draw request). No longer a follow-up -- this is a shipped,
+  live-proven capability.
 
 ## Gate 3 -- Generated data
 

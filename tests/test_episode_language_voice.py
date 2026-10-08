@@ -209,13 +209,11 @@ def test_a_gender_the_language_cannot_serve_borrows_english_same_gender():
     for cid in ("c1", "c2"):
         assert rows[cid]["voice_ref_id"] in {"am_adam", "am_liam"}, rows[cid]
         assert rows[cid]["voice_cast_fallback"] == "gender_borrowed_en"
-        assert rows[cid]["presentation_gender"] == "male"
     assert rows["c1"]["voice_ref_id"] != rows["c2"]["voice_ref_id"]
 
     # a gender the row DOES serve never leaves the language
     assert rows["c3"]["voice_ref_id"] == "ff_siwis"
     assert rows["c3"]["voice_cast_fallback"] == ""
-    assert rows["c3"]["presentation_gender"] == "female"
 
     joined = "\n".join(report)
     assert "borrowed from English, same gender" in joined
@@ -300,8 +298,6 @@ def test_a_gender_the_language_does_serve_never_borrows_english():
         # AND SHE STAYS A WOMAN. Spanish carries a female voice; it is simply
         # on the announcer row. Sharing the narrator's voice beats taking a
         # man's -- the old path stamped `em_alex` here and presented MALE.
-        assert rows["c1"]["presentation_gender"] == "female", (
-            seed, rows["c1"])
         assert rows["c1"]["voice_ref_id"] == "ef_dora", (seed, rows["c1"])
         assert rows["c1"]["voice_cast_fallback"] == "gender_reused_in_lang", (
             seed, rows["c1"])
@@ -366,7 +362,6 @@ def test_the_narrator_sharing_a_character_voice_is_reported():
         announcer_engine="kokoro", language="it")
     rows2 = {e["char_id"]: e for e in led2["cast"]}
     assert rows2["c1"]["voice_ref_id"] == "im_nicola", rows2["c1"]
-    assert rows2["c1"]["presentation_gender"] == "male"
     joined2 = "\n".join(report2)
     assert "voice distinctness: 2 distinct voice(s)" in joined2, joined2
     assert "COLLISION" not in joined2, joined2

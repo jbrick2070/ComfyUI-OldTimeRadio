@@ -1024,8 +1024,9 @@ class CastLock:
         ones already on this cast, gender-first, each row seeded by the episode
         seed and its own ``char_id`` (a distinct sha1 discriminator), so a
         re-lock of the same episode draws the same voices and no draw perturbs
-        another. ``presentation_gender`` comes from the preset actually drawn.
-        More characters than presets never reaches this draw:
+        another. A gender pool that runs dry is reported with the gender of
+        the preset actually drawn. More characters than presets never reaches
+        this draw:
         ``_assign_bark_voices`` counts them first (``_bark_seats``) and refuses
         the cast in words.
         """
@@ -1101,13 +1102,11 @@ class CastLock:
             row["voice_ref_id"] = ""
             row["commercial_clean"] = False
             row["voice_cast_fallback"] = ""
-            row["presentation_gender"] = delivered
             drawn.append("%s=%s" % (cid, preset))
             if gender in ("male", "female") and delivered != gender:
                 report.append(
                     "bark voices: %s gender pool exhausted -- requested %r, "
-                    "delivered %r (presentation_gender stamped from the "
-                    "actual preset)" % (cid, gender, delivered))
+                    "delivered %r" % (cid, gender, delivered))
         if drawn:
             report.append("bark voices: drew %s for character row(s) the "
                           "source bank left unvoiced" % ", ".join(drawn))
@@ -1218,9 +1217,9 @@ class CastLock:
         # fallback draw can therefore hand this row a preset of the OPPOSITE
         # gender from `row["gender"]`. Trusting the stale field here would be
         # exactly the "two correlated attributes, each locally plausible,
-        # globally incoherent" class Bug Bible 10.08 exists for -- so derive
-        # `presentation_gender` from what was ACTUALLY drawn, never from what
-        # was merely requested.
+        # globally incoherent" class Bug Bible 10.08 exists for -- so read the
+        # gender from what was ACTUALLY drawn, never from what was merely
+        # requested, and say so in the report when the two differ.
         from ._otr_voice_bank import bark_preset_gender
 
         delivered_gender = bark_preset_gender(preset) or str(row.get("gender") or "")
@@ -1231,7 +1230,6 @@ class CastLock:
         row["voice_ref_id"] = ""
         row["commercial_clean"] = False
         row["voice_cast_fallback"] = ""
-        row["presentation_gender"] = delivered_gender
         report.append(
             f"bark voices: announcer stamped {preset} "
             f"(excluded {len(taken)} character preset(s))"
@@ -1239,8 +1237,7 @@ class CastLock:
         if delivered_gender and delivered_gender != str(row.get("gender") or ""):
             report.append(
                 f"bark voices: announcer gender pool exhausted -- requested "
-                f"{row.get('gender')!r}, delivered {delivered_gender!r} "
-                f"(presentation_gender stamped from the actual preset)"
+                f"{row.get('gender')!r}, delivered {delivered_gender!r}"
             )
 
     # ------------------------------------------------------------------ #
@@ -2096,20 +2093,6 @@ class CastLock:
             leftover = str(entry.get("voice_preset") or "")
             if leftover.startswith("v2/"):
                 entry["voice_preset"] = ""
-        # presentation_gender (item 8 chunk 4, 2026-08-06): the gender the
-        # DELIVERED voice presents as, taken from the reference actually chosen
-        # rather than from the row's label. Stamped HERE because this is the one
-        # place every stamped row passes through -- characters, the announcer,
-        # the hybrid voice-fit branch and the gender-agnostic fallback alike.
-        #
-        # Two rows the label cannot answer for, and this is why the field exists:
-        # the ANNOUNCER's reference is drawn from the episode seed and never read
-        # its row's gender at all, and an `other` row is served by a draw the bank
-        # makes without regard to gender. In both cases the row said one thing and
-        # the audience heard another, with nothing in the ledger recording it.
-        # Whatever the bank's own vocabulary says wins -- including `neutral`,
-        # which is a real reference (el_river), not a bucket to round away.
-        entry["presentation_gender"] = str(getattr(ref, "gender", "") or "").strip().lower()
         # C3 (cloud-audio 2026-07-03): carry the provider voice id for cloud
         # (ElevenLabs) casting -- ONLY when present, so local (ref-clip/preset)
         # cast entries stay byte-identical. The durable cast stamp copies the

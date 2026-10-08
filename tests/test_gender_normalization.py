@@ -196,56 +196,7 @@ def test_the_two_helpers_are_not_interchangeable():
 # DIRECTLY, so the "second copy drifts" defect these guarded is unreachable
 # there by construction rather than by assertion.
 # --------------------------------------------------------------------------- #
-# presentation_gender -- chunk 4
-
-
-def test_presentation_gender_survives_set_cast(tmp_path):
-    """THE persistence test the earlier plan lacked. set_cast rebuilds a FIXED
-    row and drops every key it does not name -- a field written upstream and
-    omitted there evaporates on the next save."""
-    from nodes.production_ledger import Ledger
-
-    led = Ledger(episode_id="EP-GENDER-TEST", out_dir=str(tmp_path))
-    led.set_cast([{
-        "char_id": "c01", "name": "SCROOGE",
-        "character_description": "a miser", "gender": "female",
-        "presentation_gender": "female", "tts_model": "bark",
-        "voice_preset": "v2/en_speaker_9",
-    }])
-    row = led.data["cast"][0]
-    assert "presentation_gender" in row, (
-        "set_cast dropped presentation_gender -- the field would evaporate on save"
-    )
-    assert row["presentation_gender"] == "female"
-
-
-def test_set_cast_omits_presentation_gender_when_unstamped(tmp_path):
-    """Carried conditionally, like provider_voice_id: a writer-stage row nobody
-    has cast yet stays byte-identical to the legacy cast-row contract, so the
-    drift guard in test_scifi_news_pro_assembly keeps its teeth."""
-    from nodes.production_ledger import Ledger
-
-    led = Ledger(episode_id="EP-GENDER-TEST-2", out_dir=str(tmp_path))
-    led.set_cast([{"char_id": "c01", "name": "X",
-                   "character_description": "y", "gender": "male",
-                   "tts_model": "bark", "voice_preset": "v2/en_speaker_0"}])
-    row = led.data["cast"][0]
-    assert "presentation_gender" not in row
-
-
-def test_castlock_stamp_records_the_delivered_reference_gender():
-    """Stamped from the reference ACTUALLY chosen, not from the row's label --
-    the announcer's reference is drawn from the episode seed and never reads its
-    row's gender, so the label alone cannot answer for it."""
-    import inspect
-
-    from nodes import cast_lock
-
-    src = inspect.getsource(cast_lock.CastLock._stamp)
-    assert "presentation_gender" in src, (
-        "_stamp is the one place every stamped row passes through; the field "
-        "must be written there or the announcer and fallback rows miss it"
-    )
+# CastLock casts gender through the bank canonicalizer -- chunk 4
 
 
 def test_castlock_char_casting_uses_the_bank_canonicalizer():

@@ -4789,7 +4789,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # producer never honoured. Absence means legacy, permanently.
         #
         # cast_lock_revision cannot stand in: it counts EXECUTIONS, not contract
-        # versions. Nor can "is presentation_gender present?" -- that cannot tell
+        # versions. Nor can "is some per-row stamp present?" -- that cannot tell
         # POLICY ABSENT from FIELD DROPPED, which is precisely the ambiguity that
         # let the spoken-citation receipt regress unnoticed for thirty episodes.
         from ._otr_roster_gender import (

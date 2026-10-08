@@ -1413,20 +1413,6 @@ class Ledger:
                 "line_count":            _safe_int(r.get("line_count")),
                 "word_count":            _safe_int(r.get("word_count")),
             }
-            # presentation_gender (item 8 chunk 4, 2026-08-06): the gender the
-            # DELIVERED voice presents as, stamped by CastLock from the reference
-            # it actually chose. It has to be carried HERE or it evaporates --
-            # this method rebuilds a FIXED row and silently drops every key it
-            # does not name.
-            #
-            # Carried CONDITIONALLY, on the same reasoning as provider_voice_id
-            # below: a writer-stage row that nobody has cast yet stays
-            # byte-identical to the legacy contract, so the cast-row drift guard
-            # keeps its teeth. The 1,595 ledgers frozen before the field existed
-            # carry none, so a row without it is expected, not an error.
-            pg = _safe_str(r.get("presentation_gender"))
-            if pg:
-                row["presentation_gender"] = pg
             acc = _safe_str(r.get("accent"))
             if acc:
                 row["accent"] = acc

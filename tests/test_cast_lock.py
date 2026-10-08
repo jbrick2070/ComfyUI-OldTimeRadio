@@ -523,8 +523,7 @@ def test_bark_draws_voices_for_rows_a_content_owned_lane_left_empty(bank):
     assert len(set(presets[1:])) == 3
     for row in cast[2:]:
         assert row["tts_model"] == "bark" and row["voice_engine"] == "bark"
-        assert row["presentation_gender"] == bark_preset_gender(row["voice_preset"])
-        assert row["presentation_gender"] == row["gender"]
+        assert bark_preset_gender(row["voice_preset"]) == row["gender"]
     assert any("drew" in line and "c03=" in line for line in report)
 
     again = _lane_left_unvoiced_cast()
@@ -899,25 +898,12 @@ def test_bark_announcer_is_honored_on_every_source_bank(source_bank):
                for line in report)
 
 
-def test_bark_announcer_stamps_presentation_gender_from_delivered_preset():
-    from nodes.cast_lock import CastLock
-
-    cast = _bark_announcer_cast()  # ANNOUNCER row starts with gender="male"
-    CastLock._assign_bark_voices(cast, {"episode_seed": 42}, [],
-                                 announcer_voice_engine="bark")
-
-    row = next(r for r in cast if r["name"] == "ANNOUNCER")
-    from nodes._otr_voice_bank import bark_preset_gender
-
-    assert row["presentation_gender"] == bark_preset_gender(row["voice_preset"])
-
-
-def test_bark_announcer_gender_exhaustion_stamps_the_ACTUAL_delivered_gender():
+def test_bark_announcer_gender_exhaustion_is_reported_with_the_ACTUAL_delivered_gender():
     """kibitz r3 MUST-FIX (codex). python_assign_voice_preset falls back to
     the FULL pool when the requested gender's column is exhausted -- proven
     historically real by FIX-3 (3-female character casts against the
     4-female VOICE_PROFILES pool). A female-requesting announcer row whose
-    gender column is exhausted by characters must be credited for whatever
+    gender column is exhausted by characters must be reported with whatever
     gender it ACTUALLY got, never the stale request -- Bug Bible 10.08."""
     from nodes.cast_lock import CastLock
 
@@ -930,7 +916,8 @@ def test_bark_announcer_gender_exhaustion_stamps_the_ACTUAL_delivered_gender():
         {"char_id": "c3", "name": "C", "voice_preset": "v2/en_speaker_9"},
         {"char_id": "c4", "name": "D", "voice_preset": "v2/en_speaker_7"},
     ]
-    CastLock._assign_bark_voices(cast, {"episode_seed": 42}, [],
+    report: list = []
+    CastLock._assign_bark_voices(cast, {"episode_seed": 42}, report,
                                  announcer_voice_engine="bark")
 
     row = next(r for r in cast if r["name"] == "ANNOUNCER")
@@ -938,9 +925,11 @@ def test_bark_announcer_gender_exhaustion_stamps_the_ACTUAL_delivered_gender():
 
     delivered = bark_preset_gender(row["voice_preset"])
     assert delivered == "male", "every female preset was taken; must fall back"
-    assert row["presentation_gender"] == "male", (
-        "presentation_gender must reflect the ACTUAL delivered preset, not "
-        "the exhausted 'female' request")
+    assert any("announcer gender pool exhausted" in line
+               and "requested 'female', delivered 'male'" in line
+               for line in report), (
+        "the report must name the ACTUAL delivered gender, not only the "
+        "exhausted 'female' request")
 
 
 def test_non_bark_announcer_engine_leaves_the_bark_helper_a_no_op():
