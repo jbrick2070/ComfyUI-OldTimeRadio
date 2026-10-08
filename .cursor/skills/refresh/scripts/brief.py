@@ -1,9 +1,13 @@
 """Dump live shipping video pins for /refresh. Stdlib only. Run from repo root
 or anywhere: python .cursor/skills/refresh/scripts/brief.py
+
+The shipping list and every profile come from the pack's own matrix API,
+``nodes/_otr_shared/capability_profiles.py`` (``shipping_ids`` and
+``load_profile``) -- the same source ``scripts/build_variants.py`` uses -- so
+this script never re-reads build_variants.py or a profiles directory itself.
 """
 from __future__ import annotations
 
-import ast
 import json
 import sys
 from pathlib import Path
@@ -17,15 +21,14 @@ def _repo_root() -> Path:
     raise SystemExit("cannot find repo root (workflows/otr_canonical.json)")
 
 
-def _shipping_set(root: Path) -> tuple[str, ...]:
-    src = (root / "scripts" / "build_variants.py").read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            for t in node.targets:
-                if isinstance(t, ast.Name) and t.id == "SHIPPING_SET":
-                    return tuple(ast.literal_eval(node.value))
-    raise SystemExit("SHIPPING_SET not found")
+def _profile_api(root: Path):
+    # capability_profiles imports only the standard library, and the two
+    # package __init__ files above it import nothing, so this does not load
+    # the node pack.
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from nodes._otr_shared import capability_profiles
+    return capability_profiles
 
 
 def _node(graph: dict, ntype: str) -> dict | None:
@@ -39,14 +42,10 @@ def _director_video(graph: dict) -> list[str]:
     return [str(v) for v in wv[:3]]
 
 
-def _profile(root: Path, pid: str) -> dict:
-    path = root / "config" / "profiles" / ("%s.json" % pid)
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
 def main() -> int:
     root = _repo_root()
-    shipping = _shipping_set(root)
+    api = _profile_api(root)
+    shipping = api.shipping_ids()
     local = [p for p in shipping if not p.startswith("otr_cloud_")]
     cloud = [p for p in shipping if p.startswith("otr_cloud_")]
 
@@ -57,7 +56,7 @@ def main() -> int:
     print("  video", " | ".join(_director_video(canon)))
     print("LOCAL", len(local))
     for pid in local:
-        prof = _profile(root, pid)
+        prof = api.load_profile(pid)
         roles = prof.get("role_overrides") or {}
         print(
             "  %s  writer=%s  video=%s/%s/%s  image=%s"
@@ -72,7 +71,7 @@ def main() -> int:
         )
     print("CLOUD", len(cloud))
     for pid in cloud:
-        prof = _profile(root, pid)
+        prof = api.load_profile(pid)
         roles = prof.get("role_overrides") or {}
         llm = prof.get("llm") or {}
         feat = prof.get("features") or {}
