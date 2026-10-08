@@ -229,26 +229,50 @@ def test_intra_beat_chain_still_allows_episode_fanout():
              "coverage_plan": {"join_mode": "chain", "segment_count": 2}},
         ],
     }
-    assert rd._shot_is_first_to_last_chain(section["shots"][0]) is False
-    assert rd._shot_is_first_to_last_chain(section["shots"][1]) is True
     assert rd._should_fanout_cloud_episode(section, set()) is True
 
 
 def test_cross_beat_last_frame_waits_on_the_predecessor():
     """When first-to-last is added later: fire everyone whose first frame
     is already on disk; hold the beat that starts on another clip's last
-    frame until that clip lands."""
+    frame until that clip lands. Driven through ``run_cloud_fanout``, the
+    ready-queue ``run_episode`` itself uses, with the driver's own
+    ``cloud_frame_predecessors`` as the dependency source."""
     a = {"shot_id": "shot_a", "engine_id": "cloud_vidu_q2_pro_fast_720p"}
     b = {"shot_id": "shot_b", "engine_id": "cloud_vidu_q2_pro_fast_720p",
          "starts_on_last_frame_of": "shot_a"}
     c = {"shot_id": "shot_c", "engine_id": "cloud_vidu_q2_pro_fast_720p"}
     assert rd.cloud_frame_predecessors(a) == ()
     assert rd.cloud_frame_predecessors(b) == ("shot_a",)
-    ready0 = [s["shot_id"] for s in rd.cloud_shots_ready_now([a, b, c], ())]
-    assert ready0 == ["shot_a", "shot_c"]
-    ready1 = [s["shot_id"] for s in rd.cloud_shots_ready_now(
-        [a, b, c], ("shot_a",))]
-    assert ready1 == ["shot_a", "shot_b", "shot_c"]
+
+    started = []
+    started_lock = threading.Lock()
+    b_started = threading.Event()
+    c_started = threading.Event()
+
+    def execute(shot):
+        sid = shot["shot_id"]
+        with started_lock:
+            started.append(sid)
+        if sid == "shot_a":
+            # The independent beat is in flight beside A (wave 1), and a
+            # dependent that was fired at t=0 would have shown itself by now.
+            assert c_started.wait(5), "independent beat was not fired in wave 1"
+            assert not b_started.wait(0.15), (
+                "dependent beat started before its predecessor landed")
+        elif sid == "shot_b":
+            b_started.set()
+        else:
+            c_started.set()
+        return sid
+
+    out = cf.run_cloud_fanout(
+        [a, b, c], item_id=lambda s: s["shot_id"], execute=execute,
+        predecessors=rd.cloud_frame_predecessors, workers=3)
+    assert out.errors == {}
+    assert out.stuck_ids == []
+    assert sorted(out.results) == ["shot_a", "shot_b", "shot_c"]
+    assert started.index("shot_b") > started.index("shot_a")
 
 
 def test_jump_and_single_cloud_shots_may_fanout():

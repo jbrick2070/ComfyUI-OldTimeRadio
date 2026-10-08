@@ -5034,18 +5034,6 @@ def cloud_video_fanout_workers() -> int:
     return _workers() if pinned else CLOUD_VIDEO_FANOUT_DEFAULT
 
 
-def _shot_is_first_to_last_chain(shot) -> bool:
-    """True when THIS beat's later segments start on an earlier segment's last frame.
-
-    That is intra-beat JOIN_CHAIN. Those segments stay serial inside
-    ``render_beat_coverage``. They do NOT block other beats from flying.
-    """
-    raw = (shot or {}).get("coverage_plan")
-    if not isinstance(raw, dict):
-        return False
-    return str(raw.get("join_mode") or "").strip().lower() == "chain"
-
-
 def cloud_frame_predecessors(shot) -> tuple:
     """Shot ids whose LAST frame this shot needs as its FIRST frame.
 
@@ -5066,21 +5054,6 @@ def cloud_frame_predecessors(shot) -> tuple:
     if isinstance(pred, (list, tuple)):
         return tuple(str(p) for p in pred if p not in (None, ""))
     return (str(pred),)
-
-
-def cloud_shots_ready_now(shots, finished_shot_ids) -> list:
-    """Cloud parallel path: units whose first (and last, if pre-minted) frames exist.
-
-    A predecessor last-frame is 'exists' only once that shot id is in
-    ``finished_shot_ids``. Pre-minted stills need no predecessor.
-    """
-    done = {str(s) for s in (finished_shot_ids or ())}
-    ready = []
-    for shot in shots or ():
-        deps = cloud_frame_predecessors(shot)
-        if all(d in done for d in deps):
-            ready.append(shot)
-    return ready
 
 
 def _should_fanout_cloud_episode(section, gap_beats) -> bool:
@@ -5181,10 +5154,6 @@ def _stamp_budget_floor_shot(shot):
 
 def _shot_is_budget_floor(shot) -> bool:
     return bool(isinstance(shot, dict) and shot.get("budget_floor"))
-
-
-def _shot_is_content_floor(shot) -> bool:
-    return bool(isinstance(shot, dict) and shot.get("content_floor"))
 
 
 def _cloud_floor_reason(sid, errors, shot=None):
@@ -5702,8 +5671,7 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
             # Predecessor-ready beats are requested in waves via
             # run_cloud_fanout + cloud_frame_predecessors (today every
             # cheap-Vidu / jump / single shot has an empty predecessor
-            # list, so wave 1 is the episode). cloud_shots_ready_now is
-            # the same predicate, kept for the first-to-last unit test.
+            # list, so wave 1 is the episode).
             # Clips may land in any order; clips / new_shots / trace are
             # committed in LEDGER order so SilentComposite never sees a
             # scrambled timeline.

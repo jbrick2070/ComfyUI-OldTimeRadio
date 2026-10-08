@@ -1040,7 +1040,7 @@ def test_build_clip_manifest_counts_content_floor_as_sanctioned_gap():
     _delivered_n = sum(1 for c in m["clips"] if (c or {}).get("exists"))
     assert len(m["clips"]) - _delivered_n - _sanctioned == 0
     # The floor is its OWN stamp: a content refusal is not a spend cap.
-    assert rd._shot_is_content_floor(result["ledger"]["video"]["shots"][1])
+    assert result["ledger"]["video"]["shots"][1].get("content_floor")
     assert not rd._shot_is_budget_floor(result["ledger"]["video"]["shots"][1])
 
 
@@ -1139,9 +1139,9 @@ def test_content_refusal_floors_one_beat_and_the_episode_survives(
     shots = out["ledger"]["video"]["shots"]
     assert [s["shot_id"] for s in shots] == [
         "shot_0000", "shot_0001", "shot_0002"]        # order is preserved
-    assert rd._shot_is_content_floor(shots[1])
-    assert not rd._shot_is_content_floor(shots[0])
-    assert not rd._shot_is_content_floor(shots[2])
+    assert shots[1].get("content_floor")
+    assert not shots[0].get("content_floor")
+    assert not shots[2].get("content_floor")
     # The beats AFTER the refusal still rendered -- that is the whole point.
     assert "shot_0000" in out["clips"] and "shot_0002" in out["clips"]
     # The refused beat is shown as its own scene still, never as black.
@@ -1159,7 +1159,7 @@ def test_content_refusal_floors_on_the_serial_path_too(
     assert rd._should_fanout_cloud_episode(led["video"], set()) is False
     out = rd.run_episode(led)
     shots = out["ledger"]["video"]["shots"]
-    assert rd._shot_is_content_floor(shots[0])
+    assert shots[0].get("content_floor")
     # A refusal is a fact about ONE prompt: it must NOT halt the queue the way
     # an empty wallet does, so the beats behind it still get their attempt.
     assert "shot_0001" in out["clips"] and "shot_0002" in out["clips"]
@@ -1240,7 +1240,7 @@ def test_a_cloud_timeout_floors_one_beat_and_the_episode_survives(
     assert rd._shot_is_cloud_floor(shots[1])
     assert shots[1]["cloud_floor"] == "timeout"
     # A timeout is NOT a content refusal, and the ledger must not say it was.
-    assert not rd._shot_is_content_floor(shots[1])
+    assert not shots[1].get("content_floor")
     assert "shot_0000" in out["clips"] and "shot_0002" in out["clips"]
 
 
@@ -1268,8 +1268,8 @@ def test_every_floor_kind_is_counted_as_a_sanctioned_gap():
     for row in rows:
         assert row["status"] == _receipt.STATUS_SANCTIONED_GAP
     # The content stamp keeps its own boolean; the others do not claim it.
-    assert rd._shot_is_content_floor(rows[1])
-    assert not rd._shot_is_content_floor(rows[2])
+    assert rows[1].get("content_floor")
+    assert not rows[2].get("content_floor")
     assert rd._shot_is_cloud_floor(rows[1]) and rd._shot_is_cloud_floor(rows[2])
     assert rd._shot_is_budget_floor(rows[0])
 
@@ -1325,7 +1325,7 @@ def test_a_floored_beat_does_not_kill_the_run_through_its_chain_successor(
     assert done[2]["cloud_floor"] == "predecessor_floored"
     assert rd._shot_is_cloud_floor(done[2])
     # It is NOT a content refusal -- nothing refused it; it was never asked.
-    assert not rd._shot_is_content_floor(done[2])
+    assert not done[2].get("content_floor")
     # The independent beats around the chain still rendered and committed.
     assert "shot_0000" in out["clips"] and "shot_0003" in out["clips"]
     # Both floored beats are shown as their scene stills, not left as holes.
