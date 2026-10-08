@@ -3,8 +3,9 @@
 
 WHY THIS FILE EXISTS, and it is worth reading before deleting a line of it.
 
-On 2026-09-23 commit ``7e309f1b`` added ``_ingraph_upscale`` to
-a subclass and read it from ``Ltx25VideoEngine._build_graph``. ``_build_graph``
+On 2026-09-23 commit ``7e309f1b`` added a class attribute (the since-removed
+``_ingraph_upscale`` switch) to a subclass and read it from
+``Ltx25VideoEngine._build_graph``. ``_build_graph``
 is several inheritance levels ABOVE the class that declared the attribute, so
 every lane that did not descend from that subclass raised ``AttributeError`` the
 moment it built a graph. Five working lanes, dead.
@@ -133,12 +134,12 @@ def test_the_lane_can_build_its_graph(engine_id, tmp_path):
 
 @pytest.mark.parametrize("engine_id", _ltx25_lane_ids())
 def test_every_wire_points_at_a_node_that_exists(engine_id, tmp_path):
-    """A pruned node leaves dangling wires, and a dangling wire is a crash.
+    """A wire to a node that is not in the graph is a crash.
 
-    The low-res lane removes six nodes from the graph. If any surviving input
-    still referenced one of them the executor would fail at run time with a
-    missing-node error -- late, on the GPU, after the models had loaded. This
-    catches it in a second, on CPU.
+    The lanes extend the parent graph (the audio-in lanes add and re-wire
+    nodes). If any input referenced a node that is not there the executor
+    would fail at run time with a missing-node error -- late, on the GPU,
+    after the models had loaded. This catches it in a second, on CPU.
     """
     from nodes._otr_video_engines import ltx25_recipe as R
     engine = _registry().get_engine(engine_id)
@@ -154,48 +155,6 @@ def test_every_wire_points_at_a_node_that_exists(engine_id, tmp_path):
                     and isinstance(value[0], str) and value[0] not in graph):
                 dangling.append("%s.%s -> %r" % (node_id, field, value[0]))
     assert not dangling, "%s has dangling wires: %s" % (engine_id, dangling)
-
-
-def test_no_lane_skips_the_ingraph_upscale():
-    """EVERY LTX 2.5 lane runs the x2 upscale. The operator settled this.
-
-    Operator 2026-09-23: "8gb ltx25 has upscaler, all of them". The one lane that
-    skipped it, `ltx25_native_foley_lowres`, was unregistered the same day -- not
-    because dropping the upscale was wrong, but because it was REDUNDANT: the
-    8 GB tier already has faster lanes on a genuinely smaller model
-    (`otr_8gb_ltx` and `otr_8gb_video` run `ltx_8gb`, ONE 2B checkpoint against
-    five files for LTX 2.5) and `otr_8gb_low` is faster still on procedural
-    `viz_camera` with no video model at all. Reaching for a smaller model beats
-    degrading a bigger one, because the x2 stage is a LATENT upscale plus a
-    refinement sampler and the detail it adds is real.
-
-    A membership rule rather than a count, so it fails in BOTH directions: a new
-    lane that quietly sets the flag False has to come here and say so, and if
-    the operator ever wants a low-res lane again this test is where the decision
-    gets re-recorded.
-    """
-    vreg = _registry()
-    skipping = {name for name in _ltx25_lane_ids()
-                if not getattr(vreg.get_engine(name), "_ingraph_upscale", True)}
-    assert skipping == set(), (
-        "no LTX 2.5 lane should skip the in-graph upscale; these do: %r"
-        % (sorted(skipping),))
-
-
-def test_the_flag_is_declared_on_the_class_that_reads_it():
-    """The structural fix, asserted structurally.
-
-    ``_build_graph`` lives on ``Ltx25VideoEngine``, so the default must live
-    there too. If someone moves it back down to a subclass, every lane that does
-    not inherit that subclass breaks again -- and no behavioural test in this
-    file would necessarily say WHY.
-    """
-    from nodes._otr_video_engines.eng_ltx25 import Ltx25VideoEngine
-    assert "_ingraph_upscale" in vars(Ltx25VideoEngine), (
-        "_ingraph_upscale must be declared on Ltx25VideoEngine itself, because "
-        "that is the class whose _build_graph reads it. Declaring it on a "
-        "subclass leaves every sibling lane raising AttributeError.")
-    assert vars(Ltx25VideoEngine)["_ingraph_upscale"] is True
 
 
 if __name__ == "__main__":

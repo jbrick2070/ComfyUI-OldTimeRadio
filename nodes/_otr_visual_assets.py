@@ -842,9 +842,8 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         # ASK EACH LANE, same rule as every branch above: `_dit_name()` and its
         # siblings are what `_weight_paths()` -- the lane's own assert_usable
         # list -- resolves, so the preflight fetches exactly the files the lane
-        # will open, operator env overrides included. The upscaler is requested
-        # only by a lane that builds its loader, for the reason `_weight_paths`
-        # gives.
+        # will open, operator env overrides included. Every lane builds the
+        # upscale loader, so every lane requests the upscaler.
         if not ltx25:
             raise VisualAssetError("LTX 2.5 adapter resolution is unavailable")
         for eid in selected_ltx25:
@@ -859,9 +858,8 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
                 explicit=str(env.get("OTR_LTX25_VIDEO_VAE") or ""))
             add("vae", lane._audio_vae_name(),
                 explicit=str(env.get("OTR_LTX25_AUDIO_VAE") or ""))
-            if lane._ingraph_upscale:
-                add("latent_upscale_models", lane._upscaler_name(),
-                    explicit=str(env.get("OTR_LTX25_UPSCALER") or ""))
+            add("latent_upscale_models", lane._upscaler_name(),
+                explicit=str(env.get("OTR_LTX25_UPSCALER") or ""))
     selected_h3 = sorted(engines & _MINIMAX_H3_WEIGHT_ENGINES)
     if selected_h3:
         # ASK EACH LANE: `_weight_rows()` is the one table the lane's own

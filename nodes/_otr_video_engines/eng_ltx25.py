@@ -233,31 +233,22 @@ def _resolve(folder, name):
             os.path.dirname(os.path.dirname(here))))), "models", folder, name)
 
 
-def _assert_two_stage_execution(records, frame_count, *, two_stage=True):
-    """Require executor-owned proof of what actually ran.
-
-    `two_stage=False` is the FAST lane: no latent upscale, no refinement, and
-    the decode lands at the model's native 832x480 rather than the doubled
-    1664x960. The proof still exists -- it just proves a different graph, and
-    it still fails closed if the decode is missing or the canvas is wrong.
-    Loosening it to "any shape" would have made the fast lane unable to catch a
-    silent geometry change, which is the one thing this check is for.
+def _assert_two_stage_execution(records, frame_count):
+    """Require executor-owned proof of what actually ran: the latent upscale,
+    the refinement sampler and the 1664x960 decode, in that order. It fails
+    closed if a node is missing or the decode canvas is wrong; loosening it to
+    "any shape" would make it unable to catch a silent geometry change, which
+    is the one thing this check is for.
     """
-    if two_stage:
-        expected = (
-            ("latent_upscale", "LTXVLatentUpsampler"),
-            ("refine_sampler", "SamplerCustomAdvanced"),
-            ("decode", "VAEDecodeTiled"),
-        )
-    else:
-        expected = (("decode", "VAEDecodeTiled"),)
+    expected = (
+        ("latent_upscale", "LTXVLatentUpsampler"),
+        ("refine_sampler", "SamplerCustomAdvanced"),
+        ("decode", "VAEDecodeTiled"),
+    )
     if not isinstance(records, list) or len(records) != len(expected):
-        # THE COUNT COMES FROM `expected`, not a literal 3. The fast lane proves
-        # one node, so a hardcoded 3 here would have printed a wrong number in
-        # the one message a reader consults when the proof fails.
         raise RuntimeError(
-            "ltx25 %s execution proof expected %d node record(s), got %r"
-            % ("two-stage" if two_stage else "single-stage", len(expected),
+            "ltx25 two-stage execution proof expected %d node record(s), got %r"
+            % (len(expected),
                len(records) if isinstance(records, list) else type(records).__name__))
     for ordinal, (record, wanted) in enumerate(zip(records, expected), 1):
         node_id, class_name = wanted
@@ -269,17 +260,16 @@ def _assert_two_stage_execution(records, frame_count, *, two_stage=True):
 
     shapes = records[-1].get("output_shapes")
     shape = shapes[0] if isinstance(shapes, list) and shapes else None
-    want_h = R.LTX25_RENDER_CANVAS_H if two_stage else R.LTX25_CANVAS_H
-    want_w = R.LTX25_RENDER_CANVAS_W if two_stage else R.LTX25_CANVAS_W
+    want_h = R.LTX25_RENDER_CANVAS_H
+    want_w = R.LTX25_RENDER_CANVAS_W
     legal = (isinstance(shape, list) and len(shape) == 4
              and shape[0] == int(frame_count)
              and shape[1:3] == [want_h, want_w]
              and shape[3] in (3, 4))
     if not legal:
         raise RuntimeError(
-            "ltx25 %s decode returned %r; expected [%d,%d,%d,3|4]"
-            % ("two-stage" if two_stage else "single-stage", shape,
-               int(frame_count), want_h, want_w))
+            "ltx25 two-stage decode returned %r; expected [%d,%d,%d,3|4]"
+            % (shape, int(frame_count), want_h, want_w))
     return True
 
 
@@ -443,26 +433,6 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     #: Terminal node: its IMAGE batch becomes the clip.
     _TERMINAL = "decode"
 
-    #: TRUE ON EVERY LANE BUT ONE. The x2 in-graph latent upscale and the
-    #: refinement pass after it are the accepted HQ path and stay the default;
-    #: a subclass sets this False to decode the stage-one latent at its native
-    #: 832x480 instead. NOTHING OVERRIDES IT TODAY: the one lane that did,
-    #: `ltx25_native_foley_lowres`, was unregistered 2026-09-23 when the
-    #: operator settled that every LTX 2.5 8 GB lane keeps its upscaler --
-    #: `otr_8gb_ltx` already gives that tier a faster option on a 2B model
-    #: rather than on a degraded 12.86 GB one. The False branch stays proven
-    #: in both directions by tests/test_ltx25_every_lane_builds_a_graph.py,
-    #: and it is what `_output_canvas` and the conditional upscaler entry in
-    #: `_weight_paths` are written against.
-    #:
-    #: IT BELONGS ON THIS CLASS BECAUSE THIS CLASS READS IT. `_build_graph` is
-    #: defined here, so every LTX 2.5 lane reaches the attribute. When it was
-    #: first added it sat on a subclass instead, and every lane that did not
-    #: inherit that subclass raised AttributeError the moment it built a graph
-    #: -- with the entire suite green, because no test built those graphs.
-    #: tests/test_ltx25_every_lane_builds_a_graph.py is the guard now.
-    _ingraph_upscale = True
-
     # ---- weight tokens (env pins name a FILE, they cannot make one exist) ----
     #: The DiT this lane loads. Each tier subclass names its own; the base is
     #: the 16 GB weight, which is what the silent ``ltx25_video`` lane renders.
@@ -528,7 +498,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         avoid paying for it", and omitting the weight here would fail the lane
         at graph time instead of at the gate.
         """
-        paths = [
+        return [
             ("LTX 2.5 DiT",
              _resolve("unet", self._dit_name()), _FLOOR_DIT),
             ("Gemma-4 12B text encoder",
@@ -538,43 +508,20 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
              _FLOOR_VIDEO_VAE),
             ("LTX 2.5 audio VAE", _resolve("vae", self._audio_vae_name()),
              _FLOOR_AUDIO_VAE),
+            # Every lane builds the upscale loader (stage two is never
+            # skipped), so every lane needs the file.
+            ("LTX 2.5 latent spatial upscaler",
+             _resolve("latent_upscale_models", self._upscaler_name()),
+             _FLOOR_UPSCALER),
         ]
-        # THE UPSCALER IS ONLY REQUIRED BY A LANE THAT BUILDS ITS LOADER.
-        #
-        # This list feeds `assert_usable()`, which checks each file exists and
-        # clears a size floor and raises EngineUnusable otherwise. The low-res
-        # lane drops `upscale_loader` from its graph and its profile's
-        # `required_models` accordingly -- so while this entry was
-        # unconditional, a fresh install that fetched exactly the declared files
-        # had no upscaler and the lane refused to start. Declared six weights,
-        # demanded seven. Found by a refutation lane reading the inherited
-        # method rather than the diff.
-        #
-        # The alternative -- put the file back in `required_models` -- would make
-        # every install of this lane download 536 MB it never opens, which is
-        # the opposite of why the lane exists.
-        if self._ingraph_upscale:
-            paths.append(
-                ("LTX 2.5 latent spatial upscaler",
-                 _resolve("latent_upscale_models", self._upscaler_name()),
-                 _FLOOR_UPSCALER))
-        return paths
 
     def _output_canvas(self):
-        """``(width, height)`` this lane really decodes at.
-
-        THREE PLACES REPORTED THE DOUBLED CANVAS UNCONDITIONALLY -- the PLAN log,
-        the tail-trim log and the clip RECEIPT -- so a low-res lane announced
-        1664x960 while writing 832x480. The receipt is the one that mattered: it
-        is copied into the canonical clip, carried into the manifest by
-        `render_driver`, and printed in the episode's CREDITS text by
-        `otr_credits_roll`. A viewer would have read a resolution the file does
-        not have. Found by a refutation lane grepping RENDER_CANVAS rather than
-        reading the diff.
-        """
-        if self._ingraph_upscale:
-            return R.LTX25_RENDER_CANVAS_W, R.LTX25_RENDER_CANVAS_H
-        return R.LTX25_CANVAS_W, R.LTX25_CANVAS_H
+        """``(width, height)`` this lane really decodes at: the x2 stage-two
+        canvas. The PLAN log, the tail-trim log and the clip RECEIPT all print
+        it; the receipt is copied into the canonical clip, carried into the
+        manifest by `render_driver`, and printed in the episode's CREDITS text
+        by `otr_credits_roll`."""
+        return R.LTX25_RENDER_CANVAS_W, R.LTX25_RENDER_CANVAS_H
 
     def _quant_label(self):
         """The quantisation, read off the DiT filename, for the per-beat
@@ -1214,26 +1161,13 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             # Decode VIDEO ONLY. refine_separate slot 1 is the audio latent and
             # stays unwired, preserving V-1 while stage two sharpens the video.
             "decode": {"class": "decode", "inputs": {
-                "samples": W("refine_separate" if self._ingraph_upscale
-                             else "separate", 0),
+                "samples": W("refine_separate", 0),
                 "vae": W("videovae", 0),
                 "tile_size": R.LTX25_STAGE2_DECODE_TILE_SIZE,
                 "overlap": R.LTX25_STAGE2_DECODE_OVERLAP,
                 "temporal_size": R.LTX25_STAGE2_DECODE_TEMPORAL_SIZE,
                 "temporal_overlap": R.LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP}},
         }
-
-        if not self._ingraph_upscale:
-            # THE FAST LANE: drop stage two entirely rather than leave it
-            # wired-but-unused. The decode above already reads `separate`, so
-            # leaving these in place would have run the upscaler and the
-            # refinement sampler and then discarded both -- the slowest
-            # possible way to render at low resolution, which is the exact
-            # opposite of why this lane exists.
-            for stage_two in ("upscale_loader", "latent_upscale", "refine_i2v",
-                              "refine_concat", "refine_sampler",
-                              "refine_separate"):
-                graph.pop(stage_two, None)
 
         return graph
 
@@ -1431,10 +1365,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         pending = {}
 
         # WHICH node feeds the decode, read off the graph rather than named.
-        # The two-stage path wires ``refine_separate`` into it and a single-
-        # stage one would wire ``separate``; asking the graph keeps the seam
-        # correct for whichever it built, and silent (no eviction) if the shape
-        # ever changes out from under it.
+        # The two-stage graph wires ``refine_separate`` into it; asking the
+        # graph keeps the seam correct for whatever it built, and silent (no
+        # eviction) if the shape ever changes out from under it.
         _decode_feeder = None
         try:
             _samples = (graph.get(self._TERMINAL, {})
@@ -1518,9 +1451,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 graph, classes, free_after_use=True,
                 keep={"unet", "modality", self._TERMINAL},
                 external_results=external, on_result=_harvest,
-                audit_node_ids=(
-                    {"latent_upscale", "refine_sampler", "decode"}
-                    if self._ingraph_upscale else {"decode"}),
+                audit_node_ids={"latent_upscale", "refine_sampler", "decode"},
                 execution_records=execution_records)
             images = results[self._TERMINAL][0]
         finally:
@@ -1534,22 +1465,17 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             raise _wb.GraphExecutionError(
                 "%s: run_graph produced no terminal image" % self.name)
         try:
-            _assert_two_stage_execution(
-                execution_records, length, two_stage=self._ingraph_upscale)
+            _assert_two_stage_execution(execution_records, length)
         except RuntimeError as exc:
             raise _wb.GraphExecutionError(str(exc)) from exc
         # THE LINE SAYS WHICH GRAPH RAN, because this is the line a reader
-        # greps to find out what a lane actually did. It used to hardcode
-        # "TWO-STAGE PASS nodes=3" and the doubled canvas, which on a
-        # single-stage lane would have printed a confident description of a
-        # graph that never ran.
+        # greps to find out what a lane actually did (the RunPod install
+        # runbook counts "TWO-STAGE PASS nodes=3 decode=1664x960" in the
+        # server log).
         _LOG.info(
-            "[OTR video] %s %s nodes=%d decode=%dx%d render_elapsed_s=%.3f",
-            self.name,
-            "TWO-STAGE PASS" if self._ingraph_upscale else "SINGLE-STAGE PASS",
-            3 if self._ingraph_upscale else 1,
-            R.LTX25_RENDER_CANVAS_W if self._ingraph_upscale else R.LTX25_CANVAS_W,
-            R.LTX25_RENDER_CANVAS_H if self._ingraph_upscale else R.LTX25_CANVAS_H,
+            "[OTR video] %s TWO-STAGE PASS nodes=3 decode=%dx%d "
+            "render_elapsed_s=%.3f",
+            self.name, R.LTX25_RENDER_CANVAS_W, R.LTX25_RENDER_CANVAS_H,
             render_elapsed_s)
 
         # PUBLISH ON GRAPH SUCCESS, and only whole.
@@ -2065,15 +1991,9 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
         ``reclaim_idle_models`` is freed VRAM, which is a crash or silent
         garbage rather than a saving.
         """
-        # WHICH NODE CARRIES THE AUDIO DEPENDS ON THE LANE. Stage two
-        # re-samples the joint latent, so on an HQ lane the audio to keep is
-        # `refine_separate`'s. The fast lane has no stage two at all, and its
-        # audio is the stream `separate` already carries -- reading the
-        # stage-two name there would match nothing, the harvest would never
-        # fire, and the episode would come out with no foley bed and no error
-        # to say why.
-        want = "refine_separate" if self._ingraph_upscale else "separate"
-        if node_id != want or not out or len(out) < 2:
+        # Stage two re-samples the joint latent, so the audio to keep is
+        # `refine_separate`'s (slot 1), not `separate`'s.
+        if node_id != "refine_separate" or not out or len(out) < 2:
             return
         self._pending_audio_latent = self._latent_to_cpu(out[1])
 
