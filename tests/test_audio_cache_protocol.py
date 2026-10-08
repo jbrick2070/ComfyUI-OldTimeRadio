@@ -1,11 +1,10 @@
-"""Tests for the audio-cache PROTOCOL + canonical record (piece 5)."""
+"""Tests for the audio-cache canonical record + cache key (piece 5)."""
 import dataclasses
 
 import pytest
 
 from nodes._otr_audio_cache import (
     CACHE_SCHEMA_VERSION,
-    AudioCache,
     AudioCacheRecord,
     cache_key_for,
     record_from_request,
@@ -81,42 +80,6 @@ def test_record_from_request_maps_identity_fields():
     assert rec.allowed_for_release is True
     assert rec.audio_path == "/x/a.wav"
     assert rec.request_schema_version == r.request_schema_version
-
-
-def test_complete_stub_satisfies_protocol():
-    class _Cache:
-        def key_for(self, request):
-            return cache_key_for(request)
-
-        def has(self, request):
-            return False
-
-        def get(self, request):
-            return None
-
-        def put(self, request, audio, *, allowed_for_release=False,
-                actual_sample_rate=None, provider_model_id=""):
-            return record_from_request(
-                request, allowed_for_release=allowed_for_release,
-                actual_sample_rate=actual_sample_rate,
-                provider_model_id=provider_model_id,
-            )
-
-        def load(self, request):
-            return None
-
-        def iter_records(self):
-            return []
-
-    assert isinstance(_Cache(), AudioCache)
-
-
-def test_incomplete_stub_does_not_satisfy_protocol():
-    class _Partial:
-        def has(self, request):
-            return False
-
-    assert not isinstance(_Partial(), AudioCache)
 
 
 if __name__ == "__main__":

@@ -1,11 +1,11 @@
-"""Audio cache -- PROTOCOL + canonical record (plan piece 5; impl is Wave 1f).
+"""Audio cache -- canonical record + file-backed cache (plan piece 5, Wave 1f).
 
-This module defines the *interface* the Wave-1f cache implementation satisfies,
-plus the single canonical sidecar record and the one place the cache key is
-derived. It does NO disk IO and holds no implementation -- importing it is
-side-effect-free (C-5).
+This module holds the single canonical sidecar record, the one place the cache
+key is derived, and :class:`FileAudioCache`, the only cache implementation.
+Importing it is side-effect-free; all disk IO happens in the cache's methods
+(C-5).
 
-Why a protocol now (before the impl):
+Why one key and one record:
   * **One key (I-6).** ``cache_key_for(request)`` is the single definition of how
     the audio cache keys: it is exactly the ``ResolvedVoiceRequest.cache_key``
     (sha256 over the IN_KEY identity fields). The engine never keys on a raw
@@ -26,7 +26,7 @@ import logging
 import os
 import tempfile
 from dataclasses import asdict, dataclass, fields as _dc_fields
-from typing import Iterable, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Iterable, List, Optional, Tuple
 
 import numpy as np
 
@@ -135,48 +135,6 @@ def record_from_request(
     )
 
 
-# ---------------------------------------------------------------------------
-# Cache PROTOCOL -- the interface Wave 1f implements
-# ---------------------------------------------------------------------------
-
-
-@runtime_checkable
-class AudioCache(Protocol):
-    """Read/write interface for the per-line audio cache (impl: Wave 1f).
-
-    Implementations must key strictly on ``cache_key_for(request)`` and must
-    persist an :class:`AudioCacheRecord` sidecar beside each cached buffer.
-    """
-
-    def key_for(self, request) -> str:
-        """Return the cache key for ``request`` (``cache_key_for``)."""
-        ...
-
-
-    def get(self, request) -> Optional[AudioCacheRecord]:
-        """Return the cached record for ``request`` or ``None`` on a miss."""
-        ...
-
-    def put(
-        self, request, audio, *,
-        allowed_for_release: bool = False,
-        actual_sample_rate: Optional[int] = None,
-        provider_model_id: str = "",
-    ) -> AudioCacheRecord:
-        """Persist ``audio`` for ``request`` and return its sidecar record."""
-        ...
-
-    def load(self, request) -> "Optional[Tuple[dict, AudioCacheRecord]]":
-        """Return (audio_dict, record) on a verified hit; None on any failure
-        (missing/corrupt payload, hash mismatch, rate/channel drift, etc.).
-        Corruption is a silent miss with ONE bounded warning log line."""
-        ...
-
-    def iter_records(self) -> Iterable[AudioCacheRecord]:
-        """Iterate every persisted record (the release-gate manifest scan)."""
-        ...
-
-
 # ===========================================================================
 # Wave 1f -- implementation + slim migration
 # ===========================================================================
@@ -199,7 +157,7 @@ def needs_rerender(record, *, target_request_schema_version: str = REQUEST_SCHEM
 
 
 class FileAudioCache:
-    """File-backed :class:`AudioCache` implementation (G0).
+    """File-backed audio cache (G0).
 
     One sidecar JSON (``<cache_key>.json``) plus one audio buffer
     (``<cache_key>.npy``) per entry, both named by the I-6 cache key, so a gated
