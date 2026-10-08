@@ -15,6 +15,26 @@ import pytest
 from nodes import _otr_janitor as J
 
 
+def _old_entry_mtime(p: Path) -> float:
+    """The full-walk helper _entry_is_fresh replaced, kept verbatim as the oracle."""
+    try:
+        newest = p.stat().st_mtime
+    except OSError:
+        return time.time()          # unstat-able -> treat as fresh (skip)
+    if p.is_dir():
+        try:
+            for child in p.rglob("*"):
+                try:
+                    m = child.stat().st_mtime
+                    if m > newest:
+                        newest = m
+                except OSError:
+                    continue
+        except OSError:
+            pass
+    return newest
+
+
 def _touch(path, t):
     os.utime(path, (t, t))
 
@@ -38,7 +58,7 @@ def tree(tmp_path):
 def test_same_verdict_as_the_full_walk(tree, offset):
     root, base = tree
     cutoff = base + offset
-    assert J._entry_is_fresh(root, cutoff) == (J._entry_mtime(root) > cutoff)
+    assert J._entry_is_fresh(root, cutoff) == (_old_entry_mtime(root) > cutoff)
 
 
 def test_a_child_exactly_at_the_cutoff_is_not_fresh(tree):
@@ -51,7 +71,7 @@ def test_a_plain_file_entry(tmp_path):
     f.write_bytes(b"z")
     _touch(f, 1_000.0)
     for cutoff in (999.0, 1_000.0, 1_001.0):
-        assert J._entry_is_fresh(f, cutoff) == (J._entry_mtime(f) > cutoff)
+        assert J._entry_is_fresh(f, cutoff) == (_old_entry_mtime(f) > cutoff)
 
 
 @pytest.mark.parametrize("max_age", [60.0, 0.0, -5.0])
@@ -61,7 +81,7 @@ def test_root_stat_failure_compares_now_not_always_fresh(tmp_path, monkeypatch, 
     cutoff = 1_000.0 - max_age
     expected = 1_000.0 > cutoff
     assert J._entry_is_fresh(missing, cutoff) is expected
-    assert (J._entry_mtime(missing) > cutoff) is expected
+    assert (_old_entry_mtime(missing) > cutoff) is expected
 
 
 def test_the_walk_stops_at_the_first_fresh_child(tmp_path, monkeypatch):

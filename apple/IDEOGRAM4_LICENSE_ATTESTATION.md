@@ -109,7 +109,7 @@ enforcement is *"declare-and-record, non-blocking"* across the stack. **That is
 true for AUDIO and false for IMAGES**, and the distinction matters:
 
 * **Audio:** `nodes/_otr_audio_cache.py` carries `commercial_clean` into the
-  release-gate sidecar and `nodes/cast_lock.py:985` emits a *"non-blocking
+  release-gate sidecar and `nodes/cast_lock.py:1887` emits a *"non-blocking
   warning (I-8)"*. The gate's three-state rule is real: `True` ships silently,
   `False` warns and still renders, **missing/null fails closed stop-ship**.
 * **Images:** the release gate's documented scope
@@ -118,7 +118,7 @@ true for AUDIO and false for IMAGES**, and the distinction matters:
   module defines only the `ReleaseReport` dataclass and two helpers; the scan
   its docstring describes is not implemented there.) The image ledger row
   built in
-  `nodes/otr_image_gen_dispatcher.py:1606-1621` carries `engine_id`,
+  `nodes/otr_image_gen_dispatcher.py:1325-1337` carries `engine_id`,
   `engine_version` and hashes but **no `commercial_clean` field at all**.
 
 So on the image side the flag is an **adapter-level declaration only**; nothing

@@ -373,7 +373,8 @@ the air for 84 lines across 30 episodes."""
 #
 # The hardcoded _MODEL_CHOICES list was deleted in B2a; both writer slots
 # now build their dropdown live from `_otr_model_catalog.dropdown_choices()`,
-# which scans the local HF cache; labels carry a size/fit badge. The old
+# which scans the local HF cache; local curated labels carry a size/fit
+# badge (remote slot handles and uncurated cache hits are bare). The old
 # [NOT DOWNLOADED] / [LOCAL HF] download-state suffixes are no longer
 # applied, but _strip_label_suffix still strips them from older saved
 # workflows. The single legacy "model_id" widget
@@ -2572,8 +2573,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # the seed); this widget lets the operator force it.
                 # S30 B2a: single model_id widget replaced by two slots.
                 # The catalog dropdown_choices() call scans the local HF
-                # cache live; its labels carry a display-only size/fit
-                # badge (older saved workflows may still hold the retired
+                # cache live; local curated labels carry a display-only
+                # size/fit badge, remote slot handles and uncurated cache
+                # hits are bare (older saved workflows may still hold the retired
                 # [LOCAL HF] / [NOT DOWNLOADED] suffixes). Labels are
                 # stripped via _otr_model_catalog._strip_label_suffix
                 # before any consumer / meta stamp gets the value -- raw

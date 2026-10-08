@@ -87,37 +87,24 @@ def ensure_shared_readme() -> None:
         log.warning("[OTR.janitor] shared README write skipped: %s", exc)
 
 
-def _entry_mtime(p: Path) -> float:
-    """Newest mtime within an entry (a dir's recent children keep it alive)."""
-    try:
-        newest = p.stat().st_mtime
-    except OSError:
-        return time.time()          # unstat-able -> treat as fresh (skip)
-    if p.is_dir():
-        try:
-            for child in p.rglob("*"):
-                try:
-                    m = child.stat().st_mtime
-                    if m > newest:
-                        newest = m
-                except OSError:
-                    continue
-        except OSError:
-            pass
-    return newest
-
-
 def _entry_is_fresh(p: Path, cutoff: float) -> bool:
-    """``_entry_mtime(p) > cutoff``, without walking the whole tree.
+    """True when the entry, or anything inside it, is newer than ``cutoff``.
+
+    This replaced a helper that stat'ed EVERY file under the entry for its
+    newest mtime and then compared that with the cutoff
+    (tests/test_janitor_fresh_predicate.py keeps it as the oracle).
 
     Same verdict under every error rule: an unstat-able entry compares a
-    fresh "now" against the cutoff, exactly as the full walk did (so it is
-    not unconditionally fresh: a negative max age makes it stale, while a
-    zero max age reads fresh because the clock has moved on since the cutoff
-    was taken), an unstat-able child is skipped, and a walk that errors keeps
-    what it already saw. The one
-    difference is that a directory walk stops at the first child newer
-    than the cutoff instead of stat-ing everything under it.
+    fresh time.time() against the cutoff, exactly as the full walk did -- so
+    it is not unconditionally fresh. A negative max age larger than the gap
+    between the two clock readings is stale; at zero (or a tiny negative)
+    the verdict is fresh only when the clock ticked in between, which on
+    Windows' ~15.6 ms clock is rare. An unstat-able child is skipped, and a
+    walk that errors keeps
+    what it already saw. The differences: a directory walk stops at the
+    first child newer than the cutoff instead of stat-ing everything under
+    it, and an entry whose own mtime already decides it is never asked
+    is_dir() (so an is_dir() error there can no longer abort the sweep).
     """
     try:
         if p.stat().st_mtime > cutoff:
