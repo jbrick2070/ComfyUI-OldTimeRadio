@@ -10,11 +10,10 @@ rem              (2026-06-10 marathon catch).
 rem   HUMO       explicit legacy HuMo lane for bakeoffs/single-engine probes.
 rem   LTX        Sage-free boot lane: LTX opt-in ON, HuMo OFF (BUG-070)
 set HF_HOME=C:\ComfyUI-Models\huggingface
-rem UTF-8 stdio (2026-06-12): a detached cmd inherits the cp1252 console codec,
-rem so ComfyUI's logger crashes the instant OTR prestartup prints an emoji
-rem (UnicodeEncodeError on the U+2705/U+2713 glyphs) -> boot dies ~13s, exit 1,
-rem "SERVER DID NOT COME UP" failure. Desktop used to set this for us; the
-rem v2 install move dropped it. Force UTF-8 mode for stdio + filesystem.
+rem UTF-8 stdio: a detached cmd inherits the cp1252 console codec, so ComfyUI's
+rem logger crashes the instant OTR prestartup prints an emoji (UnicodeEncodeError
+rem on the U+2705/U+2713 glyphs) -> boot dies ~13s, exit 1, "SERVER DID NOT COME
+rem UP" failure. Force UTF-8 mode for stdio + filesystem.
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 rem A pytest/agent parent can leak OTR_TEST_MODE=1 into this cmd
@@ -99,11 +98,9 @@ rem The canonical wrapper chooses a free local port per leg. Direct/manual
 rem launches keep the historical port as a harmless default.
 if not defined OTR_HEADLESS_PORT set OTR_HEADLESS_PORT=8000
 echo [launch] OTR headless port %OTR_HEADLESS_PORT%
-rem Lane tokens (FLOOR/HUMO/LTX) are accepted from every caller, but the
-rem old OTR_ENABLE_* engine exports they used to set were VESTIGIAL and were
-rem removed 2026-08-28: every registered video engine declares
-rem requires_flag=None -- the registry is the menu, and engine selection is
-rem workflow-driven.
+rem Lane tokens (FLOOR/HUMO/LTX) are accepted from every caller; no enable flags
+rem exist: every registered video engine declares requires_flag=None -- the
+rem registry is the menu, and engine selection is workflow-driven.
 if /i "%2"=="FLOOR" (
   echo [launch] FLOOR leg ^(engine selection is profile/registry-driven^)
 ) else if /i "%2"=="HUMO" (
@@ -142,10 +139,9 @@ rem classes -- the 3D quick-smoke catch). We pass OUR
 rem headless copy (_otr_headless_model_paths.yaml) because the Desktop yaml's
 rem desktop_extensions entry points at the dead v1 install path and crashes
 rem main.py's prestartup scan (FileNotFoundError).
-rem LOG ROTATION (2026-08-04): this line used to redirect with `>`, so every
-rem reboot TRUNCATED the previous run's server log. That destroyed the only
-rem record of the 2026-08-03 22:11 still-unmaterialized failure when the 23:06
-rem relaunch came up. Move any existing log aside first, then APPEND.
+rem LOG ROTATION: move any existing log aside first, then APPEND. Redirecting
+rem with `>` would TRUNCATE the previous run's server log on every reboot,
+rem destroying the only record of the last failure.
 rem
 rem The caller's log path is unchanged -- eight harnesses read exactly %1.
 rem If the rotation FAILS (a locked log), we append to the old file and say so

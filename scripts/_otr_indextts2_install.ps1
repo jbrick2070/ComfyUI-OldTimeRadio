@@ -46,12 +46,10 @@ Write-Host "IndexTTS2 Path-B install -> $Root"
 # 1) uv
 #
 # THIS SCRIPT SHIPS IN THE REGISTRY BUNDLE, SO IT DOES NOT DOWNLOAD AND EXECUTE
-# CODE (2026-09-05). It used to bootstrap uv with
-# `irm https://astral.sh/uv/install.ps1 | iex` -- a remote script piped straight
-# into execution, inside a pack that is asking a security reviewer to trust its
-# account of what it runs. A reviewer greps the zip; so did we, and found it.
-# The operator installs uv once, deliberately, by their own hand; this script
-# then uses it. That is the same one-time cost and none of the exposure.
+# CODE: a remote script piped straight into execution (`irm ... | iex`) is what
+# a security reviewer greps the zip for, inside a pack that asks them to trust
+# its account of what it runs. The operator installs uv once, deliberately, by
+# their own hand; this script then uses it.
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     throw @"
 uv is required and was not found on PATH.

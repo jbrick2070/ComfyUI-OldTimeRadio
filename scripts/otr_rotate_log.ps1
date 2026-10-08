@@ -18,8 +18,7 @@
 # CONTRACT: the caller's log path is NEVER repointed. This only MOVES an
 # existing file aside; the caller then writes a fresh log at the original path.
 # The live harnesses that depend on that path: otr_headless_canonical.ps1,
-# _otr_w45_boot.ps1, otr_ia2v_server_boot.cmd. (The bakeoff runners and the
-# HuMo VRAM ladder that used to be in this roster were all retired.)
+# _otr_w45_boot.ps1, otr_ia2v_server_boot.cmd.
 #
 # EXIT 0 = nothing to rotate, or rotated successfully.
 # EXIT 1 = a prior log exists and could NOT be moved. The caller must then

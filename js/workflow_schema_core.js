@@ -81,11 +81,9 @@ function reconcileNode(node, lookup) {
     // A NODE CAN CARRY VALUES AND NO NAMES, AND THAT SHAPE IS NOT RARE.
     // ComfyUI's own core nodes serialise this way -- the shipped workflow
     // templates save KSampler with all seven widget values and ZERO widget
-    // descriptors in `inputs`. An earlier cut of this file returned "unchanged"
-    // for that shape, which meant a count mismatch passed through silently:
-    // exactly the positional corruption this boundary exists to stop, sailing
-    // through the middle of it. Found by a review pass that read the installed
-    // frontend's own templates rather than only this pack's graphs.
+    // descriptors in `inputs`. Returning "unchanged" for that shape would let a
+    // count mismatch pass through silently: exactly the positional corruption
+    // this boundary exists to stop.
     //
     // There is nothing to reconcile BY here -- inferring which value is which
     // from a bare list is the guess we refuse to make. But we CAN tell whether
