@@ -165,7 +165,6 @@ def _adapters():
     from nodes import otr_master_audio_mux as mux
     from nodes import otr_silent_composite as sc
     from nodes import video_engine as ve
-    from nodes._otr_shared import encode_sink as es
     from nodes._otr_shared import scope_draw as sd
     from nodes._otr_video_engines import render_driver as rd
     from nodes._otr_video_engines import wrapper_bridge as wb
@@ -183,7 +182,6 @@ def _adapters():
         "silent._ffmpeg_bin": lambda: sc._ffmpeg_bin("ffmpeg"),
         "credits._ffmpeg_bin": lambda: cr._ffmpeg_bin(),
         "video_engine._find_ffmpeg": lambda: ve._find_ffmpeg(),
-        "encode_sink.find_ffmpeg": lambda: es.find_ffmpeg("ffmpeg"),
         "scope_draw.find_ffmpeg": lambda: sd.find_ffmpeg("ffmpeg"),
         "wrapper_bridge.resolve_ffmpeg": lambda: wb.resolve_ffmpeg("ffmpeg"),
         "render_driver._slicer_ffmpeg_bin": lambda: rd._slicer_ffmpeg_bin(),
@@ -210,7 +208,6 @@ def test_each_adapter_keeps_its_own_answer_on_none(box, monkeypatch):
     from nodes import otr_master_audio_mux as mux
     from nodes import otr_silent_composite as sc
     from nodes import video_engine as ve
-    from nodes._otr_shared import encode_sink as es
     from nodes._otr_shared import scope_draw as sd
     from nodes._otr_video_engines import render_driver as rd
     from nodes._otr_video_engines import wrapper_bridge as wb
@@ -218,7 +215,6 @@ def test_each_adapter_keeps_its_own_answer_on_none(box, monkeypatch):
     assert mux._ffmpeg_bin("ffmpeg") == ""
     assert cb._ffmpeg_bin("ffmpeg") == ""
     assert sc._ffmpeg_bin("ffmpeg") == ""
-    assert es.find_ffmpeg("ffmpeg") is None
     assert sd.find_ffmpeg("ffmpeg") is None
     assert ve._find_ffmpeg() is None
     # The bridge and the slicer keep a STRING so argv[0] is never None and
@@ -264,16 +260,6 @@ def test_the_sites_that_call_the_owner_by_name_are_bound_to_THE_owner():
     from nodes._otr_shared import ffprobe as ffp
     assert pu.resolve_ffmpeg is ffm.resolve_ffmpeg
     assert pu._ffp is ffp
-
-
-def test_the_raw_video_sink_refuses_by_name_on_none(box, monkeypatch):
-    monkeypatch.setattr(shutil, "which", lambda name: None)
-    from nodes._otr_shared import encode_sink as es
-    sink = es.RawVideoSink.__new__(es.RawVideoSink)
-    sink.mode = "file"
-    sink.ffmpeg = "ffmpeg"
-    with pytest.raises(RuntimeError, match="ffmpeg not found"):
-        sink.__enter__()
 
 
 def test_the_probe_sibling_steps_go_through_the_owner(box, monkeypatch):

@@ -312,8 +312,6 @@ _RAWVIDEO_STDIN_ENCODERS = {
     ("video_engine.py", "_encode_mp4"):
         "the whole-episode procedural FLOOR, which hard-requires audio and "
         "stamps no frame_count -- a different contract, not a clip",
-    ("encode_sink.py", "__enter__"):
-        "imported only by scripts/profile_scope_render.py; not a live writer",
     ("otr_silent_composite.py", "_run_model_pipeline"):
         "queue item 8 (2026-08-08): the FFMPEG-owns-time / MODEL-owns-space "
         "streaming pipeline. Decoder ffmpeg emits rawvideo rgb24 on stdout, "

@@ -9,7 +9,7 @@ wrongly three separate times, in three modules, by the same one-line mistake:
 encode after that string test cost a whole episode, and its docstring then
 claimed to be the only such decision in the pack. It was not: a third copy
 survived in `_otr_shared/scope_draw.py`, and because the four viz_* engines
-encode through THAT module rather than through `RawVideoSink`, they kept
+encode through THAT module rather than through `encode_sink`, they kept
 choosing a dead encoder. A rented RTX 4090 found it on 2026-09-03 -- ffmpeg
 lists the encoder and cannot open a session, which is the ordinary case in a GPU
 container with no NVENC passthrough:
@@ -79,7 +79,7 @@ def test_no_module_reimplements_the_nvenc_string_test(path):
 
 def test_scope_draw_delegates_rather_than_deciding():
     """The specific regression: scope_draw is where copy three lived, and the
-    viz_* engines reach ffmpeg through it, not through RawVideoSink."""
+    viz_* engines reach ffmpeg through it, not through encode_sink."""
     import ast
 
     path = NODES / "_otr_shared" / "scope_draw.py"

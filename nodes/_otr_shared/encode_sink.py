@@ -1,20 +1,15 @@
-"""Raw-video ffmpeg sink helpers for render profiling.
+"""The pack's one nvenc decision: ``has_nvenc``.
 
-This module is intentionally small and torch-free. Runtime renderers can keep
-their existing encoders while profiling scripts use this shared sink to measure
-pipe/write time separately from PIL frame drawing.
+This module is intentionally small and torch-free. ``scope_draw._has_nvenc`` and
+``video_engine`` delegate here; nothing else decides whether h264_nvenc can
+actually encode.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
 import threading
-import time
-from pathlib import Path
-from typing import Optional
 
 from .ffmpeg import resolve_ffmpeg
-from .scope_draw import cfr_flags
 
 try:
     from . import proc as otr_proc
@@ -23,13 +18,6 @@ except ImportError:  # pragma: no cover -- loaded flat
         from _otr_shared import proc as otr_proc  # type: ignore  # nodes/ on sys.path
     except ImportError:
         import proc as otr_proc  # type: ignore  # _otr_shared/ on sys.path
-
-
-def find_ffmpeg(ffmpeg: str = "ffmpeg") -> Optional[str]:
-    """The pack's ONE ffmpeg answer (``.ffmpeg.resolve_ffmpeg``). This copy
-    never read ``OTR_FFMPEG`` at all and treated its signature default as a
-    choice; the owner does neither."""
-    return resolve_ffmpeg(ffmpeg)
 
 
 #: Cached for the process, PER BINARY. The probe costs about a second and the
@@ -68,9 +56,9 @@ def has_nvenc(ffmpeg: str) -> bool:
     THAT CLAIM WAS WRONG FOR FOUR DAYS, AND IT READ AS COVERAGE (2026-09-03).
     This docstring said "the ONLY nvenc decision in the pack" while a THIRD
     string test still lived in ``scope_draw._has_nvenc`` -- and the four viz_*
-    engines encode through that module, not through :class:`RawVideoSink`, so
-    they never reached this probe. A rented 4090 that lists h264_nvenc and
-    cannot open a session found it. ``scope_draw`` now delegates here too, and
+    engines encode through that module, so they never reached this probe. A
+    rented 4090 that lists h264_nvenc and cannot open a session found it.
+    ``scope_draw`` now delegates here too, and
     ``tests/test_nvenc_single_decision.py`` fails if a fourth copy appears.
 
     Probes at 256x256 deliberately: NVENC rejects tiny frames outright with
@@ -109,138 +97,3 @@ def has_nvenc(ffmpeg: str) -> bool:
             verdict = False
         _NVENC_PROBE[key] = verdict
         return verdict
-
-
-@dataclass
-class RawVideoSinkStats:
-    mode: str
-    frames: int = 0
-    bytes_written: int = 0
-    pipe_seconds: float = 0.0
-    encode_seconds: float = 0.0
-    codec: str = ""
-    used_nvenc: bool = False
-    output_path: str = ""
-
-
-class RawVideoSink:
-    """Context-managed raw RGB24 frame sink.
-
-    ``mode='none'`` measures draw-only code without spawning ffmpeg.
-    ``mode='null'`` pipes frames through ffmpeg to the null muxer.
-    ``mode='mp4'`` writes a silent yuv420p mp4.
-    """
-
-    def __init__(
-        self,
-        *,
-        mode: str,
-        width: int,
-        height: int,
-        fps: int,
-        ffmpeg: str = "ffmpeg",
-        output_path: Optional[Path] = None,
-        prefer_nvenc: bool = True,
-    ) -> None:
-        self.mode = str(mode or "none").lower()
-        if self.mode not in {"none", "null", "mp4"}:
-            raise ValueError(f"RawVideoSink: unsupported mode {mode!r}")
-        self.width = int(width)
-        self.height = int(height)
-        self.fps = int(fps)
-        self.ffmpeg = ffmpeg
-        self.output_path = Path(output_path) if output_path else None
-        self.prefer_nvenc = bool(prefer_nvenc)
-        self.proc: Optional[otr_proc.Popen] = None
-        self.stats = RawVideoSinkStats(mode=self.mode)
-
-    def __enter__(self) -> "RawVideoSink":
-        if self.mode == "none":
-            return self
-        fb = find_ffmpeg(self.ffmpeg)
-        if not fb:
-            raise RuntimeError("RawVideoSink: ffmpeg not found.")
-        use_nvenc = self.prefer_nvenc and has_nvenc(fb)
-        codec = "h264_nvenc" if use_nvenc else "libx264"
-        cmd = [
-            fb, "-y", "-loglevel", "error",
-            "-f", "rawvideo", "-vcodec", "rawvideo",
-            "-s", f"{self.width}x{self.height}",
-            "-pix_fmt", "rgb24", "-r", str(self.fps), "-i", "-",
-            "-an",
-        ]
-        if self.mode == "null":
-            cmd += ["-f", "null", "-"]
-        else:
-            if self.output_path is None:
-                raise ValueError("RawVideoSink: output_path is required for mp4 mode.")
-            self.output_path.parent.mkdir(parents=True, exist_ok=True)
-            cmd += ["-c:v", codec]
-            if use_nvenc:
-                cmd += ["-preset", "p5", "-rc", "vbr", "-b:v", "8M"]
-            else:
-                cmd += ["-preset", "medium", "-crf", "20"]
-            cmd += [
-                "-pix_fmt", "yuv420p", *cfr_flags(fb), "-r", str(self.fps),
-                "-color_primaries", "bt709", "-color_trc", "bt709",
-                "-colorspace", "bt709", "-movflags", "+faststart",
-                str(self.output_path),
-            ]
-        self.proc = otr_proc.popen(
-            cmd,
-            stdin=otr_proc.PIPE,
-            stdout=otr_proc.DEVNULL,
-            stderr=otr_proc.PIPE,
-        )
-        self.stats.codec = codec
-        self.stats.used_nvenc = use_nvenc
-        self.stats.output_path = str(self.output_path or "")
-        return self
-
-    def write(self, frame) -> None:
-        if hasattr(frame, "tobytes"):
-            payload = frame.tobytes()
-        elif isinstance(frame, (bytes, bytearray, memoryview)):
-            payload = bytes(frame)
-        else:
-            raise TypeError("RawVideoSink.write expects a numpy-like frame or bytes.")
-        self.stats.frames += 1
-        self.stats.bytes_written += len(payload)
-        if self.mode == "none":
-            return
-        if self.proc is None or self.proc.stdin is None:
-            raise RuntimeError("RawVideoSink.write called before ffmpeg started.")
-        t0 = time.perf_counter()
-        self.proc.stdin.write(payload)
-        self.stats.pipe_seconds += time.perf_counter() - t0
-
-    def close(self) -> RawVideoSinkStats:
-        if self.mode == "none":
-            return self.stats
-        if self.proc is None:
-            return self.stats
-        t0 = time.perf_counter()
-        if self.proc.stdin is not None:
-            self.proc.stdin.close()
-        err = self.proc.stderr.read().decode(errors="replace") if self.proc.stderr else ""
-        self.proc.wait()
-        self.stats.encode_seconds += time.perf_counter() - t0
-        if self.proc.returncode != 0:
-            raise RuntimeError(f"RawVideoSink: ffmpeg failed: {err[-800:]}")
-        return self.stats
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        if exc_type is not None and self.proc is not None:
-            try:
-                if self.proc.stdin is not None:
-                    self.proc.stdin.close()
-            except OSError:
-                pass
-            try:
-                self.proc.kill()
-            except OSError:
-                pass
-            return None
-        self.close()
-        return None
-
