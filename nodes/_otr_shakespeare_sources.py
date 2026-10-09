@@ -296,8 +296,8 @@ def normalize_shakespeare_body(text: Any) -> str:
     """Canonicalize a Shakespeare scene WITHOUT truncating it.
 
     The normalization owner, mirroring the public-domain lane: this result is
-    the coordinate system spans and hashes index into, so changing it
-    invalidates stored offsets.
+    the coordinate system stored character offsets and hashes index into, so
+    changing it invalidates them.
     """
     raw = html.unescape(str(text or "")).replace("\ufeff", "")
     cleaned = _WS_RE.sub(" ", raw).strip()

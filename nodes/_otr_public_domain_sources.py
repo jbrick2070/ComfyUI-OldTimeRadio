@@ -351,8 +351,8 @@ def normalize_public_domain_body(text: Any) -> str:
 
     This is the normalization owner: HTML-unescape, strip Gutenberg header and
     footer boilerplate, collapse whitespace runs. The result is the coordinate
-    system that every span offset and body hash indexes into, so changing what
-    this function produces invalidates stored offsets -- bump
+    system that stored character offsets and the body hash index into, so
+    changing what this function produces invalidates them -- bump
     ``_otr_source_document.NORMALIZATION_VERSION`` when it does.
     """
     raw = html.unescape(str(text or "")).replace("\ufeff", "")
