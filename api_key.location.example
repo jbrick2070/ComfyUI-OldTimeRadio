@@ -1,7 +1,8 @@
 # Copy this file to google_api_key.location or openrouter_api_key.location.
 # Comfy Cloud has NO key file: sign into the app. A headless box puts the
-# key in OTR_COMFY_API_KEY on the SUBMITTING machine (scripts/otr_api.py
-# sends it as extra_data.api_key_comfy_org); the server never reads it.
+# key in OTR_COMFY_API_KEY on the SUBMITTING machine (scripts/otr_api.py, in
+# a git clone, sends it as extra_data.api_key_comfy_org); the server never
+# reads it.
 #
 # First real line is the full path to YOUR key file. The key itself
 # stays in that other file. This file is gitignored once renamed.

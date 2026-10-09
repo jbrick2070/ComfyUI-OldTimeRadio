@@ -636,8 +636,8 @@ works on every platform.
 
 Nearly every weight fetches itself. The picks that do not are listed in
 [apple/MACHINES.md](apple/MACHINES.md); where no manifest exists -- `mesh_stage`
-today -- the engine refuses by name before anything else runs, and that refusal
-is the install instruction.
+today -- the engine refuses by name before anything else runs, naming what it is
+missing and where it expects it.
 
 The script step alone can run on OpenRouter, Google, or Comfy Credits; voices,
 music, images and video stay local either way. It costs money and it is off
@@ -821,8 +821,8 @@ off-by-default pieces carry restricted terms:
 
 - `flux_gen1` (Flux.1-dev) -- BFL non-commercial licence.
 - `ideogram4_local` -- non-commercial model agreement. The pack does not ship the
-  weights; it fetches them from the model's own repository on first use, under that
-  agreement.
+  weights; it fetches them on first use from Comfy-Org's public Ideogram-4
+  repackage on Hugging Face, under that agreement.
 - `h3_low_video` / `h3_low_audio_in` (MiniMax H3) -- a personal, non-transferable
   authorization the maintainer obtained directly from MiniMax. It does not carry to
   your install.

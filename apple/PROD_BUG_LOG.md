@@ -16436,3 +16436,20 @@ not promote it to the Bug Bible on this evidence alone.
   decide "auto".
 - no guard test was added (operator ruling: no new tests). The automatable
   check is in the Bible entry this row promotes to.
+
+## PBUG-20261009-01 -- correction: the row above overstated it
+- "every shipped dead end fixed" was premature. The third Sonnet QA (of
+  ef5e4e56 and b6a4b1f7) found, and the next commit fixes: four partner-pin
+  refusals still told a Manager install to "re-pin" (cloud_media_invoke x3,
+  cloud_slug_preflight); _otr_story_routing still cited the excluded subplan
+  ("lane-enablement checklist 4b item 3"); six OpenRouter / Comfy Credits links
+  in the writer's tooltips pointed at a `docs/` folder that no longer exists;
+  api_key.location.example named scripts/otr_api.py unqualified; and the
+  master_hash tooltip misdescribed the stamp (it is the variant's own semantic
+  hash, not the canonical master's) and gave only one of the mismatch's two
+  fixes.
+- same pass, docs: IMAGE_MODELS.md still called Z-Image the largest image
+  download; Lumina's 10.4 was decimal GB under a GiB label (10.0 GiB, exact
+  Hub bytes); README credited Ideogram's weights to "the model's own
+  repository" (it is Comfy-Org's public repackage); EXTENDING.md never named
+  the "self" value a bank's fetcher/interpreter take, and pointed at `docs/`.

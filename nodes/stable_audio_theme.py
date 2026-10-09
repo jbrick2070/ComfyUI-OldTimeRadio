@@ -852,8 +852,7 @@ class StableAudioTheme:
                     "usable but WRONG at those samples; the fault is upstream "
                     "of this writer. On Apple Silicon see "
                     "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                    "main/apple/MAC_LESSONS_LEARNED.md (a NaN cue on mps was "
-                    "traced to an MPS baddbmm bug, not the model).",
+                    "main/apple/MAC_LESSONS_LEARNED.md.",
                     cue_id, _nonfinite, int(arr.size),
                     100.0 * _nonfinite / max(1, int(arr.size)),
                 )

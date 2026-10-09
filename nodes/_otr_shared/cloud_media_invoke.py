@@ -198,7 +198,8 @@ def _row_for(node_key: str) -> dict:
         raise CloudMediaError(
             CloudErrorCode.UNSUPPORTED_SCHEMA,
             f"partner row {node_key!r} pinned status={status!r} (not OK); "
-            f"re-pin against the live comfy_api_nodes before invoking",
+            f"update the pack (in a git clone, re-pin against the live "
+            f"comfy_api_nodes with scripts/otr_pin_partner_nodes.py)",
         )
     return row
 
@@ -408,7 +409,9 @@ async def _call_partner(row: dict, kwargs: dict) -> Any:
         raise CloudMediaError(
             CloudErrorCode.UNSUPPORTED_SCHEMA,
             f"pinned function {fn_name!r} missing on "
-            f"{row.get('class_name')!r}; re-pin the partner table",
+            f"{row.get('class_name')!r}; this ComfyUI and the pack's partner "
+            f"pin table disagree -- update both (in a git clone, re-pin with "
+            f"scripts/otr_pin_partner_nodes.py)",
         )
     bound = None
     try:
@@ -455,7 +458,9 @@ async def _call_partner_v3(node_cls, row: dict, fn_name: str,
             raise CloudMediaError(
                 CloudErrorCode.UNSUPPORTED_SCHEMA,
                 f"pinned function {entry!r} missing on V3 node "
-                f"{row.get('class_name')!r}; re-pin the partner table",
+                f"{row.get('class_name')!r}; this ComfyUI and the pack's "
+                f"partner pin table disagree -- update both (in a git clone, "
+                f"re-pin with scripts/otr_pin_partner_nodes.py)",
             )
         result = fn(**real_inputs)
         if inspect.isawaitable(result):

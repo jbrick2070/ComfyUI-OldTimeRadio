@@ -270,7 +270,7 @@
         "nv16": "proven",
         "nv8": "oom"
       },
-      "size_gb": 10.4
+      "size_gb": 10.0
     },
     "mesh_stage": {
       "memory": {

@@ -291,7 +291,9 @@ def check_engine(engine, selectors, *, schema_options_fn, catalog_fn) -> list:
             findings.append(Finding(
                 engine_id, str(node_key), "", "",
                 "pinned partner class could not be imported: %s" % exc,
-                "re-pin partner_nodes.yaml or install the Comfy partner node",
+                "update ComfyUI and the pack so the partner pin table matches "
+                "(in a git clone, re-pin partner_nodes.yaml with "
+                "scripts/otr_pin_partner_nodes.py)",
                 "refuse"))
             continue
         for input_name, candidates in (fields or {}).items():

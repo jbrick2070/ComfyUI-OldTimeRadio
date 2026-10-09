@@ -2593,7 +2593,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "OpenRouter model, set OPENROUTER_API_KEY and "
                             "pick OpenRouter A/B (see "
                             "https://github.com/jbrick2070/"
-                            "ComfyUI-OldTimeRadio/blob/main/docs/"
+                            "ComfyUI-OldTimeRadio/blob/main/apple/"
                             "openrouter-setup.md)."
                         ),
                     },
@@ -2623,7 +2623,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "model, set OPENROUTER_API_KEY and pick "
                             "OpenRouter A/B (see "
                             "https://github.com/jbrick2070/"
-                            "ComfyUI-OldTimeRadio/blob/main/docs/"
+                            "ComfyUI-OldTimeRadio/blob/main/apple/"
                             "openrouter-setup.md)."
                         ),
                     },
@@ -2646,7 +2646,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "set. A saved slug is preserved even if absent "
                             "from a stale cache. See "
                             "https://github.com/jbrick2070/"
-                            "ComfyUI-OldTimeRadio/blob/main/docs/"
+                            "ComfyUI-OldTimeRadio/blob/main/apple/"
                             "openrouter-setup.md."
                         ),
                     },
@@ -2669,7 +2669,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "discovery, so they are still offered -- check the "
                             "family before binding one here. See "
                             "https://github.com/jbrick2070/"
-                            "ComfyUI-OldTimeRadio/blob/main/docs/"
+                            "ComfyUI-OldTimeRadio/blob/main/apple/"
                             "openrouter-setup.md."
                         ),
                     },
@@ -2701,7 +2701,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "Credit-billed at generate() when a Comfy "
                             "API key is present. See "
                             "https://github.com/jbrick2070/"
-                            "ComfyUI-OldTimeRadio/blob/main/docs/"
+                            "ComfyUI-OldTimeRadio/blob/main/apple/"
                             "comfy-credits-setup.md."
                         ),
                     },
@@ -2722,7 +2722,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "Credit-billed at generate() when a Comfy "
                             "API key is present. See "
                             "https://github.com/jbrick2070/"
-                            "ComfyUI-OldTimeRadio/blob/main/docs/"
+                            "ComfyUI-OldTimeRadio/blob/main/apple/"
                             "comfy-credits-setup.md."
                         ),
                     },

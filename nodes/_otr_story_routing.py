@@ -609,7 +609,8 @@ def _crossref_bank(bank: SourceBank, pipelines: "dict[str, StoryPipeline]",
                 raise RegistryValidationError(
                     f"{origin}: runnable bank on source-contract pipeline "
                     f"{pipe.story_pipeline_id!r} must declare BOTH fetcher "
-                    f"and interpreter (lane-enablement checklist 4b item 3)"
+                    f"and interpreter (apple/EXTENDING.md, 'Adding your own "
+                    f"source bank')"
                 )
         elif not pipe.executable:
             raise RegistryValidationError(

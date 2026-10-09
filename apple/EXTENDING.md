@@ -332,7 +332,9 @@ user_packs/source_banks/<your_bank_id>/
 Every key is required except `defaults`: `source_bank_id`, `label`,
 `source_kind`, the fetcher and interpreter entry points,
 `default_story_pipeline`, `default_story_model`, `required_seams`, `runnable`,
-`guide_ref`, and optionally `defaults`.
+`guide_ref`, and optionally `defaults`. Set `fetcher` and `interpreter` to
+`"self"` to route them to your module's `fetch_source` / `interpret_source`
+below, or to a shipped id.
 
 Two `defaults` keys are worth knowing because nothing else announces them:
 
@@ -354,7 +356,7 @@ def interpret_source(*, bank, payload, technical_fn, model_id): ...
 
 The writer calls the fetcher with `bank`, `technical_model`, `source_ref`,
 `load_config` and `policy`, and the interpreter with `bank`, `payload`,
-`technical_fn` and `model_id`. Older notes in `docs/`
+`technical_fn` and `model_id`. Older notes elsewhere
 show a shorter fetcher; that signature raises `TypeError` on its first
 real call. If you are unsure, the binding check below proves it without running
 your code.

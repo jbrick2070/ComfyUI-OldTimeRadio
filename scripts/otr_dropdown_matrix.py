@@ -1086,7 +1086,7 @@ def render_apple(rows: list) -> str:
     elif unsourced:
         L.append("Only the picks below still need a hand download.\n\n")
     else:
-        L.append("None: every pick in the grid above fetches its own weights.\n\n")
+        L.append("None: no row in the grid above reads manual.\n\n")
 
     for lane in sorted(lane_to_engines):
         specs = manual_artifacts(lane, provision, fetcher)
@@ -1121,9 +1121,8 @@ def render_apple(rows: list) -> str:
         L.append("### No manifest ships for these\n\n")
         L.append("This pack cannot fetch them, and no table here can tell you "
                  "the filename, because the engine chooses it. Select one "
-                 "anyway and it refuses by name before anything else runs -- "
-                 "**that refusal is the install instruction**: it prints the "
-                 "exact file it wants and the folder it expects. It never "
+                 "anyway and it refuses by name before anything else runs, "
+                 "naming what it is missing and where it expects it. It never "
                  "quietly substitutes another.\n\n")
         for public in sorted(set(unsourced)):
             L.append("* `%s`\n" % public)

@@ -389,11 +389,12 @@ class WorkflowValidator:
                 }),
                 "master_hash": ("STRING", {
                     "multiline": False, "default": "",
-                    "tooltip": "Generation stamp: sha256 of the canonical "
-                               "master this variant was generated from. A "
-                               "mismatch against the workflow file means this "
-                               "graph is stale -- re-open it from Browse "
-                               "Templates, never hand-fix.",
+                    "tooltip": "Generation stamp: semantic hash of this "
+                               "variant as emitted. A mismatch against the "
+                               "workflow file means this graph is a stale "
+                               "copy (re-open it from Browse Templates) or "
+                               "the file was edited (reinstall the pack); "
+                               "never hand-fix.",
                 }),
                 "generated_by": ("STRING", {
                     "multiline": False, "default": "",
