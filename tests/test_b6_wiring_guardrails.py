@@ -198,40 +198,14 @@ def _is_force_input_value(value_node: ast.AST) -> bool:
     return False
 
 
-def _has_non_llm_opt_in(cls_node: ast.ClassDef) -> bool:
-    """Return True if the class declares
-    `NON_LLM_MODEL_WIDGET_OK = True` at class scope. Non-LLM media
-    nodes (AudioGen, MusicGen, etc.) carry a `model_id` widget for
-    their own checkpoint pick; the marker exempts them from the
-    LLM-slot guard.
-    """
-    for sub in cls_node.body:
-        if not isinstance(sub, ast.Assign):
-            continue
-        if len(sub.targets) != 1:
-            continue
-        target = sub.targets[0]
-        if (
-            isinstance(target, ast.Name)
-            and target.id == "NON_LLM_MODEL_WIDGET_OK"
-            and isinstance(sub.value, ast.Constant)
-            and sub.value.value is True
-        ):
-            return True
-    return False
-
-
 def _collect_widget_offenders() -> list[str]:
     """Walk every class in nodes/, find INPUT_TYPES, scan the Dict
-    keys for any model-widget key whose value is NOT forceInput
-    AND whose class is not flagged NON_LLM_MODEL_WIDGET_OK.
+    keys for any model-widget key whose value is NOT forceInput.
     """
     offenders: list[str] = []
     for path, cls in _classes_in_nodes_dir():
         if cls.name == "OTR_LedgerScriptWriter":
             continue  # only legitimate widget-form LLM picker
-        if _has_non_llm_opt_in(cls):
-            continue  # non-LLM media node with its own checkpoint picker
         method = _input_types_method(cls)
         if method is None:
             continue

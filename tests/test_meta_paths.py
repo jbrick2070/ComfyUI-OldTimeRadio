@@ -60,7 +60,6 @@ class TestBuildMetaPathsPerEpisode:
         assert Path(paths["stills_dir"]) == ep / "stills"
         assert Path(paths["portraits_dir"]) == ep / "portraits"
         assert Path(paths["videos_dir"]) == ep / "videos"
-        assert Path(paths["composited_dir"]) == ep / "composited"
 
     def test_obs_final_stamped_when_obs_dir_exists(self, workspace):
         paths = OTRL._build_meta_paths(workspace["ledger_path"], workspace["ep_id"])
@@ -135,7 +134,7 @@ class TestBuildMetaPathsLegacyFlat:
 
     def test_no_fabricated_subdirs_in_legacy(self, workspace):
         paths = OTRL._build_meta_paths(workspace["ledger_path"], workspace["ep_id"])
-        for k in ("stills_dir", "portraits_dir", "videos_dir", "composited_dir"):
+        for k in ("stills_dir", "portraits_dir", "videos_dir"):
             assert k not in paths, (
                 f"legacy layout should NOT fabricate {k}"
             )

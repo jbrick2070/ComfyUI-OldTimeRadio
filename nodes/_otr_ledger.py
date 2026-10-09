@@ -265,7 +265,6 @@ def _build_meta_paths(
               stills/
               portraits/
               videos/
-              composited/
 
     Detects layout by checking if the ledger sits two levels under a
     directory literally named "episodes". When detected, returns a fully
@@ -300,7 +299,6 @@ def _build_meta_paths(
         paths["stills_dir"] = str(ep_dir / "stills")
         paths["portraits_dir"] = str(ep_dir / "portraits")
         paths["videos_dir"] = str(ep_dir / "videos")
-        paths["composited_dir"] = str(ep_dir / "composited")
         # OBS final lives in the sibling output/otr/obs directory (or the
         # explicitly configured OTR_OBS_DIR split tree). Before publication,
         # keep the historical planned <episode_id>.mp4 pointer. Once the

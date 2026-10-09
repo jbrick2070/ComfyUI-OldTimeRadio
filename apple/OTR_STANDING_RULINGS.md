@@ -2444,7 +2444,7 @@ FLOOR so an empty-vs-empty comparison cannot pass.
 **5. THE COUNT WAS WRONG THREE WAYS, AND THAT IS THE REAL LESSON.**
 * A comment in `__init__.py` said **34** -- pre-lean-mean, retired nodes. It was
   quoted back as fact in the plan. Comment now removed.
-* `/object_info` shows **29** `OTR_*` ids -- but **4 belong to a DIFFERENT pack**
+* `/object_info` showed **29** `OTR_*` ids at the time -- but **4 belonged to a DIFFERENT pack**
   (`ComfyUI-OTR-UpstreamStoryLab`, per each node's `python_module`), and are not
   ours to declare.
 * This pack declared and loaded exactly **25** at the time -- **22** since

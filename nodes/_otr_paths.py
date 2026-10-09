@@ -479,8 +479,8 @@ def otr_episodes_root() -> Path:
     """Root of the per-episode workspace tree: ``<output>/otr/episodes/``.
 
     Each episode has its own subdir under here:
-    ``<output>/otr/episodes/<episode_id>/{audio,stills,portraits,videos,
-    composited}/``. The ledger auto-pick logic walks this root looking
+    ``<output>/otr/episodes/<episode_id>/{audio,stills,portraits,videos}/``.
+    The ledger auto-pick logic walks this root looking
     for ``*/audio/*_ledger.json`` files across all episodes.
 
     Added 2026-05-02 EVENING per Jeffrey directive: every per-episode
