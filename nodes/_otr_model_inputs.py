@@ -13,8 +13,6 @@ B1a (offline) defines:
                               reject, not in any admit-path).
     require_model(...)     -- shared helper that fails loud if the
                               socket arrived with a falsy value.
-
-B1c will add VRAMFitFailedError + ContextCapUnknownError.
 """
 
 from __future__ import annotations
@@ -51,21 +49,6 @@ class InsufficientDiskSpaceError(RuntimeError):
     check when (free_bytes - download_bytes - 5GB_margin) < 0.
     Refuses to attempt the download because partial-download cleanup
     on a near-full disk is brittle."""
-
-
-class VRAMFitFailedError(RuntimeError):
-    """Historical admission error for a check_vram_fit FAIL verdict.
-
-    2026-09-17: request_slot no longer raises this. A FAIL estimate is a
-    recommendation / qualification signal, not a capability refusal. The
-    class remains so older tests and log greps still resolve, and so a
-    caller that constructs it by hand keeps a stable type.
-    """
-
-    def __init__(self, message: str, *, estimated_gb: float = 0.0, ceiling_gb: float = 0.0):
-        super().__init__(message)
-        self.estimated_gb = estimated_gb
-        self.ceiling_gb = ceiling_gb
 
 
 def require_model(model_id: str | None, *, slot: str) -> str:

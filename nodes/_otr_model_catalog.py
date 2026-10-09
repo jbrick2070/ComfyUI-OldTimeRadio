@@ -1984,7 +1984,7 @@ def vram_badge_for(repo_id: str) -> str:
     should state the name of the model and how much VRAM it needs so users
     select only the one they can use." A dropdown that offers a model the box
     cannot load is a broken menu, and the failure arrives minutes later as a
-    VRAMFitFailedError rather than at the moment of choosing.
+    failed load rather than at the moment of choosing.
 
     It reports the same figure :func:`_estimate_resident_gb` computes, so the
     badge and the gate cannot drift apart. Remote handles and un-estimable rows

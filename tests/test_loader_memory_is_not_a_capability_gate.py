@@ -8,7 +8,6 @@ device-0 allocation, which load_llm retries with CPU overflow.
 from __future__ import annotations
 
 import types
-from pathlib import Path
 
 from nodes import _otr_model_catalog as cat
 from nodes._otr_model_loader import (
@@ -94,14 +93,3 @@ def test_device_map_summary_reports_cpu_layers_truthfully():
     assert summary["cpu_modules"] is True
     assert summary["disk_modules"] is False
     assert summary["cpu_module_count"] == 1
-
-
-def test_production_never_raises_vram_fit_failed_error():
-    needle = "raise " + "VRAMFitFailedError"
-    nodes = Path(__file__).resolve().parents[1] / "nodes"
-    offenders = []
-    for path in sorted(nodes.glob("*.py")):
-        text = path.read_text(encoding="utf-8")
-        if needle in text:
-            offenders.append(path.name)
-    assert offenders == []

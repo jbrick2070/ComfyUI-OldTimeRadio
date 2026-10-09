@@ -46,13 +46,13 @@ def _raises_inside_vram_block(path: pathlib.Path) -> list:
             continue
         lo = max(0, node.lineno - 14)
         window = "\n".join(lines[lo:node.lineno]).lower()
-        # The loader spells it check_vram_fit / VRAMFitFailedError, not
-        # "vram-fit" -- a review caught that the hyphenated spelling matched
-        # nothing there, so a reintroduced raise in the fit gate would have
-        # slipped straight past this tripwire.
+        # The loader spells it check_vram_fit, not "vram-fit" -- a review
+        # caught that the hyphenated spelling matched nothing there, so a
+        # reintroduced raise in the fit gate would have slipped straight past
+        # this tripwire.
         if any(k in window for k in (
                 "mem_get_info", "free_gb", "vram preflight", "vram-fit",
-                "check_vram_fit", "vramfitfailederror", "fit_verdict",
+                "check_vram_fit", "fit_verdict",
                 "vram_ceiling_gb", "estimated_needed_gb", "estimated_gb")):
             found.append((path.name, node.lineno,
                           lines[node.lineno - 1].strip()[:80]))

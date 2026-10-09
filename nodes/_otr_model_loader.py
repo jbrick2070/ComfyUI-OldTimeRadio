@@ -2054,7 +2054,7 @@ def _assert_policy_admits_vram(
     # download of gemma-4-12b-it already proved the estimator is not the
     # runtime: the snapshot loads, then Accelerate/PyTorch decides. A 70B
     # pick may still OOM -- that OOM is the authority. Do not convert the
-    # 1.5x ceiling arithmetic into VRAMFitFailedError.
+    # 1.5x ceiling arithmetic into a refusal.
     if fit_verdict.tier == "FAIL":
         log.warning(
             "[Selector] VRAM-fit estimate FAIL (recommendation only; "
