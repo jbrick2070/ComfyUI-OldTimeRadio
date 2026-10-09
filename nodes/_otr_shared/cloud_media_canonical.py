@@ -134,16 +134,18 @@ def canonical_video_clip(asset: CanonicalAsset, *, clip_id: str, engine_id: str,
     ``has_audio`` is False because that strip is PROVEN inside
     ``canonicalize_video``, so never pass an asset that did not come out of it.
 
-    The honesty receipts (2026-08-06). A provider clip is downloaded whole and
-    ``frame_count`` is the counted length of the conformed file (after the
-    adapter's declared tail trim or fps-resample cap). The one lengthening OTR
-    does on this path is ``canonicalize_video``'s bounded tail pad: at most
-    ``VIDEO_FRAME_SHORTFALL_SLACK`` cloned last frames to absorb provider/fps
-    jitter. ``frame_count`` includes any such pad, ``native_frame_count`` is
-    set equal to it and ``extension_mode`` to ``"none"``, so this receipt does
-    NOT separate those few cloned frames -- it only keeps a cloud lane that
-    answered nothing from looking like a local lane that pads without saying
-    so.
+    The honesty receipts (2026-08-06) exist so every provider lane ANSWERS
+    ``native_frame_count`` / ``extension_mode`` rather than leaving them blank:
+    a lane that answered nothing could not be told apart from a local lane
+    that extends a clip without saying so. A provider clip is downloaded whole
+    and ``frame_count`` is the counted length of the conformed file (after the
+    adapter's declared tail trim or fps-resample cap).
+
+    KNOWN GAP: ``canonicalize_video`` may clone up to
+    ``VIDEO_FRAME_SHORTFALL_SLACK`` last frames onto the tail to absorb
+    provider/fps jitter. Those frames are counted in ``frame_count``, and this
+    receipt still reports ``native_frame_count`` equal to it with
+    ``extension_mode`` ``"none"``, so that bounded pad is NOT disclosed here.
     """
     frame_count = canonical_clip_frame_count(asset)
     return {
