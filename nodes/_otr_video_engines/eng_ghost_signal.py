@@ -294,8 +294,8 @@ NODE_LORA = "lora"
 #: What a person does about a missing class, said first. The queue-time gate
 #: (`_otr_visual_assets._refuse_missing_node_packs`) and `assert_usable` below
 #: both lead with it; the enum and the class names come after. It ends on the
-#: pack's URL, not a doc path: `apple/DEPENDENCIES.md` is not in the registry
-#: bundle (.comfyignore), so naming it sent a Manager install to a missing file.
+#: pack's URL, never a doc path: `apple/DEPENDENCIES.md` is not in the registry
+#: bundle (.comfyignore), so a Manager install cannot open it.
 GHOST_NODE_PACK_HINT = (
     "Install ComfyUI-AnimateDiff-Evolved (Kosinkadink) from ComfyUI Manager, "
     "then restart ComfyUI (https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved)")

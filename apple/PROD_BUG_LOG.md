@@ -16385,3 +16385,31 @@ not promote it to the Bug Bible on this evidence alone.
   lived in is gone; both type names are tombstoned in DELETED_NODE_TYPES, so
   a saved graph naming either fails loudly at validation. Nothing further is
   owed on this row.
+
+## PBUG-20261009-01 -- the AnimateDiff pack refusal sent a registry install to a file it does not have
+- surfaced: 2026-10-09 01:03 PDT, the operator's Comfy Desktop (ComfyUI 0.39.2,
+  OTR 2.3.22 installed from Node Manager, RTX 4060 laptop). `otr_8gb_animatediff`
+  was queued twice without ComfyUI-AnimateDiff-Evolved. The queue-time gate
+  refused correctly, before any download, but its instruction ended "(apple/
+  DEPENDENCIES.md names the pinned commit)", and that file is absent from the
+  install (`custom_nodes\comfyui-old-time-radio\apple\DEPENDENCIES.md`: Test-Path
+  False) because `.comfyignore` excludes it from the registry bundle. It names no
+  commit either; the pin lives in `scripts/otr_provision.py`, also unshipped.
+- root cause: `GHOST_NODE_PACK_HINT` (eng_ghost_signal.py) cited a dev-tree doc
+  as the user's reference.
+- fix: 1f8e84d6 -- the hint ends on the pack's GitHub URL, the one
+  `wrapper_bridge._PACK_FOR_PREFIX` carries, which also makes README's "an error
+  that names the pack and its URL" true. The same commit corrects VIDEO_MODELS.md
+  and MAC.md, which still called the AnimateDiff weights a manual fetch; they
+  download at queue time since df55a4b2.
+- seen, not a defect: the load-time hint (js/lane_node_packs.js) puts the pack
+  in ComfyUI's Issues panel with a Search button, not Install. The frontend
+  resolves installable packs only from graph nodes' `cnr_id` (useWorkflowPacks
+  in frontend 1.53.10), and the ADE nodes are built in Python. Search -> Install
+  -> restart is the path, and it is what README already describes.
+- open: Sonnet QA of 1f8e84d6 found about nine more user-facing strings in shipped
+  modules that name bundle-excluded paths (motion_common.py:651,
+  _otr_workflow_validator.py:644 and :652, _otr_workflow_apply.py:588,
+  eng_cloud_video.py:469, cloud_media_invoke.py:192, cloud_media_backend.py:384,
+  _otr_model_catalog.py:310, stable_audio_theme.py:849, prestartup_script.py:245).
+  Same class, not yet fixed.
