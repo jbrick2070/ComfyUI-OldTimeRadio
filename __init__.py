@@ -236,9 +236,9 @@ _NODE_MODULES = {
     # v2.0 late viewer-credits surface (credits enrichment 2026-07-03). Renders
     # the ONE unified credits roll LATE (after nodes 91/92) from the durable
     # ledger stamps (S2) + the clip manifest, appends it as a SILENT tail to
-    # node 93's output, and declares its tail duration to the mux (credits-aware
-    # guard). Wired 93 -> OTR_CreditsRoll -> 85; no fallbacks (missing receipt
-    # RAISES). See nodes/otr_credits_roll.py + GO_FORWARD_CREDITS.md.
+    # node 86's output (the caption burn), and declares its tail duration to the
+    # mux (credits-aware guard). Wired 86 -> OTR_CreditsRoll -> 85; no fallbacks
+    # (a missing receipt RAISES). See nodes/otr_credits_roll.py + GO_FORWARD_CREDITS.md.
     # =========================================================================
     "OTR_CreditsRoll":             (".nodes.otr_credits_roll",       "OTRCreditsRoll",       " CreditsRoll (late unified viewer credits, silent tail)"),
 
@@ -443,9 +443,9 @@ try:
             #
             # REMOVING THE TOP-LEVEL `fullpath` WAS NOT ENOUGH, and the first
             # pass at this stopped there. The response returns the whole ledger
-            # DOCUMENT, and that document is full of absolute paths: the ten
+            # DOCUMENT, and that document is full of absolute paths: the
             # keys `_otr_ledger` writes under `meta.paths` (ledger_path,
-            # episode_root, audio_dir, stills/portraits/videos/composited dirs,
+            # episode_root, audio_dir, stills/portraits/videos dirs,
             # obs_dir, obs_final), plus every still's `path` and cache
             # `pool_path`, the music-cue WAVs, and the final audio/video/publish
             # targets. One live episode ledger measured 75 of them. So the

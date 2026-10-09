@@ -2,10 +2,10 @@
 operator's 3-column SIGNAL LOST console (credits enrichment 2026-07-03, per
 the credits-overlay build plan).
 
-WIRED 93 -> OTR_CreditsRoll (node 95) -> 85. Renders the COMPLETE viewer credits
-LATE, from post-render truth: the DURABLE production-ledger singleton (S2 stamps)
-+ the clip manifest (node 92 slot 1). Appended as a SILENT tail to node 93's
-output; the video ENDS at credit-end.
+WIRED 86 (OTR_CaptionBurn) -> OTR_CreditsRoll (node 95) -> 85. Renders the
+COMPLETE viewer credits LATE, from post-render truth: the DURABLE production-ledger
+singleton (S2 stamps) + the clip manifest (node 92 slot 1). Appended as a SILENT
+tail to node 86's output; the video ENDS at credit-end.
 
 Presentation model (operator lock 2026-07-03):
 - COLUMNS 1 + 2 are a STATIC dashboard (title / MODELS / [PRODUCTION LEDGER] /
@@ -1819,11 +1819,11 @@ def append_credits(body_path: str, credits_path: str, out_path: str) -> str:
 
 
 # =========================================================================== #
-# The terminal node (wired 93 -> OTR_CreditsRoll -> 85)
+# The terminal node (wired 86 -> OTR_CreditsRoll -> 85)
 # =========================================================================== #
 class OTRCreditsRoll:
     """Registered as ``OTR_CreditsRoll``. Appends the late SIGNAL LOST console
-    to node 93's output and hands the mux (85) the video path + the DECLARED
+    to node 86's output (the caption burn) and hands the mux (85) the video path + the DECLARED
     credits-tail duration (credits-aware guard)."""
 
     DESCRIPTION = (

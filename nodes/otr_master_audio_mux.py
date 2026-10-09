@@ -1740,10 +1740,10 @@ class OTRMasterAudioMux:
     ) -> str:
         """Truthfully stamp all terminal asset pointers in the live ledger.
 
-        The tail chain grew a credits roll (node 95) + this mux (node 85) AFTER
-        the procgen blend (out of the canonical since 2026-09-13), whose
-        ``_stamp_ledger_final_video_path``
-        left the ledger pointing at the pre-credits / pre-mux intermediate blend.
+        The tail chain ends in a credits roll (node 95) and this mux (node 85).
+        An earlier tail stage stamped the ledger's final video path at its own
+        intermediate output, which left the ledger pointing at a pre-credits /
+        pre-mux file.
         This node is the terminal stage, so it owns the archival video, frozen
         master audio, and published OBS pointers together. ``save_ledger_safe``
         validates the published path and synchronizes ``meta.paths.obs_final``.

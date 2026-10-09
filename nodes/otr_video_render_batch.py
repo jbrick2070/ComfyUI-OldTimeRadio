@@ -417,7 +417,7 @@ def _stamp_audio_motion_profiles(amp_rows):
     credits roll requires, so it stamps LOUD), NOTHING consumes this profile yet
     (C2 deferred), so a load/save miss is logged and swallowed -- it must never
     fail the render. Uses the same in-flight-ledger discovery + save_ledger_safe
-    seam as nodes 93/85; runs AFTER the render-engines durable stamp so the
+    seam as the mux (node 85); runs AFTER the render-engines durable stamp so the
     on-disk ledger is already current."""
     if not amp_rows:
         return
