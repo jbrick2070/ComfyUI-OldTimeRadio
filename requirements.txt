@@ -215,7 +215,7 @@ pyloudnorm>=0.1.1
 # independent of Flagged/Active -- an admin approval would not populate it.
 #
 # MEASURED BLAST RADIUS: exactly one function. The only `import cairo` in
-# scope_draw.py is at line 629, indented INSIDE `paint_mandala`, so importing
+# scope_draw.py is indented INSIDE `paint_mandala`, so importing
 # the module never imports cairo; `freq_bars_green`, `cfr_flags`,
 # `find_ffmpeg` and `encode_silent_mp4` are all cairo-free, which leaves the
 # scope overlays, caption burn, silent composite and encode sink untouched.

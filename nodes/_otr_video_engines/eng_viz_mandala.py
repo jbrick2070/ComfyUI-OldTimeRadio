@@ -192,30 +192,15 @@ class VizMxcMandalaEngine:
         # audio_ref is NOT gated (audio-optional): a silent beat idles the mandala.
         return self.name
 
-    # ---- pure helpers (CPU-testable; identical shape to viz_mxc_cpu) ----
-    @staticmethod
-    def _ref_path(ref):
-        if not ref:
-            return ""
-        if isinstance(ref, str):
-            return ref
-        if isinstance(ref, dict):
-            return ref.get("path") or ""
-        return getattr(ref, "path", "") or ""
+    # ---- pure helpers (CPU-testable) ----
+    _ref_path = staticmethod(_MC.viz_ref_path)
 
     def _canvas_dims(self, request):
-        get = request.get if isinstance(request, dict) else (
-            lambda k, d=None: getattr(request, k, d))
-        canvas = get("canvas") or {}
-        c_get = canvas.get if isinstance(canvas, dict) else (
-            lambda k, d=None: getattr(canvas, k, d))
-        w = int(c_get("w", 0) or 0) or 1472
-        h = int(c_get("h", 0) or 0) or 832
-        return w, h
+        return _MC.viz_canvas_dims(request)
 
     def _build_render_request(self, request):
         """Pure: the normalized inputs render_clip consumes."""
-        return _MC.viz_render_request(request, self._ref_path)
+        return _MC.viz_render_request(request)
 
     def _clip_from_raw(self, raw, request):
         get = request.get if isinstance(request, dict) else (

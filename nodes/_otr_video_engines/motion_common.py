@@ -20,8 +20,8 @@ every guard is tested once:
   SINGLE uniform scale (``resolve_aspect_transform`` / ``assert_no_silent_stretch``)
   so a portrait init never silently stretches into a landscape canvas
   (pre-mortem N9);
-* ``viz_render_request`` -- the one request reader the four procedural
-  visualizer engines share.
+* ``viz_ref_path`` / ``viz_canvas_dims`` / ``viz_render_request`` -- the one
+  set of request readers the four procedural visualizer engines share.
 
 Cold-import clean (V-12): module scope imports only the stdlib + the dep-free
 shared GPU lease + the dep-free registry error types. torch / diffusers / the LTX
@@ -1519,12 +1519,37 @@ def compose_legacy(inputs):
     return str((inputs or {}).get("text_prompt") or "")
 
 
-def viz_render_request(request, ref_path):
+def viz_ref_path(ref):
+    """The path an audio ref names for the four procedural visualizer engines:
+    a bare string, a mapping with ``path`` or an object carrying ``path``; ""
+    when there is none."""
+    if not ref:
+        return ""
+    if isinstance(ref, str):
+        return ref
+    if isinstance(ref, dict):
+        return ref.get("path") or ""
+    return getattr(ref, "path", "") or ""
+
+
+def viz_canvas_dims(request):
+    """(w, h) of a visualizer beat's canvas, read off a VideoRequest-shaped
+    object OR a plain dict; 1472x832 when the request names none."""
+    get = request.get if isinstance(request, dict) else (
+        lambda k, d=None: getattr(request, k, d))
+    canvas = get("canvas") or {}
+    c_get = canvas.get if isinstance(canvas, dict) else (
+        lambda k, d=None: getattr(canvas, k, d))
+    w = int(c_get("w", 0) or 0) or 1472
+    h = int(c_get("h", 0) or 0) or 832
+    return w, h
+
+
+def viz_render_request(request):
     """Pure: what the four procedural visualizer engines (``viz_green``,
     ``viz_mxc_cpu``, ``viz_camera``, ``viz_mxc_mandala``) render from -- the
     audio file, the beat's frame budget and the request seed -- read off a
-    VideoRequest-shaped object OR a plain dict. ``ref_path`` is the engine's own
-    ``_ref_path`` (a bare string, a mapping or an object carrying ``path``)."""
+    VideoRequest-shaped object OR a plain dict."""
     get = request.get if isinstance(request, dict) else (
         lambda k, d=None: getattr(request, k, d))
     timing = get("timing") or {}
@@ -1534,7 +1559,7 @@ def viz_render_request(request, ref_path):
     s_get = seeds.get if isinstance(seeds, dict) else (
         lambda k, d=None: getattr(seeds, k, d))
     return {
-        "audio_path": ref_path(get("audio_ref")),
+        "audio_path": viz_ref_path(get("audio_ref")),
         "target_frame_count": int(t_get("target_frame_count", 0) or 0),
         "seed": int(s_get("request_seed", 0) or 0),
     }
