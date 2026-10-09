@@ -48,6 +48,7 @@ __all__ = [
     "canonicalize_image",
     "canonicalize_video",
     "canonical_clip_frame_count",
+    "canonical_video_clip",
     "cloud_delivery_wh",
     "engine_request_target_frames",
 ]
@@ -120,6 +121,46 @@ def canonical_clip_frame_count(asset: CanonicalAsset) -> int:
     if fps <= 0.0 or dur <= 0.0:
         return 0
     return int(round(dur * fps))
+
+
+def canonical_video_clip(asset: CanonicalAsset, *, clip_id: str, engine_id: str,
+                         family: str) -> dict:
+    """The delivered-clip receipt for a provider clip ``canonicalize_video`` conformed.
+
+    The shared tail of the Google video adapters' ``canonicalize()``: each builds
+    its own conform spec and runs ``canonicalize_video`` itself (that call strips
+    the provider audio and re-probes the output), then hands the asset it got
+    back here. ``has_audio`` is False because that strip is PROVEN inside
+    ``canonicalize_video``, so never pass an asset that did not come out of it.
+
+    The honesty receipts (2026-08-06). A provider clip is native by
+    construction: the asset is downloaded whole, OTR owns no code on this path
+    that could lengthen it, and ``frame_count`` is the counted length of that
+    file after the declared tail trim. So ``native_frame_count`` equals it and
+    ``extension_mode`` is ``"none"``.
+    """
+    frame_count = canonical_clip_frame_count(asset)
+    return {
+        "clip_id": clip_id,
+        "type": "video",
+        "path": str(asset.path),
+        "container": "mp4",
+        "codec": "h264",
+        "pixel_format": "yuv420p",
+        "fps": int(asset.fps or 25),
+        "frame_count": frame_count,
+        "has_audio": False,
+        "color_primaries": "bt709",
+        "transfer": "bt709",
+        "matrix": "bt709",
+        "engine_id": engine_id,
+        "family": family,
+        "provider_job_id": asset.provider_job_id,
+        "content_sha256": asset.sha256,
+        "actual_duration_s": asset.duration_s,
+        "native_frame_count": frame_count,
+        "extension_mode": "none",
+    }
 
 
 #: bumped on ANY output-contract change (DS R3 S-2: simple integers).

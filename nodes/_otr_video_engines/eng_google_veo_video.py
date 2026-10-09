@@ -607,7 +607,7 @@ class GoogleVeoVideoEngine:
     def canonicalize(self, raw, request, profile):  # noqa: ARG002
         from .._otr_shared.cloud_media_canonical import (
             canonicalize_video,
-            canonical_clip_frame_count,
+            canonical_video_clip,
             cloud_delivery_wh,
             engine_request_target_frames,
         )
@@ -631,31 +631,12 @@ class GoogleVeoVideoEngine:
         if n:
             spec["target_frames"] = n
         asset = canonicalize_video(raw, spec)
-        frame_count = canonical_clip_frame_count(asset)
-        return {
-            "clip_id": _req_get(request, "shot_id") or f"{self.name}_clip",
-            "type": "video",
-            "path": str(asset.path),
-            "container": "mp4",
-            "codec": "h264",
-            "pixel_format": "yuv420p",
-            "fps": int(asset.fps or 25),
-            "frame_count": frame_count,
-            "has_audio": False,
-            "color_primaries": "bt709",
-            "transfer": "bt709",
-            "matrix": "bt709",
-            "engine_id": self.name,
-            "family": self.family,
-            "provider_job_id": asset.provider_job_id,
-            "content_sha256": asset.sha256,
-            "actual_duration_s": asset.duration_s,
-            # The honesty receipts (2026-08-06). Native by construction: the
-            # asset is downloaded whole and ``frame_count`` is the counted
-            # length of that file after the declared tail trim.
-            "native_frame_count": frame_count,
-            "extension_mode": "none",
-        }
+        return canonical_video_clip(
+            asset,
+            clip_id=_req_get(request, "shot_id") or f"{self.name}_clip",
+            engine_id=self.name,
+            family=self.family,
+        )
 
     def teardown(self, prepared) -> None:  # noqa: ARG002
         return None
