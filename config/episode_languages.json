@@ -1,11 +1,5 @@
 {
   "schema_version": 1,
-  "kokoro_mirror": {
-    "package": "kokoro",
-    "version": "0.9.4",
-    "lang_codes_source": "kokoro.pipeline.LANG_CODES",
-    "note": "Every LANG_CODES key is a row (or folded into English for a/b). Off is not a row. Kokoro is the dance leader."
-  },
   "rows": [
     {
       "iso": "en",
