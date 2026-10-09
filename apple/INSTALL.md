@@ -189,9 +189,10 @@ are listed in [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from).
 
 ## Hugging Face login
 
-Most of what this pack uses is ungated. A few of the heavier video lanes are not,
-and for those you accept the licence on the model's Hugging Face page while
-signed in, then log in locally:
+Most of what this pack uses is ungated. The few picks that are not are marked
+GATED in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine); for those
+you accept the licence on the model's Hugging Face page while signed in, then log
+in locally:
 
 ```bash
 python -m pip install huggingface_hub

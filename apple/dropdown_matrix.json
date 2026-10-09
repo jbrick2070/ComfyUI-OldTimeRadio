@@ -138,7 +138,7 @@
         "nv16": "proven",
         "nv8": "oom"
       },
-      "size_gb": 13.0
+      "size_gb": 16.1
     },
     "google_image": {
       "memory": {
@@ -226,7 +226,7 @@
         "nv16": "proven",
         "nv8": "no"
       },
-      "size_gb": 17.3
+      "size_gb": 27.5
     },
     "indextts2": {
       "memory": {

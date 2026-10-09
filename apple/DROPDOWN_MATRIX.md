@@ -73,9 +73,9 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 |---|---|---|---|---|---|---|---|
 | `sd15` | **auto** | 2.0 GiB | fits | **proven** | **proven** | ? | too slow |
 | `lumina_image` | **auto** | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `flux_gen1` | **auto** | 13.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `ideogram4_local` | **auto** | 17.3 GiB | **no** | **proven** | not offered | not offered | not offered |
+| `flux_gen1` | **auto** | 16.1 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `z_image_turbo` | **auto** | 19.3 GiB | **proven** | **proven** | not offered | **proven** | not offered |
+| `ideogram4_local` | **auto** | 27.5 GiB | **no** | **proven** | not offered | not offered | not offered |
 
 **Image -- hosted**
 
@@ -130,18 +130,19 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** | ? | ? |
 | `Qwen/Qwen3.8-27B` | **auto** | 51.8 GiB | **no** | **24 GB+** | **no** | ? | ? |
 
-**How you get the weights.** Two things do the fetching for an **auto** row, and
-neither of them is a script you have to run: the engine's own library pulls it
-through the Hugging Face cache, or `OTR_WorkflowValidator` -- a node inside the
-workflow -- downloads it at queue time. A **manual** row may still have a helper in
+**How you get the weights.** Three things do the fetching for an **auto** row, and
+none of them is a script you have to run: the engine's own library pulls it
+through the Hugging Face cache, `OTR_WorkflowValidator` -- a node inside the
+workflow -- downloads it at queue time, or the engine fetches its own pinned file
+when it loads (the upscaler). A **manual** row may still have a helper in
 `scripts/`, but `scripts/` is not in the registry bundle, so from a normal
 install it is a step you take by hand and it is labelled as one.
 
 **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
-it yourself; the manual-weights table in `apple/MACHINES.md` names every
-file, the repository it comes from and the folder it goes in.
+it yourself; `apple/MACHINES.md` lists every manual pick and how to get its
+files.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 

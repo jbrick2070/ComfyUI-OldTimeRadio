@@ -164,8 +164,9 @@ Every graph this pack ships -- the canonical and every variant -- sets
 
 - The composite already resamples and sharpens on the way to the canvas, and
   that path was tuned against a measured comparison.
-- The one available model needs a manual download, so the shipped default has
-  to be the one that works on a fresh install.
+- The one available model downloads at the end of the first run that uses it,
+  and a failed fetch there costs the whole episode, so the shipped default has
+  to be the one that works on a fresh, offline install.
 - It is a radio drama. The picture is a visualizer or a procedural lane, and
   super-resolution has less to give that than it would give a photograph.
 

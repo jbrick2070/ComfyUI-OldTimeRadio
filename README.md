@@ -541,7 +541,7 @@ CUDA and Metal only. MusicGen is noncommercial (see
 [Licence](#licence-and-credits)), so on that preset alone, change the music
 dropdown on **OTR_StableAudioTheme** if that matters to you.
 
-Which file to open, what each engine costs, and every hand-fetched weight:
+Which file to open and what each engine costs:
 [apple/MACHINES.md](apple/MACHINES.md).
 
 Every
@@ -634,11 +634,10 @@ user registry at load and exporting it into the process, so a token you set that
 way does work. The login file is still the habit to build: it is the one that
 works on every platform.
 
-The weights that do **not** fetch themselves -- every hand-fetched file, its
-repository, its size, and the folder under `models/` it goes in -- are listed in
-[apple/MACHINES.md](apple/MACHINES.md). Where no manifest exists, the
-engine refuses by name before anything else runs, and that refusal is the install
-instruction.
+Nearly every weight fetches itself. The picks that do not are listed in
+[apple/MACHINES.md](apple/MACHINES.md); where no manifest exists -- `mesh_stage`
+today -- the engine refuses by name before anything else runs, and that refusal
+is the install instruction.
 
 The script step alone can run on OpenRouter, Google, or Comfy Credits; voices,
 music, images and video stay local either way. It costs money and it is off
@@ -821,7 +820,9 @@ IndexTTS2 engines -- thanks to all of their authors.
 off-by-default pieces carry restricted terms:
 
 - `flux_gen1` (Flux.1-dev) -- BFL non-commercial licence.
-- `ideogram4_local` -- non-commercial model agreement; the code ships, the weights do not.
+- `ideogram4_local` -- non-commercial model agreement. The pack does not ship the
+  weights; it fetches them from the model's own repository on first use, under that
+  agreement.
 - `h3_low_video` / `h3_low_audio_in` (MiniMax H3) -- a personal, non-transferable
   authorization the maintainer obtained directly from MiniMax. It does not carry to
   your install.

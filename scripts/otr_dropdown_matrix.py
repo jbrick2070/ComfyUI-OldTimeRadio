@@ -149,7 +149,7 @@ def availability_grid(caps: dict) -> dict:
 
 
 def download_facts() -> dict:
-    """``{lane: {"gb": float, "gated": bool, "manual": bool}}``, from the real
+    """``{lane: {"gb": float, "gated": bool}}``, from the real
     manifests -- never a typed-in size.
 
     The two lane tables carry their sizes differently. ``MANUAL_DOWNLOADS`` states
@@ -179,12 +179,11 @@ def download_facts() -> dict:
             stated = stated or summed
         # Every lane in the fetcher is by definition a no-account, no-manual-step
         # public install -- that is what the fetcher IS -- so none is gated.
-        facts[lane] = {"gb": stated or None, "gated": False, "manual": False}
+        facts[lane] = {"gb": stated or None, "gated": False}
     for name, specs in getattr(provision, "MANUAL_DOWNLOADS", {}).items():
         total = sum(int(s.get("bytes", 0) or 0) for s in specs)
         facts[name] = {"gb": round(total / 2 ** 30, 1) or None,
-                       "gated": any(s.get("gated") for s in specs),
-                       "manual": True}
+                       "gated": any(s.get("gated") for s in specs)}
     if drift:
         raise SystemExit("fetch manifests disagree with LANE_INFO:\n  "
                          + "\n  ".join(drift))
@@ -602,18 +601,19 @@ def render_table(rows: list, machines=MACHINES) -> str:
 
 
 _LEGEND = """
-**How you get the weights.** Two things do the fetching for an **auto** row, and
-neither of them is a script you have to run: the engine's own library pulls it
-through the Hugging Face cache, or `OTR_WorkflowValidator` -- a node inside the
-workflow -- downloads it at queue time. A **manual** row may still have a helper in
+**How you get the weights.** Three things do the fetching for an **auto** row, and
+none of them is a script you have to run: the engine's own library pulls it
+through the Hugging Face cache, `OTR_WorkflowValidator` -- a node inside the
+workflow -- downloads it at queue time, or the engine fetches its own pinned file
+when it loads (the upscaler). A **manual** row may still have a helper in
 `scripts/`, but `scripts/` is not in the registry bundle, so from a normal
 install it is a step you take by hand and it is labelled as one.
 
 **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
-it yourself; the manual-weights table in `apple/MACHINES.md` names every
-file, the repository it comes from and the folder it goes in.
+it yourself; `apple/MACHINES.md` lists every manual pick and how to get its
+files.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 
@@ -1061,10 +1061,6 @@ def render_apple(rows: list) -> str:
 
     # ------------------------------------------------------------- 3. weights
     L.append("## Where do the manual weights come from?\n\n")
-    L.append("Every file a **manual** row needs: the repository to download it "
-             "from, and the folder under your ComfyUI `models/` directory to "
-             "put it in. `gated` means you must accept the model's licence on "
-             "Hugging Face first, while signed in.\n\n")
     fetcher = _load("scripts/otr_fetch_lane_weights.py", "_odm_fetcher")
     lane_to_engines, unsourced = {}, []
     for row in rows:
@@ -1077,12 +1073,20 @@ def render_apple(rows: list) -> str:
         else:
             unsourced.append(row["public"])
     if lane_to_engines:
+        L.append("Every file a **manual** row needs: the repository to download "
+                 "it from, and the folder under your ComfyUI `models/` directory "
+                 "to put it in. `gated` means you must accept the model's licence "
+                 "on Hugging Face first, while signed in.\n\n")
         L.append("Two engines can share one group and still download different "
                  "amounts, because they draw different files from it. **The size "
                  "in the machine grid above is what YOUR pick costs**; the total on a heading "
                  "here is the whole group. A heading with no total means that "
                  "group's manifest predates byte receipts -- the machine grid still has "
                  "the figure.\n\n")
+    elif unsourced:
+        L.append("Only the picks below still need a hand download.\n\n")
+    else:
+        L.append("None: every pick in the grid above fetches its own weights.\n\n")
 
     for lane in sorted(lane_to_engines):
         specs = manual_artifacts(lane, provision, fetcher)
@@ -1126,16 +1130,11 @@ def render_apple(rows: list) -> str:
         L.append("\n")
 
     L.append("## What the words mean\n\n")
-    # The legend is shared with apple/DROPDOWN_MATRIX.md, where
-    # apple/MODEL_ASSET_INDEX.md is a live relative link. Here it is not:
-    # .comfyignore excludes docs/ from the bundle, so a shipped reader following
-    # that pointer finds nothing -- and the weights table above answers the question
-    # better anyway, with a repository and a destination folder per file.
+    # The legend is shared with apple/DROPDOWN_MATRIX.md, which points here for
+    # the manual picks; on this page that list is the section above.
     legend = _LEGEND.strip().replace(
-        "the manual-weights table in `apple/MACHINES.md` names every\n"
-        "file, the repository it comes from and the folder it goes in.",
-        "the manual-weights table above names every file, the repository it "
-        "comes from and the folder it goes in.")
+        "`apple/MACHINES.md` lists every manual pick and how to get its\nfiles.",
+        "the section above lists every manual pick and how to get its files.")
     L.append(legend + "\n\n")
     L.append("---\n\n")
     L.append("*This page is generated. To change it, edit "

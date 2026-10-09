@@ -131,7 +131,9 @@ change the sound**, below.
 
 This is the talking-head path: it takes a portrait and the beat's voice track
 and moves the mouth to it. Every HuMo lane is a large download and wants a
-16 GB card.
+16 GB card. HuMo animates characters only: on the announcer and music roles a
+HuMo pick runs as `ltx25_audio_in_16gb` instead, unless `OTR_ENABLE_HUMO_HOSTS=1`,
+so that lane's files (about 25 GB) download too.
 
 ### MiniMax H3
 
@@ -272,10 +274,6 @@ engine -- so this is a download that could not complete (offline, out of disk,
 a Hugging Face outage), or `mesh_stage`, the one video lane no manifest covers
 ([MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from)). The error
 names the file and never quietly substitutes another one.
-
-**It says the weights are gated.** The LTX 2.5 lanes need you to accept a
-licence on the model's page while signed in to Hugging Face, then log in
-locally. [INSTALL.md](INSTALL.md#hugging-face-login).
 
 **It runs out of memory.** The lane is bigger than your card. Check your row in
 [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) and step down -- on 8 GB that almost always

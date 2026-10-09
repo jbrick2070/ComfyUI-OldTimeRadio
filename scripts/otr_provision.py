@@ -1359,10 +1359,6 @@ NO_LANE_REASON = {
     "google_tts": "remote",
     "google_lyria": "remote",
     "sonilo": "remote",
-    # Image models fetched by their own loaders / documented manual downloads.
-    "lumina_image": "manual_doc",
-    "flux_gen1": "manual_doc",
-    "ideogram4_local": "manual_doc",
     # Hosted video lanes registered after the remote sets below were written,
     # and never added to them because no shipping profile selects one. Naming
     # them here records the gap instead of hiding it.
