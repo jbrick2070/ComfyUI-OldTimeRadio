@@ -136,10 +136,6 @@ class SourceDocument(_Transient):
     def char_count(self) -> int:
         return len(self.canonical_body)
 
-    @property
-    def word_count(self) -> int:
-        return len(self.canonical_body.split())
-
 
 def build_source_document(
     canonical_body: str,

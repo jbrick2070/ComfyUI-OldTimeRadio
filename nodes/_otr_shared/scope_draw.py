@@ -901,9 +901,8 @@ def _has_nvenc(ffmpeg):
     reports only that ffmpeg was COMPILED with nvenc. `encode_sink.has_nvenc`
     runs a real one-frame probe because that exact string test "cost a whole
     episode", and its docstring states it is the only nvenc decision in the
-    pack. The four viz_* engines reach ffmpeg through THIS module rather than
-    through `RawVideoSink`, so a copy of the string test here would keep
-    selecting a dead encoder.
+    pack. The four viz_* engines reach ffmpeg through THIS module, so a copy of
+    the string test here would keep selecting a dead encoder.
 
     Proven on a rented RTX 4090 (2026-09-03). ffmpeg lists the encoder and
     cannot open a session -- the normal case in a GPU container that does not

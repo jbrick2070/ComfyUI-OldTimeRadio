@@ -142,8 +142,8 @@ def free_otr_pipeline_residue(*, reason: str = "") -> dict:
 
     Returns a report dict with before/after VRAM telemetry and the list
     of steps that ran / failed. ``free_gb_after`` is the post-clean free
-    VRAM in GB (``float('nan')`` headless) -- OTR_HuMoTierLoader's
-    auto-downgrade rule reads it.
+    VRAM in GB (``float('nan')`` headless) -- the image dispatcher and the
+    video render driver log it.
 
     Best-effort: never raises. A step that fails is recorded in
     ``steps_failed`` and the rest still run.

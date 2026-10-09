@@ -42,7 +42,7 @@ _PUBLIC_ENGINES = {
     # GiB warm at 832x480x97 (measured with a 2.9 GiB reserve).
     "humo14_high_audio_in_wide": "humo_14B_169",
     # Lane 3, 2026-08-11. The LONG-BEAT lane (the 1.7B renders to 177 frames,
-    # 7.08 s, where the 14B stops at 97) and the auto-downgrade target. Its
+    # 7.08 s, where the 14B stops at 97). Its
     # landscape twin closes with it: same checkpoint, same VRAM class, the
     # aspect is the whole difference, so the aspect is in the id.
     "humo17_high_audio_in_portrait": "humo_1.7B",

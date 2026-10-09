@@ -102,7 +102,6 @@ def test_build_source_document_carries_identity():
     assert doc.body_sha256 == osd.canonical_body_sha256(doc.canonical_body)
     assert doc.normalization_version == osd.NORMALIZATION_VERSION
     assert doc.source_ref == "x:y"
-    assert doc.word_count == 3
 
 
 def test_build_source_document_refuses_empty():
