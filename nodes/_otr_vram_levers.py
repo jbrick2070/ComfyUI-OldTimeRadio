@@ -176,8 +176,8 @@ def free_otr_pipeline_residue(*, reason: str = "") -> dict:
         # which moves its weights to the offload device even though the
         # Python wrapper stays alive elsewhere. This is the same
         # mechanism the FLUX portrait node's EXIT eviction uses; doing
-        # it here too means the HuMoTierLoader call site (and any smoke
-        # workflow without the portrait node) gets the same reclaim.
+        # it here too means every caller (including a smoke workflow
+        # without the portrait node) gets the same reclaim.
         # Best-effort per-patcher; a failure on one never blocks the
         # rest or the unload_all_models() below.
         try:

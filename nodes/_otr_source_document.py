@@ -41,7 +41,7 @@ def canonical_body_sha256(body: str) -> str:
     This is NOT the provenance sidecar's ``body_sha256``: that one covers
     normalized RAW bytes as fetched, before HTML-unescape and whitespace
     canonicalization. The two are not interchangeable and must never be
-    compared. This hash pins the coordinate system that spans index into.
+    compared. This hash pins the canonicalized body itself.
     """
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 

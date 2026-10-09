@@ -193,8 +193,6 @@ class VizMxcMandalaEngine:
         return self.name
 
     # ---- pure helpers (CPU-testable) ----
-    _ref_path = staticmethod(_MC.viz_ref_path)
-
     def _canvas_dims(self, request):
         return _MC.viz_canvas_dims(request)
 

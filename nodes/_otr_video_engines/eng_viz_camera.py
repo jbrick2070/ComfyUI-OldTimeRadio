@@ -117,8 +117,6 @@ class VizCameraEngine:
                 "viz_camera needs ffmpeg on PATH (or set OTR_FFMPEG)", kind="video")
         return self.name
 
-    _ref_path = staticmethod(_MC.viz_ref_path)
-
     def _canvas_dims(self, request):
         return _MC.viz_canvas_dims(request)
 

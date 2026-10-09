@@ -22,7 +22,7 @@ Invariants honored: 100% local/offline; GREEN-ONLY (CRT_GREEN/CRT_DIM/CRT_DARK
 only -- the colored CRT constants are deliberately NOT imported); deterministic
 (stable-hash seeded RNG -- also fixes the floor's old unseeded np.random);
 silent -an encode (the floor's `_encode_mp4` HARD-REQUIRES audio, so this node
-ships its own no-audio encoder); UTF-8 no BOM; SFW.
+encodes through scope_draw's silent encoder); UTF-8 no BOM; SFW.
 """
 from __future__ import annotations
 

@@ -101,11 +101,11 @@ def test_assert_usable_for_all_three_roles(monkeypatch):
 # pure helpers
 # --------------------------------------------------------------------------- #
 def test_ref_path_handles_str_dict_and_empty():
-    eng = VisualizerEngine()
-    assert eng._ref_path("a.wav") == "a.wav"
-    assert eng._ref_path({"path": "b.wav"}) == "b.wav"
-    assert eng._ref_path("") == ""
-    assert eng._ref_path(None) == ""
+    from nodes._otr_video_engines import motion_common as mc
+    assert mc.viz_ref_path("a.wav") == "a.wav"
+    assert mc.viz_ref_path({"path": "b.wav"}) == "b.wav"
+    assert mc.viz_ref_path("") == ""
+    assert mc.viz_ref_path(None) == ""
 
 
 def test_build_render_request_reads_timing_and_seed():

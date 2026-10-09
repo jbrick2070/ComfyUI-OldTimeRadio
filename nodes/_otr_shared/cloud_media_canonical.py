@@ -127,17 +127,20 @@ def canonical_video_clip(asset: CanonicalAsset, *, clip_id: str, engine_id: str,
                          family: str) -> dict:
     """The delivered-clip receipt for a provider clip ``canonicalize_video`` conformed.
 
-    The shared tail of the Google video adapters' ``canonicalize()``: each builds
-    its own conform spec and runs ``canonicalize_video`` itself (that call strips
-    the provider audio and re-probes the output), then hands the asset it got
-    back here. ``has_audio`` is False because that strip is PROVEN inside
+    The shared tail of the cloud video adapters' ``canonicalize()`` (the two
+    Google engines and ``eng_cloud_video``): each builds its own conform spec
+    and runs ``canonicalize_video`` itself (that call strips the provider audio
+    and re-probes the output), then hands the asset it got back here.
+    ``has_audio`` is False because that strip is PROVEN inside
     ``canonicalize_video``, so never pass an asset that did not come out of it.
 
     The honesty receipts (2026-08-06). A provider clip is native by
     construction: the asset is downloaded whole, OTR owns no code on this path
     that could lengthen it, and ``frame_count`` is the counted length of that
-    file after the declared tail trim. So ``native_frame_count`` equals it and
-    ``extension_mode`` is ``"none"``.
+    conformed file (after the adapter's declared tail trim or fps-resample
+    cap). So ``native_frame_count`` equals it and ``extension_mode`` is
+    ``"none"`` -- a cloud lane that answered nothing would otherwise look
+    exactly like a local lane that pads without saying so.
     """
     frame_count = canonical_clip_frame_count(asset)
     return {

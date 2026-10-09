@@ -516,36 +516,16 @@ class _CloudVideoBase:
             timeout_s=_timeout_s(), estimated_usd=est)
 
     def canonicalize(self, raw, request, profile):
-        from .._otr_shared.cloud_media_canonical import (
-            canonical_clip_frame_count)
+        from .._otr_shared.cloud_media_canonical import canonical_video_clip
+        # The asset came out of canonicalize_video, which proves the audio
+        # strip; here ``frame_count`` is that file's counted length after the
+        # fps-resample cap to ``segment.render_frames`` (assembly trim_tail is
+        # later).
         asset = self._canonical_video_asset(raw, request)
-        frame_count = canonical_clip_frame_count(asset)
-        return {
-            "clip_id": _req_get(request, "shot_id") or f"{self.name}_clip",
-            "type": "video", "path": str(asset.path),
-            "container": "mp4", "codec": "h264", "pixel_format": "yuv420p",
-            "fps": int(asset.fps or 25), "frame_count": frame_count,
-            "has_audio": False,          # strip PROVEN in canonicalize_video
-            "color_primaries": "bt709", "transfer": "bt709", "matrix": "bt709",
-            "engine_id": self.name, "family": self.family,
-            "provider_job_id": asset.provider_job_id,
-            "content_sha256": asset.sha256,
-            "actual_duration_s": asset.duration_s,
-            # THE HONESTY RECEIPTS (2026-08-06). Every PROVIDER surface carried
-            # ZERO references to these two fields before today, which is the
-            # dormancy the step-3 v1 contract closes: a cloud lane that answers
-            # nothing looks exactly like a local lane that pads without saying
-            # so, and no rule could tell them apart.
-            #
-            # A provider clip is native BY CONSTRUCTION, and the reason is
-            # structural rather than a claim about the vendor: the delivered
-            # asset is downloaded and re-containered whole, and OTR owns no code
-            # on this path that could lengthen it. ``frame_count`` is the
-            # counted length of THAT file after the fps-resample cap to
-            # ``segment.render_frames``. Assembly ``trim_tail`` is later.
-            "native_frame_count": frame_count,
-            "extension_mode": "none",
-        }
+        return canonical_video_clip(
+            asset,
+            clip_id=_req_get(request, "shot_id") or f"{self.name}_clip",
+            engine_id=self.name, family=self.family)
 
     def teardown(self, prepared) -> None:
         return None
