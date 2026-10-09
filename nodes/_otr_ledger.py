@@ -33,6 +33,7 @@ import hashlib
 import json
 import logging
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -759,6 +760,36 @@ def patch_line_text(
 # audio_sample_hash is the killer field: lets a future C7 audit confirm
 # "same input → same audio bytes" without keeping the bytes themselves.
 
+def leading_audio_bytes(waveform, n_bytes):
+    """Return exactly ``waveform.tobytes()[:int(n_bytes)]``, without
+    serializing the whole buffer when it is an ordinary numeric array.
+
+    A master waveform is hundreds of MB and every caller wants only its first
+    ``GATE_HASH_BYTES``, so ``tobytes()`` followed by a slice copies the entire
+    episode to keep one kilobyte. For an exact ``numpy.ndarray`` of a plain
+    numeric dtype (bool, int, uint, float or complex) and ``n_bytes >= 0`` this
+    serializes only the first ``ceil(n_bytes / itemsize)`` elements, taken in C
+    order through ``ndarray.flat``, so no flatten, ravel, contiguous or dtype
+    copy of the whole array is made whatever its layout (Fortran order,
+    transposed, sliced, negative strides, big-endian). Every other input -- a
+    negative ``n_bytes``, another dtype, a numpy subclass, a duck type -- takes
+    the original ``waveform.tobytes()[:int(n_bytes)]`` path, so its result and
+    its exceptions are unchanged.
+
+    numpy is looked up in ``sys.modules`` and never imported: an ``ndarray``
+    cannot exist unless numpy is already loaded, and this module has to stay
+    importable without it.
+    """
+    np = sys.modules.get("numpy")
+    if (np is not None and type(waveform) is np.ndarray
+            and waveform.dtype.kind in "biufc"):
+        n = int(n_bytes)
+        if n >= 0:
+            count = min(waveform.size, -(-n // waveform.dtype.itemsize))
+            return waveform.flat[:count].tobytes()[:n]
+    return waveform.tobytes()[:int(n_bytes)]
+
+
 def compute_audio_sample_hash(
     waveform_bytes_or_array,
     n_bytes: int = 1024,
@@ -769,8 +800,9 @@ def compute_audio_sample_hash(
 
     Accepts:
       - ``bytes`` directly (already-extracted leading slice)
-      - numpy ndarray (calls ``.tobytes()`` and slices)
-      - torch.Tensor (calls ``.detach().cpu().numpy().tobytes()`` and slices)
+      - numpy ndarray (the leading ``n_bytes`` of ``.tobytes()``, via
+        ``leading_audio_bytes``, which does not serialize the whole buffer)
+      - torch.Tensor (``.detach().cpu().numpy()``, then the same)
 
     Returns a lowercase 8-char hex string. Returns ``""`` on any
     extraction failure (best-effort; never raises).
@@ -778,17 +810,16 @@ def compute_audio_sample_hash(
     import hashlib
     try:
         if isinstance(waveform_bytes_or_array, (bytes, bytearray)):
-            buf = bytes(waveform_bytes_or_array)
+            head = bytes(waveform_bytes_or_array)[:int(n_bytes)]
         else:
             # numpy or torch — duck-type via .tobytes() / .detach().cpu().numpy()
             arr = waveform_bytes_or_array
             if hasattr(arr, "detach"):
                 arr = arr.detach().cpu().numpy()
             if hasattr(arr, "tobytes"):
-                buf = arr.tobytes()
+                head = leading_audio_bytes(arr, n_bytes)
             else:
                 return ""
-        head = buf[:int(n_bytes)]
         return hashlib.sha256(head).hexdigest()[:8]
     except Exception:  # noqa: BLE001
         return ""
@@ -890,8 +921,9 @@ def audio_gate_record(
     sample_rate: int,
 ) -> dict:
     """Build a single ``audio_gates[]`` entry. Caller passes the
-    already-extracted leading bytes (typically waveform.cpu().numpy()
-    .tobytes()[:GATE_HASH_BYTES]) so this helper does no torch I/O.
+    already-extracted leading bytes (typically
+    ``leading_audio_bytes(waveform.cpu().numpy(), GATE_HASH_BYTES)``) so this
+    helper does no torch I/O.
     """
     h = hashlib.sha256(waveform_bytes).hexdigest()[:32]
     return {

@@ -1223,7 +1223,8 @@ class SceneSequencer:
                 _led = _OTRL.load_ledger_safe(_ledger_p)
                 if _led is not None:
                     _OTRL.record_phase_ms(_led, "scene_sequencer", _phase_ms)
-                    _wb = combined.tobytes()[: _OTRL.GATE_HASH_BYTES]
+                    _wb = _OTRL.leading_audio_bytes(
+                        combined, _OTRL.GATE_HASH_BYTES)
                     _gate = _OTRL.audio_gate_record(
                         gate_name="post_scene_sequencer",
                         waveform_bytes=_wb,
@@ -1918,7 +1919,8 @@ class EpisodeAssembler:
                         if hasattr(episode_waveform, "detach")
                         else episode_waveform
                     )
-                    _wb = bytes(_ew_cpu.tobytes()[: _OTRL.GATE_HASH_BYTES])
+                    _wb = bytes(_OTRL.leading_audio_bytes(
+                        _ew_cpu, _OTRL.GATE_HASH_BYTES))
                     _sample_count = int(episode_waveform.shape[-1])
                     _gate = _OTRL.audio_gate_record(
                         gate_name="post_episode_assembler",

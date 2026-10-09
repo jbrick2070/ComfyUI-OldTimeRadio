@@ -491,7 +491,8 @@ class AudioEnhance:
                         waveform.detach().cpu().numpy()
                         if hasattr(waveform, "detach") else waveform
                     )
-                    _wb = bytes(_wf_cpu.tobytes()[: _OTRL.GATE_HASH_BYTES])
+                    _wb = bytes(_OTRL.leading_audio_bytes(
+                        _wf_cpu, _OTRL.GATE_HASH_BYTES))
                     _gate = _OTRL.audio_gate_record(
                         gate_name="post_audio_enhance",
                         waveform_bytes=_wb,
