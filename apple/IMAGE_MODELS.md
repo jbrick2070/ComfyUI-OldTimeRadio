@@ -65,7 +65,7 @@ is exactly what you see below.
 |---|---|---|---|
 | `sd15` | 2.0 GiB | **yes** | Stable Diffusion 1.5. The small one, and the only local engine proven on a 16 GB Mac. Native 512; the pack fits every request down to 768 on the long side, because past that it starts drawing two heads. |
 | `z_image_turbo` | 19.3 GiB | **yes** | The canonical graph's saved pick, and the AMD graph's -- the one with a Radeon receipt. Eight steps a still, so it is quick once the weights are down -- but they are among the largest downloads here; only Ideogram's fp8 set is bigger. |
-| `lumina_image` | 10.0 GiB | **yes** | Lumina-Image 2.0. **The default in the 16 GB NVIDIA graphs** (`otr_16gb_still`, `otr_16gb_video`). Fetches the ungated Comfy-Org split set on first use, same path as `sd15` -- a 5.2 GB model plus a 5.2 GB text encoder. |
+| `lumina_image` | 10.0 GiB | **yes** | Lumina-Image 2.0. **The default in the 16 GB NVIDIA graphs** (`otr_16gb_still`, `otr_16gb_video`). Fetches the ungated Comfy-Org split set on first use, same path as `sd15` -- a 5.2 GB model, a 5.2 GB text encoder and the 0.3 GB VAE it shares with `z_image_turbo` (10.0 GiB in all). |
 | `flux_gen1` | 16.1 GiB | **yes** | FLUX.1-dev. Its licence is non-commercial. |
 | `ideogram4_local` | 27.5 GiB | **yes** | Typography specialist -- built for the `still_word` card, where the script's own words go on screen. Measured at about 95 seconds a card against `z_image_turbo`'s 12, and its licence is non-commercial. An RTX 50-series card fetches the 16.4 GiB nvfp4 set instead of the fp8 one. |
 

@@ -16453,3 +16453,5 @@ not promote it to the Bug Bible on this evidence alone.
   Hub bytes); README credited Ideogram's weights to "the model's own
   repository" (it is Comfy-Org's public repackage); EXTENDING.md never named
   the "self" value a bank's fetcher/interpreter take, and pointed at `docs/`.
+- (the fixes the correction row lists landed in cea43197, the same commit that
+  appended it, not a later one.)
