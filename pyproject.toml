@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.3.21"
+version = "2.3.22"
 description = "Press Queue once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. No account, no API key, nothing paid. Needs an NVIDIA card with 8 GB or more, a 16 GB Apple Silicon Mac, or a CPU (start ComfyUI with --cpu), plus about 25 GB of free disk; the first run fetches roughly 12 GB of models."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -106,9 +106,9 @@ dependencies = [
     #
     # Measured cost: one function. The only `import cairo` in scope_draw.py is
     # inside `paint_mandala`, so importing the module never imports cairo, and
-    # freq_bars_green / cfr_flags / find_ffmpeg / encode_silent_mp4 are all
-    # cairo-free -- scope overlays, caption burn, silent composite and encode
-    # sink are untouched. eng_viz_mandala guards load() and assert_usable() and
+    # cfr_flags / find_ffmpeg / encode_silent_mp4 are all cairo-free --
+    # caption burn, the silent composite and the encode sink are untouched.
+    # eng_viz_mandala guards load() and assert_usable() and
     # raises EngineUnusable naming the pip command, and viz_mxc_mandala appears
     # zero times in workflows/otr_canonical.json. The Linux pod keeps the engine
     # because scripts/otr_pod_provision.sh apt-installs the headers and then
