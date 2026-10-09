@@ -990,15 +990,16 @@ generic reference capability can ship.
 **THE PREVIOUS RECEIPT SAID "ZERO REGRESSIONS" AND THAT WAS NOT TRUE.** At HEAD
 `55ddf234` the suite exited **2**, with
 `tests/test_legacy_audit_clean.py::test_no_unclassified_legacy_references`
-FAILING. Item I's new `nodes/_otr_name_authority.py:90` used *"Professor & Lab
-Director"* as an example job title in a comment, and the standing legacy audit
-forbids a bare `\bDirector\b` in `*.py`/`*.json` outside a forensic context --
-it cannot tell an example from a surviving Director-era symbol. **Why four QA
+(file deleted since, 83e6040d) FAILING. Item I's new
+`nodes/_otr_name_authority.py:90` used *"Professor & Lab
+Director"* as an example job title in a comment, and the legacy audit then in
+force forbade a bare `\bDirector\b` in `*.py`/`*.json` outside a forensic context --
+it could not tell an example from a surviving Director-era symbol. **Why four QA
 rounds missed it:** the `[KNOWN-FAIL-GUARD]` line prints AFTER the 100% line and
 the conftest suppresses pytest's own summary on a failing run, so the log ends
 in a wall of dots with the complaint below the fold and no counts to contradict
 it. Read the exit code, not the dots. Fixed by rewording the comment to *"Lab
-Supervisor"* -- a comment, so nothing the pipeline emits changes, and it does
+Supervisor"* -- a comment, so nothing the pipeline emits changes, and it did
 not widen the audit's blind spot the way a `GENERIC_ENGLISH_LINES` entry would.
 
 **PREVIOUS, and its itemisation is kept because the discipline is the point:**
@@ -1018,6 +1019,7 @@ rather than a soak instrument, so it is correctly ABSENT from
 
 **THAT LAST STEP IS -34 AND EVERY ONE IS ACCOUNTED FOR:** 15 tests from
 `test_cloud_media_cache.py` and **19** from `test_post_freeze_writeback_audit.py`
+(both files were deleted in that step, 6ae86b85)
 -- 14 test functions, but one is `@parametrize`d over the 6-value music enum and
 so contributed 6 instances, not 1. **The first arithmetic said 29 and the run
 said 34**; the 5-test gap was that parametrize expansion, found by going and
@@ -1035,7 +1037,7 @@ to 295 landed in the same commit -- survival-guide HEAD `55d4eaf3`, == origin/ma
 
 > **THE COUNT WENT DOWN, AND THAT IS CORRECT.** 11097 -> 11066 is **-31**, and
 > every one is accounted for: **11** from retiring `tests/test_hybrid_voice_fit.py`
-> (the pass it tested no longer exists), **8** from the four hybrid-path tests
+> (the pass it tested no longer exists; deleted in eb264989), **8** from the four hybrid-path tests
 > dropped out of the reserved-voice file, and **12** from the marker file's gate
 > tests (they exercised `hybrid_voice_fit_enabled`, which was deleted). No test
 > was lost to a regression. A shrinking suite is only healthy when the delta is
@@ -1315,7 +1317,8 @@ Go read B. Two things are true often enough to be worth the look every time:
    that the live registry's `KNOWN_ENGINES` matched the resolver's DUPLICATE
    copy of the same set. The dependency was a consistency check on a
    redundancy -- deleting the redundancy is what removed the need for the
-   check, and both went together.
+   check, and both went together (the resolver in d3fc677b, the test file in
+   d084585d).
 2. The fuzzy cast-consolidation cluster in `story_orchestrator.py` "has
    callers" only in the sense that its four functions call EACH OTHER, and its
    test regex-extracts them from source rather than importing them. Nothing
@@ -2308,10 +2311,13 @@ female 400/400, and the shuffle's stream consumption varies with count (getrandb
 allocator untouched.
 
 **RETIRED 2026-10-08 by operator decision (never wired; recoverable from git):
-`nodes/_otr_source_grounding.py` is deleted; the `source_block` consumers stay.**
+`nodes/_otr_source_grounding.py` is deleted, and the exchange composer's
+`source_block` parameter (the delivery half, which nothing ever passed) is removed;
+only `LineRequest.source_block` stays, fed by the cast-coverage repair.**
 **Source-grounding sprint, the one piece left:** chunk 3b-ii -- the supply line
-that feeds grounding into the writer -- is BUILT-BUT-UNWIRED and PARKED under the
-story-quality directive. The delivery mechanism exists and nothing calls it. A
+that feeds grounding into the writer -- was BUILT-BUT-UNWIRED (both built parts are
+retired, above) and is PARKED under the story-quality directive. The delivery
+mechanism existed and nothing called it. A
 contributor may pick it up; chunk detail under THE CODING SPRINT item 1.
 
 ### Re-ground gate for active work
@@ -2482,12 +2488,15 @@ when the source has it -- never a prose window over the canonical body.
 all" is FALSE, and it was mine.** It came from grepping
 `source_text|full_text|source_meta|excerpt|canonical_body|source_window` -- none
 of which is the name the code uses. The real name is **`source_block`**, and the
-machinery is BUILT AND TESTED:
+machinery was BUILT AND TESTED:
 * `build_exchange_prompt(source_block=...)` at `nodes/_otr_compose_exchange.py:300`,
   with its paired CARRY-THEM text at `:430-435` and a loud non-str refusal at
-  `:420-428`; forwarded through `compose_exchange` at `:551/:569`.
+  `:420-428`; forwarded through `compose_exchange` at `:551/:569`. **REMOVED
+  2026-10-08 (nothing ever passed it; recoverable from git): the parameter, its
+  CARRY-THEM text and its refusal are gone.**
 * `LineRequest.source_block` at `nodes/_otr_line_composer.py:292`, rendered above
-  the WRITE LINE cue at `:908-915`.
+  the WRITE LINE cue at `:908-915`. **Still live:** the cast-coverage repair feeds it
+  (`_otr_cast_coverage_repair._source_block_for`).
 * An ENTIRE selector module, `nodes/_otr_source_grounding.py` (16 KB) --
   `select_grounding` at `:255`, `SourceGrounding` at `:168`,
   `render_source_block` at `:362`. **RETIRED 2026-10-08 by operator decision
