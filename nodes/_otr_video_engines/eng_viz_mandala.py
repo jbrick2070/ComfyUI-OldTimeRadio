@@ -214,19 +214,8 @@ class VizMxcMandalaEngine:
         return w, h
 
     def _build_render_request(self, request):
-        get = request.get if isinstance(request, dict) else (
-            lambda k, d=None: getattr(request, k, d))
-        timing = get("timing") or {}
-        t_get = timing.get if isinstance(timing, dict) else (
-            lambda k, d=None: getattr(timing, k, d))
-        seeds = get("seed_bundle") or {}
-        s_get = seeds.get if isinstance(seeds, dict) else (
-            lambda k, d=None: getattr(seeds, k, d))
-        return {
-            "audio_path": self._ref_path(get("audio_ref")),
-            "target_frame_count": int(t_get("target_frame_count", 0) or 0),
-            "seed": int(s_get("request_seed", 0) or 0),
-        }
+        """Pure: the normalized inputs render_clip consumes."""
+        return _MC.viz_render_request(request, self._ref_path)
 
     def _clip_from_raw(self, raw, request):
         get = request.get if isinstance(request, dict) else (
