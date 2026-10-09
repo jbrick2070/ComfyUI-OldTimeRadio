@@ -1819,6 +1819,10 @@ The codex lane carries the cap-equals-trim shape on `MAX_FACT_ROWS` (6) and
 TRUNCATES during generation rather than refusing -- silent evidence thinning,
 not a crash, and unproven on an artifact. Six facts and four entities is tight
 for a real news story. **Prove it on an artifact before touching it.**
+(RETIRED 2026-10-08: the codex lane was removed in dae1fb3c, and
+`MAX_FACT_ROWS` / `MAX_ENTITY_ROWS` went with the rest of
+`_otr_scifi_p0_contract`'s unreferenced code in 410e62f0 -- there is no
+longer a cap to prove.)
 
 ### RULED OUT BY MEASUREMENT -- do not re-propose without new evidence
 

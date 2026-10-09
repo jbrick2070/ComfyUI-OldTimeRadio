@@ -675,4 +675,3 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
         validation_warnings=warnings,
         frame_count=frame_count,
     )
-

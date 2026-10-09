@@ -2413,7 +2413,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "the act count) so the episode breathes between "
                         "scenes.\n\n"
                         "When OFF, the acts run as one continuous flow "
-                        "with no interludes."
+                        "with no interludes.\n\n"
+                        "The sci-fi news lane builds its own running "
+                        "order and does not read this switch."
                     ),
                 }),
                 # THE ONE LENGTH-SHAPED KNOB (operator directive

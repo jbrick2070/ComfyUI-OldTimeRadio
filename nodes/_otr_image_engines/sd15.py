@@ -218,7 +218,7 @@ class SD15Engine:
                 return d
 
         # THE FIELD IS "prompt", NOT "text_prompt". The dispatcher supplies
-        # `prompt` (otr_image_gen_dispatcher.py:1686) and z_image_turbo.py:348
+        # `prompt` in the image request, and z_image_turbo's `_zimage_params`
         # reads exactly that. `text_prompt` is the name from `required_inputs`,
         # which describes the CONTRACT, not the request key, and reading it
         # would mint every still from an EMPTY prompt. Silently: a valid PNG of

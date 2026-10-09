@@ -3,8 +3,7 @@
 DETERMINISTIC Tier-A integrity gate for slot-formatted dialogue output.
 
 WHO CALLS THIS: `OTR_LedgerScriptWriter` imports `evaluate_tier_a` /
-`normalize_slot_line` (`OTR_LedgerScriptWriter.py:4914-4916`) on its
-exchange-prepass path, via `_otr_compose_exchange.make_tier_a_adapter`.
+`normalize_slot_line` on its exchange-prepass path, via `_otr_compose_exchange.make_tier_a_adapter`.
 
 Helper module only -- not a node, not in _NODE_MODULES, so ComfyUI never
 auto-imports it.
