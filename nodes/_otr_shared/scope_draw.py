@@ -337,13 +337,16 @@ def paint_frame(w, h, fi, total, fps, vol, freq, wave, signal, loss,
     img = Image.alpha_composite(img.convert("RGBA"), scanlines).convert("RGB")
     arr = np.array(img, dtype=np.float32)
     arr *= vignette[:, :, np.newaxis]
-    img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+    np.clip(arr, 0, 255, out=arr)
+    img = Image.fromarray(arr.astype(np.uint8))
     if vol > 0.3:
         a = np.array(img, dtype=np.int16)
         intensity = int(vol * 12)
         noise = _rng(rng_key, fi, "noise").integers(
             -intensity, intensity + 1, size=a.shape, dtype=np.int16)
-        img = Image.fromarray(np.clip(a + noise, 0, 255).astype(np.uint8))
+        a += noise
+        np.clip(a, 0, 255, out=a)
+        img = Image.fromarray(a.astype(np.uint8))
     return img
 
 
@@ -427,12 +430,15 @@ def paint_rainbow_frame(w, h, fi, total, fps, vol, freq, wave, signal, loss,
     img = Image.alpha_composite(img.convert("RGBA"), scanlines).convert("RGB")
     arr = np.array(img, dtype=np.float32)
     arr *= vignette[:, :, np.newaxis]
-    img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+    np.clip(arr, 0, 255, out=arr)
+    img = Image.fromarray(arr.astype(np.uint8))
     a = np.array(img, dtype=np.int16)
     intensity = int(4 + float(vol) * 10)
     noise = _rng(rng_key, fi, "grain").integers(
         -intensity, intensity + 1, size=a.shape, dtype=np.int16)
-    img = Image.fromarray(np.clip(a + noise, 0, 255).astype(np.uint8))
+    a += noise
+    np.clip(a, 0, 255, out=a)
+    img = Image.fromarray(a.astype(np.uint8))
     return img
 
 
@@ -625,12 +631,15 @@ def paint_golden_camera_frame(w, h, fi, total, fps, vol, freq, wave, signal, los
     img = Image.alpha_composite(img.convert("RGBA"), scanlines).convert("RGB")
     arr = np.array(img, dtype=np.float32)
     arr *= vignette[:, :, np.newaxis]
-    img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+    np.clip(arr, 0, 255, out=arr)
+    img = Image.fromarray(arr.astype(np.uint8))
     a = np.array(img, dtype=np.int16)
     intensity = int(4 + float(vol) * 10)
     noise = _rng(rng_key, fi, "grain").integers(
         -intensity, intensity + 1, size=a.shape, dtype=np.int16)
-    return Image.fromarray(np.clip(a + noise, 0, 255).astype(np.uint8))
+    a += noise
+    np.clip(a, 0, 255, out=a)
+    return Image.fromarray(a.astype(np.uint8))
 
 
 # --------------------------------------------------------------------------- #
@@ -802,13 +811,18 @@ def apply_crt_post_rgb(rgb, scanlines, vignette, fi, rng_key, vol=0.0):
     (rng_key, fi); returns a NEW HxWx3 uint8 array, never mutates ``rgb``."""
     img = Image.fromarray(np.asarray(rgb, dtype=np.uint8), mode="RGB").convert("RGBA")
     img = Image.alpha_composite(img, scanlines).convert("RGB")
+    # `arr` is this call's own copy of the composited pixels, so the in-place
+    # clip and noise add below can never reach `rgb`.
     arr = np.array(img, dtype=np.float32)
     arr *= vignette[:, :, np.newaxis]
-    arr = np.clip(arr, 0, 255).astype(np.int16)
+    np.clip(arr, 0, 255, out=arr)
+    arr = arr.astype(np.int16)
     intensity = int(4 + float(vol) * 10)
     noise = _rng(rng_key, fi, "grain").integers(
         -intensity, intensity + 1, size=arr.shape, dtype=np.int16)
-    return np.clip(arr + noise, 0, 255).astype(np.uint8)
+    arr += noise
+    np.clip(arr, 0, 255, out=arr)
+    return arr.astype(np.uint8)
 
 
 # --------------------------------------------------------------------------- #
