@@ -27,7 +27,6 @@ EXEMPT_FILES: frozenset[str] = frozenset({
     # covering exactly what it covered before the move; widening it to files it
     # never checked would be a scope change riding on a relocation.
     "_otr_writer_tail.py",
-    "vram_context_test.py",
 })
 
 CALL_SITE_NAMES: frozenset[str] = frozenset({

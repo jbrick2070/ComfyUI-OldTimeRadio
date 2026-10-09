@@ -176,7 +176,6 @@ _NODE_MODULES = {
     "OTR_EpisodeAssembler":   (".nodes.scene_sequencer",     "EpisodeAssembler",     " Episode Assembler"),
     "OTR_AudioEnhance":       (".nodes.audio_enhance",       "AudioEnhance",         " Spatial Audio Enhance"),
     "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", " Signal Lost Video"),
-    "OTR_VRAMContextTest":    (".nodes.vram_context_test",     "VRAMContextTest",         " VRAM Context Test (diagnostics)"),
     # S26 Sprint 3 (T1.2): opt-in execution-time workflow contract
     # validator. Reads the workflow JSON from disk and runs the same
     # validate_workflow_contract check the S16.6 CI test runs. Place

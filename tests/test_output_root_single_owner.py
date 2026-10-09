@@ -32,9 +32,6 @@ _GET_OUTPUT_DIRECTORY_ALLOWED = {
     # so the mesh stage must ask folder_paths first and the pin second. Its
     # own comment says so; it is the one legitimate exception.
     NODES / "_otr_video_engines" / "eng_mesh_stage.py",
-    # A diagnostic node writing otr/vram_tests -- outside the episodes/obs
-    # contract by design, never part of a render. GO_FORWARD_PLAN 1.4a.
-    NODES / "vram_context_test.py",
     # The mux does NOT decide where anything is written here. It asks whether
     # the published episode can be served by ComfyUI's /view, which serves only
     # folder_paths' OWN output dir -- a question OTR_OUTPUT_DIR (the owner's

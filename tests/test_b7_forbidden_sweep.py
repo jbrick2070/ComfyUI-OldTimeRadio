@@ -1,15 +1,11 @@
 """S30 B7 -- forbidden-pattern sweep.
 
-Three tests:
+Two tests:
 
 1. test_forbidden_sweep_runs_clean       -- run the sweep against
    the current diff vs. s29-clean-slate-gate; assert zero RUNTIME
    hits (forensic mentions allowed).
-2. test_forbidden_sweep_non_llm_marker_works -- a class with
-   `NON_LLM_MODEL_WIDGET_OK = True` and a `model_id` STRING widget
-   is exempt from the B6 structural guard (already proven by
-   B6 tests; this is the cross-check at the B7 sweep layer).
-3. test_classifier_recognizes_fstring_context -- the sweep's line
+2. test_classifier_recognizes_fstring_context -- the sweep's line
    classifier treats Python 3.12 f-string tokens as string context.
 """
 
@@ -132,35 +128,6 @@ def test_forbidden_sweep_runs_clean():
         f"S30 forbidden-pattern sweep has {runtime} runtime hits; "
         f"forensic count: {m.group(2)}\nsweep output:\n{stdout}"
     )
-
-
-def test_forbidden_sweep_non_llm_marker_works():
-    """B6 / B7 structural rule: a class flagged
-    NON_LLM_MODEL_WIDGET_OK = True is exempt from the model-widget
-    guard. This is the B6 test's responsibility (validated there);
-    the sweep itself doesn't enforce the structural rule -- it
-    enforces the forbidden-pattern list. Cross-check: VRAMContextTest
-    (flagged with the marker) does NOT trigger the runtime sweep (it keeps its
-    `model_id` widget legitimately). BatchAudioGenGenerator + MusicGenTheme were
-    retired in the audio clean-break (1c), so the exempt set is now just the one.
-    """
-    rc, stdout = _run_sweep_subprocess()
-    # The sweep output must not mention the exempt class as a runtime offender.
-    for cls_name in ("VRAMContextTest",):
-        # A runtime hit would appear under the "--- runtime (in
-        # output file) ---" header; if the section exists but the
-        # class name appears as an offender line, fail.
-        runtime_section_started = False
-        for line in stdout.splitlines():
-            if "--- runtime" in line:
-                runtime_section_started = True
-                continue
-            if not runtime_section_started:
-                continue
-            assert cls_name not in line, (
-                f"S30 B7: exempt class {cls_name} appears as a "
-                f"runtime offender in sweep output:\n  {line}"
-            )
 
 
 def test_classifier_recognizes_fstring_context():

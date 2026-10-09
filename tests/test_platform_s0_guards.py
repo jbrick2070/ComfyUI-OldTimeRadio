@@ -6,8 +6,6 @@ Committed-state defects that broke every non-CUDA tier outright:
     (the loader :257 crash) + a CUDA-device-0-keyed ``max_memory`` dict
     built from model-id string tags alone, handed to transformers on hosts
     with no CUDA device 0.
-  - ``vram_context_test``: every ``torch.cuda.*`` memory counter unguarded,
-    so the diagnostics node crashed on exactly the hosts it should measure.
   - ``_otr_workflow_validator._detect_host``: MPS-blind and vendor-blind.
 
 The suite env hides CUDA (conftest sets ``CUDA_VISIBLE_DEVICES=''``), so
@@ -31,7 +29,6 @@ import os
 import pytest
 
 from nodes import _otr_model_loader as ml
-from nodes import vram_context_test as vct
 from nodes._otr_workflow_validator import WorkflowValidator
 
 
@@ -127,40 +124,6 @@ def test_matmul_precision_policy_survives_cuda_less_host(monkeypatch):
 
     monkeypatch.setattr(torch.cuda, "get_device_capability", _boom)
     ml._apply_matmul_precision_policy()  # must not raise
-
-
-# --------------------------------------------------------------------------
-# vram_context_test: accelerator-keyed probe helpers
-# --------------------------------------------------------------------------
-
-def test_vram_node_accel_helpers_survive_no_accelerator(monkeypatch):
-    """accel='none' path: zeros, no torch.cuda.* reached, no raise."""
-    import torch
-
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    mps = getattr(torch.backends, "mps", None)
-    if mps is not None:
-        monkeypatch.setattr(mps, "is_available", lambda: False)
-
-    accel = vct._accel_state()
-    assert accel == "none"
-
-    def _boom(*a, **k):
-        raise RuntimeError("No CUDA GPUs are available")
-
-    for fn_name in ("empty_cache", "reset_peak_memory_stats",
-                    "memory_allocated", "max_memory_allocated"):
-        monkeypatch.setattr(torch.cuda, fn_name, _boom)
-
-    _ = vct._accel_empty_cache(accel)
-    _ = vct._accel_reset_peak(accel)
-    assert vct._accel_allocated_gb(accel) == 0.0
-    assert vct._accel_peak_gb(accel) == 0.0
-
-
-def test_vram_node_accel_state_is_valid_on_this_host():
-    """Whatever the live host is, the state must be a known enum value."""
-    assert vct._accel_state() in ("cuda", "mps", "none")
 
 
 # --------------------------------------------------------------------------

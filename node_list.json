@@ -20,7 +20,6 @@
     "OTR_SignalLostVideo": "Signal Lost Video",
     "OTR_SilentComposite": "SilentComposite (render -> one always-silent video)",
     "OTR_StableAudioTheme": "Stable Audio Theme (v2)",
-    "OTR_VRAMContextTest": "VRAM Context Test (diagnostics)",
     "OTR_VideoDirector": "VideoDirector (per-role model select)",
     "OTR_VideoRenderBatch": "Video Render Batch (A-S7.5 in-process render)",
     "OTR_WorkflowValidator": "Workflow Validator (opt-in, S14.2)"

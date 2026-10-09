@@ -16,8 +16,7 @@ reclaimed, so a Cancel/crash never wedges the platform forever.
 
 VRAM is probed MACHINE-WIDE via pynvml (the nvidia-smi truth -- every process
 on the device), NEVER ComfyUI's ``get_free_memory()`` (this-process allocator
-view only; it cannot see a sidecar's allocation). ``probe_used_mb`` mirrors the
-``_nvml_used_bytes`` pattern in ``nodes/vram_context_test.py``.
+view only; it cannot see a sidecar's allocation).
 
 Import-time is side-effect-free and dependency-free at module scope (stdlib
 only -- no torch, no pynvml, no psutil). pynvml / psutil / ctypes are imported

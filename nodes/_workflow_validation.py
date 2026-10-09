@@ -122,6 +122,9 @@ DELETED_NODE_TYPES = frozenset({
     "OTR_FluxBranchGate",              # legacy FLUX topology gate (Sprint H)
     "OTR_DeferredCheckpointLoader",    # gate-bound FLUX loader shell (V-5)
     "OTR_DeferredLtxTextEncoderLoader",  # gate-bound LTX loader shell (V-5)
+    # Registered nodes that no shipped workflow used, removed 2026-10-08: a saved
+    # graph naming one fails here instead of loading a missing node.
+    "OTR_VRAMContextTest",  # developer probe of VRAM against prompt length
 })
 
 

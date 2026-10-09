@@ -388,7 +388,7 @@ the air for 84 lines across 30 episodes."""
 # ... is a one-line INPUT_TYPES add against this list". Three months on nothing
 # reads it -- no widget, no workflow, no test -- and the sibling dial it was
 # modelled on turned out to LABEL its output without controlling anything
-# (vram_context_test.py, removed the same day). A list kept for a hypothetical
+# (removed the same day). A list kept for a hypothetical
 # future reader is scaffolding; the one-line add is no harder to write from
 # scratch. The live "Standard" default in _resolve_inputs is untouched.
 
