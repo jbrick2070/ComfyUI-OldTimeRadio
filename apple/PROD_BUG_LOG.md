@@ -16413,3 +16413,26 @@ not promote it to the Bug Bible on this evidence alone.
   eng_cloud_video.py:469, cloud_media_invoke.py:192, cloud_media_backend.py:384,
   _otr_model_catalog.py:310, stable_audio_theme.py:849, prestartup_script.py:245).
   Same class, not yet fixed.
+
+## PBUG-20261009-01 -- the open list closed: every shipped dead end fixed, three passes
+- 93ee86b2 fixed the eight literals the first Sonnet QA listed (seven files).
+  Its own Sonnet QA found the rest and corrected one of that commit's fixes;
+  b6a4b1f7 landed them:
+  - the MASTER-HASH MISMATCH refusal compares the stamp in the queued graph with
+    the workflow file on disk, so a copy saved before a pack update trips it;
+    "reinstall the pack" could loop, and it now sends that copy back to Browse
+    Templates;
+  - missed by the first scan: js/workflow_schema.js's refusal dialog, the comfy:
+    catalog refusal, the replay_from and source_bank tooltips, four
+    bank-activation messages (CHECK_WHERE), two source-payload refusals citing an
+    excluded subplan, eng_cloud_image's pin advice, the ASS caption header;
+  - the SA3 non-finite warning blamed the model for the mps NaN that
+    PBUG-20260907-09b traced to our own determinism wrapper.
+- left alone as unreachable from shipped code: `workflow_to_api_prompt`'s
+  mismatch text and the model catalog's `notes` strings.
+- docs in the same class (weights described as manual after they began fetching
+  themselves): a76ba03c and ef5e4e56 -- AnimateDiff, HuMo, Flux, Ideogram and the
+  upscaler; the dropdown-matrix generator now lets the graph's `_COVERED` set
+  decide "auto".
+- no guard test was added (operator ruling: no new tests). The automatable
+  check is in the Bible entry this row promotes to.
