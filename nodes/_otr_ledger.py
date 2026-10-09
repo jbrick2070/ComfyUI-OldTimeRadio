@@ -774,7 +774,10 @@ def leading_audio_bytes(waveform, n_bytes):
     transposed, sliced, negative strides, big-endian). Every other input -- a
     negative ``n_bytes``, another dtype, a numpy subclass, a duck type -- takes
     the original ``waveform.tobytes()[:int(n_bytes)]`` path, so its result and
-    its exceptions are unchanged.
+    its exceptions are unchanged. ``int(n_bytes)`` is evaluated exactly once
+    either way. The one deliberate difference: a fast-path array too large to
+    serialize at all (a huge broadcast view, say) yields its leading bytes
+    instead of raising MemoryError.
 
     numpy is looked up in ``sys.modules`` and never imported: an ``ndarray``
     cannot exist unless numpy is already loaded, and this module has to stay
@@ -787,6 +790,7 @@ def leading_audio_bytes(waveform, n_bytes):
         if n >= 0:
             count = min(waveform.size, -(-n // waveform.dtype.itemsize))
             return waveform.flat[:count].tobytes()[:n]
+        return waveform.tobytes()[:n]
     return waveform.tobytes()[:int(n_bytes)]
 
 
