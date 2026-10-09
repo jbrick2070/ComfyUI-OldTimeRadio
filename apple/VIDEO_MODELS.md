@@ -91,9 +91,9 @@ pan. Pick either.
 
 | Dropdown | What it makes | Needs |
 |---|---|---|
-| `animatediff15_v3_haunted_video` | the degraded-transmission look: SD 1.5 through the official v3 motion module plus a domain adapter | manual weights + ComfyUI-AnimateDiff-Evolved |
-| `animatediff15_lightning_video` | the same graph on a distilled 8-step module -- much faster, and the only AnimateDiff lane proven on Apple Silicon. Marked experimental | manual weights + ComfyUI-AnimateDiff-Evolved |
-| `animatediff15_v3_stillin_lab_video` | the haunted lane started from a plate instead of empty noise. A lab variant | manual weights + ComfyUI-AnimateDiff-Evolved |
+| `animatediff15_v3_haunted_video` | the degraded-transmission look: SD 1.5 through the official v3 motion module plus a domain adapter | automatic, about 4 GB + ComfyUI-AnimateDiff-Evolved |
+| `animatediff15_lightning_video` | the same graph on a distilled 8-step module -- much faster, and the only AnimateDiff lane proven on Apple Silicon. Marked experimental | automatic, about 3 GB + ComfyUI-AnimateDiff-Evolved |
+| `animatediff15_v3_stillin_lab_video` | the haunted lane started from a plate instead of empty noise. A lab variant | automatic, about 4 GB + ComfyUI-AnimateDiff-Evolved |
 
 These write their own picture from text. Like the visualizers they mint no
 still, so **your image dropdown is idle when one of them is selected** -- they

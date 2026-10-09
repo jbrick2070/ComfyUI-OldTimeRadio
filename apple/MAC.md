@@ -52,9 +52,10 @@ The Mac still and video graphs mint stills and ship **SD 1.5** for it --
 `otr_mac16_still` and `otr_mac16_video` — one 2 GB checkpoint, ungated, no
 account, fetched on first use. `otr_mac16_low`, the one to start with, draws its
 own frames and never fetches an image model at all. `otr_mac16_animatediff`
-renders from the prompt alone, and its SD 1.5 checkpoint is a MANUAL fetch --
-a node pack supplies code, not 2 GB of weights. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from)
-names the files that lane needs and where each goes.
+renders from the prompt alone and fetches its own weights on first use, about
+3 GB. What it cannot fetch is the ComfyUI-AnimateDiff-Evolved node pack: that is
+code, so install it from Node Manager yourself and restart ComfyUI.
+[MACHINES.md](MACHINES.md#which-workflow-do-i-open) lists every pick that needs it.
 
 Z-Image-Turbo is what the NVIDIA graphs use and is a ~19 GB download; leaving it
 selected on a Mac with a still-consuming video lane starts that download. If you
