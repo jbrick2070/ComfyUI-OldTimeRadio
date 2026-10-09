@@ -188,10 +188,6 @@ class StoryInterpretation(BaseModel):
     assumptions: "list[str]" = Field(default_factory=list)
     conflicts: "list[Conflict]" = Field(default_factory=list)
 
-    def gender_by_name(self) -> "dict[str, str]":
-        return {r.name.strip(): r.stated_gender
-                for r in self.named_cast if r.stated_gender}
-
 
 # ---------------------------------------------------------------------------
 # P1 -- treatment
