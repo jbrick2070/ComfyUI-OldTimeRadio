@@ -76,8 +76,8 @@ Widget surface (current as of 2026-05-23):
                                    validators, GBNF grammar, reviewer,
                                    cast contract, format normalization)
         custom_premise    STRING  (RSS override; empty triggers feed fetch)
-        include_act_breaks BOOLEAN (True -> outline LLM plans music_inter
-                                    beats between acts; False -> continuous)
+        include_act_breaks BOOLEAN (True -> a music_inter beat between every
+                                    two acts; False -> continuous)
         act_count         combo   ('1'-'7' -- THE one length-shaped knob;
                                    always honoured, never derived)
         min_p             FLOAT   (sampling tail cut; 0.0 disables)
@@ -2408,17 +2408,12 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 "include_act_breaks": ("BOOLEAN", {
                     "default": True,
                     "tooltip": (
-                        "When ON (default), the outline LLM is told to "
-                        "plan music_inter beats between acts so the "
-                        "episode breathes between scenes.\n\n"
-                        "When OFF, the outline LLM is told the episode "
-                        "is one continuous flow with no music_inter "
-                        "beats.\n\n"
-                        "Outline schema (Beat.speaker_role) supports "
-                        "music_inter either way; this widget just "
-                        "tells the LLM whether to use it. Wired into "
-                        "the outline prompt via the `Target episode "
-                        "shape` line 2026-05-10."
+                        "When ON (default), a music interlude beat is "
+                        "placed between every two acts (one fewer than "
+                        "the act count) so the episode breathes between "
+                        "scenes.\n\n"
+                        "When OFF, the acts run as one continuous flow "
+                        "with no interludes."
                     ),
                 }),
                 # THE ONE LENGTH-SHAPED KNOB (operator directive
