@@ -750,18 +750,6 @@ def _resample_audio(clip_np, src_rate, dst_rate):
             clip_np
         ).astype(np.float32)
 
-#: The `output_dir` widget's placeholder default. NOTHING READS IT: the per-line
-#: audio goes to the episode's own dir resolved from the ledger, which is why
-#: `output_dir` does not appear anywhere below the signature.
-#:
-#: IT MUST STAY THE EMPTY STRING ("the ledger decides"): a hardcoded path such
-#: as `~/Documents/ComfyUI/output/otr/audio` is one developer box's own layout
-#: baked into a shipped module -- on a registry install, on the 4060 (which
-#: sets `$OTR_OUTPUT_DIR`), or on any two-tree split it names a directory that
-#: ComfyUI does not use. A default that is only correct on the machine it was
-#: written on is a portability defect wearing a constant's clothes.
-DEFAULT_OUT = ""
-
 
 # -----------------------------------------------------------------------------
 # Voice preset resolution: cast.voice_preset is the only source.
@@ -807,7 +795,7 @@ class SceneSequencer:
         "Sequences voiced dialogue clips from characters and the announcer end-to-end against "
         "the script ledger. Resamples clips to 48 kHz, manages inter-line pauses and pacing, "
         "and records exact line timing back into the ledger. Adjust start and end line ranges, "
-        "shift dialogue timing with dialogue offset, or supply an output directory override."
+        "or shift dialogue timing with dialogue offset."
     )
 
     CATEGORY = "OldTimeRadio"
@@ -844,14 +832,6 @@ class SceneSequencer:
                 "end_line": ("INT", {
                     "default": 999, "min": 1, "max": 9999,
                     "tooltip": "Last line to render"
-                }),
-                "output_dir": ("STRING", {
-                    "default": "",
-                    "tooltip": "Override directory for per-line audio files. "
-                               "Empty (the shipped default) = the episode's own "
-                               "audio dir from the ledger, which is where every "
-                               "downstream stage looks. Expert field: pointing "
-                               "it elsewhere strands the files.",
                 }),
                 # v1.5 Phase 3: Time-Alignment Offset Pin
                 "dialogue_offset_ms": ("FLOAT", {
@@ -911,7 +891,7 @@ class SceneSequencer:
     def sequence(self, script_json,
                  tts_audio_clips=None,
                  announcer_audio_clips=None,
-                 start_line=0, end_line=999, output_dir=DEFAULT_OUT,
+                 start_line=0, end_line=999,
                  dialogue_offset_ms=0.0,
                  ):
 
@@ -946,20 +926,6 @@ class SceneSequencer:
         # `dialogue_offset_ms` adds silence.
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
-
-        # NO MKDIR OF `output_dir` HERE (2026-09-05). It is a value that comes
-        # straight from a workflow STRING, so creating it would let an
-        # unauthenticated `/prompt` caller create directory trees anywhere the
-        # ComfyUI user could write.
-        #
-        # The value is INERT: nothing below this line reads `output_dir`. The
-        # per-line audio goes to the episode's own directory resolved from the
-        # ledger, which is where every downstream stage looks. Confining the
-        # value instead would be the wrong shape -- it would make an inert
-        # widget able to REFUSE and kill the render on any install whose
-        # output root is not this one's. The widget itself stays: it sits
-        # mid-list, and removing it re-indexes `widgets_values` and every
-        # later `dst_slot` across all 63 workflows.
 
         # Free LLM VRAM before TTS generation - Bark needs GPU headroom.
         # LLM is done by this point (script + plan already generated).

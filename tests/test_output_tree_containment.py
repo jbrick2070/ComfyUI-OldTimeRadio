@@ -136,21 +136,19 @@ CONFINED_DESTINATIONS = {
     "otr_post_upscale_procgen_blend.py": (
         "confine_to_output_tree(str(output_path),", ("source_mp4_path",)),
     "otr_credits_roll.py": ("confine_to_output_tree(out,", ("video_path",)),
-    # scene_sequencer is NOT here on purpose: its `output_dir` sink was DELETED
-    # rather than confined.
+    # scene_sequencer is NOT here on purpose: neither of its nodes has a widget
+    # that names a write destination.
 }
 
 
 def test_no_shipped_default_hardcodes_this_developers_home():
     """A default that is only correct on the machine it was written on is a
-    portability defect. `scene_sequencer.DEFAULT_OUT` was
-    `~/Documents/ComfyUI/output/otr/audio` -- wrong on a registry install, on
+    portability defect. A shipped output default of
+    `~/Documents/ComfyUI/output/otr/audio` is wrong on a registry install, on
     the 8 GB box, and on any two-tree split, and invisible to a suite that runs
     where the guess happens to be true. `video_engine.py` carried the same
     hardcoded home in its no-ledger fallback until 0c-8 moved it to the
     shared scratch tier."""
-    from nodes import scene_sequencer
-    assert scene_sequencer.DEFAULT_OUT == ""
     for name in ("scene_sequencer.py", "otr_caption_burn.py", "otr_master_audio_mux.py",
                  "otr_silent_composite.py", "otr_credits_roll.py",
                  "otr_post_upscale_procgen_blend.py", "video_engine.py"):

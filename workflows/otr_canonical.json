@@ -663,16 +663,6 @@
           "link": null
         },
         {
-          "localized_name": "output_dir",
-          "name": "output_dir",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "output_dir"
-          },
-          "link": null
-        },
-        {
           "localized_name": "dialogue_offset_ms",
           "name": "dialogue_offset_ms",
           "shape": 7,
@@ -711,7 +701,6 @@
         "[]",
         0,
         999,
-        "",
         0
       ],
       "color": "#323",

@@ -198,8 +198,8 @@ def test_workflow_json_node87_matches_live_widget_model():
     # The source is CastLock.ledger_json so SceneSequencer sees the same
     # role-repaired ledger as the pre-rendered voice buses.
     names3 = [i.get("name") for i in n3["inputs"]]
-    # Widgets: script_json, start_line, end_line, output_dir, dialogue_offset_ms.
-    assert len(n3["widgets_values"]) == 5
+    # Widgets: script_json, start_line, end_line, dialogue_offset_ms.
+    assert len(n3["widgets_values"]) == 4
     script_link_id = n3["inputs"][names3.index("script_json")]["link"]
     script_link = next(l for l in d["links"] if l[0] == script_link_id)
     src_node = next(n for n in d["nodes"] if n["id"] == script_link[1])
