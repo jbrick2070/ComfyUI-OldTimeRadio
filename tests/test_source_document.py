@@ -110,14 +110,6 @@ def test_build_source_document_refuses_empty():
         osd.build_source_document("   ")
 
 
-def test_document_refuses_out_of_range_span():
-    doc = osd.build_source_document("short body")
-    with pytest.raises(osd.SourceDocumentError):
-        doc.span(0, 999)
-    with pytest.raises(osd.SourceDocumentError):
-        doc.span(5, 5)
-
-
 # ---------------------------------------------------------------------------
 # the body must not escape through repr -- logs, tracebacks, f-strings
 # ---------------------------------------------------------------------------
@@ -135,11 +127,6 @@ def test_document_repr_carries_identity_not_the_body():
     text = repr(doc)
     assert _SENTINEL not in text
     assert doc.body_sha256[:12] in text
-
-
-def test_span_repr_does_not_carry_its_slice():
-    doc = _sentinel_doc()
-    assert _SENTINEL not in repr(doc.span(0, 200, role="probe"))
 
 
 def test_fetch_result_repr_does_not_carry_the_body():
@@ -197,17 +184,6 @@ def test_structural_serializers_refuse_the_document():
         pickle.dumps(doc)
 
 
-def test_structural_serializers_refuse_a_span():
-    import dataclasses
-    import pickle
-
-    span = _sentinel_doc().span(0, 120, role="probe")
-    with pytest.raises(TypeError):
-        dataclasses.asdict(span)
-    with pytest.raises(osd.SourceDocumentError):
-        pickle.dumps(span)
-
-
 def test_the_transient_artifacts_are_immutable():
     doc = _sentinel_doc()
     with pytest.raises(osd.SourceDocumentError):
@@ -233,40 +209,6 @@ def test_a_document_refuses_a_hash_that_is_not_its_own():
             body_sha256=osd.canonical_body_sha256("a different body"),
             normalization_version=osd.NORMALIZATION_VERSION,
         )
-
-
-# ---------------------------------------------------------------------------
-# quotation counted as balanced spans, not loose marks
-# ---------------------------------------------------------------------------
-
-@pytest.mark.parametrize("prose", [
-    "the boys' club met weekly",
-    "'tis the season for it",
-    "back in the '90s it was so",
-    "he didn't know his father's name",
-    # Dialect g-dropping is ordinary in period prose and must not read as
-    # speech: the mark is word-final, so it can never open a quotation.
-    "he was walkin' and talkin' and thinkin' nothin' of it",
-    "the Joneses' dog and the Davises' cat",
-])
-def test_lone_apostrophes_are_not_quoted_speech(prose):
-    assert osd._count_quoted_spans(prose) == 0
-
-
-def test_apostrophes_do_not_pair_across_a_long_work():
-    # The first narrowing still let an opener in "'90s" pair with a closer in
-    # "boys'" many words later, so a possessive-heavy work scored as dialogue.
-    body = "the boys' club and the girls' team and the '90s besides. " * 60
-    assert osd._count_quoted_spans(body) == 0
-
-
-@pytest.mark.parametrize("speech", [
-    '"Story!" cried the Editor.',
-    "'Tell me,' she said.",
-    '“Curly quotes count,” he said.',
-])
-def test_balanced_quotations_are_counted(speech):
-    assert osd._count_quoted_spans(speech) >= 1
 
 
 # ---------------------------------------------------------------------------

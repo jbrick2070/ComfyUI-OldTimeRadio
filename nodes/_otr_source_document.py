@@ -20,41 +20,15 @@ This module owns the artifact that fixes that, deterministic and model-free:
     hashes, never body text.
 
 Nothing here loads a model, touches the GPU, reads the network, or imports
-anything heavy. Selection is deterministic: same body in, same spans out.
+anything heavy.
 """
 from __future__ import annotations
 
 import hashlib
-import re
 
 # Bump NORMALIZATION_VERSION when the canonical body bytes for an unchanged
 # source would change -- that invalidates every stored offset and hash.
 NORMALIZATION_VERSION = "otr_source_normalization_v1"
-
-
-# Counting individual marks cannot tell a quotation from an apostrophe: the
-# first fix excluded "don't" and "father's" but still counted the mark in
-# "the boys' club", "'tis", and "the '90s". Count BALANCED SPANS instead --
-# an opener and a closer with text between them -- which is what a quotation
-# actually is. Double quotes are unambiguous; single quotes must open at a
-# word boundary and close at one, so a lone possessive or elision mark has
-# nothing to pair with and scores nothing.
-_DOUBLE_QUOTED_RE = re.compile(r"[\"“][^\"“”]{1,400}[\"”]")
-# Single quotes need tighter bounds than double ones. A first attempt paired
-# unrelated apostrophes ACROSS a work -- "'90s besides. the boys'" scans as a
-# quotation if you only require boundaries. So: the opener may not be preceded
-# by a word character (rules out possessives), may not be followed by a digit
-# (rules out decades), the span is non-greedy, may not cross a line, and is
-# length-capped. A lone possessive or elision mark then has nothing to pair
-# with and contributes nothing.
-_SINGLE_QUOTED_RE = re.compile(
-    r"(?<!\w)[‘'](?!\d)[^‘’'\n]{1,200}?['’](?!\w)")
-
-
-def _count_quoted_spans(text: str) -> int:
-    """Balanced quoted passages in ``text`` -- not loose quotation marks."""
-    return (len(_DOUBLE_QUOTED_RE.findall(text))
-            + len(_SINGLE_QUOTED_RE.findall(text)))
 
 
 class SourceDocumentError(RuntimeError):
@@ -114,67 +88,9 @@ class _Transient:
         )
 
 
-class SourceSpan(_Transient):
-    """A half-open character range into a canonical body, plus its text.
-
-    ``text`` is carried so a consumer can use the span without holding the
-    document, but the factory always slices it FROM the body, so text and
-    offsets cannot disagree. Build spans with ``SourceDocument.span`` /
-    ``_make_span``; a hand-built span is not checked against any body.
-
-    The repr carries offsets and role only -- a span can hold thousands of
-    words, and a log line is not where they belong.
-    """
-
-    __slots__ = ("start_char", "end_char", "text", "role")
-
-    def __init__(self, start_char: int, end_char: int, text: str,
-                 role: str = "") -> None:
-        self._set("start_char", int(start_char))
-        self._set("end_char", int(end_char))
-        self._set("text", str(text))
-        self._set("role", str(role))
-
-    def __repr__(self) -> str:
-        return (f"SourceSpan(start_char={self.start_char}, "
-                f"end_char={self.end_char}, role={self.role!r})")
-
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, SourceSpan):
-            return NotImplemented
-        return (self.start_char, self.end_char, self.text, self.role) == (
-            other.start_char, other.end_char, other.text, other.role)
-
-    def __hash__(self) -> int:
-        return hash((self.start_char, self.end_char, self.role))
-
-    @property
-    def char_count(self) -> int:
-        return self.end_char - self.start_char
-
-    @property
-    def word_count(self) -> int:
-        return len(self.text.split())
-
-
-def _make_span(body: str, start: int, end: int, *, role: str = "") -> SourceSpan:
-    """Build a span whose text is TAKEN FROM the body -- the only safe way.
-
-    Direct ``SourceSpan(...)`` construction can pair any offsets with any
-    text; this factory slices the body itself, so text and offsets cannot
-    disagree by construction rather than by later inspection.
-    """
-    if start < 0 or end > len(body) or start >= end:
-        raise SourceDocumentError(
-            f"span [{start}:{end}] is not a valid range into a "
-            f"{len(body)}-character body (role={role!r})"
-        )
-    return SourceSpan(
-        start_char=start, end_char=end, text=body[start:end], role=role)
-
-
 class SourceDocument(_Transient):
-    """The COMPLETE canonical body plus the identity spans index against.
+    """The COMPLETE canonical body plus its identity: hash and normalization
+    version.
 
     Transient by contract: never stamped into ``meta``, never written to a
     ledger, never persisted in a receipt. Callers that need durability store
@@ -223,10 +139,6 @@ class SourceDocument(_Transient):
     @property
     def word_count(self) -> int:
         return len(self.canonical_body.split())
-
-    def span(self, start: int, end: int, *, role: str = "") -> SourceSpan:
-        """Build a validated span into THIS body."""
-        return _make_span(self.canonical_body, start, end, role=role)
 
 
 def build_source_document(
