@@ -2447,7 +2447,9 @@ FLOOR so an empty-vs-empty comparison cannot pass.
 * `/object_info` shows **29** `OTR_*` ids -- but **4 belong to a DIFFERENT pack**
   (`ComfyUI-OTR-UpstreamStoryLab`, per each node's `python_module`), and are not
   ours to declare.
-* This pack declares and loads exactly **25**.
+* This pack declared and loaded exactly **25** at the time -- **22** since
+  2026-10-08, when the three nodes no shipped workflow used were removed.
+  `node_list.json` is the live count.
 `/object_info` plus each node's `python_module` is the authority on who owns an
 id. A grep for `OTR_` is not -- it crosses pack boundaries.
 

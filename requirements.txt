@@ -216,9 +216,9 @@ pyloudnorm>=0.1.1
 #
 # MEASURED BLAST RADIUS: exactly one function. The only `import cairo` in
 # scope_draw.py is indented INSIDE `paint_mandala`, so importing
-# the module never imports cairo; `freq_bars_green`, `cfr_flags`,
-# `find_ffmpeg` and `encode_silent_mp4` are all cairo-free, which leaves the
-# scope overlays, caption burn, silent composite and encode sink untouched.
+# the module never imports cairo; `cfr_flags`, `find_ffmpeg` and
+# `encode_silent_mp4` are all cairo-free, which leaves caption burn, the
+# silent composite and the encode sink untouched.
 # eng_viz_mandala guards both `load()` and `assert_usable()` and raises
 # EngineUnusable naming the pip command, and `viz_mxc_mandala` appears zero
 # times in workflows/otr_canonical.json. So Windows installs exactly as before

@@ -16373,3 +16373,15 @@ not promote it to the Bug Bible on this evidence alone.
   Both native-script rows the pass covers are now proven live; the row is
   closed except for the documented Latin-boundary gap in the invented-name
   check.
+
+## PBUG-20260911-03 -- retired: the scopes node no longer exists
+
+- 2026-10-08, 5c4383fd (with 5094af92): OTR_SceneAwareScopes and
+  OTR_PostUpscaleProcgenBlend, the only consumer of its scopes video, were
+  removed from the pack on the operator's ruling to drop nodes no shipped
+  workflow uses. Neither had appeared in any workflows/*.json since the
+  scopes left the canonical on 2026-09-13, so the live canonical
+  requalification this row still owed could never run. The code the defect
+  lived in is gone; both type names are tombstoned in DELETED_NODE_TYPES, so
+  a saved graph naming either fails loudly at validation. Nothing further is
+  owed on this row.

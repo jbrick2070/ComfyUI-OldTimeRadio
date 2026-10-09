@@ -795,8 +795,9 @@ The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** unde
   resilience). Consequence for debugging: a missing dependency SKIPS the affected node and prints
   `[OldTimeRadio] Skipped '<name>': <reason>` -- it does NOT zero out the pack. Proven by loading
   the real published zip with every requirements.txt dep blocked: all but two nodes still
-  registered. **THE PACK DECLARES 24 NODES, NOT 34** (`node_list.json`, and `__init__.py` prints
-  `All 24 nodes loaded successfully`). The old "32/34" ratio was written here when the count was
+  registered. **THE PACK DECLARES 22 NODES, NOT 34** (`node_list.json`, and `__init__.py` prints
+  `All 22 nodes loaded successfully`; it was 25 until the three nodes no shipped workflow used --
+  SceneAwareScopes, PostUpscaleProcgenBlend, VRAMContextTest -- were removed 2026-10-08). The old "32/34" ratio was written here when the count was
   wrong, and `tests/test_node_list_manifest.py:123` exists because that number kept propagating --
   but it only guards `__init__.py`, so THIS file carried it for weeks and a doc written for
   outside agents inherited it on 2026-09-13. Quote the live count, never a remembered ratio.
