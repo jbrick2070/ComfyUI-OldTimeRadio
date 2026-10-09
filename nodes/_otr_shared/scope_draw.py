@@ -12,18 +12,16 @@ The title-card / ident / gap branches are deliberately OMITTED -- those only mak
 sense for the whole-episode floor; a per-beat clip is pure procedural art.
 
 Self-contained on purpose: ``_rng`` / ``analyze_audio_np`` / ``dual_ema`` live here
-so the engine couples to NOTHING (neither the floor node nor the overlay node).
+so the engine couples to NOTHING (not the floor node, not an overlay node).
 The invariant is DIRECTIONAL: this module must not import a node; a node importing
-THIS module is the refactor the first paragraph anticipated, and
-``otr_scene_aware_scopes`` now imports all three rather than keeping copies.
+THIS module is the refactor the first paragraph anticipated.
 
 ``encode_silent_mp4`` is not one of the copies. The frames are counted against
 the declared ``total``, the rawvideo size is derived from the first frame so
 the declared stride cannot disagree with the piped bytes, a frame that changes
 shape or dtype mid-stream is refused, nvenc is skipped below its 145x49 floor,
 stderr goes to a file rather than a deadlockable pipe, and ffmpeg is reaped on
-every refusal path -- and ``otr_scene_aware_scopes`` calls this one rather than
-keeping its own copy. There is ONE streaming clip encoder. UTF-8, no BOM.
+every refusal path. There is ONE streaming clip encoder. UTF-8, no BOM.
 """
 from __future__ import annotations
 
@@ -227,28 +225,6 @@ def _freq_bars_wide(draw, freq, x, y, w, h, vol):
         brightness = 0.25 + float(freq[i]) * 0.75
         col = (min(255, int(r * brightness)), min(255, int(g * brightness)),
                min(255, int(b * brightness)))
-        draw.rectangle([(bx, by), (bx + bw, y + h)], fill=col)
-
-
-def freq_bars_green(draw, freq, x, y, w, h):
-    """GREEN-ONLY frequency-bar strip -- the bottom-bars overlay look.
-
-    Same bar geometry as :func:`_freq_bars_wide` but the palette is CRT_GREEN
-    scaled by per-bin magnitude (NO amber/red gradient), so it honors the
-    overlay's green-only invariant (OTR_SceneAwareScopes deliberately ships no
-    colored CRT constants). ``freq`` is one frame's 32-bin spectrum (0..1).
-    Geometry by params so the overlay node and the engine can both call it."""
-    n = min(32, len(freq))
-    if n < 1:
-        return
-    bw = max(1, w // n - 1)
-    for i in range(n):
-        mag = max(0.0, min(1.0, float(freq[i])))
-        bh = max(1, int(mag * h * 1.5))
-        bx = x + i * (bw + 1)
-        by = y + h - min(bh, h)
-        brightness = 0.25 + mag * 0.75
-        col = tuple(min(255, int(c * brightness)) for c in CRT_GREEN)
         draw.rectangle([(bx, by), (bx + bw, y + h)], fill=col)
 
 
@@ -835,10 +811,10 @@ def find_ffmpeg(ffmpeg):
     default, not a choice: with ffmpeg on PATH it would otherwise win here and
     the pin would never be read.
 
-    The env step is not optional politeness -- OTR_SceneAwareScopes ships a
-    tooltip promising exactly this order, and without it an install where
-    ffmpeg is reachable ONLY through ``OTR_FFMPEG`` encodes nothing while the
-    operator-facing contract says it should.
+    The env step is not optional politeness -- the documented contract is
+    exactly this order, and without it an install where ffmpeg is reachable
+    ONLY through ``OTR_FFMPEG`` encodes nothing while the operator-facing
+    contract says it should.
     """
     try:
         from .ffmpeg import resolve_ffmpeg
@@ -993,10 +969,7 @@ def encode_silent_mp4(frames_iter, total, out_path, w, h, fps, ffmpeg):
       after it.
 
     It still returns ``out_path`` alone: the count PROVEN AGAINST THE FILE is
-    the caller's to take, because this encoder is also used for the
-    post-upscale bars layer, which is a compositing input and not a
-    CanonicalClip and owes no clip contract. Raises ``RuntimeError``, NAMED,
-    and never falls back.
+    the caller's to take. Raises ``RuntimeError``, NAMED, and never falls back.
     """
     fb = find_ffmpeg(ffmpeg)
     if not fb:

@@ -429,7 +429,6 @@ def test_the_ratchet_catches_a_caller_that_hides_its_literals(label, scan):
     "otr_credits_roll.py",
     "otr_master_audio_mux.py",
     "otr_silent_composite.py",
-    "otr_scene_aware_scopes.py",
     "_otr_shared/cloud_media_canonical.py",
     "_otr_video_engines/wan_shared.py",
     "_otr_video_engines/eng_cloud_video.py",

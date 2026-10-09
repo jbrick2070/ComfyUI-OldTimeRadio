@@ -5,7 +5,7 @@ CPU-only coverage: registration / identity, the LOUD assert_usable ladder (no
 fallback), the pure render-request + CanonicalClip helpers, scope_draw determinism,
 and -- when ffmpeg + soundfile are present -- a real silent-mp4 render of the
 expected frame count at 25fps 16:9 with has_audio False. The engine must NOT couple
-to the floor node or the SceneAwareScopes overlay.
+to the floor node.
 """
 from __future__ import annotations
 
@@ -319,7 +319,6 @@ def test_engine_does_not_import_the_floor_node():
             imported += ["%s.%s" % (node.module or "", a.name) for a in node.names]
     joined = " ".join(imported)
     assert "video_engine" not in joined         # never the floor renderer
-    assert "scene_aware_scopes" not in joined    # never the overlay node
 
 
 def test_no_dummy_token_utf8():

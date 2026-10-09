@@ -415,16 +415,15 @@ def _validate_episode_id(episode_id: str) -> str:
             "episode_id %r contains a path separator/traversal token" % eid)
     if set(eid) == {"."}:
         # A dots-only id is a NAVIGATION token, not a name. "." collapses
-        # lexically, so `episodes/./composited` resolves to
-        # `episodes/composited` -- a directory that still passes
+        # lexically, so `episodes/./clips` resolves to
+        # `episodes/clips` -- a directory that still passes
         # _validate_contract (its first part is "episodes") while sitting
         # OUTSIDE any episode, where every ledger walker over
         # otr_episodes_root() would read it AS one. ".." is caught by the
         # separator/traversal test above; a single dot is not, because the
         # substring test looks for ".." and finds nothing. Measured 2026-09-11
-        # while re-homing the scopes video (PBUG-20260911-03): before this
-        # guard, otr_composited_dir(".") returned <output>/otr/episodes/
-        # composited and was accepted.
+        # (PBUG-20260911-03): before this guard, a per-episode helper handed
+        # "." returned <output>/otr/episodes/<subdir> and was accepted.
         raise OtrPathContractError(
             "episode_id %r is a path-navigation token, not an episode name"
             % eid)
@@ -563,32 +562,6 @@ def otr_clips_dir(episode_id: str) -> Path:
     """
     eid = _validate_episode_id(episode_id)
     return _validate_contract(otr_episodes_root() / eid / "clips")
-
-
-def otr_composited_dir(episode_id: str) -> Path:
-    """Per-episode video-chain intermediate dir:
-    ``<output>/otr/episodes/<episode_id>/composited/``.
-
-    CURRENT TENANT (2026-09-11): the scene-aware scopes video,
-    ``otr_scopes_<label>_<ts>.mp4``, written by OTR_SceneAwareScopes and
-    read by OTR_PostUpscaleProcgenBlend as its third blend input.
-
-    The ``composited`` name is a misnomer for that occupant, so read this
-    before adding another writer. The scopes video is a RETAINED deliverable
-    (PBUG-20260911-03), so it must not live in ``episodes/_shared/tmp``, the
-    janitor-swept scratch tier. The episode ROOT is arguably the better
-    semantic home -- the rest of the video chain writes flat there -- but it
-    has no validated helper, and minting one was not on the table. This
-    helper already carries the two guards the fix needs:
-    ``_validate_episode_id`` (raises on empty, reserved or traversing
-    ids) and ``_validate_contract``. A misnamed but GUARDED home beats an
-    unguarded one; renaming the tier is a separate, larger change.
-
-    NOT swept: the janitor is scoped to ``_shared/tmp`` alone, which is
-    the whole reason an episode asset belongs here rather than there.
-    """
-    eid = _validate_episode_id(episode_id)
-    return _validate_contract(otr_episodes_root() / eid / "composited")
 
 
 def otr_state_dir() -> Path:
@@ -799,7 +772,6 @@ __all__ = [
     "otr_portraits_dir",
     "otr_videos_dir",
     "otr_clips_dir",
-    "otr_composited_dir",
     "otr_obs_dir",
     "otr_state_dir",
     "otr_runtime_log_path",

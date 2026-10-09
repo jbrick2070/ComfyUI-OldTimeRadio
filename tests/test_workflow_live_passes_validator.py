@@ -85,9 +85,9 @@ def test_production_workflow_visual_structure_pinned():
     # OTR_SceneAwareScopes (node 94) left the canonical. The blend had shipped
     # with bypass=True since the 2026-09-05 low-friction ruling, so it copied
     # its input to its output on every render, and the scopes node encoded an
-    # MP4 whose only consumer was that bypassed input. Both CLASSES remain
-    # registered and selectable -- this removed the unused work, not the
-    # capability. The composite now feeds the caption node directly.
+    # MP4 whose only consumer was that bypassed input. Both classes were then
+    # removed from the pack on 2026-10-08, since no shipped workflow used them.
+    # The composite now feeds the caption node directly.
     n86 = nodes[86]
     assert n86["type"] == "OTR_CaptionBurn"
     assert n86["widgets_values"][0] is True, (

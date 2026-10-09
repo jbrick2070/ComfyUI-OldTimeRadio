@@ -119,7 +119,8 @@ def test_an_explicit_ffmpeg_still_wins_over_the_env(monkeypatch, tmp_path):
 
 
 def test_scope_draw_honours_OTR_FFMPEG(monkeypatch, tmp_path):
-    """The scopes node ships a tooltip promising this exact order."""
+    """The viz engines resolve ffmpeg through `find_ffmpeg`, which must honour
+    OTR_FFMPEG."""
     from nodes._otr_shared import scope_draw as sd
 
     fake = tmp_path / "ffmpeg.exe"

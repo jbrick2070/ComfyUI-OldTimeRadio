@@ -8,8 +8,7 @@ picture, selectable per role in OTR_VideoDirector. 16:9 only. Near-zero GPU: pur
 numpy + PIL + ffmpeg.
 
 SEPARATION INVARIANT (2026-06-17 plan section 0.2, HARD): this engine does NOT
-import or invoke the floor node (OTR_SignalLostVideo / video_engine.render), does
-NOT touch the OTR_SceneAwareScopes / OTR_PostUpscaleProcgenBlend overlay, and is
+import or invoke the floor node (OTR_SignalLostVideo / video_engine.render) and is
 INERT unless a role's dropdown selects ``viz_green``. The full-colour draw routines
 are COPIED (not extracted) into the torch-free :mod:`nodes._otr_shared.scope_draw`,
 so the floor's behaviour is provably unchanged (v1; a later refactor can extract).

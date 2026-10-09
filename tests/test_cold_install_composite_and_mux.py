@@ -1,5 +1,5 @@
-"""Cold install, part 2: the composite, the mux and the scopes measure through
-the boundary, and the composite's gates say UNPROVEN rather than raise when
+"""Cold install, part 2: the composite and the mux measure through the
+boundary, and the composite's gates say UNPROVEN rather than raise when
 nothing on the box can measure.
 
 Measured 2026-09-11 on the 5080 with ffprobe made unresolvable (PATH without
@@ -30,13 +30,12 @@ os.environ.setdefault("OTR_TEST_MODE", "1")
 from nodes._otr_shared import ffprobe as ffp  # noqa: E402
 from nodes import otr_silent_composite as composite  # noqa: E402
 from nodes import otr_master_audio_mux as mux  # noqa: E402
-from nodes import otr_scene_aware_scopes as scopes  # noqa: E402
 
 
-def _write_clip(path, *, with_audio, portrait=False):
-    """A 12-frame mpeg4 clip at 24 fps (64x48, or 48x64 portrait), with an
-    optional 16 kHz aac track -- written by PyAV, so the file needs no tool."""
-    width, height = (48, 64) if portrait else (64, 48)
+def _write_clip(path, *, with_audio):
+    """A 12-frame 64x48 mpeg4 clip at 24 fps, with an optional 16 kHz aac
+    track -- written by PyAV, so the file needs no tool."""
+    width, height = 64, 48
     with av.open(str(path), "w") as out:
         video = out.add_stream("mpeg4", rate=24)
         video.width, video.height, video.pix_fmt = width, height, "yuv420p"
@@ -70,12 +69,6 @@ def clip_av(tmp_path_factory):
 @pytest.fixture(scope="module")
 def clip_silent(tmp_path_factory):
     return _write_clip(tmp_path_factory.mktemp("cold2") / "v.mp4", with_audio=False)
-
-
-@pytest.fixture(scope="module")
-def clip_portrait(tmp_path_factory):
-    return _write_clip(tmp_path_factory.mktemp("cold2") / "p.mp4",
-                       with_audio=False, portrait=True)
 
 
 @pytest.fixture()
@@ -175,7 +168,7 @@ def test_the_assemble_gates_read_a_negative_count_as_unproven_not_a_mismatch():
 
 
 # --------------------------------------------------------------------------- #
-# the mux and the scopes measure without a binary
+# the mux measures without a binary
 # --------------------------------------------------------------------------- #
 def test_the_mux_measures_both_durations_without_a_binary(no_binary, clip_av, clip_silent):
     assert mux._probe_float(clip_silent, "v:0") == pytest.approx(0.5, abs=0.002)
@@ -193,20 +186,3 @@ def test_the_mux_measures_both_durations_without_a_binary(no_binary, clip_av, cl
         return real(path, entries, **kw)
     no_binary.setattr(ffp, "probe_json", stream_without_duration)
     assert mux._probe_float(clip_av, "v:0") == pytest.approx(0.512, abs=0.002)
-
-
-def test_the_scopes_planner_detects_portrait_without_a_binary(
-        no_binary, clip_silent, clip_portrait, tmp_path):
-    cache = {}
-    assert scopes._probe_is_portrait(clip_silent, "ffprobe", cache) is False
-    assert scopes._probe_is_portrait(clip_portrait, "ffprobe", cache) is True
-    assert scopes._probe_is_portrait(str(tmp_path / "gone.mp4"), "ffprobe", cache) is None
-    assert cache[clip_portrait] is True, "the answer is cached per path"
-
-
-# --------------------------------------------------------------------------- #
-# wiring: the boundary is used
-# --------------------------------------------------------------------------- #
-def test_the_scopes_planner_goes_through_probe_json():
-    source = inspect.getsource(scopes._probe_is_portrait)
-    assert "probe_json(" in source and "probe_raw(" not in source

@@ -1693,15 +1693,14 @@ class EpisodeAssembler:
         # then a third gain over the result -- contradicting the operator's
         # ruling that the ratio is set once and ONE delivery gain follows.
         #
-        # BUT SIMPLY SKIPPING THE PASS WOULD BREAK TWO OTHER CONSUMERS. This
-        # node's episode_audio output fans out to OTR_SignalLostVideo (node 12)
-        # and, when it is wired by hand, OTR_SceneAwareScopes (not in the
-        # canonical graph). Each receives the POST-LUFS
-        # tensor today; skipping would make procgen and the scopes hotter on
-        # foley episodes only, for no reason connected to the bed.
+        # BUT SIMPLY SKIPPING THE PASS WOULD BREAK ANOTHER CONSUMER. This
+        # node's episode_audio output fans out to OTR_SignalLostVideo (node 12),
+        # which receives the POST-LUFS tensor today; skipping would make
+        # procgen hotter on foley episodes only, for no reason connected to
+        # the bed.
         #
         # So the pass still RUNS and the returned AUDIO stays byte-identical
-        # for those two. What changes is only which waveform is written to the
+        # for it. What changes is only which waveform is written to the
         # WAV the mux later reads: the PRE-loudness one, snapshotted here. The
         # mux mixes into that and performs the single delivery gain itself --
         # unconditionally, even when every splat turns out to be silence, so a
@@ -1724,7 +1723,7 @@ class EpisodeAssembler:
                 "[EpisodeAssembler] FOLEY ROUTE: the master WAV is written "
                 "PRE-loudness as a provisional stem; OTR_MasterAudioMux mixes "
                 "the foley bed under it and performs the single delivery "
-                "loudness pass. episode_audio (SignalLostVideo, scopes) still "
+                "loudness pass. episode_audio (SignalLostVideo) still "
                 "carries the levelled tensor.")
         if _loud.get("mode") == "lufs":
             log.info(

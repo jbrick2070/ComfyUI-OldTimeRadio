@@ -21,7 +21,7 @@ use it, which is why a guard is needed rather than a fix.
 WHY THIS IS REPO-WIDE rather than pinned to the writer: the defect class is "a
 COMBO default was hand-built or taken from a bare constant instead of from the
 same function that builds the choices". Any node with a dynamic choice list can
-grow it. There are 25 registered nodes.
+grow it. There are 22 registered nodes.
 
 A NOTE ON DYNAMIC LISTS. Several choice lists change with the environment -- the
 remote-lane pickers show a sentinel until their lane is enabled, and the model

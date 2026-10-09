@@ -969,7 +969,7 @@ class _CRTRenderer:
         draw.line([(pad, ly), (self.w - pad, ly)], fill=CRT_DARK, width=1)
 
         # -- 2/3/5/6. GATED SCOPE SECTIONS ----------------------------
-        # draw_scopes=False (v2 scene-aware path) skips {2,3,5,6} as a SET:
+        # draw_scopes=False skips {2,3,5,6} as a SET:
         # section 3 reads section 2's `r`, so 2+3 go together; 5+6 are
         # independent. {1,4,7,8} (title/grid/bottom/CRT) always draw.
         if draw_scopes:
@@ -2117,11 +2117,9 @@ class SignalLostVideoRenderer:
                 # _otr_shared/episode_title.py, whose timestamp last resort
                 # covers a titleless ledger.
                 # APPENDED LAST (widgets_values is positional -- only ever
-                # append). v2 scene-aware path sets this False so the floor's
-                # in-frame scopes {2,3,5,6} (centre ring / particles /
-                # waveform / bars) turn OFF and OTR_SceneAwareScopes draws the
-                # scene-aware scopes downstream instead. Default True keeps the
-                # v1 floor visual for every existing saved workflow.
+                # append). False turns the floor's in-frame scopes {2,3,5,6}
+                # (centre ring / particles / waveform / bars) OFF. Default True
+                # keeps the v1 floor visual for every existing saved workflow.
                 "draw_scopes": ("BOOLEAN", {
                     "default": True,
                     "tooltip": "Draw the scopes over the picture -- centre ring, "

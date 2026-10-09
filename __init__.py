@@ -186,12 +186,6 @@ _NODE_MODULES = {
     # key. A V1 node declaring the hidden key writes it into /history when it
     # raises; this one cannot raise. Wired into the validator, the root.
     "OTR_ComfyCredential":         (".nodes.otr_comfy_credential", "OTR_ComfyCredential", "0 - Comfy Credential"),
-    # §4D v2 scene-aware scopes: a late, additive node that draws GREEN-ONLY
-    # audio-reactive scopes into the REAL per-beat gutters (read from the clip
-    # manifest), screened+lightened over the upscaled video by the blend's 3rd
-    # input. The floor keeps its full v1 video; only draw_scopes=False turns its
-    # in-frame scopes off so they don't double.
-    "OTR_SceneAwareScopes": (".nodes.otr_scene_aware_scopes", "SceneAwareScopes", " Scene-Aware Scopes (v2)"),
 
     # =========================================================================
     # OTR Open Video Model Platform -- A-Seam core (CW-1, 2026-06-06).

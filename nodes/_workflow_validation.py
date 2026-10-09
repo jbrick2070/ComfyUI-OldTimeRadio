@@ -126,6 +126,7 @@ DELETED_NODE_TYPES = frozenset({
     # graph naming one fails here instead of loading a missing node.
     "OTR_VRAMContextTest",  # developer probe of VRAM against prompt length
     "OTR_PostUpscaleProcgenBlend",  # procgen CRT blend over the silent composite
+    "OTR_SceneAwareScopes",  # gutter scopes overlay that fed the blend
 })
 
 

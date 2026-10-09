@@ -298,8 +298,6 @@ def test_the_engine_stamps_the_PROVEN_count_not_the_declared_one(
 #: with the reason each one exists. Pinned so that the next copy of this
 #: encoder fails HERE, by name, instead of being discovered by a fan-out two
 #: months later carrying every defect the others were already fixed for.
-#: ``otr_scene_aware_scopes.py`` is deliberately ABSENT: it carried the third
-#: copy until 2026-07-28 and now calls scope_draw's.
 _RAWVIDEO_STDIN_ENCODERS = {
     ("scope_draw.py", "encode_silent_mp4"):
         "the shared STREAMING encoder -- takes a generator, so it cannot "
@@ -326,7 +324,7 @@ _RAWVIDEO_STDIN_ENCODERS = {
 def test_there_is_no_FOURTH_copy_of_this_encoder():
     """The tree had THREE copies of one streaming encoder.
 
-    ``otr_scene_aware_scopes.py`` carried its own ``_encode_silent_mp4``: a
+    A scopes overlay node carried its own ``_encode_silent_mp4``: a
     byte-for-byte identical ffmpeg command, and every defect the shared one was
     fixed for on 2026-07-28 -- a dead ``total`` parameter, the declared size
     taken from the caller instead of the frames, no per-frame shape or dtype
@@ -362,12 +360,6 @@ def test_there_is_no_FOURTH_copy_of_this_encoder():
         "the rawvideo-stdin encoder inventory moved.\n  NEW: %r\n  GONE: %r"
         % (sorted(found - set(_RAWVIDEO_STDIN_ENCODERS)),
            sorted(set(_RAWVIDEO_STDIN_ENCODERS) - found)))
-    # Named separately from the set comparison: this is the one the chunk
-    # closed, and "it is not in a set" is a weaker sentence than saying why.
-    assert not any(module == "otr_scene_aware_scopes.py"
-                   for module, _fn in found), (
-        "otr_scene_aware_scopes.py has grown its own frame encoder again -- "
-        "it must call _otr_shared.scope_draw.encode_silent_mp4")
 
 
 # ---------------------------------------------------------------------------

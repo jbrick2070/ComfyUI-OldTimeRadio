@@ -13,9 +13,10 @@ extractor -- the Registry's, ComfyUI-Manager's, a future one -- sees nothing.
 THE COUNT HAS BEEN WRONG IN THIS REPO THREE DIFFERENT WAYS, which is exactly why
 the manifest is generated and then pinned by this test rather than typed:
   * a comment in `__init__.py` still said 34 (pre-lean-mean, retired nodes);
-  * `/object_info` reports 29 OTR_* ids -- but 4 of those belong to a DIFFERENT
-    pack, `ComfyUI-OTR-UpstreamStoryLab`, and are not ours to declare;
-  * this pack declares and loads exactly 25.
+  * `/object_info` reported 29 OTR_* ids when the manifest was pinned -- but 4
+    of those belong to a DIFFERENT pack, `ComfyUI-OTR-UpstreamStoryLab`, and
+    are not ours to declare;
+  * this pack declares and loads exactly 22.
 A hand-typed list drifts silently. This test makes drift a red build.
 
 THE VACUITY GUARD IS DELIBERATE. Comparing two sets that are both empty passes,
@@ -35,8 +36,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(REPO, "node_list.json")
 INIT = os.path.join(REPO, "__init__.py")
 
-#: This pack declared 25 nodes when the manifest was pinned. The floor exists so
-#: an empty-vs-empty comparison cannot pass; it is not an upper bound.
+#: This pack declares 22 nodes. The floor exists so an empty-vs-empty
+#: comparison cannot pass; it is not an upper bound.
 DECLARED_FLOOR = 20
 
 

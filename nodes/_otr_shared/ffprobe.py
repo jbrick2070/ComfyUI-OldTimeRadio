@@ -17,8 +17,6 @@ it is a policy, and every policy stays exactly where it was:
 * ``otr_master_audio_mux`` / ``otr_silent_composite`` return ``-1`` / ``0.0``
   and report the gate as UNPROVEN -- a finished episode is not thrown away
   because the box lacks a diagnostic tool.
-* ``otr_post_upscale_procgen_blend`` / ``otr_scene_aware_scopes`` fall back to a
-  documented default and log -- a blemish, never a lost render.
 * ``cloud_media_canonical`` raises ``CORRUPT_OUTPUT`` -- partial provider media
   never proceeds.
 

@@ -83,7 +83,6 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 WIDGET_NODES = {
     "nodes/otr_caption_burn.py": "OTR_CaptionBurn",
     "nodes/otr_master_audio_mux.py": "OTR_MasterAudioMux",
-    "nodes/otr_scene_aware_scopes.py": "OTR_SceneAwareScopes",
     "nodes/otr_silent_composite.py": "OTR_SilentComposite",
 }
 
@@ -92,10 +91,9 @@ WIDGET_NODES = {
 #: node in its own try/except and prints `Skipped '<name>': <reason>`, so a box
 #: without some optional dependency legitimately registers fewer than the
 #: manifest declares -- but a walk over three survivors is reporting green over
-#: almost nothing. Read against the live manifest so adding a node raises the
-#: floor by itself; 25 declared - 5 = 20, which is the same floor
-#: `tests/test_node_list_manifest.py` pins for the same "empty cannot look like
-#: agreement" reason.
+#: almost nothing. Read against the live manifest so adding or removing a node
+#: moves the floor by itself, for the same "empty cannot look like agreement"
+#: reason `tests/test_node_list_manifest.py` pins its own floor.
 MAX_OPTIONAL_SKIPS = 5
 
 #: A directory no install puts a binary in, so every value below names
@@ -292,17 +290,16 @@ def test_every_widget_node_binds_the_local_to_the_empty_constant(rel, node):
     this and its replacement did not: proving no `ffmpeg` PARAMETER exists says
     nothing about what the body then binds to that name, and most of the nodes
     bound it with nothing watching (`otr_caption_burn:535`,
-    `otr_master_audio_mux:1704`, `otr_silent_composite:1764`). Only the scopes
-    node kept a check.
+    `otr_master_audio_mux:1704`, `otr_silent_composite:1764`).
 
     THE PROPERTY: the first binding is the empty constant, it happens before
     the name is read, and any later binding is the pack's own resolver fed by
     that already-empty local.
 
-    Line order stands in for execution order here, as it did in the scopes walk
-    this generalises. It is a proxy, and it is the right one: the bindings are
-    straight-line statements at the top of each method, and a future edit that
-    made the order conditional would be exactly the change worth failing on.
+    Line order stands in for execution order here. It is a proxy, and it is the
+    right one: the bindings are straight-line statements at the top of each
+    method, and a future edit that made the order conditional would be exactly
+    the change worth failing on.
     """
     cls = NODE_CLASS_MAPPINGS[node]
     fn = _execute_def(rel, cls)
@@ -381,41 +378,6 @@ def test_every_widget_node_binds_the_local_to_the_empty_constant(rel, node):
     assert first.lineno < min(n.lineno for n in loads), (
         "%s reads `ffmpeg` at line %d but does not bind it until line %d"
         % (where, min(n.lineno for n in loads), first.lineno))
-
-
-def test_the_scopes_node_severs_before_BOTH_consumers():
-    """`otr_scene_aware_scopes` has TWO doors, and the encoder one was missed
-    by the first three drafts of the 2026-09-04 fix: `:491` probes with
-    `resolve_ffprobe(ffmpeg=...)`, and the encode path hands the same value to
-    `scope_draw.encode_silent_mp4` -> `find_ffmpeg` -> `resolve_ffmpeg`.
-
-    Both doors are still there and both still take a binary name. What changed
-    on 2026-09-13 is where that name can come from, and the parametrized walk
-    above owns that half now. What stays HERE is the door count: this node is
-    the one where severing before ONE consumer was not enough, so losing sight
-    of either is the specific regression worth naming.
-    """
-    rel = "nodes/otr_scene_aware_scopes.py"
-    fn = _execute_def(rel, NODE_CLASS_MAPPINGS[WIDGET_NODES[rel]])
-
-    doors = {}
-    for n in ast.walk(fn):
-        if (isinstance(n, ast.Call)
-                and getattr(n.func, "attr", "") in ("resolve_ffprobe",
-                                                    "encode_silent_mp4")):
-            doors.setdefault(n.func.attr, n.lineno)
-    assert set(doors) == {"resolve_ffprobe", "encode_silent_mp4"}, (
-        "render_scopes should reach BOTH consumers and this walk found %s -- "
-        "has the node been rewired? Severing before one of the two is the "
-        "defect this test was written for." % (sorted(doors) or "neither"))
-
-    bindings = [n.lineno for n in ast.walk(fn)
-                if isinstance(n, ast.Name) and n.id == "ffmpeg"
-                and isinstance(n.ctx, ast.Store)]
-    assert bindings, "render_scopes no longer binds `ffmpeg` at all"
-    assert min(bindings) < min(doors.values()), (
-        "`ffmpeg` is bound at line %d but a consumer runs at line %d"
-        % (min(bindings), min(doors.values())))
 
 
 # --------------------------------------------------------------------------- #

@@ -144,8 +144,8 @@ except Exception:  # noqa: BLE001
 # viz_green: the LOW-VRAM ffmpeg-only procedural CRT scope engine --
 # audio-reactive scopes rendered AS the per-beat picture (the resurrected
 # full-colour video_engine look, via the COPIED torch-free routines in
-# _otr_shared/scope_draw.py; zero coupling to the floor node / the
-# SceneAwareScopes overlay). Selectable per role (registry IS the menu). Old
+# _otr_shared/scope_draw.py; zero coupling to the floor node).
+# Selectable per role (registry IS the menu). Old
 # saved graphs carrying "visualizer" resolve via otr_video_director's
 # _LEGACY_ENGINE_ALIASES. Cold-import clean (V-12: soundfile/PIL lazy in
 # render_clip). Guarded so a packaging quirk never breaks the namespace import.

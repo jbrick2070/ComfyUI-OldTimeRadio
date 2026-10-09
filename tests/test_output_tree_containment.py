@@ -11,10 +11,10 @@ ordinary local absolute path -- so a caller chose an arbitrary destination and
 ffmpeg/``shutil``/``os.replace`` wrote there. The Comfy Registry bans exactly
 that shape as ``policy-v0.2: PATH_TRAVERSAL`` (35 bans in the surveyed corpus).
 
-These pin the containment itself and the two token whitelists. The node-level
-call sites are pinned by source assertion rather than by executing a render:
-the point is that the guard is CALLED at the execute method, and a full render
-needs ffmpeg and a GPU.
+These pin the containment itself and the profile-id token whitelist. The
+node-level call sites are pinned by source assertion rather than by executing a
+render: the point is that the guard is CALLED at the execute method, and a full
+render needs ffmpeg and a GPU.
 """
 from __future__ import annotations
 
@@ -195,17 +195,8 @@ def test_the_render_batch_rejects_remote_paths_at_all():
 
 
 # --------------------------------------------------------------------------
-# token whitelists: a caller-supplied label may name a FILE, never a LOCATION
+# token whitelist: a caller-supplied label may name a FILE, never a LOCATION
 # --------------------------------------------------------------------------
-def test_the_scopes_episode_id_becomes_a_safe_filename_token():
-    src = (_NODES / "otr_scene_aware_scopes.py").read_text(encoding="utf-8")
-    i = src.index('key = ')
-    window = src[i:i + 400]
-    assert "_re.sub" in window and "A-Za-z0-9_.-" in window, (
-        "the manifest's episode_id is joined into a filename and must be "
-        "reduced to a token first")
-
-
 def test_a_profile_id_names_a_workflow_not_a_path():
     from nodes._otr_shared import capability_profiles as cp
     for bad in ("../../../etc/hosts", r"..\..\x", "a/b", "a\\b"):
