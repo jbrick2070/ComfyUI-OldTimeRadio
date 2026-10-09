@@ -54,8 +54,9 @@ app.registerExtension({
                     `longer has, and it cannot be migrated safely.\n\n` +
                     `${verdict.reason}\n${verdict.detail}\n\n` +
                     `Nothing was loaded and your open workflow is unchanged. ` +
-                    `Re-generate it with scripts/build_variants.py, or open it ` +
-                    `in a build that still has that widget.`;
+                    `Re-open the shipped copy from Workflow > Browse Templates, ` +
+                    `or open it in a build that still has that widget (in a ` +
+                    `git clone, scripts/build_variants.py re-generates it).`;
                 console.error(
                     `${TAG}: refused -- ${verdict.reason}: ${verdict.detail}`);
                 app.ui?.dialog?.show?.(msg);

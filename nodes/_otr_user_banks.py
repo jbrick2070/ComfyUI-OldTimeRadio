@@ -44,6 +44,10 @@ RECEIPT_FILENAME = ".otr_receipt.json"
 STORY_PACKS_DIRNAME = "story_packs"
 FIXTURES_DIRNAME = "fixtures"
 
+#: Where the activation command lives, said wherever a message names it:
+#: `scripts/` is not in a registry install.
+CHECK_WHERE = " (scripts/otr_check.py, in a git clone)"
+
 # Never part of the authoring bytes: the receipt is written BY activation, and
 # bytecode caches are machine-local noise. Excluding them keeps the digest a
 # pure function of what the client actually authored.
@@ -386,14 +390,14 @@ def _validate_bundle(root: Path, *, parse_row, protected_ids, snapshots: Path
         raise _Quarantine(
             "stale_receipt",
             "the bundle changed since activation; re-run "
-            f"`otr_check bank {root} --activate`",
+            f"`otr_check bank {root} --activate`{CHECK_WHERE}",
         )
     snapshot_dir = snapshots / receipt["snapshot"]
     if not snapshot_dir.is_dir() or not _contained(snapshots, snapshot_dir):
         raise _Quarantine(
             "missing_snapshot",
             f"activation snapshot {receipt['snapshot']!r} is absent; re-run "
-            f"`otr_check bank {root} --activate`",
+            f"`otr_check bank {root} --activate`{CHECK_WHERE}",
         )
     try:
         row = parse_row(row_data, f"{BANK_JSON_FILENAME} ({bank_id})")
@@ -646,7 +650,7 @@ def activation_status(bundle_root: Path, *, base: "Path | None" = None
     if not (bundle_root / RECEIPT_FILENAME).exists():
         return UNCHECKED, (
             "no activation receipt; run "
-            f"`otr_check bank {bundle_root} --activate`")
+            f"`otr_check bank {bundle_root} --activate`{CHECK_WHERE}")
     try:
         receipt = read_receipt(bundle_root)
     except _Quarantine as exc:
@@ -718,7 +722,7 @@ def load_bundle_module(bundle: UserBankBundle):
             f"source bank {bundle.bank_id!r}: importing "
             f"{bundle.module_path.name} failed ({type(exc).__name__}: {exc}). "
             f"Fix the bundle and re-run `otr_check bank {bundle.root} "
-            f"--activate`."
+            f"--activate`{CHECK_WHERE}."
         ) from exc
     return module
 

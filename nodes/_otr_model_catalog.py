@@ -2124,7 +2124,8 @@ def validate_model_id(
         raise UnknownModelError(
             f"{normalized!r} is a Comfy Credits remote model that this "
             f"catalog does not carry. Sign into Comfy in the app with a "
-            f"Comfy API key (or submit headless through scripts/otr_api.py "
+            f"Comfy API key (or submit headless: `comfy run --workflow <file>` "
+            f"with COMFY_API_KEY set, or, from a git clone, scripts/otr_api.py "
             f"with OTR_COMFY_API_KEY in the submitter's environment), pick "
             f"a comfy:slot-* handle the writer lists, and re-queue. See "
             f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"

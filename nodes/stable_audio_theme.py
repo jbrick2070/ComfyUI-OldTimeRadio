@@ -838,20 +838,22 @@ class StableAudioTheme:
             # guard, and matches what scene_sequencer.py already does at its own
             # boundaries (np.isfinite checks at :491, :503, :520).
             #
-            # It is deliberately LOUD: a non-finite sample means the generator
-            # misbehaved, and on Apple Silicon that is a real open question
-            # (SA3 loads as float16 there -- fp16 overflow on Metal is the
-            # leading hypothesis). Silence would hide a model fault behind
-            # slightly-wrong audio, which is the worst shape this can take.
+            # It is deliberately LOUD: a non-finite sample means generation
+            # misbehaved upstream of this writer. On Apple Silicon a 100% NaN
+            # cue was traced to OTR's own determinism wrapper meeting an MPS
+            # `baddbmm` bug, not to the model (PBUG-20260907-09b). Silence
+            # would hide a fault behind slightly-wrong audio, which is the
+            # worst shape this can take.
             _nonfinite = int(np.count_nonzero(~np.isfinite(arr)))
             if _nonfinite:
                 log.warning(
                     "[OTR.sa3] cue %s: %d non-finite sample(s) of %d (%.4f%%) "
                     "from the generator -- replaced with silence. The audio is "
-                    "usable but WRONG at those samples; the generator, not this "
-                    "writer, is at fault. On Apple Silicon see "
+                    "usable but WRONG at those samples; the fault is upstream "
+                    "of this writer. On Apple Silicon see "
                     "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                    "main/apple/MAC_LESSONS_LEARNED.md (SA3 emits NaN on mps).",
+                    "main/apple/MAC_LESSONS_LEARNED.md (a NaN cue on mps was "
+                    "traced to an MPS baddbmm bug, not the model).",
                     cue_id, _nonfinite, int(arr.size),
                     100.0 * _nonfinite / max(1, int(arr.size)),
                 )

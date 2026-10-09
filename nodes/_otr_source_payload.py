@@ -978,8 +978,9 @@ def resolve_fetcher(bank, *, owner=None) -> FetcherEntry:
     if not fetcher_id:
         raise SourceContractMissingError(
             f"source_bank {bank_id!r} declares no fetcher: its source-payload "
-            f"lane is not built yet (lane-enablement checklist, STAGE2_SUBPLAN "
-            f"section 4b item 3). There is no fallback."
+            f"lane is not built yet. A bank declares its fetcher in bank.json "
+            f"(apple/EXTENDING.md, 'Adding your own source bank'). There is no "
+            f"fallback."
         )
     _oub = _user_banks()
     if fetcher_id == _oub.SELF_ENTRY_POINT:
@@ -1008,8 +1009,9 @@ def resolve_interpreter(bank, *, owner=None):
     if not interpreter_id:
         raise SourceContractMissingError(
             f"source_bank {bank_id!r} declares no interpreter: its "
-            f"source-payload lane is not built yet (lane-enablement checklist, "
-            f"STAGE2_SUBPLAN section 4b item 3). There is no fallback."
+            f"source-payload lane is not built yet. A bank declares its "
+            f"interpreter in bank.json (apple/EXTENDING.md, 'Adding your own "
+            f"source bank'). There is no fallback."
         )
     _oub = _user_banks()
     if interpreter_id == _oub.SELF_ENTRY_POINT:

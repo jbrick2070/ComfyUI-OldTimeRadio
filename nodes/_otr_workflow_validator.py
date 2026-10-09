@@ -391,8 +391,9 @@ class WorkflowValidator:
                     "multiline": False, "default": "",
                     "tooltip": "Generation stamp: sha256 of the canonical "
                                "master this variant was generated from. A "
-                               "mismatch against the real master means the "
-                               "variant is stale -- regenerate, never hand-fix.",
+                               "mismatch against the workflow file means this "
+                               "graph is stale -- re-open it from Browse "
+                               "Templates, never hand-fix.",
                 }),
                 "generated_by": ("STRING", {
                     "multiline": False, "default": "",
@@ -648,12 +649,14 @@ class WorkflowValidator:
             live = semantic_master_hash(parsed)
             if live != master_hash.strip():
                 raise ValueError(
-                    "OTR_WorkflowValidator: MASTER-HASH MISMATCH -- the "
-                    f"variant was edited after emission (stamped "
-                    f"{master_hash.strip()[:12]}, live {live[:12]}). "
-                    "Variants are GENERATED, never hand-edited: reinstall the "
-                    "pack to restore the shipped file (in a git clone, "
-                    "regenerate it with scripts/build_variants.py).")
+                    "OTR_WorkflowValidator: MASTER-HASH MISMATCH -- the graph "
+                    f"you queued and the workflow file on disk disagree (graph "
+                    f"stamp {master_hash.strip()[:12]}, file {live[:12]}). A "
+                    "copy saved before a pack update keeps its old stamp: "
+                    "re-open the workflow from Workflow > Browse Templates. If "
+                    "a file under custom_nodes was edited, reinstall the pack "
+                    "(in a git clone, regenerate it with "
+                    "scripts/build_variants.py).")
 
         # Runtime export -- EVERY execution, not "if unset" (a long-running
         # server persists env across prompts; stale values are overwritten).

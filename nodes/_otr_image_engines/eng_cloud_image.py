@@ -282,10 +282,9 @@ class _CloudImageBase:
         if not isinstance(row, dict) or str(row.get("status")) != "OK":
             raise EngineUnusable(
                 self.name, "", EngineUsabilityReason.MALFORMED_CONFIG,
-                f"partner pin row {self.node_key!r} missing or not OK -- "
-                f"re-pin via the script at "
-                f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                f"main/scripts/otr_pin_partner_nodes.py", kind="image")
+                f"partner pin row {self.node_key!r} missing or not OK in this "
+                f"install's pin table -- update the pack (in a git clone, "
+                f"re-pin with scripts/otr_pin_partner_nodes.py)", kind="image")
         return self.name
 
     def prepare(self, host_caps, profile, session_ctx):

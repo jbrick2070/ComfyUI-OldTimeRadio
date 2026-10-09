@@ -190,7 +190,7 @@ def _row_for(node_key: str) -> dict:
             CloudErrorCode.MALFORMED_CONFIG,
             f"unknown partner node_key {node_key!r} (pin table has "
             f"{len(rows)} rows; if the partner menu moved, update the pack -- "
-            f"in a git clone, regenerate it with "
+            f"in a git clone, regenerate the table with "
             f"scripts/otr_pin_partner_nodes.py)",
         )
     status = str(row.get("status", "")).upper()

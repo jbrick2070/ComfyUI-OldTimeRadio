@@ -2209,7 +2209,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "FAILS LOUD before any story work (no fallback), "
                             "with its guide_ref naming the real path: author a "
                             "bundle under user_packs/source_banks/, run "
-                            "'otr_check bank <path> --activate', restart, and "
+                            "'otr_check bank <path> --activate' "
+                            "(scripts/otr_check.py, in a git clone), restart, and "
                             "your bank joins this list as its own entry "
                             "(contract: apple/EXTENDING.md, which ships with the "
                             "pack; apple/EXTENDING_OTR.md is the longer "
@@ -2914,7 +2915,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     "tooltip": (
                         "CANONICAL REPLAY (2026-09-02). Empty = normal authorship. "
                         "A frozen replay bundle directory (scripts/"
-                        "otr_freeze_replay_bundle.py) = re-render THAT episode's "
+                        "otr_freeze_replay_bundle.py, in a git clone) = re-render THAT episode's "
                         "ledger through the whole canonical graph as a new episode: "
                         "no writer, no TTS, no music, no stills minted; same seeds, "
                         "same audio, only the video phase runs, on the engine the "
