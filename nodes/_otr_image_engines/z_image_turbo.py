@@ -202,7 +202,7 @@ class ZImageTurboEngine:
     requires_flag = None             # vestigial (registry IS the menu; no flag gate)
     required_inputs = ("text_prompt",)
     # v2 invalidates every cached v1 still that may contain the square-grid
-    # corruption from the unapproved generic ReferenceLatent path below.
+    # corruption from the unapproved generic ReferenceLatent conditioning.
     engine_version = "2"
     #: DISABLED BY MATCHED LIVE PIXEL A/B, 2026-08-20.  Same installed weights,
     #: prompt, negative, seed and 1472x832 canvas on separate fresh boots:
@@ -211,25 +211,9 @@ class ZImageTurboEngine:
     #: structural compatibility, not that this Turbo checkpoint was trained for
     #: that conditioning.  The dispatcher therefore keeps the proven
     #: portrait-derived identity SEED and never hands this engine a reference.
+    #: The adapter has no reference path at all: a request that carries a
+    #: ``reference_image`` is ignored and the nine-node base graph runs.
     accepts_reference_image = False
-
-    #: DIAGNOSTIC-ONLY map retained for the permanent matched A/B harness; the
-    #: production dispatcher cannot reach it while accepts_reference_image is
-    #: false. Resolved SEPARATELY from _node_candidates and merged per call. These must
-    #: never join the main candidate map: render_image caches the resolved map on
-    #: the registry SINGLETON, and the episode's first mint is an unreferenced
-    #: portrait -- so a params-gated map would be cached WITHOUT these keys and
-    #: every later referenced mint would die with 'class unresolved'.
-    #: ImageScale, never FluxKontextImageScale: resolve_graph_classes binds the
-    #: first installed name, and FluxKontextImageScale.execute takes `image`
-    #: ONLY, so it would receive upscale_method/width/height/crop and TypeError.
-    _REF_CANDIDATES = {
-        "load_ref": ("LoadImage",),
-        "scale_ref": ("ImageScale",),
-        "encode_ref": ("VAEEncode",),
-        "ref_pos": ("ReferenceLatent",),
-        "ref_neg": ("ReferenceLatent",),
-    }
 
     #: Terminal graph node (its IMAGE output is the still).
     _TERMINAL = "decode"
@@ -278,14 +262,6 @@ class ZImageTurboEngine:
             # no-request default. Honor dims EXACTLY -- no snapping/upscale here.
             "width": int(get("width") or get("w") or _eint("OTR_ZIMAGE_WIDTH", 1024)),
             "height": int(get("height") or get("h") or _eint("OTR_ZIMAGE_HEIGHT", 1024)),
-            # Production admission is enforced here at the adapter boundary,
-            # not only by the dispatcher capability bit. A direct caller that
-            # supplies reference_image therefore still gets the proven base
-            # graph and can never revive the corrupt generic latent path.
-            "reference_image": "",
-            # Capped well under the portrait's native 1216 so the reference
-            # costs roughly 1.5k latent tokens instead of 4k on an 8-step mint.
-            "reference_height": _eint("OTR_PORTRAIT_REF_HEIGHT", 768),
         }
 
     def _node_candidates(self, params=None):
@@ -316,7 +292,6 @@ class ZImageTurboEngine:
         0=MODEL; CLIPLoader out 0=CLIP; VAELoader out 0=VAE; ModelSamplingAuraFlow
         out 0=MODEL (shifted)."""
         W = wire
-        ref = str(params.get("reference_image") or "")
         graph = {
             "unet": {"class": "unet",
                      "inputs": {"unet_name": params["unet_name"],
@@ -352,39 +327,6 @@ class ZImageTurboEngine:
                        "inputs": {"samples": W("ksampler", 0),
                                   "vae": W("vae", 0)}},
         }
-        if not ref:
-            return graph
-        # ImageScale.upscale takes all FIVE arguments -- image, upscale_method,
-        # width, height, crop -- and run_graph calls fn(**kwargs) straight off
-        # this inputs dict with no fallback, so a short-form node is a dead
-        # episode, not a warning. width=0 lets ImageScale derive the missing
-        # side from the actual image, keeping the 832x1216 portrait's aspect so
-        # no face is cropped into a 16:9 band; VAE.encode crops to a multiple of
-        # 8 internally, so a derived odd width is safe.
-        graph["load_ref"] = {"class": "load_ref", "inputs": {"image": ref}}
-        graph["scale_ref"] = {
-            "class": "scale_ref",
-            "inputs": {"image": W("load_ref", 0), "upscale_method": "lanczos",
-                       "width": 0, "height": int(params["reference_height"]),
-                       "crop": "disabled"}}
-        graph["encode_ref"] = {
-            "class": "encode_ref",
-            "inputs": {"pixels": W("scale_ref", 0), "vae": W("vae", 0)}}
-        # BOTH conditionings, even at the shipped cfg 1.0 where the negative is
-        # inert: the model doubles its timesteps only on the omni path, and an
-        # operator can raise OTR_ZIMAGE_CFG back above 1.0 -- referencing the
-        # positive alone would then take the CFG delta between two structurally
-        # different forward passes.
-        graph["ref_pos"] = {
-            "class": "ref_pos",
-            "inputs": {"conditioning": W("pos", 0), "latent": W("encode_ref", 0)}}
-        graph["ref_neg"] = {
-            "class": "ref_neg",
-            "inputs": {"conditioning": W("neg", 0), "latent": W("encode_ref", 0)}}
-        # The rewire is the point. A graph that builds the chain and forgets to
-        # consume it passes a node-count check and renders nothing different.
-        graph["ksampler"]["inputs"]["positive"] = W("ref_pos", 0)
-        graph["ksampler"]["inputs"]["negative"] = W("ref_neg", 0)
         return graph
 
     # ---- residency (classes resolve lazily; loader nodes own the weights) ----

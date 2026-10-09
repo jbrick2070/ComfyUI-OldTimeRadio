@@ -201,7 +201,6 @@ def test_unreferenced_zimage_graph_is_byte_identical_to_the_shipped_nine():
 
     eng = _zimage()
     params = eng._zimage_params({"prompt": "a stern man", "seed": 7})
-    assert not params["reference_image"]
     assert set(eng._build_zimage_graph(params, _wb.Wire)) == {
         "unet", "clip", "vae", "sampling", "pos", "neg", "latent",
         "ksampler", "decode",
@@ -256,27 +255,3 @@ def test_direct_render_request_cannot_reactivate_reference_graph(monkeypatch):
         "unet", "clip", "vae", "sampling", "pos", "neg", "latent",
         "ksampler", "decode",
     }
-
-
-def test_flux_kontext_scaler_must_not_share_the_candidate_tuple():
-    """resolve_graph_classes binds the FIRST installed name, and
-    FluxKontextImageScale.execute takes `image` only -- it would receive four
-    extra kwargs and TypeError inside a GraphExecutionError.
-    """
-    eng = _zimage()
-    assert eng._REF_CANDIDATES["scale_ref"] == ("ImageScale",)
-    assert "FluxKontextImageScale" not in eng._REF_CANDIDATES["scale_ref"]
-
-
-def test_reference_classes_never_pollute_the_cached_singleton_map():
-    """The registry stores ONE instance and render_image caches the resolved
-    class map on it. The episode's first mint is an unreferenced portrait, so a
-    params-gated main map would be cached without the reference keys and every
-    later referenced mint would die with 'class unresolved'.
-    """
-    eng = _zimage()
-    assert "load_ref" not in eng._node_candidates()
-    assert "load_ref" not in eng._node_candidates(
-        {"reference_image": "p.png", "latent_node": "EmptySD3LatentImage"})
-    assert set(eng._REF_CANDIDATES) == {
-        "load_ref", "scale_ref", "encode_ref", "ref_pos", "ref_neg"}
