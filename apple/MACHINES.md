@@ -63,8 +63,8 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | fits | fits | not offered | ? | not offered |
 | `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered | ? | not offered |
-| `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo17_high_audio_in_portrait` | **auto** | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo17_high_audio_in_wide` | **auto** | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `ltx098_low_video` | **auto** | 16.1 GiB | **proven** | **proven** | **proven** | ? | not offered |
 | `razzle_ltx_8gb` | **auto** | 16.1 GiB | fits | fits | fits | ? | not offered |
 | `ltx25_foley_blackwell` | **auto** | 24.2 GiB | ? | ? | not offered | ? | not offered |
@@ -128,7 +128,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
-| `spandrel_esrgan` | manual | 0.1 GiB | fits | **proven** | measured | ? | ? |
+| `spandrel_esrgan` | **auto** | 0.1 GiB | fits | **proven** | measured | ? | ? |
 
 **Writer (the LLM that writes the script)**
 
@@ -147,25 +147,11 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 Every file a **manual** row needs: the repository to download it from, and the folder under your ComfyUI `models/` directory to put it in. `gated` means you must accept the model's licence on Hugging Face first, while signed in.
 
-Two engines can share one group and still download different amounts, because they draw different files from it. **The size in the machine grid above is what YOUR pick costs**; the total on a heading here is the whole group. A heading with no total means that group's manifest predates byte receipts -- the machine grid still has the figure.
-
-### humo_1_7b &mdash; 12.6 GiB total
-
-Selected by: `humo17_high_audio_in_portrait`, `humo17_high_audio_in_wide`
-
-| File | From | Put it in | Size | Gated |
-|---|---|---|---|---|
-| `humo_1.7B_fp16.safetensors` | [`Comfy-Org/HuMo_ComfyUI`](https://huggingface.co/Comfy-Org/HuMo_ComfyUI) | `models/diffusion_models/` | 3.24 GiB | no |
-| `umt5_xxl_fp8_e4m3fn_scaled.safetensors` | [`Comfy-Org/Wan_2.1_ComfyUI_repackaged`](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged) | `models/text_encoders/` | 6.27 GiB | no |
-| `whisper_large_v3_fp16.safetensors` | [`Comfy-Org/HuMo_ComfyUI`](https://huggingface.co/Comfy-Org/HuMo_ComfyUI) | `models/audio_encoders/` | 2.88 GiB | no |
-| `wan_2.1_vae.safetensors` | [`Comfy-Org/Wan_2.2_ComfyUI_Repackaged`](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged) | `models/vae/` | 0.24 GiB | no |
-
 ### No manifest ships for these
 
 This pack cannot fetch them, and no table here can tell you the filename, because the engine chooses it. Select one anyway and it refuses by name before anything else runs -- **that refusal is the install instruction**: it prints the exact file it wants and the folder it expects. It never quietly substitutes another.
 
 * `mesh_stage`
-* `spandrel_esrgan`
 
 ## What the words mean
 

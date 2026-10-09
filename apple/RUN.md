@@ -166,10 +166,11 @@ ComfyUI -- every LTX lane uses nodes that ship with ComfyUI itself -- your
 ComfyUI is older than those nodes: update it. [MACHINES.md](MACHINES.md#which-workflow-do-i-open)
 lists which lanes are which.
 
-**The render stops naming a missing file.** The lane you picked needs weights
-that do not download themselves. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from) says which
-repository it comes from and which folder it goes in. The error names the file;
-it never quietly substitutes a different one.
+**The render stops naming a missing file.** Nearly every lane fetches its own
+weights, so this is a download that could not complete (offline, out of disk, a
+Hugging Face outage), or one of the few picks
+[MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from) lists as a hand
+download. The error names the file; it never quietly substitutes a different one.
 
 **It refuses before downloading, saying the writer will not fit.** You picked a
 language model bigger than your card's ceiling. Pick a smaller one -- the writer

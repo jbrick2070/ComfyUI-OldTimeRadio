@@ -1328,6 +1328,10 @@ class Lane(NamedTuple):
 #:   "hf_cache" -- auto-downloads on first use through the Hugging Face cache.
 #:                 No lane is needed and none should be added; the engine's own
 #:                 loader fetches it. Still a download, so it still has a size.
+#:   "fetch_at_load"
+#:              -- the engine fetches its own pinned, hash-checked weights when
+#:                 it loads, through `_otr_visual_assets` rather than the
+#:                 queue-time gate. Auto for the user; still a download.
 #:   "sidecar"  -- installs through its own installer script, not the model
 #:                 provisioner. Friction lives in that installer.
 #:   "remote"   -- a hosted API. No local weights at all, only a credential.
@@ -1366,13 +1370,11 @@ NO_LANE_REASON = {
     # Upscale ships one model. "off" does nothing at all, which is neither a
     # download nor a service.
     "off": "builtin",
-    # "Pulled on first use" was the claim once, and the adapter refutes it:
-    # `eng_spandrel_esrgan.py` raises with
-    # a GitHub release URL to download "into models/upscale_models" and a
-    # pointer to `scripts/ensure_upscale_models.py`. A 67 MB file is small
-    # friction, but it is friction, and the matrix is where a stranger looks to
-    # find out whether a dropdown costs them anything before they pick it.
-    "spandrel_esrgan": "manual_doc",
+    # The upscaler sits outside the validator's gate walk, so its engine asks
+    # for its 67 MB checkpoint at load (`eng_spandrel_esrgan._fetch_model` ->
+    # `_otr_visual_assets.ensure_upscale_weights`); only a failed fetch leaves
+    # the hand-download instruction.
+    "spandrel_esrgan": "fetch_at_load",
     # Local video lanes whose weights are documented but have no fetcher lane.
     "mesh_stage": "manual_doc",
 }

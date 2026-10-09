@@ -3,9 +3,8 @@
 Every beat of the episode shows something. The **image engine** is the model that
 draws that still picture; the video lane then takes the still and makes it move.
 
-Most engines are one-click: pick them and they fetch themselves. The manual
-local ones want files you download by hand. That is the only part of this page
-most people need.
+Every local engine is one-click: pick it and it fetches itself. That is the
+only part of this page most people need.
 
 And before any of it: **on the shipped canonical graph the image pick does
 nothing at all.** That is not a fault, and the section after next explains it.
@@ -67,8 +66,8 @@ is exactly what you see below.
 | `sd15` | 2.0 GiB | **yes** | Stable Diffusion 1.5. The small one, and the only local engine proven on a 16 GB Mac. Native 512; the pack fits every request down to 768 on the long side, because past that it starts drawing two heads. |
 | `z_image_turbo` | 19.3 GiB | **yes** | The canonical graph's saved pick, and the AMD graph's -- the one with a Radeon receipt. Eight steps a still, so it is quick once the weights are down -- but they are the largest download of any image engine here. |
 | `lumina_image` | 10.4 GiB | **yes** | Lumina-Image 2.0. **The default in the 16 GB NVIDIA graphs** (`otr_16gb_still`, `otr_16gb_video`). Fetches the ungated Comfy-Org split set on first use, same path as `sd15` -- a 5.2 GB model plus a 5.2 GB text encoder. |
-| `flux_gen1` | 13.0 GiB | no | FLUX.1-dev. Its licence is non-commercial. |
-| `ideogram4_local` | 17.3 GiB | no | Typography specialist -- built for the `still_word` card, where the script's own words go on screen. Measured at about 95 seconds a card against `z_image_turbo`'s 12, and its licence is non-commercial. |
+| `flux_gen1` | 13.0 GiB | **yes** | FLUX.1-dev. Its licence is non-commercial. |
+| `ideogram4_local` | 17.3 GiB | **yes** | Typography specialist -- built for the `still_word` card, where the script's own words go on screen. Measured at about 95 seconds a card against `z_image_turbo`'s 12, and its licence is non-commercial. |
 
 ### Hosted -- no weights, you supply an account
 
@@ -108,14 +107,14 @@ still missing.
 
 ---
 
-## Which ones download themselves, and which do not
+## Which ones download themselves
 
-**`sd15`**, **`z_image_turbo`** and **`lumina_image`**. Pick any of the three and
-a node inside the graph fetches it at queue time -- no account, no token, no
-script to run. `lumina_image` joined them on 2026-09-16 and is what the 16 GB
-NVIDIA graphs ship, so the default 16 GB path now downloads itself.
-
-The manual local engines (`flux_gen1`, `ideogram4_local`) stop the render and tell you the exact filename they want and the folder it belongs in. **That refusal is the install instruction.** It never quietly substitutes another model. They ship no provisioner manifest; the refusal message at queue time is the only place the filename and folder show up.
+All five local engines: **`sd15`**, **`z_image_turbo`**, **`lumina_image`**,
+**`flux_gen1`** and **`ideogram4_local`**. Pick any of them and a node inside the
+graph fetches it at queue time -- no account, no token, no script to run.
+`lumina_image` is what the 16 GB NVIDIA graphs ship, so the default 16 GB path
+downloads itself; `flux_gen1` and `ideogram4_local` joined the list on
+2026-09-29. None of them ever quietly substitutes another model.
 
 [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) has the per-machine grid -- which of these
 has actually been run on 8 GB, on 16 GB, on a Mac, on CPU, and which will run out
@@ -148,11 +147,10 @@ Your role's video lane draws its own frames. See
 [First check whether a picture is being drawn at all](#first-check-whether-a-picture-is-being-drawn-at-all)
 -- this is correct behaviour, not a miss.
 
-**It stops and names a file.** You picked one of the manual local engines,
-`flux_gen1` or `ideogram4_local`. The refusal names the exact filename and the
-folder it belongs in, and for these two that message is the only place that
-information appears -- [MACHINES.md](MACHINES.md#no-manifest-ships-for-these)
-ships no manifest for them, by design.
+**It stops at Run with a download error.** An image weight could not be
+fetched -- offline, out of disk, or a Hugging Face outage. The run stops at
+queue time, before the writer or any model loads, and nothing is substituted.
+Fix the cause and press Run again.
 
 **A hosted pick failed partway through.** No credentials. Every hosted row --
 `google_image` included -- discovers this at the same point, when the dispatcher

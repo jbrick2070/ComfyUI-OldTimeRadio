@@ -61,13 +61,10 @@ between "the weights are there" and "the weights were attempted."
 
 ## Weights that need a licence click
 
-Some of the heavy video lanes are gated. Accept the licence on each model's
-Hugging Face page while signed in, then `hf auth login` on the pod. **More than
-one owner may be involved** — a lane can need clicks on two different accounts,
-so do not assume one acceptance covers the set.
-
-Which files, from which repository, into which folder:
-[MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from).
+A few picks are gated. Accept the licence on the model's Hugging Face page while
+signed in, then `hf auth login` on the pod. The grid in
+[MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) marks each one
+GATED; everything else downloads without an account.
 
 ## Launch and prove it
 

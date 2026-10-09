@@ -184,9 +184,8 @@ and consume no still image -- so the image model its dropdowns name stays
 **dormant** and is not downloaded. Switch a video lane to one that consumes a
 still and the image weights are fetched then, not before.
 
-Everything else -- the lanes you have to fetch by hand, which repository each file
-comes from, and which folder to put it in -- is in
-[MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from).
+Almost every pick downloads itself; the few that still need a hand download
+are listed in [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from).
 
 ## Hugging Face login
 

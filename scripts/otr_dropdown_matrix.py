@@ -192,7 +192,7 @@ def download_facts() -> dict:
 
 
 #: How an engine with no provisioning lane still gets its weights.
-_NO_LANE_WORD = {"hf_cache": "auto", "sidecar": "sidecar",
+_NO_LANE_WORD = {"hf_cache": "auto", "fetch_at_load": "auto", "sidecar": "sidecar",
                  "remote": "none", "manual_doc": "manual", "builtin": "nothing",
                  "remote_unprovisioned": "none*"}
 
@@ -282,11 +282,12 @@ def friction_for(engine: str, namespace: str, facts: dict) -> tuple:
             return ("auto", None, None)
         return (_NO_LANE_WORD.get(reason, "unrouted"), None, None)
     fact = facts.get(lane.lane, {})
-    if lane.manual or engine not in fetched:
+    if engine not in fetched:
         # A lane the render path will not fetch for you is a manual step, even
         # when `scripts/otr_fetch_lane_weights.py` can do it -- see
         # graph_fetched_engines(). The gate is what the graph downloads, not the
-        # existence of a lane.
+        # existence of a lane, and not the lane's own `manual` flag either: that
+        # flag routes the dev-tree provisioner, which a registry install lacks.
         word = "GATED+manual" if fact.get("gated") else "manual"
     else:
         word = "GATED" if fact.get("gated") else "auto"
@@ -1064,12 +1065,6 @@ def render_apple(rows: list) -> str:
              "from, and the folder under your ComfyUI `models/` directory to "
              "put it in. `gated` means you must accept the model's licence on "
              "Hugging Face first, while signed in.\n\n")
-    L.append("Two engines can share one group and still download different "
-             "amounts, because they draw different files from it. **The size "
-             "in the machine grid above is what YOUR pick costs**; the total on a heading "
-             "here is the whole group. A heading with no total means that "
-             "group's manifest predates byte receipts -- the machine grid still has "
-             "the figure.\n\n")
     fetcher = _load("scripts/otr_fetch_lane_weights.py", "_odm_fetcher")
     lane_to_engines, unsourced = {}, []
     for row in rows:
@@ -1081,6 +1076,13 @@ def render_apple(rows: list) -> str:
             lane_to_engines.setdefault(lane, []).append(row["public"])
         else:
             unsourced.append(row["public"])
+    if lane_to_engines:
+        L.append("Two engines can share one group and still download different "
+                 "amounts, because they draw different files from it. **The size "
+                 "in the machine grid above is what YOUR pick costs**; the total on a heading "
+                 "here is the whole group. A heading with no total means that "
+                 "group's manifest predates byte receipts -- the machine grid still has "
+                 "the figure.\n\n")
 
     for lane in sorted(lane_to_engines):
         specs = manual_artifacts(lane, provision, fetcher)

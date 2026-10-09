@@ -17,7 +17,7 @@ choice, not an unfinished one -- see the end of this page.
 | `upscale_engine` | What it does | What it needs from you |
 |---|---|---|
 | **`off`** -- ships this way | Leaves the composite's own resize in charge | Nothing |
-| **`spandrel_esrgan`** | Runs Real-ESRGAN x2plus over each eligible clip, one frame at a time, then fits the result to the canvas | One 64 MB file you download by hand |
+| **`spandrel_esrgan`** | Runs Real-ESRGAN x2plus over each eligible clip, one frame at a time, then fits the result to the canvas | Nothing: its one 64 MB file downloads itself the first time the engine loads |
 
 **Those are the ones that ship.** The dropdown is built from the pack's live upscale
 registry, so a new engine would appear by itself the day one ships. Today the list
@@ -51,39 +51,42 @@ That is a free knob. The model below is not.
 
 ## Turning it on: the one download
 
-`spandrel_esrgan` needs one checkpoint, and **nothing fetches it for you.**
+`spandrel_esrgan` needs one checkpoint, and **the engine fetches it itself** the
+first time it loads.
 
 | | |
 |---|---|
 | File | `RealESRGAN_x2plus.pth` |
 | Where it goes | `models/upscale_models/` under your ComfyUI folder |
 | Size | 67,061,725 bytes -- about 64 MB |
-| From | `https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth` |
+| Fetched from | the pinned copy in `nateraw/real-esrgan` on Hugging Face |
+| By hand | `https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth` |
 | Licence | BSD-3-Clause |
 
-The library half is already handled: `spandrel` is a declared dependency of the
-pack, so a Node Manager install has it. It is only the weights that are manual.
+The library half is handled too: `spandrel` is a declared dependency of the
+pack, so a Node Manager install has it.
 
 The pack checks the file's SHA-256 against a pinned value before loading it, so
 a half-finished download or a different file with the same name is refused by
 name rather than quietly used.
 
-**Download it before you flip the switch.** The engine is loaded at composite
-time, which is near the *end* of a run -- the script is written, the cast is
-voiced, the music is scored and every clip is rendered by then. A missing
-checkpoint stops the render at that point and the error names the file, the
-folder and the URL. Nothing is silently substituted, and nothing is silently
-skipped, but you will have paid for the whole episode first.
+**The fetch happens late.** The engine is loaded at composite time, which is
+near the *end* of a run -- the script is written, the cast is voiced, the music
+is scored and every clip is rendered by then. If the download cannot complete
+there, the render stops at that point and the error names the file, the folder
+and the URL above. Nothing is silently substituted, and nothing is silently
+skipped, but you will have paid for the whole episode first -- so on a machine
+that will be offline, put the file in place beforehand.
 
 **Only that one filename counts.** The engine reads exactly
 `RealESRGAN_x2plus.pth`. Other Real-ESRGAN checkpoints sitting in the same
 folder -- x4plus and the rest -- are not alternatives and are not picked up;
 they simply do nothing.
 
-If you installed from a git clone rather than the Node Manager, there is a
-helper at `scripts/ensure_upscale_models.py` that downloads and verifies it for
-you. `scripts/` is not part of the Manager bundle, so for most readers the
-download above is the path.
+A git clone also has `scripts/ensure_upscale_models.py`, which downloads the
+file from the GitHub release ahead of time and checks the same SHA-256.
+`scripts/` is not part of the Manager bundle, and nobody needs it: the engine's
+own fetch lands the identical file.
 
 ---
 

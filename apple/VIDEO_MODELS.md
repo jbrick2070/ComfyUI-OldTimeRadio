@@ -124,10 +124,10 @@ change the sound**, below.
 
 | Dropdown | What it makes | Needs |
 |---|---|---|
-| `humo14_high_audio_in_portrait` | a character's portrait animated in sync with their own speech, tall | manual weights |
-| `humo14_high_audio_in_wide` | the same, landscape | manual weights |
-| `humo17_high_audio_in_portrait` | the smaller checkpoint, tall. Handles longer beats | manual weights |
-| `humo17_high_audio_in_wide` | the smaller checkpoint, landscape | manual weights |
+| `humo14_high_audio_in_portrait` | a character's portrait animated in sync with their own speech, tall | automatic, about 27 GB |
+| `humo14_high_audio_in_wide` | the same, landscape | automatic, about 27 GB |
+| `humo17_high_audio_in_portrait` | the smaller checkpoint, tall. Handles longer beats | automatic, about 13 GB |
+| `humo17_high_audio_in_wide` | the smaller checkpoint, landscape | automatic, about 13 GB |
 
 This is the talking-head path: it takes a portrait and the beat's voice track
 and moves the mouth to it. Every HuMo lane is a large download and wants a
@@ -221,8 +221,9 @@ on paper and is unmeasured on a Mac. On unified memory that is not a free try.
 The menu shows every registered engine rather than hiding the ones that do not
 fit your card -- being in the list is not a recommendation.
 
-Exact download sizes, the per-machine grid and the repository each file comes
-from are in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) and
+Exact download sizes and the per-machine grid are in
+[MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine), and the few picks
+that still need a hand download are in
 [the manual-weights list](MACHINES.md#where-do-the-manual-weights-come-from).
 
 ---
@@ -265,11 +266,12 @@ causes look the same on screen, and the error text is what tells them apart:
   If your ComfyUI predates them, the error says to update ComfyUI instead of
   naming anything to install. Update ComfyUI, restart, queue again.
 
-**The render stops naming a missing file.** The lane needs weights that do not
-fetch themselves. The LTX and H3 lanes and the hosted ones fetch their own; the
-HuMo lanes and a few image engines do not. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from) says which
-repository and which folder. The error names the file and never quietly
-substitutes another one.
+**The render stops naming a missing file.** Nearly every local lane fetches its
+own weights -- the LTX, H3, HuMo and AnimateDiff lanes and every local image
+engine -- so this is a download that could not complete (offline, out of disk,
+a Hugging Face outage), or `mesh_stage`, the one video lane no manifest covers
+([MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from)). The error
+names the file and never quietly substitutes another one.
 
 **It says the weights are gated.** The LTX 2.5 lanes need you to accept a
 licence on the model's page while signed in to Hugging Face, then log in

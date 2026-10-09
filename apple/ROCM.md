@@ -102,8 +102,8 @@ click, no token. Stable Audio 3 declares CUDA and Metal in the engine registry,
 and ROCm arrives as CUDA, which is how it scored the tester's episode.
 About 31 GB in total for a complete episode, of which the image model is
 19.3 GiB -- this graph's `still_motion` lane consumes a still, which is what
-makes that download live. Every file, with its repository and destination
-folder, is in [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from).
+makes that download live. The per-machine sizes are in
+[MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine).
 `scripts/otr_fetch_lane_weights.py --list` shows the lanes,
 and `... z_image` / `... stable_audio_3` only save you the wait. All of it
 exists only in a GitHub clone -- `scripts/` is not in the registry package.

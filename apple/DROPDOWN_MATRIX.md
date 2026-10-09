@@ -50,8 +50,8 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 | `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | fits | fits | not offered | ? | not offered |
 | `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered | ? | not offered |
-| `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo17_high_audio_in_portrait` | **auto** | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo17_high_audio_in_wide` | **auto** | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `ltx098_low_video` | **auto** | 16.1 GiB | **proven** | **proven** | **proven** | ? | not offered |
 | `razzle_ltx_8gb` | **auto** | 16.1 GiB | fits | fits | fits | ? | not offered |
 | `ltx25_foley_blackwell` | **auto** | 24.2 GiB | ? | ? | not offered | ? | not offered |
@@ -115,7 +115,7 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
-| `spandrel_esrgan` | manual | 0.1 GiB | fits | **proven** | measured | ? | ? |
+| `spandrel_esrgan` | **auto** | 0.1 GiB | fits | **proven** | measured | ? | ? |
 
 **Writer (the LLM that writes the script)**
 
