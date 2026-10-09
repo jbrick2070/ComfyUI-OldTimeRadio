@@ -1,7 +1,7 @@
 """Cloud partner VIDEO adapters -- S3 core (pass04 secs 5+7, operator GO
 2026-07-02 evening: "code the cloud video plan").
 
-Four rows from the S0 pin table, invoked through the S0 bridge
+Six engines over five rows of the S0 pin table, invoked through the S0 bridge
 (``invoke_partner_node``) and conformed by ``canonicalize_video``:
 
     cloud_seedance_2     required_audio_ref   (init_image, audio_ref)
@@ -18,9 +18,10 @@ empty ``default_roles`` -- selectable, NEVER automatic. Operator directive
 hidden switch); a pick
 without credentials fails LOUD at auth resolution. ``assert_usable`` fails
 CLOSED (EngineUnusable) unless ffmpeg is present (the canonicalizer strips
-provider audio) and the pin row is OK. The reactive
-auto-default policy + ShotLock audit stamps + fallback chains land with S3
-FULL, after the operator's live smokes prove the bridge.
+provider audio) and the pin row is OK. There is no auto-default policy and no
+fallback chain in these adapters: the render driver floors a job-scoped
+provider failure, or a spent budget, by showing the beat as its own scene
+still through still_pan; auth and config failures are never floored.
 
 ALL provider audio is stripped unconditionally (must_strip_audio=True; the
 master mix is frozen upstream, mux is LAST) -- clips return has_audio=False

@@ -1,8 +1,9 @@
 """Final ledger safety, readiness, and freeze orchestration.
 
-Every bank converges here. Inline banks may receive one bounded atomic patch
-for the shared narrow spoken-safety policy; producer-owned banks arrive sealed
-and are checked read-only. Word count, visual vocabulary, style, craft, and
+Every bank converges here. Inline banks stamp the retired same-story safety
+cleanup's receipt (it edits nothing) and get the deterministic role sweep;
+producer-owned banks arrive sealed and are checked read-only. Word count,
+visual vocabulary, style, craft, and
 subjective quality are telemetry or generation guidance only and never affect
 liveness. Genuine ledger structure, authorship, provenance, or residual safety
 corruption remains fail-closed.
@@ -159,8 +160,9 @@ class FreezeDisposition:
 class FreezePolicy:
     """One resolved mutation policy for the final ledger boundary.
 
-    inline_safety_cleanup permits only the shared atomic safety patch and
-    deterministic role normalization. content_owned_readonly verifies the
+    inline_safety_cleanup permits only deterministic role normalization (the
+    D3 pre-freeze role sweep); its same-story safety patch is retired and edits
+    nothing. content_owned_readonly verifies the
     producer's sealed authorship and structure without changing canonical text.
     A tagged bank that cannot resolve returns a terminal configuration error;
     an untagged legacy ledger uses the inline safety policy for migration.
@@ -310,7 +312,8 @@ def _stamp_capability_receipt(
     return receipt
 
 
-# Inline banks may perform only this content mutation at freeze.
+# The phases a content-owned bank skips. Inline banks run both: the first only
+# stamps its retired receipt, the second is the speaker_role sweep.
 _INLINE_CLEANUP_PHASES = (
     "same_story_safety_cleanup",
     "d3_role_sweep_mutation",
@@ -329,8 +332,9 @@ def _hash_lines_text(ledger_data: dict) -> int:
     return hash(tuple((ln or {}).get("text", "") for ln in lines))
 
 
-# Phase records are grouped by purpose for diagnostics. Only the shared safety
-# cleanup can mutate accepted text; readiness and audits are deterministic.
+# Phase records are grouped by purpose for diagnostics. No phase here edits
+# accepted text (the shared safety cleanup is retired); readiness and audits
+# are deterministic.
 _PHASE_BUCKETS: dict[str, str] = {
     "phase_0_gap_audit_pre":              "audit_passes",
     "phase_10_gap_audit_post_and_freeze": "audit_passes",
@@ -714,10 +718,11 @@ def run_freeze_cascade(
     )
 
     # ---- Freeze policy ---------------------------------------------
-    # Inline banks may run one atomic, same-story safety cleanup. Content-owned
-    # banks perform that cleanup before sealing their authorship receipt, so the
-    # cascade validates them read-only. A tagged bank that cannot resolve is a
-    # structural configuration error; it never falls through to another lane.
+    # Inline banks stamp the retired same-story safety cleanup's receipt (no
+    # edits). Content-owned banks run their own cleanup before sealing their
+    # authorship receipt, so the cascade validates them read-only. A tagged bank
+    # that cannot resolve is a structural configuration error; it never falls
+    # through to another lane.
     policy = resolve_freeze_policy(meta)
     meta["freeze_policy"] = {"name": policy.name, "source": policy.source}
     _cap_entry_text_sha = _sha256_lines_text(ledger_data)

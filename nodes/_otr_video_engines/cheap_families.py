@@ -303,12 +303,12 @@ class _CheapFamilyBase:
         # encode_frames_to_silent_mp4 -- they build the mp4 from an ffmpeg arg
         # list instead -- so the sweep that added the proof to every ENCODER
         # walked straight past them, and _floor_clip goes on to hand-write
-        # container / codec / pixel_format / color_* as literals. still_motion
-        # is also the terminus of the documented humo -> humo_1.7B ->
-        # still_motion degrade chain, so it is the LAST place a self-declared
-        # clip should be trusted. Safe to prove: all four command builders end
-        # in the same _bt709_encode_args tail as the encoder, so a floor clip
-        # already satisfies this contract by construction.
+        # container / codec / pixel_format / color_* as literals. still_pan is
+        # also what the render driver shows a floored cloud beat through, so
+        # it is the LAST place a self-declared clip should be trusted. Safe to
+        # prove: all four command builders end in the same _bt709_encode_args
+        # tail as the encoder, so a floor clip already satisfies this contract
+        # by construction.
         fields = ffprobe_clip_fields(out_path)
         validate_silent_clip_contract(fields, fps)
         # M7 COUNT half (2026-07-28). The colour/stream half landed above on

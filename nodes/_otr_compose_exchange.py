@@ -3,14 +3,13 @@ r"""Build 4 -- compose_exchange + repair-by-exchange-group.
 PROMOTED (2026-05-28) from docs/sprint_drafts/build4/ to nodes/. Pure,
 fully-injected engine (generate_fn + tier_a_check + the two wiring
 helpers' Build 2 deps are all injected) -- not a node, not in
-_NODE_MODULES, so ComfyUI never auto-imports it. The live render-loop
-wiring (a use_exchange feature flag on OTR_LedgerScriptWriter mirroring
-use_multiturn_dialogue, + the workflow JSON rewire) is STAGED for an
-operator session: Build 4's gate is entirely live N=3 metrics (slot
-drift, exposition count, scene movement, VRAM <= 14.5 GB) which cannot
-be measured headless. See build4/WIRING_SPEC.md + the session handoff
-for the exact wiring recipe. group_voiced_beats + make_tier_a_adapter
-(bottom of this file) are the ready-made seams for that wiring.
+_NODE_MODULES, so ComfyUI never auto-imports it. OTR_LedgerScriptWriter
+wires it behind its use_exchange widget (default OFF, byte-identical to
+the per-beat composer): ON, the writer calls run_exchange_prepass (bottom
+of this file, with group_voiced_beats + make_tier_a_adapter) to render
+consecutive voiced beat groups as exchanges before the per-beat loop.
+Build 4's gate is entirely live N=3 metrics (slot drift, exposition count,
+scene movement, VRAM <= 14.5 GB) which cannot be measured headless.
 
 
 Per workflows/GO_FORWARD_PLAN_v10_four_builds_2026-05-28.md, Build 4:
@@ -30,8 +29,7 @@ Per workflows/GO_FORWARD_PLAN_v10_four_builds_2026-05-28.md, Build 4:
       speakers; one repair attempt only; still failing -> fail loud /
       legacy fallback. No multi-cycle churn.
 
-This module is a DRAFT under docs/sprint_drafts/build4/. It is not
-imported by ComfyUI. It depends conceptually on:
+This module depends conceptually on:
 
     * Build 2's slot format (`d###|SPEAKER: text`, one slot = one
       committed text block) and Build 2's Tier-A integrity validator.

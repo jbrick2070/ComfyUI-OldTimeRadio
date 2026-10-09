@@ -323,9 +323,9 @@ def test_a_MISSING_effective_count_fails_loudly_not_silently():
 
 def test_the_guard_is_actually_WIRED_into_the_writer():
     """A correct function nothing calls is the defect class this lane keeps
-    producing -- select_grounding, select_passage and SourceOverview were each
-    built to spec and never wired. Source inspection is the right tool for THIS
-    question only: is the call there?"""
+    producing -- three helpers found on 2026-09-11 (since retired or wired) were
+    each built to spec and never wired. Source inspection is the right tool for
+    THIS question only: is the call there?"""
     source = inspect.getsource(writer_node.OTR_LedgerScriptWriter)
 
     assert "assert_locked_cast_count(" in source, (

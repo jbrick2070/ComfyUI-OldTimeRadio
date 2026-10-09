@@ -18,8 +18,7 @@ on a probe-confirmed fact instead of a guess about what an ffmpeg exit code mean
 THE PROBE WAS ALREADY BUILT AND ALREADY TESTED. `caption_support_gap()` /
 `probe_ffmpeg_capabilities()` have lived in `nodes/_otr_shared/ffmpeg.py` with their
 own test file and ZERO callers outside that module -- the fourth built-and-unwired
-helper found on 2026-09-11, after `select_grounding`, `select_passage` and
-`SourceOverview`.
+helper found on 2026-09-11 (the earlier three have since been retired or wired).
 """
 from __future__ import annotations
 

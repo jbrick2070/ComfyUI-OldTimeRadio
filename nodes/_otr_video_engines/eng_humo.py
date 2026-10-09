@@ -354,7 +354,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         (+ the low/high tier pick) is the GPU smoke."""
         return os.path.exists(self._ckpt_path())
 
-    # ---- sampler tier (overridable per HuMo tier; the 1.7B downgrade isolates
+    # ---- sampler tier (overridable per HuMo tier; the 1.7B tier isolates
     # ---- its own steps/cfg so the 14B OTR_HUMO_STEPS/CFG never bleed into it) --
     def _steps(self):
         """KSampler steps for this tier. 14B + lightx2v distill = 6 (fast)."""
@@ -1210,7 +1210,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         }
 
 
-#: 1.7B fallback-tier defaults (the lighter, no-LoRA talking face). Env-isolated
+#: 1.7B tier defaults (the lighter, no-LoRA talking face). Env-isolated
 #: from the 14B knobs via the OTR_HUMO_17B_* namespace so a 14B OTR_HUMO_STEPS=6
 #: / OTR_HUMO_CFG=1.0 never bleeds into this slower tier.
 _HUMO_17B_UNET = "humo_1.7B_fp16.safetensors"
@@ -1218,9 +1218,9 @@ _HUMO_17B_UNET = "humo_1.7B_fp16.safetensors"
 
 @register
 class HuMo17BEngine(HuMoEngine):
-    """The 1.7B HuMo downgrade tier. The OOM/VRAM hard auto-downgrade from the
-    14B keystone lands HERE before the still floor, so a heavy episode that
-    can't fit the 14B keeps a REAL audio-driven talking face. Config is isolated
+    """The 1.7B HuMo tier: the lighter talking face, a selectable peer of the
+    14B keystone and not a downgrade target -- the 14B does not auto-downgrade
+    onto it on OOM/VRAM (NO FALLBACKS, operator 2026-07-02). Config is isolated
     from the 14B env: its own UNET, NO LoRA (the lightx2v distill is 14B-shaped
     and shape-mismatches the 1.7B tier), and its own steps/cfg via OTR_HUMO_17B_*
     (defaults: 20 steps -- the distill shortcut is gone so it needs more steps --
@@ -1244,10 +1244,9 @@ class HuMo17BEngine(HuMoEngine):
     render_canvas = (480, 832)
     #: ITS OWN LADDER AND ITS OWN CAP, because it is its own MODEL (2026-08-02).
     #: The 14B base now carries a 14B-sized cap, and this tier must not inherit
-    #: a memory bound measured on a checkpoint roughly eight times its size --
-    #: this is the downgrade target a heavy episode falls to precisely because
-    #: the 14B did not fit. Uncapped to the shared ``_HUMO_MAX_FRAMES`` ceiling,
-    #: which is where these two tiers have always run.
+    #: a memory bound measured on a checkpoint roughly eight times its size.
+    #: Uncapped to the shared ``_HUMO_MAX_FRAMES`` ceiling, which is where these
+    #: two tiers have always run.
     safe_render_frames = None
     frame_contract = FrameContract(
         min_frames=_HUMO_MIN_FRAMES,
@@ -1303,8 +1302,8 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
     character still (832x480) feeds it --
     meta_brief mints the still to match the selected engine's aspect via the video
     policy, so ONE dropdown pick aligns dims, cfg, still and composite canvas.
-    Not in the auto-fallback chain (it is a deliberate operator pick): a failure
-    degrades like humo_1.7B (-> still floor), never a silent aspect swap."""
+    A deliberate operator pick, not a fallback target: a failure fails LOUD
+    like humo_1.7B, never a silent aspect swap."""
 
     name = "humo_1.7B_169"
     render_aspect = "wide"
@@ -1330,7 +1329,7 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
 class HuMo14BLandscapeEngine(HuMoEngine):
     """14B HuMo in 16:9 LANDSCAPE (832x480) -- the 2026-06-09 keystone quality
     (the fast 14B Kijai + lightx2v 6-step distill) in the modern WIDE character-beat
-    aspect. The operator wants the 14B look in 16:9, NON-blue: the 1.7B downgrade
+    aspect. The operator wants the 14B look in 16:9, NON-blue: the 1.7B
     tier carries a color cast (red-crushed / blue-pushed, measured 2026-06-17),
     but the 14B shares the same wan_2.1_vae and its latents MATCH it, so the 14B
     output is colour-correct. Same 14B checkpoint / LoRA / steps / cfg / roles /
@@ -1339,7 +1338,7 @@ class HuMo14BLandscapeEngine(HuMoEngine):
     alongside the portrait 14B and the 1.7B tiers. A 16:9 character still (832x480)
     feeds it -- meta_brief mints the still to the selected engine's aspect via the
     video policy, so one dropdown pick aligns dims, still and composite canvas.
-    Degrades like the 14B base (-> humo_1.7B -> still); a deliberate
+    A failure fails LOUD like the 14B base (nothing degrades); a deliberate
     operator pick, never a silent aspect swap."""
 
     name = "humo_14B_169"
