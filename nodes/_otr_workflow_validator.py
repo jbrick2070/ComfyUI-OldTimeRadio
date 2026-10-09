@@ -641,8 +641,9 @@ class WorkflowValidator:
                 raise ValueError(
                     f"OTR_WorkflowValidator: stamped master_hash present but "
                     f"the workflow file could not be parsed for the semantic "
-                    f"check ({e}) -- regenerate the variant "
-                    f"(scripts/build_variants.py).") from e
+                    f"check ({e}) -- reinstall the pack to restore the shipped "
+                    f"file (in a git clone, regenerate it with "
+                    f"scripts/build_variants.py).") from e
             from ._otr_workflow_apply import semantic_master_hash
             live = semantic_master_hash(parsed)
             if live != master_hash.strip():
@@ -650,8 +651,9 @@ class WorkflowValidator:
                     "OTR_WorkflowValidator: MASTER-HASH MISMATCH -- the "
                     f"variant was edited after emission (stamped "
                     f"{master_hash.strip()[:12]}, live {live[:12]}). "
-                    "Variants are GENERATED, never hand-edited: regenerate "
-                    "via scripts/build_variants.py.")
+                    "Variants are GENERATED, never hand-edited: reinstall the "
+                    "pack to restore the shipped file (in a git clone, "
+                    "regenerate it with scripts/build_variants.py).")
 
         # Runtime export -- EVERY execution, not "if unset" (a long-running
         # server persists env across prompts; stale values are overwritten).

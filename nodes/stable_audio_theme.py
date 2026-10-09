@@ -850,7 +850,8 @@ class StableAudioTheme:
                     "from the generator -- replaced with silence. The audio is "
                     "usable but WRONG at those samples; the generator, not this "
                     "writer, is at fault. On Apple Silicon see "
-                    "apple/MAC_LESSONS_LEARNED.md (SA3 emits NaN on mps).",
+                    "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                    "main/apple/MAC_LESSONS_LEARNED.md (SA3 emits NaN on mps).",
                     cue_id, _nonfinite, int(arr.size),
                     100.0 * _nonfinite / max(1, int(arr.size)),
                 )

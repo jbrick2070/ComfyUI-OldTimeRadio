@@ -244,7 +244,8 @@ try:
             logging.getLogger("OTR").info(
                 "[OldTimeRadio] mps: an explicit attention flag is set; leaving it "
                 "alone. NOTE: sub-quadratic attention is measurably WRONG on MPS "
-                "(see apple/MAC_LESSONS_LEARNED.md).")
+                "(see https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                "main/apple/MAC_LESSONS_LEARNED.md).")
         elif not getattr(_otr_comfy_args, "use_pytorch_cross_attention", False):
             _otr_comfy_args.use_pytorch_cross_attention = True
             logging.getLogger("OTR").info(

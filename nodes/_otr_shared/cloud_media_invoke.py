@@ -189,8 +189,9 @@ def _row_for(node_key: str) -> dict:
         raise CloudMediaError(
             CloudErrorCode.MALFORMED_CONFIG,
             f"unknown partner node_key {node_key!r} (pin table has "
-            f"{len(rows)} rows; regenerate via "
-            f"scripts/otr_pin_partner_nodes.py if the menu moved)",
+            f"{len(rows)} rows; if the partner menu moved, update the pack -- "
+            f"in a git clone, regenerate it with "
+            f"scripts/otr_pin_partner_nodes.py)",
         )
     status = str(row.get("status", "")).upper()
     if status != "OK":

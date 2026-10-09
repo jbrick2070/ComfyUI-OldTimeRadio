@@ -655,7 +655,8 @@ def unified_memory_weight_refusal(engine_name, weight_mb, free_mb,
         "-- so loading this would not fail the render, it would take the "
         "MACHINE down. Refusing at the gate instead. Fix it by fetching a "
         "quantised build of this lane if one exists (see LANE_INFO in "
-        "scripts/otr_fetch_lane_weights.py), or run it on a host with more "
+        "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/scripts/"
+        "otr_fetch_lane_weights.py), or run it on a host with more "
         "memory. Override with OTR_UNIFIED_MEMORY_HEADROOM_MB only if you "
         "know why."
         % (engine_name or "engine", weight / 1024.0, max(0.0, budget) / 1024.0,

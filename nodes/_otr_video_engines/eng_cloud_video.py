@@ -466,8 +466,9 @@ class _CloudVideoBase:
         if not isinstance(row, dict) or str(row.get("status")) != "OK":
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                f"partner pin row {self.node_key!r} missing or not OK -- "
-                f"re-pin via scripts/otr_pin_partner_nodes.py", kind="video")
+                f"partner pin row {self.node_key!r} missing or not OK in this "
+                f"install's pin table -- update the pack (in a git clone, "
+                f"re-pin with scripts/otr_pin_partner_nodes.py)", kind="video")
 
     def prepare(self, host_caps, profile, session_ctx):
         return {}
