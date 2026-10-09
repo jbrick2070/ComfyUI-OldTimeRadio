@@ -122,7 +122,6 @@ def test_an_ordinary_workflow_path_still_resolves():
     ("OTR_CaptionBurn", "nodes/otr_caption_burn.py"),
     ("OTR_MasterAudioMux", "nodes/otr_master_audio_mux.py"),
     ("OTR_SilentComposite", "nodes/otr_silent_composite.py"),
-    ("OTR_PostUpscaleProcgenBlend", "nodes/otr_post_upscale_procgen_blend.py"),
 ])
 def test_each_media_node_refuses_remote_path_inputs(node, rel):
     src = (REPO / rel).read_text(encoding="utf-8")

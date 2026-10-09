@@ -1,12 +1,12 @@
 """The hero title left the procgen frame -- prove what stayed and what went.
 
-The title was drawn into the procgen CRT layer, which
-``otr_post_upscale_procgen_blend`` composites with ``screen`` + ``green_only``.
-``screen`` can only LIGHTEN and ``screen(A, 0) = A``, so black is the blend's
-identity: the operator's own suggested outline draws literally nothing there.
-Measured on a published episode the hero ran 8.96:1 over a dark ceiling and
-1.13:1 over a lit monitor (Bible 07.32). It now renders as ASS through
-``OTR_CaptionBurn``, which runs AFTER that blend.
+The title was drawn into the procgen CRT layer, which was composited with
+``screen`` + ``green_only``. ``screen`` can only LIGHTEN and
+``screen(A, 0) = A``, so black is the blend's identity: the operator's own
+suggested outline draws literally nothing there. Measured on a published
+episode the hero ran 8.96:1 over a dark ceiling and 1.13:1 over a lit monitor
+(Bible 07.32). It now renders as ASS through ``OTR_CaptionBurn``, downstream
+of the procgen layer.
 
 **No test anywhere constructed ``_CRTRenderer`` or called ``render()`` before
 this file.** Title coverage was ``_title_reveal_progress`` (a pure function),

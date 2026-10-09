@@ -195,24 +195,6 @@ def test_the_mux_measures_both_durations_without_a_binary(no_binary, clip_av, cl
     assert mux._probe_float(clip_av, "v:0") == pytest.approx(0.512, abs=0.002)
 
 
-def test_the_blend_reads_real_dimensions_and_rate_without_a_binary(
-        no_binary, clip_silent, tmp_path):
-    from pathlib import Path as _P
-    from nodes import otr_post_upscale_procgen_blend as blend
-    assert blend._probe_dims(_P(clip_silent), "") == (64, 48)
-    assert blend._probe_fps(_P(clip_silent), "") == 24.0
-    assert blend._probe_dims(_P(tmp_path / "gone.mp4"), "") is None
-    assert blend._probe_fps(_P(tmp_path / "gone.mp4"), "") == 25.0
-
-
-def test_the_blend_keeps_its_own_fallbacks_when_nothing_can_measure(
-        nothing_measures, clip_silent):
-    from pathlib import Path as _P
-    from nodes import otr_post_upscale_procgen_blend as blend
-    assert blend._probe_dims(_P(clip_silent), "") is None
-    assert blend._probe_fps(_P(clip_silent), "") == 25.0
-
-
 def test_the_scopes_planner_detects_portrait_without_a_binary(
         no_binary, clip_silent, clip_portrait, tmp_path):
     cache = {}

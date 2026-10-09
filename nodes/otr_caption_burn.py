@@ -218,8 +218,7 @@ def _captioned_name(in_dir: str, stem: str) -> str:
 def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
     """(basename, cwd) for the ffmpeg ``ass=`` filter -- reference the subtitle
     file by BASENAME with ffmpeg's cwd set to its folder, so a Windows
-    drive-letter colon never reaches the filtergraph parser (mirrors the legacy
-    blend node's proven trick)."""
+    drive-letter colon never reaches the filtergraph parser."""
     p = Path(ass_path)
     return (_reject_filtergraph_syntax(p.name), str(p.parent))
 
@@ -302,12 +301,9 @@ def _resolve_ledger_path(video_path: str) -> Optional[str]:
     stem -- otr_audio_dir(stem)/<stem>_ledger.json, falling back to the in-flight
     ledger singleton (mirrors the legacy _resolve_captions_ass). Lazy imports."""
     stem = Path(video_path).stem
-    # strip our pipeline suffixes so the stem matches the episode id. The
-    # 86-owner migration (2026-07-04 widget-audit) moved CaptionBurn to AFTER the
-    # procgen blend, which left the canonical 2026-09-13, so the incoming
-    # video is now
-    # "<slug>_procgen_blended.mp4" -- strip that suffix too (ported from the
-    # legacy blend node's resolver).
+    # strip our pipeline suffixes so the stem matches the episode id.
+    # "_procgen_blended" is the suffix an earlier chain gave the video this
+    # node receives; episodes rendered by it still carry it, so it is stripped.
     for suf in ("_procgen_blended", "_silent", "_captioned", "_final", "_blend"):
         if stem.endswith(suf):
             stem = stem[: -len(suf)]
@@ -321,10 +317,9 @@ def _resolve_ledger_path(video_path: str) -> Optional[str]:
             return str(cand)
     except Exception:  # noqa: BLE001
         pass
-    # Layout-relative fallback (ported from otr_post_upscale_procgen_blend): the
-    # video lives INSIDE the per-episode folder (otr/episodes/<slug>/...), so its
-    # sibling audio/ dir carries the ledger no matter which output root the
-    # server pinned.
+    # Layout-relative fallback: the video lives INSIDE the per-episode folder
+    # (otr/episodes/<slug>/...), so its sibling audio/ dir carries the ledger no
+    # matter which output root the server pinned.
     try:
         sib = Path(video_path).resolve().parent / "audio"
         cands = sorted(sib.glob("*_ledger.json")) if sib.is_dir() else []
@@ -497,8 +492,7 @@ class OTRCaptionBurn:
 
     def _default_out(self, video_path: str) -> str:
         # Write the captioned mp4 BESIDE the input video. The 86-owner input is
-        # the composite's own mp4 inside otr/episodes/<ep>/ (it was the blend's
-        # "<slug>_procgen_blended.mp4" until that node left the graph), so the
+        # the composite's own mp4 inside otr/episodes/<ep>/, so the
         # captioned twin lands in that same per-episode folder -- never the flat
         # episodes root (2026-07-04 widget-audit). Fall back to otr/episodes only
         # when the input path carries no resolvable directory.

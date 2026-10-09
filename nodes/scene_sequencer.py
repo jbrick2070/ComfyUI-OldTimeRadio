@@ -49,12 +49,11 @@ def _replay_master_audio(meta):
 
     PBUG-20260903-02. The pass-through passes the REAL AUDIO through: the
     procgen visualizer renders ``len(audio) / sample_rate`` frames from THIS
-    wire, so a one-second placeholder would make a 1.00-second overlay and
-    `PostUpscaleProcgenBlend` would truncate an 85.7-second episode to one
-    second of picture, publishing green with `obs_publish OK`. Every
-    downstream consumer -- the enhance chain, the visualizer, anything that
-    measures duration -- then sees exactly what a normal run sees, because it
-    IS what a normal run produced.
+    wire, so a one-second placeholder would make a 1.00-second overlay, and an
+    85.7-second episode was cut to one second of picture downstream, publishing
+    green with `obs_publish OK`. Every downstream consumer -- the enhance
+    chain, the visualizer, anything that measures duration -- then sees exactly
+    what a normal run sees, because it IS what a normal run produced.
 
     Falls back, loudly and in this order: silence of the master's true LENGTH
     (read from the WAV header, which costs nothing and keeps every duration

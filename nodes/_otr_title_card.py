@@ -2,14 +2,13 @@
 
 WHY THIS MODULE EXISTS
 ----------------------
-The hero title cannot be drawn straight into the procgen CRT frame, which is
-composited by ``otr_post_upscale_procgen_blend`` with ``screen`` +
-``green_only`` -- a LIGHTEN-ONLY blend. ``screen(A, 0) = A``, so black is the
-blend's identity and an outline drawn there is a mathematical no-op. Measured on
-a published episode the title ran 8.96:1 over a dark ceiling and 1.13:1 over a
-lit monitor. Bible 07.32.
+The hero title cannot be drawn straight into the procgen CRT frame, which was
+composited with ``screen`` + ``green_only`` -- a LIGHTEN-ONLY blend.
+``screen(A, 0) = A``, so black is the blend's identity and an outline drawn
+there is a mathematical no-op. Measured on a published episode the title ran
+8.96:1 over a dark ceiling and 1.13:1 over a lit monitor. Bible 07.32.
 
-So the title is drawn DOWNSTREAM of that blend, in the ASS text layer
+So the title is drawn DOWNSTREAM of the procgen layer, in the ASS text layer
 ``OTR_CaptionBurn`` already burns, where an outline is real. That means two
 different modules must agree, frame for frame, on what the title looks like --
 so neither of them owns the arithmetic. This module does.

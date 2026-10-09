@@ -75,11 +75,9 @@ BANNED_PATTERNS = [
 ALLOWLIST = [
     # Queue item 8 (2026-08-08): the rtx_upscale entry was pruned when
     # nodes/rtx_upscale.py was ripped alongside the device-selectable
-    # upscale rebuild. OBS-final writer is still OTR_PostUpscaleProcgenBlend
-    # (writes ``<ep>_procgen_blended.mp4`` via otr_obs_dir() /
-    # f"{src.stem}{out_suffix}{src.suffix}"), and the existence guard on
-    # <ep>_procgen_blended.mp4 lived inside rtx_upscale's spacesaver
-    # cleanup -- that whole path was retired with the node.
+    # upscale rebuild; the existence guard on <ep>_procgen_blended.mp4 lived
+    # inside rtx_upscale's spacesaver cleanup -- that whole path was retired
+    # with the node.
     # CW-4 legacy teardown (2026-06-07): the nodes/video_composite.py allowlist
     # entry was PRUNED -- VideoComposite was deleted in the render-chain teardown.
     # The canonical composited mp4 is now produced by OTR_SilentComposite +

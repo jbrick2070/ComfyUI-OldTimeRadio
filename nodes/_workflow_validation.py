@@ -125,6 +125,7 @@ DELETED_NODE_TYPES = frozenset({
     # Registered nodes that no shipped workflow used, removed 2026-10-08: a saved
     # graph naming one fails here instead of loading a missing node.
     "OTR_VRAMContextTest",  # developer probe of VRAM against prompt length
+    "OTR_PostUpscaleProcgenBlend",  # procgen CRT blend over the silent composite
 })
 
 

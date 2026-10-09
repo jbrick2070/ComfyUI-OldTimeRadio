@@ -118,30 +118,6 @@ def test_frame_determinism():
     assert np.array_equal(a, b), "idle scope frame is not deterministic"
 
 
-def test_blend_three_input_filtergraph():
-    from nodes.otr_post_upscale_procgen_blend import _build_blend_cmd
-    cmd = _build_blend_cmd(
-        Path("src.mp4"), Path("pgn.mp4"), Path("out.mp4"),
-        "screen", 1.0, "ffmpeg", green_only_overlay=True,
-        source_dims=(1920, 1080), scopes_mp4=Path("scopes.mp4"))
-    assert cmd.count("-i") == 3
-    fc = cmd[cmd.index("-filter_complex") + 1]
-    assert "[2:v]" in fc
-    assert "[main][pgn]blend=all_mode=screen" in fc
-    assert "blend=all_mode=lighten" in fc
-    assert fc.strip().endswith("[v]")
-
-
-def test_blend_two_input_unchanged_when_no_scopes():
-    from nodes.otr_post_upscale_procgen_blend import _build_blend_cmd
-    cmd = _build_blend_cmd(
-        Path("src.mp4"), Path("pgn.mp4"), Path("out.mp4"),
-        "screen", 1.0, "ffmpeg", green_only_overlay=True, source_dims=(1920, 1080))
-    assert cmd.count("-i") == 2
-    fc = cmd[cmd.index("-filter_complex") + 1]
-    assert "[2:v]" not in fc
-
-
 @pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg not on PATH")
 def test_silent_encode_no_audio_stream(tmp_path, monkeypatch):
     import json

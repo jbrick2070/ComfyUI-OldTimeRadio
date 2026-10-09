@@ -13,7 +13,6 @@
     "OTR_LedgerScriptWriter": "LPL Script Writer (v2.0)",
     "OTR_MasterAudioMux": "MasterAudioMux (terminal mux-LAST, -c:a copy)",
     "OTR_MetaBriefImagePromptGen": "Meta-Brief Image Prompt Gen",
-    "OTR_PostUpscaleProcgenBlend": "Post-Upscale Procgen Blend (1080p)",
     "OTR_SceneAwareScopes": "Scene-Aware Scopes (v2)",
     "OTR_SceneSequencer": "Scene Sequencer",
     "OTR_ShotLock": "Shot Lock (video plan authority)",

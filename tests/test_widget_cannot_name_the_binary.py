@@ -18,9 +18,9 @@ produced a SECOND attacker binary through the sibling rule.
 WHERE THE FIX LIVES, and why not the two obvious places:
 
 * NOT in ``_explicit``: provenance is invisible there. Trusted internal callers
-  legitimately pass directory-bearing arguments -- ``blend()`` resolves ffmpeg
-  and threads that RESOLVED path through ``_probe_dims`` -> ``probe_raw`` ->
-  ``resolve_ffprobe(ffmpeg=...)``.
+  legitimately pass directory-bearing arguments -- a node resolves ffmpeg once
+  and threads that RESOLVED path through its probes (``probe_raw`` ->
+  ``resolve_ffprobe(ffmpeg=...)``).
 * NOT in ``_ffmpeg_bin``: ``otr_master_audio_mux`` deliberately hands its
   ALREADY-RESOLVED binary to ``audio_pcm_sha`` so the byte-identity proof cannot
   resolve differently from the encode that just ran.
@@ -35,12 +35,12 @@ So the 2026-09-04 fix DISCARDED the widget at each node's EXECUTE METHOD, and
 the resolvers were made to return an ABSOLUTE path or ``None``.
 
 THE WIDGET ITSELF WAS REMOVED ON 2026-09-13, and that is what the first half of
-this file now asserts. The field is no longer DECLARED by any of the five node
-classes, so ComfyUI never passes it and there is nothing left to sanitise: the
-channel is CLOSED by non-declaration rather than guarded by a discard, which is
-strictly stronger. A discard can be forgotten at a sixth call site; an input
-that is not declared cannot be supplied at all. ``OTR_FFMPEG`` remains the one
-way to pin a binary.
+this file now asserts. The field is no longer DECLARED by any of the node
+classes in ``WIDGET_NODES``, so ComfyUI never passes it and there is nothing
+left to sanitise: the channel is CLOSED by non-declaration rather than guarded
+by a discard, which is strictly stronger. A discard can be forgotten at a new
+call site; an input that is not declared cannot be supplied at all.
+``OTR_FFMPEG`` remains the one way to pin a binary.
 
 THE RESOLVER RULES ABOVE ARE UNCHANGED, and every one of their tests stays.
 The resolvers are still reachable from the pack's own callers, so
@@ -49,16 +49,16 @@ absolute-path-or-``None`` is still what keeps a cwd hit or a bare name out of
 
 THREE GAPS AN INDEPENDENT REVIEW FOUND IN THIS FILE, all closed here:
 
-1. The blend's live security test asserted ``_ffmpeg_bin(x) == ""`` while
-   neutralising ONE of four fallbacks, so it was really claiming "this box has
-   no ffmpeg at all" -- false on any box with imageio-ffmpeg installed, and the
-   property it meant to prove (the answer is never the ARGUMENT) went untested.
-   It is now two tests: the non-echo one, which needs no neutralisation and so
-   always runs, and the empty-answer one, which neutralises every fallback and
-   proves it did.
-2. Removing the widget left four of the five nodes binding ``ffmpeg = ""`` with
-   nothing asserting it -- only the scopes node kept a binding check. The walk
-   is now parametrized over all five.
+1. The live security test of a node's ``_ffmpeg_bin`` wrapper asserted
+   ``_ffmpeg_bin(x) == ""`` while neutralising ONE of four fallbacks, so it was
+   really claiming "this box has no ffmpeg at all" -- false on any box with
+   imageio-ffmpeg installed, and the property it meant to prove (the answer is
+   never the ARGUMENT) went untested. It is now two tests: the non-echo one,
+   which needs no neutralisation and so always runs, and the empty-answer one,
+   which neutralises every fallback and proves it did.
+2. Removing the widget left most of the nodes binding ``ffmpeg = ""`` with
+   nothing asserting it -- only one node kept a binding check. The walk is now
+   parametrized over every node that declared the widget.
 3. The live-class guard parametrized over ``NODE_CLASS_MAPPINGS``, which
    ``__init__.py`` builds node-by-node in its own try/except: a missing optional
    dependency SHRINKS that list and the guard still reports green over the
@@ -79,11 +79,10 @@ import pytest
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
-#: The five nodes whose `ffmpeg` widget used to reach argv[0].
+#: The nodes whose `ffmpeg` widget used to reach argv[0].
 WIDGET_NODES = {
     "nodes/otr_caption_burn.py": "OTR_CaptionBurn",
     "nodes/otr_master_audio_mux.py": "OTR_MasterAudioMux",
-    "nodes/otr_post_upscale_procgen_blend.py": "OTR_PostUpscaleProcgenBlend",
     "nodes/otr_scene_aware_scopes.py": "OTR_SceneAwareScopes",
     "nodes/otr_silent_composite.py": "OTR_SilentComposite",
 }
@@ -189,10 +188,10 @@ def _is_trusted_resolution(value) -> bool:
     """`ffmpeg = _ffmpeg_bin(ffmpeg)` -- the resolver's answer, computed from
     the already-empty local and constants, so nothing new enters.
 
-    The blend node does exactly this at its own boundary: it binds the empty
-    constant, then immediately replaces it with the resolved absolute path
-    because every helper below it takes the binary as an argument. That is a
-    rebinding of a value this test has ALREADY proven empty, not a new channel.
+    A node may bind the empty constant and then immediately replace it with the
+    resolved absolute path, because every helper below it takes the binary as an
+    argument. That is a rebinding of a value this test has ALREADY proven empty,
+    not a new channel.
     """
     if not isinstance(value, ast.Call):
         return False
@@ -224,7 +223,7 @@ def test_the_registry_this_guard_walks_cannot_silently_shrink():
     absent = sorted(set(WIDGET_NODES.values()) - registered)
     assert not absent, (
         "the node(s) this whole file is about are not registered: %s. These "
-        "five are the classes that declared the `ffmpeg` widget, so a run "
+        "are the classes that declared the `ffmpeg` widget, so a run "
         "without them proves nothing about the channel that mattered. Read the "
         "`[OldTimeRadio] Skipped '<name>': <reason>` lines the loader prints "
         "and fix the import -- do not let the guard pass over the remainder."
@@ -287,19 +286,18 @@ def test_the_execute_method_accepts_no_ffmpeg_keyword(rel, node):
 
 @pytest.mark.parametrize("rel,node", sorted(WIDGET_NODES.items()))
 def test_every_widget_node_binds_the_local_to_the_empty_constant(rel, node):
-    """WHAT the local named `ffmpeg` HOLDS, in all five files.
+    """WHAT the local named `ffmpeg` HOLDS, in every file of ``WIDGET_NODES``.
 
     The deleted `test_every_widget_node_discards_at_its_execute_method` pinned
     this and its replacement did not: proving no `ffmpeg` PARAMETER exists says
-    nothing about what the body then binds to that name, and four of the five
-    bind it with nothing watching (`otr_caption_burn:535`,
-    `otr_master_audio_mux:1704`, `otr_post_upscale_procgen_blend:914`,
-    `otr_silent_composite:1764`). Only the scopes node kept a check.
+    nothing about what the body then binds to that name, and most of the nodes
+    bound it with nothing watching (`otr_caption_burn:535`,
+    `otr_master_audio_mux:1704`, `otr_silent_composite:1764`). Only the scopes
+    node kept a check.
 
     THE PROPERTY: the first binding is the empty constant, it happens before
     the name is read, and any later binding is the pack's own resolver fed by
-    that already-empty local -- which is what the blend does at :929, because
-    every helper below it takes the binary as an argument.
+    that already-empty local.
 
     Line order stands in for execution order here, as it did in the scopes walk
     this generalises. It is a proxy, and it is the right one: the bindings are
@@ -463,11 +461,13 @@ def _starve_the_resolver(monkeypatch):
 @pytest.mark.parametrize("starved", [False, True],
                          ids=["as-this-box-is", "nothing-to-find"])
 @pytest.mark.parametrize("value", HOSTILE_VALUES)
-def test_the_blend_never_answers_with_the_value_it_was_given(value, starved,
-                                                             monkeypatch):
+def test_the_wrapper_never_answers_with_the_value_it_was_given(value, starved,
+                                                               monkeypatch):
     """THE SECURITY PROPERTY, stated so that it runs on every box.
 
-    `_ffmpeg_bin` is `resolve_ffmpeg(x) or ""`, and the defect class it guards
+    `_ffmpeg_bin` (driven here through `otr_silent_composite`'s, the same
+    one-line wrapper the caption burn and the mux carry) is
+    `resolve_ffmpeg(x) or ""`, and the defect class it guards
     against is the one-character variant `resolve_ffmpeg(x) or x` -- a wrapper
     that hands a REJECTED value straight back to argv[0]. So the claim is "the
     answer is never the argument", not "this box has no ffmpeg".
@@ -492,10 +492,10 @@ def test_the_blend_never_answers_with_the_value_it_was_given(value, starved,
     fallback appearing would make this test answer a real binary rather than
     fail a claim about the box.
     """
-    from nodes import otr_post_upscale_procgen_blend as pu
+    from nodes import otr_silent_composite as wrapper_node
     if starved:
         _starve_the_resolver(monkeypatch)
-    got = pu._ffmpeg_bin(value)
+    got = wrapper_node._ffmpeg_bin(value)
 
     assert got != value, (
         "_ffmpeg_bin echoed its own argument %r back to the caller, which is "
@@ -521,7 +521,7 @@ def test_the_blend_never_answers_with_the_value_it_was_given(value, starved,
             "the binary" % (value, got))
 
 
-def test_the_blend_answers_empty_when_this_box_has_no_ffmpeg(monkeypatch):
+def test_the_wrapper_answers_empty_when_this_box_has_no_ffmpeg(monkeypatch):
     """The other half: when nothing resolves, the answer is `""`.
 
     `resolve_ffmpeg` has SIX steps -- the preferred value, `OTR_FFMPEG`, PATH,
@@ -532,7 +532,7 @@ def test_the_blend_answers_empty_when_this_box_has_no_ffmpeg(monkeypatch):
     answer is asserted -- otherwise a seventh fallback would quietly turn this
     test back into the one it replaced.
     """
-    from nodes import otr_post_upscale_procgen_blend as pu
+    from nodes import otr_silent_composite as wrapper_node
     ffm = _starve_the_resolver(monkeypatch)
 
     assert ffm.resolve_ffmpeg() is None, (
@@ -543,7 +543,7 @@ def test_the_blend_answers_empty_when_this_box_has_no_ffmpeg(monkeypatch):
         "neutralise that one here too." % (ffm.resolve_ffmpeg(),))
 
     for value in HOSTILE_VALUES + ("",):
-        assert pu._ffmpeg_bin(value) == "", value
+        assert wrapper_node._ffmpeg_bin(value) == "", value
 
 
 # --------------------------------------------------------------------------- #
@@ -623,7 +623,7 @@ def test_a_backslash_is_rejected_by_the_validator_itself():
     """A backslash cannot reach a BASENAME through a path -- it IS the
     separator, so `Path(...).name` never contains one. It is tested on the
     validator directly, and stays in the reject set because it is ffmpeg's own
-    escape character and the validator is shared with the blend node's copy."""
+    escape character."""
     from nodes import otr_caption_burn as cb
     with pytest.raises(ValueError):
         cb._reject_filtergraph_syntax("bad\\name.ass")
@@ -640,15 +640,14 @@ def test_an_ordinary_caption_filename_still_works(name):
     assert got == name
 
 
-def test_both_copies_of_the_filter_arg_builder_are_guarded():
-    """There are TWO `_ass_filter_arg`s and FOUR `ass={name}` interpolations.
-    Guarding only the caption node leaves three sites open."""
-    for rel in ("nodes/otr_caption_burn.py",
-                "nodes/otr_post_upscale_procgen_blend.py"):
-        src = (REPO / rel).read_text(encoding="utf-8")
-        assert "def _ass_filter_arg(" in src, rel
-        assert "_reject_filtergraph_syntax(" in src, (
-            "%s builds an ass= argument without validating it" % rel)
+def test_the_filter_arg_builder_is_guarded():
+    """`ass={name}` is interpolated into an UNQUOTED filtergraph, so the one
+    `_ass_filter_arg` must run the name through the validator first."""
+    rel = "nodes/otr_caption_burn.py"
+    src = (REPO / rel).read_text(encoding="utf-8")
+    assert "def _ass_filter_arg(" in src, rel
+    assert "_reject_filtergraph_syntax(" in src, (
+        "%s builds an ass= argument without validating it" % rel)
 
 
 # --------------------------------------------------------------------------- #

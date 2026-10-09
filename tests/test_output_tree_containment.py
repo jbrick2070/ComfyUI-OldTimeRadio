@@ -133,8 +133,6 @@ CONFINED_DESTINATIONS = {
     "otr_caption_burn.py": ("confine_to_output_tree(out,", ("output_path", "video_path")),
     "otr_master_audio_mux.py": ("confine_to_output_tree(out,", ("output_path",)),
     "otr_silent_composite.py": ("confine_to_output_tree(out,", ("output_path", "base_video_path")),
-    "otr_post_upscale_procgen_blend.py": (
-        "confine_to_output_tree(str(output_path),", ("source_mp4_path",)),
     "otr_credits_roll.py": ("confine_to_output_tree(out,", ("video_path",)),
     # scene_sequencer is NOT here on purpose: neither of its nodes has a widget
     # that names a write destination.
@@ -151,7 +149,7 @@ def test_no_shipped_default_hardcodes_this_developers_home():
     shared scratch tier."""
     for name in ("scene_sequencer.py", "otr_caption_burn.py", "otr_master_audio_mux.py",
                  "otr_silent_composite.py", "otr_credits_roll.py",
-                 "otr_post_upscale_procgen_blend.py", "video_engine.py"):
+                 "video_engine.py"):
         src = (_NODES / name).read_text(encoding="utf-8")
         code = "\n".join(l for l in src.split("\n") if not l.lstrip().startswith("#"))
         assert 'expanduser("~")' not in code, (
@@ -182,19 +180,10 @@ def test_the_guard_runs_after_the_remote_refusal_not_before():
     """Resolving first would launder a UNC spelling into a local-looking path,
     so `reject_remote_path` has to see the value as typed."""
     for filename in ("otr_caption_burn.py", "otr_master_audio_mux.py",
-                     "otr_silent_composite.py", "otr_post_upscale_procgen_blend.py",
-                     "otr_credits_roll.py"):
+                     "otr_silent_composite.py", "otr_credits_roll.py"):
         src = (_NODES / filename).read_text(encoding="utf-8")
         assert src.index("reject_remote_paths(") < src.index("confine_to_output_tree("), (
             "%s confines before it refuses a remote path" % filename)
-
-
-def test_the_blend_rejects_a_remote_scopes_path():
-    """`scopes_mp4_path` was missing from the node's own remote-refusal list
-    while being resolved and statted four lines later."""
-    src = (_NODES / "otr_post_upscale_procgen_blend.py").read_text(encoding="utf-8")
-    i = src.index("reject_remote_paths(")
-    assert "scopes_mp4_path" in src[i:i + 400]
 
 
 def test_the_render_batch_rejects_remote_paths_at_all():

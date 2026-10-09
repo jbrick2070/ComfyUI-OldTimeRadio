@@ -106,7 +106,6 @@ class SidecarBudgetTests(unittest.TestCase):
         import is stronger than asserting a matching magic number.
         """
         for module_name in ("otr_credits_roll", "otr_master_audio_mux",
-                            "otr_post_upscale_procgen_blend",
                             "otr_caption_burn"):
             source = (ROOT / "nodes" / (module_name + ".py")).read_text(
                 encoding="utf-8")

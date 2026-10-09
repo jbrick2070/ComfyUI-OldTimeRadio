@@ -186,14 +186,6 @@ _NODE_MODULES = {
     # key. A V1 node declaring the hidden key writes it into /history when it
     # raises; this one cannot raise. Wired into the validator, the root.
     "OTR_ComfyCredential":         (".nodes.otr_comfy_credential", "OTR_ComfyCredential", "0 - Comfy Credential"),
-    # BUG-LOCAL-030 Phase B (2026-05-03 EVENING): post-RTXUpscale procgen
-    # visual blend. Overlays 1920x1080 native procgen on the upscaled
-    # HuMo + LTX composite at delivery res. Audio passes through with
-    # -c:a copy so C7 byte-identity holds end-to-end. Fills the visible
-    # HuMo black pillarbox bars from Phase A simple-pillarbox composite
-    # with the SIGNAL LOST CRT signature (audio-reactive scanlines +
-    # flicker over the otherwise-static black surround).
-    "OTR_PostUpscaleProcgenBlend": (".nodes.otr_post_upscale_procgen_blend", "PostUpscaleProcgenBlend", " Post-Upscale Procgen Blend (1080p)"),
     # §4D v2 scene-aware scopes: a late, additive node that draws GREEN-ONLY
     # audio-reactive scopes into the REAL per-beat gutters (read from the clip
     # manifest), screened+lightened over the upscaled video by the blend's 3rd

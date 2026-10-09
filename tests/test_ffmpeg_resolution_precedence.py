@@ -168,13 +168,11 @@ def _adapters():
     from nodes._otr_shared import scope_draw as sd
     from nodes._otr_video_engines import render_driver as rd
     from nodes._otr_video_engines import wrapper_bridge as wb
-    # The three argv sites r3 found that no resolver copy ever touched -- they
+    # The two argv sites r3 found that no resolver copy ever touched -- they
     # ran the literal, so the AST guard could not see them.
-    from nodes import otr_post_upscale_procgen_blend as pu
     from nodes._otr_audio_engines import eng_google_lyria as ly
     from nodes._otr_video_engines import foley_stems as fs
     return {
-        "post_upscale._ffmpeg_bin": lambda: pu._ffmpeg_bin("ffmpeg"),
         "lyria._ffmpeg_bin": lambda: ly._ffmpeg_bin(),
         "foley_stems._ffmpeg_bin": lambda: fs._ffmpeg_bin(),
         "mux._ffmpeg_bin": lambda: mux._ffmpeg_bin("ffmpeg"),
@@ -224,18 +222,15 @@ def test_each_adapter_keeps_its_own_answer_on_none(box, monkeypatch):
     assert rd._slicer_ffmpeg_bin() == "ffmpeg"
     with pytest.raises(cr.CreditsDataError, match="ffmpeg not found"):
         cr._ffmpeg_bin()
-    from nodes import otr_post_upscale_procgen_blend as pu
     from nodes._otr_audio_engines import eng_google_lyria as ly
     from nodes._otr_video_engines import foley_stems as fs
-    # THE BLEND NO LONGER REFLECTS ITS ARGUMENT (2026-09-04). It used to answer
+    # NO WRAPPER REFLECTS ITS ARGUMENT (2026-09-04). One used to answer
     # `str(ffmpeg).strip() or "ffmpeg"` when the owner found nothing, so an
     # UNRESOLVED caller string came back out of the fallback and was spawned --
     # the one place a rejected value could still reach argv[0]. "" now means
-    # "this box has no ffmpeg", and blend() degrades on it by name (copying
-    # source -> output, the same way it already handles a missing procgen).
-    assert pu._ffmpeg_bin("ffmpeg") == ""
-    assert pu._ffmpeg_bin("") == ""
-    assert pu._ffmpeg_bin(r"C:\anywhere\ffmpeg.exe") == ""
+    # "this box has no ffmpeg", and the node degrades on it by name.
+    assert sc._ffmpeg_bin("") == ""
+    assert sc._ffmpeg_bin(r"C:\anywhere\ffmpeg.exe") == ""
     assert ly._ffmpeg_bin() == "ffmpeg"
     assert fs._ffmpeg_bin() == "ffmpeg"
 
@@ -245,7 +240,7 @@ def test_the_sites_that_call_the_owner_by_name_are_bound_to_THE_owner():
     ``resolve_ffmpeg`` at module scope and call it with no seam of their own,
     so the matrix above cannot drive them with media. What CAN be proven is
     that the name they call is the owner's function object -- not a second
-    module instance of it (the flat-import hazard post_upscale had)."""
+    module instance of it (the flat-import hazard)."""
     from nodes._otr_audio_engines import eng_google_lyria as ly
     from nodes._otr_shared import cloud_media_canonical as cmc
     from nodes._otr_shared import encode_sink as es
@@ -254,12 +249,6 @@ def test_the_sites_that_call_the_owner_by_name_are_bound_to_THE_owner():
     assert es.resolve_ffmpeg is ffm.resolve_ffmpeg
     assert rd._resolve_ffmpeg is ffm.resolve_ffmpeg
     assert ly.resolve_ffmpeg is ffm.resolve_ffmpeg
-    # post_upscale inserts nodes/ into sys.path and used to import BOTH tool
-    # owners flat-first, which made a second instance of each (r3, r4).
-    from nodes import otr_post_upscale_procgen_blend as pu
-    from nodes._otr_shared import ffprobe as ffp
-    assert pu.resolve_ffmpeg is ffm.resolve_ffmpeg
-    assert pu._ffp is ffp
 
 
 def test_the_probe_sibling_steps_go_through_the_owner(box, monkeypatch):

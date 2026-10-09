@@ -591,9 +591,8 @@ def _cpu_overflow_max_memory(total_vram: float, gpu_index: int = 0) -> dict:
     working set, the ComfyUI server, a browser -- plus Accelerate's own
     rounding. Measured against the 4060 leg that passed with 0.92 GB free:
     2 GB keeps the box off swap with margin, while leaving a 16 GB box a
-    usable lane instead of a fantasy 64 GB one. dram_canary's 6 GB is an
-    abort threshold, not a placement reserve -- a different job, so it is
-    not reused here. The 1.0 GiB floor is the same margin at the bottom:
+    usable lane instead of a fantasy 64 GB one. The 1.0 GiB floor is the same
+    margin at the bottom:
     under 1 GB free the box is already thrashing and the load refuses or
     fails fast either way; the floor keeps Accelerate's parser on a sane
     value instead of a near-zero or negative lane.

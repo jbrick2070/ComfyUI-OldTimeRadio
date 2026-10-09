@@ -472,15 +472,15 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
         # STAMP THE CURRENT VERSION, OR PRESERVE A FOREIGN ONE. Restamping
         # unconditionally is only safe while nothing older is
         # ever written back -- and post-hoc tools do exactly that over
-        # EXISTING episodes (audio_enhance, otr_master_audio_mux, scene_sequencer, otr_video_render_batch,
-        # otr_post_upscale_procgen_blend). A read-only corpus measurement found
+        # EXISTING episodes (audio_enhance, otr_master_audio_mux, scene_sequencer,
+        # otr_video_render_batch). A read-only corpus measurement found
         # 43 of 48 provenance-carrying ledgers predating the spoken-coda
         # receipt: one routine write-back would have promoted each of them past
         # what it actually contains, after which the citation audit reports a
         # receipt they never could have carried as a REGRESSION ON HISTORY.
         # Migration is a decision; it is not a side effect of touching an old
         # episode. This function is the only guard needed because every one of
-        # those six writers reaches history through here.
+        # those writers reaches history through here.
         existing_version = ledger.get("schema_version")
         meta = ledger.setdefault("meta", {})
         if (

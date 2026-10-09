@@ -661,9 +661,8 @@ def otr_obs_dir() -> Path:
     ``<output>/otr/obs/`` under the contract.
 
     Holds EXACTLY ONE mp4 per episode -- the final user-facing
-    deliverable. As of 2026-05-05 the canonical filename is
-    ``<episode_id>_procgen_blended.mp4`` (post BUG-LOCAL-106
-    + Jeffrey "broadcast folder" directive). OBS's directory_sorter
+    deliverable, published by OTR_MasterAudioMux under the name that
+    ``_otr_shared/obs_name.py`` spells. OBS's directory_sorter
     watches this dir and queues each finished episode in turn.
 
     Render chain (one final mp4 per episode lands here):
@@ -672,8 +671,10 @@ def otr_obs_dir() -> Path:
          (composite intermediate, already at delivery resolution;
          per-clip model enhancement happens inside SilentComposite via
          nodes/_otr_upscale_engines/)
-      2. OTR_PostUpscaleProcgenBlend -> otr/obs/<ep>_procgen_blended.mp4
-         (final broadcast cut with green-CRT overlay -- this dir)
+      2. OTR_CaptionBurn and OTR_CreditsRoll add the captions and the
+         credits tail beside it, in the same episode folder
+      3. OTR_MasterAudioMux muxes the frozen master audio on LAST and
+         publishes the cut to otr/obs/ (this dir)
 
     The "one mp4 per episode" rule is load-bearing: a second mp4 landing in
     obs/ per episode breaks the broadcast-folder contract. Intermediates

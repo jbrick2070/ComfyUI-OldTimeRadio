@@ -2099,22 +2099,18 @@ class SignalLostVideoRenderer:
                 # so procgen renders directly at delivery resolution.
                 # Per Jeffrey: "proc gen 1920x1080 ... then a final
                 # ffmpeg w/ the proc gen mix for final 1080p". Procgen
-                # is now SEPARATE from the per-clip-mux composite path,
+                # is SEPARATE from the per-clip-mux composite path,
                 # which reaches 1920x1080 itself via render.composite_w/h.
-                # The OTR_PostUpscaleProcgenBlend node overlays this
-                # 1920x1080 procgen on the composited mp4 at delivery
-                # res. Result: procgen's CRT scanline / audio-reactive
+                # Result: procgen's CRT scanline / audio-reactive
                 # flicker stays CRISP at 1080p (it would be smeared if
                 # run through a super-resolution model -- synthetic
                 # patterns + AI upscaler = ringing / softening, which is
-                # why procgen renders at delivery res instead), and
-                # fills the visible HuMo black pillarbox bars from
-                # BUG-030 Phase A as the SIGNAL LOST visual signature.
+                # why procgen renders at delivery res instead).
                 # 832x480 retained as legacy mode for the prior path
                 # (composite everything small, then upscale it together).
                 "resolution": (["1920x1080", "1280x720", "832x480", "854x480", "3840x2160"], {
                     "default": "1920x1080",
-                    "tooltip": "Procgen output resolution. 1920x1080 = delivery res for the final procgen blend (BUG-030 Phase B default). 832x480 was the prior default (rendered cheap, then upscaled with everything else; legacy mode). 1280x720 / 854x480 / 3840x2160 retained for one-off needs."
+                    "tooltip": "Procgen output resolution. 1920x1080 = delivery res (BUG-030 Phase B default). 832x480 was the prior default (rendered cheap, then upscaled with everything else; legacy mode). 1280x720 / 854x480 / 3840x2160 retained for one-off needs."
                 }),
                 # No `episode_title` widget here: OTR_LedgerScriptWriter owns
                 # episode_title, and this node reads the ledger through
@@ -2252,8 +2248,7 @@ class SignalLostVideoRenderer:
         # canonical workflow) is the only credits sequence, and a second one
         # here would play TWO credits sequences back to back. What this
         # engine owns: the procedural base video, the title-card plan, and
-        # the procgen mp4 that PostUpscaleProcgenBlend blends -- the
-        # `_silent_procgen_blended_` in every output filename.
+        # the procgen mp4 that the composite takes as its floor.
 
         # -- 3. Save audio to temp WAV for ffmpeg ---------------------
         import tempfile

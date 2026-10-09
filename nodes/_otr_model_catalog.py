@@ -35,10 +35,9 @@ except ImportError:  # pragma: no cover -- flat / standalone load
     #
     # MUTATING sys.path ONLY IN THIS ARM IS THE POINT (cursor cross-check,
     # 2026-09-04). Doing it before the try would put `nodes/` at sys.path[0] on
-    # the ORDINARY packaged import too, which is precisely the enablement
-    # `otr_post_upscale_procgen_blend.py` warns about: it makes the flat
-    # spelling resolvable everywhere and invites a SECOND module instance of
-    # the owner. Here it runs only when the relative rung has already failed,
+    # the ORDINARY packaged import too, which makes the flat spelling
+    # resolvable everywhere and invites a SECOND module instance of the owner.
+    # Here it runs only when the relative rung has already failed,
     # i.e. only when there is no package instance to duplicate.
     import os as _os_boot
     import sys as _sys_boot
