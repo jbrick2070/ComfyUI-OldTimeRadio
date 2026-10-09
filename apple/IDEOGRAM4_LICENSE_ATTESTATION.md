@@ -83,12 +83,12 @@ licence actually permits:
 `commercial_clean = False` is an established, populated declaration here, and it
 is already carried by the **shipping hero video engine**:
 
-| engine | file:line | note |
+| engine | where `commercial_clean = False` is declared | note |
 | :-- | :-- | :-- |
-| `eng_ltx25` | `nodes/_otr_video_engines/eng_ltx25.py:373` | **ships episodes today** |
-| `eng_minimax_h3` | `nodes/_otr_video_engines/eng_minimax_h3.py:460` | attested separately |
-| `flux_gen1` | `nodes/_otr_image_engines/flux_gen1.py:100` | BFL non-commercial, **registered** |
-| `eng_musicgen` | `nodes/_otr_audio_engines/eng_musicgen.py:31` | CC-BY-NC-4.0 |
+| `eng_ltx25` | `nodes/_otr_video_engines/eng_ltx25.py` (`Ltx25VideoEngine`) | **ships episodes today** |
+| `eng_minimax_h3` | `nodes/_otr_video_engines/eng_minimax_h3.py` (`_MiniMaxH3Base`) | attested separately |
+| `flux_gen1` | `nodes/_otr_image_engines/flux_gen1.py` (`FluxGen1ImageEngine`) | BFL non-commercial, **registered** |
+| `eng_musicgen` | `nodes/_otr_audio_engines/eng_musicgen.py` (`MusicGenEngine`) | CC-BY-NC-4.0 |
 
 **Correction (r1 review, cursor lane, verified):** an earlier draft also listed
 `sd35_large.py:127` here. It does declare `commercial_clean = False`, but the
@@ -109,8 +109,8 @@ enforcement is *"declare-and-record, non-blocking"* across the stack. **That is
 true for AUDIO and false for IMAGES**, and the distinction matters:
 
 * **Audio:** `nodes/_otr_audio_cache.py` carries `commercial_clean` into each
-  audio-cache sidecar record and `nodes/cast_lock.py:1887` emits a *"non-blocking
-  warning (I-8)"*. The three-state rule is real, but it is enforced where the
+  audio-cache sidecar record and `nodes/cast_lock.py` (`CastLock._auto_registry`) emits a
+  *"non-blocking warning (I-8)"*. The three-state rule is real, but it is enforced where the
   flag is read, not by a release scan: `True` ships silently, `False` warns and
   still renders, and a voice-bank row whose `commercial_clean` is missing or
   not a boolean fails closed at bank load (`nodes/_otr_voice_bank.py`).
@@ -120,7 +120,7 @@ true for AUDIO and false for IMAGES**, and the distinction matters:
   caller). Its documented scope was *"roles, voice-bank entries, audio cache
   sidecars, and `audio_meta`"* -- **images were never in that list**. The image
   ledger row built in
-  `nodes/otr_image_gen_dispatcher.py:1325-1337` carries `engine_id`,
+  `nodes/otr_image_gen_dispatcher.py` (`_commit_minted_still`) carries `engine_id`,
   `engine_version` and hashes but **no `commercial_clean` field at all**.
 
 So on the image side the flag is an **adapter-level declaration only**; nothing

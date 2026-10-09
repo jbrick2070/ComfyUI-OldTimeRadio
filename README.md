@@ -848,8 +848,10 @@ airwaves.
 
 ## Known failures
 
-None at the tip of `main`: the full test suite passes (16965 passed, 0
-failed, 2026-09-26). [apple/known-failures.md](apple/known-failures.md)
+None at the tip of `main`. [apple/known-failures.md](apple/known-failures.md)
 explains why the expected-failure set is kept empty on purpose -- a failing
-test is fixed or deleted with its feature, never parked. If something fails
-for you in practice, open an issue with the episode's ledger attached.
+test is fixed or deleted with its feature, never parked. Tests that need
+downloaded weights, voice references or optional language packs fail on a
+machine that does not have them yet; that is the machine, not the code. If
+something fails for you in practice, open an issue with the episode's ledger
+attached.
