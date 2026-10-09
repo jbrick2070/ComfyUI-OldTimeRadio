@@ -26,7 +26,6 @@ ships its own no-audio encoder); UTF-8 no BOM; SFW.
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 import re as _re
 import math
@@ -41,10 +40,17 @@ _NODES_DIR = os.path.dirname(os.path.abspath(__file__))
 if _NODES_DIR not in sys.path:
     sys.path.insert(0, _NODES_DIR)
 
+# The per-frame RNG, the audio analysis and the dual EMA are scope_draw's -- the
+# viz engines render with the very same ones. `_analyze_audio_np` / `_dual_ema`
+# keep their names here because __all__ exports them.
 try:  # ComfyUI loads these node modules flat as well as packaged
     from ._otr_shared import ffprobe as _ffp
+    from ._otr_shared.scope_draw import (
+        _rng, analyze_audio_np as _analyze_audio_np, dual_ema as _dual_ema)
 except ImportError:  # pragma: no cover -- flat (sys.path) test import
     from _otr_shared import ffprobe as _ffp  # type: ignore
+    from _otr_shared.scope_draw import (  # type: ignore
+        _rng, analyze_audio_np as _analyze_audio_np, dual_ema as _dual_ema)
 
 log = logging.getLogger("OTR.SceneAwareScopes")
 
@@ -56,68 +62,6 @@ CRT_BLACK = (0, 0, 0)
 
 _FFT_SPOKES = 32
 _TRAIL_N = 6  # bounded comet-tail / sweep lookback
-
-
-# --------------------------------------------------------------------------- #
-# Deterministic RNG (stable-hash; fixes the floor's old unseeded noise too)
-# --------------------------------------------------------------------------- #
-def _rng(key, fi, salt):
-    seed = int.from_bytes(
-        hashlib.blake2s(f"{key}|{int(fi)}|{salt}".encode()).digest()[:8], "big")
-    return np.random.default_rng(seed)
-
-
-# --------------------------------------------------------------------------- #
-# Pure-numpy audio analysis (mirrors video_engine._analyze_audio EXACTLY so the
-# scopes are frame-identical at 25fps; kept torch-free for testability).
-# --------------------------------------------------------------------------- #
-def _analyze_audio_np(audio_np, sample_rate, total_frames, fps):
-    spf = sample_rate // fps
-    volume, freqs, waves = [], [], []
-    for i in range(total_frames):
-        s = i * spf
-        e = min(s + spf, len(audio_np))
-        chunk = audio_np[s:e] if s < len(audio_np) else np.zeros(spf)
-        rms = float(np.sqrt(np.mean(chunk ** 2))) if len(chunk) > 0 else 0.0
-        volume.append(rms)
-        if len(chunk) > 0:
-            fft = np.abs(np.fft.rfft(chunk))
-            n = len(fft)
-            if n >= 32:
-                bs = n // 32
-                bins = np.array([np.mean(fft[j * bs:(j + 1) * bs]) for j in range(32)])
-            else:
-                bins = np.zeros(32)
-                bins[:n] = fft[:n]
-        else:
-            bins = np.zeros(32)
-        freqs.append(bins)
-        if len(chunk) > 200:
-            idx = np.linspace(0, len(chunk) - 1, 200, dtype=int)
-            waves.append(chunk[idx])
-        else:
-            waves.append(chunk)
-    vmax = max(volume) if volume and max(volume) > 0 else 1.0
-    volume = [v / vmax for v in volume]
-    fmax = max((np.max(f) for f in freqs), default=1.0) if freqs else 1.0
-    if fmax > 0:
-        freqs = [f / fmax for f in freqs]
-    return volume, freqs, waves
-
-
-def _dual_ema(volume):
-    """signal (slow, ambient) + trig (fast, lock) + loss = 1 - signal."""
-    v = np.asarray(volume, dtype=np.float32)
-    n = len(v)
-    sig = np.zeros(n, dtype=np.float32)
-    trg = np.zeros(n, dtype=np.float32)
-    if n > 0:
-        sig[0] = trg[0] = float(v[0])
-        a_s, a_t = 0.05, 0.30
-        for i in range(1, n):
-            sig[i] = sig[i - 1] + a_s * (float(v[i]) - sig[i - 1])
-            trg[i] = trg[i - 1] + a_t * (float(v[i]) - trg[i - 1])
-    return sig, trg, (1.0 - sig).astype(np.float32)
 
 
 # --------------------------------------------------------------------------- #

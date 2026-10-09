@@ -11,11 +11,11 @@ provably unchanged -- a later refactor can make the floor import this module.
 The title-card / ident / gap branches are deliberately OMITTED -- those only make
 sense for the whole-episode floor; a per-beat clip is pure procedural art.
 
-Self-contained on purpose: ``_analyze_audio_np`` / ``_dual_ema`` mirror the
-``otr_scene_aware_scopes`` helpers byte-for-byte but are copied here so the engine
-couples to NOTHING (neither the floor node nor the overlay node). The invariant is
-DIRECTIONAL and always was: this module must not import a node; a node importing
-THIS module is the refactor the line below anticipated.
+Self-contained on purpose: ``_rng`` / ``analyze_audio_np`` / ``dual_ema`` live here
+so the engine couples to NOTHING (neither the floor node nor the overlay node).
+The invariant is DIRECTIONAL: this module must not import a node; a node importing
+THIS module is the refactor the first paragraph anticipated, and
+``otr_scene_aware_scopes`` now imports all three rather than keeping copies.
 
 ``encode_silent_mp4`` is not one of the copies. The frames are counted against
 the declared ``total``, the rawvideo size is derived from the first frame so
