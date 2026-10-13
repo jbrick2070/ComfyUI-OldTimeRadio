@@ -279,7 +279,132 @@ different proof.
   green "installed" toast and nothing on disk, twice; then fine). Not ours to
   fix; worth telling Comfy-Org, with the 4060's timeline. His Discord.
 
+### Gemini audit 2026-10-13 -- two forks (grounded on `main` d3873fe)
+
+Both are code whose output nothing reads. One word from him closes each.
+
+**F1. `audio_motion_profile`: rip (recommended) or keep for C2.**
+Every video episode reads each beat's conditioning WAV, takes a full-clip FFT
+and re-saves the ledger (`otr_video_render_batch.py:410-445`, called at `:734`)
+to write `audio_motion_profiles` and `meta.audio_motion_profile`. Nothing in
+`nodes/`, `scripts/`, `tools/` or `js/` reads either, so no field needs a new
+owner. The module's own docstring defers its consumer (C2) and no row tracks
+C2; building C2 is new capability, outside the bar.
+* Rip: delete `nodes/_otr_audio_motion.py`, `_stamp_audio_motion_profiles` and
+  its call, the `amp_rows` plumbing in `render_driver.py` (`:4916-4930`,
+  `:5224`, `:5254-5258`, `:5489-5491`, `:5590-5604`, `:5740`), and
+  `tests/test_audio_motion_profile.py` + `tests/test_audio_motion_foldin.py`.
+  Keep `audio_motion_profile` in `_REPLAY_RUN_VOLATILE_META`
+  (`production_ledger.py:583`) so a replay of an older ledger drops the stale
+  block, and correct that comment's "all rebuilt by the replay".
+* Keep: a row naming C2's consumer and what it waits for.
+
+**F2. The `acceptance.py` graders: wire (recommended) or rip.**
+The module is not orphaned: `beat_frame_accounting` (`render_driver.py:4786`)
+and `SEGMENT_RECEIPT_KEYS` (`:6538`) are production, and
+`tests/test_multiclip_beat_loop.py:747-766` grades the real
+`render_beat_coverage -> build_clip_manifest` chain with it. What never runs on
+a real episode is `grade_episode` and its six `grade_*` rules;
+`format_findings` has no caller at all; and `otr_shot_lock._stamp_frame_bounded`
+(`:2067`, called at `:3192`) writes `frame_bounded` for the grader alone.
+* Wire: in `OTR_VideoRenderBatch`, after `_stamp_render_trace`, run
+  `grade_episode(ledger, manifest)` fail-soft, log `format_findings`, and put
+  the finding count in `node_episode_report.json`. It cannot raise
+  (`test_grade_episode_NEVER_raises_on_any_document`). The first leg reads
+  zero findings or names a real gap.
+* Rip: the graders, the `frame_bounded` stamp and its `ShotRow` field, and
+  their tests; keep `frame_count`, `beat_frame_accounting` and
+  `SEGMENT_RECEIPT_KEYS`. Costs the oracle above.
+
 ## 2. CODE -- decided, in order
+
+### 0p. Gemini audit 2026-10-13 -- verified fixes, in order
+
+Grounded on `main` d3873fe; line numbers are that tree's. Every item touches
+`nodes/` or `__init__.py`, so the 5080 owns it (CLAUDE.md section 1).
+
+1. **Interstitial music never reaches the published audio.**
+   `EpisodeAssembler.assemble` writes `<ep>_master.wav` and hashes it
+   (`scene_sequencer.py:1805-1813`), then mixes each interstitial cue into
+   `episode_waveform` inside the later ledger write-back (`:1996-2067`). The
+   mux (canonical node 85) publishes that WAV and `OTR_VideoRenderBatch`
+   (node 92) conditions on it, so every `music_inter` bridge -- any
+   `act_count` >= 2, plus the banks that mint bridge sentinels -- ships as the
+   4.0 s of zeros `SceneSequencer` inserts (`:1044-1057`). The cue reaches only
+   the tensor `OTR_SignalLostVideo` reads, after the limiter. In since
+   `e9a5b3cb` (2026-09-15). The canonical default (`act_count` 1) has no
+   bridge.
+   a. Evidence (admission rule; one file read, no render): any episode
+      published since 2026-09-15 with a `music_inter` line. Its interstitial
+      `music[]` row gives the master-mix window; `<ep>_master.wav` is digital
+      silence there, and the server log carries `[EpisodeAssembler] mixed
+      interstitial cue` for the same run.
+   b. Fix: move the overlay above `_master_loudness` (`:1720`), so the foley
+      provisional clone and the levelled master both carry it and the loudness
+      pass levels it. `_shift_samples` comes from `segments` there; the anchors
+      are read from the in-flight ledger, read-only. The `music[]` stamping
+      stays where it is.
+   c. Tests: one interstitial -> non-silence in the gap, and the stamped
+      `master_audio_sha256` equals the file's; none -> master bytes unchanged
+      (the section 0B proof: only bridge episodes move, on both boxes).
+   d. Live: one 2-act canonical leg to `otr/obs`; his ear on the bridge.
+
+2. **IndexTTS2 orphans a hung worker.** On a request timeout `generate_voice`
+   drops `self._proc` without killing it (`eng_indextts2.py:548-551`), so
+   `unload()` returns early (`:280-283`): the worker keeps its VRAM and its
+   stderr handle, and the next line spawns a second worker beside it. A dead
+   worker at `stdin.write` (`:538`) or a non-JSON reply (`:556`) escapes with
+   `_proc` still set; an `ok:false` reply or an unreadable WAV leaves the temp
+   file. A successful line does remove its temp WAV (`:570`); the audit's
+   "every character line" is wrong.
+   * Fix: mirror `eng_chatterbox.py` -- `_SC.close_worker` on readiness
+     failure, on any request failure and in `unload`; reap an idle-dead worker
+     in `load`; `_SC.remove_quietly(out_path)` on failure;
+     `_SC.load_wav_as_audio` for the read. Success path byte-identical; 16 GB+
+     only (not offered on 8 GB).
+   * Tests: run the chatterbox fake-worker cases in
+     `tests/test_tts_engine_sidecars.py` against indextts2 too.
+   * A PBUG needs a forced-timeout smoke (`OTR_SIDECAR_REQUEST_TIMEOUT=1`)
+     showing the orphan.
+
+3. **Retire the v1 ledger viewer.** `viewer/index.html` and
+   `scripts/serve_ledger.py` read a flat
+   `~/Documents/ComfyUI/output/old_time_radio/*_ledger.json`; v2 ledgers live
+   in `<episodes>/<id>/audio/`, which `scripts/otr_ledger_view.py` (`--html`,
+   `--watch`) reads. Neither ships nor is imported. Delete both, the `viewer/`
+   rule and its comment in `.comfyignore` (`:236-248`),
+   `test_the_ledger_viewer_does_not_ship_without_its_server`
+   (`tests/test_platform_s0_guards.py:376-417`), and the `viewer/` clause in
+   the `__init__.py:377-379` comment.
+
+4. **The `ltx_8gb` refusals point strangers at a script that only runs
+   here.** Four shipped messages (`eng_ltx_8gb.py:823`, `:1204`, `:1236`,
+   `:1446`) name `scripts/download_ltx_0_9_8.ps1`, which hardcodes
+   `C:\Users\jeffr\...` and `C:\ComfyUI-Models`;
+   `scripts/otr_fetch_lane_weights.py ltx_8gb` already fetches both files on
+   any OS. Move the .ps1's pin (revision `8984fa25`, 6,340,744,492 bytes,
+   SHA-256) into the fetcher's `ltx_8gb` entry, retarget the four strings and
+   the two tests that pin the old name
+   (`test_ltx_8gb_assert_usable_single_clip.py:239`,
+   `test_ltx_8gb_dir_override_tripwire.py:348`), then delete the .ps1 and
+   `scripts/hf_download_driver.py` (its only caller). Deleting first, as the
+   audit proposed, breaks the remediation link.
+
+**Not taken** -- the audit's other items, each failed on the code:
+* `retry_taxonomy.py` 41-243: `FailureKind` (`:58`) is production
+  (`render_driver.classify_failure`); the `_POLICY` table documents the future
+  retry budget on purpose (its own comment says so). Nothing to gain.
+* `still_plan_helpers.py` 50-297: the constants, `StillPlanRow` (nine engines)
+  and `resolve_row_aspect` (`eng_humo`) are production; the four validators
+  are `tests/test_still_plan_audit.py`'s registry-wide conformance check.
+* `schemas.py` Pydantic models: the oracle that pins `build_request`'s output
+  (`tests/test_video_render_driver_additive.py:748`, `:771`, `:784`);
+  production imports only `FAMILY_REQUIRED_INPUTS` / `REQUIRED_INPUT_TOKENS`.
+* Moving modules out of `nodes/`: `_otr_workflow_apply` is imported by the
+  `OTR_WorkflowValidator` node (`_otr_workflow_validator.py:649`) and
+  `google_slug_verifier` by `cloud_slug_preflight.py` (`:198`, `:407`);
+  `slug_inventory` and `_otr_gender_pronoun_scan` are never imported at load,
+  so moving them is churn with no runtime effect.
 
 ### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
 
