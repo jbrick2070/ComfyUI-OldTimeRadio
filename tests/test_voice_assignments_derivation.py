@@ -102,48 +102,49 @@ def test_voice_assignments_missing_voice_preset_yields_empty_string():
     assert result == {"GHOST": {"voice_preset": ""}}
 
 
+#: The writer's K.5 stamp lives in the writer TAIL since the writer split;
+#: the node file is read too, so the stamp cannot move back unwatched.
+_WRITER_FILES = ("OTR_LedgerScriptWriter.py", "_otr_writer_tail.py")
+
+
+def _writer_src(name):
+    import pathlib
+    return (pathlib.Path(__file__).parent.parent / "nodes" / name).read_text(
+        encoding="utf-8")
+
+
 def test_meta_voice_assignments_not_persisted_by_writer():
     """Sprint 6.2 contract: the writer's K.5 stamp must NOT write
     voice_assignments to meta. Cast is the canonical source.
 
-    This test exercises the writer's K.5 logic by inspecting source
-    text (a future writer change that re-introduces persisted
-    meta.voice_assignments would surface here). The shape-level
-    integration test lives in tests/test_lfc_*.py against the
-    real writer fixtures.
+    Source-level guard over BOTH writer files: this used to read only the node
+    file, which stopped holding K.5 when the writer was split, so it watched
+    nothing. Searches for the assignment, not the string (the explanatory
+    comments name the field).
     """
-    import pathlib
-    src_path = (
-        pathlib.Path(__file__).parent.parent
-        / "nodes" / "OTR_LedgerScriptWriter.py"
-    )
-    src = src_path.read_text(encoding="utf-8")
-    # The K.5 block (Sprint 6.2) must NOT contain meta["voice_assignments"] = ...
-    # Search for the assignment pattern, not just the string (the explanatory
-    # comments name the field).
     import re
-    assignments = re.findall(r'meta\[\s*"voice_assignments"\s*\]\s*=', src)
-    assert not assignments, (
-        f"writer K.5 must not persist meta.voice_assignments "
-        f"(Sprint 6.2 contract); found {len(assignments)} assignment(s)"
-    )
+    for name in _WRITER_FILES:
+        assignments = re.findall(r'meta\[\s*"voice_assignments"\s*\]\s*=',
+                                 _writer_src(name))
+        assert not assignments, (
+            f"{name}: writer K.5 must not persist meta.voice_assignments "
+            f"(Sprint 6.2 contract); found {len(assignments)} assignment(s)"
+        )
 
 
 def test_meta_visual_plan_characters_has_no_notes_field():
     """Sprint 6.2 contract: character entries in visual_plan have
-    only portrait_prompt -- no notes. Source-level guard."""
-    import pathlib, re
-    src_path = (
-        pathlib.Path(__file__).parent.parent
-        / "nodes" / "OTR_LedgerScriptWriter.py"
-    )
-    src = src_path.read_text(encoding="utf-8")
-    # Find the K.5 block and look for "notes":
+    only portrait_prompt -- no notes. Source-level guard.
+
+    The landmark is REQUIRED: this used to skip when it was missing, and it
+    skipped on every run once K.5 moved to the writer tail."""
+    import re
+    src = _writer_src("_otr_writer_tail.py")
     k5_start = src.find("# K.5 -- voice-path-cleanbreak")
-    k5_end_marker = "# --- L. Assemble return values"
-    k5_end = src.find(k5_end_marker, k5_start)
-    if k5_start == -1 or k5_end == -1:
-        pytest.skip("K.5 block landmark not found; skip source-level guard")
+    k5_end = src.find("# --- L. Assemble return values", k5_start)
+    assert k5_start != -1 and k5_end != -1, (
+        "K.5 block landmarks not found in nodes/_otr_writer_tail.py -- "
+        "point this guard at wherever the block now lives")
     k5_block = src[k5_start:k5_end]
     # The "notes" key must not appear as a dict assignment in the K.5 block.
     notes_assignments = re.findall(r'"notes"\s*:', k5_block)

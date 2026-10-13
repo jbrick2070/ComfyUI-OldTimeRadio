@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""The template gallery names this pack "Old-Time Radio", however it was installed.
+r"""The template gallery names this pack "Old-Time Radio", however it was installed.
 
 WHY (0d, 2026-09-25). The gallery's Extensions list labels each pack with
 its custom_nodes FOLDER name, so a stranger saw "ComfyUI-OldTimeRadio" (git
