@@ -437,6 +437,108 @@ Grounded on `main` d3873fe; line numbers are that tree's. Every item touches
   `slug_inventory` and `_otr_gender_pronoun_scan` are never imported at load,
   so moving them is churn with no runtime effect.
 
+### 0q. Gemini audit 2026-10-13, Part B -- verified, in order
+
+Grounded on `main` d3873fe. Same ownership as 0p. Most of Part B's runtime
+claims and every duplicate-test pair failed on the code, and several functions
+it cites do not exist. What holds:
+
+1. **Tests that guard nothing.**
+   * `tests/test_remaining_video_contracts.py:192-228`: both tests loop over
+     `workflows/*.env.json`, and there have been none since `a62f3567`
+     (2026-09-07), so they pass on zero iterations. Delete both.
+   * `tests/test_voice_assignments_derivation.py:105-153`: both guards read
+     `OTR_LedgerScriptWriter.py`, but the K.5 block moved to
+     `_otr_writer_tail.py:1260` (end marker `:1528`). One skips on every run;
+     the other watches the wrong file. Point both at the tail (the first may
+     scan both files).
+   * `tests/test_b7_forbidden_sweep.py:133-156` asserts `tokenize.FSTRING_*`
+     exist and never calls the classifier. Run
+     `tests/_s28_forbidden_sweep.py:classify_lines` on a planted f-string hit
+     and a planted code hit, or delete the test.
+   * `tests/test_gallery_category_name.py:14`: an invalid `\`` escape in a
+     non-raw docstring (SyntaxWarning on Python 3.12+). Make it raw.
+
+2. **The public-domain fetch normalizes the work three times.**
+   `fetch_public_domain_source` normalizes once
+   (`_otr_public_domain_sources.py:518`) and passes the body on, but
+   `_canonical_body_for` (`:401`) re-normalizes to verify it, once for the
+   payload (`:440`) and once for the document (`:421`) -- the opposite of what
+   the comments at `:416-418` and `:433-435` say. On the fetch path, build both
+   from the body derived at `:518` (private helpers); keep the verification on
+   the public entry points for outside callers. Tests: one normalization per
+   fetch; a mismatched body still raises. Gain: two regex passes over a
+   ~25,000-word work per fetch, milliseconds.
+
+3. **Dead-symbol wave**, one commit under the `f37ca348` rule (each item read
+   in context; a candidate list, not a hit list); drop each from `__all__`.
+   * No reader at all: `story_orchestrator.py:53-65` (the
+     `BaseStreamer`/`TextStreamer` try-import and its stubs; delete
+     `tests/test_core.py:314-322` with it, which pins only that import);
+     `_otr_engine_profiles.py:167` `for_role`; `_otr_story_input.py:40`
+     `KNOWN_INPUT_MODES` and `:288` `dedicated_fields_present`;
+     `_otr_my_story.py:395` `_sha256`; `_otr_verbatim_corpus.py:49`
+     `LIFE_PLUS_50_DEATH_BEFORE`; `_otr_stage3_validators.py:56` `warns`;
+     `_otr_scifi_news_pro_markup.py:822` `_speaker_key`;
+     `otr_video_director.py:173` `SEED_MODES`; `_otr_paths.py:669`
+     `comfyui_log_path`; `cloud_media_backend.py:333` `_TRUTHY` and `:491`
+     `CostQuote`; `ffmpeg.py:76` `_log`; `hf_token.py:121` `reset_cache`;
+     `wan_shared.py:35` `_WAN_DEFAULT_NEGATIVE`; `eng_ghost_signal.py:271`
+     `GHOST_SOURCE_FPS`; the spare instances at `eng_google_omni_video.py:496`
+     and `eng_google_veo_video.py:645` (`@register` builds and stores its
+     own); `cast_lock.py:102` `_VOICE_ENGINE_RESOLVE_EXTRA` (an empty set
+     unioned twice) and the unread `ann_bank` parameter of
+     `_stamp_voice_engine_selection` (`:1943`).
+   * Test-only helpers, deleted with their tests: `_otr_canon.py`
+     `CharacterCanonEntry`, `render_canon_markdown`, `write_canon`,
+     `load_canon` (`:49-100`; production writes only the episode canon) and
+     `load_episode_canon` (`:230`, no caller at all);
+     `_otr_loader_backends.py` `check_context_window` (`:79`, a documented
+     no-op), `encode_messages_for_row`, `stop_strings_for_row`,
+     `generate_kwargs_for_row`; `_otr_speaker_role.py` `resolve_speaker_role`,
+     `is_dialogue_role`, `is_radio_role`, `is_music_role`,
+     `stamp_default_role` (production imports only the constants and
+     `is_never_humo_role`); `_otr_shakespeare_sources.py` `FolgerScene` and
+     `parse_folger_scene` (`:106`, `:584`); `config/cast_pools.py`
+     `VOICE_REGISTRY` and `KNOWN_TTS_MODELS` (`:460-478`, a Phase 2
+     placeholder).
+   * Files: `cb_contract.json` (a one-line scratch file, unreferenced, and it
+     ships in the registry zip); `scripts/otr_reset_gpu_box.ps1` (an
+     unreferenced duplicate of the tested `otr_reset_gpu.ps1`).
+
+**Not taken** -- failed on the code:
+* The nine `_otr_workflow_apply.py` symbols: each is called inside the module
+  (by `patch_widget_by_name`, `resolved_profile`, `apply_profile` or
+  `_validate_widget_value`).
+* Live: `_otr_casting._strip_voice` carries `@field_validator("voice_preset")`
+  (`:236`); `LTX25_STAGE2_DECODE_NEEDS_MB` is read through `getattr`
+  (`eng_ltx25.py:1425`, `:1684`), and the eight `ltx25_recipe` underscore
+  constants do not exist; `--include-external` is read
+  (`tools/validate_workflow_links.py:286`); `proc.STDOUT` is a pinned drop-in
+  export (`tests/test_shared_env_and_proc_owners.py:271`).
+* Kept on purpose: `FORBIDDEN_PATTERNS` (a documented catalogue,
+  `tools/validate_workflow_links.py:50-54`); `MM_V2_NAME` / `MM_V2_MIN_BYTES`
+  ("recorded rather than claimed"); `CANONICALIZER_VERSION` /
+  `LOUDNESS_REFERENCE_SOURCE` (documentation constants); the `UpscaleEngine`
+  Protocol; `_otr_period_prompts`' few-shot set (parked, pinned at zero
+  callers, `_otr_creative_prompt_router.py:24-29`); `tests/_run_baseline.py`
+  (maintained, `f9552204`); `tests/lemmy_rng_check.py` (cited,
+  `config/cast_pools.py:481`); `run_agy_agent.ps1` / `run_codex_agent.ps1`
+  (hand-run lane launchers whose paths are parameter defaults); and
+  `tmp/GPT_SHAKESPEARE_HUNT_3_RESULTS_VERIFIED.md` (re-tracked on purpose,
+  `7f877ea8`; does not ship).
+* Runtime: the freeze cascade's second `json.dumps`
+  (`OTR_LedgerFreezeCascade.py:384`) carries the `freeze_unload_ok` stamp the
+  first lacks; the in-function models in `_otr_ledger_clean.py`
+  (`summarize_acts`, `_f2_judge`, `_f2_fix`, `_judge_row`) each wrap an LLM
+  call, so their build is noise; the voice sample hash
+  (`_otr_voice_node_common.py:967`) reads the leading 1 KB; and
+  `validate_ledger` / `derive_beat_records_from_ledger` do not exist.
+* `tests/test_shipped_scripts_are_shipped.py:102` returns early by design
+  when the installer does not ship (it does not, `.comfyignore:96`); only its
+  docstring is stale.
+* All five duplicate-test pairs name a counterpart file that does not exist.
+
 ### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
 
 `nodes/_otr_voice_route.py` and everything that only compiled because of it
