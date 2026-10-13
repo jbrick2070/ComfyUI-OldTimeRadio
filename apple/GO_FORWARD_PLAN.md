@@ -305,9 +305,9 @@ C2; building C2 is new capability, outside the bar.
 (`:6538`) are production, and `tests/test_multiclip_beat_loop.py:747-766`
 grades the real `render_beat_coverage -> build_clip_manifest` chain with the
 module. What never runs on a real episode is `grade_episode` and its six
-`grade_*` rules;
-`format_findings` has no caller at all; and `otr_shot_lock._stamp_frame_bounded`
-(`:2067`, called at `:3192`) writes `frame_bounded` for the grader alone.
+`grade_*` rules; `format_findings` has no caller at all; and
+`otr_shot_lock._stamp_frame_bounded` (`:2067`, called at `:3192`) writes
+`frame_bounded` for the grader alone.
 * Wire: in `OTR_VideoRenderBatch`, after `_stamp_render_trace`, run
   `grade_episode(ledger, manifest)` fail-soft, log `format_findings`, and put
   the finding count in `node_episode_report.json`. It cannot raise
