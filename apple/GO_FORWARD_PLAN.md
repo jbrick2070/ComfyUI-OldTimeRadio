@@ -294,9 +294,10 @@ C2; building C2 is new capability, outside the bar.
   its call, the `amp_rows` plumbing in `render_driver.py` (`:4916-4930`,
   `:5224`, `:5254-5258`, `:5489-5491`, `:5590-5604`, `:5740`), and
   `tests/test_audio_motion_profile.py` + `tests/test_audio_motion_foldin.py`.
-  Keep `audio_motion_profile` in `_REPLAY_RUN_VOLATILE_META`
-  (`production_ledger.py:583`) so a replay of an older ledger drops the stale
-  block, and correct that comment's "all rebuilt by the replay".
+  Leave `_REPLAY_RUN_VOLATILE_META` (`production_ledger.py:583`) as is and
+  correct its comment's "all rebuilt by the replay". A replay of an older
+  ledger keeps that ledger's top-level `audio_motion_profiles` (replay pops
+  only `meta` keys, `:799-800`); nothing reads it.
 * Keep: a row naming C2's consumer and what it waits for.
 
 **F2. The `acceptance.py` graders: wire (recommended) or rip.**
@@ -327,13 +328,16 @@ Grounded on `main` d3873fe; line numbers are that tree's. Every item touches
    `EpisodeAssembler.assemble` writes `<ep>_master.wav` and hashes it
    (`scene_sequencer.py:1805-1813`), then mixes each interstitial cue into
    `episode_waveform` inside the later ledger write-back (`:1996-2067`). The
-   mux (canonical node 85) publishes that WAV and `OTR_VideoRenderBatch`
-   (node 92) conditions on it, so every `music_inter` bridge -- any
-   `act_count` >= 2, plus the banks that mint bridge sentinels -- ships as the
-   4.0 s of zeros `SceneSequencer` inserts (`:1044-1057`). The cue reaches only
-   the tensor `OTR_SignalLostVideo` reads, after the limiter. In since
-   `e9a5b3cb` (2026-09-15). The canonical default (`act_count` 1) has no
-   bridge.
+   mux (canonical node 85, the same wiring in all 27 shipped graphs)
+   publishes that WAV and `OTR_VideoRenderBatch` (node 92) conditions on it,
+   so every `music_inter` bridge ships without its cue: the 4.0 s of zeros
+   `SceneSequencer` inserts (`:1044-1057`), or on foley lanes the foley bed
+   alone (`otr_master_audio_mux.py:2059-2063`). The cue reaches only the
+   tensor `OTR_SignalLostVideo` reads, after the limiter. In since `e9a5b3cb`
+   (2026-09-15). Bridges come from `act_count` >= 2 with `include_act_breaks`
+   on (`_otr_episode_budget.py:237`) and from banks that mint bridge
+   sentinels: 24 of the 27 shipped graphs save 3 or 5 acts with breaks on;
+   only `otr_canonical`, `otr_app` and `otr_cloud_low_1act` are 1-act.
    a. Evidence (admission rule; one file read, no render): any episode
       published since 2026-09-15 with a `music_inter` line. Its interstitial
       `music[]` row gives the master-mix window; `<ep>_master.wav` is digital
@@ -342,8 +346,14 @@ Grounded on `main` d3873fe; line numbers are that tree's. Every item touches
    b. Fix: move the overlay above `_master_loudness` (`:1720`), so the foley
       provisional clone and the levelled master both carry it and the loudness
       pass levels it. `_shift_samples` comes from `segments` there; the anchors
-      are read from the in-flight ledger, read-only. The `music[]` stamping
-      stays where it is.
+      are read from the in-flight ledger, read-only. Add OUT OF PLACE: with no
+      opening or closing theme (the canonical wiring), `episode_waveform` is
+      the upstream `main_waveform` itself (`:1654`), so the current in-place
+      `+=` (`:2056`) moved above the loudness pass would write into
+      AudioEnhance's cached output. The `music[]` stamping stays where it is.
+      Correct the comments that call the bridge silent or timeless; they
+      predate `e9a5b3cb` (`otr_shot_lock.py:626-628`,
+      `otr_master_audio_mux.py:859-861`, `foley_stems.py:872-877`).
    c. Tests: one interstitial -> non-silence in the gap, and the stamped
       `master_audio_sha256` equals the file's; none -> master bytes unchanged
       (the section 0B proof: only bridge episodes move, on both boxes).
@@ -354,16 +364,23 @@ Grounded on `main` d3873fe; line numbers are that tree's. Every item touches
    `unload()` returns early (`:280-283`): the worker keeps its VRAM and its
    stderr handle, and the next line spawns a second worker beside it. A dead
    worker at `stdin.write` (`:538`) or a non-JSON reply (`:556`) escapes with
-   `_proc` still set; an `ok:false` reply or an unreadable WAV leaves the temp
-   file. A successful line does remove its temp WAV (`:570`); the audit's
-   "every character line" is wrong.
+   `_proc` still set; a timeout (the worker may still write the file) or an
+   unreadable WAV leaves the temp file. An `ok:false` reply normally leaves
+   none (the worker reports before writing,
+   `scripts/_otr_indextts2_worker.py:86`, `:101`), and a successful line
+   removes its temp WAV (`:570`); the audit's "every character line" is wrong.
    * Fix: mirror `eng_chatterbox.py` -- `_SC.close_worker` on readiness
      failure, on any request failure and in `unload`; reap an idle-dead worker
-     in `load`; `_SC.remove_quietly(out_path)` on failure;
-     `_SC.load_wav_as_audio` for the read. Success path byte-identical; 16 GB+
-     only (not offered on 8 GB).
-   * Tests: run the chatterbox fake-worker cases in
-     `tests/test_tts_engine_sidecars.py` against indextts2 too.
+     in `load`; `_SC.remove_quietly(out_path)` on failure. Keep `_load_wav` as
+     the seam `tests/test_voice_identity_fix.py:541`, `:749` monkeypatch, and
+     have it delegate to `_SC.load_wav_as_audio`. Success path
+     byte-identical. Reach: 16 GB+ only (not offered on 8 GB) and git-tree
+     installs only (the adapter is excluded from the registry bundle,
+     `.comfyignore:162`).
+   * Tests: engine-level cases on the `_FakeProc` fakes in
+     `tests/test_tts_engine_sidecars.py:154-190` (neither engine has one
+     today): a timeout kills the worker and closes stderr; a failed request
+     removes the temp file.
    * A PBUG needs a forced-timeout smoke (`OTR_SIDECAR_REQUEST_TIMEOUT=1`)
      showing the orphan.
 
@@ -386,17 +403,31 @@ Grounded on `main` d3873fe; line numbers are that tree's. Every item touches
    SHA-256) into the fetcher's `ltx_8gb` entry, retarget the four strings and
    the two tests that pin the old name
    (`test_ltx_8gb_assert_usable_single_clip.py:239`,
-   `test_ltx_8gb_dir_override_tripwire.py:348`), then delete the .ps1 and
-   `scripts/hf_download_driver.py` (its only caller). Deleting first, as the
-   audit proposed, breaks the remediation link.
+   `test_ltx_8gb_dir_override_tripwire.py:348`), then delete the .ps1,
+   `scripts/hf_download_driver.py` (the .ps1 is its only caller) and
+   `test_download_driver_verify_materialized`
+   (`tests/test_public_engines.py:264-284`), which tests the driver itself.
+   Deleting first, as the audit proposed, breaks the remediation link.
+
+5. **`resolve_row_aspect` is dead.** No production caller
+   (`still_plan_helpers.py:187`); three `eng_humo.py` comments (`:137`,
+   `:1317`, `:1366`) say it drives the still dimensions, but production
+   resolves aspect per role in `OTR_VideoDirector._role_aspects`
+   (`otr_video_director.py:679`). Delete it and
+   `test_resolve_row_aspect_reads_engine_render_aspect`
+   (`tests/test_still_plan_audit.py:182-211`), and point the three comments
+   at the real resolver.
 
 **Not taken** -- the audit's other items, each failed on the code:
 * `retry_taxonomy.py` 41-243: `FailureKind` (`:58`) is production
-  (`render_driver.classify_failure`); the `_POLICY` table documents the future
-  retry budget on purpose (its own comment says so). Nothing to gain.
-* `still_plan_helpers.py` 50-297: the constants, `StillPlanRow` (nine engines)
-  and `resolve_row_aspect` (`eng_humo`) are production; the four validators
-  are `tests/test_still_plan_audit.py`'s registry-wide conformance check.
+  (`render_driver.classify_failure`). `classify`, `RetryDecision`, `_POLICY`
+  and `BlockClass` are test-only; the table waits on a retry budget that NO
+  FALLBACKS has not built (its note at `:177-184`), and trimming it buys
+  nothing at runtime.
+* `still_plan_helpers.py` 50-297: the constants and `StillPlanRow` (nine
+  modules) are production; the four validators are
+  `tests/test_still_plan_audit.py`'s registry-wide conformance check
+  (`resolve_row_aspect` is item 5).
 * `schemas.py` Pydantic models: the oracle that pins `build_request`'s output
   (`tests/test_video_render_driver_additive.py:748`, `:771`, `:784`);
   production imports only `FAMILY_REQUIRED_INPUTS` / `REQUIRED_INPUT_TOKENS`.
