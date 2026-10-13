@@ -384,3 +384,48 @@ def test_module_has_no_network_or_heavy_imports():
         else:
             continue
         assert not (names & banned)
+
+
+def test_a_fetch_normalizes_the_work_once(sample_manifest_path, monkeypatch):
+    """The payload and the document both index into one canonical body. The
+    fetch derives it once and builds both from it; re-verifying a body it
+    derived itself a line earlier ran the regexes over the whole work twice
+    more."""
+    from types import SimpleNamespace
+
+    calls = []
+    real = pd.normalize_public_domain_body
+
+    def counting(text):
+        calls.append(1)
+        return real(text)
+
+    monkeypatch.setattr(pd, "normalize_public_domain_body", counting)
+    bank = SimpleNamespace(
+        source_bank_id="public_domain",
+        defaults={"manifest_path": str(sample_manifest_path),
+                  "selection_mode": "fixed",
+                  "source_ref": "gutenberg-time-machine-sample:arrival"},
+    )
+    result = pd.fetch_public_domain_source(bank=bank)
+    assert len(calls) == 1
+    assert result.source_document.canonical_body == real(SAMPLE_TEXT)
+
+
+def test_the_fetch_builds_what_the_public_builders_build(sample_manifest_path):
+    """Skipping the re-check changes the cost, never the result."""
+    from types import SimpleNamespace
+
+    ref = "gutenberg-time-machine-sample:arrival"
+    bank = SimpleNamespace(
+        source_bank_id="public_domain",
+        defaults={"manifest_path": str(sample_manifest_path),
+                  "selection_mode": "fixed", "source_ref": ref},
+    )
+    result = pd.fetch_public_domain_source(bank=bank)
+    resolved = pd.resolve_manifest_unit(
+        pd.load_public_domain_manifest(sample_manifest_path), ref)
+    assert result.payload == pd.payload_from_manifest_unit(
+        resolved, text=SAMPLE_TEXT)
+    doc = pd.source_document_from_text(SAMPLE_TEXT, source_ref=ref)
+    assert result.source_document.canonical_body == doc.canonical_body
