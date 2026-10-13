@@ -262,26 +262,50 @@ def test_cross_validate_resolves_public_id():
 
 
 # --------------------------------------------------------------------------- #
-# downloader integrity (hf_download_driver extension)
+# downloader integrity (the lane fetcher every refusal points at)
 # --------------------------------------------------------------------------- #
-def test_download_driver_verify_materialized(tmp_path):
+def _lane_fetcher():
+    import importlib.util
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if os.path.join(root, "scripts") not in sys.path:
-        sys.path.insert(0, os.path.join(root, "scripts"))
-    from hf_download_driver import _verify_materialized
+    spec = importlib.util.spec_from_file_location(
+        "otr_fetch_lane_weights_under_test",
+        os.path.join(root, "scripts", "otr_fetch_lane_weights.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_lane_fetcher_verifies_size_and_sha(tmp_path):
+    fetch = _lane_fetcher()
     f = tmp_path / "w.bin"
     f.write_bytes(b"hello-weights")
     good_sha = hashlib.sha256(b"hello-weights").hexdigest()
-    # correct size + sha -> no error
-    assert _verify_materialized(str(f), len(b"hello-weights"), good_sha) == ""
-    # wrong size -> error
-    assert "size mismatch" in _verify_materialized(str(f), 999, None)
-    # wrong sha -> error
-    assert "SHA-256 mismatch" in _verify_materialized(str(f), None, "deadbeef")
-    # missing file -> error
-    assert _verify_materialized(str(tmp_path / "nope.bin"), 1, None) != ""
-    # no checks requested -> passes
-    assert _verify_materialized(str(f), None, None) == ""
+
+    def spec(size, sha):
+        return fetch.WeightSpec("org/repo", "w.bin", "checkpoints", "rev",
+                                size, sha)
+
+    assert fetch._validate_file(str(f), spec(13, good_sha), verify_hash=True)[0]
+    ok, why = fetch._validate_file(str(f), spec(999, None), verify_hash=True)
+    assert not ok and "wrong bytes" in why
+    ok, why = fetch._validate_file(str(f), spec(13, "deadbeef"),
+                                   verify_hash=True)
+    assert not ok and "SHA-256" in why
+    ok, why = fetch._validate_file(str(tmp_path / "nope.bin"), spec(1, None),
+                                   verify_hash=True)
+    assert not ok and why == "missing"
+
+
+def test_the_ltx_8gb_checkpoint_is_fetched_at_a_pin():
+    """The refusals send people to this lane; it must land the exact weight
+    the retired download_ltx_0_9_8.ps1 pinned, not whatever main serves."""
+    fetch = _lane_fetcher()
+    ckpt = fetch.weight_spec(fetch.LANES["ltx_8gb"][0])
+    assert ckpt.path_in_repo == "ltxv-2b-0.9.8-distilled.safetensors"
+    assert ckpt.revision == "8984fa25007f376c1a299016d0957a37a2f797bb"
+    assert ckpt.expected_bytes == 6340744492
+    assert ckpt.expected_sha256 == (
+        "76aa8c4786af752fa6f951947129d5290c3c6c0b2fadcadea6b5e114ae2cad8f")
 
 
 # --------------------------------------------------------------------------- #

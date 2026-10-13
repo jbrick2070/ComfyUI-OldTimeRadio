@@ -236,7 +236,7 @@ def test_CONTROL_a_missing_checkpoint_still_says_MISSING_MODEL(eng, monkeypatch)
     with pytest.raises(EngineUnusable) as e:
         eng.assert_usable(host_caps={}, profile={})
     assert e.value.reason == EngineUsabilityReason.MISSING_MODEL
-    assert "download_ltx_0_9_8" in str(e.value)  # remediation text preserved
+    assert "otr_fetch_lane_weights.py ltx_8gb" in str(e.value)  # remediation
 
 
 def test_CONTROL_a_missing_t5_still_says_offline(eng):

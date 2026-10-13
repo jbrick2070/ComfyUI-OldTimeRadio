@@ -345,7 +345,7 @@ def test_CONTROL_a_missing_checkpoint_still_says_MISSING_MODEL(eng):
     with pytest.raises(EngineUnusable) as e:
         eng.assert_usable(host_caps={}, profile={})
     assert e.value.reason == EngineUsabilityReason.MISSING_MODEL
-    assert "download_ltx_0_9_8" in str(e.value)
+    assert "otr_fetch_lane_weights.py ltx_8gb" in str(e.value)
 
 
 def test_CONTROL_by_token_IGNORES_the_DIR_by_contract(
