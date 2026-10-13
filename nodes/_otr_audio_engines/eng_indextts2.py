@@ -172,6 +172,7 @@ class IndexTTS2Engine:
 
     def __init__(self):
         self._proc = None
+        self._stderr = None
 
     # ---- config resolution (env override -> box default) ----
     def _venv_python(self):
@@ -209,6 +210,12 @@ class IndexTTS2Engine:
     def load(self):
         if self._proc is not None and self._proc.poll() is None:
             return
+        if self._proc is not None:
+            # A worker that exited while idle: reap it (pipes + stderr) before
+            # replacing it, so a respawn never leaks handles.
+            _SC.close_worker(self._proc, self._stderr)
+            self._proc = None
+            self._stderr = None
         for label, path in self.install_gaps()[:1]:
             if label == self._WEIGHTS_CONFIG:
                 raise RuntimeError(
@@ -230,76 +237,61 @@ class IndexTTS2Engine:
         except ImportError:  # pragma: no cover -- flat test imports
             from _otr_paths import otr_sidecar_stderr_path  # type: ignore
         err_path = otr_sidecar_stderr_path("_otr_indextts2_worker.err")
-        self._stderr = None
+        stderr_handle = None
         stderr = subprocess.DEVNULL
         try:
             err_path.parent.mkdir(parents=True, exist_ok=True)
-            self._stderr = open(err_path, "ab", buffering=0)
-            stderr = self._stderr
+            stderr_handle = open(err_path, "ab", buffering=0)
+            stderr = stderr_handle
         except OSError:
             pass
-        proc = subprocess.Popen(
-            args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr,
-            text=True, encoding="utf-8", bufsize=1, cwd=os.path.dirname(model_dir))
-        # BOUNDED, like both siblings (2026-09-12). This was a bare
-        # `proc.stdout.readline()` with no timeout, on the engine that is the
-        # SHIPPED DEFAULT for character voices. If the worker stalls -- a CUDA
-        # deadlock, a slow first weights load, a driver hiccup -- the call never
-        # returns, so the `finally: self._teardown(adapter)` in
-        # _otr_voice_node_common never runs, and ComfyUI plus an orphaned worker
-        # hold VRAM indefinitely with nothing in the log. It is indistinguishable
-        # from a slow render, which is what makes it expensive.
-        #
-        # eng_chatterbox already routes the identical read through this
-        # helper; this engine simply never imported it.
+        try:
+            proc = subprocess.Popen(
+                args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=stderr, text=True, encoding="utf-8", bufsize=1,
+                cwd=os.path.dirname(model_dir))
+        except Exception:
+            _SC.close_worker(None, stderr_handle)
+            raise
+        # BOUNDED: a stalled worker (a CUDA deadlock, a slow first weights
+        # load, a driver hiccup) must surface as a named error, never as a
+        # call that never returns while ComfyUI and the worker hold VRAM.
+        # EVERY refusal below reaps the worker and closes its stderr --
+        # killing alone left the pipes and the handle open.
         try:
             line = _SC.read_protocol_line(
                 proc, _SC.startup_timeout(), "IndexTTS2 readiness")
-        except (TimeoutError, EOFError) as exc:
-            line = ""
-            ready = {"ready": False, "error": str(exc)}
-        else:
-            ready = None
-        if ready is None:
-            try:
-                ready = (json.loads(line) if line.strip()
-                         else {"ready": False, "error": "no readiness line"})
-            except ValueError:
-                ready = {"ready": False,
-                         "error": "bad readiness line: %r" % line[:200]}
-        if not ready.get("ready"):
-            try:
-                proc.kill()
-            except OSError:
-                pass
+            ready = (json.loads(line) if line.strip()
+                     else {"ready": False, "error": "no readiness line"})
+            if not isinstance(ready, dict):
+                raise ValueError("readiness was not a JSON object: %r"
+                                 % line[:200])
+        except (TimeoutError, EOFError, ValueError) as exc:
+            _SC.close_worker(proc, stderr_handle)
+            raise RuntimeError(
+                "IndexTTS2 worker failed to start: %s (see %s)"
+                % (exc, err_path))
+        if ready.get("ready") is not True:
+            _SC.close_worker(proc, stderr_handle)
             raise RuntimeError(
                 "IndexTTS2 worker failed to start: %s (see %s)"
                 % (ready.get("error"), err_path))
         self._proc = proc
+        self._stderr = stderr_handle
 
     def unload(self):
         proc, self._proc = self._proc, None
-        if proc is None:
-            return
-        try:
-            if proc.poll() is None:
-                proc.stdin.write(json.dumps({"stop": True}) + "\n")
-                proc.stdin.flush()
-                proc.wait(timeout=10)
-        except Exception:  # noqa: BLE001 -- shutdown must never raise
-            pass
-        finally:
-            if proc.poll() is None:
-                try:
-                    proc.kill()
-                except OSError:
-                    pass
-            sd = getattr(self, "_stderr", None)
-            if sd is not None:
-                try:
-                    sd.close()
-                except OSError:
-                    pass
+        stderr, self._stderr = self._stderr, None
+        _SC.close_worker(proc, stderr)  # closes stderr even when proc is None
+
+    def _fail_request(self, out_path):
+        """The stream can no longer be trusted: reap the worker (a hung one
+        keeps its VRAM until killed), close its stderr, drop any file it
+        may have started writing. The next line starts a fresh worker."""
+        _SC.close_worker(self._proc, self._stderr)
+        self._proc = None
+        self._stderr = None
+        _SC.remove_quietly(out_path)
 
     # ---- emotion + text (adapter-side; sent to the worker) ----
     def prepare_text(self, text, delivery_vector=None):
@@ -535,40 +527,42 @@ class IndexTTS2Engine:
             "out_path": out_path,
             "verbose": False,
         }
-        self._proc.stdin.write(json.dumps(req, ensure_ascii=True) + "\n")
-        self._proc.stdin.flush()
-        # BOUNDED for the same reason as the readiness read above: this is the
-        # PER-LINE call, so an unbounded one hangs partway through an episode
-        # with some voices already rendered. A closed worker and a hung worker
-        # now both surface as a named error instead of one of them being
-        # silence forever.
+        # BOUNDED and FAIL-CLOSED on every branch: a dead pipe, a timeout, a
+        # closed or garbled reply. Each one reaps the worker and drops the temp
+        # file, because a hung worker left in place keeps its VRAM and the next
+        # line would spawn a second one beside it.
         try:
+            self._proc.stdin.write(json.dumps(req, ensure_ascii=True) + "\n")
+            self._proc.stdin.flush()
             resp_line = _SC.read_protocol_line(
                 self._proc, _SC.request_timeout(), "IndexTTS2 response")
-        except (TimeoutError, EOFError) as exc:
-            self._proc = None
+            resp = json.loads(resp_line)
+            if not isinstance(resp, dict):
+                raise ValueError("response was not a JSON object: %r"
+                                 % resp_line[:200])
+            if resp.get("ok") is True and not resp.get("out_path"):
+                raise ValueError("response missing out_path: %r"
+                                 % resp_line[:200])
+        except (TimeoutError, EOFError, ValueError, OSError) as exc:
+            self._fail_request(out_path)
             raise RuntimeError(
-                "IndexTTS2 worker %s (see _otr_indextts2_worker.err)" % exc)
-        if not resp_line:
-            self._proc = None
-            raise RuntimeError(
-                "IndexTTS2 worker closed unexpectedly (see _otr_indextts2_worker.err)")
-        resp = json.loads(resp_line)
-        if not resp.get("ok"):
+                "IndexTTS2 worker request failed: %s "
+                "(see _otr_indextts2_worker.err)" % exc)
+        if resp.get("ok") is not True:
+            # The worker can fail inside infer after it began writing.
+            _SC.remove_quietly(out_path)
             raise RuntimeError("IndexTTS2 render failed: %s" % resp.get("error"))
-        return self._load_wav(resp["out_path"], resp.get("sample_rate", self.sample_rate))
+        try:
+            return self._load_wav(
+                resp["out_path"], resp.get("sample_rate", self.sample_rate))
+        finally:
+            if resp["out_path"] != out_path:
+                _SC.remove_quietly(out_path)
 
     @staticmethod
     def _load_wav(path, sample_rate):
-        """Load the worker's WAV into the main venv as an AUDIO dict. Uses
-        soundfile, NOT torchaudio.load -- the Blackwell venv's torchaudio routes
-        load() through torchcodec, which is not installed here."""
-        import soundfile as sf
-        import torch
-        data, sr = sf.read(path, dtype="float32", always_2d=True)  # [T, C]
-        try:
-            os.remove(path)
-        except OSError:
-            pass
-        wav = torch.from_numpy(data.T).contiguous()  # [C, T]
-        return {"waveform": wav, "sample_rate": int(sr or sample_rate)}
+        """Load the worker's WAV into the main venv as an AUDIO dict, and
+        remove it -- even when the read fails, so a corrupt file never
+        accumulates. The shared sidecar reader (soundfile, not
+        torchaudio.load); kept as this engine's seam for tests."""
+        return _SC.load_wav_as_audio(path, sample_rate)
