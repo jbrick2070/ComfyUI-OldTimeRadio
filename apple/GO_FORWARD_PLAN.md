@@ -301,11 +301,11 @@ C2; building C2 is new capability, outside the bar.
 * Keep: a row naming C2's consumer and what it waits for.
 
 **F2. The `acceptance.py` graders: wire (recommended) or rip.**
-The module is not orphaned: `beat_frame_accounting` (`render_driver.py:4786`)
-and `SEGMENT_RECEIPT_KEYS` (`:6538`) are production, and
-`tests/test_multiclip_beat_loop.py:747-766` grades the real
-`render_beat_coverage -> build_clip_manifest` chain with it. What never runs on
-a real episode is `grade_episode` and its six `grade_*` rules;
+`beat_frame_accounting` (`render_driver.py:4786`) and `SEGMENT_RECEIPT_KEYS`
+(`:6538`) are production, and `tests/test_multiclip_beat_loop.py:747-766`
+grades the real `render_beat_coverage -> build_clip_manifest` chain with the
+module. What never runs on a real episode is `grade_episode` and its six
+`grade_*` rules;
 `format_findings` has no caller at all; and `otr_shot_lock._stamp_frame_bounded`
 (`:2067`, called at `:3192`) writes `frame_bounded` for the grader alone.
 * Wire: in `OTR_VideoRenderBatch`, after `_stamp_render_trace`, run
@@ -321,8 +321,9 @@ a real episode is `grade_episode` and its six `grade_*` rules;
 
 ### 0p. Gemini audit 2026-10-13 -- verified fixes, in order
 
-Grounded on `main` d3873fe; line numbers are that tree's. Every item touches
-`nodes/` or `__init__.py`, so the 5080 owns it (CLAUDE.md section 1).
+Grounded on `main` d3873fe; line numbers are that tree's. Every item but 4
+touches `nodes/`, `config/` or `__init__.py`, so the 5080 owns it (CLAUDE.md
+section 1); 4 is tests only.
 
 1. **Interstitial music never reaches the published audio.**
    `EpisodeAssembler.assemble` writes `<ep>_master.wav` and hashes it
@@ -368,7 +369,7 @@ Grounded on `main` d3873fe; line numbers are that tree's. Every item touches
    unreadable WAV leaves the temp file. An `ok:false` reply normally leaves
    none (the worker reports before writing,
    `scripts/_otr_indextts2_worker.py:86`, `:101`), and a successful line
-   removes its temp WAV (`:570`); the audit's "every character line" is wrong.
+   removes its temp WAV (`:570`).
    * Fix: mirror `eng_chatterbox.py` -- `_SC.close_worker` on readiness
      failure, on any request failure and in `unload`; reap an idle-dead worker
      in `load`; `_SC.remove_quietly(out_path)` on failure. Keep `_load_wav` as
@@ -384,17 +385,7 @@ Grounded on `main` d3873fe; line numbers are that tree's. Every item touches
    * A PBUG needs a forced-timeout smoke (`OTR_SIDECAR_REQUEST_TIMEOUT=1`)
      showing the orphan.
 
-3. **Retire the v1 ledger viewer.** `viewer/index.html` and
-   `scripts/serve_ledger.py` read a flat
-   `~/Documents/ComfyUI/output/old_time_radio/*_ledger.json`; v2 ledgers live
-   in `<episodes>/<id>/audio/`, which `scripts/otr_ledger_view.py` (`--html`,
-   `--watch`) reads. Neither ships nor is imported. Delete both, the `viewer/`
-   rule and its comment in `.comfyignore` (`:236-248`),
-   `test_the_ledger_viewer_does_not_ship_without_its_server`
-   (`tests/test_platform_s0_guards.py:376-417`), and the `viewer/` clause in
-   the `__init__.py:377-379` comment.
-
-4. **The `ltx_8gb` refusals point strangers at a script that only runs
+3. **The `ltx_8gb` refusals point strangers at a script that only runs
    here.** Four shipped messages (`eng_ltx_8gb.py:823`, `:1204`, `:1236`,
    `:1446`) name `scripts/download_ltx_0_9_8.ps1`, which hardcodes
    `C:\Users\jeffr\...` and `C:\ComfyUI-Models`;
@@ -407,43 +398,9 @@ Grounded on `main` d3873fe; line numbers are that tree's. Every item touches
    `scripts/hf_download_driver.py` (the .ps1 is its only caller) and
    `test_download_driver_verify_materialized`
    (`tests/test_public_engines.py:264-284`), which tests the driver itself.
-   Deleting first, as the audit proposed, breaks the remediation link.
+   Retarget before deleting, or the shipped link breaks.
 
-5. **`resolve_row_aspect` is dead.** No production caller
-   (`still_plan_helpers.py:187`); three `eng_humo.py` comments (`:137`,
-   `:1317`, `:1366`) say it drives the still dimensions, but production
-   resolves aspect per role in `OTR_VideoDirector._role_aspects`
-   (`otr_video_director.py:679`). Delete it and
-   `test_resolve_row_aspect_reads_engine_render_aspect`
-   (`tests/test_still_plan_audit.py:182-211`), and point the three comments
-   at the real resolver.
-
-**Not taken** -- the audit's other items, each failed on the code:
-* `retry_taxonomy.py` 41-243: `FailureKind` (`:58`) is production
-  (`render_driver.classify_failure`). `classify`, `RetryDecision`, `_POLICY`
-  and `BlockClass` are test-only; the table waits on a retry budget that NO
-  FALLBACKS has not built (its note at `:177-184`), and trimming it buys
-  nothing at runtime.
-* `still_plan_helpers.py` 50-297: the constants and `StillPlanRow` (nine
-  modules) are production; the four validators are
-  `tests/test_still_plan_audit.py`'s registry-wide conformance check
-  (`resolve_row_aspect` is item 5).
-* `schemas.py` Pydantic models: the oracle that pins `build_request`'s output
-  (`tests/test_video_render_driver_additive.py:748`, `:771`, `:784`);
-  production imports only `FAMILY_REQUIRED_INPUTS` / `REQUIRED_INPUT_TOKENS`.
-* Moving modules out of `nodes/`: `_otr_workflow_apply` is imported by the
-  `OTR_WorkflowValidator` node (`_otr_workflow_validator.py:649`) and
-  `google_slug_verifier` by `cloud_slug_preflight.py` (`:198`, `:407`);
-  `slug_inventory` and `_otr_gender_pronoun_scan` are never imported at load,
-  so moving them is churn with no runtime effect.
-
-### 0q. Gemini audit 2026-10-13, Part B -- verified, in order
-
-Grounded on `main` d3873fe. Same ownership as 0p. Most of Part B's runtime
-claims and every duplicate-test pair failed on the code, and several functions
-it cites do not exist. What holds:
-
-1. **Tests that guard nothing.**
+4. **Tests that guard nothing.**
    * `tests/test_remaining_video_contracts.py:192-228`: both tests loop over
      `workflows/*.env.json`, and there have been none since `a62f3567`
      (2026-09-07), so they pass on zero iterations. Delete both.
@@ -459,7 +416,7 @@ it cites do not exist. What holds:
    * `tests/test_gallery_category_name.py:14`: an invalid `\`` escape in a
      non-raw docstring (SyntaxWarning on Python 3.12+). Make it raw.
 
-2. **The public-domain fetch normalizes the work three times.**
+5. **The public-domain fetch normalizes the work three times.**
    `fetch_public_domain_source` normalizes once
    (`_otr_public_domain_sources.py:518`) and passes the body on, but
    `_canonical_body_for` (`:401`) re-normalizes to verify it, once for the
@@ -470,8 +427,19 @@ it cites do not exist. What holds:
    fetch; a mismatched body still raises. Gain: two regex passes over a
    ~25,000-word work per fetch, milliseconds.
 
-3. **Dead-symbol wave**, one commit under the `f37ca348` rule (each item read
-   in context; a candidate list, not a hit list); drop each from `__all__`.
+6. **Retire the v1 ledger viewer.** `viewer/index.html` and
+   `scripts/serve_ledger.py` read a flat
+   `~/Documents/ComfyUI/output/old_time_radio/*_ledger.json`; v2 ledgers live
+   in `<episodes>/<id>/audio/`, which `scripts/otr_ledger_view.py` (`--html`,
+   `--watch`) reads. Neither ships nor is imported. Delete both, the `viewer/`
+   rule and its comment in `.comfyignore` (`:236-248`),
+   `test_the_ledger_viewer_does_not_ship_without_its_server`
+   (`tests/test_platform_s0_guards.py:376-417`), and the `viewer/` clause in
+   the `__init__.py:377-379` comment.
+
+7. **Dead-symbol wave**, one commit under the `f37ca348` rule (each item read
+   in context; a candidate list, not a hit list). Drop each from `__all__`,
+   along with any import or constant only the deleted code used.
    * No reader at all: `story_orchestrator.py:53-65` (the
      `BaseStreamer`/`TextStreamer` try-import and its stubs; delete
      `tests/test_core.py:314-322` with it, which pins only that import);
@@ -484,38 +452,64 @@ it cites do not exist. What holds:
      `comfyui_log_path`; `cloud_media_backend.py:333` `_TRUTHY` and `:491`
      `CostQuote`; `ffmpeg.py:76` `_log`; `hf_token.py:121` `reset_cache`;
      `wan_shared.py:35` `_WAN_DEFAULT_NEGATIVE`; `eng_ghost_signal.py:271`
-     `GHOST_SOURCE_FPS`; the spare instances at `eng_google_omni_video.py:496`
-     and `eng_google_veo_video.py:645` (`@register` builds and stores its
-     own); `cast_lock.py:102` `_VOICE_ENGINE_RESOLVE_EXTRA` (an empty set
-     unioned twice) and the unread `ann_bank` parameter of
-     `_stamp_voice_engine_selection` (`:1943`).
+     `GHOST_SOURCE_FPS` (trim the ordering note above it, `:267-268`); the
+     spare instances at `eng_google_omni_video.py:496` and
+     `eng_google_veo_video.py:645` (`@register` builds and stores its own);
+     `cast_lock.py:102` `_VOICE_ENGINE_RESOLVE_EXTRA` (an empty set unioned
+     twice).
+   * `cast_lock.py`'s `ann_bank`: `_stamp_voice_engine_selection` never reads
+     its `ann_bank` parameter (`:1943`), and nothing else does either. Remove
+     the parameter, the arguments at `:718` and `:1401`, the `ann_bank=`
+     keyword at `:730`, `_auto_registry`'s parameter (`:1341`), and the
+     lookups that only feed it (`:710-711`, `:1397-1399`).
    * Test-only helpers, deleted with their tests: `_otr_canon.py`
      `CharacterCanonEntry`, `render_canon_markdown`, `write_canon`,
-     `load_canon` (`:49-100`; production writes only the episode canon) and
+     `load_canon` (`:49-146`; production writes only the episode canon),
+     with `CANON_FILENAME` (`:44`) and `import re` (`:21`), and
      `load_episode_canon` (`:230`, no caller at all);
      `_otr_loader_backends.py` `check_context_window` (`:79`, a documented
      no-op), `encode_messages_for_row`, `stop_strings_for_row`,
      `generate_kwargs_for_row`; `_otr_speaker_role.py` `resolve_speaker_role`,
      `is_dialogue_role`, `is_radio_role`, `is_music_role`,
-     `stamp_default_role` (production imports only the constants and
+     `stamp_default_role`, with `_RADIO_ROLES` (`:69`) and `_MUSIC_ROLES`
+     (`:94`) (production imports only the constants and
      `is_never_humo_role`); `_otr_shakespeare_sources.py` `FolgerScene` and
-     `parse_folger_scene` (`:106`, `:584`); `config/cast_pools.py`
-     `VOICE_REGISTRY` and `KNOWN_TTS_MODELS` (`:460-478`, a Phase 2
-     placeholder).
+     `parse_folger_scene` (`:106`, `:584`), with the `ElementTree` import
+     (`:18`); `config/cast_pools.py` `VOICE_REGISTRY` and `KNOWN_TTS_MODELS`
+     (`:460-478`, a Phase 2 placeholder); and `still_plan_helpers.py:187`
+     `resolve_row_aspect` with
+     `test_resolve_row_aspect_reads_engine_render_aspect`
+     (`tests/test_still_plan_audit.py:182-211`) -- production resolves aspect
+     per role in `OTR_VideoDirector._role_aspects`
+     (`otr_video_director.py:679`), so point the three `eng_humo.py` comments
+     that name it (`:137`, `:1317`, `:1366`) there.
    * Files: `cb_contract.json` (a one-line scratch file, unreferenced, and it
      ships in the registry zip); `scripts/otr_reset_gpu_box.ps1` (an
      unreferenced duplicate of the tested `otr_reset_gpu.ps1`).
 
-**Not taken** -- failed on the code:
-* The nine `_otr_workflow_apply.py` symbols: each is called inside the module
-  (by `patch_widget_by_name`, `resolved_profile`, `apply_profile` or
-  `_validate_widget_value`).
-* Live: `_otr_casting._strip_voice` carries `@field_validator("voice_preset")`
-  (`:236`); `LTX25_STAGE2_DECODE_NEEDS_MB` is read through `getattr`
-  (`eng_ltx25.py:1425`, `:1684`), and the eight `ltx25_recipe` underscore
-  constants do not exist; `--include-external` is read
-  (`tools/validate_workflow_links.py:286`); `proc.STDOUT` is a pinned drop-in
-  export (`tests/test_shared_env_and_proc_owners.py:271`).
+**Not taken:**
+* `_otr_workflow_apply.py` stays in `nodes/`: the `OTR_WorkflowValidator` node
+  imports it (`_otr_workflow_validator.py:649`), and its nine private helpers
+  are called inside the module (by `patch_widget_by_name`,
+  `resolved_profile`, `apply_profile` or `_validate_widget_value`).
+  `google_slug_verifier` is imported by `cloud_slug_preflight.py` (`:198`,
+  `:407`); `slug_inventory` and `_otr_gender_pronoun_scan` never load at boot,
+  so moving them out of `nodes/` is churn.
+* `retry_taxonomy.py`: `FailureKind` (`:58`) is production
+  (`render_driver.classify_failure`); `classify`, `RetryDecision`, `_POLICY`
+  and `BlockClass` are test-only and wait on a retry budget NO FALLBACKS has
+  not built (`:177-184`). Trimming buys nothing at runtime.
+* `still_plan_helpers.py`: the constants and `StillPlanRow` (nine modules) are
+  production; the four validators are `tests/test_still_plan_audit.py`'s
+  registry-wide conformance check.
+* `schemas.py` Pydantic models: the oracle that pins `build_request`'s output
+  (`tests/test_video_render_driver_additive.py:748`, `:771`, `:784`);
+  production imports only `FAMILY_REQUIRED_INPUTS` / `REQUIRED_INPUT_TOKENS`.
+* Live: `_otr_casting._strip_voice` (`@field_validator("voice_preset")`,
+  `:236`); `LTX25_STAGE2_DECODE_NEEDS_MB` (read through `getattr`,
+  `eng_ltx25.py:1425`, `:1684`); `--include-external`
+  (`tools/validate_workflow_links.py:286`); `proc.STDOUT` (a pinned drop-in
+  export, `tests/test_shared_env_and_proc_owners.py:271`).
 * Kept on purpose: `FORBIDDEN_PATTERNS` (a documented catalogue,
   `tools/validate_workflow_links.py:50-54`); `MM_V2_NAME` / `MM_V2_MIN_BYTES`
   ("recorded rather than claimed"); `CANONICALIZER_VERSION` /
@@ -532,12 +526,9 @@ it cites do not exist. What holds:
   first lacks; the in-function models in `_otr_ledger_clean.py`
   (`summarize_acts`, `_f2_judge`, `_f2_fix`, `_judge_row`) each wrap an LLM
   call, so their build is noise; the voice sample hash
-  (`_otr_voice_node_common.py:967`) reads the leading 1 KB; and
-  `validate_ledger` / `derive_beat_records_from_ledger` do not exist.
+  (`_otr_voice_node_common.py:967`) reads only the leading 1 KB.
 * `tests/test_shipped_scripts_are_shipped.py:102` returns early by design
-  when the installer does not ship (it does not, `.comfyignore:96`); only its
-  docstring is stale.
-* All five duplicate-test pairs name a counterpart file that does not exist.
+  when the installer does not ship (it does not, `.comfyignore:96`).
 
 ### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
 
