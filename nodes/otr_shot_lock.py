@@ -623,9 +623,10 @@ def overlay_audio_timing(ledger: dict, strict: bool = False) -> dict:
 #: episode 40+ minutes in.
 #:
 #: The value is not a taste call: 4.0 rounds the last correctly-timed bridge
-#: this repo produced (``dur_s=4.087``). The bridge is silent by design (see
-#: ``otr_master_audio_mux``: "it renders a picture and occupies no master-mix
-#: time at all"), so nothing but the picture's length depends on the number.
+#: this repo produced (``dur_s=4.087``). It sets more than the picture:
+#: SceneSequencer gives every ``music_inter`` line a silent gap of exactly this
+#: length, and EpisodeAssembler mixes the bridge cue into that gap, so the
+#: number is also the bridge's slot in the master.
 MUSIC_BRIDGE_FALLBACK_DUR_S = 4.0
 
 #: Video roles the assembler mints a deterministic MIRROR row for.
