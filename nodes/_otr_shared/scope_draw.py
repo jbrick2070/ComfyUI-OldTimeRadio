@@ -407,8 +407,10 @@ def paint_rainbow_frame(w, h, fi, total, fps, vol, freq, wave, signal, loss,
     arr = np.array(img, dtype=np.float32)
     arr *= vignette[:, :, np.newaxis]
     np.clip(arr, 0, 255, out=arr)
-    img = Image.fromarray(arr.astype(np.uint8))
-    a = np.array(img, dtype=np.int16)
+    # Truncate to uint8 exactly as before, then widen for the grain -- without
+    # the PIL image this used to build and read straight back (two full-frame
+    # copies per frame, identical values; viz_camera review VC-01, 2026-10-14).
+    a = arr.astype(np.uint8).astype(np.int16)
     intensity = int(4 + float(vol) * 10)
     noise = _rng(rng_key, fi, "grain").integers(
         -intensity, intensity + 1, size=a.shape, dtype=np.int16)
@@ -608,8 +610,10 @@ def paint_golden_camera_frame(w, h, fi, total, fps, vol, freq, wave, signal, los
     arr = np.array(img, dtype=np.float32)
     arr *= vignette[:, :, np.newaxis]
     np.clip(arr, 0, 255, out=arr)
-    img = Image.fromarray(arr.astype(np.uint8))
-    a = np.array(img, dtype=np.int16)
+    # Truncate to uint8 exactly as before, then widen for the grain -- without
+    # the PIL image this used to build and read straight back (two full-frame
+    # copies per frame, identical values; viz_camera review VC-01, 2026-10-14).
+    a = arr.astype(np.uint8).astype(np.int16)
     intensity = int(4 + float(vol) * 10)
     noise = _rng(rng_key, fi, "grain").integers(
         -intensity, intensity + 1, size=a.shape, dtype=np.int16)
