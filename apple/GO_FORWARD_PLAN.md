@@ -279,256 +279,50 @@ different proof.
   green "installed" toast and nothing on disk, twice; then fine). Not ours to
   fix; worth telling Comfy-Org, with the 4060's timeline. His Discord.
 
-### Gemini audit 2026-10-13 -- two forks (grounded on `main` d3873fe)
-
-Both are code whose output nothing reads. One word from him closes each.
-
-**F1. `audio_motion_profile`: rip (recommended) or keep for C2.**
-Every video episode reads each beat's conditioning WAV, takes a full-clip FFT
-and re-saves the ledger (`otr_video_render_batch.py:410-445`, called at `:734`)
-to write `audio_motion_profiles` and `meta.audio_motion_profile`. Nothing in
-`nodes/`, `scripts/`, `tools/` or `js/` reads either, so no field needs a new
-owner. The module's own docstring defers its consumer (C2) and no row tracks
-C2; building C2 is new capability, outside the bar.
-* Rip: delete `nodes/_otr_audio_motion.py`, `_stamp_audio_motion_profiles` and
-  its call, the `amp_rows` plumbing in `render_driver.py` (`:4916-4930`,
-  `:5224`, `:5254-5258`, `:5489-5491`, `:5590-5604`, `:5740`), and
-  `tests/test_audio_motion_profile.py` + `tests/test_audio_motion_foldin.py`.
-  Leave `_REPLAY_RUN_VOLATILE_META` (`production_ledger.py:583`) as is and
-  correct its comment's "all rebuilt by the replay". A replay of an older
-  ledger keeps that ledger's top-level `audio_motion_profiles` (replay pops
-  only `meta` keys, `:799-800`); nothing reads it.
-* Keep: a row naming C2's consumer and what it waits for.
-
-**F2. The `acceptance.py` graders: wire (recommended) or rip.**
-`beat_frame_accounting` (`render_driver.py:4786`) and `SEGMENT_RECEIPT_KEYS`
-(`:6538`) are production, and `tests/test_multiclip_beat_loop.py:747-766`
-grades the real `render_beat_coverage -> build_clip_manifest` chain with the
-module. What never runs on a real episode is `grade_episode` and its six
-`grade_*` rules; `format_findings` has no caller at all; and
-`otr_shot_lock._stamp_frame_bounded` (`:2067`, called at `:3192`) writes
-`frame_bounded` for the grader alone.
-* Wire: in `OTR_VideoRenderBatch`, after `_stamp_render_trace`, run
-  `grade_episode(ledger, manifest)` fail-soft, log `format_findings`, and put
-  the finding count in `node_episode_report.json`. It cannot raise
-  (`test_grade_episode_NEVER_raises_on_any_document`). The first leg reads
-  zero findings or names a real gap.
-* Rip: the graders, the `frame_bounded` stamp and its `ShotRow` field, and
-  their tests; keep `frame_count`, `beat_frame_accounting` and
-  `SEGMENT_RECEIPT_KEYS`. Costs the oracle above.
-
 ## 2. CODE -- decided, in order
 
-### 0p. Gemini audit 2026-10-13 -- verified fixes, in order
+### 0p. Gemini audit 2026-10-13 -- code landed; three live proofs and one row left
 
-Grounded on `main` d3873fe; line numbers are that tree's. Every item but 4
-touches `nodes/`, `config/` or `__init__.py`, so the 5080 owns it (CLAUDE.md
-section 1); 4 is tests only.
+The seven fixes and both forks are code on `claude/vigilant-lamport-p6x7ck`
+(PR jbrick2070/ComfyUI-OldTimeRadio#7), each scoped suite diffed against its
+same-HEAD baseline with no new failure: the act-break bridge cue is mixed
+before the master WAV is written and hashed (`c1ace8cd`); IndexTTS2 reaps its
+worker and partial WAV on every failure branch (`26eb9212`); the `ltx_8gb`
+refusals point at `otr_fetch_lane_weights.py ltx_8gb`, now pinned to revision,
+bytes and SHA-256 (`c14d21c5`); four tests that guarded nothing now do, and
+the forbidden-pattern sweep judges each hit where it sits (`94c290cc`); the
+public-domain fetch normalizes each work once (`96f3e917`); the v1 ledger
+viewer is retired (`d41f25b3`); the dead-symbol wave (`4f24985a`); F1 ripped
+`audio_motion_profile` and F2 wired the acceptance grader into
+`OTR_VideoRenderBatch` (`491ac7a1`, `09db856c`). CastLock's announcer bank lookups stayed:
+they are live admission checks.
 
-1. **Interstitial music never reaches the published audio.**
-   `EpisodeAssembler.assemble` writes `<ep>_master.wav` and hashes it
-   (`scene_sequencer.py:1805-1813`), then mixes each interstitial cue into
-   `episode_waveform` inside the later ledger write-back (`:1996-2067`). The
-   mux (canonical node 85, the same wiring in all 27 shipped graphs)
-   publishes that WAV and `OTR_VideoRenderBatch` (node 92) conditions on it,
-   so every `music_inter` bridge ships without its cue: the 4.0 s of zeros
-   `SceneSequencer` inserts (`:1044-1057`), or on foley lanes the foley bed
-   alone (`otr_master_audio_mux.py:2059-2063`). The cue reaches only the
-   tensor `OTR_SignalLostVideo` reads, after the limiter. In since `e9a5b3cb`
-   (2026-09-15). Bridges come from `act_count` >= 2 with `include_act_breaks`
-   on (`_otr_episode_budget.py:237`) and from banks that mint bridge
-   sentinels: 24 of the 27 shipped graphs save 3 or 5 acts with breaks on;
-   only `otr_canonical`, `otr_app` and `otr_cloud_low_1act` are 1-act.
-   a. Evidence (admission rule; one file read, no render): any episode
-      published since 2026-09-15 with a `music_inter` line. Its interstitial
-      `music[]` row gives the master-mix window; `<ep>_master.wav` is digital
-      silence there, and the server log carries `[EpisodeAssembler] mixed
-      interstitial cue` for the same run.
-   b. Fix: move the overlay above `_master_loudness` (`:1720`), so the foley
-      provisional clone and the levelled master both carry it and the loudness
-      pass levels it. `_shift_samples` comes from `segments` there; the anchors
-      are read from the in-flight ledger, read-only. Add OUT OF PLACE: with no
-      opening or closing theme (the canonical wiring), `episode_waveform` is
-      the upstream `main_waveform` itself (`:1654`), so the current in-place
-      `+=` (`:2056`) moved above the loudness pass would write into
-      AudioEnhance's cached output. The `music[]` stamping stays where it is.
-      Correct the comments that call the bridge silent or timeless; they
-      predate `e9a5b3cb` (`otr_shot_lock.py:626-628`,
-      `otr_master_audio_mux.py:859-861`, `foley_stems.py:872-877`).
-   c. Tests: one interstitial -> non-silence in the gap, and the stamped
-      `master_audio_sha256` equals the file's; none -> master bytes unchanged
-      (the section 0B proof: only bridge episodes move, on both boxes).
-   d. Live: one 2-act canonical leg to `otr/obs`; his ear on the bridge.
+Left, in order. Every one needs this box or the 5080 after the PR merges:
 
-2. **IndexTTS2 orphans a hung worker.** On a request timeout `generate_voice`
-   drops `self._proc` without killing it (`eng_indextts2.py:548-551`), so
-   `unload()` returns early (`:280-283`): the worker keeps its VRAM and its
-   stderr handle, and the next line spawns a second worker beside it. A dead
-   worker at `stdin.write` (`:538`) or a non-JSON reply (`:556`) escapes with
-   `_proc` still set; a timeout (the worker may still write the file) or an
-   unreadable WAV leaves the temp file. An `ok:false` reply normally leaves
-   none (the worker reports before writing,
-   `scripts/_otr_indextts2_worker.py:86`, `:101`), and a successful line
-   removes its temp WAV (`:570`).
-   * Fix: mirror `eng_chatterbox.py` -- `_SC.close_worker` on readiness
-     failure, on any request failure and in `unload`; reap an idle-dead worker
-     in `load`; `_SC.remove_quietly(out_path)` on failure. Keep `_load_wav` as
-     the seam `tests/test_voice_identity_fix.py:541`, `:749` monkeypatch, and
-     have it delegate to `_SC.load_wav_as_audio`. Success path
-     byte-identical. Reach: 16 GB+ only (not offered on 8 GB) and git-tree
-     installs only (the adapter is excluded from the registry bundle,
-     `.comfyignore:162`).
-   * Tests: engine-level cases on the `_FakeProc` fakes in
-     `tests/test_tts_engine_sidecars.py:154-190` (neither engine has one
-     today): a timeout kills the worker and closes stderr; a failed request
-     removes the temp file.
-   * A PBUG needs a forced-timeout smoke (`OTR_SIDECAR_REQUEST_TIMEOUT=1`)
-     showing the orphan.
+1. **The bridge, by ear.** One 2-act canonical leg to `otr/obs`; his ear on
+   the act break. The log reads `[EpisodeAssembler] mixed interstitial cue`
+   BEFORE the master is written now. Then the PBUG (admission rule: the
+   evidence is any episode published since 2026-09-15 with a `music_inter`
+   line, whose `<ep>_master.wav` is digital silence in that row's window) and
+   its Bible entry; `tests/test_interstitial_cue_reaches_master.py` is the
+   executable coverage.
+2. **The IndexTTS2 orphan, forced.** A PBUG needs a smoke on a 16 GB box with
+   the IndexTTS2 venv: `OTR_SIDECAR_REQUEST_TIMEOUT=1`, one line, then the
+   process list shows no worker left behind. Coverage:
+   `tests/test_indextts2_worker_lifecycle.py`.
+3. **The grader's first real episode.** Any video leg: read
+   `acceptance_finding_count` in `node_episode_report.json`. Zero, or each
+   `[OTR_VideoRenderBatch] acceptance:` log line names a real gap. The grader
+   already passes a sanctioned (floored) beat.
+4. **Two GPU reset scripts.** `scripts/otr_reset_gpu_box.ps1` is
+   unreferenced but is NOT a copy of the tested `otr_reset_gpu.ps1`; the two
+   differ, and the box script has no targeted safety test (it kills by
+   process). Consolidate only after reading both side by side and adding a
+   selection test like `tests/test_kill_otr_zombies_selection.py`.
 
-3. **The `ltx_8gb` refusals point strangers at a script that only runs
-   here.** Four shipped messages (`eng_ltx_8gb.py:823`, `:1204`, `:1236`,
-   `:1446`) name `scripts/download_ltx_0_9_8.ps1`, which hardcodes
-   `C:\Users\jeffr\...` and `C:\ComfyUI-Models`;
-   `scripts/otr_fetch_lane_weights.py ltx_8gb` already fetches both files on
-   any OS. Move the .ps1's pin (revision `8984fa25`, 6,340,744,492 bytes,
-   SHA-256) into the fetcher's `ltx_8gb` entry, retarget the four strings and
-   the two tests that pin the old name
-   (`test_ltx_8gb_assert_usable_single_clip.py:239`,
-   `test_ltx_8gb_dir_override_tripwire.py:348`), then delete the .ps1,
-   `scripts/hf_download_driver.py` (the .ps1 is its only caller) and
-   `test_download_driver_verify_materialized`
-   (`tests/test_public_engines.py:264-284`), which tests the driver itself.
-   Retarget before deleting, or the shipped link breaks.
-
-4. **Tests that guard nothing.**
-   * `tests/test_remaining_video_contracts.py:192-228`: both tests loop over
-     `workflows/*.env.json`, and there have been none since `a62f3567`
-     (2026-09-07), so they pass on zero iterations. Delete both.
-   * `tests/test_voice_assignments_derivation.py:105-153`: both guards read
-     `OTR_LedgerScriptWriter.py`, but the K.5 block moved to
-     `_otr_writer_tail.py:1260` (end marker `:1528`). One skips on every run;
-     the other watches the wrong file. Point both at the tail (the first may
-     scan both files).
-   * `tests/test_b7_forbidden_sweep.py:133-156` asserts `tokenize.FSTRING_*`
-     exist and never calls the classifier. Run
-     `tests/_s28_forbidden_sweep.py:classify_lines` on a planted f-string hit
-     and a planted code hit, or delete the test.
-   * `tests/test_gallery_category_name.py:14`: an invalid `\`` escape in a
-     non-raw docstring (SyntaxWarning on Python 3.12+). Make it raw.
-
-5. **The public-domain fetch normalizes the work three times.**
-   `fetch_public_domain_source` normalizes once
-   (`_otr_public_domain_sources.py:518`) and passes the body on, but
-   `_canonical_body_for` (`:401`) re-normalizes to verify it, once for the
-   payload (`:440`) and once for the document (`:421`) -- the opposite of what
-   the comments at `:416-418` and `:433-435` say. On the fetch path, build both
-   from the body derived at `:518` (private helpers); keep the verification on
-   the public entry points for outside callers. Tests: one normalization per
-   fetch; a mismatched body still raises. Gain: two regex passes over a
-   ~25,000-word work per fetch, milliseconds.
-
-6. **Retire the v1 ledger viewer.** `viewer/index.html` and
-   `scripts/serve_ledger.py` read a flat
-   `~/Documents/ComfyUI/output/old_time_radio/*_ledger.json`; v2 ledgers live
-   in `<episodes>/<id>/audio/`, which `scripts/otr_ledger_view.py` (`--html`,
-   `--watch`) reads. Neither ships nor is imported. Delete both, the `viewer/`
-   rule and its comment in `.comfyignore` (`:236-248`),
-   `test_the_ledger_viewer_does_not_ship_without_its_server`
-   (`tests/test_platform_s0_guards.py:376-417`), and the `viewer/` clause in
-   the `__init__.py:377-379` comment.
-
-7. **Dead-symbol wave**, one commit under the `f37ca348` rule (each item read
-   in context; a candidate list, not a hit list). Drop each from `__all__`,
-   along with any import or constant only the deleted code used.
-   * No reader at all: `story_orchestrator.py:53-65` (the
-     `BaseStreamer`/`TextStreamer` try-import and its stubs; delete
-     `tests/test_core.py:314-322` with it, which pins only that import);
-     `_otr_engine_profiles.py:167` `for_role`; `_otr_story_input.py:40`
-     `KNOWN_INPUT_MODES` and `:288` `dedicated_fields_present`;
-     `_otr_my_story.py:395` `_sha256`; `_otr_verbatim_corpus.py:49`
-     `LIFE_PLUS_50_DEATH_BEFORE`; `_otr_stage3_validators.py:56` `warns`;
-     `_otr_scifi_news_pro_markup.py:822` `_speaker_key`;
-     `otr_video_director.py:173` `SEED_MODES`; `_otr_paths.py:669`
-     `comfyui_log_path`; `cloud_media_backend.py:333` `_TRUTHY` and `:491`
-     `CostQuote`; `ffmpeg.py:76` `_log`; `hf_token.py:121` `reset_cache`;
-     `wan_shared.py:35` `_WAN_DEFAULT_NEGATIVE`; `eng_ghost_signal.py:271`
-     `GHOST_SOURCE_FPS` (trim the ordering note above it, `:267-268`); the
-     spare instances at `eng_google_omni_video.py:496` and
-     `eng_google_veo_video.py:645` (`@register` builds and stores its own);
-     `cast_lock.py:102` `_VOICE_ENGINE_RESOLVE_EXTRA` (an empty set unioned
-     twice).
-   * `cast_lock.py`'s `ann_bank`: `_stamp_voice_engine_selection` never reads
-     its `ann_bank` parameter (`:1943`), and nothing else does either. Remove
-     the parameter, the arguments at `:718` and `:1401`, the `ann_bank=`
-     keyword at `:730`, `_auto_registry`'s parameter (`:1341`), and the
-     lookups that only feed it (`:710-711`, `:1397-1399`).
-   * Test-only helpers, deleted with their tests: `_otr_canon.py`
-     `CharacterCanonEntry`, `render_canon_markdown`, `write_canon`,
-     `load_canon` (`:49-146`; production writes only the episode canon),
-     with `CANON_FILENAME` (`:44`) and `import re` (`:21`), and
-     `load_episode_canon` (`:230`, no caller at all);
-     `_otr_loader_backends.py` `check_context_window` (`:79`, a documented
-     no-op), `encode_messages_for_row`, `stop_strings_for_row`,
-     `generate_kwargs_for_row`; `_otr_speaker_role.py` `resolve_speaker_role`,
-     `is_dialogue_role`, `is_radio_role`, `is_music_role`,
-     `stamp_default_role`, with `_RADIO_ROLES` (`:69`) and `_MUSIC_ROLES`
-     (`:94`) (production imports only the constants and
-     `is_never_humo_role`); `_otr_shakespeare_sources.py` `FolgerScene` and
-     `parse_folger_scene` (`:106`, `:584`), with the `ElementTree` import
-     (`:18`); `config/cast_pools.py` `VOICE_REGISTRY` and `KNOWN_TTS_MODELS`
-     (`:460-478`, a Phase 2 placeholder); and `still_plan_helpers.py:187`
-     `resolve_row_aspect` with
-     `test_resolve_row_aspect_reads_engine_render_aspect`
-     (`tests/test_still_plan_audit.py:182-211`) -- production resolves aspect
-     per role in `OTR_VideoDirector._role_aspects`
-     (`otr_video_director.py:679`), so point the three `eng_humo.py` comments
-     that name it (`:137`, `:1317`, `:1366`) there.
-   * Files: `cb_contract.json` (a one-line scratch file, unreferenced, and it
-     ships in the registry zip); `scripts/otr_reset_gpu_box.ps1` (an
-     unreferenced duplicate of the tested `otr_reset_gpu.ps1`).
-
-**Not taken:**
-* `_otr_workflow_apply.py` stays in `nodes/`: the `OTR_WorkflowValidator` node
-  imports it (`_otr_workflow_validator.py:649`), and its nine private helpers
-  are called inside the module (by `patch_widget_by_name`,
-  `resolved_profile`, `apply_profile` or `_validate_widget_value`).
-  `google_slug_verifier` is imported by `cloud_slug_preflight.py` (`:198`,
-  `:407`); `slug_inventory` and `_otr_gender_pronoun_scan` never load at boot,
-  so moving them out of `nodes/` is churn.
-* `retry_taxonomy.py`: `FailureKind` (`:58`) is production
-  (`render_driver.classify_failure`); `classify`, `RetryDecision`, `_POLICY`
-  and `BlockClass` are test-only and wait on a retry budget NO FALLBACKS has
-  not built (`:177-184`). Trimming buys nothing at runtime.
-* `still_plan_helpers.py`: the constants and `StillPlanRow` (nine modules) are
-  production; the four validators are `tests/test_still_plan_audit.py`'s
-  registry-wide conformance check.
-* `schemas.py` Pydantic models: the oracle that pins `build_request`'s output
-  (`tests/test_video_render_driver_additive.py:748`, `:771`, `:784`);
-  production imports only `FAMILY_REQUIRED_INPUTS` / `REQUIRED_INPUT_TOKENS`.
-* Live: `_otr_casting._strip_voice` (`@field_validator("voice_preset")`,
-  `:236`); `LTX25_STAGE2_DECODE_NEEDS_MB` (read through `getattr`,
-  `eng_ltx25.py:1425`, `:1684`); `--include-external`
-  (`tools/validate_workflow_links.py:286`); `proc.STDOUT` (a pinned drop-in
-  export, `tests/test_shared_env_and_proc_owners.py:271`).
-* Kept on purpose: `FORBIDDEN_PATTERNS` (a documented catalogue,
-  `tools/validate_workflow_links.py:50-54`); `MM_V2_NAME` / `MM_V2_MIN_BYTES`
-  ("recorded rather than claimed"); `CANONICALIZER_VERSION` /
-  `LOUDNESS_REFERENCE_SOURCE` (documentation constants); the `UpscaleEngine`
-  Protocol; `_otr_period_prompts`' few-shot set (parked, pinned at zero
-  callers, `_otr_creative_prompt_router.py:24-29`); `tests/_run_baseline.py`
-  (maintained, `f9552204`); `tests/lemmy_rng_check.py` (cited,
-  `config/cast_pools.py:481`); `run_agy_agent.ps1` / `run_codex_agent.ps1`
-  (hand-run lane launchers whose paths are parameter defaults); and
-  `tmp/GPT_SHAKESPEARE_HUNT_3_RESULTS_VERIFIED.md` (re-tracked on purpose,
-  `7f877ea8`; does not ship).
-* Runtime: the freeze cascade's second `json.dumps`
-  (`OTR_LedgerFreezeCascade.py:384`) carries the `freeze_unload_ok` stamp the
-  first lacks; the in-function models in `_otr_ledger_clean.py`
-  (`summarize_acts`, `_f2_judge`, `_f2_fix`, `_judge_row`) each wrap an LLM
-  call, so their build is noise; the voice sample hash
-  (`_otr_voice_node_common.py:967`) reads only the leading 1 KB.
-* `tests/test_shipped_scripts_are_shipped.py:102` returns early by design
-  when the installer does not ship (it does not, `.comfyignore:96`).
+The B7 sweep gate (`tests/test_b7_forbidden_sweep.py`) diffs against tag
+`s29-clean-slate-gate`, which exists only on the 5080's clone; run it there
+once after the merge.
 
 ### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
 

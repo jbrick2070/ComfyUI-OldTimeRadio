@@ -1695,3 +1695,28 @@ the live version.
 - So the self-hosted story holds for someone else's machine: install
   ComfyUI and the pack, add the bridge, and an app that only speaks the SDK
   gets a finished episode, with the models arriving on their own.
+
+## 2026-10-14 -- Gemini audit fixes landed on a branch (cloud session, PR #7)
+
+- **Where:** branch `claude/vigilant-lamport-p6x7ck`, draft PR
+  jbrick2070/ComfyUI-OldTimeRadio#7, written from a Linux cloud container
+  (no GPU, no ComfyUI boot, no live leg). Not on `main` until he merges it.
+- **What landed, in order:** `c1ace8cd` act-break bridge cue mixed before the
+  master WAV is written and hashed; `26eb9212` IndexTTS2 reaps its worker and
+  partial WAV on every failure branch; `c14d21c5` `ltx_8gb` refusals point at
+  the pinned lane fetcher, the one-machine .ps1 and its driver retired;
+  `94c290cc` four tests that guarded nothing now do; `96f3e917` public-domain
+  fetch normalizes once; `d41f25b3` v1 ledger viewer retired; `4f24985a` the
+  dead-symbol wave (~1,400 lines, CastLock's announcer lookups kept as
+  admission checks); `491ac7a1` F1, `audio_motion_profile` ripped;
+  `09db856c` F2, the acceptance grader runs on every rendered episode and
+  writes `acceptance_finding_count` into `node_episode_report.json`.
+- **How it was checked:** every chunk's scoped suite diffed against a
+  same-HEAD baseline (container venv, no torch-GPU): no new failure in any
+  chunk; each new test fails on the old code. Sonnet refute-QA reads each
+  pushed diff; its findings land as follow-up commits. The B7 sweep gate needs the `s29-clean-slate-gate` tag, which only
+  the 5080's clone has.
+- **Left (GO_FORWARD_PLAN row 0p):** the bridge by ear on a 2-act leg plus
+  its PBUG; a forced-timeout IndexTTS2 smoke plus its PBUG; read the first
+  live `acceptance_finding_count`; the two GPU reset scripts as their own
+  row.
