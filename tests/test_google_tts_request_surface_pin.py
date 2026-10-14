@@ -54,6 +54,7 @@ from __future__ import annotations
 import hashlib
 import json
 import pathlib
+import re
 import unicodedata
 from collections import Counter
 
@@ -106,8 +107,22 @@ PINNED_SURFACE = {
         "tag_only/no_delivery": "82ee728effe996e8",
         "tag_spaced_comma/delivery": "38f51ccee601ffeb",
         "tag_spaced_comma/no_delivery": "38f51ccee601ffeb",
-        "japanese/delivery": "b77b7b24c50bff71",
-        "japanese/no_delivery": "b77b7b24c50bff71",
+        "trailing_pause/delivery": "5f15241c73ec3abe",
+        "trailing_pause/no_delivery": "5f15241c73ec3abe",
+        "leading_pause/delivery": "a2e8ae830dd3e215",
+        "leading_pause/no_delivery": "a2e8ae830dd3e215",
+        "pause_only/delivery": "2ed545c21022a194",
+        "pause_only/no_delivery": "2ed545c21022a194",
+        "cut_off/delivery": "dcd4bf4b986b2e90",
+        "cut_off/no_delivery": "dcd4bf4b986b2e90",
+        "shouting/delivery": "c2bcdba165dfd68a",
+        "shouting/no_delivery": "c2bcdba165dfd68a",
+        "japanese/delivery": "93bfd506bbf6e248",
+        "japanese/no_delivery": "93bfd506bbf6e248",
+        "chinese/delivery": "7bd7e5a4b358bcb2",
+        "chinese/no_delivery": "7bd7e5a4b358bcb2",
+        "hindi/delivery": "f8b14ca5c428d2a2",
+        "hindi/no_delivery": "f8b14ca5c428d2a2",
     },
 }
 
@@ -143,10 +158,20 @@ _PROBES = {
     "tag_tail": "Fine. [sighs]",
     "tag_only": "[laughs]",
     "tag_spaced_comma": "Oh [sighs] , OTR PROBE LINE",
-    # Google TTS is admitted on every episode language; Japanese lines carry
-    # fullwidth punctuation, which compatibility normalization would rewrite.
-    "japanese": _text(0x3053, 0x3093, 0x306B, 0x3061, 0x306F, 0xFF01,
-                      " OTR PROBE LINE", 0xFF1F),
+    # Pauses at the edges and alone, and speech cut off with a dash -- all
+    # passed through or manufactured by prepare_text.
+    "trailing_pause": "I do not know...",
+    "leading_pause": "...OTR PROBE LINE",
+    "pause_only": "...",
+    "cut_off": "I was going to--",
+    "shouting": "STOP!!! Now?!",
+    # Google TTS is admitted on every episode language (ja, zh, hi among
+    # them). Japanese lines carry fullwidth punctuation and ideographic
+    # stops; Chinese uses fullwidth commas; Hindi ends on a danda.
+    "japanese": _text(0x3053, 0x3093, 0x306B, 0x3061, 0x306F, 0x3001,
+                      "OTR PROBE LINE", 0x3002, " ", 0xFF01, 0xFF1F),
+    "chinese": _text(0x4F60, 0x597D, 0xFF0C, 0x4E16, 0x754C, 0x3002),
+    "hindi": _text(0x0928, 0x092E, 0x0938, 0x094D, 0x0924, 0x0947, 0x0964),
 }
 
 #: Production passes a delivery vector, or None when delivery is off or failed
@@ -359,7 +384,9 @@ def test_the_surface_is_the_real_request_for_every_model_and_voice(monkeypatch):
 
 # --------------------------------------------------------------------------- #
 # Mutants: each is a plausible edit to the request path, and each must move
-# at least one case. A probe deleted from _PROBES makes one of these fail.
+# at least one case. Every line-shape probe has a mutant keyed to it, so
+# deleting such a probe makes its mutant fail; the plain/padded/say probes are
+# covered jointly by the style and guard mutants.
 # --------------------------------------------------------------------------- #
 def _restyle_charon(monkeypatch):
     monkeypatch.setitem(G._ANNOUNCER_STYLE_BY_VOICE, "Charon",
@@ -515,6 +542,46 @@ def _close_spaced_comma(monkeypatch):
     _rewrite_text(monkeypatch, lambda t, d, s: t.replace(" ,", ","))
 
 
+def _tag_only_to_parens(monkeypatch):
+    def rewrite(t, d, s):
+        body = t.strip()
+        if body.startswith("[") and body.endswith("]") and body.count("[") == 1:
+            return "(" + body[1:-1] + ")"
+        return t
+
+    _rewrite_text(monkeypatch, rewrite)
+
+
+def _trailing_pause_to_period(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: re.sub(r"\.\.\.\s*$", ".", t) or t)
+
+
+def _strip_leading_pause(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t.lstrip(".") or t)
+
+
+def _punctuation_only_line(monkeypatch):
+    _rewrite_text(monkeypatch,
+                  lambda t, d, s: t if any(c.isalnum() for c in t) else "(pause)")
+
+
+def _cut_off_to_pause(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: re.sub(r"--\s*$", "...", t))
+
+
+def _collapse_bangs(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: re.sub(r"!{2,}", "!", t))
+
+
+def _cjk_stops(monkeypatch):
+    table = {0x3002: ". ", 0x3001: ", ", 0xFF0C: ", "}
+    _rewrite_text(monkeypatch, lambda t, d, s: t.translate(table))
+
+
+def _danda_to_period(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t.replace(chr(0x0964), "."))
+
+
 _MUTANTS = [
     _restyle_charon, _style_puck, _loosened_say_guard, _say_anywhere_guard,
     _puck_say_branch, _charon_only_temperature, _one_model_field,
@@ -522,7 +589,9 @@ _MUTANTS = [
     _delivery_set_branch, _seed_in_request, _truncate_200, _straighten_quotes,
     _ascii_quote_rewrite, _fold_accents, _whispers_only, _nfkc,
     _pause_to_comma, _dash_to_hyphen, _bang_to_period, _pad_short_lines,
-    _drop_trailing_tag, _close_spaced_comma,
+    _drop_trailing_tag, _close_spaced_comma, _tag_only_to_parens,
+    _trailing_pause_to_period, _strip_leading_pause, _punctuation_only_line,
+    _cut_off_to_pause, _collapse_bangs, _cjk_stops, _danda_to_period,
 ]
 
 
