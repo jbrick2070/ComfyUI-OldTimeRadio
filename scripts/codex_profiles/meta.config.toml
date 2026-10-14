@@ -1,0 +1,23 @@
+# Codex config profile for the Meta reviewer lane (muse-wonder via the Meta Model API).
+# scripts/run_meta_agent.ps1 copies this file to $CODEX_HOME\meta.config.toml before
+# every run, so THIS copy is the authority -- edit it here, not in CODEX_HOME.
+# `codex exec -p meta` layers it over the base config; the runner also passes
+# --ignore-user-config (see the runner header for why).
+# The key is read from env MODEL_API_KEY, which the runner fills from a key file.
+model = "muse-wonder-1.0"
+model_provider = "meta"
+model_reasoning_effort = "high"
+model_reasoning_summary = "auto"
+model_context_window = 1048576
+model_auto_compact_token_limit = 900000
+# --ignore-user-config drops the base config's Windows sandbox mode, and without it every
+# shell command the reviewer runs is "rejected: blocked by policy". The runner pins the
+# sandbox to read-only on the command line; approvals stay at Codex's default.
+[windows]
+sandbox = "elevated"
+
+[model_providers.meta]
+name = "Meta Model API"
+base_url = "https://api.meta.ai/v1"
+env_key = "MODEL_API_KEY"
+wire_api = "responses"
