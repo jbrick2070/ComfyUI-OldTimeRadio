@@ -358,6 +358,34 @@ Each of these survived on purpose and needs a ruling, not a deletion:
 - **`profile_max_render_frames`** and `_active_profile`: the KNOWN OPEN cap-authority
   row in the standing rulings.
 
+### 0r. 8 GB regression on 2.3.24: every 8 GB graph, 1 act, fastest first (MRKT -- open)
+
+Operator, 2026-10-14: "run 1 act from fastest to longest 8gb on this rig to
+regress." 2.3.24 removed about 1,200 lines from nodes/ (dead-code waves, the
+retry policy) and changed no graph, so this is a regression pass over every
+8 GB graph, not a new proof. The cloud session that published 2.3.24 has no
+GPU; this is the 4060's (MRKT) row.
+
+Same driver and settings as the 2026-10-13 MRKT receipt, one leg at a time,
+reset between legs (section 4), each leg must reach `otr/obs/`:
+
+    python scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --profile <id> --act-count 1
+
+| order | profile | expected 1-act wall (from earlier MRKT receipts) |
+| --- | --- | --- |
+| 1 | `otr_8gb_low` | ~6-10 min (1-act 6:10 on 2026-10-13, 9:49 on 09-26) |
+| 2 | `otr_8gb_still` | ~15-20 min (3-act 37:21) |
+| 3 | `otr_8gb_video` | ~15-20 min (3-act 41:16 / 46:20) |
+| 4 | `otr_8gb_animatediff` | ~35-40 min (3-act 1:40:31) |
+| 5 | `otr_8gb_ltx25_audio_in` | ~2 h (1-act 2:00:29 on 09-25) |
+| 6 | `otr_8gb_ltx25_mime` | ~2 h, never measured (same weights as foley) |
+| 7 | `otr_8gb_ltx25_foley` | ~2 h+ (3-act 6:26:58) |
+
+Per leg, record: episode id, RESULT, obs_publish, wall, sampled peak VRAM,
+acceptance_finding_count, and any Traceback / AttributeError / ImportError
+(an import of a deleted name would surface as one of these). A failure is a
+fix or a revert commit with the reason; a pass closes the row.
+
 ### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
 
 `nodes/_otr_voice_route.py` and everything that only compiled because of it
