@@ -1172,11 +1172,16 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                 # Never silent: the base teardown releases the lease in its
                 # `finally`, but an interrupt inside detach() skips unload(),
                 # and that residue is worth a line (codex QA on a87d8257).
-                _LOG.warning(
-                    "[%s] teardown after a failed prepare() raised %s: %s -- "
-                    "the lease was released, some residency may remain; the "
-                    "original error follows", self.name,
-                    type(cleanup).__name__, cleanup)
+                # The log call is guarded too: a handler that raises must not
+                # replace the original error either (sonnet QA on 171edd89).
+                try:
+                    _LOG.warning(
+                        "[%s] teardown after a failed prepare() raised %s: %s "
+                        "-- the lease release ran in teardown's finally, some "
+                        "residency may remain; the original error follows",
+                        self.name, type(cleanup).__name__, cleanup)
+                except BaseException:      # noqa: BLE001 -- never mask the cause
+                    pass
             raise
         return prepared
 
