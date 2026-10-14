@@ -411,7 +411,7 @@ def _grade_acceptance(ledger, manifest):
     """Run the acceptance grader over the episode just rendered: the same
     ledger and manifest pair the clips were built from. Records, never
     blocks -- returns the finding count (``None`` when the grader could not
-    run) and logs one line per finding."""
+    run) and logs the findings, one line each, in a single warning."""
     try:
         from ._otr_video_engines import acceptance as _acc
         findings = _acc.grade_episode(ledger, manifest)

@@ -16455,3 +16455,10 @@ not promote it to the Bug Bible on this evidence alone.
   the "self" value a bank's fetcher/interpreter take, and pointed at `docs/`.
 - (the fixes the correction row lists landed in cea43197, the same commit that
   appended it, not a later one.)
+
+## Note 2026-10-14 -- PBUG-20260903-05's coverage retired with the viewer
+- `viewer/index.html` and `scripts/serve_ledger.py` were retired in d41f25b3
+  (v2 ledgers are read by `scripts/otr_ledger_view.py --html / --watch`), and
+  `test_the_ledger_viewer_does_not_ship_without_its_server` went with them.
+  With neither half left there is no pair to ship apart: the failure class is
+  gone, not uncovered. A Bible entry citing that test should say the same.

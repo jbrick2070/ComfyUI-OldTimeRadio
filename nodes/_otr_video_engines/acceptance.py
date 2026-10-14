@@ -897,7 +897,15 @@ def grade_no_mirror(ledger, manifest):
         # ONLY an explicit True demands it. Absent means the freeze never said,
         # which is every ledger written before the stamp existed -- indicting
         # those would report the grader's calendar, not the episode.
-        if shot is not None and versioned and shot.get("frame_bounded") is True:
+        #
+        # NOT ON A FLOOR (2026-10-14). A floored shot keeps the stamp of the
+        # engine that was refused, but still_pan drew the beat and owes no
+        # native count; asking for one reported every floored beat as a
+        # mirror. Its mode is still judged above. Literal compare, as in
+        # grade_delivered.
+        floored = str(row.get("status") or "") == "sanctioned_gap"
+        if (shot is not None and versioned and not floored
+                and shot.get("frame_bounded") is True):
             declared_native = frame_count(row.get("native_frame_count"))
             if declared_native is None:
                 findings.append(_finding(

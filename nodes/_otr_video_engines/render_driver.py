@@ -4383,9 +4383,9 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         plan = _cp.CoveragePlan.from_dict(raw_plan)
     if plan is None or not plan.requires_coverage_execution:
         # THE HISTORICAL PATH, byte for byte. The caller has usually already
-        # built this request (it needs it for the trace and the audio-motion
-        # profile), so it is used as-is rather than rebuilt -- rebuilding it
-        # here would be a second derivation of one request.
+        # built this request (it needs it for the trace), so it is used as-is
+        # rather than rebuilt -- rebuilding it here would be a second
+        # derivation of one request.
         #
         # The predicate is ``requires_coverage_execution``, not
         # ``is_multi_clip``: a ONE-segment plan still owes a tail trim whenever
