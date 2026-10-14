@@ -35,7 +35,11 @@ try:
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
-DEFAULT_MODEL = "gemini-omni-flash-preview"
+#: The GA model. Google retires ``gemini-omni-flash-preview`` from the Gemini
+#: API on 2026-10-22 (same Interactions API, same 3-10 s, 720p, 24 fps), so
+#: the preview id is no longer accepted: a pinned env override naming it
+#: fails loud here instead of at Google after that date.
+DEFAULT_MODEL = "gemini-omni-1.1-flash"
 SUPPORTED_MODELS = (DEFAULT_MODEL,)
 OUTPUT_DURATION_RANGE_S = (3, 10)
 #: The rate a delivered clip is COUNTED at -- the canvas's, not OUTPUT_FPS

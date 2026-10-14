@@ -135,6 +135,10 @@ def test_bad_shape_fails_before_request(monkeypatch):
     monkeypatch.setenv("OTR_GOOGLE_VIDEO_MODEL_ID", "veo-3.1-generate-preview")
     with pytest.raises(GoogleAPIRequestShapeError, match="unsupported model"):
         eng.render_clip(_req(), {})
+    # The preview id Google retires on 2026-10-22 is refused by name.
+    monkeypatch.setenv("OTR_GOOGLE_OMNI_MODEL_ID", "gemini-omni-flash-preview")
+    with pytest.raises(GoogleAPIRequestShapeError, match="gemini-omni-flash-preview"):
+        eng.render_clip(_req(), {})
 
 
 def test_request_shape_sends_interactions_video_uri_format(monkeypatch, tmp_path):
@@ -159,7 +163,7 @@ def test_request_shape_sends_interactions_video_uri_format(monkeypatch, tmp_path
     assert pathlib.Path(raw["path"]).read_bytes() == b"mp4-bytes"
     assert raw["content_type"] == "video/mp4"
     payload = seen["payload"]
-    assert payload["model"] == "gemini-omni-flash-preview"
+    assert payload["model"] == "gemini-omni-1.1-flash"
     assert payload["response_format"] == {"type": "video", "delivery": "uri"}
     assert "duration" not in payload
     assert "seed" not in payload
@@ -206,7 +210,7 @@ def test_request_shape_accepts_init_image_interactions_parts(monkeypatch, tmp_pa
 
     with pytest.raises(GoogleAPIRequestShapeError, match="missing/absent"):
         G._interaction_payload(
-            "gemini-omni-flash-preview",
+            "gemini-omni-1.1-flash",
             _req(asset_refs={"init_image": str(tmp_path / "missing.png")}),
         )
 
