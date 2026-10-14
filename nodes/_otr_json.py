@@ -10,11 +10,10 @@ second as ``Extra data`` -- the BUG-LOCAL-261 casting crash
 ("HAYES VANCE", 2026-05-24; gemma-4-E4B-it at temperature 0.95 emitted
 a valid cast object followed by a second object).
 
-The correct logic already lived in ``news_interpreter.extract_json_block``:
-a fenced-block match plus ``json.JSONDecoder.raw_decode`` that takes the
-FIRST complete object and ignores any trailing content. This module is
-that logic's single home; ``news_interpreter`` now re-exports
-``extract_json_block`` from here.
+The correct logic already lived in ``news_interpreter`` (as
+``extract_json_block``): a fenced-block match plus
+``json.JSONDecoder.raw_decode`` that takes the FIRST complete object and
+ignores any trailing content. This module is that logic's single home.
 
 Pure stdlib (``json`` + ``re``); no sibling imports, safe to import
 from any node module.

@@ -34,7 +34,6 @@ CALL_SITE_NAMES: frozenset[str] = frozenset({
     "generate_fn",
     "creative_fn",
     "technical_fn",
-    "polish_generate_fn",
     "request_slot",
 })
 
