@@ -106,6 +106,10 @@ def _sent_requests(monkeypatch) -> dict:
                 engine.generate_voice(probe, voice, None, 0,
                                       disable_retry=True, resolved_model=model)
                 assert len(sent) == 1, (model, voice, probe, len(sent))
+                # Folding writes these markers; a request that already carries
+                # one would fold to a legitimate request's surface and hide.
+                assert "<model>" not in sent[0] and "<voice>" not in sent[0], (
+                    "request carries a fold placeholder literally", sent[0])
                 requests[(model, voice, probe)] = _fold_ids(json.loads(sent[0]), model, voice)
     return requests
 
@@ -256,6 +260,21 @@ def test_a_request_change_moves_the_fingerprint(monkeypatch, mutate):
     before = _fingerprint(monkeypatch)
     mutate(monkeypatch)
     assert _fingerprint(monkeypatch) != before
+
+
+def test_a_literal_placeholder_in_the_request_is_refused_not_folded(monkeypatch):
+    """Sending "<model>" in place of the real id is a request change that
+    folding alone would erase (codex QA on f1aeb2ee)."""
+    original = G._interaction_payload
+
+    def _payload(model, text, voice):
+        body = original(model, text, voice)
+        body["model"] = "<model>"
+        return body
+
+    monkeypatch.setattr(G, "_interaction_payload", _payload)
+    with pytest.raises(AssertionError, match="fold placeholder"):
+        _fingerprint(monkeypatch)
 
 
 @pytest.mark.parametrize("attr,extra", [
