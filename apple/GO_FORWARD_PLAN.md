@@ -368,8 +368,23 @@ which removed `OTR_SignalLostVideo.draw_scopes` from `otr_canonical.json` and
 regenerated all 26 variants (trailing widget, zero `dst_slot` repairs, 27/27
 graphs censused, nothing outside node 12 changed). No 5080 window was live to
 agree in-message, so this row is the record. **The 5080 should pull before it
-next opens `otr_canonical.json`.** Left: the final MRKT 8 GB one-act leg to
-`otr/obs` on the final HEAD, then the 2.3.27 bump the operator asked for.
+next opens `otr_canonical.json`.**
+
+**Final MRKT 8 GB one-act leg: PASSED on `9f653c1a`.** `otr_8gb_low`, RESULT
+SUCCESS, 383 s prompt / 391 s wall, `obs_publish OK` ->
+`three_boxes_20261014_123150__...final.mp4` (85.5 s, 1920x1080 h264 + aac),
+node 12 on `h264_nvenc`, 0 acceptance findings, 0 tracebacks, peak 7.1 GB of
+8 GB; live `/object_info` shows node 12 without `draw_scopes`. Receipt:
+`D:\otr-4060-testing\qa-20261014-final-1act\RESULTS.md` on MRKT.
+
+Two video-lane items from the same review landed after it: the Ghost
+`prepare()` unwind (`a87d8257`) and the mesh single digest (`a39d1e42`), both
+CPU-proven only. Correction to `a87d8257`'s message: `otr_8gb_animatediff`
+DOES run a Ghost lane (`animatediff15_v3_haunted_video`); MRKT simply has none
+of its weights (SD1.5 fp16, `v3_sd15_mm.ckpt`, `v3_sd15_adapter.ckpt`), so the
+live proof belongs to a box that has them. Open: the review's item 3 --
+profile green / rainbow / mandala (audio analysis, per-clip prep, per-frame
+paint+CRT, encode) on a quiet box before choosing any further change.
 
 ### 0r. 8 GB regression on 2.3.25: every 8 GB graph, 1 act, fastest first (MRKT -- open)
 
