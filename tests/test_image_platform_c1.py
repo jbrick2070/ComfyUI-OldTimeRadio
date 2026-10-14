@@ -165,12 +165,18 @@ _EMPTY_VIDEO_POLICY = json.dumps({"video_models": {}})
 def test_image_director_policy_json_and_seed(clean_image_registry):
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
-    out = OTRImageDirector().direct(**_direct_kwargs(
-        character_granularity="per_beat", request_seed=7))
+    out = OTRImageDirector().direct(**_direct_kwargs(request_seed=7))
     policy = json.loads(out[0])
     assert policy["image_models"]["music_image_model"]["engine_id"] == "flux_gen1"
     assert policy["seed"]["request_seed"] == 7
     assert policy["fresh_cap"] == 15
+    # The retired granularity widgets leave their receipt keys at the shipped
+    # value (2026-10-14): same shape for every downstream reader.
+    assert policy["granularity"] == {
+        "announcer_image_model": "per_object",
+        "music_image_model": "per_object",
+        "character_image_model": "per_object",
+    }
     # NO widget named 'seed' on the node (V-7)
     assert "seed" not in OTRImageDirector.INPUT_TYPES()["required"]
     assert "request_seed" in OTRImageDirector.INPUT_TYPES()["required"]
@@ -230,8 +236,6 @@ def _direct_kwargs(**over):
     except (ValueError, TypeError):
         pass  # malformed payload passes through for the fail-closed tests
     kw = dict(
-        announcer_granularity="per_object",
-        music_granularity="per_object", character_granularity="per_object",
         fresh_cap=15, seed_mode="request_hash", request_seed=0,
         video_policy_json=vp_raw,
     )

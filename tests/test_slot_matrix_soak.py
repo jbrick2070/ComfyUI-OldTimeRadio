@@ -61,21 +61,30 @@ def _load_canonical() -> dict:
 # --------------------------------------------------------------------------- #
 
 
-def test_canonical_json_character_granularity_widget():
-    # node 88 (OTR_ImageDirector) granularity widget renamed to character_granularity:
-    # all three name fields agree, the value stays positional, and the code side matches.
+_RETIRED_GRANULARITY = ("announcer_granularity", "music_granularity",
+                        "character_granularity")
+
+
+def test_canonical_image_director_granularity_widgets_are_retired():
+    # node 88 (OTR_ImageDirector): the three granularity widgets were RETIRED
+    # 2026-10-14 (no production reader; they promised a still frequency nothing
+    # applied). Gone from the saved graph, the schema and the call signature,
+    # and the retained widgets sit exactly where the migration put them.
     import inspect
     wf = _load_canonical()
     n88 = next(n for n in wf["nodes"] if n.get("id") == 88)
     assert n88.get("type") == "OTR_ImageDirector"
-    inp = next(i for i in n88["inputs"] if i.get("name") == "character_granularity")
-    assert inp["localized_name"] == "character_granularity"
-    assert inp["widget"]["name"] == "character_granularity"
-    assert n88["widgets_values"][2] == "per_object"          # positional value unchanged
+    names = [i.get("name") for i in n88["inputs"]]
+    assert not set(_RETIRED_GRANULARITY) & set(names)
+    assert names[:2] == ["video_policy_json", "gate_in"]
+    assert names[2:] == ["fresh_cap", "seed_mode", "request_seed",
+                         "custom_models_json", "dtype_policy"]
+    assert n88["widgets_values"] == [15, "request_hash", 42, "{}", "fp8_ok"]
     from nodes.otr_image_director import OTRImageDirector
-    assert "character_granularity" in OTRImageDirector.INPUT_TYPES()["required"]
-    sig = inspect.signature(OTRImageDirector().direct)
-    assert "character_granularity" in sig.parameters
+    schema = OTRImageDirector.INPUT_TYPES()
+    for name in _RETIRED_GRANULARITY:
+        assert name not in schema["required"] and name not in schema["optional"]
+        assert name not in inspect.signature(OTRImageDirector().direct).parameters
 
 
 def test_every_chosen_engine_is_capability_eligible():

@@ -139,9 +139,6 @@ def test_image_director_forwards_both_keys(monkeypatch):
     automatically -- node 89 and node 91 would silently never see the freeze."""
     video_policy = _direct(monkeypatch, announcer="humo_1.7B")
     (raw,) = idir.OTRImageDirector().direct(
-        announcer_granularity="per_object",
-        music_granularity="per_object",
-        character_granularity="per_object",
         fresh_cap=15, seed_mode="request_hash", request_seed=0,
         video_policy_json=json.dumps(video_policy),
     )

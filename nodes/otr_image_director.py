@@ -35,7 +35,6 @@ from ._otr_image_engines import registry as _ireg
 from ._otr_video_engines import registry as _vreg
 from ._otr_shared import role_compat as _rc
 from ._otr_shared import role_slots as _role_slots
-from ._otr_image_engines.schemas import GRANULARITY_MODES
 
 #: Sentinel COMBO entry that opens the "declare a custom model" path (mirrors the
 #: video director). The custom engine id is read from ``custom_models_json``.
@@ -107,16 +106,25 @@ def mesh_fodder_roles_from_video_policy(video_policy: dict) -> list:
     return sorted(roles)
 
 
+#: THE GRANULARITY RECEIPT, FIXED (2026-10-14). The three per-role
+#: granularity widgets were RETIRED: their help promised a still frequency
+#: (one reused image vs a fresh one per beat), but no production code reads
+#: the value -- the still targets come from the target producers (portraits by
+#: character, scene targets by beat, mesh objects). The keys stay on the
+#: emitted policy as LEGACY RECEIPT values, at the shipped default, so every
+#: downstream receipt keeps its shape; they cause no image reuse.
+_RECEIPT_GRANULARITY = "per_object"
+
+
 class OTRImageDirector:
-    """Registered as ``OTR_ImageDirector``. Per-role granularity / fresh-cap / seed
-    policy; image-model picks come from OTR_VideoDirector via video_policy_json."""
+    """Registered as ``OTR_ImageDirector``. Fresh-cap / seed / dtype policy;
+    image-model picks come from OTR_VideoDirector via video_policy_json."""
 
     DESCRIPTION = (
-        "Defines still-image generation policies for the visual pipeline upstream of video "
-        "rendering. Sets image reuse granularity, generation limits, and seed derivation "
-        "rules while forwarding model choices from the video director into an image policy. "
-        "Adjust granularity modes per role, limit total fresh stills rendered, or set the "
-        "request seed."
+        "Defines the still-image policy for the visual pipeline upstream of video "
+        "rendering: forwards the image models picked on the video director, and sets "
+        "the seed rule and the cloud still estimate. Which stills render follows the "
+        "episode itself -- one portrait per character, the scenes its beats need."
     )
 
     CATEGORY = "OldTimeRadio/v2/image"
@@ -127,36 +135,16 @@ class OTRImageDirector:
 
     @classmethod
     def INPUT_TYPES(cls):
-        gran = list(GRANULARITY_MODES)
         return {
             "required": {
                 # Image-MODEL selection lives in ONE place -- OTR_VideoDirector
                 # (operator 2026-06-18: "only in one place not two"). This node no
                 # longer has its own image-model dropdowns; it reads the per-role
                 # picks from the wired video_policy_json["image_models"] and owns
-                # only the granularity / fresh-cap / seed policy.
-                "announcer_granularity": (gran, {
-                    "default": "per_object",
-                    "tooltip": "How often announcer beats get a fresh still: "
-                               "per_object = one reused image (cheapest), "
-                               "per_beat = fresh per beat, capped by fresh_cap "
-                               "and the audio beat budget.",
-                }),
-                "music_granularity": (gran, {
-                    "default": "per_object",
-                    "tooltip": "How often music-card beats get a fresh still: "
-                               "per_object = one reused card, per_beat = fresh "
-                               "per cue, same caps as announcer_granularity.",
-                }),
-                "character_granularity": (gran, {
-                    "default": "per_object",
-                    "tooltip": (
-                        "per_object: one image reused per character/prop "
-                        "(cheapest). per_beat: a fresh image per beat, capped "
-                        "by fresh_cap and the audio-derived beat budget -- "
-                        "more variety, more render time."
-                    ),
-                }),
+                # only the fresh-cap / seed / dtype policy. The three granularity
+                # widgets that led this list were RETIRED 2026-10-14 (see
+                # _RECEIPT_GRANULARITY); saved graphs carry widget names, and
+                # js/workflow_schema_core.js re-pairs their values by name.
                 "fresh_cap": ("INT", {
                     "default": DEFAULT_FRESH_CAP, "min": 1, "max": 512,
                     "tooltip": (
@@ -229,9 +217,7 @@ class OTRImageDirector:
         return True
 
     # ------------------------------------------------------------------ #
-    def direct(self, announcer_granularity,
-               music_granularity, character_granularity, fresh_cap,
-               seed_mode, request_seed, video_policy_json="",
+    def direct(self, fresh_cap, seed_mode, request_seed, video_policy_json="",
                custom_models_json="{}", gate_in="",
                dtype_policy="fp8_ok"):
         warnings: list = []
@@ -265,10 +251,11 @@ class OTRImageDirector:
                 slot, picked, custom, descriptors, warnings
             )
 
+        # Legacy receipt values only -- see _RECEIPT_GRANULARITY.
         granularity = {
-            "announcer_image_model": announcer_granularity,
-            "music_image_model": music_granularity,
-            "character_image_model": character_granularity,
+            "announcer_image_model": _RECEIPT_GRANULARITY,
+            "music_image_model": _RECEIPT_GRANULARITY,
+            "character_image_model": _RECEIPT_GRANULARITY,
         }
         cap = int(fresh_cap)
         if cap < 1:

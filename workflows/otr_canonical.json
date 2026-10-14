@@ -2215,33 +2215,6 @@
           "link": null
         },
         {
-          "localized_name": "announcer_granularity",
-          "name": "announcer_granularity",
-          "type": "COMBO",
-          "widget": {
-            "name": "announcer_granularity"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "music_granularity",
-          "name": "music_granularity",
-          "type": "COMBO",
-          "widget": {
-            "name": "music_granularity"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "character_granularity",
-          "name": "character_granularity",
-          "type": "COMBO",
-          "widget": {
-            "name": "character_granularity"
-          },
-          "link": null
-        },
-        {
           "localized_name": "fresh_cap",
           "name": "fresh_cap",
           "type": "INT",
@@ -2308,9 +2281,6 @@
         "ver": "2.3.27"
       },
       "widgets_values": [
-        "per_object",
-        "per_object",
-        "per_object",
         15,
         "request_hash",
         42,
