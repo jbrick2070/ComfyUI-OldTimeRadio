@@ -220,6 +220,13 @@ def _sent_requests(monkeypatch) -> dict:
     monkeypatch.setattr(G, "_audio_from_response",
                         lambda response: {"waveform": None, "sample_rate": 24000})
     engine = AE.get_engine("google_tts")
+    # The registry caches this instance. A test elsewhere that patched
+    # generate_voice ON THE INSTANCE is undone by setattr-ing the original
+    # bound method back onto it, and that leftover shadows every class-level
+    # mutant below -- 24 mutants read "no case moved" in the full suite after
+    # test_audio_cache_wiring. Run the class's own method for this test.
+    if "generate_voice" in vars(engine):
+        monkeypatch.delattr(engine, "generate_voice")
     requests = {}
     for model in G._SUPPORTED_MODELS:
         for voice in G._SUPPORTED_VOICES:
