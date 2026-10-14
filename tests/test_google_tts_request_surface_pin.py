@@ -96,6 +96,18 @@ PINNED_SURFACE = {
         "non_latin/no_delivery": "6bf134cc24973142",
         "stage_tags/delivery": "7b99bcc90f6a00ae",
         "stage_tags/no_delivery": "7b99bcc90f6a00ae",
+        "pause_dash_bang/delivery": "6d5fa8168bec77ba",
+        "pause_dash_bang/no_delivery": "6d5fa8168bec77ba",
+        "short/delivery": "9c2fb441f36df619",
+        "short/no_delivery": "9c2fb441f36df619",
+        "tag_tail/delivery": "b0c3d2c6b814c6a2",
+        "tag_tail/no_delivery": "b0c3d2c6b814c6a2",
+        "tag_only/delivery": "82ee728effe996e8",
+        "tag_only/no_delivery": "82ee728effe996e8",
+        "tag_spaced_comma/delivery": "38f51ccee601ffeb",
+        "tag_spaced_comma/no_delivery": "38f51ccee601ffeb",
+        "japanese/delivery": "b77b7b24c50bff71",
+        "japanese/no_delivery": "b77b7b24c50bff71",
     },
 }
 
@@ -124,6 +136,17 @@ _PROBES = {
                        0x416, 0x438, 0x437, 0x43D, 0x44C, " ",
                        0x4F60, 0x597D, " OTR PROBE LINE"),
     "stage_tags": "[whispers] OTR PROBE LINE [laughs] then [gasp].",
+    # prepare_text manufactures "..." pauses (_otr_script_prep: any run of
+    # dots); dashes, bangs and very short lines pass straight through.
+    "pause_dash_bang": "Well... OTR PROBE LINE -- really!",
+    "short": "Hm.",
+    "tag_tail": "Fine. [sighs]",
+    "tag_only": "[laughs]",
+    "tag_spaced_comma": "Oh [sighs] , OTR PROBE LINE",
+    # Google TTS is admitted on every episode language; Japanese lines carry
+    # fullwidth punctuation, which compatibility normalization would rewrite.
+    "japanese": _text(0x3053, 0x3093, 0x306B, 0x3061, 0x306F, 0xFF01,
+                      " OTR PROBE LINE", 0xFF1F),
 }
 
 #: Production passes a delivery vector, or None when delivery is off or failed
@@ -222,16 +245,46 @@ def _fingerprint(monkeypatch) -> dict:
     return _digests(_request_surface(monkeypatch))
 
 
+def _leaves(node, path=""):
+    """Flatten a request to {dotted.path: value}, so it can be shown or diffed
+    field by field instead of truncated as one string."""
+    if isinstance(node, dict):
+        out = {}
+        for k, v in node.items():
+            out.update(_leaves(v, f"{path}.{k}" if path else str(k)))
+        return out
+    if isinstance(node, list):
+        out = {}
+        for i, v in enumerate(node):
+            out.update(_leaves(v, f"{path}[{i}]"))
+        return out
+    return {path: node}
+
+
+def _show(value) -> str:
+    """A value, with a long string as its length plus head and tail."""
+    if isinstance(value, str) and len(value) > 160:
+        return f"<{len(value)} chars> {value[:60]!r} ... {value[-80:]!r}"
+    return repr(value)
+
+
 def _explain(surface: dict, changed) -> str:
-    """The current request for each moved case: default body and departures."""
+    """For each moved case: every field of the default request, and for each
+    departing voice/model only the fields that differ from that default."""
     out = []
     for case in changed[:6]:
         row = surface.get(case)
         if row is None:
             out.append(f"  {case}: no longer a case (removed probe?)")
             continue
-        out.append(f"  {case}:\n    default    {_canon(row['default'])[:400]}"
-                   f"\n    departures {_canon(row['departures'])[:400]}")
+        base = _leaves(row["default"])
+        out.append(f"  {case}: default request")
+        out.extend(f"      {k} = {_show(v)}" for k, v in sorted(base.items()))
+        for who, req in sorted(row["departures"].items()):
+            mine = _leaves(req)
+            diff = sorted(k for k in set(base) | set(mine) if base.get(k) != mine.get(k))
+            out.append(f"    {who} departs on: " + "; ".join(
+                f"{k} = {_show(mine.get(k, '<absent>'))}" for k in diff))
     if len(changed) > 6:
         out.append(f"  ... and {len(changed) - 6} more")
     return "\n".join(out)
@@ -428,12 +481,48 @@ def _whispers_only(monkeypatch):
     _rewrite_text(monkeypatch, lambda t, d, s: t.replace("[whispers]", "(whispers)"))
 
 
+def _nfkc(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: unicodedata.normalize("NFKC", t))
+
+
+def _pause_to_comma(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t.replace("...", ","))
+
+
+def _dash_to_hyphen(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t.replace("--", "-"))
+
+
+def _bang_to_period(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t.replace("!", "."))
+
+
+def _pad_short_lines(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t + " ..." if len(t.strip()) < 6 else t)
+
+
+def _drop_trailing_tag(monkeypatch):
+    def drop(t, d, s):
+        body = t.rstrip()
+        if body.endswith("]") and "[" in body and not body.startswith("["):
+            return body[:body.rindex("[")].rstrip()
+        return t
+
+    _rewrite_text(monkeypatch, drop)
+
+
+def _close_spaced_comma(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t.replace(" ,", ","))
+
+
 _MUTANTS = [
     _restyle_charon, _style_puck, _loosened_say_guard, _say_anywhere_guard,
     _puck_say_branch, _charon_only_temperature, _one_model_field,
     _long_line_field, _digit_field, _new_endpoint_path, _delivery_none_branch,
     _delivery_set_branch, _seed_in_request, _truncate_200, _straighten_quotes,
-    _ascii_quote_rewrite, _fold_accents, _whispers_only,
+    _ascii_quote_rewrite, _fold_accents, _whispers_only, _nfkc,
+    _pause_to_comma, _dash_to_hyphen, _bang_to_period, _pad_short_lines,
+    _drop_trailing_tag, _close_spaced_comma,
 ]
 
 
