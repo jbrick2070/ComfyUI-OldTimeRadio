@@ -265,6 +265,23 @@ def test_misstamped_line_of_a_VOICED_announcer_row_also_reroutes():
     assert "b019" in out[2] and "b020" not in out[2]
 
 
+def test_a_voiced_character_with_stray_announcer_metadata_stays_a_character():
+    """Codex r2 on 23d4fb95: the announcer is identified the ledger's way
+    (sentinel id or the NAME ANNOUNCER). A voiced HAMLET whose row merely
+    carries role metadata saying "announcer" keeps its character line, as it
+    did before the reorder; it is never rerouted on stray metadata."""
+    from nodes.cast_lock import CastLock
+
+    cast = [dict(r) for r in _CHAR_CAST]
+    cast[0] = dict(cast[0], name="HAMLET", role="announcer")
+    lines = [{"line_id": "h001", "speaker_role": "character", "char_id": "c1",
+              "text": "To be, or not to be."}]
+    out = CastLock().lock(script_json=_ledger_with_lines(cast, lines),
+                          cast_voice_policy="preserve_ledger")
+    roles = {ln["line_id"]: ln["speaker_role"] for ln in _last_ledger(out)["lines"]}
+    assert roles == {"h001": "character"}
+
+
 def test_the_reroute_is_reported_for_persistence():
     from nodes.cast_lock import CastLock
 

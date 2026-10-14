@@ -1312,17 +1312,24 @@ class CastLock:
             cid = str(ln.get("char_id") or "")
             row = rows_by_id.get(cid)
             lid = ln.get("line_id")
-            # Announcer identity is checked BEFORE the voiced-row shortcut: the
-            # announcer row is normally VOICED, and testing the voice first let
-            # a character-stamped announcer line skip this repair and reach the
+            # The ANNOUNCER is identified BEFORE the voiced-row shortcut: that
+            # row is normally VOICED, and testing the voice first let a
+            # character-stamped announcer line skip this repair and reach the
             # character node with the announcer's reference (voice review V1,
-            # 2026-10-14). The reroute is persisted by the caller (V3).
-            is_ann = cid in announcer_ids or (
+            # 2026-10-14). "Is the announcer" here is the ledger's own rule
+            # (production_ledger.cast_ids_from_ledger): the sentinel id or the
+            # NAME ANNOUNCER. A row marked announcer only by role metadata keeps
+            # its previous handling -- a voiced one stays a character line
+            # (codex r2: never reroute a voiced HAMLET on stray metadata), an
+            # unvoiced one is rerouted below as before. The caller persists
+            # every reroute (V3).
+            named_ann = cid.strip().lower() == "announcer" or (
                 row is not None
                 and str(row.get("name") or "").strip().upper() == "ANNOUNCER"
             )
-            if not is_ann and _row_has_resolvable_voice(row):
+            if not named_ann and _row_has_resolvable_voice(row):
                 continue  # an ordinary voiced character line: resolves fine
+            is_ann = named_ann or cid in announcer_ids
             if is_ann:
                 ln["speaker_role"] = "announcer"
                 if repaired is not None and str(lid or "").strip():

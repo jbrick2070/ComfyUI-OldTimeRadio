@@ -54,14 +54,62 @@ def test_a_line_patch_corrects_an_existing_row(fresh_singleton):
     assert roles == {"l001": "character", "l002": "announcer"}
 
 
-def test_a_line_memory_does_not_hold_is_skipped_not_failed(fresh_singleton):
-    """Memory cannot overwrite a row it lacks, so the disk value stands."""
+def test_a_line_missing_from_a_populated_singleton_is_warned_not_failed(
+        fresh_singleton, caplog):
+    """The save keeps memory's rows when memory holds lines, so a line memory
+    lacks cannot be persisted from here. That is a singleton/wire divergence
+    (a cached writer on a re-queue, say), not something to fail a render on:
+    it is warned, naming the line, and nothing changes."""
+    import logging
+
     fresh_singleton.data["lines"] = _lines()
-    pl.stamp_durable(line_patches=[{"line_id": "l999", "char_id": "a1",
-                                    "fields": {"speaker_role": "announcer"}}],
-                     source="spec")
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        pl.stamp_durable(line_patches=[{"line_id": "l999", "char_id": "a1",
+                                        "fields": {"speaker_role": "announcer"}}],
+                         source="spec")
     assert [r["speaker_role"] for r in pl.get_ledger().data["lines"]] == [
         "character", "character"]
+    assert any("l999" in r.getMessage() and "NOT persisted" in r.getMessage()
+               for r in caplog.records), caplog.text
+
+
+def test_a_singleton_with_no_lines_leaves_the_disk_lines_standing(tmp_path, monkeypatch):
+    """When memory holds NO lines, a save keeps the disk's lines wholesale, so
+    skipping the patch quietly is safe -- proven on a real save."""
+    monkeypatch.setenv("OTR_TEST_MODE", "0")
+    saved = pl._CURRENT
+    try:
+        pl._CURRENT = None
+        led = pl.new_ledger("ep_no_mem_lines", out_dir=str(tmp_path))
+        led.data["lines"] = [dict(r, speaker_role="announcer" if r["line_id"] == "l002"
+                                  else r["speaker_role"]) for r in _lines()]
+        assert led.save()
+        led.data["lines"] = []
+        pl.stamp_durable(line_patches=[{"line_id": "l002", "char_id": "a1",
+                                        "fields": {"speaker_role": "announcer"}}],
+                         meta_updates={"note": "x"}, source="spec")
+        with open(pl.peek_ledger().path, encoding="utf-8") as fh:
+            disk = json.load(fh)
+        assert {r["line_id"]: r["speaker_role"] for r in disk["lines"]} == {
+            "l001": "character", "l002": "announcer"}
+    finally:
+        with pl._LEDGER_LOCK:
+            pl._CURRENT = saved
+
+
+@pytest.mark.parametrize("patch,sections,why", [
+    ({"line_id": "l002", "char_id": ""}, None, "needs both a line_id and a char_id"),
+    ({"line_id": "", "char_id": "a1"}, None, "needs both a line_id and a char_id"),
+    ({"line_id": "l002", "char_id": "a1"}, {"lines": []}, "cannot be combined"),
+], ids=["no_char_id", "no_line_id", "with_lines_section"])
+def test_a_malformed_patch_is_refused_before_any_change(fresh_singleton, patch, sections, why):
+    fresh_singleton.data["lines"] = _lines()
+    before = json.dumps(pl.get_ledger().data, sort_keys=True)
+    with pytest.raises(ValueError, match=why):
+        pl.stamp_durable(sections=sections,
+                         line_patches=[{**patch, "fields": {"speaker_role": "announcer"}}],
+                         source="spec")
+    assert json.dumps(pl.get_ledger().data, sort_keys=True) == before
 
 
 @pytest.mark.parametrize("lines,patch,why", [

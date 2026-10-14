@@ -859,42 +859,63 @@ class LedgerStampError(RuntimeError):
 _DURABLE_LINE_FIELDS = frozenset({"speaker_role"})
 
 
-def _validate_line_patches(led: "Ledger", patches, source: str):
+def _validate_line_patches(led: "Ledger", patches, sections, source: str):
     """Check every patch against the singleton BEFORE anything changes.
 
-    Returns ``[(row, fields), ...]`` to apply. A patch whose ``line_id`` is
-    absent from the singleton is skipped, not failed: the merge on save only
-    lets memory win for rows memory HOLDS, so a row memory lacks keeps the
-    value already on disk (SceneSequencer's patch), and nothing stale can be
-    re-saved over it. A duplicated ``line_id``, or a row whose ``char_id``
-    differs from the patch's, means memory and the caller disagree about
-    which line this is -- that raises ``LedgerStampError`` rather than patch
-    a line that may belong to someone else (codex r1, 2026-10-14)."""
+    Returns ``[(row, fields), ...]`` to apply. Refused outright (ValueError,
+    a caller bug): a field outside ``_DURABLE_LINE_FIELDS``, a patch with no
+    ``line_id`` or ``char_id``, and patches combined with a ``lines`` section
+    (the section would replace the very rows being patched; codex r2).
+
+    A duplicated ``line_id``, or a row whose ``char_id`` differs from the
+    patch's, means memory and the caller disagree about which line this is --
+    that raises ``LedgerStampError`` rather than patch a line that may belong
+    to someone else (codex r1).
+
+    A ``line_id`` the singleton does not hold cannot be persisted from here.
+    If the singleton holds NO lines, a save keeps the disk's lines wholesale
+    (SceneSequencer's patch stands), so that is skipped quietly. If it holds
+    OTHER lines, the save keeps memory's rows and this one is not persisted;
+    that is a singleton/wire divergence this change did not create (a cached
+    writer on a re-queue, say), so it is WARNED, naming the line, rather than
+    turned into a failed render (codex r2 asked to raise; see the commit)."""
+    if patches and "lines" in (sections or {}):
+        raise ValueError(
+            f"stamp_durable({source or '?'}): line_patches cannot be combined "
+            f"with a 'lines' section -- the section replaces the patched rows")
     rows = [r for r in (led.data.get("lines") or []) if isinstance(r, dict)]
     plan = []
     for patch in patches:
         line_id = str(patch.get("line_id") or "").strip()
+        want_char = str(patch.get("char_id") or "").strip()
         fields = dict(patch.get("fields") or {})
         unknown = set(fields) - _DURABLE_LINE_FIELDS
         if unknown:
             raise ValueError(
                 f"stamp_durable({source or '?'}): line field(s) {sorted(unknown)} "
                 f"are not patchable here (allowed: {sorted(_DURABLE_LINE_FIELDS)})")
-        if not line_id or not fields:
+        if not line_id or not want_char:
+            raise ValueError(
+                f"stamp_durable({source or '?'}): a line patch needs both a "
+                f"line_id and a char_id (got {line_id!r}, {want_char!r})")
+        if not fields:
             continue
         matches = [r for r in rows if str(r.get("line_id") or "") == line_id]
         if not matches:
-            log.info("[Ledger] stamp_durable(%s): line %r not in the singleton; "
-                     "its on-disk value stands", source or "?", line_id)
+            if rows:
+                log.warning(
+                    "[Ledger] stamp_durable(%s): line %r (char %r) is not in the "
+                    "singleton, which holds other lines; its %s correction is "
+                    "NOT persisted", source or "?", line_id, want_char,
+                    sorted(fields))
             continue
         if len(matches) > 1:
             raise LedgerStampError(
                 f"stamp_durable({source or '?'}): line_id {line_id!r} appears "
                 f"{len(matches)} times in the singleton -- refusing to guess "
                 f"which line to patch")
-        want_char = str(patch.get("char_id") or "")
-        have_char = str(matches[0].get("char_id") or "")
-        if want_char and have_char != want_char:
+        have_char = str(matches[0].get("char_id") or "").strip()
+        if have_char != want_char:
             raise LedgerStampError(
                 f"stamp_durable({source or '?'}): line {line_id!r} is char_id "
                 f"{have_char!r} in the singleton but {want_char!r} in the "
@@ -935,7 +956,7 @@ def stamp_durable(*, sections: Optional[Dict[str, Any]] = None,
       real output tree. Returns ``None`` in that case.
     """
     led = get_ledger()
-    line_plan = _validate_line_patches(led, line_patches or (), source)
+    line_plan = _validate_line_patches(led, line_patches or (), sections, source)
     for key, value in (sections or {}).items():
         led.data[key] = value
     for row, fields in line_plan:
