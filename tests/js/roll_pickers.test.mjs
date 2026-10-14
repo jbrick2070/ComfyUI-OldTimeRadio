@@ -65,8 +65,9 @@ test("labels read as words", () => {
 test("an empty pool summarizes as all eligible, never as none", () => {
     for (const empty of ["", null, "  ", "[]"]) {
         const s = poolSummary(empty, STYLES);
-        assert.equal(s.text, "All eligible");
+        assert.equal(s.text, "All eligible (none ticked)");
         assert.equal(s.count, 0);
+        assert.deepEqual(s.unknown, []);
     }
     assert.match(EMPTY_POOL_RULE, /No selections = all eligible/);
     assert.ok(POOL_HELP.startsWith(EMPTY_POOL_RULE));
@@ -92,10 +93,22 @@ test("an unknown saved entry is reported by the summary too", () => {
     assert.equal(bad.text, "No valid choice ticked");
 });
 
-test("summarizing never changes the saved value", () => {
-    const saved = "Video Art ;  ANIME";
-    poolSummary(saved, STYLES);
-    assert.equal(saved, "Video Art ;  ANIME");
-    // the round trip a click would make is the only rewrite, and it is explicit
-    assert.equal(writePool(readPool(saved, STYLES).checked, STYLES), "anime, video_art");
+test("the summary reports the same boxes the list checks", () => {
+    const s = poolSummary("Video Art ;  ANIME", STYLES);
+    assert.deepEqual([...s.checked].sort(), ["anime", "video_art"]);
+    assert.deepEqual([...s.checked].sort(),
+                     [...readPool("Video Art ;  ANIME", STYLES).checked].sort());
+});
+
+test("bracketed text is a list of quoted names or nothing, as in the backend", () => {
+    // parse_roll_pool: json.loads, then literal_eval -- an unquoted name in
+    // brackets is neither, and the run stops on it
+    for (const bad of ["[anime, cartoon]", '["anime", cartoon]', "[anime"]) {
+        assert.deepEqual(poolEntries(bad), [bad]);
+        const s = poolSummary(bad, STYLES);
+        assert.equal(s.text, "No valid choice ticked");
+        assert.deepEqual(s.unknown, [bad]);
+    }
+    assert.deepEqual(poolEntries('[ "anime" , "cartoon" ]'), ["anime", "cartoon"]);
+    assert.deepEqual(poolEntries("[ ]"), []);
 });

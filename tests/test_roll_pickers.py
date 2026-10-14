@@ -8,6 +8,7 @@ and the app form's row would break. The pure core runs under node.
 """
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -80,6 +81,49 @@ def test_the_glue_replaces_each_pool_in_place_under_its_own_name():
     assert "node.addDOMWidget(name," in glue            # same name as the text box
     assert "node.widgets.splice(index, 1, widget)" in glue  # same slot
     assert "otr_choices" in glue
+
+
+def _block(source, opener, closer):
+    start = source.index(opener)
+    return source[start:source.index(closer, start)]
+
+
+def test_opening_or_closing_a_list_never_touches_the_saved_value():
+    """Widget cleanup slice 2 (2026-10-14): the disclosure is presentation
+    only. The header's click handler and the repaint it calls must never
+    assign the value getValue returns; only a checkbox change and setValue
+    may."""
+    glue = (_ROOT / "js" / "roll_pickers.js").read_text(encoding="utf-8")
+    toggle = _block(glue, 'head.addEventListener("click"', "\n    });")
+    paint = _block(glue, "const paint = () => {", "\n    };")
+    bare = re.compile(r"(?<![.\w])value\s*=(?!=)")       # `value = ...`, not `box.value`
+    for body in (toggle, paint):
+        assert not bare.search(body), body
+    assert 'head.setAttribute("aria-expanded"' in glue
+    assert 'head.type = "button"' in glue                 # Enter and Space for free
+    writes = [m for m in bare.finditer(glue) if glue[m.start() - 4:m.start()] != "let "]
+    assert len(writes) == 2, writes                        # the box change and setValue
+
+
+def test_the_list_row_is_its_own_height_on_every_renderer():
+    """A DOM widget's `computeLayoutSize` makes the Vue-node grid stretch its
+    row with a taller node (a 52 px blank band under a closed list, measured on
+    frontend 1.53.10); the classic canvas reads `computeSize` first."""
+    glue = (_ROOT / "js" / "roll_pickers.js").read_text(encoding="utf-8")
+    assert "widget.computeSize = (width) => [width ?? 0, picker.height()]" in glue
+    assert "widget.computeLayoutSize = undefined" in glue
+    assert "margin: 2" in glue
+
+
+def test_an_unquoted_bracketed_pool_stops_the_backend_as_the_checklist_warns():
+    """roll_pickers_core.poolEntries returns "[anime, cartoon]" whole, so the
+    checklist reports it as not a choice; this is why."""
+    from nodes import _otr_rolls as ROLLS
+    with pytest.raises(ROLLS.RollError):
+        ROLLS.parse_roll_pool("[anime, cartoon]", valid_ids=ROLLS.eligible_style_ids(),
+                              surface="style_roll_pool")
+    assert ROLLS.parse_roll_pool("[]", valid_ids=ROLLS.eligible_style_ids(),
+                                 surface="style_roll_pool") == ()
 
 
 def _node_exe():

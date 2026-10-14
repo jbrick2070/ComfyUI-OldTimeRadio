@@ -19,15 +19,20 @@ export function poolKey(name) {
 }
 
 /** The entries of a saved pool value: a typed list, a JSON list, or the
- *  str() of a list saved by 2.3.8 ("['anime', 'cartoon']"). */
+ *  str() of a list saved by 2.3.8 ("['anime', 'cartoon']"). Text that opens
+ *  with "[" is a list or nothing, as in the backend: an unquoted name inside
+ *  brackets ("[anime, cartoon]") is not a list there and stops the run, so it
+ *  comes back whole, as one entry that matches no choice. */
 export function poolEntries(value) {
     if (Array.isArray(value)) return value.map(String);
     let text = value == null ? "" : String(value).trim();
     if (!text) return [];
-    if (text.startsWith("[") && text.endsWith("]")) {
-        text = text.slice(1, -1);
-        return text.split(",").map((s) => s.trim().replace(/^['"]|['"]$/g, ""))
-            .filter(Boolean);
+    if (text.startsWith("[")) {
+        const items = text.endsWith("]") ? text.slice(1, -1).split(",")
+            .map((s) => s.trim()).filter(Boolean) : null;
+        const quoted = /^(['"])[^'"]*\1$/;
+        if (!items || !items.every((s) => quoted.test(s))) return [text];
+        return items.map((s) => s.slice(1, -1).trim()).filter(Boolean);
     }
     return text.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
 }
@@ -62,9 +67,10 @@ export function choiceLabel(choice) {
 /** The empty-pool rule, said once, the same on Graph and App. */
 export const EMPTY_POOL_RULE = "No selections = all eligible.";
 
-/** The rule in full, under the open list and on its header's hover. Ticks
- *  narrow the draw; they never force a choice this run cannot take (a video
- *  lane this machine cannot run is left out, `nodes/_otr_lane_rolls.py`). */
+/** The rule in full, between the header and the boxes of an open list, and on
+ *  the header's hover. Ticks narrow the draw; they never force a choice this
+ *  run cannot take (a video lane this machine cannot run is left out,
+ *  `nodes/_otr_lane_rolls.py`). */
 export const POOL_HELP = EMPTY_POOL_RULE
     + " Ticks narrow the roll to the ticked choices still eligible for this run.";
 
@@ -73,23 +79,24 @@ export const POOL_HELP = EMPTY_POOL_RULE
  * it never normalizes or rewrites the saved value -- opening or closing the
  * list changes nothing that is serialized.
  *
- * An empty pool is "All eligible", never "none": the roll then draws from
+ * An empty pool is "All eligible (none ticked)" -- the empty-pool rule said
+ * where a closed list can be read -- never "none": the roll then draws from
  * every eligible choice. A pool with ticks names them, in the choices' own
  * order, and stops listing after `maxNames`. "Ticked", not "will run": a
  * ticked choice this run cannot take is left out of the draw. A saved value
  * naming only things that are not choices is NOT empty -- the backend stops
  * the run on it -- so it never reads "All eligible".
- * @returns {{text: string, count: number, unknown: string[]}}
+ * @returns {{text: string, count: number, checked: Set<string>, unknown: string[]}}
  */
 export function poolSummary(value, choices, maxNames = 3) {
     const { checked, unknown } = readPool(value, choices);
     const picked = choices.filter((c) => checked.has(c));
     if (picked.length === 0) {
-        return { text: unknown.length ? "No valid choice ticked" : "All eligible",
-                 count: 0, unknown };
+        return { text: unknown.length ? "No valid choice ticked" : "All eligible (none ticked)",
+                 count: 0, checked, unknown };
     }
     const shown = picked.slice(0, maxNames).map(choiceLabel).join(", ");
     const more = picked.length > maxNames ? `, +${picked.length - maxNames} more` : "";
     return { text: `${picked.length} ticked: ${shown}${more}`,
-             count: picked.length, unknown };
+             count: picked.length, checked, unknown };
 }

@@ -18,19 +18,29 @@
  * the text boxes are simply what people see, and the typed list still works.
  *
  * CLOSED BY DEFAULT (2026-10-14). Each list sits behind a one-line header that
- * says what the pool holds ("All eligible", or the ticked names) and opens on
- * a click or Enter/Space. Opening and closing touch no saved value. A saved
- * name that is not a choice is reported under the header, open or closed.
+ * says what the pool holds ("All eligible (none ticked)", or the ticked names)
+ * and opens on a click or Enter/Space. Opening and closing touch no saved
+ * value. A saved name that is not a choice is reported under the header, open
+ * or closed.
  *
  * HOW THE ROW IS SIZED, measured on frontend 1.53.10 in all three places a
  * pool is drawn (App form, Vue-node graph, classic canvas graph):
  * - The frontend stretches the widget's element to the row it was given, so
  *   the row's height is read from an inner `body` that is never stretched;
  *   that is what lets the row shrink again when the list closes.
- * - The classic canvas takes the widget's `margin` (10 by default) off the
- *   top and the bottom of the row, which left a 26 px header a 6 px slot.
- *   `margin: 0` makes the row exactly the body. Nothing clips, so a frontend
- *   that ignores the option draws the old way: content running into the gap.
+ * - The row IS that height, never a share of a taller node. A DOM widget
+ *   comes with `computeLayoutSize`, and the Vue-node grid makes every such
+ *   row an `auto` track, which splits a node's spare height between them --
+ *   a closed list in a writer node saved 1760 tall got a 78 px row for a
+ *   26 px header. So this widget has its own `computeSize` and no
+ *   `computeLayoutSize`: the Vue grid then gives it a `min-content` row, and
+ *   the classic canvas, which reads `computeSize` first, keeps it fixed.
+ *   Every frontend reader of `computeLayoutSize` checks for it before calling.
+ * - The classic canvas adds 4 px to a `computeSize` row and takes the
+ *   widget's `margin` (10 by default) off its top and bottom, which left a
+ *   26 px header a 6 px slot; `margin: 2` makes the box exactly the body.
+ *   Nothing clips, so a frontend that ignores the option draws the old way:
+ *   content running into the gap.
  * - Only the classic canvas (the widget sits in a `.dom-widget` box there)
  *   takes a node's height from its `size`. A click there grows or shrinks the
  *   node by exactly what the list gained or lost, before the next frame, so
@@ -42,8 +52,7 @@
  *   the node to its content on its own, and the App form does not draw it.
  */
 import { app } from "../../scripts/app.js";
-import { readPool, writePool, choiceLabel, poolSummary, POOL_HELP }
-    from "./roll_pickers_core.js";
+import { writePool, choiceLabel, poolSummary, POOL_HELP } from "./roll_pickers_core.js";
 
 const TAG = "[OldTimeRadio] roll pickers";
 // Each node's pools. The video director's pair narrows its Randomize video and
@@ -83,7 +92,6 @@ function makeChecklist(name, choices, initial, onToggle) {
     body.style.cssText = "padding:1px 8px 3px";
     const head = document.createElement("button");
     head.type = "button";
-    head.title = POOL_HELP;
     head.style.cssText =
         "display:flex;align-items:baseline;gap:6px;width:100%;margin:0;padding:2px 4px;" +
         "border:0;border-radius:4px;background:transparent;color:inherit;font:inherit;" +
@@ -134,9 +142,11 @@ function makeChecklist(name, choices, initial, onToggle) {
             + `display:${open ? "flex" : "none"}`;
     };
     const paint = () => {
-        const { checked, unknown } = readPool(value, choices);
+        const { checked, unknown, text } = poolSummary(value, choices);
         for (const box of boxes) box.checked = checked.has(box.value);
-        summary.textContent = poolSummary(value, choices).text;
+        summary.textContent = text;
+        // The whole summary on hover, where a narrow node cuts it short.
+        head.title = `${poolName}: ${text}. ${POOL_HELP}`;
         note.hidden = unknown.length === 0;
         note.textContent = unknown.length
             ? `Not a choice here, and the run will stop on it: ${unknown.join(", ")}. `
@@ -205,13 +215,13 @@ app.registerExtension({
                 const widget = node.addDOMWidget(name, "otr_roll_picker", picker.root, {
                     getValue: picker.get,
                     setValue: picker.set,
-                    // Exactly the list's own height, open or closed: a taller
-                    // node gives its spare room to other rows, never to a
-                    // blank band under the checklist.
-                    getMinHeight: picker.height,
-                    getMaxHeight: picker.height,
-                    margin: 0,
+                    margin: 2,
                 });
+                // Exactly the list's own height, open or closed: a taller node
+                // gives its spare room to other rows, never to a blank band
+                // under the checklist (see HOW THE ROW IS SIZED above).
+                widget.computeSize = (width) => [width ?? 0, picker.height()];
+                widget.computeLayoutSize = undefined;
                 // addDOMWidget appends; move the checklist into the text box's
                 // slot so the saved value's position never changes.
                 node.widgets.splice(node.widgets.indexOf(widget), 1);
