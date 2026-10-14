@@ -42,7 +42,7 @@ def test_the_filename_carries_the_iso_before_the_timestamp():
 
 
 def _renderer(title, card_label=""):
-    return VE._CRTRenderer(64, 64, title, [], [], [], 24, card_label=card_label)
+    return VE._CRTRenderer(64, 64, title, [], 24, card_label=card_label)
 
 
 def test_the_hero_card_carries_the_english_label_only_off_english():
@@ -64,7 +64,7 @@ def test_the_label_never_reaches_the_ident_hud_or_the_scramble_seed():
 
 def test_the_renderer_receives_the_plain_title_and_the_label_separately():
     src = inspect.getsource(VE)
-    assert "_CRTRenderer(W, H, episode_title, volume, freqs, waves, fps," in src
+    assert "_CRTRenderer(W, H, episode_title, volume, fps," in src
     assert "card_label=lang_label," in src
     assert "display_title" not in src
 

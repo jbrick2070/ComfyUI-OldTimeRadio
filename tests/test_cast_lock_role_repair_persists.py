@@ -237,3 +237,38 @@ def test_a_padded_line_id_in_the_singleton_still_matches(fresh_singleton):
                                     "fields": {"speaker_role": "announcer"}}],
                      source="spec")
     assert pl.get_ledger().data["lines"][1]["speaker_role"] == "announcer"
+
+
+# --------------------------------------------------------------------------- #
+# The treatment sidecar's word counts follow the repaired roles too
+# --------------------------------------------------------------------------- #
+def test_the_treatment_takes_its_word_counts_from_the_durable_ledger(fresh_singleton):
+    """Node 12's `led` is FreezeCascade's script, upstream of CastLock, so its
+    counts still read a rerouted announcer line as a character's (sonnet QA:
+    "char 13 / announcer 0"). The singleton's recomputed counts win."""
+    from nodes.video_engine import _treatment_ledger
+
+    fresh_singleton.data["meta"] = {"total_word_count": 13,
+                                    "character_word_count": 6,
+                                    "announcer_word_count": 7}
+    wire = {"meta": {"total_word_count": 13, "character_word_count": 13,
+                     "announcer_word_count": 0, "episode_title": "T"},
+            "lines": [], "cast": []}
+    out = _treatment_ledger(wire)
+    assert out["meta"]["character_word_count"] == 6
+    assert out["meta"]["announcer_word_count"] == 7
+    assert out["meta"]["episode_title"] == "T", "only the counts are overlaid"
+    assert wire["meta"]["character_word_count"] == 13, "the wire ledger is not mutated"
+
+
+def test_without_durable_counts_the_treatment_keeps_the_wire_ledger():
+    from nodes.video_engine import _treatment_ledger
+
+    saved = pl._CURRENT
+    try:
+        pl._CURRENT = None
+        wire = {"meta": {"character_word_count": 13}, "lines": []}
+        assert _treatment_ledger(wire) is wire
+    finally:
+        with pl._LEDGER_LOCK:
+            pl._CURRENT = saved

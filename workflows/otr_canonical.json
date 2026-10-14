@@ -1021,16 +1021,6 @@
             "name": "resolution"
           },
           "link": null
-        },
-        {
-          "localized_name": "draw_scopes",
-          "name": "draw_scopes",
-          "shape": 7,
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "draw_scopes"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -1064,8 +1054,7 @@
         "[]",
         "[]",
         25,
-        "1920x1080",
-        false
+        "1920x1080"
       ],
       "color": "#432",
       "bgcolor": "#653"

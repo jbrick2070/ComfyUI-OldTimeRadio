@@ -358,6 +358,19 @@ Each of these survived on purpose and needs a ruling, not a deletion:
 - **`profile_max_render_frames`** and `_active_profile`: the KNOWN OPEN cap-authority
   row in the standing rulings.
 
+### 0s. Muse review queue: MRKT edited the 5080's files (2026-10-14 -- live proof open)
+
+Operator, 2026-10-14: "MRKT may edit the canonical workflow while the 5080 is
+busy." So the 4060 crossed the section 1 split for one queue -- VF-01 (NVENC
+probe recovers from a transient failure), voice V1-V3, the story-path banks
+(OR/SH/PD/MS), the viz-channel round-trip cut, and the early-scopes retirement,
+which removed `OTR_SignalLostVideo.draw_scopes` from `otr_canonical.json` and
+regenerated all 26 variants (trailing widget, zero `dst_slot` repairs, 27/27
+graphs censused, nothing outside node 12 changed). No 5080 window was live to
+agree in-message, so this row is the record. **The 5080 should pull before it
+next opens `otr_canonical.json`.** Left: the final MRKT 8 GB one-act leg to
+`otr/obs` on the final HEAD, then the 2.3.27 bump the operator asked for.
+
 ### 0r. 8 GB regression on 2.3.25: every 8 GB graph, 1 act, fastest first (MRKT -- open)
 
 Operator, 2026-10-14: "run 1 act from fastest to longest 8gb on this rig to

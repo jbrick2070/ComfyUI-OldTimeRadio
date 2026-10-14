@@ -38,9 +38,7 @@ W, H, FPS, TOTAL = 1920, 1080, 25, 200
 @pytest.fixture()
 def plan_json():
     vol = np.linspace(0.0, 1.0, TOTAL).astype("float32")
-    freqs = [np.zeros(32, dtype="float32") for _ in range(TOTAL)]
-    waves = [np.zeros(64, dtype="float32") for _ in range(TOTAL)]
-    r = _CRTRenderer(W, H, "The Probe", vol, freqs, waves, FPS, timing={
+    r = _CRTRenderer(W, H, "The Probe", vol, FPS, timing={
         "music_open_start_f": 10, "music_open_end_f": 60, "first_dialogue_f": 80,
     })
     return json.dumps(r.title_card_plan(main_frames=TOTAL))

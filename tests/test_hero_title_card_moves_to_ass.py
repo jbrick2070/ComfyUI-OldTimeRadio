@@ -41,16 +41,14 @@ TIMING = {
 
 def _renderer(title="The Probe"):
     vol = np.linspace(0.0, 1.0, TOTAL).astype("float32")
-    freqs = [np.zeros(32, dtype="float32") for _ in range(TOTAL)]
-    waves = [np.zeros(64, dtype="float32") for _ in range(TOTAL)]
-    return _CRTRenderer(W, H, title, vol, freqs, waves, FPS, timing=TIMING)
+    return _CRTRenderer(W, H, title, vol, FPS, timing=TIMING)
 
 
 def _ink(img, box):
     """Count phosphor-bright pixels in ``box`` = (x0, y0, x1, y1).
 
-    Threshold 90 on green. ``draw_scopes=False`` keeps the ring, particles and
-    waveform out of the frame, and the background grid's green is capped at
+    Threshold 90 on green. The frame carries no scopes (retired 2026-10-14),
+    and the background grid's green is capped at
     ``15 + vol * 25`` -- far below 90 -- so anything counted here is TEXT.
     """
     arr = np.asarray(img.crop(box), dtype=np.int16)
@@ -78,15 +76,15 @@ def test_the_ident_slot_keeps_its_ink_during_a_card_and_after_it():
     the carrier decode and the meter with it.
     """
     r = _renderer()
-    during = r.render(30, draw_scopes=False)          # mid-reveal, open card
+    during = r.render(30)          # mid-reveal, open card
     assert _ink(during, _ident_box()) > 0, \
         "carrier line vanished on a card frame -- the suppression cut too deep"
 
-    after = r.render(100, draw_scopes=False)          # past end_f=72, no card
+    after = r.render(100)          # past end_f=72, no card
     assert _ink(after, _ident_box()) > 0, \
         "the section-1 ident vanished on a non-card frame"
 
-    closing = r.render(160, draw_scopes=False)        # inside the CLOSE card
+    closing = r.render(160)        # inside the CLOSE card
     assert _ink(closing, _ident_box()) > 0, \
         "carrier line vanished on the closing card"
 
@@ -104,13 +102,13 @@ def test_the_hero_is_absent_by_default_and_returns_under_the_control_flag(monkey
     """
     monkeypatch.delenv("OTR_HERO_TITLE_IN_PROCGEN", raising=False)
     r = _renderer()
-    frame = r.render(40, draw_scopes=False)
+    frame = r.render(40)
     assert _ink(frame, _centre_box()) == 0, \
         "hero glyphs are still burned into the procgen layer"
 
     monkeypatch.setenv("OTR_HERO_TITLE_IN_PROCGEN", "1")
     r2 = _renderer()
-    control = r2.render(40, draw_scopes=False)
+    control = r2.render(40)
     assert _ink(control, _centre_box()) > 0, \
         "the control arm draws no hero -- the acceptance measurement has no baseline"
     # ...and the legacy arm must emit NO plan, or the control render carries the
@@ -126,7 +124,7 @@ def test_the_closing_card_hero_is_suppressed_too(monkeypatch):
     episode."""
     monkeypatch.delenv("OTR_HERO_TITLE_IN_PROCGEN", raising=False)
     r = _renderer()
-    assert _ink(r.render(160, draw_scopes=False), _centre_box()) == 0
+    assert _ink(r.render(160), _centre_box()) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -257,7 +255,7 @@ def test_the_plan_matches_the_REAL_DRAW_on_every_frame_including_the_dock(
 
     for fi in range(card["start_f"], card["end_f"]):
         spy.fi = fi
-        r.render(fi, draw_scopes=False)
+        r.render(fi)
 
     assert drawn, "the spy captured nothing -- the draw never ran"
     dock_frames = [f for f in drawn if f >= card["music_end_f"]]
@@ -286,7 +284,5 @@ def test_an_episode_with_no_card_plans_nothing_rather_than_failing():
     -- an EMPTY plan, not a failed one. The burn refuses an empty plan on
     purpose, so conflating the two would refuse every card-less episode."""
     vol = np.zeros(TOTAL, dtype="float32")
-    freqs = [np.zeros(32, dtype="float32") for _ in range(TOTAL)]
-    waves = [np.zeros(64, dtype="float32") for _ in range(TOTAL)]
-    r = _CRTRenderer(W, H, "No Card", vol, freqs, waves, FPS, timing={})
+    r = _CRTRenderer(W, H, "No Card", vol, FPS, timing={})
     assert r.title_card_plan(main_frames=TOTAL) is None

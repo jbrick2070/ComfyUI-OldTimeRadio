@@ -8,13 +8,16 @@ rendered frame-by-frame and piped to ffmpeg.
 
 Architecture:
   1. Master Clock: audio duration x FPS = exact frame count
-  2. Audio Analysis: per-frame RMS volume + 32-bin FFT spectrum
-  3. CRT Frame Renderer: title bar, procedural art centre,
-     frequency bars, oscilloscope, scan lines, vignette
+  2. Audio Analysis: per-frame RMS volume, normalised over the episode
+  3. CRT Frame Renderer: title bar / hero title card, audio-reactive
+     grid, bottom bar, scan lines, vignette, grain
   4. MP4 Encoder: raw RGB frames piped to ffmpeg stdin + audio mux
 
-The centre area is PURE PROCEDURAL ART - no script text, no lyrics,
-no dialogue cards.  All visuals are driven by audio energy + math.
+No script text, no lyrics, no dialogue cards: the picture is driven by audio
+energy + math. The early in-frame scopes (centre ring, particles, waveform,
+frequency bars) were RETIRED on 2026-10-14 (operator decision, no
+compatibility layer); every shipped workflow already had them off. The later
+selectable viz_* engines draw their own scopes through _otr_shared/scope_draw.
 
 VRAM cost: zero. Runs entirely on CPU (numpy + PIL).
 
@@ -71,10 +74,8 @@ except ImportError:
 # -----------------------------------------------------------------------------
 CRT_BG        = (8, 8, 16)         # deep navy-black
 CRT_GREEN     = (0, 255, 65)       # phosphor green
-CRT_AMBER     = (255, 176, 0)      # amber accent
 CRT_DIM       = (0, 100, 28)       # dim green
 CRT_DARK      = (0, 50, 14)        # very dim green
-CRT_CYAN      = (0, 200, 200)      # cyan accent
 
 # -----------------------------------------------------------------------------
 # FONT LOADING
@@ -507,59 +508,30 @@ def _draw_crt_overstrike_text(
 
 
 # -----------------------------------------------------------------------------
-# AUDIO ANALYSIS - per-frame RMS + FFT
+# AUDIO ANALYSIS - per-frame RMS
 # -----------------------------------------------------------------------------
 def _analyze_audio(audio_np, sample_rate, total_frames, fps):
-    """Return (volume_curve, freq_data, waveform_chunks).
+    """Return the volume curve: list[float], the RMS of each frame's samples
+    normalised 0-1 over the WHOLE episode.
 
-    volume_curve    : list[float]       -- normalised 0-1 RMS per frame
-    freq_data       : list[np.ndarray]  -- normalised 0-1 FFT bins per frame
-    waveform_chunks : list[np.ndarray]  -- raw audio samples per frame
+    It also returned a 32-bin FFT spectrum and a downsampled waveform per frame;
+    those fed only the early in-frame scopes, retired 2026-10-14. The RMS
+    slicing (``sample_rate // fps`` samples per frame, zeros past the end), the
+    arithmetic and the normalisation are unchanged: the volume curve drives the
+    grid, the signal EMA, the grain and the title-card fallback timing.
     """
     spf = sample_rate // fps  # samples per frame
     volume = []
-    freqs = []
-    waves = []
 
     for i in range(total_frames):
         s = i * spf
         e = min(s + spf, len(audio_np))
         chunk = audio_np[s:e] if s < len(audio_np) else np.zeros(spf)
-
-        # RMS
         rms = float(np.sqrt(np.mean(chunk ** 2))) if len(chunk) > 0 else 0.0
         volume.append(rms)
 
-        # FFT - 32 bins
-        if len(chunk) > 0:
-            fft = np.abs(np.fft.rfft(chunk))
-            n = len(fft)
-            if n >= 32:
-                bs = n // 32
-                bins = np.array([np.mean(fft[j * bs:(j + 1) * bs]) for j in range(32)])
-            else:
-                bins = np.zeros(32)
-                bins[:n] = fft[:n]
-        else:
-            bins = np.zeros(32)
-        freqs.append(bins)
-
-        # Waveform chunk (downsample to ~200 points for drawing)
-        if len(chunk) > 200:
-            idx = np.linspace(0, len(chunk) - 1, 200, dtype=int)
-            waves.append(chunk[idx])
-        else:
-            waves.append(chunk)
-
-    # Normalise
     vmax = max(volume) if volume and max(volume) > 0 else 1.0
-    volume = [v / vmax for v in volume]
-
-    fmax = max(np.max(f) for f in freqs) if freqs else 1.0
-    if fmax > 0:
-        freqs = [f / fmax for f in freqs]
-
-    return volume, freqs, waves
+    return [v / vmax for v in volume]
 
 
 # -----------------------------------------------------------------------------
@@ -618,7 +590,7 @@ def _resolve_title_timing(led, volume, fps, total_frames):
         ``int()`` downstream (:266, :276-277, :322-323), and both raise
         ValueError on NaN/Inf -- so an announcer whose ``start_s`` arrived
         non-finite killed the render before a single frame was drawn, in a
-        code path neither _finite nor _finite_array covers. Returning None
+        code path the renderer's _finite guard does not cover. Returning None
         routes it through the same "value absent" handling the callers already
         implement.
         """
@@ -775,11 +747,11 @@ def _title_reveal_progress(fi, w0, me, in_dock, reveal_frac=0.4):
 class _CRTRenderer:
     """Generates audio-reactive procedural CRT frames.
 
-    No script text, no dialogue, no lyrics.
-    Centre area is pure math-driven generative art.
+    No script text, no dialogue, no lyrics. Driven by the volume curve alone
+    since the early in-frame scopes were retired (2026-10-14).
     """
 
-    def __init__(self, w, h, title, volume, freqs, waves, fps, timing=None,
+    def __init__(self, w, h, title, volume, fps, timing=None,
                  card_label="", font_policy="latin_arial"):
         self.w = w
         self.h = h
@@ -796,8 +768,6 @@ class _CRTRenderer:
         #    the bounded-lookback trails index them every frame) ----------
         self.volume = np.asarray(volume, dtype=np.float32) if len(volume) else \
             np.zeros(0, dtype=np.float32)
-        self.freqs = list(freqs)   # list[np.ndarray] (32-bin)
-        self.waves = list(waves)   # list[np.ndarray] (~200 pt)
         self.total = len(self.volume)
         self.timing = dict(timing or {})
 
@@ -820,11 +790,6 @@ class _CRTRenderer:
         Y, X = np.ogrid[:h, :w]
         dist = np.sqrt((X - cx) ** 2 / (cx ** 2) + (Y - cy) ** 2 / (cy ** 2))
         self._vignette = np.clip(1.0 - dist * 0.35, 0.45, 1.0).astype(np.float32)
-
-        # Pre-compute ring geometry for the circular visualizer
-        self._ring_cx = w // 2
-        self._ring_cy = int(h * 0.42)
-        self._ring_r = min(w, h) // 5
 
         # -- Title-bar layout (geometry from w/h, never baked 1920) -------
         # These coords are the section-1 ident/subtitle/timestamp anchors AND
@@ -914,13 +879,15 @@ class _CRTRenderer:
 
     # -- Public ----------------------------------------------------------
 
-    def render(self, fi, draw_scopes=True):
+    def render(self, fi):
         """Render frame *fi* and return a PIL RGB Image.
 
-        Draw order (S1): background (grid + gated scopes + bottom bar) ->
-        section-8 CRT post (scanlines/vignette/noise, numpy) -> THEN the
-        section-1 ident OR the hero title card, drawn AFTER the vignette so
-        the always-on vignette can never dim the text (the v1.5.1 bug)."""
+        Draw order (S1): background (divider + grid + bottom bar) -> section-8
+        CRT post (scanlines/vignette/noise, numpy) -> THEN the section-1 ident
+        OR the hero title card, drawn AFTER the vignette so the always-on
+        vignette can never dim the text (the v1.5.1 bug). Sections 2/3/5/6 --
+        the early scopes (ring, particles, waveform, bars) -- were retired on
+        2026-10-14; the section numbers are kept so the history reads."""
         total = self.total
         fps = self.fps
         if total <= 0:
@@ -938,14 +905,7 @@ class _CRTRenderer:
         # able to CRASH on its input signal no matter which upstream engine
         # produced it, and a black-ish frame is a better answer than a lost
         # episode.
-        #
-        # `freq` and `wave` are ARRAYS and need the same treatment as the three
-        # scalars: they feed `int()` and colour maths just as directly --
-        # `int(freq[i] * self.h * 0.18)`, `int(255 * (1.0 - freq[i] * 0.6))`,
-        # `int(3 + freq[p % len(freq)] * 8)`.
         vol = _finite(self.volume[fi])
-        freq = _finite_array(self.freqs[fi])
-        wave = _finite_array(self.waves[fi])
         signal = _finite(self._signal[fi])
         loss = _finite(self._loss[fi])
         t = fi / fps
@@ -968,61 +928,6 @@ class _CRTRenderer:
         # -- divider (background chrome) ------------------------------
         draw.line([(pad, ly), (self.w - pad, ly)], fill=CRT_DARK, width=1)
 
-        # -- 2/3/5/6. GATED SCOPE SECTIONS ----------------------------
-        # draw_scopes=False skips {2,3,5,6} as a SET:
-        # section 3 reads section 2's `r`, so 2+3 go together; 5+6 are
-        # independent. {1,4,7,8} (title/grid/bottom/CRT) always draw.
-        if draw_scopes:
-            # -- 2. CIRCULAR FREQUENCY RING (centre) ------------------
-            cx, cy, base_r = self._ring_cx, self._ring_cy, self._ring_r
-            r = base_r + int(vol * base_r * 0.3)
-            # S4 sync-drift: in weak signal (silent gaps) the receiver loses
-            # lock -> a bounded horizontal coordinate offset (NOT np.roll, NOT
-            # a hue shift). Clamped so the ring never leaves the frame.
-            drift = int(round(loss * (self.w // 120)))
-            cx = max(r, min(self.w - r, cx + drift))
-            n_bars = min(32, len(freq))
-            for i in range(n_bars):
-                angle = 2 * math.pi * i / n_bars - math.pi / 2
-                bar_len = int(freq[i] * self.h * 0.18) + 2
-                x0 = cx + int(r * math.cos(angle))
-                y0 = cy + int(r * math.sin(angle))
-                x1 = cx + int((r + bar_len) * math.cos(angle))
-                y1 = cy + int((r + bar_len) * math.sin(angle))
-                g = int(255 * (1.0 - freq[i] * 0.6))
-                rb = int(freq[i] * 180)
-                col = (rb, g, max(20, 65 - int(freq[i] * 50)))
-                draw.line([(x0, y0), (x1, y1)], fill=col,
-                          width=max(2, self.w // 400))
-
-            # Inner ring outline
-            ring_bright = min(1.0, 0.3 + vol * 0.7)
-            ring_col = tuple(min(255, int(c * ring_bright)) for c in CRT_GREEN)
-            bbox = [(cx - r, cy - r), (cx + r, cy + r)]
-            draw.ellipse(bbox, outline=ring_col, width=2)
-
-            # -- 3. ORBITING PARTICLES -------------------------------
-            n_particles = 12
-            for p in range(n_particles):
-                phase = 2 * math.pi * p / n_particles
-                orbit_r = r + int(self.h * 0.12) + int(vol * 30)
-                speed = 0.3 + freq[p % len(freq)] * 2.0
-                angle = phase + t * speed
-                px = cx + int(orbit_r * math.cos(angle))
-                py = cy + int(orbit_r * math.sin(angle) * 0.6)
-                size = max(2, int(3 + freq[p % len(freq)] * 8))
-                hue_shift = (p / n_particles + t * 0.05) % 1.0
-                if hue_shift < 0.33:
-                    pcol = CRT_GREEN
-                elif hue_shift < 0.66:
-                    pcol = CRT_CYAN
-                else:
-                    pcol = CRT_AMBER
-                bright = min(1.0, 0.3 + freq[p % len(freq)] * 0.7)
-                pcol = tuple(min(255, int(c * bright)) for c in pcol)
-                draw.ellipse([(px - size, py - size), (px + size, py + size)],
-                             fill=pcol)
-
         # -- 4. GEOMETRIC GRID ----------------------------------------
         # S4 brightness hierarchy: the grid dims FIRST when signal weakens
         # (the silent inter-beat gaps) -- it scales down faster than the ident
@@ -1039,21 +944,6 @@ class _CRTRenderer:
             wobble = int(math.sin(gy * 0.01 + t * 1.5) * vol * 8)
             draw.line([(pad + wobble, gy), (self.w - pad - wobble, gy)],
                       fill=grid_col, width=1)
-
-        if draw_scopes:
-            # -- 5. MIRRORED WAVEFORM ---------------------------------
-            wave_y = int(self.h * 0.72)
-            wave_h = int(self.h * 0.12)
-            if wave is not None and len(wave) > 1:
-                self._waveform_mirror(draw, wave, pad, wave_y,
-                                      self.w - pad * 2, wave_h, vol, t)
-
-            # -- 6. FREQUENCY BARS ------------------------------------
-            bar_y = int(self.h * 0.86)
-            bar_h = int(self.h * 0.06)
-            if freq is not None:
-                self._freq_bars_wide(draw, freq, pad, bar_y,
-                                     self.w - pad * 2, bar_h, vol)
 
         # -- 7. Bottom bar (dim chrome; stays pre-vignette) -----------
         by = self.h - pad
@@ -1075,10 +965,13 @@ class _CRTRenderer:
         arr = np.array(img, dtype=np.float32)
         arr *= self._vignette[:, :, np.newaxis]
         np.clip(arr, 0, 255, out=arr)
-        img = Image.fromarray(arr.astype(np.uint8))
+        u8 = arr.astype(np.uint8)
 
         if vol > 0.3:
-            arr = np.array(img, dtype=np.int16)
+            # Widen the uint8 frame directly for the noise; it used to become
+            # a PIL image first only to be read straight back (VC-01 pattern,
+            # 2026-10-14; pixels byte-compared).
+            arr = u8.astype(np.int16)
             intensity = int(vol * 12)
             # Seeded (was unseeded np.random in v1) so the frame is
             # deterministic per (title, fi).
@@ -1087,6 +980,8 @@ class _CRTRenderer:
             arr += noise
             np.clip(arr, 0, 255, out=arr)
             img = Image.fromarray(arr.astype(np.uint8))
+        else:
+            img = Image.fromarray(u8)
 
         # -- 1. SECTION-1 TEXT / HERO CARD (drawn AFTER the vignette) -
         # Text-exemption: the always-on vignette multiply above can never dim
@@ -1360,49 +1255,6 @@ class _CRTRenderer:
                 draw.rectangle([(x + tw + 2, y), (x + tw + 2 + cur_w, y + line_h)],
                                fill=hero_col)
 
-    def _waveform_mirror(self, draw, wave, x, y, w, h, vol, t):
-        mid = y + h // 2
-        n = len(wave)
-        pts_top = []
-        pts_bot = []
-        for i in range(min(n, w)):
-            px = x + int(i * w / n)
-            amp = wave[i] * h * 0.45
-            pts_top.append((px, mid - int(amp)))
-            pts_bot.append((px, mid + int(amp)))
-
-        brightness = min(1.0, 0.3 + vol * 0.9)
-        col_top = tuple(min(255, int(c * brightness)) for c in CRT_GREEN)
-        col_bot = tuple(min(255, int(c * brightness * 0.5)) for c in CRT_CYAN)
-
-        if len(pts_top) > 1:
-            draw.line(pts_top, fill=col_top, width=2)
-            draw.line(pts_bot, fill=col_bot, width=1)
-
-        draw.line([(x, mid), (x + w, mid)], fill=CRT_DARK, width=1)
-
-    def _freq_bars_wide(self, draw, freq, x, y, w, h, vol):
-        n = min(32, len(freq))
-        bw = w // n - 1
-        for i in range(n):
-            bh = max(1, int(freq[i] * h * 1.5))
-            bx = x + i * (bw + 1)
-            by = y + h - min(bh, h)
-            ratio = i / max(1, n - 1)
-            if ratio < 0.5:
-                r = int(ratio * 2 * 255)
-                g = 255
-                b = 20
-            else:
-                r = 255
-                g = int((1.0 - (ratio - 0.5) * 2) * 200)
-                b = 20
-            brightness = 0.25 + freq[i] * 0.75
-            col = (min(255, int(r * brightness)),
-                   min(255, int(g * brightness)),
-                   min(255, int(b * brightness)))
-            draw.rectangle([(bx, by), (bx + bw, y + h)], fill=col)
-
 
 # -----------------------------------------------------------------------------
 # FFMPEG ENCODER
@@ -1473,28 +1325,6 @@ def _announce_encoder(key, message):
     except Exception:  # noqa: BLE001
         pass
 
-
-
-def _finite_array(seq, default: float = 0.0):
-    """``seq`` with any non-finite entry replaced by ``default``.
-
-    The array counterpart of :func:`_finite`. Returns the input OBJECT unchanged
-    when everything is already finite, so no caller sees a substituted array on
-    the healthy path.
-
-    It is not allocation-free: ``np.isfinite`` builds a bool mask every frame,
-    and ``asarray(..., dtype=float)`` COPIES when the input is float32, which is
-    the normal dtype coming from the audio side. That is a per-frame cost worth
-    knowing about if this ever shows up in a profile.
-    """
-    try:
-        import numpy as _np
-        arr = _np.asarray(seq, dtype=float)
-        if _np.all(_np.isfinite(arr)):
-            return seq
-        return _np.nan_to_num(arr, nan=default, posinf=default, neginf=default)
-    except Exception:  # noqa: BLE001 -- a frame must never die in its guard
-        return seq
 
 
 def _finite(value, default: float = 0.0) -> float:
@@ -1706,6 +1536,39 @@ _PRESET_DESC = {
     "v2/pt_speaker_0": "male * Portuguese accent * soft * thoughtful",
     "v2/pt_speaker_4": "female * Portuguese accent * gentle * clear",
 }
+
+
+_TREATMENT_COUNT_KEYS = ("total_word_count", "character_word_count",
+                         "announcer_word_count")
+
+
+def _treatment_ledger(led):
+    """``led`` with its word counts taken from the DURABLE ledger when it has
+    them. Never raises.
+
+    This node's ``led`` is FreezeCascade's script, upstream of CastLock. When
+    CastLock reroutes a mis-stamped announcer line it corrects the role on its
+    wire and in the singleton (voice review V3), and the singleton's counts
+    are recomputed on every save -- but this copy still counts the line as a
+    character's, so the treatment read e.g. "char 13 / announcer 0" for an
+    episode whose announcer spoke 7 words (sonnet QA, 2026-10-14). Only the
+    three counts are overlaid; nothing else in the treatment changes source.
+    """
+    try:
+        try:
+            from .production_ledger import peek_ledger as _peek
+        except ImportError:  # pragma: no cover -- flat test imports
+            from production_ledger import peek_ledger as _peek  # type: ignore
+        durable = _peek()
+        dmeta = (getattr(durable, "data", None) or {}).get("meta") or {}
+        counts = {k: dmeta[k] for k in _TREATMENT_COUNT_KEYS if k in dmeta}
+        if not counts:
+            return led
+        overlaid = dict(led)
+        overlaid["meta"] = {**(led.get("meta") or {}), **counts}
+        return overlaid
+    except Exception:  # noqa: BLE001 -- a sidecar never fails the render
+        return led
 
 
 def _write_story_treatment(out_path, episode_title, led,
@@ -2080,10 +1943,11 @@ class SignalLostVideoRenderer:
     """Generate a procedural CRT-aesthetic MP4 from an OTR episode."""
 
     DESCRIPTION = (
-        "Renders procedural CRT sci-fi radio-floor video directly from episode audio using "
-        "mathematical waveforms without AI generation. Draws animated oscilloscope graphics, "
-        "frequency spectrum bars, CRT scanlines, and episode title cards on CPU at broadcast "
-        "resolution. Adjust video frame rate or change the output resolution dropdown."
+        "Renders the procedural CRT radio-floor video directly from episode audio, without "
+        "AI generation: an audio-reactive grid, CRT scanlines and vignette, and the episode "
+        "title cards, on CPU at broadcast resolution. It sets the episode's video length and "
+        "is the floor the composite falls back to under gaps. Adjust the frame rate or the "
+        "output resolution."
     )
 
     CATEGORY = "OldTimeRadio"
@@ -2099,7 +1963,7 @@ class SignalLostVideoRenderer:
         return {
             "required": {
                 "audio": ("AUDIO", {
-                    "tooltip": "Master episode audio that drives the procedural CRT waveforms and master timing."
+                    "tooltip": "Master episode audio: sets the video length and drives the CRT picture's brightness and grain."
                 }),
                 "script_json": ("STRING", {
                     "multiline": True, "default": "[]",
@@ -2142,17 +2006,9 @@ class SignalLostVideoRenderer:
                 # episode_title, and this node reads the ledger through
                 # _otr_shared/episode_title.py, whose timestamp last resort
                 # covers a titleless ledger.
-                # APPENDED LAST (widgets_values is positional -- only ever
-                # append). False turns the floor's in-frame scopes {2,3,5,6}
-                # (centre ring / particles / waveform / bars) OFF. Default True
-                # keeps the v1 floor visual for every existing saved workflow.
-                "draw_scopes": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "Draw the scopes over the picture -- centre ring, "
-                               "orbiting particles, waveform and frequency bars. "
-                               "Turn it off for a clean frame with nothing "
-                               "overlaid."
-                }),
+                # `draw_scopes` (the LAST widget) was REMOVED 2026-10-14 with
+                # the early scopes it switched; every shipped workflow had it
+                # off. It was trailing, so no surviving widget moved.
             },
         }
 
@@ -2161,8 +2017,7 @@ class SignalLostVideoRenderer:
         return _time.time()
 
     def render_video(self, audio, script_json, news_used,
-                     fps=25, resolution="1920x1080",
-                     draw_scopes=True):
+                     fps=25, resolution="1920x1080"):
 
         from .story_orchestrator import _runtime_log
 
@@ -2265,8 +2120,8 @@ class SignalLostVideoRenderer:
         _runtime_log(f"Video: Starting {total_frames} frames @ {fps}fps ({resolution})")
 
         # -- 2. Audio analysis ----------------------------------------
-        _runtime_log("Video: Analysing audio (FFT + RMS)")
-        volume, freqs, waves = _analyze_audio(audio_np, sr, total_frames, fps)
+        _runtime_log("Video: Analysing audio (RMS)")
+        volume = _analyze_audio(audio_np, sr, total_frames, fps)
 
         # This engine appends NO credits card: OTR_CreditsRoll (node 95 in the
         # canonical workflow) is the only credits sequence, and a second one
@@ -2360,7 +2215,7 @@ class SignalLostVideoRenderer:
         # The hero card names the language in English on a non-English
         # episode ("EL MAPA PROHIBIDO · SPANISH") -- the card only, never the
         # quoted HUD that rides every frame. English is byte-identical.
-        renderer = _CRTRenderer(W, H, episode_title, volume, freqs, waves, fps,
+        renderer = _CRTRenderer(W, H, episode_title, volume, fps,
                                 timing=_title_timing, card_label=lang_label,
                                 font_policy=_font_policy_for(led))
         total_encode_frames = total_frames
@@ -2396,7 +2251,7 @@ class SignalLostVideoRenderer:
             ) from _e
 
         def _render_crt(fi):
-            return renderer.render(fi, draw_scopes=draw_scopes)
+            return renderer.render(fi)
 
         def _frame_gen():
             import concurrent.futures
@@ -2439,7 +2294,7 @@ class SignalLostVideoRenderer:
         # pass parsed led + voice_assignments/style/genre (Sprint 6.3
         # rename of the legacy `plan` parameter).
         _write_story_treatment(
-            out_path, episode_title, led,
+            out_path, episode_title, _treatment_ledger(led),
             voice_assignments, style, genre,
             news_used,
             duration, W, H, fps, size_mb
