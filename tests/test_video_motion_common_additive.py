@@ -2,8 +2,8 @@
 
 New, self-contained tests for nodes/_otr_video_engines/motion_common.py pure
 surface, complementing tests/test_video_motion*.py: the BUG-070 SageAttention
-contamination gate (module/env detection + fail-closed), isolation-tier
-resolution, the init_image aspect transform (ONE uniform scale, never an implicit
+contamination gate (module/env detection + fail-closed), the init_image
+aspect transform (ONE uniform scale, never an implicit
 stretch; even dims), the no-silent-stretch guard, NVML-safe VRAM probes, and the
 MotionEngineBase load/unload/detach contract (V-4: never unload_all_models). No
 GPU required (NVML-absent paths are handled). No production edits. UTF-8, no BOM,

@@ -371,8 +371,8 @@ def render() -> str:
       "REQUIRES.** Several engines name alternatives -- two motion modules, or "
       "the same tensor at three quantizations -- and need one of them, not all. "
       "Checked against the fetcher: `ghost_signal_official` lists all three "
-      "files `otr_fetch_lane_weights.py haunted` installs, plus two other "
-      "AnimateDiff motion modules it can also drive.\n")
+      "files `otr_fetch_lane_weights.py haunted` installs, plus one other "
+      "AnimateDiff motion module it can also drive.\n")
     A("So where a lane appears in the one-command list above, **the fetcher is "
       "authoritative** -- it installs a set known to work together. Use the list "
       "below to understand a lane, or to install one the fetcher does not cover, "

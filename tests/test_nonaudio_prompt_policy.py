@@ -740,8 +740,9 @@ def test_a_bare_no_voice_clause_is_NOT_treated_as_finished():
 
     A caller-supplied prompt merely ENDING in the no-voice clause used to come
     back unchanged with no sound named at all, while observability still
-    reported joint_av_prompt=finished. Idempotency now requires the full
-    canonical terminator, so such a prompt gets properly finished.
+    reported joint_av_prompt=finished. Idempotency now requires the canonical
+    sound frame AND the no-voice clause last (joint_av_prompt_is_finished), so
+    such a prompt gets properly finished.
     """
     bare = "an operator override that happens to end here. No speech, no voices."
     assert not ltx25.joint_av_prompt_is_finished(bare)

@@ -133,7 +133,7 @@ It also needs an authorized male and female reference WAV plus a full portable b
 
 Copied from the engine module and the siblings it imports, so these are the literal strings the code looks for on disk.
 
-**These are the files an engine REFERENCES, which can be more than it REQUIRES.** Several engines name alternatives -- two motion modules, or the same tensor at three quantizations -- and need one of them, not all. Checked against the fetcher: `ghost_signal_official` lists all three files `otr_fetch_lane_weights.py haunted` installs, plus two other AnimateDiff motion modules it can also drive.
+**These are the files an engine REFERENCES, which can be more than it REQUIRES.** Several engines name alternatives -- two motion modules, or the same tensor at three quantizations -- and need one of them, not all. Checked against the fetcher: `ghost_signal_official` lists all three files `otr_fetch_lane_weights.py haunted` installs, plus one other AnimateDiff motion module it can also drive.
 
 So where a lane appears in the one-command list above, **the fetcher is authoritative** -- it installs a set known to work together. Use the list below to understand a lane, or to install one the fetcher does not cover, and expect to choose among alternatives rather than downloading every line.
 

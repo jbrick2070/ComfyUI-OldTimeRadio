@@ -109,8 +109,7 @@ def assert_sage_not_patched(engine_name, family, *, modules=None, env=None):
             engine_name, family, EngineUsabilityReason.INCOMPATIBLE_PROFILE,
             "SageAttention is patched/resident; %s refuses to run in-process "
             "(BUG-070: int8-PV SageAttention process-aborts with no traceback). "
-            "Disable SageAttention (e.g. KJNodes) or run this engine in a cu128 "
-            "sidecar" % engine_name,
+            "Disable SageAttention (e.g. KJNodes)." % engine_name,
             kind="video")
     return engine_name
 
@@ -1272,8 +1271,9 @@ class MotionEngineBase:
       tail, cloud safety and the banana cap all still run after you, each
       exactly once. If your lane has an audio tail (foley/mime), its owner is
       ``finish_joint_av_positive`` -- do not write one yourself; its idempotency
-      is exact suffix matching, so your own sound wording would not match and
-      you would end up with two different audio clauses.
+      check is ``joint_av_prompt_is_finished`` (the canonical sound frame
+      present, the no-voice clause last), so your own sound wording would not
+      match and you would end up with two different audio clauses.
     * **Handle a row with no leaves.** An older ledger may carry only
       ``text_prompt``; return it unchanged in that case. One rule, no branches.
 
