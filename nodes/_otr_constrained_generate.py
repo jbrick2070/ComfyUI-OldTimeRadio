@@ -7,7 +7,7 @@ constrained at the token-sampling layer: it CANNOT emit a token
 sequence that would produce invalid JSON or violate the schema's
 field-level constraints (regex, Literal, length bounds, etc.).
 
-Sibling of `_otr_model_loader.make_generate_fn` / make_polish_generate_fn
+Sibling of `_otr_model_loader.make_generate_fn`
 -- same cache_entry shape, same chat-template normalization, same
 prompt-prefix-strip post-process. The only delta: a
 prefix_allowed_tokens_fn keyed off the pydantic schema is passed into

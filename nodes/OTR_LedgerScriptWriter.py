@@ -486,10 +486,6 @@ def _get_substring_stop_class():
 # triggers the loader's full teardown + reload. When both slots
 # resolve to the same model id (default), every call cache-hits on
 # the resident model -- zero transitions.
-#
-# Polish always routes to the creative slot (the W4 fix exists to keep
-# polish sampling distinct from composer sampling; it has nothing to
-# do with the creative-vs-technical model split).
 # ---------------------------------------------------------------------------
 
 
@@ -557,9 +553,7 @@ class _SlotScheduler:
 
     Holds the resolved per-slot model ids + the writer's sampling
     config. for_slot(slot) returns a generate_fn closure that lazily
-    request_slot's the right model on every invocation. for_polish()
-    returns a polish-tuned closure that always routes through the
-    creative slot.
+    request_slot's the right model on every invocation.
 
     Counts transitions and per-slot calls for forensic meta stamping
     (meta["slot_transitions"], meta["slot_calls_by_slot"]).
@@ -3672,8 +3666,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
 
         # --- C. Slot scheduler -- B2b two-slot LLM routing -------------
         # Replaces the single _OTRML.load_llm + _build_truncating_generate_fn
-        # + make_polish_generate_fn block. The scheduler exposes per-slot
-        # generate_fn closures that lazily request_slot on each call.
+        # block. The scheduler exposes per-slot generate_fn closures that
+        # lazily request_slot on each call.
         # When creative_writing_model == technical_model (default) every
         # call cache-hits on one resident model and no transitions fire;
         # when they differ, crossing a slot boundary triggers a full
@@ -3687,7 +3681,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         #   Outline             -> creative
         #   Cast lock           -> creative
         #   Dialogue composer   -> creative
-        #   Polish              -> creative (via for_polish)
         #   Title regen         -> creative
         #   Style picker        -> per-sub-pass (S32 B2): pass 1
         #                          inventor -> creative, pass 2

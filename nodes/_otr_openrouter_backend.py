@@ -1652,9 +1652,8 @@ def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | No
 
     The closure matches the signature every OTR generate_fn uses --
     ``(messages, *, temperature, max_new_tokens, stop=None, ...) -> str`` --
-    so the loader factories (`make_generate_fn`,
-    `make_polish_generate_fn`) and the writer's
-    `_build_truncating_generate_fn` can all return it unchanged when
+    so the loader factory (`make_generate_fn`) and the writer's
+    `_build_truncating_generate_fn` can both return it unchanged when
     ``cache_entry["provider"] == "openrouter"``.
 
     `response_format` is None for free-form creative + the plain

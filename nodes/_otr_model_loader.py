@@ -97,7 +97,6 @@ __all__ = [
     "invalidate_cache_no_gpu_teardown",
     "request_slot",
     "make_generate_fn",
-    "make_polish_generate_fn",
     "ModelLoaderError",
     "GenerationDeadlineExceededError",
     # The deadline API is public because a backend consumes it from
@@ -270,9 +269,9 @@ def _publish_cache_entry_if_current(expected_epoch: int, fields: dict) -> bool:
 # BEFORE submitting its worker, the worker INSTALLS that same value and clears
 # it in its own finally, and the parent waits only the remaining duration.
 # One shared value, so there is no skew between the parent's timeout and
-# the worker's deadline. Both
-# user-facing transformers generate closures (make_generate_fn,
-# make_polish_generate_fn) check it via _DeadlineStoppingCriteria, cutting
+# the worker's deadline. The
+# user-facing transformers generate closure (make_generate_fn)
+# checks it via _DeadlineStoppingCriteria, cutting
 # an abandoned worker's remaining lifetime to ~1 token instead of the full
 # budget. (load_llm's own internal CUDA-warmup model.generate() call --
 # max_new_tokens=1, do_sample=False, already exempt from the sibling
@@ -2416,8 +2415,8 @@ def _normalize_messages_for_cache_entry(
 
     Probes the tokenizer once and caches the verdict on the
     cache_entry under `_system_role_supported`, so the probe runs
-    once per model residency rather than per generate call (both
-    make_generate_fn and make_polish_generate_fn share the entry).
+    once per model residency rather than per generate call (every
+    generate fn built from the entry shares the verdict).
     """
     from . import _otr_loader_backends as _otr_loader_backends
 
@@ -2719,187 +2718,6 @@ def make_generate_fn(cache_entry: dict[str, Any]):
         )
 
     return generate_fn
-
-
-# ---------------------------------------------------------------------------
-# Polish-specific generate fn (LFC sprint commit 3, section 6.4)
-# ---------------------------------------------------------------------------
-
-
-# Polish-specific sampling baked in per ADR section 6.4. None of these
-# are configurable per-call -- the whole point of the dedicated polish
-# fn is that the writer's closure-captured composer tuning
-# (repetition_penalty, min_p, top_p tweaks) cannot leak in.
-_POLISH_TOP_P: float = 0.9
-_POLISH_DO_SAMPLE: bool = True
-
-
-def make_polish_generate_fn(cache_entry: dict[str, Any]):
-    """Build a polish-specific generate fn from `cache_entry`.
-
-    LFC sprint commit 3, ADR section 6.4 (2026-05-11). Polish is a
-    short, targeted rewrite -- conceptually closer to a constrained
-    edit than the composer's long-form generation. The writer's main
-    `make_generate_fn` (via the OTR_LedgerScriptWriter
-    `_build_truncating_generate_fn` wrapper) bakes
-    repetition_penalty / min_p / top_p into its closure tuned for
-    composition. Those settings leak into polish via closure capture
-    and produce awkward substitutions on short rewrites.
-
-    The polish fn here is a SEPARATE closure off the same cache_entry
-    with composer-independent sampling:
-
-        temperature      -- caller-provided per call (defaults to 0.4
-                            via _otr_line_composer.polish_line)
-        top_p            -- 0.9 (slightly tighter than composer 0.92)
-        do_sample        -- True
-        min_p            -- not passed (transformers default 0)
-        repetition_penalty -- not passed (transformers default 1.0)
-
-    Returns a callable with the same signature as `make_generate_fn`:
-        (messages, *, temperature, max_new_tokens) -> str
-    """
-    # [OpenRouter S3] Remote branch (FC2 seam 2). A provider-tagged
-    # remote entry has no model/tokenizer; the remote generate_fn applies
-    # the same sampling the caller passes (polish callers pass their own
-    # temperature), so one closure covers both factories.
-    if cache_entry.get("provider") == "openrouter":
-        from ._otr_openrouter_backend import make_openrouter_generate_fn
-        return make_openrouter_generate_fn(cache_entry)
-    # BUG-LOCAL-299: Comfy Credits sibling -- same zero-VRAM remote seam.
-    if cache_entry.get("provider") == "comfy_credits":
-        from ._otr_comfy_backend import make_comfy_credits_generate_fn
-        return make_comfy_credits_generate_fn(cache_entry)
-    if cache_entry.get("provider") == "google_api":
-        from ._otr_google_api.llm import make_google_api_generate_fn
-        return make_google_api_generate_fn(cache_entry)
-    required = {"model", "tokenizer"}
-    missing = required - set(cache_entry)
-    if missing:
-        raise ModelLoaderError(
-            f"cache_entry missing required keys: {sorted(missing)}"
-        )
-
-    model = cache_entry["model"]
-    tokenizer = cache_entry["tokenizer"]
-
-    def polish_generate_fn(messages, *, temperature, max_new_tokens):
-        try:
-            import torch
-        except ImportError as exc:
-            raise ModelLoaderError("torch not available") from exc
-
-        require_full_output = bool(getattr(
-            messages, "_otr_require_full_output_budget", False,
-        ))
-        reserve_remaining = bool(getattr(
-            messages, "_otr_reserve_remaining_output_capacity", False,
-        ))
-        bounded_capacity = reserve_remaining and max_new_tokens is not None
-        fail_on_output_limit = bool(getattr(
-            messages, "_otr_fail_on_output_limit", False,
-        ))
-        prepared = prepare_native_prompt(cache_entry, messages)
-        inputs = prepared["inputs"]
-        context_cap = prepared["context_cap"]
-        requested_tokens = context_cap if reserve_remaining else max_new_tokens
-        try:
-            effective_max_new_tokens = fit_output_tokens(
-                requested_tokens,
-                context_cap=context_cap,
-                prompt_tokens=inputs["input_ids"].shape[1],
-                label=f"local polish {cache_entry.get('model_id', '<unknown>')}",
-                require_full=require_full_output or bounded_capacity,
-            )
-        except GenerationContextOverflowError as exc:
-            # THE TWO LOCAL TRANSPORTS MUST AGREE (2026-08-13). A bare
-            # ModelLoaderError with NO phase for the exact condition
-            # OTR_LedgerScriptWriter raises as a phase-carrying
-            # PromptContextOverflowError would make an identical runaway
-            # rerollable on one transport and terminal on the other (the ladder
-            # reads the PHASE to decide whether a failure is rerollable), purely
-            # from which one the pass happened to take. The phase is read off
-            # the error rather than assumed here, so a pre-call refusal that IS
-            # retryable cannot be mislabelled by this line.
-            raise PromptContextOverflowError(
-                str(exc), phase=exc.phase,
-            ) from exc
-        inputs = inputs.to(model.device)
-        from transformers import StoppingCriteriaList  # noqa: I001
-        try:
-            from ._otr_decode_guard import make_degeneracy_criterion
-        except ImportError:  # pragma: no cover - flat/standalone import path
-            from _otr_decode_guard import (  # type: ignore
-                make_degeneracy_criterion,
-            )
-        _guard = make_degeneracy_criterion(inputs["input_ids"].shape[1])
-        _deadline_guard = _DeadlineStoppingCriteria()
-
-        with torch.no_grad():
-            out = model.generate(
-                **inputs,
-                do_sample=_POLISH_DO_SAMPLE,
-                temperature=temperature,
-                top_p=_POLISH_TOP_P,
-                max_new_tokens=effective_max_new_tokens,
-                pad_token_id=prepared["pad_token_id"],
-                eos_token_id=prepared["eos_token_ids"] or None,
-                stopping_criteria=StoppingCriteriaList(
-                    [_guard, _deadline_guard]),
-                streamer=_OTRHB.make_streamer(
-                    tokenizer,
-                    f"polish:{cache_entry.get('model_id', '<unknown>')}"),
-            )
-        _memory_log.memory_snapshot("polish_generation_returned", model_id=cache_entry.get("model_id"))
-        prompt_len = inputs["input_ids"].shape[1]
-        generated_ids = out[0][prompt_len:]
-        if _deadline_guard.hit:
-            log.warning(
-                "[OTR.llm] polish generation deadline exceeded after %s of "
-                "a %s-token allowance -- raising instead of returning "
-                "truncated text (PBUG-20260825-04)",
-                len(generated_ids), effective_max_new_tokens,
-            )
-            raise GenerationDeadlineExceededError(
-                "polish generation was cut short by its caller's "
-                "wall-clock deadline; the caller has abandoned this call",
-                generated_tokens=len(generated_ids),
-            )
-        if getattr(_guard, "hit", False):
-            telemetry = _guard.telemetry()
-            log.error(
-                "[OTR.llm] POLISH DECODE HALTED (%s): repeated a %s-token run "
-                "verbatim %s times after %s generated tokens of a %s-token "
-                "allowance. Telemetry: %s",
-                _guard.reason, telemetry.get("cycle_tokens"),
-                telemetry.get("required_repeats"), len(generated_ids),
-                effective_max_new_tokens, telemetry,
-            )
-            raise GenerationDegeneracyError(
-                "polish generation was halted by the liveness guard: the output "
-                "repeated a run of tokens verbatim rather than progressing",
-                halt_reason=_guard.reason,
-                repetition=telemetry,
-                raw_completion=tokenizer.decode(
-                    generated_ids, skip_special_tokens=True,
-                ),
-                prompt_tokens=prompt_len,
-                generated_tokens=len(generated_ids),
-                effective_output_tokens=effective_max_new_tokens,
-            )
-        if (fail_on_output_limit
-                and len(generated_ids) >= effective_max_new_tokens
-                and int(generated_ids[-1]) not in prepared["eos_token_ids"]):
-            raise ModelLoaderError(
-                "prose generation exhausted the full remaining provider/context "
-                "capacity; the partial artifact is not eligible for reroll"
-            )
-        return tokenizer.decode(
-            generated_ids,
-            skip_special_tokens=True,
-        )
-
-    return polish_generate_fn
 
 
 # ---------------------------------------------------------------------------

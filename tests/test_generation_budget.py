@@ -65,7 +65,7 @@ def _exact_prompt_entry(monkeypatch, capacity=32768):
     return entry, runs, moves, refs, generated
 
 
-@pytest.mark.parametrize("route", ["writer", "constrained", "base", "polish"])
+@pytest.mark.parametrize("route", ["writer", "constrained", "base"])
 def test_native_fit_and_generation_use_identical_cpu_prompt_without_truncation(route, monkeypatch):
     import gc
     from nodes import _otr_constrained_generate as constrained
@@ -91,7 +91,7 @@ def test_native_fit_and_generation_use_identical_cpu_prompt_without_truncation(r
     assert all(ref() is None for ref in refs)
     factories = {"writer": writer._build_truncating_generate_fn,
                  "constrained": lambda e: constrained.make_constrained_generate_fn(e, _FitSchema),
-                 "base": model_loader.make_generate_fn, "polish": model_loader.make_polish_generate_fn}
+                 "base": model_loader.make_generate_fn}
     result = factories[route](entry)(messages, temperature=.2, max_new_tokens=None)
     assert result == '{"value":"ok"}'
     assert observed == [(route + "_generation_returned", {"model_id": entry["model_id"]})]
@@ -120,7 +120,7 @@ def test_constrained_eos_at_exact_capacity_is_a_completed_reply(eos, monkeypatch
     assert result == '{"value":"ok"}' and generated[-1][1] == 1
 
 
-@pytest.mark.parametrize("route", ["writer", "constrained", "base", "polish"])
+@pytest.mark.parametrize("route", ["writer", "constrained", "base"])
 @pytest.mark.parametrize("terminal", [19998, 19999, 20000])
 def test_all_native_routes_stop_on_configured_or_chat_eos_at_capacity(route, terminal, monkeypatch, caplog):
     from types import SimpleNamespace
@@ -151,7 +151,7 @@ def test_all_native_routes_stop_on_configured_or_chat_eos_at_capacity(route, ter
     entry["model"].generate = generate
     factories = {"writer": writer._build_truncating_generate_fn,
                  "constrained": lambda e: constrained.make_constrained_generate_fn(e, _FitSchema),
-                 "base": model_loader.make_generate_fn, "polish": model_loader.make_polish_generate_fn}
+                 "base": model_loader.make_generate_fn}
     assert factories[route](entry)(messages, temperature=.2, max_new_tokens=None) == '{"value":"ok"}'
     assert len(calls) == 1 and calls[0]["max_new_tokens"] == 1
     assert configured == [19998, 19999] and entry["tokenizer"].eos_token_id == 20000
@@ -218,7 +218,7 @@ def test_scheduler_fit_includes_schema_and_does_not_count_as_generation(bound, m
     assert source[0]["content"] == "Return the value."
 
 
-@pytest.mark.parametrize("route", ["writer", "constrained", "base", "polish"])
+@pytest.mark.parametrize("route", ["writer", "constrained", "base"])
 def test_fit_inspection_releases_inputs_and_refuses_atomic_budget_before_device_move(route, monkeypatch):
     import gc
     from nodes import _otr_constrained_generate as constrained
@@ -231,7 +231,7 @@ def test_fit_inspection_releases_inputs_and_refuses_atomic_budget_before_device_
     assert all(ref() is None for ref in refs)
     factories = {"writer": writer._build_truncating_generate_fn,
                  "constrained": lambda e: constrained.make_constrained_generate_fn(e, _FitSchema),
-                 "base": model_loader.make_generate_fn, "polish": model_loader.make_polish_generate_fn}
+                 "base": model_loader.make_generate_fn}
     with pytest.raises(writer.PromptContextOverflowError, match="complete requested output"):
         factories[route](entry)(messages, temperature=.2, max_new_tokens=128)
     assert not moves and not generated
@@ -404,11 +404,8 @@ def test_writer_local_complete_patch_refuses_before_model_generate(
         )
 
 
-@pytest.mark.parametrize(
-    "factory_name", ["make_generate_fn", "make_polish_generate_fn"],
-)
 def test_model_loader_captures_complete_patch_marker_before_normalization(
-    monkeypatch, factory_name,
+    monkeypatch,
 ):
     class Tensor:
         shape = (1, 7000)
@@ -441,7 +438,7 @@ def test_model_loader_captures_complete_patch_marker_before_normalization(
         "_normalize_messages_for_cache_entry",
         lambda _entry, messages: list(messages),
     )
-    generate = getattr(model_loader, factory_name)({
+    generate = model_loader.make_generate_fn({
         "model": Model(),
         "tokenizer": Tokenizer(),
         "model_id": "local-test",

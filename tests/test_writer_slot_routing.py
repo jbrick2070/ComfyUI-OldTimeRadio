@@ -173,15 +173,6 @@ def _patched_scheduler(monkeypatch, *, creative_id, technical_id):
             )
         ),
     )
-    monkeypatch.setattr(
-        ML,
-        "make_polish_generate_fn",
-        lambda cache_entry: (
-            lambda messages, *, temperature, max_new_tokens: (
-                f"<fake-polish-output for {cache_entry.model_id}>"
-            )
-        ),
-    )
 
     scheduler = W._SlotScheduler(
         creative_id=creative_id,

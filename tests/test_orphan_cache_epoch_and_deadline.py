@@ -48,8 +48,8 @@ corrections directly:
   the clear+bump and the check+publish under one lock, and unload_llm()/
   invalidate_cache_no_gpu_teardown() now return the new epoch.
 * _DeadlineStoppingCriteria latches (.hit) rather than raising mid-decode
-  (mirrors _otr_decode_guard's degeneracy criterion); both make_generate_fn
-  and make_polish_generate_fn check .hit after generate() returns and raise
+  (mirrors _otr_decode_guard's degeneracy criterion); make_generate_fn
+  checks .hit after generate() returns and raises
   GenerationDeadlineExceededError instead of returning the truncated text.
 * _run_with_timeout catches that exception alongside its own FuturesTimeout
   and routes both through the identical recovery path (cache invalidation +
@@ -589,28 +589,28 @@ def test_deadline_is_per_thread_not_global():
         ml.set_generation_deadline(None)
 
 
-def test_both_generate_call_sites_wire_in_the_deadline_criteria():
-    """Source-level pin: both model.generate() call sites in
-    make_generate_fn/make_polish_generate_fn must include a bound
-    _DeadlineStoppingCriteria instance alongside the existing degeneracy
-    guard, AND check its .hit after generate() returns, or an abandoned
-    worker either keeps running to its full token budget (missing wiring)
-    or silently returns truncated text as success (missing the .hit check)."""
+def test_the_generate_call_site_wires_in_the_deadline_criteria():
+    """Source-level pin: the model.generate() call site in make_generate_fn
+    must include a bound _DeadlineStoppingCriteria instance alongside the
+    existing degeneracy guard, AND check its .hit after generate() returns,
+    or an abandoned worker either keeps running to its full token budget
+    (missing wiring) or silently returns truncated text as success (missing
+    the .hit check)."""
     src = inspect.getsource(ml)
-    assert src.count("_deadline_guard = _DeadlineStoppingCriteria()") == 2, (
-        "expected exactly 2 bound _DeadlineStoppingCriteria instances "
-        "(make_generate_fn + make_polish_generate_fn)"
+    assert src.count("_deadline_guard = _DeadlineStoppingCriteria()") == 1, (
+        "expected exactly 1 bound _DeadlineStoppingCriteria instance "
+        "(make_generate_fn)"
     )
-    assert src.count("[_guard, _deadline_guard]") == 2, (
-        "expected exactly 2 model.generate() call sites wiring in "
+    assert src.count("[_guard, _deadline_guard]") == 1, (
+        "expected exactly 1 model.generate() call site wiring in "
         "_deadline_guard alongside _guard"
     )
-    assert src.count("if _deadline_guard.hit:") == 2, (
-        "expected exactly 2 post-generate() checks of _deadline_guard.hit -- "
+    assert src.count("if _deadline_guard.hit:") == 1, (
+        "expected exactly 1 post-generate() check of _deadline_guard.hit -- "
         "without this, a deadline hit returns truncated text as success "
         "instead of raising GenerationDeadlineExceededError"
     )
-    assert src.count("raise GenerationDeadlineExceededError(") == 2
+    assert src.count("raise GenerationDeadlineExceededError(") == 1
 
 
 def test_run_with_timeout_sets_and_clears_the_loader_deadline():
@@ -792,22 +792,6 @@ def test_make_generate_fn_is_unaffected_with_no_deadline_set():
         [{"role": "user", "content": "hello"}], temperature=0.7, max_new_tokens=64,
     )
     assert result == "ok"
-
-
-def test_make_polish_generate_fn_raises_deadline_exceeded_instead_of_returning_text():
-    ml.set_generation_deadline(time.monotonic() - 1.0)
-    try:
-        polish = ml.make_polish_generate_fn(
-            _make_cache_entry(_DeadlineHittingModel()),
-        )
-        with pytest.raises(ml.GenerationDeadlineExceededError):
-            polish(
-                [{"role": "user", "content": "hello"}],
-                temperature=0.4,
-                max_new_tokens=64,
-            )
-    finally:
-        ml.set_generation_deadline(None)
 
 
 # --------------------------------------------------------------------------- #

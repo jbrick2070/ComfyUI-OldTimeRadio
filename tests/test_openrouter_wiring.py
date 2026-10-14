@@ -156,14 +156,6 @@ def test_make_generate_fn_returns_remote_callable(enabled, monkeypatch):
     assert out == "via make_generate_fn"
 
 
-def test_make_polish_generate_fn_returns_remote_callable(enabled, monkeypatch):
-    monkeypatch.setattr(orb, "_post_chat_completion", lambda **k: _ok_post("via polish"))
-    entry = orb.OpenRouterBackend().load(SLOT_A, _row())
-    fn = loader.make_polish_generate_fn(entry)
-    out = fn([{"role": "user", "content": "x"}], temperature=0.4, max_new_tokens=64)
-    assert out == "via polish"
-
-
 def test_build_truncating_generate_fn_returns_remote_callable(enabled, monkeypatch):
     from nodes.OTR_LedgerScriptWriter import _build_truncating_generate_fn
     monkeypatch.setattr(orb, "_post_chat_completion", lambda **k: _ok_post("via truncating"))

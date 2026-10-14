@@ -9,8 +9,7 @@ text-generation routes must carry the liveness guard:
 * `_otr_constrained_generate.make_constrained_generate_fn` -- called once per
   voiced beat by the writer's slot-drama contract;
 * `_otr_model_loader.make_generate_fn` -- called by story orchestration, shot
-  lock and diagnostic nodes;
-* `_otr_model_loader.make_polish_generate_fn` -- polish-specific generate fn.
+  lock and diagnostic nodes.
 
 This test file inspects AST call trees at the function level rather than using
 fragile file-level string matching, guaranteeing:
@@ -37,7 +36,6 @@ GUARDED_ROUTES = [
     ("nodes/OTR_LedgerScriptWriter.py", "_build_truncating_generate_fn"),
     ("nodes/_otr_constrained_generate.py", "make_constrained_generate_fn"),
     ("nodes/_otr_model_loader.py", "make_generate_fn"),
-    ("nodes/_otr_model_loader.py", "make_polish_generate_fn"),
 ]
 
 #: (relative_path, enclosing_function_name) -> Reason for exemption
