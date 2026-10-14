@@ -13,11 +13,12 @@ serves the old take as if this build had made it.
 ``engine_impl_version`` is the profile's declared "the engine's behaviour
 changed" statement (see ``test_voice_identity_fix``), and it keys the cache.
 This test makes that statement impossible to forget. It drives the REAL
-``generate_voice`` for every supported model and voice, with a real-shaped
-delivery vector and a non-zero seed, stubbing only the API-key lookup, the
-shared client's ``post_json`` (no network) and decode. It captures the path
-and body each call would POST and fingerprints them. Each impl version owns
-exactly one fingerprint.
+``generate_voice`` for every supported model and voice over a set of CASES --
+each probe line with a populated delivery vector and with ``None`` (production
+passes ``None`` when delivery is off or failed), always with a non-zero seed --
+stubbing only the API-key lookup, the shared client's ``post_json`` (no
+network) and decode. It captures the path and body each call would POST and
+pins one short digest PER CASE, so a failure names the cases that moved.
 
 The model and voice ids are folded out of each request, and a voice that is
 rendered the same way on every model is recorded once. Adding a supported
@@ -25,20 +26,26 @@ model or voice that behaves like the rest therefore does not trip the pin --
 new ids key separately and strand no cached audio -- while a style, a branch
 or a payload field that depends on the real voice or model does.
 
+THE PROBES ARE REPRESENTATIVE, NOT EXHAUSTIVE. They are the line shapes OTR's
+prepared text actually takes (plain, padded, stage tags, the "Say ..." delivery
+prefixes and look-alikes, long, digits and markup, ASCII and typographic
+quotes, non-Latin scripts). A branch keyed on a shape no probe has will pass
+this test unseen: when you add one, add a probe for it in the same change.
+
 When this fails:
-  * The change alters what Google is asked to render -> bump
+  * The change alters what Google is asked to render for existing ids -> bump
     ``engine_impl_version`` on EVERY google_tts profile in
-    ``config/audio_engine_profiles.yaml`` and add the new fingerprint under the
-    new version here. Old cached lines then miss and re-render, which is the
-    point.
+    ``config/audio_engine_profiles.yaml`` and add the new version's digests
+    here (the failure message prints them ready to paste). Old cached lines
+    then miss and re-render, which is the point.
   * The change is transport-only and cannot alter the audio (a renamed wire
-    field the API now requires, say) -> re-pin the CURRENT version's
-    fingerprint and say why in the commit. That edit is visible in review on
-    purpose.
+    field the API now requires, say) -> re-pin the CURRENT version and say why
+    in the commit. That edit is visible in review on purpose.
   * The change only adds a NEW model or voice id whose request has its own
     shape (a newly styled voice, a field only a new model takes) -> re-pin
     the CURRENT version and say why. New ids key separately, so no cached
     line goes stale and a version bump would only re-bill the whole cache.
+  * You added or renamed a probe -> pin its digest under the current version.
 
 Decode (``_audio_from_response``) is a separate surface and is not pinned here.
 """
@@ -46,6 +53,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import pathlib
+import unicodedata
 from collections import Counter
 
 import pytest
@@ -54,35 +63,78 @@ from nodes import _otr_audio_engines as AE
 from nodes._otr_audio_engines import eng_google_tts as G
 from nodes._otr_google_api import client as GC
 
-#: engine_impl_version -> fingerprint of the request surface it shipped with.
+HERE = "tests/" + pathlib.Path(__file__).name
+
+#: engine_impl_version -> {case: digest} of the request surface it shipped with.
 PINNED_SURFACE = {
-    "1": "76f6a929c2eeb65924ea76e7a4f007a8fbe8d744ccb2fd5720d706e19d002a6a",
+    "1": {
+        "plain/delivery": "f07bdc305411c391",
+        "plain/no_delivery": "f07bdc305411c391",
+        "padded_tag/delivery": "911e79050ce08ff1",
+        "padded_tag/no_delivery": "911e79050ce08ff1",
+        "say_prefix/delivery": "3c5aca44ad0915e9",
+        "say_prefix/no_delivery": "3c5aca44ad0915e9",
+        "say_lower/delivery": "c186c729ed2454aa",
+        "say_lower/no_delivery": "c186c729ed2454aa",
+        "say_padded/delivery": "3c5aca44ad0915e9",
+        "say_padded/no_delivery": "3c5aca44ad0915e9",
+        "sayonara/delivery": "420509c92485c35a",
+        "sayonara/no_delivery": "420509c92485c35a",
+        "say_comma/delivery": "dc8073fabbed1776",
+        "say_comma/no_delivery": "dc8073fabbed1776",
+        "say_midline/delivery": "b943adae71d6289a",
+        "say_midline/no_delivery": "b943adae71d6289a",
+        "long/delivery": "560566da21d7fbc9",
+        "long/no_delivery": "560566da21d7fbc9",
+        "digits_markup/delivery": "ddb5ef5b68dcba97",
+        "digits_markup/no_delivery": "ddb5ef5b68dcba97",
+        "ascii_quote/delivery": "8a140bc7a20e5438",
+        "ascii_quote/no_delivery": "8a140bc7a20e5438",
+        "typographic/delivery": "8bfc03f618a2cb2c",
+        "typographic/no_delivery": "8bfc03f618a2cb2c",
+        "non_latin/delivery": "6bf134cc24973142",
+        "non_latin/no_delivery": "6bf134cc24973142",
+        "stage_tags/delivery": "7b99bcc90f6a00ae",
+        "stage_tags/no_delivery": "7b99bcc90f6a00ae",
+    },
 }
 
-#: Prepared lines as generate_voice receives them: plain, padded with a stage
-#: tag, the "Say ..." shapes a delivery prefix produces (cased, padded), lines
-#: that merely start with or contain the letters "say", a long line, digits
-#: and markup characters, and typographic punctuation (escaped: ASCII source).
-_PROBES = (
-    "OTR PROBE LINE",
-    "  OTR PROBE LINE, with [sighs] a stage tag.  ",
-    "Say quietly: OTR PROBE LINE",
-    "say it plainly: OTR PROBE LINE",
-    "  Say quietly: OTR PROBE LINE  ",
-    "Sayonara, OTR PROBE LINE.",
-    "Say, what's that? OTR PROBE LINE",
-    "I would say OTR PROBE LINE",
-    ("OTR PROBE LINE, " * 400).strip(),
-    "Act 3, scene 2: a < b & c > d, OTR PROBE LINE",
-    "OTR \u2014 it\u2019s a \u201cprobe\u201d line",
-)
-_PLAIN = _PROBES[0]
 
-#: Production calls carry a delivery vector and a per-line seed
-#: (_otr_voice_node_common._forward_one_voice_line); a request that came to
-#: depend on either must show up here, so neither is falsy.
-_DELIVERY = {"angry": 0.9, "calm": 0.1}
+def _text(*parts) -> str:
+    """A probe from str pieces and code points, so this source stays ASCII."""
+    return "".join(chr(p) if isinstance(p, int) else p for p in parts)
+
+
+#: probe name -> a prepared line as generate_voice receives it.
+_PROBES = {
+    "plain": "OTR PROBE LINE",
+    "padded_tag": "  OTR PROBE LINE, with [sighs] a stage tag.  ",
+    "say_prefix": "Say quietly: OTR PROBE LINE",
+    "say_lower": "say it plainly: OTR PROBE LINE",
+    "say_padded": "  Say quietly: OTR PROBE LINE  ",
+    "sayonara": "Sayonara, OTR PROBE LINE.",
+    "say_comma": "Say, what's that? OTR PROBE LINE",
+    "say_midline": "I would say OTR PROBE LINE",
+    "long": ("OTR PROBE LINE, " * 400).strip(),
+    "digits_markup": "Act 3, scene 2: a < b & c > d, OTR PROBE LINE",
+    "ascii_quote": 'He said "stop," OTR PROBE LINE.',
+    "typographic": _text("OTR ", 0x2014, " it", 0x2019, "s a ", 0x201C,
+                         "probe", 0x201D, " line"),
+    "non_latin": _text("Caf", 0xE9, " ", 0xFC, "ber ",
+                       0x416, 0x438, 0x437, 0x43D, 0x44C, " ",
+                       0x4F60, 0x597D, " OTR PROBE LINE"),
+    "stage_tags": "[whispers] OTR PROBE LINE [laughs] then [gasp].",
+}
+
+#: Production passes a delivery vector, or None when delivery is off or failed
+#: (_otr_voice_node_common); a request that came to depend on either must show.
+_DELIVERIES = {"delivery": {"angry": 0.9, "calm": 0.1}, "no_delivery": None}
 _SEED = 12345
+
+#: case -> (probe text, delivery vector)
+_CASES = {f"{p}/{d}": (text, vec)
+          for p, text in _PROBES.items() for d, vec in _DELIVERIES.items()}
+_PLAIN = "plain/delivery"
 
 
 def _canon(obj) -> str:
@@ -103,7 +155,7 @@ def _fold_ids(node, model: str, voice: str):
 
 
 def _sent_requests(monkeypatch) -> dict:
-    """(model, voice, probe) -> the folded {path, body} generate_voice POSTs."""
+    """(model, voice, case) -> the folded {path, body} generate_voice POSTs."""
     sent = []
 
     def _capture(path, payload, **_kw):
@@ -123,26 +175,27 @@ def _sent_requests(monkeypatch) -> dict:
     requests = {}
     for model in G._SUPPORTED_MODELS:
         for voice in G._SUPPORTED_VOICES:
-            for probe in _PROBES:
+            for case, (text, delivery) in _CASES.items():
                 del sent[:]
-                engine.generate_voice(probe, voice, dict(_DELIVERY), _SEED,
-                                      disable_retry=True, resolved_model=model)
-                assert len(sent) == 1, (model, voice, probe, len(sent))
+                engine.generate_voice(
+                    text, voice, dict(delivery) if delivery else delivery, _SEED,
+                    disable_retry=True, resolved_model=model)
+                assert len(sent) == 1, (model, voice, case, len(sent))
                 # Folding writes these markers; a request that already carries
                 # one would fold to a legitimate request's surface and hide.
                 assert "<model>" not in sent[0] and "<voice>" not in sent[0], (
                     "request carries a fold placeholder literally", sent[0])
-                requests[(model, voice, probe)] = _fold_ids(json.loads(sent[0]), model, voice)
+                requests[(model, voice, case)] = _fold_ids(json.loads(sent[0]), model, voice)
     return requests
 
 
 def _request_surface(monkeypatch) -> dict:
-    """Per probe: the majority request, plus every voice (or model|voice) that
+    """Per case: the majority request, plus every voice (or model|voice) that
     departs from it."""
     requests = _sent_requests(monkeypatch)
     surface = {}
-    for probe in _PROBES:
-        blobs = {(m, v): _canon(r) for (m, v, p), r in requests.items() if p == probe}
+    for case in _CASES:
+        blobs = {(m, v): _canon(r) for (m, v, c), r in requests.items() if c == case}
         counts = Counter(blobs.values())
         default = min(counts, key=lambda blob: (-counts[blob], blob))
         departures = {}
@@ -156,28 +209,37 @@ def _request_surface(monkeypatch) -> dict:
                 for model, blob in per_model.items():
                     if blob != default:
                         departures[f"{model}|{voice}"] = json.loads(blob)
-        surface[probe] = {"default": json.loads(default), "departures": departures}
+        surface[case] = {"default": json.loads(default), "departures": departures}
     return surface
 
 
-def _hash(surface: dict) -> str:
-    return hashlib.sha256(_canon(surface).encode("utf-8")).hexdigest()
+def _digests(surface: dict) -> dict:
+    return {case: hashlib.sha256(_canon(row).encode("utf-8")).hexdigest()[:16]
+            for case, row in surface.items()}
 
 
-def _fingerprint(monkeypatch) -> str:
-    return _hash(_request_surface(monkeypatch))
+def _fingerprint(monkeypatch) -> dict:
+    return _digests(_request_surface(monkeypatch))
 
 
-def _summary(surface: dict) -> str:
-    """Per probe: the default request's input and the departing ids -- enough
-    to see which line shape, voice or model a change touched."""
-    rows = []
-    for probe, row in surface.items():
-        body = row["default"].get("body") or {}
-        rows.append("  %-42r -> input %-46r path %r departures %s" % (
-            probe[:40], str(body.get("input", ""))[:44],
-            row["default"].get("path"), sorted(row["departures"]) or "none"))
-    return "\n".join(rows)
+def _explain(surface: dict, changed) -> str:
+    """The current request for each moved case: default body and departures."""
+    out = []
+    for case in changed[:6]:
+        row = surface.get(case)
+        if row is None:
+            out.append(f"  {case}: no longer a case (removed probe?)")
+            continue
+        out.append(f"  {case}:\n    default    {_canon(row['default'])[:400]}"
+                   f"\n    departures {_canon(row['departures'])[:400]}")
+    if len(changed) > 6:
+        out.append(f"  ... and {len(changed) - 6} more")
+    return "\n".join(out)
+
+
+def _paste(version: str, digests: dict) -> str:
+    rows = "".join(f'        "{c}": "{d}",\n' for c, d in digests.items())
+    return f'    "{version}": {{\n{rows}    }},'
 
 
 def _google_impl_versions() -> dict:
@@ -203,30 +265,34 @@ def test_every_google_profile_shares_one_impl_version():
 def test_request_surface_matches_the_pin_for_its_impl_version(monkeypatch):
     version = next(iter(_google_impl_versions().values()))
     surface = _request_surface(monkeypatch)
-    actual = _hash(surface)
+    actual = _digests(surface)
     assert version in PINNED_SURFACE, (
-        f"Google engine_impl_version is {version!r} but no request-surface "
-        f"fingerprint is pinned for it. Add {version!r}: {actual!r} "
-        f"to PINNED_SURFACE in {__name__}.")
-    assert actual == PINNED_SURFACE[version], (
+        f"Google engine_impl_version is {version!r} but nothing is pinned for "
+        f"it in PINNED_SURFACE in {HERE}. Add:\n{_paste(version, actual)}")
+    pinned = PINNED_SURFACE[version]
+    changed = sorted(c for c in set(actual) | set(pinned)
+                     if actual.get(c) != pinned.get(c))
+    assert not changed, (
         "The Google TTS request generate_voice sends changed while "
         f"engine_impl_version stayed {version!r}; cached audio would replay "
-        f"the old take. New fingerprint: {actual!r}. In PINNED_SURFACE in "
-        f"{__name__} (see its docstring), either:\n"
-        "  - the audio changes for existing ids: bump engine_impl_version on "
-        "every google_tts profile in config/audio_engine_profiles.yaml and "
-        "add the new version with this fingerprint;\n"
-        "  - transport-only, or only a NEW model/voice id with its own shape: "
-        "re-pin the current version and say why in the commit.\n"
-        "Current surface:\n" + _summary(surface))
+        f"the old take. Cases that moved: {changed}.\n"
+        f"See the docstring of {HERE} for which of its four cases applies:\n"
+        "  - audio changes for existing ids: bump engine_impl_version on every "
+        "google_tts profile in config/audio_engine_profiles.yaml and add the "
+        "new version below to PINNED_SURFACE;\n"
+        "  - transport-only, a NEW model/voice id with its own shape, or an "
+        "added probe: replace the current version's entry and say why in the "
+        "commit.\n"
+        f"Current request for the moved cases:\n{_explain(surface, changed)}\n"
+        f"Digests to paste:\n{_paste(version, actual)}")
 
 
 def test_the_surface_is_the_real_request_for_every_model_and_voice(monkeypatch):
-    """Non-vacuity: every supported pair was driven through generate_voice, and
-    the departures are exactly the announcer styles, model-independent."""
+    """Non-vacuity: every supported pair was driven through generate_voice for
+    every case, and the departures are exactly the announcer styles."""
     requests = _sent_requests(monkeypatch)
     assert len(requests) == (
-        len(G._SUPPORTED_MODELS) * len(G._SUPPORTED_VOICES) * len(_PROBES))
+        len(G._SUPPORTED_MODELS) * len(G._SUPPORTED_VOICES) * len(_CASES))
     assert G._ANNOUNCER_STYLE_BY_VOICE, "no styled voice: the pin would guard nothing"
     surface = _request_surface(monkeypatch)
     assert surface[_PLAIN]["default"]["path"] == G._INTERACTIONS_PATH
@@ -234,8 +300,14 @@ def test_the_surface_is_the_real_request_for_every_model_and_voice(monkeypatch):
     assert set(departures) == {f"voice:{v}" for v in G._ANNOUNCER_STYLE_BY_VOICE}, departures
     for voice, style in G._ANNOUNCER_STYLE_BY_VOICE.items():
         assert style in departures[f"voice:{voice}"]["body"]["input"], voice
+    assert set(PINNED_SURFACE[next(iter(_google_impl_versions().values()))]) == set(_CASES), (
+        "every case must be pinned, or a moved case could go unreported")
 
 
+# --------------------------------------------------------------------------- #
+# Mutants: each is a plausible edit to the request path, and each must move
+# at least one case. A probe deleted from _PROBES makes one of these fail.
+# --------------------------------------------------------------------------- #
 def _restyle_charon(monkeypatch):
     monkeypatch.setitem(G._ANNOUNCER_STYLE_BY_VOICE, "Charon",
                         "a gravelly American radio announcer style")
@@ -246,14 +318,22 @@ def _style_puck(monkeypatch):
                         "a brisk newsreel narrator style")
 
 
-def _loosened_say_guard(monkeypatch):
+def _voice_prompt(monkeypatch, guard):
     def _prompt(text, voice):
         style = G._ANNOUNCER_STYLE_BY_VOICE.get(voice)
-        if not style or str(text).lower().startswith("say"):
+        if not style or guard(str(text).lower()):
             return text
         return "Say in %s: %s" % (style, text)
 
     monkeypatch.setattr(G, "_apply_voice_prompt", _prompt)
+
+
+def _loosened_say_guard(monkeypatch):
+    _voice_prompt(monkeypatch, lambda t: t.startswith("say"))
+
+
+def _say_anywhere_guard(monkeypatch):
+    _voice_prompt(monkeypatch, lambda t: "say " in t)
 
 
 def _puck_say_branch(monkeypatch):
@@ -267,42 +347,102 @@ def _puck_say_branch(monkeypatch):
     monkeypatch.setattr(G, "_apply_voice_prompt", _prompt)
 
 
-def _charon_only_temperature(monkeypatch):
+def _payload_field(monkeypatch, when):
     original = G._interaction_payload
 
     def _payload(model, text, voice):
         body = original(model, text, voice)
-        if voice == "Charon":
+        if when(model, text, voice):
             body["generation_config"]["temperature"] = 0.4
         return body
 
     monkeypatch.setattr(G, "_interaction_payload", _payload)
 
 
+def _charon_only_temperature(monkeypatch):
+    _payload_field(monkeypatch, lambda m, t, v: v == "Charon")
+
+
 def _one_model_field(monkeypatch):
-    original = G._interaction_payload
+    _payload_field(monkeypatch, lambda m, t, v: m == "gemini-3.8-flash-tts")
 
-    def _payload(model, text, voice):
-        body = original(model, text, voice)
-        if model == "gemini-3.8-flash-tts":
-            body["generation_config"]["seed"] = 7
-        return body
 
-    monkeypatch.setattr(G, "_interaction_payload", _payload)
+def _long_line_field(monkeypatch):
+    _payload_field(monkeypatch, lambda m, t, v: len(t) > 300)
+
+
+def _digit_field(monkeypatch):
+    _payload_field(monkeypatch, lambda m, t, v: any(ch.isdigit() for ch in t))
 
 
 def _new_endpoint_path(monkeypatch):
     monkeypatch.setattr(G, "_INTERACTIONS_PATH", "/v1/interactions")
 
 
-@pytest.mark.parametrize("mutate", [
-    _restyle_charon, _style_puck, _loosened_say_guard, _puck_say_branch,
-    _charon_only_temperature, _one_model_field, _new_endpoint_path,
-], ids=lambda f: f.__name__.lstrip("_"))
+def _rewrite_text(monkeypatch, change):
+    """An edit inside generate_voice: the line it sends, given its inputs."""
+    cls = type(AE.get_engine("google_tts"))
+    original = cls.generate_voice
+
+    def generate_voice(self, text, provider_voice_id, delivery_vector, seed, **kw):
+        return original(self, change(text, delivery_vector, seed),
+                        provider_voice_id, delivery_vector, seed, **kw)
+
+    monkeypatch.setattr(cls, "generate_voice", generate_voice)
+
+
+def _delivery_none_branch(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t + " (neutral)" if d is None else t)
+
+
+def _delivery_set_branch(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t if d is None else "Say warmly: " + t)
+
+
+def _seed_in_request(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: f"{t} #{s}" if s else t)
+
+
+def _truncate_200(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t[:200])
+
+
+def _straighten_quotes(monkeypatch):
+    table = {0x2019: "'", 0x201C: '"', 0x201D: '"'}
+    _rewrite_text(monkeypatch, lambda t, d, s: t.translate(table))
+
+
+def _ascii_quote_rewrite(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t.replace('"', "'"))
+
+
+def _fold_accents(monkeypatch):
+    def fold(t, d, s):
+        return "".join(ch for ch in unicodedata.normalize("NFKD", t)
+                       if not unicodedata.combining(ch))
+
+    _rewrite_text(monkeypatch, fold)
+
+
+def _whispers_only(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t.replace("[whispers]", "(whispers)"))
+
+
+_MUTANTS = [
+    _restyle_charon, _style_puck, _loosened_say_guard, _say_anywhere_guard,
+    _puck_say_branch, _charon_only_temperature, _one_model_field,
+    _long_line_field, _digit_field, _new_endpoint_path, _delivery_none_branch,
+    _delivery_set_branch, _seed_in_request, _truncate_200, _straighten_quotes,
+    _ascii_quote_rewrite, _fold_accents, _whispers_only,
+]
+
+
+@pytest.mark.parametrize("mutate", _MUTANTS, ids=lambda f: f.__name__.lstrip("_"))
 def test_a_request_change_moves_the_fingerprint(monkeypatch, mutate):
     before = _fingerprint(monkeypatch)
     mutate(monkeypatch)
-    assert _fingerprint(monkeypatch) != before
+    after = _fingerprint(monkeypatch)
+    assert [c for c in before if after[c] != before[c]], "no case moved"
 
 
 def test_a_literal_placeholder_in_the_request_is_refused_not_folded(monkeypatch):
