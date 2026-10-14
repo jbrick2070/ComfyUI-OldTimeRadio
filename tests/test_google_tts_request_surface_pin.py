@@ -384,9 +384,10 @@ def test_the_surface_is_the_real_request_for_every_model_and_voice(monkeypatch):
 
 # --------------------------------------------------------------------------- #
 # Mutants: each is a plausible edit to the request path, and each must move
-# at least one case. Every line-shape probe has a mutant keyed to it, so
-# deleting such a probe makes its mutant fail; the plain/padded/say probes are
-# covered jointly by the style and guard mutants.
+# at least one case. Probes and mutants are NOT one-to-one: several shapes are
+# covered jointly (japanese / chinese / non_latin share the normalisation
+# mutants; plain / padded / say share the style and guard mutants), so deleting
+# a probe is not guaranteed to fail this suite. Review a probe deletion by hand.
 # --------------------------------------------------------------------------- #
 def _restyle_charon(monkeypatch):
     monkeypatch.setitem(G._ANNOUNCER_STYLE_BY_VOICE, "Charon",
@@ -553,7 +554,12 @@ def _tag_only_to_parens(monkeypatch):
 
 
 def _trailing_pause_to_period(monkeypatch):
-    _rewrite_text(monkeypatch, lambda t, d, s: re.sub(r"\.\.\.\s*$", ".", t) or t)
+    # A pause that ENDS speech, after a word -- not the pause-only line.
+    _rewrite_text(monkeypatch, lambda t, d, s: re.sub(r"(\w)\.\.\.\s*$", r"\1.", t))
+
+
+def _fullwidth_comma(monkeypatch):
+    _rewrite_text(monkeypatch, lambda t, d, s: t.replace(chr(0xFF0C), ","))
 
 
 def _strip_leading_pause(monkeypatch):
@@ -592,6 +598,7 @@ _MUTANTS = [
     _drop_trailing_tag, _close_spaced_comma, _tag_only_to_parens,
     _trailing_pause_to_period, _strip_leading_pause, _punctuation_only_line,
     _cut_off_to_pause, _collapse_bangs, _cjk_stops, _danda_to_period,
+    _fullwidth_comma,
 ]
 
 
