@@ -783,6 +783,11 @@ class CastLock:
                     "delivery_profile_id", "delivery_profile_version",
                     "voice_bank_id",
                     "char_voice_engine", "announcer_voice_engine",
+                    # The resolved TTS device (stamped by
+                    # _stamp_voice_engine_selection). It was the one
+                    # CastLock-owned key missing here, so the saved ledger
+                    # never recorded which device rendered the voices.
+                    "voice_device",
                     # The model-roll receipts stamped above (2026-09-28). The
                     # credits read THIS durable copy, not the wire ledger, so a
                     # receipt left off this list never reaches the recipe card

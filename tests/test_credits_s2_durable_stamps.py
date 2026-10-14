@@ -120,6 +120,10 @@ def test_cast_lock_copies_local_wire_ledger_into_singleton(fresh_singleton):
     assert meta["cast_voice_policy"] == "preserve_ledger"
     assert meta["delivery_profile_id"] == "neutral"
     assert "voice_bank_id" in meta
+    # The resolved TTS device is CastLock-owned meta too; it was the one key
+    # the durable copy dropped (voice review V3, 2026-10-14).
+    assert wire["meta"].get("voice_device")
+    assert meta["voice_device"] == wire["meta"]["voice_device"]
 
 
 # --------------------------------------------------------------------------- #
