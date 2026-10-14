@@ -58,3 +58,38 @@ export function writePool(checked, choices) {
 export function choiceLabel(choice) {
     return String(choice).replace(/_/g, " ");
 }
+
+/** The empty-pool rule, said once, the same on Graph and App. */
+export const EMPTY_POOL_RULE = "No selections = all eligible.";
+
+/** The rule in full, under the open list and on its header's hover. Ticks
+ *  narrow the draw; they never force a choice this run cannot take (a video
+ *  lane this machine cannot run is left out, `nodes/_otr_lane_rolls.py`). */
+export const POOL_HELP = EMPTY_POOL_RULE
+    + " Ticks narrow the roll to the ticked choices still eligible for this run.";
+
+/**
+ * The one-line summary a COLLAPSED checklist shows (2026-10-14). Read-only:
+ * it never normalizes or rewrites the saved value -- opening or closing the
+ * list changes nothing that is serialized.
+ *
+ * An empty pool is "All eligible", never "none": the roll then draws from
+ * every eligible choice. A pool with ticks names them, in the choices' own
+ * order, and stops listing after `maxNames`. "Ticked", not "will run": a
+ * ticked choice this run cannot take is left out of the draw. A saved value
+ * naming only things that are not choices is NOT empty -- the backend stops
+ * the run on it -- so it never reads "All eligible".
+ * @returns {{text: string, count: number, unknown: string[]}}
+ */
+export function poolSummary(value, choices, maxNames = 3) {
+    const { checked, unknown } = readPool(value, choices);
+    const picked = choices.filter((c) => checked.has(c));
+    if (picked.length === 0) {
+        return { text: unknown.length ? "No valid choice ticked" : "All eligible",
+                 count: 0, unknown };
+    }
+    const shown = picked.slice(0, maxNames).map(choiceLabel).join(", ");
+    const more = picked.length > maxNames ? `, +${picked.length - maxNames} more` : "";
+    return { text: `${picked.length} ticked: ${shown}${more}`,
+             count: picked.length, unknown };
+}
