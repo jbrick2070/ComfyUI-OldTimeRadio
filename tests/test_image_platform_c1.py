@@ -20,7 +20,6 @@ import pathlib
 import pytest
 
 from nodes._otr_image_engines import registry as ireg
-from nodes._otr_image_engines import schemas as isc
 from nodes._otr_shared import role_compat as rc
 from nodes.otr_image_director import (
     OTRImageDirector, ADD_CUSTOM,
@@ -104,7 +103,6 @@ def test_image_cold_import_no_heavy_libs():
         "import sys;"
         "import nodes._otr_image_engines;"
         "import nodes._otr_image_engines.registry;"
-        "import nodes._otr_image_engines.schemas;"
         "import nodes._otr_image_engines.flux_gen1;"
         "import nodes.otr_image_director;"
         "import nodes.otr_meta_brief_image_prompt;"

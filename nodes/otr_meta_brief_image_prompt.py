@@ -2428,7 +2428,7 @@ class OTRMetaBriefImagePromptGen:
             "optional": {
                 "image_policy_json": ("STRING", {
                     "multiline": True, "default": "{}", "forceInput": True,
-                    "tooltip": "OTR_ImageDirector policy: granularity/seed + per-role still 'aspects' (so character stills match the selected video engine: portrait 832x1216 vs 16:9 832x480).",
+                    "tooltip": "OTR_ImageDirector policy: seed + per-role still 'aspects' (so character stills match the selected video engine: portrait 832x1216 vs 16:9 832x480).",
                 }),
                 # No `consistency_gate_warn_only` widget: the helper keeps its
                 # parameter but ignores the argument ("the compatibility gate

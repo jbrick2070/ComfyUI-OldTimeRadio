@@ -161,10 +161,12 @@ past its native resolution. The pack already holds it down to 768 on the long
 side for exactly this reason, so if you are seeing it, something is asking for a
 bigger canvas than the engine can hold.
 
-**The announcer looks identical in every beat.** That is the granularity
-setting, not the engine. `OTR_ImageDirector` ships all three roles on
-`per_object`, which draws one picture per character and reuses it. `per_beat`
-draws a fresh one every time -- more variety, and considerably more rendering.
+**The announcer looks identical in every beat.** That is how the stills are
+planned, not the engine and not a setting. A portrait is drawn once per
+character -- the announcer included -- and reused in every beat where that
+character appears; scene stills are planned per beat. `OTR_ImageDirector` used
+to show a per-role "granularity" choice (`per_object` / `per_beat`), but nothing
+read it, so it was removed on 2026-10-14; there is no per-beat portrait option.
 
 ---
 

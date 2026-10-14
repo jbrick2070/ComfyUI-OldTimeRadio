@@ -1,4 +1,4 @@
-"""OTR_ImageDirector -- per-role image granularity / fresh-cap / seed policy (C1).
+"""OTR_ImageDirector -- per-role image fresh-cap / seed / dtype policy (C1).
 
 Captures POLICY only (V-6) and emits ONE ``image_policy_json`` STRING that
 ``OTR_MetaBriefImagePromptGen`` + ``OTR_ImageGenDispatcher`` consume.
@@ -6,8 +6,10 @@ Captures POLICY only (V-6) and emits ONE ``image_policy_json`` STRING that
 Image-MODEL selection lives in ONE place -- ``OTR_VideoDirector`` (operator
 2026-06-18: "only in one place not two"). This node carries no per-role
 image-model dropdowns of its own; it reads the picks from the wired
-``video_policy_json["image_models"]`` and owns only the per-role granularity, the
-fresh-mode cap, and the seed mode. A slot absent from the policy defaults to the
+``video_policy_json["image_models"]`` and owns only the fresh-mode cap, the seed
+mode and the dtype receipt (the per-role granularity widgets were retired on
+2026-10-14; the receipt records ``per_object`` for every role, see
+``_RECEIPT_GRANULARITY``). A slot absent from the policy defaults to the
 gen-1 engine (``flux_gen1``) with a LOUD warning.
 
 Role compatibility of each pick is still filtered at execute time via the SHARED
@@ -49,8 +51,8 @@ IMAGE_SLOT_ROLES = {
     "character_image_model": ("character_video",),
 }
 SEED_MODES = ("request_hash", "fixed")
-#: Operator-confirmable default ceiling for FRESH (per_beat) generation; the hard
-#: cap is the audio-derived beat budget applied in the dispatcher (PASS-IMG #3).
+#: Default for the ``fresh_cap`` widget. Recorded on the policy and read only by
+#: the cloud admission estimate (max(15, value)); it does not cap rendered stills.
 DEFAULT_FRESH_CAP = 15
 
 
@@ -200,7 +202,7 @@ class OTRImageDirector:
                     "tooltip": "Optional ordering signal (opaque STRING).",
                 }),
                 # S5 platform-portability (2026-07-10): explicit dtype policy
-                # widget (append-only; widget slot 7). Default = nv50
+                # widget (append-only; the last widget). Default = nv50
                 # baseline; emitted in the v2 policy and enforced at the
                 # adapter boundary (S4).
                 "dtype_policy": (["fp8_ok", "no_fp8", "no_fp8_no_fp4"], {

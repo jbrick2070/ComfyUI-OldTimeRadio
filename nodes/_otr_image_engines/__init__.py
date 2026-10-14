@@ -13,7 +13,7 @@ cross-pollution. The image protocol is a REDUCED ``prompt -> image`` set (no
 ``canonicalize``), mirroring the SHIPPED ``AudioEngine(Protocol)`` core.
 
 Import-time is cold-import-clean (invariant V-12): importing this package +
-:mod:`registry` + :mod:`schemas` + any adapter descriptor pulls in NO heavy lib
+:mod:`registry` + any adapter descriptor pulls in NO heavy lib
 (torch / transformers / diffusers). Adapters lazy-import their frameworks inside
 ``load`` / ``render_image``, never at module scope. The Flux gen-1 adapter is
 imported here (guarded) so it self-registers on package import while staying

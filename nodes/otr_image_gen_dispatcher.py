@@ -2578,7 +2578,7 @@ class OTRImageGenDispatcher:
                 }),
                 "image_policy_json": ("STRING", {
                     "multiline": True, "default": "{}", "forceInput": True,
-                    "tooltip": "OTR_ImageDirector policy (engine per role + granularity + seed).",
+                    "tooltip": "OTR_ImageDirector policy (engine per role + fresh cap + seed).",
                 }),
                 "image_prompts_json": ("STRING", {
                     "multiline": True, "default": "{}", "forceInput": True,
