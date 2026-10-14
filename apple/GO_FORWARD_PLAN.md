@@ -404,10 +404,30 @@ Receipts: `D:\otr-4060-testing\qa-20261014-final-1act-mux` and `-b4a1`.
 **Measured speedup (MRKT, quiet CPU, `3b655fde` vs HEAD, byte-identical
 output):** node 12 floor frame 75.8 -> 71.2 ms (-6.1%); camera painter
 90.8 -> 83.2 ms (-8.4%); rainbow 89.4 -> 81.7 ms (-8.7%); green 82.1 ->
-74.0 ms (-9.8%); whole-clip audio analysis 0.28 -> 0.01 s. Whole-episode
-time is dominated by writing and TTS and was NOT measured A/B -- the legs
-each wrote a different story; a replay of one frozen episode at both
-commits is the way to measure it.
+74.0 ms (-9.8%); whole-clip audio analysis 0.28 -> 0.01 s.
+
+**Replay A/B, 2.3.26 (`ac768f1e`) vs 2.3.27 (main), MRKT, 2026-10-14.** One
+`otr_8gb_low` one-act episode frozen (`otr_freeze_replay_bundle.py`, 36 planned
+shots) and replayed through the canonical driver (`--replay-from`) four times,
+alternating, each on a FRESH server (ComfyUI caches node outputs between
+prompts), the same junction repointed at a worktree of the old commit, CPU
+otherwise idle. A replay skips writing and TTS and re-runs the video phase and
+the publish tail -- exactly where the 2.3.27 changes are. All four published
+the same 123.6 s video / 94.0 s audio, 0 tracebacks.
+
+| | 2.3.26 | 2.3.27 |
+|---|---|---|
+| prompt time | 337.0 s, 309.9 s | 298.4 s, 295.9 s |
+| video-beat rendering (render_driver span) | 141.8 s, 128.7 s | 122.5 s, 117.9 s |
+| node 12 floor, 2,350 frames | 58.0 s, 56.3 s | 53.9 s, 55.9 s |
+
+Mean -8.1% on this post-writing part; 2.3.27 won both pairs, but the two
+2.3.26 runs differed by 27 s, so read it as 4-12%. Writing and TTS (5-8 min
+of a real episode) are unchanged, so a ~10 min one-act episode saves roughly
+15-30 s. Receipts and scripts: `D:\otr-4060-testing\qa-20261014-replay-ab`
+(`ab_results.json`, timestamped logs); the bundle stays at
+`<output>\otr\episodes\_replay\signal_lost_the_rainbow_boxes_20261014_145758`
+for any future A/B.
 
 ### 0r. 8 GB regression on 2.3.25: every 8 GB graph, 1 act, fastest first (MRKT -- open)
 
