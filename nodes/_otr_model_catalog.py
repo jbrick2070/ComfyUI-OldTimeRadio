@@ -140,8 +140,9 @@ class CuratedModel:
     slot to the period system prompt when set to `otr_1940s_v1`.
     `license` + `license_audit_status` mirror the per-repo audit at
     `docs/model-license-<sanitized>.md`. `chat_template_kind` +
-    `stop_tokens` + `context_window` carry the per-backend dispatch
-    hints that loader adapters consume. All curated rows currently
+    `stop_tokens` record each row's template and stop strings; no loader
+    reads them yet (the writer encodes through the tokenizer's own chat
+    template). `context_window` is read. All curated rows currently
     carry `prompt_profile="modern"`; the `otr_1940s_v1` profile is
     reserved for a period model and is not bound to any curated row
     at present.

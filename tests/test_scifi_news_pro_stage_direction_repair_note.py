@@ -266,8 +266,8 @@ def test_an_UNDECORATED_misspelled_cast_name_IS_TOLD_THE_LEGAL_LABELS():
 
 
 def test_the_roster_check_is_case_and_space_insensitive():
-    """Matches the parser's own `_speaker_key`, so the guard cannot be evaded by
-    capitalization the roster does not use."""
+    """Matches the parser's own `speaker_identity_key`, so the guard cannot be
+    evaded by capitalization the roster does not use."""
     for label in ("(ada)", "(  Ada  )", "*ADA"):
         got = note(ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER, label, 9))
         assert "Restore the plain canonical label" in got, label

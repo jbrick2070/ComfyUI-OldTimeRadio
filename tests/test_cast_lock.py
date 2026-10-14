@@ -89,6 +89,46 @@ def test_input_types_widget_surface():
 
 
 # ----------------------------------------------------------------------------
+# The announcer admission check. The bank name it looks up is not used; the
+# raise is the point (an announcer engine with no casting profile or no allowed
+# bank). Kept as a bare call when the unused ann_bank plumbing went, so a
+# cleanup that reads it as a discarded value must fail here.
+# ----------------------------------------------------------------------------
+class _Refused(RuntimeError):
+    pass
+
+
+def _refuse_announcer_banks(monkeypatch):
+    from nodes.cast_lock import CastLock
+    real = CastLock._bank_following_engine
+
+    def _gate(role, engine, requested_bank=None):
+        if role == "announcer_voice":
+            raise _Refused("no admitted announcer bank for %r" % (engine,))
+        return real(role, engine, requested_bank)
+
+    monkeypatch.setattr(CastLock, "_bank_following_engine", staticmethod(_gate))
+
+
+@pytest.mark.parametrize("policy", ["preserve_ledger", "auto_registry"])
+def test_lock_checks_the_announcer_engine_under_either_policy(monkeypatch, policy):
+    from nodes.cast_lock import CastLock
+
+    _refuse_announcer_banks(monkeypatch)
+    with pytest.raises(_Refused):
+        CastLock().lock(script_json=_ledger(_CHAR_CAST), cast_voice_policy=policy)
+
+
+def test_auto_registry_called_directly_makes_the_same_check(monkeypatch):
+    from nodes.cast_lock import CastLock
+
+    _refuse_announcer_banks(monkeypatch)
+    led = json.loads(_ledger(_CHAR_CAST))
+    with pytest.raises(_Refused):
+        CastLock()._auto_registry(led, led["cast"], "default", False, [])
+
+
+# ----------------------------------------------------------------------------
 # Validator + preserve_ledger
 # ----------------------------------------------------------------------------
 def test_duplicate_char_id_fails_before_cast():
