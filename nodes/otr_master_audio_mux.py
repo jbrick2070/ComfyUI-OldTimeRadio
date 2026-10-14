@@ -442,17 +442,24 @@ def _reserve_candidate(final_path: str, folder: "str | None" = None) -> str:
             "no candidate name fits the Windows path budget in %s; nothing "
             "was written" % folder)
     prefix, width = form
+    last = None
     for _ in range(8):
-        os.makedirs(folder, exist_ok=True)
         candidate = os.path.join(
             folder, "%s%s%s" % (prefix, uuid.uuid4().hex[:width], ext))
         try:
+            # ONE guarded step: under a peer's concurrent rmdir, makedirs
+            # itself can raise FileExistsError / PermissionError mid-race, and
+            # the exclusive create can raise FileNotFoundError / PermissionError
+            # (sonnet QA on 39508e1a, 4-thread stress on real files).
+            os.makedirs(folder, exist_ok=True)
             fd = os.open(long_path(candidate), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except (FileExistsError, FileNotFoundError):
+        except (FileExistsError, FileNotFoundError, PermissionError) as exc:
+            last = exc
             continue
         os.close(fd)
         return candidate
-    raise OSError("could not reserve a unique candidate in %s" % folder)
+    raise OSError("could not reserve a unique candidate in %s (%s)"
+                  % (folder, last)) from last
 
 
 def _candidate_folder(final_path: str) -> "str | None":
@@ -747,53 +754,67 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     # replaced a good final before its own replacement was accepted. The
     # candidate keeps the final's extension, so the container (and the PCM
     # gate above, keyed to `out_path`) is the one the caller asked for.
-    candidate = _reserve_candidate(out_path, _candidate_folder(out_path))
-    # mux-LAST: copy both streams, NO -shortest.
-    cmd = [
-        fb, "-y", "-loglevel", "error",
-        "-i", silent_video_path,
-        "-i", master_audio_path,
-        "-map", "0:v", "-map", "1:a",
-        "-c:v", "copy", "-c:a", "copy",
-        candidate,
-    ]
-    assert "-shortest" not in cmd, "V-2: -shortest must never appear in the mux"
-    # V-1: the audio stream is COPIED, never re-encoded. This assertion is what
-    # notices if a later edit swaps it for a re-encode (no behavioural test can
-    # tell the two apart).
-    assert cmd[cmd.index("-c:a") + 1] == "copy", (
-        "V-1: the terminal mux must pass the master audio through with "
-        "-c:a copy, never re-encode")
     gate = "OTR_MasterAudioMux archival mux"
+    staging_folder = _candidate_folder(out_path)   # None unless out is in obs
+    candidate = None
     try:
+        candidate = _reserve_candidate(out_path, staging_folder)
+        # mux-LAST: copy both streams, NO -shortest.
+        cmd = [
+            fb, "-y", "-loglevel", "error",
+            "-i", silent_video_path,
+            "-i", master_audio_path,
+            "-map", "0:v", "-map", "1:a",
+            "-c:v", "copy", "-c:a", "copy",
+            candidate,
+        ]
+        assert "-shortest" not in cmd, "V-2: -shortest must never appear in the mux"
+        # V-1: the audio stream is COPIED, never re-encoded. This assertion is
+        # what notices if a later edit swaps it for a re-encode (no behavioural
+        # test can tell the two apart).
+        assert cmd[cmd.index("-c:a") + 1] == "copy", (
+            "V-1: the terminal mux must pass the master audio through with "
+            "-c:a copy, never re-encode")
         p = _run(cmd)
-    except BaseException:
-        _drop_if_empty(candidate)   # a launch that raised wrote nothing of ours
-        raise
-    if p.returncode != 0:
-        _reject_candidate(candidate, gate, "ffmpeg mux failed :: %s"
-                          % p.stderr.strip()[:300], ValueError)
+        if p.returncode != 0:
+            _reject_candidate(candidate, gate, "ffmpeg mux failed :: %s"
+                              % p.stderr.strip()[:300], ValueError)
 
-    # byte-identity: the output audio must decode identically to the master.
-    # Pass the ALREADY-RESOLVED binary so the proof cannot resolve differently
-    # from the encode that just ran.
-    h_master = audio_pcm_sha(master_audio_path, fb)
-    h_out = audio_pcm_sha(candidate, fb)
-    if not h_out or h_out != h_master:
-        _reject_candidate(
-            candidate, gate,
-            f"output audio NOT byte-identical to master (master={h_master[:12]} "
-            f"out={h_out[:12]}); the audio was re-encoded or trimmed -- C7/V-1 "
-            f"violated", ValueError)
-    # The audio stream is proven above; the video stream is proven HERE, by
-    # name. Only a probe that READ the file and found no video refuses -- an
-    # unmeasurable file is not a missing stream, and a probe never fails a
-    # render on its own say-so.
-    if _probe_float(candidate, "v:0") == STREAM_MISSING:
-        _reject_candidate(candidate, gate, "the muxed file has NO video stream",
-                          ValueError)
-    report.append(f"audio_byte_identical OK ({h_out[:12]})")
-    _accept_candidate(candidate, out_path, gate)
+        # byte-identity: the output audio must decode identically to the
+        # master. Pass the ALREADY-RESOLVED binary so the proof cannot resolve
+        # differently from the encode that just ran. A proof that RAISES is a
+        # named rejection too, so the kept candidate is always logged.
+        try:
+            h_master = audio_pcm_sha(master_audio_path, fb)
+            h_out = audio_pcm_sha(candidate, fb)
+        except Exception as exc:  # noqa: BLE001 -- surfaced as a named rejection
+            _reject_candidate(candidate, gate, "the PCM identity proof raised "
+                              "%s: %s" % (type(exc).__name__, exc), ValueError)
+        if not h_out or h_out != h_master:
+            _reject_candidate(
+                candidate, gate,
+                f"output audio NOT byte-identical to master (master={h_master[:12]} "
+                f"out={h_out[:12]}); the audio was re-encoded or trimmed -- C7/V-1 "
+                f"violated", ValueError)
+        # The audio stream is proven above; the video stream is proven HERE, by
+        # name. Only a probe that READ the file and found no video refuses --
+        # an unmeasurable file is not a missing stream, and a probe never fails
+        # a render on its own say-so.
+        if _probe_float(candidate, "v:0") == STREAM_MISSING:
+            _reject_candidate(candidate, gate, "the muxed file has NO video stream",
+                              ValueError)
+        report.append(f"audio_byte_identical OK ({h_out[:12]})")
+        _accept_candidate(candidate, out_path, gate)
+    finally:
+        # Every exit: an EMPTY reservation of ours goes (a launch that raised
+        # wrote nothing), and an obs staging folder goes when it is empty.
+        if candidate:
+            _drop_if_empty(candidate)
+        if staging_folder:
+            try:
+                os.rmdir(staging_folder)
+            except OSError:
+                pass
     return out_path, report
 
 

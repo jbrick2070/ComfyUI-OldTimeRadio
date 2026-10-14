@@ -459,6 +459,48 @@ def test_a_staging_folder_removed_by_a_peer_mid_reservation_is_a_retry(
     assert raced["done"] and os.path.isfile(got)
 
 
+@pytest.mark.parametrize("exc", [FileExistsError(17, "raced"), PermissionError(13, "raced")],
+                         ids=["exists", "denied"])
+def test_makedirs_raising_mid_race_is_a_retry_too(tmp_path, monkeypatch, exc):
+    """Under a peer's concurrent rmdir, makedirs(exist_ok=True) itself can
+    raise (sonnet QA on 39508e1a, 4-thread stress)."""
+    folder = tmp_path / "obs" / MUX.OBS_STAGING_DIRNAME
+    real = os.makedirs
+    raised = []
+
+    def racing_makedirs(path, *a, **k):
+        if not raised:
+            raised.append(1)
+            raise exc
+        return real(path, *a, **k)
+    monkeypatch.setattr(MUX.os, "makedirs", racing_makedirs)
+    got = MUX._reserve_candidate(str(tmp_path / "obs" / "ep_final.mp4"), str(folder))
+    assert raised and os.path.isfile(got)
+
+
+def test_an_archival_final_in_obs_leaves_no_staging_folder_on_success(media, obs):
+    _mux_capable()
+    out = obs / "chosen_final.mp4"
+    result, _report = MUX.mux_master_audio(str(media["silent"]), str(media["master"]),
+                                           str(out))
+    assert result == str(out) and out.is_file()
+    assert not (obs / MUX.OBS_STAGING_DIRNAME).exists()
+
+
+def test_a_pcm_proof_that_raises_is_a_named_logged_rejection(
+        media, tmp_path, monkeypatch, caplog):
+    out = _seed(tmp_path / "ep" / "ep_final.mkv")
+
+    def broken(path, fb=None):
+        raise OSError("decoder vanished")
+    monkeypatch.setattr(MUX, "audio_pcm_sha", broken)
+    with caplog.at_level("ERROR", logger="OTR"):
+        with pytest.raises(ValueError, match="PCM identity proof raised OSError"):
+            MUX.mux_master_audio(str(media["silent"]), str(media["master"]), str(out))
+    assert out.read_bytes() == SENTINEL
+    assert "kept for inspection" in caplog.text
+
+
 def test_no_name_fits_creates_no_folder(tmp_path, monkeypatch):
     folder = tmp_path / "obs" / MUX.OBS_STAGING_DIRNAME
     monkeypatch.setattr(MUX, "path_fits", lambda path, budget=0: False)
