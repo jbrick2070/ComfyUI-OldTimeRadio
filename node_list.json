@@ -7,7 +7,7 @@
     "OTR_ComfyCredential": "0 - Comfy Credential",
     "OTR_CreditsRoll": "CreditsRoll (late unified viewer credits, silent tail)",
     "OTR_EpisodeAssembler": "Episode Assembler",
-    "OTR_ImageDirector": "ImageDirector (per-role image model + seed policy)",
+    "OTR_ImageDirector": "ImageDirector (image policy: seed + fresh cap)",
     "OTR_ImageGenDispatcher": "Image Gen Dispatcher (cache + ledger + image_done)",
     "OTR_LedgerFreezeCascade": "LFC Ledger Freeze Cascade (v2.0)",
     "OTR_LedgerScriptWriter": "LPL Script Writer (v2.0)",

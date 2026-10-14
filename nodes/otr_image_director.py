@@ -51,8 +51,11 @@ IMAGE_SLOT_ROLES = {
     "character_image_model": ("character_video",),
 }
 SEED_MODES = ("request_hash", "fixed")
-#: Default for the ``fresh_cap`` widget. Recorded on the policy and read only by
-#: the cloud admission estimate (max(15, value)); it does not cap rendered stills.
+#: Default for the ``fresh_cap`` widget. Recorded on the policy; the one reader
+#: of the number is the cloud balance preflight, which takes the widget straight
+#: from the queued prompt (``_otr_shared/cloud_balance_preflight.py``, with its
+#: own copy of this 15 as a floor) to price paid stills. Nothing caps rendered
+#: stills by it.
 DEFAULT_FRESH_CAP = 15
 
 

@@ -117,7 +117,7 @@ The size and the machine hints in the label are not decoration. Take
 
 | Piece | Means |
 |---|---|
-| `8.7 GB download` | What it downloads, once. Not what it occupies while running. |
+| `8.7 GB download` | What it downloads, once. Not what it occupies while running. Every size in these labels and in the Download column above is in binary gigabytes (GiB, 2^30 bytes), the way the catalog records it: 8.7 here is about 9.3 GB in the decimal units a disk or browser shows. |
 | `nv8-nf4` | Fits an 8 GB NVIDIA card only as NF4, which that machine already bakes. Plain `nv8` means the full download fits. |
 | `nv16` `nv24` | Fits an NVIDIA card of that many GB at full precision. `nv16-nf4` means only the quantized load fits. |
 | `mac16` | Fits a 16 GB Apple Silicon machine. |

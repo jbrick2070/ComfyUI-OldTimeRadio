@@ -24,7 +24,9 @@ OTR_COMFYUI_MODELS_ROOT   models root (or COMFYUI_MODELS_ROOT); unset, the
 text_encoders/, checkpoints/   ComfyUI-native weights (the native Gemma
                           writer; Stable Audio 3 and its text encoder)
 LLM/<org>--<name>/        other (transformers) writers, as plain files
-TTS/KokoroTTS/            Kokoro's voices (and its ONNX model on 3.13)
+TTS/KokoroTTS/            Kokoro's voices (and its ONNX model under
+                          kokoro-onnx) -- in ComfyUI's own models folder,
+                          which is not always the models root above
 HF_HOME                   what libraries fetch for themselves; the pack
                           points it beside the models at startup unless
                           you set it (see apple/INSTALL.md)

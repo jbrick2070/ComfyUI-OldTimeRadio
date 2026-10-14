@@ -134,7 +134,7 @@ def _scan(path: str) -> dict:
 
 
 #: Modules under an engine directory that are NOT engines.
-_NOT_AN_ENGINE = frozenset({"__init__.py", "registry.py", "schemas.py"})
+_NOT_AN_ENGINE = frozenset({"__init__.py", "registry.py"})
 
 #: THE IMAGE ENGINES DO NOT USE THE `eng_` PREFIX, and that is why this
 #: generator silently had no image section at all until 2026-09-12. The video
@@ -256,7 +256,9 @@ def render() -> str:
       "text_encoders/, checkpoints/   ComfyUI-native weights (the native Gemma\n"
       "                          writer; Stable Audio 3 and its text encoder)\n"
       "LLM/<org>--<name>/        other (transformers) writers, as plain files\n"
-      "TTS/KokoroTTS/            Kokoro's voices (and its ONNX model on 3.13)\n"
+      "TTS/KokoroTTS/            Kokoro's voices (and its ONNX model under\n"
+      "                          kokoro-onnx) -- in ComfyUI's own models folder,\n"
+      "                          which is not always the models root above\n"
       "HF_HOME                   what libraries fetch for themselves; the pack\n"
       "                          points it beside the models at startup unless\n"
       "                          you set it (see apple/INSTALL.md)\n"

@@ -166,11 +166,13 @@ See [MULTILINGUAL.md](MULTILINGUAL.md).
 **Nothing by hand.** There is no setup script to run and no model to place
 yourself. Almost everything arrives the first time you queue: the one exception
 is the Kokoro voice set, which the pack fetches at STARTUP so the default voice
-is ready before you ever press Run -- small files (~523 KB a voice), plus the
-~326 MB ONNX model on Python 3.13. On other Pythons Kokoro's own model
-(`hexgrad/Kokoro-82M`, about the same size) arrives with the first voice line
-instead. If the console pauses on `[OldTimeRadio]` lines during a restart, that
-is what it is doing.
+is ready before you ever press Run -- small files (~523 KB a voice). Where
+Kokoro runs through `kokoro-onnx` (what the requirements install on Python
+3.13), its ~326 MB ONNX model comes at startup too; with the torch `kokoro`
+package (Python 3.10 - 3.12) Kokoro's own model (`hexgrad/Kokoro-82M`, about
+the same size) arrives with the first voice line instead. `HF_HUB_OFFLINE=1`
+or `OTR_SKIP_KOKORO_PREFETCH=1` skips the startup fetch. If the console pauses
+on `[OldTimeRadio]` lines during a restart, that is what it is doing.
 
 What `otr_canonical` selects, and so what its first run fetches -- the file
 sizes the pack records, not a measured transfer (a cache you already have, a
@@ -181,7 +183,7 @@ partial download or a second copy all change what actually moves):
 | The writer — native Gemma 4 E2B (`comfy_native:gemma4-e2b-it-int8-convrot`) | ~4.8 GiB | `Comfy-Org/gemma-4`, ungated |
 | Music — Stable Audio 3 checkpoint | 2.11 GiB | `Comfy-Org/stable-audio-3` |
 | Music — its text encoder | 1.11 GiB | `Comfy-Org/stable-audio-3` |
-| Voices — Kokoro | ~523 KB a voice, plus a ~326 MB model | voices at startup; the model at startup on Python 3.13 (ONNX), else at the first voice line (`hexgrad/Kokoro-82M`) |
+| Voices — Kokoro | ~523 KB a voice, plus a ~326 MB model | voices at startup; the model at startup under `kokoro-onnx` (Python 3.13), else at the first voice line (`hexgrad/Kokoro-82M`) |
 
 Other workflows select other writers, and the writer is the biggest single
 file: the 16 GB and 24 GB graphs use native Gemma 4 12B (~11.2 GiB), the Mac
