@@ -1720,3 +1720,92 @@ the live version.
   its PBUG; a forced-timeout IndexTTS2 smoke plus its PBUG; read the first
   live `acceptance_finding_count`; the two GPU reset scripts as their own
   row.
+
+## 2026-10-13 -- MRKT proves the Gemini merge through Desktop's shipped workflow
+
+- **Local box only:** MRKT, RTX 4060 Laptop, 8188 MiB. Initial main HEAD
+  `fcda60e74519c5473b264017b45f8efe412068e7`; no bridge and no iDream/5080
+  access. Desktop Python 3.13.12, torch 2.12.1+cu130 / CUDA 13.0, server
+  `http://127.0.0.1:8188`, current checkout loaded through a custom_nodes
+  junction and whitelist; stale installed OTR excluded, all 22 nodes loaded.
+  Models resolved to Desktop Shared models, not the quarantine in
+  `C:\ComfyUI-Models`. Server left resident with an empty queue.
+- **Steps 1-6:** CPU static gates PASS; Desktop boot PASS; live schema dry-run
+  and links PASS; two-act bridge A PASS; one-act no-bridge B PASS; fetcher
+  list/dry-run PASS. Static results: 25 variants / zero failures, 133
+  widget/link tests and 211 merged-work tests passed. The previously flagged
+  pinned-frame-ceiling function also passed alone (5.05s); no merge defect
+  reproduced. Missing torch was an initial TEST-venv environment gap. The
+  TEST venv's own .pth exposes Desktop dependencies; Desktop was not modified
+  to install pytest. Sweep **skipped: tag missing** (`s29-clean-slate-gate`).
+  IndexTTS2 forced GPU timeout **NOT RUN** on this 8 GB box; its CPU lifecycle
+  tests passed. No model downloads, resets, blanket kills, or code fixes.
+- **Driver:** `scripts/otr_canonical_api_run.py`, profile `otr_8gb_low`, live
+  schemas; A act_count=2 / B act_count=1, include_act_breaks=true. All three
+  video dropdowns matched the shipped variant. Original bank selected so A
+  exercises the break; asset_cleanup off keeps WAV/ledger evidence. No graph,
+  wiring, engine, or profile edits; no explicit-workflow fallback needed.
+- **A:** `signal_lost_beneath_the_flickering_gaslight_20261013_195108`, prompt
+  `068b8c9b-69d6-46a5-86ba-8ab76bef4aa8`, RESULT SUCCESS and obs_publish OK.
+  Client wall 1135.11s (18m55s), sampled peak 7633 MiB. Published duration
+  99.200s, video+audio present; 13 beats, acceptance_finding_count=0, no floors.
+  In leg-a-server.log, mix line 3250 precedes loudness 3251 and WAV save 3252.
+  inter_01 / b006 starts at master 37.7147916667s for 4.0s: RMS 0.1476546
+  (-16.6151 dBFS), preceding 2s RMS 0.0761759 (-22.3636 dBFS). No unmixed
+  cue warning. WAV SHA256
+  `4f29ea06e964d574a45d7f042d5eebe8280dadd5198fcb28760942d9e5f62ca3`
+  matches ledger audio.master_audio_sha256 and log prefix. The master keeps
+  its pending_ basename after the episode folder rename; the mux reconciled
+  and stamped the active path, not a mismatch. Operator ear check remains.
+- **B:** `signal_lost_the_shattering_jar_20261013_200038`, prompt
+  `9de7b076-2d10-4442-97a3-23eed0d81a80`, RESULT SUCCESS and obs_publish OK.
+  Wall 369.71s (6m10s), sampled peak 6845 MiB; published duration 77.800s,
+  video+audio present; 8 beats, acceptance_finding_count=0, no floors. No
+  music_inter line, interstitial music row, or bridge mix log. WAV SHA256
+  `cb2ef9cfaff345bffd85d3577d34c441a9f52ea014ddbf8e09d8564a90ccafe4`
+  matches ledger and log prefix. VRAM sampled every 15s, not instantaneous.
+- **Outputs:** Desktop root
+  `C:\Users\jeffr\AppData\Local\Comfy-Desktop\ComfyUI-Installs\ComfyUI\ComfyUI\output`;
+  published under `otr\obs\` as
+  `gaslight_scene_20261013_195108__vart__vcam__none__koko__orig__cg4e2__sa3_final.mp4`
+  and
+  `shattering_jar_20261013_200038__sbke__vcam__none__koko__orig__cg4e2__sa3_final.mp4`.
+  Episode assets retained under `otr\episodes\<id>`. Evidence root
+  `D:\otr-4060-testing\qa-20261013-merge`, detailed `RESULTS.md`, both
+  histories/prompts/ledgers/grader reports/ffprobe/logs and VRAM CSV. Clip
+  `bridge-12s.mp4` is exactly 12s around A's break, outside its episode.
+- **Errors/grader:** zero runtime Traceback, AttributeError, NameError,
+  VoiceCastingError, EngineUnusable, or removed audio_motion field/log matches.
+  CastLock completed on both legs. Both grader counts zero, no findings to
+  enumerate. Neither leg exercised a live floored shot: hardware no_mirror
+  floor proof remains **not proven**, while scoped CPU tests passed. Sole
+  ImportError text is the disabled optional triton backend diagnostic, not
+  OTR failure. No OTR node Skipped; expected boot skips are the stale pack
+  and websocket_image_save.py whitelist exclusions. Three-line contexts saved.
+  No new verified merge defect, so no PROD_BUG_LOG entry or fix commit.
+- **Fetcher:** --list and ltx_8gb --dry-run exit 0, no downloads. Revision
+  `8984fa25007f376c1a299016d0957a37a2f797bb`, expected 6340744492 bytes and
+  pinned SHA256 verified in WeightSpec; no live LTX render claimed.
+- **Portable retired AFTER Desktop proof:** Gemma/T5Gemma and 59 Kokoro files
+  migrated into Shared with matching source/destination SHA256. Complete
+  portable snapshot `D:\otr-4060-testing\portable-preserved-20261013`, 64060
+  files / 39319787116 bytes, every source/copy hash matched. Only then removed
+  obsolete runtime/code/models from C:\OTR-CleanRoom\ComfyUI_windows_portable.
+  Its Python and main.py are absent; ALL original output remains in place,
+  including 24 OBS videos verified unchanged. Preservation manifest and
+  retirement log are in QA. Desktop remained healthy after removal. Normal
+  installed Desktop pack remains untouched; the resident test mapping is the
+  proven current checkout.
+- **Provenance:** shared checkout advanced through `12bf92b1` (2.3.23 release)
+  and `3f7417d0` (Meta helper), from other work. Recursive comparison found
+  workflow changes only in properties.ver; no nodes/config/wiring/widgets
+  changed from the merge baseline. Final variant check also passed. This
+  session did not edit pyproject.toml or the Meta files, which became tracked
+  in the other commit. Its only repository change is this receipt. Automatic
+  approval review rejected both combined and exact-file helper cleanup with
+  only "blocked by policy", so completed temporary helpers remain outside
+  the repository; no claim of cleanup. Active server launcher retained.
+  Detached PowerShell launches were rejected by automatic approval review
+  without a reason; tool-managed leg/watchdog sessions worked. Same Gemma
+  E2B model: A early call ~2.1 tok/s, B intervals ~60-65 and one full call
+  56.6 tok/s; slowdown cause unprofiled, no performance change claimed.
