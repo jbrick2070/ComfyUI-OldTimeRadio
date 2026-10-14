@@ -399,7 +399,9 @@ class TestCreativeFront:
         assert len(tech.seen) == 2
         assert briefs.casting_brief.strip() and briefs.script_brief.strip()
         repair = json.dumps(tech.seen[1])
-        assert "empty" in repair and "brief" in repair, (
+        # The gate's OWN reason, not words the prompt prose already contains
+        # (sonnet QA: "empty"/"brief" alone passed with the reason stripped).
+        assert "both briefs must describe the selected concept" in repair, (
             "the gate's reason must reach the repair prompt")
 
     def test_a_brief_that_stays_empty_fails_loud_in_the_lane(self):

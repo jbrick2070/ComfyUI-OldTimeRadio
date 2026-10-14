@@ -38,7 +38,18 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     import _otr_source_document as _osd  # type: ignore
 
 MANIFEST_SCHEMA_VERSION = "v1"
-PROMPT_VERSION = "public_domain_interpreter_v3"
+PROMPT_VERSION = "public_domain_interpreter_v4"
+
+#: The source cast the interpreter returns: at least one (a one-person story is
+#: a real story), at most six. ONE definition for the prompt, the field cap,
+#: the cleaner and the validator -- the prompt used to say "2-6" while the
+#: validator accepted one (story-path PD-02, 2026-10-14).
+CHARACTER_NAMES_MIN = 1
+CHARACTER_NAMES_MAX = 6
+#: A cast entry longer than this is not a name; it is prose (most likely the
+#: prompt's own instruction copied back). Real entries -- "the Time Traveller",
+#: "Sir Percy Blakeney, the Scarlet Pimpernel" -- sit far below it.
+_CHARACTER_NAME_MAX_CHARS = 60
 SCHEMA_VERSION = "public_domain_briefs_v1"
 
 
@@ -526,7 +537,8 @@ class PublicDomainBriefs(BaseModel):
     # older fixture, still validates; the writer then falls back to the pool. Public
     # -domain prose has no speaker markup, so unlike shakespeare (manifest cast_hints)
     # these must be LLM-extracted here.
-    character_names: list[str] = Field(default_factory=list, max_length=6)
+    character_names: list[str] = Field(default_factory=list,
+                                       max_length=CHARACTER_NAMES_MAX)
 
     source_hash: str = ""
     prompt_version: str = PROMPT_VERSION
@@ -537,19 +549,29 @@ class PublicDomainBriefs(BaseModel):
     @field_validator("character_names", mode="before")
     @classmethod
     def _clean_character_names(cls, value):
-        """Strip/dedupe the source names; cap at 6. Never raises -- an absent or
-        malformed list simply yields an empty list (writer falls back to pool)."""
+        """Strip/dedupe the source names; cap at CHARACTER_NAMES_MAX. Never
+        raises -- an absent or malformed list simply yields an empty list.
+
+        An entry that is not name-shaped is dropped: longer than
+        _CHARACTER_NAME_MAX_CHARS (prose -- the prompt's own instruction copied
+        back would otherwise be seated by lock_cast as a cast member), or with
+        no letter at all ("...", "-"). Role designations ("the Medical Man")
+        and one-person casts are kept. If nothing survives, the validator's
+        floor sends the brief back through the repair ladder (PD-02)."""
         if not isinstance(value, list):
             return []
         out: list[str] = []
         seen: set[str] = set()
         for nm in value:
             clean = " ".join(str(nm or "").split()).strip()
+            if (len(clean) > _CHARACTER_NAME_MAX_CHARS
+                    or not any(ch.isalpha() for ch in clean)):
+                continue
             key = clean.upper()
             if clean and key not in seen:
                 seen.add(key)
                 out.append(clean)
-            if len(out) >= 6:
+            if len(out) >= CHARACTER_NAMES_MAX:
                 break
         return out
 
@@ -616,14 +638,16 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         "  \"script_brief\": \"faithful radio adaptation brief\",\n"
         "  \"news_close_brief\": \"source attribution note\",\n"
         "  \"key_terms\": [\"optional concise source/adaptation terms\"],\n"
-        "  \"character_names\": [\"REQUIRED, 2-6. The story's OWN cast, taken "
+        "  \"character_names\": [\"...\", \"...\"]\n"
+        "}\n"
+        f"character_names: REQUIRED, {CHARACTER_NAMES_MIN}-{CHARACTER_NAMES_MAX}. "
+        "The story's OWN cast, taken "
         "straight from the source text, in order of appearance. Use each "
         "character exactly as the text refers to them -- a proper name when the "
         "source gives one (Ebenezer Scrooge, Bob Cratchit), OR the source's own "
         "role-designation when it does not (the Time Traveller, the Medical Man, "
         "Filby). List the real people from THIS source only; never invent a "
-        "name, never use a generic placeholder like 'Witness 1'\"]\n"
-        "}\n\n"
+        "name, never use a generic placeholder like 'Witness 1'.\n\n"
         f"{source_block}"
     )
     return [{"role": "user", "content": instruction}]
@@ -662,7 +686,7 @@ def build_public_domain_briefs(
         # until it returns one, or fail loud (a PD adaptation with no cast is a
         # broken render, not a simplification). This is a generation floor like
         # the key_terms one above, NOT a story-quality audit.
-        if len(brief.character_names) < 1:
+        if len(brief.character_names) < CHARACTER_NAMES_MIN:
             return ("public-domain briefs require at least one source character "
                     "name (the story's own cast, from its text)")
         # No brief-level safety rejection here (operator directive 2026-08-05):

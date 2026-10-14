@@ -270,3 +270,79 @@ def test_model_cannot_spoof_code_owned_contract_versions():
     assert brief.schema_version == SCHEMA_VERSION
     assert brief.model_id == "test-model"
     assert brief.attempts == 1
+
+
+# ---------------------------------------------------------------------------
+# PD-02 (story-path, 2026-10-14): one cast range, and no prose seated as a name
+# ---------------------------------------------------------------------------
+_OLD_INSTRUCTION = (
+    "REQUIRED, 2-6. The story's OWN cast, taken straight from the source text, "
+    "in order of appearance. Use each character exactly as the text refers to "
+    "them -- a proper name when the source gives one (Ebenezer Scrooge, Bob "
+    "Cratchit), OR the source's own role-designation when it does not (the Time "
+    "Traveller, the Medical Man, Filby). List the real people from THIS source "
+    "only; never invent a name, never use a generic placeholder like 'Witness 1'")
+
+
+def _prompt_text():
+    from nodes._otr_public_domain_sources import _build_interpreter_prompt
+
+    return "\n".join(m["content"] for m in _build_interpreter_prompt(_sample_payload()))
+
+
+def test_the_prompt_states_the_validators_own_range():
+    from nodes._otr_public_domain_sources import CHARACTER_NAMES_MAX, CHARACTER_NAMES_MIN
+
+    text = _prompt_text()
+    assert "REQUIRED, %d-%d" % (CHARACTER_NAMES_MIN, CHARACTER_NAMES_MAX) in text
+    assert "2-6" not in text, "the prompt and validator must not disagree"
+
+
+def test_the_example_array_carries_no_prose_to_copy():
+    text = _prompt_text()
+    assert '"character_names": ["...", "..."]' in text
+    assert "REQUIRED" not in text.split('"character_names":', 1)[1].split("\n", 1)[0]
+
+
+@pytest.mark.parametrize("raw,kept", [
+    ([_OLD_INSTRUCTION], []),
+    (["...", "-", "  "], []),
+    ([_OLD_INSTRUCTION, "the Time Traveller", "Filby"], ["the Time Traveller", "Filby"]),
+    (["Montresor"], ["Montresor"]),
+    (["the Medical Man", "the Psychologist"], ["the Medical Man", "the Psychologist"]),
+    (["Sir Percy Blakeney, the Scarlet Pimpernel"], ["Sir Percy Blakeney, the Scarlet Pimpernel"]),
+    (list("ABCDEFG"), list("ABCDEF")),
+], ids=["copied_instruction", "punctuation_only", "mixed", "one_person",
+        "role_designations", "long_real_name", "caps_at_six"])
+def test_the_cleaner_keeps_names_and_drops_prose(raw, kept):
+    assert _good_briefs(character_names=raw).character_names == kept
+
+
+def test_a_copied_instruction_alone_is_repaired_then_fails_loud():
+    import json
+
+    calls = []
+
+    def echo(*_a, **_kw):
+        calls.append(1)
+        return json.dumps({
+            "casting_brief": "x", "script_brief": "y",
+            "news_close_brief": "z", "character_names": [_OLD_INSTRUCTION]})
+
+    with pytest.raises(PublicDomainInterpreterError):
+        build_public_domain_briefs(technical_fn=echo, payload=_sample_payload(),
+                                   model_id="test-model")
+    assert len(calls) >= 2, "the floor must send it back through the ladder first"
+
+
+def test_a_one_person_story_is_a_valid_cast():
+    import json
+
+    brief = build_public_domain_briefs(
+        technical_fn=lambda *a, **kw: json.dumps({
+            "casting_brief": "Montresor narrates, cold and exact.",
+            "script_brief": "Montresor walls Fortunato into the vault.",
+            "news_close_brief": "This episode adapts Poe's The Cask of Amontillado.",
+            "character_names": ["Montresor"]}),
+        payload=_sample_payload(), model_id="test-model", max_attempts=1)
+    assert brief.character_names == ["Montresor"]
