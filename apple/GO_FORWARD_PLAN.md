@@ -358,13 +358,16 @@ Each of these survived on purpose and needs a ruling, not a deletion:
 - **`profile_max_render_frames`** and `_active_profile`: the KNOWN OPEN cap-authority
   row in the standing rulings.
 
-### 0r. 8 GB regression on 2.3.24: every 8 GB graph, 1 act, fastest first (MRKT -- open)
+### 0r. 8 GB regression on 2.3.25: every 8 GB graph, 1 act, fastest first (MRKT -- open)
 
 Operator, 2026-10-14: "run 1 act from fastest to longest 8gb on this rig to
-regress." 2.3.24 removed about 1,200 lines from nodes/ (dead-code waves, the
-retry policy) and changed no graph, so this is a regression pass over every
-8 GB graph, not a new proof. The cloud session that published 2.3.24 has no
-GPU; this is the 4060's (MRKT) row.
+regress", and again after 2.3.25: "let's remember to run the local Comfy 8 GB
+test here too." 2.3.24 removed about 1,200 lines from nodes/ (dead-code waves,
+the retry policy) and 2.3.25 retired the Veo engine; neither changed an 8 GB
+graph, so this is a regression pass over every 8 GB graph on the 2.3.25 tree,
+not a new proof. The cloud session that published both has no GPU and no
+peer window was reachable; this is the 4060's (MRKT) row. Pull to 2.3.25
+(`1b8b0dbc` or later) first.
 
 Same driver and settings as the 2026-10-13 MRKT receipt, one leg at a time,
 reset between legs (section 4), each leg must reach `otr/obs/`:
