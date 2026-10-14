@@ -707,6 +707,13 @@ def build_shakespeare_briefs(
             ),
         ) from exc
 
+    # Provenance is owned by this code, never by model-authored JSON: the
+    # structured schema exposes these defaulted fields, so a model can echo
+    # or spoof them. prompt_version and schema_version were left as the model
+    # wrote them and reached the ledger's meta["news"] (story-path SH-01,
+    # 2026-10-14); the Media Archive interpreter already overwrote all five.
+    brief.prompt_version = PROMPT_VERSION
+    brief.schema_version = SCHEMA_VERSION
     brief.source_hash = _source_hash(payload)
     brief.model_id = model_id
     brief.attempts = slot_calls

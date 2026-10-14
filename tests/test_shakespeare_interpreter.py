@@ -166,3 +166,31 @@ def test_shakespeare_module_import_posture():
             assert "OTR_LedgerScriptWriter" not in combined
             assert "news_interpreter" not in combined
             assert "_otr_story_routing" not in combined
+
+
+def test_model_cannot_spoof_code_owned_contract_versions():
+    """prompt_version / schema_version are code-owned provenance. A model that
+    echoes them must not reach the ledger (story-path SH-01, 2026-10-14) --
+    the same contract tests/test_media_archive_interpreter.py pins."""
+    import json
+
+    response = {
+        "casting_brief": "Macbeth hears the titles with dread; Banquo is wary.",
+        "script_brief": "The witches greet Macbeth on the heath; Banquo tests them.",
+        "news_close_brief": "This episode adapts Macbeth, Act 1, Scene 3.",
+        "key_terms": ["Macbeth", "Banquo"],
+        "prompt_version": "model-invented-1.0",
+        "schema_version": "model-invented-1.0",
+        "model_id": "model-invented",
+        "attempts": 99,
+    }
+    brief = build_shakespeare_briefs(
+        technical_fn=lambda *a, **kw: json.dumps(response),
+        payload=_sample_payload(),
+        model_id="test-model",
+        max_attempts=1,
+    )
+    assert brief.prompt_version == PROMPT_VERSION
+    assert brief.schema_version == SCHEMA_VERSION
+    assert brief.model_id == "test-model"
+    assert brief.attempts == 1

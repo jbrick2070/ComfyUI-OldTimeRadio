@@ -239,3 +239,34 @@ def test_public_domain_module_import_posture():
             assert "OTR_LedgerScriptWriter" not in combined
             assert "news_interpreter" not in combined
             assert "_otr_story_routing" not in combined
+
+
+def test_model_cannot_spoof_code_owned_contract_versions():
+    """prompt_version / schema_version are code-owned provenance. A model that
+    echoes them must not reach the ledger (story-path SH-01, 2026-10-14) --
+    the same contract tests/test_media_archive_interpreter.py pins."""
+    import json
+
+    from nodes._otr_public_domain_sources import PROMPT_VERSION, SCHEMA_VERSION
+
+    response = {
+        "casting_brief": "The traveler is shaken but precise; two witnesses doubt him.",
+        "script_brief": "The traveler returns; the machine confirms the impossible.",
+        "news_close_brief": "This episode adapts H. G. Wells's The Time Machine.",
+        "key_terms": ["traveler"],
+        "character_names": ["The Time Traveller"],
+        "prompt_version": "model-invented-1.0",
+        "schema_version": "model-invented-1.0",
+        "model_id": "model-invented",
+        "attempts": 99,
+    }
+    brief = build_public_domain_briefs(
+        technical_fn=lambda *a, **kw: json.dumps(response),
+        payload=_sample_payload(),
+        model_id="test-model",
+        max_attempts=1,
+    )
+    assert brief.prompt_version == PROMPT_VERSION
+    assert brief.schema_version == SCHEMA_VERSION
+    assert brief.model_id == "test-model"
+    assert brief.attempts == 1
