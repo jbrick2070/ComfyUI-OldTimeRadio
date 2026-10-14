@@ -616,10 +616,16 @@ def _write_thumbnails() -> None:
     targets = _thumbnail_targets()
     drawn = 0
     for target in targets:
-        card = _card_for(target)
-        want = _cards.comment_for(card, master)
-        if target.is_file() and _cards.jpeg_comment(target.read_bytes()) == want:
+        try:
+            card = _card_for(target)
+        except ValueError as e:
+            print(f"CARD FAIL {target.name}: {e}")
             continue
+        want = _cards.comment_for(card, master)
+        if target.is_file():
+            data = target.read_bytes()
+            if _cards.is_whole_jpeg(data) and _cards.jpeg_comment(data) == want:
+                continue
         target.write_bytes(_cards.render(card, master, want))
         drawn += 1
     print(f"WROTE {drawn} of {len(targets)} gallery cards")
@@ -644,7 +650,12 @@ def _thumbnail_failures() -> list[str]:
         seen.setdefault(card, target.name)
         if not target.is_file():
             failures.append(f"{target.name}: gallery card missing (run --all)")
-        elif _cards.jpeg_comment(target.read_bytes()) != _cards.comment_for(card, master):
+            continue
+        data = target.read_bytes()
+        if not _cards.is_whole_jpeg(data):
+            failures.append(f"{target.name}: gallery card is not a whole JPEG "
+                            "(truncated?) (run --all)")
+        elif _cards.jpeg_comment(data) != _cards.comment_for(card, master):
             failures.append(f"{target.name}: gallery card is stale (run --all)")
     wanted = {t.name for t in targets}
     for stray in sorted(VARIANTS_DIR.glob("*.jpg")):

@@ -358,6 +358,8 @@ def test_check_detects_variant_drift(tmp_path, monkeypatch, canonical,
     assert bv.cmd_check() == 1
     thumb.write_bytes(_card_jpeg(bv._cards.CANONICAL_CARD, master))
     assert bv.cmd_check() == 1
+    thumb.write_bytes(good[:-2])          # right comment, but truncated
+    assert bv.cmd_check() == 1
     thumb.write_bytes(good)
     orphan = vdir / "otr_retired_graph.jpg"
     orphan.write_bytes(good)

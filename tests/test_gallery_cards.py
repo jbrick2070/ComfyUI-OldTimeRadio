@@ -59,6 +59,22 @@ def test_each_hardware_class_has_its_own_background():
     assert used <= set(gt.PALETTES)
 
 
+def test_an_nvidia_row_with_no_size_in_its_id_says_so():
+    profile = dict(load_profile("otr_8gb_video"), id="otr_nvidia_video")
+    with pytest.raises(ValueError, match="VRAM size in the id"):
+        gt.card_for_profile(profile)
+
+
+def test_a_palette_change_makes_every_card_stale(monkeypatch):
+    master = b"art"
+    card = gt.CANONICAL_CARD
+    before = gt.comment_for(card, master)
+    palettes = dict(gt.PALETTES)
+    palettes["any"] = ((0, 0, 0),) + palettes["any"][1:]
+    monkeypatch.setattr(gt, "PALETTES", palettes)
+    assert gt.comment_for(card, master) != before
+
+
 def test_a_lane_with_no_words_is_refused_by_name():
     profile = dict(load_profile("otr_8gb_video"))
     profile["role_overrides"] = dict(profile["role_overrides"],
@@ -76,6 +92,8 @@ def test_a_drawn_card_carries_its_words_in_the_jpeg():
     comment = gt.comment_for(card, master)
     data = gt.render(card, master, comment)
     assert gt.jpeg_comment(data) == comment
+    assert gt.is_whole_jpeg(data)
+    assert not gt.is_whole_jpeg(data[:500])     # a truncated card is caught
     image = Image.open(io.BytesIO(data))
     assert image.format == "JPEG" and image.size == (gt.CARD_SIZE, gt.CARD_SIZE)
     assert "MAC | 16 GB | LTX VIDEO" in comment

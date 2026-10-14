@@ -140,6 +140,12 @@ and the byte floor beside it was not, so a byte-perfect 1.67 GB module was
 refused as "truncated" against a floor sized for a 1.82 GB one). **When you
 subclass, ask what ELSE was sized for the parent.**
 
+**A shipped workflow on a new lane needs gallery words.** Each shipped graph's
+gallery card names its video lane in big letters, from `LANES` in
+`scripts/gallery_thumbs.py`. Add the engine id there with its words (e.g.
+`"LTX VIDEO"`), then run `python scripts/build_variants.py --all`;
+`--check` fails by name on a lane with no words.
+
 ---
 
 ## An image engine is INERT until a video lane consumes its still

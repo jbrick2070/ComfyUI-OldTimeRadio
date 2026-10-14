@@ -16,8 +16,9 @@ shipping row whose vendor or engine has no words here raises, and ``--check``
 reports it, so a new lane cannot ship a card that says nothing.
 
 THE CHECK READS THE LABEL, NOT THE PIXELS. Every card carries a JPEG comment
-naming its words, the layout version and a hash of the master art. ``--check``
-compares that comment with the words derived now and never redraws: two
+naming its words, a hash of the master art and a hash of the look (layout
+version, palettes, card size, font). ``--check`` compares that comment with the
+one derived now, and requires the file to be a whole JPEG, but never redraws: two
 machines with different Pillow builds encode the same picture to different
 bytes, so a byte check would fail on whichever box did not draw it. ``--all``
 redraws a card only when its comment is stale.
@@ -37,9 +38,10 @@ REPO = Path(__file__).resolve().parents[1]
 MASTER_ART = REPO / "assets" / "otr_gallery_thumb_master.webp"
 FONT = REPO / "assets" / "fonts" / "InterDisplay-Black.otf"
 
-#: Bump when the drawing changes (panel, colours, sizes), so --all redraws
-#: every card and --check flags any it did not.
-LAYOUT = "v1"
+#: Bump when the drawing in render() changes (positions, sizes), so --all
+#: redraws every card and --check flags any it did not. The palettes, the card
+#: size and the font are hashed into the comment on their own (_look_hash).
+LAYOUT = "v2"
 CARD_SIZE = 400
 
 #: The video lane each character_visual engine renders, in the gallery's words.
@@ -117,17 +119,34 @@ def card_for_profile(profile: dict) -> Card:
         vendor = "cloud"
     elif vendor == "none" and "google" in pid:
         brand, tier, vendor = "GOOGLE", "GEMINI API", "google"
+    elif vendor == "nvidia":
+        raise ValueError("%s: an NVIDIA row needs its VRAM size in the id "
+                         "(otr_<N>gb_...) for its gallery card" % pid)
     else:
         raise ValueError("%s: vendor %r has no gallery words in "
                          "scripts/gallery_thumbs.card_for_profile" % (pid, vendor))
     return Card(brand, tier, lane, extra, vendor)
 
 
+def _look_hash() -> str:
+    """Everything that changes the picture without changing the words."""
+    h = hashlib.sha256()
+    h.update(("%s|%d|%r" % (LAYOUT, CARD_SIZE, sorted(PALETTES.items()))).encode())
+    h.update(FONT.read_bytes())
+    return h.hexdigest()[:12]
+
+
 def comment_for(card: Card, master: bytes) -> str:
-    """What a card's JPEG comment must say: its words, the layout and the art."""
+    """What a card's JPEG comment must say: its words, the art and the look."""
     art = hashlib.sha256(master).hexdigest()[:12]
-    return "OTR gallery card %s: %s | %s | %s | %s | art %s" % (
-        LAYOUT, card.brand, card.tier, card.lane, card.extra, art)
+    return "OTR gallery card %s: %s | %s | %s | %s | art %s | look %s" % (
+        LAYOUT, card.brand, card.tier, card.lane, card.extra, art, _look_hash())
+
+
+def is_whole_jpeg(data: bytes) -> bool:
+    """Starts with SOI and ends with EOI: a truncated card is a blank card in
+    the gallery even when its header still carries the right comment."""
+    return len(data) > 4 and data[:2] == b"\xff\xd8" and data[-2:] == b"\xff\xd9"
 
 
 def jpeg_comment(data: bytes):
@@ -205,7 +224,7 @@ def render(card: Card, master: bytes, comment: str) -> bytes:
              (card.tier, brand_c, round(h * 0.12)),
              (card.lane, lane_c, round(h * 0.10))]
     if card.extra:
-        lines.append((card.extra, lane_c, round(h * 0.06)))
+        lines.append((card.extra, lane_c, round(h * 0.07)))
     fitted = [(text, colour, _fit(draw, text, FONT, max_w, size))
               for text, colour, size in lines]
     gap = round(h * 0.03)
@@ -216,9 +235,9 @@ def render(card: Card, master: bytes, comment: str) -> bytes:
         x = (w - (b[2] - b[0])) / 2 - b[0]
         draw.text((x, y - b[1]), text, font=font, fill=colour)
         y += height + gap
-        if i == 1:      # a rule between the hardware and the lane
-            draw.rectangle((w * 0.30, y - gap * 0.6, w * 0.70, y - gap * 0.6 + h * 0.004),
-                           fill=rule_c)
+        if i == 1:      # a rule centred in the gap between hardware and lane
+            mid, half = y - gap / 2, h * 0.002
+            draw.rectangle((w * 0.30, mid - half, w * 0.70, mid + half), fill=rule_c)
 
     small = out.resize((CARD_SIZE, CARD_SIZE), Image.LANCZOS)
     buf = io.BytesIO()
