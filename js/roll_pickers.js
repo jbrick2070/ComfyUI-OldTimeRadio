@@ -37,10 +37,11 @@
  *   the classic canvas, which reads `computeSize` first, keeps it fixed.
  *   Every frontend reader of `computeLayoutSize` checks for it before calling.
  * - The classic canvas adds 4 px to a `computeSize` row and takes the
- *   widget's `margin` (10 by default) off its top and bottom, which left a
- *   26 px header a 6 px slot; `margin: 2` makes the box exactly the body.
- *   Nothing clips, so a frontend that ignores the option draws the old way:
- *   content running into the gap.
+ *   widget's `margin` (10 by default) off its top and bottom, so with the
+ *   default a 26 px header would get a 10 px box (measured before this widget
+ *   had its own `computeSize`: a 6 px box); `margin: 2` makes the box exactly
+ *   the body. Nothing clips, so a frontend that ignores the option draws the
+ *   old way: content running into the gap.
  * - Only the classic canvas (the widget sits in a `.dom-widget` box there)
  *   takes a node's height from its `size`. A click there grows or shrinks the
  *   node by exactly what the list gained or lost, before the next frame, so

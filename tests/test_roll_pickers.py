@@ -8,6 +8,7 @@ and the app form's row would break. The pure core runs under node.
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -83,47 +84,115 @@ def test_the_glue_replaces_each_pool_in_place_under_its_own_name():
     assert "otr_choices" in glue
 
 
-def _block(source, opener, closer):
-    start = source.index(opener)
-    return source[start:source.index(closer, start)]
+def _glue_code():
+    """The glue with its comments removed, so a pin can only be met by code."""
+    text = (_ROOT / "js" / "roll_pickers.js").read_text(encoding="utf-8")
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//[^\n]*", "", text)
+
+
+def _block(code, opener):
+    """From `opener` to the brace that closes the block it opens."""
+    start = re.search(opener, code).start()
+    depth, i = 0, code.index("{", start)
+    while True:
+        depth += {"{": 1, "}": -1}.get(code[i], 0)
+        if depth == 0:
+            return code[start:i + 1]
+        i += 1
+
+
+_BARE_VALUE = re.compile(r"(?<![.\w$])value(?![\w$])")
+_VALUE_WRITE = re.compile(
+    r"(?<![.\w$])value\s*(?:\*\*|<<|>>>|>>|&&|\|\||\?\?|[-+*/%&|^])?=(?!=)"
+    r"|(?<![.\w$])value\s*(?:\+\+|--)|(?:\+\+|--)\s*value(?![\w$])")
 
 
 def test_opening_or_closing_a_list_never_touches_the_saved_value():
     """Widget cleanup slice 2 (2026-10-14): the disclosure is presentation
-    only. The header's click handler and the repaint it calls must never
-    assign the value getValue returns; only a checkbox change and setValue
-    may."""
-    glue = (_ROOT / "js" / "roll_pickers.js").read_text(encoding="utf-8")
-    toggle = _block(glue, 'head.addEventListener("click"', "\n    });")
-    paint = _block(glue, "const paint = () => {", "\n    };")
-    bare = re.compile(r"(?<![.\w])value\s*=(?!=)")       # `value = ...`, not `box.value`
-    for body in (toggle, paint):
-        assert not bare.search(body), body
-    assert 'head.setAttribute("aria-expanded"' in glue
-    assert 'head.type = "button"' in glue                 # Enter and Space for free
-    writes = [m for m in bare.finditer(glue) if glue[m.start() - 4:m.start()] != "let "]
-    assert len(writes) == 2, writes                        # the box change and setValue
+    only. The header's click handler and the repaint it calls never touch the
+    value getValue returns -- the handler does not name it at all, the
+    repaint only reads it -- and the only writes anywhere are a checkbox
+    change and setValue."""
+    code = _glue_code()
+    toggle = _block(code, r"head\.addEventListener\(\s*[\"']click[\"']")
+    paint = _block(code, r"const paint = \(\) =>")
+    assert not _BARE_VALUE.search(toggle), toggle
+    assert [m.group(0) for m in _BARE_VALUE.finditer(paint)] == ["value"], paint
+    assert "poolSummary(value, choices)" in paint
+    assert 'head.setAttribute("aria-expanded"' in code
+    assert 'head.type = "button"' in code                 # Enter and Space for free
+    writes = sorted(code[code.rfind("\n", 0, m.start()) + 1:code.find("\n", m.start())].strip()
+                    for m in _VALUE_WRITE.finditer(code)
+                    if not re.search(r"(?:let|const|var)\s+$", code[:m.start()]))
+    assert writes == sorted([
+        "value = writePool(checked, choices);",
+        'set: (v) => { value = v == null ? "" : String(v); paint(); },',
+    ]), writes
 
 
 def test_the_list_row_is_its_own_height_on_every_renderer():
     """A DOM widget's `computeLayoutSize` makes the Vue-node grid stretch its
     row with a taller node (a 52 px blank band under a closed list, measured on
-    frontend 1.53.10); the classic canvas reads `computeSize` first."""
-    glue = (_ROOT / "js" / "roll_pickers.js").read_text(encoding="utf-8")
-    assert "widget.computeSize = (width) => [width ?? 0, picker.height()]" in glue
-    assert "widget.computeLayoutSize = undefined" in glue
-    assert "margin: 2" in glue
+    frontend 1.53.10); the classic canvas reads `computeSize` first. Pinned in
+    code, not in the comments that describe it."""
+    code = _glue_code()
+    assert "widget.computeSize = (width) => [width ?? 0, picker.height()];" in code
+    assert "widget.computeLayoutSize = undefined;" in code
+    assert re.search(r"addDOMWidget\(name, \"otr_roll_picker\"[^;]*\bmargin:\s*2,", code, re.S)
 
 
-def test_an_unquoted_bracketed_pool_stops_the_backend_as_the_checklist_warns():
-    """roll_pickers_core.poolEntries returns "[anime, cartoon]" whole, so the
-    checklist reports it as not a choice; this is why."""
+def _js_read_pools(values, choices):
+    """The shipped `readPool` on each value, under node."""
+    node = _node_exe()
+    if node is None:
+        pytest.skip("node is not installed; the JS reader cannot run here")
+    core = (_ROOT / "js" / "roll_pickers_core.js").as_uri()
+    script = (
+        "import { readPool } from %s;" % json.dumps(core)
+        + "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{"
+          "const {values,choices}=JSON.parse(s);"
+          "process.stdout.write(JSON.stringify(values.map(v=>{"
+          "const r=readPool(v,choices);return {checked:[...r.checked],unknown:r.unknown};})));});")
+    proc = subprocess.run([node, "--input-type=module", "-e", script],
+                          input=json.dumps({"values": values, "choices": choices}),
+                          capture_output=True, text=True, encoding="utf-8", timeout=120)
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    return json.loads(proc.stdout)
+
+
+def test_the_checklist_never_reads_as_fine_what_the_backend_refuses():
+    """The same saved values through the shipped JS reader and the backend's
+    `parse_roll_pool`. Where the backend raises, the checklist must report an
+    entry that is not a choice (it warns before the run stops). Where the
+    backend accepts, the checklist ticks exactly those choices -- except the
+    documented safe-direction forms, which warn although the run would go."""
     from nodes import _otr_rolls as ROLLS
-    with pytest.raises(ROLLS.RollError):
-        ROLLS.parse_roll_pool("[anime, cartoon]", valid_ids=ROLLS.eligible_style_ids(),
-                              surface="style_roll_pool")
-    assert ROLLS.parse_roll_pool("[]", valid_ids=ROLLS.eligible_style_ids(),
-                                 surface="style_roll_pool") == ()
+    styles = list(ROLLS.eligible_style_ids())
+    a, b = styles[0], styles[1]
+    escaped = '["\\u%04x%s"]' % (ord(a[0]), a[1:])
+    values = [
+        "", "  ", f"{a}, {b}", f"{a};{b}", f"{a}\n{b}", a.upper(), a.replace("_", " "),
+        "nonsense", f"{a}, nonsense",
+        "[]", "[ ]", f'["{a}", "{b}"]', f"['{a}', '{b}']", f"['{a}',]", f'["{a}",]',
+        f'["{a}\\t", "{b}"]', escaped,
+        f"[{a}, {b}]", f'["{a}", {b}]', f"[{a}", '[""]', '[" "]', f'["", "{a}"]', "[,]",
+        f'["{a}",,"{b}"]', "[1]", "[null]", "[{[1]: 2}]", '[["x"]]', "['x, y']",
+    ]
+    safe_direction = [f"[r'{a}']", f"['''{a}''']"]
+    js = _js_read_pools(values + safe_direction, styles)
+    for value, got in zip(values + safe_direction, js):
+        try:
+            backend = ROLLS.parse_roll_pool(value, valid_ids=styles, surface="style_roll_pool")
+        except ROLLS.RollError:
+            assert got["unknown"], ("the run stops on %r but the checklist reads it as fine"
+                                    % value)
+            continue
+        if value in safe_direction:
+            assert got["unknown"], value
+            continue
+        assert not got["unknown"], (value, got)
+        assert sorted(got["checked"]) == sorted(backend), (value, got, backend)
 
 
 def _node_exe():

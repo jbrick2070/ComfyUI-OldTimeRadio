@@ -93,22 +93,27 @@ test("an unknown saved entry is reported by the summary too", () => {
     assert.equal(bad.text, "No valid choice ticked");
 });
 
-test("the summary reports the same boxes the list checks", () => {
+test("the summary reports the boxes a saved value checks", () => {
     const s = poolSummary("Video Art ;  ANIME", STYLES);
     assert.deepEqual([...s.checked].sort(), ["anime", "video_art"]);
-    assert.deepEqual([...s.checked].sort(),
-                     [...readPool("Video Art ;  ANIME", STYLES).checked].sort());
+    assert.equal(s.count, 2);
 });
 
-test("bracketed text is a list of quoted names or nothing, as in the backend", () => {
-    // parse_roll_pool: json.loads, then literal_eval -- an unquoted name in
-    // brackets is neither, and the run stops on it
-    for (const bad of ["[anime, cartoon]", '["anime", cartoon]', "[anime"]) {
-        assert.deepEqual(poolEntries(bad), [bad]);
+test("bracketed text is read as the backend reads it, or reported whole", () => {
+    // parse_roll_pool: json.loads, then literal_eval. Anything both refuse --
+    // an unquoted name, an empty or blank slot, a missing bracket -- stops the
+    // run, so the list must not read it as ticks or as an empty pool.
+    for (const bad of ["[anime, cartoon]", '["anime", cartoon]', "[anime",
+                       '[""]', '[" "]', '["", "anime"]', "[,]", '["anime",,"cartoon"]']) {
+        assert.deepEqual(poolEntries(bad), [bad], bad);
         const s = poolSummary(bad, STYLES);
-        assert.equal(s.text, "No valid choice ticked");
+        assert.equal(s.text, "No valid choice ticked", bad);
         assert.deepEqual(s.unknown, [bad]);
     }
     assert.deepEqual(poolEntries('[ "anime" , "cartoon" ]'), ["anime", "cartoon"]);
+    assert.deepEqual(poolEntries('["anime\\t", "cartoon"]'), ["anime", "cartoon"]);
+    assert.deepEqual(poolEntries('["\\u0061nime"]'), ["anime"]);
+    assert.deepEqual(poolEntries("['anime',]"), ["anime"]);
     assert.deepEqual(poolEntries("[ ]"), []);
+    assert.deepEqual(poolEntries("[1]"), ["1"]);   // str(1) is no choice either
 });

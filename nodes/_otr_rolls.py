@@ -169,7 +169,7 @@ def parse_roll_pool(
         if text.startswith("["):
             try:
                 raw = json.loads(text)
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, RecursionError):
                 # A graph saved by 2.3.8 holds a real LIST in this slot, and
                 # core coerces every STRING input with str() (execution.py),
                 # so the node receives Python's repr: "['anime', 'cartoon']",
@@ -177,7 +177,9 @@ def parse_roll_pool(
                 # never executes anything.
                 try:
                     raw = ast.literal_eval(text)
-                except (ValueError, SyntaxError) as exc:
+                # TypeError: "[{[1]: 2}]" (an unhashable key); RecursionError:
+                # nesting deep enough -- both are "not a list", said by name.
+                except (ValueError, SyntaxError, TypeError, RecursionError) as exc:
                     raise RollError(
                         f"the {surface} roll pool {text!r} is not a list"
                     ) from exc
