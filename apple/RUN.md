@@ -52,20 +52,22 @@ anything.** Two different questions have two different answers there:
   an error that names the node that stopped it
   (`!!! Exception during processing !!!` in the console, a red node on the
   canvas). Read that, not the absence of an error you were expecting.
-- **Was a copy published?** The `obs_publish` line says so.
-  `obs_publish OK -> <path>` names the published file.
-  `obs_publish BLOCKED -- ...` means the published copy was withheld because
-  the episode's rights receipt did not clear; the archival final stays in
-  `otr/episodes/<episode>/`.
+- **Was a copy published?** Two lines say so, at two moments. The instant a
+  copy lands, `LOUD publish: final episode -> <path>` names it; when one is
+  withheld, `obs_publish BLOCKED (<reason>)` says why -- the episode's rights
+  receipt did not clear -- and the archival final stays in
+  `otr/episodes/<episode>/`. At the very end the node's summary repeats the
+  outcome as `obs_publish OK -> <path>` or `obs_publish BLOCKED -- ...`.
 
 BLOCKED on its own is not a verdict on the run. For most banks a withheld
-copy is still a finished run. A story that **had to be published** -- one
-the listener wrote in My Story -- fails the run right after that line
-(`DeliveryContractError`), with the archival final kept. No `obs_publish`
-line at all means the run stopped before publishing, however green the
-console looked. And a Cancel pressed in the last seconds can stop the run
-AFTER the published copy landed: the file in `otr/obs/` is then complete
-even though the run reports cancelled.
+copy is still a finished run. A **My Story** episode -- whether you picked
+the bank or the roll landed on it -- has to be published, and fails the run
+right after the copy is withheld (`DeliveryContractError`), with the archival
+final kept. A run that stops AFTER the copy landed -- that same delivery
+check, or a Cancel pressed in the last seconds -- never prints the end-of-run
+summary: the file in `otr/obs/` is complete, and the `LOUD publish` line is
+the record of it. No publish line of either kind means the run stopped
+before publishing, however green the console looked.
 
 ---
 
@@ -201,6 +203,6 @@ wheel supplies only one of them.
 **It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line
 first -- see [Find it](#find-it). `BLOCKED` withheld only the published copy and
 kept the archival final in `otr/episodes/<episode>/`; whether the run itself
-succeeded is the run's own final status (a My Story episode that had to be
-published fails there). No `obs_publish` line at all is a real failure: read
-the console from the end backwards for the first error.
+succeeded is the run's own final status (a My Story episode fails there). No
+publish line of either kind is a real failure: read the console from the end
+backwards for the first error.

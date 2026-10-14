@@ -255,13 +255,15 @@ did nothing. The first person outside this project to run it had no still, went
 looking in the UI, found nothing, and only then found the files.
 
 That folder is the finish line, and the console tells you what
-happened. **`obs_publish OK -> <path>`** names the published file.
-**`obs_publish BLOCKED -- ...`** means the published copy was withheld,
-because the episode's rights receipt did not clear; the archival final is in
-`otr/episodes/<episode>/`. That is not a verdict on the run by itself -- most
-banks finish normally, but a My Story episode that had to be published fails
-right after it -- so read the run's own final status too. **No `obs_publish`
-line at all** means the run did not finish, however green the console looked.
+happened. **`LOUD publish: final episode -> <path>`** names the published
+file the moment it lands, and the end-of-run summary repeats it as
+**`obs_publish OK -> <path>`**. **`obs_publish BLOCKED`** means the published
+copy was withheld, because the episode's rights receipt did not clear; the
+archival final is in `otr/episodes/<episode>/`. That is not a verdict on the
+run by itself -- most banks finish normally, but a My Story episode (picked or
+rolled) has to be published and fails right after -- so read the run's own
+final status too. **No publish line of either kind** means the run did not
+finish, however green the console looked.
 [apple/RUN.md](apple/RUN.md#find-it) has the full reading; for failures go to
 [When something goes wrong](#when-something-goes-wrong).
 
@@ -448,7 +450,8 @@ serve the requested gender, casting stamps the line `gender_unservable` and
 continues. One of them is sharper than the others: **if the master WAV cannot be
 written to disk, the assembler logs it and carries on, but the run cannot
 finish** -- the final mux needs that master and stops with a named error
-(`master audio missing`). The logs, the ledger and the working files stay in
+(`master audio missing`; on a foley episode, a missing-file error while it
+mixes the bed). The logs, the ledger and the working files stay in
 `otr/episodes/<episode>/`. (A master that WAS written but whose identity hash
 could not be computed is a different, harmless case: the audio is used as
 normal.) Each of those prints what it did; none of them substitutes an engine
@@ -614,8 +617,8 @@ names `comfyui-animatediff-evolved`, and its errors panel leads to Node Manager.
 -- either through the engine's own library and the Hugging Face cache, or through
 `OTR_WorkflowValidator`, a node inside the workflow that looks at what you actually
 picked and pulls only that, before the writer runs. Where a file lands depends on
-what kind it is, and every location goes through ComfyUI's registered folders,
-so `extra_model_paths.yaml` can move any of them:
+what kind it is; the first two are ComfyUI registered folders that
+`extra_model_paths.yaml` can move:
 
 - **ComfyUI-native weights** -- the default native Gemma writer, and Stable
   Audio 3 with its text encoder -- go in ComfyUI's own `text_encoders` and
@@ -623,7 +626,7 @@ so `extra_model_paths.yaml` can move any of them:
 - **Other writers** (Qwen and the rest) land as ordinary files in
   **`LLM/<org>--<name>/`** under your LLM folder. No symlinks, so Windows never
   asks for Developer Mode; a copy already in the Hugging Face cache keeps working.
-- **Kokoro's** model and voices go to `TTS/KokoroTTS/`.
+- **Kokoro** keeps its files in `TTS/KokoroTTS/` under ComfyUI's models folder.
 - **What a library fetches for itself** uses the Hugging Face cache, which this
   pack points at a folder beside your models at startup if you have not set
   `HF_HOME` yourself. If that volume is short of room, set `HF_HOME` **before**
@@ -767,12 +770,12 @@ a hang: about eight and a half minutes per clip on an RTX 4060, six and a half
 hours for a three-act foley episode. As long as the progress bars keep moving,
 leave it.
 
-**It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line in
-the console first, because there are two different answers. `obs_publish
-BLOCKED -- ...` means the published copy was withheld because the rights
-receipt did not clear, and the archival final is in `otr/episodes/<episode>/`;
-whether the run itself succeeded is its own final status (a My Story episode
-that had to be published fails right there). No `obs_publish` line at all means a real failure:
+**It finished but nothing is in `otr/obs/`.** Find the publish line in the
+console first, because there are two different answers. `obs_publish
+BLOCKED` means the published copy was withheld because the rights receipt did
+not clear, and the archival final is in `otr/episodes/<episode>/`; whether the
+run itself succeeded is its own final status (a My Story episode, picked or
+rolled, fails right there). No publish line at all means a real failure:
 read the console from the end backwards for the first error, and if it has been
 quiet for more than five minutes after the downloads finished, it is not going
 to finish.

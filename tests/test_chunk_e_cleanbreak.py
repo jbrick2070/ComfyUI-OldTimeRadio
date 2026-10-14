@@ -157,8 +157,13 @@ class TestEpisodeAssemblerWavSave:
 
         import nodes._otr_ledger as oled
         original_fn = oled.in_flight_ledger_path
-        # Return a path whose parent doesn't exist and can't be created
-        oled.in_flight_ledger_path = lambda: Path("/nonexistent_otr_path/audio/ep_ledger.json")
+        # A folder that CANNOT be created on any platform: its "parent" is a
+        # regular file. (The old "/nonexistent_otr_path" was creatable on
+        # Windows -- the save succeeded, wrote a WAV to the drive root, and the
+        # failure branch never ran. Sonnet QA on 1f169d40.)
+        blocker = tmp_path / "not_a_folder"
+        blocker.write_text("a file, so nothing can be created beneath it")
+        oled.in_flight_ledger_path = lambda: blocker / "audio" / "ep_ledger.json"
 
         try:
             node = sc.EpisodeAssembler()
@@ -171,8 +176,10 @@ class TestEpisodeAssemblerWavSave:
             oled.in_flight_ledger_path = original_fn
 
         _audio_out, output_path, _info, _audio_done = result
-        # Must not crash; output_path may be a fallback string or tmp path
-        assert isinstance(output_path, str)
+        # The save FAILED and the assembler said so instead of crashing: the
+        # sentinel the terminal mux then refuses as "master audio missing".
+        assert output_path == "(video-only - master WAV save failed)"
+        assert not (blocker.parent / "audio").exists()
 
 
 # ---------------------------------------------------------------------------

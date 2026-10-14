@@ -182,14 +182,17 @@ The finish line is a finished `.mp4` in:
 ```
 
 Not the console, not a green node, not the absence of errors. Read the run's
-final status and the `obs_publish` line before concluding anything; they answer
-different questions. `obs_publish OK -> <path>` names the real destination.
-`obs_publish BLOCKED -- ...` means the published copy was withheld (the rights
-receipt did not clear) and the archival final is in `otr/episodes/<episode>/`;
-it does not by itself say the run succeeded -- a My Story episode that had to
-be published fails right after it. **No `obs_publish` line at all means the run
-did not finish**, however clean the log looked. [RUN.md](RUN.md#find-it) has
-the full reading.
+final status and the publish lines before concluding anything; they answer
+different questions. `LOUD publish: final episode -> <path>` names the real
+destination the moment it lands, and the end-of-run summary repeats it as
+`obs_publish OK -> <path>`. `obs_publish BLOCKED` means the published copy was
+withheld (the rights receipt did not clear) and the archival final is in
+`otr/episodes/<episode>/`; it does not by itself say the run succeeded -- a My
+Story episode, picked or rolled, has to be published and fails right after it.
+A run stopped after the copy landed (that check, or a late Cancel) prints no
+end-of-run summary, so trust the file and the `LOUD publish` line. **No
+publish line of either kind means the run did not finish**, however clean the
+log looked. [RUN.md](RUN.md#find-it) has the full reading.
 
 Report the absolute path you verified and the filename you found.
 

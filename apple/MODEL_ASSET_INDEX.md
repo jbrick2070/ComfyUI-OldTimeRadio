@@ -14,13 +14,14 @@ So **the error message is the install instruction.** Read it literally: it names
 
 ```
 OTR_COMFYUI_MODELS_ROOT   models root: ComfyUI's own models folder when
-                          running inside ComfyUI; C:\ComfyUI-Models is the
-                          Windows default; off Windows, outside ComfyUI,
+                          running inside ComfyUI, else a sibling models/
+                          folder if there is one; C:\ComfyUI-Models is the
+                          last Windows default; off Windows with neither,
                           set it -- the pack refuses rather than guess
 text_encoders/, checkpoints/   ComfyUI-native weights (the native Gemma
                           writer; Stable Audio 3 and its text encoder)
 LLM/<org>--<name>/        other (transformers) writers, as plain files
-TTS/KokoroTTS/            Kokoro's model and voices
+TTS/KokoroTTS/            Kokoro's voices (and its ONNX model on 3.13)
 HF_HOME                   what libraries fetch for themselves; the pack
                           points it beside the models at startup unless
                           you set it (see apple/INSTALL.md)
