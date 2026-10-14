@@ -314,11 +314,14 @@ Left, in order. Every one needs this box or the 5080 after the PR merges:
    `acceptance_finding_count` in `node_episode_report.json`. Zero, or each
    `[OTR_VideoRenderBatch] acceptance:` log line names a real gap. The grader
    already passes a sanctioned (floored) beat.
-4. **Two GPU reset scripts.** `scripts/otr_reset_gpu_box.ps1` is
-   unreferenced but is NOT a copy of the tested `otr_reset_gpu.ps1`; the two
-   differ, and the box script has no targeted safety test (it kills by
-   process). Consolidate only after reading both side by side and adding a
-   selection test like `tests/test_kill_otr_zombies_selection.py`.
+4. **Port one thing into the GPU reset script.** `otr_reset_gpu_box.ps1` is gone
+   (2026-10-14); `scripts/otr_reset_gpu.ps1` is the one reset script, and
+   `tests/test_reset_gpu_selection.py` now pins its protected-process list (there
+   was no test before; the old line calling it "the tested one" was wrong). The
+   deleted copy did one thing better: it polled up to 40 s for VRAM to drop,
+   where the survivor checks once after a fixed 6 s, so a slow release reads as
+   "RESET INCOMPLETE". Porting the poll needs real PowerShell, which the cloud
+   container lacks: the 4060 or the 5080 does it, running the script once.
 
 The B7 sweep gate (`tests/test_b7_forbidden_sweep.py`) diffs against tag
 `s29-clean-slate-gate`, which exists only on the 5080's clone; run it there
