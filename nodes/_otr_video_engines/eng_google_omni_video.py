@@ -1,10 +1,11 @@
 """Google Gemini Omni Flash direct BYO-key video adapter.
 
-Direct Google API lane for short text-to-video clips. This is not a Comfy
-Cloud Partner node and it never invokes a local video model. The first shipped
-surface is text-to-video only through the Interactions API; init/reference
-image, audio, and video-editing inputs fail loud before network until those
-paths are explicitly wired and tested.
+Direct Google API lane for short clips through the Interactions API. This is
+not a Comfy Cloud Partner node and it never invokes a local video model. It
+takes a text prompt plus up to three images (the beat's still as the start
+image, and reference images); audio, base-clip and reference-video inputs fail
+loud before network, and the request builder drops them first (the
+``accepts_*`` declarations on the engine).
 
 Import-time stays light: no Google SDK, PIL, NumPy, Torch, network, or Comfy
 runtime imports happen at module scope.

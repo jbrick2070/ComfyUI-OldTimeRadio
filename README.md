@@ -116,9 +116,10 @@ and speaks every part (Gemini TTS), scores it (Lyria) and draws every still
 (Gemini image) -- a whole episode with **no GPU at all**: nothing loads
 locally, so it runs on a laptop with no graphics card. What it does *not* do
 by default is generate video, and the reason is worth knowing before you go
-looking for the switch: Google rations its video models on the paid **Tier 1**
-(Veo, measured 2026-09-19, allowed **2 requests a minute and 10 a day**), while
-a single episode asks for about sixteen clips. So the shipped Google workflow,
+looking for the switch: Google rations its video models on the paid **Tier 1**.
+The retired Veo lane, measured on 2026-09-19, was allowed **2 requests a minute
+and 10 a day**, while a single episode asks for about sixteen clips; Omni's
+allowance has not been measured. So the shipped Google workflow,
 `otr_google_still`, composites the stills instead (`still_flat`) and never
 calls a video model.
 

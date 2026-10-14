@@ -52,7 +52,7 @@ MANIFEST_PATH = os.path.join(
 ENGINE_MATRIX_PATH = os.path.join(REPO_ROOT, "apple", "ENGINE_MATRIX.md")
 
 #: The canvas rate the whole timeline is expressed at. A 24 fps model declares
-#: 25 and CONVERTS at delivery (the Veo/H3 pattern); it never relabels.
+#: 25 and CONVERTS at delivery (the Omni/H3 pattern); it never relabels.
 CANVAS_FPS = 25
 
 #: Lanes whose output Sage silently corrupts, so they must REFUSE rather than

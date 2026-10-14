@@ -141,6 +141,23 @@ def test_bad_shape_fails_before_request(monkeypatch):
         eng.render_clip(_req(), {})
 
 
+def test_the_builder_drops_exactly_what_omni_refuses():
+    """Each accepts_* declaration, pinned: flip any one and this fails. A
+    character beat's voice reaching Omni fails the beat loud."""
+    from nodes._otr_video_engines import render_driver as rd
+
+    req = {"audio_ref": {"path": "voice.wav"}, "base_clip_ref": "clip.mp4",
+           "asset_refs": {"init_image": "still.png",
+                          "reference_images": ["ref.png"],
+                          "last_frame": "end.png",
+                          "reference_videos": ["ref.mp4"]}}
+    out = rd._prune_strict_text_only_request(req, "google_omni_video")
+    assert out["audio_ref"] is None
+    assert out["base_clip_ref"] is None
+    assert out["asset_refs"] == {"init_image": "still.png",
+                                 "reference_images": ["ref.png"]}
+
+
 def test_request_shape_sends_interactions_video_uri_format(monkeypatch, tmp_path):
     _clear_keys(monkeypatch)
     monkeypatch.setenv("GEMINI_API_KEY", "KEY")

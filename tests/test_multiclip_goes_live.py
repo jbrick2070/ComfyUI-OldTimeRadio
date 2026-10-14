@@ -107,19 +107,24 @@ def test_segment_zero_still_resolves_the_beats_own_still(engine):
 # The jump lanes that DO mint: the guarantee must survive the fix
 # ---------------------------------------------------------------------------
 
-def test_a_jump_lane_that_mints_stills_STILL_demands_them():
+@pytest.mark.parametrize("lane", [
+    # Mints through its family / required inputs (image-to-video).
+    "cloud_vidu_q2_pro_fast_720p",
+    # Mints ONLY through the provider_side + accepts_still branch of
+    # _still_spine_requires_scene: text-to-video, so neither of the others
+    # applies. The last lane on that branch since Veo was retired 2026-10-14.
+    "google_omni_video",
+])
+def test_a_jump_lane_that_mints_stills_STILL_demands_them(lane):
     """The fix must not become a blanket amnesty.
 
-    ``cloud_vidu_q2_pro_fast_720p`` is soft_reference, so it JUMPs; it is
-    provider-side and consumes a still, so ``_lane_consumes_a_still`` says
-    mint. A real request IS stamped for its successor -- and if the still spine
-    never materialized that object id, the render must still refuse rather
-    than substitute the beat's still. Without this test the fix above could
-    have been written as "segment >= 1 returns None" and every test would
-    still pass. (``google_veo_video`` was the lane here until it was retired
-    on 2026-10-14.)
+    Each lane here is soft_reference, so it JUMPs, and the still spine says it
+    mints. A real request IS stamped for its successor -- and if the still
+    spine never materialized that object id, the render must still refuse
+    rather than substitute the beat's still. Without this test the fix above
+    could have been written as "segment >= 1 returns None" and every test
+    would still pass.
     """
-    lane = "cloud_vidu_q2_pro_fast_720p"
     contract = fc.frame_contract_for(vreg.get_engine(lane))
     frames = _cap(contract) + 60
     shot = _shot_for(lane, frames, role="announcer_visual")

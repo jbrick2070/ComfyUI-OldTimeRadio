@@ -159,8 +159,8 @@ def join_mode_for(contract: FrameContract, target_visible_frames: int) -> str:
 
     ``single`` whenever the beat fits in ONE legal render. Only
     ``strict_first_frame`` earns a chain: a soft identity reference (HuMo) or
-    interpolation endpoints (Veo ``lastFrame``) do not lock frame 0, so those
-    lanes jump-cut rather than pretend.
+    a provider's interpolation endpoints (first/last frame) do not lock
+    frame 0, so those lanes jump-cut rather than pretend.
 
     There is NO per-engine opt-in gate for multi-clip (operator ruling:
     "there's no gate with opt in or opt out... I don't like any hidden

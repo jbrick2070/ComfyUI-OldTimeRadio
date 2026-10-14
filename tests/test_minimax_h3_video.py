@@ -575,7 +575,7 @@ def test_the_capabilities_row_describes_the_stack_this_lane_actually_loads():
 # ---------------------------------------------------------------------------
 # THE DOCSTRING FIX THIS PACKET ALSO CARRIED
 # ---------------------------------------------------------------------------
-def test_the_discrete_frames_docstring_teaches_the_value_veo_really_declares():
+def test_the_discrete_frames_docstring_teaches_the_canvas_rate_menu():
     """``frame_contract``'s worked example is the first thing an adapter author
     reads, and it taught the exact number a test asserts is wrong."""
     doc = fc.FrameContract.__doc__ or ""

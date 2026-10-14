@@ -13,8 +13,9 @@ loading a model:
 * :data:`CONTINUITY_MODES` -- whether segment N+1 can actually begin on segment
   N's terminal frame. "Accepts a still" is NOT "guarantees first-frame
   continuity": ``accepts_still`` only controls minting (``motion_common.py:393``),
-  HuMo's reference is a soft identity hint per the Bug Bible, and Veo's
-  ``lastFrame`` is first/last INTERPOLATION inside ONE clip, not chaining.
+  HuMo's reference is a soft identity hint per the Bug Bible, and a provider's
+  last-frame input (the retired Veo lane's ``lastFrame``) is first/last
+  INTERPOLATION inside ONE clip, not chaining.
   Engines without strict first-frame support get a JUMP CUT, which is legal and
   honest; silently pretending they chain is neither.
 
@@ -46,7 +47,7 @@ from dataclasses import dataclass, field, replace
 CONTINUITY_STRICT_FIRST_FRAME = "strict_first_frame"
 
 #: The adapter accepts a reference image but does not guarantee it as frame 0
-#: (HuMo's identity hint, Veo's interpolation endpoints). NOT chainable --
+#: (HuMo's identity hint, a provider's interpolation endpoints). NOT chainable --
 #: these take a jump cut.
 CONTINUITY_SOFT_REFERENCE = "soft_reference"
 

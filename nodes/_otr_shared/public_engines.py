@@ -180,10 +180,11 @@ RETIRED_ENGINE_IDS = frozenset({
     "ltx25_native_audio_in_16gb",
     "ltx25_native_audio_in_24gb",
     # Direct Google Veo 3.1 (BYO key). Google retires all three Veo 3.1
-    # preview models from the Gemini API on 2026-10-22 and offers no Gemini
-    # API successor (the GA Veo models live on the Enterprise Agent Platform,
-    # a different login). Operator, 2026-10-14: retire it; google_omni_video
-    # (gemini-omni-1.1-flash) covers text-to-video on the same key.
+    # preview models from the Gemini API on 2026-10-22; no Veo model remains
+    # on the Gemini API (GA Veo lives on the Enterprise Agent Platform, a
+    # different login), and Google's named replacement is Omni. Operator,
+    # 2026-10-14: retire it; google_omni_video (gemini-omni-1.1-flash) covers
+    # text-to-video on the same key.
     "google_veo_video",
 })
 

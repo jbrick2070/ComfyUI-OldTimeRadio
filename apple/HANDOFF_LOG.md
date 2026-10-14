@@ -1948,3 +1948,25 @@ the live version.
   the generated matrices: no new failure against the container baseline. Pack loads 22 nodes, nothing dangles.
 - **Not proven live:** no Google key in this container. The user-visible part (Omni GA, Veo refused) wants a
   2.3.25 release before 2026-10-22; that is the operator's call.
+
+## 2026-10-14 -- 2.3.25 published; its post-push checks folded (cloud session)
+
+- **2.3.25** (`1b8b0dbc`, operator: "don't wait, commit and push") is on the registry, Pending, 31 deps; the
+  published zip carries Omni on `gemini-omni-1.1-flash`, no Veo adapter, Veo in the retired set, and the 27
+  cards byte-identical to the repo. **The full suite on that tree** (16,939 collected) fails the identical
+  169-id container set as the baseline: none new, none gone.
+- **Independent refute review of the Veo retirement** held on behaviour (every selection boundary raises the
+  named RetiredEngineError; Omni's request builder now hands it a payload it accepts for all three roles) and
+  found two real gaps, both fixed here:
+  * the queue-time cloud slug preflight answered a saved Veo pick with "cloud engine ... is not registered",
+    the generic message the tombstones exist to replace, before the director could run. It now gives the
+    retired text (`_retired_reason`); the new test fails without the fix.
+  * the minting test retargeted to Vidu no longer guarded the provider_side + accepts_still branch of
+    `_still_spine_requires_scene`, which only Omni now uses. It is parametrized over Vidu and Omni; the Omni
+    case kills a mutant that blanks that branch.
+  Plus: a table test pins every Omni `accepts_*` declaration, and stale Veo prose is corrected (README quota
+  line, UPSCALERS, VIDEO_LANE_PREFLIGHT, the google_still display name, the Omni module docstring, the
+  tombstone comment, three interpolation examples).
+- **Not verified:** Google's Omni page states 3-10 s for extension continuations and gives no fps for a first
+  generation, so the Omni frame contract (75-250 frames, unchanged from the preview) is unproven on the GA
+  model until a live leg with a Google key runs.

@@ -16,9 +16,11 @@ than a held image. Nobody had written that down as a contract, though, and one
 ``allow_tail_trim=False`` on a video adapter would silently reopen the still
 floor for that lane. So this is the roster gate that fails BY NAME.
 
-Measured at the time of writing: all 31 registered engines cover a 1-second
-beat with real video. `google_veo` renders 100 frames (4.0 s) and trims 75 --
-which is the operator's sentence, executed.
+Measured at the time of writing: every registered engine covers a 1-second
+beat with real video. `google_omni_video` renders 75 frames (3.0 s) and trims
+50 -- the operator's sentence ("if the minimum is four seconds, we should have
+video for four seconds"), executed at Omni's three. Veo's 4 s floor was the
+example until it was retired on 2026-10-14.
 """
 
 from __future__ import annotations

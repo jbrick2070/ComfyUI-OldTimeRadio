@@ -331,6 +331,22 @@ def _looks_paid(engine_id: str) -> bool:
     return eid in {"sonilo", "ideo"}
 
 
+def _retired_reason(engine_id: str) -> str:
+    """The named "retired" text for a tombstoned id, or "" if it is not one.
+
+    A retired lane is unregistered too, so without this a saved graph naming
+    one is refused here as "not registered" -- the generic message the
+    tombstone set exists to replace -- before the director can say why."""
+    try:
+        from .public_engines import (
+            RETIRED_ENGINE_IDS, RetiredEngineError, resolve_engine_id)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from public_engines import (  # type: ignore
+            RETIRED_ENGINE_IDS, RetiredEngineError, resolve_engine_id)
+    resolved = resolve_engine_id(engine_id)
+    return str(RetiredEngineError(resolved)) if resolved in RETIRED_ENGINE_IDS else ""
+
+
 def _default_resolve_engine(engine_id: str):
     eid = str(engine_id or "").strip()
     if not eid:
@@ -624,7 +640,12 @@ def collect_findings(
         seen.add(eid)
         eng = lookup(eid)
         if eng is None:
-            if _looks_paid(eid):
+            retired = _retired_reason(eid)
+            if retired:
+                findings.append(Finding(
+                    eid, eid, "engine", eid, retired,
+                    "pick another engine from the dropdown", "refuse"))
+            elif _looks_paid(eid):
                 findings.append(Finding(
                     eid, eid, "engine", eid,
                     "cloud engine %r is not registered" % eid,

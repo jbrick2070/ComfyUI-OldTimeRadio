@@ -743,7 +743,7 @@
     },
     {
       "id": "otr_google_still",
-      "display_name": "Google, your own Gemini API key -- stills only: Gemini image stills composited on the CPU (still_flat), Google TTS voices, Lyria music, and Gemini Flash (creative) + Flash-Lite (technical) writers. No video model: at Tier 1 every Veo model allows 2 requests a minute and 10 a day, and an episode needs more clips than that. Nothing downloads and no GPU is needed. The same lanes published a 1-act English Hamlet in 218 s on 2026-09-19; this workflow opens at 3 acts, so expect roughly three times that. Needs OTR_GOOGLE_API_KEY (or GEMINI_API_KEY, or the pack's google.secret file).",
+      "display_name": "Google, your own Gemini API key -- stills only: Gemini image stills composited on the CPU (still_flat), Google TTS voices, Lyria music, and Gemini Flash (creative) + Flash-Lite (technical) writers. No video model: Google rations video at Tier 1 (Veo, measured, allowed 2 requests a minute and 10 a day), and an episode needs more clips than that. Nothing downloads and no GPU is needed. The same lanes published a 1-act English Hamlet in 218 s on 2026-09-19; this workflow opens at 3 acts, so expect roughly three times that. Needs OTR_GOOGLE_API_KEY (or GEMINI_API_KEY, or the pack's google.secret file).",
       "device_backend": "cpu",
       "gpu_vendor": "none",
       "ships": true,

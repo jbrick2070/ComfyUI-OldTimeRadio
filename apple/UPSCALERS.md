@@ -39,8 +39,8 @@ the black gap fill and the credits roll are deliberately left alone.
 
 That Lanczos path is how **standard OTR** lands a true 1920x1080 file
 (`composite_res` on every shipping graph). Basic is the cheap generate
-(Veo lite at 720p, native still size). Standard is this composite. No
-extra engine, no Veo 1080p generate, no Flow 1080 download step.
+(a 720p provider clip, native still size). Standard is this composite. No
+extra engine, no 1080p provider generate, no Flow 1080 download step.
 
 If you only want a little more bite, the sharpen amount is an environment
 variable, `OTR_COMPOSITE_UNSHARP_AMOUNT`. It defaults to `0.4`; `0.8` is the

@@ -468,6 +468,38 @@ def test_director_google_engine_dead_model_refuses():
     csp._CACHE.clear()
 
 
+def test_a_retired_engine_is_named_retired_not_unregistered():
+    """A saved graph naming a retired lane meets this gate before the director
+    runs. It must hear the tombstone's diagnosis, not the generic "not
+    registered" one that reads like a broken install."""
+    prompt = {
+        "63": {"class_type": "OTR_WorkflowValidator", "inputs": {}},
+        "80": {
+            "class_type": "OTR_VideoDirector",
+            "inputs": {
+                "gate_in": ["63", 0],
+                "announcer_video_model": "google_veo_video",
+                "music_video_model": "google_veo_video",
+                "character_video_model": "google_veo_video",
+                "announcer_image_model": "z_image_turbo",
+                "music_image_model": "z_image_turbo",
+                "character_image_model": "z_image_turbo",
+            },
+        },
+    }
+    csp._CACHE.clear()
+    with pytest.raises(ValueError) as exc:
+        csp.ensure_prompt_cloud_slugs(
+            prompt, "63",
+            resolve_engine=lambda eid: None,
+            schema_options_fn=lambda _k: {},
+            catalog_fn=_catalog({}))
+    text = str(exc.value)
+    assert "video engine 'google_veo_video' is retired and is no longer selectable" in text
+    assert "is not registered" not in text
+    csp._CACHE.clear()
+
+
 def test_catalog_ids_openrouter_and_google_with_injected_get_json():
     def or_get(url):
         assert url == csp.OPENROUTER_MODELS_URL

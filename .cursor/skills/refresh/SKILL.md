@@ -79,7 +79,7 @@ Cinematic 1930s old-time radio broadcast poster. Dark walnut, brass, amber CRT, 
 
 **Center -- local economy, cheapest at the bottom.** CPU/viz, still, 8 GB, Mac 16 GB, 16 GB (silent / foley_plus / mime), AMD still if shipped. Caption: VRAM is the price of local motion.
 
-**Right -- cloud bazaar, easter egg, not the front door.** Cheap SKUs: one hosted video engine, pay for length. Deluxe exception: its own engine and writer. Back door: Kling / Seedance / Veo for the brave (dropdown, not saved default).
+**Right -- cloud bazaar, easter egg, not the front door.** Cheap SKUs: one hosted video engine, pay for length. Deluxe exception: its own engine and writer. Back door: Kling / Seedance / Omni for the brave (dropdown, not saved default).
 
 **Bottom ribbon.** Three pipes into a splicer, one 16:9 film can `otr/obs`.
 

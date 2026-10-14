@@ -57,7 +57,7 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
 ## Gate 3 -- Contract matches runtime
 
 - G3.1 `native_fps == target_fps == 25`; a 24 fps model declares 25 and
-  converts at delivery (the Veo/H3 pattern), never relabels.
+  converts at delivery (the Omni/H3 pattern), never relabels.
   *Origin: 192 frames labeled 25 fps = 7.68 s against an 8.00 s audio window.*
 - G3.2 Discrete menus in FRAMES, boundaries pinned by test at both ends;
   menu arithmetic derived from the installed node's real limits, not a doc's

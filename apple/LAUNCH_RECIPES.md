@@ -874,7 +874,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_google_still
 
 - file: `workflows/otr_google_still.json`
-- workflow: `otr_google_still` (Google, your own Gemini API key -- stills only: Gemini image stills composited on the CPU (still_flat), Google TTS voices, Lyria music, and Gemini Flash (creative) + Flash-Lite (technical) writers. No video model: at Tier 1 every Veo model allows 2 requests a minute and 10 a day, and an episode needs more clips than that. Nothing downloads and no GPU is needed. The same lanes published a 1-act English Hamlet in 218 s on 2026-09-19; this workflow opens at 3 acts, so expect roughly three times that. Needs OTR_GOOGLE_API_KEY (or GEMINI_API_KEY, or the pack's google.secret file).)
+- workflow: `otr_google_still` (Google, your own Gemini API key -- stills only: Gemini image stills composited on the CPU (still_flat), Google TTS voices, Lyria music, and Gemini Flash (creative) + Flash-Lite (technical) writers. No video model: Google rations video at Tier 1 (Veo, measured, allowed 2 requests a minute and 10 a day), and an episode needs more clips than that. Nothing downloads and no GPU is needed. The same lanes published a 1-act English Hamlet in 218 s on 2026-09-19; this workflow opens at 3 acts, so expect roughly three times that. Needs OTR_GOOGLE_API_KEY (or GEMINI_API_KEY, or the pack's google.secret file).)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
 - master_hash: `d44a3836d41bcfe41e85dbc06531114bd02ba776b10eb1464e39a72d6e372ce0`
