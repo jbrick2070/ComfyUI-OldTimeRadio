@@ -870,13 +870,12 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
         # bed on top of the opening), and "no position" is not impossible, so it
         # must not be fatal either.
         #
-        # IT IS ROUTINE. A `music_inter` beat is a video-only bridge -- ledger
-        # b006 of that episode reads `start_s=None, dur_s=None, text=''`,
-        # "Bridge to the next phase with music only" -- and it occupies NO time
-        # in the master mix at all: its neighbours b005 (33.936 + 3.499) and
-        # b007 (37.435) are exactly contiguous. Such a beat still renders a
-        # picture, and on a foley lane it still produces a stem, but there is
-        # no window in the master WAV to splat that stem into.
+        # IT CAN STILL HAPPEN. SceneSequencer gives every `music_inter` line a
+        # slot in the master, but a bridge that arrives untimed -- a ledger
+        # whose bridge row reads `start_s=None, dur_s=None, text=''`, as
+        # ledgers written before bridges had slots do -- still renders a
+        # picture, and on a foley lane still produces a stem, with no window
+        # in the master WAV to splat that stem into.
         #
         # So skipping is the only honest answer -- and skipping is NOT
         # guessing. It is LOUD and COUNTED (`unpositioned` rides the stats into
@@ -891,8 +890,8 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
             _LOG.warning(
                 "[OTR foley] stem %s has no master-mix position "
                 "(start_s=%r) -- NOT mixed. A beat with no slot in the master "
-                "cannot carry a bed; this is normal for a music_inter bridge "
-                "and a fault for anything else",
+                "cannot carry a bed; expected only for an untimed "
+                "music_inter bridge, a fault for anything else",
                 os.path.basename(path), raw_start)
             continue
         offset = int(round(start_s * float(fps))) * step

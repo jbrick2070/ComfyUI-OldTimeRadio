@@ -144,11 +144,6 @@ def test_existing_multimodal_text_only_backend_signatures_unchanged() -> None:
 def test_gptq_int4_adapter_constructable() -> None:
     """The D1c scaffold is constructable; load/generate/unload each
     raise NotImplementedError with a clear deferral message.
-
-    Sprint D D4 update: load() now calls check_context_window(row)
-    before raising NotImplementedError. Pass a fake row with
-    context_window >= HARD_VRAM_CONTEXT_LIMIT so the precondition
-    passes and the NotImplementedError surfaces as before.
     """
     from dataclasses import dataclass
 

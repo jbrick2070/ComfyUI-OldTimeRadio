@@ -381,20 +381,6 @@ def test_the_kokoro_announcer_pools_have_not_drifted():
         % (bank_announcers, sorted(presets)))
 
 
-def test_the_registry_preset_list_is_the_announcer_pool_not_a_character_catalog():
-    """VOICE_REGISTRY['kokoro']['presets'] IS ANNOUNCER_PRESETS -- the four
-    (id, label) announcer pairs. Pinned because the module calls itself "the
-    single source of truth", which invites a reader to conclude kokoro
-    CHARACTERS have four voices; the real character catalog is the 179-row
-    voice bank. The list is right, the impression it gives is not.
-    """
-    from config import cast_pools
-
-    presets = cast_pools.VOICE_REGISTRY["kokoro"]["presets"]
-    assert presets == list(cast_pools.ANNOUNCER_PRESETS)
-    assert all(isinstance(p, tuple) and len(p) == 2 for p in presets)
-
-
 def test_the_engine_and_the_bank_draw_the_SAME_announcer():
     """One pool, two draws was the defect. eng_kokoro used
     Random(f"{seed}_kokoro_announcer") while the bank used

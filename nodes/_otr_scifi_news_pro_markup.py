@@ -816,11 +816,6 @@ class _Parse:
         self.coda: "str | None" = None
         self.saw_end = False
 
-    #: Thin alias of the module-level `speaker_identity_key` (the one
-    #: implementation, which the writer imports), kept so a caller reaching for
-    #: the old private name gets the same answer rather than an AttributeError.
-    _speaker_key = staticmethod(speaker_identity_key)
-
     def defect(self, code: NewsProParseDefect, detail: str = "",
                line_no: "int | None" = None) -> None:
         self.defects.append(ParseDefect(code, detail, line_no))

@@ -281,6 +281,49 @@ different proof.
 
 ## 2. CODE -- decided, in order
 
+### 0p. Gemini audit 2026-10-13 -- code landed; three live proofs and one row left
+
+The seven fixes and both forks are code on `claude/vigilant-lamport-p6x7ck`
+(PR jbrick2070/ComfyUI-OldTimeRadio#7), each scoped suite diffed against its
+same-HEAD baseline with no new failure: the act-break bridge cue is mixed
+before the master WAV is written and hashed (`c1ace8cd`); IndexTTS2 reaps its
+worker and partial WAV on every failure branch (`26eb9212`); the `ltx_8gb`
+refusals point at `otr_fetch_lane_weights.py ltx_8gb`, now pinned to revision,
+bytes and SHA-256 (`c14d21c5`); four tests that guarded nothing now do, and
+the forbidden-pattern sweep judges each hit where it sits (`94c290cc`); the
+public-domain fetch normalizes each work once (`96f3e917`); the v1 ledger
+viewer is retired (`d41f25b3`); the dead-symbol wave (`4f24985a`); F1 ripped
+`audio_motion_profile` and F2 wired the acceptance grader into
+`OTR_VideoRenderBatch` (`491ac7a1`, `09db856c`). CastLock's announcer bank lookups stayed:
+they are live admission checks.
+
+Left, in order. Every one needs this box or the 5080 after the PR merges:
+
+1. **The bridge, by ear.** One 2-act canonical leg to `otr/obs`; his ear on
+   the act break. The log reads `[EpisodeAssembler] mixed interstitial cue`
+   BEFORE the master is written now. Then the PBUG (admission rule: the
+   evidence is any episode published since 2026-09-15 with a `music_inter`
+   line, whose `<ep>_master.wav` is digital silence in that row's window) and
+   its Bible entry; `tests/test_interstitial_cue_reaches_master.py` is the
+   executable coverage.
+2. **The IndexTTS2 orphan, forced.** A PBUG needs a smoke on a 16 GB box with
+   the IndexTTS2 venv: `OTR_SIDECAR_REQUEST_TIMEOUT=1`, one line, then the
+   process list shows no worker left behind. Coverage:
+   `tests/test_indextts2_worker_lifecycle.py`.
+3. **The grader's first real episode.** Any video leg: read
+   `acceptance_finding_count` in `node_episode_report.json`. Zero, or each
+   `[OTR_VideoRenderBatch] acceptance:` log line names a real gap. The grader
+   already passes a sanctioned (floored) beat.
+4. **Two GPU reset scripts.** `scripts/otr_reset_gpu_box.ps1` is
+   unreferenced but is NOT a copy of the tested `otr_reset_gpu.ps1`; the two
+   differ, and the box script has no targeted safety test (it kills by
+   process). Consolidate only after reading both side by side and adding a
+   selection test like `tests/test_kill_otr_zombies_selection.py`.
+
+The B7 sweep gate (`tests/test_b7_forbidden_sweep.py`) diffs against tag
+`s29-clean-slate-gate`, which exists only on the 5080's clone; run it there
+once after the merge.
+
 ### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
 
 `nodes/_otr_voice_route.py` and everything that only compiled because of it

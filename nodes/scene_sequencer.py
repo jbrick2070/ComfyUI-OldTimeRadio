@@ -223,6 +223,23 @@ def _stamp_master_wav_flavour(ledger: dict, flavour: str) -> None:
     audio["master_wav_flavour"] = str(flavour)
 
 
+def _scene_shift_samples(segments, opening_present: bool,
+                         xfade_samples: int) -> int:
+    """Where the scene audio starts in the master mix, in samples.
+
+    ``segments`` is the assembler's ordered list -- opening theme (when
+    present), scene, closing theme -- and each segment before the scene loses
+    one crossfade to the overlap. The interstitial mix and the ledger's
+    scene-to-master shift both read this ONE function, so a cue's stamped
+    position and the samples it was mixed into cannot drift apart.
+    """
+    scene_idx = 1 if opening_present else 0
+    shift = sum(int(seg.shape[-1]) for seg in segments[:scene_idx])
+    if scene_idx > 0:
+        shift = max(0, shift - int(xfade_samples) * scene_idx)
+    return shift
+
+
 def _reconcile_active_music_manifest(manifest: dict | None, *, source: str):
     """Persist manifest-backed ``music[]`` rows before timeline mutation.
 
@@ -1679,6 +1696,23 @@ class EpisodeAssembler:
         log.info("[EpisodeAssembler] Assembled %d segments with %dms crossfades",
                  len(matched), crossfade_ms)
 
+        # INTERSTITIAL CUES GO INTO THE MASTER HERE, before anything snapshots,
+        # levels or writes it. SceneSequencer leaves a silent gap for every
+        # music_inter line; the cue fills it. Mixed any later, the cue reaches
+        # only the returned tensor while <ep>_master.wav -- the file the mux
+        # publishes and the video lanes condition on -- keeps the silence.
+        # Before the foley snapshot too, so the provisional master carries it.
+        if _cue_manifest is not None and music_cue_audio is not None:
+            episode_waveform = self._mix_interstitial_cues(
+                episode_waveform,
+                sample_rate=sample_rate,
+                shift_samples=_scene_shift_samples(
+                    segments, opening_theme_audio is not None, xfade_samples),
+                music_cue_audio=music_cue_audio,
+                cue_manifest=_cue_manifest,
+                owns_waveform=len(matched) > 1,
+            )
+
         # Final loudness master (post-crossfade): measure integrated LUFS, apply
         # ONE linear gain to the delivery target, then a true-peak safety rail.
         # `sample_rate` is passed because the meter needs it, and `ceiling_dbfs`
@@ -1911,26 +1945,13 @@ class EpisodeAssembler:
                     # _shift_samples = sum of all segments before
                     # scene minus xfade_samples * num_crossfades.
                     try:
-                        # `segments` and `xfade_samples` are local to
-                        # this method (defined above). We track the
-                        # scene's index in the segments list -- with
-                        # the current code, segments is opening +
-                        # scene + closing so scene is at index 1 if
-                        # opening_theme present, else 0.
-                        _scene_idx = (
-                            1 if opening_theme_audio is not None else 0
-                        )
-                        _shift_samples = 0
-                        for _i, _seg in enumerate(segments[:_scene_idx]):
-                            _shift_samples += int(_seg.shape[-1])
-                        # Each pre-scene segment that crossfades into
-                        # the next subtracts xfade_samples from the
-                        # shift (the overlap region eats time off
-                        # both sides). With opening->scene only, one
-                        # crossfade boundary applies.
-                        if _scene_idx > 0:
-                            _shift_samples -= int(xfade_samples) * _scene_idx
-                            _shift_samples = max(0, _shift_samples)
+                        # The same arithmetic the interstitial mix used
+                        # above, from the same function, so a cue's
+                        # stamped position and the samples it was mixed
+                        # into cannot disagree.
+                        _shift_samples = _scene_shift_samples(
+                            segments, opening_theme_audio is not None,
+                            xfade_samples)
                         _shift_s = float(_shift_samples) / float(sample_rate)
                     except Exception:
                         _shift_s = 0.0
@@ -1992,79 +2013,9 @@ class EpisodeAssembler:
                     # = total_master - closing_dur. Write them by
                     # canonical placement match against ledger.music[].
                     
-                    # -------------------------------------------------------------
-                    # Overlay interstitial cues into the gaps created by SceneSequencer
-                    # -------------------------------------------------------------
-                    if _cue_manifest is not None and music_cue_audio is not None:
-                        from .otr_shot_lock import MUSIC_BRIDGE_FALLBACK_DUR_S as _GAP_S
-                        for _r in _cue_manifest.get("cues", []):
-                            if (
-                                _r.get("placement") != "interstitial"
-                                or not _r.get("anchor_line_id")
-                            ):
-                                continue
-                            _anchor_id = _r.get("anchor_line_id")
-                            _start_s_scene = None
-                            _gap_s = float(_GAP_S)
-                            for _ln in (_led.get("lines") or []):
-                                if _ln.get("line_id") != _anchor_id:
-                                    continue
-                                _raw_start = _ln.get("start_s")
-                                if not isinstance(_raw_start, (int, float)):
-                                    break
-                                _start_s_scene = float(_raw_start)
-                                if _ln.get("start_s_space") == "master_mix":
-                                    _start_s_scene -= _shift_s
-                                _raw_dur = _ln.get("dur_s")
-                                if (
-                                    isinstance(_raw_dur, (int, float))
-                                    and float(_raw_dur) > 0.0
-                                ):
-                                    _gap_s = float(_raw_dur)
-                                break
-                            if _start_s_scene is None:
-                                continue
-                            _cue_audio = self._cue_from_batch(
-                                music_cue_audio, _cue_manifest, _r,
-                            )
-                            if _cue_audio is None:
-                                continue
-                            _cue_wf = self._extract_waveform(
-                                _cue_audio, target_sr=sample_rate,
-                            )
-                            _start_idx = (
-                                int(_shift_samples)
-                                + int(_start_s_scene * sample_rate)
-                            )
-                            if _start_idx < 0 or _start_idx >= int(
-                                episode_waveform.shape[-1]
-                            ):
-                                continue
-                            _gap_samples = max(
-                                1, int(round(_gap_s * float(sample_rate))),
-                            )
-                            _mix_len = min(
-                                int(_cue_wf.shape[-1]),
-                                _gap_samples,
-                                int(episode_waveform.shape[-1]) - _start_idx,
-                            )
-                            if _mix_len <= 0:
-                                continue
-                            _channels = min(
-                                episode_waveform.shape[1], _cue_wf.shape[1],
-                            )
-                            episode_waveform[
-                                :, :_channels,
-                                _start_idx:_start_idx + _mix_len,
-                            ] += _cue_wf[:, :_channels, :_mix_len]
-                            log.info(
-                                "[EpisodeAssembler] mixed interstitial cue %s "
-                                "at %.2fs (scene) / %.2fs (master) "
-                                "window=%d/%d samples",
-                                _r.get("cue_id"), _start_s_scene,
-                                _start_idx / sample_rate,
-                                _mix_len, int(_cue_wf.shape[-1]),
-                            )
+                    # The interstitial cues themselves were mixed into the
+                    # master before it was levelled and written (see
+                    # _mix_interstitial_cues); here only their rows are stamped.
 
                     _music_rows = _led.get("music") or []
                     log.info(
@@ -2423,6 +2374,108 @@ class EpisodeAssembler:
             "[EpisodeAssembler] emit audio_done signal: %s", audio_done,
         )
         return (audio_out, output_path, info, audio_done)
+
+    def _mix_interstitial_cues(self, episode_waveform, *, sample_rate,
+                               shift_samples, music_cue_audio, cue_manifest,
+                               owns_waveform):
+        """Mix each anchored interstitial cue into its bridge gap.
+
+        The anchor is the cue's ``music_inter`` line in the in-flight ledger
+        (read, never written here). Its ``start_s`` is in scene space as
+        SceneSequencer stamped it, or in master space when a re-run already
+        shifted it -- both are handled. A cue plays for at most the line's
+        ``dur_s`` (MUSIC_BRIDGE_FALLBACK_DUR_S when unstamped), never past the
+        end of the master.
+
+        OUT OF PLACE. With no opening or closing theme the episode waveform IS
+        the upstream scene tensor, so ``owns_waveform`` is False and the first
+        cue mixes into a copy instead of AudioEnhance's cached output. Returns
+        the waveform to use from here on; with nothing to mix that is the
+        input itself, untouched.
+
+        BEST-EFFORT, AS IT ALWAYS WAS. Every cue is placed before any sample
+        is touched; a fault while placing logs a warning and returns the input
+        untouched, so a bad cue costs the bridge, never the episode.
+        """
+        rows = [r for r in (cue_manifest or {}).get("cues", [])
+                if r.get("placement") == "interstitial"
+                and r.get("anchor_line_id")]
+        if not rows:
+            return episode_waveform
+        try:
+            placed = self._place_interstitial_cues(
+                rows, total=int(episode_waveform.shape[-1]),
+                sample_rate=sample_rate, shift_samples=shift_samples,
+                music_cue_audio=music_cue_audio, cue_manifest=cue_manifest)
+        except Exception as exc:  # noqa: BLE001 -- a bad cue costs the bridge only
+            log.warning("[EpisodeAssembler] interstitial cues not mixed: %s",
+                        exc)
+            return episode_waveform
+        for cue_id, start_s_scene, start_idx, mix_len, cue_wf in placed:
+            if not owns_waveform:
+                episode_waveform = episode_waveform.clone()
+                owns_waveform = True
+            channels = min(episode_waveform.shape[1], cue_wf.shape[1])
+            episode_waveform[:, :channels, start_idx:start_idx + mix_len] += (
+                cue_wf[:, :channels, :mix_len])
+            log.info(
+                "[EpisodeAssembler] mixed interstitial cue %s at %.2fs (scene) "
+                "/ %.2fs (master) window=%d/%d samples",
+                cue_id, start_s_scene, start_idx / sample_rate,
+                mix_len, int(cue_wf.shape[-1]))
+        return episode_waveform
+
+    def _place_interstitial_cues(self, rows, *, total, sample_rate,
+                                 shift_samples, music_cue_audio, cue_manifest):
+        """Where each interstitial cue goes, as
+        ``(cue_id, start_s_scene, start_idx, mix_len, cue_waveform)``. Reads
+        the in-flight ledger and slices the music batch; writes nothing."""
+        from . import _otr_ledger as _OTRL_mix
+        from .otr_shot_lock import MUSIC_BRIDGE_FALLBACK_DUR_S
+        ledger_p = _OTRL_mix.in_flight_ledger_path()
+        ledger = _OTRL_mix.load_ledger_safe(ledger_p) if ledger_p else None
+        if not isinstance(ledger, dict):
+            log.warning(
+                "[EpisodeAssembler] %d interstitial cue(s) not mixed: no "
+                "in-flight ledger to place them", len(rows))
+            return []
+        lines = {}
+        for ln in ledger.get("lines") or []:
+            if isinstance(ln, dict):
+                lines.setdefault(ln.get("line_id"), ln)  # first wins, as before
+        shift_s = float(shift_samples) / float(sample_rate)
+        placed = []
+        for r in rows:
+            line = lines.get(r.get("anchor_line_id"))
+            raw_start = (line or {}).get("start_s")
+            if not isinstance(raw_start, (int, float)):
+                log.warning(
+                    "[EpisodeAssembler] interstitial cue %s not mixed: anchor "
+                    "%s has no position", r.get("cue_id"),
+                    r.get("anchor_line_id"))
+                continue
+            start_s_scene = float(raw_start)
+            if line.get("start_s_space") == "master_mix":
+                start_s_scene -= shift_s
+            raw_dur = line.get("dur_s")
+            gap_s = (float(raw_dur)
+                     if isinstance(raw_dur, (int, float)) and float(raw_dur) > 0.0
+                     else float(MUSIC_BRIDGE_FALLBACK_DUR_S))
+            cue_audio = self._cue_from_batch(music_cue_audio, cue_manifest, r)
+            if cue_audio is None:
+                continue
+            cue_wf = self._extract_waveform(cue_audio, target_sr=sample_rate)
+            start_idx = int(shift_samples) + int(start_s_scene * sample_rate)
+            if start_idx < 0 or start_idx >= total:
+                continue
+            mix_len = min(int(cue_wf.shape[-1]),
+                          max(1, int(round(gap_s * float(sample_rate)))),
+                          total - start_idx)
+            if mix_len <= 0:
+                continue
+            placed.append((r.get("cue_id"), start_s_scene, start_idx, mix_len,
+                           cue_wf))
+        return placed
 
     @staticmethod
     def _cue_from_batch(music_cue_audio, manifest, row):

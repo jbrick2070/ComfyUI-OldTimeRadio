@@ -642,11 +642,8 @@ class GoogleVeoVideoEngine:
         return None
 
 
-GoogleVeoVideo = GoogleVeoVideoEngine()
-
 __all__ = [
     "DEFAULT_MODEL",
-    "GoogleVeoVideo",
     "GoogleVeoVideoEngine",
     "LITE_UNSUPPORTED_RESOLUTIONS",
     "OUTPUT_FPS",

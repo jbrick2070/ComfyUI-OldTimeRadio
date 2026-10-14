@@ -130,30 +130,55 @@ def test_forbidden_sweep_runs_clean():
     )
 
 
-def test_classifier_recognizes_fstring_context():
-    """Python 3.12 split string tokens into FSTRING_START /
-    FSTRING_MIDDLE / FSTRING_END. The sweep's classifier was patched
-    in B7 to treat these as string tokens (forensic), not code.
-    Validates the classifier recognizes the FSTRING token types.
-    """
-    fstring_types = (
-        getattr(tokenize, "FSTRING_START", None),
-        getattr(tokenize, "FSTRING_MIDDLE", None),
-        getattr(tokenize, "FSTRING_END", None),
-    )
-    # The token types exist on Python 3.12+. Skip rather than hard-fail on
-    # 3.11 so the headless suite stays green on the base Python 3.11 install.
-    if sys.version_info < (3, 12):
-        pytest.skip(
-            f"FSTRING_* tokenize tokens only on Python 3.12+; "
-            f"running {sys.version_info.major}.{sys.version_info.minor}"
-        )
-    for t in fstring_types:
-        assert t is not None, (
-            "tokenize.FSTRING_* token types must exist on the OTR "
-            "Python target so the sweep classifier can recognize "
-            "f-string contexts as forensic"
-        )
+def _sweep_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_s28_forbidden_sweep_under_test", SWEEP_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # import-safe: the sweep itself is main()
+    return mod
+
+
+_PLANTED = (
+    "def f():\n"                                                  # 1
+    "    \"\"\"A docstring naming a back-compat path.\"\"\"\n"    # 2
+    "    # a comment about the old shim\n"                         # 3
+    "    msg = \"no back-compat here\"\n"                          # 4
+    "    out = generate_text(\"hello\")\n"                         # 5
+    "    note = f\"retired: {len(msg)} back-compat paths\"\n"      # 6
+    "    return generate_text(msg)  # call\n"                      # 7
+)
+
+
+@pytest.mark.parametrize("lineno, expected", [
+    (2, "forensic"),   # docstring
+    (3, "forensic"),   # comment
+    (4, "forensic"),   # plain string literal
+    (5, "code"),       # a real call on a line that ALSO holds a string
+    (6, "forensic"),   # the literal part of an f-string
+    (7, "code"),       # a real call on a line that also holds a comment
+])
+def test_the_classifier_judges_each_hit_where_it_sits(tmp_path, lineno,
+                                                       expected):
+    """Calls the sweep's own classifier. Line 5 is the case that used to slip
+    through: any string token on a line made the WHOLE line forensic, so an
+    executable hit beside a string literal never reached the runtime list."""
+    sw = _sweep_module()
+    planted = tmp_path / "planted.py"
+    planted.write_text(_PLANTED, encoding="utf-8")
+    spans = sw.string_and_comment_spans(planted)
+    text = _PLANTED.splitlines()[lineno - 1]
+    assert sw.forbidden.search(text), "fixture line %d must hit" % lineno
+    assert sw.classify_hit(spans, lineno, text) == expected
+
+
+def test_an_unreadable_file_counts_as_code(tmp_path):
+    """A gate that cannot tokenize a file must not wave its hits through."""
+    sw = _sweep_module()
+    broken = tmp_path / "broken.py"
+    broken.write_text("x = (\n  'back-compat'\n", encoding="utf-8")
+    assert sw.string_and_comment_spans(broken) is None
+    assert sw.classify_hit(None, 2, "  'back-compat'") == "code"
 
 
 if __name__ == "__main__":

@@ -66,7 +66,6 @@ __all__ = [
     "CloudErrorCode",
     "CloudMediaError",
     "CloudAuth",
-    "CostQuote",
     "ReservationState",
     "CloudMediaSession",
     "mute_ok_roles",
@@ -330,8 +329,6 @@ def is_cloud_budget_error(exc: BaseException | None) -> bool:
 # Flags + operator knobs
 # ---------------------------------------------------------------------------
 
-_TRUTHY = {"1", "true", "yes", "on"}
-
 def _budget_ceiling_from_env():
     """None = unlimited. Explicit 0 = spend-off. A number = a ceiling."""
     raw = str(otr_env.get("OTR_CLOUD_MEDIA_BUDGET_USD", "") or "").strip()
@@ -485,18 +482,6 @@ class ReservationState(str, enum.Enum):
     BILLED_ACTUAL = "BILLED_ACTUAL"
     RELEASED = "RELEASED"
     ABORTED = "ABORTED"
-
-
-@dataclass(frozen=True)
-class CostQuote:
-    provider: str
-    row_id: str
-    unit: str
-    unit_price_usd: float
-    quantity: float
-    estimated_usd: float
-    max_usd: float
-    pricing_source_version: str
 
 
 @dataclass

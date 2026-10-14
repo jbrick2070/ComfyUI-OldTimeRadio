@@ -122,8 +122,6 @@ against the real catalog:
 `tests/test_model_catalog_schema.py`,
 `tests/test_model_catalog_scan.py`,
 `tests/test_loader_backend_protocol.py`,
-`tests/test_chat_template_kind_dispatch.py`,
-`tests/test_context_window_precondition.py`,
 `tests/test_qwen_quant_twins.py`.
 
 Green here means the row is well-formed, not that it can write an episode.

@@ -856,9 +856,10 @@ def _compile_foley_master(master_audio_path: str, receipts_json: str,
     if stats["skipped"]:
         report.append("foley_skipped=%d (outside the master)"
                       % stats["skipped"])
-    # BEATS THAT MADE A STEM BUT OWN NO WINDOW IN THE MASTER. A music_inter
-    # bridge is the normal case -- it renders a picture and occupies no
-    # master-mix time at all. Reported because the same count is a FAULT for
+    # BEATS THAT MADE A STEM BUT OWN NO WINDOW IN THE MASTER. An untimed
+    # music_inter bridge is the one expected case: SceneSequencer gives every
+    # bridge it sequences a slot, so only a bridge that reached the mux with
+    # no position lands here. Reported because the same count is a FAULT for
     # any other role, and a bed quietly missing from half an episode must not
     # be invisible.
     #
@@ -869,8 +870,8 @@ def _compile_foley_master(master_audio_path: str, receipts_json: str,
     # neighbouring counters stay conditional on purpose: they are exceptions
     # worth noticing, while this one is a standing invariant somebody will come
     # to verify.
-    report.append("foley_unpositioned=%d (no master-mix slot; normal for "
-                  "music_inter bridges)" % stats["unpositioned"])
+    report.append("foley_unpositioned=%d (no master-mix slot; expected only "
+                  "for an untimed music_inter bridge)" % stats["unpositioned"])
     if stats["conform_notes"]:
         report.append("foley_conformed=" + "; ".join(stats["conform_notes"]))
     log.info("[OTR_MasterAudioMux] %s", " | ".join(report))

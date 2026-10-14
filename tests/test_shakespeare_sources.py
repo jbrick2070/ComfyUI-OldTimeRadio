@@ -297,27 +297,6 @@ def test_fetch_shakespeare_scene_missing_defaults_fail_loud():
         shx.fetch_shakespeare_scene(bank=bank)
 
 
-def test_parse_folger_scene_xml_snippet():
-    parsed = shx.parse_folger_scene(
-        """
-        <TEI xmlns="http://www.tei-c.org/ns/1.0">
-          <text><body><div>
-            <stage>Thunder.</stage>
-            <sp><speaker>First Witch</speaker><l>All hail, Macbeth!</l></sp>
-            <sp><speaker>Banquo</speaker><l>Why do you start?</l></sp>
-          </div></body></text>
-        </TEI>
-        """,
-        play_code="Mac",
-        act=1,
-        scene=3,
-    )
-    assert parsed.play_code == "Mac"
-    assert parsed.speakers == ("FIRST WITCH", "BANQUO")
-    assert parsed.stage_directions == ("Thunder.",)
-    assert "All hail, Macbeth" in parsed.text
-
-
 def test_module_import_is_lazy(monkeypatch):
     def _boom(self, *args, **kwargs):
         raise AssertionError(f"import-time file read attempted: {self}")

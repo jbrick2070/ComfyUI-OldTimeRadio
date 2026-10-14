@@ -570,10 +570,13 @@ REPLAY_MANIFEST_SCHEMA = "otr_replay_bundle_v1"
 #:
 #: Carrying it forward is not a stale value, it is the CORRECT one. The replay
 #: shows the imported stills, so the engines that made them are exactly the
-#: source's engines. (The other six members -- `render_engines`,
-#: `render_trace`, `render_trace_version`, `phase_ms`, `audio_motion_profile`,
-#: `paths` -- are all rebuilt by the replay, and `video_readiness` is a
-#: freeze-cascade diagnostic that nothing requires.)
+#: source's engines. (`render_engines`, `render_trace`,
+#: `render_trace_version`, `phase_ms` and `paths` are rebuilt by the replay;
+#: `video_readiness` is a freeze-cascade diagnostic that nothing requires; and
+#: `audio_motion_profile` is a retired stamp (2026-10-13) that nothing writes
+#: or reads, dropped from `meta` so an older source ledger's copy does not
+#: travel. That ledger's top-level `audio_motion_profiles` list still does;
+#: it is inert.)
 #:
 #: `asset_cleanup` (row 0b, 2026-09-25) is a per-run housekeeping choice, not
 #: story content: the writer's replay branch re-stamps it from THIS run's
@@ -1370,8 +1373,6 @@ class Ledger:
             # dependent dict (or None) where the casting LLM stores
             # per-character knobs it chose -- Bark might use
             # "temperature", Kokoro might use "speed", etc.
-            # Allowed param shape per model lives in
-            # config.cast_pools.VOICE_REGISTRY[<model>]["params_spec"].
             # Today the LLM does not populate this yet (Phase 2);
             # consumers fall back to their defaults when None.
             #

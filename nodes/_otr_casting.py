@@ -2223,8 +2223,7 @@ def lock_cast(
             "voice_preset":          response.voice_preset,
             # voice_params: None today (consumers fall back to their
             # defaults). Phase 2 expands the casting LLM call to ask
-            # for per-character knobs (Bark temperature, Kokoro speed)
-            # bounded by VOICE_REGISTRY[tts_model]["params_spec"].
+            # for per-character knobs (Bark temperature, Kokoro speed).
             "voice_params":          None,
             "character_description": response.character_description,
             # F5 (story-engine v1): deterministic backfill so EVERY locked

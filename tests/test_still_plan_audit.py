@@ -179,38 +179,6 @@ def test_missing_still_plan_is_distinct_from_empty_tuple():
         "explicit-empty branch has no HEAD coverage")
 
 
-def test_resolve_row_aspect_reads_engine_render_aspect():
-    """The ONE aspect resolver every reader must go through
-    (:func:`still_plan_helpers.resolve_row_aspect`). ``inherit_engine`` is
-    NEVER compared directly (spec section 5), and unknown engine aspect
-    resolves to portrait (the safe legacy look at HEAD, matching
-    ``OTR_VideoDirector._role_aspects``). This test proves the resolver
-    honours ``wide`` on both the ``render_aspect`` key (S1 caller shape)
-    and the ``engine_render_aspect`` key (S0b's future ``engine_facts``
-    shape) so downstream is not sensitive to which key S0b picks."""
-    row = _sp.StillPlanRow(
-        kind="portrait", cardinality="per_subject",
-        target_class="portrait", aspect="inherit_engine", required="never",
-        framing_geometry="", style_tail_policy="full")
-    # inherit_engine + wide engine -> wide (both key shapes accepted).
-    assert _sp.resolve_row_aspect(row, {"render_aspect": "wide"}) == "wide"
-    assert _sp.resolve_row_aspect(
-        row, {"engine_render_aspect": "wide"}) == "wide"
-    # inherit_engine + portrait engine -> portrait.
-    assert _sp.resolve_row_aspect(
-        row, {"render_aspect": "portrait"}) == "portrait"
-    # inherit_engine + missing key -> portrait (safe legacy look).
-    assert _sp.resolve_row_aspect(row, {}) == "portrait"
-    # Explicit wide / portrait rows short-circuit and never consult
-    # engine_facts at all.
-    wide_row = row._replace(aspect="wide")
-    portrait_row = row._replace(aspect="portrait")
-    assert _sp.resolve_row_aspect(wide_row, {}) == "wide"
-    assert _sp.resolve_row_aspect(portrait_row, {}) == "portrait"
-    assert _sp.resolve_row_aspect(
-        wide_row, {"render_aspect": "portrait"}) == "wide"
-
-
 def test_still_plan_schema_row_field_validation():
     """The closed schema (spec section 5) rejects out-of-enum tokens on
     every field. Uses one probe per field so an accidental widening of any

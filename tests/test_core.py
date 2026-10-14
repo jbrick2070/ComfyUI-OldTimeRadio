@@ -22,7 +22,6 @@ Run in any environment (torch-dependent tests auto-skip):
   python -m pytest tests/ -v
 """
 
-import ast
 import json
 import os
 import re
@@ -310,16 +309,6 @@ class TestStoryOrchestratorCodePatterns:
             with open(os.path.join(nodes_dir, fname), encoding="utf-8") as f:
                 parts.append(f.read())
         return "\n".join(parts)
-
-    def test_transformers_import_in_try_block(self, src):
-        tree = ast.parse(src)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Try):
-                for child in ast.walk(node):
-                    if (isinstance(child, ast.ImportFrom)
-                            and child.module == "transformers.generation.streamers"):
-                        return
-        pytest.fail("BaseStreamer import not inside a try/except block")
 
     def test_1024_floor_present(self, src):
         assert "1024" in src

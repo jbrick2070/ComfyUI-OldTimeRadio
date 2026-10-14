@@ -118,10 +118,4 @@ def ensure_hf_token() -> str | None:
     return token
 
 
-def reset_cache() -> None:
-    """Clear the in-module cache (test hook)."""
-    _HF_TOKEN_CACHE["value"] = None
-    _HF_TOKEN_CACHE["resolved"] = False
-
-
-__all__ = ["ensure_hf_token", "reset_cache"]
+__all__ = ["ensure_hf_token"]

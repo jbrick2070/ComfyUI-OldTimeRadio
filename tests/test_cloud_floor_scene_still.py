@@ -368,7 +368,7 @@ def test_a_download_that_fails_twice_is_billed_not_released(tmp_path,
 # --------------------------------------------------------------------------- #
 # 3. reporting and accounting
 # --------------------------------------------------------------------------- #
-def _floor_manifest(tmp_path):
+def _floor_manifest(tmp_path, *, bounded=False):
     clip = tmp_path / "floor.mp4"
     clip.write_bytes(b"x")
     ok = tmp_path / "ok.mp4"
@@ -385,6 +385,9 @@ def _floor_manifest(tmp_path):
                     "target_frame_count": 25}, "timeout"),
                    floor_render="still_pan"),
            ]}}
+    if bounded:  # the cloud engines' freeze-time stamp
+        for shot in led["video"]["shots"]:
+            shot["frame_bounded"] = True
     result = {"ledger": led, "clips": {
         "shot_b000": {"engine_id": "cloud_vidu_q2_pro_fast_720p",
                       "frame_count": 25, "path": str(ok)},
@@ -434,6 +437,23 @@ def test_acceptance_does_not_grade_a_floor_as_a_multiclip_render():
                            "status": "sanctioned_gap", "engine_id": "still_pan",
                            "extension_mode": "none", "frame_count": 50}]}
     assert acc.grade_multiclip_honesty(led, manifest) == []
+
+
+def test_acceptance_asks_a_bounded_render_for_its_count_but_not_a_floor(
+        tmp_path):
+    """The floored shot keeps the cloud engine's ``frame_bounded`` stamp, but
+    still_pan drew the beat and stamps no native count. Asking it for one
+    reported every floored beat as a mirror; the delivered cloud beat beside
+    it, which also stamps none here, still owes the number."""
+    from nodes._otr_video_engines import acceptance as acc
+    m = _floor_manifest(tmp_path, bounded=True)
+    led = {"video": {"shots": [
+        {"shot_id": "shot_b000", "target_frame_count": 25,
+         "frame_bounded": True},
+        {"shot_id": "shot_b001", "target_frame_count": 25,
+         "frame_bounded": True}]}}
+    findings = acc.grade_no_mirror(led, m)
+    assert [f["shot_id"] for f in findings] == ["shot_b000"]
 
 
 # --------------------------------------------------------------------------- #

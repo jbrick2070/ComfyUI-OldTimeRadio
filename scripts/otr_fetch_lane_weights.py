@@ -411,9 +411,19 @@ LANES = {
     # weight on the reference machine had been placed there by hand and could
     # not be obtained by anyone else from anything in the repo. Sizes below were
     # read from the Hub, not estimated.
+    #
+    # The checkpoint carries the pin the retired download_ltx_0_9_8.ps1 held:
+    # the repo commit that carries this weight (HF api, 2025-07-16), its size
+    # and its SHA-256. The encoder is unpinned, as it always was.
     "ltx_8gb": [
-        ("Lightricks/LTX-Video",
-         "ltxv-2b-0.9.8-distilled.safetensors", "checkpoints"),         # 6.34 GB
+        WeightSpec(
+            "Lightricks/LTX-Video",
+            "ltxv-2b-0.9.8-distilled.safetensors", "checkpoints",
+            revision="8984fa25007f376c1a299016d0957a37a2f797bb",
+            expected_bytes=6340744492,
+            expected_sha256=(
+                "76aa8c4786af752fa6f951947129d5290c3c6c0b2fadcadea6b5e114"
+                "ae2cad8f")),                                          # 6.34 GB
         ("comfyanonymous/flux_text_encoders",
          "t5xxl_fp16.safetensors", "text_encoders"),                    # 9.79 GB
     ],

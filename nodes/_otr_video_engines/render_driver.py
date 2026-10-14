@@ -4383,9 +4383,9 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         plan = _cp.CoveragePlan.from_dict(raw_plan)
     if plan is None or not plan.requires_coverage_execution:
         # THE HISTORICAL PATH, byte for byte. The caller has usually already
-        # built this request (it needs it for the trace and the audio-motion
-        # profile), so it is used as-is rather than rebuilt -- rebuilding it
-        # here would be a second derivation of one request.
+        # built this request (it needs it for the trace), so it is used as-is
+        # rather than rebuilt -- rebuilding it here would be a second
+        # derivation of one request.
         #
         # The predicate is ``requires_coverage_execution``, not
         # ``is_multi_clip``: a ONE-segment plan still owes a tail trim whenever
@@ -4913,23 +4913,6 @@ def _should_fanout_cloud_episode(section, gap_beats) -> bool:
     return work >= 2
 
 
-def _amp_row_from_request(shot, request):
-    """Best-effort audio-motion row. Never raises."""
-    try:
-        amp_ref = (request.get("audio_ref") or {}) if isinstance(request, dict) else {}
-        amp_wav = amp_ref.get("path") if isinstance(amp_ref, dict) else None
-        if not amp_wav:
-            return None
-        return {
-            "id": str(shot.get("shot_id") or ""),
-            "start_s": float(shot.get("start_s") or 0.0),
-            "dur_s": float(shot.get("dur_s") or 0.0),
-            "_wav": str(amp_wav),
-        }
-    except Exception:  # noqa: BLE001 -- profiling collection is never fatal
-        return None
-
-
 def _trace_row_from_shot(request, clip, out_shot, attempts):
     row = {"shot_id": out_shot["shot_id"], "attempts": attempts,
            "final_engine": out_shot["engine_id"]}
@@ -5221,7 +5204,6 @@ def _execute_cloud_shot(shot, ledger, *, request_builder, assets, frame_count,
             "out_shot": out_shot,
             "attempts": attempts,
             "used": used,
-            "amp_row": _amp_row_from_request(shot, request),
         }
 
     if prompt_id:
@@ -5251,11 +5233,6 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
     _episode_host_caps = build_host_caps()
     _episode_profile = build_episode_render_policy(section)
     clips, new_shots, trace = {}, [], []
-    # S-C C1 (audio_motion_profile): per-shot resolved conditioning-WAV rows
-    # (the per-line voice clip OR the read-only master slice) for the post-render
-    # profiling pass. Additive + read-only -- collecting a path NEVER affects the
-    # render; the frozen master is only ever read.
-    amp_rows = []
     # Maximum observed sample, not proof that every beat/window was sampled.
     vram_peak = None
     # Stills-first VRAM discipline (operator 2026-06-12, "evict flux when all
@@ -5486,9 +5463,6 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                     raise RenderError(
                         "cloud fan-out never rendered shot %s" % sid)
                 packed = rendered[sid]
-                amp = packed.get("amp_row")
-                if amp:
-                    amp_rows.append(amp)
                 clip = packed["clip"]
                 out_shot = packed["out_shot"]
                 clips[out_shot["shot_id"]] = clip
@@ -5587,21 +5561,6 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                     request = request_builder(shot, ledger, canvas=canvas)
                 else:
                     request = build_request(shot, assets, frame_count, canvas)
-                # S-C C1: record this shot's resolved conditioning WAV + id/timing so the
-                # post-render pass can stamp a per-beat audio_motion_profile. Best-effort;
-                # a collection hiccup must never perturb the render.
-                try:
-                    _amp_ref = (request.get("audio_ref") or {}) if isinstance(request, dict) else {}
-                    _amp_wav = _amp_ref.get("path") if isinstance(_amp_ref, dict) else None
-                    if _amp_wav:
-                        amp_rows.append({
-                            "id": str(shot.get("shot_id") or ""),
-                            "start_s": float(shot.get("start_s") or 0.0),
-                            "dur_s": float(shot.get("dur_s") or 0.0),
-                            "_wav": str(_amp_wav),
-                        })
-                except Exception:  # noqa: BLE001 -- profiling collection is never fatal
-                    pass
                 # ONE BEAT, however many renders it takes (2026-07-26, chunks 6c/6d).
                 # A shot with no coverage plan or a single-clip one goes straight to
                 # render_shot with the request already built above -- unchanged. A
@@ -5737,8 +5696,7 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
             if isinstance(_r, dict):
                 receipts.append(_r)
     return {"ledger": ledger, "clips": clips, "trace": trace,
-            "vram_peak_mb": vram_peak, "audio_motion_rows": amp_rows,
-            "receipts": receipts}
+            "vram_peak_mb": vram_peak, "receipts": receipts}
 
 
 def _log_if_legacy_render_plan_present(ledger):

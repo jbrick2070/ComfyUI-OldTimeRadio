@@ -414,8 +414,10 @@ def source_document_from_text(
 ) -> "_osd.SourceDocument":
     """Build the transient uncapped document for a public-domain source.
 
-    ``canonical_body`` accepts an already-normalized body so a fetch does not
-    re-run the regexes over a large work; it is verified against ``text``.
+    ``canonical_body`` accepts an already-normalized body; supplied from
+    OUTSIDE this module it is verified against ``text``, which costs one
+    normalization. ``fetch_public_domain_source`` derives the body itself and
+    builds from it directly, so a fetch normalizes the work exactly once.
     """
     return _osd.build_source_document(
         _canonical_body_for(text, canonical_body), source_ref=source_ref)
@@ -430,14 +432,22 @@ def payload_from_manifest_unit(
 ) -> dict[str, str]:
     """Build the legacy source payload for a resolved manifest fixture unit.
 
-    ``canonical_body`` lets a caller that has ALREADY normalized the text pass
-    it in, so a fetch does not run the boilerplate/whitespace regexes twice
-    over a 25,000-word body. Omit it and the body is normalized here.
+    ``canonical_body`` is an already-normalized body; supplied from outside it
+    is verified against ``text`` (one normalization). Omit it and the body is
+    normalized here.
     """
+    return _payload_from_body(
+        resolved, _canonical_body_for(text, canonical_body),
+        excerpt_chars=excerpt_chars)
+
+
+def _payload_from_body(
+    resolved: PublicDomainUnit, body: str, *, excerpt_chars: int = 1200,
+) -> dict[str, str]:
+    """The payload from a body this module derived itself -- no re-check."""
     source = resolved.source
     unit = resolved.unit
-    full_text = _project_to_payload_window(
-        _canonical_body_for(text, canonical_body))
+    full_text = _project_to_payload_window(body)
     excerpt = full_text[:excerpt_chars].rsplit(" ", 1)[0].rstrip() or full_text[:excerpt_chars]
     payload = {
         "headline": f"{source['title']} - {unit['label']}",
@@ -514,20 +524,20 @@ def fetch_public_domain_source(
     # Normalize ONCE: both the payload projection and the document index into
     # the same canonical body, and the regexes are not cheap on a 25,000-word
     # work. One derivation also means the payload can never disagree with the
-    # document's coordinate system.
+    # document's coordinate system. The body is derived on the line below,
+    # from the same text, so it goes to both builders without the re-check
+    # the public entry points run for a body handed in from outside.
     canonical_body = normalize_public_domain_body(text)
 
     return _osp.SourceFetchResult(
-        payload=payload_from_manifest_unit(
-            resolved, text=text, canonical_body=canonical_body),
+        payload=_payload_from_body(resolved, canonical_body),
         source_meta=source_meta_from_unit(resolved, text_path=text_path),
         source_rights=source_rights_from_unit(resolved),
         # Transient: the COMPLETE body, so the pre-outline authors can be
         # grounded in the whole work rather than the payload's 12,000-char
         # prefix. Never serialized -- see SourceFetchResult's contract.
-        source_document=source_document_from_text(
-            text, source_ref=resolved.source_ref,
-            canonical_body=canonical_body),
+        source_document=_osd.build_source_document(
+            canonical_body, source_ref=resolved.source_ref),
     )
 
 

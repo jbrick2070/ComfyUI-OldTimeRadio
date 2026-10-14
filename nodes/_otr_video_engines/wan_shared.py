@@ -32,9 +32,6 @@ try:
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
-_WAN_DEFAULT_NEGATIVE = (
-    "low quality, worst quality, blurry, distorted, watermark, text, static")
-
 
 # --------------------------------------------------------------------------- #
 # M7 silent-clip contract proof (GO_FORWARD 4A) -- ffprobe the emitted mp4 and
@@ -622,5 +619,5 @@ class WanInitImageMixin:
 __all__ = [
     "_parse_fps", "ffprobe_clip_fields", "ffprobe_counted_frames",
     "assemble_beat_segments", "validate_silent_clip_contract",
-    "WanInitImageMixin", "_WAN_DEFAULT_NEGATIVE",
+    "WanInitImageMixin",
 ]
