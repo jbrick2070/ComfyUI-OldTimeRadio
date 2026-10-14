@@ -1032,3 +1032,21 @@ def test_non_bark_announcer_engine_leaves_the_bark_helper_a_no_op():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+def test_a_reroute_without_a_char_id_is_not_turned_into_a_failure():
+    """Sonnet QA r3 on e90f83a8: a rerouted announcer line with a BLANK
+    char_id queued a persistence patch the ledger refuses, so a reroute that
+    used to proceed failed the render. It is rerouted on the wire, not
+    queued."""
+    from nodes.cast_lock import CastLock
+
+    cast = [dict(r) for r in _CHAR_CAST] + [
+        {"char_id": "", "name": "ANNOUNCER", "gender": "male",
+         "voice_preset": "v2/en_speaker_6"}]
+    repaired = []
+    lines = [{"line_id": "b030", "speaker_role": "character", "char_id": "",
+              "text": "Good night."}]
+    CastLock._resolve_character_voices_fail_soft(cast, lines, repaired=repaired)
+    assert lines[0]["speaker_role"] == "announcer"
+    assert repaired == []

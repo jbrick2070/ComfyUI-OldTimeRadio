@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import os
 import random
 import re
@@ -47,9 +48,10 @@ PROMPT_VERSION = "public_domain_interpreter_v4"
 CHARACTER_NAMES_MIN = 1
 CHARACTER_NAMES_MAX = 6
 #: A cast entry longer than this is not a name; it is prose (most likely the
-#: prompt's own instruction copied back). Real entries -- "the Time Traveller",
-#: "Sir Percy Blakeney, the Scarlet Pimpernel" -- sit far below it.
-_CHARACTER_NAME_MAX_CHARS = 60
+#: prompt's own instruction copied back, ~400 chars). Real entries run long
+#: in period fiction -- "Dr. John H. Watson, M.D., late of the Army Medical
+#: Department" is 61 -- so the cap sits well above them (sonnet r3 on 60).
+_CHARACTER_NAME_MAX_CHARS = 100
 SCHEMA_VERSION = "public_domain_briefs_v1"
 
 
@@ -555,7 +557,8 @@ class PublicDomainBriefs(BaseModel):
         A SHAPE filter, not instruction detection: an entry longer than
         _CHARACTER_NAME_MAX_CHARS (prose -- the prompt's own instruction copied
         back would otherwise be seated by lock_cast as a cast member) or with
-        no letter at all ("...", "-") is dropped. A short instruction-like
+        no letter or digit at all ("...", "-") is dropped, with a warning
+        naming it; "007" and "Agent 47" are names. A short instruction-like
         phrase is NOT caught here (codex r2); the prompt's example array no
         longer holds one to copy. Role designations ("the Medical Man") and
         one-person casts are kept. If nothing survives, the validator's floor
@@ -567,7 +570,11 @@ class PublicDomainBriefs(BaseModel):
         for nm in value:
             clean = " ".join(str(nm or "").split()).strip()
             if (len(clean) > _CHARACTER_NAME_MAX_CHARS
-                    or not any(ch.isalpha() for ch in clean)):
+                    or not any(ch.isalnum() for ch in clean)):
+                if clean:
+                    logging.getLogger("OTR").warning(
+                        "[public_domain] dropped a cast entry that is not a "
+                        "name (%d chars): %.80r", len(clean), clean)
                 continue
             key = clean.upper()
             if clean and key not in seen:

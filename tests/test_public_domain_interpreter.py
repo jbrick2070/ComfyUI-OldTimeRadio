@@ -346,3 +346,22 @@ def test_a_one_person_story_is_a_valid_cast():
             "character_names": ["Montresor"]}),
         payload=_sample_payload(), model_id="test-model", max_attempts=1)
     assert brief.character_names == ["Montresor"]
+
+
+@pytest.mark.parametrize("name", [
+    "Dr. John H. Watson, M.D., late of the Army Medical Department",   # 61
+    "007", "47", "Agent 47", "R2-D2",
+], ids=["long_period_name", "digits_007", "digits_47", "agent_47", "r2d2"])
+def test_real_names_the_guard_must_not_drop(name):
+    """Sonnet QA r3 on 3b655fde: a 60-char cap and a letters-only test
+    silently dropped real names; the cast came out one short."""
+    assert _good_briefs(character_names=[name]).character_names == [name]
+
+
+def test_a_dropped_entry_is_warned_not_silent(caplog):
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        kept = _good_briefs(character_names=["x" * 101, "Filby"]).character_names
+    assert kept == ["Filby"]
+    assert any("not a name" in r.getMessage() for r in caplog.records), caplog.text

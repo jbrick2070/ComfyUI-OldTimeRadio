@@ -1332,7 +1332,12 @@ class CastLock:
             is_ann = named_ann or cid in announcer_ids
             if is_ann:
                 ln["speaker_role"] = "announcer"
-                if repaired is not None and str(lid or "").strip():
+                # Only a line with BOTH an id and a char_id can be persisted
+                # (stamp_durable refuses a patch without either); a blank one
+                # is rerouted on the wire and left there, as before (sonnet r3:
+                # queuing it turned a reroute into a failed render).
+                if (repaired is not None and str(lid or "").strip()
+                        and cid.strip()):
                     repaired.append({"line_id": str(lid), "char_id": cid})
                 notes.append(
                     f"line {lid!r} char_id={cid!r}: mis-stamped announcer line "
