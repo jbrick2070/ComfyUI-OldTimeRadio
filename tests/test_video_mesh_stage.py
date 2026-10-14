@@ -457,6 +457,80 @@ def test_render_clip_missing_still_raises():
     assert rd.classify_failure(FileNotFoundError("x")).name == "DEPENDENCY_MISSING"
 
 
+class _StopAfterSpawn(Exception):
+    """Ends a mocked render_clip once the Blender command is built."""
+
+
+def _mesh_render_harness(monkeypatch, tmp_path, cached):
+    """A fresh engine (never the registry's cached instance) whose mesher,
+    Blender, VRAM barrier and self-test are stubbed; counts every portrait
+    digest render_clip takes."""
+    portrait = tmp_path / "portrait.png"
+    portrait.write_bytes(b"portrait-bytes-for-the-digest")
+    blender = tmp_path / "blender.exe"
+    blender.write_bytes(b"")
+    glb = tmp_path / "cache" / "joe.glb"
+    glb.parent.mkdir()
+    if cached:
+        glb.write_bytes(b"glb")
+    seen = {"digests": 0, "keys": [], "generated": []}
+    real_hash = ms.portrait_content_hash
+
+    def _counting_hash(path):
+        seen["digests"] += 1
+        return real_hash(path)
+
+    def _cached_glb(key):
+        seen["keys"].append(key)
+        return str(glb), str(glb) + ".manifest.json"
+
+    def _spawn(cmd):
+        raise _StopAfterSpawn()
+
+    eng = ms.MeshStageEngine()
+    monkeypatch.setattr(ms, "portrait_content_hash", _counting_hash)
+    monkeypatch.setattr(eng, "_still_path", lambda request: str(portrait))
+    monkeypatch.setattr(eng, "_blender_exe", lambda: str(blender))
+    monkeypatch.setattr(eng, "_request_mesh_subject_id", lambda request: "joe")
+    monkeypatch.setattr(eng, "_cached_glb", _cached_glb)
+    monkeypatch.setattr(eng, "_generate_mesh", lambda still, seed, glb_path, manifest:
+                        seen["generated"].append((still, seed, glb_path, manifest)))
+    monkeypatch.setattr(eng, "_vram_barrier", lambda: None)
+    monkeypatch.setattr(eng, "_run_selftest", lambda exe: None)
+    monkeypatch.setattr(eng, "_cache_root", lambda: str(tmp_path / "root"))
+    monkeypatch.setattr(eng, "_spawn_blender", _spawn)
+    req = {"shot_id": "s1", "canvas": {"w": 64, "h": 48, "fps": 25},
+           "timing": {"target_frame_count": 3},
+           "seed_bundle": {"request_seed": 7}}
+    return eng, req, seen, real_hash(str(portrait))
+
+
+def test_a_mesh_cache_miss_hashes_the_portrait_once_for_key_and_manifest(
+        monkeypatch, tmp_path):
+    """Muse video-lane review item 2: the miss path used to stream the same
+    portrait twice. One digest now feeds both, unchanged in shape."""
+    eng, req, seen, sha = _mesh_render_harness(monkeypatch, tmp_path, cached=False)
+    with pytest.raises(_StopAfterSpawn):
+        eng.render_clip(req)
+    assert seen["digests"] == 1
+    assert seen["keys"] == [mesh_cache_key("joe", sha)]
+    (still, seed, _glb, manifest), = seen["generated"]
+    assert seed == 7
+    expected = build_mesh_manifest("joe", sha, 7)
+    assert manifest["source_portrait_sha256"] == sha
+    assert {k: v for k, v in manifest.items() if k != "created_utc"} == \
+        {k: v for k, v in expected.items() if k != "created_utc"}
+
+
+def test_a_mesh_cache_hit_hashes_once_and_never_meshes(monkeypatch, tmp_path):
+    eng, req, seen, sha = _mesh_render_harness(monkeypatch, tmp_path, cached=True)
+    with pytest.raises(_StopAfterSpawn):
+        eng.render_clip(req)
+    assert seen["digests"] == 1
+    assert seen["keys"] == [mesh_cache_key("joe", sha)]
+    assert seen["generated"] == []
+
+
 def test_canonicalize_enforces_directory_contract(tmp_path):
     eng = vreg.get_engine("mesh_stage")
     d = tmp_path / "frames"

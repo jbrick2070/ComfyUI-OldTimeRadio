@@ -852,7 +852,10 @@ class MeshStageEngine(_CheapFamilyBase):
                 "[eng_mesh_stage] LOUD: meshing with subject_id='uncast' -- no "
                 "char_id / mesh_subject_id on the request; the mesh cannot reuse "
                 "per-subject. Investigate the 3D subject policy for this beat.")
-        key = mesh_cache_key(subject_id, portrait_content_hash(still))
+        # ONE read+hash of the portrait: the key and a miss's manifest carry the
+        # same observed digest (it used to be streamed twice on every miss).
+        portrait_sha = portrait_content_hash(still)
+        key = mesh_cache_key(subject_id, portrait_sha)
         glb_path, manifest_path = self._cached_glb(key)
         if os.path.exists(glb_path):
             _LOG.info("[eng_mesh_stage] mesh cache HIT %s (no mesher run)",
@@ -860,8 +863,7 @@ class MeshStageEngine(_CheapFamilyBase):
         else:
             _LOG.info("[eng_mesh_stage] mesh cache MISS %s -- running the "
                       "hy3d-2mv mesher", key)
-            manifest = build_mesh_manifest(subject_id,
-                                           portrait_content_hash(still), seed)
+            manifest = build_mesh_manifest(subject_id, portrait_sha, seed)
             self._generate_mesh(still, seed, glb_path, manifest)
         # E-1: the lease seam -- torch is FULLY reclaimed before Blender.
         self._vram_barrier()
