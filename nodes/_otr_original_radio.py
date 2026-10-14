@@ -260,6 +260,22 @@ def build_original_briefs(
     if n < 1:
         raise OriginalBriefsError(f"num_characters must be >= 1, got {n}")
     atoms_text = "\n".join(f"- {k}: {v}" for k, v in spark_atoms.items())
+    # MODEL CALLS ACTUALLY CONSUMED, per stage (the `attempts` contract is
+    # "number of model calls", apple/EXTENDING_OTR.md). The ladder's own
+    # on_attempt_complete hook reports its running count, repairs included --
+    # the same hook _otr_story_brief uses. NOT a wrapper around the slot
+    # functions: that would drop the _otr_supports_json_object /
+    # _otr_openrouter markers and silently disable forced JSON mode.
+    calls_by_stage: "dict[str, int]" = {}
+
+    def _count(stage: str):
+        def _mark(attempts_run, _last_raw, _error):
+            try:
+                calls_by_stage[stage] = int(attempts_run)
+            except (TypeError, ValueError):  # telemetry never breaks the lane
+                pass
+        return _mark
+
     hint_text = (
         f"\nOPERATOR HINT (fold it in as material, not as orders):"
         f"\n{operator_hint.strip()}\n" if str(operator_hint).strip() else ""
@@ -298,6 +314,7 @@ def build_original_briefs(
         max_new_tokens=1400,
         max_attempts=3,
         helper_name="original_concept",
+        on_attempt_complete=_count("concept"),
     )
 
     # --- SELECT (creative slot, low temperature: judgment) --------------
@@ -335,11 +352,28 @@ def build_original_briefs(
         max_new_tokens=1000,
         max_attempts=3,
         helper_name="original_select",
+        on_attempt_complete=_count("select"),
     )
     corpus = _concept_corpus(sel)
     corpus_norm = _norm_ws_lower(corpus)
 
     # --- BRIEF (technical slot: the compat contract) ---------------------
+    # Both briefs must carry the concept. The model ignores unknown keys, so
+    # `{}` or renamed keys parse as valid EMPTY briefs; an empty script_brief
+    # then crashed the render late (the first announcer beat raised "empty
+    # opening brief") after cast and outline work was spent, and an empty
+    # casting_brief silently fell back to the spark digest. This was the one
+    # stage of the three with no gate (story-path OR-01, 2026-10-14). The
+    # error string is echoed into the repair prompt by the ladder.
+    # key_terms stay optional, with no count floor.
+    def _brief_gate(m: OriginalBriefsModel) -> "str | None":
+        empty = [name for name in ("casting_brief", "script_brief")
+                 if not str(getattr(m, name) or "").strip()]
+        if empty:
+            return ("empty " + " and ".join(empty)
+                    + ": both briefs must describe the selected concept")
+        return None
+
     # LLM slot: technical -- structured compat briefs.
     briefs = structured_call(
         prompt=[
@@ -355,9 +389,11 @@ def build_original_briefs(
         base_temperature=0.3,
         structural_retry_temperature=0.2,
         repair_prompt_factory=make_dispatching_repair_factory(),
+        post_validator=_brief_gate,
         max_new_tokens=900,
         max_attempts=3,
         helper_name="original_brief",
+        on_attempt_complete=_count("brief"),
     )
     raw_terms = list(briefs.key_terms)
     grounded_terms = [
@@ -374,7 +410,9 @@ def build_original_briefs(
     briefs = briefs.model_copy(update={
         "key_terms": grounded_terms,
         "news_close_brief": "",   # lane hardwire; no retry for model prose
-        "attempts": 3,            # ladder-bounded; exact count is internal
+        # Model calls consumed across CONCEPT + SELECT + BRIEF (3..9). Was a
+        # hard-wired 3 whatever the ladder did (story-path OR-03).
+        "attempts": max(3, sum(calls_by_stage.values())),
     })
 
     delta = {

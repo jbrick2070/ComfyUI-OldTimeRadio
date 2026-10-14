@@ -337,6 +337,90 @@ class TestCreativeFront:
         assert len(delta["pitches"]) == 1
         assert delta["selected_concept"]["selected_index"] == 0
 
+    # --- OR-01: an empty brief is repaired in the ladder, never handed on --
+    @staticmethod
+    def _counting(*replies):
+        """A slot that returns replies in order (last repeats), counting
+        calls and keeping every message list it was handed."""
+        seen = []
+        it = iter(replies)
+        last = replies[-1]
+
+        def _fn(messages, **kw):
+            seen.append(messages)
+            return next(it, last)
+        _fn.seen = seen
+        return _fn
+
+    @pytest.mark.parametrize("empty", [
+        "{}",                                              # nothing at all
+        json.dumps({"cast_brief": "x", "plot": "y"}),      # renamed keys
+        json.dumps({"casting_brief": "   ", "script_brief": "\n"}),
+        json.dumps({**json.loads(_BRIEFS_JSON), "script_brief": ""}),
+        json.dumps({**json.loads(_BRIEFS_JSON), "casting_brief": " "}),
+    ], ids=["empty_object", "renamed_keys", "whitespace", "no_script",
+            "no_casting"])
+    def test_an_empty_brief_is_repaired_by_the_ladder(self, empty):
+        tech = self._counting(empty, _BRIEFS_JSON)
+        briefs, _ = ORR.build_original_briefs(
+            spark_atoms={"place": "the lock"},
+            num_characters=2,
+            creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
+            technical_fn=tech,
+            pack=self._pack(),
+        )
+        assert len(tech.seen) == 2
+        assert briefs.casting_brief.strip() and briefs.script_brief.strip()
+        repair = json.dumps(tech.seen[1])
+        assert "empty" in repair and "brief" in repair, (
+            "the gate's reason must reach the repair prompt")
+
+    def test_a_brief_that_stays_empty_fails_loud_in_the_lane(self):
+        tech = self._counting("{}")
+        with pytest.raises(StructuredCallFailedError):
+            ORR.build_original_briefs(
+                spark_atoms={"place": "the lock"},
+                num_characters=2,
+                creative_fn=_seq_fn(_CONCEPT_JSON, _SELECT_JSON),
+                technical_fn=tech,
+                pack=self._pack(),
+            )
+        # Base call + the typed repair. The ladder's same-prompt structural
+        # retry is reserved for broken JSON / capacity errors
+        # (_otr_structured_call ~1027), so a failing content gate costs two.
+        assert len(tech.seen) == 2
+
+    # --- OR-03: `attempts` is the model calls actually consumed -----------
+    def _attempts(self, creative, technical):
+        briefs, _ = ORR.build_original_briefs(
+            spark_atoms={"place": "the lock"},
+            num_characters=2,
+            creative_fn=creative,
+            technical_fn=technical,
+            pack=self._pack(),
+        )
+        return briefs.attempts
+
+    def test_attempts_is_three_on_a_clean_run(self):
+        creative = self._counting(_CONCEPT_JSON, _SELECT_JSON)
+        tech = self._counting(_BRIEFS_JSON)
+        assert self._attempts(creative, tech) == 3
+        assert len(creative.seen) + len(tech.seen) == 3
+
+    @pytest.mark.parametrize("stage", ["concept", "select", "brief"])
+    def test_attempts_counts_a_retry_in_any_stage(self, stage):
+        bad_select = json.dumps({**json.loads(_SELECT_JSON), "selected_index": 9})
+        creative = self._counting(
+            *({"concept": ("not json", _CONCEPT_JSON, _SELECT_JSON),
+               "select": (_CONCEPT_JSON, bad_select, _SELECT_JSON),
+               "brief": (_CONCEPT_JSON, _SELECT_JSON)}[stage]))
+        tech = self._counting(*({"brief": ("{}", _BRIEFS_JSON)}.get(
+            stage, (_BRIEFS_JSON,))))
+        got = self._attempts(creative, tech)
+        assert got == 4
+        assert got == len(creative.seen) + len(tech.seen), (
+            "attempts must equal the calls the fake slots actually served")
+
 
 # ---------------------------------------------------------------------------
 # 5. Interpreter adapter (D.2 shape + D3 restamp)
