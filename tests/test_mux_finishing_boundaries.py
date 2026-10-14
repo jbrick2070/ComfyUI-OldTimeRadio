@@ -213,15 +213,16 @@ def test_a_failed_encode_keeps_the_old_copy_and_only_drops_an_empty_reservation(
 
 
 windows_only = pytest.mark.skipif(
-    os.name != "nt", reason="a sharing violation is a Windows rename failure")
+    os.name != "nt", reason="needs a real Windows file handle")
 
 
 def _held(winerror=32):
-    """A PermissionError carrying a real Windows code (SHARING_VIOLATION)."""
-    return PermissionError(13, "being used by another process", None, winerror)
+    """A PermissionError carrying a Windows hold code, on ANY platform (a
+    subclass attribute, so the retry logic is exercised off Windows too)."""
+    cls = type("_Hold", (PermissionError,), {"winerror": winerror})
+    return cls(13, "being used by another process")
 
 
-@windows_only
 def test_a_replacement_that_fails_never_deletes_the_old_copy(media, obs, monkeypatch):
     """Windows refuses a rename over a file a player holds open. The old copy
     stays; it is never deleted to make room."""
@@ -242,7 +243,6 @@ def test_a_replacement_that_fails_never_deletes_the_old_copy(media, obs, monkeyp
     assert len(tries) == MUX._REPLACE_ATTEMPTS, "a held file is retried, boundedly"
 
 
-@windows_only
 def test_a_briefly_held_candidate_is_retried_not_failed(media, obs, monkeypatch):
     """An antivirus or indexer holding the fresh candidate for a moment must
     not fail the last step of a long render (sonnet QA on 733c2386)."""
@@ -280,7 +280,58 @@ def test_a_permission_error_that_is_not_a_hold_is_tried_once(media, obs, monkeyp
     assert len(tries) == 1
 
 
-@windows_only
+@pytest.mark.parametrize("dest", ["writable_file", "absent"])
+def test_access_denied_on_a_writable_or_absent_destination_is_a_hold(
+        media, obs, monkeypatch, dest):
+    """ACCESS_DENIED (5) is how a real hold often surfaces; it is retried
+    when the destination could take the file (pins 5 in the set)."""
+    final = str(media["av"])
+    dst = obs / MUX._obs_basename(final)
+    if dest == "writable_file":
+        _seed(dst)
+    monkeypatch.setattr(MUX, "_run", _writes(media["av"]))
+    monkeypatch.setattr(MUX, "_REPLACE_WAIT_S", 0.0)
+    tries = []
+
+    def denied(src, target):
+        tries.append(1)
+        raise _held(5)
+    monkeypatch.setattr(MUX.os, "replace", denied)
+    with pytest.raises(OSError, match="could not replace"):
+        MUX.OTRMasterAudioMux()._publish_to_obs(final)
+    assert len(tries) == MUX._REPLACE_ATTEMPTS
+
+
+@pytest.mark.parametrize("dest", ["read_only_file", "directory"])
+def test_access_denied_on_a_read_only_or_directory_destination_is_tried_once(
+        media, obs, monkeypatch, dest):
+    """The same code 5 from a destination that can never take the file is not
+    a hold: one try, no ~1.25 s of retries (sonnet QA on 2c901787)."""
+    import stat
+
+    final = str(media["av"])
+    dst = obs / MUX._obs_basename(final)
+    if dest == "directory":
+        dst.mkdir()
+    else:
+        _seed(dst)
+        os.chmod(dst, stat.S_IREAD)
+    monkeypatch.setattr(MUX, "_run", _writes(media["av"]))
+    tries = []
+
+    def denied(src, target):
+        tries.append(1)
+        raise _held(5)
+    monkeypatch.setattr(MUX.os, "replace", denied)
+    try:
+        with pytest.raises(OSError, match="could not replace"):
+            MUX.OTRMasterAudioMux()._publish_to_obs(final)
+    finally:
+        if dest == "read_only_file":
+            os.chmod(dst, stat.S_IREAD | stat.S_IWRITE)
+    assert len(tries) == 1
+
+
 def test_a_cancel_during_a_held_retry_is_honoured_before_the_next_try(
         media, obs, monkeypatch, caplog):
     """The Cancel poll runs before EVERY try, so a hold never delays a Cancel;
@@ -335,6 +386,85 @@ def test_a_cancel_with_the_candidate_still_held_is_logged_not_silent(
     assert "cancelled before replacing" in caplog.text
     assert "could not remove the cancelled candidate" in caplog.text
     assert dst.read_bytes() == SENTINEL
+
+
+def test_a_failed_removal_after_cancel_is_logged_on_any_platform(
+        media, obs, monkeypatch, caplog):
+    final = str(media["av"])
+    dst = _seed(obs / MUX._obs_basename(final))
+    state = _install_comfy(monkeypatch)
+    copy = _writes(media["av"])
+
+    def encode_then_cancel(argv, **kw):
+        result = copy(argv)
+        state["cancel"] = True
+        return result
+    monkeypatch.setattr(MUX, "_run", encode_then_cancel)
+
+    def held_remove(path, *a, **k):
+        raise _held(32)
+    monkeypatch.setattr(MUX.os, "remove", held_remove)
+    with caplog.at_level("WARNING", logger="OTR"):
+        with pytest.raises(InterruptProcessingException):
+            MUX.OTRMasterAudioMux()._publish_to_obs(final)
+    monkeypatch.undo()
+    assert "could not remove the cancelled candidate" in caplog.text
+    assert dst.read_bytes() == SENTINEL
+
+
+def test_the_alias_refusal_does_not_wait_for_the_ffmpeg_gate(media, tmp_path, monkeypatch):
+    """With no usable ffmpeg the alias is still named, not "ffmpeg not found"
+    (sonnet QA on 2c901787: the order was unpinned)."""
+    silent = tmp_path / "silent.mp4"
+    shutil.copyfile(media["silent"], silent)
+    monkeypatch.setattr(MUX, "_ffmpeg_bin", lambda *a, **k: "")
+    with pytest.raises(ValueError, match="silent video input"):
+        MUX.mux_master_audio(str(silent), str(media["master"]), str(silent))
+
+
+def test_an_encode_that_raises_leaves_no_reservation_or_staging(
+        media, obs, tmp_path, monkeypatch):
+    final = str(media["av"])
+    dst = _seed(obs / MUX._obs_basename(final))
+
+    def timed_out(argv, **kw):
+        raise TimeoutError("ffmpeg hung")
+    monkeypatch.setattr(MUX, "_run", timed_out)
+    with pytest.raises(TimeoutError):
+        MUX.OTRMasterAudioMux()._publish_to_obs(final)
+    assert dst.read_bytes() == SENTINEL
+    assert not (obs / MUX.OBS_STAGING_DIRNAME).exists()
+    out = _seed(tmp_path / "ep" / "ep_final.mkv")
+    with pytest.raises(TimeoutError):
+        MUX.mux_master_audio(str(media["silent"]), str(media["master"]), str(out))
+    assert [p.name for p in out.parent.iterdir()] == [out.name]
+
+
+def test_a_staging_folder_removed_by_a_peer_mid_reservation_is_a_retry(
+        tmp_path, monkeypatch):
+    """A peer's rmdir between our mkdir and our create is a retry, not a
+    failed publish (sonnet QA on 2c901787)."""
+    folder = tmp_path / "obs" / MUX.OBS_STAGING_DIRNAME
+    real_open = os.open
+    raced = {"done": False}
+
+    def racing_open(path, flags, *a):
+        if not raced["done"]:
+            raced["done"] = True
+            os.rmdir(folder)                     # the peer empties and removes it
+            raise FileNotFoundError(2, "the folder vanished")
+        return real_open(path, flags, *a)
+    monkeypatch.setattr(MUX.os, "open", racing_open)
+    got = MUX._reserve_candidate(str(tmp_path / "obs" / "ep_final.mp4"), str(folder))
+    assert raced["done"] and os.path.isfile(got)
+
+
+def test_no_name_fits_creates_no_folder(tmp_path, monkeypatch):
+    folder = tmp_path / "obs" / MUX.OBS_STAGING_DIRNAME
+    monkeypatch.setattr(MUX, "path_fits", lambda path, budget=0: False)
+    with pytest.raises(OSError, match="path budget"):
+        MUX._reserve_candidate(str(tmp_path / "obs" / "ep_final.mp4"), str(folder))
+    assert not folder.exists()
 
 
 def test_a_non_sharing_replace_error_is_not_retried(media, obs, monkeypatch):

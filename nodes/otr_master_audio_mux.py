@@ -427,10 +427,14 @@ def _reserve_candidate(final_path: str, folder: "str | None" = None) -> str:
     Windows will not let ffmpeg open a file this process still holds, and the
     exclusive create is what makes two concurrent invocations unable to share
     one. The longest name form that fits the Windows path budget is used.
-    Raises ``OSError`` -- before anything is written -- when no form fits."""
+    Raises ``OSError`` -- before anything is written, and before the folder
+    is created -- when no form fits.
+
+    The folder is (re)created INSIDE the loop: a peer that has just emptied
+    and removed a shared staging folder between our mkdir and our create is a
+    retry, not a failure (sonnet QA on 2c901787)."""
     ext = os.path.splitext(str(final_path))[1]
     folder = folder or os.path.dirname(os.path.abspath(str(final_path)))
-    os.makedirs(folder, exist_ok=True)
     form = next((f for f in _CANDIDATE_FORMS if path_fits(os.path.join(
         folder, "%s%s%s" % (f[0], "0" * f[1], ext)))), None)
     if form is None:
@@ -439,11 +443,12 @@ def _reserve_candidate(final_path: str, folder: "str | None" = None) -> str:
             "was written" % folder)
     prefix, width = form
     for _ in range(8):
+        os.makedirs(folder, exist_ok=True)
         candidate = os.path.join(
             folder, "%s%s%s" % (prefix, uuid.uuid4().hex[:width], ext))
         try:
             fd = os.open(long_path(candidate), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
+        except (FileExistsError, FileNotFoundError):
             continue
         os.close(fd)
         return candidate
@@ -492,15 +497,32 @@ _REPLACE_ATTEMPTS = 6
 _REPLACE_WAIT_S = 0.25
 
 #: The Windows errors a momentary hold produces: ACCESS_DENIED (a delete-
-#: pending or scanning handle), SHARING_VIOLATION, LOCK_VIOLATION. Anything
-#: else -- and every POSIX error, where a rename does not hit sharing modes --
-#: is not transient and fails at once (sonnet QA on b4a1f00f).
+#: pending or scanning handle, or a destination a player has open),
+#: SHARING_VIOLATION, LOCK_VIOLATION. Anything else -- and every POSIX error,
+#: where a rename does not hit sharing modes -- is not transient and fails at
+#: once (sonnet QA on b4a1f00f).
 _TRANSIENT_REPLACE_WINERRORS = frozenset({5, 32, 33})
 
 
-def _is_transient_hold(exc: BaseException) -> bool:
-    return (isinstance(exc, PermissionError)
-            and getattr(exc, "winerror", None) in _TRANSIENT_REPLACE_WINERRORS)
+def _is_transient_hold(exc: BaseException, final_path: str) -> bool:
+    """Is this rename failure a hold that may clear? ACCESS_DENIED is also
+    what a DIRECTORY or a READ-ONLY destination gives on Windows, and those
+    never clear, so it counts as a hold only when the destination is absent
+    or an existing writable file (sonnet QA on 2c901787 measured 1.26 s of
+    pointless retries there)."""
+    code = getattr(exc, "winerror", None)
+    if not isinstance(exc, PermissionError) or code not in _TRANSIENT_REPLACE_WINERRORS:
+        return False
+    if code == 5:
+        try:
+            target = long_path(str(final_path))
+            if os.path.isdir(target):
+                return False
+            if os.path.exists(target) and not os.access(target, os.W_OK):
+                return False
+        except (OSError, ValueError):
+            return False
+    return True
 
 
 def _same_file_path(a, b) -> bool:
@@ -548,7 +570,7 @@ def _accept_candidate(candidate: str, final_path: str, gate: str) -> None:
             return
         except OSError as exc:
             last = exc
-            if _is_transient_hold(exc) and attempt + 1 < _REPLACE_ATTEMPTS:
+            if _is_transient_hold(exc, final_path) and attempt + 1 < _REPLACE_ATTEMPTS:
                 time.sleep(_REPLACE_WAIT_S)
                 continue
         break
@@ -743,7 +765,11 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
         "V-1: the terminal mux must pass the master audio through with "
         "-c:a copy, never re-encode")
     gate = "OTR_MasterAudioMux archival mux"
-    p = _run(cmd)
+    try:
+        p = _run(cmd)
+    except BaseException:
+        _drop_if_empty(candidate)   # a launch that raised wrote nothing of ours
+        raise
     if p.returncode != 0:
         _reject_candidate(candidate, gate, "ffmpeg mux failed :: %s"
                           % p.stderr.strip()[:300], ValueError)
@@ -1920,9 +1946,10 @@ class OTRMasterAudioMux:
             raise OSError("obs publish: the published name is the archival "
                           "final itself (%s); refusing to replace it" % dst)
         staging = os.path.join(obs_dir, OBS_STAGING_DIRNAME)
-        candidate = _reserve_candidate(dst, staging)
         gate = "obs publish"
+        candidate = None
         try:
+            candidate = _reserve_candidate(dst, staging)
             p = _run([fb, "-y", "-loglevel", "error", "-i", final,
                       "-map", "0:v", "-map", "0:a",
                       "-c:v", "copy", "-c:a", "aac", "-b:a", "320k",
@@ -1971,9 +1998,12 @@ class OTRMasterAudioMux:
 
             _accept_candidate(candidate, dst, gate)
         finally:
-            # The staging folder goes whenever it is EMPTY -- after a publish,
-            # a Cancel or an empty failed reservation; a kept rejected
-            # candidate keeps it. It is never an output.
+            # On every exit -- a raising encode (a timeout) included -- an
+            # EMPTY reservation of this invocation goes, and then the staging
+            # folder goes whenever it is empty. A kept rejected candidate
+            # keeps it. It is never an output.
+            if candidate:
+                _drop_if_empty(candidate)
             try:
                 os.rmdir(staging)
             except OSError:
