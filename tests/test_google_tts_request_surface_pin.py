@@ -13,10 +13,11 @@ serves the old take as if this build had made it.
 ``engine_impl_version`` is the profile's declared "the engine's behaviour
 changed" statement (see ``test_voice_identity_fix``), and it keys the cache.
 This test makes that statement impossible to forget. It drives the REAL
-``generate_voice`` for every supported model and voice, stubbing only the
-shared client's ``post_json`` (no network) and decode, captures the path and
-body it would POST, and fingerprints them. Each impl version owns exactly one
-fingerprint.
+``generate_voice`` for every supported model and voice, with a real-shaped
+delivery vector and a non-zero seed, stubbing only the API-key lookup, the
+shared client's ``post_json`` (no network) and decode. It captures the path
+and body each call would POST and fingerprints them. Each impl version owns
+exactly one fingerprint.
 
 The model and voice ids are folded out of each request, and a voice that is
 rendered the same way on every model is recorded once. Adding a supported
@@ -34,6 +35,10 @@ When this fails:
     field the API now requires, say) -> re-pin the CURRENT version's
     fingerprint and say why in the commit. That edit is visible in review on
     purpose.
+  * The change only adds a NEW model or voice id whose request has its own
+    shape (a newly styled voice, a field only a new model takes) -> re-pin
+    the CURRENT version and say why. New ids key separately, so no cached
+    line goes stale and a version bump would only re-bill the whole cache.
 
 Decode (``_audio_from_response``) is a separate surface and is not pinned here.
 """
@@ -51,12 +56,13 @@ from nodes._otr_google_api import client as GC
 
 #: engine_impl_version -> fingerprint of the request surface it shipped with.
 PINNED_SURFACE = {
-    "1": "e61a9d68500d519a5ac4539b36d4aaa1265bc94d909752c6cc3026484556cf4d",
+    "1": "76f6a929c2eeb65924ea76e7a4f007a8fbe8d744ccb2fd5720d706e19d002a6a",
 }
 
 #: Prepared lines as generate_voice receives them: plain, padded with a stage
-#: tag, the "Say ..." shapes a delivery prefix produces (cased, padded), and a
-#: line that merely starts with the letters "say".
+#: tag, the "Say ..." shapes a delivery prefix produces (cased, padded), lines
+#: that merely start with or contain the letters "say", a long line, digits
+#: and markup characters, and typographic punctuation (escaped: ASCII source).
 _PROBES = (
     "OTR PROBE LINE",
     "  OTR PROBE LINE, with [sighs] a stage tag.  ",
@@ -64,8 +70,19 @@ _PROBES = (
     "say it plainly: OTR PROBE LINE",
     "  Say quietly: OTR PROBE LINE  ",
     "Sayonara, OTR PROBE LINE.",
+    "Say, what's that? OTR PROBE LINE",
+    "I would say OTR PROBE LINE",
+    ("OTR PROBE LINE, " * 400).strip(),
+    "Act 3, scene 2: a < b & c > d, OTR PROBE LINE",
+    "OTR \u2014 it\u2019s a \u201cprobe\u201d line",
 )
 _PLAIN = _PROBES[0]
+
+#: Production calls carry a delivery vector and a per-line seed
+#: (_otr_voice_node_common._forward_one_voice_line); a request that came to
+#: depend on either must show up here, so neither is falsy.
+_DELIVERY = {"angry": 0.9, "calm": 0.1}
+_SEED = 12345
 
 
 def _canon(obj) -> str:
@@ -95,6 +112,11 @@ def _sent_requests(monkeypatch) -> dict:
 
     monkeypatch.setattr(G, "_resolve_api_key", lambda: "otr-test-key")
     monkeypatch.setattr(GC, "post_json", _capture)
+    # _post_interaction imports post_json at call time today; if that import
+    # ever moves to module scope, stub the module's copy too so no test can
+    # reach the network.
+    if hasattr(G, "post_json"):
+        monkeypatch.setattr(G, "post_json", _capture)
     monkeypatch.setattr(G, "_audio_from_response",
                         lambda response: {"waveform": None, "sample_rate": 24000})
     engine = AE.get_engine("google_tts")
@@ -103,7 +125,7 @@ def _sent_requests(monkeypatch) -> dict:
         for voice in G._SUPPORTED_VOICES:
             for probe in _PROBES:
                 del sent[:]
-                engine.generate_voice(probe, voice, None, 0,
+                engine.generate_voice(probe, voice, dict(_DELIVERY), _SEED,
                                       disable_retry=True, resolved_model=model)
                 assert len(sent) == 1, (model, voice, probe, len(sent))
                 # Folding writes these markers; a request that already carries
@@ -138,8 +160,24 @@ def _request_surface(monkeypatch) -> dict:
     return surface
 
 
+def _hash(surface: dict) -> str:
+    return hashlib.sha256(_canon(surface).encode("utf-8")).hexdigest()
+
+
 def _fingerprint(monkeypatch) -> str:
-    return hashlib.sha256(_canon(_request_surface(monkeypatch)).encode("utf-8")).hexdigest()
+    return _hash(_request_surface(monkeypatch))
+
+
+def _summary(surface: dict) -> str:
+    """Per probe: the default request's input and the departing ids -- enough
+    to see which line shape, voice or model a change touched."""
+    rows = []
+    for probe, row in surface.items():
+        body = row["default"].get("body") or {}
+        rows.append("  %-42r -> input %-46r path %r departures %s" % (
+            probe[:40], str(body.get("input", ""))[:44],
+            row["default"].get("path"), sorted(row["departures"]) or "none"))
+    return "\n".join(rows)
 
 
 def _google_impl_versions() -> dict:
@@ -164,18 +202,23 @@ def test_every_google_profile_shares_one_impl_version():
 
 def test_request_surface_matches_the_pin_for_its_impl_version(monkeypatch):
     version = next(iter(_google_impl_versions().values()))
-    actual = _fingerprint(monkeypatch)
+    surface = _request_surface(monkeypatch)
+    actual = _hash(surface)
     assert version in PINNED_SURFACE, (
         f"Google engine_impl_version is {version!r} but no request-surface "
         f"fingerprint is pinned for it. Add {version!r}: {actual!r} "
-        f"to PINNED_SURFACE.")
+        f"to PINNED_SURFACE in {__name__}.")
     assert actual == PINNED_SURFACE[version], (
         "The Google TTS request generate_voice sends changed while "
-        f"engine_impl_version stayed {version!r}. Cached audio would replay "
-        "the old take. Bump engine_impl_version on every google_tts profile "
-        "in config/audio_engine_profiles.yaml and pin the new fingerprint "
-        f"{actual!r}, or, for a transport-only change, re-pin the current "
-        "version and say why in the commit.")
+        f"engine_impl_version stayed {version!r}; cached audio would replay "
+        f"the old take. New fingerprint: {actual!r}. In PINNED_SURFACE in "
+        f"{__name__} (see its docstring), either:\n"
+        "  - the audio changes for existing ids: bump engine_impl_version on "
+        "every google_tts profile in config/audio_engine_profiles.yaml and "
+        "add the new version with this fingerprint;\n"
+        "  - transport-only, or only a NEW model/voice id with its own shape: "
+        "re-pin the current version and say why in the commit.\n"
+        "Current surface:\n" + _summary(surface))
 
 
 def test_the_surface_is_the_real_request_for_every_model_and_voice(monkeypatch):
