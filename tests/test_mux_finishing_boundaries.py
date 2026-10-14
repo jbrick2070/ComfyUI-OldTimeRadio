@@ -332,6 +332,33 @@ def test_a_deep_non_ascii_folder_reserves_and_publishes(media, tmp_path, monkeyp
     assert Path(out).parent == folder and Path(out).is_file()
 
 
+@pytest.mark.parametrize("room,prefix", [(25, "otr_cand_"), (17, "oc_"), (13, "c")])
+def test_a_deep_folder_gets_a_shorter_candidate_not_a_refusal(
+        tmp_path, monkeypatch, room, prefix):
+    """A short operator final (`ep_final.mp4`, 12) can fit where the long
+    candidate (25) would not; refusing there failed a render that used to
+    write (codex QA on 733c2386)."""
+    monkeypatch.setattr(MUX, "path_fits",
+                        lambda path, budget=0: len(os.path.basename(path)) <= room)
+    got = Path(MUX._reserve_candidate(str(tmp_path / "ep_final.mp4")))
+    assert got.name.startswith(prefix) and got.suffix == ".mp4"
+    assert len(got.name) <= room and "_final" not in got.name
+
+
+def test_an_archival_final_inside_obs_stages_its_candidate_out_of_the_listing(
+        media, obs, monkeypatch):
+    """An operator `output_path` may name the watch folder on a cleared
+    episode; a rejected archival candidate must still not appear in it."""
+    out = _seed(obs / "chosen_final.mkv")
+    shas = iter(["a" * 64, "b" * 64])
+    monkeypatch.setattr(MUX, "audio_pcm_sha", lambda path, fb=None: next(shas))
+    with pytest.raises(ValueError, match="NOT byte-identical"):
+        MUX.mux_master_audio(str(media["silent"]), str(media["master"]), str(out))
+    assert out.read_bytes() == SENTINEL
+    assert sorted(p.name for p in obs.iterdir() if p.is_file()) == [out.name]
+    assert len(_staged(obs)) == 1
+
+
 def test_a_candidate_over_the_path_budget_is_refused_before_any_write(
         tmp_path, monkeypatch):
     final = _seed(tmp_path / "ep_final.mp4")

@@ -406,11 +406,14 @@ def _poll_interrupt():
 #: top-level MP4 listing the operator watches.
 OBS_STAGING_DIRNAME = ".otr_staging"
 
-#: A candidate's name: short (shorter than any final it stands in for, so a
-#: final that fits the Windows path budget gives a candidate that fits), with
-#: no ``_final`` marker and no episode words, so nothing that finds finals by
-#: name can mistake it for one.
-_CANDIDATE_PREFIX = "otr_cand_"
+#: A candidate's name, longest form first: no ``_final`` marker and no episode
+#: words, so nothing that finds finals by name can mistake it for one. The
+#: shorter forms exist for a DEEP folder: an operator's short ``output_path``
+#: name (``ep_final.mp4``) can fit the Windows path budget where the long
+#: candidate would not (codex QA on 733c2386), and refusing there would fail a
+#: render that used to write. Each form still carries enough randomness that
+#: the exclusive create, not luck, is what settles a collision.
+_CANDIDATE_FORMS = (("otr_cand_", 12), ("oc_", 10), ("c", 8))
 
 
 def _reserve_candidate(final_path: str, folder: "str | None" = None) -> str:
@@ -422,18 +425,21 @@ def _reserve_candidate(final_path: str, folder: "str | None" = None) -> str:
     what it says. Reserved with ``O_CREAT | O_EXCL`` and closed again at once:
     Windows will not let ffmpeg open a file this process still holds, and the
     exclusive create is what makes two concurrent invocations unable to share
-    one. Raises ``OSError`` -- before anything is written -- when the folder
-    cannot hold it."""
+    one. The longest name form that fits the Windows path budget is used.
+    Raises ``OSError`` -- before anything is written -- when no form fits."""
     ext = os.path.splitext(str(final_path))[1]
     folder = folder or os.path.dirname(os.path.abspath(str(final_path)))
     os.makedirs(folder, exist_ok=True)
+    form = next((f for f in _CANDIDATE_FORMS if path_fits(os.path.join(
+        folder, "%s%s%s" % (f[0], "0" * f[1], ext)))), None)
+    if form is None:
+        raise OSError(
+            "no candidate name fits the Windows path budget in %s; nothing "
+            "was written" % folder)
+    prefix, width = form
     for _ in range(8):
         candidate = os.path.join(
-            folder, "%s%s%s" % (_CANDIDATE_PREFIX, uuid.uuid4().hex[:12], ext))
-        if not path_fits(candidate):
-            raise OSError(
-                "candidate %s exceeds the Windows path budget; nothing was "
-                "written" % candidate)
+            folder, "%s%s%s" % (prefix, uuid.uuid4().hex[:width], ext))
         try:
             fd = os.open(long_path(candidate), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
@@ -441,6 +447,16 @@ def _reserve_candidate(final_path: str, folder: "str | None" = None) -> str:
         os.close(fd)
         return candidate
     raise OSError("could not reserve a unique candidate in %s" % folder)
+
+
+def _candidate_folder(final_path: str) -> "str | None":
+    """Where ``final_path``'s candidate goes: the OBS staging subfolder when
+    the final itself is inside the watch folder (an operator ``output_path``
+    may name one), else beside the final (``None``). A rejected candidate must
+    never appear in the listing he watches (codex QA on 733c2386)."""
+    if _is_inside_obs_dir(final_path):
+        return os.path.join(str(_obs_dir()), OBS_STAGING_DIRNAME)
+    return None
 
 
 def _drop_if_empty(candidate: str) -> None:
@@ -638,7 +654,7 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     # replaced a good final before its own replacement was accepted. The
     # candidate keeps the final's extension, so the container (and the PCM
     # gate above, keyed to `out_path`) is the one the caller asked for.
-    candidate = _reserve_candidate(out_path)
+    candidate = _reserve_candidate(out_path, _candidate_folder(out_path))
     # mux-LAST: copy both streams, NO -shortest.
     cmd = [
         fb, "-y", "-loglevel", "error",
