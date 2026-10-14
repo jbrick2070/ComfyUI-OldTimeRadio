@@ -45,8 +45,7 @@ def out_root(tmp_path, monkeypatch):
 # Helper-contract: every OUTPUT helper lands under otr/{episodes,obs}
 # --------------------------------------------------------------------------- #
 _EPISODE_HELPERS = [
-    P.otr_audio_dir, P.otr_stills_dir, P.otr_portraits_dir,
-    P.otr_videos_dir,
+    P.otr_audio_dir, P.otr_stills_dir,
     # otr_clips_dir was added by the 2026-06-18 durable-clips migration and
     # never pinned here -- so the one tier created BY the every-asset-under-
     # its-episode directive was the one tier this contract did not cover.

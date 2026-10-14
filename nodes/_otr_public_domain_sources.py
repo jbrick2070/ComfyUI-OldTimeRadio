@@ -11,17 +11,11 @@ import json
 import os
 import random
 import re
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
 from pydantic import BaseModel, Field, field_validator
-
-try:
-    from ._otr_shared import env as otr_env
-except ImportError:  # pragma: no cover -- flat test imports
-    from _otr_shared import env as otr_env  # type: ignore
 
 try:
     from . import _otr_source_payload as _osp
@@ -378,69 +372,6 @@ def _project_to_payload_window(body: str, *, max_chars: int = 12000) -> str:
     return body
 
 
-def canonicalize_public_domain_text(text: Any, *, max_chars: int = 12000) -> str:
-    """Legacy payload projection: the canonical body, capped at ``max_chars``.
-
-    Kept for the seven-key ``full_text`` contract, which predates the source
-    document and cannot hold a 25,000-word body. Callers that need the WHOLE
-    work must use ``normalize_public_domain_body`` (or the SourceDocument
-    built from it) -- this one returns a prefix by design.
-    """
-    return _project_to_payload_window(
-        normalize_public_domain_body(text), max_chars=max_chars)
-
-
-def _canonical_body_for(text: Any, canonical_body: str | None) -> str:
-    """Return the canonical body, PROVING a supplied one derives from ``text``.
-
-    The normalize-once optimization hands the same body to the payload
-    projection and to the document. Accepting it on trust would let a caller
-    pair a payload with a document built from different material -- offsets
-    would index into a body the episode never used. Cheap insurance: verify.
-    """
-    derived = normalize_public_domain_body(text)
-    if canonical_body is None:
-        return derived
-    if canonical_body != derived:
-        raise PublicDomainSourceRefError(
-            "supplied canonical_body does not match the normalization of "
-            "text; the payload and the source document would disagree"
-        )
-    return canonical_body
-
-
-def source_document_from_text(
-    text: Any, *, source_ref: str = "", canonical_body: str | None = None,
-) -> "_osd.SourceDocument":
-    """Build the transient uncapped document for a public-domain source.
-
-    ``canonical_body`` accepts an already-normalized body; supplied from
-    OUTSIDE this module it is verified against ``text``, which costs one
-    normalization. ``fetch_public_domain_source`` derives the body itself and
-    builds from it directly, so a fetch normalizes the work exactly once.
-    """
-    return _osd.build_source_document(
-        _canonical_body_for(text, canonical_body), source_ref=source_ref)
-
-
-def payload_from_manifest_unit(
-    resolved: PublicDomainUnit,
-    *,
-    text: str,
-    excerpt_chars: int = 1200,
-    canonical_body: str | None = None,
-) -> dict[str, str]:
-    """Build the legacy source payload for a resolved manifest fixture unit.
-
-    ``canonical_body`` is an already-normalized body; supplied from outside it
-    is verified against ``text`` (one normalization). Omit it and the body is
-    normalized here.
-    """
-    return _payload_from_body(
-        resolved, _canonical_body_for(text, canonical_body),
-        excerpt_chars=excerpt_chars)
-
-
 def _payload_from_body(
     resolved: PublicDomainUnit, body: str, *, excerpt_chars: int = 1200,
 ) -> dict[str, str]:
@@ -769,38 +700,6 @@ def build_public_domain_briefs(
     return brief
 
 
-def source_bank_cache_root() -> Path:
-    """Resolve the public source-bank cache root without creating it."""
-    env = otr_env.get("OTR_SOURCE_BANK_CACHE_DIR", "").strip()
-    if env:
-        return Path(env).expanduser()
-    try:
-        from ._otr_paths import otr_shared_cache_dir
-    except ImportError:  # pragma: no cover -- flat import harnesses
-        from nodes._otr_paths import otr_shared_cache_dir  # type: ignore
-    return otr_shared_cache_dir() / "source_banks"
-
-
-def atomic_write_json(path: str | os.PathLike[str], data: Any) -> Path:
-    """Atomically write JSON to ``path`` using a same-directory temp file."""
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix=f".{p.name}.", suffix=".tmp", dir=str(p.parent))
-    tmp = Path(tmp_name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
-            json.dump(data, f, ensure_ascii=False, sort_keys=True, indent=2)
-            f.write("\n")
-        os.replace(tmp, p)
-    except Exception:
-        try:
-            tmp.unlink()
-        except OSError:
-            pass
-        raise
-    return p
-
-
 __all__ = [
     "MANIFEST_SCHEMA_VERSION",
     "PROMPT_VERSION",
@@ -811,14 +710,10 @@ __all__ = [
     "PublicDomainSourceRefError",
     "PublicDomainUnit",
     "SCHEMA_VERSION",
-    "atomic_write_json",
     "build_public_domain_briefs",
-    "canonicalize_public_domain_text",
     "fetch_public_domain_source",
     "load_public_domain_manifest",
-    "payload_from_manifest_unit",
     "resolve_manifest_unit",
-    "source_bank_cache_root",
     "source_meta_from_unit",
     "source_rights_from_unit",
     "validate_public_domain_manifest",

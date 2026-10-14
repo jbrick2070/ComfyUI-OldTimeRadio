@@ -162,14 +162,16 @@ def test_text_canonicalizer_strips_gutenberg_boilerplate_and_limits():
     *** END OF THE PROJECT GUTENBERG EBOOK THE TIME MACHINE ***
     License tail.
     """
-    assert pd.canonicalize_public_domain_text(raw, max_chars=80) == "First line. Second line."
+    assert pd._project_to_payload_window(
+        pd.normalize_public_domain_body(raw), max_chars=80) == "First line. Second line."
 
 
 def test_payload_from_manifest_unit_has_exact_legacy_keys():
     resolved = pd.resolve_manifest_unit(_manifest(), "gutenberg-time-machine-sample:arrival")
-    payload = pd.payload_from_manifest_unit(
+    payload = pd._payload_from_body(
         resolved,
-        text="The machine stood in the room. The witnesses doubted him.",
+        pd.normalize_public_domain_body(
+            "The machine stood in the room. The witnesses doubted him."),
     )
     assert set(payload) == osp.SOURCE_PAYLOAD_KEYS
     assert payload["headline"] == "The Time Machine - The impossible arrival"
@@ -183,7 +185,7 @@ def test_sidecars_are_separate_from_payload():
     meta = pd.source_meta_from_unit(resolved)
     assert rights["license_status"] == "public_domain_us"
     assert meta["source_ref"] == resolved.source_ref
-    payload = pd.payload_from_manifest_unit(resolved, text="A compact excerpt.")
+    payload = pd._payload_from_body(resolved, "A compact excerpt.")
     assert "source_rights" not in payload
     assert "source_meta" not in payload
 
@@ -258,22 +260,6 @@ def test_fetch_public_domain_source_missing_defaults_fail_loud(
     )
     with pytest.raises(pd.PublicDomainSourceRefError, match="source_ref"):
         pd.fetch_public_domain_source(bank=bank)
-
-
-def test_cache_root_env_override(monkeypatch, tmp_path):
-    monkeypatch.setenv("OTR_SOURCE_BANK_CACHE_DIR", str(tmp_path / "cache"))
-    assert pd.source_bank_cache_root() == tmp_path / "cache"
-
-
-def test_atomic_write_json_replaces_existing_file(tmp_path):
-    target = tmp_path / "cache" / "manifest.json"
-    pd.atomic_write_json(target, {"version": 1})
-    pd.atomic_write_json(target, {"version": 2, "items": ["a"]})
-    assert json.loads(target.read_text(encoding="utf-8")) == {
-        "items": ["a"],
-        "version": 2,
-    }
-    assert not list(target.parent.glob("*.tmp"))
 
 
 #: The child program that proves the import is lazy. It runs in a SEPARATE
@@ -412,8 +398,8 @@ def test_a_fetch_normalizes_the_work_once(sample_manifest_path, monkeypatch):
     assert result.source_document.canonical_body == real(SAMPLE_TEXT)
 
 
-def test_the_fetch_builds_what_the_public_builders_build(sample_manifest_path):
-    """Skipping the re-check changes the cost, never the result."""
+def test_the_fetch_builds_payload_and_document_from_one_normalized_body(sample_manifest_path):
+    """Normalizing once changes the cost, never the result."""
     from types import SimpleNamespace
 
     ref = "gutenberg-time-machine-sample:arrival"
@@ -425,7 +411,7 @@ def test_the_fetch_builds_what_the_public_builders_build(sample_manifest_path):
     result = pd.fetch_public_domain_source(bank=bank)
     resolved = pd.resolve_manifest_unit(
         pd.load_public_domain_manifest(sample_manifest_path), ref)
-    assert result.payload == pd.payload_from_manifest_unit(
-        resolved, text=SAMPLE_TEXT)
-    doc = pd.source_document_from_text(SAMPLE_TEXT, source_ref=ref)
-    assert result.source_document.canonical_body == doc.canonical_body
+    body = pd.normalize_public_domain_body(SAMPLE_TEXT)
+    assert result.payload == pd._payload_from_body(resolved, body)
+    assert result.source_document.canonical_body == body
+    assert result.source_document.source_ref == ref

@@ -21,7 +21,7 @@ CORPUS = REPO_ROOT / "config" / "source_banks" / "public_domain_story" / "source
 
 
 # ---------------------------------------------------------------------------
-# normalization split: the owner is uncapped, the legacy projection is not
+# normalization split: the owner is uncapped, the payload projection is not
 # ---------------------------------------------------------------------------
 
 def test_normalize_public_domain_body_does_not_truncate():
@@ -31,16 +31,16 @@ def test_normalize_public_domain_body_does_not_truncate():
     assert out.split()[:3] == ["word", "word", "word"]
 
 
-def test_canonicalize_still_caps_for_the_legacy_payload():
+def test_projection_still_caps_for_the_legacy_payload():
     body = "word " * 8000
-    out = pd.canonicalize_public_domain_text(body)
+    out = pd._project_to_payload_window(pd.normalize_public_domain_body(body))
     assert len(out) <= pd.INTERPRETER_TEXT_WINDOW
 
 
 def test_projection_is_a_prefix_of_the_owner():
     body = "alpha beta gamma delta " * 900
     full = pd.normalize_public_domain_body(body)
-    capped = pd.canonicalize_public_domain_text(body)
+    capped = pd._project_to_payload_window(full)
     assert full.startswith(capped)
 
 
@@ -63,22 +63,8 @@ def test_legacy_parity_at_max_chars_zero_still_raises():
     # max_chars=0 raised. Splitting normalization out moved that check; it is
     # restored, because a silent empty body is worse than a loud refusal.
     with pytest.raises(pd.PublicDomainSourceRefError):
-        pd.canonicalize_public_domain_text("hello world", max_chars=0)
-
-
-def test_a_supplied_canonical_body_must_match_the_text():
-    # The normalize-once optimization must not let a caller pair a payload
-    # with a document built from different material.
-    with pytest.raises(pd.PublicDomainSourceRefError):
-        pd.source_document_from_text(
-            "the real source text", canonical_body="something else entirely")
-
-
-def test_a_matching_supplied_canonical_body_is_accepted():
-    text = "  The traveller   returned.  "
-    body = pd.normalize_public_domain_body(text)
-    doc = pd.source_document_from_text(text, canonical_body=body)
-    assert doc.canonical_body == body
+        pd._project_to_payload_window(
+            pd.normalize_public_domain_body("hello world"), max_chars=0)
 
 
 def test_normalization_is_idempotent():

@@ -391,14 +391,6 @@ def confine_to_output_tree(value, field: str, *, roots=None) -> str:
         % (field, resolved, ", ".join(str(p) for p in permitted) or "none"))
 
 
-def confine_to_output_tree_paths(**named) -> None:
-    """:func:`confine_to_output_tree` for several inputs at once, for its refusal
-    only -- the caller keeps using its own values. Mirrors
-    :func:`reject_remote_paths`, and like it belongs at a node's EXECUTE METHOD."""
-    for field, value in named.items():
-        confine_to_output_tree(value, field)
-
-
 def _validate_episode_id(episode_id: str) -> str:
     """A production write helper's ``episode_id`` must be a non-empty
     single path component and not the reserved system tier. RAISES
@@ -528,27 +520,6 @@ def otr_stills_dir(episode_id: str = "") -> Path:
     return _validate_contract(otr_episodes_root() / eid / "stills")
 
 
-def otr_portraits_dir(episode_id: str = "") -> Path:
-    """Per-episode PASS1 character portrait dir:
-    ``<output>/otr/episodes/<episode_id>/portraits/``.
-    An empty/invalid ``episode_id`` RAISES LOUD (OH-1).
-    """
-    eid = _validate_episode_id(episode_id)
-    return _validate_contract(otr_episodes_root() / eid / "portraits")
-
-
-def otr_videos_dir(episode_id: str) -> Path:
-    """Per-episode per-line HuMo + LTX clip dir:
-    ``<output>/otr/episodes/<episode_id>/videos/``.
-
-    Holds the per-line piece clips: ``l002.mp4`` (HuMo character),
-    ``music_opening_001.mp4`` (LTX music), ``l001.mp4`` (LTX announcer),
-    etc. VideoComposite reads these and assembles the final composite.
-    """
-    eid = _validate_episode_id(episode_id)
-    return _validate_contract(otr_episodes_root() / eid / "videos")
-
-
 def otr_clips_dir(episode_id: str) -> Path:
     """Per-episode DURABLE per-beat motion-clip dir:
     ``<output>/otr/episodes/<episode_id>/clips/``.
@@ -675,15 +646,12 @@ __all__ = [
     "reject_remote_paths",
     "is_remote_path",
     "confine_to_output_tree",
-    "confine_to_output_tree_paths",
     "is_reserved_episode_entry",
     "otr_shared_root",
     "otr_shared_cache_dir",
     "otr_shared_tmp_dir",
     "otr_audio_dir",
     "otr_stills_dir",
-    "otr_portraits_dir",
-    "otr_videos_dir",
     "otr_clips_dir",
     "otr_obs_dir",
     "otr_state_dir",

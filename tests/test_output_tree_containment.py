@@ -116,7 +116,6 @@ class TestConfineToOutputTree:
 
     def test_it_is_exported(self):
         assert "confine_to_output_tree" in P.__all__
-        assert "confine_to_output_tree_paths" in P.__all__
 
 
 # --------------------------------------------------------------------------
