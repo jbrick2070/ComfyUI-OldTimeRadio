@@ -1906,3 +1906,22 @@ the live version.
 - **Checked:** pack loads 22 nodes, every module imports, nothing dangles, no new pyflakes undefined name,
   collection 16984 -> 16954 with no new error; the touched and neighbouring test files pass. The full suite was
   still running at push; its failure set is diffed against the 165 known container failures in the next note.
+
+## 2026-10-14 -- every gallery card says which machine and lane it is (cloud session)
+
+- **Operator:** the square image beside each workflow should say in big letters what is unique about it
+  ("NVIDIA 8 GB", "MAC ... LTX VIDEO"), Mac and AMD easy to call out, a different background per hardware class,
+  and the OLD TIME RADIO title smaller ("people already made the decision to download it").
+- **What ships:** 27 cards, all different. A small OLD TIME RADIO banner cut from the operator's art on top;
+  below it a field in the class colour (NVIDIA green, Mac silver, AMD red, Comfy Cloud blue, Google yellow, any
+  machine purple) lettered with the hardware in the biggest type, then the tier, then the video lane, plus the act
+  count on the cloud cards.
+- **How:** `scripts/gallery_thumbs.py` derives the words from the matrix row (vendor, size in the id,
+  `character_visual` engine), so there is no second list of graph names; a new lane or vendor with no words fails
+  `--check` by name. Each JPEG carries its words, the layout version and the art's hash in a comment, and
+  `--check` compares that comment instead of bytes, because another Pillow build on the other box encodes the same
+  picture differently. `--all` redraws only a stale card (a second run wrote 0 of 27). The font is Inter Display
+  Black under the SIL OFL (`assets/fonts/`, with the licence); assets/ and scripts/ do not ship, the cards do.
+  The old single `assets/otr_gallery_thumb.jpg` is deleted.
+- **Checked:** `build_variants --check` 25 variants, 0 failures; 28 test files touching the gallery or
+  build_variants, 830 passed, no new failure. Not yet seen in a live ComfyUI gallery or on the registry page.

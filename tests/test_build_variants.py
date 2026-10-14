@@ -292,6 +292,14 @@ def test_validator_runs_cpu_snapshot_on_a_gpu_server(
     assert "stamp OK" in msg
 
 
+def _card_jpeg(card, master_path):
+    """The smallest JPEG `--check` accepts for `card`: its comment segment.
+    --check reads the words, never the pixels."""
+    comment = bv._cards.comment_for(card, master_path.read_bytes()).encode()
+    return (b"\xff\xd8\xff\xfe" + (len(comment) + 2).to_bytes(2, "big")
+            + comment + b"\xff\xd9")
+
+
 # ---------------------------------------------------------------------------
 # --check mode
 # ---------------------------------------------------------------------------
@@ -303,14 +311,15 @@ def test_check_still_checks_the_canonical_thumbnail_with_no_variants(
     passed. An empty variants folder must still fail on it."""
     empty = tmp_path / "workflows"
     empty.mkdir()
-    master = tmp_path / "otr_gallery_thumb.jpg"
-    master.write_bytes(b"\xff\xd8 gallery art \xff\xd9")
+    master = tmp_path / "otr_gallery_thumb_master.webp"
+    master.write_bytes(b"gallery art")
     monkeypatch.setattr(bv, "VARIANTS_DIR", empty)
-    monkeypatch.setattr(bv, "GALLERY_THUMB", master)
+    monkeypatch.setattr(bv, "GALLERY_MASTER", master)
     assert bv.cmd_check() == 1
-    (empty / (bv.CANONICAL.stem + ".jpg")).write_bytes(master.read_bytes())
-    # The advanced app (plan 0e) ships beside the canonical, with its own art.
-    (empty / "otr_app.jpg").write_bytes(master.read_bytes())
+    (empty / (bv.CANONICAL.stem + ".jpg")).write_bytes(
+        _card_jpeg(bv._cards.CANONICAL_CARD, master))
+    # The advanced app (plan 0e) ships beside the canonical, with its own card.
+    (empty / "otr_app.jpg").write_bytes(_card_jpeg(bv._cards.APP_CARD, master))
     assert bv.cmd_check() == 0
 
 
@@ -331,27 +340,34 @@ def test_check_detects_variant_drift(tmp_path, monkeypatch, canonical,
     # or hand-edited one is drift like any variant.
     app = vdir / "otr_app.json"
     app.write_text(bv._dump(bv.build_app(canonical)), encoding="utf-8")
-    # The gallery thumbnail: one copy beside the canonical and each variant,
-    # byte-identical to the master (2026-09-25).
-    master = tmp_path / "otr_gallery_thumb.jpg"
-    master.write_bytes(b"\xff\xd8 gallery art \xff\xd9")
-    monkeypatch.setattr(bv, "GALLERY_THUMB", master)
+    # The gallery cards: one beside the canonical and each variant, each
+    # carrying the words derived for its graph (2026-10-14).
+    master = tmp_path / "otr_gallery_thumb_master.webp"
+    master.write_bytes(b"gallery art")
+    monkeypatch.setattr(bv, "GALLERY_MASTER", master)
     for target in bv._thumbnail_targets():
-        target.write_bytes(master.read_bytes())
+        target.write_bytes(_card_jpeg(bv._card_for(target), master))
     assert bv.cmd_check() == 0
 
-    # A missing, stale or orphaned gallery thumbnail each fail the check.
+    # A missing, stale, mislabelled or orphaned gallery card each fail.
     thumb = vdir / "otr_cloud_low.jpg"
+    good = thumb.read_bytes()
     thumb.unlink()
     assert bv.cmd_check() == 1
     thumb.write_bytes(b"an older picture")
     assert bv.cmd_check() == 1
-    thumb.write_bytes(master.read_bytes())
+    thumb.write_bytes(_card_jpeg(bv._cards.CANONICAL_CARD, master))
+    assert bv.cmd_check() == 1
+    thumb.write_bytes(good)
     orphan = vdir / "otr_retired_graph.jpg"
-    orphan.write_bytes(master.read_bytes())
+    orphan.write_bytes(good)
     assert bv.cmd_check() == 1
     orphan.unlink()
     assert bv.cmd_check() == 0
+    # New art makes every card stale.
+    master.write_bytes(b"new gallery art")
+    assert bv.cmd_check() == 1
+    master.write_bytes(b"gallery art")
 
     good_app = app.read_text(encoding="utf-8")
     app.write_text(good_app.replace('"linearMode":true', '"linearMode":false'),

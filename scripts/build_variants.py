@@ -50,6 +50,8 @@ from nodes._otr_workflow_apply import (  # noqa: E402
     NOTE_NODE_TYPES, apply_profile, build_offline_schemas,
     load_widget_mapping, patch_widget_by_name, semantic_master_hash,
 )
+sys.path.insert(0, str(REPO / "scripts"))
+import gallery_thumbs as _cards  # noqa: E402
 
 CANONICAL = REPO / "workflows" / "otr_canonical.json"
 #: THE VARIANTS LIVE BESIDE THE CANONICAL, IN workflows/ ITSELF (operator,
@@ -260,14 +262,16 @@ def build_app(canonical=None) -> dict:
 #: with the rest of the docs, and `--check` fails if a `.launch.md` comes
 #: back into workflows/.
 LAUNCH_RECIPES = REPO / "apple" / "LAUNCH_RECIPES.md"
-#: THE GALLERY THUMBNAIL (2026-09-25). ComfyUI's template gallery builds each
-#: custom-pack card with `mediaSubtype: "jpg"` hardcoded and requests
+#: THE GALLERY CARDS (2026-09-25; one card per graph since 2026-10-14).
+#: ComfyUI's template gallery builds each custom-pack card with
+#: `mediaSubtype: "jpg"` hardcoded and requests
 #: /api/workflow_templates/<pack>/<stem>.jpg, so every shipped graph needs its
-#: own same-stem JPEG or its card is blank. One image, the operator's own art
-#: (assets/otr_gallery_thumb_master.webp, reduced to this 400x400 JPEG), is
-#: copied beside every graph; `--check` fails on a missing, stale or orphaned
-#: copy. assets/ does not ship; the copies in workflows/ do.
-GALLERY_THUMB = REPO / "assets" / "otr_gallery_thumb.jpg"
+#: own same-stem JPEG or its card is blank. Each graph gets its own card,
+#: lettered with its hardware and video lane (scripts/gallery_thumbs.py, from
+#: the operator's art in assets/otr_gallery_thumb_master.webp); `--check`
+#: fails on a missing, stale, look-alike or orphaned card. assets/ does not
+#: ship; the cards in workflows/ do.
+GALLERY_MASTER = _cards.MASTER_ART
 
 #: THE SHIPPING SET, DERIVED FROM THE MATRIX (2026-09-24). The rows in
 #: `config/workflow_matrix.json` that say `ships` are the only configs that emit a
@@ -596,29 +600,56 @@ def _thumbnail_targets() -> list[Path]:
             + [path.with_suffix(".jpg") for path in _committed_variant_paths()])
 
 
+def _card_for(target: Path):
+    """The gallery card a `<stem>.jpg` must carry."""
+    if target.stem == CANONICAL.stem:
+        return _cards.CANONICAL_CARD
+    if target.stem == _app_path().stem:
+        return _cards.APP_CARD
+    return _cards.card_for_profile(load_profile(target.stem))
+
+
 def _write_thumbnails() -> None:
-    data = GALLERY_THUMB.read_bytes()
-    for target in _thumbnail_targets():
-        target.write_bytes(data)
-    print(f"WROTE {len(_thumbnail_targets())} gallery thumbnails")
+    """Draw each graph's card, skipping any whose comment is already current:
+    a redraw on a machine with another Pillow build changes bytes, not words."""
+    master = GALLERY_MASTER.read_bytes()
+    targets = _thumbnail_targets()
+    drawn = 0
+    for target in targets:
+        card = _card_for(target)
+        want = _cards.comment_for(card, master)
+        if target.is_file() and _cards.jpeg_comment(target.read_bytes()) == want:
+            continue
+        target.write_bytes(_cards.render(card, master, want))
+        drawn += 1
+    print(f"WROTE {drawn} of {len(targets)} gallery cards")
 
 
 def _thumbnail_failures() -> list[str]:
-    if not GALLERY_THUMB.is_file():
-        return [f"{GALLERY_THUMB.name}: the gallery thumbnail master is missing"]
-    master = GALLERY_THUMB.read_bytes()
+    if not GALLERY_MASTER.is_file():
+        return [f"{GALLERY_MASTER.name}: the gallery art master is missing"]
+    master = GALLERY_MASTER.read_bytes()
     failures = []
     targets = _thumbnail_targets()
+    seen = {}
     for target in targets:
+        try:
+            card = _card_for(target)
+        except ValueError as e:
+            failures.append(f"{target.name}: {e}")
+            continue
+        if card in seen:
+            failures.append(f"{target.name}: gallery card says the same as "
+                            f"{seen[card]} (give its lane or extra new words)")
+        seen.setdefault(card, target.name)
         if not target.is_file():
-            failures.append(f"{target.name}: gallery thumbnail missing (run --all)")
-        elif target.read_bytes() != master:
-            failures.append(f"{target.name}: gallery thumbnail differs from "
-                            f"{GALLERY_THUMB.name} (run --all)")
+            failures.append(f"{target.name}: gallery card missing (run --all)")
+        elif _cards.jpeg_comment(target.read_bytes()) != _cards.comment_for(card, master):
+            failures.append(f"{target.name}: gallery card is stale (run --all)")
     wanted = {t.name for t in targets}
     for stray in sorted(VARIANTS_DIR.glob("*.jpg")):
         if stray.name not in wanted:
-            failures.append(f"{stray.name}: a gallery thumbnail with no graph "
+            failures.append(f"{stray.name}: a gallery card with no graph "
                             "of that name (delete it)")
     return failures
 

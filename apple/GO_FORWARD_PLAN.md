@@ -789,8 +789,10 @@ order:
    Google workflow's bar is wanted there.
 3. `requires-comfyui` in `[tool.comfy]`, set to the oldest core that runs
    the canonical workflow -- measured, never guessed; too high blocks installs.
-4. DONE: `build_variants.py --all` writes a gallery thumbnail beside the
-   canonical and every workflow, and `--check` fails on a missing one. The
+4. DONE: `build_variants.py --all` writes a gallery card beside the
+   canonical and every workflow -- since 2026-10-14 each its own, lettered
+   with its hardware and video lane (`scripts/gallery_thumbs.py`) -- and
+   `--check` fails on a missing, stale or look-alike one. The
    audit's "rename to example_workflows/" half is rejected (Fable's call,
    OTR_STANDING_RULINGS 2026-09-25: `workflows/` stays).
 5. Maybe: a GitHub Actions job running the CPU suite on push/PR (torch
