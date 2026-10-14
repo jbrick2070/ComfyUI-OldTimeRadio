@@ -1436,10 +1436,9 @@ def _check_nvenc(ffmpeg_path):
     fails a render; anything unexpected is CPU (operator rule, 2026-10-14).
     """
     if not ffmpeg_path:
-        if "" not in _NVENC_ANNOUNCED:
-            _NVENC_ANNOUNCED.add("")
-            log.info("[Video] Encoder: CPU libx264 (ffmpeg path unknown)")
+        _announce_encoder("", "[Video] Encoder: CPU libx264 (ffmpeg path unknown)")
         return False
+    verdict = False
     try:
         try:
             from ._otr_shared.encode_sink import has_nvenc as _has_nvenc
@@ -1447,15 +1446,28 @@ def _check_nvenc(ffmpeg_path):
             from _otr_shared.encode_sink import has_nvenc as _has_nvenc  # type: ignore
         verdict = bool(_has_nvenc(ffmpeg_path))
     except Exception as exc:  # noqa: BLE001 -- a probe must never be fatal.
-        log.warning("[Video] nvenc probe failed (%s: %s); using CPU libx264",
-                    type(exc).__name__, exc)
+        _announce_encoder(("probe-error", type(exc).__name__),
+                          "[Video] nvenc probe failed (%s); using CPU libx264"
+                          % type(exc).__name__)
         verdict = False
-    key = (os.path.normcase(os.path.abspath(str(ffmpeg_path))), verdict)
-    if key not in _NVENC_ANNOUNCED:
-        _NVENC_ANNOUNCED.add(key)
-        log.info("[Video] Encoder: %s",
-                 "NVIDIA h264_nvenc" if verdict else "CPU libx264")
+    try:
+        key = (os.path.normcase(os.path.abspath(str(ffmpeg_path))), verdict)
+    except Exception:  # noqa: BLE001 -- an unprintable path still encodes
+        key = ("<unprintable ffmpeg path>", verdict)
+    _announce_encoder(key, "[Video] Encoder: %s"
+                      % ("NVIDIA h264_nvenc" if verdict else "CPU libx264"))
     return verdict
+
+
+def _announce_encoder(key, message):
+    """Log ``message`` once per ``key``. Never raises: it runs on the encode
+    path, and a broken log handler must not change the encoder choice."""
+    try:
+        if key not in _NVENC_ANNOUNCED:
+            _NVENC_ANNOUNCED.add(key)
+            log.info(message)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 

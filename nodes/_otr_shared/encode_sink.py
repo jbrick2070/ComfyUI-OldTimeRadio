@@ -48,24 +48,33 @@ _NVENC_RETRY_MAX_S = 1800.0
 #: on an 8 GB card, VRAM can stay full of model weights for a whole video phase.
 _NVENC_MAX_TIMEOUTS = 3
 
-#: Session-open refusals that depend on the MOMENT, not the machine, matched on
-#: the OpenEncodeSessionEx line only so an unrelated allocation failure
-#: elsewhere in stderr is not mistaken for one:
-#:   * "incompatible client key (21)" -- the GeForce CONCURRENT-SESSION CAP on
-#:     current drivers. MEASURED on MRKT (RTX 4060 Laptop, driver 617.42,
-#:     ffmpeg 9.0, 2026-10-14): twelve
-#:     live h264_nvenc encodes ran, and the thirteenth session was refused with
+#: Refusals that depend on the MOMENT, not the machine:
+#:   * "OpenEncodeSessionEx failed: incompatible client key (21)" -- the
+#:     GeForce CONCURRENT-SESSION CAP on current drivers. MEASURED on MRKT (RTX
+#:     4060 Laptop, driver 617.42, ffmpeg 9.0, 2026-10-14): twelve live
+#:     h264_nvenc encodes ran, and the thirteenth session was refused with
 #:     exactly this. NVIDIA's header calls it a licensing refusal, and the r1
 #:     review dropped it on that reading; the hardware says otherwise.
-#:   * "out of memory (10)" -- the same cap on older drivers, or VRAM truly
-#:     exhausted. (A probe with 48 MB of VRAM free still ENCODED on MRKT, so
-#:     model weights alone do not trigger it on that Windows driver.)
-#:   * "encoder busy" -- NV_ENC_ERR_ENCODER_BUSY.
-#: If one of these is permanent on some box, each retry is a sub-second refusal
-#: on a doubling cooldown -- noise, not a slowdown.
+#:   * "OpenEncodeSessionEx failed: encoder busy" -- NV_ENC_ERR_ENCODER_BUSY.
+#:   * MEMORY EXHAUSTION ANYWHERE in the probe -- "out of memory" (the same cap
+#:     on older drivers, NVENC surface allocation, VRAM), CUDA_ERROR_OUT_OF_
+#:     MEMORY, "Cannot allocate memory" (the host). Memory pressure passes. A
+#:     probe with 48 MB of VRAM free still ENCODED on MRKT, so model weights
+#:     alone rarely trip this; when something does, it clears.
+#: The costs are lopsided (codex r2): read a permanent refusal as passing and a
+#: box pays a sub-second refusal per cooldown; read a passing one as permanent
+#: and it loses NVENC until the server restarts. So doubt leans to "passing".
 _TRANSIENT_REFUSAL = re.compile(
-    r"OpenEncodeSessionEx failed: "
-    r"(incompatible client key|out of memory|encoder busy)", re.IGNORECASE)
+    r"OpenEncodeSessionEx failed: (incompatible client key|encoder busy)"
+    r"|out of memory|cannot allocate memory|CUDA_ERROR_OUT_OF_MEMORY",
+    re.IGNORECASE)
+
+#: A spawn that fails because the binary is not there, not runnable, or not a
+#: file will fail the same way forever. Any other OSError at spawn -- no memory,
+#: too many open files, WinError 1455 (paging file too small) on an 8 GB
+#: laptop -- is the moment, and is re-probed like a refusal (sonnet QA r2).
+_SPAWN_FINAL = (FileNotFoundError, NotADirectoryError, IsADirectoryError,
+                PermissionError)
 
 _TIMEOUT = "timeout"
 _REFUSED = "refused"
@@ -132,7 +141,20 @@ def has_nvenc(ffmpeg: str) -> bool:
     moment-dependent session refusal answers False for THIS call -- the
     caller encodes on libx264 as always -- and is re-probed after a cooldown;
     see ``_classify``. NVENC is an accelerator here, never a requirement.
+
+    NEVER RAISES (operator rule, 2026-10-14: no probe may fail a workflow --
+    only a true OOM in real work may). Anything unexpected answers False and
+    the caller encodes on libx264.
     """
+    try:
+        return _decide(ffmpeg)
+    except Exception as exc:  # noqa: BLE001 -- no probe may fail a workflow.
+        _log(logging.WARNING, "[OTR nvenc] probe bookkeeping failed (%s: %s); "
+             "CPU libx264 for this encode", type(exc).__name__, exc)
+        return False
+
+
+def _decide(ffmpeg) -> bool:
     if not ffmpeg:
         return False
     # A BARE name would key the cache on <cwd>/ffmpeg and probe whatever
@@ -150,8 +172,15 @@ def has_nvenc(ffmpeg: str) -> bool:
         settled = _settled(key)
         if settled is not None:
             return settled
+        reprobe = isinstance(_NVENC_PROBE.get(key), _Pending)
         key_lock = _NVENC_KEY_LOCKS.setdefault(key, threading.Lock())
-    with key_lock:
+    # A FIRST probe is waited for: every caller wants the real answer. A
+    # RE-probe is not: the answer is already "CPU for now", so a caller that
+    # finds one running encodes on libx264 at once instead of stalling up to
+    # twenty seconds behind it (sonnet QA r2).
+    if not key_lock.acquire(blocking=not reprobe):
+        return False
+    try:
         # A racing caller may have probed while this one waited for the lock.
         with _NVENC_PROBE_LOCK:
             settled = _settled(key)
@@ -161,6 +190,17 @@ def has_nvenc(ffmpeg: str) -> bool:
         outcome = _probe(ffmpeg)
         with _NVENC_PROBE_LOCK:
             return _record(key, ffmpeg, pending, outcome)
+    finally:
+        key_lock.release()
+
+
+def _log(level: int, msg: str, *args) -> None:
+    """Best-effort logging: a broken handler must not turn a decided probe
+    into an exception on the encode path."""
+    try:
+        log.log(level, msg, *args)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _settled(key: str):
@@ -191,16 +231,23 @@ def _probe(ffmpeg: str):
         )
     except otr_proc.TimeoutExpired:
         return _TIMEOUT
+    except _SPAWN_FINAL:
+        return False
+    except OSError:
+        return _REFUSED
     except Exception:  # noqa: BLE001 -- a probe must never be fatal.
         return False
-    if out.returncode == 0:
-        return True
-    return _classify(str(getattr(out, "stderr", "") or ""))
+    try:
+        if out.returncode == 0:
+            return True
+        return _classify(str(getattr(out, "stderr", "") or ""))
+    except Exception:  # noqa: BLE001 -- a malformed result is a final "no".
+        return False
 
 
 def _classify(stderr: str):
-    """A nonzero probe: ``_REFUSED`` when the session refusal can clear by
-    waiting, else FINAL False."""
+    """A nonzero probe: ``_REFUSED`` when the refusal can clear by waiting,
+    else FINAL False."""
     return _REFUSED if _TRANSIENT_REFUSAL.search(stderr) else False
 
 
@@ -210,27 +257,27 @@ def _record(key: str, ffmpeg: str, pending, outcome) -> bool:
     if isinstance(outcome, bool):
         _NVENC_PROBE[key] = outcome
         if isinstance(pending, _Pending):
-            log.info("[OTR nvenc] %s: h264_nvenc %s after %d inconclusive "
-                     "probe(s)", ffmpeg,
-                     "available" if outcome else "refused for good",
-                     pending.attempts)
+            _log(logging.INFO, "[OTR nvenc] %s: h264_nvenc %s after %d "
+                 "inconclusive probe(s)", ffmpeg,
+                 "available" if outcome else "refused for good",
+                 pending.attempts)
         return outcome
     attempts = (pending.attempts if isinstance(pending, _Pending) else 0) + 1
     timeouts = (pending.timeouts if isinstance(pending, _Pending) else 0)
     timeouts += 1 if outcome == _TIMEOUT else 0
     reason = ("timed out" if outcome == _TIMEOUT
-              else "session refused for now (VRAM, session cap or busy)")
+              else "refused for now (session cap, busy or memory)")
     if timeouts >= _NVENC_MAX_TIMEOUTS:
         _NVENC_PROBE[key] = False
-        log.warning("[OTR nvenc] %s: probe %s; %d timeouts, so CPU libx264 for "
-                    "the rest of this process", ffmpeg, reason, timeouts)
+        _log(logging.WARNING, "[OTR nvenc] %s: probe %s; %d timeouts, so CPU "
+             "libx264 for the rest of this process", ffmpeg, reason, timeouts)
         return False
     # The exponent is capped: refusals are uncapped, and 2 ** 1024 overflows a
     # float -- a probe must never be the thing that fails a workflow.
     wait = min(_NVENC_RETRY_MAX_S,
                _NVENC_RETRY_FIRST_S * 2 ** min(attempts - 1, 16))
     _NVENC_PROBE[key] = _Pending(attempts, timeouts, _now() + wait)
-    log.warning("[OTR nvenc] %s: probe %s; CPU libx264 for now, re-probing in "
-                "%d s (inconclusive probe %d)", ffmpeg, reason, int(wait),
-                attempts)
+    _log(logging.WARNING, "[OTR nvenc] %s: probe %s; CPU libx264 for now, "
+         "re-probing in %d s (inconclusive probe %d)", ffmpeg, reason,
+         int(wait), attempts)
     return False
