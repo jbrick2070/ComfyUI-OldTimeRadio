@@ -85,6 +85,17 @@ def _timeout():
     return subprocess.TimeoutExpired(cmd="ffmpeg", timeout=20)
 
 
+def _win(code, msg, err=22):
+    """An OSError carrying Windows error ``code`` on EVERY platform. The
+    4-argument constructor sets ``winerror`` only on Windows (and there picks
+    the matching subclass from the mapped errno); elsewhere it is set by hand,
+    so these cases also run on the Mac and Linux boxes."""
+    exc = OSError(err, msg, None, code)
+    if getattr(exc, "winerror", None) != code:
+        exc.winerror = code
+    return exc
+
+
 # --------------------------------------------------------------------------- #
 # Inconclusive -> CPU now, recover later
 # --------------------------------------------------------------------------- #
@@ -118,8 +129,9 @@ def test_a_refusal_that_can_clear_recovers(monkeypatch, clock, stderr):
 @pytest.mark.parametrize("exc", [
     OSError(12, "Cannot allocate memory"),
     OSError(24, "Too many open files"),
-    OSError(22, "The paging file is too small", None, 1455),
-], ids=["enomem", "emfile", "winerror_1455"])
+    _win(1455, "The paging file is too small"),
+    _win(32, "used by another process", err=13),    # sharing violation (AV scan)
+], ids=["enomem", "emfile", "winerror_1455", "winerror_32_sharing"])
 def test_a_spawn_that_fails_for_the_moment_recovers(monkeypatch, clock, exc):
     calls = _script(monkeypatch, [exc, 0])
     assert es.has_nvenc(BIN) is False
@@ -154,10 +166,11 @@ def test_a_refusal_that_waiting_cannot_change_is_probed_once(monkeypatch, clock,
     NotADirectoryError(20, "Not a directory"),
     es.otr_proc.ExecutableNotAllowed("not an allowed executable"),
     OSError(es.errno.ENOEXEC, "Exec format error"),
-    OSError(22, "is not a valid Win32 application", None, 193),
-    OSError(22, "requires elevation", None, 740),
+    _win(193, "is not a valid Win32 application"),
+    _win(216, "not compatible with the version of Windows"),   # renamed non-exe
+    _win(740, "requires elevation"),
 ], ids=["missing", "denied", "not_a_dir", "not_allowed", "enoexec",
-        "winerror_193", "winerror_740"])
+        "winerror_193", "winerror_216", "winerror_740"])
 def test_a_binary_that_cannot_run_is_final(monkeypatch, clock, exc):
     calls = _script(monkeypatch, [exc, 0])
     assert es.has_nvenc(BIN) is False
@@ -383,6 +396,34 @@ def test_losing_the_reprobe_race_takes_the_winners_final_answer(monkeypatch, clo
     es._NVENC_KEY_LOCKS[key] = WinnerFinishesNow()
     monkeypatch.setattr(es.otr_proc, "run", lambda *a, **k: pytest.fail("spawned"))
     assert es.has_nvenc(BIN) is True
+
+
+def test_no_log_line_is_written_while_the_shared_lock_is_held(monkeypatch, clock):
+    """A slow or re-entrant handler must never run under _NVENC_PROBE_LOCK,
+    or it would stall (or deadlock) every other binary's cached answer."""
+    held = []
+
+    class Watch(logging.Handler):
+        def emit(self, record):
+            held.append(es._NVENC_PROBE_LOCK.locked())
+
+    handler, previous = Watch(), es.log.level
+    es.log.addHandler(handler)
+    es.log.setLevel(logging.INFO)
+    try:
+        _script(monkeypatch, [_timeout(), _timeout(), _timeout()])
+        for _ in range(es._NVENC_MAX_TIMEOUTS):            # pending..., then cap
+            es.has_nvenc(BIN)
+            clock.t += es._NVENC_RETRY_MAX_S + 1
+        _script(monkeypatch, [(1, OOM), 0])
+        es.has_nvenc(OTHER)                                 # pending
+        clock.t += es._NVENC_RETRY_FIRST_S + 1
+        es.has_nvenc(OTHER)                                 # recovery INFO
+    finally:
+        es.log.removeHandler(handler)
+        es.log.setLevel(previous)
+    assert len(held) >= es._NVENC_MAX_TIMEOUTS + 2, held
+    assert not any(held), "a log line ran while the shared lock was held"
 
 
 def test_a_broken_log_handler_cannot_change_the_answer(monkeypatch, clock):

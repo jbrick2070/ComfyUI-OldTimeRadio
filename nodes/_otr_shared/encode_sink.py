@@ -81,9 +81,15 @@ _SPAWN_FINAL = (FileNotFoundError, NotADirectoryError, IsADirectoryError,
                 PermissionError)
 _SPAWN_FINAL_ERRNO = frozenset({errno.ENOEXEC})
 _SPAWN_FINAL_WINERROR = frozenset({193, 216, 740})
+#: Windows reports a sharing violation (32: another process -- typically an
+#: antivirus scan -- holds ffmpeg.exe) as a PermissionError, but it passes in
+#: seconds; it is the moment, not the machine (sonnet r4).
+_SPAWN_PASSING_WINERROR = frozenset({32})
 
 
 def _spawn_is_final(exc: OSError) -> bool:
+    if getattr(exc, "winerror", None) in _SPAWN_PASSING_WINERROR:
+        return False
     return (isinstance(exc, _SPAWN_FINAL)
             or getattr(exc, "errno", None) in _SPAWN_FINAL_ERRNO
             or getattr(exc, "winerror", None) in _SPAWN_FINAL_WINERROR)
