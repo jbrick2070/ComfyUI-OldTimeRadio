@@ -1417,7 +1417,7 @@ def _find_ffmpeg():
     return resolve_ffmpeg()
 
 
-_NVENC_ANNOUNCED: set = set()  # binaries whose verdict was already logged
+_NVENC_ANNOUNCED: set = set()  # (binary, verdict) pairs already logged
 
 def _check_nvenc(ffmpeg_path):
     """Can h264_nvenc ENCODE with this ffmpeg -- the pack's ONE owner's answer.
@@ -1429,6 +1429,11 @@ def _check_nvenc(ffmpeg_path):
     consulting the owner's per-binary key, so this function delegates every
     call; only the log line is de-duplicated. Safe when ffmpeg_path is None
     (returns False).
+
+    The log is de-duplicated per (binary, verdict), not per binary: since
+    VF-01 an inconclusive probe answers CPU now and can recover to NVENC
+    later, and that switch must be announced. NEVER RAISES -- a probe never
+    fails a render; anything unexpected is CPU (operator rule, 2026-10-14).
     """
     if not ffmpeg_path:
         if "" not in _NVENC_ANNOUNCED:
@@ -1436,11 +1441,16 @@ def _check_nvenc(ffmpeg_path):
             log.info("[Video] Encoder: CPU libx264 (ffmpeg path unknown)")
         return False
     try:
-        from ._otr_shared.encode_sink import has_nvenc as _has_nvenc
-    except ImportError:  # pragma: no cover -- flat-import test harnesses
-        from _otr_shared.encode_sink import has_nvenc as _has_nvenc  # type: ignore
-    verdict = bool(_has_nvenc(ffmpeg_path))
-    key = os.path.normcase(os.path.abspath(str(ffmpeg_path)))
+        try:
+            from ._otr_shared.encode_sink import has_nvenc as _has_nvenc
+        except ImportError:  # pragma: no cover -- flat-import test harnesses
+            from _otr_shared.encode_sink import has_nvenc as _has_nvenc  # type: ignore
+        verdict = bool(_has_nvenc(ffmpeg_path))
+    except Exception as exc:  # noqa: BLE001 -- a probe must never be fatal.
+        log.warning("[Video] nvenc probe failed (%s: %s); using CPU libx264",
+                    type(exc).__name__, exc)
+        verdict = False
+    key = (os.path.normcase(os.path.abspath(str(ffmpeg_path))), verdict)
     if key not in _NVENC_ANNOUNCED:
         _NVENC_ANNOUNCED.add(key)
         log.info("[Video] Encoder: %s",
