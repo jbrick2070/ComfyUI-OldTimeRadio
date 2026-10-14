@@ -18,7 +18,11 @@ Seam guards folded in (PASS-IMG MUST/SHOULD-FIX):
 * CONTENT-ADDRESSED cache so a re-gen (changed prompt/seed/engine) yields a new
   key -> new pixels -> new ``portrait_content_hash`` -> new file, and B's mesh
   cache (keyed on that hash) invalidates correctly.
-* FRESH-mode hard cap = ``min(fresh_cap, beat_budget)`` -- never over-generate.
+* The still count follows the beat budget. ``fresh_cap`` rides along on the
+  image policy and is RECORDED here, but nothing in this module applies it as a
+  cap (docs review, 2026-10-14: the old "min(fresh_cap, beat_budget)" line
+  described a limiter that does not exist; only the cloud cost estimate reads
+  the value).
 * image generation is the only GPU step; it is injected on the CPU test path, so
   this node's cache/ledger/gate logic is fully unit-tested without a GPU.
 

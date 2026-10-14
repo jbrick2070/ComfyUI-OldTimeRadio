@@ -160,9 +160,12 @@ class OTRImageDirector:
                 "fresh_cap": ("INT", {
                     "default": DEFAULT_FRESH_CAP, "min": 1, "max": 512,
                     "tooltip": (
-                        "Ceiling on FRESH (per_beat) renders per episode; the "
-                        "dispatcher additionally hard-caps to the audio-derived "
-                        "beat budget (never over-generate)."
+                        "Recorded on the image policy and used by the cloud "
+                        "cost estimate before a paid run: the estimate assumes "
+                        "this many stills per image role, never fewer than the "
+                        "default. It does NOT limit how many stills render -- "
+                        "the still count follows the episode's beats "
+                        "(docs review, 2026-10-14)."
                     ),
                 }),
                 "seed_mode": (list(SEED_MODES), {

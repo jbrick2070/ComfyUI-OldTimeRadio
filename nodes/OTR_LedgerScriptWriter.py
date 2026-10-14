@@ -2859,18 +2859,16 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 "enable_production_stage3_validators": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
-                        "OFF (default) preserves PD1 byte-identity on the "
-                        "legacy path -- no validators run. ON wires Stage 3 "
-                        "validators (speaker-leak, banned-phrase, length, "
-                        "pronoun, on-beat) into the production compose_line "
-                        "for every character dialogue beat. TELEMETRY ONLY: "
-                        "findings are stamped on "
-                        "meta.lines[].validation_findings and NOTHING is "
-                        "regenerated, rerolled or rejected -- an audit may "
-                        "never fail a story for length, language, style or "
-                        "quality. Costs no extra LLM call at any severity. "
-                        "Flip ON for production smokes; OFF for the "
-                        "byte-identity regression run."
+                        "OFF (default): no validator runs. ON: a narrow "
+                        "telemetry check on character lines written by the "
+                        "per-line composer (lines the grouped exchange pass "
+                        "wrote skip it). It flags only an empty spoken line "
+                        "or one decorated with transport/speaker markup -- "
+                        "the old pronoun, length, style and content checks "
+                        "are retired. Findings are saved under "
+                        "meta.stage3_findings_per_beat; NOTHING is "
+                        "regenerated, rerolled or rejected, and it costs no "
+                        "extra LLM call. A diagnostic, not a story control."
                     ),
                 }),
                 # Sprint 2.2 (2026-05-28) -- Jeffrey 2026-05-27

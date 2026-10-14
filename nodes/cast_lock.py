@@ -535,12 +535,16 @@ class CastLock:
                     ),
                 }),
                 "allow_voice_reuse": ("BOOLEAN", {
-                    # Matches the shipped graph. Off means a cast larger than
-                    # the bank stops the render rather than doubling a voice.
+                    # Matches the shipped graph. Off ASKS for distinct voices;
+                    # thin language rows and the same-gender fallback still
+                    # reuse one rather than stop (docs review, 2026-10-14).
                     "default": True,
                     "tooltip": (
                         "Let two characters share a voice when the bank runs "
-                        "out of distinct ones. Off stops the render instead."
+                        "out of distinct ones. Off asks for a distinct voice "
+                        "per character wherever the bank has them; a language "
+                        "with only a few voices, or keeping a character's "
+                        "gender right, can still reuse one rather than stop."
                     ),
                 }),
                 "char_voice_engine": (list(_CHAR_VOICE_ENGINES), {

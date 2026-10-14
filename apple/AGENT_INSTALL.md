@@ -64,10 +64,14 @@ The Python version decides the voice backend, and this is not a preference:
   3.13). Repair lines if an install lost them:
   `<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set` and
   `<ComfyUI Python> -m pip install fugashi jaconv unidic-lite`.
-* **3.14** -> **no kokoro backend is packaged yet.** The pack still installs;
-  an English user can switch the voice controls to Bark. Non-English episodes
-  are unavailable because day-one multilingual rows admit Kokoro only. Say so
-  plainly rather than letting them hit it at render time.
+* **3.14** -> **no Kokoro backend is packaged yet**, and provisioning refuses
+  a Kokoro selection there. The pack still installs; an English user can
+  switch the voice controls to Bark, which is local. Kokoro is the only LOCAL
+  voice the non-English languages admit, so a non-English episode has no
+  local voice on 3.14. Every language also admits the hosted voices (Google
+  TTS, ElevenLabs); those need their own account and key, and a full
+  non-English episode on 3.14 through them has not been run. Say so plainly rather than
+  letting the user hit it at render time.
 
 For a multilingual install, also read [MULTILINGUAL.md](MULTILINGUAL.md);
 Japanese and Mandarin have language-specific readiness extras that are not an
@@ -165,8 +169,9 @@ nothing: every dropdown already holds a working value.
 `act_count` on **OTR_LedgerScriptWriter** already ships at `1` in
 `otr_canonical`, which is the shortest proof. Leave it alone.
 
-The first run downloads about 12 GB -- the writer, the music model and its text
-encoder, and the Kokoro voices. Later runs skip it.
+The first run downloads several GB -- the writer, the music model and its text
+encoder, and the Kokoro voices; [INSTALL.md](INSTALL.md#weights-what-you-do-not-have-to-do)
+lists what `otr_canonical` selects. Later runs skip it.
 
 ### Prove it -- and this is the only proof that counts
 
@@ -176,12 +181,15 @@ The finish line is a finished `.mp4` in:
 <ComfyUI output folder>/otr/obs/
 ```
 
-Not the console, not a green node, not the absence of errors. Read the
-`obs_publish` line before concluding anything: `obs_publish OK -> <path>` names
-the real destination, and `obs_publish BLOCKED -- ...` means the run SUCCEEDED
-with the episode in `otr/episodes/<episode>/` and only the published copy
-withheld. **No `obs_publish` line at all means the run did not finish**, however
-clean the log looked.
+Not the console, not a green node, not the absence of errors. Read the run's
+final status and the `obs_publish` line before concluding anything; they answer
+different questions. `obs_publish OK -> <path>` names the real destination.
+`obs_publish BLOCKED -- ...` means the published copy was withheld (the rights
+receipt did not clear) and the archival final is in `otr/episodes/<episode>/`;
+it does not by itself say the run succeeded -- a My Story episode that had to
+be published fails right after it. **No `obs_publish` line at all means the run
+did not finish**, however clean the log looked. [RUN.md](RUN.md#find-it) has
+the full reading.
 
 Report the absolute path you verified and the filename you found.
 

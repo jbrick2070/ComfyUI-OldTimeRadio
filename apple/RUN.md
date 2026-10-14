@@ -23,7 +23,8 @@ machine (`otr_8gb_still`, `otr_16gb_video`, `otr_mac16_low`, ...).
 
 ## Press Run
 
-The first run downloads about 12 GB (see [INSTALL.md](INSTALL.md#weights-what-you-do-not-have-to-do)) and
+The first run downloads several GB of models (what, and where it lands:
+[INSTALL.md](INSTALL.md#weights-what-you-do-not-have-to-do)) and
 then writes, casts, performs, scores and cuts an episode. Later runs skip the
 download.
 
@@ -44,12 +45,27 @@ That is where a finished episode lands — the `.mp4`, with its audio mixed,
 captions burned and credits rolled. The working files for each run live one level
 up in `otr/episodes/<episode>/` if you want the stems.
 
-**If nothing is in `otr/obs/`, read the `obs_publish` line before concluding
-anything.** `obs_publish BLOCKED -- ...` means the run SUCCEEDED and the
-episode is in `otr/episodes/<episode>/`; only the published copy was
-withheld, because the rights receipt did not clear. No `obs_publish` line at
-all means the run did not finish, however green the console
-looked.
+**If nothing is in `otr/obs/`, read the end of the console before concluding
+anything.** Two different questions have two different answers there:
+
+- **Did the run finish?** ComfyUI's own result says so: a failed run ends in
+  an error that names the node that stopped it
+  (`!!! Exception during processing !!!` in the console, a red node on the
+  canvas). Read that, not the absence of an error you were expecting.
+- **Was a copy published?** The `obs_publish` line says so.
+  `obs_publish OK -> <path>` names the published file.
+  `obs_publish BLOCKED -- ...` means the published copy was withheld because
+  the episode's rights receipt did not clear; the archival final stays in
+  `otr/episodes/<episode>/`.
+
+BLOCKED on its own is not a verdict on the run. For most banks a withheld
+copy is still a finished run. A story that **had to be published** -- one
+the listener wrote in My Story -- fails the run right after that line
+(`DeliveryContractError`), with the archival final kept. No `obs_publish`
+line at all means the run stopped before publishing, however green the
+console looked. And a Cancel pressed in the last seconds can stop the run
+AFTER the published copy landed: the file in `otr/obs/` is then complete
+even though the run reports cancelled.
 
 ---
 
@@ -183,6 +199,8 @@ wheel supplies only one of them.
 **Captions are blank boxes on Linux.** Install a monospace TTF.
 
 **It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line
-first -- see above. `BLOCKED` means it succeeded and withheld only the published
-copy. No `obs_publish` line at all is a real failure: read the console from the
-end backwards for the first error.
+first -- see [Find it](#find-it). `BLOCKED` withheld only the published copy and
+kept the archival final in `otr/episodes/<episode>/`; whether the run itself
+succeeded is the run's own final status (a My Story episode that had to be
+published fails there). No `obs_publish` line at all is a real failure: read
+the console from the end backwards for the first error.

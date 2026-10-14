@@ -33,8 +33,9 @@ class BatchCharacterVoices(OTRVoiceNodeBase):
         "Synthesizes spoken dialogue for all dramatic characters in the script using "
         "voice assignments from the production ledger. Dispatches character lines to "
         "the chosen speech engine and packs the resulting audio into a batch for "
-        "sequencing. Change the engine dropdown to select IndexTTS2, Chatterbox, "
-        "Bark, Kokoro, or cloud voice models, or connect execution gates."
+        "sequencing. The engine is chosen on OTR_CastLock (char_voice_engine), which "
+        "casts every voice before this node runs -- IndexTTS2, Chatterbox, Bark, "
+        "Kokoro or a cloud voice."
     )
 
     ROLE = "char_voice"

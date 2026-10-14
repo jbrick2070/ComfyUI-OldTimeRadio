@@ -170,14 +170,21 @@ is ready before you ever press Run -- a few hundred MB on Python 3.13, where
 it also brings the ONNX model. If the console pauses on `[OldTimeRadio]` lines
 during a restart, that is what it is doing.
 
-What comes down on that first run is about **12 GB**:
+What `otr_canonical` selects, and so what its first run fetches -- the file
+sizes the pack pins, not a measured transfer (a cache you already have, a
+partial download or a second copy all change what actually moves):
 
-| What | Size | From |
+| What | File size | From |
 |---|---|---|
-| The writer — `Qwen/Qwen3.5-4B` | ~8.7 GB | Hugging Face, ungated |
+| The writer — native Gemma 4 E2B (`comfy_native:gemma4-e2b-it-int8-convrot`) | ~4.8 GiB | `Comfy-Org/gemma-4`, ungated |
 | Music — Stable Audio 3 checkpoint | 2.11 GiB | `Comfy-Org/stable-audio-3` |
 | Music — its text encoder | 1.11 GiB | `Comfy-Org/stable-audio-3` |
-| Voices — Kokoro | a few hundred MB | with the Python package |
+| Voices — Kokoro | a few hundred MB | fetched at startup |
+
+Other workflows select other writers, and the writer is the biggest single
+file: the 16 GB and 24 GB graphs use native Gemma 4 12B (11.2 GB), the Mac and
+AMD graphs use `Qwen/Qwen3.5-4B` (8.7 GB), and the cloud graphs download no
+writer at all. [WRITERS.md](WRITERS.md) has every writer and what it costs.
 
 The canonical's procedural video lanes draw their own frames
 and consume no still image -- so the image model its dropdowns name stays
@@ -203,22 +210,31 @@ That stores a token in your Hugging Face config. **Do not paste a token into a
 workflow widget** — no node here asks for one, and a token saved in a
 workflow travels with it.
 
-**Everything lands inside your ComfyUI models tree**, not in your home
-directory, in two places:
+**Where it lands depends on what kind of file it is.** Four mechanisms, each
+resolved through ComfyUI's registered folders, so an `extra_model_paths.yaml`
+entry can put any of them on another drive:
 
-- **The writer** (`Qwen/Qwen3.5-4B` on most workflows, ~8.7 GB) goes to
-  `models/LLM/Qwen--Qwen3.5-4B/` as ordinary files -- a normal ComfyUI model
-  folder, relocatable with an `LLM:` entry in `extra_model_paths.yaml`. No
-  symlinks, so Windows never asks for Developer Mode. If you already have the
-  writer in the Hugging Face cache from an earlier version, it stays there and
-  keeps working; nothing is moved or downloaded twice.
-- **The rest** (the music model and its text encoder) goes to the Hugging Face
-  cache: if `HF_HOME` is unset, this pack points it at
-  `ComfyUI/models/huggingface` during startup.
+- **ComfyUI-native weights** go in ComfyUI's own model categories, like any
+  other ComfyUI model. The native Gemma writer is one file in `text_encoders`;
+  Stable Audio 3 is a file in `checkpoints` plus its text encoder in
+  `text_encoders`.
+- **Other writers** (Qwen and the rest of the transformers rows) download as
+  ordinary files to `LLM/<org>--<name>/` under your LLM folder -- relocatable
+  with an `LLM:` entry. No symlinks, so Windows never asks for Developer Mode.
+  A complete copy already in the Hugging Face cache from an earlier version
+  stays there and keeps working; nothing is moved or fetched twice.
+- **Kokoro** has explicit folders: its model and voices go to `TTS/KokoroTTS/`
+  under your models folder, not into the Hugging Face cache.
+- **Everything a library fetches for itself** goes to the Hugging Face cache.
+  A location you set yourself (`HF_HOME`, or `HF_HUB_CACHE`) always wins.
+  Otherwise the pack points it during startup at a `huggingface` folder beside
+  your ComfyUI models; on Windows, when that path would be too long for a
+  machine without long paths enabled, it falls back to a shared models folder
+  and then to your user cache. The startup log names the folder it chose.
 
-If that volume is short of room, set `HF_HOME` yourself **before launching
-ComfyUI**. Setting it later does not move the cache, it adds a second one, and
-you end up with two copies of everything.
+If the Hugging Face cache's volume is short of room, set `HF_HOME` yourself
+**before launching ComfyUI**. Setting it later does not move the cache, it adds
+a second one, and you end up with two copies of everything.
 
 ## Node packs, only for some lanes
 

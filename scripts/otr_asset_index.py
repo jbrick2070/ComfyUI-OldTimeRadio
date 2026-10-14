@@ -245,11 +245,17 @@ def render() -> str:
       "it names what to fetch.\n")
     A("## Where assets go\n")
     A("```\n"
-      "OTR_COMFYUI_MODELS_ROOT   models root       default C:\\ComfyUI-Models\n"
-      "                                            (Linux/pods: set it, or the\n"
-      "                                            Windows default becomes a\n"
-      "                                            literal directory nothing scans)\n"
-      "HF_HOME                   writer/voice/music cache, default ~/.cache/huggingface\n"
+      "OTR_COMFYUI_MODELS_ROOT   models root: ComfyUI's own models folder when\n"
+      "                          running inside ComfyUI; C:\\ComfyUI-Models is the\n"
+      "                          Windows default; off Windows, outside ComfyUI,\n"
+      "                          set it -- the pack refuses rather than guess\n"
+      "text_encoders/, checkpoints/   ComfyUI-native weights (the native Gemma\n"
+      "                          writer; Stable Audio 3 and its text encoder)\n"
+      "LLM/<org>--<name>/        other (transformers) writers, as plain files\n"
+      "TTS/KokoroTTS/            Kokoro's model and voices\n"
+      "HF_HOME                   what libraries fetch for themselves; the pack\n"
+      "                          points it beside the models at startup unless\n"
+      "                          you set it (see apple/INSTALL.md)\n"
       "<models_root>/TTS/refs/<engine>/*.wav       voice-cloning reference clips\n"
       "```\n")
     A("Resolve the models root through `nodes/_otr_models_root.py::_models_root()` "
@@ -392,7 +398,8 @@ def render() -> str:
     A("The shortest complete path, all ungated, no token:\n")
     A("```\n"
       "python scripts/otr_fetch_lane_weights.py haunted\n"
-      "# writer, voices and music download themselves into HF_HOME on first use\n"
+      "# writer, voices and music download themselves on first use\n"
+      "# (where each kind lands: apple/INSTALL.md)\n"
       "python scripts/otr_canonical_api_run.py --profile otr_8gb_animatediff "
       "--act-count 1\n"
       "```\n")

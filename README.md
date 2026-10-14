@@ -17,7 +17,8 @@
 2. Install ffmpeg: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
 3. Restart ComfyUI.
 4. **Workflow -> Browse Templates -> Extensions -> Old-Time Radio**, open `otr_canonical`.
-5. Press **Run**. The first run downloads about 12 GB. Your episode is an `.mp4` in
+5. Press **Run**. The first run downloads several GB of models
+   ([what](apple/INSTALL.md#weights-what-you-do-not-have-to-do)). Your episode is an `.mp4` in
    `<your ComfyUI output folder>/otr/obs/`.
 
 **It performs your story, not only its own.** On the **OTR_LedgerScriptWriter**
@@ -38,7 +39,10 @@ them back (`pip install jieba pypinyin cn2an ordered-set`, `pip install fugashi 
 
 Change nothing else in the workflow. You need an NVIDIA card with 8 GB or more, a 16 GB
 Apple Silicon Mac, or just a CPU (start ComfyUI with `--cpu`; slow but it works),
-plus about 25 GB of free disk. No account, no API key, nothing paid. If a step
+plus about 25 GB of free disk. On a Mac or a CPU, read [the engines](#the-engines)
+first: the episodes measured there (2026-09-13) used the Qwen writer -- the
+`otr_mac16_*` workflows ship it -- and the canonical's native writer is not yet
+proven on either. No account, no API key, nothing paid. If a step
 fails, [Make an episode](#make-an-episode) below walks through each one.
 
 <p align="center">
@@ -160,7 +164,8 @@ What those lanes turn on, and how to pick a hosted writer, is
 
 **New to ComfyUI? This is a short read and then a button.** You need a
 working ComfyUI (Desktop, portable or a git install -- any of them), about
-**25 GB of free disk** -- the first run fetches roughly 12 GB of models, and an
+**25 GB of free disk** -- the first run fetches several GB of models (the
+writer is the biggest, and which one depends on the workflow), and an
 episode's working files need room too -- and one of the machines below. You do not need an account, an API key, a paid
 service, or any of the saved workflows further down this page:
 those are per-machine presets you can grow into. Installing the pack and
@@ -233,8 +238,9 @@ into it, the per-machine ones with their machine's models already chosen;
 finished episode plays in the app.
 
 **Wait, then look in `<your ComfyUI output folder>/otr/obs/`.** The first run
-downloads about **12 GB** -- the writer, the music model and its text encoder, and
-the Kokoro voices -- and then writes, casts, performs, scores and cuts an episode.
+downloads the writer, the music model and its text encoder, and the Kokoro
+voices -- several GB, listed in [apple/INSTALL.md](apple/INSTALL.md#weights-what-you-do-not-have-to-do)
+-- and then writes, casts, performs, scores and cuts an episode.
 Later runs skip the download. On a 16 GB NVIDIA card a short episode is minutes;
 on CPU it is a long wait, and that is the model working, not a hang. On an 8 GB
 card the LTX 2.5 workflows are the same story in hours: a three-act foley
@@ -250,10 +256,13 @@ looking in the UI, found nothing, and only then found the files.
 
 That folder is the finish line, and the console tells you what
 happened. **`obs_publish OK -> <path>`** names the published file.
-**`obs_publish BLOCKED -- ...`** means the run SUCCEEDED and only the published
-copy was withheld, because the episode's rights receipt did not clear -- the
-finished episode is in `otr/episodes/<episode>/`. **No `obs_publish` line at
-all** means the run did not finish, however green the console looked; go to
+**`obs_publish BLOCKED -- ...`** means the published copy was withheld,
+because the episode's rights receipt did not clear; the archival final is in
+`otr/episodes/<episode>/`. That is not a verdict on the run by itself -- most
+banks finish normally, but a My Story episode that had to be published fails
+right after it -- so read the run's own final status too. **No `obs_publish`
+line at all** means the run did not finish, however green the console looked.
+[apple/RUN.md](apple/RUN.md#find-it) has the full reading; for failures go to
 [When something goes wrong](#when-something-goes-wrong).
 
 To stop a run, press **Cancel** in the ComfyUI menu (or clear the queue). It
@@ -335,8 +344,10 @@ the roll lands on another bank, the boxes are ignored and the log says so.
 
 ## The guides that ship with it
 
-Everything under `apple/` is in the pack, whichever way you installed it. (The
-folder name is historical; the guides cover every platform.)
+These user guides ship in the pack, whichever way you installed it. (The
+folder name is historical; the guides cover every platform.) The rest of
+`apple/` -- plans, bug logs and other development records -- lives only in the
+GitHub repository.
 
 | Page | The question it answers |
 |---|---|
@@ -435,9 +446,13 @@ the older peak-based mastering runs instead; if no monospace font can be loaded,
 the credits fall back to a bitmap font and look worse; if a voice bank cannot
 serve the requested gender, casting stamps the line `gender_unservable` and
 continues. One of them is sharper than the others: **if the master WAV cannot be
-written to disk, the run continues and produces a video-only episode** rather
-than stopping. Each of those prints what it did; none of them substitutes an
-engine you did not pick.
+written to disk, the assembler logs it and carries on, but the run cannot
+finish** -- the final mux needs that master and stops with a named error
+(`master audio missing`). The logs, the ledger and the working files stay in
+`otr/episodes/<episode>/`. (A master that WAS written but whose identity hash
+could not be computed is a different, harmless case: the audio is used as
+normal.) Each of those prints what it did; none of them substitutes an engine
+you did not pick.
 
 What `otr_canonical` ships, and why:
 
@@ -598,21 +613,25 @@ names `comfyui-animatediff-evolved`, and its errors panel leads to Node Manager.
 **Most engines fetch their own weights** the first time a dropdown selects them
 -- either through the engine's own library and the Hugging Face cache, or through
 `OTR_WorkflowValidator`, a node inside the workflow that looks at what you actually
-picked and pulls only that, before the writer runs. Two places, both inside
-your ComfyUI models tree:
+picked and pulls only that, before the writer runs. Where a file lands depends on
+what kind it is, and every location goes through ComfyUI's registered folders,
+so `extra_model_paths.yaml` can move any of them:
 
-- **The writer** (Qwen or Gemma, the biggest single download) lands as ordinary
-  files in **`models/LLM/<org>--<name>/`**, the same way any other model folder
-  in ComfyUI works: you can see it, move it, or point an `LLM:` entry in
-  `extra_model_paths.yaml` somewhere else. No symlinks, so Windows never asks
-  for Developer Mode. A writer you downloaded before this folder existed stays
-  in the Hugging Face cache below and keeps working; nothing is moved or
-  fetched twice.
-- **Everything else** (the music model and its text encoder, the voices'
-  extras) uses the Hugging Face cache at **`models/huggingface`** -- this pack
-  points `HF_HOME` there at startup if you have not set it yourself. If that
-  volume is short of room, set `HF_HOME` **before** launching, because setting
-  it later creates a second cache rather than moving the first.
+- **ComfyUI-native weights** -- the default native Gemma writer, and Stable
+  Audio 3 with its text encoder -- go in ComfyUI's own `text_encoders` and
+  `checkpoints` folders, like any other ComfyUI model.
+- **Other writers** (Qwen and the rest) land as ordinary files in
+  **`LLM/<org>--<name>/`** under your LLM folder. No symlinks, so Windows never
+  asks for Developer Mode; a copy already in the Hugging Face cache keeps working.
+- **Kokoro's** model and voices go to `TTS/KokoroTTS/`.
+- **What a library fetches for itself** uses the Hugging Face cache, which this
+  pack points at a folder beside your models at startup if you have not set
+  `HF_HOME` yourself. If that volume is short of room, set `HF_HOME` **before**
+  launching, because setting it later creates a second cache rather than moving
+  the first.
+
+The details, and the Windows long-path fallback, are in
+[apple/INSTALL.md](apple/INSTALL.md#weights-what-you-do-not-have-to-do).
 
 **You do not need a Hugging Face token to run OTR.** Everything the canonical
 selects, and everything the 8 GB and Mac workflows select, is ungated. A token is
@@ -685,8 +704,12 @@ is in the wrong folder or ComfyUI crashed during startup before any node loaded.
 **One node is missing.** Find that `Skipped` line in the console; it names the
 library. Install it into ComfyUI's own interpreter.
 
-**The render stops naming a missing class** (`ADE_*`, `LTXV*`).
-The lane you picked needs a node pack; the message names it.
+**The render stops naming a missing class.** Read what the error asks for.
+`ADE_*` classes belong to a node pack: the AnimateDiff lanes need
+ComfyUI-AnimateDiff-Evolved, and the message names it -- install it and restart.
+`LTXV*` classes ship with ComfyUI itself, and that error says to update ComfyUI:
+yours is older than those nodes. [apple/RUN.md](apple/RUN.md#when-something-goes-wrong)
+has the same split.
 
 **The render stops naming a missing file.** The lane needs weights that do not
 fetch themselves. The message names the file; it never quietly substitutes
@@ -705,8 +728,10 @@ runs Kokoro through `kokoro-onnx` on the CPU and speaks every language; the
 Mandarin and Japanese libraries install with the pack (if they went missing:
 `pip install jieba pypinyin cn2an ordered-set`, `pip install fugashi jaconv unidic-lite`). Python 3.14 has no Kokoro build yet and is refused. The message names
 the exact pip line. An English episode can use Bark instead, except on a 16 GB
-Mac where Bark is a memory hazard. Non-English rows admit Kokoro and Google
-TTS (hosted, your own Google API key).
+Mac where Bark is a memory hazard. Non-English rows admit Kokoro -- the only
+local voice they admit -- and the hosted voices Google TTS and ElevenLabs
+(your own account and key). A full non-English episode on
+3.14 through a hosted voice has not been run.
 
 **A gated model returns HTTP 401.** `gemma-2-2b-it` and `stable_audio_music` need
 a licence click on Hugging Face plus a login; every default weight is ungated,
@@ -744,9 +769,10 @@ leave it.
 
 **It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line in
 the console first, because there are two different answers. `obs_publish
-BLOCKED -- ...` means the run SUCCEEDED and the episode is in
-`otr/episodes/<episode>/`; only the published copy was withheld, because the
-rights receipt did not clear. No `obs_publish` line at all means a real failure:
+BLOCKED -- ...` means the published copy was withheld because the rights
+receipt did not clear, and the archival final is in `otr/episodes/<episode>/`;
+whether the run itself succeeded is its own final status (a My Story episode
+that had to be published fails right there). No `obs_publish` line at all means a real failure:
 read the console from the end backwards for the first error, and if it has been
 quiet for more than five minutes after the downloads finished, it is not going
 to finish.
@@ -849,8 +875,9 @@ airwaves.
 
 ## Known failures
 
-None at the tip of `main`. [apple/known-failures.md](apple/known-failures.md)
-explains why the expected-failure set is kept empty on purpose -- a failing
+None at the tip of `main`.
+[apple/known-failures.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/known-failures.md)
+(in the GitHub repository; it is not part of the installed pack) explains why the expected-failure set is kept empty on purpose -- a failing
 test is fixed or deleted with its feature, never parked. Tests that need
 downloaded weights, voice references or optional language packs fail on a
 machine that does not have them yet; that is the machine, not the code. If

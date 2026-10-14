@@ -349,7 +349,10 @@ class AudioEnhance:
                     "default": 0.0, "min": 0.0, "max": 24000.0, "step": 1000.0,
                     "tooltip": "Optional low-pass cutoff Hz for a voice engine "
                                "that leaves high-frequency chirp artifacts "
-                               "(0=off, default; 16000 is a gentle cleanup)"
+                               "(0=off, default; 16000 is a gentle cleanup). "
+                               "Applies only below half the target sample "
+                               "rate: a cutoff at or above it is skipped "
+                               "silently, not clamped."
                 }),
                 "tape_emulation": (["off", "subtle", "medium", "heavy"], {
                     "default": "off",

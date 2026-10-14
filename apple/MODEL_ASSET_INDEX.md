@@ -13,11 +13,17 @@ So **the error message is the install instruction.** Read it literally: it names
 ## Where assets go
 
 ```
-OTR_COMFYUI_MODELS_ROOT   models root       default C:\ComfyUI-Models
-                                            (Linux/pods: set it, or the
-                                            Windows default becomes a
-                                            literal directory nothing scans)
-HF_HOME                   writer/voice/music cache, default ~/.cache/huggingface
+OTR_COMFYUI_MODELS_ROOT   models root: ComfyUI's own models folder when
+                          running inside ComfyUI; C:\ComfyUI-Models is the
+                          Windows default; off Windows, outside ComfyUI,
+                          set it -- the pack refuses rather than guess
+text_encoders/, checkpoints/   ComfyUI-native weights (the native Gemma
+                          writer; Stable Audio 3 and its text encoder)
+LLM/<org>--<name>/        other (transformers) writers, as plain files
+TTS/KokoroTTS/            Kokoro's model and voices
+HF_HOME                   what libraries fetch for themselves; the pack
+                          points it beside the models at startup unless
+                          you set it (see apple/INSTALL.md)
 <models_root>/TTS/refs/<engine>/*.wav       voice-cloning reference clips
 ```
 
@@ -252,7 +258,8 @@ The shortest complete path, all ungated, no token:
 
 ```
 python scripts/otr_fetch_lane_weights.py haunted
-# writer, voices and music download themselves into HF_HOME on first use
+# writer, voices and music download themselves on first use
+# (where each kind lands: apple/INSTALL.md)
 python scripts/otr_canonical_api_run.py --profile otr_8gb_animatediff --act-count 1
 ```
 

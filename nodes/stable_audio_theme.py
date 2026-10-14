@@ -176,7 +176,8 @@ class StableAudioTheme:
                     "tooltip": (
                         "Your own music, in your own words -- 'gamelan "
                         "orchestra', 'surf rock', 'solo cello'. Applies to "
-                        "the generated opening and closing cues, and only "
+                        "every generated cue in the episode -- opening, "
+                        "act-break interstitials and closing -- and only "
                         "on the listener-authored My Story bank. Blank "
                         "uses the bank's own genre: sci-fi news is Detroit "
                         "techno, media archive a jazz quartet, the "

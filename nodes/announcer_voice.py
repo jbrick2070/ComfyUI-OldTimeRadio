@@ -35,9 +35,10 @@ class AnnouncerVoice(OTRVoiceNodeBase):
     DESCRIPTION = (
         "Synthesizes narration, opening introductions, and outro bookends for the "
         "episode using the selected voice engine. Dispatches each announcer line "
-        "from the script to generate an audio batch for the scene sequencer. Change "
-        "the engine dropdown to switch between Kokoro, Chatterbox, Bark, or "
-        "cloud TTS, or connect optional execution gates."
+        "from the script to generate an audio batch for the scene sequencer. The "
+        "engine is chosen on OTR_CastLock (announcer_voice_engine), which casts the "
+        "announcer before this node runs -- Kokoro, Chatterbox, Bark or a cloud "
+        "voice."
     )
 
     ROLE = "announcer_voice"
