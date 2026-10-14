@@ -414,7 +414,8 @@ def _resolve_seed() -> int:
 
 def _call(pass_id: str, bundle: Any, *, attempt_receipts=None,
           source_rewrite_receipts=None, slot_scheduler=None, configured_model_id=None,
-          source_rewrite_instruction="", language_instruction="", **kwargs) -> Any:
+          source_rewrite_instruction="", language_instruction="", authored_out=None,
+          **kwargs) -> Any:
     """Use the shared capacity contract and retain actual attempt evidence.
 
     ``language_instruction`` is the episode row's native authoring rule. It
@@ -448,6 +449,12 @@ def _call(pass_id: str, bundle: Any, *, attempt_receipts=None,
 
     # LLM slot: per-sub-pass -- caller supplies the creative or technical slot.
     authored = structured_call(on_attempt_complete=completed, **kwargs)
+    # The author pass as the model wrote it: the source rewrite below restores
+    # omitted fields from model_dump(), which carries the schema DEFAULTS, so
+    # after it "the model left this out" can no longer be told apart from "the
+    # model wrote the default". A caller that needs provenance reads it here.
+    if authored_out is not None:
+        authored_out["model"] = authored
     if source_rewrite_receipts is None:
         return authored
     original = authored.model_dump(mode="json")
@@ -515,10 +522,31 @@ def _full_artifact_repair(instruction: str):
 # P0 -- interpret (planning notes, not another admission gate)
 # ---------------------------------------------------------------------------
 
+def _cast_plan_source(authored, final) -> str:
+    """``"model"`` when a model pass actually wrote ``cast_plan.planned``,
+    else ``"default"`` (story-path MS-03, 2026-10-14).
+
+    CastPlan defaults planned to 2, so an interpretation that omits it still
+    reads 2 -- and the runner recorded that as the model's plan. The author
+    pass's own fields_set says whether it wrote the value. If it did not, a
+    final value other than the default can only have come from the source
+    rewrite writing it (an omission there restores the default)."""
+    plan = getattr(authored, "cast_plan", None)
+    if ("cast_plan" in getattr(authored, "model_fields_set", ())
+            and plan is not None and "planned" in plan.model_fields_set):
+        return "model"
+    if final.cast_plan.planned != CastPlan.model_fields["planned"].default:
+        return "model"
+    return "default"
+
+
 def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
                     act_count: int, include_act_breaks: bool,
-                    attempt_receipts=None, **source_kwargs) -> StoryInterpretation:
+                    attempt_receipts=None, provenance=None,
+                    **source_kwargs) -> StoryInterpretation:
     base, retry = _TEMP["interpret"]
+    authored_out: dict = {}
+    source_kwargs["authored_out"] = authored_out
     source_kwargs["source_rewrite_instruction"] = (
         "Return the complete named_cast and cast_plan explicitly. These describe "
         "the dramatic cast; exclude the production house ANNOUNCER and count only "
@@ -527,7 +555,7 @@ def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
         "Explain the house-role exclusion in cast_plan.reason when relevant, "
         "alongside the dramatic cast-count reasoning. Preserve legitimate named "
         "dramatic people, including someone whose profession is announcer.")
-    return _call(
+    interp = _call(
         "interpret", bundle, attempt_receipts=attempt_receipts, **source_kwargs,
         prompt=[
             {"role": "system", "content": _seam(pack, "my_story_interpret_system")},
@@ -549,6 +577,10 @@ def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
         max_attempts=3,
         helper_name="my_story_interpret",
     )
+    if provenance is not None:
+        provenance["cast_plan"] = _cast_plan_source(
+            authored_out.get("model", interp), interp)
+    return interp
 
 
 # ---------------------------------------------------------------------------
@@ -1120,16 +1152,23 @@ def run_my_story_episode(
     try:
         # --- P0 interpret ----------------------------------------------------
         # Interpretation records intent; selected acts own the act structure.
+        plan_provenance: dict = {}
         with _helper_ctx(slot_scheduler, "my_story_interpret"):
             interp = _pass_interpret(
                 technical_fn, pack, bundle, requested=requested,
                 act_count=act_count, include_act_breaks=include_act_breaks,
-                attempt_receipts=story["attempts"], **source_kwargs(technical_model))
+                attempt_receipts=story["attempts"], provenance=plan_provenance,
+                **source_kwargs(technical_model))
         receipt("interpret", technical_model, _TEMP["interpret"][0],
                 None)
         story["interpretation"] = interp.model_dump(mode="json")
         story["cast_plan"] = interp.cast_plan.model_dump(mode="json")
-        story["counts"]["planned_characters"] = interp.cast_plan.planned
+        # A plan the model never wrote is the schema's default of 2, not a
+        # decision: record it as such instead of as the model's plan (MS-03).
+        story["cast_plan_source"] = plan_provenance.get("cast_plan", "model")
+        story["counts"]["planned_characters"] = (
+            interp.cast_plan.planned
+            if story["cast_plan_source"] == "model" else None)
         if interp.assumptions:
             log.info("[my_story] filled %d unstated detail(s): %s",
                      len(interp.assumptions), "; ".join(interp.assumptions[:3]))

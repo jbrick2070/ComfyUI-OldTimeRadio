@@ -1705,3 +1705,46 @@ def test_a_native_episode_speaks_its_attribution_in_the_episode_language():
     spoken = [row["text"] for row in led.data["lines"]]
     assert spanish in spoken
     assert spoken.count(spanish) == 1
+
+
+# ---------------------------------------------------------------------------
+# MS-03 (story-path, 2026-10-14): a defaulted cast plan is not the model's plan
+# ---------------------------------------------------------------------------
+def _interpretation_without(*keys, plan_keys=()):
+    data = _interpretation()
+    for key in keys:
+        data.pop(key)
+    for key in plan_keys:
+        data["cast_plan"].pop(key)
+    return data
+
+
+@pytest.mark.parametrize("house_source", [True, False], ids=["no_rewrite", "source_rewrite"])
+def test_an_omitted_cast_plan_is_recorded_as_default_not_as_planned(house_source):
+    """CastPlan defaults planned to 2. When the interpretation omits cast_plan,
+    that 2 is a schema default, not a decision -- and the source rewrite
+    re-fills omitted fields from model_dump(), which would launder it into an
+    explicit-looking value. Provenance is read from the author pass."""
+    slots = Slots(interpretation=_interpretation_without("cast_plan"))
+    kwargs = ({"idea": "", "characters": "", "author": "", "house_source": True}
+              if house_source else {})
+    led, _ = _run(slots, **kwargs)
+    story = led.data["meta"]["my_story"]
+    assert story["cast_plan_source"] == "default"
+    assert story["counts"]["planned_characters"] is None
+
+
+def test_a_cast_plan_without_planned_is_default_too():
+    slots = Slots(interpretation=_interpretation_without(plan_keys=("planned",)))
+    led, _ = _run(slots)
+    story = led.data["meta"]["my_story"]
+    assert story["cast_plan_source"] == "default"
+    assert story["counts"]["planned_characters"] is None
+
+
+def test_an_explicit_cast_plan_is_recorded_as_the_models():
+    slots = Slots(interpretation=_interpretation(planned=2))
+    led, _ = _run(slots)
+    story = led.data["meta"]["my_story"]
+    assert story["cast_plan_source"] == "model"
+    assert story["counts"]["planned_characters"] == 2
