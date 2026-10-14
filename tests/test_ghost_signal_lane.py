@@ -611,6 +611,158 @@ def test_teardown_releases_the_lease_even_when_unload_raises(monkeypatch):
     assert released == ["L1"], "the lease must be released in a finally"
 
 
+# --- a failed prepare() unwinds what it owns (Muse video-lane review) ------ #
+#
+# The base takes the cross-process GPU lease before Ghost loads anything, and
+# BeatSession only owns `prepared` once prepare() RETURNS it. These tests run
+# the REAL base prepare/teardown and the REAL lease code against an isolated
+# lock directory -- never the resident server's -- with the graph leaves faked.
+
+GHOST_LANES = ("animatediff15_v3_haunted_video", "animatediff15_lightning_video",
+               "animatediff15_v3_stillin_lab_video")
+
+# Bound before any test patches the module: motion_common's ``_GR`` IS this
+# module, so a patch that called ``gpu_residency.acquire`` would call itself.
+from nodes._otr_shared import gpu_residency as _real_gr  # noqa: E402
+
+_REAL_ACQUIRE = _real_gr.acquire
+
+
+def _vae_loader(rec, behaviour):
+    class VaeLoader:
+        FUNCTION = "go"
+
+        def go(self, **kw):
+            rec.calls.append(("vae_loader", dict(kw)))
+            if behaviour == "raise":
+                raise RuntimeError("vae load refused for the test")
+            if behaviour == "cancel":
+                raise KeyboardInterrupt("cancelled for the test")
+            if behaviour == "empty":
+                return ()
+            return (rec.external_vae,)
+
+    return VaeLoader
+
+
+def _lane(name, rec, monkeypatch, tmp_path, vae="ok"):
+    """A registered Ghost lane whose prepare() runs for real, minus the GPU."""
+    from nodes._otr_video_engines import motion_common as mc
+
+    rec.external_vae = _Handle("external_vae")
+    eng = type(vreg.get_engine(name))()
+    classes = rec.classes()
+    classes["vae_loader"] = _vae_loader(rec, vae)
+
+    def _load():
+        eng._classes = classes
+        eng._loaded = True
+
+    lockdir = tmp_path / "gpu_lease"
+    monkeypatch.setattr(eng, "load", _load)
+    monkeypatch.setattr(mc._GR, "acquire", lambda timeout_s=120.0, **kw:
+                        _REAL_ACQUIRE(timeout_s=0.5, lockdir=lockdir))
+    monkeypatch.setattr(mc._GR, "wait_until_stable", lambda **kw: None)
+    return eng, lockdir
+
+
+def _assert_lease_free(lockdir):
+    """Released, and provably so: a fresh acquire on the same lock succeeds."""
+    assert not _real_gr.is_held(lockdir), "the failed prepare stranded the lease"
+    lease = _REAL_ACQUIRE(timeout_s=0.5, lockdir=lockdir)
+    _real_gr.release(lease)
+
+
+def test_a_failing_external_vae_releases_the_lease_and_detaches_the_checkpoint(
+        monkeypatch, tmp_path):
+    rec = _Recorder()
+    eng, lockdir = _lane("animatediff15_lightning_video", rec, monkeypatch,
+                         tmp_path, vae="raise")
+    with pytest.raises(wb.GraphExecutionError, match="vae load refused"):
+        eng.prepare({}, {}, None)
+    assert rec.base_model.detached == 1, "the registered checkpoint was not detached"
+    assert eng._patchers == []
+    _assert_lease_free(lockdir)
+
+
+def test_an_empty_external_vae_keeps_its_error_and_unwinds(monkeypatch, tmp_path):
+    rec = _Recorder()
+    eng, lockdir = _lane("animatediff15_lightning_video", rec, monkeypatch,
+                         tmp_path, vae="empty")
+    with pytest.raises(RuntimeError, match="VAELoader returned no VAE"):
+        eng.prepare({}, {}, None)
+    assert rec.base_model.detached == 1
+    _assert_lease_free(lockdir)
+
+
+def test_a_failure_before_any_patcher_is_owned_detaches_nothing(
+        monkeypatch, tmp_path):
+    """The checkpoint MODEL is refused BEFORE registration: the lease still
+    goes back, and no handle Ghost never owned is touched."""
+    rec = _Recorder()
+    rec.base_model = _Handle("base_model", detach_callable=False)
+    eng, lockdir = _lane("animatediff15_v3_haunted_video", rec, monkeypatch,
+                         tmp_path)
+    with pytest.raises(wb.GraphExecutionError, match="no callable detach"):
+        eng.prepare({}, {}, None)
+    assert eng._patchers == []
+    assert rec.clip.detached == 0 and rec.vae.detached == 0
+    _assert_lease_free(lockdir)
+
+
+def test_a_cancellation_after_the_lease_unwinds_it(monkeypatch, tmp_path):
+    rec = _Recorder()
+    eng, lockdir = _lane("animatediff15_lightning_video", rec, monkeypatch,
+                         tmp_path, vae="cancel")
+    with pytest.raises(KeyboardInterrupt):
+        eng.prepare({}, {}, None)
+    assert rec.base_model.detached == 1
+    _assert_lease_free(lockdir)
+
+
+def test_a_raising_teardown_never_replaces_the_original_cause(
+        monkeypatch, tmp_path):
+    """The real teardown boundary runs; its unload raises; the caller still
+    sees the VAE failure, and the lease still goes back (teardown's finally)."""
+    rec = _Recorder()
+    eng, lockdir = _lane("animatediff15_lightning_video", rec, monkeypatch,
+                         tmp_path, vae="raise")
+
+    def _unload():
+        raise RuntimeError("unload refused for the test")
+
+    monkeypatch.setattr(eng, "unload", _unload)
+    with pytest.raises(wb.GraphExecutionError, match="vae load refused"):
+        eng.prepare({}, {}, None)
+    _assert_lease_free(lockdir)
+
+
+@pytest.mark.parametrize("name", GHOST_LANES)
+def test_a_successful_prepare_is_unchanged_and_keeps_its_lease(
+        monkeypatch, tmp_path, name):
+    rec = _Recorder()
+    eng, lockdir = _lane(name, rec, monkeypatch, tmp_path)
+    prepared = eng.prepare({}, {}, {"multi_clip": True})
+    try:
+        assert set(prepared) == {"engine_id", "lease", "patchers", "session_ctx",
+                                 "base_model", "clip", "vae", "recipe"}
+        assert prepared["engine_id"] == name
+        assert prepared["session_ctx"] == {"multi_clip": True}
+        assert prepared["patchers"] == [rec.base_model]
+        assert prepared["base_model"] == (rec.base_model,)
+        assert prepared["clip"] == (rec.clip,)
+        assert prepared["recipe"] == eng._recipe_receipt()
+        expected_calls = ["ckpt"] + (["vae_loader"] if eng.vae_name else [])
+        assert [c for c, _ in rec.calls] == expected_calls
+        assert prepared["vae"] == ((rec.external_vae,) if eng.vae_name
+                                   else (rec.vae,))
+        assert rec.base_model.detached == 0
+        assert _real_gr.is_held(lockdir), "a successful prepare holds the lease"
+    finally:
+        eng.teardown(prepared)
+    _assert_lease_free(lockdir)
+
+
 def test_the_concrete_load_override_exists_because_base_prepare_calls_it():
     """`MotionEngineBase.prepare` calls `self.load()` unconditionally; the base
     implementation raises NotImplementedError, so inheriting it would kill

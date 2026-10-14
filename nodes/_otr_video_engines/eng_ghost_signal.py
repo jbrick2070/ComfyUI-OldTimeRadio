@@ -1085,73 +1085,92 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         The three outputs are split into SEPARATE one-slot handles and the
         combined result tuple is discarded, so a released family can never be
         retained by a tuple nobody remembered was holding it.
+
+        EVERYTHING AFTER ``super().prepare()`` RUNS UNDER AN UNWIND. The base
+        has taken the cross-process GPU lease by then, and ``BeatSession``
+        only owns ``prepared`` once this method RETURNS it -- so a raise here
+        (the external VAE failing after the checkpoint loaded, a cancellation)
+        left the lease held for the life of the server and the next heavy lane
+        waited out its acquire timeout (Muse video-lane review, 2026-10-14).
+        On any failure the existing teardown runs -- detach what was
+        registered, unload, release the lease in its ``finally`` -- and the
+        original exception is re-raised; a teardown that raises never replaces
+        it. Same shape as ``eng_ltx_8gb`` and ``eng_humo``.
         """
         prepared = super().prepare(host_caps, profile, session_ctx)
-        from . import wrapper_bridge as _wb
+        try:
+            from . import wrapper_bridge as _wb
 
-        classes = self._classes or _wb.resolve_graph_classes(
-            self._node_candidates())
+            classes = self._classes or _wb.resolve_graph_classes(
+                self._node_candidates())
 
-        def _register_base(node_id, out_tuple):
-            """Register the base MODEL patcher THE MOMENT IT EXISTS.
+            def _register_base(node_id, out_tuple):
+                """Register the base MODEL patcher THE MOMENT IT EXISTS.
 
-            A post-``run_graph`` scan is too late: the executor can evict
-            between the return and the scan, and a patcher we never registered
-            is a patcher teardown cannot detach."""
-            if node_id != NODE_CKPT:
-                return
-            if len(out_tuple) != 3:
+                A post-``run_graph`` scan is too late: the executor can evict
+                between the return and the scan, and a patcher we never
+                registered is a patcher teardown cannot detach."""
+                if node_id != NODE_CKPT:
+                    return
+                if len(out_tuple) != 3:
+                    raise RuntimeError(
+                        "%s: CheckpointLoaderSimple returned %d outputs, expected "
+                        "exactly 3 (MODEL, CLIP, VAE)"
+                        % (self.name, len(out_tuple)))
+                model = out_tuple[0]
+                if not callable(getattr(model, "detach", None)):
+                    raise RuntimeError(
+                        "%s: the checkpoint MODEL has no callable detach() -- this "
+                        "adapter cannot take ownership of a patcher it cannot "
+                        "release, and proceeding would strand it resident"
+                        % self.name)
+                self._patchers.append(model)
+
+            ckpt_out = _wb.run_graph(
+                {NODE_CKPT: {"class": classes["checkpoint"],
+                             "inputs": {"ckpt_name": GHOST_CHECKPOINT_NAME}}},
+                terminal=NODE_CKPT, on_result=_register_base)
+
+            if len(ckpt_out) != 3:
                 raise RuntimeError(
-                    "%s: CheckpointLoaderSimple returned %d outputs, expected "
-                    "exactly 3 (MODEL, CLIP, VAE)"
-                    % (self.name, len(out_tuple)))
-            model = out_tuple[0]
-            if not callable(getattr(model, "detach", None)):
-                raise RuntimeError(
-                    "%s: the checkpoint MODEL has no callable detach() -- this "
-                    "adapter cannot take ownership of a patcher it cannot "
-                    "release, and proceeding would strand it resident"
-                    % self.name)
-            self._patchers.append(model)
+                    "%s: expected MODEL/CLIP/VAE from the checkpoint, got %d "
+                    "output(s)" % (self.name, len(ckpt_out)))
 
-        ckpt_out = _wb.run_graph(
-            {NODE_CKPT: {"class": classes["checkpoint"],
-                         "inputs": {"ckpt_name": GHOST_CHECKPOINT_NAME}}},
-            terminal=NODE_CKPT, on_result=_register_base)
+            # SEPARATE ONE-SLOT HANDLES, and the three-slot tuple goes away here.
+            prepared["base_model"] = (ckpt_out[0],)
+            prepared["clip"] = (ckpt_out[1],)
+            prepared["vae"] = (ckpt_out[2],)
+            prepared["recipe"] = self._recipe_receipt()
+            del ckpt_out
 
-        if len(ckpt_out) != 3:
-            raise RuntimeError(
-                "%s: expected MODEL/CLIP/VAE from the checkpoint, got %d "
-                "output(s)" % (self.name, len(ckpt_out)))
-
-        # SEPARATE ONE-SLOT HANDLES, and the three-slot tuple goes away here.
-        prepared["base_model"] = (ckpt_out[0],)
-        prepared["clip"] = (ckpt_out[1],)
-        prepared["vae"] = (ckpt_out[2],)
-        prepared["recipe"] = self._recipe_receipt()
-        del ckpt_out
-
-        # AN EXTERNAL DECODER, on a lane that declares one. THE ONLY GRAPH
-        # CHANGE this seam makes: `render_clip`'s decode node already consumes
-        # `owners["vae"]` as a one-slot tuple and does not care where it came
-        # from, so rebinding it here is the whole wiring.
-        #
-        # The checkpoint's own VAE is simply never bound. It was returned by
-        # CheckpointLoaderSimple regardless -- that cost is the checkpoint's,
-        # not this seam's -- and dropping the reference here lets it go rather
-        # than holding two decoders resident on a 16 GB machine.
-        if self.vae_name:
-            vae_out = _wb.run_graph(
-                {NODE_VAE_LOADER: {"class": classes["vae_loader"],
-                                   "inputs": {"vae_name": self.vae_name}}},
-                terminal=NODE_VAE_LOADER)
-            if not vae_out:
-                raise RuntimeError(
-                    "%s: VAELoader returned no VAE for %r -- the artifact gate "
-                    "passed, so this is a graph fault, not a missing file"
-                    % (self.name, self.vae_name))
-            prepared["vae"] = (vae_out[0],)
-            del vae_out
+            # AN EXTERNAL DECODER, on a lane that declares one. THE ONLY GRAPH
+            # CHANGE this seam makes: `render_clip`'s decode node already
+            # consumes `owners["vae"]` as a one-slot tuple and does not care
+            # where it came from, so rebinding it here is the whole wiring.
+            #
+            # The checkpoint's own VAE is simply never bound. It was returned by
+            # CheckpointLoaderSimple regardless -- that cost is the
+            # checkpoint's, not this seam's -- and dropping the reference here
+            # lets it go rather than holding two decoders resident on a 16 GB
+            # machine.
+            if self.vae_name:
+                vae_out = _wb.run_graph(
+                    {NODE_VAE_LOADER: {"class": classes["vae_loader"],
+                                       "inputs": {"vae_name": self.vae_name}}},
+                    terminal=NODE_VAE_LOADER)
+                if not vae_out:
+                    raise RuntimeError(
+                        "%s: VAELoader returned no VAE for %r -- the artifact "
+                        "gate passed, so this is a graph fault, not a missing "
+                        "file" % (self.name, self.vae_name))
+                prepared["vae"] = (vae_out[0],)
+                del vae_out
+        except BaseException:
+            try:
+                self.teardown(prepared)
+            except BaseException:          # noqa: BLE001 -- never mask the cause
+                pass
+            raise
         return prepared
 
     # ---- request -------------------------------------------------------- #
