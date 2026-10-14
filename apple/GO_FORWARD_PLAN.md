@@ -386,6 +386,24 @@ live proof belongs to a box that has them. Open: the review's item 3 --
 profile green / rainbow / mandala (audio analysis, per-clip prep, per-frame
 paint+CRT, encode) on a quiet box before choosing any further change.
 
+**Mux finishing (Muse review, 4 items) landed and is live-proven on MRKT.**
+`733c2386` + QA follow-ups `4a406d20` `b4a1f00f` `2c901787`: finals are
+replaced only by validated candidates (OBS ones staged in `obs/.otr_staging`),
+the terminal stamp writes only the ledger that answers for the video's stem,
+Cancel is polled at each finishing boundary with Comfy's own exception, and a
+missing audio/video stream is refused by name (`STREAM_MISSING`). Two more
+`otr_8gb_low` one-act legs passed: on `733c2386` (648 s wall, 145 MB final,
+no staging residue) and on `b4a1f00f` (487 s wall, 91.6 MB, peak 6.8 GB).
+Receipts: `D:\otr-4060-testing\qa-20261014-final-1act-mux` and `-b4a1`.
+
+**Measured speedup (MRKT, quiet CPU, `3b655fde` vs HEAD, byte-identical
+output):** node 12 floor frame 75.8 -> 71.2 ms (-6.1%); camera painter
+90.8 -> 83.2 ms (-8.4%); rainbow 89.4 -> 81.7 ms (-8.7%); green 82.1 ->
+74.0 ms (-9.8%); whole-clip audio analysis 0.28 -> 0.01 s. Whole-episode
+time is dominated by writing and TTS and was NOT measured A/B -- the legs
+each wrote a different story; a replay of one frozen episode at both
+commits is the way to measure it.
+
 ### 0r. 8 GB regression on 2.3.25: every 8 GB graph, 1 act, fastest first (MRKT -- open)
 
 Operator, 2026-10-14: "run 1 act from fastest to longest 8gb on this rig to
