@@ -8,8 +8,8 @@ already covers these properties at D3 landing:
      0x97 cp1252 em-dash false-positive class.
 
   2. Era literals INSIDE `OTR_PERIOD_SYSTEM_PROMPT` (and
-     `PERIOD_EXEMPLARS`) live on lines tokenize-classified as
-     "string". The sweep classifies those as FORENSIC, not RUNTIME.
+     `PERIOD_EXEMPLARS`) sit inside tokenize string spans. The sweep
+     judges each match by its span, so those are FORENSIC, not RUNTIME.
 
 This file pins both properties against future regression:
 
@@ -17,19 +17,15 @@ This file pins both properties against future regression:
       Source inspection of `tests/test_b7_forbidden_sweep.py`
       confirms the git diff invocation carries `-- "*.py"`.
 
-  test_classify_lines_marks_period_system_prompt_body_as_string
-      Smoke against the live `nodes/_otr_period_prompts.py` -- the
-      multi-line triple-quoted string body of OTR_PERIOD_SYSTEM_PROMPT
-      is classified as "string" so its era literals would be
-      forensic-suppressed even if they appeared on a new ADDED diff
-      line.
+  test_the_period_system_prompt_era_literals_are_forensic
+      Smoke against the live `nodes/_otr_period_prompts.py` -- every
+      era literal in it sits inside a string span, so each would be
+      forensic even if it appeared on a new ADDED diff line.
 
-  test_planted_era_literal_in_period_prompts_file_outside_string_would_be_runtime
-      Negative control: if a future commit accidentally placed an
-      era literal OUTSIDE the carved constants (e.g. in a docstring
-      that doesn't span a triple-quoted form OR in a variable name),
-      the existing classifier would correctly mark it. This test
-      asserts the classifier's behavior, not the sweep run itself.
+  test_era_literals_in_strings_and_comments_are_forensic
+      A planted fixture: a docstring, a comment, a module string and a
+      returned string each carry an era literal, and each is forensic.
+      The executable-hit side is pinned in test_b7_forbidden_sweep.py.
 """
 from __future__ import annotations
 
@@ -46,22 +42,15 @@ PERIOD_SRC = REPO_ROOT / "nodes" / "_otr_period_prompts.py"
 SWEEP_TEST_SRC = REPO_ROOT / "tests" / "test_b7_forbidden_sweep.py"
 
 
-def _load_classify_lines():
-    """Import classify_lines from tests/_s28_forbidden_sweep.py
-    without running the module body (which auto-walks the diff file).
-    """
+def _load_sweep():
+    """Import tests/_s28_forbidden_sweep.py. The sweep itself runs only
+    under ``main()``, so importing it walks no diff."""
     sweep_path = REPO_ROOT / "tests" / "_s28_forbidden_sweep.py"
     spec = importlib.util.spec_from_file_location("_s28_sweep_for_test", sweep_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(module)
-    except FileNotFoundError:
-        # The sweep module top-level body tries to read DIFF_PATH and
-        # OUT_PATH; FileNotFoundError when neither exists is benign --
-        # classify_lines is still bound. Re-raise anything else.
-        pass
-    return module.classify_lines
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_forbidden_sweep_test_driver_restricts_to_py_extension_only() -> None:
@@ -81,61 +70,32 @@ def test_forbidden_sweep_test_driver_restricts_to_py_extension_only() -> None:
     )
 
 
-def test_classify_lines_marks_period_system_prompt_body_as_string() -> None:
-    """The multi-line triple-quoted OTR_PERIOD_SYSTEM_PROMPT body
-    spans roughly lines 37-84 of `nodes/_otr_period_prompts.py`.
-    The tokenize classifier must mark these lines as "string" so
-    forbidden markers like "1940s" appearing inside the prompt are
-    suppressed from runtime hits.
+def test_the_period_system_prompt_era_literals_are_forensic() -> None:
+    """The multi-line triple-quoted OTR_PERIOD_SYSTEM_PROMPT body is one
+    string span, so every era literal in it is a forensic mention, not a
+    runtime hit.
     """
-    classify_lines = _load_classify_lines()
-    cls = classify_lines(PERIOD_SRC)
-    # Spot-check the lines around the system prompt body. Line 37 is
-    # the assignment line; lines 38-83 are inside the string. Line
-    # 84 closes the string. The classifier marks any tokenize STRING
-    # span as "string".
-    string_lines = [i for i, kind in cls.items() if kind == "string"]
-    assert len(string_lines) > 30, (
-        f"_otr_period_prompts.py has only {len(string_lines)} "
-        f"string-classified lines; expected >30 (the period system "
-        f"prompt body alone is ~45 lines). Classifier may not be "
-        f"recognizing the triple-quoted block."
-    )
-    # Confirm one specific line known to contain "1940s" is classified
-    # as string. Per current source, "1940s" appears in the system
-    # prompt body around line 38 ("a 1940s American anthology radio
-    # drama...").
+    sweep = _load_sweep()
+    spans = sweep.string_and_comment_spans(PERIOD_SRC)
+    assert spans is not None, "tokenize could not read _otr_period_prompts.py"
+    covered = [i for i, s in spans.items() if s]
+    assert len(covered) > 30, (
+        f"_otr_period_prompts.py has only {len(covered)} lines inside a "
+        f"string or comment; the period system prompt body alone is ~45")
     src_lines = PERIOD_SRC.read_text(encoding="utf-8").splitlines()
-    for i, line in enumerate(src_lines, start=1):
-        if "1940s" in line:
-            kind = cls.get(i, "?")
-            assert kind == "string", (
-                f"line {i} contains '1940s' but is classified as "
-                f"{kind!r}; expected 'string' (it's inside the period "
-                f"system prompt triple-quoted body)"
-            )
-            return
-    pytest.fail(
-        "no '1940s' literal found in _otr_period_prompts.py source; "
-        "the test smoke fixture may be stale or the prompt body was "
-        "rewritten"
-    )
+    hits = [(i, line) for i, line in enumerate(src_lines, start=1)
+            if "1940s" in line and sweep.forbidden.search(line)]
+    assert hits, ("no '1940s' literal found in _otr_period_prompts.py; the "
+                  "smoke fixture is stale or the prompt body was rewritten")
+    for i, line in hits:
+        assert sweep.classify_hit(spans, i, line) == "forensic", (
+            f"line {i} carries '1940s' outside every string span")
 
 
-def test_planted_era_literal_in_a_helper_string_would_be_runtime(tmp_path: Path) -> None:
-    """Negative control: a single-line module-level string literal
-    containing an era token gets classified as "string" too -- the
-    classifier doesn't distinguish "the canonical period prompt" from
-    "any other string literal". The actual carve-out lives at the
-    diff-filter layer (only NEW added lines fire the sweep) plus the
-    fact that the period prompt body was added long before Sprint D.
-
-    This test plants a small fixture .py file with various era-token
-    placements and confirms the classifier marks them all as
-    string-classified or comment-classified -- the categorical
-    expectation holds.
-    """
-    classify_lines = _load_classify_lines()
+def test_era_literals_in_strings_and_comments_are_forensic(tmp_path: Path) -> None:
+    """A docstring, a comment, a module string and a returned string each
+    carry an era literal; the sweep calls every one of them a mention."""
+    sweep = _load_sweep()
     fixture = tmp_path / "fixture.py"
     fixture.write_text(
         '"""Module docstring mentioning 1940s era flavor."""\n'
@@ -148,17 +108,12 @@ def test_planted_era_literal_in_a_helper_string_would_be_runtime(tmp_path: Path)
         '    return "1940s noir"\n',
         encoding="utf-8",
     )
-    cls = classify_lines(fixture)
-    # Module docstring -- string
-    assert cls.get(1) == "string", cls
-    # Comment line -- comment
-    assert cls.get(3) == "comment", cls
-    # BANNER assignment -- the line has both code (BANNER = ) and a
-    # string literal. The classifier marks lines where ANY token is
-    # a string as string-classified; the BANNER line ends up "string".
-    assert cls.get(5) in ("string", "code"), cls
-    # The return inside foo() -- mixed code + string.
-    assert cls.get(8) in ("string", "code"), cls
+    spans = sweep.string_and_comment_spans(fixture)
+    lines = fixture.read_text(encoding="utf-8").splitlines()
+    for lineno in (1, 3, 5, 8):
+        text = lines[lineno - 1]
+        assert sweep.forbidden.search(text), "fixture line %d must hit" % lineno
+        assert sweep.classify_hit(spans, lineno, text) == "forensic", lineno
 
 
 if __name__ == "__main__":
