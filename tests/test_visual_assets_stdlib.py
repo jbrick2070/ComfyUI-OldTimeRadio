@@ -637,7 +637,8 @@ class RuntimeBridgeTests(_NativeFixtureCase):
         never enters the download path; the READY receipt names the writer."""
         from nodes import _otr_comfy_textgen_backend as native
         self.install_defaults()
-        self.folders.put(native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)
+        weight_token = native.WEIGHT_FILENAME.rsplit("/", 1)[-1]
+        self.folders.put(native.WEIGHT_CATEGORY, weight_token)
         prompt = canonical_prompt()
         prompt["1"]["inputs"]["creative_writing_model"] = (
             native.MODEL_ID + " (5.2 GB download)")
@@ -647,7 +648,7 @@ class RuntimeBridgeTests(_NativeFixtureCase):
         self.assertEqual(result["status"], "ready")
         self.assertEqual(trace.downloads, [])
         tokens = [(row["category"], row["token"]) for row in self.requests()]
-        self.assertEqual(tokens.count((native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)), 0)
+        self.assertEqual(tokens.count((native.WEIGHT_CATEGORY, weight_token)), 0)
 
     def test_every_download_lands_in_the_first_registered_folder_of_its_type(self):
         """The gate writes through ``model_type_dir`` (2026-09-25): the folder

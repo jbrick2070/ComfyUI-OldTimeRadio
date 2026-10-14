@@ -16,8 +16,8 @@ video/image platform is built on (A-Seam deltas AS-1..AS-5):
   lock-dir + dead-PID reclaim) + machine-wide NVML probe (AS-3), taken by A and
   by C's / B's cu128 sidecars so only ONE heavy engine is resident at a time.
 * :mod:`portrait_ledger` -- ledger-driven, content-addressed portrait
-  resolution (``{portrait_content_hash}.png``, decoded-pixel hash, never
-  overwrite) (AS-5), shared by the image director (C) and the 3D adapter (B).
+  stamping (``{portrait_content_hash}.png``, decoded-pixel hash, never
+  overwrite) (AS-5), used by the image dispatcher.
 
 Every module here imports NOTHING heavy at module scope (no torch /
 transformers / diffusers / pydantic). Importing this package -- and any

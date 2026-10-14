@@ -1098,26 +1098,6 @@ def queue_snapshot() -> tuple[int, int]:
         return -1, -1
 
 
-def cancel_queue() -> bool:
-    """POST /queue {"clear": true} + /interrupt. Best-effort, returns True on 200/200."""
-    ok = True
-    try:
-        r1 = requests.post(
-            f"{COMFYUI_URL}/queue",
-            json={"clear": True},
-            timeout=5,
-        )
-        ok &= (r1.status_code == 200)
-    except Exception:
-        ok = False
-    try:
-        r2 = requests.post(f"{COMFYUI_URL}/interrupt", timeout=5)
-        ok &= (r2.status_code == 200)
-    except Exception:
-        ok = False
-    return ok
-
-
 __all__ = [
     "COMFYUI_URL",
     "load_workflow",
@@ -1133,5 +1113,4 @@ __all__ = [
     "VANISHED_CHECK_EVERY",
     "SERVER_GONE_MARKER",
     "queue_snapshot",
-    "cancel_queue",
 ]

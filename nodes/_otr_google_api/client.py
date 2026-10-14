@@ -23,7 +23,6 @@ DEFAULT_TIMEOUT_S = 120
 # would bill it again. OTR_GOOGLE_TIMEOUT_S still overrides.
 DEFAULT_INTERACTION_TIMEOUT_S = 600
 DEFAULT_MAX_RETRIES = 2
-_RETRYABLE_STATUS = frozenset({408, 409, 429, 500, 502, 503, 504})
 
 
 class GoogleAPIError(RuntimeError):

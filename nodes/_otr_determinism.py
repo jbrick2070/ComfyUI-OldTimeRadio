@@ -1,16 +1,14 @@
 """Determinism scaffolding for the audio forward (C-1, C-2, C-3, I-2).
 
-Two layers, deliberately separated:
+``REQUIRED_DETERMINISM_ENV`` is the env the headless launcher must export
+BEFORE python/torch starts (C-1); a test pins ``scripts/_otr_soak_server_launch.cmd``
+against it.
 
-  * ``determinism_env_status()`` -- a pure ``os.environ`` inspection (no CUDA,
-    never ``cuda.is_initialized()`` per C-1) reporting whether the headless
-    launcher exported the determinism env BEFORE python/torch started.
-  * ``deterministic_inference(seed)`` -- a SCOPED context manager that pins
-    strict determinism (``use_deterministic_algorithms(True, warn_only=False)``
-    + SDPA MATH backend) and seeds every RNG around ONE audio forward, then
-    restores all prior flags + RNG state in ``finally``. The PROCESS default
-    stays non-strict so the default video render does not crash on sm_120
-    (C-2/C-3).
+``deterministic_inference(seed)`` is a SCOPED context manager that pins strict
+determinism (``use_deterministic_algorithms(True, warn_only=False)`` + SDPA MATH
+backend) and seeds every RNG around ONE audio forward, then restores all prior
+flags + RNG state in ``finally``. The PROCESS default stays non-strict so the
+default video render does not crash on sm_120 (C-2/C-3).
 
 Import-time is side-effect-free (C-5): the lightweight module defaults are an
 explicit call, not an import side effect.
@@ -22,11 +20,6 @@ import random
 
 import torch
 
-try:
-    from ._otr_shared import env as otr_env
-except ImportError:  # pragma: no cover -- flat test imports
-    from _otr_shared import env as otr_env  # type: ignore
-
 # The env the launcher must export BEFORE python/torch starts (C-1).
 REQUIRED_DETERMINISM_ENV = {
     "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
@@ -34,17 +27,6 @@ REQUIRED_DETERMINISM_ENV = {
     "NVIDIA_TF32_OVERRIDE": "0",
     "TOKENIZERS_PARALLELISM": "false",
 }
-
-
-def determinism_env_status() -> dict:
-    """Map each required env var -> ``(ok: bool, actual: str | None)``.
-
-    Pure ``os.environ`` inspection; touches no torch/CUDA state (C-1).
-    """
-    return {
-        key: (otr_env.get(key) == expected, otr_env.get(key))
-        for key, expected in REQUIRED_DETERMINISM_ENV.items()
-    }
 
 
 def _enter_sdpa_math(stack: contextlib.ExitStack) -> None:

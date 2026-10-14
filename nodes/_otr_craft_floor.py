@@ -52,12 +52,10 @@ from typing import Any, List
 
 
 __all__ = [
-    "FAILURE_CODES",
     "SLOT_LINE_RE",
     "SlotFailure",
     "CraftFloorResult",
     "ParsedSlot",
-    "parse_slot_lines",
     "normalize_slot_line",
     "evaluate_tier_a",
 ]
@@ -77,15 +75,6 @@ SPEAKER_MISMATCH = "SPEAKER_MISMATCH"
 EMPTY_LINE = "EMPTY_LINE"
 PARSE_ERROR = "PARSE_ERROR"
 DUPLICATE_SLOT = "DUPLICATE_SLOT"
-
-FAILURE_CODES = (
-    SLOT_COUNT_MISMATCH,
-    SLOT_ORDER_MISMATCH,
-    SPEAKER_MISMATCH,
-    EMPTY_LINE,
-    PARSE_ERROR,
-    DUPLICATE_SLOT,
-)
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +126,7 @@ class ParsedSlot:
 class SlotFailure:
     """One Tier-A failure, machine-readable.
 
-    code:    one of FAILURE_CODES.
+    code:    one of the failure-code constants above.
     slot_id: the offending slot id when known (the draft's id, or the
              manifest id for an order/count divergence). May be '' for a
              whole-output failure like SLOT_COUNT_MISMATCH where no
@@ -230,40 +219,6 @@ def _split_blocks(raw):
         if block:
             blocks.append(block)
     return blocks
-
-
-def parse_slot_lines(raw):
-    """Parse Story Room slot output into (slot_id, speaker, text) tuples.
-
-    Input form (one block per voiced slot):
-        d001|ANNOUNCER: From the newsroom, a story.
-        d002|REN BLACK: I will not sign that paper. ... Not tonight.
-        d003|DR. MAEVE COLE: Then we both go down with it.
-
-    A block may span multiple physical lines and carry internal pauses;
-    it is terminated by the next d###| prefix or end of input. Text is
-    returned verbatim (internal newlines preserved, edges stripped).
-
-    Blocks that do not match d###|SPEAKER: text are SKIPPED here (they
-    surface as PARSE_ERROR in evaluate_tier_a, which sees the same
-    blocks). This helper is the public parse contract; it returns only
-    the well-formed rows so callers that only want the structured rows
-    do not have to filter. evaluate_tier_a does its own parse so it can
-    attribute parse failures by position.
-
-    PURE. Same input -> same output.
-    """
-    rows = []
-    for block in _split_blocks(raw):
-        m = SLOT_LINE_RE.match(block)
-        if not m:
-            continue
-        rows.append((
-            m.group("slot_id").strip(),
-            m.group("speaker").strip(),
-            m.group("text").strip(),
-        ))
-    return rows
 
 
 def normalize_slot_line(slot_id, speaker, text):

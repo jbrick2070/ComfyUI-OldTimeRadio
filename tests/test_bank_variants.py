@@ -64,7 +64,6 @@ def test_each_live_bank_resolves_its_own_pack_and_pipeline(bank_id):
 @pytest.mark.parametrize("bank_id", LIVE_BANKS)
 def test_live_bank_ids_are_not_bakeoff_variants(bank_id):
     assert BV.base_source_bank_id(bank_id) == bank_id
-    assert BV.is_bakeoff_variant(bank_id) is False
 
 
 @pytest.mark.parametrize("bank_id", ("public_domain", "shakespeare"))

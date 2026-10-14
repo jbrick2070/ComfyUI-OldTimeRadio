@@ -185,15 +185,6 @@ def resolve_voice_ref_path(ref):
     return os.path.abspath(ref)
 
 
-def engine_supports_external_generator(engine) -> bool:
-    """True iff ``engine`` binds an external ``torch.Generator`` per forward.
-
-    Read via ``getattr`` so duck-typed adapters that never set the flag read as
-    ``False`` (correctly disqualified from bit_exact mode until F verifies them).
-    """
-    return bool(getattr(engine, "supports_external_generator", False))
-
-
 def supported_kwargs(fn, **kwargs) -> dict:
     """Subset of ``kwargs`` whose names appear in ``fn``'s signature.
 

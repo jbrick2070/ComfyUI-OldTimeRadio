@@ -40,13 +40,7 @@ def base_source_bank_id(bank_id: str) -> str:
     return bank_id
 
 
-def is_bakeoff_variant(bank_id: str) -> bool:
-    """True iff ``bank_id`` carries a bake-off ``_v2``/``_v3`` variant suffix."""
-    return isinstance(bank_id, str) and bank_id.endswith(BAKEOFF_VARIANT_SUFFIXES)
-
-
 __all__ = [
     "BAKEOFF_VARIANT_SUFFIXES",
     "base_source_bank_id",
-    "is_bakeoff_variant",
 ]

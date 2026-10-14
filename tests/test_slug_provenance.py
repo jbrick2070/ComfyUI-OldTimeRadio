@@ -427,11 +427,6 @@ def test_every_registered_engine_is_collected_or_explicitly_exempt():
         "attribute." % unmapped)
 
 
-def test_the_exemption_is_keyed_on_a_reason_not_a_bare_name():
-    assert "sonilo" in inv.EXEMPT_ENGINES
-    assert "partner row" in inv.EXEMPT_ENGINES["sonilo"]
-
-
 def test_static_lanes_are_enumerated_separately_from_engines(records):
     """A registered engine name cannot represent every source: the Comfy LLM
     list and the Google text tuples are module constants with no adapter."""

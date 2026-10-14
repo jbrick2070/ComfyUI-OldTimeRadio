@@ -17,9 +17,9 @@ Two consequences the platform relies on:
   and the ledger is re-stamped to point at the new hash. This is what lets the
   3D mesh cache (keyed on ``portrait_content_hash``) stay correct across
   regenerations: a regen MUST invalidate the cached mesh, and a new hash does.
-* **One resolver, three consumers.** The image director (C1), the 3D
-  ``character_3d`` adapter (B1) and A all resolve a character's portrait through
-  THIS module, so they agree on the path + the hash rule instead of drifting.
+* **One path rule.** The image dispatcher derives a portrait's content hash and
+  path through THIS module (``compute_portrait_hash``, ``portrait_path_for_hash``,
+  ``stamp_portrait``), so the pool layout and the hash rule live in one place.
 
 Character lookup is by ``char_id`` (the alias-stable key), NEVER the display
 name (BUG-098). Dependency-free at module scope -- ``folder_paths`` (ComfyUI),
@@ -133,33 +133,6 @@ def _cast_entry_for_char(ledger: dict, char_id: str) -> Optional[dict]:
     return None
 
 
-def portrait_hash_for_char(ledger: dict, char_id: str) -> Optional[str]:
-    """The stamped ``portrait_content_hash`` for ``char_id``, or None."""
-    entry = _cast_entry_for_char(ledger, char_id)
-    if entry is None:
-        return None
-    h = entry.get("portrait_content_hash")
-    return str(h) if h else None
-
-
-def resolve_portrait_path(ledger: dict, char_id: str,
-                          output_dir: Optional[str] = None) -> Path:
-    """Resolve ``char_id`` -> its content-addressed portrait PNG path.
-
-    Reads the ``portrait_content_hash`` the ledger stamped for the character
-    (looked up by ``char_id``) and returns ``<output>/otr/stills/{hash}.png``.
-    Raises :class:`PortraitUnresolved` (fail-closed) if the character is unknown
-    or carries no portrait hash -- never returns a guessed path.
-    """
-    h = portrait_hash_for_char(ledger, char_id)
-    if not h:
-        raise PortraitUnresolved(
-            f"no portrait_content_hash for char_id {char_id!r} "
-            f"(lookup is by char_id, never display name)"
-        )
-    return portrait_path_for_hash(h, output_dir)
-
-
 def stamp_portrait(ledger: dict, char_id: str, decoded_pixels,
                    output_dir: Optional[str] = None,
                    require_cast_entry: bool = True) -> Path:
@@ -211,6 +184,5 @@ def _write_png(decoded_pixels, path: Path) -> None:
 
 __all__ = [
     "PortraitUnresolved", "stills_root", "compute_portrait_hash",
-    "portrait_path_for_hash", "portrait_hash_for_char",
-    "resolve_portrait_path", "stamp_portrait",
+    "portrait_path_for_hash", "stamp_portrait",
 ]

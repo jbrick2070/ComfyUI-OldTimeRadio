@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 
 from nodes._otr_google_api.client import GoogleAPIKeyMissingError, resolve_api_key
-from nodes._otr_google_api.models import google_api_enabled
 from nodes._otr_openrouter_backend import openrouter_enabled, refresh_catalog_cache
 from nodes._otr_shared import api_key_files as keys
 from nodes._otr_shared import cloud_media_backend as cmb
@@ -84,13 +83,14 @@ def test_test_mode_ignores_pack_files_unless_opted_in(monkeypatch, tmp_path):
         resolve_api_key()
 
 
-def test_google_broken_pointer_disables_the_lane(monkeypatch, tmp_path):
+def test_google_broken_pointer_fails_the_key_lookup(monkeypatch, tmp_path):
     _clear_google(monkeypatch)
     _enable_files(monkeypatch, tmp_path)
     (tmp_path / "google_api_key.location").write_text(
         str(tmp_path / "missing.txt") + "\n", encoding="utf-8"
     )
-    assert google_api_enabled() is False
+    with pytest.raises(GoogleAPIKeyMissingError):
+        resolve_api_key()
 
 
 def test_openrouter_broken_pointer_is_disabled(monkeypatch, tmp_path):

@@ -60,15 +60,12 @@ def test_the_lane_is_registered_with_a_capabilities_row():
     assert set(row) == set(vreg.CAPABILITIES["minimax_h3_video"])
 
 
-def test_the_bare_id_passes_through_and_carries_a_friendly_label():
+def test_the_bare_id_passes_through():
     """No `_PUBLIC_ENGINES` self-alias -- the resolver already passes a bare
     internal id through, and a self-alias would put a duplicate in the
     bijection for nothing."""
     assert pub.resolve_engine_id(NAME) == NAME
     assert NAME not in pub._PUBLIC_ENGINES
-    assert pub._PUBLIC_LABEL[NAME] == (
-        "AnimateDiff v3 haunted -- Ghost Signal (official v3 module + the "
-        "removable domain adapter, Apache-2.0; degraded transmission look)")
     # The public id carries no unmeasured cost token.
     assert "low" not in NAME and "high" not in NAME
 

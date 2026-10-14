@@ -368,22 +368,10 @@ def is_pointer(slug: str) -> bool:
     return isinstance(slug, str) and (slug.startswith("~") or slug.endswith("-latest"))
 
 
-def unverified_identities() -> Dict[Tuple[str, str], str]:
-    """`(provider_id, lane) -> lane`, for everything nobody has settled.
-
-    Not a failure; a worklist. The VERIFIER prints it -- a pytest print lands
-    under capture and is invisible at the `-q` baseline the project actually
-    runs, which silently gutted the original mitigation.
-    """
-    return {key: rec.authority_lane
-            for key, rec in SLUG_PROVENANCE.items()
-            if rec.verification_kind == UNVERIFIED}
-
-
 __all__ = [
     "CATALOG_LISTED", "SIGNAL_LISTED", "UNVERIFIED", "VERIFICATION_KINDS",
     "DATED_KINDS", "ProvenanceRecord", "LANE_AUTHORITY", "SLUG_PROVENANCE",
     "FREE_MARKERS", "PREVIEW_DATE_EXCEPTIONS", "PREVIEW_TO_STABLE",
     "EVERGREEN_EXEMPTIONS", "is_evergreen",
-    "has_preview_token", "is_pointer", "unverified_identities",
+    "has_preview_token", "is_pointer",
 ]

@@ -19,8 +19,8 @@ every case here runs.
 Hermetic: no GPU, no I/O, no live LLM. All generate_fn calls are stubs.
 
 The function and class surface asserted below (NewsBriefs,
-build_source_wrapper, compute_cache_key, extract_json_block,
-build_news_briefs) is the API contract that commit 2 must satisfy.
+build_source_wrapper, compute_cache_key, build_news_briefs)
+is the API contract that commit 2 must satisfy.
 That's the safety-net mechanic -- locking the API before code lands.
 """
 from __future__ import annotations
@@ -50,6 +50,8 @@ news_interpreter = pytest.importorskip(
         "wait dormant until then."
     ),
 )
+# The fence / trailing-object extractor the briefs ladder relies on lives in the shared module.
+_otr_json = pytest.importorskip("_otr_json")
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +162,7 @@ def test_extractor_handles_markdown_fenced_json():
     is the belt-and-braces second layer.
     """
     raw = "```json\n" + _valid_brief_json() + "\n```"
-    extracted = news_interpreter.extract_json_block(raw)
+    extracted = _otr_json.extract_first_json_block(raw)
     parsed = json.loads(extracted)
     assert parsed["key_terms"] == _VALID_BRIEFS["key_terms"]
 
@@ -172,7 +174,7 @@ def test_extractor_handles_markdown_fenced_json():
 
 def test_extractor_rejects_multiple_top_level_objects():
     raw = _valid_brief_json() + "\n" + _valid_brief_json()
-    extracted = news_interpreter.extract_json_block(raw)
+    extracted = _otr_json.extract_first_json_block(raw)
     # Either the extractor returns just the first block (legitimate
     # recovery) OR it raises / returns empty so the validator layer
     # rejects. In no case may it return a concatenation of two payloads.

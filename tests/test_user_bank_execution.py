@@ -221,7 +221,6 @@ def test_unknown_entry_point_name_is_a_caller_error(bundle):
 def test_self_id_is_never_a_registered_entry_point():
     assert ub.SELF_ENTRY_POINT not in osp.registered_fetcher_ids()
     assert ub.SELF_ENTRY_POINT not in osp.registered_interpreter_ids()
-    assert osp.client_entry_point_id() == ub.SELF_ENTRY_POINT
 
 
 def test_shipped_registry_ids_are_unchanged():

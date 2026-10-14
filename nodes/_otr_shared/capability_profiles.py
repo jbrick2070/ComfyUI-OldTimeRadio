@@ -25,7 +25,6 @@ S1 -- DERIVED ENABLE-SET, never hand-listed:
     "wizard" named in older comments here and in the video registry was never
     built: grep the repo and the word survives only in comments describing what
     it would have asked for;
-  * ``enabled_engines`` = engines whose declarations fit the profile;
   * ``cross_validate_profile`` -- every profile override must be in the
     enable-set of its namespace (per-engine fit ONLY; NO static co-residency
     rejection -- residency is wrapper_bridge's runtime invariant).
@@ -47,7 +46,6 @@ __all__ = [
     "validate_profile_shape",
     "validate_widget_mapping_shape",
     "availability",
-    "enabled_engines",
     "cross_validate_profile",
 ]
 
@@ -791,11 +789,6 @@ def availability(profile: dict, declarations: dict) -> dict:
         decl = validate_declaration(name, declarations[name])
         out[name] = _fit_reason(decl, profile)
     return out
-
-
-def enabled_engines(profile: dict, declarations: dict) -> list:
-    """``enabled(P)`` for one namespace -- DERIVED, never hand-listed."""
-    return [n for n, reason in availability(profile, declarations).items() if reason == REASON_OK]
 
 
 def cross_validate_profile(profile: dict, mapping: dict,

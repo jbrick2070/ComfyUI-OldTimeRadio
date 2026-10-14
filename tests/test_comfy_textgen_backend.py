@@ -10,6 +10,9 @@ import pytest
 from nodes import _otr_comfy_textgen_backend as native
 from nodes import _otr_visual_assets as va
 
+#: The manifest's token for the E2B weight: the basename of the file the backend names.
+WEIGHT_TOKEN = native.WEIGHT_FILENAME.rsplit("/", 1)[-1]
+
 
 def _prompt(creative="Qwen/Qwen3.5-4B", technical="Qwen/Qwen3.5-4B", replay=""):
     return {
@@ -29,9 +32,8 @@ def _plan(prompt):
 def test_the_manifest_row_is_the_backend_pin():
     """The fetch table owns the pin (repo, revision, size, sha256); the backend
     only names the file, and must name the one the table downloads."""
-    spec = va.MANIFEST[(native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)]
+    spec = va.MANIFEST[(native.WEIGHT_CATEGORY, WEIGHT_TOKEN)]
     assert spec["filename"] == native.WEIGHT_FILENAME
-    assert native.WEIGHT_FILENAME.rsplit("/", 1)[-1] == native.WEIGHT_TOKEN
 
 
 def test_every_native_writer_has_its_manifest_pin():
@@ -54,7 +56,7 @@ def test_every_native_writer_has_its_manifest_pin():
 
 def test_only_the_exact_native_id_needs_a_weight():
     assert native.native_writer_weights(native.MODEL_ID) == (
-        (native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN),)
+        (native.WEIGHT_CATEGORY, WEIGHT_TOKEN),)
     for other in ("google/gemma-4-E2B-it", "Qwen/Qwen3.5-4B", "comfy:slot-a",
                   "", None, native.MODEL_ID + " (5.2 GB download)"):
         assert native.native_writer_weights(other) == (), other
@@ -90,9 +92,9 @@ def test_both_slots_request_the_pinned_weight_once():
     requests = va.native_requests(set(), folder_paths=va._NothingInstalled,
                                   writer_models={native.MODEL_ID})
     assert [(r["category"], r["token"]) for r in requests] == [
-        (native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)]
+        (native.WEIGHT_CATEGORY, WEIGHT_TOKEN)]
     assert requests[0]["path"] is None
-    assert requests[0]["spec"] == va.MANIFEST[(native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)]
+    assert requests[0]["spec"] == va.MANIFEST[(native.WEIGHT_CATEGORY, WEIGHT_TOKEN)]
 
 
 def test_no_writer_models_requests_nothing_extra():
@@ -594,8 +596,8 @@ def _row():
 def test_the_catalog_row_names_this_backend_and_its_pin():
     row = _row()
     assert (row.provider, row.loader_backend) == (native.PROVIDER, native.LOADER_BACKEND)
-    assert row.hf_repo_id == va.MANIFEST[(native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)]["repo_id"]
-    pinned = va.MANIFEST[(native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)]
+    assert row.hf_repo_id == va.MANIFEST[(native.WEIGHT_CATEGORY, WEIGHT_TOKEN)]["repo_id"]
+    pinned = va.MANIFEST[(native.WEIGHT_CATEGORY, WEIGHT_TOKEN)]
     assert row.approx_safetensors_gb == round(pinned["size"] / 2**30, 2)
     assert row.context_window == native.WORKING_CONTEXT_CAP
     assert row.implied_quant_policy == "none" and row.requires_auth is False
@@ -611,10 +613,10 @@ def test_the_dropdown_offers_it_with_a_download_badge_and_no_fit_claim():
 
 
 def test_on_disk_comes_from_comfys_folder_lookup(monkeypatch, tmp_path):
-    weight = tmp_path / native.WEIGHT_TOKEN
+    weight = tmp_path / WEIGHT_TOKEN
     fake = types.ModuleType("folder_paths")
     fake.get_full_path = lambda category, token: (
-        str(weight) if (category, token) == (native.WEIGHT_CATEGORY, native.WEIGHT_TOKEN)
+        str(weight) if (category, token) == (native.WEIGHT_CATEGORY, WEIGHT_TOKEN)
         and weight.exists() else None)
     monkeypatch.setitem(sys.modules, "folder_paths", fake)
 
@@ -772,11 +774,11 @@ class _LoadedClip:
 @pytest.fixture
 def comfy_env(monkeypatch, tmp_path):
     """Fake ``folder_paths``, ``comfy.sd`` and ``comfy.model_management``."""
-    weight = tmp_path / native.WEIGHT_TOKEN
+    weight = tmp_path / WEIGHT_TOKEN
     weight.write_bytes(b"x")
     state = {"load_clip": [], "unloaded": [], "clip_factory": None}
     folder = types.ModuleType("folder_paths")
-    folder.get_full_path = lambda c, t: str(weight) if t == native.WEIGHT_TOKEN else None
+    folder.get_full_path = lambda c, t: str(weight) if t == WEIGHT_TOKEN else None
     folder.get_full_path_or_raise = lambda c, t: folder.get_full_path(c, t)
     folder.get_folder_paths = lambda c: [str(tmp_path)]
     sd = types.ModuleType("comfy.sd")

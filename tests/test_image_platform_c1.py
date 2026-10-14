@@ -677,9 +677,10 @@ def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_
     man = json.loads(mpath.read_text(encoding="utf-8"))
     assert man["episode_id"] == "ep_test"
     assert man["stills"][0]["object_id"] == "c1"
-    # cast was stamped so the AS-5 resolver round-trips to the POOL copy
+    # cast was stamped so its hash round-trips to the POOL copy
     from nodes._otr_shared import portrait_ledger as pl
-    assert pl.resolve_portrait_path(led, "c1", output_dir=str(tmp_path)) \
+    stamped = next(e for e in led["cast"] if e["char_id"] == "c1")["portrait_content_hash"]
+    assert pl.portrait_path_for_hash(stamped, output_dir=str(tmp_path)) \
         == pathlib.Path(img["pool_path"])
 
     # re-run, SAME prompt -> cache HIT (no regen) BUT the hit still

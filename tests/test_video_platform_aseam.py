@@ -789,32 +789,28 @@ def test_gpu_residency_probe_is_machine_wide_int():
 # CW-2 -- AS-5 content-addressed portrait-ledger resolution
 # ---------------------------------------------------------------------------
 def test_portrait_ledger_resolution(tmp_path):
-    """AS-5: char_id -> content-addressed portrait path; lookup is by char_id,
-    never the display name (BUG-098); unknown / unstamped both fail closed."""
+    """AS-5: a hash -> its content-addressed portrait path; the cast row is found
+    by char_id, never the display name (BUG-098); an unknown id fails closed."""
     from nodes._otr_shared import portrait_ledger as pl
+    import numpy as np
 
     h = "a" * 64
-    led = {"cast": [
-        {"char_id": "c1", "name": "BABA", "portrait_content_hash": h},
-        {"char_id": "c2", "name": "NOON"},  # no portrait stamped
-    ]}
-    p = pl.resolve_portrait_path(led, "c1", output_dir=str(tmp_path))
+    p = pl.portrait_path_for_hash(h, output_dir=str(tmp_path))
     # OH-1 (output-tree contract 2026-06-11): the content-addressed pool
     # moved from top-level otr/stills to the episodes/_shared/cache tier.
     assert p == (tmp_path / "otr" / "episodes" / "_shared" / "cache"
                  / f"{h}.png")
 
-    # Lookup is by char_id ONLY -- the display name does not resolve.
-    with pytest.raises(pl.PortraitUnresolved):
-        pl.resolve_portrait_path(led, "BABA", output_dir=str(tmp_path))
-    # Unstamped char + unknown char both fail closed.
-    with pytest.raises(pl.PortraitUnresolved):
-        pl.resolve_portrait_path(led, "c2", output_dir=str(tmp_path))
-    with pytest.raises(pl.PortraitUnresolved):
-        pl.resolve_portrait_path(led, "missing", output_dir=str(tmp_path))
+    # The cast row is matched by char_id ONLY -- the display name does not
+    # find it, and an id with no cast row fails closed (no row is stamped).
+    led = {"cast": [{"char_id": "c1", "name": "BABA"}]}
+    px_named = np.full((4, 4, 3), 9, dtype=np.uint8)
+    for unknown in ("BABA", "missing"):
+        with pytest.raises(pl.PortraitUnresolved):
+            pl.stamp_portrait(led, unknown, px_named, output_dir=str(tmp_path))
+    assert "portrait_content_hash" not in led["cast"][0]
 
     # Hash is over DECODED pixels: content-addressed + re-encoding-stable.
-    import numpy as np
     px = np.zeros((4, 4, 3), dtype=np.uint8)
     h1 = pl.compute_portrait_hash(px)
     px2 = px.copy()
@@ -838,10 +834,10 @@ def test_portrait_magic_byte(tmp_path):
     with open(path, "rb") as fh:
         assert fh.read(8) == b"\x89PNG\r\n\x1a\n"
 
-    # Ledger stamped by char_id; resolve round-trips to the same path.
+    # Ledger stamped by char_id; the stamped hash round-trips to the same path.
     h = led["cast"][0]["portrait_content_hash"]
     assert path.name == f"{h}.png"
-    assert pl.resolve_portrait_path(led, "c1", output_dir=str(tmp_path)) == path
+    assert path == pl.portrait_path_for_hash(h, output_dir=str(tmp_path))
 
     # Idempotent: identical pixels -> same path, no overwrite error.
     again = pl.stamp_portrait(led, "c1", px.copy(), output_dir=str(tmp_path))

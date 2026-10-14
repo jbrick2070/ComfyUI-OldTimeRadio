@@ -76,8 +76,6 @@ NEW_AUDIO_NODES = (
     ),
 )
 
-NEW_NODE_SPECS = {spec.key: spec for spec in NEW_AUDIO_NODES}
-
 
 def new_node_modules_table() -> dict:
     """The ``{key: (module_path, class_name, display_name)}`` mapping in the

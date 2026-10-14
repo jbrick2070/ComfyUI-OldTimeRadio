@@ -26,10 +26,7 @@ from nodes._otr_shared.google_image_model_ids import (  # noqa: E402
 )
 from nodes._otr_shared.slug_inventory import (  # noqa: E402
     CATALOG_GOOGLE,
-    EXEMPT_ENGINES,
     collect_inventory,
-    google_catalog_records,
-    provider_identities,
 )
 
 REPO = Path(__file__).resolve().parents[1]
@@ -129,13 +126,12 @@ def test_uniqueness_is_per_source_surface_and_offered_value():
 
 
 def test_google_projection_excludes_non_google_surfaces():
-    """Without this projection the verifier would ask Google about ElevenLabs
+    """Without a `catalog_target` the verifier would ask Google about ElevenLabs
     models and Comfy display selectors, then report them 'missing' -- a
     confident wrong answer."""
-    google = google_catalog_records(collect_inventory())
+    google = [r for r in collect_inventory() if r.catalog_target == CATALOG_GOOGLE]
     lanes = {r.authority_lane for r in google}
     assert "elevenlabs" not in lanes
-    assert all(r.catalog_target == CATALOG_GOOGLE for r in google)
     assert google, "the Google projection collected nothing"
     # A Comfy SURFACE may still expose a Google provider id -- that is exactly
     # why catalog_target is separate from authority_lane.
@@ -144,18 +140,10 @@ def test_google_projection_excludes_non_google_surfaces():
 
 
 def test_provider_identities_are_the_pairs_provenance_keys_on():
-    ids = provider_identities(collect_inventory())
+    ids = {(r.provider_id, r.authority_lane) for r in collect_inventory()}
     assert ("gemini-3.1-flash-image-preview", "comfy_image") in ids
     assert ("gemini-3.1-flash-lite-image", "google_image") in ids
     assert ("gemini-3.1-flash-lite-image", "comfy_image") in ids
-
-
-def test_exempt_engines_record_a_REASON_not_just_a_name():
-    """An allowlist of bare names decays into a shrug. `sonilo` is exempt
-    because it ships a partner row rather than a model slug."""
-    assert "sonilo" in EXEMPT_ENGINES
-    for name, reason in EXEMPT_ENGINES.items():
-        assert isinstance(reason, str) and len(reason) > 20, (name, reason)
 
 
 # --------------------------------------------------------------------------

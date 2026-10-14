@@ -260,11 +260,6 @@ def _float_env(name: str) -> float | None:
         return None
 
 
-def is_comfy_row_id(repo_id: str) -> bool:
-    """True for the two virtual handles `comfy:slot-a|b`."""
-    return isinstance(repo_id, str) and repo_id in COMFY_ROW_IDS
-
-
 def _slot_letter(repo_id: str) -> str:
     if repo_id == SLOT_A_ID:
         return "A"
@@ -490,12 +485,6 @@ def _usage_tokens(body: dict) -> int:
     except (TypeError, ValueError):
         return 0
     return max(0, prompt + completion)
-
-
-def catalog_models() -> list[dict]:
-    """The pinned catalog as id-dicts (shape parity with the OpenRouter
-    cache so the dropdown builder can share filtering logic)."""
-    return [{"id": slug} for slug in COMFY_LLM_MODELS]
 
 
 # ---------------------------------------------------------------------------
@@ -881,19 +870,6 @@ def make_comfy_credits_generate_fn(cache_entry: dict, *, response_format: dict |
     return generate_fn
 
 
-def comfy_run_meta() -> dict[str, Any]:
-    """Run-meta provenance: the slug each Comfy-bound slot resolves to.
-    The resolved slug is a PUBLIC model id (not a secret); the auth token
-    is never read or stamped. Never raises (PD1)."""
-    out: dict[str, Any] = {}
-    for letter, handle in (("A", SLOT_A_ID), ("B", SLOT_B_ID)):
-        try:
-            out[f"slot_{letter.lower()}_resolved_slug"] = resolve_slug(handle)
-        except ComfyCreditsError:
-            out[f"slot_{letter.lower()}_resolved_slug"] = "<unresolved>"
-    return out
-
-
 __all__ = [
     "COMFY_BACKEND_KEY",
     "PROVIDER",
@@ -918,7 +894,6 @@ __all__ = [
     "ComfyCreditsError",
     "ComfyCreditsConfigError",
     "ComfyCreditsCallFailedError",
-    "is_comfy_row_id",
     "recommended_slug_for_slot",
     "resolve_slug",
     "set_slot_bindings",
@@ -926,8 +901,6 @@ __all__ = [
     "set_auth",
     "clear_auth",
     "reset_run_budget",
-    "catalog_models",
     "ComfyCreditsBackend",
     "make_comfy_credits_generate_fn",
-    "comfy_run_meta",
 ]

@@ -46,7 +46,6 @@ Public surface
                               (commit 3 lands the writer wiring).
   DEFAULT_DECODER_PROFILE  -- "default_v1".
   build_source_wrapper(...)           -- inert-source prompt wrapper.
-  extract_json_block(raw)             -- fence-tolerant JSON extractor.
   build_news_briefs(generate_fn, ...) -- end-to-end caller.
 """
 from __future__ import annotations
@@ -244,22 +243,13 @@ def build_source_wrapper(
 
 
 # ---------------------------------------------------------------------------
-# JSON extractor (markdown-fence tolerant)
+# Structured-JSON retry ladder
 # ---------------------------------------------------------------------------
 
 
 # JSON extraction lives in the shared _otr_json module (BUG-LOCAL-261
-# consolidation). ``extract_json_block`` is re-exported here under its
-# historical name so existing importers keep working; new code should
-# call ``_otr_json.parse_first_json_object`` directly. Package import in
-# production; flat import when loaded standalone / under test.
-try:
-    from . import _otr_json
-except ImportError:  # pragma: no cover - standalone / test load
-    import _otr_json  # type: ignore
-
-extract_json_block = _otr_json.extract_first_json_block
-
+# consolidation); the ladder below is its only caller here.
+#
 # Sprint 2A/2D: the shared structured-JSON retry ladder. build_news_briefs
 # routes its one structured brief call through it -- the ladder subsumes the former
 # hand-rolled 3-attempt loop + repair branch. Package import in

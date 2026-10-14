@@ -68,7 +68,8 @@ def test_key_slot_choices_include_static_text_models(monkeypatch):
 def test_virtual_rows_present_without_a_key():
     """Like OpenRouter's and Comfy Credits': the pick is the enable, and the
     call fails closed without a key (test below)."""
-    assert not gmodels.google_api_enabled()
+    with pytest.raises(gclient.GoogleAPIKeyMissingError):
+        gclient.resolve_api_key()  # precondition: this box holds no Google key
     labels = cat.dropdown_choices()
     assert gmodels.GOOGLE_API_SLOT_A_ID in labels
     assert gmodels.GOOGLE_API_SLOT_B_ID in labels

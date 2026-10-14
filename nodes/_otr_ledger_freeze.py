@@ -69,7 +69,6 @@ __all__ = [
     "FreezeAssertionError",
     "GapAuditReport",
     "FreezeVerdict",
-    "ALLOWED_FREEZE_VERDICTS",
     "ALLOWED_SPEAKER_ROLES",
     "EXPECTED_SCHEMA_VERSION",
     "run_gap_audit",
@@ -116,13 +115,6 @@ FreezeVerdict = Literal[
     "frozen_with_warns",
     "needs_full_rerun",
 ]
-
-
-ALLOWED_FREEZE_VERDICTS: frozenset[str] = frozenset({
-    "frozen_clean",
-    "frozen_with_warns",
-    "needs_full_rerun",
-})
 
 
 # Top-level fields that must be present AND must be a list (never null,
@@ -188,14 +180,6 @@ class GapAuditReport:
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     info: dict = field(default_factory=dict)
-
-    @property
-    def is_clean(self) -> bool:
-        return not self.errors and not self.warnings
-
-    @property
-    def has_critical_gaps(self) -> bool:
-        return bool(self.errors)
 
 
 # ---------------------------------------------------------------------------

@@ -188,8 +188,8 @@ read the row:
 
 * `nodes/_otr_shared/capability_profiles.py` `_fit_reason()`, which decides
   whether one engine fits one *profile* (`REASON_REQUIRES_CUDA` when the
-  profile's `device_backend` is not in the list). It feeds `availability()`,
-  `enabled_engines()` and `cross_validate_profile()` -- i.e. which engines a
+  profile's `device_backend` is not in the list). It feeds `availability()`
+  and `cross_validate_profile()` -- i.e. which engines a
   profile admits into its enable set. The only live non-test caller is
   `scripts/build_variants.py`, at variant-emit time; `scripts/otr_api.py`
   dropped its enable-set cross-validation on 2026-08-31.

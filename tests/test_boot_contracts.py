@@ -72,13 +72,11 @@ def test_the_default_contract_constrains_nothing():
     `default` must be a real no-op or this mechanism would retire them all."""
     spec = bc.contract_spec(bc.DEFAULT)
     assert set(spec.values()) == {None}
-    assert bc.launch_env_for(bc.DEFAULT) == {}
 
 
 def test_cpu_contract_owns_the_real_comfyui_argv():
     assert bc.contract_spec(bc.CPU)["cpu"] is True
     assert bc.launch_args_for(bc.CPU) == ["--cpu"]
-    assert bc.launch_env_for(bc.CPU) == {}
     assert bc.check_running_server(
         bc.CPU, {"available": True, "cpu": True}) == []
 
@@ -145,7 +143,6 @@ def test_no_contract_reserves_vram():
     for name, spec in bc.BOOT_CONTRACTS.items():
         assert "reserve_vram_gb" not in spec, name
         assert "--reserve-vram" not in bc.launch_args_for(name), name
-        assert not any("RESERVE" in k for k in bc.launch_env_for(name)), name
 
 
 def test_the_physical_8gb_h3_lab_launch_turns_pinned_memory_off():
@@ -153,8 +150,7 @@ def test_the_physical_8gb_h3_lab_launch_turns_pinned_memory_off():
     assert spec["disable_pinned_memory"] is True
     assert spec["sage_attention"] is False
     assert bc.launch_args_for(bc.H3_8GB_LAB) == ["--disable-pinned-memory"]
-    assert bc.launch_env_for(bc.H3_8GB_LAB) == {
-        "OTR_HEADLESS_DISABLE_PINNED": "1"}
+    assert bc.CONTRACT_ENV["disable_pinned_memory"] == "OTR_HEADLESS_DISABLE_PINNED"
 
 
 def test_an_unknown_contract_raises_rather_than_meaning_no_constraints():
@@ -164,19 +160,18 @@ def test_an_unknown_contract_raises_rather_than_meaning_no_constraints():
         bc.contract_spec("humo_deit")
 
 
-def test_the_env_mapping_only_emits_knobs_a_launcher_actually_reads():
+def test_the_env_mapping_only_names_knobs_a_launcher_actually_reads():
     """Lesson L6. `sage_attention` gets NO env row because no launcher passes
-    an attention flag -- emitting one would be another configured knob that
+    an attention flag -- naming one would be another configured knob that
     reaches nothing. Sage-sensitive lanes refuse at assert_usable instead,
     which is enforcement that runs. Both halves are asserted: the knob a
-    launcher reads DOES emit, and Sage still does not.
+    launcher reads IS named, and Sage still is not.
     """
-    env = bc.launch_env_for(bc.H3_8GB_LAB)
-    assert env == {"OTR_HEADLESS_DISABLE_PINNED": "1"}
-    assert not any("SAGE" in k.upper() for k in env)
+    assert bc.CONTRACT_ENV == {
+        "disable_pinned_memory": "OTR_HEADLESS_DISABLE_PINNED"}
+    assert not any("SAGE" in v.upper() for v in bc.CONTRACT_ENV.values())
     # H3 constrains ONLY Sage since 2026-09-26 (operator: no artificial
-    # reserve) -- and Sage has no launcher row, so H3 emits nothing at all.
-    assert bc.launch_env_for(bc.H3) == {}
+    # reserve) -- and Sage has no launcher row, so H3 emits no argv at all.
     assert bc.launch_args_for(bc.H3) == []
 
 

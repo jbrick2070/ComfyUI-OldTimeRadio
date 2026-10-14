@@ -931,11 +931,6 @@ def _user_banks():
     return _oub
 
 
-def client_entry_point_id() -> str:
-    """The reserved entry-point value meaning "my own bundle owns this lane"."""
-    return _user_banks().SELF_ENTRY_POINT
-
-
 def _require_owner(owner, *, bank_id: str, field: str):
     """The admitted bundle that may execute for `bank_id`, or LOUD.
 
@@ -1041,7 +1036,6 @@ __all__ = [
     "UnknownFetcherError",
     "UnknownInterpreterError",
     "build_source_interpreter_fallback",
-    "client_entry_point_id",
     "normalize_fetch_result",
     "interpreter_exhaustion_attempts",
     "registered_fetcher_ids",

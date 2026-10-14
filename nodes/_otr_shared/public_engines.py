@@ -9,9 +9,7 @@ public id to its internal id, THEN maps a renamed engine's legacy id to its curr
 id (`_LEGACY_ENGINE_ALIASES`, so the director and every other boundary read ONE
 table).
 
-The friendly prose labels (`LTX 0.9.8 2B - low VRAM`, ...) live in `_PUBLIC_LABEL` for
-the static widget tooltip + docs ONLY -- they are NEVER the combo value / saved value
-(the menu value = the short public id + the existing aspect suffix).
+The menu value is the short public id + the existing aspect suffix.
 
 stdlib-only, cold-import clean (V-12): importing this module pulls in NOTHING (no
 torch / no registry / no ComfyUI). UTF-8, no BOM, ASCII-only.
@@ -106,69 +104,6 @@ _LEGACY_ENGINE_ALIASES = {
 #: Internal engine id -> its public menu id (inverse of _PUBLIC_ENGINES; the label
 #: builder maps an internal id to the public token shown in the dropdown).
 _INTERNAL_TO_PUBLIC = {v: k for k, v in _PUBLIC_ENGINES.items()}
-
-#: Friendly prose labels -- TOOLTIP / DOCS ONLY, never the combo/saved value.
-_PUBLIC_LABEL = {
-    # MEASURED, and deliberately NOT an 8 GB claim. This label states what the
-    # lane was measured to COST (6.8 GiB net at 512x288x161, cold) and lets the
-    # user decide what that fits on. Saying "runs on an 8 GB card" would encode
-    # the card the lane was built for, and net cost is not the whole story on a
-    # card whose desktop already eats some of it.
-    "ltx098_low_video": (
-        "LTX 0.9.8 2B - low VRAM (6.8 GiB net at 512x288x161; "
-        "the cheapest local video lane, ~22 s a beat)"),
-    "humo14_high_audio_in_wide": (
-        "HuMo 14B fp8 16:9 - audio-driven face, high VRAM "
-        "(13.06 GiB warm at 832x480x97 with a since-retired reserve; "
-        "14.98 GiB without)"),
-    "humo17_high_audio_in_portrait": (
-        "HuMo 1.7B portrait - audio-driven face, high VRAM, LONG beats "
-        "(12.84 GiB warm at 480x832x129 with a since-retired reserve; "
-        "177 frames)"),
-    "humo17_high_audio_in_wide": (
-        "HuMo 1.7B 16:9 - audio-driven face, high VRAM, LONG beats "
-        "(same checkpoint as the portrait tier; UNMEASURED at this aspect)"),
-    "humo14_high_audio_in_portrait": (
-        "HuMo 14B fp8 portrait - audio-driven face, high VRAM "
-        "(13.22 GiB warm at 480x832x97 with a since-retired reserve)"),
-    # "low" is the measured bucket and the label names the leg it came from, per
-    # the lane-1 convention. It also states the two things a user has to know
-    # before picking this lane: it needs its own boot, and it is SLOW -- a 5 s
-    # beat is minutes, not seconds, because a 21 GB DiT streams through a 16 GB
-    # card. Neither is a quality claim in either direction.
-    "h3_low_video": (
-        "MiniMax H3 33B silent video - low VRAM (7.3 GiB at 864x480; needs the "
-        "sage-free h3 boot, and it is the slowest local lane by far)"),
-    # Same two warnings as its sibling, plus what it actually adds: this is the
-    # only LOCAL lane that conditions on a reference picture and audio together
-    # -- each beat's own still since 2026-09-26 (3a61a421), not a portrait.
-    "h3_low_audio_in": (
-        "MiniMax H3 33B audio-in - low VRAM (6.9-7.2 GiB at 864x480; each "
-        "beat's own still + its own audio; needs the sage-free h3 boot, and it "
-        "is as slow as its silent sibling)"),
-    "ltx25_high_video": (
-        "LTX 2.5 Distilled mix4x8 HQ two-stage silent video - 16 GB "
-        "(832x480 first stage, 1664x960 refined decode, one 3.88 s rung)"),
-    # GHOST SIGNAL (2026-08-22). A LABEL ONLY -- there is deliberately no
-    # `_PUBLIC_ENGINES` self-alias, because the resolver already passes a bare
-    # internal id through unchanged (the existing identity-engine precedent) and
-    # a self-alias would put a duplicate in the bijection for no gain.
-    #
-    # NO `low` OR `high` TOKEN, and that is the whole naming decision. Those
-    # tokens carry MEASURED cost semantics in this repo -- every one of the
-    # labels above names a real measured bucket -- and no measurement campaign
-    # was run for this lane. "very-low-VRAM-targeted" is a design target, so the
-    # label says targeted and nothing stronger.
-    # ONE GHOST LANE (operator, 2026-08-23: "delete any animatediff that are
-    # not haunted"); its five non-haunted siblings are RETIRED and listed in
-    # RETIRED_ENGINE_IDS below. The adapter IS this lane's identity, so the
-    # label says so plainly. "Apache-2.0" is in the label deliberately: for
-    # anyone deciding what to build on, the licence is the most load-bearing
-    # fact about this lane.
-    "animatediff15_v3_haunted_video": (
-        "AnimateDiff v3 haunted -- Ghost Signal (official v3 module + the "
-        "removable domain adapter, Apache-2.0; degraded transmission look)"),
-}
 
 # Bijection guard: unique internals (no two public ids share one internal engine),
 # so _INTERNAL_TO_PUBLIC never collapses a row -- exact_menu_option_for stays 1:1.
@@ -277,6 +212,6 @@ def check_retired_engine(engine_id) -> None:
 
 __all__ = [
     "_PUBLIC_ENGINES", "_LEGACY_ENGINE_ALIASES", "_INTERNAL_TO_PUBLIC",
-    "_PUBLIC_LABEL", "resolve_engine_id",
+    "resolve_engine_id",
     "RETIRED_ENGINE_IDS", "RetiredEngineError", "check_retired_engine",
 ]

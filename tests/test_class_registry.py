@@ -2,7 +2,7 @@
 import pathlib
 import re
 
-from nodes._otr_class_registry import NEW_AUDIO_NODES, NEW_NODE_SPECS, V2_AUDIO_CATEGORY, new_node_modules_table
+from nodes._otr_class_registry import NEW_AUDIO_NODES, V2_AUDIO_CATEGORY, new_node_modules_table
 
 _PLACEHOLDER_MARKERS = ("[EMOJI]", "[TODO]", "[PLACEHOLDER]", "[FIXME]")
 _EXPECTED_KEYS = {
@@ -14,7 +14,7 @@ _EXPECTED_KEYS = {
 
 
 def test_expected_keys_present():
-    assert set(NEW_NODE_SPECS) == _EXPECTED_KEYS
+    assert {s.key for s in NEW_AUDIO_NODES} == _EXPECTED_KEYS
 
 
 def test_keys_have_otr_prefix_and_are_unique():
@@ -44,12 +44,13 @@ def test_module_paths_and_class_names_well_formed():
 def test_modules_table_shape_matches_init_convention():
     table = new_node_modules_table()
     assert set(table) == _EXPECTED_KEYS
+    specs = {s.key: s for s in NEW_AUDIO_NODES}
     for key, value in table.items():
         assert isinstance(value, tuple) and len(value) == 3, key
         module_path, class_name, display_name = value
-        assert module_path == NEW_NODE_SPECS[key].module_path
-        assert class_name == NEW_NODE_SPECS[key].class_name
-        assert display_name == NEW_NODE_SPECS[key].display_name
+        assert module_path == specs[key].module_path
+        assert class_name == specs[key].class_name
+        assert display_name == specs[key].display_name
 
 
 def test_strict_types_cli_includes_dynamic_registry_keys():

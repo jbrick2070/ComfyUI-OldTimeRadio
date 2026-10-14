@@ -20,8 +20,8 @@ happened:
 
 **The contract rides `launch.boot_contract`, never `launch.extra_args`.** A
 launcher derives argv from the named contract through :func:`launch_args_for`;
-the Windows headless launcher receives the compatible clamp subset through
-``launch.env``. `extra_args` is written only into a markdown string, so
+the Windows headless launcher reads the pinned-memory switch from
+``launch.env`` (``CONTRACT_ENV`` names the variable). `extra_args` is written only into a markdown string, so
 a load-bearing flag placed there changes no process while looking configured
 (lesson L6).
 
@@ -113,10 +113,10 @@ LAUNCH_ONLY_KNOBS = {
     CPU: frozenset({"cpu"}),
 }
 
-#: The compatibility channel used by the Windows headless launcher for clamp
-#: knobs. General launchers derive every argv row through ``launch_args_for``;
-#: CPU therefore needs no env alias. Keeping the legacy mapping visible still
-#: prevents a clamp profile from claiming an env row no launcher consumes.
+#: The env variable the Windows headless launcher reads for a clamp knob.
+#: General launchers derive every argv row through ``launch_args_for``; CPU
+#: therefore needs no env alias. Keeping the mapping visible prevents a clamp
+#: profile from claiming an env row no launcher consumes.
 CONTRACT_ENV = {
     "disable_pinned_memory": "OTR_HEADLESS_DISABLE_PINNED",
 }
@@ -147,21 +147,6 @@ def contract_spec(name) -> dict:
             "unknown boot contract %r; known contracts are %s"
             % (key, ", ".join(sorted(BOOT_CONTRACTS))))
     return dict(BOOT_CONTRACTS[key])
-
-
-def launch_env_for(name) -> dict:
-    """Clamp rows the Windows headless env channel needs for this contract.
-
-    Values are strings because that is what the env channel and the profile
-    schema both hold. CPU is emitted directly by :func:`launch_args_for`, and
-    `sage_attention` is deliberately absent because no launcher passes an
-    attention flag. A sage-sensitive lane refuses through live preflight.
-    """
-    spec = contract_spec(name)
-    env = {}
-    if spec["disable_pinned_memory"]:
-        env[CONTRACT_ENV["disable_pinned_memory"]] = "1"
-    return env
 
 
 def launch_args_for(name) -> list:
@@ -463,7 +448,7 @@ def check_engine_against_profile(engine, profile) -> list:
 __all__ = [
     "DEFAULT", "H3", "H3_8GB_LAB", "CPU",
     "BOOT_CONTRACTS", "CONTRACT_ENV", "LAUNCH_ONLY_KNOBS",
-    "BootContractError", "known_contract", "contract_spec", "launch_env_for",
+    "BootContractError", "known_contract", "contract_spec",
     "launch_args_for",
     "running_server_boot_state", "check_running_server",
     "assert_running_server", "contract_for_profile",

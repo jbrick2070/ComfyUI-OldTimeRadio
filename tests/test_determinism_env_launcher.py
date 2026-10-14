@@ -7,7 +7,7 @@ import random
 import pytest
 import torch
 
-from nodes._otr_determinism import REQUIRED_DETERMINISM_ENV, determinism_env_status, deterministic_inference
+from nodes._otr_determinism import REQUIRED_DETERMINISM_ENV, deterministic_inference
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _LAUNCH_CMD = REPO_ROOT / "scripts" / "_otr_soak_server_launch.cmd"
@@ -21,12 +21,6 @@ def test_required_env_keys():
         "CUBLAS_WORKSPACE_CONFIG", "PYTHONHASHSEED",
         "NVIDIA_TF32_OVERRIDE", "TOKENIZERS_PARALLELISM",
     }
-
-
-def test_env_status_reports_actual(monkeypatch):
-    monkeypatch.setenv("PYTHONHASHSEED", "7")  # wrong value
-    ok, actual = determinism_env_status()["PYTHONHASHSEED"]
-    assert ok is False and actual == "7"
 
 
 # --- launchers: values present AND set before python (C-1 ordering) --------

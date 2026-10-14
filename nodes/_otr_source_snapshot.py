@@ -82,13 +82,6 @@ def snapshot_payload_sha256(payload) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
-def _clear_cache() -> None:
-    """Retained test hook. The manifest is re-read on every call (it is read at
-    most once per episode), so there is no parsed-manifest cache to drop; a live
-    re-pin of the manifest file is always seen immediately."""
-    return None
-
-
 def _manifest_path() -> str:
     """The configured manifest path (stripped), or '' when unset."""
     return otr_env.get(SNAPSHOT_MANIFEST_ENV, "").strip()

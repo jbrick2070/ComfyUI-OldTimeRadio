@@ -24,10 +24,9 @@ Pure and stdlib-only: no pydantic, no LLM, no ledger writes.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from functools import lru_cache
 import re
-from typing import Any, Mapping
+from typing import Any
 
 
 PROFANITY_TERMS: tuple[str, ...] = (
@@ -89,20 +88,6 @@ EXPLICIT_NUDITY_TERMS: tuple[str, ...] = (
     "sexual intercourse",
 )
 
-SPOKEN_ROLES = frozenset({"character", "announcer"})
-
-
-@dataclass(frozen=True)
-class SafetyHit:
-    line_id: str
-    line_index: int
-    category: str
-    term: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
 def profanity_terms() -> tuple[str, ...]:
     """Return the global narrow profanity vocabulary."""
     return PROFANITY_TERMS
@@ -138,43 +123,10 @@ def find_text_hits(text: Any) -> tuple[tuple[str, str], ...]:
     return tuple(found)
 
 
-def scan_spoken_ledger(ledger_data: Mapping[str, Any]) -> tuple[SafetyHit, ...]:
-    """Scan the exact non-skipped character/announcer projection."""
-    hits: list[SafetyHit] = []
-    lines = ledger_data.get("lines") if isinstance(ledger_data, Mapping) else ()
-    for index, row in enumerate(lines or ()):
-        if not isinstance(row, Mapping):
-            continue
-        if bool(row.get("skip")):
-            continue
-        if str(row.get("speaker_role") or "") not in SPOKEN_ROLES:
-            continue
-        line_id = str(row.get("line_id") or f"lines[{index}]")
-        for category, term in find_text_hits(row.get("text")):
-            hits.append(SafetyHit(line_id, index, category, term))
-    return tuple(hits)
-
-
-def format_safety_hits(hits: Iterable[SafetyHit], *, limit: int = 8) -> str:
-    rows = list(hits)
-    sample = rows[: max(1, int(limit))]
-    rendered = "; ".join(
-        f"{hit.line_id}: {hit.category}={hit.term!r}"
-        for hit in sample
-    )
-    if len(rows) > len(sample):
-        rendered += f" (+{len(rows) - len(sample)} more)"
-    return rendered
-
-
 __all__ = [
     "EXPLICIT_NUDITY_TERMS",
     "PROFANITY_TERMS",
     "EXPLICIT_WEAPON_TERMS",
-    "SPOKEN_ROLES",
-    "SafetyHit",
     "find_text_hits",
-    "format_safety_hits",
     "profanity_terms",
-    "scan_spoken_ledger",
 ]

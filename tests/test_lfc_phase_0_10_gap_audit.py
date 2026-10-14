@@ -137,12 +137,11 @@ class TestCleanLedger:
         assert rep.warnings == []
         assert rep.info["line_count"] == 4
         assert rep.info["voiced_beat_count"] == 4
-        assert rep.is_clean is True
 
     def test_phase_0_clean_stamps_audit(self):
         data = _clean_ledger_data()
         rep = _LFC.phase_0_gap_audit_pre(data)
-        assert rep.is_clean
+        assert not (rep.errors or rep.warnings)
         assert data["meta"]["gap_audit_pre"]["errors"] == []
         assert data["meta"]["gap_audit_pre"]["warnings"] == []
         # Phase 0 does NOT stamp the freeze lock.
@@ -153,7 +152,7 @@ class TestCleanLedger:
     def test_phase_10_clean_stamps_freeze(self):
         data = _clean_ledger_data()
         rep = _LFC.phase_10_gap_audit_post_and_freeze(data)
-        assert rep.is_clean
+        assert not (rep.errors or rep.warnings)
         meta = data["meta"]
         assert meta["cleanup_locked"] is True
         assert meta["freeze_verdict"] == "frozen_clean"
@@ -181,12 +180,12 @@ class TestCleanLedger:
         data["meta"]["story_style_status"] = "story_scaffold_off"
         rep = _LFC.run_gap_audit(data, label="pre")
         assert "meta.style is missing" not in rep.warnings
-        assert rep.is_clean
+        assert not (rep.errors or rep.warnings)
 
     def test_phase_10_accepts_ledger_obj(self):
         led = _ledger_obj(_clean_ledger_data())
         rep = _LFC.phase_10_gap_audit_post_and_freeze(led)
-        assert rep.is_clean
+        assert not (rep.errors or rep.warnings)
         assert led.data["meta"]["cleanup_locked"] is True
 
     def test_phase_10_idempotent(self):
@@ -195,8 +194,8 @@ class TestCleanLedger:
         ts1 = data["meta"]["freeze_timestamp"]
         rep2 = _LFC.phase_10_gap_audit_post_and_freeze(data)
         ts2 = data["meta"]["freeze_timestamp"]
-        assert rep1.is_clean
-        assert rep2.is_clean
+        assert not (rep1.errors or rep1.warnings)
+        assert not (rep2.errors or rep2.warnings)
         # Allow timestamp to advance (idempotent stamp -- not byte-identical
         # but always-valid). Both verdicts should be frozen_clean.
         assert data["meta"]["freeze_verdict"] == "frozen_clean"
@@ -320,7 +319,7 @@ class TestPhase10HardFail:
             _LFC.phase_10_gap_audit_post_and_freeze(data)
         except _LFC.FreezeAssertionError as exc:
             assert isinstance(exc.report, _LFC.GapAuditReport)
-            assert exc.report.has_critical_gaps
+            assert exc.report.errors
             assert exc.errors == exc.report.errors
 
 
@@ -597,25 +596,7 @@ class TestSoftGapsAdvanceCleanly:
 
 
 class TestGapAuditReport:
-    def test_is_clean_true_when_no_errors_no_warnings(self):
-        rep = _LFC.GapAuditReport(label="pre")
-        assert rep.is_clean
-        assert not rep.has_critical_gaps
-
-    def test_is_clean_false_when_warnings(self):
-        rep = _LFC.GapAuditReport(label="pre", warnings=["soft"])
-        assert not rep.is_clean
-        assert not rep.has_critical_gaps
-
-    def test_has_critical_gaps_true_when_errors(self):
-        rep = _LFC.GapAuditReport(label="pre", errors=["critical"])
-        assert rep.has_critical_gaps
-        assert not rep.is_clean
-
     def test_constants_exposed(self):
         assert _LFC.EXPECTED_SCHEMA_VERSION == "l4-2026-08-07"
-        assert "frozen_clean" in _LFC.ALLOWED_FREEZE_VERDICTS
-        assert "frozen_with_warns" in _LFC.ALLOWED_FREEZE_VERDICTS
-        assert "needs_full_rerun" in _LFC.ALLOWED_FREEZE_VERDICTS
         assert "character" in _LFC.ALLOWED_SPEAKER_ROLES
         assert "announcer" in _LFC.ALLOWED_SPEAKER_ROLES

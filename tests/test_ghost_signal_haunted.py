@@ -432,19 +432,9 @@ def test_the_capability_row_names_all_three_artifacts():
     assert set(row) == set(vreg.CAPABILITIES[HAUNTED])
 
 
-def test_the_public_label_names_the_adapter_and_the_licence():
+def test_the_haunted_id_passes_through_the_public_resolver():
     from nodes._otr_shared import public_engines as pub
-    label = pub._PUBLIC_LABEL[HAUNTED]
-    assert "adapter" in label.lower()
-    assert "Apache-2.0" in label
     assert pub.resolve_engine_id(HAUNTED) == HAUNTED
-
-
-def test_the_haunted_lane_makes_no_vram_claim():
-    from nodes._otr_shared import public_engines as pub
-    label = pub._PUBLIC_LABEL[HAUNTED]
-    for claim in ("GiB", "GB VRAM", "fits"):
-        assert claim not in label
 
 
 def test_it_declares_commercial_clean_false_like_its_parent():

@@ -70,9 +70,7 @@ def _write_manifest(tmp_path, snapshots, *, name="manifest.json", allow_partial=
 @pytest.fixture(autouse=True)
 def _clean_snapshot_env(monkeypatch):
     monkeypatch.delenv(SS.SNAPSHOT_MANIFEST_ENV, raising=False)
-    SS._clear_cache()
     yield
-    SS._clear_cache()
 
 
 # ---------------------------------------------------------------------------

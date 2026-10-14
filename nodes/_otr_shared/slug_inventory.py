@@ -61,18 +61,6 @@ class InventoryRecord(NamedTuple):
     catalog_target: Optional[str]
 
 
-#: Engines that legitimately ship NO concrete model collection. Keyed on the
-#: reason, not on a bare name, so a future engine of the same shape is covered
-#: without editing an allowlist.
-#:
-#: ``sonilo`` routes through a Comfy PARTNER ROW (``_PARTNER_ROW =
-#: "cloud_sonilo_music"``), which is a product identifier rather than a model
-#: slug -- there is no version pin in it to go stale.
-EXEMPT_ENGINES = {
-    "sonilo": "ships a partner row, not a model slug -- no version pin to date",
-}
-
-
 def _norm(provider_id: str) -> str:
     """Strip exactly one leading ``models/`` so ids compare equal to catalog
     names. Google returns ``models/{id}``; everything else ships bare."""
@@ -150,23 +138,4 @@ def collect_inventory() -> List[InventoryRecord]:
     return out
 
 
-def google_catalog_records(records: Iterable[InventoryRecord]
-                           ) -> List[InventoryRecord]:
-    """Only the records a Google catalog fetch may be asked about.
-
-    Without this projection the verifier would send ElevenLabs models and Comfy
-    display selectors into Google's catalog and report them 'missing' -- a
-    confident wrong answer, which is the failure mode this whole chunk exists to
-    prevent."""
-    return [r for r in records if r.catalog_target == CATALOG_GOOGLE]
-
-
-def provider_identities(records: Iterable[InventoryRecord]) -> set:
-    """The ``(provider_id, authority_lane)`` pairs provenance is keyed by."""
-    return {(r.provider_id, r.authority_lane) for r in records}
-
-
-__all__ = [
-    "CATALOG_GOOGLE", "InventoryRecord", "EXEMPT_ENGINES",
-    "collect_inventory", "google_catalog_records", "provider_identities",
-]
+__all__ = ["CATALOG_GOOGLE", "InventoryRecord", "collect_inventory"]

@@ -201,14 +201,14 @@ def test_dialogue_ratio_separates_scaffold_from_text():
     ("船長：老大\n水手長：在\n", 2),
 ])
 def test_every_vendored_label_shape_counts(text, want):
-    assert C.count_speaker_labels(text) == want
+    assert C.speaker_label_stats(text)[0] == want
 
 
 def test_label_shapes_are_maxed_not_summed():
     """A page uses ONE convention; summing would let two weak partial
     matches look like a performable scene."""
     mixed = "MACBETH: un\nBanq. deux\n"
-    assert C.count_speaker_labels(mixed) == 1
+    assert C.speaker_label_stats(mixed)[0] == 1
 
 
 @pytest.mark.parametrize("text, scene, want", [

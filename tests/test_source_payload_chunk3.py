@@ -36,6 +36,7 @@ import pytest
 from nodes import _otr_public_domain_sources as _pd_sources
 from nodes import _otr_source_payload as osp
 from nodes import _otr_story_routing as routing
+from nodes import _otr_user_banks as _ub
 
 REPO = Path(__file__).resolve().parents[1]
 WRITER_PATH = REPO / "nodes" / "OTR_LedgerScriptWriter.py"
@@ -1043,7 +1044,7 @@ def test_source_interpreter_fallback_serves_a_client_owned_lane():
     identity plus the validated payload; it borrows no shipped dramaturgy.
     """
     bank = SimpleNamespace(
-        interpreter=osp.client_entry_point_id(),
+        interpreter=_ub.SELF_ENTRY_POINT,
         label="Lighthouse Logs",
         source_bank_id="lighthouse_logs",
     )
@@ -1070,7 +1071,7 @@ def test_source_interpreter_fallback_serves_a_client_owned_lane():
 
 def test_client_fallback_names_the_bank_id_when_the_row_has_no_label():
     bank = SimpleNamespace(
-        interpreter=osp.client_entry_point_id(),
+        interpreter=_ub.SELF_ENTRY_POINT,
         label="",
         source_bank_id="lighthouse_logs",
     )

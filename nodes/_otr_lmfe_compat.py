@@ -33,17 +33,6 @@ where prebuilt wheels are scarce -- see project memory
 hyworld_2_pivot for context).
 """
 
-# Guard: transformers is an optional dep (lives in the ComfyUI venv; absent in
-# the bare pytest sandbox). The module-level import must not raise on import so
-# that _otr_constrained_generate (which imports this shim at module scope) stays
-# importable in test environments where transformers is not installed.
-try:
-    import transformers as _transformers  # noqa: F401 -- probed below
-    import transformers.tokenization_utils as _tu  # noqa: F401
-    _TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    _TRANSFORMERS_AVAILABLE = False
-
 
 def ensure_lmfe_transformers_compat() -> None:
     """Idempotently re-apply the v4 PreTrainedTokenizerBase alias.
@@ -62,8 +51,10 @@ def ensure_lmfe_transformers_compat() -> None:
     try:
         # Re-resolve transformers.tokenization_utils every call because
         # an importlib.reload would have replaced the module object in
-        # sys.modules; our cached `_tu` would then point at the stale
-        # (but still in-memory) module.
+        # sys.modules; a module-level reference would point at the stale
+        # (but still in-memory) module. transformers is an optional dep
+        # (absent in the bare pytest sandbox), so an ImportError below is the
+        # normal "nothing to shim" case and the module stays importable.
         import transformers as _t
         import transformers.tokenization_utils as _live_tu
     except ImportError:

@@ -91,6 +91,5 @@ def test_music_engine_fails_closed_without_lib():
     ],
 )
 def test_engine_not_external_generator_ready_until_pilot(modname, clsname):
-    from nodes._otr_audio_engines.base import engine_supports_external_generator
-
-    assert engine_supports_external_generator(_engine(modname, clsname)) is False
+    # an engine that never sets the flag reads False: not bit_exact-eligible
+    assert getattr(_engine(modname, clsname), "supports_external_generator", False) is False

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .client import GoogleAPIKeyMissingError, resolve_api_key
+from .client import GoogleAPIKeyMissingError
 
 try:
     from .._otr_shared import env as otr_env
@@ -85,14 +85,6 @@ _slot_bindings: dict[str, str | None] = {"A": None, "B": None}
 
 class GoogleAPISlotBindingError(GoogleAPIKeyMissingError):
     """A Google slot handle was selected without a concrete model binding."""
-
-
-def google_api_enabled() -> bool:
-    try:
-        resolve_api_key()
-        return True
-    except GoogleAPIKeyMissingError:
-        return False
 
 
 def is_google_api_row_id(repo_id: str) -> bool:
@@ -265,7 +257,6 @@ __all__ = [
     "GOOGLE_API_STATIC_TEXT_MODELS",
     "GoogleAPISlotBindingError",
     "clear_slot_bindings",
-    "google_api_enabled",
     "google_api_model_choices",
     "google_api_run_meta",
     "is_google_api_row_id",

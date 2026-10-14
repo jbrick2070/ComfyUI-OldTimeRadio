@@ -2,7 +2,7 @@
 
 Covers the deterministic Tier-A craft floor:
   * clean pass on a known-good slot-formatted draft (zero false-reds),
-  * one focused case per failure code in FAILURE_CODES,
+  * one focused case per failure code,
   * determinism: same input twice -> identical verdict.
 
 PURE: no torch, no live model, no ComfyUI import. The module under test
@@ -66,8 +66,12 @@ def _clean_raw():
 # ---------------------------------------------------------------------------
 
 
-def test_parse_slot_lines_shape():
-    rows = cf.parse_slot_lines(_clean_raw())
+def _rows(result):
+    return [(p.slot_id, p.speaker, p.text) for p in result.parsed_slots]
+
+
+def test_parsed_slots_shape():
+    rows = _rows(cf.evaluate_tier_a(_clean_raw(), _manifest()))
     assert len(rows) == 4
     assert rows[0] == (
         "d001",
@@ -80,16 +84,18 @@ def test_parse_slot_lines_shape():
 
 def test_parse_preserves_internal_pause_as_one_block():
     raw = "d002|REN BLACK: I will not sign that paper. ... Not tonight."
-    rows = cf.parse_slot_lines(raw)
-    assert len(rows) == 1
-    assert rows[0][2] == "I will not sign that paper. ... Not tonight."
+    result = cf.evaluate_tier_a(raw, [{"slot_id": "d002", "speaker": "REN BLACK"}])
+    assert result.passed is True
+    assert len(result.parsed_slots) == 1
+    assert result.parsed_slots[0].text == "I will not sign that paper. ... Not tonight."
 
 
 def test_normalize_round_trips():
     line = cf.normalize_slot_line("d007", "  REN BLACK ", " hold the line ")
     assert line == "d007|REN BLACK: hold the line"
-    rows = cf.parse_slot_lines(line)
-    assert rows == [("d007", "REN BLACK", "hold the line")]
+    result = cf.evaluate_tier_a(line, [{"slot_id": "d007", "speaker": "REN BLACK"}])
+    assert result.passed is True
+    assert _rows(result) == [("d007", "REN BLACK", "hold the line")]
 
 
 # ---------------------------------------------------------------------------
@@ -233,19 +239,6 @@ def test_duplicate_slot():
         f for f in result.failures if f.code == cf.DUPLICATE_SLOT
     )
     assert dup_fail.slot_id == "d002"
-
-
-def test_failure_code_vocabulary_is_complete():
-    # Every code referenced by tests must be in the published vocabulary.
-    for code in (
-        cf.SLOT_COUNT_MISMATCH,
-        cf.SLOT_ORDER_MISMATCH,
-        cf.SPEAKER_MISMATCH,
-        cf.EMPTY_LINE,
-        cf.PARSE_ERROR,
-        cf.DUPLICATE_SLOT,
-    ):
-        assert code in cf.FAILURE_CODES
 
 
 # ---------------------------------------------------------------------------

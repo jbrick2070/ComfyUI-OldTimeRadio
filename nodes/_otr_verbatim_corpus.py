@@ -376,11 +376,6 @@ def speaker_label_stats(text: str) -> tuple:
     return best
 
 
-def count_speaker_labels(text: str) -> int:
-    """How many speeches this page seems to carry. See `speaker_label_stats`."""
-    return speaker_label_stats(text)[0]
-
-
 #: The word an edition puts before the number, in the seven shipped rows plus
 #: English. Matching the NUMBER alone made "there are 2 witches" a scene
 #: heading, and the bare roman `i` matched the English pronoun.
@@ -713,7 +708,7 @@ __all__ = [
     "READY", "REQUIRED_MANIFEST_FIELDS", "SCHEMA_VERSION", "SPEAKER_MAP_FIELD",
     "SPEAKER_LABEL_PATTERNS", "TRANSCRIPTION_PENDING_MARKERS",
     "US_PUBLICATION_BEFORE", "CorpusError", "LeadReport", "assess",
-    "count_speaker_labels", "vendored_text",
+    "vendored_text",
     "dialogue_ratio", "find_pending_markers", "headings_present",
     "load_manifest", "publication_reasons", "select_scene", "speaker_bindings",
     "strip_tracking",

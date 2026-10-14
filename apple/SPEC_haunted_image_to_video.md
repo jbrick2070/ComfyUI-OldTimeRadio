@@ -245,7 +245,6 @@ receipt that lies. Section 6's table missed it entirely.
 | `registry.py` `CAPABILITIES` dict | `tests/test_capability_profiles.py:393` asserts `set(vreg.CAPABILITIES) == set(vreg.all_engine_names())`. Registering without it FAILS CI. |
 | engine class `still_plan` | non-empty `StillPlanRow` entries, or no stills are minted (above) |
 | `tests/fixtures/still_plan_matrix.json` | parity test; needs regeneration |
-| `public_engines.py` `_PUBLIC_LABEL` | 1:1 bijection assert |
 | `content_oracle.py` `_FAMILY_FALLBACK` | bare-script family resolution |
 | `apple/ENGINE_MATRIX.md` via `tools/engine_matrix.py` | `test_engine_matrix_doc` asserts every registered engine is documented |
 | frame-contract tests | sweep new engines automatically |

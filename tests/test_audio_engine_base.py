@@ -4,7 +4,6 @@ import torch
 
 from nodes._otr_audio_engines import (
     AudioEngineAdapter,
-    engine_supports_external_generator,
     pack_audio_batch,
 )
 from nodes._otr_resolved_request import assert_audio_batch_contract
@@ -77,22 +76,9 @@ def test_base_adapter_defaults_and_noop_lifecycle():
 
     e = _E()
     assert e.supports_external_generator is False
-    assert engine_supports_external_generator(e) is False
     # load/unload defaults are cheap no-ops and must not raise.
     e.load()
     e.unload()
-
-
-def test_external_generator_helper_reads_flag():
-    class _E(AudioEngineAdapter):
-        supports_external_generator = True
-
-    assert engine_supports_external_generator(_E()) is True
-
-    class _Duck:  # never sets the flag -> reads False
-        pass
-
-    assert engine_supports_external_generator(_Duck()) is False
 
 
 if __name__ == "__main__":

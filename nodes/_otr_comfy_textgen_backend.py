@@ -33,9 +33,8 @@ MODEL_ID = "comfy_native:gemma4-e2b-it-int8-convrot"
 PROVIDER = "comfy_native"
 LOADER_BACKEND = "comfy_textgen"
 
-#: The ComfyUI model category the stock CLIPLoader reads, and the file in it.
+#: The ComfyUI model category the stock CLIPLoader reads.
 WEIGHT_CATEGORY = "text_encoders"
-WEIGHT_TOKEN = "gemma4_e2b_it_int8_convrot.safetensors"
 
 #: The upstream file's name. ``_otr_visual_assets._PINNED_SOURCES`` owns the
 #: repo, the revision, the size and the sha256 (the download is verified against

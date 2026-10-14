@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from .base import (
     AudioEngineAdapter,
-    engine_supports_external_generator,
     pack_audio_batch,
     resolve_voice_ref_path,
 )
@@ -63,7 +62,6 @@ __all__ = [
     "EngineUsabilityReason",
     "assert_usable",
     "default_engine_for_role",
-    "engine_supports_external_generator",
     "engines_for_role",
     "get_engine",
     "is_registered",
