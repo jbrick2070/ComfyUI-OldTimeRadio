@@ -330,7 +330,9 @@ once after the merge.
 ### 0q. Dead code: what the reachability pass left for a ruling (2026-10-14)
 
 Five commits landed (`4d92cfaf` `0d461867` `e6daae04` `f74316a5` `22231ffa`; about
-2,600 lines, three finished one-shot scripts among them). A symbol is dead when
+2,600 lines, three finished one-shot scripts among them), and then the last three
+scripts with no reader (`otr_build_obs_listen_page`, `otr_gemma4_doctor`,
+`otr_tail_logs`) went at the operator's word. A symbol is dead when
 nothing reachable from the pack's real roots (the node table in `__init__.py`,
 `scripts/`, `tools/`) reads it. Tests are neither roots nor evidence: a test that is
 a symbol's only reader is read for what it asserts, then deleted with a subject
@@ -358,9 +360,6 @@ Each of these survived on purpose and needs a ruling, not a deletion:
   pinned unwired on purpose by a test.
 - **`profile_max_render_frames`** and `_active_profile`: the KNOWN OPEN cap-authority
   row in the standing rulings.
-- **Scripts.** `otr_build_obs_listen_page.py` has no reader and may be a daily tool;
-  `otr_gemma4_doctor.py` is a support diagnostic; `otr_tail_logs.py` is named in row 0c.
-  Kept until the operator says otherwise.
 
 ### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
 
@@ -679,8 +678,10 @@ and the platform quant bakes NF4 only when the vendor is NVIDIA.
    the sidecar stderr files and `otr_runtime.log` write under the output
    tree; the old pack-folder billing ledger is copied forward once. The
    episode's telemetry line reads the live log only -- the frozen
-   pack-folder log is shown by `otr_tail_logs` as history, never read as
-   current (a Sonnet review reproduced a stale model name leaking in).
+   pack-folder log is history, never read as current (a Sonnet review
+   reproduced a stale model name leaking in). The log tailer that used to
+   display it, `otr_tail_logs`, was deleted 2026-10-14 with the other
+   scripts nothing reads.
 8. Lower. DONE: the Chatterbox default venv path (`3e1fd8be`) and the
    video no-ledger output fallback (`ed4cd47b`). Still open: NVFP4 is preferred among installed files without a hardware check;
    `config/otr_windows_extra_model_paths.yaml` names `C:/ComfyUI-Models`.

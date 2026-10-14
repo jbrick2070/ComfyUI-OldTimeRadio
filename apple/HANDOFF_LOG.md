@@ -1857,3 +1857,18 @@ the live version.
 - **A run is only a baseline if nothing under it moves.** Eight source-inspection tests failed once because a
   prose edit to `OTR_LedgerScriptWriter.py` shifted the line numbers `inspect.getsource` reads while the suite was
   live; they pass in a fresh process. Do not edit the tree under a running suite.
+
+## 2026-10-14 -- the last three scripts with no reader are gone (cloud session)
+
+- **Operator:** "delete the scripts with no readers." That was the three held back from the 22231ffa
+  cleanup: `scripts/otr_build_obs_listen_page.py` (266 lines, built `LISTEN.html` from `otr/obs`; no reader
+  anywhere), `scripts/otr_gemma4_doctor.py` (202, an offline loader check for the official Gemma 4 writer; only
+  a 2026-06 bug-log entry mentioned it) and `scripts/otr_tail_logs.py` (139, a log tailer; only plan row 0c
+  named it). 607 lines, all recoverable from git.
+- **Checked:** no code, test, launcher, CI file or current doc references them (`git grep -F` on all three
+  names); the pack still loads 22 nodes, every module imports, nothing dangles. Row 0c's sentence that said the
+  frozen pack-folder log "is shown by `otr_tail_logs`" now says the log is history and the tailer is deleted;
+  the 0q "Scripts" bullet is gone. The bug-log entry and the rights note that mention the old outputs are
+  dated history and stay.
+- **If you want one back:** `git log --diff-filter=D --oneline -- scripts/<name>` finds the deleting commit;
+  `git show <that commit>^:scripts/<name>` prints the file.
