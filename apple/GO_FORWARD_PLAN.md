@@ -386,6 +386,11 @@ live proof belongs to a box that has them. Open: the review's item 3 --
 profile green / rainbow / mandala (audio analysis, per-clip prep, per-frame
 paint+CRT, encode) on a quiet box before choosing any further change.
 
+**Released as 2.3.27 (`b9733a23`, 2026-10-14 21:31 UTC): publish Action
+green, registry row Pending with 31 dependencies.** The mux hardening after
+the last live leg (`2c901787` `39508e1a` `9e763d14`) is failure-path only and
+unit-proven; the next MRKT leg on any later tree re-proves the shipped path.
+
 **Mux finishing (Muse review, 4 items) landed and is live-proven on MRKT.**
 `733c2386` + QA follow-ups `4a406d20` `b4a1f00f` `2c901787`: finals are
 replaced only by validated candidates (OBS ones staged in `obs/.otr_staging`),
