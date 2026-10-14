@@ -507,7 +507,8 @@ class TestMuxStampAndCacheKey:
     def test_a_withheld_publication_still_stamps_the_archival_final(self, episode):
         self._write(episode, _RESEARCH)
         line = MUX.OTRMasterAudioMux()._stamp_terminal_paths(
-            episode["final"], None, episode["audio"])
+            episode["final"], None, episode["audio"],
+            MUX._episode_stem(episode["video"]))
         saved = json.loads(episode["ledger_path"].read_text(encoding="utf-8"))
         assert "publication withheld" in line
         assert saved["final_video_path"] == episode["final"]
@@ -520,7 +521,8 @@ class TestMuxStampAndCacheKey:
         obs = str(episode["ledger_path"].parents[3] / "obs" / "the_test_episode.mp4")
         Path(obs).write_bytes(b"published")
         MUX.OTRMasterAudioMux()._stamp_terminal_paths(
-            episode["final"], obs, episode["audio"])
+            episode["final"], obs, episode["audio"],
+            MUX._episode_stem(episode["video"]))
         saved = json.loads(episode["ledger_path"].read_text(encoding="utf-8"))
         assert saved["meta"]["obs_final_path"]
 

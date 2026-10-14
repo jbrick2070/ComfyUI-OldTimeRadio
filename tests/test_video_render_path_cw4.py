@@ -310,9 +310,12 @@ def test_master_audio_mux_terminal_stamp_owns_all_final_paths(
     }), encoding="utf-8")
     monkeypatch.setattr(
         otr_ledger, "in_flight_ledger_path", lambda: ledger_path)
+    from nodes import otr_master_audio_mux as mux_mod
+    monkeypatch.setattr(mux_mod, "_episodes_root", lambda: otr_root / "episodes")
 
     status = OTRMasterAudioMux()._stamp_terminal_paths(
-        str(final_video), str(obs_video), str(final_audio))
+        str(final_video), str(obs_video), str(final_audio),
+        f"{ep_id}_with_credits")
     saved = json.loads(ledger_path.read_text(encoding="utf-8"))
 
     assert "stamped ledger" in status

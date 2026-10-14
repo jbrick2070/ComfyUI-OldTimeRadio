@@ -54,9 +54,10 @@ except ImportError:  # pragma: no cover -- flat (sys.path) test import
     from _otr_shared import ffprobe as _ffp  # type: ignore
 
 try:
-    from ._otr_shared.pathbudget import compact_artifact
+    from ._otr_shared.pathbudget import compact_artifact, long_path, path_fits
 except ImportError:  # pragma: no cover -- flat (sys.path) test import
-    from _otr_shared.pathbudget import compact_artifact  # type: ignore
+    from _otr_shared.pathbudget import (  # type: ignore
+        compact_artifact, long_path, path_fits)
 
 # The show prefix the published (watching) filename drops. Spelled once, in the
 # ledger, whose `_published_obs_path` must accept the name written here; bound
@@ -116,12 +117,32 @@ def _run(cmd):
                           encoding="utf-8", errors="replace")
 
 
+#: ``_probe_float``'s answer when the probe READ the file and the selected
+#: stream is not in it. Distinct from ``-1.0`` ("nothing could measure"), and
+#: negative like it, so every ``< 0`` "unmeasured" branch still reads it as no
+#: duration -- only a caller that asks for the stream by name refuses on it.
+STREAM_MISSING = -2.0
+
+
 def _probe_float(path: str, stream: str) -> float:
     """Duration (s) of the first ``stream`` (``v:0`` / ``a:0``), the container
-    duration when the stream carries none, ``-1.0`` when nothing can measure."""
+    duration when the stream carries none, ``-1.0`` when nothing can measure,
+    and :data:`STREAM_MISSING` when the file was read and has no such stream.
+
+    A MISSING STREAM IS NOT A STREAM WITHOUT A DURATION. Both the ffprobe
+    binary and the PyAV fallback answer an absent ``-select_streams`` with an
+    explicit EMPTY ``streams`` list (measured 2026-10-14: ffprobe 9.0 and PyAV
+    on a video-only and an audio-only file). Falling back to the container
+    duration there let a video-only file pass the audio check with a plausible
+    number (codex QA, Muse finishing review item 4). A present stream with no
+    duration of its own still takes the container fallback, and a document
+    with no ``streams`` key at all is treated as unmeasured, never missing."""
     try:
         doc = _ffp.probe_json(path, "stream=duration", select_streams=stream)
-        streams = doc.get("streams") or []
+        streams = doc.get("streams")
+        if isinstance(streams, list) and not streams:
+            return STREAM_MISSING
+        streams = streams or []
         value = (streams[0] if streams else {}).get("duration")
         if value not in (None, ""):
             return float(value)
@@ -360,14 +381,107 @@ class _Interrupted(RuntimeError):
 
 
 def _poll_interrupt():
-    """Honour ComfyUI Cancel (BUG-073). No-op outside ComfyUI."""
+    """Honour ComfyUI Cancel (BUG-073). No-op outside ComfyUI.
+
+    ONLY THE IMPORT IS GUARDED. Comfy's own ``InterruptProcessingException``
+    propagates exactly as Comfy raised it -- never translated, never caught.
+    On the current runtime it derives from ``BaseException``; older ComfyUI
+    builds derived it from ``Exception``, and the old shape (call inside the
+    same ``try`` as the import, then ``except Exception: return``) silently
+    swallowed a Cancel on those (Muse finishing review item 3)."""
     try:
         import comfy.model_management as mm  # type: ignore
-        mm.throw_exception_if_processing_interrupted()
-    except _Interrupted:
-        raise
-    except Exception:  # noqa: BLE001  (not running under comfy / no such API)
+    except Exception:  # noqa: BLE001 -- not running under ComfyUI
         return
+    check = getattr(mm, "throw_exception_if_processing_interrupted", None)
+    if callable(check):
+        check()
+
+
+# --------------------------------------------------------------------------- #
+# Candidate-then-replace: a final file is only ever replaced by ACCEPTED bytes
+# --------------------------------------------------------------------------- #
+#: The OBS candidates' folder, INSIDE the OBS folder so acceptance is one
+#: same-filesystem rename, and a SUBFOLDER so a candidate never appears in the
+#: top-level MP4 listing the operator watches.
+OBS_STAGING_DIRNAME = ".otr_staging"
+
+#: A candidate's name: short (shorter than any final it stands in for, so a
+#: final that fits the Windows path budget gives a candidate that fits), with
+#: no ``_final`` marker and no episode words, so nothing that finds finals by
+#: name can mistake it for one.
+_CANDIDATE_PREFIX = "otr_cand_"
+
+
+def _reserve_candidate(final_path: str, folder: "str | None" = None) -> str:
+    """An exclusively reserved, invocation-unique path to write ``final_path``'s
+    replacement to, in ``folder`` (default: beside the final).
+
+    The final's own extension is kept, so ffmpeg chooses the same container
+    and the PCM capability gate (keyed to the REQUESTED output) still means
+    what it says. Reserved with ``O_CREAT | O_EXCL`` and closed again at once:
+    Windows will not let ffmpeg open a file this process still holds, and the
+    exclusive create is what makes two concurrent invocations unable to share
+    one. Raises ``OSError`` -- before anything is written -- when the folder
+    cannot hold it."""
+    ext = os.path.splitext(str(final_path))[1]
+    folder = folder or os.path.dirname(os.path.abspath(str(final_path)))
+    os.makedirs(folder, exist_ok=True)
+    for _ in range(8):
+        candidate = os.path.join(
+            folder, "%s%s%s" % (_CANDIDATE_PREFIX, uuid.uuid4().hex[:12], ext))
+        if not path_fits(candidate):
+            raise OSError(
+                "candidate %s exceeds the Windows path budget; nothing was "
+                "written" % candidate)
+        try:
+            fd = os.open(long_path(candidate), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            continue
+        os.close(fd)
+        return candidate
+    raise OSError("could not reserve a unique candidate in %s" % folder)
+
+
+def _drop_if_empty(candidate: str) -> None:
+    """Remove THIS invocation's reservation only when nothing was written to
+    it. A candidate with bytes is evidence of what failed and is kept under
+    its unpublished name. Never raises."""
+    try:
+        if os.path.isfile(candidate) and os.path.getsize(candidate) == 0:
+            os.remove(long_path(candidate))
+    except OSError:
+        pass
+
+
+def _reject_candidate(candidate: str, gate: str, why: str, exc_type=OSError):
+    """Log the rejected candidate and its gate, keep its bytes, raise."""
+    _drop_if_empty(candidate)
+    kept = os.path.isfile(candidate)
+    log.error("[OTR_MasterAudioMux] %s REJECTED its candidate (%s); %s",
+              gate, str(why)[:300],
+              ("kept for inspection at %s" % candidate) if kept
+              else "nothing was written")
+    raise exc_type("%s: %s (candidate %s)" % (
+        gate, str(why)[:300], candidate if kept else "empty, removed"))
+
+
+def _accept_candidate(candidate: str, final_path: str, gate: str) -> None:
+    """Replace ``final_path`` with the VALIDATED ``candidate`` -- one atomic
+    same-filesystem rename, after a last Cancel check.
+
+    If the rename fails (on Windows: the final is open in a player), the old
+    final is left exactly as it was and the candidate is kept. The old file is
+    NEVER deleted to make room: that would turn a busy file into a lost one."""
+    _poll_interrupt()
+    try:
+        os.replace(long_path(candidate), long_path(str(final_path)))
+    except OSError as exc:
+        log.error("[OTR_MasterAudioMux] %s could not replace %s (%s); the "
+                  "previous file is untouched and the accepted candidate is "
+                  "at %s", gate, final_path, exc, candidate)
+        raise OSError("%s: could not replace %s (%s); accepted candidate kept "
+                      "at %s" % (gate, final_path, exc, candidate)) from exc
 
 
 #: Slack on the duration gate, in FRAMES. Not a fudge factor -- a quantization
@@ -518,6 +632,13 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     # UNCONDITIONAL master copy (2026-08-06): there is no SFX mix branch; every
     # episode takes the passthrough.
     report.append("audio_mode=master_copy")
+    # WRITE A CANDIDATE, NEVER THE FINAL (Muse finishing review item 1). ffmpeg
+    # with -y against `out_path` itself meant a failed encode, or a later
+    # failed gate, left rejected bytes under the final name -- and a RETRY
+    # replaced a good final before its own replacement was accepted. The
+    # candidate keeps the final's extension, so the container (and the PCM
+    # gate above, keyed to `out_path`) is the one the caller asked for.
+    candidate = _reserve_candidate(out_path)
     # mux-LAST: copy both streams, NO -shortest.
     cmd = [
         fb, "-y", "-loglevel", "error",
@@ -525,7 +646,7 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
         "-i", master_audio_path,
         "-map", "0:v", "-map", "1:a",
         "-c:v", "copy", "-c:a", "copy",
-        out_path,
+        candidate,
     ]
     assert "-shortest" not in cmd, "V-2: -shortest must never appear in the mux"
     # V-1: the audio stream is COPIED, never re-encoded. This assertion is what
@@ -534,22 +655,32 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     assert cmd[cmd.index("-c:a") + 1] == "copy", (
         "V-1: the terminal mux must pass the master audio through with "
         "-c:a copy, never re-encode")
+    gate = "OTR_MasterAudioMux archival mux"
     p = _run(cmd)
     if p.returncode != 0:
-        raise ValueError(f"OTR_MasterAudioMux: ffmpeg mux failed :: {p.stderr.strip()[:300]}")
+        _reject_candidate(candidate, gate, "ffmpeg mux failed :: %s"
+                          % p.stderr.strip()[:300], ValueError)
 
     # byte-identity: the output audio must decode identically to the master.
     # Pass the ALREADY-RESOLVED binary so the proof cannot resolve differently
     # from the encode that just ran.
     h_master = audio_pcm_sha(master_audio_path, fb)
-    h_out = audio_pcm_sha(out_path, fb)
+    h_out = audio_pcm_sha(candidate, fb)
     if not h_out or h_out != h_master:
-        raise ValueError(
-            f"OTR_MasterAudioMux: output audio NOT byte-identical to master "
-            f"(master={h_master[:12]} out={h_out[:12]}); the audio was re-encoded "
-            f"or trimmed -- C7/V-1 violated"
-        )
+        _reject_candidate(
+            candidate, gate,
+            f"output audio NOT byte-identical to master (master={h_master[:12]} "
+            f"out={h_out[:12]}); the audio was re-encoded or trimmed -- C7/V-1 "
+            f"violated", ValueError)
+    # The audio stream is proven above; the video stream is proven HERE, by
+    # name. Only a probe that READ the file and found no video refuses -- an
+    # unmeasurable file is not a missing stream, and a probe never fails a
+    # render on its own say-so.
+    if _probe_float(candidate, "v:0") == STREAM_MISSING:
+        _reject_candidate(candidate, gate, "the muxed file has NO video stream",
+                          ValueError)
     report.append(f"audio_byte_identical OK ({h_out[:12]})")
+    _accept_candidate(candidate, out_path, gate)
     return out_path, report
 
 
@@ -1689,13 +1820,23 @@ class OTRMasterAudioMux:
             # empty-string contract here too instead of running a literal
             # that fails inside subprocess with a less useful name.
             raise OSError("obs publish: ffmpeg not found (OTR_FFMPEG / PATH)")
+        # ENCODE A CANDIDATE, VALIDATE IT, THEN REPLACE (Muse finishing review
+        # item 1). Writing `dst` directly left a rejected copy under the
+        # published name on any failure below, and a retry over an existing
+        # publication destroyed the good copy before its replacement passed.
+        # The candidate lives in a SUBFOLDER of obs (same filesystem, so the
+        # acceptance is one rename; not in the top-level listing he watches)
+        # and carries no `_final` marker, so nothing reads it as published.
+        staging = os.path.join(obs_dir, OBS_STAGING_DIRNAME)
+        candidate = _reserve_candidate(dst, staging)
+        gate = "obs publish"
         p = _run([fb, "-y", "-loglevel", "error", "-i", final,
                   "-map", "0:v", "-map", "0:a",
                   "-c:v", "copy", "-c:a", "aac", "-b:a", "320k",
-                  "-ar", "48000", dst])
+                  "-ar", "48000", candidate])
         if p.returncode != 0:
-            raise OSError("obs publish (aac viewing copy) failed: %s"
-                          % p.stderr.strip()[:300])
+            _reject_candidate(candidate, gate, "aac viewing copy failed: %s"
+                              % p.stderr.strip()[:300])
 
         # THE FILE HE ACTUALLY WATCHES GETS CHECKED LIKE ONE (2026-09-12).
         # Until now this trusted `returncode == 0` alone, while the ARCHIVAL
@@ -1708,25 +1849,34 @@ class OTRMasterAudioMux:
         # obs IS the success signal in this project -- a leg that does not land
         # there did not happen -- so "the bytes exist" is not the same claim as
         # "it plays". Both streams are probed against the source they were
-        # copied from, reusing the `_probe_float` already in this file.
-        _size = os.path.getsize(dst)
+        # copied from, reusing the `_probe_float` already in this file -- all
+        # of it against the CANDIDATE, before it may become the published file.
+        _size = os.path.getsize(candidate)
         if _size <= 0:
-            raise OSError("obs publish wrote a ZERO-BYTE file: %s" % dst)
+            _reject_candidate(candidate, gate, "the encode wrote a ZERO-BYTE file")
         for _stream, _label in (("v:0", "video"), ("a:0", "audio")):
             _src = _probe_float(final, _stream)
-            _got = _probe_float(dst, _stream)
+            _got = _probe_float(candidate, _stream)
+            # A MISSING stream is refused by name: the container duration of
+            # a video-only copy is a plausible number and used to pass here.
+            if _got == STREAM_MISSING:
+                _reject_candidate(candidate, gate, "the %s stream is MISSING"
+                                  % _label)
             if _got < 0:
-                raise OSError(
-                    "obs publish: %s stream of %s does not probe -- the file "
-                    "is not playable" % (_label, dst))
+                _reject_candidate(candidate, gate, "%s stream does not probe -- "
+                                  "the file is not playable" % _label)
             # A tenth of a second of slack: the AAC encoder pads the final
             # frame, so an exact match is the wrong test. Anything beyond that
             # means the copy is short, which is the failure worth catching.
             if _src > 0 and abs(_got - _src) > 0.1:
-                raise OSError(
-                    "obs publish TRUNCATED: %s is %.2fs but the source is "
-                    "%.2fs (%s)" % (_label, _got, _src, dst))
+                _reject_candidate(candidate, gate, "TRUNCATED: %s is %.2fs but "
+                                  "the source is %.2fs" % (_label, _got, _src))
 
+        _accept_candidate(candidate, dst, gate)
+        try:  # the staging folder goes when it is empty; it is not an output
+            os.rmdir(staging)
+        except OSError:
+            pass
         log.warning("[OTR_MasterAudioMux] LOUD publish: final episode -> %s "
                     "(%d bytes; video copy + AAC-320k viewing audio; archival "
                     "PCM byte-identical final: %s)",
@@ -1738,6 +1888,7 @@ class OTRMasterAudioMux:
         final_path: str,
         obs_path: "str | None",
         master_audio_path: str,
+        episode_stem: str,
     ) -> str:
         """Truthfully stamp all terminal asset pointers in the live ledger.
 
@@ -1757,6 +1908,16 @@ class OTRMasterAudioMux:
         and on a blocked episode nothing ever arrives. The archival
         ``final_video_path`` / ``final_audio_path`` are stamped either way: the
         work exists, it simply may not be published.
+
+        ONLY THIS EPISODE'S LEDGER IS WRITTEN (Muse finishing review item 2).
+        ``episode_stem`` is the incoming silent video's stem, and the ledger is
+        resolved through ``_inflight_episode_for_stem`` -- the same name-
+        boundary identity the publication decision uses. The raw in-flight
+        path (singleton, or its most-recent-ledger fallback) could name a
+        DIFFERENT episode on a legacy, replay or optional-publication run, and
+        stamping it overwrote that episode's final pointers and cleared its
+        valid OBS claim. A ledger that does not answer for this stem is never
+        loaded or saved; the stamp is skipped and says so.
         """
         try:
             try:
@@ -1767,9 +1928,11 @@ class OTRMasterAudioMux:
                 if _here not in _sys.path:
                     _sys.path.insert(0, _here)
                 import _otr_ledger as _OTRL  # type: ignore
-            ledger_p = _OTRL.in_flight_ledger_path()
+            ledger_p, _ = _inflight_episode_for_stem(episode_stem)
             if ledger_p is None:
-                return "terminal path stamp skipped: no in-flight ledger singleton"
+                return ("terminal path stamp skipped: no in-flight ledger answers "
+                        "for this episode (%s); a foreign or absent ledger is "
+                        "never written" % episode_stem)
             led = _OTRL.load_ledger_safe(ledger_p)
             if led is None:
                 return f"terminal path stamp skipped: could not load {ledger_p.name}"
@@ -2074,6 +2237,10 @@ class OTRMasterAudioMux:
             # not the second. Withholding is not a failure: this node returns
             # success either way and says which happened, out loud.
             if decision.publishable:
+                # A Cancel set during the mux or its PCM proof is honoured
+                # BEFORE anything reaches the watch folder (Muse finishing
+                # review item 3). Comfy's own exception propagates untouched.
+                _poll_interrupt()
                 obs_copy = self._publish_to_obs(final)
                 report.append("obs_publish OK -> " + obs_copy)
             else:
@@ -2087,7 +2254,8 @@ class OTRMasterAudioMux:
             # N2 (truthful ledger): this terminal node restamps
             # final_video_path over the pre-credits/pre-mux video it is handed.
             report.append(self._stamp_terminal_paths(
-                final, obs_copy, master_audio_path))
+                final, obs_copy, master_audio_path,
+                _episode_stem(silent_video_path)))
             # THE REQUIRED-DELIVERY GATE. Only after the stamp above, because
             # what it checks is the state the stamp leaves on disk.
             #
@@ -2122,7 +2290,10 @@ class OTRMasterAudioMux:
             # OH-3 (output-tree contract 2026-06-11): post-publish janitor
             # pass over episodes/_shared/tmp -- fully fail-soft (PD1, never
             # blocks the mux). One of the two sanctioned auto-deletes; the
-            # other is the asset cleanup below.
+            # other is the asset cleanup below. A pending Cancel is honoured
+            # FIRST, outside the fail-soft block (the publication above stays
+            # exactly as it landed).
+            _poll_interrupt()
             try:
                 from ._otr_janitor import sweep_shared_tmp
                 _jrep = sweep_shared_tmp()
@@ -2137,6 +2308,8 @@ class OTRMasterAudioMux:
             # THE PREVIEW BEFORE THE CLEANUP. Its poster frame is extracted
             # from the archival `final`, which `partial` and `full` delete.
             ui = _canvas_preview(final, obs_copy)
+            # A Cancel set while the preview ran stops the deletions below.
+            _poll_interrupt()
             # ASSET CLEANUP AFTER PUBLISH (row 0b) -- THE LAST STEP, after the
             # publish, the ledger stamp, the required-delivery gate and the
             # janitor. The episode is already delivered, so nothing here may
