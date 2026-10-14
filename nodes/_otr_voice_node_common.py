@@ -1695,6 +1695,27 @@ class OTRVoiceNodeBase:
                         f"reference WAVs or cast a voice with a resolvable ref -- there "
                         f"is NO bark fallback (no-fallback rip).",
                     )
+                # The same rule for an engine that speaks from the bank's
+                # voice_ref_id (Kokoro): a CHARACTER line with none fell through
+                # to the engine's episode voice -- the announcer's -- so every
+                # such character spoke with one shared voice, silently, while the
+                # ledger still named their old identities (voice review V2,
+                # 2026-10-14: a ledger cast for Bark rendered under
+                # preserve_ledger on Kokoro). Character node only: the announcer's
+                # episode pick is its legitimate default.
+                if (self.ROLE == "char_voice" and ref_field == "voice_ref_id"
+                        and not voice_ref):
+                    raise EngineUnusable(
+                        engine, self.ROLE, EngineUsabilityReason.INCOMPATIBLE_PROFILE,
+                        f"line={line_id or occ} char={char_id or '-'} has no "
+                        f"voice_ref_id for engine '{engine}'"
+                        + (f" (its voice_preset {voice_preset!r} is a Bark identity)"
+                           if voice_preset else "")
+                        + ". preserve_ledger does not re-cast; re-run with "
+                        "cast_voice_policy=auto_registry to cast voices for this "
+                        "engine, or select the engine the ledger was cast for. "
+                        "No shared fallback voice (no-fallback rip).",
+                    )
                 # G1: scope strict-determinism + seed/restore every RNG around the
                 # single forward (I-2/C-2). warn_only=True keeps the process default
                 # non-strict so a nondeterministic CUDA op cannot crash the opt-in
