@@ -1809,3 +1809,51 @@ the live version.
   without a reason; tool-managed leg/watchdog sessions worked. Same Gemma
   E2B model: A early call ~2.1 tok/s, B intervals ~60-65 and one full call
   56.6 tok/s; slowdown cause unprofiled, no performance change claimed.
+
+## 2026-10-14 -- dead code, certified by reachability instead of by the old tests (cloud session)
+
+- **Brief.** Operator: "you need to run your own cert. You can't rely upon old tests"; a test that is a
+  symbol's only reader must be read for what it asserts; old scripts that are not needed go too. Muse Wonder
+  (out of credits) is parked. The Sonnet removal handoff on D: was not readable from this container.
+- **The cert** (not in the repo; the kit went to the operator as `dead_code_cert_kit.tgz`). Reachability from
+  the pack's real roots -- the `__init__.py` node table, `prestartup_script.py`, every module in `scripts/` and
+  `tools/`, dotted-path and `.py` string constants in live code -- with tests neither roots nor evidence and
+  `__all__` entries not counted as references. Edges: from-imports, `module.attr`, same-module names, decorated
+  defs, impure module-level statements, string constants and non-Python production text (workflows, config, js,
+  launchers), quoted forward-reference annotations, siblings loaded by file path, modules passed around as values.
+  Recall 38/38 on the previous wave's hand-found symbols; an independent resolver (jedi references) disagreed on
+  9, all explained; the verifier was mutation-tested (a good deletion passes, three bad ones fail, one of them
+  reachable only through a module object passed as a value).
+- **Readers.** 186 candidates (2,224 lines) went to eight independent Sonnet readers, one packet each, briefed to
+  refute, verdicts DEAD / TEST-HOOK / CONTRACT / FRAMEWORK / UNWIRED-FEATURE / LIVE / UNSURE with their own greps.
+  They exposed four gaps in the tool (path-loaded sibling scripts, quoted pydantic annotations, a submodule
+  import not making its parent packages live, a module returned as a value hiding attribute use). All four are
+  fixed and every symbol they rescued stayed.
+- **Landed on `main`** (939167bf..375f1324, about -2,600 lines): `4d92cfaf` the polish generate factory;
+  `0d461867` the public-domain builders and three path helpers; `e6daae04` vestigial engine flags and video
+  leftovers (the regenerated asset index no longer tells users to fetch a 1.8 GB file nothing loads);
+  `f74316a5` unread helpers across the shared modules, registries and key-file readers; `22231ffa` three finished
+  one-shot scripts (-1,435 lines); `64dcbf8f` `3cb984c1` `bbc4e31c` stale prose, plan row 0q, two stale
+  references. A test that pinned something live through a dead helper was retargeted, not dropped: craft-floor
+  parsing now through `evaluate_tier_a`, the BUG-098 char_id rule through `stamp_portrait`, payload shape through
+  `_payload_from_body`, the no-voice-clause test through `joint_av_prompt_is_finished`.
+- **Verified.** Each wave: the real pack loads the same 22 nodes with no `Skipped` line, all modules import, no
+  dangling `from`-import or `alias.attr` in production or tests, pyflakes shows nothing new, `pytest
+  --collect-only` 17018 -> 16983 with no new collection error, deleted names appear nowhere else. Scoped tests ran
+  in this tree and in a same-HEAD pristine tree: the same failures, none new. Full suite on the head before the
+  review follow-ups: 16,983 collected, 165 fail in this container (no GPU, no Windows paths, no JS toolchain, no
+  models) -- the identical 165 that fail at 939167bf, none new. The follow-ups (prose, two new tests, one duplicate
+  removed: 16,984 collected) were checked with the verifier and the touched test files.
+- **Independent review.** Four independent Sonnet reviewers (briefed to refute; polish and
+  public-domain, flags and video leftovers, shared modules in two halves) found no live reader of any deleted
+  name and no lost guard -- zero blockers. They raised 25 findings. The real ones were two weaknesses the
+  rewritten tests had inherited (a vacuous `"elevenlabs" not in lanes` assertion and an unpinned verifier rule,
+  both now pinned and mutation-checked; the craft-floor newline-in-a-block contract had no test, now has one)
+  and a wrong sentence in the f74316a5 commit message (`parsed_slots` is a test surface; production reads only
+  `passed`/`failures`). The rest was stale prose. All folded in `64dcbf8f` `bbc4e31c` `044baeb9` `375f1324`.
+- **Not proven / open.** Plan row 0q lists what was kept on purpose and why. No `pyproject.toml` change, so no
+  registry publish (2.3.23 is still Pending). The Bug Bible repo is not in this container, so its regression
+  file was not run; the Sonnet removal handoff on D: was not readable from here.
+- **A run is only a baseline if nothing under it moves.** Eight source-inspection tests failed once because a
+  prose edit to `OTR_LedgerScriptWriter.py` shifted the line numbers `inspect.getsource` reads while the suite was
+  live; they pass in a fresh process. Do not edit the tree under a running suite.
