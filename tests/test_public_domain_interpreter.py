@@ -312,8 +312,9 @@ def test_the_example_array_carries_no_prose_to_copy():
     (["the Medical Man", "the Psychologist"], ["the Medical Man", "the Psychologist"]),
     (["Sir Percy Blakeney, the Scarlet Pimpernel"], ["Sir Percy Blakeney, the Scarlet Pimpernel"]),
     (list("ABCDEFG"), list("ABCDEF")),
+    ([{"name": "Scrooge"}, ["Marley"], 7, None, "Bob Cratchit"], ["Bob Cratchit"]),
 ], ids=["copied_instruction", "punctuation_only", "mixed", "one_person",
-        "role_designations", "long_real_name", "caps_at_six"])
+        "role_designations", "long_real_name", "caps_at_six", "non_strings"])
 def test_the_cleaner_keeps_names_and_drops_prose(raw, kept):
     assert _good_briefs(character_names=raw).character_names == kept
 

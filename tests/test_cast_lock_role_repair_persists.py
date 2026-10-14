@@ -217,13 +217,17 @@ def test_the_repaired_role_survives_a_later_unrelated_stamp(tmp_path, monkeypatc
             pl._CURRENT = saved
 
 
-def test_only_the_voiced_roles_can_be_written(fresh_singleton):
+@pytest.mark.parametrize("value", ["music_open", ["announcer"], {"role": "x"}, 1],
+                         ids=["other_role", "list", "dict", "int"])
+def test_only_the_voiced_roles_can_be_written(fresh_singleton, value):
     """The channel exists to move a line between the two voiced roles; a
-    patch cannot write any other role string (sonnet QA r2)."""
+    patch cannot write any other role string (sonnet QA r2) -- and an
+    unhashable value is the same ValueError, not a TypeError (sonnet QA,
+    2026-10-14)."""
     fresh_singleton.data["lines"] = _lines()
     with pytest.raises(ValueError, match="not a patchable value"):
         pl.stamp_durable(line_patches=[{"line_id": "l002", "char_id": "a1",
-                                        "fields": {"speaker_role": "music_open"}}],
+                                        "fields": {"speaker_role": value}}],
                          source="spec")
     assert [r["speaker_role"] for r in pl.get_ledger().data["lines"]] == [
         "character", "character"]

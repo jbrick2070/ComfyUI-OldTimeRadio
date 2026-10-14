@@ -562,12 +562,19 @@ class PublicDomainBriefs(BaseModel):
         phrase is NOT caught here (codex r2); the prompt's example array no
         longer holds one to copy. Role designations ("the Medical Man") and
         one-person casts are kept. If nothing survives, the validator's floor
-        sends the brief back through the repair ladder (PD-02)."""
+        sends the brief back through the repair ladder (PD-02). A non-string
+        entry ({"name": ...}, a number, a nested list) is dropped the same way
+        rather than seated as its repr (sonnet QA, 2026-10-14)."""
         if not isinstance(value, list):
             return []
         out: list[str] = []
         seen: set[str] = set()
         for nm in value:
+            if nm is not None and not isinstance(nm, str):
+                logging.getLogger("OTR").warning(
+                    "[public_domain] dropped a cast entry that is not a "
+                    "string (%s): %.80r", type(nm).__name__, nm)
+                continue
             clean = " ".join(str(nm or "").split()).strip()
             if (len(clean) > _CHARACTER_NAME_MAX_CHARS
                     or not any(ch.isalnum() for ch in clean)):

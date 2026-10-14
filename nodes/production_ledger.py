@@ -897,7 +897,9 @@ def _validate_line_patches(led: "Ledger", patches, sections, source: str):
                 f"stamp_durable({source or '?'}): line field(s) {sorted(unknown)} "
                 f"are not patchable here (allowed: {sorted(_DURABLE_LINE_FIELDS)})")
         for name, value in fields.items():
-            if value not in _DURABLE_LINE_FIELDS[name]:
+            # str-gated first: an unhashable value (a list, a dict) must be the
+            # same documented ValueError, not a TypeError from the set lookup.
+            if not isinstance(value, str) or value not in _DURABLE_LINE_FIELDS[name]:
                 raise ValueError(
                     f"stamp_durable({source or '?'}): {name}={value!r} is not a "
                     f"patchable value (allowed: {sorted(_DURABLE_LINE_FIELDS[name])})")
