@@ -91,7 +91,6 @@ ENGINE_FAMILY = {
 }
 
 _GOOGLE_SILENT_TEXT_PROVIDERS = frozenset({
-    "google_veo_video",
     "google_omni_video",
 })
 #: Every Google provider here is a silent text provider, so the
@@ -2130,7 +2129,7 @@ def _is_cloud_video_engine(engine_id: str) -> bool:
     """True for provider-side video engines.
 
     Includes Partner/cloud engines plus direct BYO API engines such as Google
-    Veo/Omni. These engines do not load local video weights, so local VRAM
+    Omni. These engines do not load local video weights, so local VRAM
     residue cleanup and local HuMo policy redirects must not treat them as
     in-process model routes.
     """
@@ -2155,7 +2154,7 @@ def _prune_strict_text_only_request(req: dict, engine_id: str) -> dict:
     The full episode builder often has per-beat audio and stills available even
     when the selected video engine is text-to-video. Local engines may use some
     of those optional refs, so this is opt-in per adapter; provider adapters can
-    declare ``accepts_*`` booleans to keep useful refs like Veo start frames
+    declare ``accepts_*`` booleans to keep useful refs like a start frame
     while still pruning unsupported audio/video refs before invoke.
     """
     eid = str(engine_id or "")

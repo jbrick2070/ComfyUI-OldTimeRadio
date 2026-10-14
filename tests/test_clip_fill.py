@@ -420,13 +420,13 @@ def test_persist_rekeys_clip_to_renamed_episode_clips(monkeypatch, tmp_path):
             "shot_b001": {
                 "type": "video",
                 "path": str(clip_src),
-                "engine_id": "google_veo_video",
+                "engine_id": "google_omni_video",
             }
         },
         "ledger": {"video": {"shots": [{
             "shot_id": "shot_b001",
             "role": "character_video",
-            "engine_id": "google_veo_video",
+            "engine_id": "google_omni_video",
         }]}},
     }
 

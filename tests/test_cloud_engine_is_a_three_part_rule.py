@@ -12,9 +12,10 @@ is not a style preference, it is two shipped engines that disagree:
 * `cloud_seedance_2` declares NO `provider_side` attribute at all, so a
   builder written as `getattr(eng, "provider_side", False)` classifies a
   Seedance row as LOCAL.
-* `google_veo_video` declares `provider_side = True` but carries NO `cloud_`
+* `google_omni_video` declares `provider_side = True` but carries NO `cloud_`
   prefix and NO `node_key`, so a builder written on the prefix alone
-  classifies a Veo row as LOCAL.
+  classifies an Omni row as LOCAL. (`google_veo_video` was the example here
+  until it was retired on 2026-10-14; Omni has the same shape.)
 
 Neither engine is hypothetical and neither is deprecated. These tests pin the
 disagreement itself, so that the next person who reaches for a one-line
@@ -30,7 +31,7 @@ from nodes._otr_video_engines import render_driver as rd
 #: The engine that fails the ATTRIBUTE clause and is carried by the prefix.
 SEEDANCE = "cloud_seedance_2"
 #: The engine that fails the PREFIX clause and is carried by the attribute.
-VEO = "google_veo_video"
+OMNI = "google_omni_video"
 
 
 def _engine(engine_id):
@@ -44,7 +45,7 @@ def _engine(engine_id):
 # 1. The verdict itself, on the picked path.
 # --------------------------------------------------------------------------- #
 
-@pytest.mark.parametrize("engine_id", [SEEDANCE, VEO])
+@pytest.mark.parametrize("engine_id", [SEEDANCE, OMNI])
 def test_a_provider_side_engine_is_cloud_however_it_declares_itself(engine_id):
     assert rd._is_cloud_video_engine(engine_id) is True
 
@@ -73,12 +74,12 @@ def test_the_bare_attribute_alone_would_misroute_seedance():
     assert rd._is_cloud_video_engine(SEEDANCE) is True
 
 
-def test_the_prefix_alone_would_misroute_veo():
-    eng = _engine(VEO)
-    assert not VEO.startswith("cloud_")
+def test_the_prefix_alone_would_misroute_omni():
+    eng = _engine(OMNI)
+    assert not OMNI.startswith("cloud_")
     assert not str(getattr(eng, "node_key", "") or "").startswith("cloud_")
     assert bool(getattr(eng, "provider_side", False)) is True
-    assert rd._is_cloud_video_engine(VEO) is True
+    assert rd._is_cloud_video_engine(OMNI) is True
 
 
 def test_no_single_clause_covers_both_shipped_engines():
@@ -91,13 +92,13 @@ def test_no_single_clause_covers_both_shipped_engines():
         return bool(getattr(eng, "provider_side", False))
 
     for clause in (by_prefix, by_attribute):
-        verdicts = {eid: clause(eid) for eid in (SEEDANCE, VEO)}
+        verdicts = {eid: clause(eid) for eid in (SEEDANCE, OMNI)}
         assert not all(verdicts.values()), (
             "a single clause now covers both engines (%r) -- if that is "
             "deliberate, simplify the rule and delete this test; if it is "
             "accidental, the other clauses are still what protect the third "
             "engine nobody has added yet" % verdicts)
-    assert all(rd._is_cloud_video_engine(eid) for eid in (SEEDANCE, VEO))
+    assert all(rd._is_cloud_video_engine(eid) for eid in (SEEDANCE, OMNI))
 
 
 # --------------------------------------------------------------------------- #
@@ -114,12 +115,12 @@ def test_a_forced_seedance_classifies_exactly_as_a_picked_one(monkeypatch):
     assert rd._is_cloud_video_engine(forced) is True
 
 
-def test_a_forced_veo_classifies_exactly_as_a_picked_one(monkeypatch):
+def test_a_forced_omni_classifies_exactly_as_a_picked_one(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    snap = rf.routing_env_snapshot({"OTR_FORCE_ENGINE_MAP": "*=%s" % VEO})
+    snap = rf.routing_env_snapshot({"OTR_FORCE_ENGINE_MAP": "*=%s" % OMNI})
     forced = rf.effective_engine_for_role(
         "announcer", "ltx25_high_video", snapshot=snap)
-    assert forced == VEO
+    assert forced == OMNI
     assert rd._is_cloud_video_engine(forced) is True
 
 

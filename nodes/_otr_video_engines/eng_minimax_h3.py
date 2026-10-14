@@ -1078,8 +1078,7 @@ class MiniMaxH3AudioInEngine(_MiniMaxH3Base):
     #: any of them. Claiming STRICT here would promise the coverage planner a
     #: seam this node cannot deliver, and the visible cost of a wrong strict
     #: claim is a jump at a join the plan said was seamless. A jump cut is
-    #: honest; that is what SOFT means (same reasoning ``google_veo_video``
-    #: records for its own endpoints).
+    #: honest; that is what SOFT means.
     frame_contract = FrameContract(
         discrete_frames=H3_CANVAS_RUNGS,
         native_fps=H3_CANVAS_FPS,

@@ -96,16 +96,17 @@ def test_no_engine_forbids_the_TAIL_TRIM_that_makes_the_floor_work(name):
 def test_the_operators_own_example_is_the_shipped_arithmetic():
     """"If the minimum is four seconds, we should have video for four seconds."
 
-    Veo's smallest menu entry is 100 frames = 4.0 s at the 25 fps canvas. A
-    one-second beat on that lane renders the whole 4 s and trims 3 s of it --
+    Omni's shortest clip is 3 seconds = 75 frames at the 25 fps canvas. A
+    one-second beat on that lane renders the whole 3 s and trims 2 s of it --
     real video for the beat, at the cost of frames nobody sees, which is the
-    trade the direction asks for explicitly.
+    trade the direction asks for explicitly. (Veo's 4 s menu floor was the
+    example until it was retired on 2026-10-14.)
     """
-    contract = _contract("google_veo_video")
-    assert 100 in contract.discrete_frames
+    contract = _contract("google_omni_video")
+    assert int(contract.min_frames) == 75
     plan = cp.partition_beat(SHORT_BEAT, contract)
-    assert [s.render_frames for s in plan.segments] == [100]
-    assert plan.segments[0].render_frames / FPS == 4.0
+    assert [s.render_frames for s in plan.segments] == [75]
+    assert plan.segments[0].render_frames / FPS == 3.0
     assert plan.total_visible_frames == SHORT_BEAT       # trimmed to the beat
 
 

@@ -42,7 +42,7 @@ RETIRED = sorted(RETIRED_ENGINE_IDS)
 # The contract itself: type, fields, message -- ONE spelling, pinned
 # ---------------------------------------------------------------------------
 
-def test_the_retired_set_is_exactly_the_twenty_three_known_ids():
+def test_the_retired_set_is_exactly_the_twenty_four_known_ids():
     # Five from the 2026-08-06 SFX-bed rip, five from the 2026-08-23 dormant-3D
     # retirement (lean-mean order 4), five from the 2026-08-23 Ghost narrowing
     # (operator: "delete any animatediff that are not haunted"), one from
@@ -50,7 +50,8 @@ def test_the_retired_set_is_exactly_the_twenty_three_known_ids():
     # GETS RIPPED"), and seven from the 2026-09-25 "native" rename (0b2 step
     # 2) -- these were DEFAULT widget values on four shipped, gallery-
     # published workflows, unlike the obscure `wan_i2v` lane below.
-    # Local `razzle_ltx_8gb` stays.
+    # Local `razzle_ltx_8gb` stays. And one from 2026-10-14: direct Google Veo,
+    # whose preview models Google removes from the Gemini API on 2026-10-22.
     # The 14B `wan_i2v` lane (2026-08-26, "rip the large wan we don't need")
     # LEFT this set on the 2026-09-25 clean rip of local Wan: a saved graph
     # naming it now gets the ordinary unregistered-engine refusal, the same
@@ -84,9 +85,10 @@ def test_the_retired_set_is_exactly_the_twenty_three_known_ids():
         "ltx25_native_mime_24gb",
         "ltx25_native_audio_in_16gb",
         "ltx25_native_audio_in_24gb",
+        "google_veo_video",
     })
     assert isinstance(RETIRED_ENGINE_IDS, frozenset)
-    assert len(RETIRED_ENGINE_IDS) == 23, (
+    assert len(RETIRED_ENGINE_IDS) == 24, (
         "the count in this test's name is part of the guard -- rename it in "
         "the same edit that grows the set")
 
@@ -104,7 +106,7 @@ def test_the_error_contract_is_pinned(engine_id):
 
 
 def test_non_retired_ids_pass_through_untouched():
-    for ok in ("", "humo", "ltx25_video", "google_veo_video",
+    for ok in ("", "humo", "ltx25_video", "google_omni_video",
                "cloud_vidu_q2_pro_fast_720p", "unknown_engine"):
         check_retired_engine(ok)                # must not raise
 

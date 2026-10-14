@@ -116,21 +116,20 @@ and speaks every part (Gemini TTS), scores it (Lyria) and draws every still
 (Gemini image) -- a whole episode with **no GPU at all**: nothing loads
 locally, so it runs on a laptop with no graphics card. What it does *not* do
 by default is generate video, and the reason is worth knowing before you go
-looking for the switch: on Google's paid **Tier 1**, every Veo model allows
-**2 requests a minute and 10 a day**, while a single episode's video needs
-run well past that ceiling. No arrangement of a Tier 1 key finishes a Veo episode, so the
-shipped Google workflow, `otr_google_still`, composites the stills instead
-(`still_flat`) and never calls Veo.
+looking for the switch: Google rations its video models on the paid **Tier 1**
+(Veo, measured 2026-09-19, allowed **2 requests a minute and 10 a day**), while
+a single episode asks for about sixteen clips. So the shipped Google workflow,
+`otr_google_still`, composites the stills instead (`still_flat`) and never
+calls a video model.
 
-**If your Google account is on a higher tier, turn video on yourself** -- the
-engines are built, tested and waiting:
+**If your Google account allows more video, turn it on yourself:**
 
-* Open `otr_google_still` and pick `google_veo_video` (or
-  `google_omni_video`) in the three VideoDirector visual dropdowns in place
-  of `still_flat`.
-* `OTR_GOOGLE_VEO_MODEL_ID` chooses the model -- `veo-3.1-lite-generate-preview`
-  (cheapest), `veo-3.1-fast-generate-preview`, `veo-3.1-generate-preview`.
-  Each has its **own** daily allowance, so they run out separately.
+* Open `otr_google_still` and pick `google_omni_video` (Gemini Omni 1.1
+  Flash) in the three VideoDirector visual dropdowns in place of
+  `still_flat`. Its daily allowance has not been measured here.
+* The Veo engine (`google_veo_video`) was retired on 2026-10-14: Google
+  removes the Veo 3.1 preview models from the Gemini API on 2026-10-22, and a
+  saved graph that still names it stops with a "retired" error.
 * A 429 mid-episode is a quota wall, not a broken key: the run keeps its
   place, floors the beat to its still, and publishes anyway.
 * Google's own *Increase Requests* tab (Cloud console → Quotas) is how the

@@ -75,7 +75,7 @@ def _run(prompt, balances, *, unit=None, writer=None, skip_writer=False):
     )
 
 
-def test_clip_seconds_follow_veo_menu():
+def test_clip_seconds_per_act_count():
     assert cbp.clip_seconds_for_act_count(1) == 4
     assert cbp.clip_seconds_for_act_count("1") == 4
     assert cbp.clip_seconds_for_act_count(3) == 8
@@ -154,10 +154,10 @@ def test_openrouter_uncapped_credits_403_warns():
 
 
 def test_google_only_paid_media_never_refuses_on_balance():
-    prompt = _prompt(_director("google_veo_video", image="google_image"))
+    prompt = _prompt(_director("google_omni_video", image="google_image"))
     verdicts = _run(
         prompt, {"google": cbp.google_balance()},
-        unit=_prices({"google_veo_video": 0.40, "google_image": 0.04}),
+        unit=_prices({"google_omni_video": 0.40, "google_image": 0.04}),
         skip_writer=True,
     )
     assert verdicts
@@ -201,17 +201,17 @@ def test_one_act_prices_four_second_clips_not_eight():
     prompt = _prompt(
         _writer("google_api:slot-a", "google_api_slot_a_model",
                 "gemini-flash-latest", act_count=1),
-        _director("google_veo_video", image="google_image"),
+        _director("google_omni_video", image="google_image"),
     )
     lines = cbp.estimate_lines(
         prompt, "63",
         resolve_engine=lambda _eid: object(),
-        unit_usd_fn=_prices({"google_veo_video": 0.40}),
+        unit_usd_fn=_prices({"google_omni_video": 0.40}),
         writer_usd_fn=lambda _h, _s: (0.0, "injected"),
         walk_fn=_walk,
         skip_writer=True,
     )
-    video = [ln for ln in lines if ln.label == "google_veo_video"]
+    video = [ln for ln in lines if ln.label == "google_omni_video"]
     assert video and "4s clip" in video[0].note
     assert "8s clip" not in video[0].note
 
@@ -310,7 +310,7 @@ def test_default_unit_usd_reads_real_adapter_price_functions(monkeypatch):
     assert cbp.default_unit_usd("sonilo", areg.get_engine("sonilo")) == pytest.approx(30 * 0.15 / 60.0)
     assert cbp.default_unit_usd("cloud_elevenlabs", areg.get_engine("cloud_elevenlabs")) == pytest.approx(
         cbp.TTS_CHARS_PER_ACT * 0.24 / 1000.0)
-    assert cbp.default_unit_usd("google_veo_video", vreg.get_engine("google_veo_video")) is None
+    assert cbp.default_unit_usd("google_omni_video", vreg.get_engine("google_omni_video")) is None
 
 
 def test_every_registered_comfy_wallet_engine_has_a_price():

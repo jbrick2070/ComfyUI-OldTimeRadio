@@ -433,7 +433,6 @@ def test_the_ratchet_catches_a_caller_that_hides_its_literals(label, scan):
     "_otr_video_engines/wan_shared.py",
     "_otr_video_engines/eng_cloud_video.py",
     "_otr_video_engines/eng_google_omni_video.py",
-    "_otr_video_engines/eng_google_veo_video.py",
     "_otr_upscale_engines/_pipeline.py",
 ])
 def test_every_migrated_caller_actually_goes_through_the_boundary(relative):

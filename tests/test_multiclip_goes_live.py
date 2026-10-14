@@ -110,16 +110,19 @@ def test_segment_zero_still_resolves_the_beats_own_still(engine):
 def test_a_jump_lane_that_mints_stills_STILL_demands_them():
     """The fix must not become a blanket amnesty.
 
-    ``google_veo_video`` is soft_reference, so it JUMPs; it is provider-side
-    and accepts stills, so ``_lane_consumes_a_still`` says mint. A real request
-    IS stamped for its successor -- and if the still spine never materialized
-    that object id, the render must still refuse rather than substitute the
-    beat's still. Without this test the fix above could have been written as
-    "segment >= 1 returns None" and every test would still pass.
+    ``cloud_vidu_q2_pro_fast_720p`` is soft_reference, so it JUMPs; it is
+    provider-side and consumes a still, so ``_lane_consumes_a_still`` says
+    mint. A real request IS stamped for its successor -- and if the still spine
+    never materialized that object id, the render must still refuse rather
+    than substitute the beat's still. Without this test the fix above could
+    have been written as "segment >= 1 returns None" and every test would
+    still pass. (``google_veo_video`` was the lane here until it was retired
+    on 2026-10-14.)
     """
-    contract = fc.frame_contract_for(vreg.get_engine("google_veo_video"))
-    frames = int(max(contract.discrete_frames)) + 60
-    shot = _shot_for("google_veo_video", frames, role="announcer_visual")
+    lane = "cloud_vidu_q2_pro_fast_720p"
+    contract = fc.frame_contract_for(vreg.get_engine(lane))
+    frames = _cap(contract) + 60
+    shot = _shot_for(lane, frames, role="announcer_visual")
     plan = cp.CoveragePlan.from_dict(shot["coverage_plan"])
 
     assert plan.join_mode == cp.JOIN_JUMP

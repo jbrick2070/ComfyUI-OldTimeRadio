@@ -1412,7 +1412,7 @@ def _obs_basename(final: str) -> str:
             `_video`/`_image` (the field position already implies the role)
             would turn a real id into one the shortcode table has never heard
             of, because the table is keyed on the engine id EXACTLY as the
-            registry spells it -- `google_veo_video`, `still_motion` -- and
+            registry spells it -- `google_omni_video`, `still_motion` -- and
             spell the lane `unk`.
             """
             if not value:

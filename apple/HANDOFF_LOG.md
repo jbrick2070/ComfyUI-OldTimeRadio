@@ -1925,3 +1925,26 @@ the live version.
   The old single `assets/otr_gallery_thumb.jpg` is deleted.
 - **Checked:** `build_variants --check` 25 variants, 0 failures; 28 test files touching the gallery or
   build_variants, 830 passed, no new failure. Not yet seen in a live ComfyUI gallery or on the registry page.
+
+## 2026-10-14 -- Google's October 22 cutoff: Omni moved to GA, Veo retired (cloud session)
+
+- **Operator forwarded the AI Studio notice:** on 2026-10-22 the Gemini API drops `gemini-omni-flash-preview`
+  and all three Veo 3.1 previews. The GA Veo models move to the Gemini Enterprise Agent Platform (a different
+  login); the Gemini API successor is `gemini-omni-1.1-flash` only.
+- **Omni (`cf3b7ed5`):** default model is now `gemini-omni-1.1-flash` (same Interactions API, 3-10 s, 720p,
+  24 fps per ai.google.dev/gemini-api/docs/omni); the preview id is refused by name.
+- **Veo retired (operator's call):** `google_veo_video` joins `RETIRED_ENGINE_IDS` (24 ids now), so a saved
+  graph naming it stops with the named "retired" error. The adapter, its registration, its test file and its
+  entries in the provision, shortcode and Google-provider lists are gone; README, VIDEO_MODELS, CLOUD and the
+  Mac guide now point Google video at `google_omni_video`; ENGINE_MATRIX, DROPDOWN_MATRIX, MACHINES and
+  MODEL_ASSET_INDEX were regenerated (they lost only the Veo rows). No shipped workflow selected Veo.
+- **A real Omni defect the retirement surfaced:** Omni never declared `accepts_audio_ref = False`, so a
+  character beat's voice reached `render_clip`, which refuses audio, and the beat failed loud. Veo had the
+  declaration. Omni now declares what it refuses (audio, base clip, last frame) and the request builder drops
+  them first; `test_google_omni_request_prunes_audio_but_keeps_scene_still` failed before the fix.
+- **Tests that used Veo as the example** now use Omni where Omni has the same property (provider-side without
+  a `cloud_` prefix, the 24-to-25 fps count, the Google request shape) and `cloud_vidu_q2_pro_fast_720p` where
+  the property was a minting soft-reference jump lane. 120 test files touching registries, the Google lanes and
+  the generated matrices: no new failure against the container baseline. Pack loads 22 nodes, nothing dangles.
+- **Not proven live:** no Google key in this container. The user-visible part (Omni GA, Veo refused) wants a
+  2.3.25 release before 2026-10-22; that is the operator's call.

@@ -1007,7 +1007,7 @@ not all the same one:
 | lane | credential it actually measures |
 | --- | --- |
 | every `cloud_*` row, `elevenlabs`, `sonilo` | Comfy Cloud -- the queue's `api_key_comfy_org`, received by the **0 - Comfy Credential** node: a **signed-in ComfyUI session**, or `OTR_COMFY_API_KEY` in the environment of a headless *submitter* running `scripts/otr_api.py` (the server never reads it) |
-| `google_omni_video`, `google_veo_video`, `google_image`, `google_tts`, `google_lyria` | a direct BYO Google API key -- these do not touch Comfy Cloud at all |
+| `google_omni_video`, `google_image`, `google_tts`, `google_lyria` | a direct BYO Google API key -- these do not touch Comfy Cloud at all |
 
 The compliance matrix's "Cloud lanes" section records exactly how far this was
 taken: the local half of every cloud video lane (the ffmpeg gate, the 1080p

@@ -43,8 +43,11 @@ DEFAULT_MODEL = "gemini-omni-1.1-flash"
 SUPPORTED_MODELS = (DEFAULT_MODEL,)
 OUTPUT_DURATION_RANGE_S = (3, 10)
 #: The rate a delivered clip is COUNTED at -- the canvas's, not OUTPUT_FPS
-#: below. ``canonicalize()`` resamples to ``canvas.fps`` before anything reads
-#: a frame count. See the matching note in ``eng_google_veo_video.py``.
+#: below. ``canonicalize()`` resamples to ``canvas.fps`` with a real
+#: duration-preserving ffmpeg ``fps=`` filter before anything reads a frame
+#: count, so a 6-second Omni clip is 150 frames to the partitioner. The
+#: provider's 24 fps decides what Omni renders; the canvas's 25 is what the
+#: coverage path counts.
 CANVAS_FPS = 25
 OUTPUT_RESOLUTION = "720p"
 OUTPUT_FPS = 24
@@ -413,6 +416,14 @@ class GoogleOmniVideoEngine:
         return {self.name: {"model": (_selected_model(),)}}
     accepts_still = True
     accepts_init_image = True
+    accepts_reference_images = True
+    #: What render_clip refuses (``_reject_unsupported_inputs``), declared so
+    #: the request builder drops it first: a character beat carries its voice
+    #: as ``audio_ref``, and without this every such beat failed loud here.
+    #: ``last_frame`` is not read by this adapter, so it is dropped too.
+    accepts_audio_ref = False
+    accepts_base_clip_ref = False
+    accepts_last_frame = False
     render_aspect = "wide"
     #: S1 per-model still plan (see ``_GOOGLE_OMNI_STILL_PLAN`` above).
     still_plan = _GOOGLE_OMNI_STILL_PLAN
@@ -525,9 +536,7 @@ except ImportError:  # pragma: no cover -- flat test imports
 def _google_chronological(inputs, tail):
     """Chronological action, endpoint, then ONE camera behaviour.
 
-    Both Google lanes want the same SHAPE and neither exposes a numeric motion
-    control, so the prompt is the only lever. They are bound separately anyway,
-    so either can diverge without touching the other.
+    Omni exposes no numeric motion control, so the prompt is the only lever.
     """
     core = _parts(inputs, include_camera=False)
     if not core:
@@ -541,7 +550,7 @@ def _google_chronological(inputs, tail):
 
 
 def compose_googleomnivideoengine(self, inputs):
-    """`GoogleOmniVideoEngine` -- Gemini Omni Flash Preview; provider chooses 3-10s; NO numeric motion control exists, so the prompt is the whole lever."""
+    """`GoogleOmniVideoEngine` -- Gemini Omni 1.1 Flash; provider chooses 3-10s; NO numeric motion control exists, so the prompt is the whole lever."""
     return _google_chronological(inputs, "One continuous shot, no cuts.")
 
 

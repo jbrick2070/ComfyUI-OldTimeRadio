@@ -79,22 +79,21 @@ def test_every_registered_engine_has_a_row():
 def test_the_google_rows_report_the_CANVAS_rate_not_the_providers():
     """The conversion most likely to be silently wrong, pinned in the doc too.
 
-    Veo generates at 24 fps and is COUNTED at the canvas's 25, because
+    Omni generates at 24 fps and is COUNTED at the canvas's 25, because
     ``canonicalize()`` resamples before anything reads a frame count. This test
-    itself asserted the opposite until the chunk-7a QA panel corrected the
-    declaration -- it was named ``..._report_24_fps_not_the_canvas_25`` and
-    demanded ``menu: 96, 144, 192``. It agreed with the bug because it was
-    written from the same wrong premise, one file over. Pin the published
-    seconds too: those are what a reader actually checks against Veo's docs,
-    and 4/6/8 is right whichever rate you count in -- it is the FRAMES that
-    move.
+    once asserted the opposite for Veo (``menu: 96, 144, 192``) because it was
+    written from the same wrong premise as the declaration, one file over. Pin
+    the published seconds too: those are what a reader checks against Google's
+    docs, and 3-10 s is right whichever rate you count in -- it is the FRAMES
+    that move. (Veo was the row pinned here until it was retired 2026-10-14.)
     """
     text = DOC.read_text(encoding="utf-8")
     for line in text.splitlines():
-        if line.startswith("| google_veo_video |"):
-            assert "menu: 100, 150, 200" in line
-            assert "menu: 4, 6, 8 s" in line
+        if line.startswith("| google_omni_video |"):
+            assert "| 75-250 |" in line
+            assert "| 3-10 s |" in line
             assert "| 25 |" in line
-            assert "96" not in line, "the provider-rate frame counts came back"
+            assert "72-240" not in line, (
+                "the provider-rate frame counts came back")
             return
-    pytest.fail("no google_veo_video row in the matrix")
+    pytest.fail("no google_omni_video row in the matrix")

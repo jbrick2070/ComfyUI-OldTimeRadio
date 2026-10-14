@@ -172,14 +172,6 @@
       },
       "size_gb": null
     },
-    "google_veo_video": {
-      "memory": {
-        "mac16": "fits",
-        "nv16": "fits",
-        "nv8": "fits"
-      },
-      "size_gb": null
-    },
     "humo": {
       "memory": {
         "mac16": "oom",

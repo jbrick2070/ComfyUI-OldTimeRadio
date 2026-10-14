@@ -60,8 +60,8 @@ def test_the_cloud_prefix_arm_classifies_the_cloud_family(engine_id):
     assert _RD._is_cloud_video_engine(engine_id) is True
 
 
-@pytest.mark.parametrize("engine_id", ["google_veo_video", "google_omni_video"])
-def test_the_attribute_arm_classifies_the_google_lanes(engine_id):
+@pytest.mark.parametrize("engine_id", ["google_omni_video"])
+def test_the_attribute_arm_classifies_the_google_lane(engine_id):
     """Their ids do NOT start with `cloud_`, so only the attribute sees them."""
     if engine_id not in _roster_ids():
         pytest.skip("%s is not registered in this build" % engine_id)

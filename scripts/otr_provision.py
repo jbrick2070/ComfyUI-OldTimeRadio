@@ -1250,7 +1250,6 @@ _REMOTE_NO_WEIGHT_VIDEO_ENGINES = {
     "cloud_ltx25_audio_in",
     "cloud_vidu_q2_pro_fast_720p",
     "google_omni_video",
-    "google_veo_video",
 }
 _REMOTE_NO_WEIGHT_IMAGE_ENGINES = {
     "cloud_flux_pro",

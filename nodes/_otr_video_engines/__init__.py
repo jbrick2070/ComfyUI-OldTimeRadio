@@ -207,13 +207,6 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# Direct Google Veo 3.1 BYO API video adapter. Not a Partner node and not local
-# GPU; selectable only, no default role.
-try:  # pragma: no cover - trivial guard
-    from . import eng_google_veo_video as _eng_google_veo_video  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
-
 
 # animatediff15_video (Ghost Signal, 2026-08-22): SD1.5 + the mm-p_0.5 v2 motion
 # module through AnimateDiff-Evolved's NON-LOOPED Standard Static context, at a

@@ -162,37 +162,26 @@ def test_the_local_ladders_match_their_adapters_named_constants():
     assert bounds("ltx_8gb") == (_l8._LTX8_MIN_FRAMES, 161)
 
 
-def test_the_google_menus_are_counted_at_the_CANVAS_rate_not_the_providers():
-    """The conversion this chunk got wrong twice, pinned in both directions.
+def test_the_google_window_is_counted_at_the_CANVAS_rate_not_the_providers():
+    """The conversion this lane got wrong twice, pinned in both directions.
 
-    Veo publishes 4/6/8 SECONDS and GENERATES at 24 fps. Writing the seconds
-    straight in as frames would assert sixth-of-a-second clips -- the first
-    error. Multiplying by 24 asserts frame counts that are UNREACHABLE -- the
-    second, caught by the chunk-7a QA panel. ``canonicalize()`` resamples every
-    delivered clip to ``canvas.fps`` and then counts ``duration_s * asset.fps``
-    at that same rate, so by the time the coverage path sees a Veo clip its
-    length is 4/6/8 s * 25 = 100/150/200 frames and 192 never occurs.
-
-    Both wrong answers are pinned out: not the seconds, and not the provider's
-    own rate either.
+    Omni renders 3-10 SECONDS and GENERATES at 24 fps. Writing the seconds
+    straight in as frames would assert tenth-of-a-second clips; multiplying by
+    24 asserts frame counts the coverage path can never see. ``canonicalize()``
+    resamples every delivered clip to ``canvas.fps`` and then counts
+    ``duration_s * asset.fps`` at that same rate, so the window is 75-250
+    frames at 25. (Veo carried the same lesson as its 100/150/200 menu until
+    it was retired on 2026-10-14.)
     """
     from nodes._otr_video_engines import eng_google_omni_video as _omni
-    from nodes._otr_video_engines import eng_google_veo_video as _veo
-
-    veo = fc.frame_contract_for(vreg.get_engine("google_veo_video"))
-    assert _veo.OUTPUT_FPS == 24, "Veo still generates at 24"
-    assert veo.native_fps == _veo.CANVAS_FPS == 25, "but it is COUNTED at 25"
-    assert veo.discrete_frames == tuple(
-        s * _veo.CANVAS_FPS for s in _veo.SUPPORTED_DURATIONS_S)
-    assert veo.discrete_frames == (100, 150, 200)
-    assert veo.discrete_frames != _veo.SUPPORTED_DURATIONS_S      # not seconds
-    assert veo.discrete_frames != (96, 144, 192)                  # not 24 fps
 
     omni = fc.frame_contract_for(vreg.get_engine("google_omni_video"))
     lo, hi = _omni.OUTPUT_DURATION_RANGE_S
-    assert _omni.OUTPUT_FPS == 24
-    assert omni.native_fps == _omni.CANVAS_FPS == 25
+    assert _omni.OUTPUT_FPS == 24, "Omni still generates at 24"
+    assert omni.native_fps == _omni.CANVAS_FPS == 25, "but it is COUNTED at 25"
     assert (omni.min_frames, omni.max_frames) == (lo * 25, hi * 25) == (75, 250)
+    assert (omni.min_frames, omni.max_frames) != (lo, hi)          # not seconds
+    assert (omni.min_frames, omni.max_frames) != (lo * 24, hi * 24)  # not 24 fps
 
 
 def test_a_capped_subclass_declares_its_OWN_ceiling():

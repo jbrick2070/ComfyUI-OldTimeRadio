@@ -738,16 +738,8 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
-    # google_veo_video (2026-07-08): direct Google Veo 3.1 BYO API text-to-video
-    # lane via predictLongRunning. Provider-side render, no local weights/VRAM.
-    # Selectable only; missing Google key fails loud at invoke.
-    "google_veo_video": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": True, "sidecar_conditional": False,
-        "model_requirements": []},
-    # Retired SFX-bed ids (cloud_vidu_q2_pro_fast_720p_sfx, google_vid_sfx_*)
+    # Retired ids (the SFX-bed cloud_vidu_q2_pro_fast_720p_sfx and google_vid_sfx_*,
+    # google_veo_video and the rest)
     # live in nodes/_otr_shared/public_engines.RETIRED_ENGINE_IDS, consulted by
     # check_retired_engine at every selection boundary; they must never
     # return to this table.

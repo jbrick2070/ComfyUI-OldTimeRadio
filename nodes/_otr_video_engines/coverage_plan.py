@@ -238,7 +238,7 @@ def _candidate_totals(required, contract, count):
 
 
 def _discrete_partition(total_render_frames, contract, count):
-    """Exact split over a fixed duration menu (Veo's 4/6/8s), or None.
+    """Exact split over a fixed duration menu (MiniMax H3's rungs), or None.
 
     MEMOIZED, and that is not an optimization -- it is a correctness-of-service
     fix (2026-07-25 QA). The bare recursive descent explores up to
@@ -353,8 +353,9 @@ def partition_beat(target_visible_frames, contract, *, join_mode=None,
     # ``[12, 4, 4]`` -- a third render, a third model load and a third seam, to
     # recover four frames -- and it did that to 4,885 cases across the sweep
     # grid. No contract in this tree has a menu gap wide enough to produce the
-    # pathological case (the widest shipped menus are Veo's 100/150/200 and
-    # Pixverse's 125/200, whose worst trim is 25 frames), so there is no bound.
+    # pathological case (the widest menus it has declared were Veo's
+    # 100/150/200 and Pixverse's 125/200, both since retired, whose worst trim
+    # was 25 frames), so there is no bound.
     # Revisit if an adapter ever declares a menu whose largest entry dwarfs its
     # smallest.
     for count in range(2, int(max_segments) + 1):

@@ -28,12 +28,8 @@ engine renders at whatever rate the canvas asks for and the seconds column is
 meaningless rather than merely unknown -- it is marked `unbounded`.
 
 **Two lanes run at 24 fps against a 25 fps canvas, and every contract in this
-page counts CANVAS frames.** Veo's published menu is 4/6/8 SECONDS, which is
-**100/150/200** frames at 25 -- not 96/144/192, which is the same menu counted
-at Veo's own 24 and is a length nothing downstream can produce. (This paragraph
-said 96/144/192 until 2026-08-12, contradicting the `google_veo_video` row in
-the table above it.) The two lanes reach 25 by different routes:
-`google_veo_video` by the provider-side duration-preserving resample in
+page counts CANVAS frames.** The two lanes reach 25 by different routes:
+`google_omni_video` by the provider-side duration-preserving resample in
 `cloud_media_canonical`, and `minimax_h3_video` by its own nearest-source-frame
 index map applied to the decoded batch before the encoder -- the local encoder
 can LABEL a frame rate but never resample one, so a 24 fps render shipped
@@ -73,7 +69,6 @@ without that map would play ~4% short.
 | cloud_wan_i2v | provider | image_to_video | wide | env OTR_CLOUD_WAN_RESOLUTION, default 720P | 50-375 step 25 | 2-15 s | 25 | soft_reference | yes |
 | cloud_wan_i2v_audio | provider | audio_conditioned_video | wide | env OTR_CLOUD_WAN_RESOLUTION, default 720P | 50-375 step 25 | 2-15 s | 25 | soft_reference | yes |
 | google_omni_video | provider | text_to_video | wide | 720p (fixed) | 75-250 | 3-10 s | 25 | none | yes |
-| google_veo_video | provider | text_to_video | wide | env OTR_GOOGLE_VEO_RESOLUTION, default 720p | menu: 100, 150, 200 | menu: 4, 6, 8 s | 25 | soft_reference | yes |
 | humo | local | audio_driven_face | portrait | canvas-negotiated (_aspect_plan) | 33-97 step 4 | 1.32-3.88 s | 25 | soft_reference | yes |
 | humo_1.7B | local | audio_driven_face | portrait | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
 | humo_1.7B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
@@ -114,7 +109,6 @@ without that map would play ~4% short.
 | cloud_wan_i2v | init_image, text_prompt | text_prompt REQUIRED |
 | cloud_wan_i2v_audio | init_image, audio_ref, text_prompt | text_prompt REQUIRED |
 | google_omni_video | text_prompt | text_prompt REQUIRED |
-| google_veo_video | text_prompt | text_prompt REQUIRED |
 | humo | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | humo_1.7B | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | humo_1.7B_169 | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
@@ -159,7 +153,6 @@ the engine's own `aspect` column above.
 | cloud_wan_i2v | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_wan_i2v_audio | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | google_omni_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
-| google_veo_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | humo | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | humo_1.7B | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | humo_1.7B_169 | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
@@ -206,7 +199,6 @@ means the adapter sizes itself and IGNORES the request canvas.
 | cloud_wan_i2v | n/a -- renders remotely | see `resolution` column |
 | cloud_wan_i2v_audio | n/a -- renders remotely | see `resolution` column |
 | google_omni_video | n/a -- renders remotely | see `resolution` column |
-| google_veo_video | n/a -- renders remotely | see `resolution` column |
 | humo | 480x832 | engine _native_dims |
 | humo_1.7B | 480x832 | engine _native_dims |
 | humo_1.7B_169 | 832x480 | engine _native_dims |
@@ -257,7 +249,6 @@ JUMP plan on a still-consuming lane ever re-mints.
 | cloud_wan_i2v | jump | 2: 375, 75 | 450 | 442 | 1 |
 | cloud_wan_i2v_audio | jump | 2: 375, 75 | 450 | 442 | 1 |
 | google_omni_video | jump | 2: 250, 192 | 442 | 442 | 1 |
-| google_veo_video | jump | 3: 200, 150, 100 | 450 | 442 | 2 |
 | humo | jump | 5: 97, 97, 97, 97, 57 | 445 | 442 | 0 |
 | humo_1.7B | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
 | humo_1.7B_169 | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
@@ -305,7 +296,6 @@ and it read exactly like a measured number until someone looked.
 | cloud_wan_i2v | - | contract max | none cited |
 | cloud_wan_i2v_audio | - | contract max | none cited |
 | google_omni_video | - | contract max | none cited |
-| google_veo_video | - | contract max | none cited |
 | humo | 97 | safe_render_frames | `vram-recipe-lab/docs/HUMO_BAKEOFF.md` (sibling lab repo), apple/evidence |
 | humo_1.7B | - | contract max | `vram-recipe-lab/docs/HUMO_BAKEOFF.md` (sibling lab repo), apple/evidence |
 | humo_1.7B_169 | - | contract max | `vram-recipe-lab/docs/HUMO_BAKEOFF.md` (sibling lab repo), apple/evidence |
@@ -334,7 +324,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **36**
-* provider-side: **8**
+* registered engine names: **35**
+* provider-side: **7**
 * local: **28**
 * can chain (strict_first_frame): **11**

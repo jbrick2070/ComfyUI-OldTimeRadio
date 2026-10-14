@@ -75,18 +75,18 @@ class FrameContract:
         Legal lengths are ``min_frames + k * quantum``. An ``8n+1`` engine
         declares ``min_frames=9, quantum=8``. ``1`` means any length in range.
     ``discrete_frames``
-        For providers that only accept a fixed menu of clip lengths (Veo's
-        4/6/8 SECONDS). When non-empty this REPLACES the min/max/quantum
+        For adapters that only accept a fixed menu of clip lengths (MiniMax
+        H3's rungs). When non-empty this REPLACES the min/max/quantum
         arithmetic and the legal lengths are exactly these values.
 
         THE UNIT IS FRAMES, NOT SECONDS. ``coverage_plan`` compares these
         numbers against ``target_visible_frames`` directly, so a provider menu
         expressed in seconds MUST be multiplied by :attr:`native_fps` at the
-        declaration site -- and by the CANVAS rate, never the model's. Veo's
-        4/6/8 s menu declares ``(100, 150, 200)``: 25 fps, not Veo's own 24.
-        Counting at 24 (``(96, 144, 192)``) is the known error:
-        ``tests/test_engine_contract_roster.py`` asserts it is wrong. Every
-        24 fps lane is delivered at 25 -- Veo by the provider-side
+        declaration site -- and by the CANVAS rate, never the model's. The
+        retired Veo lane's 4/6/8 s menu was ``(100, 150, 200)``: 25 fps, not
+        Veo's own 24. Counting at 24 (``(96, 144, 192)``) is the known error;
+        ``tests/test_engine_contract_roster.py`` pins the canvas rate. Every
+        24 fps lane is delivered at 25 -- Google Omni by the provider-side
         duration-preserving resample in ``cloud_media_canonical``, MiniMax H3
         by its own index map before the encoder -- so a menu counted at 24
         lists lengths nothing downstream can ever produce, and a contract

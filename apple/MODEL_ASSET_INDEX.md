@@ -56,7 +56,6 @@ Anything not listed there is a manual install -- see its row below.
 | `ghost_signal_official` | 4 weight file(s) | manual download | - |
 | `ghost_signal_stillin_lab` | 2 weight file(s) | manual download | - |
 | `google_omni_video` | nothing on disk | - | - |
-| `google_veo_video` | nothing on disk | - | - |
 | `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual download](RUNPOD_INSTALL.md) | - |
 | `ltx25` | 4 weight file(s) | auto at queue time; or `otr_fetch_lane_weights.py ltx25_16gb` / `ltx25_24gb` / `ltx25_blackwell` | - |
 | `ltx_8gb` | 2 weight file(s) | `otr_fetch_lane_weights.py ltx_8gb` | 2 profile(s) |

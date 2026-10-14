@@ -87,10 +87,8 @@ def _resolution(engine, name):
         return "env OTR_CLOUD_LTX25_RESOLUTION, default 1920x1080"
     if name == "cloud_ltx25_audio_in":
         return "env OTR_CLOUD_LTX25_A2V_RESOLUTION, default 1920x1080"
-    if name.startswith("google_") and "omni" in name:
+    if name == "google_omni_video":
         return "720p (fixed)"
-    if name.startswith("google_"):
-        return "env OTR_GOOGLE_VEO_RESOLUTION, default 720p"
     if hasattr(engine, "_aspect_plan") or hasattr(engine, "_aspect_policy"):
         return "canvas-negotiated (_aspect_plan)"
     return "canvas"
@@ -390,12 +388,8 @@ engine renders at whatever rate the canvas asks for and the seconds column is
 meaningless rather than merely unknown -- it is marked `unbounded`.
 
 **Two lanes run at 24 fps against a 25 fps canvas, and every contract in this
-page counts CANVAS frames.** Veo's published menu is 4/6/8 SECONDS, which is
-**100/150/200** frames at 25 -- not 96/144/192, which is the same menu counted
-at Veo's own 24 and is a length nothing downstream can produce. (This paragraph
-said 96/144/192 until 2026-08-12, contradicting the `google_veo_video` row in
-the table above it.) The two lanes reach 25 by different routes:
-`google_veo_video` by the provider-side duration-preserving resample in
+page counts CANVAS frames.** The two lanes reach 25 by different routes:
+`google_omni_video` by the provider-side duration-preserving resample in
 `cloud_media_canonical`, and `minimax_h3_video` by its own nearest-source-frame
 index map applied to the decoded batch before the encoder -- the local encoder
 can LABEL a frame rate but never resample one, so a 24 fps render shipped

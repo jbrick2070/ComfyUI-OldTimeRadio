@@ -117,7 +117,6 @@ EXPECTED_CLOUD_GAP = {
     "cloud_wan_i2v",
     "cloud_wan_i2v_audio",
     "google_omni_video",
-    "google_veo_video",
 }
 
 

@@ -154,7 +154,6 @@ VIDEO_LANE = {
     "cloud_wan_i2v": "cwan",
     "cloud_wan_i2v_audio": "cwna",
     "google_omni_video": "gomn",
-    "google_veo_video": "gveo",
     "humo": "humo",
     "humo_1.7B": "h17",
     "humo_1.7B_169": "h17w",

@@ -160,31 +160,29 @@ open one.
 
 `cloud_seedance_2`, `cloud_wan_i2v`, `cloud_wan_i2v_audio`,
 `cloud_vidu_q2_pro_fast_720p`, `cloud_ltx25_foley_plus` and
-`cloud_ltx25_audio_in` render on Comfy's partner services and bill your Comfy credits. `google_veo_video` and
-`google_omni_video` go straight to Google and bill your Google key.
+`cloud_ltx25_audio_in` render on Comfy's partner services and bill your Comfy credits.
+`google_omni_video` goes straight to Google and bills your Google key.
 
 They download nothing and use no VRAM, so they run on any machine. Selecting one
 in the dropdown is the whole switch -- there is no enable flag. Without a
 credential the render stops and says so. For the Comfy partner rows, sign into Comfy
 with a Comfy API key (headless: `OTR_COMFY_API_KEY` on the *submitting*
 machine, sent by `scripts/otr_api.py`; the server never reads it);
-`OTR_GOOGLE_API_KEY` for the Google pair (or `google.secret` /
+`OTR_GOOGLE_API_KEY` for the Google row (or `google.secret` /
 `google_api_key.location` in the pack folder -- see the README).
 Never put a key in a workflow widget.
 
-**The Veo daily allowance decides whether this lane finishes.** Measured on a
-paid Tier 1 project, 2026-09-19: every Veo model allows **2 requests a minute
-and 10 a day**, counted separately per model
-(`veo-3.1-lite-generate-preview`, `veo-3.1-fast-generate-preview`,
-`veo-3.1-generate-preview`; pick one with `OTR_GOOGLE_VEO_MODEL_ID`). One
-episode asks for roughly **sixteen** clips -- two jump segments per beat -- so
-a Tier 1 key runs out part-way through and the remaining beats floor to their
-stills. The run still publishes; it is a quota wall, not a failure. That is
-why the shipped Google workflow, `otr_google_still`, uses `still_flat` and
-never calls Veo: stills have no daily cap, so that shape runs every day. On
-a higher tier, or after Google grants an increase on the *Increase
-Requests* tab, switch its three visual dropdowns to `google_veo_video` --
-the Veo engines are built and proven, they are simply rationed.
+**Google's daily video allowance decides whether this lane finishes.** Veo,
+measured on a paid Tier 1 project on 2026-09-19, allowed **2 requests a minute
+and 10 a day** per model, and one episode asks for roughly **sixteen** clips,
+so a Tier 1 key ran out part-way through and the remaining beats floored to
+their stills. The run still publishes; it is a quota wall, not a failure. That
+is why the shipped Google workflow, `otr_google_still`, uses `still_flat` and
+never calls a video model: stills have no daily cap, so that shape runs every
+day. To try video, switch its three visual dropdowns to `google_omni_video`
+(Gemini Omni 1.1 Flash); its allowance has not been measured here.
+`google_veo_video` was retired on 2026-10-14, ahead of Google removing the Veo
+3.1 preview models from the Gemini API on 2026-10-22.
 
 ---
 
@@ -203,7 +201,7 @@ folder and in the template gallery:
 | Comfy Cloud (cheap, 1/3/5-act) | `otr_cloud_low*.json` | `cloud_vidu_q2_pro_fast_720p` |
 | Comfy Cloud (deluxe Foley) | `otr_cloud_deluxe_3act.json` | `cloud_ltx25_foley_plus` |
 | Comfy Cloud (deluxe audio-in) | `otr_cloud_deluxe_audio_in_3act.json` | `cloud_ltx25_audio_in` |
-| Google, your own key | `otr_google_still.json` | `still_flat` over Gemini stills (no Veo) |
+| Google, your own key | `otr_google_still.json` | `still_flat` over Gemini stills (no video model) |
 
 **The pack default is the three viz lanes on `otr_canonical.json`.** That is the GPU-friendly first run: no video weights, no Comfy credits. Local machine graphs keep the local lane in the table above.
 

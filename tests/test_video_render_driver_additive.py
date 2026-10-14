@@ -780,10 +780,11 @@ def test_audio_face_request_missing_inputs_fails_closed():
         VideoRequest.model_validate(req)
 
 
-def test_google_veo_request_prunes_audio_but_keeps_scene_still():
-    """Direct Google Veo cannot consume OTR audio refs, but it can use Veo's
-    documented start-image path. The shared builder must keep the per-beat
-    scene still and prune only unsupported audio/video refs."""
+def test_google_omni_request_prunes_audio_but_keeps_scene_still():
+    """Direct Google Omni cannot consume OTR audio refs, but it takes a start
+    image. The shared builder must keep the per-beat scene still and prune
+    only the audio/video refs Omni's render_clip refuses -- a character beat's
+    voice reaching Omni fails the beat loud."""
     from nodes._otr_video_engines.schemas import VideoRequest
 
     led = {
@@ -800,7 +801,7 @@ def test_google_veo_request_prunes_audio_but_keeps_scene_still():
         ]},
         "video": {"video_revision": 1, "fps": 25, "shots": [
             {"shot_id": "shot_b010", "source_line_ids": ["b010"],
-             "role": "character_video", "engine_id": "google_veo_video",
+             "role": "character_video", "engine_id": "google_omni_video",
              "family": "text_to_video", "group_id": "grp_char",
              "target_frame_count": 60, "degradation_trail": [],
              "creative": {"text_prompt": "archival reading room, slow pan"}},
@@ -815,7 +816,7 @@ def test_google_veo_request_prunes_audio_but_keeps_scene_still():
     assert req["observability"]["init_source"] == "scene_still"
 
 
-def test_google_veo_video_art_music_open_uses_scene_still_and_style_prompt():
+def test_google_omni_video_art_music_open_uses_scene_still_and_style_prompt():
     """A Google all-cloud music/open beat must not fall back to the generic
     1940s-studio host prompt. It should carry the generated scene still plus the
     selected video_art motion/style language."""
@@ -829,7 +830,7 @@ def test_google_veo_video_art_music_open_uses_scene_still_and_style_prompt():
         },
     }
     shot = dict(led["video"]["shots"][0])
-    shot["engine_id"] = "google_veo_video"
+    shot["engine_id"] = "google_omni_video"
     shot["family"] = "text_to_video"
     shot["creative"] = {}
     req = rd.build_request_from_shot(shot, led)
@@ -845,7 +846,7 @@ def test_google_veo_video_art_music_open_uses_scene_still_and_style_prompt():
 
 def test_google_video_is_provider_side_not_local_for_reclaim():
     section = {"shots": [
-        {"shot_id": "shot_google", "engine_id": "google_veo_video"},
+        {"shot_id": "shot_google", "engine_id": "google_omni_video"},
     ]}
     assert rd._section_has_local_video_engine(section) is False
 

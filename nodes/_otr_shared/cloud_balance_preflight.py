@@ -148,7 +148,9 @@ def pad_usd(subtotal: float) -> float:
 
 
 def clip_seconds_for_act_count(act_count) -> int:
-    """Veo menu, not a guess: 1 act -> 4s / 100 frames; else 8s / 200."""
+    """The clip length a per-second price is estimated at: 1 act -> 4 s, else
+    8 s. These were the retired Veo lane's menu; they stay as a conservative
+    per-clip length for the per-second partner prices."""
     try:
         n = int(act_count)
     except (TypeError, ValueError):

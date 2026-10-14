@@ -366,7 +366,7 @@ def test_a_row_carrying_real_jump_still_requests_validates():
     plan = cp.partition_beat(400, jump_contract)
     assert plan.join_mode == "jump", plan.join_mode
     requests = cp.jump_still_requests(plan, "b001", role="character_video",
-                                      engine_id="google_veo_video", char_id="c1")
+                                      engine_id="google_omni_video", char_id="c1")
     assert requests, "the minter produced nothing -- nothing is being proven"
 
     row = dict(_real_rows()[0])

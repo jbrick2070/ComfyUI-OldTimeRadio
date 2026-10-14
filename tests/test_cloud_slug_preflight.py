@@ -114,8 +114,8 @@ def test_t2_refuse_same_host_warn_other_host():
     def dead(_auth):
         return csp.CatalogResult(None, "timeout", csp.GOOGLE_HOST)
 
-    eng = _FakeEngine("google_veo_video", {
-        "google_veo_video": {"model": ("veo-3.1-lite-generate-preview",)},
+    eng = _FakeEngine("google_omni_video", {
+        "google_omni_video": {"model": ("gemini-omni-1.1-flash",)},
     }, catalog="google")
     hits = csp.check_engine(
         eng, eng.cloud_selectors(),
@@ -125,15 +125,15 @@ def test_t2_refuse_same_host_warn_other_host():
 
 
 def test_t2_google_models_prefix_matches_bare_catalog_id():
-    """Validator congruity: posted models/veo-... must match catalog veo-..."""
-    eng = _FakeEngine("google_veo_video", {
-        "google_veo_video": {"model": ("models/veo-3.1-lite-generate-preview",)},
+    """Validator congruity: posted models/gemini-... must match catalog gemini-..."""
+    eng = _FakeEngine("google_omni_video", {
+        "google_omni_video": {"model": ("models/gemini-omni-1.1-flash",)},
     }, catalog="google")
     hits = csp.check_engine(
         eng, eng.cloud_selectors(),
         schema_options_fn=lambda _k: {},
         catalog_fn=lambda _a: csp.CatalogResult(
-            frozenset({"veo-3.1-lite-generate-preview"}), "", csp.GOOGLE_HOST))
+            frozenset({"gemini-omni-1.1-flash"}), "", csp.GOOGLE_HOST))
     assert hits == []
 
 
@@ -422,13 +422,13 @@ def test_writer_check_restores_process_global_bindings(clean_slot_env):
 
 
 def test_director_google_engine_dead_model_refuses():
-    class _Veo:
-        name = "google_veo_video"
-        node_key = "google_veo_video"
+    class _Omni:
+        name = "google_omni_video"
+        node_key = "google_omni_video"
         cloud_catalog = "google"
 
         def cloud_selectors(self):
-            return {"google_veo_video": {"model": ("veo-dead-preview",)}}
+            return {"google_omni_video": {"model": ("gemini-omni-flash-preview",)}}
 
     class _Image:
         name = "google_image"
@@ -438,16 +438,16 @@ def test_director_google_engine_dead_model_refuses():
         def cloud_selectors(self):
             return {"google_image": {"model": ("gemini-dead-image",)}}
 
-    engines = {"google_veo_video": _Veo(), "google_image": _Image()}
+    engines = {"google_omni_video": _Omni(), "google_image": _Image()}
     prompt = {
         "63": {"class_type": "OTR_WorkflowValidator", "inputs": {}},
         "80": {
             "class_type": "OTR_VideoDirector",
             "inputs": {
                 "gate_in": ["63", 0],
-                "announcer_video_model": "google_veo_video",
-                "music_video_model": "google_veo_video",
-                "character_video_model": "google_veo_video",
+                "announcer_video_model": "google_omni_video",
+                "music_video_model": "google_omni_video",
+                "character_video_model": "google_omni_video",
                 "announcer_image_model": "google_image",
                 "music_image_model": "google_image",
                 "character_image_model": "google_image",
@@ -460,10 +460,10 @@ def test_director_google_engine_dead_model_refuses():
             prompt, "63",
             resolve_engine=lambda eid: engines.get(eid),
             schema_options_fn=lambda _k: {},
-            catalog_fn=_catalog({"google": {"veo-3.1-generate-preview",
+            catalog_fn=_catalog({"google": {"gemini-omni-1.1-flash",
                                             "gemini-3.1-flash-image"}}))
     text = str(exc.value)
-    assert "veo-dead-preview" in text
+    assert "gemini-omni-flash-preview" in text
     assert "google catalog" in text
     csp._CACHE.clear()
 
@@ -480,10 +480,10 @@ def test_catalog_ids_openrouter_and_google_with_injected_get_json():
     def google_get(path):
         assert path.startswith("/v1beta/models?pageSize=")
         return {"models": [{"name": "models/gemini-3.5-flash"},
-                           {"name": "models/veo-3.1-generate-preview"}]}
+                           {"name": "models/gemini-omni-1.1-flash"}]}
 
     got = csp.catalog_ids("google", get_json=google_get)
-    assert got.ids == frozenset({"gemini-3.5-flash", "veo-3.1-generate-preview"})
+    assert got.ids == frozenset({"gemini-3.5-flash", "gemini-omni-1.1-flash"})
     assert got.host == csp.GOOGLE_HOST and got.error == ""
 
     def down(_path):
