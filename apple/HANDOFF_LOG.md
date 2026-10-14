@@ -1879,3 +1879,30 @@ the live version.
   lost its script caller: `_otr_voice_bank.compute_bank_coverage` and `APPROVED_VOICE_ENGINES` (the ingest
   script used them as a report). They stay: the tests that read them assert the SHIPPED voice bank meets the
   casting floor for every approved engine, a guard over production data.
+
+## 2026-10-14 -- Bug Bible run, and the retry policy nobody executed is gone (cloud session)
+
+- **Bible regression, run here for the first time this wave.** `tests/bug_bible_regression.py` from
+  `comfyui-custom-node-survival-guide` at `df382fd`, with `--pack-dir` on this tree and on `939167bf` (the
+  tree before the dead-code waves): 54 passed, 14 skipped, 3 xfailed, 1 failed, and the per-test outcomes are
+  identical on both. The one failure is in the Bible repo itself (`BUG_BIBLE.yaml` has 379 entries, its README
+  says 378). The Bible names no file or symbol the waves deleted. All 14 skips are OTR-local guards that look
+  for files OTR retired before this session (`_otr_scifi_codex.py`, `_otr_scifi_fable2.py`,
+  `_otr_original_codex56sol.py`, `anchor_gen.py`, `test_news_coda_delivery_surface.py`), so they can never run
+  against this pack; that is the Bible repo's to tidy.
+- **`retry_taxonomy` deleted.** Row 0q held its retry policy because `test_video_survival_guide_vectors.py`
+  called itself a Bible-pinned exit gate. The Bible never mentions `retry_taxonomy`, `classify`, `BlockClass`,
+  `RetryDecision` or that file, so nothing pinned it. Production read one thing from the module:
+  `render_driver.classify_failure` returns a `FailureKind`, and `render_shot` puts it in the `RenderError` text
+  and raises. Nothing retried; the policy's own comment said it documented a budget nobody enforced.
+  `FailureKind` now lives in the error leaf `render_errors.py` (re-exported by `render_driver`, like
+  `RenderError`), trimmed to the eight kinds `classify_failure` can return; the six it never returns
+  (`asset_missing`, `license_blocked` and the four WARN kinds) went with the policy.
+- **Tests.** `test_video_retry_taxonomy.py`, `test_video_retry_taxonomy_additive.py` and
+  `test_video_survival_guide_vectors.py` pinned only the policy table and are deleted. What the vectors meant
+  for production is now one test against the real driver: a failed shot calls the engine once, raises
+  `RenderError`, and names the kind (`test_a_failed_shot_is_tried_once_and_named_in_the_error`). The leaf guard
+  in `test_wire_w2_deferred_image_gap.py` allows `enum` beside `os` and `sys` (stdlib, still a leaf).
+- **Checked:** pack loads 22 nodes, every module imports, nothing dangles, no new pyflakes undefined name,
+  collection 16984 -> 16954 with no new error; the touched and neighbouring test files pass. The full suite was
+  still running at push; its failure set is diffed against the 165 known container failures in the next note.

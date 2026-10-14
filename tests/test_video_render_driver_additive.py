@@ -3,7 +3,7 @@
 New, self-contained tests complementing tests/test_video_render_driver.py. The
 pure helpers (engine_family / classify_failure kind map) plus a CPU exercise of
 the REAL render loop (run_episode) driven by STUB engines registered into a
-snapshot/restore registry: it proves a HARD failure RAISES LOUD (NO FALLBACKS --
+snapshot/restore registry: it proves a render failure RAISES LOUD (NO FALLBACKS --
 2026-07-02 directive; no engine swap, no still floor), the frozen audio section is
 never touched, the input ledger is not mutated, and a clean run is deterministic.
 No GPU, no model load. UTF-8, no BOM, ASCII-only, SFW.
@@ -14,7 +14,6 @@ import pathlib
 
 import pytest
 
-from nodes._otr_shared import retry_taxonomy as rt
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import render_driver as rd
 
@@ -36,9 +35,9 @@ def test_engine_family_known_and_unknown():
 
 
 def test_classify_failure_specific_kind_mappings():
-    assert rd.classify_failure(RuntimeError("CUDA out of memory")) is rt.FailureKind.OOM
+    assert rd.classify_failure(RuntimeError("CUDA out of memory")) is rd.FailureKind.OOM
     for exc in (LookupError(), KeyError("k"), FileNotFoundError()):
-        assert rd.classify_failure(exc) is rt.FailureKind.DEPENDENCY_MISSING
+        assert rd.classify_failure(exc) is rd.FailureKind.DEPENDENCY_MISSING
 
     class WrapperNodeMissing(Exception):
         pass
@@ -47,10 +46,10 @@ def test_classify_failure_specific_kind_mappings():
         pass
 
     assert rd.classify_failure(WrapperNodeMissing()) is (
-        rt.FailureKind.DEPENDENCY_MISSING)
-    assert rd.classify_failure(GraphExecutionError()) is rt.FailureKind.INVALID_DAG
+        rd.FailureKind.DEPENDENCY_MISSING)
+    assert rd.classify_failure(GraphExecutionError()) is rd.FailureKind.INVALID_DAG
     assert rd.classify_failure(RuntimeError("boom")) is (
-        rt.FailureKind.CRASH_BEFORE_LOAD)
+        rd.FailureKind.CRASH_BEFORE_LOAD)
 
 
 # --------------------------------------------------------------------------- #
@@ -921,15 +920,15 @@ def test_classify_failure_names_a_policy_verdict_not_a_crash():
     refused = cmb.CloudMediaError(
         cmb.CloudErrorCode.CONTENT_REFUSED,
         "cloud_ltx25_i2v: Content filtered due to policy restrictions")
-    assert rd.classify_failure(refused) is rt.FailureKind.CONTENT_REFUSED
+    assert rd.classify_failure(refused) is rd.FailureKind.CONTENT_REFUSED
     wrap = RuntimeError("shot shot_shot_001_b40 failed to render")
     wrap.__cause__ = refused
-    assert rd.classify_failure(wrap) is rt.FailureKind.CONTENT_REFUSED
+    assert rd.classify_failure(wrap) is rd.FailureKind.CONTENT_REFUSED
     # Everything else keeps the answer it had.
     assert rd.classify_failure(RuntimeError("boom")) is (
-        rt.FailureKind.CRASH_BEFORE_LOAD)
+        rd.FailureKind.CRASH_BEFORE_LOAD)
     assert rd.classify_failure(FileNotFoundError("nope")) is (
-        rt.FailureKind.DEPENDENCY_MISSING)
+        rd.FailureKind.DEPENDENCY_MISSING)
 
 
 def test_cloud_floor_reason_sees_through_the_render_error_wrap():

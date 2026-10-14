@@ -67,9 +67,9 @@ def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
     GraphExecutionError like every other probe failure. The ONLY observable
     consequence is the label ``render_driver.classify_failure`` writes into the
     RenderError text and the log line -- ``invalid_dag`` instead of
-    ``crash_before_load``. It changes no control flow: ``_render_shot`` raises
-    LOUD on any exception under the 2026-06-16 no-fallbacks directive, and
-    nothing on the render path reads the retry taxonomy's ``same_seed_retries``.
+    ``crash_before_load``. It changes no control flow: ``render_shot`` raises
+    LOUD on any exception under the 2026-06-16 no-fallbacks directive, and the
+    render path has no retry for a label to steer.
     A function that documents one contract and keeps two exits out of it is a
     trap for the next reader; consistency with its own docstring is worth more
     than an accidental label.

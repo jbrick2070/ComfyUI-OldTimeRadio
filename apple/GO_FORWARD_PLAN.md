@@ -332,13 +332,14 @@ once after the merge.
 Five commits landed (`4d92cfaf` `0d461867` `e6daae04` `f74316a5` `22231ffa`; about
 2,600 lines, three finished one-shot scripts among them), and then the last three
 scripts with no reader (`otr_build_obs_listen_page`, `otr_gemma4_doctor`,
-`otr_tail_logs`) went at the operator's word. A symbol is dead when
+`otr_tail_logs`) went at the operator's word, and `retry_taxonomy`'s retry policy
+went once the Bug Bible showed it pinned none of it. A symbol is dead when
 nothing reachable from the pack's real roots (the node table in `__init__.py`,
 `scripts/`, `tools/`) reads it. Tests are neither roots nor evidence: a test that is
 a symbol's only reader is read for what it asserts, then deleted with a subject
 that was only itself, retargeted onto the live path when it pinned live behaviour
 through the dead helper, or kept when it is an oracle, a drift guard or an inverted
-tripwire. The 123 symbols the pass still lists are overwhelmingly that last kind.
+tripwire. The 119 symbols the pass still lists are overwhelmingly that last kind.
 Each of these survived on purpose and needs a ruling, not a deletion:
 
 - **Role-query aliases.** `engines_for_role` / `default_engine_for_role` on the audio,
@@ -346,10 +347,6 @@ Each of these survived on purpose and needs a ruling, not a deletion:
   upscale `is_registered`: no production caller, kept as the "1:1 registry surface"
   and as the query API the capability-matrix tests read. All or none: delete the
   family and let the matrices read `descriptor_for_engine`, or declare it public.
-- **`retry_taxonomy`'s retry policy** (`classify`, `block_class_of`, `_POLICY`,
-  `RetryDecision`, `BlockClass`): only `FailureKind` is read. Thirty test functions
-  pin it and `test_video_survival_guide_vectors.py` is a Bible-pinned exit gate, so
-  removing it is a cross-repo call.
 - **`OTR_VIDEO_MUTE`** (`cloud_media_backend`): an inert knob for an operator
   amendment (2026-07-02) that nothing enforces. Enforce it or retire it.
 - **Closed vocabulary.** The still-plan cardinalities `per_recurring_subject` and

@@ -2,8 +2,9 @@
 
 The live engine forwards (render_shot / run_episode / _render_one) are proven
 by a live canonical episode and never run in pytest -- exactly as the engine
-adapters' forwards don't. Here we prove the model-agnostic glue the driver is
-responsible for: failures classify HARD and requests are deterministic.
+adapters' forwards don't; render_shot runs here only with _render_one stubbed.
+Here we prove the model-agnostic glue the driver is responsible for: a failed
+shot is labelled and fails once, LOUD, and requests are deterministic.
 """
 
 import pytest
@@ -13,14 +14,29 @@ from nodes._otr_video_engines import eng_humo         # noqa: F401 (register hum
 from nodes._otr_video_engines import eng_ltx25          # noqa: F401 (register)
 from nodes._otr_video_engines import eng_ltx_8gb        # noqa: F401 (register)
 from nodes._otr_video_engines import render_driver as rd
-from nodes._otr_shared import retry_taxonomy as rt
 
 
-def test_classify_failure_is_always_hard():
-    assert rd.classify_failure(RuntimeError("CUDA out of memory")) is rt.FailureKind.OOM
-    assert rt.block_class_of(rd.classify_failure(LookupError())) is rt.BlockClass.HARD
-    assert rt.block_class_of(
-        rd.classify_failure(RuntimeError("boom"))) is rt.BlockClass.HARD
+def test_classify_failure_labels_every_exception():
+    assert rd.classify_failure(RuntimeError("CUDA out of memory")) is rd.FailureKind.OOM
+    assert rd.classify_failure(LookupError()) is rd.FailureKind.DEPENDENCY_MISSING
+    assert rd.classify_failure(RuntimeError("boom")) is rd.FailureKind.CRASH_BEFORE_LOAD
+
+
+def test_a_failed_shot_is_tried_once_and_named_in_the_error(monkeypatch):
+    """No retry and no fallback: the engine runs once, the shot fails LOUD,
+    and the error names the kind classify_failure gave it."""
+    calls = []
+
+    def render(engine_name, request, **kwargs):
+        calls.append(engine_name)
+        raise RuntimeError("CUDA out of memory")
+
+    monkeypatch.setattr(rd, "_render_one", render)
+    shot = {"shot_id": "shot_0001", "engine_id": "ltx25_video"}
+    with pytest.raises(rd.RenderError) as excinfo:
+        rd.render_shot(shot, {"shot_id": "shot_0001"})
+    assert calls == ["ltx25_video"]
+    assert str(rd.FailureKind.OOM) in str(excinfo.value)
 
 
 def test_build_request_is_deterministic_per_shot():

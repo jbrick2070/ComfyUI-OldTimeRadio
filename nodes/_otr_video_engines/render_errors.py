@@ -1,16 +1,15 @@
 """THE RENDER ERROR LEAF: render failure types, and nothing else.
 
-WHY THIS MODULE EXISTS, and why it is not in ``retry_taxonomy``. ShotLock
-needs to catch ONE specific render failure -- a cast-time image gap -- and let
-every other render failure through. That needs a named exception type, and the
-type has to live somewhere both ``render_driver`` and ``otr_shot_lock`` can
-import without a cycle. ``retry_taxonomy`` is the obvious-looking home and is
-the wrong one: ``render_driver`` already imports it, so defining a subclass of
-``RenderError`` there would import ``render_driver`` straight back.
+WHY THIS MODULE EXISTS. ShotLock needs to catch ONE specific render failure --
+a cast-time image gap -- and let every other render failure through. That
+needs a named exception type, and the type has to live somewhere both
+``render_driver`` and ``otr_shot_lock`` can import without a cycle.
+``render_driver`` itself is the obvious-looking home and is the wrong one:
+ShotLock would then import the whole driver just to name one exception.
 
 So this is a LEAF. It imports nothing from this package -- nothing from the
 registry, the engines, the driver or the shared helpers -- and nothing here
-may ever grow an import that changes that. ``render_driver`` re-exports both
+may ever grow an import that changes that. ``render_driver`` re-exports these
 names, so every existing ``from .render_driver import RenderError`` keeps
 working and the class objects are identical, which is what makes ``isinstance``
 and ``except`` behave the same on both import paths.
@@ -19,6 +18,28 @@ Cold-import clean: stdlib only.
 """
 
 from __future__ import annotations
+
+import enum
+
+
+class FailureKind(str, enum.Enum):
+    """The label ``render_driver.classify_failure`` puts on a failed render.
+
+    It names the failure in the :class:`RenderError` text and nothing more:
+    there is no retry and no fallback on the render path (operator
+    2026-07-02), so a kind changes what the operator reads, never what runs.
+    Every member is one ``classify_failure`` can return -- the four cloud ones
+    through ``render_driver._JOB_CODE_TO_KIND``.
+    """
+
+    DEPENDENCY_MISSING = "dependency_missing"
+    INVALID_DAG = "invalid_dag"
+    OOM = "oom"
+    TIMEOUT = "timeout"
+    CRASH_BEFORE_LOAD = "crash_before_load"
+    CONTENT_REFUSED = "content_refused"
+    CORRUPT_OUTPUT = "corrupt_output"
+    TRANSIENT_IO = "transient_io"
 
 
 class RenderError(RuntimeError):

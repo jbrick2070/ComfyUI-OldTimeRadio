@@ -51,10 +51,10 @@ def test_the_gap_type_is_a_render_error_so_the_render_path_still_fails_loud():
 def test_the_error_leaf_imports_nothing_from_this_package():
     """It exists to be importable from both sides of a would-be cycle.
 
-    ``retry_taxonomy`` was the obvious home and is the wrong one: render_driver
-    already imports it, so a RenderError subclass there imports render_driver
-    back. This module stays a LEAF, and this test is what notices if someone
-    adds a convenience import to it later.
+    ``render_driver`` was the obvious home and is the wrong one: ShotLock would
+    import the whole driver to name one exception. This module stays a LEAF,
+    and this test is what notices if someone adds a convenience import to it
+    later.
     """
     src = os.path.join(os.path.dirname(rd.__file__), "render_errors.py")
     tree = ast.parse(open(src, encoding="utf-8").read())
@@ -71,7 +71,7 @@ def test_the_error_leaf_imports_nothing_from_this_package():
             # landed. A new test file is inside the sweep's blast radius the
             # commit AFTER you write it.
             for imp in node.names:
-                assert imp.name in ("os", "sys"), (
+                assert imp.name in ("enum", "os", "sys"), (
                     "render_errors must stay a dependency leaf; it imports %r"
                     % (imp.name,))
 

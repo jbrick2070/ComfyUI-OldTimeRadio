@@ -4,8 +4,8 @@ that ``OTR_VideoRenderBatch`` walks to ship Subproject A.
 For each shot the driver drives the registry engine lifecycle
 (``assert_usable -> prepare -> render_clip -> canonicalize -> teardown``).
 NO FALLBACKS (operator directive 2026-07-02: NO fallbacks / NO auto-defaults
-anywhere): a HARD render failure is classified via the A-S7 retry taxonomy for
-the error message and then RAISES :class:`RenderError` LOUD -- there is NO
+anywhere): a render failure is labelled with a :class:`FailureKind` for the
+error message and then RAISES :class:`RenderError` LOUD -- there is NO
 engine swap, NO chain, NO still-image floor. The dropdown values saved in
 ``workflows/otr_canonical.json`` are the ONLY defaults. The frozen
 ``ledger['audio']`` section is read-only throughout (V-1 / the audio spine is
@@ -32,7 +32,6 @@ import shutil
 import tempfile
 import time
 
-from .._otr_shared import retry_taxonomy as _rt
 from .._otr_shared import still_receipt as _receipt
 from .._otr_shared.ffmpeg import resolve_ffmpeg as _resolve_ffmpeg
 from .._otr_shared.aspect import is_wide as _aspect_is_wide
@@ -252,9 +251,10 @@ class RenderFloorError(RuntimeError):
 # re-export rather than a copy the class objects are IDENTICAL, so `except`
 # and `isinstance` behave the same whichever path a caller imported by.
 try:  # pragma: no cover -- package import
-    from .render_errors import DeferredImageGapError, RenderError
+    from .render_errors import DeferredImageGapError, FailureKind, RenderError
 except ImportError:  # pragma: no cover -- flat test imports
-    from render_errors import DeferredImageGapError, RenderError  # type: ignore
+    from render_errors import (  # type: ignore
+        DeferredImageGapError, FailureKind, RenderError)
 
 
 class FamilyInputGap(RuntimeError):
@@ -358,24 +358,24 @@ def _job_scoped_failure_kind(exc):
     if code is None:
         return None
     named = _JOB_CODE_TO_KIND.get(code.value)
-    return getattr(_rt.FailureKind, named) if named else None
+    return getattr(FailureKind, named) if named else None
 
 
 def classify_failure(exc):
-    """Map a render exception to a HARD :class:`FailureKind` (all escalate)."""
+    """Map a render exception to the :class:`FailureKind` its RenderError
+    names. A label only: every kind fails the shot the same way."""
     # BEFORE the type table: an OOM wearing a GraphExecutionError is an OOM.
     if out_of_memory_in_chain(exc):
-        return _rt.FailureKind.OOM
+        return FailureKind.OOM
     # A PROVIDER POLICY VERDICT IS NOT A CRASH, and it reached this function
     # wearing one. ``CloudMediaError`` matches no branch below, so a filtered
     # prompt fell through to CRASH_BEFORE_LOAD -- "the engine died before it
     # loaded" -- about an engine that loaded, submitted, polled, and got an
-    # answer. The wrong name cost twice: it licensed a same-seed retry against
-    # a gate that returns the same verdict every time, and it told the
-    # operator to "fix the engine or its inputs" when the engine was fine.
+    # answer, and it told the operator to "fix the engine or its inputs"
+    # when the engine was fine.
     # Walks the cause chain -- ``render_beat_coverage`` may have wrapped it.
     if _is_provider_content_refusal(exc):
-        return _rt.FailureKind.CONTENT_REFUSED
+        return FailureKind.CONTENT_REFUSED
     # ...and the same courtesy for every OTHER job-scoped verdict. Naming only
     # the refusal left the original defect half-closed: a cloud TIMEOUT or a
     # corrupt delivery still came back as CRASH_BEFORE_LOAD, and render_shot
@@ -388,10 +388,10 @@ def classify_failure(exc):
     name = type(exc).__name__
     if name in ("EngineUnusable", "WrapperNodeMissing", "LookupError",
                 "KeyError", "FileNotFoundError", "FamilyInputGap"):
-        return _rt.FailureKind.DEPENDENCY_MISSING
+        return FailureKind.DEPENDENCY_MISSING
     if name == "GraphExecutionError":
-        return _rt.FailureKind.INVALID_DAG
-    return _rt.FailureKind.CRASH_BEFORE_LOAD
+        return FailureKind.INVALID_DAG
+    return FailureKind.CRASH_BEFORE_LOAD
 
 
 def engine_family(name, default=None):
@@ -6980,7 +6980,7 @@ __all__ = [
     "ENGINE_FAMILY",
     "RenderError", "RenderFloorError",
     "FamilyInputGap",
-    "classify_failure", "engine_family",
+    "FailureKind", "classify_failure", "engine_family",
     "build_request",
     "build_request_from_shot", "_slice_master_audio",
     "SLICER_VERSION", "slice_cache_key",

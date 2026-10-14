@@ -88,7 +88,7 @@ class AnOutOfMemoryIsAnOutOfMemory(unittest.TestCase):
         outer = RuntimeError("graph execution failed at node 92")
         outer.__cause__ = inner
         self.assertIs(RD.out_of_memory_in_chain(outer), True)
-        self.assertEqual(RD.classify_failure(outer), RD._rt.FailureKind.OOM)
+        self.assertEqual(RD.classify_failure(outer), RD.FailureKind.OOM)
 
     def test_a_cuda_out_of_memory_type_is_matched_by_name(self):
         class OutOfMemoryError(RuntimeError):
