@@ -758,8 +758,9 @@ class CastLock:
         # synthesized-identity / orphan-reassign fallback); the ONLY repair kept is
         # re-routing a mis-stamped announcer line (a routing correction, not a
         # fallback). Runs UNCONDITIONALLY, independent of cast_seed.
+        _rerouted: list = []
         for _note in self._resolve_character_voices_fail_soft(
-            cast, led.get("lines") or []
+            cast, led.get("lines") or [], repaired=_rerouted,
         ):
             log.warning("[CastLock] announcer reroute: %s", _note)
             report.append(f"announcer reroute: {_note}")
@@ -795,6 +796,16 @@ class CastLock:
                     *_lane_rolls.LEDGER_KEYS,
                 ) if k in meta
             },
+            # The announcer reroutes made above, as role-only patches. They
+            # were wire-only: speaker_role is memory-owned in the save merge,
+            # so SceneSequencer's disk patch was undone by the next unrelated
+            # stamp and the credits' word counts read the stale roles
+            # (voice review V3, 2026-10-14).
+            line_patches=[
+                {"line_id": r["line_id"], "char_id": r["char_id"],
+                 "fields": {"speaker_role": "announcer"}}
+                for r in _rerouted
+            ],
             source="cast_lock",
         )
 
@@ -1231,7 +1242,7 @@ class CastLock:
 
     # ------------------------------------------------------------------ #
     @staticmethod
-    def _resolve_character_voices_fail_soft(cast, lines) -> list:
+    def _resolve_character_voices_fail_soft(cast, lines, repaired=None) -> list:
         """STEP 3 (NO-FALLBACK rip, operator 2026-07-03): guarantee every
         speaker_role='character' line reaches node-81 with a resolvable voice, or
         FAIL LOUD. The name is retained for the call site; behavior is now fail-loud.
@@ -1249,7 +1260,10 @@ class CastLock:
             defect the operator must fix, never papered over (no silent swap).
 
         Mutates line dicts in place for the announcer reroute only. Returns LOUD
-        routing notes for the cast report. RAISES VoiceCastingError on any
+        routing notes for the cast report. When ``repaired`` is a list, each
+        rerouted line is appended to it as ``{"line_id", "char_id"}`` so the
+        caller can persist the correction (lines without an id cannot be
+        patched and are left to the wire). RAISES VoiceCastingError on any
         unvoiceable character row/line.
         """
         from ._otr_voice_bank import VoiceCastingError
@@ -1306,6 +1320,8 @@ class CastLock:
             )
             if is_ann:
                 ln["speaker_role"] = "announcer"
+                if repaired is not None and str(lid or "").strip():
+                    repaired.append({"line_id": str(lid), "char_id": cid})
                 notes.append(
                     f"line {lid!r} char_id={cid!r}: mis-stamped announcer line "
                     f"-> re-routed to OTR_AnnouncerVoice (announcer model)"

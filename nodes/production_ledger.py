@@ -853,8 +853,59 @@ class LedgerStampError(RuntimeError):
     missing-receipt failure at mux time. Never catch-and-continue."""
 
 
+#: Line fields a stage may correct on the singleton through ``stamp_durable``.
+#: Deliberately tiny: a per-line patch is a narrow repair channel, not a way to
+#: rewrite lines (timing, text and renderer fields have their own owners).
+_DURABLE_LINE_FIELDS = frozenset({"speaker_role"})
+
+
+def _validate_line_patches(led: "Ledger", patches, source: str):
+    """Check every patch against the singleton BEFORE anything changes.
+
+    Returns ``[(row, fields), ...]`` to apply. A patch whose ``line_id`` is
+    absent from the singleton is skipped, not failed: the merge on save only
+    lets memory win for rows memory HOLDS, so a row memory lacks keeps the
+    value already on disk (SceneSequencer's patch), and nothing stale can be
+    re-saved over it. A duplicated ``line_id``, or a row whose ``char_id``
+    differs from the patch's, means memory and the caller disagree about
+    which line this is -- that raises ``LedgerStampError`` rather than patch
+    a line that may belong to someone else (codex r1, 2026-10-14)."""
+    rows = [r for r in (led.data.get("lines") or []) if isinstance(r, dict)]
+    plan = []
+    for patch in patches:
+        line_id = str(patch.get("line_id") or "").strip()
+        fields = dict(patch.get("fields") or {})
+        unknown = set(fields) - _DURABLE_LINE_FIELDS
+        if unknown:
+            raise ValueError(
+                f"stamp_durable({source or '?'}): line field(s) {sorted(unknown)} "
+                f"are not patchable here (allowed: {sorted(_DURABLE_LINE_FIELDS)})")
+        if not line_id or not fields:
+            continue
+        matches = [r for r in rows if str(r.get("line_id") or "") == line_id]
+        if not matches:
+            log.info("[Ledger] stamp_durable(%s): line %r not in the singleton; "
+                     "its on-disk value stands", source or "?", line_id)
+            continue
+        if len(matches) > 1:
+            raise LedgerStampError(
+                f"stamp_durable({source or '?'}): line_id {line_id!r} appears "
+                f"{len(matches)} times in the singleton -- refusing to guess "
+                f"which line to patch")
+        want_char = str(patch.get("char_id") or "")
+        have_char = str(matches[0].get("char_id") or "")
+        if want_char and have_char != want_char:
+            raise LedgerStampError(
+                f"stamp_durable({source or '?'}): line {line_id!r} is char_id "
+                f"{have_char!r} in the singleton but {want_char!r} in the "
+                f"patch -- refusing to patch a different line")
+        plan.append((matches[0], fields))
+    return plan
+
+
 def stamp_durable(*, sections: Optional[Dict[str, Any]] = None,
                   meta_updates: Optional[Dict[str, Any]] = None,
+                  line_patches: Optional[List[Dict[str, Any]]] = None,
                   source: str = "") -> Optional[str]:
     """Copy credit-bearing sections from a LOCAL wire-parsed ledger dict
     into the process SINGLETON and persist, LOUDLY.
@@ -868,6 +919,13 @@ def stamp_durable(*, sections: Optional[Dict[str, Any]] = None,
     - ``sections``: top-level keys replaced wholesale on the singleton
       (e.g. ``{"cast": [...]}``, ``{"images": {...}}``).
     - ``meta_updates``: merged into ``data["meta"]`` (additive).
+    - ``line_patches``: ``[{"line_id", "char_id", "fields": {...}}, ...]`` --
+      field corrections to EXISTING singleton line rows, limited to
+      ``_DURABLE_LINE_FIELDS``. ``speaker_role`` is memory-owned in the save
+      merge, so a repair made on the wire (CastLock's announcer reroute) and
+      only patched on disk was re-saved stale by the next unrelated stamp;
+      this is how it reaches memory. All patches are validated before any
+      state changes (``_validate_line_patches``).
     - Production: ``Ledger.save()`` returns ``None`` on failure and never
       raises, so the return IS checked here and a ``None`` RAISES
       ``LedgerStampError`` (Fable BUILD-BREAKER #3).
@@ -877,8 +935,11 @@ def stamp_durable(*, sections: Optional[Dict[str, Any]] = None,
       real output tree. Returns ``None`` in that case.
     """
     led = get_ledger()
+    line_plan = _validate_line_patches(led, line_patches or (), source)
     for key, value in (sections or {}).items():
         led.data[key] = value
+    for row, fields in line_plan:
+        row.update(fields)
     if meta_updates:
         meta = led.data.setdefault("meta", {})
         if not isinstance(meta, dict):
