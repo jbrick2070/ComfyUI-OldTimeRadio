@@ -562,28 +562,6 @@ def otr_runtime_log_path() -> Path:
     return _validate_contract(otr_state_dir() / "otr_runtime.log")
 
 
-def legacy_pack_runtime_log_path() -> Path:
-    """Former pack-root log location. Frozen: shown by the log viewer as
-    history, never read as current telemetry."""
-    return Path(__file__).resolve().parents[1] / "otr_runtime.log"
-
-
-def otr_runtime_log_read_paths() -> list[Path]:
-    """Paths the log VIEWER shows: legacy pack log (if any) then primary.
-
-    Writers only append to :func:`otr_runtime_log_path`; the legacy file is
-    read-only, like the writer-LLM hub-cache precedent -- never migrated.
-    Not for current telemetry: the legacy file holds only earlier runs
-    (``video_engine._get_latest_telemetry`` reads the live log alone)."""
-    primary = otr_runtime_log_path()
-    legacy = legacy_pack_runtime_log_path()
-    paths: list[Path] = []
-    if legacy.is_file():
-        paths.append(legacy)
-    paths.append(primary)
-    return paths
-
-
 def otr_sidecar_stderr_path(basename: str) -> Path:
     """Captured stderr for Path-B audio sidecar workers.
 
@@ -656,7 +634,5 @@ __all__ = [
     "otr_obs_dir",
     "otr_state_dir",
     "otr_runtime_log_path",
-    "legacy_pack_runtime_log_path",
-    "otr_runtime_log_read_paths",
     "otr_sidecar_stderr_path",
 ]

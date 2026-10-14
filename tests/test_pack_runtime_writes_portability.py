@@ -117,10 +117,10 @@ def test_chatterbox_unwritable_stderr_does_not_crash_before_worker(pinned_out, m
         eng.load()
 
 
-def test_the_episode_telemetry_never_reads_the_frozen_legacy_log(
+def test_the_episode_telemetry_reads_only_the_live_log(
         pinned_out, monkeypatch, tmp_path):
     """A field the live log has not written yet keeps its default; it never
-    falls through to a stale run in the legacy pack-root log."""
+    falls through to a stale run in some other log."""
     from nodes import video_engine
 
     live = tmp_path / "state" / "otr_runtime.log"
@@ -128,11 +128,5 @@ def test_the_episode_telemetry_never_reads_the_frozen_legacy_log(
     live.write_text("[heartbeat] still rendering\n"
                     "VRAM_SNAPSHOT stage=x peak_gb=9.87\n", encoding="utf-8")
     monkeypatch.setenv("OTR_RUNTIME_LOG_PATH", str(live))
-    legacy = tmp_path / "legacy" / "otr_runtime.log"
-    legacy.parent.mkdir(parents=True)
-    legacy.write_text("VRAM_SNAPSHOT stage=x peak_gb=3.33\n"
-                      "LLM loaded: org/OLD-STALE-MODEL\n"
-                      "DONE: 900 tokens 12.5 tok/s\n", encoding="utf-8")
-    monkeypatch.setattr(P, "legacy_pack_runtime_log_path", lambda: legacy)
 
     assert video_engine._get_latest_telemetry() == ("9.87", "???", "UNKNOWN CORE")

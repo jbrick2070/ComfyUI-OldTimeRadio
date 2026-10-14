@@ -1872,3 +1872,10 @@ the live version.
   dated history and stay.
 - **If you want one back:** `git log --diff-filter=D --oneline -- scripts/<name>` finds the deleting commit;
   `git show <that commit>^:scripts/<name>` prints the file.
+- **Follow-up (independent review of the script deletion):** `otr_tail_logs.py` was the only caller of
+  `_otr_paths.otr_runtime_log_read_paths`, whose only other reader was `legacy_pack_runtime_log_path`; both are
+  deleted, and the telemetry test that monkeypatched the legacy helper now asserts only what is still live (the
+  episode telemetry reads the live log alone). A reachability re-run after the deletion shows one more pair that
+  lost its script caller: `_otr_voice_bank.compute_bank_coverage` and `APPROVED_VOICE_ENGINES` (the ingest
+  script used them as a report). They stay: the tests that read them assert the SHIPPED voice bank meets the
+  casting floor for every approved engine, a guard over production data.
