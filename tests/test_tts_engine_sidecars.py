@@ -117,8 +117,7 @@ def test_bank_has_a_chatterbox_pool_mirroring_indextts2():
     cbx = [e for e in bank if e.engine == "chatterbox" and "char_voice" in e.roles]
     idx = [e for e in bank if e.engine == "indextts2" and "char_voice" in e.roles]
     # FLOOR, not an exact count: the bank GROWS as public-domain voices are
-    # added (scripts/otr_ingest_pd_voices.py). The original mirrored pools were
-    # 36 each.
+    # added. The original mirrored pools were 36 each.
     #
     # LOWERED 36 -> 20 ON 2026-08-20, and only because the OPERATOR SHRANK THE
     # BANK ON PURPOSE. He auditioned all 63 donor references and retired 21 of
