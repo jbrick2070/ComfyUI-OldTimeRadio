@@ -2277,7 +2277,7 @@ def _enforce_radio_is_host(shot):
     pick is LOUDLY redirected to :data:`_NEVER_HUMO_REDIRECT_ENGINE` -- never a
     hard-fail: this is a structural POLICY correction applied BEFORE any render
     is attempted, not a render-time failure, so it does not touch the separate
-    NO-FALLBACKS rule in :func:`render_shot` (a HARD render failure still raises
+    NO-FALLBACKS rule in :func:`render_shot` (a render failure still raises
     LOUD with no engine swap). Must run before any engine-specific request
     logic (canvas / init_image / audio resolution) so everything downstream
     sees the corrected engine -- call this FIRST in
@@ -4289,7 +4289,7 @@ def build_actual_receipt(engine, shot, request, clip, *, segment=None,
 def render_shot(shot, request, *, host_caps=None, profile=None, segment=None):
     """Render ONE shot with its selected engine. NO FALLBACKS (operator
     2026-06-16 'this is art, not a space shuttle'; hardened 2026-07-02 NO
-    fallbacks / NO auto-defaults directive): a HARD render failure RAISES
+    fallbacks / NO auto-defaults directive): a render failure RAISES
     :class:`RenderError` LOUD -- there is NO engine swap and NO still-image
     floor, so a proven model path must prove itself.
 

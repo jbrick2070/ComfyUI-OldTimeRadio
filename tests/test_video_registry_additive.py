@@ -16,7 +16,7 @@ from nodes._otr_shared import engine_registry_base as base
 from nodes._otr_shared import role_compat as rc
 from nodes._otr_video_engines import registry as vreg
 # Importing the adapters self-registers the core engines (the same import the
-# retry-taxonomy test relies on); read-only -- we never clear/modify the global.
+# render-driver tests rely on); read-only -- we never clear/modify the global.
 from nodes._otr_video_engines import eng_humo            # noqa: F401
 from nodes._otr_video_engines import cheap_families      # noqa: F401
 

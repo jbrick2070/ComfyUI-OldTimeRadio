@@ -22,6 +22,23 @@ def test_classify_failure_labels_every_exception():
     assert rd.classify_failure(RuntimeError("boom")) is rd.FailureKind.CRASH_BEFORE_LOAD
 
 
+@pytest.mark.parametrize("code, kind", [
+    ("content_refused", "CONTENT_REFUSED"),
+    ("timeout", "TIMEOUT"),
+    ("corrupt_output", "CORRUPT_OUTPUT"),
+    ("retryable_transport", "TRANSIENT_IO"),
+])
+def test_a_cloud_job_verdict_is_labelled_with_its_kind(code, kind):
+    """Each job-scoped cloud verdict names its own kind. The kind is looked up
+    BY NAME (getattr), so a FailureKind member removed by mistake would turn a
+    cloud timeout into an AttributeError instead of a RenderError."""
+    from nodes._otr_shared import cloud_media_backend as cmb
+
+    assert set(rd._JOB_CODE_TO_KIND.values()) <= set(rd.FailureKind.__members__)
+    exc = cmb.CloudMediaError(code, "test verdict")
+    assert rd.classify_failure(exc) is rd.FailureKind[kind]
+
+
 def test_a_failed_shot_is_tried_once_and_named_in_the_error(monkeypatch):
     """No retry and no fallback: the engine runs once, the shot fails LOUD,
     and the error names the kind classify_failure gave it."""

@@ -225,7 +225,8 @@ _NODE_MODULES = {
     # =========================================================================
     # v2.0 in-process render driver (A-S7.5) -- the model-agnostic render entry
     # that walks the registry engines (prepare->render_clip->canonicalize->
-    # teardown) with the A-S7 retry taxonomy + fallback chain + LOUD restamp.
+    # teardown); any failure raises a RenderError labelled with its
+    # FailureKind (no retry, no fallback).
     # "soak" mode is the A-ship full-episode gate; "single" validates one
     # engine's in-process forward. No model is "primary". See
     # nodes/_otr_video_engines/render_driver.py.
