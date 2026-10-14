@@ -407,6 +407,27 @@ def _stamp_render_trace(receipts, *, render_run_id=""):
     return len(rows)
 
 
+def _grade_acceptance(ledger, manifest):
+    """Run the acceptance grader over the episode just rendered: the same
+    ledger and manifest pair the clips were built from. Records, never
+    blocks -- returns the finding count (``None`` when the grader could not
+    run) and logs one line per finding."""
+    try:
+        from ._otr_video_engines import acceptance as _acc
+        findings = _acc.grade_episode(ledger, manifest)
+        text = _acc.format_findings(findings)
+    except Exception as exc:  # noqa: BLE001 -- grading must never fail the render
+        log.warning("[OTR_VideoRenderBatch] acceptance grader did not run: %s",
+                    exc)
+        return None
+    if findings:
+        log.warning("[OTR_VideoRenderBatch] acceptance: %d finding(s)\n%s",
+                    len(findings), text)
+    else:
+        log.info("[OTR_VideoRenderBatch] acceptance: 0 findings")
+    return len(findings)
+
+
 class OTRVideoRenderBatch:
     """Registered as ``OTR_VideoRenderBatch``. Walks the model-agnostic render
     loop in-process (NODE_CLASS_MAPPINGS populated). OUTPUT_NODE so it can be the
@@ -688,6 +709,10 @@ class OTRVideoRenderBatch:
         _n_trace = _stamp_render_trace(ep.get("receipts") or [],
                                        render_run_id=_uuid.uuid4().hex[:12])
         report["render_trace_rows"] = _n_trace
+        # Did the episode render the route it froze? Graded here, on every
+        # real episode, and recorded in the report beside the trace.
+        report["acceptance_finding_count"] = _grade_acceptance(
+            ep.get("ledger"), manifest)
         return (report, json.dumps(manifest, ensure_ascii=True, default=str),
                 "node_episode_report.json")
 
