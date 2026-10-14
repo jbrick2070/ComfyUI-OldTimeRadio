@@ -4,7 +4,7 @@ Why this module exists
 ----------------------
 The fidelity packs instruct the model to CARRY the author's words, and until
 now nothing put those words in front of it. Worse, the body the pipeline did
-carry was a PREFIX: the payload's seed text, capped at 12,000
+carry was a PREFIX: the payload's full_text, capped at 12,000
 characters, so on a 25,200-word work the pre-outline authors -- the
 interpreter that names the cast, the story contract, the outline -- read the
 opening and inferred the rest. An author who is shown a prefix and told to be

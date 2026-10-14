@@ -90,6 +90,18 @@ def test_parse_preserves_internal_pause_as_one_block():
     assert result.parsed_slots[0].text == "I will not sign that paper. ... Not tonight."
 
 
+def test_a_newline_inside_a_block_stays_in_the_same_block():
+    raw = "d001|ANNOUNCER: line one\nstill the same block\nd002|REN BLACK: next"
+    manifest = [{"slot_id": "d001", "speaker": "ANNOUNCER"},
+                {"slot_id": "d002", "speaker": "REN BLACK"}]
+    result = cf.evaluate_tier_a(raw, manifest)
+    assert result.passed is True
+    assert _rows(result) == [
+        ("d001", "ANNOUNCER", "line one\nstill the same block"),
+        ("d002", "REN BLACK", "next"),
+    ]
+
+
 def test_normalize_round_trips():
     line = cf.normalize_slot_line("d007", "  REN BLACK ", " hold the line ")
     assert line == "d007|REN BLACK: hold the line"

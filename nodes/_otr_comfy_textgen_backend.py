@@ -87,7 +87,7 @@ def is_native_writer(model_id) -> bool:
 
 # ---------------------------------------------------------------------------
 # SLICE A1: generation. An explicit adapter that speaks the transformers
-# `generate()` subset OTR's four generation factories pass, on top of ComfyUI's
+# `generate()` subset OTR's three generation factories pass, on top of ComfyUI's
 # own CLIP.generate. Design r3 (kibitz-runs/2026-09-26-comfy-gemma-writer/r3):
 # ONE copy of the writer's halt classification, budget fitting and stop
 # trimming -- the factories run unchanged against a real tokenizer and this
@@ -488,7 +488,7 @@ def load_native_writer(model_id, *, policy=None, context_verdict=None, weight_pa
     cache entry OTR's generation factories consume.
 
     ``model`` is the :class:`ComfyGemmaGenerateAdapter` and ``tokenizer`` the
-    model's own fast tokenizer, so the four factories run unchanged. The same
+    model's own fast tokenizer, so the three factories run unchanged. The same
     call the stock CLIPLoader makes (``comfy.sd.load_clip``, type
     stable_diffusion), with the load device taken from the policy only when it
     names one: ``cpu`` or ``cuda:N``. A bare ``cuda`` (or ``mps``) leaves the

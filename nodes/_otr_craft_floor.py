@@ -159,8 +159,9 @@ class CraftFloorResult:
                    parse errors first (in draft order), then structural
                    (duplicate, count, order), then per-slot semantic-free
                    checks (speaker, empty) in draft order.
-    parsed_slots:  the ParsedSlot list (empty when a parse error aborts
-                   before a full parse is possible).
+    parsed_slots:  the well-formed blocks as ParsedSlot rows, in draft order
+                   (a block that does not parse is reported as PARSE_ERROR and
+                   left out of this list).
     """
 
     passed: bool

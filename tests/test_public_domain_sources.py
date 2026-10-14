@@ -166,7 +166,7 @@ def test_text_canonicalizer_strips_gutenberg_boilerplate_and_limits():
         pd.normalize_public_domain_body(raw), max_chars=80) == "First line. Second line."
 
 
-def test_payload_from_manifest_unit_has_exact_legacy_keys():
+def test_payload_from_body_has_exact_legacy_keys():
     resolved = pd.resolve_manifest_unit(_manifest(), "gutenberg-time-machine-sample:arrival")
     payload = pd._payload_from_body(
         resolved,

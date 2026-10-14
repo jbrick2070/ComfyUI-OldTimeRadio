@@ -131,7 +131,7 @@ def test_google_projection_excludes_non_google_surfaces():
     confident wrong answer."""
     google = [r for r in collect_inventory() if r.catalog_target == CATALOG_GOOGLE]
     lanes = {r.authority_lane for r in google}
-    assert "elevenlabs" not in lanes
+    assert "cloud_elevenlabs" not in lanes
     assert google, "the Google projection collected nothing"
     # A Comfy SURFACE may still expose a Google provider id -- that is exactly
     # why catalog_target is separate from authority_lane.

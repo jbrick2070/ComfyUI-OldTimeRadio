@@ -305,7 +305,7 @@ class LineRequest:
     all_voice_cards: str = ""
     position: str = ""
     # LFC sprint commit 3, section 6.1 (2026-05-11). speaker_role lets
-    # polish_line branch its system prompt -- character beats get
+    # the composer branch its system prompt -- character beats get
     # the strict "no narration" prompt; announcer beats get the
     # narration-allowed prompt that still strips bracket stage
     # directions and asterisk action. Default "character" so legacy
@@ -961,7 +961,7 @@ def _build_user_prompt(req: LineRequest) -> str:
 
 
 _DEFAULT_STOP_STRINGS: tuple[str, ...] = ("\n\n", "\n[", "\n(")
-"""Default stop substrings for compose_line + polish_line. `\n\n`
+"""Default stop substrings for compose_line. `\n\n`
 catches "line + stage direction on next paragraph"; `\n[` / `\n(`
 catch leaked bracketed/parenthesized directions on a new line.
 Do not stop on a bare `\n` -- some legitimate lines have a soft

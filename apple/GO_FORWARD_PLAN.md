@@ -404,7 +404,7 @@ there, and a fresh or emptied writer on those machines falls back to Qwen
 
 **Design** (kibitz-runs/2026-09-26-comfy-gemma-writer, r1-r3): an adapter that
 speaks the transformers `generate()` subset over ComfyUI's `CLIP.generate`, so
-the writer's four generation factories, halt rules, grammar and stop trimming
+the writer's three generation factories, halt rules, grammar and stop trimming
 run unchanged; weights come through the queue-time preflight's pinned fetch;
 `request_slot` gives them the same residency rules as a transformers writer;
 teardown hands them back through ComfyUI's `unload_model_and_clones`. Each row

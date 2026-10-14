@@ -835,8 +835,8 @@ def make_comfy_credits_generate_fn(cache_entry: dict, *, response_format: dict |
 
     Matches the signature every OTR generate_fn uses --
     ``(messages, *, temperature, max_new_tokens, stop=None) -> str`` -- so
-    the loader factories and the writer's `_build_truncating_generate_fn`
-    return it unchanged when ``cache_entry["provider"] == "comfy_credits"``.
+    the loader factory (`make_generate_fn`) and the writer's
+    `_build_truncating_generate_fn` return it unchanged when ``cache_entry["provider"] == "comfy_credits"``.
     """
     backend = ComfyCreditsBackend()
     bound_rf = response_format

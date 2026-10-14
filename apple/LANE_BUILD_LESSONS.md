@@ -723,9 +723,10 @@ exception type instead of quietly passing.
 **What did NOT bite: the measurement-before-naming order paid.** The corpus told
 this lane to measure before final naming and the manifest said the marker was
 provisional because nothing had ever measured the lane on this box. Smoking
-first turned `low` from an inherited guess into 6,835 MB net -- and the label
-states the measured COST rather than "runs on an 8 GB card", which is the claim
-the retired `8gb` token made without evidence.
+first turned `low` from an inherited guess into 6,835 MB net -- and the lane's
+label stated the measured COST rather than "runs on an 8 GB card", which is the
+claim the retired `8gb` token made without evidence (the prose label table has
+since been deleted; the measurement lives in the lane receipt).
 
 ---
 

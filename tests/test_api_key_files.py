@@ -83,16 +83,6 @@ def test_test_mode_ignores_pack_files_unless_opted_in(monkeypatch, tmp_path):
         resolve_api_key()
 
 
-def test_google_broken_pointer_fails_the_key_lookup(monkeypatch, tmp_path):
-    _clear_google(monkeypatch)
-    _enable_files(monkeypatch, tmp_path)
-    (tmp_path / "google_api_key.location").write_text(
-        str(tmp_path / "missing.txt") + "\n", encoding="utf-8"
-    )
-    with pytest.raises(GoogleAPIKeyMissingError):
-        resolve_api_key()
-
-
 def test_openrouter_broken_pointer_is_disabled(monkeypatch, tmp_path):
     from nodes import _otr_openrouter_backend as orb
 

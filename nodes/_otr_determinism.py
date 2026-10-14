@@ -10,8 +10,7 @@ backend) and seeds every RNG around ONE audio forward, then restores all prior
 flags + RNG state in ``finally``. The PROCESS default stays non-strict so the
 default video render does not crash on sm_120 (C-2/C-3).
 
-Import-time is side-effect-free (C-5): the lightweight module defaults are an
-explicit call, not an import side effect.
+Import-time is side-effect-free (C-5).
 """
 from __future__ import annotations
 

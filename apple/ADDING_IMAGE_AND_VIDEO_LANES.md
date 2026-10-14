@@ -190,9 +190,10 @@ read the row:
   whether one engine fits one *profile* (`REASON_REQUIRES_CUDA` when the
   profile's `device_backend` is not in the list). It feeds `availability()`
   and `cross_validate_profile()` -- i.e. which engines a
-  profile admits into its enable set. The only live non-test caller is
-  `scripts/build_variants.py`, at variant-emit time; `scripts/otr_api.py`
-  dropped its enable-set cross-validation on 2026-08-31.
+  profile admits into its enable set. The live non-test callers are
+  `scripts/build_variants.py` (variant-emit time), `scripts/otr_dropdown_matrix.py`
+  and, at run time, `nodes/_otr_lane_rolls.py` (the randomizers' host-fit check);
+  `scripts/otr_api.py` dropped its enable-set cross-validation on 2026-08-31.
 * `scripts/otr_machine_matrix.py`, which prints the list -- but only in the
   **voice-engines** table, off the *audio* registry. Video rows are not
   rendered there at all, so a wrong video row prints nothing anywhere.

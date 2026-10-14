@@ -20,10 +20,10 @@ happened:
 
 **The contract rides `launch.boot_contract`, never `launch.extra_args`.** A
 launcher derives argv from the named contract through :func:`launch_args_for`;
-the Windows headless launcher reads the pinned-memory switch from
-``launch.env`` (``CONTRACT_ENV`` names the variable). `extra_args` is written only into a markdown string, so
-a load-bearing flag placed there changes no process while looking configured
-(lesson L6).
+the Windows headless launcher (``scripts/_otr_soak_server_launch.cmd``) turns
+the environment variable ``CONTRACT_ENV`` names into ``--disable-pinned-memory``.
+`extra_args` is written only into a markdown string, so a load-bearing flag
+placed there changes no process while looking configured (lesson L6).
 
 **Enforcement probes the RUNNING SERVER, not the profile text.** A check that
 reads the same config file the launcher was supposed to honour cannot tell

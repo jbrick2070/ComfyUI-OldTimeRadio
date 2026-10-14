@@ -1,4 +1,4 @@
-"""Ledger-driven, content-addressed portrait resolution (A-Seam AS-5).
+"""Ledger-driven, content-addressed portrait stamping (A-Seam AS-5).
 
 A character's portrait still is identified by the CONTENT of its decoded pixels,
 not by a filename or a generation seed: ``portrait_content_hash =
@@ -42,9 +42,10 @@ _STILLS_SUBDIR = ("otr", "episodes", "_shared", "cache")
 
 
 class PortraitUnresolved(LookupError):
-    """Raised when no ``portrait_content_hash`` can be found for a ``char_id``
-    (fail-closed). A consumer must KNOW a portrait is missing rather than
-    receive a silently-guessed path."""
+    """Raised when a portrait cannot be stamped or located: an empty hash, an
+    unusable episode id, or a ``char_id`` with no cast row (fail-closed). A
+    consumer must KNOW a portrait is missing rather than receive a
+    silently-guessed path."""
 
 
 def _output_base(output_dir: Optional[str] = None) -> str:
@@ -114,7 +115,7 @@ def compute_portrait_hash(decoded_pixels) -> str:
 
 def portrait_path_for_hash(portrait_content_hash: str,
                            output_dir: Optional[str] = None) -> Path:
-    """Deterministic path ``<output>/otr/stills/{hash}.png`` for a hash."""
+    """Deterministic pool path ``<output>/otr/episodes/_shared/cache/{hash}.png``."""
     h = str(portrait_content_hash or "").strip()
     if not h:
         raise PortraitUnresolved("empty portrait_content_hash")

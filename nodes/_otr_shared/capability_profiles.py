@@ -18,8 +18,9 @@ S1 -- DERIVED ENABLE-SET, never hand-listed:
     (``nodes/_otr_video_engines/registry.py`` etc., ``CAPABILITIES`` dict --
     NOT in adapter modules);
   * ``availability(profile, declarations)`` -> the shared availability object
-    with one reason code per engine. ITS ONLY PRODUCTION CONSUMER IS EMIT-TIME:
-    ``cross_validate_profile`` in ``scripts/build_variants.py``, plus the
+    with one reason code per engine. Its consumers are ``cross_validate_profile``
+    (called by ``scripts/build_variants.py`` at emit time), the lane randomizers'
+    host-fit check (``nodes/_otr_lane_rolls.py``, at run time) and the
     dropdown-matrix generator. The workflow validator does NOT use it -- it
     imports ``load_profile`` and ``ProfileError`` and nothing else -- and the
     "wizard" named in older comments here and in the video registry was never

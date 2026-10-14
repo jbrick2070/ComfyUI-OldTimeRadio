@@ -157,7 +157,7 @@ no transformers snapshot, no bitsandbytes, and no Quant choice.
 
 How it plugs in, in `nodes/_otr_comfy_textgen_backend.py`:
 `ComfyGemmaGenerateAdapter` speaks the part of transformers' `generate()`
-OTR's four generation factories use, and the cache entry carries the model's
+OTR's three generation factories use, and the cache entry carries the model's
 own tokenizer. The writer's halt rules, budget fitting, grammar and stop
 trimming therefore run unchanged -- one copy, not a parallel native path.
 `request_slot` gives it the same residency rules as a transformers writer.

@@ -19,7 +19,7 @@ every case here runs.
 Hermetic: no GPU, no I/O, no live LLM. All generate_fn calls are stubs.
 
 The function and class surface asserted below (NewsBriefs,
-build_source_wrapper, compute_cache_key, build_news_briefs)
+build_source_wrapper, build_news_briefs)
 is the API contract that commit 2 must satisfy.
 That's the safety-net mechanic -- locking the API before code lands.
 """

@@ -375,7 +375,7 @@ def _project_to_payload_window(body: str, *, max_chars: int = 12000) -> str:
 def _payload_from_body(
     resolved: PublicDomainUnit, body: str, *, excerpt_chars: int = 1200,
 ) -> dict[str, str]:
-    """The payload from a body this module derived itself -- no re-check."""
+    """The legacy seven-key payload from an already-normalized body."""
     source = resolved.source
     unit = resolved.unit
     full_text = _project_to_payload_window(body)
@@ -456,8 +456,7 @@ def fetch_public_domain_source(
     # the same canonical body, and the regexes are not cheap on a 25,000-word
     # work. One derivation also means the payload can never disagree with the
     # document's coordinate system. The body is derived on the line below,
-    # from the same text, so it goes to both builders without the re-check
-    # the public entry points run for a body handed in from outside.
+    # from the same text, and goes to both builders.
     canonical_body = normalize_public_domain_body(text)
 
     return _osp.SourceFetchResult(
@@ -593,8 +592,9 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         # cannot see. The Wells arrival unit is 11,410 bytes against a
         # 5,000-char window: the press ridicule, "Story be damned!" and the
         # closing image of listeners' faces in the dark all fell outside it.
-        # canonicalize_* already caps the body at INTERPRETER_TEXT_WINDOW,
-        # so this reads whatever survived that cap and truncates nothing further.
+        # _project_to_payload_window already caps the payload's full_text at
+        # INTERPRETER_TEXT_WINDOW, so this reads whatever survived that cap and
+        # truncates nothing further.
             full_text[:INTERPRETER_TEXT_WINDOW],
         )
         if part

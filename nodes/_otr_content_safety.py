@@ -88,6 +88,7 @@ EXPLICIT_NUDITY_TERMS: tuple[str, ...] = (
     "sexual intercourse",
 )
 
+
 def profanity_terms() -> tuple[str, ...]:
     """Return the global narrow profanity vocabulary."""
     return PROFANITY_TERMS

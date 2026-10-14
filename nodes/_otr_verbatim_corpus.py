@@ -708,10 +708,9 @@ __all__ = [
     "READY", "REQUIRED_MANIFEST_FIELDS", "SCHEMA_VERSION", "SPEAKER_MAP_FIELD",
     "SPEAKER_LABEL_PATTERNS", "TRANSCRIPTION_PENDING_MARKERS",
     "US_PUBLICATION_BEFORE", "CorpusError", "LeadReport", "assess",
-    "vendored_text",
-    "dialogue_ratio", "find_pending_markers", "headings_present",
-    "load_manifest", "publication_reasons", "select_scene", "speaker_bindings",
-    "strip_tracking",
+    "vendored_text", "dialogue_ratio", "find_pending_markers",
+    "headings_present", "load_manifest", "publication_reasons", "select_scene",
+    "speaker_bindings", "strip_tracking",
 ]
 
 

@@ -371,6 +371,8 @@ ENGINE_COVERAGE = {
     "cloud_elevenlabs": "collected",
     "google_tts": "collected",
     "google_lyria": "collected",
+    # sonilo routes through a Comfy PARTNER ROW (a product id, not a model slug):
+    # there is no version pin in it to go stale.
     "sonilo": "exempt",
     # --- image: local ---------------------------------------------------------
     "z_image_turbo": "local", "flux_gen1": "local", "lumina_image": "local",
@@ -621,6 +623,21 @@ def test_unshipped_catalog_entries_are_not_a_finding(records):
     this pack."""
     everything = {r.provider_id for r in records}
     catalog = core.CatalogFetch(frozenset(everything | {"some-other-model"}), True, 1)
+    report = core.build_report(
+        records, prov.SLUG_PROVENANCE, catalog=catalog,
+        as_of=datetime.date(2026, 8, 10), is_pointer=prov.is_pointer,
+        unverified_kind=prov.UNVERIFIED)
+    assert report.missing == ()
+    assert report.exit_code == core.EXIT_OK
+
+
+def test_untagged_rows_are_not_asked_of_the_google_catalog(records):
+    """A row with no `catalog_target` (ElevenLabs, the Comfy display selectors) is
+    not a Google model. A complete Google catalog that lists only the tagged ids
+    must not report the rest missing -- that would be a confident wrong answer."""
+    tagged = {r.provider_id for r in records if r.catalog_target}
+    assert tagged and tagged != {r.provider_id for r in records}
+    catalog = core.CatalogFetch(frozenset(tagged), True, 1)
     report = core.build_report(
         records, prov.SLUG_PROVENANCE, catalog=catalog,
         as_of=datetime.date(2026, 8, 10), is_pointer=prov.is_pointer,

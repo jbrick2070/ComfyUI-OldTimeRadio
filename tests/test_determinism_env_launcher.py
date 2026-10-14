@@ -98,9 +98,6 @@ def test_model_loader_tf32_disabled():
     assert "allow_tf32 = True" not in src
 
 
-# --- apply_module_determinism_defaults ------------------------------------
-
-
 # --- scoped deterministic_inference CM ------------------------------------
 
 def test_cm_enables_then_restores_determinism_flag():

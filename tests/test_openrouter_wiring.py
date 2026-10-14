@@ -3,7 +3,7 @@
 Proves FC2: request_slot routes an openrouter_http row to the remote
 backend, skipping every local step (context cap / vram fit / download /
 teardown / load_llm) and leaving the resident local model in LLM_CACHE
-UNTOUCHED (C2 no-evict); and the three generate-fn factories return a
+UNTOUCHED (C2 no-evict); and the generate-fn factories return a
 working remote callable for a provider-tagged entry. No network, no
 torch -- the only HTTP seam is patched.
 """

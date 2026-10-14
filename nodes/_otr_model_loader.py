@@ -293,8 +293,8 @@ def _publish_cache_entry_if_current(expected_epoch: int, fields: dict) -> bool:
 # _otr_decode_guard.py's degeneracy criterion: raising from inside a
 # StoppingCriteria skips Transformers' own generate()
 # cleanup and arrives at the caller unclassified. So the criterion sets
-# ``.hit`` and returns True, letting generate() return normally -- but both
-# generate() call sites below then check ``.hit`` and RAISE
+# ``.hit`` and returns True, letting generate() return normally -- but the
+# generate() call site below then checks ``.hit`` and RAISES
 # GenerationDeadlineExceededError instead of returning the truncated text as
 # a normal result. Without that check, a deadline hit that lands just before
 # _run_with_timeout's own future.result(timeout=...) fires would let the

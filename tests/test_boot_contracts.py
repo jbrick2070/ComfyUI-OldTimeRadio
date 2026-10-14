@@ -176,7 +176,7 @@ def test_the_env_mapping_only_names_knobs_a_launcher_actually_reads():
 
 
 # ---------------------------------------------------------------------------
-# The channel: launch.env is live, launch.extra_args is documentation
+# The channel: the variable the launcher reads is live, launch.extra_args is documentation
 # ---------------------------------------------------------------------------
 
 def test_the_launcher_applies_the_pinned_switch_and_passes_no_reserve():
