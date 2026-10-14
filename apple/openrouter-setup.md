@@ -90,7 +90,7 @@ Since 2026-06-01 the `OTR_LedgerScriptWriter` node has **four** model dropdowns 
 
 **Layer 1 — where each pass runs (the routing selectors):**
 
-- **`creative_writing_model`** — the narrative passes (outline, cast, dialogue, polish). Choices are your **local** models plus **`openrouter:slot-a`** and **`openrouter:slot-b`**. This is the best slot to try remote.
+- **`creative_writing_model`** — the narrative passes (outline, cast, dialogue). Choices are your **local** models plus **`openrouter:slot-a`** and **`openrouter:slot-b`**. This is the best slot to try remote.
 - **`technical_model`** — the structured/JSON passes. Same choices. See the technical-slot note below before sending it remote.
 
 **Layer 2 — which real OpenRouter model each slot is (the slug pickers):**

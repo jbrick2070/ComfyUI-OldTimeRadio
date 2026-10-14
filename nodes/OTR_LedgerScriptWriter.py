@@ -71,7 +71,7 @@ Widget surface (current as of 2026-05-23):
         seed              INT     (C7 byte-identity seed; shuffle-on
                                    randomizes per Queue Prompt)
         creative_writing_model combo (HF LLM -- narrative passes: outline,
-                                      cast, dialogue, polish, style picker)
+                                      cast, dialogue, style picker)
         technical_model   combo   (HF LLM -- structured passes: JSON
                                    validators, GBNF grammar, reviewer,
                                    cast contract, format normalization)
@@ -473,7 +473,7 @@ def _get_substring_stop_class():
 #
 # Encapsulates per-slot generate_fn construction + request_slot
 # invocation + transition counting. Two configurable slots:
-#   - creative   (narrative passes: outline, cast, dialogue, polish,
+#   - creative   (narrative passes: outline, cast, dialogue,
 #                 style picker invention, title regen)
 #   - technical  (structured passes: GBNF / JSON validators,
 #                 reviewer verdicts, news_interpreter, style chooser,
@@ -1308,9 +1308,8 @@ def _build_truncating_generate_fn(
         # generation but leaves the trigger bytes in the output
         # buffer. Slice at the first stop substring so leaked
         # bracketed/parenthesized tails don't survive into the
-        # composer's strip_line_formatting -> ledger pipeline. With
-        # polish OFF (default), this is the last guard before the
-        # text lands. Earliest-match wins.
+        # composer's strip_line_formatting -> ledger pipeline. This is the
+        # last guard before the text lands. Earliest-match wins.
         if stop:
             cut = len(decoded)
             for s in stop:
@@ -2578,7 +2577,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "default": _creative_default,
                         "tooltip": (
                             "LLM for the creative/narrative passes "
-                            "(outline, cast, dialogue composer, polish, "
+                            "(outline, cast, dialogue composer, "
                             "style picker invention). Mistral-Nemo is "
                             "the C7 byte-identical audio baseline. "
                             "Suffix tags like [LOCAL HF] "
@@ -3705,7 +3704,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             policy=resolved["llm_policy"],
         )
         # LLM slot: creative -- bulk writer path (outline, cast,
-        # dialogue, polish, style picker, title regen).
+        # dialogue, style picker, title regen).
         creative_generate_fn = slot_scheduler.for_slot("creative")
         # LLM slot: technical -- structured passes (news_interpreter
         # in B2b; B4b adds RSS news rerank).

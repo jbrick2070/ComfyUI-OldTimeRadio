@@ -67,7 +67,7 @@ The earlier NVIDIA picks -- Qwen3.5-4B on 8 GB, `gemma-4-12b-it` (NF4) on
 
 | Widget | Which passes it runs |
 |---|---|
-| `creative_writing_model` | The writing -- outline, cast, dialogue, polish, title |
+| `creative_writing_model` | The writing -- outline, cast, dialogue, title |
 | `technical_model` | The bookkeeping -- JSON the pipeline has to parse, reviewer verdicts, cast contract checks, format normalization |
 
 **Set them to the same model unless you have a reason not to.** When both slots

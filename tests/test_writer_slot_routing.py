@@ -1,12 +1,10 @@
 """S30 B2b tests -- writer-side slot scheduler + per-phase LLM routing.
 
-Five guardrails for the OTR_LedgerScriptWriter internal slot routing:
+Guardrails for the OTR_LedgerScriptWriter internal slot routing:
 
 1. test_no_direct_load_llm_calls_inside_writer
 2. test_writer_uses_request_slot_for_every_llm_pass
 3. test_slot1_neq_slot2_split_routing_full_phase_trace
-4. test_polish_routes_to_creative
-5. test_slot_transition_count_matches_dag
 
 Tests are AST-level + scheduler-unit-level so the suite does NOT
 require torch / transformers / GPU. End-to-end writer runs are out of
@@ -123,7 +121,7 @@ def test_writer_has_slot_tag_comments_at_every_llm_call_site():
     assert creative_hits >= 8, (
         f"expected >=8 '# LLM slot: creative' tags (style picker, "
         f"cast lock, outline, dialogue composer, announcer intro, "
-        f"announcer outro, polish, title regen); found "
+        f"announcer outro, title regen); found "
         f"{creative_hits}"
     )
     assert technical_hits >= 1, (
@@ -273,16 +271,6 @@ def test_scheduler_local_schema_binding_reaches_truncating_generator(monkeypatch
     }
     assert bound._otr_bound_schema_model is ExactSchema  # type: ignore[attr-defined]
     assert bound._otr_local_schema_binding is True  # type: ignore[attr-defined]
-
-
-# ---------------------------------------------------------------------------
-# 4. test_polish_routes_to_creative
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# 5. test_slot_transition_count_matches_dag
-# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
