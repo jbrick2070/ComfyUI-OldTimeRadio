@@ -212,6 +212,16 @@ def test_a_failed_encode_keeps_the_old_copy_and_only_drops_an_empty_reservation(
     assert len(kept) == (1 if partial else 0)
 
 
+windows_only = pytest.mark.skipif(
+    os.name != "nt", reason="a sharing violation is a Windows rename failure")
+
+
+def _held(winerror=32):
+    """A PermissionError carrying a real Windows code (SHARING_VIOLATION)."""
+    return PermissionError(13, "being used by another process", None, winerror)
+
+
+@windows_only
 def test_a_replacement_that_fails_never_deletes_the_old_copy(media, obs, monkeypatch):
     """Windows refuses a rename over a file a player holds open. The old copy
     stays; it is never deleted to make room."""
@@ -223,7 +233,7 @@ def test_a_replacement_that_fails_never_deletes_the_old_copy(media, obs, monkeyp
 
     def busy(src, target):
         tries.append(1)
-        raise PermissionError(13, "the file is open in a player")
+        raise _held()
     monkeypatch.setattr(MUX.os, "replace", busy)
     with pytest.raises(OSError, match="could not replace"):
         MUX.OTRMasterAudioMux()._publish_to_obs(final)
@@ -232,6 +242,7 @@ def test_a_replacement_that_fails_never_deletes_the_old_copy(media, obs, monkeyp
     assert len(tries) == MUX._REPLACE_ATTEMPTS, "a held file is retried, boundedly"
 
 
+@windows_only
 def test_a_briefly_held_candidate_is_retried_not_failed(media, obs, monkeypatch):
     """An antivirus or indexer holding the fresh candidate for a moment must
     not fail the last step of a long render (sonnet QA on 733c2386)."""
@@ -245,11 +256,85 @@ def test_a_briefly_held_candidate_is_retried_not_failed(media, obs, monkeypatch)
     def scanned_twice(src, target):
         if held["left"]:
             held["left"] -= 1
-            raise PermissionError(32, "being used by another process")
+            raise _held()
         return real_replace(src, target)
     monkeypatch.setattr(MUX.os, "replace", scanned_twice)
     out = MUX.OTRMasterAudioMux()._publish_to_obs(final)
     assert out == str(dst) and dst.read_bytes() != SENTINEL
+
+
+def test_a_permission_error_that_is_not_a_hold_is_tried_once(media, obs, monkeypatch):
+    """A read-only or wrong-type destination is not transient: no retries
+    (sonnet QA on b4a1f00f)."""
+    final = str(media["av"])
+    _seed(obs / MUX._obs_basename(final))
+    monkeypatch.setattr(MUX, "_run", _writes(media["av"]))
+    tries = []
+
+    def read_only(src, target):
+        tries.append(1)
+        raise PermissionError(13, "read-only destination")   # no Windows hold code
+    monkeypatch.setattr(MUX.os, "replace", read_only)
+    with pytest.raises(OSError, match="could not replace"):
+        MUX.OTRMasterAudioMux()._publish_to_obs(final)
+    assert len(tries) == 1
+
+
+@windows_only
+def test_a_cancel_during_a_held_retry_is_honoured_before_the_next_try(
+        media, obs, monkeypatch, caplog):
+    """The Cancel poll runs before EVERY try, so a hold never delays a Cancel;
+    the cancel is logged, the candidate removed, the empty staging folder
+    gone and the old copy untouched (sonnet QA on b4a1f00f)."""
+    final = str(media["av"])
+    dst = _seed(obs / MUX._obs_basename(final))
+    monkeypatch.setattr(MUX, "_run", _writes(media["av"]))
+    monkeypatch.setattr(MUX, "_REPLACE_WAIT_S", 0.0)
+    state = _install_comfy(monkeypatch)
+    tries = []
+
+    def held_then_cancelled(src, target):
+        tries.append(1)
+        if len(tries) == 2:
+            state["cancel"] = True          # noticed by the poll before try 3
+        raise _held()
+    monkeypatch.setattr(MUX.os, "replace", held_then_cancelled)
+    with caplog.at_level("WARNING", logger="OTR"):
+        with pytest.raises(InterruptProcessingException):
+            MUX.OTRMasterAudioMux()._publish_to_obs(final)
+    assert len(tries) == 2, "a third replace ran after the Cancel was pending"
+    assert "cancelled before replacing" in caplog.text
+    assert dst.read_bytes() == SENTINEL
+    assert not (obs / MUX.OBS_STAGING_DIRNAME).exists()
+
+
+@windows_only
+def test_a_cancel_with_the_candidate_still_held_is_logged_not_silent(
+        media, obs, monkeypatch, caplog):
+    """The scanner the retry exists for can hold the candidate when Cancel
+    arrives: removal fails, and that must be said, not swallowed."""
+    final = str(media["av"])
+    dst = _seed(obs / MUX._obs_basename(final))
+    state = _install_comfy(monkeypatch)
+    handles = []
+    copy = _writes(media["av"])
+
+    def encode_hold_cancel(argv, **kw):
+        result = copy(argv)
+        handles.append(open(argv[-1], "rb"))     # a scanner's handle
+        state["cancel"] = True
+        return result
+    monkeypatch.setattr(MUX, "_run", encode_hold_cancel)
+    try:
+        with caplog.at_level("WARNING", logger="OTR"):
+            with pytest.raises(InterruptProcessingException):
+                MUX.OTRMasterAudioMux()._publish_to_obs(final)
+    finally:
+        for h in handles:
+            h.close()
+    assert "cancelled before replacing" in caplog.text
+    assert "could not remove the cancelled candidate" in caplog.text
+    assert dst.read_bytes() == SENTINEL
 
 
 def test_a_non_sharing_replace_error_is_not_retried(media, obs, monkeypatch):
@@ -271,11 +356,15 @@ def test_an_output_that_is_an_input_is_refused_by_name(media, tmp_path):
     """ffmpeg used to refuse "Output same as Input" itself; a candidate renamed
     over the destination would now overwrite the input (sonnet QA on 733c2386)."""
     silent = tmp_path / "silent.mp4"
+    master = tmp_path / "master.wav"
     shutil.copyfile(media["silent"], silent)
-    before = silent.read_bytes()
+    shutil.copyfile(media["master"], master)
+    before = (silent.read_bytes(), master.read_bytes())
     with pytest.raises(ValueError, match="silent video input"):
-        MUX.mux_master_audio(str(silent), str(media["master"]), str(silent))
-    assert silent.read_bytes() == before
+        MUX.mux_master_audio(str(silent), str(master), str(silent))
+    with pytest.raises(ValueError, match="master audio input"):
+        MUX.mux_master_audio(str(silent), str(master), str(master))
+    assert (silent.read_bytes(), master.read_bytes()) == before
 
 
 def test_a_published_name_that_is_the_archival_final_is_refused(obs, media, monkeypatch):

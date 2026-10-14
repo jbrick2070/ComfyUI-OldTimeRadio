@@ -491,6 +491,17 @@ def _reject_candidate(candidate: str, gate: str, why: str, exc_type=OSError):
 _REPLACE_ATTEMPTS = 6
 _REPLACE_WAIT_S = 0.25
 
+#: The Windows errors a momentary hold produces: ACCESS_DENIED (a delete-
+#: pending or scanning handle), SHARING_VIOLATION, LOCK_VIOLATION. Anything
+#: else -- and every POSIX error, where a rename does not hit sharing modes --
+#: is not transient and fails at once (sonnet QA on b4a1f00f).
+_TRANSIENT_REPLACE_WINERRORS = frozenset({5, 32, 33})
+
+
+def _is_transient_hold(exc: BaseException) -> bool:
+    return (isinstance(exc, PermissionError)
+            and getattr(exc, "winerror", None) in _TRANSIENT_REPLACE_WINERRORS)
+
 
 def _same_file_path(a, b) -> bool:
     """Do two path strings name one file? Never raises."""
@@ -514,26 +525,32 @@ def _accept_candidate(candidate: str, final_path: str, gate: str) -> None:
     last = None
     for attempt in range(_REPLACE_ATTEMPTS):
         try:
-            _poll_interrupt()
+            _poll_interrupt()           # before EVERY try, so a hold never delays a Cancel
         except BaseException:
-            try:
-                os.remove(long_path(candidate))
+            try:  # the cancel is logged first, so a failed removal still says so
                 log.warning("[OTR_MasterAudioMux] %s cancelled before replacing "
-                            "%s; the previous file is untouched and the "
-                            "candidate %s was removed", gate, final_path, candidate)
+                            "%s; the previous file is untouched; removing the "
+                            "candidate %s", gate, final_path, candidate)
             except BaseException:          # noqa: BLE001 -- never mask the cancel
                 pass
+            try:
+                os.remove(long_path(candidate))
+            except BaseException as gone:  # noqa: BLE001 -- never mask the cancel
+                try:
+                    log.warning("[OTR_MasterAudioMux] could not remove the "
+                                "cancelled candidate %s (%s); it is left in "
+                                "place", candidate, gone)
+                except BaseException:      # noqa: BLE001
+                    pass
             raise
         try:
             os.replace(long_path(candidate), long_path(str(final_path)))
             return
-        except PermissionError as exc:
-            last = exc
-            if attempt + 1 < _REPLACE_ATTEMPTS:
-                time.sleep(_REPLACE_WAIT_S)
-                continue
         except OSError as exc:
             last = exc
+            if _is_transient_hold(exc) and attempt + 1 < _REPLACE_ATTEMPTS:
+                time.sleep(_REPLACE_WAIT_S)
+                continue
         break
     log.error("[OTR_MasterAudioMux] %s could not replace %s (%s); the "
               "previous file is untouched and the accepted candidate is "
@@ -594,6 +611,18 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     The guard is never blind-widened past what the roll declares.
     """
     report: list = []
+    # AN OUTPUT THAT IS ONE OF ITS INPUTS IS REFUSED BY NAME, FIRST -- before
+    # any capability gate, so the refusal does not depend on the ffmpeg build.
+    # ffmpeg used to refuse it itself ("Output same as Input"); writing a
+    # candidate and renaming it over the destination would now overwrite the
+    # input instead (sonnet QA on 733c2386). Only an operator output_path can
+    # alias one.
+    for _label, _src in (("silent video", silent_video_path),
+                         ("master audio", master_audio_path)):
+        if _same_file_path(out_path, _src):
+            raise ValueError(
+                f"OTR_MasterAudioMux: the output path is the {_label} input "
+                f"({out_path!r}); refusing to overwrite an input")
     fb = _ffmpeg_bin(ffmpeg)
     if not fb:
         raise ValueError(f"OTR_MasterAudioMux: ffmpeg not found ({ffmpeg!r})")
@@ -621,16 +650,6 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
         raise ValueError(f"OTR_MasterAudioMux: silent video missing: {silent_video_path!r}")
     if not os.path.isfile(master_audio_path):
         raise ValueError(f"OTR_MasterAudioMux: master audio missing: {master_audio_path!r}")
-    # AN OUTPUT THAT IS ONE OF ITS INPUTS IS REFUSED BY NAME. ffmpeg used to
-    # refuse it itself ("Output same as Input"); writing a candidate and
-    # renaming it over the destination would now overwrite the input instead
-    # (sonnet QA on 733c2386). Only an operator output_path can alias one.
-    for _label, _src in (("silent video", silent_video_path),
-                         ("master audio", master_audio_path)):
-        if _same_file_path(out_path, _src):
-            raise ValueError(
-                f"OTR_MasterAudioMux: the output path is the {_label} input "
-                f"({out_path!r}); refusing to overwrite an input")
 
     # Duration gate: the silent composite covers drama beats only; the master
     # audio also includes opening/closing themes (typically 10s + 8s).  It is
@@ -1903,53 +1922,62 @@ class OTRMasterAudioMux:
         staging = os.path.join(obs_dir, OBS_STAGING_DIRNAME)
         candidate = _reserve_candidate(dst, staging)
         gate = "obs publish"
-        p = _run([fb, "-y", "-loglevel", "error", "-i", final,
-                  "-map", "0:v", "-map", "0:a",
-                  "-c:v", "copy", "-c:a", "aac", "-b:a", "320k",
-                  "-ar", "48000", candidate])
-        if p.returncode != 0:
-            _reject_candidate(candidate, gate, "aac viewing copy failed: %s"
-                              % p.stderr.strip()[:300])
+        try:
+            p = _run([fb, "-y", "-loglevel", "error", "-i", final,
+                      "-map", "0:v", "-map", "0:a",
+                      "-c:v", "copy", "-c:a", "aac", "-b:a", "320k",
+                      "-ar", "48000", candidate])
+            if p.returncode != 0:
+                _reject_candidate(candidate, gate, "aac viewing copy failed: %s"
+                                  % p.stderr.strip()[:300])
 
-        # THE FILE HE ACTUALLY WATCHES GETS CHECKED LIKE ONE (2026-09-12).
-        # Until now this trusted `returncode == 0` alone, while the ARCHIVAL
-        # copy forty lines up proves itself byte-identical by SHA-256 before
-        # calling its own write a success. So the weaker check guarded the more
-        # important file: ffmpeg can exit 0 having written a truncated or empty
-        # container, and the log would still say publish OK, the ledger would
-        # record it published, and the operator would open a black screen.
-        #
-        # obs IS the success signal in this project -- a leg that does not land
-        # there did not happen -- so "the bytes exist" is not the same claim as
-        # "it plays". Both streams are probed against the source they were
-        # copied from, reusing the `_probe_float` already in this file -- all
-        # of it against the CANDIDATE, before it may become the published file.
-        _size = os.path.getsize(candidate)
-        if _size <= 0:
-            _reject_candidate(candidate, gate, "the encode wrote a ZERO-BYTE file")
-        for _stream, _label in (("v:0", "video"), ("a:0", "audio")):
-            _src = _probe_float(final, _stream)
-            _got = _probe_float(candidate, _stream)
-            # A MISSING stream is refused by name: the container duration of
-            # a video-only copy is a plausible number and used to pass here.
-            if _got == STREAM_MISSING:
-                _reject_candidate(candidate, gate, "the %s stream is MISSING"
-                                  % _label)
-            if _got < 0:
-                _reject_candidate(candidate, gate, "%s stream does not probe -- "
-                                  "the file is not playable" % _label)
-            # A tenth of a second of slack: the AAC encoder pads the final
-            # frame, so an exact match is the wrong test. Anything beyond that
-            # means the copy is short, which is the failure worth catching.
-            if _src > 0 and abs(_got - _src) > 0.1:
-                _reject_candidate(candidate, gate, "TRUNCATED: %s is %.2fs but "
-                                  "the source is %.2fs" % (_label, _got, _src))
+            # THE FILE HE ACTUALLY WATCHES GETS CHECKED LIKE ONE (2026-09-12).
+            # Until now this trusted `returncode == 0` alone, while the
+            # ARCHIVAL copy proves itself byte-identical by SHA-256 before
+            # calling its own write a success. So the weaker check guarded the
+            # more important file: ffmpeg can exit 0 having written a truncated
+            # or empty container, and the log would still say publish OK, the
+            # ledger would record it published, and the operator would open a
+            # black screen.
+            #
+            # obs IS the success signal in this project -- a leg that does not
+            # land there did not happen -- so "the bytes exist" is not the same
+            # claim as "it plays". Both streams are probed against the source
+            # they were copied from, reusing the `_probe_float` already in this
+            # file -- all of it against the CANDIDATE, before it may become the
+            # published file.
+            _size = os.path.getsize(candidate)
+            if _size <= 0:
+                _reject_candidate(candidate, gate, "the encode wrote a ZERO-BYTE file")
+            for _stream, _label in (("v:0", "video"), ("a:0", "audio")):
+                _src = _probe_float(final, _stream)
+                _got = _probe_float(candidate, _stream)
+                # A MISSING stream is refused by name: the container duration
+                # of a video-only copy is a plausible number and used to pass.
+                if _got == STREAM_MISSING:
+                    _reject_candidate(candidate, gate, "the %s stream is MISSING"
+                                      % _label)
+                if _got < 0:
+                    _reject_candidate(candidate, gate, "%s stream does not probe "
+                                      "-- the file is not playable" % _label)
+                # A tenth of a second of slack: the AAC encoder pads the final
+                # frame, so an exact match is the wrong test. Anything beyond
+                # that means the copy is short, which is the failure worth
+                # catching.
+                if _src > 0 and abs(_got - _src) > 0.1:
+                    _reject_candidate(candidate, gate, "TRUNCATED: %s is %.2fs "
+                                      "but the source is %.2fs"
+                                      % (_label, _got, _src))
 
-        _accept_candidate(candidate, dst, gate)
-        try:  # the staging folder goes when it is empty; it is not an output
-            os.rmdir(staging)
-        except OSError:
-            pass
+            _accept_candidate(candidate, dst, gate)
+        finally:
+            # The staging folder goes whenever it is EMPTY -- after a publish,
+            # a Cancel or an empty failed reservation; a kept rejected
+            # candidate keeps it. It is never an output.
+            try:
+                os.rmdir(staging)
+            except OSError:
+                pass
         log.warning("[OTR_MasterAudioMux] LOUD publish: final episode -> %s "
                     "(%d bytes; video copy + AAC-320k viewing audio; archival "
                     "PCM byte-identical final: %s)",
