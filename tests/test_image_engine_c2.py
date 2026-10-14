@@ -26,10 +26,9 @@ def test_registry_holds_two_engines():
     assert len(names) >= 2  # model-agnostic: the registry holds >=2 image engines
 
 
-def test_z_image_selectable_no_flag(monkeypatch):
+def test_z_image_selectable_no_flag():
     # Registry IS the menu: z_image_turbo is selectable for a role it serves with
     # NO flag gate (the deeper disk/dep check is the adapter's).
-    monkeypatch.delenv(zit.ENABLE_FLAG, raising=False)
     assert ireg.assert_usable("z_image_turbo", "announcer_visual") == "z_image_turbo"
 
 

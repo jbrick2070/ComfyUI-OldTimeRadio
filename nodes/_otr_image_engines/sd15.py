@@ -52,10 +52,6 @@ except ImportError:  # pragma: no cover -- flat test imports
 
 log = logging.getLogger("OTR.image.sd15")
 
-#: VESTIGIAL (no runtime reader; the registry IS the menu). Kept for pattern
-#: parity with the sibling engines and the no-gate regression test.
-ENABLE_FLAG = "OTR_ENABLE_SD15"
-
 #: One ordinary checkpoint: MODEL + CLIP + VAE together. Env-overridable so a
 #: user can point this at any SD-1.5-architecture checkpoint they already have
 #: (see apple/ADDING_IMAGE_AND_VIDEO_LANES.md, level 1) without touching code.

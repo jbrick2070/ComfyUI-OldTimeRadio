@@ -56,16 +56,6 @@ MM_V3_NAME = "v3_sd15_mm.ckpt"
 #: file was byte-perfect.
 MM_V3_MIN_BYTES = 1_600_000_000
 
-#: The official v2 module. Balanced, and the only one of the three with
-#: MotionLoRA support (eight camera moves). Ghost wires no Motion LoRA today --
-#: that is excluded by the coding plan -- so this is a future capability, not a
-#: current one, and it is recorded rather than claimed.
-MM_V2_NAME = "mm_sd_v15_v2.ckpt"
-
-#: 1,817,888,431 bytes -- within 6 KB of mm-p_0.5, which is the clearest single
-#: piece of evidence that mm-p_0.5 is a v2 derivative.
-MM_V2_MIN_BYTES = 1_700_000_000
-
 
 # UNREGISTERED 2026-08-23. The class survives because the haunted lane inherits
 # it -- the v3 module, its byte floor and its recipe receipt are that lane's own
@@ -185,7 +175,6 @@ class GhostSignalV3HauntedEngine(GhostSignalV3Engine):
 
 __all__ = ["GhostSignalV3Engine",
            "GhostSignalV3HauntedEngine",
-           "MM_V3_NAME", "MM_V2_NAME",
-           "MM_V3_MIN_BYTES", "MM_V2_MIN_BYTES",
+           "MM_V3_NAME", "MM_V3_MIN_BYTES",
            "ADAPTER_V3_NAME", "ADAPTER_V3_MIN_BYTES", "ADAPTER_V3_STRENGTH",
            "ADAPTER_V3_STRENGTH_ENV"]

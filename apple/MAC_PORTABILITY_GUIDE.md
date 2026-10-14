@@ -1432,7 +1432,7 @@ That covers every knob that binds: the loader-name and path overrides
 `OTR_GHOST_HOLD_FACTOR`, `OTR_CAPTION_MONO_FONT`. If you changed one and nothing
 changed, you almost certainly set it on the wrong process.
 
-**`ENABLE_FLAG` constants gate nothing.** Every registered engine sets
+**No engine has an enable flag.** Every registered engine sets
 `requires_flag = None`, `EngineUsabilityReason` has no flag-gate member, and
 `tests/test_registry_is_the_menu_guard.py` asserts that no registered
 engine carries a live flag. If an engine refuses, the reason is in its

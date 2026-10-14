@@ -744,10 +744,10 @@ def test_a_bare_no_voice_clause_is_NOT_treated_as_finished():
     canonical terminator, so such a prompt gets properly finished.
     """
     bare = "an operator override that happens to end here. No speech, no voices."
+    assert not ltx25.joint_av_prompt_is_finished(bare)
     out = ltx25.finish_joint_av_positive("ltx25_foley_16gb", bare)
     assert out != bare
-    assert out.rstrip(" ,.;:").endswith(
-        ltx25.JOINT_AV_TERMINATOR.rstrip(" ,.;:"))
+    assert ltx25.joint_av_prompt_is_finished(out)
 
 
 def test_a_properly_finished_prompt_IS_left_alone():

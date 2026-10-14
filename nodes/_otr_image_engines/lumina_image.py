@@ -26,10 +26,8 @@ stays CPU-testable with no comfy import (V-12), and ComfyUI's own shipped
 Lumina-family blueprint composes it as a string into a plain ``CLIPTextEncode``.
 
 Flux stays gen 1; Lumina is an OPT-IN peer (``default_roles=()`` -- no model is
-"primary"). ``requires_flag`` is None -- the registry IS the menu, and
-``OTR_ENABLE_LUMINA`` is vestigial, NOT a gate (pinned by
-``tests/test_lumina_image_engine.py``, which deletes the var and still expects
-the engine usable). The fail-closed gate is the WEIGHTS FILE: ``assert_usable`` greys the engine
+"primary"). ``requires_flag`` is None -- the registry IS the menu and there is
+no enable env var. The fail-closed gate is the WEIGHTS FILE: ``assert_usable`` greys the engine
 until ``lumina_2_model_bf16.safetensors`` is in ``diffusion_models`` or
 ``OTR_LUMINA_CKPT`` points at it. A 16 GB graph (or any still-consuming lane
 that picks this engine) fetches the ungated Comfy-Org split set on first use
@@ -55,9 +53,6 @@ except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR.image.lumina_image")
-
-#: Opt-in flag (default-OFF). The registry greys the engine until set to "1".
-ENABLE_FLAG = "OTR_ENABLE_LUMINA"
 
 #: Env var pointing at the downloaded Lumina-Image 2.0 diffusion model. Absent /
 #: not a file -> ``assert_usable`` fails closed. Native in-stack load (ComfyUI
@@ -414,6 +409,6 @@ class LuminaImage2Engine:
         return None
 
 
-__all__ = ["LuminaImage2Engine", "ENABLE_FLAG", "MODEL_ENV", "CLIP_ENV", "VAE_ENV",
+__all__ = ["LuminaImage2Engine", "MODEL_ENV", "CLIP_ENV", "VAE_ENV",
            "SYSTEM_ENV", "SYSTEM_PROMPTS", "PROMPT_START_TAG",
            "compose_encoder_text"]

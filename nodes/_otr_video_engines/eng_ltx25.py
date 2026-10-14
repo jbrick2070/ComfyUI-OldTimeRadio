@@ -2435,18 +2435,6 @@ def _join_sounds(sounds):
     return ", ".join(sounds)
 
 
-#: The LEGACY contiguous terminator -- what a finished joint-AV prompt ended
-#: with under the pre-2026-08-29 append-at-the-tail shape, and what the
-#: legacy branch of ``finish_joint_av_positive`` still appends for prompts
-#: that never met the composer. Since the golden-shape reordering the frame
-#: and the clause are NOT contiguous on a normally composed prompt (the
-#: camera clause sits between them), so finished-ness is decided by
-#: ``joint_av_prompt_is_finished`` -- frame PRESENT plus clause LAST -- and
-#: never by matching this constant at the tail. Kept exported because the
-#: two-constant pair is still the exact tail of a legacy-finished prompt.
-JOINT_AV_TERMINATOR = "%s. %s" % (_SOUND_FRAME, _NO_VOICE_CLAUSE)
-
-
 def build_joint_av_suffix(positive):
     """The LEGACY appended tail -- sounds named, frame, clause, all at the end.
 
@@ -3402,5 +3390,4 @@ __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine",
            "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY",
            "finish_joint_av_positive", "build_joint_av_suffix",
            "named_sounds_for", "sounds_named_in",
-           "joint_av_prompt_is_finished", "JOINT_AV_TERMINATOR",
-           "identity_leaks_in"]
+           "joint_av_prompt_is_finished", "identity_leaks_in"]

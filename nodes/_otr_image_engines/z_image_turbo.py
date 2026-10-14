@@ -42,8 +42,7 @@ are env-overridable so the operator never edits code):
 
 Fail-closed: ``assert_usable`` raises MISSING_MODEL until the diffusion-model file
 exists (the TE+VAE loaders fail LOUD at render -> dispatcher floor). No enable
-flag gates selection -- the registry is the menu; ``OTR_ENABLE_ZIMAGE`` is
-vestigial and read by nothing (``test_image_engine_c2.py`` pins the no-gate
+flag gates selection -- the registry is the menu.
 
 Cold-import clean (V-12): module scope imports only the dep-free registry + role
 vocabulary + stdlib. torch / comfy / the model are NEVER imported here -- the heavy
@@ -63,10 +62,6 @@ except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR.image.z_image_turbo")
-
-#: VESTIGIAL (no runtime reader; the registry is the menu). Kept only for
-#: pattern parity with sibling engines and the no-gate regression test.
-ENABLE_FLAG = "OTR_ENABLE_ZIMAGE"
 
 #: Split-file weights. Defaults target the LOW-VRAM fp8 variants (the whole point
 #: of this engine); point them at bf16 to taste. The loaders take a basename
@@ -410,4 +405,4 @@ class ZImageTurboEngine:
         return None
 
 
-__all__ = ["ZImageTurboEngine", "ENABLE_FLAG", "MODEL_ENV", "CLIP_ENV", "VAE_ENV"]
+__all__ = ["ZImageTurboEngine", "MODEL_ENV", "CLIP_ENV", "VAE_ENV"]

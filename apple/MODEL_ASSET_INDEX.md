@@ -53,8 +53,8 @@ Anything not listed there is a manual install -- see its row below.
 | `cloud_video` | nothing on disk | - | - |
 | `ghost_signal` | 2 weight file(s) | manual download | - |
 | `ghost_signal_lightning` | 4 weight file(s) | manual download | - |
-| `ghost_signal_official` | 5 weight file(s) | manual download | - |
-| `ghost_signal_stillin_lab` | 3 weight file(s) | manual download | - |
+| `ghost_signal_official` | 4 weight file(s) | manual download | - |
+| `ghost_signal_stillin_lab` | 2 weight file(s) | manual download | - |
 | `google_omni_video` | nothing on disk | - | - |
 | `google_veo_video` | nothing on disk | - | - |
 | `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual download](RUNPOD_INSTALL.md) | - |
@@ -152,14 +152,12 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 **`ghost_signal_official`** -- `nodes/_otr_video_engines/eng_ghost_signal_official.py`
 
 - `mm-p_0.5.pth`
-- `mm_sd_v15_v2.ckpt`
 - `v1-5-pruned-emaonly-fp16.safetensors`
 - `v3_sd15_adapter.ckpt`
 - `v3_sd15_mm.ckpt`
 
 **`ghost_signal_stillin_lab`** -- `nodes/_otr_video_engines/eng_ghost_signal_stillin_lab.py`
 
-- `mm_sd_v15_v2.ckpt`
 - `v3_sd15_adapter.ckpt`
 - `v3_sd15_mm.ckpt`
 

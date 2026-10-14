@@ -34,7 +34,6 @@ def test_lumina_registered_optin_clean():
 def test_lumina_weight_gate(monkeypatch, tmp_path):
     eng = ireg.get_engine("lumina_image")
     # (1) Registry IS the menu: a registered engine is selectable, no flag gate.
-    monkeypatch.delenv("OTR_ENABLE_LUMINA", raising=False)
     assert ireg.assert_usable("lumina_image", "music_visual") == "lumina_image"
     # (2) engine-level: no weight -> MISSING_MODEL (fail-closed, BUG-046).
     monkeypatch.delenv("OTR_LUMINA_CKPT", raising=False)
@@ -50,7 +49,6 @@ def test_lumina_weight_gate(monkeypatch, tmp_path):
 
 def test_lumina_env_constants_exported():
     from nodes._otr_image_engines import lumina_image as m
-    assert m.ENABLE_FLAG == "OTR_ENABLE_LUMINA"
     assert m.MODEL_ENV == "OTR_LUMINA_CKPT"
     assert m.CLIP_ENV == "OTR_LUMINA_CLIP"
     assert m.VAE_ENV == "OTR_LUMINA_VAE"

@@ -381,7 +381,6 @@ def test_the_version_constant_is_not_the_capability_token():
     # rendered by the previous composer and the change looks like a no-op.
     assert gsp.GHOST_PROMPT_VERSION_V3 == "ghost_signal_v3.1"
     assert gsp.GHOST_PROMPT_PROFILE == "ghost_signal_v1"
-    assert gsp.GHOST_PROMPT_VERSION_V3 != gsp.GHOST_PROMPT_VERSION_V2
 
 
 # ---------------------------------------------------------------------------

@@ -106,13 +106,7 @@ def format_suffix(departed):
     return "%s[%s]" % (PREQUALIFICATION_SUFFIX, body)
 
 
-def receipt_suffix(frozen, resolved):
-    """``departures`` then ``format_suffix`` -- the whole rule in one call, so
-    an adapter cannot do half of it."""
-    return format_suffix(departures(frozen, resolved))
-
-
 __all__ = [
     "PREQUALIFICATION_SUFFIX", "MAX_INLINE_VALUE",
-    "render_value", "departures", "format_suffix", "receipt_suffix",
+    "render_value", "departures", "format_suffix",
 ]

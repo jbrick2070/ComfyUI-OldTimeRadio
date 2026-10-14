@@ -54,16 +54,13 @@ GHOST_PROMPT_PROFILE = "ghost_signal_v1"
 #: which composer wrote the text. Bump with the composer, never in place.
 GHOST_PROMPT_VERSION = "ghost_signal_v1"
 
-#: THE PROMPT v2 COMPOSER VERSION, and it is deliberately NOT the capability
-#: token above. ``GHOST_PROMPT_PROFILE`` is what every engine DECLARES and what
-#: the driver branches on; bumping it would silently unregister every peer from
-#: its own lane. What changed is the composer, so the composer's version is what
-#: moves -- a published receipt then says which text authority wrote the prompt
-#: while the adapter keeps advertising the capability it still has.
-GHOST_PROMPT_VERSION_V2 = "ghost_signal_v2"
-
-#: THE PROMPT v3 COMPOSER VERSION ("draw the crux", 2026-09-02). Same reasoning
-#: as v2 above: the COMPOSER moves, the capability token does not. v3 is a
+#: THE PROMPT v3 COMPOSER VERSION ("draw the crux", 2026-09-02), and it is
+#: deliberately NOT the capability token above. ``GHOST_PROMPT_PROFILE`` is what
+#: every engine DECLARES and what the driver branches on; bumping it would
+#: silently unregister every peer from its own lane. What changed is the
+#: composer, so the composer's version is what moves -- a published receipt then
+#: says which text authority wrote the prompt while the adapter keeps
+#: advertising the capability it still has. v3 is a
 #: render-time change only -- it reads the episode's own `key_objects`,
 #: `story_brief_terms` and the beat's stored mode, and it reads NEITHER the
 #: stored `motif_cue` NOR the stored `drawable_beat`. The authored object stays
@@ -1046,7 +1043,7 @@ def _prefix_pack_cue(style, prompt) -> str:
 
 
 __all__ = [
-    "GHOST_PROMPT_PROFILE", "GHOST_PROMPT_VERSION", "GHOST_PROMPT_VERSION_V2",
+    "GHOST_PROMPT_PROFILE", "GHOST_PROMPT_VERSION",
     "GHOST_PROMPT_VERSION_V3", "GHOST_VANTAGE_V3", "GHOST_V3_SLOTS",
     "_trailing_pack_cue",
     "GHOST_PROMPT_SOURCE", "GHOST_MODE_LAWS_V2", "GHOST_V2_SLOTS",

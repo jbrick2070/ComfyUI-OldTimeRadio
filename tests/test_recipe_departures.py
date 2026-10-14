@@ -150,19 +150,12 @@ def test_the_suffix_names_the_departures_in_the_documented_shape():
 
 
 def test_several_departures_are_comma_separated_in_key_order():
-    out = rd.receipt_suffix(
+    out = rd.format_suffix(rd.departures(
         {"steps": 8, "cfg": 1.0, "t5_device": "cpu"},
-        {"steps": 12, "cfg": 1.0, "t5_device": "default"})
+        {"steps": 12, "cfg": 1.0, "t5_device": "default"}))
     assert out == "+prequalification[steps=12,t5_device=default]"
 
 
 def test_the_marked_suffix_still_STARTS_with_the_bare_mark():
     # Everything downstream that greps for a sweep artifact keys on this.
     assert rd.format_suffix({"steps": 12}).startswith(rd.PREQUALIFICATION_SUFFIX)
-
-
-def test_receipt_suffix_is_departures_then_format_in_one_call():
-    frozen = {"steps": 8, "tiled_vae": True}
-    resolved = {"steps": 8, "tiled_vae": False}
-    assert rd.receipt_suffix(frozen, resolved) \
-        == rd.format_suffix(rd.departures(frozen, resolved))

@@ -36,18 +36,6 @@ def test_assert_sage_not_patched_raises_when_patched_else_returns():
         "ltx25_video", "text_to_video", modules={}, env={}) == "ltx25_video"
 
 
-def test_resolve_isolation_escalates_optional_when_sage_resident():
-    assert mc.resolve_isolation(mc.ISOLATION_SIDECAR_REQUIRED, False) == (
-        mc.ISOLATION_SIDECAR_REQUIRED)
-    assert mc.resolve_isolation(mc.ISOLATION_SIDECAR_OPTIONAL, True) == (
-        mc.ISOLATION_SIDECAR_REQUIRED)
-    assert mc.resolve_isolation(mc.ISOLATION_SIDECAR_OPTIONAL, False) == (
-        mc.ISOLATION_IN_PROCESS)
-    assert mc.resolve_isolation(mc.ISOLATION_IN_PROCESS, True) == (
-        mc.ISOLATION_IN_PROCESS)
-    assert mc.resolve_isolation("anything_else", False) == mc.ISOLATION_IN_PROCESS
-
-
 # --------------------------------------------------------------------------- #
 # init_image aspect handling -- no silent stretch
 # --------------------------------------------------------------------------- #

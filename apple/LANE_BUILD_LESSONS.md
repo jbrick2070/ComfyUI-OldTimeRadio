@@ -221,9 +221,10 @@ schema validator and a docs generator. No boot script passes
 controls nothing is how the next reader gets this wrong.
 
 **Same class, third instance:** the `sidecar_optional -> sidecar_required` Sage
-escalation. `resolve_isolation()` has no production caller -- only tests -- and
-there is no video sidecar runner in `nodes/`. Either delete the claim or build
-the escape; do not leave a docstring describing protection that is not there.
+escalation. `resolve_isolation()` had no production caller -- only tests -- and
+there is no video sidecar runner in `nodes/`. It was deleted, with the two
+sidecar tiers, rather than left describing protection that is not there; a lane
+that needs a sidecar must build the runner first.
 
 **Runnable check:** boot contracts ride `launch.env`; enforcement probes
 `comfy.cli_args.args` on the running server; a dead channel is documented dead

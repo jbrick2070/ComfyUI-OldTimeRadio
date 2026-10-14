@@ -13,9 +13,8 @@ every guard is tested once:
   ``unload_all_models``;
 * the BUG-070 SageAttention contamination gate -- int8-PV SageAttention
   process-aborts LTX with NO traceback, so ``ltx_8gb`` fails CLOSED before its
-  first forward (``assert_sage_not_patched``); ``resolve_isolation`` still
-  answers whether a lane must escalate to a sidecar when Sage is resident,
-  though every currently registered lane declares ``ISOLATION_IN_PROCESS``;
+  first forward (``assert_sage_not_patched``); every registered lane runs
+  in-process (``ISOLATION_IN_PROCESS``) -- there is no sidecar runner;
 * ``init_image`` aspect handling that maps a source image into the canvas with a
   SINGLE uniform scale (``resolve_aspect_transform`` / ``assert_no_silent_stretch``)
   so a portrait init never silently stretches into a landscape canvas
@@ -55,10 +54,9 @@ except ImportError:  # pragma: no cover -- flat test imports
 ASPECT_POLICIES = ("pad", "crop", "fit")
 DEFAULT_ASPECT_POLICY = "pad"
 
-#: Engine isolation tiers (schemas dependency_manifest.isolation).
+#: Engine isolation tier. Every registered lane runs in-process; there is no
+#: video sidecar runner (a lane that needs one must build it, not declare it).
 ISOLATION_IN_PROCESS = "in_process"
-ISOLATION_SIDECAR_REQUIRED = "sidecar_required"
-ISOLATION_SIDECAR_OPTIONAL = "sidecar_optional"
 
 
 # --------------------------------------------------------------------------- #
@@ -115,21 +113,6 @@ def assert_sage_not_patched(engine_name, family, *, modules=None, env=None):
             "sidecar" % engine_name,
             kind="video")
     return engine_name
-
-
-def resolve_isolation(declared_isolation, sage_patched):
-    """Resolve an engine's runtime isolation tier (pure).
-
-    ``sidecar_optional`` escalates to ``sidecar_required`` when
-    SageAttention is resident -- running in-process next to a Sage-patched
-    attention is toxic (BUG-070). ``sidecar_required`` stays required; everything
-    else runs ``in_process``.
-    """
-    if declared_isolation == ISOLATION_SIDECAR_REQUIRED:
-        return ISOLATION_SIDECAR_REQUIRED
-    if declared_isolation == ISOLATION_SIDECAR_OPTIONAL and sage_patched:
-        return ISOLATION_SIDECAR_REQUIRED
-    return ISOLATION_IN_PROCESS
 
 
 # --------------------------------------------------------------------------- #
@@ -1456,9 +1439,8 @@ class MotionEngineBase:
 
 __all__ = [
     "ASPECT_POLICIES", "DEFAULT_ASPECT_POLICY",
-    "ISOLATION_IN_PROCESS", "ISOLATION_SIDECAR_REQUIRED",
-    "ISOLATION_SIDECAR_OPTIONAL", "sageattention_patched",
-    "assert_sage_not_patched", "resolve_isolation", "assert_aspect_policy",
+    "ISOLATION_IN_PROCESS", "sageattention_patched",
+    "assert_sage_not_patched", "assert_aspect_policy",
     "resolve_aspect_transform", "assert_no_silent_stretch", "vram_used_mb",
     "VramPeakProbe",
     "FRAME_COST_MODEL", "FRAME_MOTION_FLOOR", "free_vram_mb",
