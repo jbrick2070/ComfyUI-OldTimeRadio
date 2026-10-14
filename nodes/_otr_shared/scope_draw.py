@@ -314,15 +314,19 @@ def paint_frame(w, h, fi, total, fps, vol, freq, wave, signal, loss,
     arr = np.array(img, dtype=np.float32)
     arr *= vignette[:, :, np.newaxis]
     np.clip(arr, 0, 255, out=arr)
-    img = Image.fromarray(arr.astype(np.uint8))
+    u8 = arr.astype(np.uint8)
     if vol > 0.3:
-        a = np.array(img, dtype=np.int16)
+        # Widen the uint8 frame directly for the noise; it used to become a PIL
+        # image first only to be read straight back (VC-01 pattern, 2026-10-14).
+        a = u8.astype(np.int16)
         intensity = int(vol * 12)
         noise = _rng(rng_key, fi, "noise").integers(
             -intensity, intensity + 1, size=a.shape, dtype=np.int16)
         a += noise
         np.clip(a, 0, 255, out=a)
         img = Image.fromarray(a.astype(np.uint8))
+    else:
+        img = Image.fromarray(u8)
     return img
 
 
