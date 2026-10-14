@@ -61,7 +61,9 @@ class TestLoader:
             return real(self, *a, **k)
 
         monkeypatch.setattr(Path, "read_text", _spy)
+        import nodes
         original = sys.modules.get("nodes._otr_visual_styles")
+        original_attr = getattr(nodes, "_otr_visual_styles", None)
         try:
             sys.modules.pop("nodes._otr_visual_styles", None)
             mod = importlib.import_module("nodes._otr_visual_styles")
@@ -71,8 +73,14 @@ class TestLoader:
             mod.resolve_visual_style("sci_fi_radio")
             assert calls, "expected the first resolve to read the packs"
         finally:
+            # BOTH handles go back: the re-import rebinds the package
+            # attribute too, and a later test patching through
+            # `nodes._otr_visual_styles` would patch a module nothing imports
+            # (the scene_sequencer / foley_speech lesson, 2026-10-14).
             if original is not None:
                 sys.modules["nodes._otr_visual_styles"] = original
+            if original_attr is not None:
+                nodes._otr_visual_styles = original_attr
 
     def test_default_resolution_paths(self):
         assert vs.get_visual_style({}).style_id == "sci_fi_radio"

@@ -22,31 +22,6 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-@pytest.fixture
-def fresh_flat_scene_sequencer():
-    """A fresh FLAT ``scene_sequencer`` import for the duration of one test,
-    with the interpreter put back exactly as it was afterwards.
-
-    These tests used to delete every ``*scene_sequencer*`` module and prepend
-    ``nodes/`` to ``sys.path`` for good. When ``nodes.scene_sequencer`` had
-    already been imported, the package attribute kept pointing at the old
-    module while ``sys.modules`` had none, so a later test that patched
-    ``nodes.scene_sequencer`` patched an object the code under test no longer
-    imported (test_foley_speech's mux test, 2026-10-14)."""
-    saved = {k: m for k, m in sys.modules.items() if "scene_sequencer" in k}
-    for key in saved:
-        del sys.modules[key]
-    flat = str(REPO_ROOT / "nodes")
-    sys.path.insert(0, flat)
-    try:
-        yield
-    finally:
-        sys.path.remove(flat)
-        for key in [k for k in sys.modules if "scene_sequencer" in k]:
-            del sys.modules[key]
-        sys.modules.update(saved)
 CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_canonical.json"
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -112,15 +87,16 @@ class TestEpisodeAssemblerWavSave:
     temp dir, then verifies a valid 16-bit PCM WAV is written and
     output_path is a real file path."""
 
-    def test_wav_saved_and_path_returned(self, tmp_path, fresh_flat_scene_sequencer):
+    def test_wav_saved_and_path_returned(self, tmp_path):
         import torch
 
-        # A fresh flat import (the fixture removes any cached scene_sequencer
-        # for this test and restores the interpreter afterwards).
-        try:
-            import scene_sequencer as sc
-        except ImportError:
-            pytest.skip("scene_sequencer import requires ComfyUI context")
+        # THE PACKAGE IMPORT, never a fresh FLAT one (2026-10-14). These tests
+        # used to delete every *scene_sequencer* module and import it flat --
+        # which always failed on the module's own relative imports, so both
+        # tests skipped on every box since they were written, while the
+        # deletion left `nodes.scene_sequencer` absent from sys.modules and
+        # broke test_foley_speech's mux test whenever it ran later.
+        from nodes import scene_sequencer as sc
 
         # Build a minimal audio input
         sr = 24000
@@ -168,14 +144,11 @@ class TestEpisodeAssemblerWavSave:
             assert wf.getframerate() == sr
             assert wf.getnframes() == samples
 
-    def test_wav_save_failure_non_fatal(self, tmp_path, fresh_flat_scene_sequencer):
+    def test_wav_save_failure_non_fatal(self, tmp_path):
         """If WAV save fails, assemble must still return without raising."""
         import torch
 
-        try:
-            import scene_sequencer as sc
-        except ImportError:
-            pytest.skip("scene_sequencer import requires ComfyUI context")
+        from nodes import scene_sequencer as sc
 
         sr = 24000
         samples = int(sr * 0.5)
