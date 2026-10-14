@@ -105,7 +105,7 @@
           "seam_refs": [
             "original_concept_system"
           ],
-          "description": "Spark atoms (+ optional operator hint) -> THREE pitched concepts, exactly N dramatic roles each."
+          "description": "Spark atoms (+ optional operator hint) -> one or more pitched concepts, exactly N dramatic roles each."
         },
         {
           "pass_id": "original_select",

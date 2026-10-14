@@ -337,6 +337,33 @@ class TestCreativeFront:
         assert len(delta["pitches"]) == 1
         assert delta["selected_concept"]["selected_index"] == 0
 
+    # --- OR-04: SELECT does not assume a pitch count the code never fixed --
+    def test_the_select_seam_is_count_neutral(self):
+        """CONCEPT may pitch one or more; the code selects over len(pitches).
+        The seam used to say "THREE", "0, 1, or 2" and "the other two", so a
+        fourth pitch was never offered and a 1-2 pitch round cost repairs."""
+        seam = self._pack().prompt_stages["original_select_system"]
+        for stale in ("THREE", "0, 1, or 2", "other two"):
+            assert stale not in seam, stale
+        assert "0-based position" in seam
+
+    def test_a_fourth_pitch_can_be_selected(self):
+        concept = json.loads(_CONCEPT_JSON)
+        concept["pitches"].append(dict(concept["pitches"][0], logline="Pitch 3: x"))
+        selected = json.loads(_SELECT_JSON)
+        selected["selected_index"] = 3
+        creative = self._counting(json.dumps(concept), json.dumps(selected))
+        _, delta = ORR.build_original_briefs(
+            spark_atoms={"place": "the lock"},
+            num_characters=2,
+            creative_fn=creative,
+            technical_fn=_seq_fn(_BRIEFS_JSON),
+            pack=self._pack(),
+        )
+        assert len(delta["pitches"]) == 4
+        assert delta["selected_concept"]["selected_index"] == 3
+        assert len(creative.seen) == 2, "no repair call for a valid fourth pick"
+
     # --- OR-01: an empty brief is repaired in the ladder, never handed on --
     @staticmethod
     def _counting(*replies):
