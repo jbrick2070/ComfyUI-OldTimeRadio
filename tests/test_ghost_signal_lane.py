@@ -740,6 +740,42 @@ def test_a_raising_teardown_never_replaces_the_original_cause(
     _assert_lease_free(lockdir)
 
 
+def test_a_raising_log_handler_never_replaces_the_original_cause(
+        monkeypatch, tmp_path):
+    """A handler whose emit() raises propagates out of Logger.warning; the
+    cleanup warning is guarded so the caller still sees the VAE failure
+    (sonnet QA on 171edd89, guarded in cced31ed)."""
+    import logging
+
+    rec = _Recorder()
+    eng, lockdir = _lane("animatediff15_lightning_video", rec, monkeypatch,
+                         tmp_path, vae="raise")
+
+    def _unload():
+        raise RuntimeError("unload refused for the test")
+
+    monkeypatch.setattr(eng, "unload", _unload)
+    emitted = []
+
+    class _Exploding(logging.Handler):
+        def emit(self, record):
+            emitted.append(record)
+            raise RuntimeError("handler exploded")
+
+    logger = logging.getLogger("OTR.video.ghost_signal")
+    handler = _Exploding(level=logging.WARNING)
+    monkeypatch.setattr(logger, "level", logging.DEBUG)
+    monkeypatch.setattr(logger, "disabled", False)
+    logger.addHandler(handler)
+    try:
+        with pytest.raises(wb.GraphExecutionError, match="vae load refused"):
+            eng.prepare({}, {}, None)
+    finally:
+        logger.removeHandler(handler)
+    assert emitted, "the handler was never reached -- the test proved nothing"
+    _assert_lease_free(lockdir)
+
+
 def test_an_interrupt_inside_detach_still_releases_the_lease(
         monkeypatch, tmp_path, caplog):
     """A second interrupt during the failure teardown escapes the base

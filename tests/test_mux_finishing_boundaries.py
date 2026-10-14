@@ -218,14 +218,76 @@ def test_a_replacement_that_fails_never_deletes_the_old_copy(media, obs, monkeyp
     final = str(media["av"])
     dst = _seed(obs / MUX._obs_basename(final))
     monkeypatch.setattr(MUX, "_run", _writes(media["av"]))
+    monkeypatch.setattr(MUX, "_REPLACE_WAIT_S", 0.0)
+    tries = []
 
     def busy(src, target):
+        tries.append(1)
         raise PermissionError(13, "the file is open in a player")
     monkeypatch.setattr(MUX.os, "replace", busy)
     with pytest.raises(OSError, match="could not replace"):
         MUX.OTRMasterAudioMux()._publish_to_obs(final)
     assert dst.read_bytes() == SENTINEL
     assert len(_staged(obs)) == 1, "the accepted candidate must be kept"
+    assert len(tries) == MUX._REPLACE_ATTEMPTS, "a held file is retried, boundedly"
+
+
+def test_a_briefly_held_candidate_is_retried_not_failed(media, obs, monkeypatch):
+    """An antivirus or indexer holding the fresh candidate for a moment must
+    not fail the last step of a long render (sonnet QA on 733c2386)."""
+    final = str(media["av"])
+    dst = _seed(obs / MUX._obs_basename(final))
+    monkeypatch.setattr(MUX, "_run", _writes(media["av"]))
+    monkeypatch.setattr(MUX, "_REPLACE_WAIT_S", 0.0)
+    real_replace = os.replace
+    held = {"left": 2}
+
+    def scanned_twice(src, target):
+        if held["left"]:
+            held["left"] -= 1
+            raise PermissionError(32, "being used by another process")
+        return real_replace(src, target)
+    monkeypatch.setattr(MUX.os, "replace", scanned_twice)
+    out = MUX.OTRMasterAudioMux()._publish_to_obs(final)
+    assert out == str(dst) and dst.read_bytes() != SENTINEL
+
+
+def test_a_non_sharing_replace_error_is_not_retried(media, obs, monkeypatch):
+    final = str(media["av"])
+    _seed(obs / MUX._obs_basename(final))
+    monkeypatch.setattr(MUX, "_run", _writes(media["av"]))
+    tries = []
+
+    def gone(src, target):
+        tries.append(1)
+        raise FileNotFoundError(2, "the volume went away")
+    monkeypatch.setattr(MUX.os, "replace", gone)
+    with pytest.raises(OSError, match="could not replace"):
+        MUX.OTRMasterAudioMux()._publish_to_obs(final)
+    assert len(tries) == 1
+
+
+def test_an_output_that_is_an_input_is_refused_by_name(media, tmp_path):
+    """ffmpeg used to refuse "Output same as Input" itself; a candidate renamed
+    over the destination would now overwrite the input (sonnet QA on 733c2386)."""
+    silent = tmp_path / "silent.mp4"
+    shutil.copyfile(media["silent"], silent)
+    before = silent.read_bytes()
+    with pytest.raises(ValueError, match="silent video input"):
+        MUX.mux_master_audio(str(silent), str(media["master"]), str(silent))
+    assert silent.read_bytes() == before
+
+
+def test_a_published_name_that_is_the_archival_final_is_refused(obs, media, monkeypatch):
+    """An operator output_path that lands the archival final on the exact
+    published name: the AAC copy would replace the PCM final it reads."""
+    final = obs / "ep_final.mp4"
+    shutil.copyfile(media["av"], final)
+    before = final.read_bytes()
+    monkeypatch.setattr(MUX, "_obs_basename", lambda path: os.path.basename(path))
+    with pytest.raises(OSError, match="archival final itself"):
+        MUX.OTRMasterAudioMux()._publish_to_obs(str(final))
+    assert final.read_bytes() == before
 
 
 # --------------------------------------------------------------------------- #
@@ -474,6 +536,7 @@ def test_a_cancel_during_the_obs_encode_keeps_the_old_copy(media, obs, monkeypat
     with pytest.raises(InterruptProcessingException):
         MUX.OTRMasterAudioMux()._publish_to_obs(final)
     assert dst.read_bytes() == SENTINEL, "a cancelled publish replaced the copy"
+    assert _staged(obs) == [], "a cancelled candidate must not be orphaned"
 
 
 def test_a_cancel_after_publication_skips_the_janitor_and_keeps_the_copy(

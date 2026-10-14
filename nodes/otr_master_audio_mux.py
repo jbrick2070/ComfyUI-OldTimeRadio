@@ -35,6 +35,7 @@ import os
 import uuid
 import re
 import shutil
+import time
 from pathlib import Path
 
 import logging
@@ -482,22 +483,63 @@ def _reject_candidate(candidate: str, gate: str, why: str, exc_type=OSError):
         gate, str(why)[:300], candidate if kept else "empty, removed"))
 
 
+#: A file this process just wrote is often held for a moment by an antivirus
+#: scan, the search indexer or a sync client, and a rename then fails with a
+#: sharing violation. A short bounded retry rides that out; a final genuinely
+#: held open (a player) still fails, after about a second (sonnet QA on
+#: 733c2386 -- the old direct write had no such last-step exposure).
+_REPLACE_ATTEMPTS = 6
+_REPLACE_WAIT_S = 0.25
+
+
+def _same_file_path(a, b) -> bool:
+    """Do two path strings name one file? Never raises."""
+    try:
+        return (os.path.normcase(os.path.realpath(str(a)))
+                == os.path.normcase(os.path.realpath(str(b))))
+    except (OSError, ValueError):
+        return False
+
+
 def _accept_candidate(candidate: str, final_path: str, gate: str) -> None:
     """Replace ``final_path`` with the VALIDATED ``candidate`` -- one atomic
     same-filesystem rename, after a last Cancel check.
 
     If the rename fails (on Windows: the final is open in a player), the old
     final is left exactly as it was and the candidate is kept. The old file is
-    NEVER deleted to make room: that would turn a busy file into a lost one."""
-    _poll_interrupt()
-    try:
-        os.replace(long_path(candidate), long_path(str(final_path)))
-    except OSError as exc:
-        log.error("[OTR_MasterAudioMux] %s could not replace %s (%s); the "
-                  "previous file is untouched and the accepted candidate is "
-                  "at %s", gate, final_path, exc, candidate)
-        raise OSError("%s: could not replace %s (%s); accepted candidate kept "
-                      "at %s" % (gate, final_path, exc, candidate)) from exc
+    NEVER deleted to make room: that would turn a busy file into a lost one.
+    A Cancel noticed here leaves the old final untouched and removes this
+    invocation's candidate, which is not failure evidence -- it would only be
+    an orphaned full-size copy (sonnet QA on 733c2386)."""
+    last = None
+    for attempt in range(_REPLACE_ATTEMPTS):
+        try:
+            _poll_interrupt()
+        except BaseException:
+            try:
+                os.remove(long_path(candidate))
+                log.warning("[OTR_MasterAudioMux] %s cancelled before replacing "
+                            "%s; the previous file is untouched and the "
+                            "candidate %s was removed", gate, final_path, candidate)
+            except BaseException:          # noqa: BLE001 -- never mask the cancel
+                pass
+            raise
+        try:
+            os.replace(long_path(candidate), long_path(str(final_path)))
+            return
+        except PermissionError as exc:
+            last = exc
+            if attempt + 1 < _REPLACE_ATTEMPTS:
+                time.sleep(_REPLACE_WAIT_S)
+                continue
+        except OSError as exc:
+            last = exc
+        break
+    log.error("[OTR_MasterAudioMux] %s could not replace %s (%s); the "
+              "previous file is untouched and the accepted candidate is "
+              "at %s", gate, final_path, last, candidate)
+    raise OSError("%s: could not replace %s (%s); accepted candidate kept "
+                  "at %s" % (gate, final_path, last, candidate)) from last
 
 
 #: Slack on the duration gate, in FRAMES. Not a fudge factor -- a quantization
@@ -579,6 +621,16 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
         raise ValueError(f"OTR_MasterAudioMux: silent video missing: {silent_video_path!r}")
     if not os.path.isfile(master_audio_path):
         raise ValueError(f"OTR_MasterAudioMux: master audio missing: {master_audio_path!r}")
+    # AN OUTPUT THAT IS ONE OF ITS INPUTS IS REFUSED BY NAME. ffmpeg used to
+    # refuse it itself ("Output same as Input"); writing a candidate and
+    # renaming it over the destination would now overwrite the input instead
+    # (sonnet QA on 733c2386). Only an operator output_path can alias one.
+    for _label, _src in (("silent video", silent_video_path),
+                         ("master audio", master_audio_path)):
+        if _same_file_path(out_path, _src):
+            raise ValueError(
+                f"OTR_MasterAudioMux: the output path is the {_label} input "
+                f"({out_path!r}); refusing to overwrite an input")
 
     # Duration gate: the silent composite covers drama beats only; the master
     # audio also includes opening/closing themes (typically 10s + 8s).  It is
@@ -1843,6 +1895,11 @@ class OTRMasterAudioMux:
         # The candidate lives in a SUBFOLDER of obs (same filesystem, so the
         # acceptance is one rename; not in the top-level listing he watches)
         # and carries no `_final` marker, so nothing reads it as published.
+        if _same_file_path(dst, final):
+            # An operator output_path that IS the published name: the AAC copy
+            # would replace the archival PCM final it is made from.
+            raise OSError("obs publish: the published name is the archival "
+                          "final itself (%s); refusing to replace it" % dst)
         staging = os.path.join(obs_dir, OBS_STAGING_DIRNAME)
         candidate = _reserve_candidate(dst, staging)
         gate = "obs publish"
