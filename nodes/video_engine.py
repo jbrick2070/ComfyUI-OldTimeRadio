@@ -1553,14 +1553,23 @@ def _treatment_ledger(led):
     character's, so the treatment read e.g. "char 13 / announcer 0" for an
     episode whose announcer spoke 7 words (sonnet QA, 2026-10-14). Only the
     three counts are overlaid; nothing else in the treatment changes source.
+
+    The singleton outlives an episode, so the counts are taken only once it is
+    proven to be THIS episode -- the same freeze-receipt identity proof the
+    post-audio join uses (``_same_frozen_episode``). An unproven singleton
+    leaves the wire counts standing (codex QA, 2026-10-14).
     """
     try:
         try:
             from .production_ledger import peek_ledger as _peek
+            from .otr_shot_lock import _same_frozen_episode as _same
         except ImportError:  # pragma: no cover -- flat test imports
             from production_ledger import peek_ledger as _peek  # type: ignore
-        durable = _peek()
-        dmeta = (getattr(durable, "data", None) or {}).get("meta") or {}
+            from otr_shot_lock import _same_frozen_episode as _same  # type: ignore
+        durable = getattr(_peek(), "data", None) or {}
+        if not _same(led, durable)[0]:
+            return led
+        dmeta = durable.get("meta") or {}
         counts = {k: dmeta[k] for k in _TREATMENT_COUNT_KEYS if k in dmeta}
         if not counts:
             return led

@@ -250,15 +250,37 @@ def test_the_treatment_takes_its_word_counts_from_the_durable_ledger(fresh_singl
 
     fresh_singleton.data["meta"] = {"total_word_count": 13,
                                     "character_word_count": 6,
-                                    "announcer_word_count": 7}
+                                    "announcer_word_count": 7,
+                                    "freeze_timestamp": "freeze-1"}
     wire = {"meta": {"total_word_count": 13, "character_word_count": 13,
-                     "announcer_word_count": 0, "episode_title": "T"},
+                     "announcer_word_count": 0, "episode_title": "T",
+                     "freeze_timestamp": "freeze-1"},
             "lines": [], "cast": []}
     out = _treatment_ledger(wire)
     assert out["meta"]["character_word_count"] == 6
     assert out["meta"]["announcer_word_count"] == 7
     assert out["meta"]["episode_title"] == "T", "only the counts are overlaid"
     assert wire["meta"]["character_word_count"] == 13, "the wire ledger is not mutated"
+
+
+@pytest.mark.parametrize("wire_meta, why", [
+    ({"freeze_timestamp": "freeze-A"}, "another episode's receipt"),
+    ({}, "the wire carries no receipt while the singleton does"),
+])
+def test_a_singleton_from_another_episode_never_donates_its_counts(
+        fresh_singleton, wire_meta, why):
+    """The singleton outlives an episode (codex QA, 2026-10-14): a stale one
+    must not print its counts into this episode's treatment."""
+    from nodes.video_engine import _treatment_ledger
+
+    fresh_singleton.data["meta"] = {"total_word_count": 999,
+                                    "character_word_count": 900,
+                                    "announcer_word_count": 99,
+                                    "freeze_timestamp": "freeze-B"}
+    wire = {"meta": {"total_word_count": 3, "character_word_count": 3,
+                     "announcer_word_count": 0, **wire_meta},
+            "lines": [], "cast": []}
+    assert _treatment_ledger(wire) is wire, why
 
 
 def test_without_durable_counts_the_treatment_keeps_the_wire_ledger():
