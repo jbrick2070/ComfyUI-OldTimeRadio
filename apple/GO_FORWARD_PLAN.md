@@ -327,6 +327,41 @@ The B7 sweep gate (`tests/test_b7_forbidden_sweep.py`) diffs against tag
 `s29-clean-slate-gate`, which exists only on the 5080's clone; run it there
 once after the merge.
 
+### 0q. Dead code: what the reachability pass left for a ruling (2026-10-14)
+
+Five commits landed (`4d92cfaf` `0d461867` `e6daae04` `f74316a5` `22231ffa`; about
+2,600 lines, three finished one-shot scripts among them). A symbol is dead when
+nothing reachable from the pack's real roots (the node table in `__init__.py`,
+`scripts/`, `tools/`) reads it. Tests are neither roots nor evidence: a test that is
+a symbol's only reader is read for what it asserts, then deleted with a subject
+that was only itself, retargeted onto the live path when it pinned live behaviour
+through the dead helper, or kept when it is an oracle, a drift guard or an inverted
+tripwire. The 123 symbols the pass still lists are overwhelmingly that last kind.
+Each of these survived on purpose and needs a ruling, not a deletion:
+
+- **Role-query aliases.** `engines_for_role` / `default_engine_for_role` on the audio,
+  image, video and upscale registries, the two `EngineRegistry` base methods and the
+  upscale `is_registered`: no production caller, kept as the "1:1 registry surface"
+  and as the query API the capability-matrix tests read. All or none: delete the
+  family and let the matrices read `descriptor_for_engine`, or declare it public.
+- **`retry_taxonomy`'s retry policy** (`classify`, `block_class_of`, `_POLICY`,
+  `RetryDecision`, `BlockClass`): only `FailureKind` is read. Thirty test functions
+  pin it and `test_video_survival_guide_vectors.py` is a Bible-pinned exit gate, so
+  removing it is a cross-repo call.
+- **`OTR_VIDEO_MUTE`** (`cloud_media_backend`): an inert knob for an operator
+  amendment (2026-07-02) that nothing enforces. Enforce it or retire it.
+- **Closed vocabulary.** The still-plan cardinalities `per_recurring_subject` and
+  `per_bookend_role` and the aspect `portrait` have no declarer left; `Quality` and
+  `Policy` on `VideoRequest` have no reader or writer. Removing one narrows what the
+  schema accepts, so it is a schema ruling.
+- **Parked D2c few-shot** (`render_prompt`, `render_few_shot_block`, `PeriodExemplar`):
+  pinned unwired on purpose by a test.
+- **`profile_max_render_frames`** and `_active_profile`: the KNOWN OPEN cap-authority
+  row in the standing rulings.
+- **Scripts.** `otr_build_obs_listen_page.py` has no reader and may be a daily tool;
+  `otr_gemma4_doctor.py` is a support diagnostic; `otr_tail_logs.py` is named in row 0c.
+  Kept until the operator says otherwise.
+
 ### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
 
 `nodes/_otr_voice_route.py` and everything that only compiled because of it
