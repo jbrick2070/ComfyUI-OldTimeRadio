@@ -63,8 +63,9 @@ BLOCKED on its own is not a verdict on the run. For most banks a withheld
 copy is still a finished run. A **My Story** episode -- whether you picked
 the bank or the roll landed on it -- has to be published, and fails the run
 right after the copy is withheld (`DeliveryContractError`), with the archival
-final kept. A run that stops AFTER the copy landed -- that same delivery
-check, or a Cancel pressed in the last seconds -- never prints the end-of-run
+final kept. A run that stops AFTER the copy landed -- the same My Story
+delivery gate finding that the episode's record does not name the published
+file, or a Cancel pressed in the last seconds -- never prints the end-of-run
 summary: the file in `otr/obs/` is complete, and the `LOUD publish` line is
 the record of it. No publish line of either kind means the run stopped
 before publishing, however green the console looked.
@@ -200,8 +201,8 @@ wheel supplies only one of them.
 
 **Captions are blank boxes on Linux.** Install a monospace TTF.
 
-**It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line
-first -- see [Find it](#find-it). `BLOCKED` withheld only the published copy and
+**It finished but nothing is in `otr/obs/`.** Find the publish lines first
+(`LOUD publish`, then the `obs_publish` summary) -- see [Find it](#find-it). `BLOCKED` withheld only the published copy and
 kept the archival final in `otr/episodes/<episode>/`; whether the run itself
 succeeded is the run's own final status (a My Story episode fails there). No
 publish line of either kind is a real failure: read the console from the end

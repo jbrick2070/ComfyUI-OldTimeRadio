@@ -13,11 +13,14 @@ So **the error message is the install instruction.** Read it literally: it names
 ## Where assets go
 
 ```
-OTR_COMFYUI_MODELS_ROOT   models root: ComfyUI's own models folder when
-                          running inside ComfyUI, else a sibling models/
-                          folder if there is one; C:\ComfyUI-Models is the
-                          last Windows default; off Windows with neither,
-                          set it -- the pack refuses rather than guess
+OTR_COMFYUI_MODELS_ROOT   models root (or COMFYUI_MODELS_ROOT); unset, the
+                          first match wins: inside ComfyUI, the folder that
+                          holds its first configured checkpoints/ path;
+                          C:\ComfyUI-Models if it exists and is not empty;
+                          ComfyUI's models_dir; a models/ folder beside
+                          custom_nodes/; then C:\ComfyUI-Models on Windows.
+                          Off Windows with none of these, set it -- the
+                          pack refuses rather than guess
 text_encoders/, checkpoints/   ComfyUI-native weights (the native Gemma
                           writer; Stable Audio 3 and its text encoder)
 LLM/<org>--<name>/        other (transformers) writers, as plain files

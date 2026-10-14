@@ -215,7 +215,8 @@ Each of these cost a real session before it was written down.
 * **Do not assume the output folder from the launch flags.** The pack honours
   `OTR_OUTPUT_DIR`, so a machine can publish somewhere other than ComfyUI's
   `--output-directory`. Take the truth from the server log's pinned line or from
-  `obs_publish OK ->`.
+  `LOUD publish: final episode -> <path>` (the end-of-run `obs_publish OK ->`
+  summary repeats it, but a run stopped after the copy never prints that).
 * **Do not pick a per-machine graph for the user.** The `otr_<machine>_<kind>`
   entries beside the canonical in Browse Templates are presets, and
   `otr_canonical` is the intended first run. Shipping rows have a published episode behind them.
