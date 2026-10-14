@@ -1311,13 +1311,18 @@ class CastLock:
                 continue
             cid = str(ln.get("char_id") or "")
             row = rows_by_id.get(cid)
-            if _row_has_resolvable_voice(row):
-                continue  # resolves fine
             lid = ln.get("line_id")
+            # Announcer identity is checked BEFORE the voiced-row shortcut: the
+            # announcer row is normally VOICED, and testing the voice first let
+            # a character-stamped announcer line skip this repair and reach the
+            # character node with the announcer's reference (voice review V1,
+            # 2026-10-14). The reroute is persisted by the caller (V3).
             is_ann = cid in announcer_ids or (
                 row is not None
                 and str(row.get("name") or "").strip().upper() == "ANNOUNCER"
             )
+            if not is_ann and _row_has_resolvable_voice(row):
+                continue  # an ordinary voiced character line: resolves fine
             if is_ann:
                 ln["speaker_role"] = "announcer"
                 if repaired is not None and str(lid or "").strip():

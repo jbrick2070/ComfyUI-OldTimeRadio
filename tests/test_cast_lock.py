@@ -243,6 +243,43 @@ def test_misstamped_announcer_line_reroutes_to_announcer():
     assert b018["speaker_role"] == "announcer"   # re-routed
 
 
+def test_misstamped_line_of_a_VOICED_announcer_row_also_reroutes():
+    """Voice review V1 (2026-10-14). The announcer cast row is normally VOICED
+    (here a1 carries a preset), and the voiced-row shortcut used to run first,
+    so its character-stamped line skipped the repair and went to the character
+    node. Announcer identity is now checked first; the reroute is reported for
+    persistence."""
+    from nodes.cast_lock import CastLock
+
+    lines = [
+        {"line_id": "b019", "speaker_role": "character", "char_id": "a1",
+         "text": "And now, the conclusion."},
+        {"line_id": "b020", "speaker_role": "character", "char_id": "c1",
+         "text": "We move at dawn."},
+    ]
+    out = CastLock().lock(script_json=_ledger_with_lines(_CHAR_CAST, lines),
+                          cast_voice_policy="preserve_ledger")
+    roles = {ln["line_id"]: ln["speaker_role"] for ln in _last_ledger(out)["lines"]}
+    assert roles == {"b019": "announcer", "b020": "character"}, (
+        "the announcer's line reroutes; an ordinary voiced character's does not")
+    assert "b019" in out[2] and "b020" not in out[2]
+
+
+def test_the_reroute_is_reported_for_persistence():
+    from nodes.cast_lock import CastLock
+
+    repaired = []
+    cast = [dict(r) for r in _CHAR_CAST]
+    lines = [{"line_id": "b019", "speaker_role": "character", "char_id": "a1",
+              "text": "x"},
+             {"line_id": "", "speaker_role": "character", "char_id": "a1",
+              "text": "no id"}]
+    CastLock._resolve_character_voices_fail_soft(cast, lines, repaired=repaired)
+    assert repaired == [{"line_id": "b019", "char_id": "a1"}], (
+        "only lines with an id can be persisted; both are rerouted on the wire")
+    assert [ln["speaker_role"] for ln in lines] == ["announcer", "announcer"]
+
+
 def test_orphan_character_line_fails_loud():
     """NO-FALLBACK (2026-07-03): a character line whose char_id matches no voiced
     cast row is a true orphan -- CastLock RAISES VoiceCastingError instead of
