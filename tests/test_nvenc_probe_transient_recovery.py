@@ -153,7 +153,11 @@ def test_a_refusal_that_waiting_cannot_change_is_probed_once(monkeypatch, clock,
     PermissionError(13, "Access is denied"),
     NotADirectoryError(20, "Not a directory"),
     es.otr_proc.ExecutableNotAllowed("not an allowed executable"),
-], ids=["missing", "denied", "not_a_dir", "not_allowed"])
+    OSError(es.errno.ENOEXEC, "Exec format error"),
+    OSError(22, "is not a valid Win32 application", None, 193),
+    OSError(22, "requires elevation", None, 740),
+], ids=["missing", "denied", "not_a_dir", "not_allowed", "enoexec",
+        "winerror_193", "winerror_740"])
 def test_a_binary_that_cannot_run_is_final(monkeypatch, clock, exc):
     calls = _script(monkeypatch, [exc, 0])
     assert es.has_nvenc(BIN) is False
@@ -326,8 +330,16 @@ def test_a_caller_arriving_during_a_reprobe_gets_cpu_at_once(monkeypatch, clock)
 @pytest.mark.parametrize("result", [None, SimpleNamespace(stderr="")],
                          ids=["none", "no_returncode"])
 def test_a_malformed_probe_result_is_a_final_no(monkeypatch, clock, result):
-    monkeypatch.setattr(es.otr_proc, "run", lambda cmd, **_kw: result)
+    """Final, not merely False: cached after ONE spawn, even past a cooldown
+    (so the outer guard is not what is answering)."""
+    calls = []
+    monkeypatch.setattr(es.otr_proc, "run",
+                        lambda cmd, **_kw: calls.append(cmd[0]) or result)
     assert es.has_nvenc(BIN) is False
+    clock.t += 10 * es._NVENC_RETRY_MAX_S
+    assert es.has_nvenc(BIN) is False
+    assert len(calls) == 1
+    assert es._NVENC_PROBE[es.os.path.normcase(es.os.path.abspath(BIN))] is False
 
 
 def test_has_nvenc_never_raises_whatever_breaks_inside(monkeypatch, clock):
@@ -336,6 +348,41 @@ def test_has_nvenc_never_raises_whatever_breaks_inside(monkeypatch, clock):
 
     monkeypatch.setattr(es, "_decide", broken)
     assert es.has_nvenc(BIN) is False
+
+
+def test_a_probe_that_raises_releases_the_binary_lock(monkeypatch, clock):
+    """An exception inside the locked section must not strand the per-binary
+    lock, or every later call for that ffmpeg would hang."""
+    def boom(_ffmpeg):
+        raise RuntimeError("probe blew up")
+
+    monkeypatch.setattr(es, "_probe", boom)
+    assert es.has_nvenc(BIN) is False
+    assert not es._NVENC_KEY_LOCKS[es.os.path.normcase(es.os.path.abspath(BIN))].locked()
+    monkeypatch.undo()
+    monkeypatch.setattr(es, "_NVENC_PROBE", {})
+    monkeypatch.setattr(es, "_now", clock)
+    _script(monkeypatch, [0])
+    assert es.has_nvenc(BIN) is True
+
+
+def test_losing_the_reprobe_race_takes_the_winners_final_answer(monkeypatch, clock):
+    """The re-probe winner can record True between the loser's read and its
+    failed acquire; the loser must return that, not a stale "CPU"."""
+    key = es.os.path.normcase(es.os.path.abspath(BIN))
+    es._NVENC_PROBE[key] = es._Pending(1, 0, clock.t)      # cooldown just ended
+
+    class WinnerFinishesNow:
+        def acquire(self, blocking=True, timeout=-1):
+            es._NVENC_PROBE[key] = True                    # the winner records
+            return False
+
+        def release(self):
+            raise AssertionError("released a lock it never acquired")
+
+    es._NVENC_KEY_LOCKS[key] = WinnerFinishesNow()
+    monkeypatch.setattr(es.otr_proc, "run", lambda *a, **k: pytest.fail("spawned"))
+    assert es.has_nvenc(BIN) is True
 
 
 def test_a_broken_log_handler_cannot_change_the_answer(monkeypatch, clock):
@@ -347,7 +394,9 @@ def test_a_broken_log_handler_cannot_change_the_answer(monkeypatch, clock):
             raise OSError("log sink failed")
 
     handler = Exploding()
+    previous = es.log.level
     es.log.addHandler(handler)
+    es.log.setLevel(logging.INFO)               # so the recovery INFO line runs
     try:
         _script(monkeypatch, [_timeout(), 0])
         assert es.has_nvenc(BIN) is False       # logs a warning: must not raise
@@ -355,6 +404,7 @@ def test_a_broken_log_handler_cannot_change_the_answer(monkeypatch, clock):
         assert es.has_nvenc(BIN) is True        # logs a recovery: must not raise
     finally:
         es.log.removeHandler(handler)
+        es.log.setLevel(previous)
 
 
 # --------------------------------------------------------------------------- #
@@ -400,3 +450,14 @@ def test_video_engine_keeps_its_answer_when_logging_breaks(monkeypatch):
     monkeypatch.setattr(ve, "log", Broken())
     assert ve._check_nvenc(BIN) is True
     assert ve._check_nvenc(None) is False
+
+
+def test_video_engine_survives_a_path_whose_truth_test_raises(monkeypatch):
+    from nodes import video_engine as ve
+    monkeypatch.setattr(ve, "_NVENC_ANNOUNCED", set())
+
+    class Ambiguous:
+        def __bool__(self):
+            raise ValueError("truth value is ambiguous")
+
+    assert ve._check_nvenc(Ambiguous()) is False

@@ -1435,7 +1435,11 @@ def _check_nvenc(ffmpeg_path):
     later, and that switch must be announced. NEVER RAISES -- a probe never
     fails a render; anything unexpected is CPU (operator rule, 2026-10-14).
     """
-    if not ffmpeg_path:
+    try:
+        has_path = bool(ffmpeg_path)
+    except Exception:  # noqa: BLE001 -- even a truth test may not fail a render
+        has_path = False
+    if not has_path:
         _announce_encoder("", "[Video] Encoder: CPU libx264 (ffmpeg path unknown)")
         return False
     verdict = False

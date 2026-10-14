@@ -6,6 +6,7 @@ actually encode.
 """
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import re
@@ -69,12 +70,23 @@ _TRANSIENT_REFUSAL = re.compile(
     r"|out of memory|cannot allocate memory|CUDA_ERROR_OUT_OF_MEMORY",
     re.IGNORECASE)
 
-#: A spawn that fails because the binary is not there, not runnable, or not a
-#: file will fail the same way forever. Any other OSError at spawn -- no memory,
-#: too many open files, WinError 1455 (paging file too small) on an 8 GB
-#: laptop -- is the moment, and is re-probed like a refusal (sonnet QA r2).
+#: A spawn that fails because the binary is not there, not runnable, not a
+#: valid executable, or not a file will fail the same way forever. Any other
+#: OSError at spawn -- no memory, too many open files, WinError 1455 (paging
+#: file too small) on an 8 GB laptop -- is the moment, and is re-probed like a
+#: refusal (sonnet QA r2). Exec-format failures are final too (codex r3):
+#: ENOEXEC, and on Windows 193 (not a valid Win32 application), 216 (wrong
+#: architecture) and 740 (needs elevation).
 _SPAWN_FINAL = (FileNotFoundError, NotADirectoryError, IsADirectoryError,
                 PermissionError)
+_SPAWN_FINAL_ERRNO = frozenset({errno.ENOEXEC})
+_SPAWN_FINAL_WINERROR = frozenset({193, 216, 740})
+
+
+def _spawn_is_final(exc: OSError) -> bool:
+    return (isinstance(exc, _SPAWN_FINAL)
+            or getattr(exc, "errno", None) in _SPAWN_FINAL_ERRNO
+            or getattr(exc, "winerror", None) in _SPAWN_FINAL_WINERROR)
 
 _TIMEOUT = "timeout"
 _REFUSED = "refused"
@@ -179,7 +191,11 @@ def _decide(ffmpeg) -> bool:
     # finds one running encodes on libx264 at once instead of stalling up to
     # twenty seconds behind it (sonnet QA r2).
     if not key_lock.acquire(blocking=not reprobe):
-        return False
+        # The probe holding it may have finished between our read and this
+        # attempt; take its answer if so rather than a stale "CPU" (sonnet r3).
+        with _NVENC_PROBE_LOCK:
+            settled = _settled(key)
+        return settled if settled is not None else False
     try:
         # A racing caller may have probed while this one waited for the lock.
         with _NVENC_PROBE_LOCK:
@@ -189,7 +205,12 @@ def _decide(ffmpeg) -> bool:
             pending = _NVENC_PROBE.get(key)
         outcome = _probe(ffmpeg)
         with _NVENC_PROBE_LOCK:
-            return _record(key, ffmpeg, pending, outcome)
+            answer, note = _record(key, ffmpeg, pending, outcome)
+        # Logged after the shared lock is released: a slow handler must not
+        # hold up a cached answer for another binary (codex r3).
+        if note:
+            _log(*note)
+        return answer
     finally:
         key_lock.release()
 
@@ -231,10 +252,8 @@ def _probe(ffmpeg: str):
         )
     except otr_proc.TimeoutExpired:
         return _TIMEOUT
-    except _SPAWN_FINAL:
-        return False
-    except OSError:
-        return _REFUSED
+    except OSError as exc:
+        return False if _spawn_is_final(exc) else _REFUSED
     except Exception:  # noqa: BLE001 -- a probe must never be fatal.
         return False
     try:
@@ -251,17 +270,18 @@ def _classify(stderr: str):
     return _REFUSED if _TRANSIENT_REFUSAL.search(stderr) else False
 
 
-def _record(key: str, ffmpeg: str, pending, outcome) -> bool:
-    """Store a probe's outcome; return this call's answer. Caller holds
-    ``_NVENC_PROBE_LOCK``."""
+def _record(key: str, ffmpeg: str, pending, outcome):
+    """Store a probe's outcome. Returns (this call's answer, log note or
+    None); the caller holds ``_NVENC_PROBE_LOCK`` and logs the note after
+    releasing it."""
     if isinstance(outcome, bool):
         _NVENC_PROBE[key] = outcome
         if isinstance(pending, _Pending):
-            _log(logging.INFO, "[OTR nvenc] %s: h264_nvenc %s after %d "
-                 "inconclusive probe(s)", ffmpeg,
-                 "available" if outcome else "refused for good",
-                 pending.attempts)
-        return outcome
+            return outcome, (logging.INFO, "[OTR nvenc] %s: h264_nvenc %s after "
+                             "%d inconclusive probe(s)", ffmpeg,
+                             "available" if outcome else "refused for good",
+                             pending.attempts)
+        return outcome, None
     attempts = (pending.attempts if isinstance(pending, _Pending) else 0) + 1
     timeouts = (pending.timeouts if isinstance(pending, _Pending) else 0)
     timeouts += 1 if outcome == _TIMEOUT else 0
@@ -269,15 +289,14 @@ def _record(key: str, ffmpeg: str, pending, outcome) -> bool:
               else "refused for now (session cap, busy or memory)")
     if timeouts >= _NVENC_MAX_TIMEOUTS:
         _NVENC_PROBE[key] = False
-        _log(logging.WARNING, "[OTR nvenc] %s: probe %s; %d timeouts, so CPU "
-             "libx264 for the rest of this process", ffmpeg, reason, timeouts)
-        return False
+        return False, (logging.WARNING, "[OTR nvenc] %s: probe %s; %d timeouts, "
+                       "so CPU libx264 for the rest of this process", ffmpeg,
+                       reason, timeouts)
     # The exponent is capped: refusals are uncapped, and 2 ** 1024 overflows a
     # float -- a probe must never be the thing that fails a workflow.
     wait = min(_NVENC_RETRY_MAX_S,
                _NVENC_RETRY_FIRST_S * 2 ** min(attempts - 1, 16))
     _NVENC_PROBE[key] = _Pending(attempts, timeouts, _now() + wait)
-    _log(logging.WARNING, "[OTR nvenc] %s: probe %s; CPU libx264 for now, "
-         "re-probing in %d s (inconclusive probe %d)", ffmpeg, reason,
-         int(wait), attempts)
-    return False
+    return False, (logging.WARNING, "[OTR nvenc] %s: probe %s; CPU libx264 for "
+                   "now, re-probing in %d s (inconclusive probe %d)", ffmpeg,
+                   reason, int(wait), attempts)
