@@ -76,15 +76,6 @@ class LoaderBackend(Protocol):
         ...
 
 
-def check_context_window(row: Any) -> None:
-    """Compatibility hook: a smaller native window is not a load failure.
-
-    The generation owner measures each prompt against actual loaded capacity.
-    Catalog working-window estimates cannot reject an otherwise usable model.
-    """
-    return None
-
-
 #: Qwen rows whose chat template opens a think block unless told not to.
 #: EXACT Hugging Face ids, never a prefix: a startswith("Qwen") test would
 #: sweep up any future Qwen row whose template does not take the argument,
@@ -108,59 +99,6 @@ def chat_template_kwargs(model_id: str) -> dict:
     if _otr_model_catalog.hf_weights_id(stripped) in THINKING_SUPPRESSED_IDS:
         return {"enable_thinking": False}
     return {}
-
-
-def encode_messages_for_row(tokenizer, messages: list[dict], row: Any):
-    """Sprint D D2c -- per-backend message encoding dispatch.
-
-    Dispatches on the catalog row's `chat_template_kind` Literal:
-
-      "transformers_default"  -> tokenizer.apply_chat_template(
-                                     messages, return_tensors="pt",
-                                     add_generation_prompt=True,
-                                 )
-      "raw_completion"        -> tokenizer(
-                                     "\\n".join(m["content"] for m in messages),
-                                     return_tensors="pt",
-                                 )
-      "manual"                -> NotImplementedError. The row-level
-                                 manual template field is not in
-                                 the v1 schema; deferred to D-future.
-
-    Returns the encoded inputs ready to pass into model.generate().
-    Raises ValueError on an unknown chat_template_kind.
-
-    Backend dispatch is metadata-driven. Shared exact-model template options
-    keep this compatibility surface aligned with the live writer factories.
-    """
-    kind = row.chat_template_kind
-    if kind == "transformers_default":
-        # Fold system messages into the first user turn for tokenizers
-        # whose chat template rejects the system role (BUG-LOCAL-262)
-        # so the dispatch path and the live writer path agree.
-        normalized = normalize_messages_for_tokenizer(tokenizer, messages)
-        return tokenizer.apply_chat_template(
-            normalized,
-            return_tensors="pt",
-            add_generation_prompt=True,
-            **chat_template_kwargs(getattr(row, "repo_id", "")),
-        )
-    if kind == "raw_completion":
-        joined = "\n".join(m.get("content", "") for m in messages)
-        return tokenizer(joined, return_tensors="pt")
-    if kind == "manual":
-        raise NotImplementedError(
-            f"chat_template_kind='manual' requires a row-level "
-            f"manual_chat_template field not present in the v1 "
-            f"CuratedModel schema (D1a). Deferred to D-future for "
-            f"tokenizers that ship without chat_template AND need "
-            f"a non-raw template. Affected row: "
-            f"repo_id={getattr(row, 'repo_id', '?')!r}"
-        )
-    raise ValueError(
-        f"unknown chat_template_kind {kind!r}; expected one of "
-        f"('transformers_default', 'raw_completion', 'manual')"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -277,39 +215,8 @@ def normalize_messages_for_tokenizer(
     return out
 
 
-def stop_strings_for_row(row: Any) -> list[str]:
-    """Return the row's stop_tokens as a list (the shape generate()
-    expects via stop_strings= kwarg). Empty tuple -> empty list,
-    meaning "use the tokenizer's default EOS handling".
-    """
-    return list(getattr(row, "stop_tokens", ()) or ())
-
-
-def generate_kwargs_for_row(row: Any) -> dict[str, Any]:
-    """Return per-row kwargs to thread into the model.generate()
-    call. At D2c this is just:
-
-        {
-            "max_new_tokens": <caller-controlled, NOT set here>,
-            "stop_strings": list(row.stop_tokens),
-        }
-
-    The effective context limit (D1b helper) caps the PROMPT side
-    of the budget. The caller decides max_new_tokens for the
-    OUTPUT side. This helper assembles the stop_strings half so
-    every adapter dispatches stop tokens identically.
-    """
-    return {
-        "stop_strings": stop_strings_for_row(row),
-    }
-
-
 __all__ = [
     "LoaderBackend",
-    "check_context_window",
-    "encode_messages_for_row",
     "normalize_messages_for_tokenizer",
-    "stop_strings_for_row",
     "tokenizer_supports_system_role",
-    "generate_kwargs_for_row",
 ]

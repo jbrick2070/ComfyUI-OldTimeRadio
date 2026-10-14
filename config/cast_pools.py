@@ -436,48 +436,6 @@ def recurring_character_voice(character_key, engine, registry=None) -> str:
     return str(mapping.get(str(engine or "").strip()) or "").strip()
 
 
-# -----------------------------------------------------------------------------
-# VOICE_REGISTRY -- unified per-model voice catalog
-# -----------------------------------------------------------------------------
-#
-# Single dict that exposes each TTS family's voices + allowed parameter spec
-# in one place. Today the registry has two entries (bark, kokoro); when a new
-# TTS model lands (Fish Speech, CosyVoice, the future period model) add an
-# entry here.
-#
-# Schema per entry:
-#   "presets":     list of (preset_id, short_description) tuples
-#   "params_spec": dict mapping param-name -> (min, max, default) tuple
-#                  for any model-tunable knob the LLM should pick per
-#                  character. Empty today on both Bark and Kokoro --
-#                  we'll fill these in when the casting LLM call is
-#                  wired to ask for params (cast contract Phase 2;
-#                  see project_cast_contract_p2_followups.md).
-#
-# Consumers should read THIS registry, not the standalone constants below,
-# when they need a model-aware view. The standalone constants are kept for
-# back-compat with code that already imports them directly.
-VOICE_REGISTRY: dict[str, dict] = {
-    "bark": {
-        "presets": [
-            # Lifted from VOICE_PROFILES; flattened to (preset, short)
-            # so the registry shape is uniform across models.
-            (p, " ".join(sorted(tags)))
-            for p, _g, _lang, tags in VOICE_PROFILES
-        ],
-        "params_spec": {},  # placeholder -- e.g. "temperature": (0.5, 0.9, 0.7)
-    },
-    "kokoro": {
-        "presets": list(ANNOUNCER_PRESETS),
-        "params_spec": {},  # placeholder -- e.g. "speed": (0.8, 1.2, 1.0)
-    },
-}
-
-# Convenience constant for callers that want to know which TTS models are
-# currently supported by the registry.
-KNOWN_TTS_MODELS: tuple[str, ...] = tuple(VOICE_REGISTRY.keys())
-
-
 # LEMMY 11% cameo rate. Statistically held by tests/lemmy_rng_check.py.
 LEMMY_RATE = 0.11
 

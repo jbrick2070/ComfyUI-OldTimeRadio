@@ -170,7 +170,6 @@ def _engine_id_from_pick(pick) -> str:
 #: slots -- announcer / music / character (character is its own slot; there is
 #: no catch-all slot).
 VIDEO_SLOT_ROLES = _role_slots.VIDEO_SLOT_ROLES
-SEED_MODES = ("request_hash", "fixed")
 
 
 def _video_model_combo() -> list:

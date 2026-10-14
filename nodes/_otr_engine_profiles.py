@@ -164,9 +164,6 @@ class EngineProfileResolver:
                 f"no engine profile '{profile_id}'",
             )
 
-    def for_role(self, role: str) -> List[EngineProfile]:
-        return [p for p in self._by_id.values() if p.role == role]
-
     def profile_for(self, role: str, engine: str) -> Optional[EngineProfile]:
         for p in self._by_id.values():
             if p.role == role and p.engine == engine:

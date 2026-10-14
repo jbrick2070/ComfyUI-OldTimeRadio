@@ -37,7 +37,6 @@ UTF-8, no BOM, ASCII source.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import random
@@ -390,10 +389,6 @@ def _require_ledger_save(led: Any, what: str) -> None:
             "the ledger did not persist after %s -- refusing to continue, "
             "because every downstream node reads it from disk" % what,
         )
-
-
-def _sha256(text: str) -> str:
-    return hashlib.sha256(str(text or "").encode("utf-8")).hexdigest()
 
 
 def _interstitial_count(act_count: int, include_act_breaks: bool) -> int:

@@ -53,10 +53,6 @@ class ValidationResult:
         return [row for row in self.findings if row.severity == SEVERITY_ERROR]
 
     @property
-    def warns(self) -> list[ValidationFinding]:
-        return []
-
-    @property
     def ok(self) -> bool:
         return not self.errors
 

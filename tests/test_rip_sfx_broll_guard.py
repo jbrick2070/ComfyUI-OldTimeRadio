@@ -60,31 +60,6 @@ def test_slot_maps_are_exactly_the_three_roles_and_slots():
 # (c) old sfx ledgers / unknown roles fail LOUD at every converted site
 # ---------------------------------------------------------------------------
 
-def test_resolve_speaker_role_raises_on_sfx_and_unknown():
-    with pytest.raises(ValueError):
-        SR.resolve_speaker_role({"line_id": "l01", "speaker_role": "sfx"})
-    with pytest.raises(ValueError):
-        SR.resolve_speaker_role({"line_id": "l01", "speaker_role": "narrator"})
-    with pytest.raises(ValueError):
-        SR.resolve_speaker_role({"line_id": "l01"})          # missing field
-    with pytest.raises(ValueError):
-        SR.resolve_speaker_role(None)                        # non-mapping
-    # the happy path still normalizes
-    assert SR.resolve_speaker_role(
-        {"speaker_role": " Character "}) == "character"
-
-
-def test_stamp_default_role_raises_instead_of_backfilling():
-    with pytest.raises(ValueError):
-        SR.stamp_default_role({"line_id": "l01"})            # missing
-    with pytest.raises(ValueError):
-        SR.stamp_default_role({"speaker_role": "sfx"})       # dead role
-    with pytest.raises(TypeError):
-        SR.stamp_default_role(["not", "a", "dict"])          # wrong type
-    row = {"speaker_role": "ANNOUNCER"}
-    assert SR.stamp_default_role(row)["speaker_role"] == "announcer"
-
-
 def test_slot_for_role_and_engine_id_raise_on_dead_roles():
     for dead in ("retired_role_a", "retired_role_b", "retired_role_c", "bogus"):
         with pytest.raises(ValueError):

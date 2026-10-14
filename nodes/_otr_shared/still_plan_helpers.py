@@ -1,7 +1,6 @@
 """Per-model STILL-PLAN schema and pure helpers (S1 of the still-plans build).
 
-Sole authority for the closed :class:`StillPlanRow` schema and the ONE pure
-helper every reader must go through, ``resolve_row_aspect``. Also provides
+Sole authority for the closed :class:`StillPlanRow` schema. Also provides
 schema validation utilities the POST-REGISTRATION audit runs against every
 adapter's ``still_plan`` class attribute.
 
@@ -93,8 +92,9 @@ VALID_TARGET_CLASSES = frozenset((
     TARGET_CLASS_MESH,
 ))
 
-#: Aspect on the still. ``inherit_engine`` is NEVER compared directly; every
-#: reader goes through :func:`resolve_row_aspect` (spec section 5).
+#: Aspect on the still. ``inherit_engine`` names the engine's ``render_aspect``,
+#: which is what production sizes every still from, per role
+#: (``OTR_VideoDirector._role_aspects``).
 ASPECT_WIDE = "wide"
 ASPECT_PORTRAIT = "portrait"
 ASPECT_INHERIT_ENGINE = "inherit_engine"
@@ -175,50 +175,6 @@ StillPlanRow = namedtuple(
      "framing_geometry", "style_tail_policy", "identity"),
     defaults=(IDENTITY_PORTRAIT_SEED,),
 )
-
-
-# ---------------------------------------------------------------------------
-# The ONE aspect resolver. Every reader of a plan row that needs a concrete
-# ``wide`` / ``portrait`` answer MUST go through this helper. ``engine_facts``
-# is the ``{"engine_id", "family", "provider_side"}`` descriptor S0b will
-# introduce; only ``family`` and the engine's shipped ``render_aspect`` are
-# read here. Pure over inputs.
-# ---------------------------------------------------------------------------
-def resolve_row_aspect(row, engine_facts):
-    """Return ``"wide"`` or ``"portrait"`` for one plan row, resolving
-    ``aspect="inherit_engine"`` against the engine's shipped ``render_aspect``.
-
-    ``engine_facts`` is a plain dict-or-namedtuple with at least
-    ``engine_render_aspect`` (or the engine's ``render_aspect`` attribute --
-    accepted BOTH ways so an S1 caller building facts by hand doesn't have to
-    guess S0b's key names). Unknown / missing engine aspect resolves to
-    ``portrait`` (the safe legacy look at HEAD -- matches
-    ``OTR_VideoDirector._role_aspects``).
-
-    Direct ``inherit_engine`` comparisons are forbidden per spec section 5:
-    an audit that filters on the string ``"inherit_engine"`` in a consumer
-    is a bug this helper exists to prevent.
-    """
-    aspect = str(getattr(row, "aspect", None) or "")
-    if aspect == ASPECT_WIDE:
-        return ASPECT_WIDE
-    if aspect == ASPECT_PORTRAIT:
-        return ASPECT_PORTRAIT
-    if aspect == ASPECT_INHERIT_ENGINE:
-        engine_aspect = None
-        if isinstance(engine_facts, dict):
-            engine_aspect = (engine_facts.get("engine_render_aspect")
-                             or engine_facts.get("render_aspect"))
-        else:
-            engine_aspect = (getattr(engine_facts, "engine_render_aspect", None)
-                             or getattr(engine_facts, "render_aspect", None))
-        if engine_aspect == ASPECT_WIDE:
-            return ASPECT_WIDE
-        return ASPECT_PORTRAIT
-    # An unknown aspect on a row that reached us here is a defect the audit
-    # should have caught; degrade to the safe legacy look rather than raise
-    # inside a hot render path.
-    return ASPECT_PORTRAIT
 
 
 # ---------------------------------------------------------------------------
@@ -332,7 +288,6 @@ __all__ = [
     "IDENTITY_PORTRAIT_SEED",
     "IDENTITY_NONE",
     "VALID_IDENTITY",
-    "resolve_row_aspect",
     "validate_still_plan_row",
     "validate_still_plan",
     "engine_has_still_plan",

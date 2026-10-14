@@ -43,11 +43,6 @@ US_PUBLICATION_BEFORE = 1931
 #: life+70 (EU, UK, most of Latin America): the translator died before this.
 LIFE_PLUS_70_DEATH_BEFORE = 1956
 
-#: life+50 (China; Japan pre-2018 works). Recorded because the spec records it;
-#: the operator's pick does NOT rely on it -- a row that needs this and fails
-#: the two above is not "publishable anywhere" and is refused.
-LIFE_PLUS_50_DEATH_BEFORE = 1976
-
 
 # `publication_reasons` writes the human sentence into `LeadReport.notes`,
 # which a reader sees and no verdict reads. The difference is the whole point
@@ -713,7 +708,7 @@ def select_scene(rows: Sequence[Mapping], *, iso: str, play: str, scene: str,
 
 
 __all__ = [
-    "BLOCKED", "EMPTY", "LIFE_PLUS_50_DEATH_BEFORE", "LIFE_PLUS_70_DEATH_BEFORE",
+    "BLOCKED", "EMPTY", "LIFE_PLUS_70_DEATH_BEFORE",
     "MANIFEST_NAME", "MIN_DIALOGUE_RATIO", "MIN_SPEAKER_LABELS", "PARTIAL",
     "READY", "REQUIRED_MANIFEST_FIELDS", "SCHEMA_VERSION", "SPEAKER_MAP_FIELD",
     "SPEAKER_LABEL_PATTERNS", "TRANSCRIPTION_PENDING_MARKERS",

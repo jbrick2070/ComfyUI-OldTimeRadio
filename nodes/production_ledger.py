@@ -1370,8 +1370,6 @@ class Ledger:
             # dependent dict (or None) where the casting LLM stores
             # per-character knobs it chose -- Bark might use
             # "temperature", Kokoro might use "speed", etc.
-            # Allowed param shape per model lives in
-            # config.cast_pools.VOICE_REGISTRY[<model>]["params_spec"].
             # Today the LLM does not populate this yet (Phase 2);
             # consumers fall back to their defaults when None.
             #

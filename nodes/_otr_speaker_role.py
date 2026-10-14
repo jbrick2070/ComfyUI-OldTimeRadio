@@ -17,8 +17,8 @@ Every line in ``ledger.lines[]`` carries a ``speaker_role``. Routing:
     music_inter -> same as music_open.
 
 A ledger that carries ``speaker_role: "sfx"`` is an OLD ledger and is
-rejected LOUD by :func:`resolve_speaker_role`, the ledger-freeze per-line
-invariant, and the SceneSequencer dispatch. NO FALLBACKS.
+rejected LOUD by the ledger-freeze per-line invariant and the SceneSequencer
+dispatch. NO FALLBACKS.
 
 **Why the radio is never HuMo's reference:**
 
@@ -34,8 +34,6 @@ import-time cost.
 """
 
 from __future__ import annotations
-
-from typing import Any, Dict, Mapping
 
 
 # Canonical role string constants.  Use these instead of literals
@@ -59,16 +57,6 @@ VALID_SPEAKER_ROLES = (
 )
 
 
-# No role routes to the radio still as a HuMo I2V reference (BUG-LOCAL-129).
-# HuMo's weights only animate faces; passing the radio still produces
-# unconstrained generic-face output. Such roles fall through the portrait
-# chain; if no portrait is found the line gets a deterministic static-radio
-# fill (BUG-129a). The set is deliberately empty as a defense-in-depth signal:
-# if a future commit re-populates it, is_radio_role() flips True and the
-# regression resurfaces visibly.
-_RADIO_ROLES: frozenset[str] = frozenset()
-
-
 # Roles that must NEVER trigger a HuMo render. These get visual
 # coverage from the animated radio console (post-2026-05-01
 # architecture, BUG-LOCAL-134). Aesthetic intent: classic 1940s
@@ -86,77 +74,6 @@ _NEVER_HUMO_ROLES = frozenset({
     SPEAKER_ROLE_MUSIC_CLOSE,
     SPEAKER_ROLE_MUSIC_INTER,
 })
-
-
-# Music-tier roles, in case a downstream consumer wants the music
-# vs. announcer split (e.g. for separate VRAM pipelines or
-# different ref-image families).
-_MUSIC_ROLES = frozenset({
-    SPEAKER_ROLE_MUSIC_OPEN,
-    SPEAKER_ROLE_MUSIC_CLOSE,
-    SPEAKER_ROLE_MUSIC_INTER,
-})
-
-
-def resolve_speaker_role(line: Any) -> str:
-    """Return the canonical ``speaker_role`` for a ledger line, or RAISE.
-
-    NO FALLBACKS (2026-07-01): there is no silent default-to-character path:
-
-      - ``line`` must be a ``Mapping`` carrying a string ``speaker_role``
-        whose normalized value is in :data:`VALID_SPEAKER_ROLES`;
-        the normalized value is returned.
-      - Anything else -- a non-mapping, a missing field, a non-string,
-        or an unknown value (including the retired ``"sfx"``) -- raises
-        ``ValueError``. An old ledger with ``speaker_role: "sfx"``
-        fails LOUD here.
-    """
-    if not isinstance(line, Mapping):
-        raise ValueError(
-            f"resolve_speaker_role: line must be a mapping with a "
-            f"'speaker_role' field, got {type(line).__name__}"
-        )
-    raw = line.get("speaker_role")
-    if not isinstance(raw, str):
-        raise ValueError(
-            f"resolve_speaker_role: line "
-            f"{str(line.get('line_id') or line.get('beat_id') or '?')!r} "
-            f"has missing/non-string speaker_role ({raw!r}); valid roles: "
-            f"{VALID_SPEAKER_ROLES}"
-        )
-    norm = raw.strip().lower()
-    if norm in VALID_SPEAKER_ROLES:
-        return norm
-    raise ValueError(
-        f"resolve_speaker_role: line "
-        f"{str(line.get('line_id') or line.get('beat_id') or '?')!r} "
-        f"carries unknown speaker_role {raw!r} (valid: "
-        f"{VALID_SPEAKER_ROLES}). The 'sfx' role was removed 2026-07-01 "
-        f"(rip-sfx-broll) -- an old sfx ledger must be regenerated."
-    )
-
-
-def is_dialogue_role(role: str) -> bool:
-    """True iff the role drives a character portrait HuMo render.
-
-    Currently only ``character``; future expansion (e.g. multiple
-    dialogue subroles) would extend this set.
-    """
-    return role == SPEAKER_ROLE_CHARACTER
-
-
-def is_radio_role(role: str) -> bool:
-    """Always returns ``False`` (``_RADIO_ROLES`` is empty; BUG-LOCAL-129).
-
-    HuMo's weights only animate faces -- passing the radio still as a
-    non-face reference produces unconstrained generic-face output
-    (BUG-129) -- so no role uses the radio still as HuMo's I2V reference.
-
-    The predicate is preserved as a defense-in-depth flag: any test that
-    asserts ``is_radio_role(r)`` is True will fail loudly if a future commit
-    re-populates :data:`_RADIO_ROLES`.
-    """
-    return role in _RADIO_ROLES
 
 
 def is_never_humo_role(role: str) -> bool:
@@ -181,44 +98,6 @@ def is_never_humo_role(role: str) -> bool:
     return role in _NEVER_HUMO_ROLES
 
 
-def is_music_role(role: str) -> bool:
-    """True iff the role is one of the music tiers (open/close/inter).
-
-    Used by consumers that want music-vs-other-radio behavior splits
-    (e.g. different ledger fields, different render budgets).
-    """
-    return role in _MUSIC_ROLES
-
-
-def stamp_default_role(line: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate ``line``'s ``speaker_role`` in place; RAISE if bad.
-
-    NO FALLBACKS (2026-07-01): no silent backfill (stamping ``character`` over
-    a missing or invalid role, including on lines that have NO speaker_role at
-    all). Every producer stamps a valid role at init; a line that reaches this
-    helper without one is a bug upstream, not a legacy shape to repair.
-
-    Raises ``TypeError`` if ``line`` is not a dict (this helper
-    expects a mutable row) and ``ValueError`` on a missing/invalid
-    ``speaker_role``. Returns the same dict for chaining.
-    """
-    if not isinstance(line, dict):
-        raise TypeError(
-            f"stamp_default_role expects a dict, got {type(line).__name__}"
-        )
-    raw = line.get("speaker_role")
-    if not isinstance(raw, str) or \
-            raw.strip().lower() not in VALID_SPEAKER_ROLES:
-        raise ValueError(
-            f"stamp_default_role: line "
-            f"{str(line.get('line_id') or line.get('beat_id') or '?')!r} "
-            f"has missing/invalid speaker_role ({raw!r}); valid: "
-            f"{VALID_SPEAKER_ROLES}. NO FALLBACKS -- fix the producer."
-        )
-    line["speaker_role"] = raw.strip().lower()
-    return line
-
-
 __all__ = [
     "SPEAKER_ROLE_CHARACTER",
     "SPEAKER_ROLE_ANNOUNCER",
@@ -226,10 +105,5 @@ __all__ = [
     "SPEAKER_ROLE_MUSIC_CLOSE",
     "SPEAKER_ROLE_MUSIC_INTER",
     "VALID_SPEAKER_ROLES",
-    "resolve_speaker_role",
-    "is_dialogue_role",
-    "is_radio_role",
-    "is_music_role",
     "is_never_humo_role",
-    "stamp_default_role",
 ]

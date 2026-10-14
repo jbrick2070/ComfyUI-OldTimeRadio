@@ -50,19 +50,6 @@ from ._vram_log import vram_snapshot, vram_reset_peak
 
 log = logging.getLogger("OTR")
 
-# BaseStreamer for custom heartbeat logic.
-# Graceful stub allows importing this module in test environments without
-# a GPU or transformers installed - ScriptParser and pure-logic tests work fine;
-# actual LLM generation will raise ImportError at call time as expected.
-try:
-    from transformers.generation.streamers import BaseStreamer, TextStreamer
-except ImportError:
-    class BaseStreamer:  # type: ignore[no-redef]
-        """Stub - transformers not installed in this environment."""
-        def put(self, value): pass
-        def end(self): pass
-    class TextStreamer(BaseStreamer):  # type: ignore[no-redef]
-        pass
 
 def _runtime_log(msg):
     """Write a persistent heartbeat to otr_runtime.log for monitoring."""

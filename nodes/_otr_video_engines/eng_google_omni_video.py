@@ -493,11 +493,8 @@ class GoogleOmniVideoEngine:
         return None
 
 
-GoogleOmniVideo = GoogleOmniVideoEngine()
-
 __all__ = [
     "DEFAULT_MODEL",
-    "GoogleOmniVideo",
     "GoogleOmniVideoEngine",
     "OUTPUT_DURATION_RANGE_S",
     "OUTPUT_FPS",

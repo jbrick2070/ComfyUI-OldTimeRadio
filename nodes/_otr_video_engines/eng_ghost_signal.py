@@ -251,24 +251,10 @@ GHOST_SOURCE_FLOOR = 16
 #: different hold.
 GHOST_DEFAULT_HOLD = 2
 
-#: THE MODULE-LEVEL source rate: the DEFAULT lane's rate, and nothing more.
-#: It was the literal 12.5 until 2026-09-03; deriving it from the constants at
-#: least keeps it honest when the default hold moves.
-#:
-#: IT IS NOT THE VALUE A RECEIPT MAY USE, and an earlier version of this comment
-#: wrongly claimed it was ("a derived value cannot drift from the cadence it
-#: describes" -- it can, because this one is frozen at import from the MODULE
-#: constant, not read from the instance). A subclass declaring `hold_factor = 3`
-#: would sample at 8.33 fps and stamp 12 here. `sampler_inputs_for` therefore
-#: computes its receipt value from `self.hold_factor`; see the note there.
-#: Caught in r1 review, after the first fix claimed to have closed it.
 #: The DELIVERED rate, and the only one anything outside this lane sees: the
 #: frame contract declares it, the silent-clip contract validates against it,
-#: and the mux, captions, credits and workflow JSON are all built on it. It is
-#: defined BEFORE the source rate because the source rate is derived from it.
+#: and the mux, captions, credits and workflow JSON are all built on it.
 GHOST_TARGET_FPS = 25
-
-GHOST_SOURCE_FPS = GHOST_TARGET_FPS / GHOST_DEFAULT_HOLD
 
 #: THE EIGHT NODE INSTANCES. Ids are stable strings because the tests, the
 #: executor aliases and the audit records all name them.
@@ -1723,7 +1709,7 @@ __all__ = [
     "GHOST_CONTEXT_LENGTH", "GHOST_CONTEXT_OVERLAP",
     "GHOST_CONTEXT_FUSE_METHOD", "GHOST_CONTEXT_USE_ON_EQUAL_LENGTH",
     "GHOST_CONTEXT_START_PERCENT", "GHOST_CONTEXT_GUARANTEE_STEPS",
-    "GHOST_SOURCE_FLOOR", "GHOST_SOURCE_FPS", "GHOST_TARGET_FPS",
+    "GHOST_SOURCE_FLOOR", "GHOST_TARGET_FPS",
     "GHOST_NODE_CANDIDATES", "GHOST_ADE_OMITTED_SOCKETS",
     "GHOST_CONTEXT_OMITTED_SOCKETS",
     "NODE_CKPT", "NODE_POSITIVE", "NODE_NEGATIVE", "NODE_CONTEXT", "NODE_ADE",

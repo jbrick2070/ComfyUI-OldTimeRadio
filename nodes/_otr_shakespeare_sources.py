@@ -15,7 +15,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
-from xml.etree import ElementTree
 
 from pydantic import BaseModel, Field
 
@@ -100,18 +99,6 @@ class ShakespeareScene:
     @property
     def source_ref(self) -> str:
         return self.scene["source_ref"]
-
-
-@dataclass(frozen=True)
-class FolgerScene:
-    """Small parsed-scene surface for Folger XML/TEI snippets."""
-
-    play_code: str
-    act: int
-    scene: int
-    speakers: tuple[str, ...]
-    stage_directions: tuple[str, ...]
-    text: str
 
 
 def _check_unknown_keys(obj: dict[str, Any], allowed: frozenset[str], origin: str) -> None:
@@ -581,49 +568,6 @@ def fetch_shakespeare_scene(*, bank: Any, source_ref: str = "") -> "_osp.SourceF
     )
 
 
-def parse_folger_scene(xml_text: str, play_code: str, act: int, scene: int) -> FolgerScene:
-    """Parse a small Folger XML/TEI scene snippet into speaker/stage text.
-
-    This helper is intentionally namespace-tolerant and conservative. V1 does
-    not fetch Folger XML; tests use snippets so later import code has a rooted
-    parser instead of ad hoc string splitting.
-    """
-    try:
-        root = ElementTree.fromstring(xml_text)
-    except ElementTree.ParseError as exc:
-        raise ShakespeareManifestError(f"invalid Folger XML: {exc}") from exc
-
-    def _tag(el) -> str:
-        return str(el.tag).rsplit("}", 1)[-1].lower()
-
-    speakers: list[str] = []
-    stage: list[str] = []
-    parts: list[str] = []
-    for el in root.iter():
-        tag = _tag(el)
-        text = _WS_RE.sub(" ", "".join(el.itertext())).strip()
-        if not text:
-            continue
-        if tag in {"speaker", "spkr"}:
-            speaker = text.upper()
-            if speaker not in speakers:
-                speakers.append(speaker)
-            parts.append(f"{speaker}:")
-        elif tag in {"stage", "stagedir"}:
-            stage.append(text)
-            parts.append(f"[{text}]")
-        elif tag in {"l", "p", "ab"}:
-            parts.append(text)
-    return FolgerScene(
-        play_code=str(play_code),
-        act=int(act),
-        scene=int(scene),
-        speakers=tuple(speakers),
-        stage_directions=tuple(stage),
-        text=canonicalize_shakespeare_text(" ".join(parts)),
-    )
-
-
 class ShakespeareBriefs(BaseModel):
     """Briefs contract consumed by the source adapter and writer."""
 
@@ -770,7 +714,6 @@ def build_shakespeare_briefs(
 
 
 __all__ = [
-    "FolgerScene",
     "MANIFEST_SCHEMA_VERSION",
     "PROMPT_VERSION",
     "SCHEMA_VERSION",
@@ -784,7 +727,6 @@ __all__ = [
     "canonicalize_shakespeare_text",
     "fetch_shakespeare_scene",
     "load_shakespeare_manifest",
-    "parse_folger_scene",
     "payload_from_scene",
     "resolve_shakespeare_scene",
     "select_shakespeare_scene_ref",

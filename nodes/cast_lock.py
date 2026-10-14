@@ -99,7 +99,7 @@ _ANNOUNCER_VOICE_ENGINES = (
     "google_tts")
 # google_tts stays last in the COMBO (draft google_* profiles need it) but is
 # never a CastLock default and must not be pinned by any otr_cloud_* profile.
-_VOICE_ENGINE_RESOLVE_EXTRA = frozenset()
+
 # Old graphs/profiles stored ``elevenlabs``; that id was always the Comfy
 # Credits partner adapter, never a local install. Normalize so the dropdown
 # label stays ``cloud_elevenlabs`` without bricking saved widgets.
@@ -707,15 +707,16 @@ class CastLock:
         # in hand first.
         char_bank = self._bank_following_engine(
             "char_voice", char_voice_engine, voice_bank)
-        ann_bank = self._bank_following_engine(
-            "announcer_voice", announcer_voice_engine)
+        # Admission check only: the lookup raises for an announcer engine with
+        # no casting profile or no allowed bank. The bank name is not used.
+        self._bank_following_engine("announcer_voice", announcer_voice_engine)
 
         bank_entries = None
         if cast_voice_policy == "auto_registry":
             from ._otr_voice_bank import load_voice_bank
             bank_entries, _bank_sha = load_voice_bank()
         target_engine, announcer_engine = self._stamp_voice_engine_selection(
-            led, char_bank, ann_bank, char_voice_engine, announcer_voice_engine,
+            led, char_bank, char_voice_engine, announcer_voice_engine,
             bank_entries=bank_entries, voice_device=voice_device)
 
         if cast_voice_policy == "auto_registry":
@@ -727,7 +728,6 @@ class CastLock:
                 bank_entries=bank_entries,
                 target_engine=target_engine,
                 announcer_engine=announcer_engine,
-                ann_bank=ann_bank,
                 language=language_iso)
         else:
             # STEP 5 (plan 5.2): in preserve_ledger ONLY the claimed row changes.
@@ -1338,11 +1338,10 @@ class CastLock:
                        bank_entries=None,
                        target_engine=None,
                        announcer_engine=None,
-                       ann_bank=None,
                        language="en"):
         """Re-cast the registry rows.
 
-        ``bank_entries`` / ``target_engine`` / ``announcer_engine`` /
+        ``bank_entries`` / ``target_engine`` / ``announcer_engine`` are
         optional because this method is also called directly, with five
         positional arguments, and must keep resolving its own inputs when it is.
         """
@@ -1394,11 +1393,10 @@ class CastLock:
         voice_bank = self._bank_following_engine(
             "char_voice", char_voice_engine, voice_bank)
         if announcer_engine is None:
-            if ann_bank is None:
-                ann_bank = self._bank_following_engine(
-                    "announcer_voice", announcer_voice_engine)
+            # Same admission check CastLock.lock makes before calling here.
+            self._bank_following_engine("announcer_voice", announcer_voice_engine)
             target_engine, announcer_engine = self._stamp_voice_engine_selection(
-                led, voice_bank, ann_bank, char_voice_engine, announcer_voice_engine,
+                led, voice_bank, char_voice_engine, announcer_voice_engine,
                 bank_entries=bank_entries, voice_device=voice_device)
         if target_engine is None:
             report.append(
@@ -1940,7 +1938,7 @@ class CastLock:
 
 
     # ------------------------------------------------------------------ #
-    def _stamp_voice_engine_selection(self, led, voice_bank, ann_bank,
+    def _stamp_voice_engine_selection(self, led, voice_bank,
                                       char_voice_engine="auto",
                                       announcer_voice_engine="auto",
                                       bank_entries=None,
@@ -2067,7 +2065,7 @@ class CastLock:
         requested = CastLock._normalize_voice_engine(requested_engine)
         if requested == "auto":
             return _DEFAULT_ANNOUNCER_ENGINE
-        allowed = set(_ANNOUNCER_VOICE_ENGINES) | _VOICE_ENGINE_RESOLVE_EXTRA
+        allowed = set(_ANNOUNCER_VOICE_ENGINES)
         if requested not in allowed:
             from ._otr_voice_bank import VoiceCastingError
             raise VoiceCastingError(
@@ -2089,7 +2087,7 @@ class CastLock:
             engines_with_refs = {e.engine for e in bank_entries}
             requested = CastLock._normalize_voice_engine(requested_engine)
             if requested != "auto":
-                allowed = set(_CHAR_VOICE_ENGINES) | _VOICE_ENGINE_RESOLVE_EXTRA
+                allowed = set(_CHAR_VOICE_ENGINES)
                 if requested not in allowed:
                     raise VoiceCastingError(
                         f"unsupported char_voice_engine {requested!r}; expected "

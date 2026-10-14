@@ -133,12 +133,13 @@ _HUMO_DEFAULT_UNET = "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"
 #: ``tests/test_still_plan_layer2_parity.py`` now enforces it so the sharing
 #: cannot regrow.
 #:
-#: The ``aspect="inherit_engine"`` FIELD is unchanged -- it still drives the
-#: DIMENSIONS through ``resolve_row_aspect``. Only the authored layer-2 TEXT
-#: is pinned per file. S2's HuMo cutover is the FOUR hosts-off bookend
-#: role-cells (portrait humo / humo_1.7B x announcer / music, redirected by
-#: ``_enforce_radio_is_host`` to the WIDE audio-in lane that renders them);
-#: with ``OTR_ENABLE_HUMO_HOSTS=1`` a portrait HuMo keeps its portrait still.
+#: The ``aspect="inherit_engine"`` FIELD is unchanged -- the DIMENSIONS follow
+#: the engine's ``render_aspect`` (``OTR_VideoDirector._role_aspects``). Only
+#: the authored layer-2 TEXT is pinned per file. S2's HuMo cutover is the FOUR
+#: hosts-off bookend role-cells (portrait humo / humo_1.7B x announcer / music,
+#: redirected by ``_enforce_radio_is_host`` to the WIDE audio-in lane that
+#: renders them); with ``OTR_ENABLE_HUMO_HOSTS=1`` a portrait HuMo keeps its
+#: portrait still.
 _HUMO_STILL_PLAN = (
     StillPlanRow(kind="scene_open", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
@@ -1314,10 +1315,10 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
     #: NOT claim an envelope. Both axes /32-legal (26 x 15).
     render_canvas = (832, 480)
     #: S1b per-model still plan (see ``_HUMO_169_STILL_PLAN`` -- the LANDSCAPE
-    #: HuMo plan). ``render_aspect="wide"`` drives ``resolve_row_aspect`` to
-    #: size portraits WIDE, and the plan's portrait row carries the WIDE
-    #: layer-2 geometry to match. This sibling was ALREADY wide before the
-    #: still-plans build; nothing about it flips.
+    #: HuMo plan). ``render_aspect="wide"`` sizes portraits WIDE
+    #: (``OTR_VideoDirector._role_aspects``), and the plan's portrait row
+    #: carries the WIDE layer-2 geometry to match. This sibling was ALREADY
+    #: wide before the still-plans build; nothing about it flips.
     still_plan = _HUMO_169_STILL_PLAN
 
     def _cfg(self):
@@ -1363,8 +1364,9 @@ class HuMo14BLandscapeEngine(HuMoEngine):
     #: out-of-memory is recorded, not pre-empted.
     #: S1b per-model still plan (see ``_HUMO_169_STILL_PLAN`` -- the LANDSCAPE
     #: HuMo plan). ``render_aspect="wide"`` drives portraits WIDE via
-    #: ``resolve_row_aspect``, and the plan's portrait row carries the WIDE
-    #: layer-2 geometry to match. Already wide before this build.
+    #: ``OTR_VideoDirector._role_aspects``, and the plan's portrait row
+    #: carries the WIDE layer-2 geometry to match. Already wide before this
+    #: build.
     still_plan = _HUMO_169_STILL_PLAN
     #: Route-A VRAM frame cap (only this 14B tier; base humo / humo_1.7B* stay
     #: uncapped). render_clip renders at the cap then exact-fits to the audio

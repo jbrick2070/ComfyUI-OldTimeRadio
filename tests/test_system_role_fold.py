@@ -195,34 +195,6 @@ def test_input_list_is_not_mutated() -> None:
 
 
 # ---------------------------------------------------------------------------
-# encode_messages_for_row routes through the normalizer
-# ---------------------------------------------------------------------------
-
-
-def test_encode_messages_for_row_folds_system_for_rejecting_tokenizer() -> None:
-    """The transformers_default dispatch branch must normalize system
-    messages so the dispatch path and the live writer path agree.
-    """
-    from dataclasses import dataclass
-
-    @dataclass
-    class _Row:
-        chat_template_kind: str = "transformers_default"
-        repo_id: str = "google/gemma-2-2b-it"
-
-    tok = _SystemRejectingTokenizer()
-    messages = [
-        {"role": "system", "content": "sys"},
-        {"role": "user", "content": "usr"},
-    ]
-    # Must not raise -- the branch folds the system role before
-    # calling apply_chat_template.
-    backends.encode_messages_for_row(tok, messages, _Row())
-    assert tok.last_messages is not None
-    assert all(m.get("role") != "system" for m in tok.last_messages)
-
-
-# ---------------------------------------------------------------------------
 # Public surface
 # ---------------------------------------------------------------------------
 
@@ -239,8 +211,7 @@ def test_helpers_are_exported() -> None:
 
 def test_gemma_2_2b_it_row_is_a_clean_technical_pick() -> None:
     """BUG-LOCAL-262: google/gemma-2-2b-it must have a catalog row
-    with its transformers_default chat template. A project estimate
-    cannot impose a minimum model window at load time.
+    with its transformers_default chat template.
     """
     from nodes import _otr_model_catalog as catalog
 
@@ -250,8 +221,6 @@ def test_gemma_2_2b_it_row_is_a_clean_technical_pick() -> None:
         "google/gemma-2-2b-it missing from CURATED_LLM_MODELS"
     )
     assert row.chat_template_kind == "transformers_default"
-    # Actual prompt fit is checked by the generation owner.
-    backends.check_context_window(row)
 
 
 if __name__ == "__main__":

@@ -21,7 +21,6 @@ name. That test, not this docstring, is what makes "one owner" true.
 """
 from __future__ import annotations
 
-import logging
 import os
 import shutil
 from typing import Optional
@@ -71,9 +70,6 @@ _MACOS_INSTALL_CANDIDATES = (
     "/usr/local/bin/ffmpeg",      # Homebrew, Intel
     "/opt/local/bin/ffmpeg",      # MacPorts
 )
-
-
-_log = logging.getLogger("OTR")
 
 
 def resolve_ffmpeg(preferred=None) -> Optional[str]:

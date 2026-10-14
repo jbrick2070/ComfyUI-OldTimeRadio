@@ -389,32 +389,6 @@ def test_lemmy_row_carries_tts_model_bark():
     assert lemmy["voice_preset"] == "v2/en_speaker_8"
 
 
-def test_voice_registry_exposes_bark_and_kokoro():
-    """VOICE_REGISTRY is the unified per-model voice catalog."""
-    assert "bark" in _POOLS.VOICE_REGISTRY
-    assert "kokoro" in _POOLS.VOICE_REGISTRY
-    assert _POOLS.KNOWN_TTS_MODELS == ("bark", "kokoro")
-    # Each entry exposes presets + params_spec
-    for model, entry in _POOLS.VOICE_REGISTRY.items():
-        assert "presets" in entry, f"{model}: missing presets"
-        assert "params_spec" in entry, f"{model}: missing params_spec"
-        assert isinstance(entry["presets"], list)
-        assert isinstance(entry["params_spec"], dict)
-        # presets is list of (preset_id, short_desc) tuples
-        for preset_entry in entry["presets"]:
-            assert isinstance(preset_entry, tuple)
-            assert len(preset_entry) == 2
-
-
-def test_voice_registry_bark_presets_match_voice_profiles():
-    """VOICE_REGISTRY['bark']['presets'] is a flat view of VOICE_PROFILES;
-    the preset IDs must match exactly (the descriptions in the registry
-    are flattened from quality tags)."""
-    bark_presets = {p for p, _ in _POOLS.VOICE_REGISTRY["bark"]["presets"]}
-    profile_presets = {p for p, _, _, _ in _POOLS.VOICE_PROFILES}
-    assert bark_presets == profile_presets
-
-
 def test_announcer_row_carries_voice_params_none():
     """voice_params default is None until the casting LLM is wired
     to pick model-specific knobs (Phase 2)."""

@@ -37,7 +37,6 @@ STORY_INPUT_SCHEMA = "my_story_input_v1"
 #: legacy source route, which is every shipped bank today.
 INPUT_MODE_LEGACY = "legacy"
 INPUT_MODE_USER_FIELDS = "user_fields_v1"
-KNOWN_INPUT_MODES = frozenset({INPUT_MODE_LEGACY, INPUT_MODE_USER_FIELDS})
 
 #: The four creative fields, in the order they are shown and projected. The
 #: author is deliberately NOT one of them: naming who a story is by is not an
@@ -283,12 +282,6 @@ def creative_input_present(fields: RawStoryFields) -> bool:
     """
     norm = normalize(fields)
     return any(getattr(norm, name) for name in CREATIVE_FIELDS)
-
-
-def dedicated_fields_present(fields: RawStoryFields) -> bool:
-    """Did the listener fill a field only My Story reads?"""
-    norm = normalize(fields)
-    return any(getattr(norm, name) for name in DEDICATED_FIELDS)
 
 
 def filled_dedicated_fields(fields: RawStoryFields) -> "tuple[str, ...]":
@@ -765,7 +758,6 @@ __all__ = [
     "FIELD_LABELS",
     "INPUT_MODE_LEGACY",
     "INPUT_MODE_USER_FIELDS",
-    "KNOWN_INPUT_MODES",
     "QueuedWriter",
     "RawStoryFields",
     "STORY_INPUT_SCHEMA",
@@ -784,7 +776,6 @@ __all__ = [
     "compute_digest",
     "creative_input_present",
     "credits_source_line",
-    "dedicated_fields_present",
     "filled_dedicated_fields",
     "first_creative_value",
     "is_link",
