@@ -2325,7 +2325,13 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "other, what they are like"
                     ),
                     "tooltip": (
-                        "MY STORY ONLY. Character names and notes, in ordinary "
+                        "MY STORY ONLY -- read when Story bank is my_story, or "
+                        "when its roll lands on My Story. A roll that lands "
+                        "on another bank ignores these boxes; another bank "
+                        "picked BY HAND with text left here stops the run and "
+                        "says so (clear the boxes, pick my_story, or roll). "
+                        "Nothing here is ever cleared for you.\n\n"
+                        "Character names and notes, in ordinary "
                         "words: 'Ada, the lighthouse keeper. Her brother Tom, "
                         "who does not believe her.'\n\n"
                         "Names you write here are kept exactly as you type "
