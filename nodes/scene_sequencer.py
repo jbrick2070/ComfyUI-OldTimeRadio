@@ -2392,12 +2392,44 @@ class EpisodeAssembler:
         cue mixes into a copy instead of AudioEnhance's cached output. Returns
         the waveform to use from here on; with nothing to mix that is the
         input itself, untouched.
+
+        BEST-EFFORT, AS IT ALWAYS WAS. Every cue is placed before any sample
+        is touched; a fault while placing logs a warning and returns the input
+        untouched, so a bad cue costs the bridge, never the episode.
         """
         rows = [r for r in (cue_manifest or {}).get("cues", [])
                 if r.get("placement") == "interstitial"
                 and r.get("anchor_line_id")]
         if not rows:
             return episode_waveform
+        try:
+            placed = self._place_interstitial_cues(
+                rows, total=int(episode_waveform.shape[-1]),
+                sample_rate=sample_rate, shift_samples=shift_samples,
+                music_cue_audio=music_cue_audio, cue_manifest=cue_manifest)
+        except Exception as exc:  # noqa: BLE001 -- a bad cue costs the bridge only
+            log.warning("[EpisodeAssembler] interstitial cues not mixed: %s",
+                        exc)
+            return episode_waveform
+        for cue_id, start_s_scene, start_idx, mix_len, cue_wf in placed:
+            if not owns_waveform:
+                episode_waveform = episode_waveform.clone()
+                owns_waveform = True
+            channels = min(episode_waveform.shape[1], cue_wf.shape[1])
+            episode_waveform[:, :channels, start_idx:start_idx + mix_len] += (
+                cue_wf[:, :channels, :mix_len])
+            log.info(
+                "[EpisodeAssembler] mixed interstitial cue %s at %.2fs (scene) "
+                "/ %.2fs (master) window=%d/%d samples",
+                cue_id, start_s_scene, start_idx / sample_rate,
+                mix_len, int(cue_wf.shape[-1]))
+        return episode_waveform
+
+    def _place_interstitial_cues(self, rows, *, total, sample_rate,
+                                 shift_samples, music_cue_audio, cue_manifest):
+        """Where each interstitial cue goes, as
+        ``(cue_id, start_s_scene, start_idx, mix_len, cue_waveform)``. Reads
+        the in-flight ledger and slices the music batch; writes nothing."""
         from . import _otr_ledger as _OTRL_mix
         from .otr_shot_lock import MUSIC_BRIDGE_FALLBACK_DUR_S
         ledger_p = _OTRL_mix.in_flight_ledger_path()
@@ -2406,11 +2438,13 @@ class EpisodeAssembler:
             log.warning(
                 "[EpisodeAssembler] %d interstitial cue(s) not mixed: no "
                 "in-flight ledger to place them", len(rows))
-            return episode_waveform
-        lines = {ln.get("line_id"): ln for ln in (ledger.get("lines") or [])
-                 if isinstance(ln, dict)}
+            return []
+        lines = {}
+        for ln in ledger.get("lines") or []:
+            if isinstance(ln, dict):
+                lines.setdefault(ln.get("line_id"), ln)  # first wins, as before
         shift_s = float(shift_samples) / float(sample_rate)
-        total = int(episode_waveform.shape[-1])
+        placed = []
         for r in rows:
             line = lines.get(r.get("anchor_line_id"))
             raw_start = (line or {}).get("start_s")
@@ -2439,18 +2473,9 @@ class EpisodeAssembler:
                           total - start_idx)
             if mix_len <= 0:
                 continue
-            if not owns_waveform:
-                episode_waveform = episode_waveform.clone()
-                owns_waveform = True
-            channels = min(episode_waveform.shape[1], cue_wf.shape[1])
-            episode_waveform[:, :channels, start_idx:start_idx + mix_len] += (
-                cue_wf[:, :channels, :mix_len])
-            log.info(
-                "[EpisodeAssembler] mixed interstitial cue %s at %.2fs (scene) "
-                "/ %.2fs (master) window=%d/%d samples",
-                r.get("cue_id"), start_s_scene, start_idx / sample_rate,
-                mix_len, int(cue_wf.shape[-1]))
-        return episode_waveform
+            placed.append((r.get("cue_id"), start_s_scene, start_idx, mix_len,
+                           cue_wf))
+        return placed
 
     @staticmethod
     def _cue_from_batch(music_cue_audio, manifest, row):

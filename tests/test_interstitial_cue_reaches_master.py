@@ -107,9 +107,16 @@ def _assemble(tmp_path, monkeypatch, *, themes=True, bridge=True, policy=""):
     shift = (2 * SR - XFADE) if themes else 0
     start = shift + int(GAP_START_S * SR)
     window = data[start:start + int(GAP_S * SR)]
+    edge = int(0.1 * SR)
+
+    def _rms(x):
+        return float(np.sqrt(np.mean(np.square(x))))
+
     return {
         "path": Path(out_path),
-        "window_rms": float(np.sqrt(np.mean(np.square(window)))),
+        "window_rms": _rms(window),
+        "head_rms": _rms(window[:edge]),
+        "tail_rms": _rms(window[-edge:]),
         "ledger": json.loads(ledger_path.read_text(encoding="utf-8")),
         "scene_untouched": torch.equal(scene_before, scene["waveform"]),
         "bridge_master_s": start / SR,
@@ -121,6 +128,29 @@ def test_the_bridge_cue_is_in_the_published_master_wav(tmp_path, monkeypatch):
     assert got["window_rms"] > 0.05, (
         "the bridge window of <ep>_master.wav is silent -- the interstitial cue "
         "never reached the file the mux publishes")
+
+
+def test_the_cue_fills_the_gap_from_its_first_sample_to_its_last(
+        tmp_path, monkeypatch):
+    """Placement, not just presence: the cue is longer than the gap, so a cue
+    mixed early leaves the gap's last 100 ms silent and one mixed late leaves
+    its first 100 ms silent. Half a crossfade either way fails one edge."""
+    got = _assemble(tmp_path, monkeypatch)
+    assert got["head_rms"] > 0.05, "the cue starts after the gap does"
+    assert got["tail_rms"] > 0.05, "the cue starts before the gap does"
+
+
+def test_a_cue_that_cannot_be_placed_costs_the_bridge_not_the_episode(
+        tmp_path, monkeypatch):
+    """The mix was best-effort inside the ledger write-back before it moved;
+    moving it must not turn a bad cue into a lost episode."""
+    def _boom(self, *_a, **_kw):
+        raise RuntimeError("malformed cue")
+
+    monkeypatch.setattr(sc.EpisodeAssembler, "_place_interstitial_cues", _boom)
+    got = _assemble(tmp_path, monkeypatch)
+    assert got["path"].is_file()
+    assert got["window_rms"] < 1e-6
 
 
 def test_the_stamped_master_hash_is_the_file_with_the_cue(tmp_path, monkeypatch):
