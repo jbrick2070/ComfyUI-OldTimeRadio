@@ -530,7 +530,13 @@ def _cast_plan_source(authored, final) -> str:
     reads 2 -- and the runner recorded that as the model's plan. The author
     pass's own fields_set says whether it wrote the value. If it did not, a
     final value other than the default can only have come from the source
-    rewrite writing it (an omission there restores the default)."""
+    rewrite writing it (an omission there restores the default).
+
+    A rewrite that returns planned=2 after the author omitted it is still
+    "default", on purpose: the rewrite is shown the draft from model_dump(),
+    which already carries the default 2, so echoing it back is not a decision
+    -- counting it as one is exactly the laundering this function exists to
+    stop (codex r2 raised the case; kept, with this reasoning)."""
     plan = getattr(authored, "cast_plan", None)
     if ("cast_plan" in getattr(authored, "model_fields_set", ())
             and plan is not None and "planned" in plan.model_fields_set):

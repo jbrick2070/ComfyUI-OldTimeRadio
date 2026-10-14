@@ -552,12 +552,14 @@ class PublicDomainBriefs(BaseModel):
         """Strip/dedupe the source names; cap at CHARACTER_NAMES_MAX. Never
         raises -- an absent or malformed list simply yields an empty list.
 
-        An entry that is not name-shaped is dropped: longer than
+        A SHAPE filter, not instruction detection: an entry longer than
         _CHARACTER_NAME_MAX_CHARS (prose -- the prompt's own instruction copied
-        back would otherwise be seated by lock_cast as a cast member), or with
-        no letter at all ("...", "-"). Role designations ("the Medical Man")
-        and one-person casts are kept. If nothing survives, the validator's
-        floor sends the brief back through the repair ladder (PD-02)."""
+        back would otherwise be seated by lock_cast as a cast member) or with
+        no letter at all ("...", "-") is dropped. A short instruction-like
+        phrase is NOT caught here (codex r2); the prompt's example array no
+        longer holds one to copy. Role designations ("the Medical Man") and
+        one-person casts are kept. If nothing survives, the validator's floor
+        sends the brief back through the repair ladder (PD-02)."""
         if not isinstance(value, list):
             return []
         out: list[str] = []

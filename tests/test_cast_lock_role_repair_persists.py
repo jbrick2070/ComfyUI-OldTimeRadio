@@ -215,3 +215,25 @@ def test_the_repaired_role_survives_a_later_unrelated_stamp(tmp_path, monkeypatc
     finally:
         with pl._LEDGER_LOCK:
             pl._CURRENT = saved
+
+
+def test_only_the_voiced_roles_can_be_written(fresh_singleton):
+    """The channel exists to move a line between the two voiced roles; a
+    patch cannot write any other role string (sonnet QA r2)."""
+    fresh_singleton.data["lines"] = _lines()
+    with pytest.raises(ValueError, match="not a patchable value"):
+        pl.stamp_durable(line_patches=[{"line_id": "l002", "char_id": "a1",
+                                        "fields": {"speaker_role": "music_open"}}],
+                         source="spec")
+    assert [r["speaker_role"] for r in pl.get_ledger().data["lines"]] == [
+        "character", "character"]
+
+
+def test_a_padded_line_id_in_the_singleton_still_matches(fresh_singleton):
+    lines = _lines()
+    lines[1]["line_id"] = " l002 "
+    fresh_singleton.data["lines"] = lines
+    pl.stamp_durable(line_patches=[{"line_id": "l002", "char_id": "a1",
+                                    "fields": {"speaker_role": "announcer"}}],
+                     source="spec")
+    assert pl.get_ledger().data["lines"][1]["speaker_role"] == "announcer"

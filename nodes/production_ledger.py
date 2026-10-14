@@ -853,10 +853,12 @@ class LedgerStampError(RuntimeError):
     missing-receipt failure at mux time. Never catch-and-continue."""
 
 
-#: Line fields a stage may correct on the singleton through ``stamp_durable``.
-#: Deliberately tiny: a per-line patch is a narrow repair channel, not a way to
-#: rewrite lines (timing, text and renderer fields have their own owners).
-_DURABLE_LINE_FIELDS = frozenset({"speaker_role"})
+#: Line fields a stage may correct on the singleton through ``stamp_durable``,
+#: and the VALUES each may take. Deliberately tiny: a per-line patch is a
+#: narrow repair channel between the two voiced roles, not a way to rewrite
+#: lines (timing, text and renderer fields have their own owners; sonnet QA
+#: r2: names alone were checked, so any role string could be written).
+_DURABLE_LINE_FIELDS = {"speaker_role": frozenset({"character", "announcer"})}
 
 
 def _validate_line_patches(led: "Ledger", patches, sections, source: str):
@@ -889,25 +891,33 @@ def _validate_line_patches(led: "Ledger", patches, sections, source: str):
         line_id = str(patch.get("line_id") or "").strip()
         want_char = str(patch.get("char_id") or "").strip()
         fields = dict(patch.get("fields") or {})
-        unknown = set(fields) - _DURABLE_LINE_FIELDS
+        unknown = set(fields) - set(_DURABLE_LINE_FIELDS)
         if unknown:
             raise ValueError(
                 f"stamp_durable({source or '?'}): line field(s) {sorted(unknown)} "
                 f"are not patchable here (allowed: {sorted(_DURABLE_LINE_FIELDS)})")
+        for name, value in fields.items():
+            if value not in _DURABLE_LINE_FIELDS[name]:
+                raise ValueError(
+                    f"stamp_durable({source or '?'}): {name}={value!r} is not a "
+                    f"patchable value (allowed: {sorted(_DURABLE_LINE_FIELDS[name])})")
         if not line_id or not want_char:
             raise ValueError(
                 f"stamp_durable({source or '?'}): a line patch needs both a "
                 f"line_id and a char_id (got {line_id!r}, {want_char!r})")
         if not fields:
             continue
-        matches = [r for r in rows if str(r.get("line_id") or "") == line_id]
+        matches = [r for r in rows
+                   if str(r.get("line_id") or "").strip() == line_id]
         if not matches:
             if rows:
                 log.warning(
                     "[Ledger] stamp_durable(%s): line %r (char %r) is not in the "
-                    "singleton, which holds other lines; its %s correction is "
-                    "NOT persisted", source or "?", line_id, want_char,
-                    sorted(fields))
+                    "singleton, which holds other lines -- the singleton and the "
+                    "wire ledger have diverged. Its %s correction is NOT "
+                    "persisted, and a save keeps the singleton's line set, so "
+                    "the on-disk copy of this line does not survive either.",
+                    source or "?", line_id, want_char, sorted(fields))
             continue
         if len(matches) > 1:
             raise LedgerStampError(
