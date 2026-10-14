@@ -1168,8 +1168,15 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         except BaseException:
             try:
                 self.teardown(prepared)
-            except BaseException:          # noqa: BLE001 -- never mask the cause
-                pass
+            except BaseException as cleanup:  # noqa: BLE001 -- never mask the cause
+                # Never silent: the base teardown releases the lease in its
+                # `finally`, but an interrupt inside detach() skips unload(),
+                # and that residue is worth a line (codex QA on a87d8257).
+                _LOG.warning(
+                    "[%s] teardown after a failed prepare() raised %s: %s -- "
+                    "the lease was released, some residency may remain; the "
+                    "original error follows", self.name,
+                    type(cleanup).__name__, cleanup)
             raise
         return prepared
 

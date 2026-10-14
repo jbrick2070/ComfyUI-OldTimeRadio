@@ -721,9 +721,10 @@ def test_a_cancellation_after_the_lease_unwinds_it(monkeypatch, tmp_path):
 
 
 def test_a_raising_teardown_never_replaces_the_original_cause(
-        monkeypatch, tmp_path):
+        monkeypatch, tmp_path, caplog):
     """The real teardown boundary runs; its unload raises; the caller still
-    sees the VAE failure, and the lease still goes back (teardown's finally)."""
+    sees the VAE failure, the lease still goes back (teardown's finally), and
+    the swallowed cleanup failure is logged rather than silent."""
     rec = _Recorder()
     eng, lockdir = _lane("animatediff15_lightning_video", rec, monkeypatch,
                          tmp_path, vae="raise")
@@ -732,8 +733,32 @@ def test_a_raising_teardown_never_replaces_the_original_cause(
         raise RuntimeError("unload refused for the test")
 
     monkeypatch.setattr(eng, "unload", _unload)
-    with pytest.raises(wb.GraphExecutionError, match="vae load refused"):
-        eng.prepare({}, {}, None)
+    with caplog.at_level("WARNING", logger="OTR.video.ghost_signal"):
+        with pytest.raises(wb.GraphExecutionError, match="vae load refused"):
+            eng.prepare({}, {}, None)
+    assert "unload refused for the test" in caplog.text
+    _assert_lease_free(lockdir)
+
+
+def test_an_interrupt_inside_detach_still_releases_the_lease(
+        monkeypatch, tmp_path, caplog):
+    """A second interrupt during the failure teardown escapes the base
+    detach guard (it catches Exception): the lease still goes back in
+    teardown's finally, the ORIGINAL error is what the caller sees, and the
+    skipped cleanup is named in the log (codex QA on a87d8257)."""
+    rec = _Recorder()
+
+    class _InterruptingHandle(_Handle):
+        def detach(self, unpatch_all=False):
+            raise KeyboardInterrupt("second interrupt during detach")
+
+    rec.base_model = _InterruptingHandle("base_model")
+    eng, lockdir = _lane("animatediff15_lightning_video", rec, monkeypatch,
+                         tmp_path, vae="raise")
+    with caplog.at_level("WARNING", logger="OTR.video.ghost_signal"):
+        with pytest.raises(wb.GraphExecutionError, match="vae load refused"):
+            eng.prepare({}, {}, None)
+    assert "KeyboardInterrupt" in caplog.text
     _assert_lease_free(lockdir)
 
 
