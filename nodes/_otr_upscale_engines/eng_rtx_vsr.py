@@ -18,9 +18,15 @@ frames of a 1472x832 OTR viz clip, 2026-10-14:
 * Production shape (1472x832 straight to the 1920x1080 canvas): VSR 11-14
   ms a frame; Real-ESRGAN x2 then fit, 1,846 ms a frame on fp16 -- and at
   fp32 it spilled the 8 GB card into shared memory and stalled.
+* Through THIS class, live (2026-10-14, same card): load() from the widget's
+  shipped ``cpu`` landed on cuda:0 in 1.8 s; 48 frames x2 (1472x832 ->
+  2944x1664) at 31 ms each including the copy back; torch peak 0.97 GB, the
+  card at 2.5 GB with its desktop baseline; the same frame gave identical
+  bytes on repeat and after other frames (held-frame reuse stays exact); a
+  1001x501 input came back exactly 2002x1002.
 
 WHAT IT NEEDS, AND WHY IT IS NOT A DECLARED DEPENDENCY. An NVIDIA RTX card
-(Turing or newer) and ``pip install nvidia-vfx`` (about 540 MB; Windows and
+(Turing or newer; driver 570.65+ on Windows) and ``pip install nvidia-vfx`` (about 540 MB; Windows and
 Linux x86-64; NVIDIA's proprietary licence). Declaring it in requirements.txt
 would put a proprietary 540 MB wheel on every AMD, Intel and Mac install for
 nothing -- the Mac Kokoro path's "installs itself and just works" is the

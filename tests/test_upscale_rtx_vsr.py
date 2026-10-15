@@ -210,6 +210,44 @@ def test_composite_falls_back_to_off_when_rtx_vsr_cannot_run(tmp_path, monkeypat
     assert "rtx_vsr unavailable here" in report and "used off" in report
 
 
+def test_a_cuda_typed_on_a_machine_without_cuda_also_falls_back(tmp_path, monkeypatch):
+    """QA on aa7f11af: the device resolve sits inside the gate too, and a
+    multi-line reason is folded to one line in the report."""
+    import nodes.otr_silent_composite as SC
+
+    class _Engine:
+        name, intrinsic_scale, degrades_to_off, device = "rtx_vsr", 2, True, None
+
+        def load(self, device):
+            raise AssertionError("never reached: the device did not resolve")
+
+        def unload(self):
+            pass
+
+    def no_cuda(v):
+        raise EngineUnusable("<upscale>", "upscale_stage", "incompatible_profile",
+                             "cuda requested\nbut torch.cuda.is_available() is False",
+                             kind="upscale")
+    off = get_engine("off")
+    monkeypatch.setattr(SC, "_get_upscale_engine",
+                        lambda name: _Engine() if name == "rtx_vsr" else off)
+    monkeypatch.setattr(SC, "_assert_upscale_usable", lambda name, role: name)
+    monkeypatch.setattr(SC, "_resolve_upscale_device", no_cuda)
+    monkeypatch.setattr(SC, "assemble_silent_timeline",
+                        lambda *a, **kw: ("out.mp4", ["engine=" + kw["engine"].name]))
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
+    src = tmp_path / "source.mp4"
+    src.write_bytes(b"fake-mp4")
+    silent, report = SC.OTRSilentComposite().composite(
+        base_video_path=str(src), canvas_w=1920, canvas_h=1080, fps=25,
+        output_path=str(tmp_path / "out.mp4"), gate_in="",
+        clip_manifest_json=json.dumps({"fps": 25, "clips": [{"path": "x", "n_frames": 1}]}),
+        upscale_engine="rtx_vsr", upscale_device="cuda")
+    first_line = report.splitlines()[0]
+    assert "engine=off" in report and "rtx_vsr unavailable here" in first_line
+    assert "torch.cuda.is_available() is False" in first_line   # folded, not split
+
+
 def test_spandrel_refusal_is_still_loud(tmp_path, monkeypatch):
     import nodes.otr_silent_composite as SC
 

@@ -1732,8 +1732,11 @@ class OTRSilentComposite:
         _engine_active = (engine.name != "off") and assemble
         _upscale_fallback = ""
         if _engine_active:
-            device = _resolve_upscale_device(upscale_device)
+            device = None
             try:
+                # Inside the gate: a `cuda` typed on a machine without CUDA is
+                # the same "cannot run here" for an optional accelerator.
+                device = _resolve_upscale_device(upscale_device)
                 engine.load(device)
             except Exception as exc:  # noqa: BLE001 -- see the gate just below
                 # AN OPTIONAL ACCELERATOR NEVER COSTS THE EPISODE (2026-10-14).
@@ -1744,8 +1747,11 @@ class OTRSilentComposite:
                 # Every other engine keeps its loud refusal.
                 if not getattr(engine, "degrades_to_off", False):
                     raise
-                _upscale_fallback = "%s unavailable here (%s); used off" % (
-                    engine.name, exc)
+                # One line: a CUDA or SDK error can carry newlines, and this
+                # text lands in the log and in the node's report string.
+                _reason = " ".join(str(exc).split())[:300]
+                _upscale_fallback = "%s unavailable here (%s: %s); used off" % (
+                    engine.name, type(exc).__name__, _reason)
                 log.warning("[OTR_SilentComposite] upscale %s", _upscale_fallback)
                 engine = _get_upscale_engine("off")
                 _engine_active = False

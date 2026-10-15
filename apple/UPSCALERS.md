@@ -100,7 +100,7 @@ native 1472x832:
 |---|---|---|
 | `rtx_vsr` | 11-14 ms | PSNR 35.8, SSIM 0.936, visibly crisper edges |
 | `spandrel_esrgan` | about 1.8 s (fp16); at fp32 it spilled the 8 GB card and stalled | PSNR 34.5, SSIM 0.899 |
-| `off` (lanczos + unsharp) | 37 ms | PSNR 36.0, SSIM 0.944 |
+| `off` (lanczos + unsharp) | 37 ms (ffmpeg, same benchmark; 16 ms at the half-size fidelity shape) | PSNR 36.0, SSIM 0.944 |
 
 So it is the upscaler to pick on an RTX card, at roughly a hundredth of
 Real-ESRGAN's cost. It is not on by default: `off` still scores as well on
@@ -113,7 +113,9 @@ checkpoint to fetch:
 pip install nvidia-vfx
 ```
 
-Run it with ComfyUI's own Python. It is about 540 MB, Windows and Linux
+Run it with ComfyUI's own Python. It needs an RTX card (Turing, the RTX 20
+series, or newer) and NVIDIA driver 570.65 or later on Windows, per NVIDIA's
+own package notes. It is about 540 MB, Windows and Linux
 x86-64 only, under NVIDIA's licence -- which is why the pack does not install
 it for you: it would land on every AMD, Intel and Mac machine for nothing.
 
@@ -191,8 +193,10 @@ one model call instead of hundreds. The console reports that as
 `upscale HELD-FRAME REUSE`. On a genuinely moving lane every frame is different
 and every frame is paid for.
 
-The 64 MB checkpoint is small next to the writer model or a video model, so
-loading it is not the expensive part. The frames are.
+For `spandrel_esrgan` the 64 MB checkpoint is small next to the writer model
+or a video model, so loading it is not the expensive part. The frames are.
+`rtx_vsr` has no checkpoint of its own (its models live in NVIDIA's package)
+and its frames are cheap -- see its section above.
 
 ---
 
@@ -203,9 +207,10 @@ Every graph this pack ships -- the canonical and every variant -- sets
 
 - The composite already resamples and sharpens on the way to the canvas, and
   that path was tuned against a measured comparison.
-- The one available model downloads at the end of the first run that uses it,
-  and a failed fetch there costs the whole episode, so the shipped default has
-  to be the one that works on a fresh, offline install.
+- `spandrel_esrgan`'s checkpoint downloads at the end of the first run that
+  uses it, and a failed fetch there costs the whole episode; `rtx_vsr` needs a
+  hand install and an RTX card. The shipped default has to be the one that
+  works on a fresh, offline install of any machine.
 - It is a radio drama. The picture is a visualizer or a procedural lane, and
   super-resolution has less to give that than it would give a photograph.
 

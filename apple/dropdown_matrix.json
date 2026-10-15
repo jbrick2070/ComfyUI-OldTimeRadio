@@ -445,7 +445,7 @@
         "mac16": "no",
         "nv8": "measured"
       },
-      "note": "NVIDIA RTX Video Super Resolution through the user-installed nvidia-vfx wheel (proprietary, ~540 MB, never a pack dependency). MEASURED on the RTX 4060 Laptop 8 GB 2026-10-14 on 48 real 1472x832 OTR frames: 11-14 ms a frame straight to 1920x1080 (Real-ESRGAN x2 fp16 then fit: 1,846 ms), about 2.4-3.4 GB device-wide during the run. No published episode has used it yet. Where it cannot run (no nvidia-vfx, AMD, Mac, a GTX card) the composite falls back to off with a warning.",
+      "note": "NVIDIA RTX Video Super Resolution through the user-installed nvidia-vfx wheel (proprietary, ~540 MB, never a pack dependency). MEASURED on the RTX 4060 Laptop 8 GB 2026-10-14 on 48 real 1472x832 OTR frames: 11-14 ms a frame straight to 1920x1080 (Real-ESRGAN x2 fp16 then fit: 1,846 ms), about 2.5-3.0 GB device-wide during the run, including the ~1.5 GB desktop baseline (torch peak ~0.97 GB at x2). No published episode has used it yet. Where it cannot run (no nvidia-vfx, AMD, Mac, a GTX card) the composite falls back to off with a warning.",
       "size_gb": 0.5
     }
   },
