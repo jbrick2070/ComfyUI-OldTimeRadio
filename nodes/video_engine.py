@@ -1513,6 +1513,7 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
     # nothing else is touched.
     proc = None
     drained = False
+    pipe_died = False   # set ONLY by an OSError from the pipe itself
     t0 = _time.time()
     try:
         proc = otr_proc.popen(
@@ -1523,7 +1524,11 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
         )
         try:
             for i, frame in enumerate(frames_iter):
-                proc.stdin.write(frame.tobytes())
+                try:
+                    proc.stdin.write(frame.tobytes())
+                except OSError:
+                    pipe_died = True
+                    raise
                 if i % max(1, fps * 10) == 0:
                     elapsed = _time.time() - t0
                     pct = int(100 * i / total_frames)
@@ -1536,7 +1541,11 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
                     _close()
                 except Exception:  # noqa: BLE001 -- never mask the cause
                     pass
-        proc.stdin.close()
+        try:
+            proc.stdin.close()
+        except OSError:
+            pipe_died = True
+            raise
         proc.wait()
     except BaseException as exc:
         if proc is not None:
@@ -1552,9 +1561,10 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
         # exception notes. A broken pipe means ffmpeg itself died, and its own
         # reason (e.g. an NVENC "Invalid argument") is in stderr, so THAT
         # failure is re-raised as a RuntimeError quoting the tail, chained to
-        # the pipe error. Anything else -- a frame-source failure, a cancel --
-        # propagates untouched, with the tail attached as a note.
-        if proc is not None and isinstance(exc, OSError):
+        # the pipe error. Anything else -- a frame-source failure (even an
+        # OSError such as a missing overlay file), a cancel -- propagates
+        # untouched, with the tail attached as a note.
+        if pipe_died:
             raise RuntimeError(
                 "ffmpeg stopped mid-encode (%s) :: %s (full log: %s)"
                 % (type(exc).__name__, _tail or "no stderr captured",

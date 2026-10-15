@@ -216,8 +216,8 @@ def _a_download_holds_a_lock(download_dir: Path) -> bool:
             lock.acquire(timeout=0)
         except Timeout:
             return True
-        except OSError:
-            return True
+        except Exception:  # noqa: BLE001 -- OSError, or NotImplementedError
+            return True    # on a filesystem without locks: cannot tell = live
         else:
             lock.release()
     return False

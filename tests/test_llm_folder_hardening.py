@@ -155,6 +155,26 @@ def test_a_live_partial_is_never_dropped(tmp_path):
         assert partial.exists()
 
 
+def test_a_lock_the_filesystem_cannot_take_reads_as_live(tmp_path, monkeypatch):
+    """filelock raises NotImplementedError on a filesystem without locks
+    (hub's own fallback catches exactly that). Cannot tell = live, never a
+    crash out of the completeness check and never a dropped partial."""
+    import filelock
+    folder = _plain(tmp_path, receipt=False)
+    with _live_transfer(folder, "model-00001-of-00002.safetensors") as partial:
+        pass
+    # A Windows release deletes the lock file; leave one for the probe to try.
+    (partial.parent / "model-00001-of-00002.safetensors.lock").write_bytes(b"")
+
+    def no_locks(self, *a, **k):
+        raise NotImplementedError("no locks on this filesystem")
+
+    monkeypatch.setattr(filelock.FileLock, "acquire", no_locks)
+    assert LF.dead_partials(folder) == []
+    assert LF.drop_dead_partials(folder) == []
+    assert partial.exists()
+
+
 def test_the_cleanup_creates_nothing_in_a_fresh_folder(tmp_path):
     fresh = tmp_path / "never_downloaded"
     assert LF.drop_dead_partials(fresh) == []

@@ -134,6 +134,18 @@ def test_a_frame_source_failure_keeps_its_own_exception_with_a_note(harness):
     assert "something" in " ".join(getattr(raised.value, "__notes__", []))
 
 
+def test_an_oserror_from_the_frame_source_is_not_blamed_on_ffmpeg(harness):
+    """Only an OSError from the PIPE means ffmpeg died; a frame source that
+    hits a missing file keeps its own exception."""
+    def frames():
+        yield np.zeros((2, 2, 3), dtype=np.uint8)
+        raise FileNotFoundError("overlay.png missing")
+    with pytest.raises(FileNotFoundError, match="overlay.png missing") as raised:
+        _encode(harness, frames())
+    assert "ffmpeg stopped mid-encode" not in str(raised.value)
+    assert "something" in " ".join(getattr(raised.value, "__notes__", []))
+
+
 def test_the_failure_log_lives_in_the_swept_scratch_tier(harness, monkeypatch, tmp_path):
     scratch = tmp_path / "scratch"
     monkeypatch.setattr(ve, "_scratch_dir_or_none", lambda: str(scratch.mkdir() or scratch))
