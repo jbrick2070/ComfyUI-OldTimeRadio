@@ -907,6 +907,30 @@ def floored_line_silence(text, sr):
     return {"waveform": torch.zeros(1, 1, samples), "sample_rate": int(sr)}
 
 
+#: The AUDIO-dict key that carries each floored line's exact span past the
+#: batch padding (plan item 6, 2026-10-14). ``pack_audio_batch`` pads every
+#: clip to the longest, and SceneSequencer trims each row's trailing silence --
+#: which shrank a floor's whole planned pause to 100 samples, so the lines after
+#: it started early and the episode came up short. The marker is the only way
+#: the planned length survives: a floor is all zeros by contract, so the
+#: sequencer cannot tell it from padding by looking at the samples.
+FLOOR_SPANS_KEY = "floor_spans"
+
+
+def floor_span(clips, line_id, sr) -> dict:
+    """The marker entry for the floor just appended to ``clips``."""
+    return {"index": len(clips) - 1, "line_id": str(line_id or ""),
+            "samples": int(clips[-1]["waveform"].shape[-1]),
+            "sample_rate": int(sr)}
+
+
+def attach_floor_spans(packed, spans):
+    """Put the floors' spans on the packed AUDIO dict (no key when none)."""
+    if spans:
+        packed[FLOOR_SPANS_KEY] = [dict(span) for span in spans]
+    return packed
+
+
 def _floor_voice_line(job, reason, *, role, clips, ledger_stamps, log_lines,
                       sr, engine, log, floored, cache_stats):
     """Hold a failed line's slot with silence and SAY SO."""
@@ -1818,6 +1842,7 @@ class OTRVoiceNodeBase:
             _line_progress.finish()
 
             _floored_lines = []
+            _floor_spans = []
             for j in line_jobs:
                 cache_status = j["cache_status"]
                 try:
@@ -1837,6 +1862,7 @@ class OTRVoiceNodeBase:
                             ledger_stamps=ledger_stamps, log_lines=log_lines,
                             sr=sr, engine=engine, log=log,
                             floored=_floored_lines, cache_stats=cache_stats)
+                        _floor_spans.append(floor_span(clips, j.get("line_id"), sr))
                         cache_status = j["cache_status"]
                         continue
                     if _line_err is not None:
@@ -1867,7 +1893,8 @@ class OTRVoiceNodeBase:
                     f"place. These lines are not spoken: {_tally}")
                 log_lines.append(_msg)
                 log.error("[OTR voice] %s", _msg)
-            packed = pack_audio_batch(clips, sample_rate=sr, mono=mono)
+            packed = attach_floor_spans(
+                pack_audio_batch(clips, sample_rate=sr, mono=mono), _floor_spans)
             n = int(packed["waveform"].shape[0]) if packed["waveform"].numel() else 0
             log_lines.append(f"{self.ROLE}: packed {n} clips at {sr} Hz")
         finally:

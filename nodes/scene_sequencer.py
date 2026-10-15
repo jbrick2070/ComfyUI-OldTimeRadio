@@ -279,6 +279,44 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
 
 
+def _floor_span_lengths(audio_input, n_rows, n_samples, sr) -> dict:
+    """``{row: samples}`` for the floored voice lines a bus marks.
+
+    A floored line is silence of its line's planned length, and the batch
+    padding is silence too, so the trim below cannot tell them apart -- it cut
+    every floor to 100 samples and the lines after it started early (plan
+    item 6, 2026-10-14). The voice node marks each floor's exact span
+    (``_otr_voice_node_common.FLOOR_SPANS_KEY``); this keeps it. A marker that
+    does not fit this bus -- wrong rate, an index or length out of bounds, a
+    duplicate row -- is ignored WHOLE with a warning, and every row falls back
+    to the old trim: a bad marker must never fail the episode."""
+    spans = (audio_input.get("floor_spans")
+             if isinstance(audio_input, dict) else None)
+    if not spans:
+        return {}
+    out = {}
+    try:
+        for span in spans:
+            index = span["index"]
+            samples = span["samples"]
+            rate = span["sample_rate"]
+            if (type(index) is not int or type(samples) is not int
+                    or type(rate) is not int or int(rate) != int(sr)
+                    or not 0 <= index < n_rows or not 0 < samples <= n_samples
+                    or index in out):
+                raise ValueError("span %r does not fit a %d-row bus of %d "
+                                 "samples at %s Hz" % (span, n_rows, n_samples, sr))
+            out[index] = samples
+    except Exception as exc:  # noqa: BLE001 -- a bad marker never fails a run
+        log.warning("[SceneSequencer] ignoring the voice-floor marker (%s); "
+                    "floored lines fall back to the trailing-silence trim", exc)
+        return {}
+    log.info("[SceneSequencer] keeping %d floored line(s) at their planned "
+             "length: %s", len(out),
+             ", ".join(str(s.get("line_id") or s.get("index")) for s in spans))
+    return out
+
+
 def _trim_trailing_silence(clip_np, threshold=1e-4, min_samples=100):
     """Strip trailing zero-padding from a 1-D float32 numpy array.
 
@@ -895,11 +933,18 @@ class SceneSequencer:
 
         # Return list of (waveform_np, sample_rate) per batch element.
         # Strip trailing zero-padding from batched tensors (ComfyUI pads
-        # shorter clips to match the longest in the batch).
+        # shorter clips to match the longest in the batch) -- except a
+        # floored line's row, which keeps exactly its marked span.
+        floors = _floor_span_lengths(audio_input, int(waveform.shape[0]),
+                                     int(waveform.shape[-1]), sr)
         clips = []
         for b in range(waveform.shape[0]):
             clip_np = waveform[b].cpu().numpy().squeeze()
-            clip_np = _trim_trailing_silence(clip_np)
+            keep = floors.get(b)
+            if keep is not None:
+                clip_np = clip_np[..., :keep]
+            else:
+                clip_np = _trim_trailing_silence(clip_np)
             if len(clip_np) > 0:
                 clips.append((clip_np, sr))
 
