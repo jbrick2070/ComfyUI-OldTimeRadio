@@ -171,7 +171,9 @@ Kokoro runs through `kokoro-onnx` (what the requirements install on Python
 3.13), its ~326 MB ONNX model comes at startup too; with the torch `kokoro`
 package (Python 3.10 - 3.12) Kokoro's own model (`hexgrad/Kokoro-82M`, about
 the same size) arrives with the first voice line instead. `HF_HUB_OFFLINE=1`
-or `OTR_SKIP_KOKORO_PREFETCH=1` skips the startup fetch. If the console pauses
+or `OTR_SKIP_KOKORO_PREFETCH=1` skips the startup fetch; under `kokoro-onnx`
+nothing fetches the model later, so the first voice line then stops and names
+the command that fetches it. If the console pauses
 on `[OldTimeRadio]` lines during a restart, that is what it is doing.
 
 What `otr_canonical` selects, and so what its first run fetches -- the file

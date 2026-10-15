@@ -64,11 +64,10 @@ copy is still a finished run. A **My Story** episode -- whether you picked
 the bank or the roll landed on it -- has to be published, and fails the run
 right after the copy is withheld (`DeliveryContractError`), with the archival
 final kept. A run that stops AFTER the copy landed -- the same My Story gate
-failing one of its after-copy checks (the published file is missing, the
-episode's delivery record cannot be confirmed, or the ledger does not name the
-published file), or a Cancel pressed in the last seconds -- never prints the
-end-of-run summary: the file in `otr/obs/` is complete, and the `LOUD publish`
-line is the record of it. No publish line of either kind means the run stopped
+finding that the episode's delivery record cannot be confirmed or that the
+ledger does not name the published file, or a Cancel pressed in the last
+seconds -- never prints the end-of-run summary: the file in `otr/obs/` is
+complete, and the `LOUD publish` line is the record of it. No publish line of either kind means the run stopped
 before publishing, however green the console looked.
 
 ---
@@ -205,7 +204,7 @@ wheel supplies only one of them.
 **It finished but nothing is in `otr/obs/`.** Find the publish lines first
 (`LOUD publish`, then the `obs_publish` summary) -- see [Find it](#find-it).
 `BLOCKED` withheld only the published copy and kept the archival final in
-`otr/episodes/<episode>/`; whether the run itself
-succeeded is the run's own final status (a My Story episode fails there). No
+`otr/episodes/<episode>/`; whether the run itself succeeded is the run's own
+final status (a My Story episode fails there). No
 publish line of either kind is a real failure: read the console from the end
 backwards for the first error.

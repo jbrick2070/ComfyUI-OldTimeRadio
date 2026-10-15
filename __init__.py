@@ -200,12 +200,13 @@ _NODE_MODULES = {
 
     # =========================================================================
     # v2.0 Image platform (Subproject C1) -- model-agnostic image-gen adapters,
-    # one level UPSTREAM of video. Per-role image engine + fresh-cap/seed policy ->
+    # one level UPSTREAM of video. Image policy (the video director's per-role picks,
+    # seed, dtype receipt) ->
     # Meta-Brief prompts -> cache-checked dispatch + ledger write-back + image_done.
     # "Flux" is just gen 1 (nodes/_otr_image_engines/flux_gen1.py); swap it and
     # nothing downstream changes. Cold-import clean; the live render is GPU.
     # =========================================================================
-    "OTR_ImageDirector":           (".nodes.otr_image_director",          "OTRImageDirector",           " ImageDirector (image policy: seed + fresh cap)"),
+    "OTR_ImageDirector":           (".nodes.otr_image_director",          "OTRImageDirector",           " ImageDirector (image policy)"),
     "OTR_MetaBriefImagePromptGen": (".nodes.otr_meta_brief_image_prompt", "OTRMetaBriefImagePromptGen", " Meta-Brief Image Prompt Gen"),
     "OTR_ImageGenDispatcher":      (".nodes.otr_image_gen_dispatcher",    "OTRImageGenDispatcher",      " Image Gen Dispatcher (cache + ledger + image_done)"),
 
