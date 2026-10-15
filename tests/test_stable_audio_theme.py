@@ -122,9 +122,23 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
         raise RuntimeError("profiles unavailable")
 
     monkeypatch.setattr(ep, "legacy_first_engines", _boom)
-    engines = list(T.INPUT_TYPES()["required"]["engine"][0])
-    assert engines == ["musicgen", "stable_audio_music"]
-    assert engines
+    it = T.INPUT_TYPES()
+    engines = list(it["required"]["engine"][0])
+    # OTR-F003 (2026-10-15): the broken-profiles fallback leads with the SAME
+    # shipped default as the registry -- never musicgen (CC-BY-NC).
+    assert engines == ["stable_audio_3", "musicgen", "stable_audio_music"]
+    assert it["required"]["engine"][1]["default"] == "stable_audio_3"
+
+
+def test_the_fallback_default_matches_the_registry_default():
+    """The fallback list may be shorter than the registry's, but its index 0
+    -- the dropdown default when profiles cannot import -- must be the shipped
+    default, and every name in it must be a real music engine."""
+    from nodes._otr_engine_profiles import legacy_first_engines
+    from nodes.stable_audio_theme import _LEGACY_FIRST_FALLBACK
+    registry = legacy_first_engines("music")
+    assert _LEGACY_FIRST_FALLBACK[0] == registry[0] == "stable_audio_3"
+    assert set(_LEGACY_FIRST_FALLBACK) <= set(registry)
 
 
 def test_musicgen_clip_renders_two_cues(monkeypatch):

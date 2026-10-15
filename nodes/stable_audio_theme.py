@@ -42,7 +42,12 @@ _CUE_CEILING = 10.0 ** (_CUE_CEILING_DBFS / 20.0)
 log = logging.getLogger("OTR")
 
 ROLE = "music"
-_LEGACY_FIRST_FALLBACK = ("musicgen", "stable_audio_music")
+# The list INPUT_TYPES shows ONLY if `_otr_engine_profiles` cannot import. Its
+# index 0 is the dropdown default there, so it leads with the same shipped
+# default as `_LEGACY_FIRST_ENGINES["music"]` (OTR-F003, 2026-10-15): it used to
+# lead with musicgen -- the CC-BY-NC engine PBUG-20260907-04 removed as the
+# default -- on exactly the broken install least able to notice.
+_LEGACY_FIRST_FALLBACK = ("stable_audio_3", "musicgen", "stable_audio_music")
 
 # The three fixed theme cues. Durations + the per-cue prompt are composed by the
 # single-source Meta-brief composer (nodes/_otr_music_prompt.compose_music_prompt),
