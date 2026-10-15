@@ -119,7 +119,9 @@ still and clip the run made, and it adds up fast. `asset_cleanup` on
   (video, audio, images); the ledger, the canon, the treatment, the manifests,
   the captions and the QA reports stay.
 - **full (keep only the published video)** -- the default. The whole episode
-  folder goes.
+  folder goes -- except that an episode whose source's rights receipt did not
+  clear keeps its ledger, which holds that receipt (everything else still
+  goes).
 
 All three leave `otr/obs/` alone. Nothing is deleted unless the published copy
 is on disk there, so an episode with no published copy is never cleaned.

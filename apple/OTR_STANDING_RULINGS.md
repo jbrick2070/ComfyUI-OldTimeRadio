@@ -211,8 +211,9 @@ still the singleton's last-resort fallback. So:
 - an episode with no published copy is never cleaned: the archival final is
   then its only copy. (AMENDED 2026-10-15: a rights receipt that did not clear
   no longer withholds the OBS copy -- operator ruling, every finished episode is
-  published -- so such an episode has a published copy and IS cleaned like any
-  other; its receipt survives in the mux report and log, not in a kept folder.)
+  published -- so such an episode has a published copy and IS cleaned. But
+  operator ruling, same day: `full` keeps that episode's LEDGER, which holds
+  the stamped rights receipt, and deletes everything else.)
 - the published copy must exist, be non-empty, sit OUTSIDE the folder, and be
   what the RE-READ ledger records as `meta.obs_final_path`;
 - `partial` is a DELETE list by extension; an unknown extension is KEPT;

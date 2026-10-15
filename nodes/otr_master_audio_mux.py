@@ -2163,6 +2163,19 @@ class OTRMasterAudioMux:
             return ("asset_cleanup %s: refused -- %s; nothing was deleted"
                     % (mode, exc)), False
         live_intent = meta.get("delivery_intent")
+        # AN EPISODE WHOSE RIGHTS RECEIPT DID NOT CLEAR KEEPS ITS LEDGER
+        # (operator ruling 2026-10-15). It is published like every other
+        # episode, but the ledger carries the stamped receipt -- the only
+        # durable record of why -- so the cleanup deletes everything else and
+        # leaves that one file. If the ledger cannot be named safely, nothing
+        # is deleted: a cleanup must never lose the record it was told to keep.
+        keep_paths: list = []
+        if not _publication_decision(silent_video_path).publishable:
+            if ledger_path is None or not os.path.isfile(ledger_path):
+                return ("asset_cleanup %s: refused -- the rights receipt did not "
+                        "clear and its ledger cannot be located, so nothing was "
+                        "deleted" % mode), False
+            keep_paths = [ledger_path]
         delete, keep, refusal = _AC.plan_asset_cleanup(
             episode_dir, mode,
             episodes_root=_episodes_root(),
@@ -2173,6 +2186,7 @@ class OTRMasterAudioMux:
             ledger_token=(live_intent.get("delivery_token")
                           if isinstance(live_intent, dict) else None),
             ledger_obs_path=meta.get("obs_final_path"),
+            keep_paths=keep_paths,
         )
         if refusal:
             return ("asset_cleanup %s: refused -- %s; nothing was deleted"

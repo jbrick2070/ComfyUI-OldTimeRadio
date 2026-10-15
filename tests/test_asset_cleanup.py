@@ -24,6 +24,7 @@ import inspect
 import json
 import os
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -381,6 +382,71 @@ def test_the_mux_never_cleans_a_withheld_episode(tmp_path, monkeypatch):
     M, ep, obs, ledger_path, intent, silent, final = _mux_rig(tmp_path, monkeypatch)
     line, _ = M.OTRMasterAudioMux()._asset_cleanup(silent, final, None, intent)
     assert "refused" in line and Path(final).is_file()
+
+
+def test_full_keeps_the_ledger_of_an_episode_whose_rights_receipt_did_not_clear(tmp_path, monkeypatch):
+    """Operator ruling 2026-10-15: such an episode is published like any other,
+    but `full` must leave its ledger (the only durable home of the receipt) and
+    still delete everything else."""
+    M, ep, obs, ledger_path, intent, silent, final = _mux_rig(
+        tmp_path, monkeypatch, mode="full")
+    monkeypatch.setattr(M, "_publication_decision", lambda p: types.SimpleNamespace(
+        publishable=False, summary=lambda: "research_only"))
+    line, final_removed = M.OTRMasterAudioMux()._asset_cleanup(silent, final, str(obs), intent)
+    assert line.startswith("asset_cleanup full: removed"), line
+    assert ledger_path.is_file() and obs.is_file() and final_removed is True
+    survivors = sorted(p.relative_to(ep).as_posix() for p in ep.rglob("*") if p.is_file())
+    assert survivors == [ledger_path.relative_to(ep).as_posix()], survivors
+    saved = json.loads(ledger_path.read_text(encoding="utf-8"))
+    assert saved["meta"]["asset_cleanup_receipt"]["state"] == "done"
+    assert "kept 1, skipped 0" in line
+
+
+def test_full_still_removes_the_whole_folder_when_the_receipt_cleared(tmp_path, monkeypatch):
+    M, ep, obs, ledger_path, intent, silent, final = _mux_rig(
+        tmp_path, monkeypatch, mode="full")
+    monkeypatch.setattr(M, "_publication_decision", lambda p: types.SimpleNamespace(
+        publishable=True, summary=lambda: "cleared"))
+    line, final_removed = M.OTRMasterAudioMux()._asset_cleanup(silent, final, str(obs), intent)
+    assert not ep.exists() and obs.is_file() and final_removed is True, line
+
+
+def test_the_planner_keeps_named_files_and_deletes_the_rest_for_full(tmp_path):
+    root, ep, obs_dir, obs = _tree(tmp_path)
+    ledger = ep / "audio" / ("%s_ledger.json" % EP_ID)
+    ledger.write_text("{}", encoding="utf-8")
+    delete, keep, refusal = AC.plan_asset_cleanup(
+        ep, "full", keep_paths=[ledger], **_facts(root, ep, obs_dir, obs))
+    assert refusal is None
+    assert [Path(k) for k in keep] == [ledger] and ledger not in delete
+    every_file = sorted(p.relative_to(ep).as_posix() for p in ep.rglob("*") if p.is_file())
+    assert ep not in delete
+    assert _rel(ep, delete) == [r for r in every_file
+                                if r != ledger.relative_to(ep).as_posix()]
+
+
+def test_the_executor_deletes_file_by_file_and_leaves_the_folder_when_a_file_is_kept(tmp_path):
+    root, ep, obs_dir, obs = _tree(tmp_path)
+    ledger = ep / "audio" / ("%s_ledger.json" % EP_ID)
+    ledger.write_text("{}", encoding="utf-8")
+    delete, keep, _ = AC.plan_asset_cleanup(
+        ep, "full", keep_paths=[ledger], **_facts(root, ep, obs_dir, obs))
+    receipts = _Receipts()
+    line = AC.execute_asset_cleanup("full", ep, delete, keep,
+                                    write_receipt=receipts, obs_copy=str(obs))
+    assert [c["state"] for c in receipts.calls] == ["started", "done"]
+    assert ledger.is_file() and ep.is_dir() and obs.is_file()
+    assert [p for p in ep.rglob("*") if p.is_file()] == [ledger]
+    assert receipts.calls[-1]["kept"] == [str(ledger)]
+
+
+def test_a_file_to_keep_outside_the_folder_refuses_the_whole_cleanup(tmp_path):
+    root, ep, obs_dir, obs = _tree(tmp_path)
+    stray = tmp_path / "elsewhere.json"
+    stray.write_text("{}", encoding="utf-8")
+    delete, keep, refusal = AC.plan_asset_cleanup(
+        ep, "full", keep_paths=[stray], **_facts(root, ep, obs_dir, obs))
+    assert delete == [] and keep == [] and "must be kept" in refusal
 
 
 def test_the_mux_calls_the_cleanup_last_after_the_preview_and_the_delivery_gate():

@@ -79,7 +79,8 @@ TOOLTIP = (
     "partial deletes the sound and the pictures (video, audio, images) and "
     "keeps every text file: the ledger, the canon, the treatment, the "
     "manifests, the captions and the QA reports.\n\n"
-    "full deletes the whole episode folder.\n\n"
+    "full deletes the whole episode folder -- except that an episode whose "
+    "rights receipt did not clear keeps its ledger, which holds that receipt.\n\n"
     "All three leave otr/obs alone: the published video there is never "
     "touched, and nothing is deleted unless that published copy is on disk. "
     "An episode with no published copy is never cleaned.\n\n"
@@ -191,13 +192,18 @@ def plan_asset_cleanup(
     wire_token=None,
     ledger_token=None,
     ledger_obs_path=None,
+    keep_paths: Iterable = (),
 ) -> Tuple[List[Path], List[Path], Optional[str]]:
     """What a cleanup of ``episode_dir`` would delete and keep, or why not.
 
     Returns ``(delete, keep, refusal)``. ``refusal`` is None when the plan may
     run; otherwise it names the first fact that did not agree and both lists
     are empty. ``off`` is always ``([], [], None)``. ``full`` lists the folder
-    itself as its one deletion; ``partial`` lists files.
+    itself as its one deletion, UNLESS ``keep_paths`` names files that must
+    survive (the ledger of an episode whose rights receipt did not clear, so
+    the receipt stays on record, 2026-10-15): then ``full`` deletes every
+    other file one by one and the folder stays with just those files.
+    ``partial`` lists files.
 
     Every fact is passed in by the caller, so this reads the tree and nothing
     else -- no ledger, no singleton, no ComfyUI:
@@ -216,6 +222,9 @@ def plan_asset_cleanup(
       fallback harmless.
     * ``ledger_obs_path`` -- ``meta.obs_final_path`` RE-READ from disk after
       the terminal stamp; it must name ``obs_copy``.
+    * ``keep_paths`` -- files that must survive any mode. Each must be a file
+      inside ``episode_dir``; one that is not REFUSES the cleanup, because
+      deleting the folder around a file the caller asked to keep would lose it.
     """
     refused = lambda why: ([], [], why)  # noqa: E731 -- one shape, many exits
     slug = str(mode or "").strip().lower()
@@ -278,10 +287,25 @@ def plan_asset_cleanup(
     if linked_dirs:
         return refused("a linked folder sits inside the episode: %s" % linked_dirs[0])
 
+    must_keep = [Path(p) for p in (keep_paths or ()) if str(p or "").strip()]
+    for kept_file in must_keep:
+        if not _inside(kept_file, episode_dir) or not kept_file.is_file():
+            return refused("%s must be kept but is not a file inside %s"
+                           % (kept_file, episode_dir))
+
     if slug == "full":
-        return [episode_dir], [], None
+        if not must_keep:
+            return [episode_dir], [], None
+        survivors = {_norm(p) for p in must_keep}
+        delete = [f for f in files if _norm(f) not in survivors]
+        keep = [f for f in files if _norm(f) in survivors]
+        return delete, keep, None
     delete = [f for f in files if f.suffix.lower() in PARTIAL_DELETE_EXTENSIONS]
     keep = [f for f in files if f.suffix.lower() not in PARTIAL_DELETE_EXTENSIONS]
+    if must_keep:
+        survivors = {_norm(p) for p in must_keep}
+        delete = [f for f in delete if _norm(f) not in survivors]
+        keep = [f for f in files if f not in delete]
     return delete, keep, None
 
 
@@ -354,7 +378,10 @@ def execute_asset_cleanup(
     removed: List[str] = []
     skipped: List[str] = []
     removed_bytes = 0
-    if slug == "full":
+    # ``full`` removes the folder wholesale -- unless the plan named files to
+    # keep (the ledger of an episode whose rights receipt did not clear), in
+    # which case it deletes file by file like ``partial`` and the folder stays.
+    if slug == "full" and not keep:
         try:
             files, _dirs, _linked = _walk(episode_dir)
         except OSError:
@@ -390,10 +417,11 @@ def execute_asset_cleanup(
         _remove_empty_dirs(episode_dir)
         kept = [str(k) for k in keep]
 
-    # THE DONE RECEIPT. For `partial` the ledger is still there and this is
-    # the tombstone that explains the missing files. For `full` it normally
-    # went with the folder and the save simply reports False; when a locked
-    # file kept the folder (and possibly the ledger) alive, it lands.
+    # THE DONE RECEIPT. For `partial` (and `full` with a kept ledger) the
+    # ledger is still there and this is the tombstone that explains the missing
+    # files. For a plain `full` it normally went with the folder and the save
+    # simply reports False; when a locked file kept the folder (and possibly
+    # the ledger) alive, it lands.
     done_saved = write_receipt({
         "state": "done",
         "mode": slug,
@@ -408,7 +436,7 @@ def execute_asset_cleanup(
     line = ("asset_cleanup %s: removed %d files (%.1f MB), kept %d, skipped %d"
             % (slug, len(removed), removed_bytes / (1024.0 * 1024.0),
                len(kept), len(skipped)))
-    if slug == "partial" and not done_saved:
+    if (slug == "partial" or keep) and not done_saved:
         line += "; the done receipt did not save"
     if skipped:
         line += " [skipped: %s]" % ", ".join(skipped)
