@@ -1,6 +1,6 @@
 """nodes/_otr_episode_budget.py — episode act topology.
 
-The operator selects `act_count` (1..8). That is the only knob, and
+The operator selects `act_count` (1..7, MAX_ACT_COUNT). That is the only knob, and
 everything else — arc-phase labels, per-phase beat counts, music_inter
 count — is derived from it alone.
 

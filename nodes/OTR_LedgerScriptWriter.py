@@ -2422,8 +2422,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 }),
                 # THE ONE LENGTH-SHAPED KNOB (operator directive
                 # 2026-08-14). 'auto' was removed with target_words --
-                # it meant "derive the act count from the word total" --
-                # and the range grew from 1-7 to 1-8. Whatever is picked
+                # it meant "derive the act count from the word total".
+                # The range is 1-7 (MAX_ACT_COUNT). Whatever is picked
                 # here is honoured: there is no derived floor or ceiling
                 # that can refuse it.
                 # 7-act is admitted; 8-act is refused by

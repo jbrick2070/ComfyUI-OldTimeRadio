@@ -645,28 +645,44 @@ def test_a_rolled_cast_checks_and_charges_no_saved_voice():
     assert "cloud_elevenlabs" in _looked_up(prompt, validator)
 
 
-def test_a_replay_neither_checks_nor_prices_the_frozen_cast():
-    """A replay passes CastLock's frozen cast through with no TTS, so a dead
-    or unaffordable saved voice must not refuse it."""
+def test_a_replay_checks_and_prices_video_only():
+    """A replay re-renders video and nothing else: CastLock passes the frozen
+    cast through, the theme the frozen master, the dispatcher the frozen
+    stills. A dead or unaffordable voice, music or image pick must not refuse
+    it; the video engines are still checked and priced."""
     from nodes._otr_shared import cloud_balance_preflight as cbp
     prompt, validator, _castlock = _shipped_prompt("otr_cloud_low.json")
+    live = cbp.estimate_lines(prompt, validator, resolve_engine=lambda _e: object(),
+                              unit_usd_fn=lambda _e, _g: 1.0,
+                              writer_usd_fn=lambda _h, _s: (0.0, "x"))
     for node in prompt.values():
         if node.get("class_type") == "OTR_LedgerScriptWriter":
             node["inputs"]["replay_from"] = "bundle.json"
-    assert "cloud_elevenlabs" not in _looked_up(prompt, validator)
-    lines = cbp.estimate_lines(prompt, validator, resolve_engine=lambda _e: object(),
-                               unit_usd_fn=lambda _e, _g: 1.0,
-                               writer_usd_fn=lambda _h, _s: (0.0, "x"))
-    assert not [ln for ln in lines if ln.label == "cloud_elevenlabs"]
+    replay = cbp.estimate_lines(prompt, validator, resolve_engine=lambda _e: object(),
+                                unit_usd_fn=lambda _e, _g: 1.0,
+                                writer_usd_fn=lambda _h, _s: (0.0, "x"))
+    live_notes = {ln.label: ln.note for ln in live}
+    replay_labels = {ln.label for ln in replay}
+    assert "cloud_elevenlabs" in live_notes and "cloud_elevenlabs" not in replay_labels
+    # Only the video lines survive a replay.
+    assert replay_labels == {lbl for lbl, note in live_notes.items() if "beats" in note}
+    assert replay_labels, "the shipped cloud graph renders paid video"
+    looked = _looked_up(prompt, validator)
+    assert "cloud_elevenlabs" not in looked
 
 
 def test_a_saved_voice_alias_is_checked_as_the_engine_it_casts():
+    """The preflight and CastLock agree on what an alias casts -- on the
+    character slot too (CastLock normalized only the announcer's until
+    2026-10-14, and a character 'elevenlabs' raised EngineUnusable there)."""
+    from nodes.cast_lock import cast_voice_engines
     prompt, validator, castlock = _shipped_prompt("otr_cloud_low.json")
-    prompt[castlock]["inputs"]["char_voice_engine"] = "elevenlabs"
-    prompt[castlock]["inputs"]["announcer_voice_engine"] = "kokoro"
-    assert csp.castlock_voice_picks(prompt[castlock]["inputs"])[0] == [
-        "cloud_elevenlabs", "kokoro"]
-    assert "cloud_elevenlabs" in _looked_up(prompt, validator)
+    for char, ann in (("elevenlabs", "kokoro"), ("kokoro", "elevenlabs")):
+        prompt[castlock]["inputs"]["char_voice_engine"] = char
+        prompt[castlock]["inputs"]["announcer_voice_engine"] = ann
+        picks = csp.castlock_voice_picks(prompt[castlock]["inputs"])[0]
+        assert tuple(picks) == cast_voice_engines(char, ann)
+        assert "cloud_elevenlabs" in _looked_up(prompt, validator)
 
 
 def test_a_wired_voice_slot_warns_instead_of_raising():

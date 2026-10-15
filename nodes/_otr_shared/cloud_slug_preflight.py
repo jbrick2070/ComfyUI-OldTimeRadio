@@ -759,23 +759,26 @@ def collect_findings(
             _catalog_memo[key] = raw_catalog(authority)
         return _catalog_memo[key]
 
+    # A REPLAY re-renders video only. The image dispatcher re-stamps the
+    # frozen stills, the theme passes the frozen master through and CastLock
+    # the frozen cast, with no model call -- so on a replay only the video
+    # engines are checked (the writer is skipped below).
     engine_ids = []
     directors = [n for n in scoped if n.get("class_type") == _DIRECTOR]
     for node in directors:
         videos, images = director_engine_picks(node.get("inputs") or {})
         engine_ids.extend(videos)
-        engine_ids.extend(images)
+        if not replay:
+            engine_ids.extend(images)
 
     for node in scoped:
         ctype = node.get("class_type")
         inputs = node.get("inputs") or {}
-        if ctype == _MUSIC:
+        if ctype == _MUSIC and not replay:
             picked = _widget_str(inputs, "engine", "")
             if picked and not picked.startswith("+ Add Custom"):
                 engine_ids.append(picked)
         if ctype == _CASTLOCK and not replay:
-            # A replay passes the frozen cast through with no TTS at all, so
-            # its voice widgets are neither checked nor priced.
             picks, wired = castlock_voice_picks(inputs)
             engine_ids.extend(picks)
             for slot in wired:

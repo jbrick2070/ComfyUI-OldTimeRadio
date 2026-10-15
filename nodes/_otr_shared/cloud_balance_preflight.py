@@ -58,7 +58,7 @@ PAD_RATIO = 0.15
 PAD_MIN_USD = 1.0
 
 #: Conservative queue-time counts. The script does not exist yet.
-DEFAULT_BEATS = 40            # floor of the beat estimate; see episode_beats_bound
+DEFAULT_BEATS = 40            # floor of the beat proxy; see episode_beats_bound
 DEFAULT_FRESH_CAP = 15        # OTR_ImageDirector.fresh_cap default
 DEFAULT_ACT_COUNT = 3
 MUSIC_CUES = 4
@@ -147,11 +147,13 @@ def pad_usd(subtotal: float) -> float:
 
 
 def episode_beats_bound(act_count) -> int:
-    """Beats the video estimate assumes every paid engine renders: never
-    fewer than ``DEFAULT_BEATS``, and at least the outline's own capacity for
-    this act count (``_otr_episode_budget.outline_beats_max``: 5 acts -> 56,
-    7 -> 78). The old flat 40 was called an upper bound and stopped being one
-    once the outline accepted every phase the generator returns."""
+    """Beats the video estimate assumes every paid engine renders -- a
+    CONSERVATIVE PROXY, not a bound: never fewer than ``DEFAULT_BEATS`` (which
+    already exceeds the capacity of 1-3 acts), and at least the outline's own
+    capacity for this act count (``_otr_episode_budget.outline_beats_max``:
+    5 acts -> 56, 7 -> 78, with act breaks on). Beats x clip seconds stands in
+    for the real clip count, which coverage can split further per beat. The
+    old flat 40 fell below what a 5- to 7-act outline can hold."""
     try:
         acts = int(act_count)
     except (TypeError, ValueError):
@@ -522,10 +524,14 @@ def estimate_lines(
     # Video: every distinct paid engine is assumed to take every beat.
     video_ids = []
     image_roles = []
+    # A REPLAY prices video only: the dispatcher re-stamps the frozen stills,
+    # the theme and CastLock pass the frozen audio through (no model call), and
+    # the writer is skipped below.
     for node in [n for n in scoped if n.get("class_type") == _DIRECTOR]:
         videos, images = csp.director_engine_picks(node.get("inputs") or {})
         video_ids.extend(videos)
-        image_roles.extend(images)
+        if not replay:
+            image_roles.extend(images)
 
     def add(label, count, note):
         wallet = wallet_for_engine(label)
@@ -551,12 +557,11 @@ def estimate_lines(
     for node in scoped:
         ctype = node.get("class_type")
         inputs = node.get("inputs") or {}
-        if ctype == _MUSIC:
+        if ctype == _MUSIC and not replay:
             picked = csp._widget_str(inputs, "engine", "")
             if picked and not picked.startswith("+ Add Custom"):
                 add(picked, MUSIC_CUES, "%d cues" % MUSIC_CUES)
         if ctype == _CASTLOCK and not replay:
-            # A replay passes the frozen cast through with no TTS at all.
             voices, _wired = csp.castlock_voice_picks(inputs)
             for picked in sorted(set(voices)):
                 add(picked, act_count,
