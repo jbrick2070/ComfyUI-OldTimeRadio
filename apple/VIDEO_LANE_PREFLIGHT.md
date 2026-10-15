@@ -112,12 +112,16 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
 
 - G3.7 **The lane's `still_plan` is DECLARED and TRUE -- it is what tells the
   image phase what to mint.** The video lane is the authority on the image
-  assets it needs, and it says so through a `still_plan` of `StillPlanRow`:
+  assets it needs, and it says so through a `still_plan` of `StillPlanRow`
+  (`nodes/_otr_shared/still_plan_helpers.py`), eight fields in this order:
   `kind` (portrait / scene_open / scene_beat / scene_character / mesh_fodder /
-  background_plate), `cardinality` (how MANY -- per_beat / per_subject /
-  per_recurring_subject / per_bookend_role), `aspect` (the dimensions --
-  wide / portrait / inherit_engine), `required` (always / never / conditional),
-  `framing_geometry` and `style_tail_policy`. That declaration must match what
+  scene_background_plate), `cardinality` (how MANY -- per_beat / per_subject /
+  per_recurring_subject / per_bookend_role), `target_class` (which validator
+  slot it fills -- scene / portrait / mesh), `aspect` (the dimensions -- wide /
+  portrait / inherit_engine), `required` (`always` or `never`; there is no
+  third token), `framing_geometry`, `style_tail_policy` (full / minimal_clean),
+  and `identity` (`portrait_seed`, the default, or `none` -- see
+  `ADDING_IMAGE_AND_VIDEO_LANES.md`). That declaration must match what
   the lane's renderer ACTUALLY consumes: `ltx_8gb` declares portrait `never`
   and is family `image_to_video`, so `render_driver` overrides its init with the
   per-beat scene still; `humo` declares portrait `always` and is
@@ -133,12 +137,14 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   which is why it hid for months; FATAL on `ideogram4_local`, which returns a
   safety placeholder for a person close-up and killed a live leg. The lane was
   right, the enumerator was not asking.*
-  *The seam is the lane-derived role-set family that already carries the other
-  four decisions into the image phase -- `still_aspects` (dimensions),
-  `mesh_fodder_roles` (kind), `talking_roles` (framing), `still_word_roles`
-  (which composer) and now `_portrait_free_roles_from_policy` (whether a
-  portrait is minted at all). Swept by `tests/test_portrait_free_roles.py`;
-  a new lane is covered the day it declares its plan, with no edit anywhere.*
+  *The seam is the lane-derived role-set family in
+  `otr_meta_brief_image_prompt.py` that carries these decisions into the image
+  phase -- `_still_aspects_from_policy` (dimensions),
+  `_mesh_fodder_roles_from_policy` (kind), `_still_word_roles_from_policy`
+  (which composer), `_portrait_free_roles_from_policy` (whether a portrait is
+  minted at all) and `_identity_roles_from_policy` (whether a character keeps a
+  seed identity). Swept by `tests/test_portrait_free_roles.py`; a new lane is
+  covered the day it declares its plan, with no edit anywhere.*
 
 - G3.7-SCOPED **A PROMPT-OWNED, STILL-FREE LANE MUST DECLARE WHAT IT OWNS.**
   Added 2026-08-22 with Ghost Signal (`animatediff15_video`), the first lane

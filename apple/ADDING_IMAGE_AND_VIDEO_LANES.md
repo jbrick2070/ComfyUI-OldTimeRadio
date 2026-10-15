@@ -129,6 +129,45 @@ model is never invoked**, and the episode renders anyway with nothing reporting
 it. `tests/test_still_spine_engine_coverage.py` fails any engine that stays
 silent.
 
+**What the image phase mints for your lane -- three separate questions
+(preflight G3.6/G3.7).** Your `still_plan` answers them independently; do not
+let one decide another.
+
+- *Purpose* -- what the image is FOR: a per-beat scene still (`scene_beat`,
+  `scene_character`, `scene_open`), a reference the renderer conditions on
+  (`portrait`), or mesh input (`mesh_fodder` subject plus a separate
+  `scene_background_plate`). A scene lane gets its own beat image; a mesh lane
+  gets clean subject fodder plus a plate.
+- *Shape* -- `aspect`: wide, portrait or `inherit_engine`. The word "portrait"
+  in `kind` is historical and does not make every reference vertical.
+- *Face framing* -- whether a visible face and mouth matter. A face-driven
+  adapter such as HuMo keeps its face/lip reference because it animates a mouth
+  from it; another audio-in adapter follows its own declared inputs and does
+  NOT inherit a face rule from the word "audio".
+
+**Identity is not pixels.** `identity="portrait_seed"` (the default) seeds every
+beat of a character from a hash of that character's portrait PROMPT -- it is not
+an instruction to generate portrait pixels. `kind="portrait" required="never"`
+suppresses the pixels while the seed identity stays; `identity="none"` opts out
+of the identity too (the still_word card, which is typography, not a face). A
+lane that declares `accepts_still = False` requests no image generation at all.
+
+**Capability comes from the registered adapter, never its name.** Nothing infers
+it from an id prefix such as `viz_`; declare it.
+
+**A custom image engine is declared once, on `OTR_VideoDirector`.** Its
+`custom_models_json` covers the image roles too and resolves the
+`+ Add Custom Model` sentinel before `OTR_ImageDirector` sees it, so the queue
+check and the render read the same engine (see `IMAGE_MODELS.md`).
+
+Test it with the existing CPU contract tests before a live leg: the adapter's
+real init/reference file, every role it claims, a no-image lane making zero
+image calls, distinct scene / reference / mesh decoys, seed identity, and
+missing/unknown handling (`tests/test_still_spine_engine_coverage.py`,
+`tests/test_portrait_free_roles.py`, `tests/test_custom_image_has_one_owner.py`).
+Mock checks do not replace a live leg's proof of face quality, duration, model
+availability or cost.
+
 **Every per-artifact constant must travel with the lane (preflight G1.3).**
 If you build your lane as a SIBLING of an existing one, make the model filename,
 byte floor, recipe receipt and quant token **class attributes your sibling can

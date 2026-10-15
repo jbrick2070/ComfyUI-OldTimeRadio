@@ -2,10 +2,12 @@
 
 ``workflows/otr_canonical.json`` wires node 87 (OTR_VideoDirector) to node 88
 (OTR_ImageDirector) and to node 90 (OTR_ShotLock). Node 88 feeds node 89
-(MetaBrief) and node 91 (the dispatcher). There is NO 89 -> 90 edge: the image
-branch and the video branch are INDEPENDENT and only reconverge at node 91.
-Node 87 is therefore the unique common ancestor, and the only place a route
-freeze can inform both branches.
+(MetaBrief) and node 91 (the dispatcher). When this was written the image and
+video branches were independent; since the still-spine fix MetaBrief also reads
+ShotLock's patched ledger (90 -> 89, pinned by
+tests/test_canonical_still_spine_wiring.py), so ShotLock's drift guard runs
+before the image phase. Node 87 is still where the route is frozen, once, for
+every consumer.
 
 These tests pin that wiring, the environment guard, and -- most importantly --
 the decapitation regression the freeze exists to fix.

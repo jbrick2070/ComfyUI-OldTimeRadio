@@ -527,12 +527,16 @@ class OTRVideoDirector:
 
         # THE ROUTE FREEZE (2026-07-25, multi-clip coverage chunk 1b; kibitz r4
         # codex gpt-5.6-sol high + agy, then a six-way grounded Sonnet fan-out).
-        # This node is the UNIQUE COMMON ANCESTOR of both downstream branches --
-        # verified against workflows/otr_canonical.json's link list, node 89
-        # (MetaBrief) and node 90 (ShotLock) are INDEPENDENT branches that
-        # reconverge at node 91, with no 89->90 edge. Ascending node ids are NOT
-        # an execution order. So a freeze taken at ShotLock can never inform the
-        # image phase, and node 87 is the only point that can inform both.
+        # This node is where the route is frozen, once, for every consumer.
+        # When this was written, node 89 (MetaBrief) and node 90 (ShotLock)
+        # were independent branches. Since the still-spine fix MetaBrief reads
+        # ShotLock's patched ledger (link 90->89, pinned by
+        # tests/test_canonical_still_spine_wiring.py), so ShotLock's drift
+        # guard -- which compares this snapshot with the live env -- now runs
+        # BEFORE the image phase, and render has a second guard. That is why
+        # the image consumers' own route lookups were left alone (plan item 8,
+        # 2026-10-14: nothing in the pack mutates the routing env in-process,
+        # so a drifted route is refused before an image is planned).
         # Everything downstream consumes THIS map instead of re-deriving the
         # route from ambient env.
         from ._otr_shared import route_freeze as _rf
