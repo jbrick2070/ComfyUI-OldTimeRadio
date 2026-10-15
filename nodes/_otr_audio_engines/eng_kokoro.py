@@ -64,9 +64,10 @@ KOKORO_ONNX_REPO_ID = "onnx-community/Kokoro-82M-v1.0-ONNX"
 # auto-waterfall. The voice node threads the CastLock ledger stamp
 # (meta.voice_device) onto the adapter as ``requested_device``; a device the
 # host cannot provide fails LOUD in KPipeline -- never a silent downgrade to a
-# 10x slower backend. The ONNX backend is CPU by design and says so once at
-# load (it is not a downgrade from anything: there is no ONNX-CUDA path in the
-# pack, and an 82M model runs ~6x realtime on CPU).
+# 10x slower backend. The ONNX backend runs on CUDA when the installed
+# onnxruntime offers it and the ledger asks for cuda, on CPU otherwise, and
+# logs the provider it got once at load. CPU is not a downgrade there: an 82M
+# model runs ~6x realtime on CPU, and the pack declares the CPU onnxruntime.
 
 
 def _kokoro_model_dir() -> str:
@@ -289,8 +290,9 @@ class KokoroEngine:
             try:
                 voices_npz = _kb.ensure_voices_npz(_kokoro_voices_dir())
                 providers = _kb.parse_onnx_providers(otr_env.get("OTR_KOKORO_ONNX_PROVIDERS"))
-                backend = _kb.OnnxKokoroBackend(model_path, voices_npz, providers,
-                                                lang_code=lang)
+                backend = _kb.OnnxKokoroBackend(
+                    model_path, voices_npz, providers, lang_code=lang,
+                    prefer_gpu=str(device).lower().startswith("cuda"))
                 backend.load()
             except _kb.BackendUnavailable as exc:
                 raise self._unusable(EngineUsabilityReason.MALFORMED_CONFIG, str(exc)) from exc
@@ -299,11 +301,14 @@ class KokoroEngine:
                     EngineUsabilityReason.MALFORMED_CONFIG,
                     "kokoro ONNX backend failed to load (%s: %s)" % (type(exc).__name__, exc),
                 ) from exc
+            on_gpu = "CUDAExecutionProvider" in backend.providers_active
             log.info(
-                "[OTR.kokoro] backend=onnx provider=%s threads=%d lang=%s model=%s; the "
-                "ledger's voice_device=%r is not used by this backend (CPU by design)",
+                "[OTR.kokoro] backend=onnx provider=%s threads=%d lang=%s model=%s; "
+                "ledger voice_device=%r -> %s",
                 ",".join(backend.providers_active), backend.threads, lang, model_path,
-                device)
+                device, "on GPU" if on_gpu else (
+                    "on CPU (no working CUDA in this onnxruntime; onnxruntime-gpu "
+                    "adds it)" if str(device).lower().startswith("cuda") else "on CPU"))
         self._backend = backend
         self._backend_name = name
         self._backend_key = cache_key

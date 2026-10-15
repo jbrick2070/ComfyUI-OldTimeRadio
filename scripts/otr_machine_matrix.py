@@ -457,7 +457,8 @@ def render() -> str:
       "(`--profile` is the flag name on both scripts; it selects a row by id). "
       "Every machine row selects the Kokoro voice. On the Python 3.13 that "
       "ComfyUI Desktop and the portable build ship it runs through kokoro-onnx "
-      "on the CPU (the same voices, about six times faster than realtime); on "
+      "on the CPU (the same voices, about six times faster than realtime), or "
+      "on CUDA by itself when onnxruntime-gpu is installed; on "
       "Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro "
       "backend packaged yet; there, switch the OTR_CastLock voice dropdowns "
       "to bark.")
@@ -652,7 +653,7 @@ def inject_readme(check_only: bool = False) -> bool:
 # from the code; the ships column is the one hand-kept fact per engine, and it
 # is a fact about packaging, not about capability.
 _VOICE_SHIP_NOTES = {
-    "kokoro": "ships: `kokoro` (torch) on Python 3.12, `kokoro-onnx` (CPU) on 3.13; "
+    "kokoro": "ships: `kokoro` (torch) on Python 3.12, `kokoro-onnx` on 3.13 (CPU; CUDA with onnxruntime-gpu); "
               "voices and the ONNX model fetch once at boot",
     "bark": "ships: weights download on first use (about 4 GB)",
     "indextts2": "install it yourself: `scripts/_otr_indextts2_install.ps1` plus your "

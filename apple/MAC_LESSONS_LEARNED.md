@@ -77,11 +77,11 @@ driver) mapped into the address space and `IOAccelerator` regions resident.
 
 * **Kokoro TTS** -- `voice_device="mps"` is accepted by the widget and unused by
   the engine. On Python 3.13 the backend is `kokoro-onnx` (the torch `kokoro`
-  line is gated `python_version < "3.13"`), and its onnxruntime session is built
-  from an explicit CPU-by-default provider list. **This is deliberate: the ONNX
-  backend is what makes Kokoro auto-install on 3.13 at all.** The code logs the
-  device stamp as unused. The defect is only that the dropdown still offers
-  `mps` as if it did something.
+  line is gated `python_version < "3.13"`), and its onnxruntime session runs on
+  CPU unless the ledger asks for cuda AND the installed onnxruntime offers CUDA.
+  **This is deliberate: the ONNX backend is what makes Kokoro auto-install on
+  3.13 at all.** The load log names the provider it got. The defect is only that
+  the dropdown still offers `mps` as if it did something.
 * **Upscale lane** -- `_otr_upscale_engines/_resolve.py` rejects `mps` outright,
   by documented intent, and raises rather than degrading.
 * **VRAM budgeter** -- `total_vram` comes from `torch.cuda.get_device_properties`

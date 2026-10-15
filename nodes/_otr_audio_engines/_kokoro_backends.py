@@ -13,10 +13,12 @@ per_line interface, and only the synthesis call differs:
   call over the full line). The RTX 5080's 3.12 venv keeps selecting it and its
   output is byte-identical to the pre-change engine; that is proven by sha256,
   not asserted (a 5080 torch-baseline sha256 receipt from 2026-09-02).
-* ``OnnxKokoroBackend`` -- CPU by design: an 82M model runs six times faster than
-  realtime on CPU, the 8 GB tier's GPU is owed to the video engine, and
-  onnxruntime-gpu would drag CUDA DLL matching into a voice. The CastLock ledger's
-  ``voice_device`` stamp is logged as unused by this backend, once, at load.
+* ``OnnxKokoroBackend`` -- CUDA when it is there, CPU otherwise (operator
+  2026-10-14). The pack declares the CPU ``onnxruntime``, so most installs voice
+  on CPU, where an 82M model runs about six times faster than realtime. A user
+  who installs ``onnxruntime-gpu`` gets CUDA without setting anything, as long as
+  the CastLock ledger's ``voice_device`` asks for cuda. A CUDA session that cannot
+  start (CUDA DLL matching) falls back to CPU with one warning, never a failed run.
 
 ONE VOICE SOURCE. The ONNX backend reuses the ``voices/<id>.pt`` files the boot
 prefetch already places (hexgrad/Kokoro-82M): they are float32 tensors of shape
@@ -80,10 +82,14 @@ ONNX_CREATE_KWARGS = {
     "clause_pause": 0.1,
 }
 
-#: CPU by design (see the module docstring). ``OTR_KOKORO_ONNX_PROVIDERS`` is the
-#: only override, for an operator who deliberately installed an accelerated
-#: onnxruntime build and wants to use it.
+#: The floor every build has. With ``OTR_KOKORO_ONNX_PROVIDERS`` unset the
+#: backend picks AUTOMATICALLY at load (operator 2026-10-14): CUDA first, then
+#: CPU, when the installed onnxruntime offers ``CUDAExecutionProvider`` (an
+#: ``onnxruntime-gpu`` install) and the ledger asked for a cuda voice device;
+#: this list otherwise. Setting the variable names the list exactly, and a
+#: provider it names that the build lacks is refused.
 DEFAULT_ONNX_PROVIDERS = ("CPUExecutionProvider",)
+GPU_ONNX_PROVIDERS = ("CUDAExecutionProvider", "CPUExecutionProvider")
 
 #: Intra-op thread cap so a 16-thread session does not fight the video encode
 #: running beside it; RTF measured under this cap is ~0.15 on the dev box.
@@ -165,15 +171,15 @@ def select_backend_name(env_value=None) -> str:
     return "onnx"
 
 
-def parse_onnx_providers(env_value=None) -> list:
-    """``OTR_KOKORO_ONNX_PROVIDERS`` as a list, or the CPU default when unset.
+def parse_onnx_providers(env_value=None):
+    """``OTR_KOKORO_ONNX_PROVIDERS`` as a list, or ``None`` (pick at load) when unset.
 
     An empty or whitespace list RAISES rather than passing ``providers=[]`` to
-    onnxruntime, which would mean "every available provider" and silently undo
-    the CPU pin.
+    onnxruntime, which would mean "every available provider" and silently pick
+    for the operator who tried to name one.
     """
     if env_value is None:
-        return list(DEFAULT_ONNX_PROVIDERS)
+        return None
     names = [p.strip() for p in str(env_value).split(",")]
     names = [p for p in names if p]
     if not names:
@@ -747,9 +753,12 @@ class OnnxKokoroBackend:
     name = "onnx"
 
     def __init__(self, model_path: str, voices_npz: str, providers=None, threads=None,
-                 lang_code: str = "b"):
+                 lang_code: str = "b", prefer_gpu: bool = True):
         self.model_path = model_path
         self.voices_npz = voices_npz
+        # None = pick at load (GPU when the build has it and prefer_gpu, else CPU).
+        self.auto = providers is None
+        self.prefer_gpu = bool(prefer_gpu)
         self.providers = list(providers or DEFAULT_ONNX_PROVIDERS)
         self.threads = int(threads or min(ONNX_THREAD_CAP, os.cpu_count() or 1))
         self.lang_code = str(lang_code or "b").strip() or "b"
@@ -771,12 +780,15 @@ class OnnxKokoroBackend:
         from kokoro_onnx import Kokoro
 
         available = list(ort.get_available_providers())
+        if self.auto:
+            gpu = self.prefer_gpu and GPU_ONNX_PROVIDERS[0] in available
+            self.providers = list(GPU_ONNX_PROVIDERS if gpu else DEFAULT_ONNX_PROVIDERS)
         unknown = [p for p in self.providers if p not in available]
         if unknown:
             raise BackendUnavailable(
                 "onnxruntime provider(s) %s are not available in this build "
-                "(available: %s); unset OTR_KOKORO_ONNX_PROVIDERS for the CPU default"
-                % (unknown, available))
+                "(available: %s); unset OTR_KOKORO_ONNX_PROVIDERS to let the "
+                "pack pick" % (unknown, available))
         # phonemizer logs "words count mismatch on 100.0% of the lines" at WARNING
         # for every line whose phoneme count differs from its word count -- which is
         # every line kokoro-onnx hands it, by design of its punctuation handling.
@@ -784,8 +796,7 @@ class OnnxKokoroBackend:
         logging.getLogger("phonemizer").setLevel(logging.ERROR)
         options = ort.SessionOptions()
         options.intra_op_num_threads = self.threads
-        session = ort.InferenceSession(
-            self.model_path, sess_options=options, providers=self.providers)
+        session = self._open_session(ort, options)
         kokoro = Kokoro.from_session(session, self.voices_npz)
         # After the session (it points phonemizer at kokoro-onnx's espeak-ng),
         # and before anything is kept: a phonemizer that fails to build leaves
@@ -798,6 +809,33 @@ class OnnxKokoroBackend:
             g2p = None
         self._session, self._kokoro, self._g2p = session, kokoro, g2p
         self.providers_active = list(session.get_providers())
+
+    def _open_session(self, ort, options):
+        """The session on ``self.providers``. An AUTOMATIC GPU pick that cannot
+        open -- a CUDA or cuDNN DLL the onnxruntime-gpu build does not find,
+        which onnxruntime reports either by raising or by quietly running
+        without CUDA -- falls back to the CPU floor and says so once. The GPU
+        is an opportunity here, never a requirement, so it never fails a run.
+        An explicit OTR_KOKORO_ONNX_PROVIDERS list gets no fallback."""
+        gpu = GPU_ONNX_PROVIDERS[0]
+        if not (self.auto and gpu in self.providers):
+            return ort.InferenceSession(
+                self.model_path, sess_options=options, providers=self.providers)
+        try:
+            session = ort.InferenceSession(
+                self.model_path, sess_options=options, providers=self.providers)
+        except Exception as exc:  # noqa: BLE001 -- any GPU failure degrades
+            reason = "%s: %s" % (type(exc).__name__, exc)
+            session = None
+        else:
+            if gpu in session.get_providers():
+                return session
+            reason = "onnxruntime opened the session without CUDA"
+        log.warning("[OTR.kokoro] ONNX on CUDA did not start (%s); voicing on CPU",
+                    reason[:300])
+        self.providers = list(DEFAULT_ONNX_PROVIDERS)
+        return ort.InferenceSession(
+            self.model_path, sess_options=options, providers=self.providers)
 
     def voice_ids(self) -> list:
         return list(self._kokoro.get_voices()) if self._kokoro is not None else []

@@ -93,7 +93,7 @@ def test_selection_is_re_evaluated_per_call(monkeypatch):
 
 
 def test_provider_list_parsing_rejects_empty():
-    assert kb.parse_onnx_providers(None) == ["CPUExecutionProvider"]
+    assert kb.parse_onnx_providers(None) is None    # unset: the backend picks at load
     assert kb.parse_onnx_providers("CUDAExecutionProvider, CPUExecutionProvider") == [
         "CUDAExecutionProvider", "CPUExecutionProvider"]
     with pytest.raises(kb.BackendUnavailable):
@@ -172,35 +172,77 @@ def test_onnx_unknown_voice_and_wrong_rate_fail_by_name():
         backend.synthesize("hello", "bm_george", 0.95)
 
 
-def test_onnx_session_is_built_with_the_explicit_provider_list(monkeypatch):
-    seen = {}
+_CUDA, _CPU = "CUDAExecutionProvider", "CPUExecutionProvider"
+
+
+def _fake_ort_with(monkeypatch, available, *, cuda_raises=False, cuda_silently_dropped=False):
+    """A fake onnxruntime. ``cuda_raises``: a CUDA session fails to build (a
+    missing cuDNN DLL). ``cuda_silently_dropped``: it builds but runs without
+    CUDA, which onnxruntime does when the provider cannot initialise."""
+    opened = []
 
     class _Session:
         def __init__(self, path, sess_options=None, providers=None):
-            seen["path"] = path
-            seen["providers"] = providers
-            seen["threads"] = sess_options.intra_op_num_threads
+            opened.append(list(providers))
+            self.threads = sess_options.intra_op_num_threads
+            if _CUDA in providers and cuda_raises:
+                raise RuntimeError("cudnn64_9.dll not found")
+            self._active = ([p for p in providers if p != _CUDA]
+                            if cuda_silently_dropped else list(providers))
 
         def get_providers(self):
-            return list(seen["providers"])
+            return list(self._active)
 
     class _Options:
         intra_op_num_threads = 0
 
-    fake_ort = types.SimpleNamespace(
+    monkeypatch.setitem(sys.modules, "onnxruntime", types.SimpleNamespace(
         InferenceSession=_Session, SessionOptions=_Options,
-        get_available_providers=lambda: ["CUDAExecutionProvider", "CPUExecutionProvider"])
-    monkeypatch.setitem(sys.modules, "onnxruntime", fake_ort)
+        get_available_providers=lambda: list(available)))
     monkeypatch.setitem(sys.modules, "kokoro_onnx", types.SimpleNamespace(
         Kokoro=types.SimpleNamespace(from_session=lambda s, v: _StubKokoro())))
-    monkeypatch.setenv("ONNX_PROVIDER", "CUDAExecutionProvider")   # kokoro-onnx's own knob is ignored
+    return opened
+
+
+def test_onnx_picks_cuda_by_itself_when_the_build_offers_it(monkeypatch):
+    opened = _fake_ort_with(monkeypatch, [_CUDA, _CPU])
+    monkeypatch.setenv("ONNX_PROVIDER", _CPU)   # kokoro-onnx's own knob is ignored
     backend = kb.OnnxKokoroBackend("m.onnx", "v.npz")
     backend.load()
-    assert seen["providers"] == ["CPUExecutionProvider"]
-    assert 1 <= seen["threads"] <= kb.ONNX_THREAD_CAP
+    assert opened == [[_CUDA, _CPU]] and backend.providers_active == [_CUDA, _CPU]
+    assert 1 <= backend._session.threads <= kb.ONNX_THREAD_CAP
+
+
+def test_onnx_stays_on_cpu_without_a_cuda_build_or_a_cuda_ledger(monkeypatch):
+    opened = _fake_ort_with(monkeypatch, [_CPU])
+    kb.OnnxKokoroBackend("m.onnx", "v.npz").load()
+    _fake_ort_with(monkeypatch, [_CUDA, _CPU])
+    cpu_ledger = kb.OnnxKokoroBackend("m.onnx", "v.npz", prefer_gpu=False)
+    cpu_ledger.load()
+    assert opened == [[_CPU]] and cpu_ledger.providers_active == [_CPU]
+
+
+@pytest.mark.parametrize("how", ["cuda_raises", "cuda_silently_dropped"])
+def test_a_cuda_that_will_not_start_falls_back_to_cpu_and_never_fails(monkeypatch, caplog, how):
+    opened = _fake_ort_with(monkeypatch, [_CUDA, _CPU], **{how: True})
+    backend = kb.OnnxKokoroBackend("m.onnx", "v.npz")
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        backend.load()
+    assert opened == [[_CUDA, _CPU], [_CPU]]
+    assert backend.providers_active == [_CPU] and backend.providers == [_CPU]
+    assert any("voicing on CPU" in r.getMessage() for r in caplog.records)
+
+
+def test_an_explicit_provider_list_is_exact_and_strict(monkeypatch):
+    opened = _fake_ort_with(monkeypatch, [_CUDA, _CPU])
+    kb.OnnxKokoroBackend("m.onnx", "v.npz", providers=[_CPU]).load()
+    assert opened == [[_CPU]]                       # named CPU: no GPU pick
     bad = kb.OnnxKokoroBackend("m.onnx", "v.npz", providers=["DmlExecutionProvider"])
     with pytest.raises(kb.BackendUnavailable, match="not available"):
         bad.load()
+    _fake_ort_with(monkeypatch, [_CUDA, _CPU], cuda_raises=True)
+    with pytest.raises(RuntimeError, match="cudnn"):  # named CUDA: no silent fallback
+        kb.OnnxKokoroBackend("m.onnx", "v.npz", providers=[_CUDA, _CPU]).load()
 
 
 # --------------------------------------------------------------------------- #
@@ -250,9 +292,11 @@ class _StubOnnxBackend:
     name = "onnx"
     instances: list = []
 
-    def __init__(self, model_path, voices_npz, providers=None, threads=None, lang_code="b"):
+    def __init__(self, model_path, voices_npz, providers=None, threads=None, lang_code="b",
+                 prefer_gpu=True):
         self.model_path, self.voices_npz = model_path, voices_npz
         self.lang_code = lang_code
+        self.prefer_gpu = prefer_gpu
         self.providers_active = ["CPUExecutionProvider"]
         self.threads = 4
         self.closed = False
@@ -293,7 +337,9 @@ def test_engine_onnx_path_logs_the_ledger_device_and_returns_the_contract(monkey
     assert float(out["waveform"].abs().max()) == pytest.approx(0.9)
     assert eng._backend_name == "onnx"
     text = " ".join(r.getMessage() for r in caplog.records)
-    assert "backend=onnx" in text and "voice_device='cuda'" in text and "CPU by design" in text
+    assert "backend=onnx" in text and "voice_device='cuda'" in text
+    assert "on CPU (no working CUDA" in text      # the stub ran on CPU: say why
+    assert _StubOnnxBackend.instances[-1].prefer_gpu is True
     assert "lang=b" in text
     eng.unload()
     assert eng._backend is None and _StubOnnxBackend.instances[-1].closed
