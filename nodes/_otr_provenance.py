@@ -28,10 +28,12 @@ manner specified", which does not mean read aloud mid-drama.
 
 Terminal = the publication boundary, not the freeze (2026-08-15, build contract
 D5a). ``blocks_publish`` feeds ``_otr_publication_eligibility``, whose receipt
-Phase 10 stamps and ``OTR_MasterAudioMux`` consumes: a research_only episode
-still freezes and still keeps its ARCHIVAL final, and only the OBS copy -- the
-published deliverable -- is withheld. ``G14`` in ``run_gap_audit`` reports the
-same fact as a WARNING so the audit still explains why. Raising
+Phase 10 stamps and ``OTR_MasterAudioMux`` reads: a research_only episode
+freezes, keeps its ARCHIVAL final and, since 2026-10-15 (operator ruling: every
+finished episode is published to OBS regardless of rights), is published too --
+the receipt is advisory, reported and recorded, never a gate. ``G14`` in
+``run_gap_audit`` reports the same fact as a WARNING so the audit still
+explains why. Raising
 ``FreezeAssertionError`` would enforce the rule by destroying a finished
 render and leave the operator without even the copy a research-only source is
 cleared for. Pure; never raises. Self-contained. UTF-8 no BOM, SFW.

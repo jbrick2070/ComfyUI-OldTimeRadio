@@ -892,7 +892,11 @@ def test_a_singleton_that_moves_mid_run_is_not_written(
     current = {"path": mine}
     monkeypatch.setattr(OTRL, "in_flight_ledger_path", lambda: current["path"])
     monkeypatch.setattr(MUX, "_publication_decision", lambda path: types.SimpleNamespace(
-        publishable=False, summary=lambda: "withheld for the test"))
+        publishable=False, summary=lambda: "not cleared for the test"))
+    # Every finished episode is published (2026-10-15), so the OBS copy is
+    # stubbed: this test is about the stamp, not about ffmpeg.
+    monkeypatch.setattr(MUX.OTRMasterAudioMux, "_publish_to_obs",
+                        lambda self, final: str(obs / "ep1_final.mp4"))
     final = str(episodes.root / "ep1" / "ep1_silent_final.mp4")
 
     def mux_then_move(*a, **k):

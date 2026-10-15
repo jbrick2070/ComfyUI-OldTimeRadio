@@ -107,14 +107,19 @@ def test_unrelated_input_fails_before_any_media_write(episode, mismatch):
     assert calls == []
 
 
-def test_withheld_required_delivery_fails_but_keeps_archive(episode):
+def test_a_required_delivery_publishes_even_when_the_rights_receipt_did_not_clear(episode):
+    """Operator ruling 2026-10-15: every finished episode lands in otr/obs
+    regardless of rights. A research-only receipt is reported, not a gate, so a
+    story that must publish does, and the contract is verified on disk and on
+    the ledger."""
     args, data, path, obs, final, calls = episode
     data["meta"]["provenance"] = {"status": "research_only", "blocks_publish": True}
     PE.stamp_publication_eligibility(data)
     path.write_text(json.dumps(data), encoding="utf-8")
-    with pytest.raises(MUX.DeliveryContractError, match="withheld"):
-        MUX.OTRMasterAudioMux().mux(**args)
-    assert final.is_file() and not obs.exists() and calls == ["mux"]
+    _result, report = MUX.OTRMasterAudioMux().mux(**args)["result"]
+    assert final.is_file() and obs.is_file() and calls == ["mux", "publish"]
+    assert "rights receipt did not clear" in report and "delivery OK" in report
+    assert json.loads(path.read_text())["meta"]["obs_final_path"] == str(obs)
 
 
 def test_failed_stamp_cannot_claim_delivery(episode, monkeypatch):

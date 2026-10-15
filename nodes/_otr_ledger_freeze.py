@@ -726,11 +726,11 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
 #
 # The block now lands where publication happens. `_otr_publication_eligibility`
 # is the ONE producer of the durable verdict -- stamped by Phase 10 below, from
-# this same `blocks_publish` fact -- and OTR_MasterAudioMux consumes it: the
-# archival final is written either way and only the OBS copy is withheld.
-# Nothing weakened: "blocks publish" still blocks publish, deterministically,
-# and now says so in a receipt instead of in a traceback. This diagnostic stays
-# because the audit report is where an operator looks to find out WHY.
+# this same `blocks_publish` fact -- and OTR_MasterAudioMux reads it. Since
+# 2026-10-15 it is ADVISORY (operator ruling: every finished episode is
+# published to OBS regardless of rights): the mux reports a receipt that did not
+# clear and the ledger records it, but nothing is withheld. This diagnostic
+# stays because the audit report is where an operator looks to find out WHY.
 
 
 def _check_g14_provenance_publish(
@@ -945,9 +945,10 @@ def _stamp_publication_eligibility(ledger_data: dict) -> None:
     read-only guarantee quietly stops being true.
 
     Fail-soft. A publication receipt that could not be computed leaves the field
-    ABSENT, and an absent receipt is read as BLOCKED by the consumer -- so the
-    failure mode of this stamper is a withheld OBS copy, never a false claim of
-    clearance.
+    ABSENT, and an absent receipt is read as NOT CLEARED by the consumer -- so
+    the failure mode of this stamper is a warning in the mux report, never a
+    false claim of clearance. (The receipt no longer gates the OBS copy:
+    operator ruling 2026-10-15.)
     """
     try:
         try:
@@ -960,14 +961,16 @@ def _stamp_publication_eligibility(ledger_data: dict) -> None:
     except Exception as exc:  # noqa: BLE001 -- see the fail-soft note above
         log.warning(
             "[LFC:phase_10] publication eligibility not stamped (%s: %s) -- "
-            "the terminal mux will withhold the OBS copy until it is",
+            "the terminal mux will report the receipt as absent (it still "
+            "publishes to OBS)",
             type(exc).__name__, exc,
         )
         return
     if not eligibility.eligible:
         log.warning(
-            "[LFC:phase_10] publication BLOCKED for this episode (%s) -- the "
-            "archival final is still produced; the OBS copy is withheld",
+            "[LFC:phase_10] rights receipt did not clear for this episode "
+            "(%s) -- recorded on the ledger; the episode is still published "
+            "to OBS (operator ruling 2026-10-15)",
             ", ".join(eligibility.blocking_reasons) or "unspecified",
         )
 

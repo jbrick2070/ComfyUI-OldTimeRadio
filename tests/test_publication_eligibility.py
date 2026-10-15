@@ -359,22 +359,25 @@ class TestObsAliasesOnSave:
         assert saved["meta"]["paths"]["obs_final"]
         assert saved["meta"]["paths"]["obs_dir"]
 
-    def test_a_blocked_episode_carries_NO_obs_path_at_either_alias(self, workspace):
-        """A path key reads as "the deliverable is there" to every downstream
-        reader. On a blocked episode nothing ever arrives at it."""
+    def test_a_not_cleared_episode_still_carries_its_obs_pointers(self, workspace):
+        """Operator ruling 2026-10-15: every finished episode is published to
+        OBS, so the ledger no longer strips the pointers when the rights
+        receipt did not clear -- they tell the truth about where it went."""
         saved = self._saved(workspace, _RESEARCH)
-        assert "obs_final" not in saved["meta"]["paths"]
-        assert "obs_dir" not in saved["meta"]["paths"]
-        assert "obs_final_path" not in saved["meta"]
+        assert saved["meta"]["paths"]["obs_final"]
+        assert saved["meta"]["paths"]["obs_dir"]
+        # The receipt itself stays on the ledger as the record.
+        assert saved["meta"][PE.PUBLICATION_ELIGIBILITY_META_KEY]["eligible"] is False
 
-    def test_a_stale_published_claim_is_cleared_when_the_block_lands(self, workspace):
+    def test_a_published_claim_survives_a_not_cleared_receipt(self, workspace):
         led = _ledger(_RESEARCH, _NAMED)
-        led["meta"]["obs_final_path"] = str(
+        claimed = str(
             workspace.parent.parent.parent.parent / "obs" / "the_test_episode.mp4")
+        led["meta"]["obs_final_path"] = claimed
         PE.stamp_publication_eligibility(led)
         assert OTRL.save_ledger_safe(workspace, led) is True
         saved = json.loads(workspace.read_text(encoding="utf-8"))
-        assert "obs_final_path" not in saved["meta"]
+        assert saved["meta"]["obs_final_path"]
 
     def test_a_ledger_with_no_receipt_is_left_alone(self, workspace):
         """"We cannot tell" is not "we know it is blocked" -- the producer side
@@ -504,17 +507,20 @@ class TestMuxStampAndCacheKey:
         PE.stamp_publication_eligibility(led)
         assert OTRL.save_ledger_safe(episode["ledger_path"], led) is True
 
-    def test_a_withheld_publication_still_stamps_the_archival_final(self, episode):
+    def test_a_not_cleared_episode_stamps_its_obs_pointer_like_any_other(self, episode):
+        """2026-10-15: a receipt that did not clear no longer withholds the
+        copy, so the terminal stamp records where it was published."""
         self._write(episode, _RESEARCH)
+        obs = str(episode["ledger_path"].parents[3] / "obs" / "the_test_episode.mp4")
+        Path(obs).write_bytes(b"published")
         line = MUX.OTRMasterAudioMux()._stamp_terminal_paths(
-            episode["final"], None, episode["audio"],
+            episode["final"], obs, episode["audio"],
             MUX._episode_stem(episode["video"]))
         saved = json.loads(episode["ledger_path"].read_text(encoding="utf-8"))
-        assert "publication withheld" in line
+        assert "obs_final_path ->" in line
         assert saved["final_video_path"] == episode["final"]
         assert saved["final_audio_path"] == episode["audio"]
-        assert "obs_final_path" not in saved["meta"]
-        assert "obs_final" not in saved["meta"]["paths"]
+        assert saved["meta"]["obs_final_path"]
 
     def test_a_published_episode_stamps_the_obs_pointer(self, episode):
         self._write(episode, _CLEARED)
@@ -588,46 +594,40 @@ class TestMuxStampAndCacheKey:
             episode["video"], episode["audio"])["result"]
         return path, report, published
 
-    def test_an_INELIGIBLE_episode_still_SUCCEEDS_and_keeps_its_final(
+    def test_an_episode_whose_rights_did_not_clear_is_published_and_says_so(
             self, episode, monkeypatch):
-        """The acceptance assertion for D5a, and the whole reason this chunk
-        exists: withholding a copy is not failing a render."""
+        """Operator ruling 2026-10-15, which reverses the D5a acceptance
+        assertion this test used to be: every finished episode reaches otr/obs
+        regardless of rights. The receipt is advisory -- it is reported, in the
+        report line and the log, and never withholds the copy."""
         self._write(episode, _RESEARCH)
         path, report, published = self._run_mux(episode, monkeypatch)
         assert path == episode["final"]
-        assert published == []
-        assert "obs_publish BLOCKED" in report
-        assert "obs_publish OK" not in report
+        assert published == [episode["final"]]
+        assert "obs_publish OK" in report
+        assert "rights receipt did not clear" in report
+        assert "BLOCKED" not in report
         saved = json.loads(episode["ledger_path"].read_text(encoding="utf-8"))
         assert saved["final_video_path"] == episode["final"]
-        assert "obs_final_path" not in saved["meta"]
-        assert "obs_final" not in saved["meta"]["paths"]
 
-    def test_output_path_is_NOT_a_back_door_into_obs_for_a_blocked_episode(
+    def test_output_path_into_obs_is_honoured_when_rights_did_not_clear(
             self, episode, monkeypatch, tmp_path):
-        """Withholding the published COPY while the archival write lands in the
-        watch folder anyway would satisfy the code and defeat the rule.
-
-        `output_path` is an operator widget, so it can name any destination --
-        including obs. On a blocked episode that destination is refused and the
-        archival final goes to the episode dir instead. Found by the agy QA
-        pass; this is the narrow version of it, so `output_path` keeps its
-        meaning everywhere else.
-        """
+        """Operator ruling 2026-10-15: obs is where every finished episode
+        goes, so the old refusal of an `output_path` inside obs on a blocked
+        episode is gone. `output_path` keeps its plain meaning."""
         self._write(episode, _RESEARCH)
         obs_dir = tmp_path / "output" / "otr" / "obs"
         monkeypatch.setattr(MUX, "_obs_dir", lambda: obs_dir)
         seen = _record_mux_destination(monkeypatch)
         monkeypatch.setattr(
             MUX.OTRMasterAudioMux, "_publish_to_obs",
-            lambda self, final: pytest.fail("a blocked episode published"),
+            lambda self, final: "obs/copy.mp4",
         )
-        smuggled = str(obs_dir / "sneaky_final.mp4")
+        chosen = str(obs_dir / "operator_final.mp4")
         path, report = MUX.OTRMasterAudioMux().mux(
-            episode["video"], episode["audio"], output_path=smuggled)["result"]  # {"ui", "result"} envelope since 2026-09-13
-        assert not MUX._is_inside_obs_dir(seen["out"]), seen["out"]
-        assert not MUX._is_inside_obs_dir(path), path
-        assert "obs_publish BLOCKED" in report
+            episode["video"], episode["audio"], output_path=chosen)["result"]  # {"ui", "result"} envelope since 2026-09-13
+        assert seen["out"] == chosen and path == chosen
+        assert "obs_publish OK" in report
 
     @pytest.mark.parametrize("variant", [
         "exact", "upper", "mixed", "trailing_sep", "the_dir_itself", "dotdot",

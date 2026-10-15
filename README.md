@@ -257,12 +257,12 @@ looking in the UI, found nothing, and only then found the files.
 That folder is the finish line, and the console tells you what
 happened. **`LOUD publish: final episode -> <path>`** names the published
 file the moment it lands, and the end-of-run summary repeats it as
-**`obs_publish OK -> <path>`**. **`obs_publish BLOCKED`** means the published
-copy was withheld, because the episode's rights receipt did not clear; the
-archival final is in `otr/episodes/<episode>/`. That is not a verdict on the
-run by itself -- most banks finish normally, but a My Story episode (picked or
-rolled) has to be published and fails right after -- so read the run's own
-final status too. **No publish line of either kind** means the run did not
+**`obs_publish OK -> <path>`**. Every finished episode is published, whatever
+its source's rights receipt says: if the receipt did not clear, the line adds
+`(rights receipt did not clear: ...)` and the console warns, but the episode is
+still in `otr/obs/`. A My Story episode (picked or rolled) is also checked
+against its delivery record and fails the run if that cannot be confirmed, so
+read the run's own final status too. **No publish line** means the run did not
 finish, however green the console looked.
 [apple/RUN.md](apple/RUN.md#find-it) has the full reading; for failures go to
 [When something goes wrong](#when-something-goes-wrong).
@@ -772,11 +772,9 @@ hours for a three-act foley episode. As long as the progress bars keep moving,
 leave it.
 
 **It finished but nothing is in `otr/obs/`.** Find the publish line in the
-console first, because there are two different answers. `obs_publish
-BLOCKED` means the published copy was withheld because the rights receipt did
-not clear, and the archival final is in `otr/episodes/<episode>/`; whether the
-run itself succeeded is its own final status (a My Story episode, picked or
-rolled, fails right there). No publish line at all means a real failure:
+console first. Every finished episode is published, so a missing file means the
+run did not finish (or `OTR_OBS_DIR` points somewhere other than the folder you
+are watching). No publish line at all means a real failure:
 read the console from the end backwards for the first error, and if it has been
 quiet for more than five minutes after the downloads finished, it is not going
 to finish.

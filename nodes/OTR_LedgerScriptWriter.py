@@ -4058,9 +4058,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # source still BLOCKS publish, deterministically -- but at the
         # publication boundary now, not the freeze (2026-08-15, build contract
         # D5a): `blocks_publish` feeds the publication-eligibility receipt that
-        # Phase 10 stamps and OTR_MasterAudioMux consumes, so the episode keeps
-        # its archival final and only the OBS copy is withheld. G14 in the gap
-        # audit reports the same fact as a warning.
+        # Phase 10 stamps and OTR_MasterAudioMux reads. Since 2026-10-15 the
+        # receipt is ADVISORY (operator ruling: every finished episode is
+        # published to OBS regardless of rights): it is reported and recorded,
+        # and never withholds the copy. G14 in the gap audit reports the same
+        # fact as a warning.
         # ACTIVE on public_domain and shakespeare (nodes/story_packs/banks.json),
         # pinned by tests/test_provenance_v4.py. This comment read "inert for
         # every current bank" for a day after both banks opted in on 2026-08-04,

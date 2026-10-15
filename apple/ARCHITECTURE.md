@@ -64,11 +64,11 @@ node's list.
 
 - Per-episode working files: `otr/episodes/<episode>/` (the ledger, the master
   audio, the clips, the intermediate videos).
-- The finished episode: `otr/obs/`, once its rights receipt clears. If it does
-  not clear, the mux archives the finished file in `otr/episodes/<episode>/`
-  and logs that the publish was blocked. The publish folder can be moved with
-  `OTR_OBS_DIR`. A run that leaves nothing in either place did not finish,
-  whatever the logs say.
+- The finished episode: `otr/obs/`, always. The mux reads the source's rights
+  receipt and reports a receipt that did not clear in the log and its summary
+  line, but never withholds the copy (operator ruling 2026-10-15). The publish
+  folder can be moved with `OTR_OBS_DIR`. A run that leaves nothing there did
+  not finish, whatever the logs say.
 
 ## Reading further
 

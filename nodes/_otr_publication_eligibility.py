@@ -12,10 +12,11 @@ research-only source is actually cleared for.
 
 That is the shape the build contract calls a Law 7 violation ("a render must
 not die"; structural refusal is allowed BEFORE generation, not after it). The
-rule now lands where publication actually happens: `OTRMasterAudioMux` writes
-the archival final either way and only the OBS copy -- the published
-deliverable -- is withheld. Blocking publish and destroying the work are
-different actions, and only one of them is what the operator asked for.
+rule landed where publication actually happens: `OTRMasterAudioMux` reads this
+receipt. It first withheld the OBS copy of a not-cleared episode (2026-08-15);
+since 2026-10-15 the operator's ruling is that every finished episode is
+published to OBS regardless of rights, so the receipt is ADVISORY -- reported in
+the mux's summary line and log, recorded on the ledger, never a gate.
 
 ONE PRODUCER. The receipt combines RIGHTS reason codes (the rights sidecar,
 normalised by `_otr_provenance.normalize_provenance`) and IDENTITY reason codes

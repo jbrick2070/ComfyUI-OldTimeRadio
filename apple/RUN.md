@@ -53,17 +53,17 @@ anything.** Two different questions have two different answers there:
   (`!!! Exception during processing !!!` in the console, a red node on the
   canvas). Read that, not the absence of an error you were expecting.
 - **Was a copy published?** Two lines say so, at two moments. The instant a
-  copy lands, `LOUD publish: final episode -> <path>` names it; when one is
-  withheld, `obs_publish BLOCKED (<reason>)` says why -- the episode's rights
-  receipt did not clear -- and the archival final stays in
-  `otr/episodes/<episode>/`. At the very end the node's summary repeats the
-  outcome as `obs_publish OK -> <path>` or `obs_publish BLOCKED -- ...`.
+  copy lands, `LOUD publish: final episode -> <path>` names it. At the very end
+  the node's summary repeats the outcome as `obs_publish OK -> <path>`. Every
+  finished episode is published whatever its source's rights receipt says: when
+  the receipt did not clear, the summary line adds `(rights receipt did not
+  clear: <reason> -- published anyway)` and the console warns, but the file is
+  still in `otr/obs/`.
 
-BLOCKED on its own is not a verdict on the run. For most banks a withheld
-copy is still a finished run. A **My Story** episode -- whether you picked
-the bank or the roll landed on it -- has to be published, and fails the run
-right after the copy is withheld (`DeliveryContractError`), with the archival
-final kept. A run that stops AFTER the copy landed -- the same My Story gate
+A **My Story** episode -- whether you picked the bank or the roll landed on
+it -- is also checked against its delivery record, and fails the run
+(`DeliveryContractError`) if that record cannot be confirmed. A run that stops
+AFTER the copy landed -- the same My Story gate
 finding that the episode's delivery record cannot be confirmed or that the
 ledger does not name the published file, or a Cancel pressed in the last
 seconds -- never prints the end-of-run summary: the file in `otr/obs/` is

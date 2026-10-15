@@ -185,10 +185,11 @@ Not the console, not a green node, not the absence of errors. Read the run's
 final status and the publish lines before concluding anything; they answer
 different questions. `LOUD publish: final episode -> <path>` names the real
 destination the moment it lands, and the end-of-run summary repeats it as
-`obs_publish OK -> <path>`. `obs_publish BLOCKED` means the published copy was
-withheld (the rights receipt did not clear) and the archival final is in
-`otr/episodes/<episode>/`; it does not by itself say the run succeeded -- a My
-Story episode, picked or rolled, has to be published and fails right after it.
+`obs_publish OK -> <path>`. Every finished episode is published whatever its
+rights receipt says (a receipt that did not clear adds `(rights receipt did not
+clear: ...)` to that line and a console warning); a My Story episode, picked or
+rolled, is also checked against its delivery record and fails the run if that
+cannot be confirmed.
 A run stopped after the copy landed -- the My Story gate finding that the
 delivery record cannot be confirmed or that the ledger does not name the
 published file, or a late Cancel -- prints no end-of-run summary, so trust

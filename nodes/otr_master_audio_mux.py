@@ -16,14 +16,13 @@ Audio-identity is asserted by decoding both the muxed output's audio and the
 master to canonical PCM and comparing SHA-256 -- container-agnostic proof that
 the audio was copied, not re-encoded or trimmed. Cold-import clean (stdlib only).
 
-IT IS ALSO THE PUBLICATION BOUNDARY (2026-08-15, build contract D5a). Producing
-the episode and publishing it are two decisions, and only the second one is
-governed by the source's rights. The archival final is written for every
-episode that gets this far; the OBS copy -- the file the operator watches -- is
-made only when the ledger's publication-eligibility receipt says so. That rule
-is enforced here by withholding the copy and keeping the render, never by
-refusing to freeze upstream (which would destroy a finished render to prevent a
-copy).
+IT IS ALSO THE PUBLICATION BOUNDARY. Every finished episode is copied to the
+OBS folder the operator watches (operator ruling 2026-10-15, which reverses the
+2026-08-15 build contract D5a that withheld the copy when the ledger's
+publication-eligibility receipt said the source was not cleared). The receipt is
+still read and still reported -- an episode whose source did not clear says so
+in the log and in its report line -- but it is advisory: it never withholds the
+copy and never fails a delivery.
 """
 from __future__ import annotations
 
@@ -1879,9 +1878,9 @@ class OTRMasterAudioMux:
                     "tooltip": "Writer ledger JSON (OTR_LedgerScriptWriter "
                                "script_json). Read for ONE question: must this "
                                "episode reach otr/obs to count as delivered? "
-                               "A story the listener wrote must; the other "
-                               "banks keep their existing withheld-but-"
-                               "successful behaviour.",
+                               "A story the listener wrote must, and a miss "
+                               "fails the run; every other bank is published "
+                               "too, whatever its rights receipt says.",
                 }),
             },
         }
@@ -2054,12 +2053,12 @@ class OTRMasterAudioMux:
         Best-effort -- a stamp failure must NEVER block the deliverable, so it is
         caught and reported, never raised. Returns a single report line.
 
-        ``obs_path`` is ``None`` when publication was WITHHELD. It stamps no OBS
-        pointer then and actively clears any stale one, because a path key on a
-        ledger reads as "the deliverable is there" to everything downstream --
-        and on a blocked episode nothing ever arrives. The archival
-        ``final_video_path`` / ``final_audio_path`` are stamped either way: the
-        work exists, it simply may not be published.
+        ``obs_path`` is ``None`` only if no OBS copy was made (a publish that
+        raised never reaches here; every finished episode is published since
+        2026-10-15). It stamps no OBS pointer then and clears any stale one,
+        because a path key on a ledger reads as "the deliverable is there" to
+        everything downstream. The archival ``final_video_path`` /
+        ``final_audio_path`` are stamped either way.
 
         ONLY THIS EPISODE'S LEDGER IS WRITTEN (Muse finishing review item 2).
         ``episode_stem`` is the incoming silent video's stem, and the ledger is
@@ -2102,7 +2101,7 @@ class OTRMasterAudioMux:
             if not _OTRL.save_ledger_safe(ledger_p, led):
                 return f"terminal path stamp failed: save returned False for {ledger_p.name}"
             obs_note = (
-                "no obs_final_path (publication withheld)" if obs_path is None
+                "no obs_final_path (no OBS copy was made)" if obs_path is None
                 else f"obs_final_path -> {os.path.basename(str(obs_path))}"
             )
             return (
@@ -2310,25 +2309,15 @@ class OTRMasterAudioMux:
         if _must_publish:
             _assert_delivery_binding(_intent, _episode_stem(silent_video_path))
         master_audio_path = _reresolve_master_audio(master_audio_path)
-        # DECIDE BEFORE WRITING. The verdict is a pure read, and knowing it
-        # first is what lets the archival write choose a lawful destination --
-        # deciding after the file exists would leave the one case below already
-        # on disk in the folder the rule forbids.
+        # THE RIGHTS RECEIPT IS ADVISORY, NEVER A GATE (operator ruling
+        # 2026-10-15: "always have the episode in otr/obs regardless of
+        # rights"). The verdict is still read and still reported, so an episode
+        # whose source did not clear says so in the log, the report and the
+        # ledger's own receipt -- but it no longer decides whether the episode
+        # reaches the folder the operator watches. otr/obs is the success
+        # signal; an episode that is not there did not finish.
         decision = _publication_decision(silent_video_path)
         out = output_path.strip() or self._default_out(silent_video_path)
-        if not decision.publishable and _is_inside_obs_dir(out):
-            # A BLOCKED EPISODE MAY NOT REACH obs BY ANY ROUTE, INCLUDING THE
-            # OPERATOR'S OWN output_path. Withholding the published COPY while
-            # the archival write lands in the watch folder anyway would satisfy
-            # the code and defeat the rule. `output_path` keeps its meaning
-            # everywhere else; only this destination is refused, and loudly.
-            out = self._default_out(silent_video_path)
-            log.warning(
-                "[OTR_MasterAudioMux] output_path %r points into the OBS "
-                "folder and this episode may not be published (%s); the "
-                "archival final goes to %s instead",
-                output_path.strip(), decision.summary(), out,
-            )
         # AND THE SETTLED DESTINATION MUST LAND IN THE OUTPUT TREE
         # (2026-09-05). Checked HERE, on the final `out`, because the obs rule
         # above may REPLACE a caller's `output_path` -- confining the widget at
@@ -2382,26 +2371,28 @@ class OTRMasterAudioMux:
                 declared_credits_tail_s=float(declared_credits_tail_s or 0.0),
             )
             report.extend(foley_report)
-            # PUBLICATION IS A SEPARATE DECISION FROM PRODUCTION. The archival
-            # final above is written unconditionally -- it is finished work and
-            # the operator keeps it. The OBS copy is the PUBLISHED deliverable,
-            # and a research-only source is cleared for exactly the first and
-            # not the second. Withholding is not a failure: this node returns
-            # success either way and says which happened, out loud.
+            # EVERY FINISHED EPISODE IS PUBLISHED (operator ruling 2026-10-15).
+            # The archival final above is finished work; the OBS copy is the
+            # deliverable the operator reads success from. A rights receipt that
+            # did not clear is REPORTED -- loudly, in the log and in the report
+            # line -- and recorded on the ledger by the freeze, but it does not
+            # withhold the copy.
+            # A Cancel set during the mux or its PCM proof is honoured BEFORE
+            # anything reaches the watch folder (Muse finishing review item 3).
+            # Comfy's own exception propagates untouched.
+            _poll_interrupt()
+            obs_copy = self._publish_to_obs(final)
             if decision.publishable:
-                # A Cancel set during the mux or its PCM proof is honoured
-                # BEFORE anything reaches the watch folder (Muse finishing
-                # review item 3). Comfy's own exception propagates untouched.
-                _poll_interrupt()
-                obs_copy = self._publish_to_obs(final)
                 report.append("obs_publish OK -> " + obs_copy)
             else:
-                obs_copy = None
-                report.append("obs_publish BLOCKED -- " + decision.summary())
+                report.append(
+                    "obs_publish OK -> %s (rights receipt did not clear: %s -- "
+                    "published anyway, operator ruling 2026-10-15)"
+                    % (obs_copy, decision.summary()))
                 log.warning(
-                    "[OTR_MasterAudioMux] obs_publish BLOCKED (%s) -- the "
-                    "archival final is on disk at %s and no OBS copy was made",
-                    decision.summary(), final,
+                    "[OTR_MasterAudioMux] rights receipt did not clear (%s); "
+                    "published to OBS anyway -> %s",
+                    decision.summary(), obs_copy,
                 )
             # N2 (truthful ledger): this terminal node restamps
             # final_video_path over the pre-credits/pre-mux video it is handed.
@@ -2416,12 +2407,6 @@ class OTRMasterAudioMux:
             # everything and always returns prose -- so trusting its return
             # value would let a silent stamp failure pass as a delivery.
             if _must_publish:
-                if not decision.publishable:
-                    raise DeliveryContractError(
-                        "OTR_MasterAudioMux: this story had to be published "
-                        "and publication was withheld (%s). The archival "
-                        "final is at %s; nothing reached obs."
-                        % (decision.summary(), final))
                 if not obs_copy or not os.path.isfile(obs_copy):
                     raise DeliveryContractError(
                         "OTR_MasterAudioMux: this story had to be published "
