@@ -54,6 +54,28 @@ class CatalogResult(NamedTuple):
     ids: Optional[frozenset]
     error: str
     host: str
+    #: The host rejected (401/403) or lacked the API key -- a verdict, unlike
+    #: an outage: every paid call with that key fails too, so it refuses.
+    key_rejected: bool = False
+
+
+#: A list ping is a probe: keep it short. The Google client's own default is
+#: 120 s with retries -- far too long to hold every queue in an outage.
+CATALOG_TIMEOUT_S = 15
+
+
+def _key_rejected(exc) -> bool:
+    """Whether a catalog fetch failed on the key rather than the network."""
+    if exc is None:
+        return False
+    if type(exc).__name__ == "GoogleAPIKeyMissingError":
+        return True
+    if getattr(exc, "failure_kind", None) == "auth":
+        return True
+    status = getattr(exc, "http_status", None)
+    if status is None:
+        status = getattr(exc, "code", None)   # urllib.error.HTTPError
+    return status in (401, 403)
 
 
 def default_partner_selectors(node_key: str) -> dict:
@@ -171,7 +193,11 @@ def schema_options(node_key, *, resolve_class=None, rows=None) -> dict:
 
 
 def catalog_ids(authority, *, get_json=None) -> CatalogResult:
-    """T2 list ping. ``ids is None`` means the catalog was not obtained."""
+    """T2 list ping. ``ids is None`` means the catalog was not obtained.
+
+    An EMPTY list is "not obtained" too: no live provider lists zero models,
+    so an empty answer is a degraded endpoint, not a verdict that every slug
+    is gone. ``key_rejected`` marks a fetch that failed on the API key."""
     auth = str(authority or "").strip().lower()
     if auth == "openrouter":
         getter = get_json or _live_openrouter_get_json
@@ -179,7 +205,7 @@ def catalog_ids(authority, *, get_json=None) -> CatalogResult:
             payload = getter(OPENROUTER_MODELS_URL)
         except Exception as exc:  # noqa: BLE001 -- classified as transport
             return CatalogResult(None, "%s: %s" % (type(exc).__name__, exc),
-                                 OPENROUTER_HOST)
+                                 OPENROUTER_HOST, _key_rejected(exc))
         if not isinstance(payload, dict):
             return CatalogResult(None, "openrouter catalog is not an object",
                                  OPENROUTER_HOST)
@@ -189,6 +215,9 @@ def catalog_ids(authority, *, get_json=None) -> CatalogResult:
                                  OPENROUTER_HOST)
         ids = frozenset(_norm(row.get("id")) for row in data
                         if isinstance(row, dict) and row.get("id"))
+        if not ids:
+            return CatalogResult(None, "openrouter catalog listed no models",
+                                 OPENROUTER_HOST)
         return CatalogResult(ids, "", OPENROUTER_HOST)
     if auth == "google":
         getter = get_json or _live_google_get_json
@@ -196,11 +225,23 @@ def catalog_ids(authority, *, get_json=None) -> CatalogResult:
             from .google_slug_verifier import fetch_catalog
         except ImportError:  # pragma: no cover
             from google_slug_verifier import fetch_catalog
-        fetched = fetch_catalog(getter)
+        last = {}
+
+        def watched(path):
+            try:
+                return getter(path)
+            except Exception as exc:  # noqa: BLE001 -- kept for classification
+                last["exc"] = exc
+                raise
+
+        fetched = fetch_catalog(watched)
         if not fetched.complete:
             return CatalogResult(
                 None, fetched.error or "google models.list incomplete",
-                GOOGLE_HOST)
+                GOOGLE_HOST, _key_rejected(last.get("exc")))
+        if not fetched.ids:
+            return CatalogResult(None, "google models.list listed no models",
+                                 GOOGLE_HOST)
         return CatalogResult(fetched.ids, "", GOOGLE_HOST)
     raise ValueError("unknown catalog authority %r" % authority)
 
@@ -208,29 +249,50 @@ def catalog_ids(authority, *, get_json=None) -> CatalogResult:
 def _live_openrouter_get_json(url: str) -> dict:
     req = urllib.request.Request(
         url, headers={"User-Agent": "OTR-cloud-slug-preflight"})
-    with urlopen(req, timeout=20) as resp:
+    with urlopen(req, timeout=CATALOG_TIMEOUT_S) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
 def _live_google_get_json(path: str) -> dict:
     from .._otr_google_api.client import get_json
-    return get_json(path)
+    return get_json(path, timeout_s=CATALOG_TIMEOUT_S)
 
 
 def catalog_outage_hint(catalog_host: str, paid_host: str) -> str:
-    """The note on a T2 catalog outage, which is always a WARNING.
+    """The note on a T2 catalog outage, which is a WARNING.
 
-    An unreachable catalog is a failed probe, not a finding about the pick, and
-    no probe may fail a workflow (operator rule, 2026-10-14). When the paid call
-    goes to the same host, a real outage makes that call fail loudly on its own;
-    a blip that has cleared by then costs nothing. A catalog that ANSWERS
-    without the slug still refuses -- that is a verdict on the pick."""
+    An unreachable, failing or empty catalog is a failed probe, not a finding
+    about the pick, and no probe may fail a workflow (operator rule,
+    2026-10-14). When the paid call goes to the same host, a real outage makes
+    that call fail loudly on its own; a blip that has cleared by then costs
+    nothing. Two cases still refuse because they are verdicts: a catalog that
+    ANSWERS without the slug, and a host that rejects the API key
+    (``CatalogResult.key_rejected``) -- every paid call with it fails too."""
     cat = (urlparse(catalog_host).hostname or catalog_host or "").lower()
     paid = (urlparse(paid_host).hostname or paid_host or "").lower()
     if cat and cat == paid:
         return ("slug unverified; the paid call goes to this host and fails "
                 "loudly if it is really down")
     return "paid host differs; check is skipped"
+
+
+def _catalog_unavailable(result, paid_host, engine, node_key, input_name, value):
+    """The finding for a catalog that was not obtained: a refusal when the key
+    was rejected, otherwise a warning (see :func:`catalog_outage_hint`)."""
+    if result.key_rejected:
+        return Finding(
+            engine, node_key, input_name, value,
+            "the %s catalog rejected the API key (%s)"
+            % (result.host, result.error or "auth"),
+            "set a valid key for %s; every paid call with this one fails"
+            % result.host,
+            "refuse")
+    return Finding(
+        engine, node_key, input_name, value,
+        "T2 catalog unavailable (%s)" % (result.error or "transport"),
+        "catalog host=%s paid host=%s; %s"
+        % (result.host, paid_host, catalog_outage_hint(result.host, paid_host)),
+        "warn")
 
 
 def _fix_hint(node_key: str, input_name: str, live) -> str:
@@ -264,12 +326,8 @@ def check_engine(engine, selectors, *, schema_options_fn, catalog_fn) -> list:
         result = catalog_fn(catalog)
         paid_host = GOOGLE_HOST if str(catalog) == "google" else str(catalog)
         if result.ids is None:
-            findings.append(Finding(
-                engine_id, engine_id, "catalog", "",
-                "T2 catalog unavailable (%s)" % (result.error or "transport"),
-                "catalog URL host=%s status logged; %s"
-                % (result.host, catalog_outage_hint(result.host, paid_host)),
-                "warn"))
+            findings.append(_catalog_unavailable(
+                result, paid_host, engine_id, engine_id, "catalog", ""))
             return findings
         for node_key, fields in (selectors or {}).items():
             for input_name, candidates in (fields or {}).items():
@@ -760,13 +818,8 @@ def collect_findings(
                 continue
             result = cat_fn(authority)
             if result.ids is None:
-                findings.append(Finding(
-                    handle, handle, widget, slug,
-                    "T2 catalog unavailable (%s)" % (result.error or "transport"),
-                    "catalog host=%s paid host=%s; %s"
-                    % (result.host, paid_host,
-                       catalog_outage_hint(result.host, paid_host)),
-                    "warn"))
+                findings.append(_catalog_unavailable(
+                    result, paid_host, handle, handle, widget, slug))
                 continue
             if _normalize_checked_slug(authority, slug) not in result.ids:
                 findings.append(Finding(

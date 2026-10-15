@@ -184,17 +184,56 @@ def test_local_ltx_and_kokoro_make_no_query():
     assert seen == []
 
 
-def test_comfy_balance_http_500_refuses():
+def test_comfy_balance_http_500_warns():
+    """A balance endpoint that fails is a failed probe, and no probe may fail
+    a workflow (operator rule, 2026-10-14): the queue proceeds with a warning,
+    and the paid call fails loudly if the wallet really is empty."""
     result = cbp.comfy_balance(
         get_json=lambda _url, _token: (500, {}),
         bearer=lambda: "k",
     )
-    assert result.severity == "refuse"
+    assert result.severity == "warn"
     assert result.remaining_usd is None
     prompt = _prompt(_director("cloud_wan_i2v"))
-    with pytest.raises(ValueError, match="remaining unknown"):
-        _run(prompt, {"comfy": result},
-             unit=_prices({"cloud_wan_i2v": 1.0}), skip_writer=True)
+    verdicts = _run(prompt, {"comfy": result},
+                    unit=_prices({"cloud_wan_i2v": 1.0}), skip_writer=True)
+    assert [v.severity for v in verdicts] == ["warn"]
+    assert "remaining unknown" in verdicts[0].reason
+
+
+def _raise(exc):
+    def getter(_url, _token):
+        raise exc
+    return getter
+
+
+@pytest.mark.parametrize("probe", [cbp.comfy_balance, cbp.openrouter_balance])
+def test_a_balance_probe_that_gets_no_number_warns(probe):
+    for getter in (_raise(OSError("host unreachable")),
+                   lambda _u, _t: (503, {}),
+                   lambda _u, _t: (429, {}),
+                   lambda _u, _t: (404, {}),
+                   lambda _u, _t: (200, {"unexpected": True})):
+        result = probe(get_json=getter, bearer=lambda: "k")
+        if result.remaining_usd is None:
+            assert result.severity == "warn", (probe.__name__, result)
+
+
+@pytest.mark.parametrize("probe", [cbp.comfy_balance, cbp.openrouter_balance])
+@pytest.mark.parametrize("status", [401, 403])
+def test_a_rejected_key_still_refuses(probe, status):
+    result = probe(get_json=lambda _u, _t: (status, {}), bearer=lambda: "bad")
+    assert result.remaining_usd is None
+    assert result.severity == "refuse"
+
+
+def test_a_crashed_balance_probe_warns():
+    def crash(_wallet):
+        raise RuntimeError("probe bug")
+    prompt = _prompt(_director("cloud_wan_i2v"))
+    verdicts = _run(prompt, crash, unit=_prices({"cloud_wan_i2v": 1.0}),
+                    skip_writer=True)
+    assert [v.severity for v in verdicts] == ["warn"]
 
 
 def test_one_act_prices_four_second_clips_not_eight():

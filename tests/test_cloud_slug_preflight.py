@@ -685,6 +685,68 @@ def test_a_castlock_stays_with_its_own_validator():
     assert sum(1 for n in scope63 if n is prompt["80"]) == 1
 
 
+def test_a_rejected_key_refuses_but_an_outage_or_empty_catalog_warns():
+    import urllib.error
+    from nodes._otr_google_api.client import GoogleAPIKeyMissingError
+
+    def or_401(_url):
+        raise urllib.error.HTTPError(_url, 401, "Unauthorized", {}, None)
+
+    assert csp.catalog_ids("openrouter", get_json=or_401).key_rejected
+    assert not csp.catalog_ids("openrouter", get_json=lambda _u: {"data": []}).key_rejected
+    assert csp.catalog_ids("openrouter", get_json=lambda _u: {"data": []}).ids is None
+
+    def google_no_key(_path):
+        raise GoogleAPIKeyMissingError("no key")
+
+    class _Forbidden(RuntimeError):
+        http_status = 403
+        failure_kind = "auth"
+        retryable = False
+
+    def google_403(_path):
+        raise _Forbidden("API key not valid")
+
+    def google_down(_path):
+        raise OSError("connection refused")
+
+    assert csp.catalog_ids("google", get_json=google_no_key).key_rejected
+    assert csp.catalog_ids("google", get_json=google_403).key_rejected
+    assert not csp.catalog_ids("google", get_json=google_down).key_rejected
+    empty = csp.catalog_ids("google", get_json=lambda _p: {"models": []})
+    assert empty.ids is None and not empty.key_rejected
+
+    eng = _FakeEngine("google_omni_video", {
+        "google_omni_video": {"model": ("gemini-omni-1.1-flash",)},
+    }, catalog="google")
+
+    def severity(catalog):
+        hits = csp.check_engine(eng, eng.cloud_selectors(),
+                                schema_options_fn=lambda _k: {},
+                                catalog_fn=lambda _a: catalog)
+        return [h.severity for h in hits]
+
+    assert severity(csp.catalog_ids("google", get_json=google_403)) == ["refuse"]
+    assert severity(csp.catalog_ids("google", get_json=google_down)) == ["warn"]
+    assert severity(empty) == ["warn"]
+
+
+def test_the_live_catalog_pings_use_the_short_probe_timeout(monkeypatch):
+    from nodes._otr_google_api import client
+    seen = {}
+
+    def fake_get_json(path, **kwargs):
+        seen.update(kwargs)
+        return {"models": [{"name": "models/gemini-3.5-flash"}]}
+
+    monkeypatch.setattr(client, "get_json", fake_get_json)
+    csp._live_google_get_json("/v1beta/models?pageSize=1000")
+    assert seen.get("timeout_s") == csp.CATALOG_TIMEOUT_S
+    src = (REPO / "nodes" / "_otr_shared" / "cloud_slug_preflight.py").read_text(
+        encoding="utf-8")
+    assert "timeout=CATALOG_TIMEOUT_S" in src
+
+
 def test_catalog_ids_openrouter_and_google_with_injected_get_json():
     def or_get(url):
         assert url == csp.OPENROUTER_MODELS_URL

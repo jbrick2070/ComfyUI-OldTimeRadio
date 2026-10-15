@@ -304,11 +304,25 @@ def _comfy_bearer_from(api_key) -> Callable[[], str]:
     return bearer
 
 
+#: Why a balance read that got no number is only a WARNING: the balance endpoint
+#: is a probe, and no probe may fail a workflow (operator rule, 2026-10-14). An
+#: unreachable host, a 5xx or 429, or a payload with no balance in it says
+#: nothing about the wallet; the paid call itself fails loudly if the wallet
+#: really is empty. A REJECTED KEY (401/403) is a verdict, not a blip -- every
+#: paid call with that key fails -- so it refuses, as does a known balance
+#: below the estimate.
+_KEY_REJECTED = (401, 403)
+
+
+def _missing_number_severity(status=None) -> str:
+    return "refuse" if status in _KEY_REJECTED else "warn"
+
+
 def comfy_balance(*, get_json: Callable = None, bearer: Callable = None,
                   api_key: str = None) -> BalanceResult:
-    """Remaining Comfy Credits in USD. A missing number on this host refuses,
-    except when the queue carries no credential at all -- that case is a
-    warn, not a refusal, and the lane fails closed at execution instead."""
+    """Remaining Comfy Credits in USD. A key the host rejects refuses; any
+    other missing number warns (see ``_KEY_REJECTED``). A queue with no
+    credential at all warns too, and the lane fails closed at execution."""
     getter = get_json or _http_get_json
     bearer_fn = bearer or _comfy_bearer_from(api_key)
     try:
@@ -322,14 +336,14 @@ def comfy_balance(*, get_json: Callable = None, bearer: Callable = None,
         status, payload = getter(COMFY_BALANCE_URL, token)
     except Exception as exc:  # noqa: BLE001 -- transport
         return BalanceResult(None, "%s: %s" % (type(exc).__name__, exc),
-                             COMFY_HOST, "refuse")
+                             COMFY_HOST, "warn")
     if status != 200:
         return BalanceResult(None, "HTTP %d from %s" % (status, COMFY_BALANCE_URL),
-                             COMFY_HOST, "refuse")
+                             COMFY_HOST, _missing_number_severity(status))
     remaining = parse_comfy_balance(payload)
     if remaining is None:
         return BalanceResult(None, "balance payload has no *_micros field",
-                             COMFY_HOST, "refuse")
+                             COMFY_HOST, "warn")
     return BalanceResult(remaining, "", COMFY_HOST, "refuse",
                          "~%d credits" % int(remaining * COMFY_CREDITS_PER_USD))
 
@@ -356,10 +370,10 @@ def openrouter_balance(*, get_json: Callable = None, bearer: Callable = None) ->
         status, payload = getter(OPENROUTER_KEY_URL, token)
     except Exception as exc:  # noqa: BLE001 -- transport
         return BalanceResult(None, "%s: %s" % (type(exc).__name__, exc),
-                             OPENROUTER_HOST, "refuse")
+                             OPENROUTER_HOST, "warn")
     if status != 200:
         return BalanceResult(None, "HTTP %d from %s" % (status, OPENROUTER_KEY_URL),
-                             OPENROUTER_HOST, "refuse")
+                             OPENROUTER_HOST, _missing_number_severity(status))
     data = payload.get("data") if isinstance(payload, dict) else None
     data = data if isinstance(data, dict) else {}
     limit_remaining = data.get("limit_remaining")
@@ -608,11 +622,11 @@ def collect_verdicts(prompt, unique_id, *, balance_fn=None, comfy_api_key=None,
     for wallet in wallets:
         try:
             balance = getter(wallet)
-        except Exception as exc:  # noqa: BLE001 -- a getter crash is a finding
+        except Exception as exc:  # noqa: BLE001 -- a crashed probe warns
             host = COMFY_HOST if wallet == WALLET_COMFY else (
                 OPENROUTER_HOST if wallet == WALLET_OPENROUTER else "")
             balance = BalanceResult(None, "%s: %s" % (type(exc).__name__, exc),
-                                    host, "refuse" if host else "warn")
+                                    host, "warn")
         verdicts.append(judge_wallet(wallet, lines, balance))
     return verdicts
 
