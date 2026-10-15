@@ -121,7 +121,7 @@ and the tooltip lists every writer like this:
 | Piece | Means |
 |---|---|
 | `about 9.3 GB` | What it downloads, once, in the decimal gigabytes a disk or browser shows (measured from the files). Not what it occupies while running. |
-| `nv8-nf4` | Fits an 8 GB NVIDIA card only as NF4, which that machine already bakes. Plain `nv8` means the full download fits. |
+| `nv8-nf4` | Fits an 8 GB NVIDIA card only as NF4, which that machine already bakes. Plain `nv8` means it fits without quantizing. (The two multimodal Gemma 4 rows load only their text decoder, so their tags are rated on far less than their download; their fit is due a re-measure.) |
 | `nv16` `nv24` | Fits an NVIDIA card of that many GB at full precision. `nv16-nf4` means only the quantized load fits. |
 | `mac16` | Fits a 16 GB Apple Silicon machine. |
 | `-tight` | Fits with nothing to spare. Close everything else. |
@@ -136,9 +136,13 @@ model there costs its full size. That is why the tooltip carries tags instead
 of one number.
 
 A workflow saved before 2026-10-14 may still hold the old long label, such as
-`Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)`. It loads and
-runs unchanged: the pack reads it as the bare name, and shows the bare name in
-the box once the workflow is open.
+`Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)`. The writer
+reads it as the bare name, and the box shows the bare name once the workflow is
+open -- so a workflow you built yourself, or a copy of `otr_canonical`, runs
+unchanged. A saved copy of a per-machine preset (`otr_8gb_low` and the like) is
+different: the preset's own file changed, so its preflight check stops the run
+with "re-open the workflow from Workflow > Browse Templates", exactly as after
+any update that changes a preset. Re-open it there and set your story again.
 
 ### The Mac exception, and it is the expensive one
 
@@ -158,13 +162,13 @@ Nothing downloads when you pick a model. It downloads the first time you press
 Run with that model selected, and never again. The console says so:
 
 ```
-[OTR] Downloading Qwen/Qwen3.5-4B -- 8.7 GB -> ... (first run only)
+[OTR] Downloading Qwen/Qwen3.5-4B -- 9.3 GB -> ... (first run only)
 ```
 
 A first Queue that appears to sit still for a long time is usually this. Let it
 run.
 
-The download needs the model's size **plus 5 GB of headroom** on the drive
+The download needs the model's size **plus 5 GiB (5.4 GB) of headroom** on the drive
 holding your Hugging Face cache, or it stops before starting and tells you the
 numbers.
 
@@ -214,7 +218,7 @@ In the order these actually happen.
 A recommendation in the log, not a hard refusal. The load still attempts; a
 real OOM is the authority. On NVIDIA, an oversized NF4 pick may retry with
 CPU overflow after that runtime failure.
-Pick a model whose label carries your machine's tag. The ceiling itself is the
+Pick a model whose tooltip line carries your machine's tag. The ceiling itself is the
 `llm_vram_ceiling_gb` widget, and raising it does not create memory; it only
 moves where the failure happens.
 

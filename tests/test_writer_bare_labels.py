@@ -59,7 +59,11 @@ def test_every_dropdown_label_is_the_bare_id():
 
 
 def test_the_old_labels_name_exactly_todays_options():
-    assert [C._strip_label_suffix(l) for l in OLD_LABELS] == C.dropdown_choices()
+    """The catalog's own rows only: a causal LM the machine happens to have
+    cached also appears in the dropdown, and must not make this test depend
+    on the box it runs on."""
+    curated = [e.label for e in C.build_dropdown_choices() if e.curated]
+    assert [C._strip_label_suffix(l) for l in OLD_LABELS] == curated
 
 
 def test_the_published_filename_code_and_run_id_do_not_move():
@@ -98,6 +102,27 @@ def test_the_widgets_offer_bare_ids_and_carry_the_size_table():
         assert not any("GB download" in c for c in choices), name
         assert opts["default"] in choices, name
         assert C.writer_tooltip_table() in opts["tooltip"], name
+
+
+def test_the_cli_validator_admits_old_labels_exactly_as_the_server_does():
+    """scripts/otr_api.py validates --set values before submitting; it mirrors
+    the catalog's strip so an old badged label is not refused client-side
+    while the server would run it."""
+    import sys
+    sys.path.insert(0, str(_ROOT / "scripts"))
+    import otr_api
+    choices = C.dropdown_choices()
+    for label in OLD_LABELS + ("Qwen/Qwen3.5-4B:nf4", "Qwen/Qwen3.5-4B [LOCAL HF]",
+                               "mistralai/Mistral-Nemo-Instruct-2407 [NOT DOWNLOADED]"):
+        assert otr_api._writer_bare_id(label) == C._canonical_qwen_id(label), label
+        otr_api._validate_widget_value("OTR_LedgerScriptWriter", "creative_writing_model",
+                                       [choices, {}], label)
+    with pytest.raises(ValueError):
+        otr_api._validate_widget_value("OTR_LedgerScriptWriter", "creative_writing_model",
+                                       [choices, {}], "nobody/no-such-writer (1.0 GB download)")
+    # the admission is for the two writer widgets only
+    with pytest.raises(ValueError):
+        otr_api._validate_widget_value("X", "source_bank", [["original"], {}], "original (badge)")
 
 
 def _node_exe():

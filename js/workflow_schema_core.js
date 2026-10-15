@@ -295,6 +295,17 @@ export function reconcileGraph(graphData, lookup) {
     let changed = false;
     const notes = [];
     let dropped = false;
+    // Writers inside a subgraph's definition are respelled too (the widget-drop
+    // reconciliation below has only ever covered the top-level nodes).
+    for (const sub of copy.definitions?.subgraphs ?? []) {
+        for (const node of Array.isArray(sub?.nodes) ? sub.nodes : []) {
+            const respelled = respellValues(node, lookup);
+            if (respelled.length) {
+                changed = true;
+                notes.push(...respelled.map((n) => `subgraph ${sub.id ?? "?"}: ${n}`));
+            }
+        }
+    }
     for (const node of copy.nodes) {
         // A respelling touches one value and no input, so it needs no link
         // repair -- and must not start refusing a file the loader takes today.

@@ -72,10 +72,13 @@ def test_the_estimate_counts_exactly_what_the_download_fetches():
                _Sib("pytorch_model.bin", 9 * 2**30),           # not in ALLOW_PATTERNS
                _Sib("config.json", 1024))
     assert C.estimate_model_size_gb("someone/uncurated-mistral-like", _hf_api=api) == 4.0
-    # huggingface_hub matches the FULL path, case-sensitively: these ARE fetched
-    api = _api(_Sib("original/consolidated.safetensors", 2**30),
-               _Sib("Consolidated.safetensors", 2**30))
-    assert C.estimate_model_size_gb("someone/odd-layout", _hf_api=api) == 2.0
+    # Odd layouts: whatever the installed huggingface_hub's own filter would
+    # fetch is what is counted (its matching differs across versions -- full
+    # path vs basename, case on Windows -- so the expectation asks the filter).
+    names = ["original/consolidated.safetensors", "Consolidated.safetensors"]
+    api = _api(*[_Sib(n, 2**30) for n in names])
+    expected = float(len(C._fetched_paths(names)))
+    assert C.estimate_model_size_gb("someone/odd-layout", _hf_api=api) == expected
 
 
 def test_the_download_call_passes_the_ignore_patterns(tmp_path, monkeypatch):
@@ -112,6 +115,35 @@ def test_a_stale_partial_of_the_ignored_copy_is_cleared_and_nothing_else(tmp_pat
     removed = C._drop_stale_ignored_partials(folder)
     assert removed == [stale.name]
     assert not Path(stale).exists() and Path(kept).exists()
+
+
+def test_the_download_clears_the_stale_partial_before_its_disk_check(tmp_path, monkeypatch):
+    """The call site, with huggingface_hub 1.30's real partial name
+    (<hash>.<etag>.<uuid8>.incomplete): cleared before the disk check runs."""
+    hub_local = pytest.importorskip("huggingface_hub._local_folder")
+    folder = tmp_path / "m"
+    folder.mkdir()
+    prefix = hub_local.get_local_download_paths(folder, "consolidated.safetensors") \
+        .incomplete_path("ETAG").name.split(".ETAG.")[0]
+    stale = folder / ".cache" / "huggingface" / "download" / (prefix + ".abc123.1f2e3d4c.incomplete")
+    stale.write_bytes(b"partial")
+    order = []
+
+    def free(_p):
+        order.append(("disk_check", stale.exists()))
+        return 10**15
+
+    def fake_snapshot_download(**kwargs):
+        raise RuntimeError("stop after the call")
+
+    monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
+    monkeypatch.setattr(C, "scan_local_llm_cache", lambda **_k: [])
+    monkeypatch.setattr(C, "_free_disk_bytes_for", free)
+    monkeypatch.setattr(C._LLM, "download_destination", lambda _w: folder)
+    with pytest.raises(RuntimeError, match="stop after the call"):
+        C.auto_download_if_missing("mistralai/Mistral-Nemo-Instruct-2407", hub_root=tmp_path,
+                                   _snapshot_download=fake_snapshot_download)
+    assert order == [("disk_check", False)]
 
 
 def test_the_cleanup_creates_nothing_in_a_fresh_folder(tmp_path):

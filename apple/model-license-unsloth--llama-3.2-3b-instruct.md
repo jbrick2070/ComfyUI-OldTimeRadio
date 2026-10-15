@@ -77,11 +77,12 @@ This is the only row that fits an 8 GB card unquantized without a token.
 
 ## Notes
 
-The catalog badge UNDERSTATES this row. `vram_badge_for` halves
-`approx_safetensors_gb` on the assumption of a 4-bit load, so the picker
-shows roughly 3.2 GB while an unquantized load really costs 5.98 GiB --
+The catalog's resident estimate UNDERSTATES this row. `_estimate_resident_gb`
+halves `approx_safetensors_gb` on the assumption of a 4-bit load, so it
+projects roughly 3.2 GB while an unquantized load really costs 5.98 GiB --
 on precisely the hosts this row exists to serve. The heuristic is wrong
 here in the safe direction for NVIDIA and the unsafe direction for AMD.
+(The writer tooltip states the download, about 6.4 GB, and the fit tags.)
 
 Nothing about this row is qualified on hardware. Speed, memory, prose,
 constrained JSON and any episode result are all NOT TESTED.

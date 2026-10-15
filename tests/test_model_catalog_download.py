@@ -285,7 +285,7 @@ def test_auto_download_disk_space_precheck(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
     monkeypatch.setenv("HF_TOKEN", "fake-token")
     # Force the free-disk check to report 1 GB free; DEFAULT_LLM
-    # (Qwen/Qwen3.5-4B, 8.68 GB) needs 8.68 GB + 5 GB margin -> raise.
+    # (Qwen/Qwen3.5-4B, 9.3 GB) needs 9.3 GB + a 5 GiB (5.4 GB) margin -> raise.
     monkeypatch.setattr(catalog, "_free_disk_bytes_for", lambda _p: 1 * 1024**3)
     snap = MagicMock()
     with pytest.raises(InsufficientDiskSpaceError) as exc:

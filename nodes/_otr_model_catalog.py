@@ -1798,16 +1798,17 @@ def _structural_reject(model_id: str) -> str | None:
 def _strip_label_suffix(model_id: str) -> str:
     """Strip UI-only dropdown suffixes from a selected model id.
 
-    Also removes a trailing PARENTHETICAL badge -- the VRAM figure the picker
-    shows so an operator can tell at a glance whether a model fits the card in
-    front of them (``'google/gemma-4-12b-it (11.9 GB)'`` -> the bare repo id).
+    Also removes a trailing PARENTHETICAL badge -- the size figure the picker
+    showed until 2026-10-14 and older saved graphs still hold
+    (``'Qwen/Qwen3.5-4B (8.7 GB download, ...)'`` -> the bare repo id).
     Safe because a Hugging Face repo id cannot contain ``' ('``; this mirrors
     ``public_engines.resolve_engine_id``, which does the same for the video
-    picker's ``'ltx098_low_video (16:9)'``.
+    picker's ``'ltx098_low_video (16:9)'``. js/workflow_schema_core.js
+    ``writerName`` mirrors these steps for the load-time respelling.
 
     IDEMPOTENT AND BACKWARD-COMPATIBLE, which is the whole point: a bare id
     from a saved graph, a profile, a CLI flag or an older workflow passes
-    through untouched, so adding the badge cannot break a stored selection."""
+    through untouched, and a badged one reads as the id it names."""
     s = model_id.strip()
     for suffix in (
         NOT_DOWNLOADED_SUFFIX,
@@ -1846,7 +1847,7 @@ _MAC16_PHYSICAL_GB = 16.0
 def _fit_budgets():
     """Resolved at CALL time -- ``DEFAULT_VRAM_CEILING_GB`` is defined further
     down this module, and importing it eagerly here is a NameError at import,
-    which empties the writer dropdown rather than failing one badge."""
+    which would break the writer schema rather than one tooltip line."""
     return (
         ("mac16", 12.0),
         ("nv8", 7.0),
@@ -2006,10 +2007,13 @@ def writer_fit_line(repo_id: str) -> str:
     number means nothing without naming the context it assumed.
 
     FRICTION IS PART OF "CAN I USE THIS": a row that needs a licence click and
-    an HF_TOKEN says so first, derived from the row's own flag, never typed.
-    The ComfyUI-native rows carry no fit tags (the projection does not rate
-    them) and say so rather than claim a fit."""
+    an HF_TOKEN says so right after its size, derived from the row's own flag,
+    never typed. The ComfyUI-native rows carry no fit tags (the projection does
+    not rate them) and say so rather than claim a fit; a row the catalog does
+    not know says that."""
     curated = _by_repo_id().get(repo_id)
+    if curated is None:
+        return "not in the writer catalog; size and fit unknown"
     parts = []
     size = download_size_text(repo_id)
     if size:
@@ -2578,17 +2582,20 @@ def _fetched_paths(paths: "list[str]") -> "set[str]":
 
 
 def _drop_stale_ignored_partials(local_dir: Path) -> "list[str]":
-    """Delete a half-downloaded copy of a file IGNORE_PATTERNS now skips.
+    """Delete a half-downloaded ``consolidated.safetensors`` -- the one file name
+    IGNORE_PATTERNS skips in a curated repo (Mistral-Nemo).
 
-    A Mistral-Nemo pull interrupted before 2026-10-14 can leave its
-    consolidated.safetensors as an ``.incomplete`` under
-    ``.cache/huggingface/download/``. The download no longer resumes it, and
-    :func:`_otr_llm_folder.structurally_complete` reads any ``.incomplete`` as a
-    transfer in progress -- so the folder could never be complete again
-    (Sonnet QA on abcd6a3f). huggingface_hub names a partial file by a short
-    hash of its metadata name, so its own path helper is asked which files
-    belong to the ignored name; nothing else is touched. Without that helper
-    (a different huggingface_hub), nothing is deleted."""
+    A Mistral-Nemo pull interrupted before 2026-10-14 can leave that copy as an
+    ``.incomplete`` under ``.cache/huggingface/download/``. The download no
+    longer fetches it, and :func:`_otr_llm_folder.structurally_complete` reads
+    any ``.incomplete`` as a transfer in progress -- so the folder could never
+    be complete again (Sonnet QA on abcd6a3f). huggingface_hub names a partial
+    by a hash of its metadata name (``<hash>.<etag>[.<uuid>].incomplete``), so
+    its own path helper is asked for that name's prefix; nothing else is
+    touched. Without that helper (a different huggingface_hub), nothing is
+    deleted. NOT handled here, and older than this: a stale partial of a file
+    the download DOES fetch (a hard-killed shard) wedges the folder the same
+    way -- that is the folder check's to solve, not this name list's."""
     # A stale partial can only sit in a folder an earlier download started. The
     # hub helper below CREATES the folder and its .cache as a side effect, so
     # it is not asked anything unless that download directory already exists.
@@ -2797,6 +2804,11 @@ def auto_download_if_missing(
     # models root at all keeps the hub cache, exactly as before.
     local_dir = _LLM.download_destination(weights_id)
     dest_path = local_dir if local_dir is not None else hub_root_path
+    # A stale partial of the ignored copy goes BEFORE the disk check: on a disk
+    # an interrupted Mistral pull filled, that partial is what is using the space.
+    if local_dir is not None:
+        for stale in _drop_stale_ignored_partials(local_dir):
+            print(f"[OTR] Removed a stale partial download of an ignored file: {stale}")
     # The disk check measures the drive the bytes actually land on.
     free_bytes = _free_disk_bytes_for(dest_path)
     margin = size_bytes + _DISK_SPACE_MARGIN_BYTES
@@ -2816,9 +2828,6 @@ def auto_download_if_missing(
         f"[OTR] Downloading {weights_id} -- {size_bytes / 1e9:.1f} GB -> "
         f"{dest_path} (first run only)"
     )
-    if local_dir is not None:
-        for stale in _drop_stale_ignored_partials(local_dir):
-            print(f"[OTR] Removed a stale partial download of an ignored file: {stale}")
 
     if _snapshot_download is None:
         from huggingface_hub import snapshot_download as _snapshot_download  # type: ignore

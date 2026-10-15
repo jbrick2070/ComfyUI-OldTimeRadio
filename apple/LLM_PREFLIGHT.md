@@ -16,7 +16,8 @@ transformers dropdown row (Mac loads full) until the native path is proven
 there. Every row downloads itself.
 
 This page is the add-your-own checklist. The models that already ship, and
-how to read their badges, are [WRITERS.md](WRITERS.md). The short binding
+how to read their size and fit tags (in the writer boxes' tooltip), are
+[WRITERS.md](WRITERS.md). The short binding
 notes are in [EXTENDING.md](EXTENDING.md). Run [PREFLIGHT.md](PREFLIGHT.md)
 for the named tests after a catalog edit.
 
@@ -63,7 +64,7 @@ hardware.
 
 A first Queue that sits still is usually the download. The console prints
 `[OTR] Downloading ...`. Auto-download is designed, not a defect. Disk
-headroom is the model size plus 5 GB on the volume the writer folder is on.
+headroom is the model size plus 5 GiB (5.4 GB) on the volume the writer folder is on.
 
 ---
 
@@ -100,8 +101,8 @@ model to satisfy a selection.
 **The VRAM tier is honest.** `vram_fit_tier` is `PASS`, `WARN`,
 `UNKNOWN`, or `FAIL`. PASS means soak-tested inside the ceiling. WARN means
 not soak-tested; **it stays in the dropdown** (operator 2026-09-06). What a
-tier owes the user is honesty at the moment of choosing -- the badge number
-and truthful `notes` -- not absence. Ripping a row is an explicit decision
+tier owes the user is honesty at the moment of choosing -- the size and fit
+line in the writer tooltip and truthful `notes` -- not absence. Ripping a row is an explicit decision
 about a specific model. UNKNOWN / FAIL do not ship.
 
 **It loads under the Quant the pick claims.** For Qwen that is
@@ -135,7 +136,7 @@ artifact supports, not what a model card claims. KV cache is not free.
 | `loader_backend` | Dispatch key. `transformers_safetensors` for an ordinary causal LM; `comfy_textgen` for a writer ComfyUI runs itself. |
 | `provider` | `local` (transformers), `comfy_native` (ComfyUI's own loader, still local), or a cloud provider. |
 | `vram_fit_tier` | Honesty at choose-time. |
-| `approx_safetensors_gb` | Download size on disk, not VRAM resident. The badge prints this number. |
+| `approx_safetensors_gb` | The basis the fit tags and VRAM estimates are computed from, written as a download size. It is not the download on every row; the tooltip's size comes from the measured bytes in `_MEASURED_DOWNLOAD_BYTES` -- add your row there too. |
 
 Defaulted but set explicitly on every production row: `prompt_profile`,
 `chat_template_kind`, `stop_tokens`, `context_window`, `license`,
@@ -193,10 +194,10 @@ what is already in the list.
 
 ### If it becomes a shipped default
 
-The badge string is part of the saved widget value. Update `DEFAULT_LLM` /
-`default_llm_option()` and `fresh_llm_option()` together -- they are the
-same one Qwen label -- then the writer `widgets_values` on
-`workflows/otr_canonical.json` (never a bare repo id), then
+The saved widget value is the bare repo id (since 2026-10-14; the size and
+fit live in the tooltip). Update `DEFAULT_LLM`, then the writer
+`widgets_values` on `workflows/otr_canonical.json` to that bare id --
+`default_llm_option()` and `fresh_llm_option()` answer with it -- then
 `python scripts/build_variants.py --all` and `--check`. Edit
 [WRITERS.md](WRITERS.md) in the same change. Do not hand-edit the variant
 JSONs.

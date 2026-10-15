@@ -295,7 +295,7 @@ SELECTED writer touches a workflow: the canonical's writer
 
 The full checklist -- on-machine cache path, catalog row, a writer ComfyUI
 runs itself, the gates -- is [LLM_PREFLIGHT.md](LLM_PREFLIGHT.md). Which
-models already ship, and how to read the badge, is [WRITERS.md](WRITERS.md).
+models already ship, and how to read the size and fit tooltip, is [WRITERS.md](WRITERS.md).
 
 ---
 

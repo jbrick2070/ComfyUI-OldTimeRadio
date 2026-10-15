@@ -612,9 +612,10 @@ WE FIXED IT"*; looking for LTX 2.5 as a foley/mime substitute;
   real stills plus cloud video, so the CPU graph was strictly dominated.
   CPU-only itself is NOT retired and is still proven on `otr_canonical`
   with no profile. `cpu_floor` survives as a build-variants test fixture
-  and is not a graph people open. Writer badges
-  name the download size and use `-nf4` when only the quantized load
-  fits. The dropdown rows and loaders stay the same. Download-state
+  and is not a graph people open. Writer dropdowns list the bare model
+  id (operator, 2026-10-14: stable dropdown ids); each writer's download
+  size and fit tags -- `-nf4` when only the quantized load fits -- are in
+  the writer boxes' tooltip. The loaders stay the same. Download-state
   badges stay ripped.
 * Official model and install docs live in `apple/`. That folder is the
   index strangers and agents should read: `VIDEO_MODELS.md`,

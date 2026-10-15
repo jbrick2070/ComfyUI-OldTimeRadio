@@ -373,9 +373,9 @@ the air for 84 lines across 30 episodes."""
 #
 # The hardcoded _MODEL_CHOICES list was deleted in B2a; both writer slots
 # now build their dropdown live from `_otr_model_catalog.dropdown_choices()`,
-# which scans the local HF cache; local curated labels carry a size/fit
-# badge (remote slot handles and uncurated cache hits are bare). The old
-# [NOT DOWNLOADED] / [LOCAL HF] download-state suffixes are no longer
+# which scans the local HF cache. Every label is the bare id (2026-10-14; each
+# writer's size and fit are in the widget tooltip). The retired size badge and
+# the [NOT DOWNLOADED] / [LOCAL HF] download-state suffixes are no longer
 # applied, but _strip_label_suffix still strips them from older saved
 # workflows. The single legacy "model_id" widget
 # was replaced by `creative_writing_model` + `technical_model`; broadcast

@@ -197,7 +197,8 @@ def _pool_values(a, b):
     from nodes._otr_rolls import POOL_TEXT_LIMIT as limit
     for size in (limit, limit + 1):
         typed = a + "," * (size - len(a))
-        bracketed = '["%s"' % a + ' ' * (size - len(a) - 5) + "]"
+        bracketed = '["%s"' % a + " " * (size - len(a) - 4) + "]"   # '["' a '"' ... ']'
+        assert len(typed) == len(bracketed) == size
         values += [typed, bracketed, "  " + typed + "  "]
     return values
 

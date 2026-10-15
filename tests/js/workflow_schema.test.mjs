@@ -294,6 +294,19 @@ test("a writer value is left alone unless it names an option this build offers",
     }
 });
 
+test("a writer inside a subgraph definition is respelled too", () => {
+    declareWriter();
+    const inner = savedNode(3, "OTR_LedgerScriptWriter", [
+        ["episode_title", "x"], ["creative_writing_model", "Qwen/Qwen3.5-4B (8.7 GB download)"],
+        ["technical_model", "Qwen/Qwen3.5-4B"]]);
+    const graph = { nodes: [], links: [], definitions: { subgraphs: [{ id: "sg1", nodes: [inner] }] } };
+    const out = reconcile(graph);
+    assert.equal(out.ok, true);
+    assert.equal(out.changed, true);
+    assert.equal(out.graph.definitions.subgraphs[0].nodes[0].widgets_values[1], "Qwen/Qwen3.5-4B");
+    assert.match(out.notes[0], /^subgraph sg1: /);
+});
+
 test("a respelling alone never triggers the link repair (nor its duplicate-id refusal)", () => {
     declareWriter();
     const a = savedNode(7, "OTR_LedgerScriptWriter", [

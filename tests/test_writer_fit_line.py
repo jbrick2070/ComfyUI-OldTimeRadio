@@ -35,9 +35,11 @@ def test_a_gated_row_says_so_first_and_native_rows_claim_no_fit():
     assert "fits " not in native
 
 
-def test_a_line_never_raises_on_an_unknown_row():
-    """A tooltip must render even for a row nothing can estimate."""
-    assert writer_fit_line("definitely/not-a-real-model-xyz") == "fits none of the rated machines"
+def test_a_line_never_raises_on_an_unknown_row_and_claims_nothing_about_it():
+    """A tooltip must render even for a row nothing can estimate -- and say it
+    is unknown, never that it fits nothing."""
+    assert writer_fit_line("definitely/not-a-real-model-xyz") == \
+        "not in the writer catalog; size and fit unknown"
 
 
 def test_the_table_lists_every_local_and_native_writer_then_the_legend():

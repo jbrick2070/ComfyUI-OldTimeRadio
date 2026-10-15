@@ -164,6 +164,35 @@ def _is_comfy_admissible(widget_name: str, value: Any) -> bool:
     return value.startswith("comfy:")
 
 
+# [2026-10-14] The writer pickers offer bare model ids; a value saved or typed in
+# the retired badged spelling ("Qwen/Qwen3.5-4B (8.7 GB download, ...)") still
+# runs -- the writer's VALIDATE_INPUTS admits it and the run path strips it.
+_WRITER_WIDGETS = frozenset({"creative_writing_model", "technical_model"})
+_LEGACY_WRITER_TAGS = (" [NOT DOWNLOADED]", " [LOCAL HF]")
+
+
+def _writer_bare_id(value: str) -> str:
+    """Mirror of nodes/_otr_model_catalog._canonical_qwen_id(_strip_label_suffix)
+    (this script imports nothing from nodes/; tests/test_writer_bare_labels.py
+    pins the two together)."""
+    s = value.strip()
+    for tag in _LEGACY_WRITER_TAGS:
+        if s.endswith(tag):
+            s = s[: -len(tag)].rstrip()
+    if s.endswith(_LEGACY_WRITER_TAGS[1]):
+        s = s[: -len(_LEGACY_WRITER_TAGS[1])].rstrip()
+    if s.endswith(")") and " (" in s:
+        s = s.rsplit(" (", 1)[0].rstrip()
+    return "Qwen/Qwen3.5-4B" if s == "Qwen/Qwen3.5-4B:nf4" else s
+
+
+def _is_writer_label_admissible(widget_name: str, value: Any, choices: list) -> bool:
+    """An old badged / tagged writer label whose bare id is a current choice."""
+    if widget_name not in _WRITER_WIDGETS or not isinstance(value, str) or not value:
+        return False
+    return _writer_bare_id(value) in choices
+
+
 def _validate_widget_value(
     node_type: str,
     widget_name: str,
@@ -219,6 +248,8 @@ def _validate_widget_value(
             if _is_openrouter_admissible(widget_name, value):
                 return
             if _is_comfy_admissible(widget_name, value):
+                return
+            if _is_writer_label_admissible(widget_name, value, type_def):
                 return
             raise ValueError(
                 f"widget {widget_name!r} on node_type {node_type!r} is a "
@@ -557,7 +588,7 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
     carries the BUG-LOCAL-027 + BUG-LOCAL-029 fixes for socket-only
     inputs and "stripped" vs "preserved" widgets_values shapes.
 
-    Sprint H §3.7 sibling fix (Jeffrey 2026-05-17): walk the SERIALIZED
+    Sprint H \u00a73.7 sibling fix (Jeffrey 2026-05-17): walk the SERIALIZED
     slot layout from `_serialized_slot_names` rather than the bare
     declared widget list. Companion slots auto-injected next to seed
     widgets are recognised, validated against the
@@ -684,7 +715,7 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
 def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
     """POST the API prompt to /prompt and return the prompt_id.
 
-    Sprint H §3.7 hardening (Jeffrey 2026-05-17): ComfyUI returns
+    Sprint H \u00a73.7 hardening (Jeffrey 2026-05-17): ComfyUI returns
     HTTP 200 even when the prompt has validation errors -- it accepts
     the POST, refuses to execute the invalid nodes, and the resulting
     history entry returns status_str='success' with zero outputs. That

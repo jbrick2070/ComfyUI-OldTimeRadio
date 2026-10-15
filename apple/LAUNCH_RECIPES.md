@@ -35,7 +35,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_animatediff
 
 - file: `workflows/otr_16gb_animatediff.json`
-- workflow: `otr_16gb_animatediff` (16 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
+- workflow: `otr_16gb_animatediff` (16 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 12.1 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `542a20183790e478e029cab7216ea26915346ebd0b38775fbda0965fe74755d9`
@@ -77,7 +77,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_foley
 
 - file: `workflows/otr_16gb_foley.json`
-- workflow: `otr_16gb_foley` (16 GB NVIDIA -- video that generates its own sound, mixed under the voices. Lane ltx25_foley_16gb (mix4x8-13.8GB) through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8). MEASURED on an RTX 5080 Laptop 2026-09-23: one 97-frame 1664x960 clip with foley in 205.3 s.)
+- workflow: `otr_16gb_foley` (16 GB NVIDIA -- video that generates its own sound, mixed under the voices. Lane ltx25_foley_16gb (mix4x8-13.8GB) through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 12.1 GB int8). MEASURED on an RTX 5080 Laptop 2026-09-23: one 97-frame 1664x960 clip with foley in 205.3 s.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `3e40182cd7360b1a29e5644e91e8f93ed363eb10488658ca456564ae6c6df30b`
@@ -121,7 +121,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_low
 
 - file: `workflows/otr_16gb_low.json`
-- workflow: `otr_16gb_low` (16 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
+- workflow: `otr_16gb_low` (16 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 12.1 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `3e32e40d93c9cd0c8e7b4feda4897de42d309959e35196cbfc4e00bd8186ba30`
@@ -162,7 +162,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_mime
 
 - file: `workflows/otr_16gb_mime.json`
-- workflow: `otr_16gb_mime` (16 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_mime_16gb on the same mix4x8-13.8GB DiT as the 16 GB foley lane, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8).)
+- workflow: `otr_16gb_mime` (16 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_mime_16gb on the same mix4x8-13.8GB DiT as the 16 GB foley lane, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 12.1 GB int8).)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `a823b8e0c706974c30a92f9b08e6dbc74c2dc755f267128063a0b919c68d10dd`
@@ -206,7 +206,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_still
 
 - file: `workflows/otr_16gb_still.json`
-- workflow: `otr_16gb_still` (16 GB NVIDIA -- a still image with motion, minted by Z-Image Turbo. Lane still_motion, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
+- workflow: `otr_16gb_still` (16 GB NVIDIA -- a still image with motion, minted by Z-Image Turbo. Lane still_motion, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 12.1 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `2d3ffa7c518284eef1f65d27fc218d688cd20b0982a766be8f5a894d8895a869`
@@ -246,7 +246,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_video
 
 - file: `workflows/otr_16gb_video.json`
-- workflow: `otr_16gb_video` (16 GB NVIDIA -- real video diffusion, silent picture under the voices. Lane ltx25_high_video on the same mix4x8-13.8GB DiT the 16 GB foley and mime lanes load, through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8).)
+- workflow: `otr_16gb_video` (16 GB NVIDIA -- real video diffusion, silent picture under the voices. Lane ltx25_high_video on the same mix4x8-13.8GB DiT the 16 GB foley and mime lanes load, through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 12.1 GB int8).)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `ecbe3c0f1723be422359b122192ea8dc8fcc4c519df0699ec242b23a3f4000ea`
@@ -290,7 +290,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_24gb_foley
 
 - file: `workflows/otr_24gb_foley.json`
-- workflow: `otr_24gb_foley` (24 GB AND UP, ANY modern NVIDIA (Ada, Ampere or Blackwell) -- video that generates its own sound. Lane ltx25_foley_24gb (int8, stock ComfyUI loaders), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 11.2 GB int8). Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.)
+- workflow: `otr_24gb_foley` (24 GB AND UP, ANY modern NVIDIA (Ada, Ampere or Blackwell) -- video that generates its own sound. Lane ltx25_foley_24gb (int8, stock ComfyUI loaders), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 12.1 GB int8). Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.)
 - status: draft
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `28c98ee1239a3114525a570673bb0b71a588e1b8cd8ae39ccd6552a6a12d4189`
@@ -334,7 +334,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_8gb_animatediff
 
 - file: `workflows/otr_8gb_animatediff.json`
-- workflow: `otr_8gb_animatediff` (8 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, which consumes no still, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 4.8 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
+- workflow: `otr_8gb_animatediff` (8 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, which consumes no still, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 5.2 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `7d424c5cbc8a8c7ed670a107d41f540c98499d73d36617a812f77121e5f5136c`
@@ -376,7 +376,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_8gb_low
 
 - file: `workflows/otr_8gb_low.json`
-- workflow: `otr_8gb_low` (8 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, which consumes no still, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 4.8 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
+- workflow: `otr_8gb_low` (8 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, which consumes no still, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 5.2 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `95ab91032f171717105f796e90964c426f610954335efe43e32253afdd968f36`
@@ -548,7 +548,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_8gb_still
 
 - file: `workflows/otr_8gb_still.json`
-- workflow: `otr_8gb_still` (8 GB NVIDIA -- a still image with motion, minted by Z-Image Turbo. Lane still_motion, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 4.8 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
+- workflow: `otr_8gb_still` (8 GB NVIDIA -- a still image with motion, minted by Z-Image Turbo. Lane still_motion, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 E2B, run by ComfyUI itself (comfy_native, 5.2 GB int8). Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `c1d8a17f8631ef75f97bf30abdf06b5a2b59be53ad0e8b23d77eae31ad992dbd`

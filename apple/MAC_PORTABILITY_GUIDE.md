@@ -115,13 +115,14 @@ remote-desktop session, or a test suite that imports torch, is enough.
 Note `ps` under-reports badly on Apple Silicon (0.33 GB for a 14 GB process);
 use `footprint -p <pid>` and read `phys_footprint`.
 
-**THE WRITER DROPDOWN UNDER-STATES THIS BY 3x, and that is the trap.** The
-picker shows `Qwen/Qwen3.5-4B (4.3 GB)`. That badge reports
-`_estimate_resident_gb`, which halves a row's download size on the stated
-assumption that OTR loads at 8-bit/NF4 -- true on NVIDIA, false here, because
-bitsandbytes is excluded on darwin by declared intent. The honest Apple Silicon
-number for that row is the measured **14 GB**. Read the badge as an NVIDIA
-figure until the picker carries per-device rows. Nothing refuses the load: the
+**THE DOWNLOAD SIZE IS NOT THE MAC MEMORY COST, and that is the trap.** The
+writer tooltip says `Qwen/Qwen3.5-4B: about 9.3 GB; fits mac16-tight ...` --
+9.3 GB is the one-time download, and `-tight` means nothing to spare. The
+measured Apple Silicon resident for that row is **14 GB**: the pack's resident
+estimate halves a download on the stated assumption of an 8-bit/NF4 load --
+true on NVIDIA, false here, because bitsandbytes is excluded on darwin by
+declared intent. (Until 2026-09-09 the picker printed that halved figure,
+"(4.3 GB)", which under-stated this row by 3x.) Nothing refuses the load: the
 menu offers it, and the machine pays.
 
 The writer is also what took the machine down three times on 2026-09-08 -- it

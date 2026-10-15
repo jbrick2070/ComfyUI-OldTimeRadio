@@ -136,8 +136,9 @@ def resolve_creative_system_prompt(
             f"unknown creative phase {phase!r}; expected one of "
             f"{sorted(['outline', *_PHASE_TO_PACK_SEAM])}"
         )
-    # The picker's VRAM badge is part of the widget value the graph now saves,
-    # so normalize BEFORE the lookup -- the same strip the loader performs.
+    # An older saved graph's writer value may still carry the retired size
+    # badge (labels are bare ids since 2026-10-14), so normalize BEFORE the
+    # lookup -- the same strip the loader performs.
     # Done as a rebind rather than inline so the lookup below stays the exact
     # `rows.get(repo_id)` idiom this module is pinned on: still one exact dict
     # access keyed on a full repo_id, never substring dispatch.
