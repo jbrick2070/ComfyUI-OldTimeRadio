@@ -121,7 +121,7 @@ and the tooltip lists every writer like this:
 | Piece | Means |
 |---|---|
 | `about 9.3 GB` | What it downloads, once, in the decimal gigabytes a disk or browser shows (measured from the files). Not what it occupies while running. |
-| `nv8-nf4` | Fits an 8 GB NVIDIA card only as NF4, which that machine already bakes. Plain `nv8` means it fits without quantizing. (Measured on an RTX 4060 Laptop 8 GB, 2026-10-14: `gemma-4-E2B-it` loads as NF4 at 6.1 GiB, which with the desktop's share fills the 8 GB card, and writes at about 7 tokens a second -- so it is `nv8-nf4`, tight. `gemma-4-E4B-it` ran out of memory loading as NF4 on that card; it can still run there through CPU offload at about half a token a second, with ~12 GB of free RAM, which is not a fit, so it has no 8 GB tag.) |
+| `nv8-nf4` | Fits an 8 GB NVIDIA card only as NF4, which that machine already bakes. Plain `nv8` means it fits without quantizing. (Measured on an RTX 4060 Laptop 8 GB, 2026-10-14: `gemma-4-E2B-it` loads as NF4 at 6.1 GiB, which with the desktop's share fills the 8 GB card, and writes at about 7 tokens a second -- so it is `nv8-nf4`, tight. `gemma-4-E4B-it` ran out of memory loading as NF4 on that card; it has run there through CPU offload, at about half a token a second (2026-09-06; the offload needs roughly 12 GiB of free RAM by the loader's own planner), which is not a fit, so it has no 8 GB tag.) |
 | `nv16` `nv24` | Fits an NVIDIA card of that many GB at full precision. `nv16-nf4` means only the quantized load fits. |
 | `mac16` | Fits a 16 GB Apple Silicon machine. |
 | `-tight` | Fits with nothing to spare. Close everything else. |

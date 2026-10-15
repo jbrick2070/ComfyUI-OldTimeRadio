@@ -1898,10 +1898,11 @@ MEASURED_NVIDIA_NF4_GB = {
     # Same card and day: the all-on-GPU NF4 load ran OUT OF MEMORY with 7.19
     # GiB already allocated (its per-layer embeddings alone are ~5 GiB and do
     # not quantize). So 7.2 is a FLOOR, not a reading -- enough to say it does
-    # not fit the 7.0 GB nv8 budget. It still RUNS on that card through the
-    # loader's CPU-offload retry when ~12 GiB of RAM is free -- at ~0.5 tok/s
-    # (PBUG-20260906-06), which is a crawl, not a fit; that retry refused here
-    # only because the RAM lane was short at the time.
+    # not fit the 7.0 GB nv8 budget. It has RUN on that card through the
+    # loader's CPU-offload retry -- 0.5 tok/s at its first 64-token heartbeat on
+    # 2026-09-06 (PBUG-20260906-06), a crawl, not a fit. That retry refused here:
+    # the loader's own planner, probed on this row's config, needs a CPU lane of
+    # about 12 GiB (free RAM minus 2), and the lane was shorter at the time.
     "google/gemma-4-E4B-it": 7.2,
 }
 

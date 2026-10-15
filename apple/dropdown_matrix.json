@@ -490,7 +490,7 @@
         "nv16": "proven",
         "nv8": "measured"
       },
-      "note": "The 8 GB 'measured' is a run, not a fit: on the RTX 4060 8 GB it loads only through the loader's CPU offload, at ~0.5 tok/s with ~12 GiB of free RAM (PBUG-20260906-06). Loading it all on the GPU as NF4 ran out of memory there at 7.19 GiB (2026-10-14), which is why it carries no nv8 tag."
+      "note": "The 8 GB 'measured' is a run, not a fit: on the RTX 4060 8 GB it loads only through the loader's CPU offload, at 0.5 tok/s at its first heartbeat (2026-09-06, PBUG-20260906-06); the loader's planner needs roughly 12 GiB of free RAM for that offload. Loading it all on the GPU as NF4 ran out of memory there at 7.19 GiB (2026-10-14), which is why it carries no nv8 tag."
     },
     "mistralai/Mistral-Nemo-Instruct-2407": {
       "memory": {
