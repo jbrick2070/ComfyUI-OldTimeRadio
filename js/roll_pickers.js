@@ -150,8 +150,8 @@ function makeChecklist(name, choices, initial, onToggle) {
         head.title = `${poolName}: ${text}. ${POOL_HELP}`;
         note.hidden = unknown.length === 0;
         note.textContent = unknown.length
-            ? `Not a choice here, and the run will stop on it: ${unknown.join(", ")}. `
-              + (open ? "Click any box to clear it." : "Open the list and click any box to clear it.")
+            ? `Not a choice this list can read: ${unknown.join(", ")}. The run may stop on it -- `
+              + (open ? "click any box to clear it." : "open the list and click any box to clear it.")
             : "";
     };
     // The row's height: the drawn body, or before it is drawn (or while the

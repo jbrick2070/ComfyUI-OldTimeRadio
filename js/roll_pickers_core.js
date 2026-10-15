@@ -10,12 +10,20 @@
  *
  * NEVER "FINE" WHERE THE BACKEND STOPS. Every value the backend refuses reads
  * here as an entry that is not a choice, so the list warns before the run
- * does (tests/test_roll_pickers.py runs both on the same inputs). The one
- * difference left is the safe direction: a few hand-typed Python forms that
- * literal_eval accepts and this does not read (a name with a backslash
- * escape, an r/u prefix or triple quotes inside a single-quoted list) warn
- * although the run would go; any click rewrites them as plain names.
+ * does. Bracketed text is read by ONE grammar on both sides -- this file and
+ * `_otr_rolls._bracket_names` -- so there they agree exactly, both ways.
+ * Typed text is trusted only in printable ASCII plus TAB/LF/CR (every choice
+ * in every pool is [0-9A-Za-z_], and in that alphabet JS's and Python's
+ * trimming, case-folding and `\s` agree); typed text with any other
+ * character -- a pasted no-break space, say -- warns although the backend's
+ * more forgiving reader may run it. tests/test_roll_pickers.py runs both
+ * readers over the same few thousand values.
  */
+
+/** Same limit as the backend's `POOL_TEXT_LIMIT`. */
+export const POOL_TEXT_LIMIT = 4096;
+const TRUSTED = /^[\x20-\x7e\t\n\r]*$/;
+const trimWs = (s) => s.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "");
 
 /** How a pool entry is compared -- the same rule as the backend's `_pool_key`. */
 export function poolKey(name) {
@@ -23,47 +31,68 @@ export function poolKey(name) {
         .replace(/^_+|_+$/g, "").toLowerCase();
 }
 
-/** The entries of a saved pool value: a typed list, a JSON list, or the
- *  str() of a list saved by 2.3.8 ("['anime', 'cartoon']"). Text that opens
- *  with "[" is a list or nothing, as in the backend: anything it would refuse
- *  ("[anime, cartoon]", an empty or blank entry, a missing bracket) comes
- *  back whole, as one entry that matches no choice. */
+/** The entries of a saved pool value: a typed list, a JSON list of strings,
+ *  or the str() of a list saved by 2.3.8 ("['anime', 'cartoon']"). Anything
+ *  the backend would refuse, or text outside the trusted alphabet, comes back
+ *  whole, as one entry that matches no choice. (The widget always holds a
+ *  string: roll_pickers.js stringifies whatever a graph saved.) */
 export function poolEntries(value) {
-    if (Array.isArray(value)) return value.map(String);
-    const text = value == null ? "" : String(value).trim();
-    if (!text) return [];
-    if (text.startsWith("[")) return bracketEntries(text) ?? [text];
-    return text.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
+    const { names, refused } = readEntries(value);
+    return refused === null ? names : [refused];
 }
 
-// A bracketed value read the way `parse_roll_pool` reads it -- json.loads,
-// then literal_eval -- as its trimmed names, or null where it raises.
-function bracketEntries(text) {
+// `refused` is the whole text when it cannot be read as names at all; it is
+// then reported as is and never matched against a choice (poolKey's own trim
+// would otherwise forgive a no-break space the backend does not).
+function readEntries(value) {
+    const text = trimWs(value == null ? "" : String(value));
+    if (!text) return { names: [], refused: null };
+    if (text.length > POOL_TEXT_LIMIT || !TRUSTED.test(text)) return { names: [], refused: text };
+    if (text.startsWith("[")) {
+        const names = bracketNames(text);
+        return names ? { names, refused: null } : { names: [], refused: text };
+    }
+    return { names: text.split(/[,;\n]/).map(trimWs).filter(Boolean), refused: null };
+}
+
+// The Python repr of a list of plain names: quoted, no quote, backslash or
+// control character inside; one trailing comma allowed ("['anime',]"), no
+// empty slot ("[,]"). Mirrors `_otr_rolls._repr_names`.
+function reprNames(text) {
+    if (!text.endsWith("]")) return null;
+    const parts = text.slice(1, -1).split(",").map(trimWs);
+    if (parts.length === 1 && parts[0] === "") return [];
+    if (parts.length > 1 && parts[parts.length - 1] === ""
+        && parts[parts.length - 2] !== "") parts.pop();
+    const out = [];
+    for (const part of parts) {
+        const m = /^(['"])([^'"\\\x00-\x1f\x7f]*)\1$/.exec(part);
+        if (!m) return null;
+        out.push(m[2]);
+    }
+    return out;
+}
+
+// A bracketed value read by the backend's grammar (`_bracket_names`): a JSON
+// list of strings, else the plain repr -- its trimmed names, or null where the
+// backend raises. Each name is checked against the alphabet BEFORE trimming
+// (a decoded "\ufeffanime" is refused by both; trimmed first, JS would keep it).
+function bracketNames(text) {
     let items;
     try {
-        const parsed = JSON.parse(text);
-        if (!Array.isArray(parsed)) return null;
-        // str() of a non-string is never a choice; any spelling of it will do
-        items = parsed.map((v) => (typeof v === "string" ? v : JSON.stringify(v)));
+        items = JSON.parse(text);
     } catch {
-        // The Python repr of a list of plain names: quoted, no escapes inside,
-        // one trailing comma allowed ("['anime',]"), no empty slot ("[,]").
-        if (!text.endsWith("]")) return null;
-        const parts = text.slice(1, -1).split(",").map((s) => s.trim());
-        if (parts.length === 1 && parts[0] === "") return [];
-        if (parts.length > 1 && parts[parts.length - 1] === ""
-            && parts[parts.length - 2] !== "") parts.pop();
-        const quoted = /^(['"])([^'"\\]*)\1$/;
-        items = [];
-        for (const part of parts) {
-            const m = quoted.exec(part);
-            if (!m) return null;
-            items.push(m[2]);
-        }
+        items = reprNames(text);
     }
-    const names = items.map((s) => s.trim());
-    // a blank name is not a choice to the backend: it stops the run
-    return names.some((s) => !s) ? null : names;
+    if (!Array.isArray(items) || !items.every((v) => typeof v === "string")) return null;
+    const names = [];
+    for (const raw of items) {
+        if (!TRUSTED.test(raw)) return null;
+        const name = trimWs(raw);
+        if (!name) return null;
+        names.push(name);
+    }
+    return names;
 }
 
 /**
@@ -74,8 +103,10 @@ function bracketEntries(text) {
 export function readPool(value, choices) {
     const byKey = new Map(choices.map((c) => [poolKey(c), c]));
     const checked = new Set();
+    const { names, refused } = readEntries(value);
+    if (refused !== null) return { checked, unknown: [refused] };
     const unknown = [];
-    for (const entry of poolEntries(value)) {
+    for (const entry of names) {
         const hit = byKey.get(poolKey(entry));
         if (hit) checked.add(hit);
         else unknown.push(entry);

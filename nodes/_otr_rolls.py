@@ -43,7 +43,6 @@ Import direction stays one-way:
 
 from __future__ import annotations
 
-import ast
 import json
 import random
 import re
@@ -138,6 +137,59 @@ def _pool_key(name: Any) -> str:
     return re.sub(r"[\s_-]+", "_", str(name).strip()).strip("_").casefold()
 
 
+#: Longer than any honest pool: every choice of the largest pool (24 video
+#: lanes) comes to about 500 characters. Refused before anything is parsed --
+#: the same limit as js/roll_pickers_core.js.
+POOL_TEXT_LIMIT = 4096
+
+#: What a bracketed name may contain, checked BEFORE it is trimmed: printable
+#: ASCII plus TAB, LF and CR. Every choice in every pool is [0-9A-Za-z_], and
+#: within this alphabet Python's strip() and the checklist's trim agree.
+_NAME_ALPHABET = re.compile(r"[\x20-\x7e\t\n\r]*")
+_WS = " \t\r\n"
+#: One item of the Python repr a 2.3.8 graph saved: a quoted name with no
+#: quote, backslash or control character inside.
+_REPR_ITEM = re.compile(r"""(['"])([^'"\\\x00-\x1f\x7f]*)\1""")
+
+
+def _repr_names(text: str) -> "list[str] | None":
+    """``['anime', 'cartoon']`` -> its names, or None. One trailing comma is
+    allowed (``['anime',]``), an empty slot (``[,]``) is not."""
+    if not text.endswith("]"):
+        return None
+    parts = [p.strip(_WS) for p in text[1:-1].split(",")]
+    if parts == [""]:
+        return []
+    if len(parts) > 1 and parts[-1] == "" and parts[-2] != "":
+        parts.pop()
+    names = []
+    for part in parts:
+        m = _REPR_ITEM.fullmatch(part)
+        if m is None:
+            return None
+        names.append(m.group(2))
+    return names
+
+
+def _bracket_names(text: str, surface: str) -> "list[str]":
+    """A bracketed pool, read by the ONE grammar the checklist also uses
+    (js/roll_pickers_core.js::bracketNames): a JSON list of strings, else the
+    Python repr of a list of plain names. Both sides read it the same way, so
+    the checklist warns exactly where this refuses (2026-10-14; the earlier
+    literal_eval fallback accepted escapes, prefixes, implicit concatenation
+    and comments the checklist could not mirror, and leaked MemoryError and
+    the int-digit ValueError as unnamed exceptions)."""
+    try:
+        parsed = json.loads(text)
+    except (ValueError, RecursionError):
+        parsed = _repr_names(text)
+        if parsed is None:
+            raise RollError(f"the {surface} roll pool {text!r} is not a list of names")
+    if not isinstance(parsed, list) or not all(isinstance(v, str) for v in parsed):
+        raise RollError(f"the {surface} roll pool {text!r} is not a list of names")
+    return parsed
+
+
 def parse_roll_pool(
     raw: Any,
     *,
@@ -148,17 +200,20 @@ def parse_roll_pool(
     """The ids a SELECTIVE roll may draw from, first-seen order, no repeats.
 
     The pool widgets are typed lists (STRING): "anime, video_art" --
-    commas, semicolons or new lines separate names. A JSON list string,
-    or a real list (a graph saved by 2.3.8, when the pools were
-    multi-selects), parses to the same tuple. Empty (None, "", []) is ``()`` -- "no pool chosen", which the
-    callers read as the whole list.
+    commas, semicolons or new lines separate names. A JSON list of strings,
+    the Python repr of a list a graph saved by 2.3.8 held when the pools
+    were multi-selects ("['anime', 'cartoon']" -- core coerces a STRING
+    input with str()), or a real list parses to the same tuple. Empty
+    (None, "", []) is ``()`` -- "no pool chosen", which the callers read as
+    the whole list.
 
     FORGIVING ABOUT SPELLING-OF-FORM, STRICT ABOUT NAMES (2026-09-28). A
     person types into a text box: "english, spanish" or "video art" means
     English, Spanish and video_art. Case, and spaces or hyphens against
     underscores, are ignored, and each entry comes back as the canonical id.
     A name that matches nothing, or one in ``refused``, still fails LOUD: a
-    pool that quietly drops a typo rolls from a set nobody chose.
+    pool that quietly drops a typo rolls from a set nobody chose. Bracketed
+    text is strict (see ``_bracket_names``); typed text stays forgiving.
     """
     if raw is None:
         return ()
@@ -166,23 +221,17 @@ def parse_roll_pool(
         text = raw.strip()
         if not text:
             return ()
+        if len(text) > POOL_TEXT_LIMIT:
+            raise RollError(
+                f"the {surface} roll pool is {len(text)} characters long; no "
+                f"pool is longer than {POOL_TEXT_LIMIT}")
         if text.startswith("["):
-            try:
-                raw = json.loads(text)
-            except (json.JSONDecodeError, RecursionError):
-                # A graph saved by 2.3.8 holds a real LIST in this slot, and
-                # core coerces every STRING input with str() (execution.py),
-                # so the node receives Python's repr: "['anime', 'cartoon']",
-                # which is not JSON. literal_eval reads literals only -- it
-                # never executes anything.
-                try:
-                    raw = ast.literal_eval(text)
-                # TypeError: "[{[1]: 2}]" (an unhashable key); RecursionError:
-                # nesting deep enough -- both are "not a list", said by name.
-                except (ValueError, SyntaxError, TypeError, RecursionError) as exc:
+            raw = _bracket_names(text, surface)
+            for name in raw:
+                if not _NAME_ALPHABET.fullmatch(name) or not name.strip(_WS):
                     raise RollError(
-                        f"the {surface} roll pool {text!r} is not a list"
-                    ) from exc
+                        f"the {surface} roll pool {text!r} names {name!r}, which "
+                        f"is not a name")
         else:
             raw = [part for part in (p.strip() for p in
                    text.replace(";", ",").replace("\n", ",").split(","))
@@ -192,6 +241,8 @@ def parse_roll_pool(
             f"the {surface} roll pool must be a list of ids, got "
             f"{type(raw).__name__}"
         )
+    if not all(isinstance(item, str) for item in raw):
+        raise RollError(f"the {surface} roll pool must be a list of names, got {raw!r}")
     canonical = {_pool_key(v): v for v in valid_ids}
     refused_keys = {_pool_key(v) for v in refused}
     chosen: "list[str]" = []

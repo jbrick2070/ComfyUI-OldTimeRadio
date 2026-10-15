@@ -28,7 +28,8 @@ test("a typed list, a JSON list and a 2.3.8 saved list read the same", () => {
     assert.deepEqual(poolEntries("anime;cartoon"), want);
     assert.deepEqual(poolEntries('["anime", "cartoon"]'), want);
     assert.deepEqual(poolEntries("['anime', 'cartoon']"), want);
-    assert.deepEqual(poolEntries(["anime", "cartoon"]), want);
+    // what roll_pickers.js hands over for a graph that saved a real list
+    assert.deepEqual(poolEntries(String(["anime", "cartoon"])), want);
     assert.deepEqual(poolEntries(""), []);
     assert.deepEqual(poolEntries(null), []);
 });
@@ -99,12 +100,16 @@ test("the summary reports the boxes a saved value checks", () => {
     assert.equal(s.count, 2);
 });
 
-test("bracketed text is read as the backend reads it, or reported whole", () => {
-    // parse_roll_pool: json.loads, then literal_eval. Anything both refuse --
-    // an unquoted name, an empty or blank slot, a missing bracket -- stops the
-    // run, so the list must not read it as ticks or as an empty pool.
+test("bracketed text is read by the backend's one grammar, or reported whole", () => {
+    // _otr_rolls._bracket_names: a JSON list of strings, else the plain repr.
+    // Anything it refuses -- an unquoted name, an empty or blank slot, a
+    // missing bracket, a non-string item, an escape inside a repr, a name with
+    // a character outside the alphabet -- stops the run, so the list must not
+    // read it as ticks or as an empty pool.
     for (const bad of ["[anime, cartoon]", '["anime", cartoon]', "[anime",
-                       '[""]', '[" "]', '["", "anime"]', "[,]", '["anime",,"cartoon"]']) {
+                       '[""]', '[" "]', '["", "anime"]', "[,]", '["anime",,"cartoon"]',
+                       "[1]", "[null]", '[["anime"]]', "['anime\\n']", "[r'anime']",
+                       '["\\ufeffanime"]', '["anime\\u00a0"]', '["anime"] x']) {
         assert.deepEqual(poolEntries(bad), [bad], bad);
         const s = poolSummary(bad, STYLES);
         assert.equal(s.text, "No valid choice ticked", bad);
@@ -115,5 +120,12 @@ test("bracketed text is read as the backend reads it, or reported whole", () => 
     assert.deepEqual(poolEntries('["\\u0061nime"]'), ["anime"]);
     assert.deepEqual(poolEntries("['anime',]"), ["anime"]);
     assert.deepEqual(poolEntries("[ ]"), []);
-    assert.deepEqual(poolEntries("[1]"), ["1"]);   // str(1) is no choice either
+});
+
+test("typed text is trusted only in printable ASCII", () => {
+    for (const odd of ["anime\u00a0", "\ufeffanime", "anime,\u3000cartoon", "anime\x0b"]) {
+        assert.deepEqual(poolEntries(odd).length, 1, JSON.stringify(odd));
+        assert.equal(poolSummary(odd, STYLES).text, "No valid choice ticked");
+    }
+    assert.deepEqual(poolEntries("x".repeat(4097)), ["x".repeat(4097)]);
 });

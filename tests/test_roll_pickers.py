@@ -142,8 +142,8 @@ def test_the_list_row_is_its_own_height_on_every_renderer():
     assert re.search(r"addDOMWidget\(name, \"otr_roll_picker\"[^;]*\bmargin:\s*2,", code, re.S)
 
 
-def _js_read_pools(values, choices):
-    """The shipped `readPool` on each value, under node."""
+def _js_read_pools(jobs):
+    """The shipped `readPool` under node, for [(values, choices), ...] in one run."""
     node = _node_exe()
     if node is None:
         pytest.skip("node is not installed; the JS reader cannot run here")
@@ -151,48 +151,94 @@ def _js_read_pools(values, choices):
     script = (
         "import { readPool } from %s;" % json.dumps(core)
         + "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{"
-          "const {values,choices}=JSON.parse(s);"
-          "process.stdout.write(JSON.stringify(values.map(v=>{"
-          "const r=readPool(v,choices);return {checked:[...r.checked],unknown:r.unknown};})));});")
-    proc = subprocess.run([node, "--input-type=module", "-e", script],
-                          input=json.dumps({"values": values, "choices": choices}),
-                          capture_output=True, text=True, encoding="utf-8", timeout=120)
+          "const jobs=JSON.parse(s);"
+          "process.stdout.write(JSON.stringify(jobs.map(([values,choices])=>values.map(v=>{"
+          "const r=readPool(v,choices);return {checked:[...r.checked],unknown:r.unknown};}))));});")
+    try:
+        proc = subprocess.run([node, "--input-type=module", "-e", script],
+                              input=json.dumps(jobs), capture_output=True, text=True,
+                              encoding="utf-8", timeout=300)
+    except subprocess.TimeoutExpired:
+        pytest.fail("node did not answer within 300 s")
     assert proc.returncode == 0, proc.stderr[-2000:]
     return json.loads(proc.stdout)
 
 
+#: Every whitespace-like or control character on which JS and Python have been
+#: seen to disagree (trim / strip / \s / the Python tokenizer), plus NUL/DEL.
+_ODD = ["\t", "\n", "\r", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x1f", "\x85",
+        "\xa0", "\u1680", "\u2000", "\u2007", "\u2028", "\u2029", "\u202f", "\u205f",
+        "\u3000", "\ufeff", "\x00", "\x7f"]
+_TEMPLATES_PLAIN = ["{a}", "{a}, {b}", "{a};{b}", "{a}\n{b}", "{A}", "{a_sp}", "nonsense",
+                    "{a}, nonsense", "", "  ", "{a},", ",{a}", "{a},,{b}"]
+_TEMPLATES_BRACKET = [
+    "[]", "[ ]", '["{a}"]', '["{a}", "{b}"]', '["{a}",]', '[""]', '[" "]', '["", "{a}"]',
+    "[1]", "[null]", "[true]", '[["{a}"]]', "[NaN]", '["{a}"] x', '["{a}"]]', '["{a_esc}"]',
+    '["{a}\\t", "{b}"]', "['{a}']", "['{a}', '{b}']", "['{a}',]", "['{a}',,]", "[{a}]",
+    "[{a}, {b}]", "['{a}' '{b}']", "['{a}\\n']", "[r'{a}']", "['''{a}''']", "[,]",
+    "['{a}', \"{b}\"]", "[ '{a}' ]", "['{a}' # c\n]", "['{a}',\\\n'{b}']", "['x, y']",
+]
+_TEMPLATES_ODD = ["{w}{a}", "{a}{w}", "{a},{w}{b}", '["{w}{a}"]', '["{a}{w}"]',
+                  '["{a}",{w}"{b}"]', "[{w}]", '{w}["{a}"]', '["{w_esc}{a}"]',
+                  '["{a}{w_esc}"]', "['{w}{a}']", "['{a}',{w}'{b}']"]
+
+
+def _pool_values(a, b):
+    fill = {"a": a, "b": b, "A": a.upper(), "a_sp": a.replace("_", " "),
+            "a_esc": "\\u%04x%s" % (ord(a[0]), a[1:])}
+    values = [t.format(**fill) for t in _TEMPLATES_PLAIN + _TEMPLATES_BRACKET]
+    for w in _ODD:
+        values += [t.format(w=w, w_esc="\\u%04x" % ord(w), **fill) for t in _TEMPLATES_ODD]
+    values += [", ".join([a] * 1000), "[" + "9" * 5000 + "]", "[" * 3000]
+    return values
+
+
 def test_the_checklist_never_reads_as_fine_what_the_backend_refuses():
     """The same saved values through the shipped JS reader and the backend's
-    `parse_roll_pool`. Where the backend raises, the checklist must report an
-    entry that is not a choice (it warns before the run stops). Where the
-    backend accepts, the checklist ticks exactly those choices -- except the
-    documented safe-direction forms, which warn although the run would go."""
+    `parse_roll_pool`, for all five pools. Where the backend raises, the list
+    must report an entry that is not a choice (it warns before the run stops).
+    Where the text is in the trusted alphabet (printable ASCII + TAB/LF/CR,
+    within the length limit), the two agree exactly: same ticks, no warning.
+    Text outside it is refused whole by the list -- the documented safe
+    direction (the backend's typed-text reader is more forgiving)."""
+    from nodes import _otr_episode_languages as LANG
+    from nodes import _otr_lane_rolls as LR
     from nodes import _otr_rolls as ROLLS
-    styles = list(ROLLS.eligible_style_ids())
-    a, b = styles[0], styles[1]
-    escaped = '["\\u%04x%s"]' % (ord(a[0]), a[1:])
-    values = [
-        "", "  ", f"{a}, {b}", f"{a};{b}", f"{a}\n{b}", a.upper(), a.replace("_", " "),
-        "nonsense", f"{a}, nonsense",
-        "[]", "[ ]", f'["{a}", "{b}"]', f"['{a}', '{b}']", f"['{a}',]", f'["{a}",]',
-        f'["{a}\\t", "{b}"]', escaped,
-        f"[{a}, {b}]", f'["{a}", {b}]', f"[{a}", '[""]', '[" "]', f'["", "{a}"]', "[,]",
-        f'["{a}",,"{b}"]', "[1]", "[null]", "[{[1]: 2}]", '[["x"]]', "['x, y']",
-    ]
-    safe_direction = [f"[r'{a}']", f"['''{a}''']"]
-    js = _js_read_pools(values + safe_direction, styles)
-    for value, got in zip(values + safe_direction, js):
-        try:
-            backend = ROLLS.parse_roll_pool(value, valid_ids=styles, surface="style_roll_pool")
-        except ROLLS.RollError:
-            assert got["unknown"], ("the run stops on %r but the checklist reads it as fine"
-                                    % value)
-            continue
-        if value in safe_direction:
-            assert got["unknown"], value
-            continue
-        assert not got["unknown"], (value, got)
-        assert sorted(got["checked"]) == sorted(backend), (value, got, backend)
+    langs = [c for c in LANG.dropdown_choices() if c != LANG.OFF_LABEL]
+    pools = [("style_roll_pool", list(ROLLS.eligible_style_ids()), ()),
+             ("bank_roll_pool", list(ROLLS.eligible_bank_ids()), ()),
+             ("language_roll_pool", langs, (LANG.OFF_LABEL,)),
+             ("video_roll_pool", list(LR.video_roll_choices()), ()),
+             ("still_roll_pool", list(LR.still_roll_choices()), ())]
+    jobs = []
+    for _surface, choices, refused in pools:
+        values = _pool_values(choices[0], choices[1])
+        values += [str(r) for r in refused]
+        jobs.append((values, choices))
+    results = _js_read_pools(jobs)
+    trusted = re.compile(r"[\x20-\x7e\t\n\r]*")
+    seen = {"refused_both": 0, "agree": 0, "over_warn": 0}
+    for (surface, choices, refused), (values, _c), outs in zip(pools, jobs, results):
+        assert len(outs) == len(values)
+        for value, got in zip(values, outs):
+            text = value.strip(" \t\r\n")
+            in_alphabet = len(text) <= ROLLS.POOL_TEXT_LIMIT and trusted.fullmatch(text)
+            try:
+                backend = ROLLS.parse_roll_pool(value, valid_ids=choices, surface=surface,
+                                                refused=refused)
+            except ROLLS.RollError:
+                assert got["unknown"], ("%s: the run stops on %r but the list reads it as fine"
+                                        % (surface, value))
+                seen["refused_both"] += 1
+                continue
+            if in_alphabet:
+                assert not got["unknown"], (surface, value, got)
+                assert sorted(got["checked"]) == sorted(backend), (surface, value, got, backend)
+                seen["agree"] += 1
+            else:
+                assert got["unknown"], (surface, value, got)
+                seen["over_warn"] += 1
+    assert seen["refused_both"] and seen["agree"] and seen["over_warn"], seen
 
 
 def _node_exe():
