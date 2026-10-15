@@ -80,7 +80,10 @@ def test_an_unmeasured_row_still_uses_the_projection():
     Every other row must keep the exact tags it had before the table existed,
     which is what makes this safe to add to shared code.
     """
-    assert set(catalog.MEASURED_NVIDIA_NF4_GB) == {BIG_CARD_WRITER}, (
+    # Extended deliberately 2026-10-14: the two multimodal Gemma 4 rows were
+    # measured on an RTX 4060 Laptop 8 GB (E2B 6.1 GiB; E4B OOM, floor 7.2).
+    assert set(catalog.MEASURED_NVIDIA_NF4_GB) == {
+        BIG_CARD_WRITER, "google/gemma-4-E2B-it", "google/gemma-4-E4B-it"}, (
         "a row was measured into the table; extend this pin deliberately "
         "rather than loosening it")
     # gemma-4-12b-it is the nearest neighbour: same loader backend, same
@@ -89,6 +92,20 @@ def test_an_unmeasured_row_still_uses_the_projection():
         "nv16-nf4", "nv24-nf4")
     assert catalog.fit_tags_for("Qwen/Qwen3.5-4B") == (
         "mac16-tight", "nv8-nf4", "nv16", "nv24")
+
+
+def test_the_measured_gemma_4_rows_are_rated_on_their_nf4_resident():
+    """2026-10-14, RTX 4060 Laptop 8 GB. E2B's small fit basis (6.0, the text
+    decoder) used to earn a plain `nv8` -- an unquantized fit nobody measured
+    -- while its real NF4 load is 6.1 GiB. E4B ran out of memory on that card
+    yet carried `nv8-nf4`. A measured row is rated on the measurement."""
+    assert catalog.fit_tags_for("google/gemma-4-E2B-it") == (
+        "mac16-tight", "nv8-nf4", "nv16-nf4", "nv24-nf4")
+    assert catalog.fit_tags_for("google/gemma-4-E4B-it") == (
+        "mac16-tight", "nv16-nf4", "nv24-nf4")
+    # The gate's estimate reads the same table, so the two cannot drift.
+    assert catalog._estimate_resident_gb("google/gemma-4-E2B-it") == 6.1
+    assert catalog._estimate_resident_gb("google/gemma-4-E4B-it") == 7.2
 
 
 def test_the_gate_and_the_fit_tags_quote_the_same_number():

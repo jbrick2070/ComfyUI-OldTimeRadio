@@ -121,7 +121,7 @@ and the tooltip lists every writer like this:
 | Piece | Means |
 |---|---|
 | `about 9.3 GB` | What it downloads, once, in the decimal gigabytes a disk or browser shows (measured from the files). Not what it occupies while running. |
-| `nv8-nf4` | Fits an 8 GB NVIDIA card only as NF4, which that machine already bakes. Plain `nv8` means it fits without quantizing. (The two multimodal Gemma 4 rows load only their text decoder, so their tags are rated on far less than their download; their fit is due a re-measure.) |
+| `nv8-nf4` | Fits an 8 GB NVIDIA card only as NF4, which that machine already bakes. Plain `nv8` means it fits without quantizing. (Measured on an RTX 4060 Laptop 8 GB, 2026-10-14: `gemma-4-E2B-it` loads as NF4 at 6.1 GiB -- about 6.9 GiB on the card with the desktop -- and writes at about 7 tokens a second, so it is `nv8-nf4`, tight. `gemma-4-E4B-it` ran out of memory on that card and has no 8 GB tag.) |
 | `nv16` `nv24` | Fits an NVIDIA card of that many GB at full precision. `nv16-nf4` means only the quantized load fits. |
 | `mac16` | Fits a 16 GB Apple Silicon machine. |
 | `-tight` | Fits with nothing to spare. Close everything else. |

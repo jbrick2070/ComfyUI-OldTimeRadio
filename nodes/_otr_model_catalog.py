@@ -1886,6 +1886,19 @@ MEASURED_NVIDIA_NF4_GB = {
     # RTX 5090, 2026-09-21: 17.7 GiB resident, 17.8 GiB peak during load, on
     # a 33.7 GiB card, then prose and constrained JSON generated from it.
     "Qwen/Qwen3.8-27B": 17.8,
+    # RTX 4060 Laptop 8 GB, 2026-10-14, through load_llm (NF4, native text
+    # decoder): 6.04 GiB resident, 6.06 GiB peak during load, 6.05 GiB peak
+    # over a 300-token generation at 6.8 tok/s; the card at 6.9 GiB with its
+    # desktop baseline. Matches the 6.01 GiB this repo already recorded from
+    # the checkpoint header (tests/test_plan_max_memory_size_tags.py): 5.12
+    # GiB of it is NON-quantizable embeddings, which is why the old
+    # download/2 projection (3 GB) was half the truth.
+    "google/gemma-4-E2B-it": 6.1,
+    # Same card and day: the full NF4 load ran OUT OF MEMORY with 7.19 GiB
+    # already allocated, and the loader's CPU-offload retry refused its own
+    # plan. So 7.2 is a FLOOR, not a reading -- enough to say it does not fit
+    # the 7.0 GB nv8 budget, which is the claim this row has to stop making.
+    "google/gemma-4-E4B-it": 7.2,
 }
 
 
@@ -1978,14 +1991,25 @@ def fit_tags_for(repo_id: str) -> tuple:
             if download_gb <= budget_gb:
                 tags.append(name)
             continue
+        # A MEASURED NF4 RESIDENT IS THE ANSWER FOR NVIDIA (2026-10-14). The
+        # basis below is not always the download (the multimodal Gemma 4 rows
+        # load only their text decoder, so their basis is a small number), and
+        # the plain tag it earned -- E2B "nv8" off a 6.0 basis -- promised an
+        # unquantized fit nobody measured, while the real NF4 load is 6.1 GiB.
+        # NF4 is what NVIDIA loads by default, so a measured row is rated on
+        # that alone.
+        measured_nf4 = MEASURED_NVIDIA_NF4_GB.get(hf_weights_id(repo_id))
+        if measured_nf4:
+            if measured_nf4 <= budget_gb:
+                tags.append(name + "-nf4")
+            continue
         if download_gb <= budget_gb:
             tags.append(name)
             continue
-        # Measurement beats the rule of thumb. The halving below models an
-        # 8-bit load, not a 4-bit one, so it overstates a big row by ~2x and
-        # silently withholds a tag the card has earned.
-        measured_nf4 = MEASURED_NVIDIA_NF4_GB.get(hf_weights_id(repo_id))
-        nf4_gb = measured_nf4 if measured_nf4 else (download_gb / 2.0)
+        # Unmeasured: the rule of thumb. The halving models an 8-bit load, not
+        # a 4-bit one, so it overstates a big row by ~2x (measure it and the
+        # branch above answers instead).
+        nf4_gb = download_gb / 2.0
         if nf4_gb <= budget_gb:
             tags.append(name + "-nf4")
     return tuple(tags)
@@ -2388,8 +2412,9 @@ def _estimate_resident_gb(
     fit basis -- NOT always the download; see CuratedModel). Documented
     numbers per plan section 6, in that basis:
         Mistral-Nemo:  24 -> ~12 GB resident.
-        Gemma-4-E2B:    6 -> ~3 GB resident (its download is 10.2 GB; only
-                        the text decoder loads).
+        Gemma-4-E2B:    6 -> ~3 GB by this rule -- WRONG by half: measured
+                        6.1 GiB on an 8 GB card (2026-10-14), so its row in
+                        MEASURED_NVIDIA_NF4_GB answers instead.
 
     A factor-of-2 divisor matches both anchor points for curated entries.
     SPECIAL_VRAM_ESTIMATES_GB (B1d) lets us pin an explicit resident
