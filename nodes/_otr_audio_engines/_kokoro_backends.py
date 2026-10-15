@@ -885,6 +885,12 @@ class OnnxKokoroBackend:
         ``synthesize`` can tell a GPU run failure from a text defect."""
         try:
             return self._kokoro.create(text, **kwargs)
+        except ValueError:
+            # kokoro-onnx phonemizes English INSIDE create() and refuses a bad
+            # line with ValueError ("Nothing to synthesize", "No phonemes ...
+            # in the model vocabulary"). That is the text's defect, never the
+            # GPU's; onnxruntime's own errors are not ValueError.
+            raise
         except Exception as exc:  # noqa: BLE001 -- marked and re-raised as is
             try:
                 exc._otr_in_model_run = True

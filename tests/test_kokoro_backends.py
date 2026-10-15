@@ -292,6 +292,22 @@ def test_a_text_defect_outside_the_model_run_keeps_the_gpu(monkeypatch):
     assert backend.providers_active == [_CUDA, _CPU]
 
 
+def test_an_english_text_defect_inside_create_keeps_the_gpu(monkeypatch):
+    """English is phonemized INSIDE kokoro-onnx's create(), which refuses a
+    bad line with ValueError: still the line's defect, not the GPU's."""
+    class _Refuses(_StubKokoro):
+        def create(self, text, **kw):
+            raise ValueError("Nothing to synthesize")
+    opened = _fake_ort_with(monkeypatch, [_CUDA, _CPU])
+    monkeypatch.setitem(sys.modules, "kokoro_onnx", types.SimpleNamespace(
+        Kokoro=types.SimpleNamespace(from_session=lambda s, v: _Refuses())))
+    backend = kb.OnnxKokoroBackend("m.onnx", "v.npz")
+    backend.load()
+    with pytest.raises(ValueError, match="Nothing to synthesize"):
+        backend.synthesize("...", "bm_george", 1.0)
+    assert opened == [[_CUDA, _CPU]] and backend.auto is True
+
+
 def test_an_explicit_provider_list_is_exact_and_strict(monkeypatch):
     opened = _fake_ort_with(monkeypatch, [_CUDA, _CPU])
     kb.OnnxKokoroBackend("m.onnx", "v.npz", providers=[_CPU]).load()
