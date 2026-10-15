@@ -1131,10 +1131,25 @@ def compose_still_word_prompt(meta, role, beat_line, style=None):
 def _iter_beat_lines(lines):
     """(beat_id, line) pairs mirroring OTR_ShotLock's beat-id scheme exactly
     (line_id or beat_%04d over the NON-SKIPPED lines) so a still minted here
-    joins the ShotLock shot rows downstream. Pure."""
+    joins the ShotLock shot rows downstream. Pure.
+
+    It mirrors ShotLock's beat SET too: a pre-audio opening/closing music
+    SENTINEL that a timed mirror has superseded is not a beat there, so it is
+    not one here (plan item 10, 2026-10-14) -- it used to get a still that no
+    shot ever showed, paid per image on the cloud graphs. The rule is
+    ShotLock's own ``_untimed_music_sentinels``, applied INSIDE the same
+    enumeration so every later ``beat_NNNN`` fallback id is unchanged. The
+    rows themselves stay in the ledger: audio assembly still needs them."""
     live = [ln for ln in (lines or [])
             if isinstance(ln, dict) and not ln.get("skip")]
+    try:
+        from .otr_shot_lock import _untimed_music_sentinels
+    except ImportError:  # pragma: no cover -- flat test imports
+        from otr_shot_lock import _untimed_music_sentinels  # type: ignore
+    superseded = _untimed_music_sentinels(live)
     for i, ln in enumerate(live):
+        if str(ln.get("line_id") or "") in superseded:
+            continue
         yield str(ln.get("line_id") or f"beat_{i:04d}"), ln
 
 
