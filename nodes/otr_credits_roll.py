@@ -1630,16 +1630,21 @@ def extract_final_frame(video_path: str, out_png: str) -> str:
     2026-07-28 wiring arc (r3, unamended by r4); flagged here for an eyeball
     because a panel cannot judge how a 52-second held frame reads.
 
-    ``-sseof -3`` seeks three seconds from the END and takes the last frame
-    that decodes, which is robust on a container whose duration metadata is
-    approximate. RAISES: a body video whose final frame cannot be read is not
-    a presentation problem, it is an unreadable body.
+    ``-sseof -3`` seeks three seconds from the END and ``-update 1`` keeps
+    overwriting the one output image until the last frame that decodes, which
+    is robust on a container whose duration metadata is approximate. The
+    primary command must NOT cap output at one frame: ``-frames:v 1`` stopped
+    at the first frame after the seek point, so the held backdrop was the
+    picture three seconds before the end, not the end (measured with this
+    exact command, plan item 16, 2026-10-14). RAISES: a body video whose final
+    frame cannot be read is not a presentation problem, it is an unreadable
+    body.
     """
     # Accurate yuv420p -> RGB (an OUTPUT option): the default flags return the
     # frame ~1.3 luma darker (2026-09-28, wrapper_bridge.ffmpeg_terminal_frame_cmd).
     accurate = ["-sws_flags", "accurate_rnd+full_chroma_int"]
     cmd = [_ffmpeg_bin(), "-y", "-sseof", "-3", "-i", video_path] + accurate + [
-           "-update", "1", "-frames:v", "1", "-q:v", "2", out_png]
+           "-update", "1", "-q:v", "2", out_png]
     r = otr_proc.run(cmd, capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(out_png) \
             or os.path.getsize(out_png) == 0:

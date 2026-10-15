@@ -585,6 +585,57 @@ def test_a_body_of_only_a_few_frames_still_yields_a_backdrop(tmp_path):
     assert png.exists() and png.stat().st_size > 0
 
 
+def _marked_video(path, dur, mark, *, at_end, size="256x144"):
+    """A grey body with a solid ``mark`` colour over its first or last 0.5 s."""
+    when = ("gte(t,%.2f)" % (dur - 0.5)) if at_end else "lt(t,0.5)"
+    _ff("-f", "lavfi", "-i", f"color=c=gray:s={size}:d={dur}", "-vf",
+        f"drawbox=x=0:y=0:w=iw:h=ih:color={mark}:t=fill:enable='{when}'",
+        "-r", "25", "-pix_fmt", "yuv420p", "-t", f"{dur}", "-an", str(path))
+
+
+def _mean_rgb(png):
+    from PIL import Image
+    img = Image.open(png).convert("RGB")
+    px = list(img.getdata())
+    return tuple(sum(p[i] for p in px) / len(px) for i in range(3))
+
+
+@needs_ffmpeg
+def test_the_backdrop_is_the_FINAL_frame_not_the_one_three_seconds_back(tmp_path):
+    """Plan item 16. The tail seek lands 3 s before the end; with the old
+    one-frame cap the held backdrop was THAT frame. The final 0.5 s here is
+    red, so only the true final frame is red."""
+    body = tmp_path / "body.mp4"
+    _marked_video(body, 6.0, "red", at_end=True)
+    png = tmp_path / "bd.png"
+    cr.extract_final_frame(str(body), str(png))
+    r, g, b = _mean_rgb(png)
+    assert r > 150 and g < 90 and b < 90, (r, g, b)
+
+
+@needs_ffmpeg
+def test_a_failed_tail_seek_still_falls_back_to_frame_zero(tmp_path, monkeypatch):
+    """The fallback is unchanged: force the primary command to fail and the
+    extractor takes frame 0 (blue here) instead of refusing the episode."""
+    body = tmp_path / "body.mp4"
+    _marked_video(body, 2.0, "blue", at_end=False)
+    real_run = cr.otr_proc.run
+    calls = []
+
+    def run(cmd, **kw):
+        calls.append(list(cmd))
+        if "-sseof" in cmd:
+            return subprocess.CompletedProcess(cmd, 1, "", "forced seek failure")
+        return real_run(cmd, **kw)
+
+    monkeypatch.setattr(cr.otr_proc, "run", run)
+    png = tmp_path / "bd.png"
+    cr.extract_final_frame(str(body), str(png))
+    assert len(calls) == 2 and "-sseof" not in calls[1]
+    r, g, b = _mean_rgb(png)
+    assert b > 150 and r < 90, (r, g, b)
+
+
 def test_an_unreadable_body_is_TERMINAL_at_the_extractor(tmp_path):
     """A body whose frame cannot be read is not a presentation problem -- there
     is no picture to make and no episode to hand back either."""
