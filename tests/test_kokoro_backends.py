@@ -264,12 +264,32 @@ def test_a_cuda_kernel_failure_mid_run_voices_the_line_on_cpu(monkeypatch, caplo
     assert any("failed mid-run" in r.getMessage() for r in caplog.records)
 
 
-def test_a_real_cuda_oom_mid_run_still_fails_the_line(monkeypatch):
-    backend, opened = _auto_gpu_backend(
-        monkeypatch, "Failed to allocate memory for requested buffer of size 8388608")
-    with pytest.raises(RuntimeError, match="Failed to allocate"):
+@pytest.mark.parametrize("oom", [
+    "Failed to allocate memory for requested buffer of size 8388608",
+    "CUBLAS_STATUS_ALLOC_FAILED", "CUDNN_STATUS_ALLOC_FAILED",
+    "CUDA failure 2: out of memory"])
+def test_a_real_cuda_oom_mid_run_still_fails_the_line(monkeypatch, oom):
+    backend, opened = _auto_gpu_backend(monkeypatch, oom)
+    with pytest.raises(RuntimeError, match=oom.split()[0]):
         backend.synthesize("hello", "bm_george", 1.0)
     assert opened == [[_CUDA, _CPU]]            # no CPU rebuild hid the OOM
+
+
+def test_a_text_defect_outside_the_model_run_keeps_the_gpu(monkeypatch):
+    """A phonemizer that chokes on one line is that line's defect, not the
+    GPU's: it raises as itself and later lines stay on CUDA."""
+    opened = _fake_ort_with(monkeypatch, [_CUDA, _CPU])
+    backend = kb.OnnxKokoroBackend("m.onnx", "v.npz")
+    backend.load()
+
+    def g2p(chunk):
+        raise ValueError("espeak choked on this line")
+    g2p.language = "es"
+    backend._g2p = g2p
+    with pytest.raises(ValueError, match="espeak choked"):
+        backend.synthesize("hola", "bm_george", 1.0)
+    assert opened == [[_CUDA, _CPU]] and backend.auto is True
+    assert backend.providers_active == [_CUDA, _CPU]
 
 
 def test_an_explicit_provider_list_is_exact_and_strict(monkeypatch):

@@ -172,12 +172,13 @@ def select_backend_name(env_value=None) -> str:
 
 
 _OOM_MARKERS = ("out of memory", "failed to allocate", "cudaerrormemoryallocation",
-                "cuda_error_out_of_memory", "bfcarena")
+                "cuda_error_out_of_memory", "bfcarena", "alloc_failed")
 
 
 def _is_out_of_memory(reason: str) -> bool:
     """onnxruntime raises a plain RuntimeError for a CUDA OOM; the text is the
-    only signal ("Failed to allocate memory", "BFCArena", "out of memory")."""
+    only signal ("Failed to allocate memory", "BFCArena", "out of memory", and
+    cuBLAS / cuDNN's own CUBLAS_STATUS_ALLOC_FAILED / CUDNN_STATUS_ALLOC_FAILED)."""
     text = (reason or "").lower()
     return any(marker in text for marker in _OOM_MARKERS)
 
@@ -856,15 +857,19 @@ class OnnxKokoroBackend:
         could not see (a cuDNN or cuBLAS kernel error on the first Run) rebuilds
         the session on CPU, warns once, and voices the line there: the GPU never
         fails a run. A real out-of-memory still raises (only a true OOM in real
-        work may fail a render), and so does a named error of this backend."""
+        work may fail a render), and so does anything raised outside the model
+        run -- a phonemizer or text defect, or a named error of this backend --
+        which keeps the GPU for the lines after it."""
         on_auto_gpu = self.auto and GPU_ONNX_PROVIDERS[0] in self.providers_active
         if not on_auto_gpu:
             return self._synthesize(text, voice_id, speed)
         try:
             return self._synthesize(text, voice_id, speed)
-        except BackendUnavailable:
-            raise
-        except Exception as exc:  # noqa: BLE001 -- any GPU run failure degrades
+        except Exception as exc:  # noqa: BLE001 -- sorted below
+            # Only a failure INSIDE the model run is the GPU's; a phonemizer or
+            # text defect raises as itself and keeps the GPU for later lines.
+            if not getattr(exc, "_otr_in_model_run", False):
+                raise
             reason = "%s: %s" % (type(exc).__name__, exc)
             if _is_out_of_memory(reason):
                 raise
@@ -874,6 +879,18 @@ class OnnxKokoroBackend:
         self.auto, self.providers = False, list(DEFAULT_ONNX_PROVIDERS)
         self.load()
         return self._synthesize(text, voice_id, speed)
+
+    def _run_model(self, text, **kwargs):
+        """``kokoro.create``, with any failure marked as the model run's own, so
+        ``synthesize`` can tell a GPU run failure from a text defect."""
+        try:
+            return self._kokoro.create(text, **kwargs)
+        except Exception as exc:  # noqa: BLE001 -- marked and re-raised as is
+            try:
+                exc._otr_in_model_run = True
+            except Exception:  # noqa: BLE001 -- an exception without a __dict__
+                pass
+            raise
 
     def _synthesize(self, text: str, voice_id: str, speed: float):
         import numpy as np
@@ -895,7 +912,7 @@ class OnnxKokoroBackend:
             if not chunk:
                 continue
             if self._g2p is None:
-                samples, rate = self._kokoro.create(
+                samples, rate = self._run_model(
                     chunk, voice=voice_id, speed=speed, **ONNX_CREATE_KWARGS)
             else:
                 phonemes = self._g2p(chunk)
@@ -909,7 +926,7 @@ class OnnxKokoroBackend:
                     # quarter second of nothing.
                     unknown_only.append(phonemes)
                     continue
-                samples, rate = self._kokoro.create(
+                samples, rate = self._run_model(
                     phonemes, voice=voice_id, speed=speed, is_phonemes=True,
                     **dict(ONNX_CREATE_KWARGS, lang=self._g2p.language))
             if int(rate) != SAMPLE_RATE:
