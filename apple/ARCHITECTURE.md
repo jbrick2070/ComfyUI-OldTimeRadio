@@ -22,7 +22,7 @@ still fill every field it used to own.
 | 1 | `OTR_LedgerScriptWriter` | Writes the script and opens the ledger. The writer model, act count, source bank, visual style and `episode_language` are widgets here |
 | 2 | `OTR_LedgerFreezeCascade` | Freezes the script; later stages read it as fixed |
 | 3 | `OTR_CastLock` | Casts every speaking role to a voice engine and voice, and stamps the voice device |
-| 4a / 4b / 4c | `OTR_BatchCharacterVoices`, `OTR_AnnouncerVoice`, `OTR_StableAudioTheme` | Speak the lines and score the theme cues through the engine each role was cast to |
+| 4a / 4b / 4c | `OTR_BatchCharacterVoices`, `OTR_AnnouncerVoice`, `OTR_StableAudioTheme` | Speak the lines through the engine each role was cast to; the theme node scores the opening and closing cues through its own engine dropdown |
 | 5 | `OTR_SceneSequencer` | Lays voices and music on one timeline |
 | 6 | `OTR_AudioEnhance` | Mix polish |
 | 7 | `OTR_EpisodeAssembler` | Writes the 48 kHz master WAV and emits `audio_done`, the signal every picture stage waits on |
@@ -40,19 +40,23 @@ cannot appear in an error report. API keys never live in the workflow JSON.
 
 ## Engines are pluggable
 
-Voice, music, image, video and upscale engines each have their own registry
-under `nodes/_otr_*_engines/`: an adapter class decorated with `@register`, a
-capabilities row (which devices it runs on, which vendor, which weights), and
-nothing imported at module scope that is heavy. The dropdowns are built from
-the registries, so adding an engine adds a menu entry. A hosted engine is never
-chosen automatically; a local one fetches its own weights on first use.
+There are four engine registries under `nodes/`: audio (voices and music share
+`_otr_audio_engines`), image, video and upscale. Each engine is an adapter
+class decorated with `@register`, with a capabilities row (which devices it
+runs on, which vendor, which weights), and nothing heavy imported at module
+scope. The dropdowns are built from the registries, so adding an engine adds a
+menu entry. A hosted engine is never chosen automatically. Most local engines
+fetch their own weights on first use; the engine matrices (`DROPDOWN_MATRIX.md`)
+mark the exceptions as manual (you fetch the weights) or gated (a licence and a
+Hugging Face token).
 
 ## Presets are generated, not hand-edited
 
 `workflows/otr_canonical.json` is the source. The 25 presets for specific
 machines are produced from it by `scripts/build_variants.py` using the rows in
-`config/workflow_matrix.json` and `config/machine_classes.json`;
-`python scripts/build_variants.py --check` confirms they are in sync. Widget
+`config/workflow_matrix.json` (`config/machine_classes.json` feeds the machine
+matrix doc, not the graphs); `python scripts/build_variants.py --check`
+confirms they are in sync. Widget
 values are positional, so a new widget is only ever appended at the end of a
 node's list.
 
@@ -60,8 +64,11 @@ node's list.
 
 - Per-episode working files: `otr/episodes/<episode>/` (the ledger, the master
   audio, the clips, the intermediate videos).
-- The finished episode: `otr/obs/`. An episode that does not reach `otr/obs/`
-  did not finish, whatever the logs say.
+- The finished episode: `otr/obs/`, once its rights receipt clears. If it does
+  not clear, the mux archives the finished file in `otr/episodes/<episode>/`
+  and logs that the publish was blocked. The publish folder can be moved with
+  `OTR_OBS_DIR`. A run that leaves nothing in either place did not finish,
+  whatever the logs say.
 
 ## Reading further
 
