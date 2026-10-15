@@ -55,6 +55,19 @@ def test_a_projection_that_throws_reads_as_unknown_never_as_fits_none(monkeypatc
     assert "fits none" not in line
 
 
+def test_a_row_without_a_size_basis_reads_as_unknown_never_as_fits_none(monkeypatch):
+    """fit_tags_for answers () for a row it cannot rate (no size basis); the
+    line must not turn that into 'fits none of the rated machines'."""
+    import dataclasses
+    repo = "Qwen/Qwen3.5-4B"
+    row = dataclasses.replace(catalog._by_repo_id()[repo], approx_safetensors_gb=0.0)
+    monkeypatch.setattr(catalog, "_by_repo_id", lambda: {repo: row})
+    assert catalog.fit_tags_for(repo) == ()
+    line = writer_fit_line(repo)
+    assert line.endswith("fit unknown (no size basis)"), line
+    assert "fits none" not in line
+
+
 def test_a_line_never_raises_on_an_unknown_row_and_claims_nothing_about_it():
     """A tooltip must render even for a row nothing can estimate -- and say it
     is unknown, never that it fits nothing."""

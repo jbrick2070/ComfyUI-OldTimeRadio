@@ -9,9 +9,10 @@ B1c adds check_vram_fit.
 Catalog discipline:
   * CURATED_LLM_MODELS is the canonical curated set. Annotations
     (requires_auth, vram_fit_tier, loader_backend, approx_safetensors_gb)
-    drive dropdown labels, error messages, and backend dispatch.
-  * Only entries with vram_fit_tier == "PASS" are advertised in
-    dropdown labels and gated-error recovery messages as "16 GB-ready."
+    drive the writer tooltip's size and fit lines, error messages, and
+    backend dispatch. Dropdown labels are the bare ids (since 2026-10-14).
+  * Only entries with vram_fit_tier == "PASS" can earn a PASS verdict from
+    check_vram_fit; every other tier reads WARN or worse there.
   * Module-level constants (DEFAULT_LLM, TEST_TECHNICAL_LLM,
     TEST_OVERSIZED_LLM) are the single source of truth for tests + wiring.
 """
@@ -1929,8 +1930,9 @@ def fit_tags_for(repo_id: str) -> tuple:
     """Machine classes this writer FITS, smallest first. Derived, never typed.
 
     WHY THE PICKER NEEDS THIS AND A SIZE IS NOT ENOUGH. The operator's rule
-    (2026-08-01) is that a dropdown states "how much VRAM it needs so users
-    select only the one they can use". One number cannot do that across these
+    (2026-08-01) is that the picker states "how much VRAM it needs so users
+    select only the one they can use" -- on the dropdown label until
+    2026-10-14, in the writer tooltip since. One number cannot do that across these
     machines, because the same row costs DIFFERENT amounts depending on whether
     bitsandbytes exists: `Qwen/Qwen3.5-4B` is ~4.3 GB resident quantized on an
     NVIDIA card and a measured 14 GB unquantized on Apple Silicon. A single
@@ -2017,7 +2019,7 @@ def writer_fit_line(repo_id: str) -> str:
     if curated is None:
         return "not in the writer catalog; size and fit unknown"
     provider = getattr(curated, "provider", "local")
-    if provider not in ("local", "comfy_native"):
+    if provider not in LOCAL_PROVIDERS:
         return "hosted; nothing downloads and no machine fit applies"
     parts = []
     size = download_size_text(repo_id)
@@ -2027,6 +2029,9 @@ def writer_fit_line(repo_id: str) -> str:
         parts.append("gated (needs a Hugging Face licence and HF_TOKEN)")
     if provider == "comfy_native":
         parts.append("run by ComfyUI itself; fit not rated by these tags")
+    elif float(getattr(curated, "approx_safetensors_gb", 0.0) or 0.0) <= 0.0:
+        # fit_tags_for rates nothing without a size basis and answers ().
+        parts.append("fit unknown (no size basis)")
     else:
         try:
             tags = fit_tags_for(repo_id)
@@ -2052,7 +2057,7 @@ def writer_tooltip_table() -> str:
     and cache-independent, so INPUT_TYPES can call it."""
     lines = ["Writers -- download size and where each fits:"]
     for m in _active_curated_models():
-        if getattr(m, "provider", "local") not in ("local", "comfy_native"):
+        if getattr(m, "provider", "local") not in LOCAL_PROVIDERS:
             continue
         if m.repo_id == DEFAULT_LLM_NF4:
             continue

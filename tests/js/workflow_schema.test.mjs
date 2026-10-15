@@ -309,7 +309,7 @@ test("a writer inside a subgraph definition is respelled too", () => {
 
 test("a malformed subgraphs field is skipped, never thrown on", () => {
     declareWriter();
-    for (const subgraphs of [{ sg1: {} }, "sg1", 7, null]) {
+    for (const subgraphs of [{ sg1: {} }, "sg1", 7, null, [{ id: "sg1", nodes: [null, 3] }]]) {
         const out = reconcile({ nodes: [], links: [], definitions: { subgraphs } });
         assert.equal(out.ok, true);
         assert.equal(out.changed, false);

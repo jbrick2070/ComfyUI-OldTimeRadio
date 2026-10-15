@@ -1315,8 +1315,9 @@ engine name and never sees an LLM.
 
 **So the writer is unguarded on this platform, by design and by operator
 ruling** (no gated dropdowns, no capability matrix in code -- documentation
-only). Read the dropdown's own fit tags instead: a row without `mac16` is the
-warning, and `mac16-tight` means it fits with nothing else running.
+only). Read the fit tags in the writer boxes' tooltip instead: a row without
+`mac16` is the warning, and `mac16-tight` means it fits with nothing else
+running.
 
 ---
 

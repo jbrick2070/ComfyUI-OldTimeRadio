@@ -48,11 +48,11 @@ def test_canonical_kept_local_slots_are_registered_or_cataloged(tmp_path, monkey
 
     writer = _widgets(_node(workflow, "OTR_LedgerScriptWriter"))
     monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
-    # Both writer model widgets are saved as the BADGED dropdown label from
-    # catalog.default_llm_option() (e.g. "Qwen/Qwen3.5-4B (8.7 GB, ...)"), not
-    # the bare DEFAULT_LLM repo id -- a bare id matches no COMBO choice and
-    # ComfyUI resolves an unmatched COMBO to index 0, silently running
-    # whatever sorted first. Derive the expected id from default_llm_option()
+    # Both writer model widgets are saved as the dropdown label from
+    # catalog.default_llm_option() -- the bare repo id since 2026-10-14 (it was
+    # a badged label, "Qwen/Qwen3.5-4B (8.7 GB, ...)", before). A value that
+    # matches no COMBO choice would be resolved by ComfyUI to index 0, silently
+    # running whatever sorted first. Derive the expected id from default_llm_option()
     # itself (through the same validate_model_id normalization) rather than a
     # hand-written repo id, so this stays correct if DEFAULT_LLM moves again.
     expected_default_llm = catalog.validate_model_id(

@@ -120,6 +120,7 @@ const VALUE_RESPELLINGS = {
 
 /** Respell ONE node's saved values in place, by widget name. Caller works on a copy. */
 function respellValues(node, lookup) {
+    if (!node || typeof node !== "object") return [];
     const rules = VALUE_RESPELLINGS[node.type];
     const values = node.widgets_values;
     if (!rules || !Array.isArray(values)) return [];

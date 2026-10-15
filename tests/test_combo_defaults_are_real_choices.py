@@ -13,8 +13,9 @@ nothing. It was correct only by the accident that that row sorts first in the
 catalog, and would have become a silent wrong-model bug the day the catalog
 order changed.
 
-`nodes/_otr_model_catalog.py::default_llm_option()` exists precisely to hand out
-the badged label, and its docstring records the previous occurrence (both writer
+`nodes/_otr_model_catalog.py::default_llm_option()` existed precisely to hand out
+the badged label (since 2026-10-14 the labels are bare ids and it returns
+DEFAULT_LLM), and its docstring recorded the previous occurrence (both writer
 widgets rendering red, 2026-08-04). The helper existed and the call site did not
 use it, which is why a guard is needed rather than a fix.
 
