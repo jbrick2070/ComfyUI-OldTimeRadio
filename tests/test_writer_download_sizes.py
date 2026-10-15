@@ -74,10 +74,14 @@ def test_the_estimate_counts_exactly_what_the_download_fetches():
     assert C.estimate_model_size_gb("someone/uncurated-mistral-like", _hf_api=api) == 4.0
     # Odd layouts: whatever the installed huggingface_hub's own filter would
     # fetch is what is counted (its matching differs across versions -- full
-    # path vs basename, case on Windows -- so the expectation asks the filter).
+    # path vs basename, case on Windows -- so the expectation asks the hub's
+    # filter directly with the download's own patterns, not the catalog helper).
+    from huggingface_hub.utils import filter_repo_objects
     names = ["original/consolidated.safetensors", "Consolidated.safetensors"]
     api = _api(*[_Sib(n, 2**30) for n in names])
-    expected = float(len(C._fetched_paths(names)))
+    expected = float(len(list(filter_repo_objects(
+        names, allow_patterns=list(C.ALLOW_PATTERNS),
+        ignore_patterns=list(C.IGNORE_PATTERNS)))))
     assert C.estimate_model_size_gb("someone/odd-layout", _hf_api=api) == expected
 
 

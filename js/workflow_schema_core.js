@@ -297,7 +297,8 @@ export function reconcileGraph(graphData, lookup) {
     let dropped = false;
     // Writers inside a subgraph's definition are respelled too (the widget-drop
     // reconciliation below has only ever covered the top-level nodes).
-    for (const sub of copy.definitions?.subgraphs ?? []) {
+    const subgraphs = copy.definitions?.subgraphs;
+    for (const sub of Array.isArray(subgraphs) ? subgraphs : []) {
         for (const node of Array.isArray(sub?.nodes) ? sub.nodes : []) {
             const respelled = respellValues(node, lookup);
             if (respelled.length) {

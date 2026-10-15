@@ -28,11 +28,31 @@ def test_the_fit_words_come_from_the_gate_s_own_projection():
         assert ("fits " + " ".join(tags)) in writer_fit_line(repo), repo
 
 
-def test_a_gated_row_says_so_first_and_native_rows_claim_no_fit():
-    assert "gated" in writer_fit_line("google/gemma-2-2b-it")
+def test_a_gated_row_says_so_after_its_size_and_native_rows_claim_no_fit():
+    gated = writer_fit_line("google/gemma-2-2b-it")
+    assert gated.split("; ")[1].startswith("gated"), gated
     native = writer_fit_line("comfy_native:gemma4-e2b-it-int8-convrot")
     assert native.startswith("about 5.2 GB") and "fit not rated" in native
     assert "fits " not in native
+
+
+def test_a_hosted_row_claims_no_download_and_no_fit():
+    hosted = [m.repo_id for m in catalog._active_curated_models()
+              if getattr(m, "provider", "local") not in ("local", "comfy_native")]
+    assert hosted
+    for repo in hosted:
+        line = writer_fit_line(repo)
+        assert line.startswith("hosted"), (repo, line)
+        assert "fits " not in line, (repo, line)
+
+
+def test_a_projection_that_throws_reads_as_unknown_never_as_fits_none(monkeypatch):
+    def broken(_repo):
+        raise RuntimeError("projection unavailable")
+    monkeypatch.setattr(catalog, "fit_tags_for", broken)
+    line = writer_fit_line("Qwen/Qwen3.5-4B")
+    assert line.endswith("fit unknown (could not be estimated)"), line
+    assert "fits none" not in line
 
 
 def test_a_line_never_raises_on_an_unknown_row_and_claims_nothing_about_it():

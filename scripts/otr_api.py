@@ -588,7 +588,7 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
     carries the BUG-LOCAL-027 + BUG-LOCAL-029 fixes for socket-only
     inputs and "stripped" vs "preserved" widgets_values shapes.
 
-    Sprint H \u00a73.7 sibling fix (Jeffrey 2026-05-17): walk the SERIALIZED
+    Sprint H §3.7 sibling fix (Jeffrey 2026-05-17): walk the SERIALIZED
     slot layout from `_serialized_slot_names` rather than the bare
     declared widget list. Companion slots auto-injected next to seed
     widgets are recognised, validated against the
@@ -715,7 +715,7 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
 def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
     """POST the API prompt to /prompt and return the prompt_id.
 
-    Sprint H \u00a73.7 hardening (Jeffrey 2026-05-17): ComfyUI returns
+    Sprint H §3.7 hardening (Jeffrey 2026-05-17): ComfyUI returns
     HTTP 200 even when the prompt has validation errors -- it accepts
     the POST, refuses to execute the invalid nodes, and the resulting
     history entry returns status_str='success' with zero outputs. That

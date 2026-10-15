@@ -534,8 +534,8 @@ itself, token-less.
 2. The working cap: a 14k-token prompt probe decides whether 8192 can rise. No
    writer pass overflowed it in any episode above.
 3. `scripts/otr_dropdown_matrix.py` still skips `comfy_native` rows and their
-   badges carry no fit tags; list them with the proven classes (nv8 for E2B,
-   nv16 for 12B).
+   writer-tooltip lines carry no fit tags; list them with the proven classes
+   (nv8 for E2B, nv16 for 12B).
 
 ### 0o. Selective rolls -- SHIPPED 2026-09-26 (operator: "build all of it")
 

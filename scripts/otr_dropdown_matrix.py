@@ -356,7 +356,7 @@ def writer_rows() -> list:
 
     Writers do not live in an engine registry, so they cannot come through
     `registry_capabilities`: they come from the catalog's curated list, and
-    their machine fit is the same `fit_tags_for` the dropdown badge uses -- one
+    their machine fit is the same `fit_tags_for` the writer tooltip uses -- one
     derivation, so the table and the picker cannot disagree.
     """
     cat = _load("nodes/_otr_model_catalog.py", "_odm_catalog")
@@ -366,7 +366,7 @@ def writer_rows() -> list:
         provider = getattr(m, "provider", "local")
         if provider == "comfy_native":
             # Plan row 0n: listed here once an episode qualifies it on a
-            # machine class; until then its badge claims none either.
+            # machine class; until then its tooltip line claims none either.
             continue
         if provider != "local":
             continue          # hosted lanes: a credential, not a download

@@ -887,10 +887,10 @@ def quant_pick_mismatch(model_id: str, quant_policy: str) -> str | None:
 def text_only_load_mode(model_id: str) -> str:
     """``"native_text_decoder"`` or ``"composite"`` for a selected model id.
 
-    Accepts a badged dropdown label as well as a bare repo id -- the picker
-    shows ``'google/gemma-4-E2B-it (3.0 GB)'`` and a saved graph stores that
-    string, so an exact-match lookup on the raw widget value would quietly
-    miss and fall back to the composite path.
+    Accepts a label badged by an older version as well as a bare repo id -- a
+    graph saved before 2026-10-14 stores ``'google/gemma-4-E2B-it (3.0 GB)'``,
+    so an exact-match lookup on the raw widget value would quietly miss and
+    fall back to the composite path.
 
     An id with NO curated row returns ``"composite"``: an uncurated local
     cache hit keeps loading exactly as it does today. This is the loader's
@@ -1937,8 +1937,9 @@ def fit_tags_for(repo_id: str) -> tuple:
     figure has to be wrong on one of them, and it was wrong on the platform
     where being wrong REBOOTS THE MACHINE.
 
-    So the badge states the download size -- a platform-independent fact -- and
-    these tags carry the fit. A missing `mac16` means "do not pick this on a
+    So the size shown (in the writer tooltip since 2026-10-14; in the dropdown
+    label before) is the download -- a platform-independent fact -- and these
+    tags carry the fit. A missing `mac16` means "do not pick this on a
     16 GB Mac"; it gates nothing, and the row stays selectable everywhere.
     """
     curated = _by_repo_id().get(repo_id)
@@ -2009,25 +2010,30 @@ def writer_fit_line(repo_id: str) -> str:
     FRICTION IS PART OF "CAN I USE THIS": a row that needs a licence click and
     an HF_TOKEN says so right after its size, derived from the row's own flag,
     never typed. The ComfyUI-native rows carry no fit tags (the projection does
-    not rate them) and say so rather than claim a fit; a row the catalog does
-    not know says that."""
+    not rate them) and say so rather than claim a fit; a hosted row has nothing
+    to download or fit; a row the catalog does not know says that. "Fits none"
+    is said only when the projection actually ran and rated nothing."""
     curated = _by_repo_id().get(repo_id)
     if curated is None:
         return "not in the writer catalog; size and fit unknown"
+    provider = getattr(curated, "provider", "local")
+    if provider not in ("local", "comfy_native"):
+        return "hosted; nothing downloads and no machine fit applies"
     parts = []
     size = download_size_text(repo_id)
     if size:
         parts.append(size)
     if repo_id in GATED_CURATED_MODELS or getattr(curated, "requires_auth", False):
         parts.append("gated (needs a Hugging Face licence and HF_TOKEN)")
-    if getattr(curated, "provider", "local") == "comfy_native":
+    if provider == "comfy_native":
         parts.append("run by ComfyUI itself; fit not rated by these tags")
     else:
         try:
             tags = fit_tags_for(repo_id)
         except Exception:  # noqa: BLE001 -- a tooltip must never break INPUT_TYPES
-            tags = ()
-        parts.append("fits " + " ".join(tags) if tags else "fits none of the rated machines")
+            parts.append("fit unknown (could not be estimated)")
+        else:
+            parts.append("fits " + " ".join(tags) if tags else "fits none of the rated machines")
     return "; ".join(parts)
 
 
@@ -2389,8 +2395,8 @@ def _estimate_resident_gb(
         implied = getattr(curated, "implied_quant_policy", "") or ""
         if implied == "none":
             return download
-        # MEASUREMENT BEATS THE PROJECTION, and the badge reads this same
-        # table -- that is the point of consulting it here.
+        # MEASUREMENT BEATS THE PROJECTION, and the writer tooltip's fit tags
+        # read this same table -- that is the point of consulting it here.
         #
         # FOUND ON A LIVE LEG, 2026-09-21. The Selector printed
         # "vram_fit=FAIL@25.9 GB" for Qwen3.8-27B while that model was

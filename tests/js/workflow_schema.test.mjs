@@ -307,6 +307,15 @@ test("a writer inside a subgraph definition is respelled too", () => {
     assert.match(out.notes[0], /^subgraph sg1: /);
 });
 
+test("a malformed subgraphs field is skipped, never thrown on", () => {
+    declareWriter();
+    for (const subgraphs of [{ sg1: {} }, "sg1", 7, null]) {
+        const out = reconcile({ nodes: [], links: [], definitions: { subgraphs } });
+        assert.equal(out.ok, true);
+        assert.equal(out.changed, false);
+    }
+});
+
 test("a respelling alone never triggers the link repair (nor its duplicate-id refusal)", () => {
     declareWriter();
     const a = savedNode(7, "OTR_LedgerScriptWriter", [
