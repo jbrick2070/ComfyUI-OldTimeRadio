@@ -267,16 +267,19 @@ def wrap_cjk_chars(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> list[str]:
     tokens: list[str] = []
     word = ""
     for ch in compact:
-        if _is_wide(ch):
-            if word:
-                tokens.append(word)
-                word = ""
-            tokens.append(ch)
-        elif ch.isspace():
+        # Whitespace first: the ideographic space U+3000 is East Asian Wide AND
+        # whitespace, and as a "wide" token it was stripped late, leaving a
+        # blank line in the output.
+        if ch.isspace():
             if word:
                 tokens.append(word)
                 word = ""
             tokens.append(" ")
+        elif _is_wide(ch):
+            if word:
+                tokens.append(word)
+                word = ""
+            tokens.append(ch)
         else:
             word += ch
     if word:

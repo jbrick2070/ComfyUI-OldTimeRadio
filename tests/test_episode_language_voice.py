@@ -391,9 +391,19 @@ def test_cjk_wrap_never_cuts_a_latin_word():
 
 
 def test_cjk_wrap_pure_cjk_is_unchanged():
-    text = "关联性高的因子被筛选出来最有影响的是特定的生活习惯"
+    """Text made only of wide characters (ideographs, kana, hangul, fullwidth
+    forms) slices exactly as before: max_chars characters a line. A digit run
+    of two or more, or any Latin text, is deliberately kept whole instead."""
+    text = "关联性高的因子被筛选出来最有影响的是特定的生活习惯。「引用」"
     assert CAP.wrap_cjk_chars(text, max_chars=10) == [
         text[i:i + 10] for i in range(0, len(text), 10)]
+    assert CAP.wrap_cjk_chars("你好吗朋友们好吗2024年", max_chars=9) == [
+        "你好吗朋友们好吗", "2024年"]
+
+
+def test_cjk_wrap_ideographic_space_never_makes_a_blank_line():
+    out = CAP.wrap_cjk_chars("ab　abcdefgh", max_chars=2)
+    assert "" not in out and "".join(out).replace(" ", "") == "ababcdefgh", out
 
 
 def test_devanagari_wrap_breaks_between_words_not_inside_them():
