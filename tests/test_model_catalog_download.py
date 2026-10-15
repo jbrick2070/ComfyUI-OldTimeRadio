@@ -53,12 +53,13 @@ def test_resolve_hf_token_is_cross_platform_safe():
 
 
 def test_estimate_curated_returns_catalog_value():
-    # Curated entries skip the network call entirely. DEFAULT_LLM is
-    # Qwen/Qwen3.5-4B (approx_safetensors_gb=8.68 in CURATED_LLM_MODELS) --
-    # this used to be a 24 GB model (Mistral-Nemo-class) before the default
-    # moved to the smaller writer; the pinned value follows the default.
+    # Curated entries skip the network call entirely. Since 2026-10-14 the
+    # answer is the MEASURED download (`_MEASURED_DOWNLOAD_BYTES`, in GiB as
+    # this function always returned): Qwen/Qwen3.5-4B is 9,319,828,096 bytes,
+    # the 8.68 its catalog row records, unrounded.
     out = catalog.estimate_model_size_gb(catalog.QWEN_LLM)
-    assert out == 8.68
+    assert out == pytest.approx(9_319_828_096 / 1024**3)
+    assert out == pytest.approx(8.68, abs=0.005)
 
 
 def test_estimate_uncurated_uses_hf_api_seam():

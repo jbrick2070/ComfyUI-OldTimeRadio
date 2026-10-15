@@ -18,6 +18,7 @@ Catalog discipline:
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -160,7 +161,15 @@ class CuratedModel:
         "comfy_textgen",
     ]
     vram_fit_tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
-    approx_safetensors_gb: float  # download size on disk, not VRAM resident
+    # The basis the fit tags and resident estimates are computed from, written
+    # as a download size. NOT what the download actually is on every row: the
+    # two multimodal Gemma 4 rows carry 6.0 / 9.0 against measured downloads of
+    # 10.2 / 16.0 GB, and the units are mixed (some rows bytes/2**30, some
+    # bytes/1e9). Left as is on purpose (2026-10-14): fit and VRAM admission
+    # read it, and they were proven at these values, not re-measured. What a
+    # person sees and what the disk check reserves come from
+    # `download_bytes_for` (measured bytes) instead.
+    approx_safetensors_gb: float
     notes: str = ""
     # Sprint D D1a fields with safe defaults so any future row written
     # against the pre-D1a schema (or any test fixture that omits these)
@@ -2476,6 +2485,47 @@ def check_vram_fit(
 # ---------------------------------------------------------------------------
 
 
+#: What each curated writer's weights really are on disk, in bytes: the
+#: safetensors the download fetches, read from the Hugging Face file listing on
+#: 2026-10-14 (configs and tokenizers add a few MB more). The three Comfy-native
+#: rows are the single Comfy-Org file each loads (the byte counts their rows
+#: already record). Used for what a person is told and for the disk check --
+#: never for fit; see `CuratedModel.approx_safetensors_gb`.
+_MEASURED_DOWNLOAD_BYTES: "dict[str, int]" = {
+    "Qwen/Qwen3.5-4B": 9_319_828_096,
+    "Qwen/Qwen3.8-27B": 55_563_006_776,
+    "unsloth/Llama-3.2-3B-Instruct": 6_425_529_048,
+    # The five transformers shards. The repo ALSO holds consolidated.safetensors,
+    # a second full copy in Mistral's own format that transformers never reads;
+    # IGNORE_PATTERNS keeps it out of the download (it was fetched too: ~49 GB).
+    "mistralai/Mistral-Nemo-Instruct-2407": 24_495_607_104,
+    "google/gemma-4-E2B-it": 10_246_621_918,
+    "google/gemma-4-E4B-it": 15_992_595_884,
+    "google/gemma-4-12b-it": 23_919_549_408,
+    "google/gemma-2-2b-it": 5_228_717_488,
+    "comfy_native:gemma4-e2b-it-int8-convrot": 5_199_997_904,
+    "comfy_native:gemma4-e4b-it-int8-convrot": 8_090_965_702,
+    "comfy_native:gemma4-12b-int8-convrot": 12_055_234_634,
+}
+
+
+def download_bytes_for(repo_id: str) -> int:
+    """The measured download for a curated writer, else its catalog figure read
+    as GiB, else 0 (a remote handle, or nothing known)."""
+    if repo_id in _MEASURED_DOWNLOAD_BYTES:
+        return _MEASURED_DOWNLOAD_BYTES[repo_id]
+    curated = _by_repo_id().get(repo_id)
+    gb = float(getattr(curated, "approx_safetensors_gb", 0.0) or 0.0)
+    return int(gb * 1024**3) if gb > 0 else 0
+
+
+def download_size_text(repo_id: str) -> str:
+    """``'about 10.2 GB'`` -- decimal gigabytes, the unit a disk or a browser
+    shows -- or ``''`` when nothing is known."""
+    size = download_bytes_for(repo_id)
+    return "about %.1f GB" % (size / 1e9) if size > 0 else ""
+
+
 # Conservative weight-file allow-list. Transformers loader path only.
 ALLOW_PATTERNS = (
     "*.json",
@@ -2491,6 +2541,11 @@ ALLOW_PATTERNS = (
     "chat_template*.jinja",
     "*.md",
 )
+
+#: Matched by ALLOW_PATTERNS and still never fetched: Mistral's own
+#: consolidated format, a second full copy of the weights beside the
+#: transformers shards that the writer loads (Mistral-Nemo: 24.5 GB twice).
+IGNORE_PATTERNS = ("consolidated*.safetensors",)
 
 # Pre-flight disk-space margin: leave at least 5 GB free after the
 # download lands. Prevents partial-download cleanup brittleness on a
@@ -2523,7 +2578,10 @@ def estimate_model_size_gb(repo_id: str, *, _hf_api: object | None = None) -> fl
     """
     curated = _by_repo_id().get(repo_id)
     if curated is not None:
-        return float(curated.approx_safetensors_gb)
+        # The measured download, in the GiB this function has always returned
+        # (the disk check multiplies by 1024**3) -- not the fit basis, which
+        # under-states the two multimodal Gemma 4 rows by about 40%.
+        return download_bytes_for(repo_id) / float(1024**3)
     if _hf_api is None:
         from huggingface_hub import HfApi  # local import: defer network deps
 
@@ -2553,6 +2611,9 @@ def estimate_model_size_gb(repo_id: str, *, _hf_api: object | None = None) -> fl
     for sibling in getattr(info, "siblings", []) or []:
         size = getattr(sibling, "size", None) or 0
         path = (getattr(sibling, "rfilename", "") or "").lower()
+        name = path.rsplit("/", 1)[-1]
+        if any(fnmatch.fnmatch(name, pattern) for pattern in IGNORE_PATTERNS):
+            continue                    # never fetched -- see IGNORE_PATTERNS
         if path.endswith(".safetensors") or path.endswith(".bin"):
             total += size
     if total <= 0:
@@ -2712,6 +2773,7 @@ def auto_download_if_missing(
     kwargs: dict[str, object] = {
         "repo_id": weights_id,
         "allow_patterns": list(ALLOW_PATTERNS),
+        "ignore_patterns": list(IGNORE_PATTERNS),
         "token": resolve_hf_token(),
     }
     if local_dir is not None:
@@ -2862,6 +2924,9 @@ __all__ = [
     "NOT_DOWNLOADED_SUFFIX",
     "LOCAL_HF_SUFFIX",
     "ALLOW_PATTERNS",
+    "IGNORE_PATTERNS",
+    "download_bytes_for",
+    "download_size_text",
     "HARD_VRAM_CONTEXT_LIMIT",
     "CURATED_CONTEXT_OVERRIDES",
     "DEFAULT_VRAM_CEILING_GB",
