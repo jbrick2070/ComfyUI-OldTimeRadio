@@ -99,10 +99,14 @@ def sanitise_name_part(text, fallback="episode"):
     return part.lower()
 
 
-#: `_<iso>_<YYYYMMDD>_<HHMMSS>`, plus a replay stamp when one is present. The
-#: iso is ABSENT on English, matching `video_engine._language_marks`.
-_TIMESTAMP_TAIL = re.compile(
-    r"_(\d{8}_\d{6}(?:_replay_\d{8}_\d{6}_\d{6})?)$")
+#: `_<iso>_<YYYYMMDD>_<HHMMSS>`, plus any replay stamps. The iso is ABSENT on
+#: English, matching `video_engine._language_marks`. A replay appends
+#: `_rp<8 hex>` (`production_ledger.replay_episode_id`), and replaying a replay
+#: appends again, so the stamps repeat; `_replay_<date>_<time>_<us>` is the
+#: older form. Until 2026-10-14 only the old form parsed, so every current
+#: replay lost its glossed name (plan item 19).
+REPLAY_STAMP = r"(?:_replay_\d{8}_\d{6}_\d{6}|_rp[0-9a-f]{8})"
+_TIMESTAMP_TAIL = re.compile(r"_(\d{8}_\d{6}%s*)$" % REPLAY_STAMP)
 
 
 def identity_tail(episode_id, iso=""):

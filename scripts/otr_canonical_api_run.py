@@ -475,8 +475,14 @@ def episode_of_prompt(prompt_id: str) -> str | None:
                 yield from _strings(item)
 
     names = []
+    # A replay id ends in one or more replay stamps (`_rp<8 hex>`, or the
+    # older `_replay_<date>_<time>_<us>`); the same grammar as
+    # nodes/_otr_shared/obs_name.REPLAY_STAMP (plan item 19, 2026-10-14). The
+    # history lists the prompt's inputs before its outputs, so the LAST match
+    # -- this run's own output -- names the episode, never the replay source.
     pattern = re.compile(
-        r"(?:^|[\\/])episodes[\\/]+([^\\/]+_\d{8}_\d{6})(?=[\\/]|$)")
+        r"(?:^|[\\/])episodes[\\/]+([^\\/]+_\d{8}_\d{6}"
+        r"(?:_replay_\d{8}_\d{6}_\d{6}|_rp[0-9a-f]{8})*)(?=[\\/]|$)")
     for text in _strings(history):
         for match in pattern.finditer(text):
             if match.group(1) not in names:
