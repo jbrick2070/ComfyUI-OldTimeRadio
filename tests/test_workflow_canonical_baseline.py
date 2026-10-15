@@ -99,11 +99,13 @@ class TestWriterCanonicalModelSlots:
         # 2026-07-20: official Gemma4Unified Transformers 5.10.4 + NF4
         # measured ~7.15 GiB and hard-constrained JSON through LMFE. This is
         # the safetensors/HF lane.
-        # 2026-08-04: THE SIZE SUFFIX IS PART OF THE COMBO VALUE. A bare repo
-        # id matches nothing: the operator reported both dropdowns rendering
-        # RED on opening the graph, and an unmatched COMBO can resolve to index
-        # 0 of the list. The canvas said one model and could have run another.
-        # Pinned in full so the suffix cannot be lost.
+        # 2026-08-04: THE SAVED VALUE MUST BE AN EXACT COMBO MEMBER. Then the
+        # labels carried a size suffix and a bare repo id matched nothing: the
+        # operator reported both dropdowns rendering RED on opening the graph,
+        # and an unmatched COMBO can resolve to index 0 of the list. The canvas
+        # said one model and could have run another. Since 2026-10-14 the
+        # labels ARE the bare ids, so the exact member is the bare id -- still
+        # pinned in full, through the same helper the dropdown uses.
         #
         # 2026-09-06 (PBUG-20260906-09): DERIVED, no longer a literal. This
         # assertion used to hard-code the Gemma label. When DEFAULT_LLM moved

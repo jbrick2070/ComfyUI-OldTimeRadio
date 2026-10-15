@@ -160,8 +160,9 @@ class ChatTemplateKwargsWiringTests(unittest.TestCase):
         self.assertIn("Qwen/Qwen3.8-27B", source)
 
     def test_exact_match_is_fed_a_stripped_id_not_a_badged_label(self):
-        """The dropdown label carries a ' (4.3 GB)' badge; the comparison must
-        see the bare repo id or the suppression silently stops firing."""
+        """A value saved before 2026-10-14 carries a ' (4.3 GB)' badge (the
+        dropdown labels are bare ids since); the comparison must see the bare
+        repo id or the suppression silently stops firing on such a graph."""
         source = (NODES / "_otr_loader_backends.py").read_text(encoding="utf-8")
         self.assertIn(
             'split(" ", 1)[0]', source,

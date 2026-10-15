@@ -260,17 +260,18 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     # in-process Transformers lane. NF4 is measured below 7.3 GiB and the
     # lane binds LMFE schema constraints.
     #
-    # 2026-08-04: THE SIZE SUFFIX IS PART OF THE VALUE. A bare repo id matches
-    # no choice: the operator saw both dropdowns render RED on opening the
-    # graph, and an unmatched COMBO can resolve to index 0 of the list. A graph
-    # that said one model could run another. Asserted in full here so the
-    # suffix cannot be dropped again.
+    # 2026-08-04: THE VALUE MUST BE AN EXACT COMBO MEMBER. Then the labels
+    # carried a size suffix and a bare repo id matched no choice: the operator
+    # saw both dropdowns render RED on opening the graph, and an unmatched
+    # COMBO can resolve to index 0 of the list. A graph that said one model
+    # could run another. Since 2026-10-14 the labels are the bare ids, so the
+    # exact member is the bare id; asserted in full here.
     #
     # 2026-09-06 (PBUG-20260906-09): DERIVED, not pinned. This assertion
     # hard-coded the Gemma label; when DEFAULT_LLM moved to Qwen the literal
     # stayed, so the test asserted the OLD default was shipped and pinned the
     # drift in place instead of catching it. The index-0 hazard described above
-    # is also why the derivation must keep the suffix.
+    # is also why the derivation must produce exactly what the dropdown offers.
     _expected_writer_model = _default_llm_option()
     assert writer["inputs"]["creative_writing_model"] == _expected_writer_model
     assert writer["inputs"]["technical_model"] == _expected_writer_model

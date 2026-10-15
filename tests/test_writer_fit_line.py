@@ -55,8 +55,8 @@ def test_a_projection_that_throws_reads_as_unknown_never_as_fits_none(monkeypatc
     assert "fits none" not in line
 
 
-def test_a_row_without_a_size_basis_reads_as_unknown_never_as_fits_none(monkeypatch):
-    """fit_tags_for answers () for a row it cannot rate (no size basis); the
+def test_a_row_without_a_fit_basis_reads_as_unknown_never_as_fits_none(monkeypatch):
+    """fit_tags_for answers () for a row it cannot rate (no fit basis); the
     line must not turn that into 'fits none of the rated machines'."""
     import dataclasses
     repo = "Qwen/Qwen3.5-4B"
@@ -64,8 +64,25 @@ def test_a_row_without_a_size_basis_reads_as_unknown_never_as_fits_none(monkeypa
     monkeypatch.setattr(catalog, "_by_repo_id", lambda: {repo: row})
     assert catalog.fit_tags_for(repo) == ()
     line = writer_fit_line(repo)
-    assert line.endswith("fit unknown (no size basis)"), line
+    assert line.endswith("fit unknown (no fit basis in the catalog)"), line
     assert "fits none" not in line
+
+
+def test_a_malformed_fit_basis_never_raises_out_of_the_line(monkeypatch):
+    """Measured row (size still shown) and an unmeasured one (size read from
+    the same malformed figure): neither raises."""
+    import dataclasses
+    real = catalog._by_repo_id()
+    monkeypatch.setattr(catalog, "_MEASURED_DOWNLOAD_BYTES",
+                        {"Qwen/Qwen3.5-4B": 9_300_000_000})
+    lines = {}
+    for repo in ("Qwen/Qwen3.5-4B", "unsloth/Llama-3.2-3B-Instruct"):
+        row = dataclasses.replace(real[repo], approx_safetensors_gb="n/a")
+        monkeypatch.setattr(catalog, "_by_repo_id", lambda r=repo, w=row: {r: w})
+        lines[repo] = writer_fit_line(repo)
+        assert lines[repo].endswith("fit unknown (could not be estimated)"), (repo, lines[repo])
+    assert lines["Qwen/Qwen3.5-4B"].startswith("about 9.3 GB")
+    assert not lines["unsloth/Llama-3.2-3B-Instruct"].startswith("about")
 
 
 def test_a_line_never_raises_on_an_unknown_row_and_claims_nothing_about_it():

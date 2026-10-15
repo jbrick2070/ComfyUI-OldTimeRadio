@@ -2022,23 +2022,29 @@ def writer_fit_line(repo_id: str) -> str:
     if provider not in LOCAL_PROVIDERS:
         return "hosted; nothing downloads and no machine fit applies"
     parts = []
-    size = download_size_text(repo_id)
+    try:
+        size = download_size_text(repo_id)
+    except Exception:  # noqa: BLE001 -- a malformed catalog figure; same rule
+        size = ""
     if size:
         parts.append(size)
     if repo_id in GATED_CURATED_MODELS or getattr(curated, "requires_auth", False):
         parts.append("gated (needs a Hugging Face licence and HF_TOKEN)")
     if provider == "comfy_native":
         parts.append("run by ComfyUI itself; fit not rated by these tags")
-    elif float(getattr(curated, "approx_safetensors_gb", 0.0) or 0.0) <= 0.0:
-        # fit_tags_for rates nothing without a size basis and answers ().
-        parts.append("fit unknown (no size basis)")
     else:
         try:
-            tags = fit_tags_for(repo_id)
+            basis = float(getattr(curated, "approx_safetensors_gb", 0.0) or 0.0)
+            # fit_tags_for rates nothing without a fit basis and answers ().
+            tags = fit_tags_for(repo_id) if basis > 0.0 else None
         except Exception:  # noqa: BLE001 -- a tooltip must never break INPUT_TYPES
             parts.append("fit unknown (could not be estimated)")
         else:
-            parts.append("fits " + " ".join(tags) if tags else "fits none of the rated machines")
+            if tags is None:
+                parts.append("fit unknown (no fit basis in the catalog)")
+            else:
+                parts.append("fits " + " ".join(tags) if tags
+                             else "fits none of the rated machines")
     return "; ".join(parts)
 
 

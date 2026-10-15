@@ -309,11 +309,24 @@ test("a writer inside a subgraph definition is respelled too", () => {
 
 test("a malformed subgraphs field is skipped, never thrown on", () => {
     declareWriter();
-    for (const subgraphs of [{ sg1: {} }, "sg1", 7, null, [{ id: "sg1", nodes: [null, 3] }]]) {
+    for (const subgraphs of [{ sg1: {} }, "sg1", 7, null]) {
         const out = reconcile({ nodes: [], links: [], definitions: { subgraphs } });
         assert.equal(out.ok, true);
         assert.equal(out.changed, false);
     }
+});
+
+test("a null or primitive entry in a subgraph is skipped and the writer after it is still respelled", () => {
+    declareWriter();
+    const inner = savedNode(3, "OTR_LedgerScriptWriter", [
+        ["episode_title", "x"], ["creative_writing_model", "Qwen/Qwen3.5-4B (8.7 GB download)"],
+        ["technical_model", "Qwen/Qwen3.5-4B"]]);
+    const graph = { nodes: [], links: [],
+        definitions: { subgraphs: [{ id: "sg1", nodes: [null, 3, "OTR_LedgerScriptWriter", inner] }] } };
+    const out = reconcile(graph);
+    assert.equal(out.ok, true);
+    assert.equal(out.changed, true);
+    assert.equal(out.graph.definitions.subgraphs[0].nodes[3].widgets_values[1], "Qwen/Qwen3.5-4B");
 });
 
 test("a respelling alone never triggers the link repair (nor its duplicate-id refusal)", () => {

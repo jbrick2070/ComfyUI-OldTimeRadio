@@ -94,9 +94,10 @@ class ShippedTemplateWriterTests(unittest.TestCase):
 
     def test_the_saved_label_is_a_real_dropdown_option(self):
         """A value that is not an exact member of the dropdown fails validation
-        at load, so the saved value must be the label verbatim, size suffix and
-        all. The availability markers are stripped because they depend on what
-        happens to be cached on the machine running the test, not on the graph."""
+        at load, so the saved value must be the label verbatim (the bare id
+        since 2026-10-14; a size suffix before). The legacy availability markers
+        are stripped because they depended on what happened to be cached on the
+        machine running the test, not on the graph."""
         from _otr_model_catalog import (LOCAL_HF_SUFFIX,
                                         NOT_DOWNLOADED_SUFFIX, dropdown_choices)
 
