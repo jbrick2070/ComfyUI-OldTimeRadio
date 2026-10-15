@@ -1450,6 +1450,7 @@ class EpisodeAssembler:
         # read with the stdlib, torchaudio is tried first only because it is
         # cheaper when it works, and a fallback is LOUD.
         episode_audio = None
+        _substituted = False   # True ONLY when both readers failed (below)
         try:
             import torchaudio as _ta
             wave, sr = _ta.load(_master_wav)
@@ -1470,12 +1471,17 @@ class EpisodeAssembler:
                           _ta_exc, _wav_exc)
                 episode_audio = {"waveform": _torch.zeros(1, 2, 48000),
                                  "sample_rate": 48000}
+                _substituted = True
         # DO NOT SAY VERIFIED IF SILENCE WAS SUBSTITUTED. The error above
         # names both failed readers and the one-second batch; saying "copied
         # and verified" three lines later, and returning the ordinary
         # audio_done:replay receipt, told every downstream reader the opposite.
         # A wire carrying one second cannot be reported like a whole episode.
-        _substituted = int(episode_audio["waveform"].shape[-1]) <= 48000
+        # The flag is SET WHERE THE SILENCE IS MADE (GRK-001, 2026-10-14). It
+        # used to be inferred from the length (<= 48,000 samples), which also
+        # caught a real master that is simply short, labelled it unreadable and
+        # skipped its pre-loudness level -- and 48,000 samples is one second
+        # only at 48 kHz.
         info = json.dumps({"episode_id": _ep_id, "replay_of_episode": meta.get("replay_of_episode"),
                            "master_sha256": want, "title": str(episode_title or ""),
                            "master_readable": not _substituted})

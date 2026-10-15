@@ -478,7 +478,7 @@ def test_import_refuses_a_bundle_that_froze_another_audio_stage(frozen):
         PL.import_replay_bundle(str(bundle))
 
 
-def _sine_episode(tmp_path, monkeypatch, flavour):
+def _sine_episode(tmp_path, monkeypatch, flavour, n_samples=48000 * 3):
     import math
     import wave as _wave
     monkeypatch.setattr(PL, "_default_out_dir", lambda ep=None: str(
@@ -486,7 +486,7 @@ def _sine_episode(tmp_path, monkeypatch, flavour):
     ep, ledger = _make_episode(tmp_path / "episodes")
     master = ep / "audio" / (ep.name + "_master.wav")
     frames = bytearray()
-    for i in range(48000 * 3):
+    for i in range(int(n_samples)):
         v = int(0.05 * 32767 * math.sin(2 * math.pi * 440 * i / 48000))
         frames += v.to_bytes(2, "little", signed=True) * 2
     with _wave.open(str(master), "wb") as fh:
@@ -526,6 +526,60 @@ def test_a_pre_loudness_replay_wire_is_levelled_and_its_disk_bytes_are_not(
         assert rms(audio["waveform"]) > 1.5 * rms(raw["waveform"])
     else:
         assert abs(rms(audio["waveform"]) - rms(raw["waveform"])) < 1e-3
+
+
+def _replay_assemble(fz):
+    from nodes.scene_sequencer import EpisodeAssembler
+    sj, led = _replay_ledger_json(fz)
+    descriptor = json.dumps({"meta": led.data["meta"]})
+    return EpisodeAssembler().assemble(
+        None, music_cue_audio={"waveform": None, "sample_rate": 48000},
+        music_cue_manifest_json="", replay_descriptor=descriptor)
+
+
+def test_a_real_one_second_master_is_a_verified_replay_not_unreadable(
+        tmp_path, monkeypatch):
+    """GRK-001. A hash-verified master that DECODED is audio_done:replay at any
+    length. The old flag inferred "unreadable" from <= 48,000 samples, so a
+    real one-second master was labelled unreadable."""
+    fz = _sine_episode(tmp_path, monkeypatch, "delivery_levelled", n_samples=48000)
+    audio, _out, info, done = _replay_assemble(fz)
+    want = fz["ledger"]["audio"]["master_audio_sha256"]
+    assert done == "audio_done:replay:" + want[:12]
+    assert json.loads(info)["master_readable"] is True
+    assert int(audio["waveform"].shape[-1]) == 48000
+
+
+def test_a_short_pre_loudness_master_still_reaches_the_level(tmp_path, monkeypatch):
+    """GRK-001. The false "unreadable" return came BEFORE the pre-loudness
+    level, so a short real master skipped it."""
+    import nodes.scene_sequencer as SS
+    calls = []
+    real = SS._master_loudness
+
+    def spy(wave, **kw):
+        calls.append(int(wave.shape[-1]))
+        return real(wave, **kw)
+    monkeypatch.setattr(SS, "_master_loudness", spy)
+    fz = _sine_episode(tmp_path, monkeypatch, "pre_loudness", n_samples=48000)
+    _audio, _out, _info, done = _replay_assemble(fz)
+    assert done.startswith("audio_done:replay:") and calls == [48000]
+
+
+def test_a_master_neither_reader_can_open_is_still_flagged_unreadable(
+        tmp_path, monkeypatch):
+    """The degrade itself is unchanged: when BOTH readers fail, the wire is the
+    one-second placeholder and says so -- now flagged where it is made."""
+    import nodes.scene_sequencer as SS
+    fz = _sine_episode(tmp_path, monkeypatch, "delivery_levelled")
+    monkeypatch.setitem(sys.modules, "torchaudio", None)
+
+    def unreadable(path):
+        raise ValueError("not a wav")
+    monkeypatch.setattr(SS, "wav_file_as_audio", unreadable)
+    _audio, _out, info, done = _replay_assemble(fz)
+    assert done.startswith("audio_done:replay_unreadable:")
+    assert json.loads(info)["master_readable"] is False
 
 
 def test_the_assembler_refuses_a_descriptor_for_another_workspace(frozen):
