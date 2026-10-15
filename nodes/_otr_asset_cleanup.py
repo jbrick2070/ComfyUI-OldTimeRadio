@@ -82,7 +82,7 @@ TOOLTIP = (
     "full deletes the whole episode folder.\n\n"
     "All three leave otr/obs alone: the published video there is never "
     "touched, and nothing is deleted unless that published copy is on disk. "
-    "An episode whose publication was withheld is never cleaned.\n\n"
+    "An episode with no published copy is never cleaned.\n\n"
     "A partial or full episode can no longer be frozen into a replay bundle "
     "(the freeze needs the master WAV and the stills). Freeze first, or run "
     "it off."
@@ -205,7 +205,7 @@ def plan_asset_cleanup(
     * ``episode_dir`` -- the in-flight singleton's folder, or None.
     * ``episodes_root`` -- ``otr_episodes_root()``; the folder must be a
       direct child of it and not ``_``-prefixed.
-    * ``obs_copy`` -- the published copy. None (a BLOCKED episode) refuses:
+    * ``obs_copy`` -- the published copy. None (no OBS copy was made) refuses:
       the archival final is then its only copy.
     * ``video_paths`` -- the silent video and the archival final; each must
       resolve INSIDE the folder, or the folder is not the one this run wrote.
@@ -259,7 +259,7 @@ def plan_asset_cleanup(
 
     # --- the publish proof ---------------------------------------------------
     if not obs_copy:
-        return refused("nothing was published (a withheld episode is never cleaned)")
+        return refused("nothing was published (an episode with no published copy is never cleaned)")
     if _inside(obs_copy, episode_dir):
         return refused("the published copy is inside the folder it would clean")
     try:

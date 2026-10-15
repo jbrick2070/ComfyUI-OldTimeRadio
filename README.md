@@ -679,8 +679,7 @@ The working folders add up fast. `asset_cleanup` on **OTR_LedgerScriptWriter**
 tidies each one after its episode is published: `partial` deletes the sound and
 the pictures and keeps every text file (ledger, canon, captions, QA), `full`,
 the default, deletes the whole folder, and `off` keeps everything. None of them
-touch `otr/obs/`, nothing is deleted unless the published copy is there, and an
-episode whose publication was withheld is never cleaned. A cleaned episode can
+touch `otr/obs/`, and nothing is deleted unless the published copy is there. A cleaned episode can
 no longer be frozen into a replay bundle, so pick `off` (or freeze first) if you want one. More
 in [apple/RUN.md](apple/RUN.md#saving-disk-space).
 

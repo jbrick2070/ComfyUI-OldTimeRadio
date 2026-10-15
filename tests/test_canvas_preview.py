@@ -181,9 +181,10 @@ class TestItDegradesInSteps:
 class TestTheWithheldEpisodeSaysSo:
     def test_a_withheld_episode_is_named_as_withheld(
             self, episode, comfy_temp, monkeypatch):
-        """obs_copy is None when the rights receipt does not clear. A poster
-        frame beside a bare archival path reads as a normal publish -- the
-        exact confusion this preview exists to remove."""
+        """obs_copy is None when no OBS copy was made (the mux no longer skips
+        it for rights, 2026-10-15, but the preview still names the case). A
+        poster frame beside a bare archival path reads as a normal publish --
+        the exact confusion this preview exists to remove."""
         _stub_ffmpeg(monkeypatch, path="")
         ui = MUX._canvas_preview(str(episode), None)
         text = ui["text"][0]

@@ -189,11 +189,12 @@ def _canvas_preview(final_path: str, obs_copy) -> dict:
     frame that will not extract yields the path as text; only a truly broken
     call yields {}.
     """
-    # Name the withheld case instead of showing a bare path: a poster frame
+    # Name the unpublished case instead of showing a bare path: a poster frame
     # beside an archival path reads as a normal publish, which is the exact
-    # confusion this preview exists to remove.
+    # confusion this preview exists to remove. (The mux publishes every
+    # finished episode since 2026-10-15, so this is a defensive branch.)
     where = (str(obs_copy) if obs_copy
-             else ("not published (rights receipt did not clear) -- archived at "
+             else ("not published -- archived at "
                    + str(final_path)) if final_path else "")
     ui: dict = {}
     try:
@@ -1244,8 +1245,10 @@ def _obs_dir() -> Path:
 def _is_inside_obs_dir(path: str) -> bool:
     """Would writing ``path`` put a file in the operator's watch folder?
 
-    Used to refuse an unpublishable episode a back door into obs via the
-    operator's own ``output_path``. Compares RESOLVED paths so ``..`` segments,
+    Used to keep a rejected candidate out of the watch folder's listing (the
+    OBS staging subfolder). It once also refused an unpublishable episode a
+    back door into obs via ``output_path``; every episode is published now
+    (2026-10-15). Compares RESOLVED paths so ``..`` segments,
     case differences and short/long Windows forms cannot walk around it. Never
     raises -- an unresolvable path is not inside obs by any reading, and a
     crash here would take a finished episode down over a string comparison.
@@ -1323,19 +1326,19 @@ def _inflight_episode_for_stem(stem: str) -> "tuple[Path | None, Path | None]":
 
 
 def _publication_decision(silent_video_path: str):
-    """May this episode be copied to the operator's OBS folder?
+    """What does the rights receipt say about this episode? ADVISORY ONLY.
 
     Consumes the ONE durable receipt stamped at the freeze
     (``_otr_publication_eligibility``). This node decides nothing about rights
-    itself -- it reads a verdict, which is the whole point of the receipt.
+    itself -- it reads a verdict and reports it. Since 2026-10-15 (operator
+    ruling: every finished episode is published to OBS regardless of rights)
+    the verdict never withholds the copy; it only decides whether the summary
+    line carries "rights receipt did not clear".
 
-    FAILS CLOSED, ON PURPOSE. No ledger, no receipt, a malformed receipt, an
-    unreadable version, or a receipt stamped for a DIFFERENT episode all come
-    back not-publishable. Publishing is the irreversible half of this node (the
-    file lands in the folder the operator watches, and on a research-only
-    source that is the exact thing the rule forbids), while withholding is
-    recoverable -- the archival final is still on disk and a re-freeze
-    republishes it. Between a guess and a receipt, take the receipt.
+    FAILS CLOSED in what it REPORTS: no ledger, no receipt, a malformed receipt,
+    an unreadable version, or a receipt stamped for a DIFFERENT episode all come
+    back not-publishable, so the report says the record is missing rather than
+    claiming a clearance nobody stamped.
     """
     try:
         try:
@@ -2196,12 +2199,12 @@ class OTRMasterAudioMux:
         """Cache key: the manifest, the EPISODE, and its publication verdict.
 
         THE KEY MUST NOT BE THE MANIFEST ALONE, OR IT REUSES A PUBLISHED RESULT
-        FOR A BLOCKED EPISODE. ``clip_manifest_json`` is a RETIRED connector
+        FOR A DIFFERENT EPISODE. ``clip_manifest_json`` is a RETIRED connector
         that feeds nothing, so two runs with the same manifest would look
         identical to ComfyUI's cache even when they are different episodes with
-        different rights. A cached node does not execute, and a mux that does
-        not execute cannot withhold anything: the receipt would say blocked and
-        the earlier run's published output would stand in for it.
+        different rights. A cached node does not execute, so a mux that does
+        not execute cannot publish or report: the earlier run's output and
+        report line would stand in for this episode's.
 
         Episode identity closes the cross-episode half; the eligibility digest
         closes the same-episode half, so re-freezing an episode after its rights

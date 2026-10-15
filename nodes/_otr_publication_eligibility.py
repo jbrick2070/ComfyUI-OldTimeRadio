@@ -124,9 +124,9 @@ DECISION_REMEDIES = {
     DECISION_NO_RECEIPT: (
         "no publication verdict was ever stamped for this episode. The "
         "producer is OTR_LedgerFreezeCascade Phase 10 -- re-run the graph "
-        "through the freeze, or re-freeze this ledger, and the mux will "
-        "publish on the next pass. The archival final is already on disk and "
-        "nothing was lost"
+        "through the freeze, or re-freeze this ledger, to record one. The "
+        "episode is published either way (operator ruling 2026-10-15); this "
+        "only means the rights record is missing"
     ),
     DECISION_MALFORMED: (
         "the receipt is present but unreadable, so it was written by "
@@ -219,8 +219,8 @@ class PublicationDecision:
         """The reason phrase, AND what to do about it.
 
         Deliberately carries no "BLOCKED"/"OK" prefix of its own: the terminal
-        node prints ``obs_publish BLOCKED -- <summary>`` beside its existing
-        ``obs_publish OK -> <path>``, and a second verdict word inside the
+        node prints it inside ``obs_publish OK -> <path> (rights receipt did
+        not clear: <summary> -- ...)``, and a second verdict word inside the
         summary would read as two verdicts about one decision.
 
         The REMEDY is appended for the consumer-side refusals, because an

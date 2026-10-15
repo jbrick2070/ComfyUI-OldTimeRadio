@@ -753,10 +753,10 @@ def _check_g14_provenance_publish(
         label = str(prov.get("source_label") or prov.get("license_label") or "")
         warnings.append(
             f"G14: source provenance is 'research_only' ({label!r}) -- the "
-            f"operator rule BLOCKS publication of a research-only source. The "
-            f"episode still freezes and still keeps its archival final; "
-            f"OTR_MasterAudioMux will withhold the OBS copy on the "
-            f"publication-eligibility receipt."
+            f"rights receipt will not clear. The episode freezes, keeps its "
+            f"archival final and is still published to OBS (operator ruling "
+            f"2026-10-15); OTR_MasterAudioMux reports the receipt in its "
+            f"summary line and the ledger records it."
         )
 
 

@@ -122,8 +122,8 @@ still and clip the run made, and it adds up fast. `asset_cleanup` on
   folder goes.
 
 All three leave `otr/obs/` alone. Nothing is deleted unless the published copy
-is on disk there, and an episode whose publication was withheld is never
-cleaned, because its working folder holds the only copy. A file Windows has
+is on disk there, so an episode with no published copy is never cleaned.
+A file Windows has
 open is skipped and named in the log, never forced.
 
 **The one thing you give up:** a `partial` or `full` episode can no longer be
@@ -203,8 +203,7 @@ wheel supplies only one of them.
 
 **It finished but nothing is in `otr/obs/`.** Find the publish lines first
 (`LOUD publish`, then the `obs_publish` summary) -- see [Find it](#find-it).
-`BLOCKED` withheld only the published copy and kept the archival final in
-`otr/episodes/<episode>/`; whether the run itself succeeded is the run's own
-final status (a My Story episode fails there). No
-publish line of either kind is a real failure: read the console from the end
+Every finished episode is published, whatever its rights receipt says, so a
+missing file means the run did not finish (or `OTR_OBS_DIR` points elsewhere).
+No publish line is a real failure: read the console from the end
 backwards for the first error.
