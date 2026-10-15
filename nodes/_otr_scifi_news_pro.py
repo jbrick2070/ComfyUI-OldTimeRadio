@@ -891,6 +891,15 @@ class FinalDraft:
     salvaged: bool = False
     #: The alias map the parse was performed against, for the same reason.
     speaker_aliases: "tuple[tuple[str, tuple[str, ...]], ...]" = ()
+    #: The locked roster the parse was performed against -- the treatment's
+    #: cast, silent members included -- for the same reason again, and the one
+    #: that cost finished episodes (plan item 5, 2026-10-14). The seal check
+    #: used to rebuild a roster from the speakers in the OUTPUT: that promoted
+    #: adopted strangers to locked cast and dropped silent originals, so a
+    #: salvaged script that nothing had touched re-parsed differently and was
+    #: thrown away as "parsed artifact seal is stale". Required on every draft;
+    #: bound into the artifact seal.
+    cast_roster: "tuple[str, ...]" = ()
 
     def alias_map(self) -> "dict[str, list[str]]":
         return {name: list(values) for name, values in self.speaker_aliases}
@@ -4352,6 +4361,7 @@ def _final_draft_seal_payload(
     parsed_sha256: str,
     proof_map_sha256: str,
     p3_attempts: "tuple[PassAttemptTrace, ...]",
+    cast_roster: "tuple[str, ...]",
 ) -> dict:
     return {
         "raw_sha256": raw_sha256,
@@ -4359,6 +4369,7 @@ def _final_draft_seal_payload(
         "parsed_sha256": parsed_sha256,
         "proof_map_sha256": proof_map_sha256,
         "p3_attempts": [_attempt_payload(row) for row in p3_attempts],
+        "cast_roster": list(cast_roster),
     }
 
 
@@ -4428,6 +4439,7 @@ def build_final_draft(
         parsed_sha256=parsed_hash,
         proof_map_sha256=proof_hash,
         p3_attempts=p3_attempts,
+        cast_roster=tuple(cast_names),
     ))
     return FinalDraft(
         raw_source=raw_source,
@@ -4451,6 +4463,7 @@ def build_final_draft(
         salvaged=bool(salvaged),
         speaker_aliases=tuple(
             (name, tuple(values)) for name, values in sorted(aliases.items())),
+        cast_roster=tuple(cast_names),
         hashes=FinalDraftHashes(
             raw_sha256=raw_hash,
             normalized_sha256=normalized_hash,
@@ -4487,13 +4500,23 @@ def _validate_final_draft_integrity(label: str, draft: Any) -> None:
         )
     _validate_attempt_sequence(f"{label} P3", draft.p3_attempts)
 
+    roster = draft.cast_roster
+    if (type(roster) is not tuple or not roster
+            or any(not isinstance(name, str) or not name.strip()
+                   for name in roster)):
+        raise NewsProScriptError(
+            "final_draft", f"{label} carries no locked cast roster"
+        )
+
     normalized = normalize_scifi_news_pro_markup_text(draft.raw_source)
     if normalized != draft.normalized_source:
         raise NewsProScriptError(
             "final_draft", f"{label} normalized source seal is stale"
         )
+    # The SAME roster the build parsed against -- never one rebuilt from the
+    # output's speakers (see FinalDraft.cast_roster).
     authoritative, defects = parse_scifi_news_pro_markup(
-        draft.raw_source, _speakers_in_order(draft.parsed),
+        draft.raw_source, list(roster),
         draft.alias_map(), salvage=draft.salvaged,
     )
     if authoritative is None:
@@ -4562,6 +4585,7 @@ def _validate_final_draft_integrity(label: str, draft: Any) -> None:
         parsed_sha256=parsed_hash,
         proof_map_sha256=proof_hash,
         p3_attempts=draft.p3_attempts,
+        cast_roster=roster,
     ))
     expected = FinalDraftHashes(
         raw_sha256=raw_hash,
@@ -4587,6 +4611,11 @@ def _validate_selected_final_draft(
             "final_draft", "selected draft has no observed P3 attempts"
         )
     if treatment is not None:
+        if list(draft.cast_roster) != [s.name for s in treatment.cast_shapes]:
+            raise NewsProScriptError(
+                "final_draft",
+                "selected draft roster does not match its treatment cast",
+            )
         expected_proof = _build_proof_map(
             draft.parsed, treatment, draft.normalized_source
         )

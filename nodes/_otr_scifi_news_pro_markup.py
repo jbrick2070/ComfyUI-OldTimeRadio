@@ -754,13 +754,13 @@ class ParsedScript:
     # Retained for receipt compatibility.
     #
     # SPEAKER RESOLUTIONS DO NOT BELONG HERE. `_parsed_payload` SEALS this
-    # field, and the seal is re-verified by re-parsing the raw source. The
-    # build parses against the treatment's full `cast_names`; the seal check
-    # parses against `_speakers_in_order(parsed)` -- a SMALLER roster. Same
-    # script, same speakers, but a label can reach its character by a
-    # different RUNG, so the receipt STRING differs and the seal reports
-    # "parsed artifact seal is stale" for a draft nothing touched. A seal must
-    # depend on the script, not on how the parser got there.
+    # field, and the seal is re-verified by re-parsing the raw source. When
+    # this was written the seal check parsed against a SMALLER roster than the
+    # build (the speakers in the output), so a label could reach its character
+    # by a different RUNG and the receipt STRING differed. The check now
+    # re-parses against `FinalDraft.cast_roster`, the build's own roster
+    # (2026-10-14), but the rule stands: a seal must depend on the script, not
+    # on how the parser got there.
     normalizations: "tuple[str, ...]" = ()
     #: How each non-exact speaker label reached its character. A RECEIPT, and
     #: deliberately OUTSIDE the sealed payload for the reason above.
