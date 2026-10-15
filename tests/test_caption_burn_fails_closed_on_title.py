@@ -1,7 +1,7 @@
 """A planned hero title must never be dropped by a silent passthrough.
 
 ``OTR_CaptionBurn`` has FIVE no-error exits that return the input video
-untouched, and ``burn_captions`` DEFAULTS TO FALSE:
+untouched (``burn_captions`` defaults to True; captions OFF is the first):
 
   1. captions OFF                       -- the default
   2. no timed ledger resolves

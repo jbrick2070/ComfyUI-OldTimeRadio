@@ -701,8 +701,9 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         return (None, f"could not write {out_path}: {type(exc).__name__}: {exc}")
 
     report = [
-        f"captions: {len(events)} events from {len(dlines)} speech lines "
-        f"-> {out_path.name} (style={style}, margin_v={mv})",
+        (f"captions: {len(events)} events from {len(dlines)} speech lines "
+         if speech_captions else "captions OFF: title only ")
+        + f"-> {out_path.name} (style={style}, margin_v={mv})",
     ]
     if lint:
         report.append(f"  LINT ({len(lint)}):")

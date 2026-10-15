@@ -5,10 +5,14 @@ the frame iterator, or a cancellation used to skip the close and the stderr
 read: the child lived until garbage collection and the log leaked. The caller's
 audio WAV was ONE shared name in the system temp, removed only after success.
 
+On a failure the full stderr log is now KEPT (evidence) and named, its tail is
+logged and attached to the original exception; on success it is removed.
+
 Mocked process boundary -- no ffmpeg, no GPU.
 """
 from __future__ import annotations
 
+import inspect
 import os
 
 import numpy as np
@@ -56,7 +60,7 @@ class _Proc:
 
 
 @pytest.fixture
-def harness(monkeypatch, tmp_path):
+def harness(monkeypatch):
     state = {"procs": [], "logs": []}
     monkeypatch.setattr(ve, "_find_ffmpeg", lambda: "ffmpeg")
     monkeypatch.setattr(ve, "_check_nvenc", lambda _ff: False)
@@ -71,50 +75,51 @@ def harness(monkeypatch, tmp_path):
 
     monkeypatch.setattr(ve.otr_proc, "popen", popen)
     state["make"] = lambda: _Proc(_Stdin())
-    state["out"] = str(tmp_path / "out.mp4")
-    return state
+    state["out"] = "out.mp4"
+    yield state
+    for path in state["logs"]:          # kept failure logs: tidy up after
+        try:
+            os.remove(path)
+        except OSError:
+            pass
 
 
-def _frames(n, closed):
-    try:
-        for _ in range(n):
-            yield np.zeros((2, 2, 3), dtype=np.uint8)
-    finally:
-        closed.append(True)
+def _frames(n):
+    for _ in range(n):
+        yield np.zeros((2, 2, 3), dtype=np.uint8)
 
 
 def _encode(state, frames, total=4):
     return ve._encode_mp4(frames, total, "audio.wav", state["out"], 2, 2, 25)
 
 
-def test_success_closes_and_reaps_and_leaves_no_log(harness):
-    closed = []
-    assert _encode(harness, _frames(4, closed)) == harness["out"]
+def test_success_closes_and_reaps_and_removes_the_log(harness):
+    gen = _frames(4)
+    assert _encode(harness, gen) == harness["out"]
     proc = harness["procs"][0]
     assert proc.stdin.closed and proc.waited and not proc.killed
-    assert closed == [True]
+    assert inspect.getgeneratorstate(gen) == inspect.GEN_CLOSED
     assert not any(os.path.exists(p) for p in harness["logs"])
 
 
-@pytest.mark.parametrize("make,frames,exc", [
-    # the pipe breaks mid-stream
-    (lambda: _Proc(_Stdin(fail_after=2)), None, BrokenPipeError),
-    # closing the pipe fails
-    (lambda: _Proc(_Stdin(fail_on_close=True)), None, OSError),
+@pytest.mark.parametrize("make,exc", [
+    (lambda: _Proc(_Stdin(fail_after=2)), BrokenPipeError),   # pipe breaks mid-stream
+    (lambda: _Proc(_Stdin(fail_on_close=True)), OSError),     # closing the pipe fails
 ])
-def test_a_pipe_failure_stops_the_owned_child_and_keeps_the_cause(
-        harness, make, frames, exc, caplog):
+def test_a_pipe_failure_stops_the_child_keeps_the_log_and_notes_the_cause(
+        harness, make, exc, caplog):
     harness["make"] = make
-    closed = []
-    with pytest.raises(exc):
-        _encode(harness, _frames(4, closed))
+    gen = _frames(4)     # held here, so only an EXPLICIT close can close it
+    with pytest.raises(exc) as raised:
+        _encode(harness, gen)
     proc = harness["procs"][0]
-    assert proc.killed or proc.returncode is not None
-    assert proc.waited
-    assert closed == [True], "the frame source must be closed so its pool unwinds"
-    assert not any(os.path.exists(p) for p in harness["logs"])
-    assert any("stderr tail" in r.message and "something" in r.message
-               for r in caplog.records)
+    assert proc.waited and (proc.killed or proc.returncode is not None)
+    assert inspect.getgeneratorstate(gen) == inspect.GEN_CLOSED, \
+        "the frame source must be closed so its worker pool unwinds"
+    assert all(os.path.exists(p) for p in harness["logs"]), "the failure log is evidence"
+    notes = " ".join(getattr(raised.value, "__notes__", []))
+    assert "something" in notes and harness["logs"][0] in notes
+    assert any("stderr tail" in r.message for r in caplog.records)
 
 
 def test_a_frame_source_failure_or_cancel_stops_the_child(harness):
@@ -129,26 +134,28 @@ def test_a_frame_source_failure_or_cancel_stops_the_child(harness):
             _encode(harness, frames())
         proc = harness["procs"][-1]
         assert proc.killed and proc.waited
-    assert not any(os.path.exists(p) for p in harness["logs"])
 
 
-def test_a_spawn_failure_leaves_no_log(harness, monkeypatch):
+def test_a_spawn_failure_keeps_its_log_and_raises_the_cause(harness, monkeypatch):
     seen = []
 
     def popen(cmd, stdin=None, stdout=None, stderr=None):
         seen.append(stderr.name)
+        harness["logs"].append(stderr.name)
         raise OSError("cannot spawn ffmpeg")
 
     monkeypatch.setattr(ve.otr_proc, "popen", popen)
     with pytest.raises(OSError, match="cannot spawn"):
         _encode(harness, iter([]))
-    assert seen and not os.path.exists(seen[0])
+    assert seen
 
 
-def test_a_nonzero_exit_still_quotes_stderr(harness):
+def test_a_nonzero_exit_quotes_stderr_and_names_the_kept_log(harness):
     harness["make"] = lambda: _Proc(_Stdin(), returncode=1)
-    with pytest.raises(RuntimeError, match="ffmpeg exited with code 1 :: .*something"):
-        _encode(harness, _frames(2, []))
+    with pytest.raises(RuntimeError, match="ffmpeg exited with code 1 :: .*something") as raised:
+        _encode(harness, _frames(2))
+    assert harness["logs"][0] in str(raised.value)
+    assert os.path.exists(harness["logs"][0])
 
 
 def test_each_encode_gets_its_own_wav_and_it_is_removed_on_every_exit():
@@ -166,7 +173,6 @@ def test_each_encode_gets_its_own_wav_and_it_is_removed_on_every_exit():
 def test_render_video_writes_the_wav_through_the_owner():
     """The caller no longer builds a shared temp name; the owned WAV is the only
     way the base encode gets its audio."""
-    import inspect
     src = inspect.getsource(ve)
     assert '"otr_video_audio.wav"' not in src
     assert "with _owned_audio_wav(audio_np, sr) as tmp_wav:" in src

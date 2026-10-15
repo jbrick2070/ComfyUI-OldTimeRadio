@@ -19,7 +19,8 @@ node also burns the episode's title card, because the procgen layer it used to
 be drawn in composites lighten-only and cannot carry an outline (Bible 07.32).
 So when ``title_card_plan_json`` is supplied this node is NO LONGER a
 best-effort passthrough: it burns REGARDLESS of ``burn_captions``, and any
-failure RAISES instead of passing through. That is the whole point -- there are
+failure RAISES instead of passing through. ``burn_captions`` still decides
+whether DIALOGUE is drawn: OFF burns the title alone (2026-10-14). That is the whole point -- there are
 five no-error exits here, and once the title exists only in this .ass, each one
 would publish an untitled episode with a clean log. With no plan supplied every
 historical passthrough above is unchanged.
@@ -405,7 +406,9 @@ def burn_captions_on_video(video_path: str, ledger_path: str, out_path: str, *,
                        encoding="utf-8", errors="replace")
     if p.returncode != 0:
         raise ValueError(f"OTR_CaptionBurn: ffmpeg ass-burn failed :: {p.stderr.strip()[:300]}")
-    return out_path, f"captions burned (style={style}) :: {report.splitlines()[0] if report else ''}"
+    what = (f"captions burned (style={style})" if speech_captions
+            else "title burned, captions OFF (no dialogue drawn)")
+    return out_path, f"{what} :: {report.splitlines()[0] if report else ''}"
 
 
 class OTRCaptionBurn:

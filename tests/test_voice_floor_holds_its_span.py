@@ -150,6 +150,7 @@ def test_the_voice_node_marks_every_floor_and_attaches_after_packing():
     assert i_floor < i_span < i_cont
     span_args = stmts[i_span].args[0].args
     assert [getattr(a, "id", None) for a in (span_args[0], span_args[2])] == ["clips", "sr"]
+    assert "line_id" in ast.unparse(span_args[1])   # the job's own line id
     # Nothing outside that branch records a span.
     assert sum(1 for n in ast.walk(tree) if is_span_append(n)) == 1
     assert sum(1 for n in ast.walk(tree) if isinstance(n, ast.Call)

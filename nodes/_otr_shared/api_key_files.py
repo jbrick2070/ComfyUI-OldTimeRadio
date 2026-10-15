@@ -67,6 +67,12 @@ def _first_real_line(path: Path) -> str | None:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return None
+    except UnicodeDecodeError as exc:
+        # Most often a file PowerShell 5.1's `>` wrote as UTF-16. A broken key
+        # file is a KeyFileError, the one error every caller already handles.
+        raise KeyFileError(
+            "%s is not UTF-8 text (%s); save it as UTF-8 with the key on one "
+            "line" % (path, exc.reason)) from exc
     for raw in text.splitlines():
         line = raw.strip().strip('"').strip("'")
         if not line or line.startswith("#"):

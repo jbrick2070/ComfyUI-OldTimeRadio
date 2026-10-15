@@ -1414,8 +1414,10 @@ def _stop_owned_encoder(proc):
         pass
 
 
-def _drain_stderr_log(stderr_file) -> str:
-    """Read, close and remove the encoder's stderr log; never raises."""
+def _drain_stderr_log(stderr_file, *, keep=False) -> str:
+    """Read and close the encoder's stderr log; never raises. Removed on
+    success; KEPT (``keep=True``) on a failure, so the full log survives as
+    evidence beside the quoted tail."""
     text = ""
     try:
         stderr_file.seek(0)
@@ -1426,10 +1428,11 @@ def _drain_stderr_log(stderr_file) -> str:
         stderr_file.close()
     except Exception:  # noqa: BLE001
         pass
-    try:
-        os.remove(stderr_file.name)
-    except OSError:
-        pass
+    if not keep:
+        try:
+            os.remove(stderr_file.name)
+        except OSError:
+            pass
     return text
 
 
@@ -1494,8 +1497,10 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
     # skip the stderr read and the close: the child lived on until garbage
     # collection and the log leaked. Now the owned encoder is stopped and
     # reaped, the frame generator is closed (so its worker pool unwinds), the
-    # stderr tail is logged, and the ORIGINAL exception propagates. The partial
-    # output file is left as evidence; nothing else is touched.
+    # stderr tail is logged AND attached to the ORIGINAL exception, which
+    # propagates. On any failure the full stderr log is kept and named; on
+    # success it is removed. The partial output file is left as evidence;
+    # nothing else is touched.
     proc = None
     drained = False
     t0 = _time.time()
@@ -1523,18 +1528,30 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
                     pass
         proc.stdin.close()
         proc.wait()
-    except BaseException:
+    except BaseException as exc:
         if proc is not None:
             _stop_owned_encoder(proc)
-        stderr_text = _drain_stderr_log(stderr_file)
+        # The full log is KEPT on a failure (evidence), its tail quoted.
+        stderr_text = _drain_stderr_log(stderr_file, keep=True)
         drained = True
         _tail = (stderr_text or "").strip().replace("\n", " ")[-400:]
         log.error("[Video] encode stopped before ffmpeg finished; ffmpeg "
-                  "stderr tail: %s", _tail or "(none captured)")
+                  "stderr tail: %s (full log: %s)", _tail or "(none captured)",
+                  stderr_file.name)
+        # ComfyUI shows the EXCEPTION, not the log: a bare BrokenPipeError
+        # hides ffmpeg's own reason (e.g. an NVENC "Invalid argument"). Attach
+        # it to the ORIGINAL exception rather than replacing it.
+        if hasattr(exc, "add_note"):
+            try:
+                exc.add_note("ffmpeg stderr tail: %s (full log: %s)"
+                             % (_tail or "(none captured)", stderr_file.name))
+            except Exception:  # noqa: BLE001 -- never mask the cause
+                pass
         raise
     finally:
         if not drained:
-            stderr_text = _drain_stderr_log(stderr_file)
+            stderr_text = _drain_stderr_log(
+                stderr_file, keep=proc is None or proc.returncode != 0)
 
     if proc.returncode != 0:
         log.error("[Video] ffmpeg failed:\n%s", stderr_text[-2000:])
@@ -1544,8 +1561,8 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
         # already put stderr in the raise; this was the outlier.
         _tail = (stderr_text or "").strip().replace("\n", " ")[-400:]
         raise RuntimeError(
-            "ffmpeg exited with code %d :: %s"
-            % (proc.returncode, _tail or "no stderr captured"))
+            "ffmpeg exited with code %d :: %s (full log: %s)"
+            % (proc.returncode, _tail or "no stderr captured", stderr_file.name))
 
     elapsed = _time.time() - t0
     log.info("[Video] Encode complete: %d frames in %.1fs (%.1f fps)",

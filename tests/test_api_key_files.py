@@ -135,3 +135,16 @@ def test_injected_key_lands_on_api_key_hidden_input_only():
     out = _inject_hidden_inputs(row, {}, _Sess())
     assert out["api_key_comfy_org"] == "queue-key"
     assert "auth_token_comfy_org" not in out
+
+
+def test_a_utf16_key_file_is_a_key_file_error(monkeypatch, tmp_path):
+    """PowerShell 5.1's `>` writes UTF-16. That file is a broken key file --
+    a KeyFileError every caller handles -- never a raw UnicodeDecodeError
+    escaping into openrouter_enabled() and the dropdown builder."""
+    for name in ("OPENROUTER_API_KEY", "OTR_OPENROUTER_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    _enable_files(monkeypatch, tmp_path)
+    (tmp_path / "openrouter.secret").write_bytes("sk-or-key\r\n".encode("utf-16"))
+    with pytest.raises(keys.KeyFileError, match="not UTF-8"):
+        keys.file_key("openrouter")
+    assert openrouter_enabled() is False
