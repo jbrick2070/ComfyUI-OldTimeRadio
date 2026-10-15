@@ -94,9 +94,9 @@ def _writer_creative_and_technical_slot_values(
         for v in n.get("widgets_values") or []:
             if not isinstance(v, str) or not v:
                 continue
-            # NORMALIZE THE WAY THE RUNTIME DOES (2026-08-04). A saved widget
-            # value carries the picker's VRAM badge -- "google/gemma-4-12b-it
-            # (11.9 GB)" -- and the loader strips it via
+            # NORMALIZE THE WAY THE RUNTIME DOES (2026-08-04). A widget value
+            # saved before 2026-10-14 carries the picker's VRAM badge --
+            # "google/gemma-4-12b-it (11.9 GB)" -- and the loader strips it via
             # catalog._strip_label_suffix before resolving the row. Matching
             # the RAW string here meant a correctly-badged value resolved to
             # NO curated row, this helper returned empty, and the licence

@@ -7,8 +7,9 @@ different option from the one it claims. Nothing errors and nothing logs.
 
 Measured on 2026-09-14, before this guard existed: `OTR_LedgerScriptWriter`'s
 `technical_model` declared `default="Qwen/Qwen3.5-4B"` while its choices read
-`"Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)"` -- the label carries a
-size and fit badge and THE BADGE IS PART OF THE VALUE. The default matched
+`"Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)"` -- the label carried a
+size and fit badge and THE BADGE WAS PART OF THE VALUE (the labels are bare ids
+since 2026-10-14, so the guard now has nothing to catch there). The default matched
 nothing. It was correct only by the accident that that row sorts first in the
 catalog, and would have become a silent wrong-model bug the day the catalog
 order changed.

@@ -105,15 +105,15 @@ class TestWriterCanonicalModelSlots:
         # and an unmatched COMBO can resolve to index 0 of the list. The canvas
         # said one model and could have run another. Since 2026-10-14 the
         # labels ARE the bare ids, so the exact member is the bare id -- still
-        # pinned in full, through the same helper the dropdown uses.
+        # pinned in full, derived from DEFAULT_LLM via default_llm_option().
         #
         # 2026-09-06 (PBUG-20260906-09): DERIVED, no longer a literal. This
         # assertion used to hard-code the Gemma label. When DEFAULT_LLM moved
         # to Qwen the literal did not move with it, so the test asserted the
         # OLD default was shipped -- it pinned the drift instead of catching
-        # it. default_llm_option() composes the label the same way the dropdown
-        # does, so one edit to DEFAULT_LLM now moves the constant, the shipped
-        # graphs and this check together.
+        # it. default_llm_option() answers with DEFAULT_LLM (it composed the
+        # badged label until 2026-10-14), so one edit to DEFAULT_LLM moves the
+        # constant, the shipped graphs and this check together.
         expected_creative = _default_llm_option()
         expected_technical = _default_llm_option()
         actual_creative = value(n, "creative_writing_model")

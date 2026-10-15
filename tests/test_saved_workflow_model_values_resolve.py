@@ -14,13 +14,14 @@ On 2026-08-09 exactly that happened to the OTHER hand-maintained graph:
 `value_not_in_list` and the graph could not be run at all. The `--dry-run`
 PASSED, so dry-run is not a substitute for this check.
 
-WHY IT CAN DRIFT WITHOUT ANYONE EDITING A LABEL. The badge is not a literal; it
-is `_estimate_resident_gb(repo_id)` rendered as `" (%.1f GB)"`
-(`nodes/_otr_model_catalog.py:1189-1195`), and its own docstring says it
-deliberately reports the SAME number the admission gate computes. So a change to
-quantisation policy or to the estimator silently rewrites every label -- and
-every saved graph pinned to the old spelling breaks at submit time, minutes into
-a run, rather than here in two seconds.
+WHY IT COULD DRIFT WITHOUT ANYONE EDITING A LABEL (until 2026-10-14). The badge
+was not a literal; it was a computed estimate (latterly the measured download
+plus fit tags), so a change to quantisation policy or to the estimator silently
+rewrote every label -- and every saved graph pinned to the old spelling broke at
+submit time, minutes into a run, rather than here in two seconds. Since
+2026-10-14 the writer labels are the bare ids (size and fit in the tooltip), so
+that drift is gone; a choice can still be removed or renamed, which is what this
+keeps checking.
 
 SCOPE: the HAND-MAINTAINED graphs only. The generated variants beside it in workflows/
 are already covered by `scripts/build_variants.py --check`,
@@ -102,10 +103,10 @@ def test_saved_model_values_are_offered_by_the_live_dropdown(wf_name):
     assert not problems, (
         f"{wf_name} cannot be submitted as committed:\n  " +
         "\n  ".join(problems) +
-        "\nThe dropdown badge is a COMPUTED estimate, not a literal "
-        "(_otr_model_catalog.py:1189-1195), so it can drift without anyone "
-        "editing the label. Re-save the graph with the spelling the live "
-        "dropdown offers."
+        "\nThe writer dropdown offers bare ids (since 2026-10-14); a value it "
+        "does not offer is a removed or renamed choice, or an older badged "
+        "spelling. Re-save the graph with the spelling the live dropdown "
+        "offers."
     )
 
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""A measured NF4 resident must beat the halving projection in the badge.
+"""A measured NF4 resident must beat the halving projection in the fit tags
+(the dropdown badge until 2026-10-14, the writer tooltip since).
 
 THE PROJECTION IS A RULE OF THUMB WITH A KNOWN BIAS. ``fit_tags_for`` prices
 a quantized NVIDIA load as ``download_gb / 2``. The download is bf16 -- two
@@ -8,8 +9,9 @@ bytes a parameter -- so halving it models ONE byte a parameter, which is an
 row by close to 2x, which is invisible while every row is small enough to fit
 anyway and is not invisible at 27B.
 
-THE HARM IS RECORDED, not hypothetical. ``vram_badge_for``'s own docstring
-carries PBUG-20260829-17: a badge that read "(7.9 GB)" against an 8 GB card
+THE HARM IS RECORDED, not hypothetical. ``vram_badge_for``'s docstring (the
+function is retired; ``writer_fit_line`` replaced it) carried PBUG-20260829-17:
+a badge that read "(7.9 GB)" against an 8 GB card
 sent an owner past the smallest, cheapest writer in the list, and "the cost of
 that was a user walking away". A withheld ``nv24-nf4`` tag is the same defect
 wearing the opposite sign -- the row simply claims no machine at all, and the
@@ -89,12 +91,13 @@ def test_an_unmeasured_row_still_uses_the_projection():
         "mac16-tight", "nv8-nf4", "nv16", "nv24")
 
 
-def test_the_gate_and_the_badge_quote_the_same_number():
+def test_the_gate_and_the_fit_tags_quote_the_same_number():
     """The promise that actually broke, now enforced.
 
-    ``vram_badge_for``'s docstring says it "reports the same figure
-    :func:`_estimate_resident_gb` computes, so the badge and the gate cannot
-    drift apart". Teaching ``fit_tags_for`` the measured number without
+    ``vram_badge_for``'s docstring (retired 2026-10-14) said it "reports the
+    same figure :func:`_estimate_resident_gb` computes, so the badge and the
+    gate cannot drift apart"; the tooltip's fit tags inherit that promise.
+    Teaching ``fit_tags_for`` the measured number without
     teaching ``_estimate_resident_gb`` broke exactly that, and a LIVE LEG is
     what found it: the Selector logged ``vram_fit=FAIL@25.9 GB`` for a model
     that was at that moment resident on the card at 17.1 GB and generating.
@@ -115,7 +118,7 @@ def test_the_gate_and_the_badge_quote_the_same_number():
         est = catalog._estimate_resident_gb(row.repo_id)
         assert est == measured, (
             f"{row.repo_id}: the gate prices it at {est} GB while the measured "
-            f"table says {measured} GB. The badge reads the table and the gate "
+            f"table says {measured} GB. The fit tags read the table and the gate "
             "does not, which is the drift both are documented to prevent.")
 
 
@@ -128,5 +131,5 @@ def test_the_measured_row_is_priced_under_its_own_fit_budget():
     budget = _nv24_budget()
     assert est <= budget, (
         f"the gate prices {BIG_CARD_WRITER} at {est} GB against an nv24 budget "
-        f"of {budget} GB, so it would warn on a card the badge advertises")
+        f"of {budget} GB, so it would warn on a card the fit tags advertise")
     assert "nv24-nf4" in catalog.fit_tags_for(BIG_CARD_WRITER)

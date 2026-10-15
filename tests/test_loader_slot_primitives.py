@@ -225,10 +225,11 @@ def test_every_curated_local_row_is_pass_tier():
 
     THE 08-25 RULING IS NOT WEAKENED BY THIS, because the harm it names is a
     dropdown that "promises a load that may not happen on the 16 GB target
-    card". This row promises nothing to a 16 GB card: its badge reads
-    "51.8 GB download, nv24-nf4", so the only machine class it claims is one
+    card". This row promises nothing to a 16 GB card: its size-and-fit line
+    (the dropdown badge until 2026-10-14, the writer tooltip since) reads
+    "about 55.6 GB; fits nv24-nf4", so the only machine class it claims is one
     with 22 GB to give. A 16 GB owner reading that sees a row that does not
-    list their card, which is the badge doing its job rather than a gate
+    list their card, which is that line doing its job rather than a gate
     doing it for them -- and an OOM from picking it anyway is loud, not a
     silent wrong render.
     """

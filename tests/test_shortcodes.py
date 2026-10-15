@@ -61,12 +61,13 @@ class TableShapeTests(unittest.TestCase):
                     "%s: %r -> %r must be lowercase alphanumeric" % (name, value, code))
 
     def test_the_label_decorations_are_stripped(self):
-        """Live labels carry a size badge, an aspect tag or a trailing note; the
-        table is written against the bare value."""
+        """A value may carry a size badge (a writer value saved before
+        2026-10-14), an aspect tag or a trailing note; the table is written
+        against the bare value."""
         self.assertEqual(SC.code_for("llm", "Qwen/Qwen3.5-4B (4.3 GB)"), "q354b")
         self.assertEqual(SC.code_for("llm", "Qwen/Qwen3.5-4B"), "q354b",
-                         "the ledger stores the bare id, the dropdown a badged "
-                         "one; both must resolve")
+                         "the ledger and today's dropdown carry the bare id, an "
+                         "older saved graph a badged one; both must resolve")
         self.assertEqual(
             SC.code_for("llm", "Qwen/Qwen3.5-4B:nf4 (8.7 GB, nv8 nv16 nv24)"),
             "q354n")

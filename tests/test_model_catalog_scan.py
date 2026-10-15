@@ -257,7 +257,7 @@ def test_dropdown_appends_uncurated_locally_scanned_at_end(hub_root_with_uncurat
     assert uncurated_entry is not None
     assert uncurated_entry.on_disk is True
     assert uncurated_entry.curated is False
-    assert uncurated_entry.label == "meta-llama/Llama-3-8B-Instruct"  # uncurated: no estimate, so no badge
+    assert uncurated_entry.label == "meta-llama/Llama-3-8B-Instruct"  # uncurated: the bare id, like every label
 
 
 # ---------------------------------------------------------------------------

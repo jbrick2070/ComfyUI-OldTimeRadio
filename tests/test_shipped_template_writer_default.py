@@ -93,9 +93,11 @@ class ShippedTemplateWriterTests(unittest.TestCase):
                         % (name, node["id"], slot, saved, self.DEFAULT_LLM))
 
     def test_the_saved_label_is_a_real_dropdown_option(self):
-        """A value that is not an exact member of the dropdown fails validation
-        at load, so the saved value must be the label verbatim (the bare id
-        since 2026-10-14; a size suffix before). The legacy availability markers
+        """A shipped graph must save the label verbatim (the bare id since
+        2026-10-14; a size suffix before). The writer's VALIDATE_INPUTS still
+        admits an older badged spelling, but a COMBO value that is not an exact
+        member is the index-0 hazard everywhere else, and a shipped graph is not
+        where to rely on a compatibility step. The legacy availability markers
         are stripped because they depended on what happened to be cached on the
         machine running the test, not on the graph."""
         from _otr_model_catalog import (LOCAL_HF_SUFFIX,

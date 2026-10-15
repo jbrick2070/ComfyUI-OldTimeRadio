@@ -160,13 +160,14 @@ class ChatTemplateKwargsWiringTests(unittest.TestCase):
         self.assertIn("Qwen/Qwen3.8-27B", source)
 
     def test_exact_match_is_fed_a_stripped_id_not_a_badged_label(self):
-        """A value saved before 2026-10-14 carries a ' (4.3 GB)' badge (the
+        """A value saved before 2026-10-14 carries a size badge -- ' (4.3 GB)'
+        in the oldest graphs, ' (8.7 GB download, ...)' in later ones (the
         dropdown labels are bare ids since); the comparison must see the bare
         repo id or the suppression silently stops firing on such a graph."""
         source = (NODES / "_otr_loader_backends.py").read_text(encoding="utf-8")
         self.assertIn(
             'split(" ", 1)[0]', source,
-            "chat_template_kwargs must strip a badged dropdown label before "
+            "chat_template_kwargs must strip an older saved badge before "
             "comparing, or a saved workflow value disables think-suppression")
 
 

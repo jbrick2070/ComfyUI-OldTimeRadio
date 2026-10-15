@@ -246,7 +246,7 @@ class CatalogOptInTests(unittest.TestCase):
             "transformers_multimodal_text_only")
 
     def test_badged_dropdown_labels_resolve(self):
-        """A saved graph stores the picker's label, badge and all."""
+        """A graph saved before 2026-10-14 stores the picker's badged label."""
         self.assertEqual(
             CATALOG.text_only_load_mode("google/gemma-4-E2B-it (3.0 GB)"),
             "native_text_decoder")

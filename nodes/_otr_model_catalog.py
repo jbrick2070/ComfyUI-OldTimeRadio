@@ -2014,7 +2014,10 @@ def writer_fit_line(repo_id: str) -> str:
     never typed. The ComfyUI-native rows carry no fit tags (the projection does
     not rate them) and say so rather than claim a fit; a hosted row has nothing
     to download or fit; a row the catalog does not know says that. "Fits none"
-    is said only when the projection actually ran and rated nothing."""
+    is said only when the projection actually ran and rated nothing: a row with
+    no fit basis reads "fit unknown (no fit basis in the catalog)", and one the
+    projection cannot price (it raised) reads "fit unknown (could not be
+    estimated)". Nothing here raises."""
     curated = _by_repo_id().get(repo_id)
     if curated is None:
         return "not in the writer catalog; size and fit unknown"
