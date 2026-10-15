@@ -84,3 +84,31 @@ def is_sanctioned_gap(row) -> bool:
     if not isinstance(row, dict):
         return False
     return str(row.get("status") or "") == STATUS_SANCTIONED_GAP
+
+
+def sanctioned_gap_reason(row) -> str:
+    """WHY a sanctioned gap row was floored, in one precedence every reader
+    shares: ``"budget"`` when the spend budget halted it, the cloud failure
+    code when the cloud clip failed, else ``"still_gap"`` (the image model
+    refused its still). The batch receipt and the LTX-open health log used to
+    disagree: the log called every sanctioned row an image refusal (plan item
+    14, 2026-10-14)."""
+    row = row if isinstance(row, dict) else {}
+    if row.get("budget_floor"):
+        return "budget"
+    if row.get("cloud_floor"):
+        return str(row.get("cloud_floor") or "cloud")
+    return "still_gap"
+
+
+#: How a person reads each reason in a log line.
+_GAP_REASON_WORDS = {
+    "budget": "the run's spend budget halted it",
+    "still_gap": "the image model refused its still",
+}
+
+
+def sanctioned_gap_words(reason) -> str:
+    """``sanctioned_gap_reason``'s answer as a log phrase."""
+    reason = str(reason or "")
+    return _GAP_REASON_WORDS.get(reason, "the cloud clip failed (%s)" % reason)

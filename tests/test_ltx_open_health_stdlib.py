@@ -175,6 +175,31 @@ class LtxOpenHealthTests(unittest.TestCase):
         self.assertTrue(any("SANCTIONED" in message for message in logged.output))
         self.assertFalse(any("LTX-OPEN HEALTH" in message for message in logged.output))
 
+    def test_a_sanctioned_opener_names_its_real_reason(self):
+        """Plan item 14: the log used to call every sanctioned opener an image
+        refusal. It now names the batch receipt's own reason -- and stays a
+        non-fatal, sanctioned row even in strict mode."""
+        cases = (
+            ({"budget_floor": True}, "budget", "spend budget"),
+            ({"cloud_floor": "cloud_job_failed"}, "cloud_job_failed",
+             "cloud clip failed (cloud_job_failed)"),
+            ({}, "still_gap", "refused its still"),
+        )
+        for extra, reason, words in cases:
+            clip = row(exists=True)
+            clip["status"] = self.rd._receipt.STATUS_SANCTIONED_GAP
+            clip.update(extra)
+            report = {}
+            with self.subTest(reason=reason), \
+                    self.assertLogs(self.rd._LOG, level="WARNING") as logged:
+                self.assertEqual(self.rd.check_ltx_open_health(
+                    manifest(clip), strict=True, report_out=report), [])
+            self.assertTrue(any("SANCTIONED" in m and words in m for m in logged.output),
+                            logged.output)
+            self.assertEqual(report["rows"][0]["reason"], reason)
+            self.assertEqual(report["rows"][0]["status"], "sanctioned")
+            self.assertEqual(self.rd._receipt.sanctioned_gap_reason(clip), reason)
+
     def test_absent_or_unknown_status_does_not_sanction_a_missing_clip(self):
         for status in (None, "not_a_sanctioned_gap"):
             clip = row(exists=False)

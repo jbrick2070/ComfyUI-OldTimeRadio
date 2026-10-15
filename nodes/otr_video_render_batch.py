@@ -254,12 +254,7 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
             if _receipt.is_sanctioned_gap(clip):
                 sid = str(clip.get("shot_id") or "?")
                 sanctioned_gap_shot_ids.append(sid)
-                if clip.get("budget_floor"):
-                    why = "budget"
-                elif clip.get("cloud_floor"):
-                    why = str(clip.get("cloud_floor") or "cloud")
-                else:
-                    why = "still_gap"
+                why = _receipt.sanctioned_gap_reason(clip)
                 reason_row = {
                     "shot_id": sid,
                     "beat_id": str(clip.get("beat_id") or ""),

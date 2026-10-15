@@ -6290,15 +6290,18 @@ def check_ltx_open_health(manifest, *, strict=None, report_out=None):
         if _receipt.is_sanctioned_gap(row):
             # C6 (2026-08-28): a SANCTIONED open beat is not a health failure.
             # This check hunts an open that fell to the procgen/still floor
-            # when an LTX engine was expected -- a wiring fault. An opener
-            # whose required still the model refused never had an engine to
-            # fall from, and the operator's ruling says that episode still
-            # publishes; raising here in strict mode would contradict it.
+            # when an LTX engine was expected -- a wiring fault. A sanctioned
+            # opener was floored by design, and the operator's ruling says that
+            # episode still publishes; raising here in strict mode would
+            # contradict it. The log names the REAL reason -- budget, a failed
+            # cloud clip, or a refused still -- in the receipt's own precedence.
+            why = _receipt.sanctioned_gap_reason(row)
             _LOG.warning(
                 "[OTR.render_driver] LTX-OPEN: radio-open beat %s was "
-                "SANCTIONED (the image model refused its still) -- floored by "
-                "design, not a health failure.", bid or row.get("shot_id"))
+                "SANCTIONED (%s) -- floored by design, not a health failure.",
+                bid or row.get("shot_id"), _receipt.sanctioned_gap_words(why))
             observation["status"] = "sanctioned"
+            observation["reason"] = why
             continue
         if not intended or not (intended in _LTX_OPEN_ENGINES
                                 or intended in _vreg.CAPABILITIES
@@ -6420,7 +6423,16 @@ def persist_episode_clips(result, episode_id):
     clips = (result or {}).get("clips") or {}
     if not episode_id or not clips:
         return result
-    episode_id = resolve_episode_id_for_clip_persistence(episode_id)
+    # CARRY THE FREEZE EVIDENCE (plan item 13, 2026-10-14). This re-resolve ran
+    # without it, so when the pending dir was already gone -- which it is on
+    # every canonical run, once SignalLostVideo renames the episode -- the guard
+    # that rejects a FOREIGN active ledger was skipped, and clips could be moved
+    # into another episode while the manifest kept the first id. The episode's
+    # own freeze travels on the result's full ledger.
+    freeze = (((result or {}).get("ledger") or {}).get("meta") or {}).get(
+        "freeze_timestamp")
+    episode_id = resolve_episode_id_for_clip_persistence(
+        episode_id, freeze_timestamp=str(freeze or ""))
     try:
         from .._otr_paths import otr_clips_dir
         dest_dir = str(otr_clips_dir(str(episode_id)))

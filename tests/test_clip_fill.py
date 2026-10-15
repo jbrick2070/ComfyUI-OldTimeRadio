@@ -466,6 +466,64 @@ def test_resolve_stale_pending_clip_rejects_foreign_freeze(monkeypatch, tmp_path
                for r in caplog.records)
 
 
+def _foreign_episode(monkeypatch, tmp_path, freeze):
+    """An episodes tree whose active in-flight ledger belongs to ANOTHER
+    episode (freeze ``freeze``), with this run's pending dir already gone."""
+    import nodes._otr_paths as paths
+    monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    root = tmp_path / "otr" / "episodes"
+    other = root / "signal_lost_other"
+    (other / "audio").mkdir(parents=True)
+    ledger_path = other / "audio" / "signal_lost_other_ledger.json"
+    ledger_path.write_text(json.dumps({
+        "episode_id": "signal_lost_other", "meta": {"freeze_timestamp": freeze},
+    }), encoding="utf-8")
+    monkeypatch.setattr(paths, "otr_episodes_root", lambda: root)
+    monkeypatch.setattr("nodes._otr_ledger.in_flight_ledger_path", lambda: ledger_path)
+    monkeypatch.setattr(paths, "otr_clips_dir", lambda eid: root / eid / "clips")
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    clip_src = scratch / "shot.mp4"
+    clip_src.write_bytes(b"mp4")
+    return root, other, clip_src
+
+
+def _result(clip_src, freeze):
+    return {
+        "clips": {"shot_b001": {"type": "video", "path": str(clip_src),
+                                "engine_id": "google_omni_video"}},
+        "ledger": {"meta": {"freeze_timestamp": freeze},
+                   "video": {"shots": [{"shot_id": "shot_b001",
+                                        "role": "character_video",
+                                        "engine_id": "google_omni_video"}]}},
+    }
+
+
+def test_persist_never_moves_clips_into_a_foreign_episode(monkeypatch, tmp_path):
+    """Plan item 13: the persist re-resolve now carries the run's own freeze,
+    so a foreign active ledger is rejected exactly as the first lookup rejects
+    it -- no clip lands in the other episode."""
+    from nodes._otr_video_engines import render_driver as rd
+    root, other, clip_src = _foreign_episode(monkeypatch, tmp_path, "freeze-other")
+    result = _result(clip_src, "freeze-current")
+    rd.persist_episode_clips(result, "pending_20260708_030303")
+    assert not (other / "clips").exists()
+    assert "signal_lost_other" not in result["clips"]["shot_b001"]["path"]
+    # The run keeps its own identity; the batch's manifest id agrees with it.
+    assert rd.resolve_episode_id_for_clip_persistence(
+        "pending_20260708_030303", freeze_timestamp="freeze-current"
+    ) == "pending_20260708_030303"
+
+
+def test_persist_still_rekeys_when_the_freeze_matches(monkeypatch, tmp_path):
+    from nodes._otr_video_engines import render_driver as rd
+    root, other, clip_src = _foreign_episode(monkeypatch, tmp_path, "freeze-same")
+    result = _result(clip_src, "freeze-same")
+    rd.persist_episode_clips(result, "pending_20260708_040404")
+    assert str(other / "clips") in result["clips"]["shot_b001"]["path"]
+    assert not clip_src.exists()
+
+
 # --------------------------------------------------------------------------- #
 # Piece 5 -- composite underrun guard
 # --------------------------------------------------------------------------- #
