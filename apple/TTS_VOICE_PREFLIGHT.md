@@ -34,16 +34,14 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   `test_p1_the_degraded_fallback_matches_the_profiles_table`, parametrized over
   both voice nodes.
 
-  **The MUSIC node has the same drift and is NOT fixed here -- flagged for the
-  operator.** `nodes/stable_audio_theme.py:36` declares
-  `("musicgen", "stable_audio_music")` while the profiles table for `music` is
-  `("stable_audio_3", "musicgen", "stable_audio_music", "sonilo",
-  "google_lyria")`. It is short by three AND its index 0 disagrees with the
-  shipped default, so a degraded boot would render music on `musicgen` instead
-  of the promoted `stable_audio_3`. That is a silent DEFAULT change rather than
-  a missing menu entry, it is outside the TTS surface this preflight governs,
-  and it deserves its own decision rather than a drive-by edit inside a voice
-  sprint. `MUSIC_AUDIO_PREFLIGHT.md` is the right home for the gate.
+  **The MUSIC node had the same drift -- FIXED 2026-10-15 (a94363c1,
+  21c229bb), at the operator's request, from the Grok review's OTR-F003.**
+  `nodes/stable_audio_theme.py` declared `("musicgen", "stable_audio_music")`:
+  short by three, and its index 0 put a degraded boot on `musicgen` instead of
+  the promoted `stable_audio_3`. Its `_LEGACY_FIRST_FALLBACK` is now the whole
+  `music` profiles list in order, pinned by
+  `test_the_fallback_equals_the_registry_list` in
+  `tests/test_stable_audio_theme.py`.
 - **P1.2 Every name in the dropdown is a registered adapter that serves the
   role.** A menu entry no adapter answers to is a queue-time crash wearing a
   menu entry. *Twin:* `test_p1_2_every_char_voice_engine_is_registered_...`.
