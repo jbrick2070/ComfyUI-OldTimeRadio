@@ -106,10 +106,14 @@ def test_class_import_failure_is_a_finding():
     assert hits and "could not be imported" in hits[0].reason
 
 
-def test_t2_refuse_same_host_warn_other_host():
-    assert csp.transport_severity(csp.GOOGLE_HOST, csp.GOOGLE_HOST) == "refuse"
-    assert csp.transport_severity(csp.OPENROUTER_HOST, csp.COMFY_PAID_HOST) == "warn"
-    assert csp.transport_severity(csp.OPENROUTER_HOST, csp.OPENROUTER_HOST) == "refuse"
+def test_t2_catalog_outage_warns_on_any_host():
+    """An unreachable catalog is a failed probe, and no probe may fail a
+    workflow (operator rule, 2026-10-14) -- a warning whether or not the paid
+    call shares the host. The note says which case it is."""
+    same = csp.catalog_outage_hint(csp.GOOGLE_HOST, csp.GOOGLE_HOST)
+    other = csp.catalog_outage_hint(csp.OPENROUTER_HOST, csp.COMFY_PAID_HOST)
+    assert "fails loudly" in same
+    assert "check is skipped" in other
 
     def dead(_auth):
         return csp.CatalogResult(None, "timeout", csp.GOOGLE_HOST)
@@ -121,7 +125,8 @@ def test_t2_refuse_same_host_warn_other_host():
         eng, eng.cloud_selectors(),
         schema_options_fn=lambda _k: {},
         catalog_fn=dead)
-    assert hits[0].severity == "refuse"
+    assert [h.severity for h in hits] == ["warn"]
+    assert "fails loudly" in hits[0].fix_hint
 
 
 def test_t2_google_models_prefix_matches_bare_catalog_id():
@@ -150,38 +155,103 @@ def test_t2_missing_catalog_id_refuses():
     assert hits[0].severity == "refuse"
 
 
-def test_all_findings_in_one_raise():
-    csp._CACHE.clear()
+def test_all_findings_in_one_raise(monkeypatch):
     prompt = {"63": {"class_type": "OTR_WorkflowValidator", "inputs": {}}}
     findings = [
         csp.Finding("a", "a", "model", "x", "bad x", "fix x", "refuse"),
         csp.Finding("b", "b", "model", "y", "bad y", "fix y", "refuse"),
         csp.Finding("c", "c", "catalog", "", "timeout", "warn only", "warn"),
     ]
-    csp._CACHE["u1"] = findings
+    monkeypatch.setattr(csp, "collect_findings", lambda *_a, **_k: findings)
     with pytest.raises(ValueError) as exc:
         csp.ensure_prompt_cloud_slugs(prompt, "u1")
     text = str(exc.value)
     assert "2 issue(s)" in text
     assert "bad x" in text and "bad y" in text
-    csp._CACHE.clear()
 
 
-def test_per_prompt_cache_does_not_recompute():
-    csp._CACHE.clear()
-    calls = {"n": 0}
+# ---------------------------------------------------------------------------
+# Every queue is checked afresh (plan item 1, 2026-10-14). The production call
+# passes NO keyword overrides -- the validator's own path -- so these tests mock
+# the module's catalog and engine lookups instead of injecting them, and never
+# touch private state between calls.
+# ---------------------------------------------------------------------------
 
-    def walk(_prompt, _uid):
-        calls["n"] += 1
-        return []
 
-    prompt = {"63": {"class_type": "OTR_WorkflowValidator", "inputs": {}}}
-    csp.ensure_prompt_cloud_slugs(prompt, "cache-me", walk_fn=walk)
-    csp.ensure_prompt_cloud_slugs(prompt, "cache-me")
-    assert calls["n"] == 1
-    csp.ensure_prompt_cloud_slugs(prompt, "other", walk_fn=walk)
-    assert calls["n"] == 2
-    csp._CACHE.clear()
+@pytest.fixture
+def production_path(monkeypatch):
+    """Module-level catalog/engine stand-ins plus a call counter."""
+    state = {"catalog_calls": 0, "ids": {"openrouter": {"google/gemini-3.5-flash"}}}
+
+    def fake_catalog_ids(authority, get_json=None):
+        state["catalog_calls"] += 1
+        auth = str(authority)
+        host = csp.GOOGLE_HOST if auth == "google" else csp.OPENROUTER_HOST
+        ids = state["ids"].get(auth)
+        if ids is None:
+            return csp.CatalogResult(None, "timeout", host)
+        return csp.CatalogResult(frozenset(ids), "", host)
+
+    monkeypatch.setattr(csp, "catalog_ids", fake_catalog_ids)
+    monkeypatch.setattr(csp, "_default_resolve_engine", lambda _eid: None)
+    monkeypatch.setattr(csp, "schema_options", lambda _k: {})
+    for name in ("OTR_OPENROUTER_SLOT_A_DEFAULT", "OTR_OPENROUTER_SLOT_B_DEFAULT",
+                 "OPENROUTER_MODEL_A", "OPENROUTER_MODEL_B"):
+        monkeypatch.delenv(name, raising=False)
+    return state
+
+
+def _or_writer(slug, validator="63", model="openrouter:slot-a"):
+    return {
+        validator: {"class_type": "OTR_WorkflowValidator", "inputs": {}},
+        "70": {"class_type": "OTR_LedgerScriptWriter", "inputs": {
+            "gate_in": [validator, 0],
+            "creative_writing_model": model,
+            "technical_model": model,
+            "openrouter_slot_a_model": slug,
+        }},
+    }
+
+
+def test_a_refusal_does_not_outlive_the_repaired_pick(production_path):
+    with pytest.raises(ValueError):
+        csp.ensure_prompt_cloud_slugs(_or_writer("dead/not-a-model"), "63")
+    findings = csp.ensure_prompt_cloud_slugs(
+        _or_writer("google/gemini-3.5-flash"), "63")
+    assert not [f for f in findings if f.severity == "refuse"]
+    # ...and back again: a good result does not shelter the next bad pick.
+    with pytest.raises(ValueError):
+        csp.ensure_prompt_cloud_slugs(_or_writer("dead/not-a-model"), "63")
+
+
+def test_a_local_first_queue_does_not_wave_through_a_later_cloud_pick(production_path):
+    local = _or_writer("", model="Qwen/Qwen3.5-4B")
+    assert csp.ensure_prompt_cloud_slugs(local, "63") == []
+    assert production_path["catalog_calls"] == 0
+    with pytest.raises(ValueError) as exc:
+        csp.ensure_prompt_cloud_slugs(_or_writer("dead/not-a-model"), "63")
+    assert "dead/not-a-model" in str(exc.value)
+
+
+def test_every_queue_and_every_validator_is_checked(production_path):
+    good = "google/gemini-3.5-flash"
+    csp.ensure_prompt_cloud_slugs(_or_writer(good), "63")
+    csp.ensure_prompt_cloud_slugs(_or_writer(good), "63")
+    csp.ensure_prompt_cloud_slugs(_or_writer(good, validator="99"), "99")
+    assert production_path["catalog_calls"] == 3
+
+
+def test_a_catalog_outage_warns_on_every_queue_and_never_refuses(production_path):
+    production_path["ids"] = {}
+    for _ in range(2):
+        findings = csp.ensure_prompt_cloud_slugs(
+            _or_writer("google/gemini-3.5-flash"), "63")
+        assert [f.severity for f in findings] == ["warn"]
+    assert production_path["catalog_calls"] == 2
+    # The outage clears: the same queue is verified, and a dead slug refuses.
+    production_path["ids"] = {"openrouter": {"google/gemini-3.5-flash"}}
+    with pytest.raises(ValueError):
+        csp.ensure_prompt_cloud_slugs(_or_writer("dead/not-a-model"), "63")
 
 
 def test_replay_skips_writer_and_still_checks_video():
@@ -279,16 +349,12 @@ _LIVE_CATALOG = _catalog({"openrouter": {_LIVE_OR}, "google": {_LIVE_GOOGLE}})
 
 
 def _run(prompt, catalog_fn, **kwargs):
-    csp._CACHE.clear()
-    try:
-        return csp.ensure_prompt_cloud_slugs(
-            prompt, "63",
-            resolve_engine=lambda _eid: None,
-            schema_options_fn=lambda _k: {},
-            catalog_fn=catalog_fn,
-            **kwargs)
-    finally:
-        csp._CACHE.clear()
+    return csp.ensure_prompt_cloud_slugs(
+        prompt, "63",
+        resolve_engine=lambda _eid: None,
+        schema_options_fn=lambda _k: {},
+        catalog_fn=catalog_fn,
+        **kwargs)
 
 
 @pytest.fixture
@@ -379,11 +445,14 @@ def test_google_unbound_refuses_without_consulting_catalog(clean_slot_env):
         assert "No request was sent" in text
 
 
-def test_openrouter_catalog_down_refuses(clean_slot_env):
+def test_openrouter_catalog_down_warns(clean_slot_env):
+    """Same host as the paid call: still a warning -- an outage is a failed
+    probe, and the paid call itself fails loudly if the host is really down."""
     prompt = _writer_prompt("openrouter:slot-a", "openrouter_slot_a_model", _LIVE_OR)
-    with pytest.raises(ValueError) as exc:
-        _run(prompt, _catalog({}))
-    assert "catalog unavailable" in str(exc.value)
+    findings = _run(prompt, _catalog({}))
+    assert [f.severity for f in findings] == ["warn"]
+    assert "catalog unavailable" in findings[0].reason
+    assert "fails loudly" in findings[0].fix_hint
 
 
 def test_comfy_writer_openrouter_catalog_down_warns(clean_slot_env):
@@ -395,13 +464,12 @@ def test_comfy_writer_openrouter_catalog_down_warns(clean_slot_env):
     assert not [f for f in findings if f.severity == "refuse"]
 
 
-def test_google_catalog_down_refuses(clean_slot_env):
+def test_google_catalog_down_warns(clean_slot_env):
     prompt = _writer_prompt("google_api:slot-a", "google_api_slot_a_model", _LIVE_GOOGLE)
-    with pytest.raises(ValueError) as exc:
-        _run(prompt, _catalog({}))
-    text = str(exc.value)
-    assert "catalog unavailable" in text
-    assert csp.GOOGLE_HOST in text
+    findings = _run(prompt, _catalog({}))
+    assert [f.severity for f in findings] == ["warn"]
+    assert "catalog unavailable" in findings[0].reason
+    assert csp.GOOGLE_HOST in findings[0].fix_hint
 
 
 def test_writer_check_restores_process_global_bindings(clean_slot_env):
@@ -454,7 +522,6 @@ def test_director_google_engine_dead_model_refuses():
             },
         },
     }
-    csp._CACHE.clear()
     with pytest.raises(ValueError) as exc:
         csp.ensure_prompt_cloud_slugs(
             prompt, "63",
@@ -465,7 +532,6 @@ def test_director_google_engine_dead_model_refuses():
     text = str(exc.value)
     assert "gemini-omni-flash-preview" in text
     assert "google catalog" in text
-    csp._CACHE.clear()
 
 
 def test_a_retired_engine_is_named_retired_not_unregistered():
@@ -487,7 +553,6 @@ def test_a_retired_engine_is_named_retired_not_unregistered():
             },
         },
     }
-    csp._CACHE.clear()
     with pytest.raises(ValueError) as exc:
         csp.ensure_prompt_cloud_slugs(
             prompt, "63",
@@ -497,7 +562,6 @@ def test_a_retired_engine_is_named_retired_not_unregistered():
     text = str(exc.value)
     assert "video engine 'google_veo_video' is retired and is no longer selectable" in text
     assert "is not registered" not in text
-    csp._CACHE.clear()
 
 
 def test_catalog_ids_openrouter_and_google_with_injected_get_json():

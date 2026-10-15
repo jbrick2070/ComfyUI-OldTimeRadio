@@ -39,8 +39,6 @@ _OR_B = "openrouter:slot-b"
 _GOOG_A = "google_api:slot-a"
 _GOOG_B = "google_api:slot-b"
 
-_CACHE: dict[str, list] = {}
-
 
 class Finding(NamedTuple):
     engine: str
@@ -219,11 +217,20 @@ def _live_google_get_json(path: str) -> dict:
     return get_json(path)
 
 
-def transport_severity(catalog_host: str, paid_host: str) -> str:
-    """Refuse when the catalog host is the host the paid call will hit."""
+def catalog_outage_hint(catalog_host: str, paid_host: str) -> str:
+    """The note on a T2 catalog outage, which is always a WARNING.
+
+    An unreachable catalog is a failed probe, not a finding about the pick, and
+    no probe may fail a workflow (operator rule, 2026-10-14). When the paid call
+    goes to the same host, a real outage makes that call fail loudly on its own;
+    a blip that has cleared by then costs nothing. A catalog that ANSWERS
+    without the slug still refuses -- that is a verdict on the pick."""
     cat = (urlparse(catalog_host).hostname or catalog_host or "").lower()
     paid = (urlparse(paid_host).hostname or paid_host or "").lower()
-    return "refuse" if cat and cat == paid else "warn"
+    if cat and cat == paid:
+        return ("slug unverified; the paid call goes to this host and fails "
+                "loudly if it is really down")
+    return "paid host differs; check is skipped"
 
 
 def _fix_hint(node_key: str, input_name: str, live) -> str:
@@ -257,16 +264,12 @@ def check_engine(engine, selectors, *, schema_options_fn, catalog_fn) -> list:
         result = catalog_fn(catalog)
         paid_host = GOOGLE_HOST if str(catalog) == "google" else str(catalog)
         if result.ids is None:
-            sev = transport_severity(result.host, paid_host)
             findings.append(Finding(
                 engine_id, engine_id, "catalog", "",
                 "T2 catalog unavailable (%s)" % (result.error or "transport"),
                 "catalog URL host=%s status logged; %s"
-                % (result.host,
-                   "run cannot verify a spend on this host"
-                   if sev == "refuse" else
-                   "paid host differs; check is skipped"),
-                sev))
+                % (result.host, catalog_outage_hint(result.host, paid_host)),
+                "warn"))
             return findings
         for node_key, fields in (selectors or {}).items():
             for input_name, candidates in (fields or {}).items():
@@ -696,12 +699,13 @@ def collect_findings(
                 continue
             result = cat_fn(authority)
             if result.ids is None:
-                sev = transport_severity(result.host, paid_host)
                 findings.append(Finding(
                     handle, handle, widget, slug,
                     "T2 catalog unavailable (%s)" % (result.error or "transport"),
-                    "catalog host=%s paid host=%s" % (result.host, paid_host),
-                    sev))
+                    "catalog host=%s paid host=%s; %s"
+                    % (result.host, paid_host,
+                       catalog_outage_hint(result.host, paid_host)),
+                    "warn"))
                 continue
             if _normalize_checked_slug(authority, slug) not in result.ids:
                 findings.append(Finding(
@@ -730,14 +734,14 @@ def format_refusal(findings) -> str:
 
 
 def ensure_prompt_cloud_slugs(prompt, unique_id, **kwargs) -> list:
-    """Wired entry. Raises ValueError listing every refuse finding."""
-    cache_key = str(unique_id or "").strip()
-    if cache_key and cache_key in _CACHE and not kwargs:
-        findings = _CACHE[cache_key]
-    else:
-        findings = collect_findings(prompt, unique_id, **kwargs)
-        if cache_key and not kwargs:
-            _CACHE[cache_key] = findings
+    """Wired entry. Raises ValueError listing every refuse finding.
+
+    Computed afresh for every queue. It used to memoize the findings under the
+    validator's node id, which is the same id (63) on every queue of a shipped
+    graph -- so a refusal outlived the repaired pick, and a cached empty result
+    let a later bad cloud pick through. The per-call catalog memo inside
+    collect_findings is all the caching this needs."""
+    findings = collect_findings(prompt, unique_id, **kwargs)
     for item in findings:
         if item.severity == "warn":
             log.warning("[OTR.cloud.slug] %s %s %s -- %s",
@@ -752,6 +756,7 @@ __all__ = [
     "CatalogResult",
     "Finding",
     "catalog_ids",
+    "catalog_outage_hint",
     "check_engine",
     "collect_findings",
     "default_partner_selectors",
@@ -760,5 +765,4 @@ __all__ = [
     "format_refusal",
     "options_from_class",
     "schema_options",
-    "transport_severity",
 ]
