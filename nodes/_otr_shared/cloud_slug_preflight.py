@@ -79,6 +79,8 @@ def _key_rejected(exc) -> bool:
     if getattr(exc, "failure_kind", None) == "auth":
         return True
     status = getattr(exc, "http_status", None)
+    if status is None:
+        status = getattr(exc, "code", None)   # a raw urllib HTTPError
     if status in (401, 403):
         return True
     body = getattr(exc, "response_json", None)
@@ -244,6 +246,14 @@ def catalog_ids(authority, *, get_json=None) -> CatalogResult:
                 return getter(path)
             except Exception as exc:  # noqa: BLE001 -- kept for classification
                 last["exc"] = exc
+                if getattr(exc, "http_status", None) == 429:
+                    # A rate limit is not worth retrying in a probe:
+                    # fetch_catalog's retries do not sleep, so they would
+                    # only send three requests at once. Warn and move on.
+                    try:
+                        exc.retryable = False
+                    except Exception:  # noqa: BLE001 -- immutable exception
+                        pass
                 raise
 
         fetched = fetch_catalog(watched)

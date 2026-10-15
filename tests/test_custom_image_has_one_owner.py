@@ -62,6 +62,15 @@ def test_the_declaration_is_read_the_way_admission_reads_it(monkeypatch):
     policy = _video_policy(monkeypatch, {"music_image_model": "  z_image_turbo  "},
                            music_image_model=vd.ADD_CUSTOM)
     assert json.loads(policy)["image_models"]["music_image_model"] == "z_image_turbo"
+    # A pick with stray spaces (an API-built prompt) resolves on both sides.
+    spaced = "  " + vd.ADD_CUSTOM + " "
+    policy = _video_policy(monkeypatch, {"music_image_model": "z_image_turbo"},
+                           music_image_model=spaced)
+    assert json.loads(policy)["image_models"]["music_image_model"] == "z_image_turbo"
+    inputs = {"music_image_model": spaced,
+              "custom_models_json": json.dumps({"music_image_model": "z_image_turbo"})}
+    assert _resolve_slot(inputs, "music_image_model", _custom_models(inputs),
+                         "image") == "z_image_turbo"
 
 
 def test_an_undeclared_sentinel_passes_through_unchanged(monkeypatch):

@@ -691,8 +691,11 @@ class OTRVideoDirector:
         custom = _custom_models({"custom_models_json": custom_models_json})
         out = {}
         for slot, picked in picks.items():
+            # Stripped first, as admission's _literal strips it, so an
+            # API-built pick with stray spaces resolves on both sides.
+            bare = picked.strip() if isinstance(picked, str) else picked
             declared = (custom.get(slot, "")
-                        if isinstance(picked, str) and picked.startswith(_ADD_CUSTOM)
+                        if isinstance(bare, str) and bare.startswith(_ADD_CUSTOM)
                         else "")
             out[slot] = declared or picked
         return out

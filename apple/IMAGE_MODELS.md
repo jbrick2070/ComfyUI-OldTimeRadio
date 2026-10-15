@@ -105,9 +105,9 @@ sentinel to your engine id before `OTR_ImageDirector` ever sees it (since
 `OTR_VideoDirector`. In the shipped graphs, leave it as `{}`.
 
 Pick the sentinel and leave that role out of the mapping, and the queue refuses
-it before anything renders, naming the slot -- unless that role's video lane
-takes no still, in which case nothing is generated for it and nothing needs
-declaring.
+it before anything renders, naming the slot. That holds even when the role's
+video lane takes no still: the asset check resolves every image pick before it
+skips the ones no lane consumes, so declare it or pick from the dropdown.
 
 ---
 

@@ -213,25 +213,34 @@ def test_a_balance_probe_that_gets_no_number_warns(probe):
                    lambda _u, _t: (503, {}),
                    lambda _u, _t: (429, {}),
                    lambda _u, _t: (404, {}),
+                   lambda _u, _t: (402, {}),
                    lambda _u, _t: (200, {"unexpected": True})):
         result = probe(get_json=getter, bearer=lambda: "k")
         assert result.remaining_usd is None, (probe.__name__, result)
         assert result.severity == "warn", (probe.__name__, result)
 
 
-def test_an_unloadable_openrouter_backend_warns_but_no_key_refuses():
-    def unloadable():
-        raise ImportError("backend missing")
+def test_a_broken_key_lookup_warns_but_a_missing_or_bad_key_refuses():
+    """The key itself (none set, a bad or unreadable key file) is a verdict:
+    every paid call with it fails. A lookup that BROKE (import, attribute,
+    type errors from a changed backend) is a failed probe and only warns."""
+    from nodes._otr_shared.api_key_files import KeyFileError
 
-    def no_key():
-        raise RuntimeError("no OpenRouter key")
+    def raising(exc):
+        def bearer():
+            raise exc
+        return bearer
 
-    assert cbp.openrouter_balance(bearer=unloadable).severity == "warn"
-    assert cbp.openrouter_balance(bearer=no_key).severity == "refuse"
+    for exc in (ImportError("backend missing"), AttributeError("renamed"),
+                KeyError("k"), TypeError("signature")):
+        assert cbp.openrouter_balance(bearer=raising(exc)).severity == "warn", exc
+    for exc in (RuntimeError("no OpenRouter key"), KeyFileError("bad key file"),
+                PermissionError("key file unreadable")):
+        assert cbp.openrouter_balance(bearer=raising(exc)).severity == "refuse", exc
 
 
 @pytest.mark.parametrize("probe", [cbp.comfy_balance, cbp.openrouter_balance])
-@pytest.mark.parametrize("status", [401, 402, 403])
+@pytest.mark.parametrize("status", [401, 403])
 def test_a_rejected_key_still_refuses(probe, status):
     result = probe(get_json=lambda _u, _t: (status, {}), bearer=lambda: "bad")
     assert result.remaining_usd is None

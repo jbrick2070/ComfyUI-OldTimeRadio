@@ -329,9 +329,11 @@ def _comfy_bearer_from(api_key) -> Callable[[], str]:
 #: nothing about the wallet; the paid call itself fails loudly if the wallet
 #: really is empty. A REJECTED KEY (401/403) is a verdict, not a blip -- every
 #: paid call with that key fails -- so it refuses, as does a known balance
-#: below the estimate -- and so does 402 Payment Required, the host's own
-#: answer that the wallet cannot pay.
-_VERDICT_STATUSES = (401, 402, 403)
+#: below the estimate. A 402 is NOT in this set: what a read-only balance
+#: endpoint (or a gateway in front of it) means by 402 is not grounded, and an
+#: empty wallet is already caught by the numeric comparison whenever a balance
+#: comes back.
+_VERDICT_STATUSES = (401, 403)
 
 
 def _missing_number_severity(status=None) -> str:
@@ -340,8 +342,8 @@ def _missing_number_severity(status=None) -> str:
 
 def comfy_balance(*, get_json: Callable = None, bearer: Callable = None,
                   api_key: str = None) -> BalanceResult:
-    """Remaining Comfy Credits in USD. A rejected key or a 402 refuses; any
-    other missing number warns (see ``_VERDICT_STATUSES``). A queue with no
+    """Remaining Comfy Credits in USD. A rejected key refuses; any other
+    missing number warns (see ``_VERDICT_STATUSES``). A queue with no
     credential at all warns too, and the lane fails closed at execution."""
     getter = get_json or _http_get_json
     bearer_fn = bearer or _comfy_bearer_from(api_key)
@@ -383,12 +385,15 @@ def openrouter_balance(*, get_json: Callable = None, bearer: Callable = None) ->
     bearer_fn = bearer or _openrouter_bearer
     try:
         token = bearer_fn()
-    except ImportError as exc:  # the backend did not load: a failed probe
-        return BalanceResult(None, "OpenRouter key lookup unavailable (%s)" % exc,
-                             OPENROUTER_HOST, "warn")
-    except Exception as exc:  # noqa: BLE001 -- no key / unreadable key file
+    except (RuntimeError, OSError) as exc:
+        # The key itself: none set (RuntimeError), or a key file that is
+        # wrong or unreadable (KeyFileError is a RuntimeError; OSError).
+        # Every paid writer call would fail the same way, so it refuses.
         return BalanceResult(None, "no OpenRouter key (%s)" % exc,
                              OPENROUTER_HOST, "refuse")
+    except Exception as exc:  # noqa: BLE001 -- the lookup broke: a failed probe
+        return BalanceResult(None, "OpenRouter key lookup unavailable (%s: %s)"
+                             % (type(exc).__name__, exc), OPENROUTER_HOST, "warn")
     try:
         status, payload = getter(OPENROUTER_KEY_URL, token)
     except Exception as exc:  # noqa: BLE001 -- transport

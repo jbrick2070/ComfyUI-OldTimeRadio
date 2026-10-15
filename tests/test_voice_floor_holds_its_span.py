@@ -124,17 +124,30 @@ def test_the_voice_node_marks_every_floor_and_attaches_after_packing():
                       if isinstance(n, ast.If) and isinstance(n.test, ast.Name)
                       and n.test.id == "_floor_why"]
     assert len(floor_branches) == 1
-    body = floor_branches[0].body
-    assert {"_floor_voice_line", "floor_span"} <= calls(ast.Module(body=body, type_ignores=[]))
+    branch = ast.Module(body=floor_branches[0].body, type_ignores=[])
+    assert "_floor_voice_line" in calls(branch)
+
+    def is_span_append(node):
+        """``_floor_spans.append(floor_span(...))`` -- exactly that list,
+        exactly that value, so a computed-and-dropped span cannot pass."""
+        return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "append"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "_floor_spans"
+                and len(node.args) == 1 and isinstance(node.args[0], ast.Call)
+                and getattr(node.args[0].func, "id", "") == "floor_span")
+
+    assert any(is_span_append(n) for n in ast.walk(branch))
     # Nothing outside that branch records a span.
-    outside = sum(1 for n in ast.walk(tree) if isinstance(n, ast.Call)
-                  and getattr(n.func, "id", "") == "floor_span")
-    assert outside == 1
+    assert sum(1 for n in ast.walk(tree) if is_span_append(n)) == 1
+    assert sum(1 for n in ast.walk(tree) if isinstance(n, ast.Call)
+               and getattr(n.func, "id", "") == "floor_span") == 1
     attaches = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
                 and getattr(n.func, "id", "") == "attach_floor_spans"]
     assert len(attaches) == 1
-    first = attaches[0].args[0]
-    assert isinstance(first, ast.Call) and getattr(first.func, "id", "") == "pack_audio_batch"
+    packed, spans = attaches[0].args
+    assert isinstance(packed, ast.Call) and getattr(packed.func, "id", "") == "pack_audio_batch"
+    assert isinstance(spans, ast.Name) and spans.id == "_floor_spans"
 
 
 @pytest.fixture

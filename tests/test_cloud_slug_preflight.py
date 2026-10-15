@@ -788,6 +788,28 @@ def test_a_rejected_key_refuses_but_an_outage_or_empty_catalog_warns():
     assert severity(empty) == ["warn"]
 
 
+def test_a_rate_limited_catalog_is_asked_once_and_warns():
+    """A 429 is not retried in the probe: fetch_catalog's retries do not
+    sleep, so they would only fire three requests at once."""
+    calls = {"n": 0}
+
+    def limited(_path):
+        calls["n"] += 1
+        exc = RuntimeError("HTTP 429")
+        exc.http_status, exc.failure_kind, exc.retryable = 429, "quota", True
+        raise exc
+
+    got = csp.catalog_ids("google", get_json=limited)
+    assert got.ids is None and not got.key_rejected
+    assert calls["n"] == 1
+
+
+def test_a_raw_http_error_carries_its_status_too():
+    import urllib.error
+    assert csp._key_rejected(urllib.error.HTTPError("u", 403, "Forbidden", {}, None))
+    assert not csp._key_rejected(urllib.error.HTTPError("u", 503, "Busy", {}, None))
+
+
 def test_the_live_catalog_pings_are_short_and_never_sleep_on_a_429(monkeypatch):
     """Both list pings use the probe timeout, and the Google one bypasses the
     client's 429 sleeper (_quota_retry), which could hold a queue for
