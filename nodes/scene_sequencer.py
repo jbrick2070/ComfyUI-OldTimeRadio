@@ -1472,6 +1472,17 @@ class EpisodeAssembler:
                 episode_audio = {"waveform": _torch.zeros(1, 2, 48000),
                                  "sample_rate": 48000}
                 _substituted = True
+        if not _substituted and int(episode_audio["waveform"].shape[-1]) == 0:
+            # A reader that "succeeds" with NO samples (a 0-frame WAV) decoded
+            # nothing: that is the unreadable degrade, not a verified episode,
+            # and an empty wire would hand the video node zero frames.
+            import torch as _torch
+            log.error("[OTR_EpisodeAssembler] REPLAY: the master at %s decoded "
+                      "to zero samples; emitting the one-second batch",
+                      _master_wav)
+            episode_audio = {"waveform": _torch.zeros(1, 2, 48000),
+                             "sample_rate": 48000}
+            _substituted = True
         # DO NOT SAY VERIFIED IF SILENCE WAS SUBSTITUTED. The error above
         # names both failed readers and the one-second batch; saying "copied
         # and verified" three lines later, and returning the ordinary

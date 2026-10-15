@@ -582,6 +582,17 @@ def test_a_master_neither_reader_can_open_is_still_flagged_unreadable(
     assert json.loads(info)["master_readable"] is False
 
 
+def test_a_zero_frame_master_is_unreadable_not_a_verified_empty_wire(
+        tmp_path, monkeypatch):
+    """QA on GRK-001: the stdlib reader accepts a 0-frame WAV. Decoding to no
+    samples is the unreadable degrade, never a verified replay."""
+    fz = _sine_episode(tmp_path, monkeypatch, "pre_loudness", n_samples=0)
+    audio, _out, info, done = _replay_assemble(fz)
+    assert done.startswith("audio_done:replay_unreadable:")
+    assert json.loads(info)["master_readable"] is False
+    assert int(audio["waveform"].shape[-1]) == 48000
+
+
 def test_the_assembler_refuses_a_descriptor_for_another_workspace(frozen):
     from nodes.scene_sequencer import EpisodeAssembler
     sj, led = _replay_ledger_json(frozen)
