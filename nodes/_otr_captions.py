@@ -243,13 +243,65 @@ def wrap_words(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> list[str]:
     return lines or [""]
 
 
+def _is_wide(ch: str) -> bool:
+    """A character that may break the line on its own: CJK ideographs, kana,
+    hangul and fullwidth forms (East Asian Width W or F)."""
+    import unicodedata
+    return unicodedata.east_asian_width(ch) in ("W", "F")
+
+
 def wrap_cjk_chars(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> list[str]:
-    """Wrap CJK (and any non-spaced script) by character count, not spaces."""
+    """Wrap CJK by character count, but keep any Latin or digit run whole.
+
+    A line may break after ANY wide character (Chinese and Japanese have no
+    spaces), and at a space inside Latin text. A run of Latin letters or digits
+    is one unbreakable word, so an English title, a quoted passage or a name
+    inside a Mandarin or Japanese caption is never cut in half ("soul r /
+    avished", seen on a live Mandarin episode, 2026-10-15). A run longer than
+    the line is hard-broken. Pure CJK text wraps exactly as it always did:
+    ``max_chars`` characters a line."""
     compact = str(text or "").replace("\n", "")
     if not compact:
         return [""]
     width = max(1, int(max_chars))
-    return [compact[i:i + width] for i in range(0, len(compact), width)]
+    tokens: list[str] = []
+    word = ""
+    for ch in compact:
+        if _is_wide(ch):
+            if word:
+                tokens.append(word)
+                word = ""
+            tokens.append(ch)
+        elif ch.isspace():
+            if word:
+                tokens.append(word)
+                word = ""
+            tokens.append(" ")
+        else:
+            word += ch
+    if word:
+        tokens.append(word)
+    lines: list[str] = []
+    cur = ""
+    for tok in tokens:
+        if tok == " ":
+            if cur:
+                cur += " "
+            continue
+        while len(tok) > width:      # one Latin run longer than a whole line
+            if cur.strip():
+                lines.append(cur.rstrip())
+                cur = ""
+            lines.append(tok[:width])
+            tok = tok[width:]
+        if len(cur) + len(tok) <= width:
+            cur += tok
+        else:
+            lines.append(cur.rstrip())
+            cur = tok
+    if cur.strip():
+        lines.append(cur.rstrip())
+    return lines or [""]
 
 
 def _grapheme_clusters(text: str) -> list[str]:
@@ -276,23 +328,42 @@ def _grapheme_clusters(text: str) -> list[str]:
 
 
 def wrap_unicode_grapheme(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> list[str]:
-    """Wrap Hindi / Devanagari on grapheme clusters, not ASCII spaces."""
-    clusters = _grapheme_clusters(str(text or "").replace("\n", ""))
-    if not clusters:
+    """Wrap Hindi / Devanagari at spaces, measured in grapheme clusters.
+
+    Devanagari is a spaced script: lines break BETWEEN words, as the Latin
+    policy does, and a word is measured in grapheme clusters, so a conjunct
+    (a consonant plus virama plus consonant) is never split into two broken
+    glyphs. Only a word longer than a whole line is broken, and then on a
+    cluster boundary. It used to break on cluster boundaries everywhere, which
+    cut ordinary words in half ("सिस्ट / म नहीं है", live Hindi episode,
+    2026-10-15)."""
+    words = str(text or "").replace("\n", " ").split()
+    if not words:
         return [""]
     width = max(1, int(max_chars))
     lines: list[str] = []
-    cur: list[str] = []
-    for cluster in clusters:
-        if cluster.isspace() and not cur:
-            continue
-        if len(cur) + 1 <= width:
-            cur.append(cluster)
+    cur = ""
+    cur_n = 0
+    for word in words:
+        clusters = _grapheme_clusters(word)
+        while len(clusters) > width:     # one word longer than a whole line
+            if cur_n:
+                lines.append(cur)
+                cur, cur_n = "", 0
+            lines.append("".join(clusters[:width]))
+            clusters = clusters[width:]
+        n = len(clusters)
+        piece = "".join(clusters)
+        if not cur_n:
+            cur, cur_n = piece, n
+        elif cur_n + 1 + n <= width:
+            cur += " " + piece
+            cur_n += 1 + n
         else:
-            lines.append("".join(cur))
-            cur = [] if cluster.isspace() else [cluster]
-    if cur:
-        lines.append("".join(cur))
+            lines.append(cur)
+            cur, cur_n = piece, n
+    if cur_n:
+        lines.append(cur)
     return lines or [""]
 
 

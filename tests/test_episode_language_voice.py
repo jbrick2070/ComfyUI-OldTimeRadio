@@ -375,6 +375,38 @@ def test_caption_wrap_policies():
     assert conjunct == ["क्ष"]
 
 
+def test_cjk_wrap_never_cuts_a_latin_word():
+    """Live Mandarin episode, 2026-10-15: Shakespeare's English lines inside a
+    zh episode wrapped as "soul r / avished" and "neve / r"."""
+    line = "BENEDICK: Now, divine air! Now is his soul ravished."
+    out = CAP.wrap_cjk_chars(line, max_chars=44)
+    assert " ".join(out).split() == line.split(), out          # nothing lost or cut
+    assert all(len(l) <= 44 for l in out), out
+    mixed = CAP.wrap_cjk_chars("播音员: 今晚的这场戏取自William Shakespeare的作品", max_chars=14)
+    assert "William" in " ".join(mixed) and "Shakespeare" in " ".join(mixed), mixed
+    assert all(len(l) <= 14 for l in mixed), mixed
+    # A Latin run longer than the line is hard-broken, never dropped.
+    long = CAP.wrap_cjk_chars("a" * 20, max_chars=8)
+    assert long == ["a" * 8, "a" * 8, "a" * 4], long
+
+
+def test_cjk_wrap_pure_cjk_is_unchanged():
+    text = "关联性高的因子被筛选出来最有影响的是特定的生活习惯"
+    assert CAP.wrap_cjk_chars(text, max_chars=10) == [
+        text[i:i + 10] for i in range(0, len(text), 10)]
+
+
+def test_devanagari_wrap_breaks_between_words_not_inside_them():
+    text = "यह कोई सिस्टम नहीं है। यह एक पैटर्न है।"
+    out = CAP.wrap_unicode_grapheme(text, max_chars=14)
+    assert " ".join(out).split() == text.split(), out
+    assert max(len(CAP._grapheme_clusters(l)) for l in out) <= 14, out
+    # A word longer than the line is broken on a CLUSTER boundary, so a
+    # conjunct survives whole.
+    long = CAP.wrap_unicode_grapheme("क्षक्षक्षक्ष", max_chars=2)
+    assert long == ["क्षक्ष", "क्षक्ष"], long
+
+
 def test_row_wrap_policies_match_scripts():
     assert EPLANG.row_by_iso("en").captions["wrap_policy"] == "word_split"
     assert EPLANG.row_by_iso("hi").captions["wrap_policy"] == "unicode_grapheme"
