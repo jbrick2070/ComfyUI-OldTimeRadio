@@ -564,6 +564,127 @@ def test_a_retired_engine_is_named_retired_not_unregistered():
     assert "is not registered" not in text
 
 
+# ---------------------------------------------------------------------------
+# Voice engines behind the validator (plan item 2, 2026-10-14). The shipped
+# graphs leave CastLock's gate_in unlinked; the cast it locks is consumed by
+# the voice nodes behind the validator, so it is in scope without a JSON edit.
+# ---------------------------------------------------------------------------
+
+
+def _shipped_prompt(name):
+    import json
+    from nodes._otr_workflow_apply import build_offline_schemas, workflow_to_api_prompt
+    workflow = json.loads((REPO / "workflows" / name).read_text(encoding="utf-8"))
+    prompt = workflow_to_api_prompt(workflow, build_offline_schemas())
+    validator = next(nid for nid, n in prompt.items()
+                     if n.get("class_type") == "OTR_WorkflowValidator")
+    castlock = next(nid for nid, n in prompt.items()
+                    if n.get("class_type") == "OTR_CastLock")
+    return prompt, validator, castlock
+
+
+def _looked_up(prompt, validator):
+    seen = []
+
+    def resolve(eid):
+        seen.append(eid)
+        return None
+
+    csp.collect_findings(prompt, validator, resolve_engine=resolve,
+                         schema_options_fn=lambda _k: {},
+                         catalog_fn=lambda _a: csp.CatalogResult(frozenset(), "", ""),
+                         skip_writer=True)
+    return seen
+
+
+@pytest.mark.parametrize("name,voice", [
+    ("otr_cloud_low.json", "cloud_elevenlabs"),
+    ("otr_cloud_deluxe_3act.json", "cloud_elevenlabs"),
+    ("otr_google_still.json", "google_tts"),
+])
+def test_a_shipped_cloud_voice_reaches_the_slug_check_and_the_estimate(name, voice):
+    from nodes._otr_shared import cloud_balance_preflight as cbp
+    prompt, validator, castlock = _shipped_prompt(name)
+    assert (prompt[castlock]["inputs"].get("gate_in") is None), \
+        "the premise: the shipped CastLock is not gated"
+    assert prompt[castlock] in csp._collect_scoped(prompt, validator)
+    assert voice in _looked_up(prompt, validator)
+    lines = cbp.estimate_lines(prompt, validator, resolve_engine=lambda _e: object(),
+                               unit_usd_fn=lambda _e, _g: 1.0,
+                               writer_usd_fn=lambda _h, _s: (0.0, "x"),
+                               skip_writer=True)
+    voice_lines = [ln for ln in lines if ln.label == voice]
+    assert len(voice_lines) == 1, voice_lines   # char + announcer: one line
+
+
+def test_a_local_cast_adds_no_voice_check_or_cost():
+    from nodes._otr_shared import cloud_balance_preflight as cbp
+    prompt, validator, _castlock = _shipped_prompt("otr_canonical.json")
+    assert not [e for e in _looked_up(prompt, validator)
+                if e in ("cloud_elevenlabs", "google_tts")]
+    lines = cbp.estimate_lines(prompt, validator, resolve_engine=lambda _e: object(),
+                               unit_usd_fn=lambda _e, _g: 1.0,
+                               writer_usd_fn=lambda _h, _s: (0.0, "x"),
+                               skip_writer=True)
+    assert not [ln for ln in lines if ln.label in ("cloud_elevenlabs", "google_tts")]
+
+
+def test_a_rolled_cast_checks_and_charges_no_saved_voice():
+    from nodes._otr_shared import cloud_balance_preflight as cbp
+    prompt, validator, castlock = _shipped_prompt("otr_cloud_low.json")
+    prompt[castlock]["inputs"]["roll_audio_engines"] = True
+    prompt[castlock]["inputs"]["cast_voice_policy"] = "auto_registry"
+    assert "cloud_elevenlabs" not in _looked_up(prompt, validator)
+    lines = cbp.estimate_lines(prompt, validator, resolve_engine=lambda _e: object(),
+                               unit_usd_fn=lambda _e, _g: 1.0,
+                               writer_usd_fn=lambda _h, _s: (0.0, "x"),
+                               skip_writer=True)
+    assert not [ln for ln in lines if ln.label == "cloud_elevenlabs"]
+    # The switch alone, without auto_registry, still casts the saved pick.
+    prompt[castlock]["inputs"]["cast_voice_policy"] = "preserve_ledger"
+    assert "cloud_elevenlabs" in _looked_up(prompt, validator)
+
+
+def test_a_wired_voice_slot_warns_instead_of_raising():
+    prompt, validator, castlock = _shipped_prompt("otr_cloud_low.json")
+    prompt[castlock]["inputs"]["char_voice_engine"] = ["999", 0]
+    findings = csp.collect_findings(prompt, validator, resolve_engine=lambda _e: None,
+                                    schema_options_fn=lambda _k: {},
+                                    catalog_fn=lambda _a: csp.CatalogResult(frozenset(), "", ""),
+                                    skip_writer=True)
+    wired = [f for f in findings if f.input_name == "char_voice_engine"]
+    assert [f.severity for f in wired] == ["warn"]
+
+
+def test_a_castlock_stays_with_its_own_validator():
+    def node(cls, **inputs):
+        return {"class_type": cls, "inputs": inputs}
+
+    prompt = {
+        "63": node("OTR_WorkflowValidator"),
+        "64": node("OTR_WorkflowValidator"),
+        # Behind 63: a voice node consuming the ungated CastLock 80.
+        "81": node("OTR_BatchKokoroGenerator", gate_in=["63", 0], ledger_json=["80", 0]),
+        "80": node("OTR_CastLock", char_voice_engine="cloud_elevenlabs",
+                   announcer_voice_engine="kokoro"),
+        # Behind 64 only: its own ungated CastLock 90.
+        "91": node("OTR_BatchKokoroGenerator", gate_in=["64", 0], ledger_json=["90", 0]),
+        "90": node("OTR_CastLock", char_voice_engine="google_tts",
+                   announcer_voice_engine="kokoro"),
+        # A CastLock gated on 64 that a 63 node consumes stays 64's.
+        "82": node("OTR_BatchKokoroGenerator", gate_in=["63", 0], ledger_json=["95", 0]),
+        "95": node("OTR_CastLock", gate_in=["64", 0],
+                   char_voice_engine="cloud_elevenlabs", announcer_voice_engine="kokoro"),
+    }
+    scope63 = csp._collect_scoped(prompt, "63")
+    scope64 = csp._collect_scoped(prompt, "64")
+    assert prompt["80"] in scope63 and prompt["90"] not in scope63
+    assert prompt["95"] not in scope63
+    assert prompt["90"] in scope64 and prompt["80"] not in scope64
+    assert prompt["95"] in scope64
+    assert sum(1 for n in scope63 if n is prompt["80"]) == 1
+
+
 def test_catalog_ids_openrouter_and_google_with_injected_get_json():
     def or_get(url):
         assert url == csp.OPENROUTER_MODELS_URL

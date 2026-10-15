@@ -566,7 +566,64 @@ def _collect_scoped(prompt, unique_id, *, walk_fn=None):
     if walker is None:
         from .._otr_visual_assets import walk_gate_consumers
         walker = walk_gate_consumers
-    return list(walker(prompt, unique_id) or [])
+    scoped = list(walker(prompt, unique_id) or [])
+    return scoped + _castlocks_feeding(prompt, scoped)
+
+
+def _castlocks_feeding(prompt, scoped) -> list:
+    """Every ungated ``OTR_CastLock`` whose output a scoped node consumes.
+
+    The shipped graphs feed CastLock the frozen script and leave its
+    ``gate_in`` unlinked, so the gate walk never reached it, and its voice
+    engines went unchecked and unpriced: ElevenLabs on five cloud graphs,
+    Google TTS on ``otr_google_still`` (plan item 2, 2026-10-14). The voice
+    nodes that consume its cast ARE behind this validator, so the cast belongs
+    to this run. A CastLock whose ``gate_in`` is linked is left to the gate walk
+    -- already in scope, or another validator's, which must not check or charge
+    for it."""
+    held = {id(node) for node in scoped}
+    found = []
+    for node in scoped:
+        for value in (node.get("inputs") or {}).values():
+            if not (isinstance(value, (list, tuple)) and len(value) == 2):
+                continue
+            src = prompt.get(str(value[0])) if isinstance(prompt, dict) else None
+            if not isinstance(src, dict) or src.get("class_type") != _CASTLOCK:
+                continue
+            gate = (src.get("inputs") or {}).get("gate_in")
+            if isinstance(gate, (list, tuple)) or id(src) in held:
+                continue
+            held.add(id(src))
+            found.append(src)
+    return found
+
+
+def castlock_voice_picks(inputs) -> tuple:
+    """``(engine_ids, wired_slots)`` one CastLock's voice widgets name.
+
+    Nothing to check when the cast rolls: with ``roll_audio_engines`` on and
+    ``cast_voice_policy`` ``auto_registry``, CastLock draws one LOCAL engine at
+    run time (``_otr_lane_rolls``), so a saved paid pick never casts and must not
+    be checked or charged. A voice slot wired to another node has no value
+    before execution; it is named in ``wired_slots`` instead of raising."""
+    inputs = inputs or {}
+    roll = inputs.get("roll_audio_engines", False)
+    policy = inputs.get("cast_voice_policy", "preserve_ledger")
+    if not isinstance(roll, (list, tuple)) and policy == "auto_registry":
+        if isinstance(roll, str):
+            rolling = roll.strip().lower() in ("true", "1", "yes", "on")
+        else:
+            rolling = bool(roll)
+        if rolling:
+            return [], []
+    picks, wired = [], []
+    for slot in _CAST_SLOTS:
+        value = inputs.get(slot, "")
+        if isinstance(value, (list, tuple)):
+            wired.append(slot)
+        elif isinstance(value, str) and value.strip():
+            picks.append(value.strip())
+    return picks, wired
 
 
 def collect_findings(
@@ -630,10 +687,14 @@ def collect_findings(
             if picked and not picked.startswith("+ Add Custom"):
                 engine_ids.append(picked)
         if ctype == _CASTLOCK:
-            for slot in _CAST_SLOTS:
-                picked = _widget_str(inputs, slot, "")
-                if picked:
-                    engine_ids.append(picked)
+            picks, wired = castlock_voice_picks(inputs)
+            engine_ids.extend(picks)
+            for slot in wired:
+                findings.append(Finding(
+                    _CASTLOCK, _CASTLOCK, slot, "",
+                    "voice slot is wired to another node; its engine is "
+                    "unknown until the run",
+                    "the voice node checks it when it runs", "warn"))
 
     seen = set()
     for engine_id in engine_ids:
@@ -757,6 +818,7 @@ __all__ = [
     "Finding",
     "catalog_ids",
     "catalog_outage_hint",
+    "castlock_voice_picks",
     "check_engine",
     "collect_findings",
     "default_partner_selectors",

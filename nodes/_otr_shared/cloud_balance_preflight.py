@@ -86,7 +86,6 @@ _DIRECTOR = "OTR_VideoDirector"
 _CASTLOCK = "OTR_CastLock"
 _MUSIC = "OTR_StableAudioTheme"
 _IMAGE_DIRECTOR = "OTR_ImageDirector"
-_CAST_SLOTS = ("char_voice_engine", "announcer_voice_engine")
 
 
 class CostLine(NamedTuple):
@@ -522,8 +521,8 @@ def estimate_lines(
             if picked and not picked.startswith("+ Add Custom"):
                 add(picked, MUSIC_CUES, "%d cues" % MUSIC_CUES)
         if ctype == _CASTLOCK:
-            voices = {csp._widget_str(inputs, slot, "") for slot in _CAST_SLOTS}
-            for picked in sorted(v for v in voices if v):
+            voices, _wired = csp.castlock_voice_picks(inputs)
+            for picked in sorted(set(voices)):
                 add(picked, act_count,
                     "%d acts x %d chars" % (act_count, TTS_CHARS_PER_ACT))
 
