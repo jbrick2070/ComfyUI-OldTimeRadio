@@ -96,13 +96,15 @@ def test_an_unmeasured_row_still_uses_the_projection():
 
 def test_the_measured_gemma_4_rows_are_rated_on_their_nf4_resident():
     """2026-10-14, RTX 4060 Laptop 8 GB. E2B's small fit basis (6.0, the text
-    decoder) used to earn a plain `nv8` -- an unquantized fit nobody measured
-    -- while its real NF4 load is 6.1 GiB. E4B ran out of memory on that card
-    yet carried `nv8-nf4`. A measured row is rated on the measurement."""
+    decoder) used to earn a plain `nv8` -- an unquantized fit -- while its real
+    NF4 load fills the card. E4B ran out of memory loading NF4 on that card yet
+    carried `nv8-nf4`. A measured row earns a plain tag only when its REAL
+    download fits, and an -nf4 tag when its measured NF4 resident does."""
     assert catalog.fit_tags_for("google/gemma-4-E2B-it") == (
-        "mac16-tight", "nv8-nf4", "nv16-nf4", "nv24-nf4")
+        "mac16-tight", "nv8-nf4", "nv16", "nv24")
     assert catalog.fit_tags_for("google/gemma-4-E4B-it") == (
-        "mac16-tight", "nv16-nf4", "nv24-nf4")
+        "mac16-tight", "nv16-nf4", "nv24")
+    assert catalog.fit_tags_for("Qwen/Qwen3.8-27B") == ("nv24-nf4",)
     # The gate's estimate reads the same table, so the two cannot drift.
     assert catalog._estimate_resident_gb("google/gemma-4-E2B-it") == 6.1
     assert catalog._estimate_resident_gb("google/gemma-4-E4B-it") == 7.2
