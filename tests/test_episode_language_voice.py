@@ -394,7 +394,9 @@ def test_cjk_wrap_pure_cjk_is_unchanged():
     """Text made only of wide characters (ideographs, kana, hangul, fullwidth
     forms) slices exactly as before: max_chars characters a line. A digit run
     of two or more, or any Latin text, is deliberately kept whole instead."""
-    text = "关联性高的因子被筛选出来最有影响的是特定的生活习惯。「引用」"
+    # Includes East Asian Width F forms (fullwidth comma, letter and digit),
+    # not only W: a mutation accepting just "W" must fail this pin.
+    text = "关联性高的因子被筛选出来最有影响的是特定的生活习惯，Ａ１。「引用」"
     assert CAP.wrap_cjk_chars(text, max_chars=10) == [
         text[i:i + 10] for i in range(0, len(text), 10)]
     assert CAP.wrap_cjk_chars("你好吗朋友们好吗2024年", max_chars=9) == [
