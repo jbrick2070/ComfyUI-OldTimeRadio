@@ -460,6 +460,74 @@ def test_the_assembler_withholds_audio_done_on_a_digest_mismatch(frozen):
     assert not (Path(led.out_dir) / (led.data["episode_id"] + "_master.wav")).exists()
 
 
+def test_import_refuses_a_bundle_that_froze_another_audio_stage(frozen):
+    """Plan item 18. A bundle whose master is not the ledger's assembler master
+    -- the shape the old freezer produced from a foley episode's delivered mix
+    -- passes file integrity and must still be refused, before any workspace."""
+    bundle = Path(frozen["bundle"])
+    manifest_path = bundle / PL.REPLAY_MANIFEST_NAME
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    master = bundle / manifest["master_audio"]
+    master.write_bytes(master.read_bytes() + b"\x00\x01mixed")
+    for row in manifest["files"]:
+        if row["path"] == manifest["master_audio"]:
+            row["bytes"] = master.stat().st_size
+            row["sha256"] = _sha(master.read_bytes())
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(PL.ReplayBundleError, match="assembler master"):
+        PL.import_replay_bundle(str(bundle))
+
+
+def _sine_episode(tmp_path, monkeypatch, flavour):
+    import math
+    import wave as _wave
+    monkeypatch.setattr(PL, "_default_out_dir", lambda ep=None: str(
+        tmp_path / "episodes" / (ep or "pending") / "audio"))
+    ep, ledger = _make_episode(tmp_path / "episodes")
+    master = ep / "audio" / (ep.name + "_master.wav")
+    frames = bytearray()
+    for i in range(48000 * 3):
+        v = int(0.05 * 32767 * math.sin(2 * math.pi * 440 * i / 48000))
+        frames += v.to_bytes(2, "little", signed=True) * 2
+    with _wave.open(str(master), "wb") as fh:
+        fh.setnchannels(2)
+        fh.setsampwidth(2)
+        fh.setframerate(48000)
+        fh.writeframes(bytes(frames))
+    ledger["audio"]["master_audio_sha256"] = _sha(master.read_bytes())
+    if flavour:
+        ledger["audio"]["master_wav_flavour"] = flavour
+    (ep / "audio" / (ep.name + "_ledger.json")).write_text(
+        json.dumps(ledger, indent=2), encoding="utf-8")
+    bundle = _freeze(ep, tmp_path / "bundles")
+    return {"ep": ep, "ledger": ledger, "bundle": bundle, "tmp": tmp_path}
+
+
+@pytest.mark.parametrize("flavour,levelled", [("pre_loudness", True),
+                                              ("delivery_levelled", False)])
+def test_a_pre_loudness_replay_wire_is_levelled_and_its_disk_bytes_are_not(
+        tmp_path, monkeypatch, flavour, levelled):
+    """A live foley run hands the wire LEVELLED while writing the master WAV
+    pre-loudness. The replay now levels an in-memory copy for the wire -- the
+    disk bytes, digest and flavour stay as frozen, so the terminal mux still
+    performs the one delivery stage. An already-levelled master is unchanged."""
+    from nodes.scene_sequencer import EpisodeAssembler, wav_file_as_audio
+    fz = _sine_episode(tmp_path, monkeypatch, flavour)
+    sj, led = _replay_ledger_json(fz)
+    descriptor = json.dumps({"meta": led.data["meta"]})
+    audio, out_path, _info, done = EpisodeAssembler().assemble(
+        None, music_cue_audio={"waveform": None, "sample_rate": 48000},
+        music_cue_manifest_json="", replay_descriptor=descriptor)
+    assert _sha(Path(out_path).read_bytes()) == fz["ledger"]["audio"]["master_audio_sha256"]
+    assert PL.peek_ledger().data["audio"].get("master_wav_flavour") == flavour
+    raw, _note = wav_file_as_audio(out_path)
+    rms = lambda w: float((w.float() ** 2).mean().sqrt())  # noqa: E731
+    if levelled:
+        assert rms(audio["waveform"]) > 1.5 * rms(raw["waveform"])
+    else:
+        assert abs(rms(audio["waveform"]) - rms(raw["waveform"])) < 1e-3
+
+
 def test_the_assembler_refuses_a_descriptor_for_another_workspace(frozen):
     from nodes.scene_sequencer import EpisodeAssembler
     sj, led = _replay_ledger_json(frozen)
@@ -554,10 +622,7 @@ def test_the_verifier_recomputes_the_receipt_sha():
     assert vr.recompute_sha(row) != row["actual_request_sha"]
 
 
-def test_the_freezer_takes_the_lone_pending_master_of_a_failed_episode(tmp_path):
-    """A video-phase failure leaves only the provisional `pending_*` master (no
-    `final_audio_path`); that file is the master. Two pending masters are
-    ambiguous and refused; a renamed master still wins over a pending one."""
+def _freezer():
     import importlib.util
     spec = importlib.util.spec_from_file_location(
         "otr_freeze_replay_bundle_under_test",
@@ -565,18 +630,53 @@ def test_the_freezer_takes_the_lone_pending_master_of_a_failed_episode(tmp_path)
             / "otr_freeze_replay_bundle.py"))
     freezer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(freezer)
+    return freezer
 
+
+def _digest_ledger(path):
+    import hashlib
+    return {"audio": {"master_audio_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}}
+
+
+def test_the_freezer_takes_the_assembler_master_by_digest(tmp_path):
+    """Plan item 18. The freezer picks the ASSEMBLER's master by the digest the
+    ledger stamps -- never final_audio_path (on a foley episode that is the
+    delivered mix), never by filename or mtime. Pending and renamed masters are
+    both candidates: a renamed episode keeps its pending_ name, and a failed
+    video phase leaves only that file."""
+    freezer = _freezer()
     ep = tmp_path / "signal_lost_fixture_20260926_000000"
     audio = ep / "audio"
     audio.mkdir(parents=True)
     lone = audio / "pending_20260926_000000_master.wav"
-    lone.write_bytes(b"RIFF")
-    assert freezer.find_master(ep, {}) == lone.resolve()
+    lone.write_bytes(b"RIFF-assembler")
+    assert freezer.find_master(ep, _digest_ledger(lone)) == lone.resolve()
 
-    (audio / "pending_20260926_000001_master.wav").write_bytes(b"RIFF")
-    with pytest.raises(SystemExit):
+    # The delivered foley mix, an episode-named decoy and a stale pending
+    # master with different bytes all lose to the digest -- and a newer
+    # final_audio_path pointer is ignored.
+    delivered = audio / "signal_lost_fixture_20260926_000000_foley.wav"
+    delivered.write_bytes(b"RIFF-mixed")
+    decoy = audio / "signal_lost_fixture_20260926_000000_master.wav"
+    decoy.write_bytes(b"RIFF-other")
+    (audio / "pending_20260926_000001_master.wav").write_bytes(b"RIFF-stale")
+    led = dict(_digest_ledger(lone), final_audio_path=str(delivered))
+    assert freezer.find_master(ep, led) == lone.resolve()
+
+
+def test_the_freezer_refuses_when_no_master_matches_or_none_is_stamped(tmp_path):
+    freezer = _freezer()
+    ep = tmp_path / "signal_lost_fixture_20260926_000000"
+    audio = ep / "audio"
+    audio.mkdir(parents=True)
+    (audio / "pending_20260926_000000_master.wav").write_bytes(b"RIFF")
+    with pytest.raises(SystemExit, match="matches the ledger"):
+        freezer.find_master(ep, {"audio": {"master_audio_sha256": "0" * 64}})
+    with pytest.raises(SystemExit, match="stamps no"):
         freezer.find_master(ep, {})
-
-    final = audio / "signal_lost_fixture_20260926_000000_master.wav"
-    final.write_bytes(b"RIFF")
-    assert freezer.find_master(ep, {}) == final.resolve()
+    # A master OUTSIDE the episode is never a candidate.
+    outside = tmp_path / "elsewhere_master.wav"
+    outside.write_bytes(b"RIFF-x")
+    with pytest.raises(SystemExit):
+        freezer.find_master(ep, dict(_digest_ledger(outside),
+                                     final_audio_path=str(outside)))

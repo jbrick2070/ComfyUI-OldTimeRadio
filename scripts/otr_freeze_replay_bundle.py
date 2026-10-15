@@ -85,29 +85,41 @@ def find_ledger(ep_dir: pathlib.Path) -> pathlib.Path:
     return hits[0]
 
 
+def master_digest(ledger: dict) -> str:
+    """The assembler master's digest the ledger stamps, or ""."""
+    audio = ledger.get("audio") if isinstance(ledger.get("audio"), dict) else {}
+    return str(audio.get("master_audio_sha256") or "").strip().lower()
+
+
 def find_master(ep_dir: pathlib.Path, ledger: dict) -> pathlib.Path:
-    fap = str(ledger.get("final_audio_path") or "")
-    if fap and pathlib.Path(fap).is_file():
-        return pathlib.Path(fap).resolve()
-    # the fallback: never a `pending_*` master (the un-renamed provisional file
-    # can outlive the rename with a newer mtime); prefer the one carrying the
-    # episode id, else the newest
-    hits = [p for p in (ep_dir / "audio").glob("*_master.wav")
-            if not p.name.startswith("pending_")]
-    named = [p for p in hits if p.name.startswith(ep_dir.name)]
-    hits = sorted(named or hits, key=lambda p: p.stat().st_mtime)
-    if not hits:
-        # AN EPISODE WHOSE VIDEO PHASE FAILED never reaches the mux that stamps
-        # `final_audio_path` and renames the master, so the provisional
-        # `pending_*` file is the ONLY master -- and the right one. Freezing
-        # such an episode is how a video defect is smoke-tested without paying
-        # for the writer, voices and music again. More than one pending master
-        # is ambiguous and still refused.
-        pending = list((ep_dir / "audio").glob("pending_*_master.wav"))
-        if len(pending) == 1:
-            return pending[0].resolve()
-        raise SystemExit("no *_master.wav under %s" % (ep_dir / "audio"))
-    return hits[-1].resolve()
+    """The ASSEMBLER's master WAV, chosen by the digest the ledger stamps.
+
+    NOT ``final_audio_path`` (plan item 18, 2026-10-14). That pointer is
+    truthful about what was DELIVERED, and on a foley episode the delivered
+    file is the terminal foley mix. Freezing it made the replay mix an
+    already-mixed master a second time. The replay needs the pre-loudness
+    assembler stem, which the ledger identifies by digest.
+
+    Every ``audio/*_master.wav`` inside THIS episode is a candidate, pending or
+    not -- a renamed episode keeps its ``pending_<ts>_master.wav`` name, and a
+    run whose video failed has only that file -- and neither filename nor mtime
+    decides: only the digest does. No match refuses, and names the digest.
+    """
+    want = master_digest(ledger)
+    if not want:
+        raise SystemExit("the ledger stamps no audio.master_audio_sha256; it cannot "
+                         "name its assembler master. Re-render the episode on a "
+                         "current tree, then freeze it.")
+    audio_dir = ep_dir / "audio"
+    matches = [p for p in sorted(audio_dir.glob("*_master.wav"))
+               if p.is_file() and _sha256(p) == want]
+    if not matches:
+        raise SystemExit(
+            "no *_master.wav under %s matches the ledger's assembler master %s "
+            "(was it cleaned up after publish? freeze with cleanup off)"
+            % (audio_dir, want[:12]))
+    named = [p for p in matches if p.name.startswith(ep_dir.name)]
+    return (named or matches)[0].resolve()
 
 
 def freeze(ep_dir: pathlib.Path, out_root: pathlib.Path, *, allow_no_plan: bool = False) -> pathlib.Path:
@@ -149,6 +161,10 @@ def freeze(ep_dir: pathlib.Path, out_root: pathlib.Path, *, allow_no_plan: bool 
     master_rel = "audio/" + master.name
     _add(ledger_path, ledger_rel)
     _add(master, master_rel)
+    if files[-1]["sha256"] != master_digest(ledger):
+        raise SystemExit("the copied master %s does not match the ledger's assembler "
+                         "master %s" % (files[-1]["sha256"][:12],
+                                        master_digest(ledger)[:12]))
     canon = ep_dir / "episode_canon.json"
     if canon.is_file():
         _add(canon, "episode_canon.json")

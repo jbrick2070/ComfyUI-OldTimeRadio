@@ -1488,6 +1488,29 @@ class EpisodeAssembler:
                       _master_wav)
             return (episode_audio, _master_wav, info,
                     "audio_done:replay_unreadable:%s" % want[:12])
+        # WIRE PARITY WITH A LIVE RUN (plan item 18, 2026-10-14). A live run
+        # hands episode_audio downstream LEVELLED, while the master WAV on a
+        # foley route is written PRE-loudness for the mux. A replay copies that
+        # pre-loudness master, so its wire was quieter than the live wire it
+        # replays. Level an in-memory copy with the same routine; the disk
+        # bytes, the digest and the pre_loudness flavour stay exactly as they
+        # are, so the terminal mux still performs the one delivery stage.
+        _flavour = str(((led.data.get("audio") or {}) if isinstance(
+            led.data.get("audio"), dict) else {}).get("master_wav_flavour") or "")
+        if _flavour == MASTER_WAV_PRE_LOUDNESS:
+            try:
+                _wave = episode_audio["waveform"]
+                _levelled, _ = _master_loudness(
+                    _wave.clone() if hasattr(_wave, "clone") else _wave,
+                    ceiling_dbfs=-1.0, sample_rate=int(episode_audio["sample_rate"]))
+                episode_audio = {"waveform": _levelled,
+                                 "sample_rate": episode_audio["sample_rate"]}
+                log.info("[OTR_EpisodeAssembler] REPLAY: pre-loudness master "
+                         "levelled in memory for the wire (disk bytes untouched)")
+            except Exception as _lvl_exc:  # noqa: BLE001 -- the wire still plays
+                log.warning("[OTR_EpisodeAssembler] REPLAY: could not level the "
+                            "pre-loudness wire (%s); passing it through as read",
+                            _lvl_exc)
         log.warning("[OTR_EpisodeAssembler] REPLAY: frozen master copied and verified -> %s",
                     _master_wav)
         return (episode_audio, _master_wav, info, "audio_done:replay:%s" % want[:12])

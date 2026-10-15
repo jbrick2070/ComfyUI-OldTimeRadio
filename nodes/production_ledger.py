@@ -750,6 +750,23 @@ def import_replay_bundle(bundle_dir: str, new_episode_id: Optional[str] = None) 
         source = json.load(fh)
     if not isinstance(source, dict) or not source.get("lines"):
         raise ReplayBundleError("bundle ledger carries no lines")
+    # THE FROZEN MASTER MUST BE THE ASSEMBLER'S MASTER (plan item 18,
+    # 2026-10-14). File integrity above proves the bytes are the bytes that
+    # were frozen, not that they are the right STAGE: a freezer that took the
+    # delivered foley mix (final_audio_path) produced a verified bundle whose
+    # replay mixed an already-mixed master again. The ledger stamps the
+    # assembler master's digest; the frozen file must be that file. Checked
+    # before any workspace is created.
+    _audio = source.get("audio") if isinstance(source.get("audio"), dict) else {}
+    _stamped = str(_audio.get("master_audio_sha256") or "").strip().lower()
+    _frozen = next((str(r.get("sha256") or "").lower() for r in manifest["files"]
+                    if _safe_relative(r.get("path")) == manifest["master_audio"]), "")
+    if not _stamped or _frozen != _stamped:
+        raise ReplayBundleError(
+            "bundle master %s is not the ledger's assembler master %s -- it froze "
+            "another audio stage (the delivered mix?). Re-freeze the episode with "
+            "scripts/otr_freeze_replay_bundle.py."
+            % (_frozen[:12] or "?", _stamped[:12] or "(unstamped)"))
     data = copy.deepcopy(source)
     meta = data.get("meta")
     if not isinstance(meta, dict):
