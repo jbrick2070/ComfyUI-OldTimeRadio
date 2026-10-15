@@ -149,24 +149,34 @@ let one decide another.
 beat of a character from a hash of that character's portrait PROMPT -- it is not
 an instruction to generate portrait pixels. `kind="portrait" required="never"`
 suppresses the pixels while the seed identity stays; `identity="none"` opts out
-of the identity too (the still_word card, which is typography, not a face). A
-lane that declares `accepts_still = False` requests no image generation at all.
+of the identity too (the still_word card, which is typography, not a face).
+`identity` is read from the lane's `scene_character` row only; setting it on
+another row does nothing. A lane that declares `accepts_still = False` requests
+no image generation at all.
 
-**Capability comes from the registered adapter, never its name.** Nothing infers
-it from an id prefix such as `viz_`; declare it.
+**Still capability comes from the registered adapter, not its name.** Whether a
+lane consumes a still, which roles it fills and what its plan mints are read
+from its declarations (`accepts_still`, roles, `still_plan`); nothing infers
+them from an id prefix such as `viz_`, so declare them. (Prefixes do carry
+OTHER meanings in this pack -- `cloud_` / `google_` mark a paid lane for the
+cost checks, and `ltx` gates one LTX framing clause -- so name a lane honestly.)
 
 **A custom image engine is declared once, on `OTR_VideoDirector`.** Its
 `custom_models_json` covers the image roles too and resolves the
 `+ Add Custom Model` sentinel before `OTR_ImageDirector` sees it, so the queue
 check and the render read the same engine (see `IMAGE_MODELS.md`).
 
-Test it with the existing CPU contract tests before a live leg: the adapter's
-real init/reference file, every role it claims, a no-image lane making zero
-image calls, distinct scene / reference / mesh decoys, seed identity, and
-missing/unknown handling (`tests/test_still_spine_engine_coverage.py`,
-`tests/test_portrait_free_roles.py`, `tests/test_custom_image_has_one_owner.py`).
-Mock checks do not replace a live leg's proof of face quality, duration, model
-availability or cost.
+Before a live leg, the existing CPU tests check the declarations:
+`tests/test_still_spine_engine_coverage.py` (every lane declares
+`accepts_still`), `tests/test_portrait_free_roles.py` (a `required="never"`
+portrait is not minted), `tests/test_identity_anchor_transport.py` (the seed
+identity reaches every beat) and `tests/test_custom_image_has_one_owner.py`
+(a custom declaration). They do NOT exercise your adapter's own render path --
+add a CPU/mock test of your own for that: the adapter's real init/reference
+file, every role it claims, a no-image lane making zero image calls, distinct
+scene / reference / mesh decoys, and missing/unknown handling. Mock checks do
+not replace a live leg's proof of face quality, duration, model availability or
+cost.
 
 **Every per-artifact constant must travel with the lane (preflight G1.3).**
 If you build your lane as a SIBLING of an existing one, make the model filename,

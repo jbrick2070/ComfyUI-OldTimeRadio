@@ -669,6 +669,14 @@ def test_a_replay_checks_and_prices_video_only():
     assert replay_labels, "the shipped cloud graph renders paid video"
     looked = _looked_up(prompt, validator)
     assert "cloud_elevenlabs" not in looked
+    # The SLUG side too: on a replay only the video engines are looked up --
+    # no music engine, no image engine, no voice.
+    from nodes._otr_shared.cloud_slug_preflight import director_engine_picks
+    videos = set()
+    for node in prompt.values():
+        if node.get("class_type") == "OTR_VideoDirector":
+            videos.update(director_engine_picks(node.get("inputs") or {})[0])
+    assert set(looked) == videos, (looked, videos)
 
 
 def test_a_saved_voice_alias_is_checked_as_the_engine_it_casts():

@@ -80,9 +80,10 @@ def cast_voice_engines(char_voice_engine="auto", announcer_voice_engine="auto"):
     ``auto`` is Kokoro on both, and a saved alias is normalized on BOTH slots
     (until 2026-10-14 only the announcer's was, so a character slot holding
     ``elevenlabs`` passed validation and then raised EngineUnusable here). The
-    queue-time language check (``_otr_lane_rolls.settle_prompt_language``) and
-    the cloud preflights ask this too, so they judge the engines this node
-    will actually use.
+    queue-time language check (``_otr_lane_rolls.settle_prompt_language``)
+    asks this too. The cloud preflights read the same alias table
+    (``_VOICE_ENGINE_ALIASES``) without the announcer validation, which may
+    not raise at queue time; tests pin that the two agree.
     """
     char = CastLock._normalize_voice_engine(char_voice_engine)
     if char == "auto":

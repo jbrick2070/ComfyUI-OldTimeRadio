@@ -300,9 +300,10 @@ class OTRImageDirector:
             # forwarded verbatim from OTR_VideoDirector. This payload is built
             # KEY BY KEY, so an upstream key is NOT forwarded automatically --
             # every field above needed its own line and so do these two. Node 89
-            # (MetaBrief) and node 91 (the dispatcher) both hang off THIS node,
-            # so this is the only path by which the image branch can learn the
-            # route that node 90 (ShotLock) freezes on the other branch.
+            # (MetaBrief) and node 91 (the dispatcher) read the route through
+            # THIS node. (MetaBrief also reads ShotLock's patched ledger since
+            # the still-spine fix, so ShotLock's drift guard runs first; see
+            # OTR_VideoDirector's route-freeze comment.)
             # {} -> a pre-1b policy; consumers fall back to resolving the route
             # themselves exactly as they did before.
             "effective_video_models": (
