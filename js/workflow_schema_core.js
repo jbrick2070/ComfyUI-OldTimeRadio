@@ -110,6 +110,8 @@ export function writerName(value) {
  * the option it names before the loader sees it, so the widget shows the pick
  * instead of a value its list does not hold (the backend's VALIDATE_INPUTS
  * would run the old spelling anyway -- this is for the person looking at it).
+ * A saved copy of a stamped per-machine preset still stops at its MASTER-HASH
+ * check; re-opening it from Browse Templates is the answer (operator, 2026-10-14).
  */
 const VALUE_RESPELLINGS = {
     OTR_LedgerScriptWriter: {

@@ -113,7 +113,7 @@ absent unless you set a key yourself.
 ## Reading the tooltip
 
 The dropdown shows only the model's name -- the same name it saves, so a
-corrected size can never break a saved workflow. Hover over either writer box
+later size correction never changes what a workflow saves. Hover over either writer box
 and the tooltip lists every writer like this:
 
 `- Qwen/Qwen3.5-4B: about 9.3 GB; fits mac16-tight nv8-nf4 nv16 nv24`

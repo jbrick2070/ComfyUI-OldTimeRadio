@@ -2588,10 +2588,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "tooltip": (
                             "LLM for the creative/narrative passes "
                             "(outline, cast, dialogue composer, "
-                            "style picker invention). A name an older "
-                            "graph saved with a size badge or a [LOCAL HF] "
-                            "/ [NOT DOWNLOADED] tag still runs: it is read "
-                            "as the bare name. To use a remote "
+                            "style picker invention). To use a remote "
                             "OpenRouter model, set OPENROUTER_API_KEY and "
                             "pick OpenRouter A/B (see "
                             "https://github.com/jbrick2070/"

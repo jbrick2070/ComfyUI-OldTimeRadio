@@ -101,9 +101,12 @@ THE DROPDOWN SHOWS THIS BARE ID (operator, 2026-10-14). Labels used to be
 bare constant was not a member of its own option list and ComfyUI fell through
 to index 0 -- undefined behaviour dressed as a default. Every label is now the
 bare id; the size and fit moved to the widget's tooltip
-(:func:`writer_tooltip_table`). A badge saved by an older graph still loads:
-``_strip_label_suffix`` normalizes it, the writer's ``VALIDATE_INPUTS`` admits
-it, and ``js/workflow_schema_core.js`` rewrites it to the bare id on load.
+(:func:`writer_tooltip_table`). A badge saved by an older unstamped graph still
+loads: ``_strip_label_suffix`` normalizes it, the writer's ``VALIDATE_INPUTS``
+admits it, and ``js/workflow_schema_core.js`` rewrites it to the bare id on
+load. A saved copy of a stamped per-machine preset is stopped by its
+MASTER-HASH check instead ("re-open from Browse Templates") -- by operator
+decision, 2026-10-14: no compatibility path for older preset copies.
 """
 
 DEFAULT_LLM_NF4 = "Qwen/Qwen3.5-4B:nf4"
