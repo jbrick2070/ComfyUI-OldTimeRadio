@@ -2426,8 +2426,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # and the range grew from 1-7 to 1-8. Whatever is picked
                 # here is honoured: there is no derived floor or ceiling
                 # that can refuse it.
-                # 7-act is admitted (Outline.beats max_length=36).
-                # 8-act stays refused (41 beats).
+                # 7-act is admitted; 8-act is refused by
+                # compute_episode_budget (MAX_ACT_COUNT), not by a beat count.
                 "num_characters": ("INT", {
                     "default": 2, "min": 1, "max": _FABLE2_MAX_CAST, "step": 1,
                     "tooltip": (

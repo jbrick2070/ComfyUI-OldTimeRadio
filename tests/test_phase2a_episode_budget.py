@@ -127,7 +127,7 @@ class TestActCountConfigSanity:
 
 
 # ---------------------------------------------------------------------------
-# Outline schema -- arc_phase field + 36-beat cap (7-act)
+# Outline schema -- arc_phase field + beat capacity (OUTLINE_BEATS_MAX)
 # ---------------------------------------------------------------------------
 
 
@@ -180,8 +180,19 @@ class TestOutlineSchemaChanges:
             "beats": beats,
         })  # should not raise
 
-    def test_outline_rejects_37_beats(self):
-        beats = [_ok_beat(f"b{i:03d}") for i in range(1, 38)]
+    def test_outline_accepts_37_beats_and_rejects_past_the_capacity(self):
+        """37 is a valid 7-act outline with one five-beat phase (plan item 3,
+        2026-10-14); the cap is the producers' bound, 78. Act count is
+        refused by compute_episode_budget, never inferred from beats."""
+        from nodes._otr_outline import OUTLINE_BEATS_MAX
+        Outline.model_validate({
+            "title": "Test",
+            "premise": "A test premise of sufficient length.",
+            "setting": "A lab",
+            "time_of_day": "midnight",
+            "beats": [_ok_beat(f"b{i:03d}") for i in range(1, 38)],
+        })
+        beats = [_ok_beat(f"b{i:03d}") for i in range(1, OUTLINE_BEATS_MAX + 2)]
         from pydantic import ValidationError
         with pytest.raises(ValidationError):
             Outline.model_validate({

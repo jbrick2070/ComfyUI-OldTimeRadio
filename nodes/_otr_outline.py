@@ -33,7 +33,7 @@ import re
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from ._otr_episode_budget import EpisodeBudget
+from ._otr_episode_budget import MAX_ACT_COUNT, EpisodeBudget
 from pydantic import (
     BaseModel,
     Field,
@@ -44,8 +44,17 @@ from pydantic import (
 
 log = logging.getLogger("OTR")
 
+#: The most voiced beats one phase skeleton (Stage 2) may return. One phase
+#: per act; the request asks for fewer, and an accepted phase may differ.
+_PHASE_BEATS_MAX = 10
+#: The most beats an accepted outline can hold: every act's phase at its
+#: ceiling, one interstitial between acts, and the announcer open and close.
+#: 7 * 10 + 6 + 2 = 78.
+OUTLINE_BEATS_MAX = MAX_ACT_COUNT * _PHASE_BEATS_MAX + (MAX_ACT_COUNT - 1) + 2
+
 
 __all__ = [
+    "OUTLINE_BEATS_MAX",
     "Beat",
     "Outline",
     "OutlineRequest",
@@ -202,8 +211,14 @@ class Outline(BaseModel):
     premise: str = Field(..., min_length=1)
     setting: str = Field(..., min_length=1)
     time_of_day: str = Field(..., min_length=1)
-    # 7-act is 5*7+1 = 36 beats with act breaks on. 8-act (41) stays refused.
-    beats: list[Beat] = Field(..., min_length=1, max_length=36)
+    # The most beats an ACCEPTED outline can hold, not the nominal request
+    # (plan item 3, 2026-10-14). The writer asks four voiced beats per act --
+    # 36 at seven acts -- but a phase may come back with up to
+    # _PHASE_BEATS_MAX and _phase_check accepts that on purpose, so a ceiling
+    # of 36 crashed a 7-act episode after every model call had been paid for.
+    # Act count is admitted by compute_episode_budget (8 acts refuse there);
+    # this bound is beat capacity only.
+    beats: list[Beat] = Field(..., min_length=1, max_length=OUTLINE_BEATS_MAX)
 
     # Story-spine Stream A (2026-05-31): arc gate. central_tension rides
     # the Stage-1 _MacroShape LLM call; turning_point + button are
@@ -766,7 +781,7 @@ class _PhaseBeatSeed(BaseModel):
 
 
 class _PhaseSkeleton(BaseModel):
-    beats: list[_PhaseBeatSeed] = Field(..., min_length=1, max_length=10)
+    beats: list[_PhaseBeatSeed] = Field(..., min_length=1, max_length=_PHASE_BEATS_MAX)
 
 
 # Stage 3 schema -- per-beat fleshout. intent + mood only.

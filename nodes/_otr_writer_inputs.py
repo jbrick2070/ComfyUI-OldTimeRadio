@@ -81,7 +81,7 @@ _LEMMY_CAMEO_FORCE = {
 _DEFAULT_ACT_COUNT: int = 3
 
 #: Operator-facing act choices. Explicit 1..7 (7-act is a paid-length
-#: cloud UI; Outline.beats max_length=36 fits 5*7+1. 8-act stays refused).
+#: cloud UI; 8-act is refused by compute_episode_budget).
 #: DERIVED from MIN/MAX_ACT_COUNT, not a second hardcoded range.
 _ACT_COUNT_CHOICES: list[str] = [
     str(n) for n in range(_OTRB.MIN_ACT_COUNT, _OTRB.MAX_ACT_COUNT + 1)
