@@ -300,7 +300,7 @@ All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
 | `visual_style` | How it looks. Ships on *roll*. The ids are in [apple/STYLES.md](apple/STYLES.md). |
 | `lemmy_cameo` | Whether a character named Lemmy drops by. Ships on *roll*, about an 11% chance. |
 | `episode_language` | One switch. See [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md). |
-| `asset_cleanup` | What to delete from the episode's working folder once it is published: `off (keep everything)`, `partial (keep only the text files)` or `full (keep only the published video)`. Ships **full**: once the episode is in `otr/obs`, its working folder goes. See [Where things land](#where-things-land). |
+| `asset_cleanup` | What to delete from the episode's working folder once it is published: `off (keep everything)`, `partial (keep only the text files)` or `full (keep only the published video)` (an episode whose rights receipt did not clear keeps its ledger). Ships **full**: once the episode is in `otr/obs`, its working folder goes. See [Where things land](#where-things-land). |
 
 `episode_title` and `custom_premise` are set on the node in graph view; the app form leaves them off and they stay blank unless you fill them there.
 

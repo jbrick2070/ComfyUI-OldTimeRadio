@@ -6,7 +6,10 @@ workflow carries full (operator, 2026-09-28: "full for everyone"):
 
 * ``off``     -- keep everything (nothing is stamped on the ledger).
 * ``partial`` -- delete the sound and the pictures, keep every text file.
-* ``full``    -- delete the whole episode folder.
+* ``full``    -- delete the whole episode folder, except that an episode whose
+                rights receipt did not clear keeps its ledger (the receipt's
+                only durable home; operator ruling 2026-10-15) and loses
+                everything else.
 
 All three leave ``otr/obs`` alone: the published copy is the deliverable, and
 this module refuses to run at all unless that copy is proven to exist OUTSIDE
@@ -358,7 +361,9 @@ def execute_asset_cleanup(
     ``state: started`` BEFORE the first unlink, so a crash mid-delete leaves a
     record, and ``state: done`` after. If the started receipt cannot be saved
     nothing is deleted. ``full`` writes the started receipt and then removes
-    the folder, receipt and all; its done receipt lands only when a locked
+    the folder, receipt and all (unless the plan keeps the ledger of a
+    rights-uncleared episode, when it deletes file by file and the done receipt
+    lands on that ledger); otherwise its done receipt lands only when a locked
     file kept the ledger alive.
 
     A file that will not go (a Windows handle, a permission) is SKIPPED and
