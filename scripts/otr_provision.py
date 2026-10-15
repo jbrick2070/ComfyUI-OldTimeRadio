@@ -1370,6 +1370,11 @@ NO_LANE_REASON = {
     # `_otr_visual_assets.ensure_upscale_weights`); only a failed fetch leaves
     # the hand-download instruction.
     "spandrel_esrgan": "fetch_at_load",
+    # NVIDIA RTX VSR (2026-10-14): its models ship inside NVIDIA's own
+    # nvidia-vfx wheel (proprietary, ~540 MB, NVIDIA-only), which the user
+    # installs by hand -- never a pack dependency. Unusable here means the
+    # composite falls back to off, so a missing install costs no episode.
+    "rtx_vsr": "manual_doc",
     # Local video lanes whose weights are documented but have no fetcher lane.
     "mesh_stage": "manual_doc",
 }

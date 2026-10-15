@@ -45,8 +45,13 @@ from nodes._otr_upscale_engines import registry as ureg  # noqa: E402
 
 def test_both_rows_now_claim_mps():
     """A device row is a claim about PROVEN execution in this repo, so these
-    two moved only when the receipt existed."""
+    two moved only when the receipt existed. rtx_vsr (2026-10-14) is the
+    NVIDIA-only row by nature -- it claims cuda alone, and degrades to off
+    everywhere else -- so it is the one row this receipt does not cover."""
     for name, row in ureg.CAPABILITIES.items():
+        if name == "rtx_vsr":
+            assert row["device_backends"] == ["cuda"], row
+            continue
         assert "mps" in row["device_backends"], name
         assert "cuda" in row["device_backends"], (
             "%s must not strand NVIDIA to gain Metal" % name)

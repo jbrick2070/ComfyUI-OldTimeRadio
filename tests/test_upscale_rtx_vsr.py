@@ -1,0 +1,236 @@
+"""``rtx_vsr``: NVIDIA RTX Video Super Resolution as an opt-in upscaler.
+
+A fake ``nvvfx`` stands in for NVIDIA's package (no RTX card in CI). The live
+receipt -- a real 4060, real OTR frames -- is in the engine's docstring.
+"""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import types
+from pathlib import Path
+
+import pytest
+import torch
+
+from nodes._otr_upscale_engines import eng_rtx_vsr as V
+from nodes._otr_upscale_engines.registry import (
+    CAPABILITIES, EngineUnusable, assert_usable, get_engine)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+class _FakeEffect:
+    instances: list = []
+
+    def __init__(self, quality=None, strength=None, device=None, image_encoding=None):
+        self.quality, self.device = quality, device
+        self.output_width = self.output_height = None
+        self.loaded = self.closed = False
+        self.runs = 0
+        _FakeEffect.instances.append(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.closed = True
+
+    def load(self):
+        assert self.output_width % 8 == 0 and self.output_height % 8 == 0
+        self.loaded = True
+
+    def run(self, chw):
+        assert self.loaded and chw.dim() == 3 and chw.shape[0] == 3
+        self.runs += 1
+        # Pixel-doubled into the top-left of the requested (rounded-up) frame,
+        # so the engine's crop back to exact x2 is checkable byte for byte.
+        up = chw.repeat_interleave(2, 1).repeat_interleave(2, 2)
+        frame = torch.zeros((3, self.output_height, self.output_width))
+        frame[:, :up.shape[1], :up.shape[2]] = up
+        return types.SimpleNamespace(image=frame.contiguous())
+
+
+def _fake_nvvfx(monkeypatch, effect_cls=_FakeEffect):
+    _FakeEffect.instances = []
+    levels = {"LOW": 0, "HIGH": 1, "ULTRA": 2, "DENOISE_HIGH": 3}
+    mod = types.SimpleNamespace(
+        VideoSuperRes=effect_cls,
+        QualityLevel=types.SimpleNamespace(__members__=levels),
+        ImageEncoding=types.SimpleNamespace(RGB8="rgb8"))
+    monkeypatch.setitem(sys.modules, "nvvfx", mod)
+    return mod
+
+# --------------------------------------------------------------------------- #
+def test_registered_opt_in_never_default():
+    eng = get_engine("rtx_vsr")
+    assert assert_usable("rtx_vsr", "upscale_stage") == "rtx_vsr"
+    assert eng.default_roles == () and eng.intrinsic_scale == 2
+    assert eng.device_backends == ("cuda",) and eng.requires_vendor == "nvidia"
+    assert eng.degrades_to_off is True
+    row = CAPABILITIES["rtx_vsr"]
+    assert row["device_backends"] == ["cuda"] and row["requires_vendor"] == "nvidia"
+    assert row["practical_without_gpu"] is False
+
+
+def test_not_a_declared_dependency():
+    """Proprietary and ~540 MB: opt-in, never on an AMD/Intel/Mac install."""
+    for name in ("requirements.txt", "pyproject.toml"):
+        assert "nvidia-vfx" not in (REPO_ROOT / name).read_text(encoding="utf-8")
+
+
+def test_shipped_graphs_keep_off_as_the_default():
+    for path in sorted((REPO_ROOT / "workflows").glob("*.json")):
+        wf = json.loads(path.read_text(encoding="utf-8"))
+        for node in wf.get("nodes", []):
+            if node.get("type") == "OTR_SilentComposite":
+                assert "rtx_vsr" not in node.get("widgets_values", []), path.name
+
+
+def test_fingerprint_is_metadata_only_and_stable(monkeypatch):
+    monkeypatch.setattr(V, "_package_version", lambda: "0.2.0.0")
+    eng = V.RtxVsr()
+    first = eng.model_fingerprint_parts()
+    assert first == eng.model_fingerprint_parts()
+    assert first == (("nvidia_vfx", "0.2.0.0"), ("quality", "ULTRA"))
+    monkeypatch.setattr(V, "_package_version", lambda: "absent")
+    assert eng.model_fingerprint_parts() != first        # installing it moves the key
+    monkeypatch.setenv("OTR_RTX_VSR_QUALITY", "high")
+    assert ("quality", "HIGH") in eng.model_fingerprint_parts()
+
+
+def test_fingerprint_does_not_import_torch_or_nvvfx():
+    code = ("import sys;"
+            "from nodes._otr_upscale_engines.eng_rtx_vsr import RtxVsr;"
+            "RtxVsr().model_fingerprint_parts();"
+            "heavy=[m for m in ('torch','nvvfx') if m in sys.modules];"
+            "print('HEAVY',heavy); sys.exit(1 if heavy else 0)")
+    r = subprocess.run([sys.executable, "-c", code], cwd=str(REPO_ROOT),
+                       capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_without_the_package_load_refuses_with_the_pip_line(monkeypatch):
+    monkeypatch.setitem(sys.modules, "nvvfx", None)
+    with pytest.raises(EngineUnusable, match="pip install nvidia-vfx"):
+        V.RtxVsr().load(torch.device("cpu"))
+
+
+def test_a_non_cuda_device_refuses(monkeypatch):
+    _fake_nvvfx(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    with pytest.raises(EngineUnusable, match="NVIDIA CUDA device"):
+        V.RtxVsr().load(torch.device("cpu"))
+
+
+def test_a_rocm_torch_refuses(monkeypatch):
+    _fake_nvvfx(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", "6.2", raising=False)
+    with pytest.raises(EngineUnusable, match="ROCm"):
+        V.RtxVsr().load(torch.device("cuda:0"))
+
+
+@pytest.mark.parametrize("quality,match", [("BOGUS", "not one of"),
+                                           ("DENOISE_HIGH", "keeps the input size")])
+def test_a_bad_quality_level_refuses(monkeypatch, quality, match):
+    _fake_nvvfx(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
+    monkeypatch.setenv("OTR_RTX_VSR_QUALITY", quality)
+    with pytest.raises(EngineUnusable, match=match):
+        V.RtxVsr().load(torch.device("cuda:0"))
+
+
+def test_upscale_is_exact_x2_with_sides_rounded_for_the_sdk_and_cropped():
+    """1001x501 asks the SDK for 2008x1008 (multiples of 8) and crops to the
+    exact 2002x1002 the composite validates; one effect serves a size."""
+    eng = V.RtxVsr()
+    eng._nvvfx = types.SimpleNamespace(
+        VideoSuperRes=_FakeEffect,
+        QualityLevel={"ULTRA": 2}, ImageEncoding=types.SimpleNamespace(RGB8="rgb8"))
+    eng._quality, eng.device = "ULTRA", torch.device("cpu")
+    _FakeEffect.instances = []
+    import contextlib
+    orig = torch.cuda.device
+    torch.cuda.device = lambda *_a: contextlib.nullcontext()
+    try:
+        frames = torch.rand((2, 501, 1001, 3))
+        out = eng.upscale_frames(frames)
+        assert tuple(out.shape) == (2, 1002, 2002, 3)
+        assert (_FakeEffect.instances[-1].output_width,
+                _FakeEffect.instances[-1].output_height) == (2008, 1008)
+        assert torch.equal(out[0, ::2, ::2], frames[0])          # nearest stand-in
+        eng.upscale_frames(torch.rand((1, 501, 1001, 3)))
+        assert len(_FakeEffect.instances) == 1                    # reused
+        eng.upscale_frames(torch.rand((1, 100, 100, 3)))
+        assert len(_FakeEffect.instances) == 2 and _FakeEffect.instances[0].closed
+        eng.unload()
+        assert _FakeEffect.instances[1].closed and eng.device is None
+    finally:
+        torch.cuda.device = orig
+
+
+def test_composite_falls_back_to_off_when_rtx_vsr_cannot_run(tmp_path, monkeypatch):
+    """The composite is the episode's last stage: an optional accelerator that
+    cannot run here costs the sharpening, never the episode."""
+    import nodes.otr_silent_composite as SC
+
+    class _Refusing:
+        name, intrinsic_scale, degrades_to_off, device = "rtx_vsr", 2, True, None
+
+        def load(self, device):
+            raise EngineUnusable("rtx_vsr", "upscale_stage", "missing_model",
+                                 "no nvvfx", kind="upscale")
+
+        def unload(self):
+            raise AssertionError("a refused load is never unloaded")
+
+    seen = {}
+    off = get_engine("off")
+    monkeypatch.setattr(SC, "_get_upscale_engine",
+                        lambda name: _Refusing() if name == "rtx_vsr" else off)
+    monkeypatch.setattr(SC, "_assert_upscale_usable", lambda name, role: name)
+    monkeypatch.setattr(SC, "_resolve_upscale_device", lambda v: torch.device("cpu"))
+
+    def assemble(*a, **kw):
+        seen["engine"] = kw["engine"].name
+        return "out.mp4", ["stubbed"]
+    monkeypatch.setattr(SC, "assemble_silent_timeline", assemble)
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
+    src = tmp_path / "source.mp4"
+    src.write_bytes(b"fake-mp4")
+    silent, report = SC.OTRSilentComposite().composite(
+        base_video_path=str(src), canvas_w=1920, canvas_h=1080, fps=25,
+        output_path=str(tmp_path / "out.mp4"), gate_in="",
+        clip_manifest_json=json.dumps({"fps": 25, "clips": [{"path": "x", "n_frames": 1}]}),
+        upscale_engine="rtx_vsr", upscale_device="cpu")
+    assert silent == "out.mp4" and seen["engine"] == "off"
+    assert "rtx_vsr unavailable here" in report and "used off" in report
+
+
+def test_spandrel_refusal_is_still_loud(tmp_path, monkeypatch):
+    import nodes.otr_silent_composite as SC
+
+    class _Refusing:
+        name, intrinsic_scale, device = "spandrel_esrgan", 2, None
+
+        def load(self, device):
+            raise RuntimeError("missing checkpoint")
+
+        def unload(self):
+            pass
+
+    monkeypatch.setattr(SC, "_get_upscale_engine", lambda name: _Refusing())
+    monkeypatch.setattr(SC, "_assert_upscale_usable", lambda name, role: name)
+    monkeypatch.setattr(SC, "_resolve_upscale_device", lambda v: torch.device("cpu"))
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
+    src = tmp_path / "source.mp4"
+    src.write_bytes(b"fake-mp4")
+    with pytest.raises(RuntimeError, match="missing checkpoint"):
+        SC.OTRSilentComposite().composite(
+            base_video_path=str(src), canvas_w=1920, canvas_h=1080, fps=25,
+            output_path=str(tmp_path / "out.mp4"), gate_in="",
+            clip_manifest_json=json.dumps({"fps": 25, "clips": [{"path": "x", "n_frames": 1}]}),
+            upscale_engine="spandrel_esrgan", upscale_device="cpu")

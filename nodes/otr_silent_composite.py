@@ -1485,7 +1485,11 @@ class OTRSilentComposite:
                         "Post-render upscale/enhance stage. Runs INSIDE the "
                         "composite per-clip (sharpen=True branch only); floor / "
                         "directory / black paths are unchanged. off = today's "
-                        "lanczos+unsharp, byte-identical."
+                        "lanczos+unsharp, byte-identical. spandrel_esrgan = "
+                        "Real-ESRGAN x2 (any device, slow). rtx_vsr = NVIDIA "
+                        "RTX Video Super Resolution (RTX card + `pip install "
+                        "nvidia-vfx`; ~100x faster than ESRGAN; falls back to "
+                        "off with a warning where it cannot run)."
                     ),
                 }),
                 "upscale_device": ("STRING", {
@@ -1493,7 +1497,9 @@ class OTRSilentComposite:
                     "tooltip": (
                         "cpu | cuda | cuda:N. Composite itself runs on CPU "
                         "(ffmpeg); this widget selects the device the model "
-                        "loads on. Rejected invalid tokens fail loud."
+                        "loads on. Rejected invalid tokens fail loud. rtx_vsr "
+                        "runs on the NVIDIA GPU whatever this says (cpu means "
+                        "cuda:0 for it)."
                     ),
                 }),
             },
@@ -1724,9 +1730,26 @@ class OTRSilentComposite:
             _assert_upscale_usable(upscale_engine, "upscale_stage")
             engine = _get_upscale_engine(upscale_engine)
         _engine_active = (engine.name != "off") and assemble
+        _upscale_fallback = ""
         if _engine_active:
             device = _resolve_upscale_device(upscale_device)
-            engine.load(device)
+            try:
+                engine.load(device)
+            except Exception as exc:  # noqa: BLE001 -- see the gate just below
+                # AN OPTIONAL ACCELERATOR NEVER COSTS THE EPISODE (2026-10-14).
+                # An engine that declares `degrades_to_off` (rtx_vsr: it needs
+                # an RTX card and a user-installed SDK) falls back to off -- the
+                # lanczos path -- with a warning when it cannot run here. This is
+                # the last stage of an episode; everything before it is done.
+                # Every other engine keeps its loud refusal.
+                if not getattr(engine, "degrades_to_off", False):
+                    raise
+                _upscale_fallback = "%s unavailable here (%s); used off" % (
+                    engine.name, exc)
+                log.warning("[OTR_SilentComposite] upscale %s", _upscale_fallback)
+                engine = _get_upscale_engine("off")
+                _engine_active = False
+        if _engine_active:
             # Load succeeds silently in the adapter, so without this a reader
             # cannot tell "loaded fine" from "never engaged". Report the
             # RESOLVED checkpoint too: on the headless topology folder_paths
@@ -1742,7 +1765,8 @@ class OTRSilentComposite:
                 _resolved = None
             log.info(
                 "[OTR_SilentComposite] upscale engine LOADED: %s on %s "
-                "(checkpoint=%s)", engine.name, device, _resolved or "n/a")
+                "(checkpoint=%s)", engine.name, engine.device or device,
+                _resolved or "n/a")
         try:
             try:
                 if assemble:
@@ -1802,6 +1826,8 @@ class OTRSilentComposite:
         mode = "assemble" if assemble else "single-base"
         engine_tag = ("" if engine.name == "off"
                       else " upscale=%s@%s" % (engine.name, upscale_device))
+        if _upscale_fallback:
+            engine_tag = " upscale %s" % _upscale_fallback
         return (silent, "OTR_SilentComposite OK (%s%s) -> %s\n%s"
                 % (mode, engine_tag, silent, "\n".join(report)))
 

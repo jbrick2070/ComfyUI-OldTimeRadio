@@ -128,6 +128,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 |---|---|---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
 | `spandrel_esrgan` | **auto** | 0.1 GiB | fits | **proven** | measured | ? | ? |
+| `rtx_vsr` | manual | 0.5 GiB | measured | ? | not offered | not offered | not offered |
 
 **Writer (the LLM that writes the script)**
 
@@ -151,6 +152,7 @@ Only the picks below still need a hand download.
 This pack cannot fetch them, and no table here can tell you the filename, because the engine chooses it. Select one anyway and it refuses by name before anything else runs, naming what it is missing and where it expects it. It never quietly substitutes another.
 
 * `mesh_stage`
+* `rtx_vsr`
 
 ## What the words mean
 

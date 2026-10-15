@@ -187,6 +187,16 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": ["real-esrgan-x2plus"]},
+    # NVIDIA RTX Video Super Resolution (2026-10-14). Its models ship inside the
+    # user-installed nvidia-vfx wheel, so there is no checkpoint to require.
+    # Measured on an RTX 4060 Laptop; refuses (and the composite falls back to
+    # off) anywhere it cannot run -- see eng_rtx_vsr.py.
+    "rtx_vsr": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": "nvidia",
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": []},
 }
 
 

@@ -115,6 +115,7 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 |---|---|---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
 | `spandrel_esrgan` | **auto** | 0.1 GiB | fits | **proven** | measured | ? | ? |
+| `rtx_vsr` | manual | 0.5 GiB | measured | ? | not offered | not offered | not offered |
 
 **Writer (the LLM that writes the script)**
 

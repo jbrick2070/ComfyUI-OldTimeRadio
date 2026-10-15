@@ -15,11 +15,12 @@ def test_registry_module_imports_clean():
     assert r is not None
 
 
-def test_two_engines_ship_and_only_two():
+def test_three_engines_ship_and_only_three():
+    """off, Real-ESRGAN, and (2026-10-14) NVIDIA RTX VSR."""
     from nodes._otr_upscale_engines.registry import all_engine_names
     names = list(all_engine_names())
-    assert set(names) == {"off", "spandrel_esrgan"}, (
-        f"expected exactly {{'off', 'spandrel_esrgan'}}; got {names!r}")
+    assert set(names) == {"off", "spandrel_esrgan", "rtx_vsr"}, (
+        f"expected exactly off, spandrel_esrgan, rtx_vsr; got {names!r}")
 
 
 def test_capabilities_roster_matches_registered():

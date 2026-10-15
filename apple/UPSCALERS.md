@@ -18,6 +18,7 @@ choice, not an unfinished one -- see the end of this page.
 |---|---|---|
 | **`off`** -- ships this way | Leaves the composite's own resize in charge | Nothing |
 | **`spandrel_esrgan`** | Runs Real-ESRGAN x2plus over each eligible clip, one frame at a time, then fits the result to the canvas | Nothing: its one 64 MB file downloads itself the first time the engine loads |
+| **`rtx_vsr`** | NVIDIA RTX Video Super Resolution: the same upscaler an RTX card applies to browser video, x2, then fitted to the canvas | An NVIDIA RTX card and one install line, `pip install nvidia-vfx` (below) |
 
 **Those are the ones that ship.** The dropdown is built from the pack's live upscale
 registry, so a new engine would appear by itself the day one ships. Today the list
@@ -87,6 +88,44 @@ A git clone also has `scripts/ensure_upscale_models.py`, which downloads the
 file from the GitHub release ahead of time and checks the same SHA-256.
 `scripts/` is not part of the Manager bundle, and nobody needs it: the engine's
 own fetch lands the identical file.
+
+---
+
+## `rtx_vsr`: the fast one, for NVIDIA RTX cards
+
+Measured on an RTX 4060 Laptop (8 GB), 48 frames of a real OTR clip at its
+native 1472x832:
+
+| | per frame, straight to 1920x1080 | fidelity (downscale x2, upscale x2, compare) |
+|---|---|---|
+| `rtx_vsr` | 11-14 ms | PSNR 35.8, SSIM 0.936, visibly crisper edges |
+| `spandrel_esrgan` | about 1.8 s (fp16); at fp32 it spilled the 8 GB card and stalled | PSNR 34.5, SSIM 0.899 |
+| `off` (lanczos + unsharp) | 37 ms | PSNR 36.0, SSIM 0.944 |
+
+So it is the upscaler to pick on an RTX card, at roughly a hundredth of
+Real-ESRGAN's cost. It is not on by default: `off` still scores as well on
+fidelity, and no published episode has used `rtx_vsr` yet.
+
+**The install.** Its models ship inside NVIDIA's own package, so there is no
+checkpoint to fetch:
+
+```
+pip install nvidia-vfx
+```
+
+Run it with ComfyUI's own Python. It is about 540 MB, Windows and Linux
+x86-64 only, under NVIDIA's licence -- which is why the pack does not install
+it for you: it would land on every AMD, Intel and Mac machine for nothing.
+
+**It never costs you an episode.** If `rtx_vsr` cannot run where you picked
+it -- the package is missing, the card is AMD or a GTX, the machine is a Mac --
+the composite says why in the log and in its report line, and finishes the
+episode with `off`. The upscaler is the last stage of a run; everything before
+it is already done.
+
+**The device box does not matter for it.** It only runs on the NVIDIA GPU, so
+the shipped `cpu` value means `cuda:0` for this engine. `OTR_RTX_VSR_QUALITY`
+picks another of NVIDIA's quality levels (`ULTRA` is the default).
 
 ---
 
