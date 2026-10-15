@@ -234,8 +234,9 @@ def test_a_broken_key_lookup_warns_but_a_missing_or_bad_key_refuses():
     for exc in (ImportError("backend missing"), AttributeError("renamed"),
                 KeyError("k"), TypeError("signature")):
         assert cbp.openrouter_balance(bearer=raising(exc)).severity == "warn", exc
+    utf16 = UnicodeDecodeError("utf-8", b"\xff\xfe", 0, 1, "invalid start byte")
     for exc in (RuntimeError("no OpenRouter key"), KeyFileError("bad key file"),
-                PermissionError("key file unreadable")):
+                PermissionError("key file unreadable"), utf16):
         assert cbp.openrouter_balance(bearer=raising(exc)).severity == "refuse", exc
 
 

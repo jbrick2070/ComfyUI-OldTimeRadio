@@ -71,6 +71,9 @@ def test_the_declaration_is_read_the_way_admission_reads_it(monkeypatch):
               "custom_models_json": json.dumps({"music_image_model": "z_image_turbo"})}
     assert _resolve_slot(inputs, "music_image_model", _custom_models(inputs),
                          "image") == "z_image_turbo"
+    # A plain spaced pick is emitted stripped, as admission reads it.
+    policy = _video_policy(monkeypatch, {}, music_image_model="  z_image_turbo ")
+    assert json.loads(policy)["image_models"]["music_image_model"] == "z_image_turbo"
 
 
 def test_an_undeclared_sentinel_passes_through_unchanged(monkeypatch):

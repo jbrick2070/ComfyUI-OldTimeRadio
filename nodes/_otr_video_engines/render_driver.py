@@ -6429,8 +6429,9 @@ def persist_episode_clips(result, episode_id):
     # that rejects a FOREIGN active ledger was skipped, and clips could be moved
     # into another episode while the manifest kept the first id. The episode's
     # own freeze travels on the result's full ledger.
-    freeze = (((result or {}).get("ledger") or {}).get("meta") or {}).get(
-        "freeze_timestamp")
+    _ledger = (result or {}).get("ledger")
+    _meta = _ledger.get("meta") if isinstance(_ledger, dict) else None
+    freeze = _meta.get("freeze_timestamp") if isinstance(_meta, dict) else ""
     episode_id = resolve_episode_id_for_clip_persistence(
         episode_id, freeze_timestamp=str(freeze or ""))
     try:

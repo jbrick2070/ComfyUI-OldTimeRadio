@@ -697,7 +697,7 @@ class OTRVideoDirector:
             declared = (custom.get(slot, "")
                         if isinstance(bare, str) and bare.startswith(_ADD_CUSTOM)
                         else "")
-            out[slot] = declared or picked
+            out[slot] = declared or bare
         return out
 
     @staticmethod

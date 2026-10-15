@@ -385,9 +385,11 @@ def openrouter_balance(*, get_json: Callable = None, bearer: Callable = None) ->
     bearer_fn = bearer or _openrouter_bearer
     try:
         token = bearer_fn()
-    except (RuntimeError, OSError) as exc:
+    except (RuntimeError, OSError, ValueError) as exc:
         # The key itself: none set (RuntimeError), or a key file that is
-        # wrong or unreadable (KeyFileError is a RuntimeError; OSError).
+        # wrong or unreadable (KeyFileError is a RuntimeError; OSError; a
+        # UTF-16 file PowerShell 5.1 wrote is a UnicodeDecodeError, a
+        # ValueError).
         # Every paid writer call would fail the same way, so it refuses.
         return BalanceResult(None, "no OpenRouter key (%s)" % exc,
                              OPENROUTER_HOST, "refuse")

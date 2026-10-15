@@ -138,6 +138,18 @@ def test_the_voice_node_marks_every_floor_and_attaches_after_packing():
                 and getattr(node.args[0].func, "id", "") == "floor_span")
 
     assert any(is_span_append(n) for n in ast.walk(branch))
+    # ...as a TOP-LEVEL statement of the branch, right after the floor is
+    # appended to clips, with the real clips and sample rate -- not before it,
+    # not after the `continue`, not inside a dead `if`.
+    body = floor_branches[0].body
+    stmts = [s.value if isinstance(s, ast.Expr) else None for s in body]
+    i_floor = next(i for i, c in enumerate(stmts) if isinstance(c, ast.Call)
+                   and getattr(c.func, "id", "") == "_floor_voice_line")
+    i_span = next(i for i, c in enumerate(stmts) if c is not None and is_span_append(c))
+    i_cont = next((i for i, s in enumerate(body) if isinstance(s, ast.Continue)), len(body))
+    assert i_floor < i_span < i_cont
+    span_args = stmts[i_span].args[0].args
+    assert [getattr(a, "id", None) for a in (span_args[0], span_args[2])] == ["clips", "sr"]
     # Nothing outside that branch records a span.
     assert sum(1 for n in ast.walk(tree) if is_span_append(n)) == 1
     assert sum(1 for n in ast.walk(tree) if isinstance(n, ast.Call)

@@ -246,7 +246,10 @@ def catalog_ids(authority, *, get_json=None) -> CatalogResult:
                 return getter(path)
             except Exception as exc:  # noqa: BLE001 -- kept for classification
                 last["exc"] = exc
-                if getattr(exc, "http_status", None) == 429:
+                status = getattr(exc, "http_status", None)
+                if status is None:
+                    status = getattr(exc, "code", None)
+                if status == 429:
                     # A rate limit is not worth retrying in a probe:
                     # fetch_catalog's retries do not sleep, so they would
                     # only send three requests at once. Warn and move on.
