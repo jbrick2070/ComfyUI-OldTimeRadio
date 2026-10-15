@@ -897,8 +897,9 @@ class FinalDraft:
     #: used to rebuild a roster from the speakers in the OUTPUT: that promoted
     #: adopted strangers to locked cast and dropped silent originals, so a
     #: salvaged script that nothing had touched re-parsed differently and was
-    #: thrown away as "parsed artifact seal is stale". Required on every draft;
-    #: bound into the artifact seal.
+    #: thrown away as "parsed artifact seal is stale". Defaults to empty only
+    #: so the dataclass can be built; validation refuses a draft without one.
+    #: Bound into the artifact seal.
     cast_roster: "tuple[str, ...]" = ()
 
     def alias_map(self) -> "dict[str, list[str]]":

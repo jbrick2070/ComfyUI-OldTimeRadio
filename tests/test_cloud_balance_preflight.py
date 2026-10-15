@@ -215,12 +215,23 @@ def test_a_balance_probe_that_gets_no_number_warns(probe):
                    lambda _u, _t: (404, {}),
                    lambda _u, _t: (200, {"unexpected": True})):
         result = probe(get_json=getter, bearer=lambda: "k")
-        if result.remaining_usd is None:
-            assert result.severity == "warn", (probe.__name__, result)
+        assert result.remaining_usd is None, (probe.__name__, result)
+        assert result.severity == "warn", (probe.__name__, result)
+
+
+def test_an_unloadable_openrouter_backend_warns_but_no_key_refuses():
+    def unloadable():
+        raise ImportError("backend missing")
+
+    def no_key():
+        raise RuntimeError("no OpenRouter key")
+
+    assert cbp.openrouter_balance(bearer=unloadable).severity == "warn"
+    assert cbp.openrouter_balance(bearer=no_key).severity == "refuse"
 
 
 @pytest.mark.parametrize("probe", [cbp.comfy_balance, cbp.openrouter_balance])
-@pytest.mark.parametrize("status", [401, 403])
+@pytest.mark.parametrize("status", [401, 402, 403])
 def test_a_rejected_key_still_refuses(probe, status):
     result = probe(get_json=lambda _u, _t: (status, {}), bearer=lambda: "bad")
     assert result.remaining_usd is None

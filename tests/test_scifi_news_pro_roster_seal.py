@@ -146,6 +146,15 @@ def test_a_forged_roster_raw_or_hash_is_refused():
         F2._validate_selected_final_draft(forged, treatment=treatment)
 
 
+def test_the_roster_is_bound_into_the_artifact_seal():
+    """Where no treatment is at hand -- the ledger receipt -- only the seal
+    stands between a swapped roster and a draft that re-parses identically."""
+    draft, _treatment = _short_then_long()
+    swapped = dataclasses.replace(draft, cast_roster=draft.cast_roster + ("Eli Marsh",))
+    with pytest.raises(F2.NewsProScriptError, match="hash seal"):
+        F2._final_draft_ledger_payload(swapped)
+
+
 def test_the_roster_must_match_the_treatment_it_is_selected_against():
     draft, _treatment_ok = _short_then_long()
     with pytest.raises(F2.NewsProScriptError, match="roster does not match"):

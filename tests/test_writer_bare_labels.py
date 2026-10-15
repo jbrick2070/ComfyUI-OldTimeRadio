@@ -3,9 +3,11 @@
 Until then each label carried a size/fit badge ("Qwen/Qwen3.5-4B (8.7 GB
 download, mac16-tight nv8-nf4 nv16 nv24)"), so correcting a size changed the
 SAVED value and orphaned every saved graph. Now the label is the id, the size
-and fit sit in the tooltip, and an older graph's badged value keeps working
-three ways: the writer's VALIDATE_INPUTS admits it, js/workflow_schema_core.js
-rewrites it to the bare option on load, and the run path strips it as before.
+and fit sit in the tooltip, and an older unstamped graph's badged value keeps
+working three ways: the writer's VALIDATE_INPUTS admits it,
+js/workflow_schema_core.js rewrites it to the bare option on load, and the run
+path strips it as before. (A saved copy of a stamped per-machine preset stops at
+its MASTER-HASH check instead -- operator decision, no compat path.)
 
 The published filename's writer code (the `__cg4e2__` in an otr/obs name) is
 computed from the bare id the ledger stamps, so it does not move -- pinned

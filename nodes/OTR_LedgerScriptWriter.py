@@ -2580,7 +2580,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # load, and every value is stripped via
                 # _otr_model_catalog._strip_label_suffix before any consumer
                 # / meta stamp gets it -- raw widget strings never reach
-                # downstream nodes.
+                # downstream nodes. (A saved copy of a stamped per-machine
+                # preset stops at its MASTER-HASH check before any of this.)
                 "creative_writing_model": (
                     list(_llm_choices),
                     {

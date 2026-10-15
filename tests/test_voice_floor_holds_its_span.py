@@ -105,12 +105,36 @@ def test_a_duplicate_row_in_the_marker_falls_back():
 
 
 def test_the_voice_node_marks_every_floor_and_attaches_after_packing():
-    """The wiring, read where it lives: the helpers are only worth anything if
-    the commit loop calls them."""
-    src = (REPO / "nodes" / "_otr_voice_node_common.py").read_text(encoding="utf-8")
-    floor_call = src.index("_floor_voice_line(\n")
-    assert src.index("_floor_spans.append(floor_span(clips", floor_call) > floor_call
-    assert "attach_floor_spans(\n                pack_audio_batch(clips" in src
+    """The wiring, read where it lives (structurally, not by whitespace): the
+    floor branch of the commit loop records a span right after flooring, the
+    healthy branch never does, and the packed batch is what gets the spans."""
+    import ast
+    tree = ast.parse((REPO / "nodes" / "_otr_voice_node_common.py").read_text(
+        encoding="utf-8"))
+
+    def calls(node):
+        names = set()
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Call):
+                f = sub.func
+                names.add(f.id if isinstance(f, ast.Name) else getattr(f, "attr", ""))
+        return names
+
+    floor_branches = [n for n in ast.walk(tree)
+                      if isinstance(n, ast.If) and isinstance(n.test, ast.Name)
+                      and n.test.id == "_floor_why"]
+    assert len(floor_branches) == 1
+    body = floor_branches[0].body
+    assert {"_floor_voice_line", "floor_span"} <= calls(ast.Module(body=body, type_ignores=[]))
+    # Nothing outside that branch records a span.
+    outside = sum(1 for n in ast.walk(tree) if isinstance(n, ast.Call)
+                  and getattr(n.func, "id", "") == "floor_span")
+    assert outside == 1
+    attaches = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+                and getattr(n.func, "id", "") == "attach_floor_spans"]
+    assert len(attaches) == 1
+    first = attaches[0].args[0]
+    assert isinstance(first, ast.Call) and getattr(first.func, "id", "") == "pack_audio_batch"
 
 
 @pytest.fixture

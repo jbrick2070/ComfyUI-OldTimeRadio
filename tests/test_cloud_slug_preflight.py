@@ -716,26 +716,43 @@ def test_a_rejected_key_refuses_but_an_outage_or_empty_catalog_warns():
     def or_401(_url):
         raise urllib.error.HTTPError(_url, 401, "Unauthorized", {}, None)
 
-    assert csp.catalog_ids("openrouter", get_json=or_401).key_rejected
+    # The OpenRouter listing sends NO key, so its 401 is a proxy, not the key.
+    assert not csp.catalog_ids("openrouter", get_json=or_401).key_rejected
     assert not csp.catalog_ids("openrouter", get_json=lambda _u: {"data": []}).key_rejected
     assert csp.catalog_ids("openrouter", get_json=lambda _u: {"data": []}).ids is None
 
     def google_no_key(_path):
         raise GoogleAPIKeyMissingError("no key")
 
-    class _Forbidden(RuntimeError):
-        http_status = 403
-        failure_kind = "auth"
-        retryable = False
+    def raiser(**attrs):
+        exc = RuntimeError("google failure")
+        for name, value in attrs.items():
+            setattr(exc, name, value)
 
-    def google_403(_path):
-        raise _Forbidden("API key not valid")
+        def get(_path):
+            raise exc
+        return get
+
+    # How Google really answers a bad key: HTTP 400, filed as request_shape,
+    # reason API_KEY_INVALID in the structured body (measured 2026-10-14).
+    key_invalid_400 = raiser(http_status=400, failure_kind="request_shape",
+                             retryable=False, response_json={"error": {
+                                 "code": 400, "status": "INVALID_ARGUMENT",
+                                 "message": "API key not valid. Please pass a valid API key.",
+                                 "details": [{"reason": "API_KEY_INVALID"}]}})
+    google_403 = raiser(http_status=403, retryable=False)
+    auth_kind_only = raiser(failure_kind="auth", retryable=False)
+    other_400 = raiser(http_status=400, failure_kind="request_shape", retryable=False,
+                       response_json={"error": {"details": [{"reason": "BAD_PAGE"}]}})
 
     def google_down(_path):
         raise OSError("connection refused")
 
     assert csp.catalog_ids("google", get_json=google_no_key).key_rejected
+    assert csp.catalog_ids("google", get_json=key_invalid_400).key_rejected
     assert csp.catalog_ids("google", get_json=google_403).key_rejected
+    assert csp.catalog_ids("google", get_json=auth_kind_only).key_rejected
+    assert not csp.catalog_ids("google", get_json=other_400).key_rejected
     assert not csp.catalog_ids("google", get_json=google_down).key_rejected
     empty = csp.catalog_ids("google", get_json=lambda _p: {"models": []})
     assert empty.ids is None and not empty.key_rejected
@@ -755,20 +772,44 @@ def test_a_rejected_key_refuses_but_an_outage_or_empty_catalog_warns():
     assert severity(empty) == ["warn"]
 
 
-def test_the_live_catalog_pings_use_the_short_probe_timeout(monkeypatch):
+def test_the_live_catalog_pings_are_short_and_never_sleep_on_a_429(monkeypatch):
+    """Both list pings use the probe timeout, and the Google one bypasses the
+    client's 429 sleeper (_quota_retry), which could hold a queue for
+    minutes; fetch_catalog's own bounded retries do not sleep."""
     from nodes._otr_google_api import client
     seen = {}
 
-    def fake_get_json(path, **kwargs):
-        seen.update(kwargs)
-        return {"models": [{"name": "models/gemini-3.5-flash"}]}
+    def fake_get_bytes(path, *, api_key, timeout_s, accept=None):
+        seen["google_timeout"] = timeout_s
+        return b'{"models": [{"name": "models/gemini-3.5-flash"}]}'
 
-    monkeypatch.setattr(client, "get_json", fake_get_json)
-    csp._live_google_get_json("/v1beta/models?pageSize=1000")
-    assert seen.get("timeout_s") == csp.CATALOG_TIMEOUT_S
-    src = (REPO / "nodes" / "_otr_shared" / "cloud_slug_preflight.py").read_text(
-        encoding="utf-8")
-    assert "timeout=CATALOG_TIMEOUT_S" in src
+    def no_quota_retry(*_a, **_k):
+        raise AssertionError("the catalog probe must not go through _quota_retry")
+
+    monkeypatch.setattr(client, "_get_bytes", fake_get_bytes)
+    monkeypatch.setattr(client, "_quota_retry", no_quota_retry)
+    monkeypatch.setattr(client, "resolve_api_key", lambda: "k")
+    assert csp._live_google_get_json("/v1beta/models?pageSize=1000")["models"]
+    assert seen["google_timeout"] == csp.CATALOG_TIMEOUT_S
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+        def read(self):
+            return b'{"data": [{"id": "x/y"}]}'
+
+    def fake_urlopen(_req, timeout=None):
+        seen["openrouter_timeout"] = timeout
+        return _Resp()
+
+    monkeypatch.setattr(csp, "urlopen", fake_urlopen)
+    csp._live_openrouter_get_json(csp.OPENROUTER_MODELS_URL)
+    assert seen["openrouter_timeout"] == csp.CATALOG_TIMEOUT_S
+    assert csp.CATALOG_TIMEOUT_S <= 15
 
 
 def test_catalog_ids_openrouter_and_google_with_injected_get_json():

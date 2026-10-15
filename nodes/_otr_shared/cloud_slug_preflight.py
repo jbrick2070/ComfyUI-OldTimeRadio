@@ -65,7 +65,13 @@ CATALOG_TIMEOUT_S = 15
 
 
 def _key_rejected(exc) -> bool:
-    """Whether a catalog fetch failed on the key rather than the network."""
+    """Whether a Google catalog fetch failed on the KEY rather than the network.
+
+    Read from the client's structured evidence, never the message text: a
+    missing key (``GoogleAPIKeyMissingError``), ``failure_kind == "auth"`` or an
+    HTTP 401/403 -- and HTTP 400 with reason ``API_KEY_INVALID``, which is how
+    Google actually answers a malformed or revoked key (measured; the client
+    files that one as ``request_shape``)."""
     if exc is None:
         return False
     if type(exc).__name__ == "GoogleAPIKeyMissingError":
@@ -73,9 +79,13 @@ def _key_rejected(exc) -> bool:
     if getattr(exc, "failure_kind", None) == "auth":
         return True
     status = getattr(exc, "http_status", None)
-    if status is None:
-        status = getattr(exc, "code", None)   # urllib.error.HTTPError
-    return status in (401, 403)
+    if status in (401, 403):
+        return True
+    body = getattr(exc, "response_json", None)
+    err = body.get("error") if isinstance(body, dict) else None
+    details = err.get("details") if isinstance(err, dict) else None
+    return any(isinstance(d, dict) and d.get("reason") == "API_KEY_INVALID"
+               for d in (details if isinstance(details, list) else ()))
 
 
 def default_partner_selectors(node_key: str) -> dict:
@@ -204,8 +214,10 @@ def catalog_ids(authority, *, get_json=None) -> CatalogResult:
         try:
             payload = getter(OPENROUTER_MODELS_URL)
         except Exception as exc:  # noqa: BLE001 -- classified as transport
+            # Never key_rejected: this listing sends NO key, so a 401/403 here
+            # is a proxy or the host, not the user's key.
             return CatalogResult(None, "%s: %s" % (type(exc).__name__, exc),
-                                 OPENROUTER_HOST, _key_rejected(exc))
+                                 OPENROUTER_HOST)
         if not isinstance(payload, dict):
             return CatalogResult(None, "openrouter catalog is not an object",
                                  OPENROUTER_HOST)
@@ -254,8 +266,19 @@ def _live_openrouter_get_json(url: str) -> dict:
 
 
 def _live_google_get_json(path: str) -> dict:
-    from .._otr_google_api.client import get_json
-    return get_json(path, timeout_s=CATALOG_TIMEOUT_S)
+    """One plain GET with the short probe timeout. Deliberately NOT the
+    client's ``get_json``: that wraps every call in ``_quota_retry``, which
+    sleeps on a 429 (Retry-After, up to 60 s, several times) -- minutes of a
+    queue held by a probe. ``fetch_catalog`` already retries a retryable
+    failure a bounded number of times, without sleeping."""
+    from .._otr_google_api import client
+    body = client._get_bytes(path, api_key=client.resolve_api_key(),
+                             timeout_s=CATALOG_TIMEOUT_S, accept="application/json")
+    parsed = client._safe_json(body)
+    if not isinstance(parsed, dict):
+        raise client.GoogleAPIRequestShapeError(
+            "Google models.list did not return a JSON object.")
+    return parsed
 
 
 def catalog_outage_hint(catalog_host: str, paid_host: str) -> str:
