@@ -9,11 +9,11 @@ bytes a parameter -- so halving it models ONE byte a parameter, which is an
 row by close to 2x, which is invisible while every row is small enough to fit
 anyway and is not invisible at 27B.
 
-THE HARM IS RECORDED, not hypothetical. ``vram_badge_for``'s docstring (the
-function is retired; ``writer_fit_line`` replaced it) carried PBUG-20260829-17:
-a badge that read "(7.9 GB)" against an 8 GB card
-sent an owner past the smallest, cheapest writer in the list, and "the cost of
-that was a user walking away". A withheld ``nv24-nf4`` tag is the same defect
+THE HARM IS RECORDED, not hypothetical: PBUG-20260829-17 (commit 4478c81f,
+quoted in the ``vram_badge_for`` docstring until 2026-09-24; the function is
+retired and ``writer_fit_line`` replaced it). A badge that read "(7.9 GB)"
+against an 8 GB card sent an owner past the smallest, cheapest writer in the
+list, and "the cost of that was a user walking away". A withheld ``nv24-nf4`` tag is the same defect
 wearing the opposite sign -- the row simply claims no machine at all, and the
 one owner it was added for reads that as "not for me".
 

@@ -711,12 +711,14 @@ def test_no_dropdown_label_carries_any_state_badge(
             assert e.label == e.repo_id
             _assert_no_state_badge(e.label)
 
-    # THE INVARIANT THAT ACTUALLY MATTERS (2026-08-01). The label may now carry
-    # a VRAM figure -- the operator asked the picker to say how much a model
-    # needs so only runnable ones get chosen -- but it must remain MACHINE-
-    # INDEPENDENT. The download-state badge was removed precisely because it
-    # varied with each user's HF cache layout; this asserts the new badge does
-    # NOT, by comparing labels across two completely different cache states.
+    # THE INVARIANT THAT ACTUALLY MATTERS (2026-08-01). From then until
+    # 2026-10-14 the label carried a VRAM/size figure -- the operator asked the
+    # picker to say how much a model needs so only runnable ones get chosen --
+    # and it had to stay MACHINE-INDEPENDENT. The download-state badge was
+    # removed precisely because it varied with each user's HF cache layout.
+    # The labels are bare ids now (the figure moved to the tooltip); this still
+    # asserts they do not vary, by comparing labels across two completely
+    # different cache states.
     a = {e.repo_id: e.label
          for e in catalog.build_dropdown_choices(hub_root=hub_root_operator_gemma_mix)}
     b = {e.repo_id: e.label

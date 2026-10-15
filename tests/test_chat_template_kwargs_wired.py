@@ -161,9 +161,10 @@ class ChatTemplateKwargsWiringTests(unittest.TestCase):
 
     def test_exact_match_is_fed_a_stripped_id_not_a_badged_label(self):
         """A value saved before 2026-10-14 carries a size badge -- ' (4.3 GB)'
-        in the oldest graphs, ' (8.7 GB download, ...)' in later ones (the
-        dropdown labels are bare ids since); the comparison must see the bare
-        repo id or the suppression silently stops firing on such a graph."""
+        in the oldest graphs, then ' (8.7 GB, mac16-tight ...)', then
+        ' (8.7 GB download, ...)' from 2026-09-17 (the dropdown labels are bare
+        ids since 2026-10-14); the comparison must see the bare repo id or the
+        suppression silently stops firing on such a graph."""
         source = (NODES / "_otr_loader_backends.py").read_text(encoding="utf-8")
         self.assertIn(
             'split(" ", 1)[0]', source,

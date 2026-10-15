@@ -1871,9 +1871,11 @@ def _fit_budgets():
 #: `Qwen/Qwen3.8-27B` projects to 25.9 GB against the 22.0 GB nv24 budget and
 #: earns NO tag, while the card measured 17.7 GiB with room to spare.
 #:
-#: This is the defect shape recorded in writer_fit_line's docstring
-#: (PBUG-20260829-17) -- a number that reads as "your card cannot do this"
-#: when the card can. The cost there "was a user walking away".
+#: This is the defect shape of PBUG-20260829-17 (commit 4478c81f; the
+#: writer_fit_line docstring cites it for its no-context-term rule) -- a number
+#: that reads as "your card cannot do this" when the card can. The cost there,
+#: in the words of the vram_badge_for docstring that carried the record until
+#: 2026-09-24 (e5ff488b), "was a user walking away".
 #:
 #: Add a row here whenever someone measures one; never infer one. The figure
 #: is peak resident during a real load, not weights alone.
@@ -2017,7 +2019,8 @@ def writer_fit_line(repo_id: str) -> str:
     is said only when the projection actually ran and rated nothing: a row with
     no fit basis reads "fit unknown (no fit basis in the catalog)", and one the
     projection cannot price (it raised) reads "fit unknown (could not be
-    estimated)". Nothing here raises."""
+    estimated)". No catalog figure makes it raise (and INPUT_TYPES wraps the
+    table call regardless)."""
     curated = _by_repo_id().get(repo_id)
     if curated is None:
         return "not in the writer catalog; size and fit unknown"

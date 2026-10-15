@@ -3,7 +3,7 @@
 WHY THIS FILE EXISTS -- it was predicted, then it happened.
 
 The 2026-08-07 slug audit (`kibitz-runs/2026-08-07-slugfest/`) flagged that
-`workflows/otr_canonical.json` saves a full COMBO label, e.g. `"Qwen/Qwen3.5-4B (4.3 GB)"` --
+`workflows/otr_canonical.json` then saved a full COMBO label, e.g. `"Qwen/Qwen3.5-4B (4.3 GB)"` --
 a SIZE-SUFFIXED label -- and warned that if the suffix ever changed without the
 JSON being updated, saved workflows would stop matching the dropdown.
 
@@ -101,12 +101,13 @@ def test_saved_model_values_are_offered_by_the_live_dropdown(wf_name):
                 f"{[c for c in choices if isinstance(c, str) and str(value).split(' (')[0] in c][:3]}"
             )
     assert not problems, (
-        f"{wf_name} cannot be submitted as committed:\n  " +
+        f"{wf_name} saves writer values the live dropdown does not offer:\n  " +
         "\n  ".join(problems) +
-        "\nThe writer dropdown offers bare ids (since 2026-10-14); a value it "
-        "does not offer is a removed or renamed choice, or an older badged "
-        "spelling. Re-save the graph with the spelling the live dropdown "
-        "offers."
+        "\nThe writer dropdown offers bare ids (since 2026-10-14). A removed or "
+        "renamed choice fails at submit; an older badged spelling is still "
+        "admitted by the writer's VALIDATE_INPUTS, but a shipped graph must "
+        "not rely on that. Re-save the graph with the spelling the live "
+        "dropdown offers."
     )
 
 
