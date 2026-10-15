@@ -224,7 +224,8 @@ def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
 
 
 def _build_ass(ledger_path: str, style: str, margin_v: Optional[int],
-               title_plan=None, ass_out: Optional[str] = None):
+               title_plan=None, ass_out: Optional[str] = None, *,
+               speech_captions: bool = True):
     """Build the SDH .ass via the surviving _otr_captions builder (lazy import).
     Returns (ass_path|None, report).
 
@@ -247,7 +248,8 @@ def _build_ass(ledger_path: str, style: str, margin_v: Optional[int],
         return (None, f"caption builder unavailable: {type(exc).__name__}: {exc}")
     try:
         return build_ass_from_ledger(ledger_path, style=style, margin_v=margin_v,
-                                     title_plan=title_plan, out_path=ass_out)
+                                     title_plan=title_plan, out_path=ass_out,
+                                     speech_captions=speech_captions)
     except TitlePlanError:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -343,7 +345,7 @@ def _resolve_ledger_path(video_path: str) -> Optional[str]:
 def burn_captions_on_video(video_path: str, ledger_path: str, out_path: str, *,
                            style: str = _DEFAULT_CAPTION_STYLE, fps: int = 25,
                            ffmpeg: str = "ffmpeg", margin_v: Optional[int] = None,
-                           title_plan=None):
+                           title_plan=None, speech_captions: bool = True):
     """Burn the SDH .ass onto the SILENT ``video_path`` -> ``out_path``.
 
     Pure function (node + tests). Builds the .ass from ``ledger_path`` then burns
@@ -382,7 +384,8 @@ def burn_captions_on_video(video_path: str, ledger_path: str, out_path: str, *,
     # honest source for this. Found in QA.
     ass_out = _ass_sidecar_path(out_path)
     ass_path, report = _build_ass(ledger_path, style, margin_v,
-                                  title_plan=title_plan, ass_out=ass_out)
+                                  title_plan=title_plan, ass_out=ass_out,
+                                  speech_captions=speech_captions)
     if not ass_path:
         raise ValueError(f"OTR_CaptionBurn: no captions ({report})")
     ass_name, ass_cwd = _ass_filter_arg(ass_path)
@@ -567,9 +570,11 @@ class OTRCaptionBurn:
         # confining `output_path` alone would leave the sink open.
         confine_to_output_tree(out, "output_path" if output_path.strip() else "video_path")
         try:
+            # A title keeps the burn running with captions OFF; the switch
+            # still decides whether DIALOGUE is drawn (plan item 15).
             final, report = burn_captions_on_video(
                 video_path, led, out, style=style, fps=int(fps), ffmpeg=ffmpeg,
-                title_plan=title_plan,
+                title_plan=title_plan, speech_captions=bool(burn_captions),
             )
         except CaptionCapabilityGapError as exc:
             # A PROBE-CONFIRMED capability gap (no ffmpeg, or an ffmpeg with no

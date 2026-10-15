@@ -527,7 +527,8 @@ def title_events_from_plan(plan) -> list[str]:
 def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
                           margin_v: Optional[int] = None,
                           out_path=None,
-                          title_plan=None) -> tuple[Optional[str], str]:
+                          title_plan=None, *,
+                          speech_captions: bool = True) -> tuple[Optional[str], str]:
     """Build an .ass caption file from a ledger. Returns (out_path, report).
 
     On any failure returns (None, reason). Best-effort: never raises -- EXCEPT
@@ -538,6 +539,11 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
     With ``title_plan`` supplied this may produce a TITLE-ONLY .ass: an episode
     whose ledger will not load, or that has no speech lines at all, still gets
     its title card.
+
+    ``speech_captions=False`` builds NO speech events -- the node's
+    ``burn_captions`` OFF while a title still burns (plan item 15, 2026-10-14;
+    it used to burn the dialogue anyway). The ledger is still loaded: its
+    language picks the title font (Devanagari, CJK).
     """
     title_events = title_events_from_plan(title_plan) if title_plan else []
 
@@ -593,7 +599,7 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
     # rows BEFORE sorting/clamping prevents a muted row from both leaking into
     # the ASS and shortening the preceding spoken cue.
     dlines = (list(_OTRLC.iter_lines(ledger, roles=_SPEECH_ROLES))
-              if ledger is not None else [])
+              if ledger is not None and speech_captions else [])
     dlines.sort(key=lambda ln: float(ln.get("start_s") or 0.0))
 
     for li, ln in enumerate(dlines):

@@ -175,6 +175,81 @@ def test_a_title_only_burn_writes_its_ass_beside_the_episode_not_into_the_cwd(
 
 
 # ---------------------------------------------------------------------------
+# Captions OFF + a title: the title burns, the DIALOGUE does not (plan item 15)
+# ---------------------------------------------------------------------------
+
+def _burn_ass(plan_json, tmp_path, monkeypatch, *, captions, iso="en"):
+    """Drive the REAL node -> burn_captions_on_video -> _build_ass ->
+    build_ass_from_ledger with a speech-bearing ledger, and return the .ass the
+    builder wrote. The process boundary is this interpreter standing in for
+    ffmpeg (the .ass is written, then the spawn fails), exactly as the CWD test
+    above does it."""
+    import sys
+
+    from nodes._otr_shared import ffmpeg as ffmpeg_boundary
+    monkeypatch.setattr(burn_mod, "_ffmpeg_bin", lambda _widget: sys.executable)
+    monkeypatch.setattr(ffmpeg_boundary, "caption_support_gap", lambda _bin: None)
+    ep = tmp_path / ("ep_%s_%s" % (iso, "on" if captions else "off"))
+    ep.mkdir(parents=True)
+    led = ep / "ep_ledger.json"
+    led.write_text(json.dumps({
+        "episode_id": "ep", "meta": {"episode_language": iso},
+        "cast": [{"char_id": "c01", "name": "ALICE"}],
+        "lines": [{"line_id": "b001", "speaker_role": "character",
+                   "char_id": "c01", "speaker": "ALICE",
+                   "text": "The signal came back at midnight.",
+                   "start_s": 4.0, "dur_s": 2.5}],
+    }), encoding="utf-8")
+    vid = ep / "ep_silent.mp4"
+    vid.write_bytes(b"\x00\x00")
+    with pytest.raises(RuntimeError):
+        OTRCaptionBurn().burn(str(vid), burn_captions=captions,
+                              ledger_path=str(led), title_card_plan_json=plan_json)
+    (ass,) = list(ep.glob("*.ass"))
+    lines = ass.read_text(encoding="utf-8").splitlines()
+    speech = [ln for ln in lines if ln.startswith("Dialogue: 0,") and ",SDH," in ln]
+    title = [ln for ln in lines if ln.startswith("Dialogue: 1,")]
+    styles = [ln for ln in lines if ln.startswith("Style: TITLE,")]
+    return speech, title, styles
+
+
+def test_captions_off_with_a_title_burns_the_title_and_no_dialogue(
+        plan_json, tmp_path, monkeypatch):
+    off_speech, off_title, _ = _burn_ass(plan_json, tmp_path, monkeypatch,
+                                         captions=False)
+    on_speech, on_title, _ = _burn_ass(plan_json, tmp_path, monkeypatch,
+                                       captions=True)
+    assert off_title and off_title == on_title       # the same title either way
+    assert off_speech == []                          # OFF draws no dialogue
+    assert on_speech and "midnight" in on_speech[0]  # ON still does
+
+
+def test_captions_off_still_reads_the_ledger_for_the_title_font(
+        plan_json, tmp_path, monkeypatch):
+    """The ledger is loaded, not swapped for an empty one: its language still
+    picks a Devanagari font for a Hindi title."""
+    _, _, off_style = _burn_ass(plan_json, tmp_path, monkeypatch,
+                                captions=False, iso="hi")
+    _, _, on_style = _burn_ass(plan_json, tmp_path, monkeypatch,
+                               captions=True, iso="hi")
+    assert off_style == on_style and "Nirmala UI" in off_style[0]
+
+
+def test_the_builder_default_still_draws_dialogue(plan, tmp_path):
+    """Existing helper callers that pass nothing keep their captions."""
+    led = tmp_path / "ep_ledger.json"
+    led.write_text(json.dumps({
+        "episode_id": "ep", "cast": [], "lines": [{
+            "line_id": "b001", "speaker_role": "character", "char_id": "c01",
+            "speaker": "ALICE", "text": "Still here.", "start_s": 1.0,
+            "dur_s": 1.5}]}), encoding="utf-8")
+    out = tmp_path / "c.ass"
+    build_ass_from_ledger(str(led), title_plan=plan, out_path=str(out))
+    assert any(ln.startswith("Dialogue: 0,") for ln in
+               out.read_text(encoding="utf-8").splitlines())
+
+
+# ---------------------------------------------------------------------------
 # EXIT 3 -- the unknown style, the fifth exit a third reviewer found
 # ---------------------------------------------------------------------------
 
