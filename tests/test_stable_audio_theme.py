@@ -126,19 +126,20 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     engines = list(it["required"]["engine"][0])
     # OTR-F003 (2026-10-15): the broken-profiles fallback leads with the SAME
     # shipped default as the registry -- never musicgen (CC-BY-NC).
-    assert engines == ["stable_audio_3", "musicgen", "stable_audio_music"]
+    assert engines == ["stable_audio_3", "musicgen", "stable_audio_music",
+                       "sonilo", "google_lyria"]
     assert it["required"]["engine"][1]["default"] == "stable_audio_3"
 
 
-def test_the_fallback_default_matches_the_registry_default():
-    """The fallback list may be shorter than the registry's, but its index 0
-    -- the dropdown default when profiles cannot import -- must be the shipped
-    default, and every name in it must be a real music engine."""
+def test_the_fallback_equals_the_registry_list():
+    """P1.1 (apple/TTS_VOICE_PREFLIGHT.md), as the voice nodes already obey:
+    the fallback IS the registry list, in order -- so its index 0, the default
+    when profiles cannot import, is the shipped default, and a saved pick of
+    any music engine keeps its value in a degraded boot."""
     from nodes._otr_engine_profiles import legacy_first_engines
     from nodes.stable_audio_theme import _LEGACY_FIRST_FALLBACK
-    registry = legacy_first_engines("music")
-    assert _LEGACY_FIRST_FALLBACK[0] == registry[0] == "stable_audio_3"
-    assert set(_LEGACY_FIRST_FALLBACK) <= set(registry)
+    assert list(_LEGACY_FIRST_FALLBACK) == legacy_first_engines("music")
+    assert _LEGACY_FIRST_FALLBACK[0] == "stable_audio_3"
 
 
 def test_musicgen_clip_renders_two_cues(monkeypatch):

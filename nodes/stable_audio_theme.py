@@ -47,7 +47,11 @@ ROLE = "music"
 # default as `_LEGACY_FIRST_ENGINES["music"]` (OTR-F003, 2026-10-15): it used to
 # lead with musicgen -- the CC-BY-NC engine PBUG-20260907-04 removed as the
 # default -- on exactly the broken install least able to notice.
-_LEGACY_FIRST_FALLBACK = ("stable_audio_3", "musicgen", "stable_audio_music")
+# It is the WHOLE registry list, like the voice nodes' fallbacks (P1.1 in
+# apple/TTS_VOICE_PREFLIGHT.md), so a saved sonilo / google_lyria pick still
+# has its value in a degraded boot.
+_LEGACY_FIRST_FALLBACK = ("stable_audio_3", "musicgen", "stable_audio_music",
+                          "sonilo", "google_lyria")
 
 # The three fixed theme cues. Durations + the per-cue prompt are composed by the
 # single-source Meta-brief composer (nodes/_otr_music_prompt.compose_music_prompt),
