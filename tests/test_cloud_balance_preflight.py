@@ -227,6 +227,23 @@ def test_a_rejected_key_still_refuses(probe, status):
     assert result.severity == "refuse"
 
 
+def test_the_beat_estimate_covers_the_outlines_capacity_for_its_act_count():
+    """The flat 40 stopped being an upper bound once the outline accepted
+    every phase the generator returns (plan item 3): 5 acts can hold 56
+    beats, 7 acts 78. Short episodes keep the old conservative 40."""
+    assert [cbp.episode_beats_bound(n) for n in (1, 3, 5, 7)] == [40, 40, 56, 78]
+    assert cbp.episode_beats_bound("bogus") == 40
+    prompt = _prompt(_director("cloud_wan_i2v"),
+                     _writer("openrouter:slot-a", "openrouter_slot_a_model",
+                             "x/y", act_count=5))
+    lines = cbp.estimate_lines(prompt, "63", resolve_engine=lambda _e: object(),
+                               unit_usd_fn=_prices({"cloud_wan_i2v": 1.0}),
+                               writer_usd_fn=lambda _h, _s: (0.0, "x"),
+                               walk_fn=_walk, skip_writer=True)
+    video = [ln for ln in lines if ln.label == "cloud_wan_i2v"]
+    assert video and video[0].count == 56
+
+
 def test_a_crashed_balance_probe_warns():
     def crash(_wallet):
         raise RuntimeError("probe bug")

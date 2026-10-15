@@ -51,6 +51,8 @@ __all__ = [
     "ARC_PHASE_GUIDANCE",
     "MIN_ACT_COUNT",
     "MAX_ACT_COUNT",
+    "PHASE_BEATS_MAX",
+    "outline_beats_max",
     "EpisodeBudget",
     "compute_episode_budget",
     "voiced_beat_count",
@@ -82,12 +84,27 @@ class InvalidEpisodeBudgetError(ValueError):
 #: word-count veto in a project whose law says word targets are advisory.
 #:
 #: MAX_ACT_COUNT is 7 (2026-09-14). PBUG-20260825-01 had lowered it 8 -> 6
-#: because Outline.beats max_length=32 only fit 1..6 (5*act_count+1 beats).
-#: 7-act is back as a paid-length cloud UI; the outline cap moves with it to
-#: 36. 8-act stays refused (41 beats). Widget choices derive from this
-#: constant, so the dropdown and the schema stay in lockstep.
+#: when the outline's beat cap was tied to the nominal request. 7-act is back
+#: as a paid-length cloud UI, and 8-act is refused HERE, by this constant --
+#: never by a beat count. The outline's cap is beat CAPACITY,
+#: ``outline_beats_max`` (plan item 3, 2026-10-14). Widget choices derive
+#: from this constant, so the dropdown and the admission stay in lockstep.
 MIN_ACT_COUNT: int = 1
 MAX_ACT_COUNT: int = 7
+
+#: The most voiced beats one phase skeleton may return (one phase per act).
+#: The writer requests fewer; an accepted phase may differ from the request.
+PHASE_BEATS_MAX: int = 10
+
+
+def outline_beats_max(act_count: int) -> int:
+    """The most beats an accepted outline of ``act_count`` acts can hold:
+    every phase at ``PHASE_BEATS_MAX``, one interstitial between acts, and the
+    announcer open and close. 7 acts -> 78. Capacity, not a request: the
+    Outline schema caps at the 7-act value, and the queue-time cost estimate
+    prices the episode's own act count with it."""
+    acts = max(MIN_ACT_COUNT, min(MAX_ACT_COUNT, int(act_count)))
+    return acts * PHASE_BEATS_MAX + (acts - 1) + 2
 
 
 # ---------------------------------------------------------------------------

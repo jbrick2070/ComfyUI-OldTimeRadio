@@ -645,6 +645,30 @@ def test_a_rolled_cast_checks_and_charges_no_saved_voice():
     assert "cloud_elevenlabs" in _looked_up(prompt, validator)
 
 
+def test_a_replay_neither_checks_nor_prices_the_frozen_cast():
+    """A replay passes CastLock's frozen cast through with no TTS, so a dead
+    or unaffordable saved voice must not refuse it."""
+    from nodes._otr_shared import cloud_balance_preflight as cbp
+    prompt, validator, _castlock = _shipped_prompt("otr_cloud_low.json")
+    for node in prompt.values():
+        if node.get("class_type") == "OTR_LedgerScriptWriter":
+            node["inputs"]["replay_from"] = "bundle.json"
+    assert "cloud_elevenlabs" not in _looked_up(prompt, validator)
+    lines = cbp.estimate_lines(prompt, validator, resolve_engine=lambda _e: object(),
+                               unit_usd_fn=lambda _e, _g: 1.0,
+                               writer_usd_fn=lambda _h, _s: (0.0, "x"))
+    assert not [ln for ln in lines if ln.label == "cloud_elevenlabs"]
+
+
+def test_a_saved_voice_alias_is_checked_as_the_engine_it_casts():
+    prompt, validator, castlock = _shipped_prompt("otr_cloud_low.json")
+    prompt[castlock]["inputs"]["char_voice_engine"] = "elevenlabs"
+    prompt[castlock]["inputs"]["announcer_voice_engine"] = "kokoro"
+    assert csp.castlock_voice_picks(prompt[castlock]["inputs"])[0] == [
+        "cloud_elevenlabs", "kokoro"]
+    assert "cloud_elevenlabs" in _looked_up(prompt, validator)
+
+
 def test_a_wired_voice_slot_warns_instead_of_raising():
     prompt, validator, castlock = _shipped_prompt("otr_cloud_low.json")
     prompt[castlock]["inputs"]["char_voice_engine"] = ["999", 0]

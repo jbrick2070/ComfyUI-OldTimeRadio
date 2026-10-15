@@ -58,7 +58,7 @@ PAD_RATIO = 0.15
 PAD_MIN_USD = 1.0
 
 #: Conservative queue-time counts. The script does not exist yet.
-DEFAULT_BEATS = 40            # upper bound on a planned episode's beats
+DEFAULT_BEATS = 40            # floor of the beat estimate; see episode_beats_bound
 DEFAULT_FRESH_CAP = 15        # OTR_ImageDirector.fresh_cap default
 DEFAULT_ACT_COUNT = 3
 MUSIC_CUES = 4
@@ -144,6 +144,23 @@ def wallet_for_writer_handle(handle: str) -> Optional[str]:
 
 def pad_usd(subtotal: float) -> float:
     return max(float(subtotal) * PAD_RATIO, PAD_MIN_USD)
+
+
+def episode_beats_bound(act_count) -> int:
+    """Beats the video estimate assumes every paid engine renders: never
+    fewer than ``DEFAULT_BEATS``, and at least the outline's own capacity for
+    this act count (``_otr_episode_budget.outline_beats_max``: 5 acts -> 56,
+    7 -> 78). The old flat 40 was called an upper bound and stopped being one
+    once the outline accepted every phase the generator returns."""
+    try:
+        acts = int(act_count)
+    except (TypeError, ValueError):
+        acts = DEFAULT_ACT_COUNT
+    try:
+        from .._otr_episode_budget import outline_beats_max
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_episode_budget import outline_beats_max  # type: ignore
+    return max(DEFAULT_BEATS, outline_beats_max(acts))
 
 
 def clip_seconds_for_act_count(act_count) -> int:
@@ -474,7 +491,6 @@ def estimate_lines(
     lookup = resolve_engine or csp._default_resolve_engine
     writer_price = writer_usd_fn or default_writer_usd
 
-    beats = DEFAULT_BEATS
     fresh_cap = DEFAULT_FRESH_CAP
     for node in _find_nodes(prompt, scoped, _IMAGE_DIRECTOR):
         fresh_cap = max(fresh_cap,
@@ -491,6 +507,7 @@ def estimate_lines(
             replay_flags.append(bool(csp._widget_str(inputs, "replay_from", "")))
         act_count = max(seen_acts) if seen_acts else DEFAULT_ACT_COUNT
     replay = bool(replay_flags) and all(replay_flags)
+    beats = episode_beats_bound(act_count)
     clip_s = clip_seconds_for_act_count(act_count)
     if unit_usd_fn is None:
         def price(label, eng):
@@ -534,7 +551,8 @@ def estimate_lines(
             picked = csp._widget_str(inputs, "engine", "")
             if picked and not picked.startswith("+ Add Custom"):
                 add(picked, MUSIC_CUES, "%d cues" % MUSIC_CUES)
-        if ctype == _CASTLOCK:
+        if ctype == _CASTLOCK and not replay:
+            # A replay passes the frozen cast through with no TTS at all.
             voices, _wired = csp.castlock_voice_picks(inputs)
             for picked in sorted(set(voices)):
                 add(picked, act_count,

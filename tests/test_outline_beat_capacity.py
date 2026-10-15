@@ -115,7 +115,20 @@ def test_the_maximum_is_accepted_with_unique_ids_and_owned_cast():
     assert len(set(ids)) == len(ids)
     assert {b.speaker for b in outline.beats
             if b.speaker_role == "character"} <= set(_CAST)
+    assert calls.count("phase") == 7     # no phase was retried
     assert calls.count("beat") == 70
+
+
+def test_shorter_episodes_with_long_phases_are_accepted_too():
+    """The old cap of 36 also rejected 4- to 6-act outlines whose phases came
+    back long -- the shipped otr_cloud_low_5act graph is 5 acts."""
+    from nodes._otr_episode_budget import outline_beats_max
+    outline, calls = _run(5, lambda i, req: 7)
+    assert len(outline.beats) == 5 * 7 + 4 + 2 == 41
+    assert calls.count("phase") == 5
+    for acts in range(1, MAX_ACT_COUNT + 1):
+        top, _ = _run(acts, lambda i, req: 10)
+        assert len(top.beats) == outline_beats_max(acts)
 
 
 def _beat(i):

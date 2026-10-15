@@ -33,7 +33,9 @@ import re
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from ._otr_episode_budget import MAX_ACT_COUNT, EpisodeBudget
+from ._otr_episode_budget import (
+    MAX_ACT_COUNT, PHASE_BEATS_MAX, EpisodeBudget, outline_beats_max,
+)
 from pydantic import (
     BaseModel,
     Field,
@@ -46,11 +48,10 @@ log = logging.getLogger("OTR")
 
 #: The most voiced beats one phase skeleton (Stage 2) may return. One phase
 #: per act; the request asks for fewer, and an accepted phase may differ.
-_PHASE_BEATS_MAX = 10
-#: The most beats an accepted outline can hold: every act's phase at its
-#: ceiling, one interstitial between acts, and the announcer open and close.
-#: 7 * 10 + 6 + 2 = 78.
-OUTLINE_BEATS_MAX = MAX_ACT_COUNT * _PHASE_BEATS_MAX + (MAX_ACT_COUNT - 1) + 2
+_PHASE_BEATS_MAX = PHASE_BEATS_MAX
+#: The most beats an accepted outline can hold at the most acts admitted:
+#: 7 * 10 + 6 + 2 = 78 (``_otr_episode_budget.outline_beats_max``).
+OUTLINE_BEATS_MAX = outline_beats_max(MAX_ACT_COUNT)
 
 
 __all__ = [

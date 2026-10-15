@@ -674,13 +674,19 @@ def castlock_voice_picks(inputs) -> tuple:
             rolling = bool(roll)
         if rolling:
             return [], []
+    try:
+        from ..cast_lock import _VOICE_ENGINE_ALIASES as aliases
+    except ImportError:  # pragma: no cover -- no Comfy tree
+        aliases = {}
     picks, wired = [], []
     for slot in _CAST_SLOTS:
         value = inputs.get(slot, "")
         if isinstance(value, (list, tuple)):
             wired.append(slot)
         elif isinstance(value, str) and value.strip():
-            picks.append(value.strip())
+            # The id CastLock will actually cast with: a saved alias such as
+            # "elevenlabs" becomes "cloud_elevenlabs" there, so check that.
+            picks.append(aliases.get(value.strip(), value.strip()))
     return picks, wired
 
 
@@ -744,7 +750,9 @@ def collect_findings(
             picked = _widget_str(inputs, "engine", "")
             if picked and not picked.startswith("+ Add Custom"):
                 engine_ids.append(picked)
-        if ctype == _CASTLOCK:
+        if ctype == _CASTLOCK and not replay:
+            # A replay passes the frozen cast through with no TTS at all, so
+            # its voice widgets are neither checked nor priced.
             picks, wired = castlock_voice_picks(inputs)
             engine_ids.extend(picks)
             for slot in wired:
@@ -752,7 +760,8 @@ def collect_findings(
                     _CASTLOCK, _CASTLOCK, slot, "",
                     "voice slot is wired to another node; its engine is "
                     "unknown until the run",
-                    "the voice node checks it when it runs", "warn"))
+                    "unchecked here; a dead cloud pick fails when the voice "
+                    "engine calls it", "warn"))
 
     seen = set()
     for engine_id in engine_ids:
