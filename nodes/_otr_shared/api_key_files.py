@@ -73,7 +73,9 @@ def _first_real_line(path: Path) -> str | None:
         raise KeyFileError(
             "%s is not UTF-8 text (%s); save it as UTF-8 with the key on one "
             "line" % (path, exc.reason)) from exc
-    for raw in text.splitlines():
+    # A UTF-8 BOM (Notepad's "UTF-8 with BOM") is valid UTF-8 but would ride
+    # along as an invisible first character of the key; strip() keeps it.
+    for raw in text.lstrip("﻿").splitlines():
         line = raw.strip().strip('"').strip("'")
         if not line or line.startswith("#"):
             continue

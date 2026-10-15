@@ -102,24 +102,45 @@ def test_success_closes_and_reaps_and_removes_the_log(harness):
     assert not any(os.path.exists(p) for p in harness["logs"])
 
 
-@pytest.mark.parametrize("make,exc", [
+@pytest.mark.parametrize("make,cause", [
     (lambda: _Proc(_Stdin(fail_after=2)), BrokenPipeError),   # pipe breaks mid-stream
     (lambda: _Proc(_Stdin(fail_on_close=True)), OSError),     # closing the pipe fails
 ])
-def test_a_pipe_failure_stops_the_child_keeps_the_log_and_notes_the_cause(
-        harness, make, exc, caplog):
+def test_a_dead_ffmpeg_surfaces_its_own_reason_and_keeps_the_log(
+        harness, make, cause, caplog):
+    """ComfyUI's error panel shows str(exception), not notes: a broken pipe
+    means ffmpeg died, so the error the user sees quotes ffmpeg's stderr,
+    chained to the pipe error, and names the kept log."""
     harness["make"] = make
     gen = _frames(4)     # held here, so only an EXPLICIT close can close it
-    with pytest.raises(exc) as raised:
+    with pytest.raises(RuntimeError, match="ffmpeg stopped mid-encode .*something") as raised:
         _encode(harness, gen)
+    assert isinstance(raised.value.__cause__, cause)
+    assert harness["logs"][0] in str(raised.value)
     proc = harness["procs"][0]
     assert proc.waited and (proc.killed or proc.returncode is not None)
     assert inspect.getgeneratorstate(gen) == inspect.GEN_CLOSED, \
         "the frame source must be closed so its worker pool unwinds"
     assert all(os.path.exists(p) for p in harness["logs"]), "the failure log is evidence"
-    notes = " ".join(getattr(raised.value, "__notes__", []))
-    assert "something" in notes and harness["logs"][0] in notes
     assert any("stderr tail" in r.message for r in caplog.records)
+
+
+def test_a_frame_source_failure_keeps_its_own_exception_with_a_note(harness):
+    def frames():
+        yield np.zeros((2, 2, 3), dtype=np.uint8)
+        raise ValueError("frame render failed")
+    with pytest.raises(ValueError, match="frame render failed") as raised:
+        _encode(harness, frames())
+    assert "something" in " ".join(getattr(raised.value, "__notes__", []))
+
+
+def test_the_failure_log_lives_in_the_swept_scratch_tier(harness, monkeypatch, tmp_path):
+    scratch = tmp_path / "scratch"
+    monkeypatch.setattr(ve, "_scratch_dir_or_none", lambda: str(scratch.mkdir() or scratch))
+    harness["make"] = lambda: _Proc(_Stdin(), returncode=1)
+    with pytest.raises(RuntimeError):
+        _encode(harness, _frames(2))
+    assert os.path.dirname(harness["logs"][-1]) == str(scratch)
 
 
 def test_a_frame_source_failure_or_cancel_stops_the_child(harness):

@@ -1344,6 +1344,18 @@ def _finite(value, default: float = 0.0) -> float:
     return out if math.isfinite(out) else default
 
 
+def _scratch_dir_or_none():
+    """The pack's swept scratch tier (otr_shared_tmp_dir), created if needed;
+    None (the system temp) when there is no output tree."""
+    try:
+        from ._otr_paths import otr_shared_tmp_dir
+        tmp_dir = str(otr_shared_tmp_dir())
+        os.makedirs(tmp_dir, exist_ok=True)
+        return tmp_dir
+    except Exception:  # noqa: BLE001 -- no output tree: the system temp
+        return None
+
+
 class _owned_audio_wav:
     """A per-call 16-bit mono WAV of ``audio_np`` for the base-video encode,
     removed when the block exits -- on success, failure or cancellation.
@@ -1361,14 +1373,8 @@ class _owned_audio_wav:
     def __enter__(self):
         import tempfile
         import wave as wave_mod
-        try:
-            from ._otr_paths import otr_shared_tmp_dir
-            tmp_dir = str(otr_shared_tmp_dir())
-            os.makedirs(tmp_dir, exist_ok=True)
-        except Exception:  # noqa: BLE001 -- no output tree: the system temp
-            tmp_dir = None
         fd, self.path = tempfile.mkstemp(prefix="otr_video_audio_",
-                                         suffix=".wav", dir=tmp_dir)
+                                         suffix=".wav", dir=_scratch_dir_or_none())
         os.close(fd)
         try:
             pcm = (self._audio * 32767).astype(np.int16)
@@ -1488,8 +1494,12 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
     log.info("[Video] Launching ffmpeg: %s", " ".join(cmd[:6]) + " ...")
 
     import tempfile as _tf
+    # In the pack's swept scratch tier: a FAILED encode keeps this log as
+    # evidence, and the janitor ages it out instead of it piling up in the
+    # system temp.
     stderr_file = _tf.NamedTemporaryFile(
-        mode="w+b", prefix="otr_ffmpeg_", suffix=".log", delete=False
+        mode="w+b", prefix="otr_ffmpeg_", suffix=".log", delete=False,
+        dir=_scratch_dir_or_none(),
     )
 
     # EVERY EXIT OWNS ITS CLEANUP (plan item 17, 2026-10-14). A raise from
@@ -1538,9 +1548,17 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
         log.error("[Video] encode stopped before ffmpeg finished; ffmpeg "
                   "stderr tail: %s (full log: %s)", _tail or "(none captured)",
                   stderr_file.name)
-        # ComfyUI shows the EXCEPTION, not the log: a bare BrokenPipeError
-        # hides ffmpeg's own reason (e.g. an NVENC "Invalid argument"). Attach
-        # it to the ORIGINAL exception rather than replacing it.
+        # ComfyUI's error panel shows str(exception) and the traceback -- NOT
+        # exception notes. A broken pipe means ffmpeg itself died, and its own
+        # reason (e.g. an NVENC "Invalid argument") is in stderr, so THAT
+        # failure is re-raised as a RuntimeError quoting the tail, chained to
+        # the pipe error. Anything else -- a frame-source failure, a cancel --
+        # propagates untouched, with the tail attached as a note.
+        if proc is not None and isinstance(exc, OSError):
+            raise RuntimeError(
+                "ffmpeg stopped mid-encode (%s) :: %s (full log: %s)"
+                % (type(exc).__name__, _tail or "no stderr captured",
+                   stderr_file.name)) from exc
         if hasattr(exc, "add_note"):
             try:
                 exc.add_note("ffmpeg stderr tail: %s (full log: %s)"

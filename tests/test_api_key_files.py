@@ -148,3 +148,11 @@ def test_a_utf16_key_file_is_a_key_file_error(monkeypatch, tmp_path):
     with pytest.raises(keys.KeyFileError, match="not UTF-8"):
         keys.file_key("openrouter")
     assert openrouter_enabled() is False
+
+
+def test_a_utf8_bom_does_not_ride_along_into_the_key(monkeypatch, tmp_path):
+    for name in ("OPENROUTER_API_KEY", "OTR_OPENROUTER_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    _enable_files(monkeypatch, tmp_path)
+    (tmp_path / "openrouter.secret").write_bytes(b"\xef\xbb\xbfsk-or-key\r\n")
+    assert keys.file_key("openrouter") == "sk-or-key"
