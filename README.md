@@ -727,7 +727,8 @@ If yours lives somewhere unusual, set `OTR_FFMPEG` to the binary's full path.
 
 **`neither kokoro backend is installed` at the first voice line.** Python 3.10 to
 3.12 run Kokoro on torch and serve every admitted language. Python 3.13
-runs Kokoro through `kokoro-onnx` on the CPU and speaks every language; the
+runs Kokoro through `kokoro-onnx` on the CPU (or on CUDA by itself when
+`onnxruntime-gpu` is installed) and speaks every language; the
 Mandarin and Japanese libraries install with the pack (if they went missing:
 `pip install jieba pypinyin cn2an ordered-set`, `pip install fugashi jaconv unidic-lite`). Python 3.14 has no Kokoro build yet and is refused. The message names
 the exact pip line. An English episode can use Bark instead, except on a 16 GB

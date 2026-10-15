@@ -171,6 +171,17 @@ def select_backend_name(env_value=None) -> str:
     return "onnx"
 
 
+_OOM_MARKERS = ("out of memory", "failed to allocate", "cudaerrormemoryallocation",
+                "cuda_error_out_of_memory", "bfcarena")
+
+
+def _is_out_of_memory(reason: str) -> bool:
+    """onnxruntime raises a plain RuntimeError for a CUDA OOM; the text is the
+    only signal ("Failed to allocate memory", "BFCArena", "out of memory")."""
+    text = (reason or "").lower()
+    return any(marker in text for marker in _OOM_MARKERS)
+
+
 def parse_onnx_providers(env_value=None):
     """``OTR_KOKORO_ONNX_PROVIDERS`` as a list, or ``None`` (pick at load) when unset.
 
@@ -841,6 +852,30 @@ class OnnxKokoroBackend:
         return list(self._kokoro.get_voices()) if self._kokoro is not None else []
 
     def synthesize(self, text: str, voice_id: str, speed: float):
+        """One line. On an AUTOMATIC CUDA pick, a run-time failure the load
+        could not see (a cuDNN or cuBLAS kernel error on the first Run) rebuilds
+        the session on CPU, warns once, and voices the line there: the GPU never
+        fails a run. A real out-of-memory still raises (only a true OOM in real
+        work may fail a render), and so does a named error of this backend."""
+        on_auto_gpu = self.auto and GPU_ONNX_PROVIDERS[0] in self.providers_active
+        if not on_auto_gpu:
+            return self._synthesize(text, voice_id, speed)
+        try:
+            return self._synthesize(text, voice_id, speed)
+        except BackendUnavailable:
+            raise
+        except Exception as exc:  # noqa: BLE001 -- any GPU run failure degrades
+            reason = "%s: %s" % (type(exc).__name__, exc)
+            if _is_out_of_memory(reason):
+                raise
+        log.warning("[OTR.kokoro] ONNX on CUDA failed mid-run (%s); rebuilding the "
+                    "session on CPU", reason[:300])
+        self.close()
+        self.auto, self.providers = False, list(DEFAULT_ONNX_PROVIDERS)
+        self.load()
+        return self._synthesize(text, voice_id, speed)
+
+    def _synthesize(self, text: str, voice_id: str, speed: float):
         import numpy as np
 
         if self._kokoro is None:

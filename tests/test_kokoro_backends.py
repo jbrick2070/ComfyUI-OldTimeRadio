@@ -233,6 +233,45 @@ def test_a_cuda_that_will_not_start_falls_back_to_cpu_and_never_fails(monkeypatc
     assert any("voicing on CPU" in r.getMessage() for r in caplog.records)
 
 
+class _GpuRunFails(_StubKokoro):
+    def __init__(self, error):
+        super().__init__()
+        self._error = error
+
+    def create(self, text, **kw):
+        raise RuntimeError(self._error)
+
+
+def _auto_gpu_backend(monkeypatch, error):
+    """Loaded on an automatic CUDA pick whose FIRST Run fails with ``error``;
+    a CPU session voices normally."""
+    opened = _fake_ort_with(monkeypatch, [_CUDA, _CPU])
+    monkeypatch.setitem(sys.modules, "kokoro_onnx", types.SimpleNamespace(
+        Kokoro=types.SimpleNamespace(from_session=lambda s, v: (
+            _GpuRunFails(error) if _CUDA in s.get_providers() else _StubKokoro()))))
+    backend = kb.OnnxKokoroBackend("m.onnx", "v.npz")
+    backend.load()
+    assert backend.providers_active == [_CUDA, _CPU]
+    return backend, opened
+
+
+def test_a_cuda_kernel_failure_mid_run_voices_the_line_on_cpu(monkeypatch, caplog):
+    backend, opened = _auto_gpu_backend(monkeypatch, "CUDNN_STATUS_EXECUTION_FAILED")
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        out = backend.synthesize("hello", "bm_george", 1.0)
+    assert out.size == 100 and opened[-1] == [_CPU]
+    assert backend.providers_active == [_CPU] and backend.auto is False
+    assert any("failed mid-run" in r.getMessage() for r in caplog.records)
+
+
+def test_a_real_cuda_oom_mid_run_still_fails_the_line(monkeypatch):
+    backend, opened = _auto_gpu_backend(
+        monkeypatch, "Failed to allocate memory for requested buffer of size 8388608")
+    with pytest.raises(RuntimeError, match="Failed to allocate"):
+        backend.synthesize("hello", "bm_george", 1.0)
+    assert opened == [[_CUDA, _CPU]]            # no CPU rebuild hid the OOM
+
+
 def test_an_explicit_provider_list_is_exact_and_strict(monkeypatch):
     opened = _fake_ort_with(monkeypatch, [_CUDA, _CPU])
     kb.OnnxKokoroBackend("m.onnx", "v.npz", providers=[_CPU]).load()

@@ -132,7 +132,7 @@ or for a crash during ComfyUI's startup, before any node loaded.
 | Your Python | Voices | Notes |
 |---|---|---|
 | 3.10 – 3.12 | Kokoro on torch | The multilingual path; every admitted language. |
-| 3.13 | Kokoro through `kokoro-onnx`, on CPU | Picked automatically. Every language works (Mandarin and Japanese after their libraries below). |
+| 3.13 | Kokoro through `kokoro-onnx`, on CPU (on an NVIDIA card it moves to CUDA by itself once `onnxruntime-gpu` is installed) | Picked automatically. Every language works (Mandarin and Japanese after their libraries below). |
 | 3.14 and up | Refused | No Kokoro build exists yet. The provisioner refuses rather than installing something that cannot speak. |
 
 Japanese and Mandarin also need their readiness extras, checked only when
