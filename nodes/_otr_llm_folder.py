@@ -189,14 +189,88 @@ def _nonempty(path: Path) -> bool:
         return False
 
 
+def _download_dir(folder: Path) -> Path:
+    return Path(folder) / ".cache" / "huggingface" / "download"
+
+
+def _a_download_holds_a_lock(download_dir: Path) -> bool:
+    """True while some huggingface_hub transfer is writing into this folder.
+
+    huggingface_hub (1.30) holds ``<file>.lock`` here for the WHOLE transfer of
+    that file (``WeakFileLock`` around ``_download_to_tmp_and_move``), in this
+    process or another. So a lock nobody holds means no writer. Probed with a
+    zero-timeout acquire and an immediate release. When this cannot tell --
+    no ``filelock``, an unreadable directory, an odd lock error -- it answers
+    True: a live partial must never be mistaken for a dead one."""
+    try:
+        from filelock import FileLock, Timeout
+    except ImportError:  # pragma: no cover -- a huggingface_hub dependency
+        return True
+    try:
+        locks = list(download_dir.rglob("*.lock"))
+    except OSError:
+        return True
+    for path in locks:
+        lock = FileLock(str(path), timeout=0)
+        try:
+            lock.acquire(timeout=0)
+        except Timeout:
+            return True
+        except OSError:
+            return True
+        else:
+            lock.release()
+    return False
+
+
+def dead_partials(folder: Path) -> "list[Path]":
+    """The ``.incomplete`` files under ``folder`` that no transfer is writing.
+
+    WHY THIS EXISTS (the hard-kill wedge, 2026-10-14). huggingface_hub writes
+    every attempt to a process-unique ``<hash>.<etag>.<uuid8>.incomplete``,
+    never resumes one, and deletes its own partial in a ``finally`` -- which a
+    hard kill (closing the window, Task Manager, a power cut) skips. The orphan
+    then sat there forever, and because any ``.incomplete`` read as "a transfer
+    is in progress", the folder could never be complete again: every Queue
+    fetched the model anew and still found it unfinished.
+
+    The partials are listed BEFORE the locks are probed, so a transfer that
+    starts in between writes a NEW partial this list does not contain."""
+    download = _download_dir(folder)
+    try:
+        partials = list(download.rglob("*.incomplete"))
+    except OSError:
+        return []
+    if not partials or _a_download_holds_a_lock(download):
+        return []
+    return partials
+
+
+def drop_dead_partials(folder: Path) -> "list[str]":
+    """Delete :func:`dead_partials`; return their names. Best effort, never
+    raises -- a partial that will not delete is just left behind."""
+    removed = []
+    for partial in dead_partials(folder):
+        try:
+            partial.unlink()
+            removed.append(partial.name)
+        except OSError:
+            continue
+    return removed
+
+
 def _transfer_in_progress(folder: Path) -> bool:
     """huggingface_hub keeps a partial file as ``.incomplete`` under
     ``.cache/huggingface/download/`` until it is whole, then renames it into
-    place. One of those means a download is unfinished."""
+    place. A partial WITH a live writer means a download is unfinished; one
+    whose writer is gone (:func:`dead_partials`) is debris, not a transfer."""
+    download = _download_dir(folder)
     try:
-        return any((folder / ".cache" / "huggingface" / "download").rglob("*.incomplete"))
+        if not any(download.rglob("*.incomplete")):
+            return False
     except OSError:
         return False
+    return _a_download_holds_a_lock(download)
 
 
 def structurally_complete(folder: Path) -> bool:

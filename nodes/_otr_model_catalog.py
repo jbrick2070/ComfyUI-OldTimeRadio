@@ -2607,42 +2607,6 @@ def _fetched_paths(paths: "list[str]") -> "set[str]":
                 and not any(fnmatch.fnmatchcase(p, i) for i in IGNORE_PATTERNS)}
 
 
-def _drop_stale_ignored_partials(local_dir: Path) -> "list[str]":
-    """Delete a half-downloaded ``consolidated.safetensors`` -- the one file name
-    IGNORE_PATTERNS skips in a curated repo (Mistral-Nemo).
-
-    A Mistral-Nemo pull interrupted before 2026-10-14 can leave that copy as an
-    ``.incomplete`` under ``.cache/huggingface/download/``. The download no
-    longer fetches it, and :func:`_otr_llm_folder.structurally_complete` reads
-    any ``.incomplete`` as a transfer in progress -- so the folder could never
-    be complete again (Sonnet QA on abcd6a3f). huggingface_hub names a partial
-    by a hash of its metadata name (``<hash>.<etag>[.<uuid>].incomplete``), so
-    its own path helper is asked for that name's prefix; nothing else is
-    touched. Without that helper (a different huggingface_hub), nothing is
-    deleted. NOT handled here, and older than this: a stale partial of a file
-    the download DOES fetch (a hard-killed shard) wedges the folder the same
-    way -- that is the folder check's to solve, not this name list's."""
-    # A stale partial can only sit in a folder an earlier download started. The
-    # hub helper below CREATES the folder and its .cache as a side effect, so
-    # it is not asked anything unless that download directory already exists.
-    if not (Path(local_dir) / ".cache" / "huggingface" / "download").is_dir():
-        return []
-    try:
-        from huggingface_hub._local_folder import get_local_download_paths
-    except Exception:  # noqa: BLE001 -- a private helper; absent means do nothing
-        return []
-    removed = []
-    for name in ("consolidated.safetensors",):
-        try:
-            paths = get_local_download_paths(Path(local_dir), name)
-            prefix = paths.incomplete_path("ETAG").name.split(".ETAG.")[0]
-            for partial in paths.metadata_path.parent.glob(prefix + ".*.incomplete"):
-                partial.unlink()
-                removed.append(partial.name)
-        except Exception:  # noqa: BLE001 -- best effort; the download still runs
-            continue
-    return removed
-
 # Pre-flight disk-space margin: leave at least 5 GB free after the
 # download lands. Prevents partial-download cleanup brittleness on a
 # near-full disk.
@@ -2830,11 +2794,14 @@ def auto_download_if_missing(
     # models root at all keeps the hub cache, exactly as before.
     local_dir = _LLM.download_destination(weights_id)
     dest_path = local_dir if local_dir is not None else hub_root_path
-    # A stale partial of the ignored copy goes BEFORE the disk check: on a disk
-    # an interrupted Mistral pull filled, that partial is what is using the space.
-    if local_dir is not None:
-        for stale in _drop_stale_ignored_partials(local_dir):
-            print(f"[OTR] Removed a stale partial download of an ignored file: {stale}")
+    # Partials a hard-killed download left behind go BEFORE the disk check: on
+    # a disk an interrupted pull filled, they are what is using the space, and
+    # nothing would ever resume them (huggingface_hub writes a fresh
+    # process-unique partial per attempt). Only partials NO transfer is writing
+    # are touched -- see _otr_llm_folder.dead_partials.
+    if local_dir is not None and Path(local_dir).is_dir():
+        for stale in _LLM.drop_dead_partials(Path(local_dir)):
+            print(f"[OTR] Removed a partial download a killed transfer left behind: {stale}")
     # The disk check measures the drive the bytes actually land on.
     free_bytes = _free_disk_bytes_for(dest_path)
     margin = size_bytes + _DISK_SPACE_MARGIN_BYTES

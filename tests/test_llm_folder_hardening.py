@@ -93,10 +93,9 @@ def test_an_unsharded_hand_placed_model_is_complete(tmp_path):
     (folder / "config.json").write_text("{}", encoding="utf-8")
     (folder / "model.safetensors").write_bytes(b"w" * 64)
     assert LF.plain_folder_complete(folder)
-    # a transfer still in progress says otherwise
-    (folder / ".cache" / "huggingface" / "download").mkdir(parents=True)
-    (folder / ".cache" / "huggingface" / "download" / "model.safetensors.incomplete").write_bytes(b"?")
-    assert not LF.plain_folder_complete(folder)
+    # a transfer still in progress -- its writer holds the file's lock -- says otherwise
+    with _live_transfer(folder, "model.safetensors"):
+        assert not LF.plain_folder_complete(folder)
 
 
 def test_a_sharded_folder_with_a_transfer_in_progress_is_not_complete(tmp_path):
@@ -104,9 +103,62 @@ def test_a_sharded_folder_with_a_transfer_in_progress_is_not_complete(tmp_path):
     a file still downloading -- not complete on the sharded branch either."""
     folder = _plain(tmp_path, receipt=False)
     assert LF.plain_folder_complete(folder)
-    (folder / ".cache" / "huggingface" / "download").mkdir(parents=True)
-    (folder / ".cache" / "huggingface" / "download" / "tokenizer.json.incomplete").write_bytes(b"?")
-    assert not LF.plain_folder_complete(folder)
+    with _live_transfer(folder, "tokenizer.json"):
+        assert not LF.plain_folder_complete(folder)
+
+
+import contextlib  # noqa: E402
+
+
+@contextlib.contextmanager
+def _live_transfer(folder, name):
+    """huggingface_hub 1.30's shape for a file being downloaded: a
+    process-unique ``<hash>.<etag>.<uuid8>.incomplete`` and the file's
+    ``.lock`` HELD for the whole transfer."""
+    from filelock import FileLock
+    download = folder / ".cache" / "huggingface" / "download"
+    download.mkdir(parents=True, exist_ok=True)
+    partial = download / ("a1b2c3.%s.etag.1f2e3d4c.incomplete" % name)
+    partial.write_bytes(b"?")
+    lock = FileLock(str(download / (name + ".lock")))
+    with lock:
+        yield partial
+
+
+def test_a_partial_a_killed_download_left_behind_does_not_wedge_the_folder(tmp_path):
+    """THE HARD-KILL WEDGE (2026-10-14). huggingface_hub never resumes a
+    partial and deletes its own in a ``finally`` a hard kill skips. The orphan
+    -- no writer, its lock free -- used to read as "a transfer in progress"
+    forever, so the folder could never be complete again."""
+    for sharded in (False, True):
+        folder = (_plain(tmp_path / ("s" if sharded else "u"), receipt=False)
+                  if sharded else tmp_path / FOLDER)
+        if not sharded:
+            folder.mkdir()
+            (folder / "config.json").write_text("{}", encoding="utf-8")
+            (folder / "model.safetensors").write_bytes(b"w" * 64)
+        with _live_transfer(folder, "model.safetensors") as partial:
+            assert not LF.plain_folder_complete(folder)      # live: unfinished
+        # The writer died (its lock released, the partial left behind).
+        assert partial.exists()
+        assert LF.plain_folder_complete(folder), sharded     # debris, not a transfer
+        assert LF.dead_partials(folder) == [partial]
+        assert LF.drop_dead_partials(folder) == [partial.name]
+        assert not partial.exists()
+
+
+def test_a_live_partial_is_never_dropped(tmp_path):
+    folder = _plain(tmp_path, receipt=False)
+    with _live_transfer(folder, "model-00001-of-00002.safetensors") as partial:
+        assert LF.dead_partials(folder) == []
+        assert LF.drop_dead_partials(folder) == []
+        assert partial.exists()
+
+
+def test_the_cleanup_creates_nothing_in_a_fresh_folder(tmp_path):
+    fresh = tmp_path / "never_downloaded"
+    assert LF.drop_dead_partials(fresh) == []
+    assert not fresh.exists()
 
 
 def test_a_lone_first_shard_is_never_complete_even_with_config(tmp_path):

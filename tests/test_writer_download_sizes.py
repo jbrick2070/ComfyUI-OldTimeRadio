@@ -105,31 +105,14 @@ def test_the_download_call_passes_the_ignore_patterns(tmp_path, monkeypatch):
     assert seen["allow_patterns"] == list(C.ALLOW_PATTERNS)
 
 
-def test_a_stale_partial_of_the_ignored_copy_is_cleared_and_nothing_else(tmp_path):
-    hub_local = pytest.importorskip("huggingface_hub._local_folder")
-    folder = tmp_path / "Mistral"
-    folder.mkdir()
-    stale = hub_local.get_local_download_paths(folder, "consolidated.safetensors") \
-        .incomplete_path("abc123")
-    kept = hub_local.get_local_download_paths(folder, "model-00001-of-00005.safetensors") \
-        .incomplete_path("def456")
-    for p in (stale, kept):
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_bytes(b"partial")
-    removed = C._drop_stale_ignored_partials(folder)
-    assert removed == [stale.name]
-    assert not Path(stale).exists() and Path(kept).exists()
-
-
-def test_the_download_clears_the_stale_partial_before_its_disk_check(tmp_path, monkeypatch):
-    """The call site, with huggingface_hub 1.30's real partial name
-    (<hash>.<etag>.<uuid8>.incomplete): cleared before the disk check runs."""
-    hub_local = pytest.importorskip("huggingface_hub._local_folder")
+def test_the_download_clears_dead_partials_before_its_disk_check(tmp_path, monkeypatch):
+    """The call site: a partial a killed transfer left (its lock free) is gone
+    before the disk check runs -- it may be what is filling the disk -- and
+    huggingface_hub would never have resumed it anyway."""
     folder = tmp_path / "m"
-    folder.mkdir()
-    prefix = hub_local.get_local_download_paths(folder, "consolidated.safetensors") \
-        .incomplete_path("ETAG").name.split(".ETAG.")[0]
-    stale = folder / ".cache" / "huggingface" / "download" / (prefix + ".abc123.1f2e3d4c.incomplete")
+    download = folder / ".cache" / "huggingface" / "download"
+    download.mkdir(parents=True)
+    stale = download / "a1b2c3.model-00001-of-00005.safetensors.abc123.1f2e3d4c.incomplete"
     stale.write_bytes(b"partial")
     order = []
 
@@ -148,10 +131,3 @@ def test_the_download_clears_the_stale_partial_before_its_disk_check(tmp_path, m
         C.auto_download_if_missing("mistralai/Mistral-Nemo-Instruct-2407", hub_root=tmp_path,
                                    _snapshot_download=fake_snapshot_download)
     assert order == [("disk_check", False)]
-
-
-def test_the_cleanup_creates_nothing_in_a_fresh_folder(tmp_path):
-    """A first download must not find its folder already made by the cleanup."""
-    fresh = tmp_path / "never_downloaded"
-    assert C._drop_stale_ignored_partials(fresh) == []
-    assert not fresh.exists()
