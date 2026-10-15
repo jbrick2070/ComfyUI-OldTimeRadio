@@ -346,8 +346,11 @@ class OTRVideoDirector:
                     "default": "{}",
                     "tooltip": (
                         "When a role is set to '+ Add Custom Model', map the "
-                        "role key to a custom engine id here, e.g. "
-                        '{"character_video_model": "my_engine"}.'
+                        "role key to a custom engine id here -- video AND image "
+                        "roles, e.g. "
+                        '{"character_video_model": "my_engine", '
+                        '"music_image_model": "my_image_engine"}. This is the '
+                        "one declaration the queue check and the render both read."
                     ),
                 }),
                 "gate_in": ("STRING", {
@@ -650,11 +653,20 @@ class OTRVideoDirector:
             # still was minted and the wide render centre-cropped it, lopping
             # the subject's head off.
             "aspects": self._role_aspects(resolved_video, effective_video),
-            "image_models": {
+            # A '+ Add Custom Model' image pick is resolved HERE, from this
+            # node's custom_models_json, and leaves as the bare engine id
+            # (plan item 9, 2026-10-14). This node owns the selections, and the
+            # queue-time planners already resolve image customs with this
+            # declaration -- so the engine admitted is the engine generated.
+            # ImageDirector used to resolve the raw sentinel from its OWN map,
+            # so one declaration could pass the queue and fail at run time,
+            # and two different ones could plan one engine and run another.
+            # An undeclared sentinel still passes through unchanged.
+            "image_models": self._image_picks(custom_models_json, {
                 "announcer_image_model": announcer_image_model,
                 "music_image_model": music_image_model,
                 "character_image_model": character_image_model,
-            },
+            }),
             "canvas": {"w": int(canvas_w), "h": int(canvas_h), "fps": int(fps)},
             "warnings": warnings,
         }
@@ -663,6 +675,24 @@ class OTRVideoDirector:
         return (json.dumps(policy, ensure_ascii=True, separators=(",", ":")),)
 
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _image_picks(custom_models_json, picks) -> dict:
+        """The three image picks with any declared custom sentinel resolved.
+
+        Uses the queue-time admission's own reading of the declaration
+        (``_otr_visual_assets._custom_models``: stripped scalars, blanks
+        dropped; a pick that starts with "+ Add Custom") so the engine this
+        emits is exactly the one admission checked."""
+        from ._otr_visual_assets import _ADD_CUSTOM, _custom_models
+        custom = _custom_models({"custom_models_json": custom_models_json})
+        out = {}
+        for slot, picked in picks.items():
+            declared = (custom.get(slot, "")
+                        if isinstance(picked, str) and picked.startswith(_ADD_CUSTOM)
+                        else "")
+            out[slot] = declared or picked
+        return out
+
     @staticmethod
     def _parse_custom(custom_models_json, warnings) -> dict:
         try:

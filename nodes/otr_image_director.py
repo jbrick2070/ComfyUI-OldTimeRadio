@@ -196,8 +196,12 @@ class OTRImageDirector:
                 "custom_models_json": ("STRING", {
                     "multiline": True, "default": "{}",
                     "tooltip": (
-                        "When a role is '+ Add Custom Model', map the role key to "
-                        'a custom engine id, e.g. {"music_image_model":"z_image"}.'
+                        "Declare custom image engines on OTR_VideoDirector's "
+                        "custom_models_json instead -- that one is resolved "
+                        "before this node and is what the queue check reads. "
+                        "This map is used only for a '+ Add Custom Model' pick "
+                        "that arrives here unresolved (a policy built without "
+                        'OTR_VideoDirector), e.g. {"music_image_model":"z_image"}.'
                     ),
                 }),
                 "gate_in": ("STRING", {

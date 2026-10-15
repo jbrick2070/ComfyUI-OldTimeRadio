@@ -93,17 +93,21 @@ you queue, whichever hosted row you use.
 ### `+ Add Custom Model`
 
 The last entry in the dropdown is not an engine. It is the door to naming one of
-your own -- but declare it on **`OTR_ImageDirector`**, not `OTR_VideoDirector`.
-Both nodes carry a widget called `custom_models_json`, and they are not the same
-box: `OTR_VideoDirector`'s copy maps the three *video* roles, so typing your
-image engine there does nothing. The one that resolves an image role's sentinel
-lives on `OTR_ImageDirector` -- map the role key to your engine id there, e.g.
-`{"music_image_model": "my_engine"}`.
+your own. Declare it on **`OTR_VideoDirector`**, in its `custom_models_json` --
+the same box that maps the video roles also maps the image roles, e.g.
+`{"music_image_model": "my_engine"}`. That one declaration is what the queue
+check reads and what the render uses: `OTR_VideoDirector` resolves the image
+sentinel to your engine id before `OTR_ImageDirector` ever sees it (since
+2026-10-14).
 
-Pick the sentinel and leave that role out of the mapping, and nothing refuses on
-the spot. That role's picture is skipped while the rest of the episode keeps
-rendering, and the run only fails at the end, when the completion check finds a
-still missing.
+`OTR_ImageDirector` also carries a `custom_models_json`. It is read only when a
+`+ Add Custom Model` image pick reaches it unresolved -- a policy built without
+`OTR_VideoDirector`. In the shipped graphs, leave it as `{}`.
+
+Pick the sentinel and leave that role out of the mapping, and the queue refuses
+it before anything renders, naming the slot -- unless that role's video lane
+takes no still, in which case nothing is generated for it and nothing needs
+declaring.
 
 ---
 
