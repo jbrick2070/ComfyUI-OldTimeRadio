@@ -22,7 +22,7 @@ import path from "node:path";
 const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\//, ""));
 const CORE = pathToFileURL(
     path.join(here, "..", "..", "js", "workflow_schema_core.js")).href;
-const { reconcileGraph } = await import(CORE);
+const { reconcileGraph, writerName, comboOptions } = await import(CORE);
 
 /** The live-schema lookup the core reads, shaped like LiteGraph's registry. */
 const registry = {};
@@ -229,6 +229,80 @@ test("widgets_values_named loses the dropped key, so the two agree", () => {
     assert.equal(out.ok, true);
     assert.equal(out.changed, true);
     assert.deepEqual(out.graph.nodes[0].widgets_values_named, { kept: "K" });
+});
+
+// --- writer labels saved with a size badge (bare names since 2026-10-14) -----
+
+const WRITERS = ["comfy_native:gemma4-e2b-it-int8-convrot", "Qwen/Qwen3.5-4B",
+                 "openrouter:slot-a"];
+function declareWriter() {
+    registry.OTR_LedgerScriptWriter = { nodeData: { input: {
+        required: { episode_title: ["STRING", {}] },
+        optional: { creative_writing_model: [WRITERS, {}],
+                    technical_model: ["COMBO", { options: WRITERS }] },
+    } } };
+}
+
+test("a writer label is read the way the backend's _strip_label_suffix reads it", () => {
+    assert.equal(writerName("Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)"),
+                 "Qwen/Qwen3.5-4B");
+    assert.equal(writerName("comfy_native:gemma4-e2b-it-int8-convrot (4.8 GB download)"),
+                 "comfy_native:gemma4-e2b-it-int8-convrot");
+    assert.equal(writerName("google/gemma-4-12b-it (11.9 GB)"), "google/gemma-4-12b-it");
+    assert.equal(writerName("mistralai/Mistral-Nemo-Instruct-2407 [NOT DOWNLOADED]"),
+                 "mistralai/Mistral-Nemo-Instruct-2407");
+    assert.equal(writerName("Qwen/Qwen3.5-4B [LOCAL HF]"), "Qwen/Qwen3.5-4B");
+    assert.equal(writerName("Qwen/Qwen3.5-4B:nf4 (8.7 GB, mac16-tight)"), "Qwen/Qwen3.5-4B");
+    // the LAST " (" is the badge, as rsplit takes it
+    assert.equal(writerName("a (b) (c)"), "a (b)");
+    assert.equal(writerName("openrouter:slot-a"), "openrouter:slot-a");
+});
+
+test("COMBO options are read from either spec shape", () => {
+    declareWriter();
+    assert.deepEqual(comboOptions("OTR_LedgerScriptWriter", "creative_writing_model", registry), WRITERS);
+    assert.deepEqual(comboOptions("OTR_LedgerScriptWriter", "technical_model", registry), WRITERS);
+    assert.equal(comboOptions("OTR_LedgerScriptWriter", "episode_title", registry), null);
+});
+
+test("an older graph's badged writer labels load as the bare options they name", () => {
+    declareWriter();
+    const node = savedNode(1, "OTR_LedgerScriptWriter", [
+        ["episode_title", "x"],
+        ["creative_writing_model", "comfy_native:gemma4-e2b-it-int8-convrot (4.8 GB download)"],
+        ["technical_model", "Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)"],
+    ]);
+    node.widgets_values_named = { technical_model: node.widgets_values[2] };
+    const out = reconcile({ nodes: [node], links: [] });
+    assert.equal(out.ok, true);
+    assert.equal(out.changed, true);
+    assert.deepEqual(out.graph.nodes[0].widgets_values,
+                     ["x", "comfy_native:gemma4-e2b-it-int8-convrot", "Qwen/Qwen3.5-4B"]);
+    assert.equal(out.graph.nodes[0].widgets_values_named.technical_model, "Qwen/Qwen3.5-4B");
+    assert.equal(out.notes.length, 2);
+});
+
+test("a writer value is left alone unless it names an option this build offers", () => {
+    declareWriter();
+    for (const value of ["Qwen/Qwen3.5-4B", "some/removed-model (3.0 GB download)", "openrouter:slot-a"]) {
+        const node = savedNode(1, "OTR_LedgerScriptWriter", [
+            ["episode_title", "x"], ["creative_writing_model", value], ["technical_model", "Qwen/Qwen3.5-4B"]]);
+        const out = reconcile({ nodes: [node], links: [] });
+        assert.equal(out.ok, true);
+        assert.equal(out.changed, false, value);
+        assert.equal(out.graph.nodes[0].widgets_values[1], value);
+    }
+});
+
+test("a respelling alone never triggers the link repair (nor its duplicate-id refusal)", () => {
+    declareWriter();
+    const a = savedNode(7, "OTR_LedgerScriptWriter", [
+        ["episode_title", "x"], ["creative_writing_model", "Qwen/Qwen3.5-4B (8.7 GB download)"],
+        ["technical_model", "Qwen/Qwen3.5-4B"]]);
+    const b = savedNode(7, "Other", [["kept", "K"]]);
+    const out = reconcile({ nodes: [a, b], links: [] });
+    assert.equal(out.ok, true);
+    assert.equal(out.graph.nodes[0].widgets_values[1], "Qwen/Qwen3.5-4B");
 });
 
 test("REFUSES duplicate node ids rather than repairing against the wrong node", () => {

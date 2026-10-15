@@ -252,18 +252,19 @@ def _is_engine_director_admissible(widget_name: str, value: Any) -> bool:
     return False
 
 
-#: The two LLM picker widgets whose menu options now carry a VRAM badge
-#: (``'google/gemma-4-12b-it (11.9 GB)'``). Profiles, CLI flags and saved graphs
-#: store the BARE repo id, so both the validator and the writer need the same
-#: bare<->badged tolerance the video director already has for ``'ltx098_low_video (16:9)'``.
+#: The two LLM picker widgets. Their menu options carried a size badge
+#: (``'Qwen/Qwen3.5-4B (8.7 GB download, ...)'``) until 2026-10-14 and are the
+#: bare repo id since; profiles and CLI flags always stated the bare id, and an
+#: older saved graph may still carry the badge -- so both the validator and the
+#: writer keep the same bare<->badged tolerance the video director has for
+#: ``'ltx098_low_video (16:9)'``.
 _LLM_MODEL_WIDGETS = frozenset({"creative_writing_model", "technical_model"})
 
 
 def _is_llm_model_admissible(widget_name: str, value: Any, type_def: Any) -> bool:
-    """A BARE repo id is admissible against a VRAM-badged choice list.
-
-    Without this, adding the badge would reject every profile that names a
-    creative model -- the badge is display text, not a new identity."""
+    """A writer value is admissible when its bare id is one of the choices,
+    whichever side carries a badge (an older saved graph, or an older schema
+    snapshot) -- the badge is display text, never an identity."""
     if widget_name not in _LLM_MODEL_WIDGETS or not isinstance(value, str):
         return False
     from ._otr_model_catalog import _strip_label_suffix
@@ -456,7 +457,8 @@ def widget_value_by_name(target_node: dict, widget_name: str,
 def _to_profile_form(value: Any) -> Any:
     """A value in the spelling a profile row uses. Idempotent; non-strings pass through.
 
-    The graph stores COMBO labels -- 'Qwen/Qwen3.5-4B (8.7 GB download, ...)' -- where a
+    The graph stores COMBO labels -- bare since 2026-10-14, but an older graph may
+    hold 'Qwen/Qwen3.5-4B (8.7 GB download, ...)' -- where a
     row states the bare value, so `_strip_label_suffix` (documented "IDEMPOTENT AND
     BACKWARD-COMPATIBLE") is the inverse that matters. It is the same one the WRITE path
     applies, so this cannot drift from emitting.
@@ -772,18 +774,19 @@ def _director_option_value(node_type: str, widget: str, value: Any) -> Any:
 def _llm_option_value(node_type: str, widget: str, value: Any,
                       schemas: Optional[dict],
                       quant_policy: Any = None) -> Any:
-    """Write the EXACT live menu option for an LLM picker, badge included.
+    """Write the EXACT live menu option for an LLM picker.
 
     The sibling of :func:`_director_option_value`. A profile stores the bare
-    repo id (``'google/gemma-4-12b-it'``); the picker now shows it with its VRAM
-    cost (``'google/gemma-4-12b-it (11.9 GB)'``). Storing the bare form would
-    leave a saved graph carrying a value ComfyUI's own COMBO validation does not
-    recognize, so resolve it to the live choice.
+    repo id (``'google/gemma-4-12b-it'``); the saved graph must carry the
+    option the live picker offers, or ComfyUI's own COMBO validation does not
+    recognize it. Since 2026-10-14 that option IS the bare id (the size badge
+    moved to the tooltip), so this resolves to the same string -- and it still
+    maps correctly against an older schema whose options carried the badge.
 
     Qwen 3.5 is one identity. A profile still names the family
     (``Qwen/Qwen3.5-4B``) plus ``quant_policy``; Quant is baked from the
     machine at load time. This maps the bare family onto the single live
-    COMBO label (badge included).
+    COMBO label.
 
     Falls through UNCHANGED whenever the choice list is unavailable or nothing
     matches -- a remote handle (``openrouter:slot-a``), an uncurated id with no

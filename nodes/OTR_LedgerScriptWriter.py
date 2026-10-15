@@ -2155,13 +2155,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         except Exception:  # noqa: BLE001 -- INPUT_TYPES must never raise
             _remote_on = False
             _slot_a_id = "openrouter:slot-a"
-        # THE SUFFIX IS PART OF THE VALUE. `dropdown_choices()` offers labels
-        # carrying a size + fit badge, so a BARE repo id matches no choice and
-        # ComfyUI resolves an unmatched COMBO to index 0 -- a node that SAYS one
-        # model and silently runs another. `default_llm_option()` exists for
-        # exactly this and its docstring records the last time it bit (both
-        # writer widgets rendering red, 2026-08-04). The remote slot id is a
-        # real choice when the lane is on, so it stays bare.
+        # THE DEFAULT MUST BE A MEMBER OF THE LIST: ComfyUI resolves an
+        # unmatched COMBO to index 0 -- a node that SAYS one model and
+        # silently runs another (both writer widgets red, 2026-08-04).
+        # `fresh_llm_option()` answers in the list's own spelling, which since
+        # 2026-10-14 is the bare id (size and fit live in the tooltip below).
         _creative_default = (
             _slot_a_id if _remote_on else _otr_model_catalog.fresh_llm_option()
         )
@@ -2170,6 +2168,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # cached across requests -- a model downloaded since the last
         # refresh must appear on the next one.
         _llm_choices = _otr_model_catalog.dropdown_choices()
+        try:
+            _writer_table = "\n\n" + _otr_model_catalog.writer_tooltip_table()
+        except Exception:  # noqa: BLE001 -- INPUT_TYPES must never raise
+            _writer_table = ""
         _slot_a_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("a")
         _slot_b_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("b")
         # Comfy Credits slot pickers (2026-06-01). Choices come from the
@@ -2570,13 +2572,15 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # the seed); this widget lets the operator force it.
                 # S30 B2a: single model_id widget replaced by two slots.
                 # The catalog dropdown_choices() call scans the local HF
-                # cache live; local curated labels carry a display-only
-                # size/fit badge, remote slot handles and uncurated cache
-                # hits are bare (older saved workflows may still hold the retired
-                # [LOCAL HF] / [NOT DOWNLOADED] suffixes). Labels are
-                # stripped via _otr_model_catalog._strip_label_suffix
-                # before any consumer / meta stamp gets the value -- raw
-                # widget strings never reach downstream nodes.
+                # cache live. Every label is the bare id (2026-10-14); the
+                # size and fit of each writer are in the tooltip. Older
+                # saved workflows may still hold a retired size badge or the
+                # [LOCAL HF] / [NOT DOWNLOADED] suffixes: VALIDATE_INPUTS
+                # admits them, js/workflow_schema_core.js rewrites them on
+                # load, and every value is stripped via
+                # _otr_model_catalog._strip_label_suffix before any consumer
+                # / meta stamp gets it -- raw widget strings never reach
+                # downstream nodes.
                 "creative_writing_model": (
                     list(_llm_choices),
                     {
@@ -2584,29 +2588,25 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "tooltip": (
                             "LLM for the creative/narrative passes "
                             "(outline, cast, dialogue composer, "
-                            "style picker invention). Mistral-Nemo is "
-                            "the C7 byte-identical audio baseline. "
-                            "Suffix tags like [LOCAL HF] "
-                            "and [NOT DOWNLOADED] are "
-                            "stripped before HF lookup. To use a remote "
+                            "style picker invention). A name an older "
+                            "graph saved with a size badge or a [LOCAL HF] "
+                            "/ [NOT DOWNLOADED] tag still runs: it is read "
+                            "as the bare name. To use a remote "
                             "OpenRouter model, set OPENROUTER_API_KEY and "
                             "pick OpenRouter A/B (see "
                             "https://github.com/jbrick2070/"
                             "ComfyUI-OldTimeRadio/blob/main/apple/"
                             "openrouter-setup.md)."
-                        ),
+                        ) + _writer_table,
                     },
                 ),
                 "technical_model": (
                     list(_llm_choices),
                     {
-                        # The BADGED label, not the bare repo id -- see the
-                        # note on _creative_default above. Measured 2026-09-14:
-                        # this default was 'Qwen/Qwen3.5-4B' while the choices
-                        # read 'Qwen/Qwen3.5-4B (8.7 GB, mac16-tight ...)', so
-                        # it matched nothing and a freshly dropped node fell
-                        # through to index 0. It was right only by the accident
-                        # of that row sorting first.
+                        # In the list's own spelling -- see the note on
+                        # _creative_default above. Measured 2026-09-14: a
+                        # default that matched no choice made a freshly
+                        # dropped node fall through to index 0.
                         "default": _otr_model_catalog.fresh_llm_option(),
                         "tooltip": (
                             "LLM for the technical/structured passes "
@@ -2624,7 +2624,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "https://github.com/jbrick2070/"
                             "ComfyUI-OldTimeRadio/blob/main/apple/"
                             "openrouter-setup.md)."
-                        ),
+                        ) + _writer_table,
                     },
                 ),
                 "openrouter_slot_a_model": (
@@ -3100,6 +3100,38 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # may change, the model may have warmed, etc.
         import time as _t
         return _t.time()
+
+    @classmethod
+    def VALIDATE_INPUTS(cls, creative_writing_model=None, technical_model=None):
+        """Admit a writer name an OLDER graph saved with its size badge
+        (``'Qwen/Qwen3.5-4B (8.7 GB download, ...)'``), a retired
+        [LOCAL HF] / [NOT DOWNLOADED] tag or the retired ``:nf4`` Qwen
+        spelling, now that the dropdown offers bare names (2026-10-14).
+
+        EXPLICIT ARGUMENTS ONLY, NEVER ``**kwargs``. ComfyUI calls this with just
+        the inputs its signature names and skips its own list check for exactly
+        those; every other widget on this node keeps its checks
+        (docs.comfy.org/custom-nodes/backend/server_overview; core
+        execution.py validate_inputs). ``**kwargs`` would switch validation off
+        for every widget here. Core's LoadImage uses the same shape.
+
+        A linked or absent input arrives as None (only constants are passed),
+        so there is nothing to check. The run path stays authoritative: run()
+        normalizes and validates the id itself before anything loads."""
+        choices = None
+        for name, value in (("creative_writing_model", creative_writing_model),
+                            ("technical_model", technical_model)):
+            if value is None:
+                continue
+            if not isinstance(value, str):
+                return "%s: expected a writer name, got %s" % (name, type(value).__name__)
+            bare = _otr_model_catalog._canonical_qwen_id(value)
+            if choices is None:
+                choices = set(_otr_model_catalog.dropdown_choices())
+            if bare not in choices:
+                return ("%s: %r is not a writer this install offers (read as %r); "
+                        "pick one from the dropdown" % (name, value, bare))
+        return True
 
     # ------------------------------------------------------------------
     # FUNCTION method

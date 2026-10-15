@@ -19,8 +19,8 @@ fits its own tier. Which one depends on which workflow you opened:
 
 | Workflow | Both slots ship |
 |---|---|
-| 16 GB and 24 GB NVIDIA (`otr_16gb_*`, `otr_24gb_*`) | **Gemma 4 12B run by ComfyUI itself** (`comfy_native:gemma4-12b-int8-convrot`, 11.2 GB download) |
-| 8 GB NVIDIA and the canonical | **Gemma 4 E2B run by ComfyUI itself** (`comfy_native:gemma4-e2b-it-int8-convrot`, 4.8 GB download) |
+| 16 GB and 24 GB NVIDIA (`otr_16gb_*`, `otr_24gb_*`) | **Gemma 4 12B run by ComfyUI itself** (`comfy_native:gemma4-12b-int8-convrot`, about 12.1 GB download) |
+| 8 GB NVIDIA and the canonical | **Gemma 4 E2B run by ComfyUI itself** (`comfy_native:gemma4-e2b-it-int8-convrot`, about 5.2 GB download) |
 | 16 GB Mac, AMD | **one Qwen row** (`Qwen/Qwen3.5-4B`). Mac loads full (`none`). There is no `:nf4` picker entry. |
 | Comfy Cloud cheap (`otr_cloud_low*`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
 | Comfy Cloud deluxe (`otr_cloud_deluxe_3act`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
@@ -88,19 +88,19 @@ This is the advertised list, exactly as the dropdown spells it. You can still
 pick any of them -- the ComfyUI-native Gemma 4 E2B is what every NVIDIA
 workflow *ships*, and Qwen 3.5 4B is what the Mac and AMD workflows ship.
 
-| What the dropdown says | Download | Licence | Worth knowing |
-|---|---|---|---|
-| `comfy_native:gemma4-e2b-it-int8-convrot (4.8 GB download)` | 4.8 GB | Apache 2.0 | **The 8 GB NVIDIA and canonical writer.** Gemma 4 E2B run by ComfyUI itself (its own loader and generate loop), already int8. About 63 tok/s on an 8 GB RTX 4060, 124 on an RTX 5080; episodes published on both. Works inside ComfyUI only. Unproven on Mac and AMD so far. |
-| `comfy_native:gemma4-e4b-it-int8-convrot (7.5 GB download)` | 7.5 GB | Apache 2.0 | The same path, a size up: ~84 tok/s on an RTX 5080, one episode. No workflow ships it. |
-| `comfy_native:gemma4-12b-int8-convrot (11.2 GB download)` | 11.2 GB | Apache 2.0 | **The 16 and 24 GB NVIDIA writer.** Gemma 4 12B run by ComfyUI itself: ~41 tok/s on an RTX 5080, four times the NF4 row below, ~13.5 GB peak -- too big for an 8 GB card. Works inside ComfyUI only. |
-| `Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)` | 8.7 GB | Apache 2.0 | **The one Qwen**, and the Mac and AMD default. NVIDIA loads NF4 (`nv8-nf4`). Mac / CPU load full (`mac16-tight`). There is no second Qwen row. |
-| `unsloth/Llama-3.2-3B-Instruct (6.4 GB download, mac16 nv8 nv16 nv24)` | 6.4 GB | Llama 3.2 Community | **The no-quantization row.** It is the one to pick if your machine has no `bitsandbytes` -- AMD above all. Nobody has published an episode with it yet. |
-| `mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB download, nv16-nf4 nv24-nf4)` | 24.0 GB | Apache 2.0 | Not what any workflow ships -- an earlier writer, still proven on 16 GB+ NVIDIA, and the pack's audio regression baseline. |
-| `google/gemma-4-E2B-it (6.0 GB download, mac16-tight nv8 nv16 nv24)` | 6.0 GB | Apache 2.0 | Compact technical-slot option. Loads the native text decoder (PBUG-20260906-07). OOM on a 16 GB Mac -- do not pick it there. |
-| `google/gemma-4-E4B-it (9.0 GB download, mac16-tight nv8-nf4 nv16 nv24)` | 9.0 GB | Apache 2.0 | Same family, a size up. Proven on 16 GB NVIDIA. |
-| `google/gemma-4-12b-it (23.9 GB download, nv16-nf4 nv24-nf4)` | 23.9 GB | Apache 2.0 | What the 16 GB NVIDIA workflows shipped until 2026-09-26. NF4 is baked into the pick, so you do not also change Quant; it loads NF4 even if Quant still says `none`. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |
-| `Qwen/Qwen3.8-27B (51.8 GB download, nv24-nf4)` | 51.8 GB | Apache 2.0 | **The big-card writer**, and the only row here that asks for more than 24 GB of card. Same architecture as the Qwen above it, six times the parameters, and prose quality is the only thing it buys -- it is about a quarter slower than `gemma-4-12b-it`. NF4 is baked into the pick. Measured on an RTX 5090: 17.7 GB resident, coherent prose, and constrained JSON that parsed. No workflow ships it and nobody has published an episode with it yet -- pick it deliberately, and mind that the download is over 50 GB. |
-| `google/gemma-2-2b-it (5.2 GB download, gated mac16 nv8 nv16 nv24)` | 5.2 GB | Gemma Terms of Use | The smallest of all, and **the only one that needs a Hugging Face login**. Intended as a `technical_model`, not a creative one. |
+| What the dropdown says | Download | Fits | Licence | Worth knowing |
+|---|---|---|---|---|
+| `comfy_native:gemma4-e2b-it-int8-convrot` | 5.2 GB | not rated (run by ComfyUI itself) | Apache 2.0 | **The 8 GB NVIDIA and canonical writer.** Gemma 4 E2B run by ComfyUI itself (its own loader and generate loop), already int8. About 63 tok/s on an 8 GB RTX 4060, 124 on an RTX 5080; episodes published on both. Works inside ComfyUI only. Unproven on Mac and AMD so far. |
+| `comfy_native:gemma4-e4b-it-int8-convrot` | 8.1 GB | not rated (run by ComfyUI itself) | Apache 2.0 | The same path, a size up: ~84 tok/s on an RTX 5080, one episode. No workflow ships it. |
+| `comfy_native:gemma4-12b-int8-convrot` | 12.1 GB | not rated (run by ComfyUI itself) | Apache 2.0 | **The 16 and 24 GB NVIDIA writer.** Gemma 4 12B run by ComfyUI itself: ~41 tok/s on an RTX 5080, four times the NF4 row below, ~13.5 GB peak -- too big for an 8 GB card. Works inside ComfyUI only. |
+| `Qwen/Qwen3.5-4B` | 9.3 GB | `mac16-tight` `nv8-nf4` `nv16` `nv24` | Apache 2.0 | **The one Qwen**, and the Mac and AMD default. NVIDIA loads NF4 (`nv8-nf4`). Mac / CPU load full (`mac16-tight`). There is no second Qwen row. |
+| `unsloth/Llama-3.2-3B-Instruct` | 6.4 GB | `mac16` `nv8` `nv16` `nv24` | Llama 3.2 Community | **The no-quantization row.** It is the one to pick if your machine has no `bitsandbytes` -- AMD above all. Nobody has published an episode with it yet. |
+| `mistralai/Mistral-Nemo-Instruct-2407` | 24.5 GB | `nv16-nf4` `nv24-nf4` | Apache 2.0 | Not what any workflow ships -- an earlier writer, still proven on 16 GB+ NVIDIA, and the pack's audio regression baseline. |
+| `google/gemma-4-E2B-it` | 10.2 GB | `mac16-tight` `nv8` `nv16` `nv24` | Apache 2.0 | Compact technical-slot option. Loads the native text decoder (PBUG-20260906-07). OOM on a 16 GB Mac -- do not pick it there. |
+| `google/gemma-4-E4B-it` | 16.0 GB | `mac16-tight` `nv8-nf4` `nv16` `nv24` | Apache 2.0 | Same family, a size up. Proven on 16 GB NVIDIA. |
+| `google/gemma-4-12b-it` | 23.9 GB | `nv16-nf4` `nv24-nf4` | Apache 2.0 | What the 16 GB NVIDIA workflows shipped until 2026-09-26. NF4 is baked into the pick, so you do not also change Quant; it loads NF4 even if Quant still says `none`. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |
+| `Qwen/Qwen3.8-27B` | 55.6 GB | `nv24-nf4` | Apache 2.0 | **The big-card writer**, and the only row here that asks for more than 24 GB of card. Same architecture as the Qwen above it, six times the parameters, and prose quality is the only thing it buys -- it is about a quarter slower than `gemma-4-12b-it`. NF4 is baked into the pick. Measured on an RTX 5090: 17.7 GB resident, coherent prose, and constrained JSON that parsed. No workflow ships it and nobody has published an episode with it yet -- pick it deliberately, and mind that the download is over 50 GB. |
+| `google/gemma-2-2b-it` | 5.2 GB | gated, `mac16` `nv8` `nv16` `nv24` | Gemma Terms of Use | The smallest of all, and **the only one that needs a Hugging Face login**. Intended as a `technical_model`, not a creative one. |
 
 The local rows download themselves except the gated Gemma 2 pick, which still needs a Hugging Face login.
 
@@ -110,26 +110,35 @@ absent unless you set a key yourself.
 
 ---
 
-## Reading the label
+## Reading the tooltip
 
-The size and the machine hints in the label are not decoration. Take
-`Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)` apart:
+The dropdown shows only the model's name -- the same name it saves, so a
+corrected size can never break a saved workflow. Hover over either writer box
+and the tooltip lists every writer like this:
+
+`- Qwen/Qwen3.5-4B: about 9.3 GB; fits mac16-tight nv8-nf4 nv16 nv24`
 
 | Piece | Means |
 |---|---|
-| `8.7 GB download` | Roughly what it downloads, once. Not what it occupies while running. The figures are approximate: a few rows are recorded in binary gigabytes, so a disk can show up to about 7% more. |
+| `about 9.3 GB` | What it downloads, once, in the decimal gigabytes a disk or browser shows (measured from the files). Not what it occupies while running. |
 | `nv8-nf4` | Fits an 8 GB NVIDIA card only as NF4, which that machine already bakes. Plain `nv8` means the full download fits. |
 | `nv16` `nv24` | Fits an NVIDIA card of that many GB at full precision. `nv16-nf4` means only the quantized load fits. |
 | `mac16` | Fits a 16 GB Apple Silicon machine. |
 | `-tight` | Fits with nothing to spare. Close everything else. |
 | `gated` | Needs a Hugging Face account and an accepted licence before it will download. |
-| A missing tag | Do not pick it on that machine. `(24.0 GB download, nv16-nf4 nv24-nf4)` has no `nv8`, so an 8 GB card should leave it alone. |
+| A missing tag | Do not pick it on that machine. Mistral-Nemo's `fits nv16-nf4 nv24-nf4` has no `nv8`, so an 8 GB card should leave it alone. |
+| `fit not rated` | The ComfyUI-native rows. The tags do not rate them; the table above says where each was proven. |
 
-**The download figure is honest everywhere; the fit tags are the part that
-changes by machine.** On NVIDIA the pack loads these models 4-bit, so a 24 GB
-download runs in roughly 12 GB. Apple Silicon has no 4-bit path at all, so the
-same model there costs its full size. That is the whole reason the label carries
-tags instead of one number.
+**The size is the download everywhere; the fit tags are the part that changes
+by machine.** On NVIDIA the pack loads these models 4-bit, so a 24 GB download
+runs in roughly 12 GB. Apple Silicon has no 4-bit path at all, so the same
+model there costs its full size. That is why the tooltip carries tags instead
+of one number.
+
+A workflow saved before 2026-10-14 may still hold the old long label, such as
+`Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)`. It loads and
+runs unchanged: the pack reads it as the bare name, and shows the bare name in
+the box once the workflow is open.
 
 ### The Mac exception, and it is the expensive one
 

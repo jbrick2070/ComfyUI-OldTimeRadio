@@ -46,9 +46,11 @@ hardware.
    show up this way -- the Gemma 4 rows are curated for exactly that reason.
 4. **Restart ComfyUI.** `INPUT_TYPES` runs at registration. A download that
    finished while the server was up is invisible until then.
-5. **An uncurated id has no fit tags.** Curated labels look like
-   `Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)`. A cache-discovered id is
-   the bare `org/name`. Do not infer tags for it.
+5. **An uncurated id has no fit tags.** Every dropdown entry is the bare
+   `org/name` (since 2026-10-14); the curated rows' sizes and fit tags are in the
+   writer boxes' tooltip, e.g. `Qwen/Qwen3.5-4B: about 9.3 GB; fits mac16-tight
+   nv8-nf4 nv16 nv24`. A cache-discovered id has no line there. Do not infer tags
+   for it.
 6. **Quant is baked on the rows that own it.** The one Qwen loads NF4 on
    NVIDIA and full on Mac / CPU. Gemma 4 12B owns `bnb_nf4`. Llama,
    Gemma-2, a cache folder, and cloud handles still use the Quant widget.

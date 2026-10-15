@@ -243,10 +243,12 @@ DIMENSIONS = {
 def _bare(value: str) -> str:
     """A dropdown label reduced to the key this table is written against.
 
-    Live labels carry decorations the table deliberately does not: a size badge
-    on the writer rows (``Qwen/Qwen3.5-4B (4.3 GB)``), an aspect tag on the
-    video rows (``ltx098_low_video (16:9)``) and a trailing note on the
-    audio-reactive ones. All of them start at the first ``" ("``.
+    Labels can carry decorations the table deliberately does not: the size
+    badge an older saved graph's writer value may still hold
+    (``Qwen/Qwen3.5-4B (8.7 GB download, ...)`` -- the writer dropdown offers
+    bare ids since 2026-10-14), an aspect tag on the video rows
+    (``ltx098_low_video (16:9)``) and a trailing note on the audio-reactive
+    ones. All of them start at the first ``" ("``.
     """
     text = (value or "").strip()
     cut = text.find(" (")

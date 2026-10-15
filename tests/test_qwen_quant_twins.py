@@ -20,7 +20,8 @@ def test_retired_nf4_spelling_collapses_to_the_one_qwen():
     nf4 = catalog.DEFAULT_LLM_NF4
     assert full != nf4
     assert catalog._canonical_qwen_id(nf4) == full
-    assert catalog._canonical_qwen_id(nf4 + catalog.vram_badge_for(full)) == full
+    # as an older graph may have saved it, with the retired size badge
+    assert catalog._canonical_qwen_id(nf4 + " (8.7 GB download, mac16-tight nv8-nf4)") == full
     assert catalog.hf_weights_id(full) == "Qwen/Qwen3.5-4B"
     assert catalog.hf_weights_id(nf4) == "Qwen/Qwen3.5-4B"
 
@@ -173,14 +174,13 @@ def test_chat_template_kwargs_fire_for_the_one_qwen():
 
 def test_fresh_and_default_llm_options_are_the_default_writer_and_qwen_keeps_its_tags():
     """The fresh-node and default options are the default writer's label (the
-    Comfy-native Gemma 4 E2B since 2026-09-26); the one Qwen row, still the Mac
-    and AMD writer, keeps its own fit tags."""
-    assert catalog.fresh_llm_option() == catalog.default_llm_option()
-    assert catalog.fresh_llm_option().startswith(catalog.DEFAULT_LLM + " (")
-    assert "download" in catalog.fresh_llm_option()
-    qwen_label = catalog.QWEN_LLM + catalog.vram_badge_for(catalog.QWEN_LLM)
-    assert qwen_label in catalog.dropdown_choices()
-    assert "nv8-nf4" in qwen_label
+    Comfy-native Gemma 4 E2B since 2026-09-26) -- the bare id since 2026-10-14;
+    the one Qwen row, still the Mac and AMD writer, keeps its own fit tags,
+    now stated in the writer tooltip."""
+    assert catalog.fresh_llm_option() == catalog.default_llm_option() == catalog.DEFAULT_LLM
+    assert catalog.QWEN_LLM in catalog.dropdown_choices()
+    assert "nv8-nf4" in catalog.writer_fit_line(catalog.QWEN_LLM)
+    assert "- %s: " % catalog.QWEN_LLM in catalog.writer_tooltip_table()
     assert catalog.DEFAULT_LLM_NF4 not in catalog.dropdown_choices()
 
 

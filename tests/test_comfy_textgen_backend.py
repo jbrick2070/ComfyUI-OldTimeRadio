@@ -603,13 +603,16 @@ def test_the_catalog_row_names_this_backend_and_its_pin():
     assert row.implied_quant_policy == "none" and row.requires_auth is False
 
 
-def test_the_dropdown_offers_it_with_a_download_badge_and_no_fit_claim():
-    """No machine class is claimed until an episode is proven on it."""
+def test_the_dropdown_offers_it_bare_with_its_size_in_the_tooltip_and_no_fit_claim():
+    """No machine class is claimed until an episode is proven on it. The
+    dropdown offers the bare id (2026-10-14); its size is in the tooltip."""
     label = catalog.dropdown_choices()
     mine = [choice for choice in label if choice.startswith(native.MODEL_ID)]
-    assert mine == [native.MODEL_ID + " (4.8 GB download)"]
+    assert mine == [native.MODEL_ID]
     assert catalog.validate_model_id(mine[0]) == native.MODEL_ID
     assert catalog.fit_tags_for(native.MODEL_ID) == ()
+    line = catalog.writer_fit_line(native.MODEL_ID)
+    assert line.startswith("about 5.2 GB") and "fit not rated" in line
 
 
 def test_on_disk_comes_from_comfys_folder_lookup(monkeypatch, tmp_path):

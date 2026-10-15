@@ -95,13 +95,14 @@ Quant is baked from the machine -- there is no second Qwen dropdown and
 the Quant widget is not a setting people have to flip. :data:`DEFAULT_LLM_NF4`
 is a retired spelling that still validates onto this row.
 
-ALSO FIXES A LATENT MISMATCH. Every curated dropdown label is
-``repo_id + vram_badge_for(repo_id)``, so the option list holds
-``'... (12.0 GB)'`` while this constant is the BARE id -- the declared default
-was never a member of its own option list, and ComfyUI fell through to whichever
-row happened to sit at index 0. That fallback is undefined behaviour dressed as
-a default. Consumers normalize through ``_strip_label_suffix``, so a bare id
-here is correct; what was wrong was pointing it at a row an 8 GB user cannot run.
+THE DROPDOWN SHOWS THIS BARE ID (operator, 2026-10-14). Labels used to be
+``repo_id`` plus a size/fit badge (``'... (8.7 GB download, ...)'``), so this
+bare constant was not a member of its own option list and ComfyUI fell through
+to index 0 -- undefined behaviour dressed as a default. Every label is now the
+bare id; the size and fit moved to the widget's tooltip
+(:func:`writer_tooltip_table`). A badge saved by an older graph still loads:
+``_strip_label_suffix`` normalizes it, the writer's ``VALIDATE_INPUTS`` admits
+it, and ``js/workflow_schema_core.js`` rewrites it to the bare id on load.
 """
 
 DEFAULT_LLM_NF4 = "Qwen/Qwen3.5-4B:nf4"
@@ -324,10 +325,10 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         "card UNQUANTIZED with roughly 2 GiB spare, and needs no bitsandbytes "
         "at all. Plain llama architecture, AutoModelForCausalLM, safetensors, "
         "no trust_remote_code. "
-        "MIND THE BADGE: vram_badge_for halves approx_safetensors_gb, which "
-        "assumes a 4-bit load, so the picker will show ~3.2 GB while an "
-        "unquantized load really costs 5.98 GiB. The badge understates this "
-        "row on exactly the hosts it is for. "
+        "MIND THE ESTIMATE: _estimate_resident_gb halves approx_safetensors_gb, "
+        "which assumes a 4-bit load, so it projects ~3.2 GB while an "
+        "unquantized load really costs 5.98 GiB. The projection understates "
+        "this row on exactly the hosts it is for. "
         "LICENCE IS NOT PERMISSIVE -- Llama 3.2 Community Licence, see "
         "apple/model-license-unsloth--llama-3.2-3b-instruct.md. Ungated on this "
         "mirror (meta-llama's own repo is gated), verified 2026-09-06. "
@@ -1253,9 +1254,10 @@ def build_dropdown_choices(
         else:
             weights = hf_weights_id(m.repo_id)
             on_disk = weights in scan and scan[weights].on_disk
-        entries.append(DropdownEntry(
-            m.repo_id + vram_badge_for(m.repo_id), m.repo_id,
-            on_disk, curated=True))
+        # The bare id, like ComfyUI's own loaders (operator 2026-10-14): size
+        # and fit live in the widget tooltip, so a measurement that moves can
+        # never again change the saved value and orphan every saved graph.
+        entries.append(DropdownEntry(m.repo_id, m.repo_id, on_disk, curated=True))
     curated_ids = {m.repo_id for m in active}
     for repo_id, result in scan.items():
         if repo_id in curated_ids:
@@ -1300,28 +1302,22 @@ def dropdown_choices(hub_root: Path | None = None) -> list[str]:
 
 
 def default_llm_option() -> str:
-    """The exact COMBO label for :data:`DEFAULT_LLM`, size suffix included.
+    """The exact COMBO label for :data:`DEFAULT_LLM` -- since 2026-10-14 the
+    bare id itself (labels carry no size badge; see :func:`writer_tooltip_table`).
 
-    THE SUFFIX IS PART OF THE VALUE. A saved graph must carry the label the
-    dropdown offers -- a bare repo id matches no choice, and an unmatched COMBO
+    A saved graph must carry the label the dropdown offers: an unmatched COMBO
     can resolve to index 0, so a graph that SAYS one model silently runs
-    another. That failure is already recorded (2026-08-04, both writer widgets
-    rendering red) and is why callers must never hand-build "repo_id (N GB)".
+    another (2026-08-04, both writer widgets rendering red). Callers ask here
+    rather than hand-building a label.
 
-    WHY THIS EXISTS (PBUG-20260906-09). A hard-coded
-    ``"google/gemma-4-12b-it (11.9 GB)"`` in a test does not move when
-    DEFAULT_LLM does, so the test asserts the OLD default is shipped -- it pins
-    the drift in place instead of catching it, and a test that fails when the
-    default legitimately changes is a test that will be edited rather than
-    believed. Deriving the label here means one edit to DEFAULT_LLM moves the
-    constant, the shipped graphs' checker, and every test at once.
-
-    Cache-independent by construction: it composes the same way
-    :func:`build_dropdown_choices` composes a curated row
-    (``repo_id + vram_badge_for(repo_id)``) and never scans the HF cache, so it
-    answers identically on a cold box and a warm one.
+    WHY THIS EXISTS (PBUG-20260906-09). A hard-coded label in a test does not
+    move when DEFAULT_LLM does, so the test asserts the OLD default is shipped
+    -- it pins the drift in place instead of catching it. Deriving the label
+    here means one edit to DEFAULT_LLM moves the constant, the shipped graphs'
+    checker, and every test at once. Cache-independent: it never scans the HF
+    cache, so it answers identically on a cold box and a warm one.
     """
-    return DEFAULT_LLM + vram_badge_for(DEFAULT_LLM)
+    return DEFAULT_LLM
 
 
 def default_writer_for_host(vendor: str | None = None) -> str:
@@ -1348,9 +1344,9 @@ def default_writer_for_host(vendor: str | None = None) -> str:
 def fresh_llm_option() -> str:
     """The exact COMBO label a newly dropped writer node should save on this
     machine: the default writer's label (the canonical's), or Qwen's on Apple
-    and AMD -- see :func:`default_writer_for_host`."""
-    writer = default_writer_for_host()
-    return writer + vram_badge_for(writer)
+    and AMD -- see :func:`default_writer_for_host`. The bare id, like every
+    label since 2026-10-14."""
+    return default_writer_for_host()
 
 
 # ---------------------------------------------------------------------------
@@ -1873,7 +1869,7 @@ def _fit_budgets():
 #: `Qwen/Qwen3.8-27B` projects to 25.9 GB against the 22.0 GB nv24 budget and
 #: earns NO tag, while the card measured 17.7 GiB with room to spare.
 #:
-#: This is the defect shape recorded in vram_badge_for's own docstring
+#: This is the defect shape recorded in writer_fit_line's docstring
 #: (PBUG-20260829-17) -- a number that reads as "your card cannot do this"
 #: when the card can. The cost there "was a user walking away".
 #:
@@ -1986,59 +1982,73 @@ def fit_tags_for(repo_id: str) -> tuple:
     return tuple(tags)
 
 
-def vram_badge_for(repo_id: str) -> str:
-    """``' (11.9 GB)'`` for a model whose resident cost is known, else ``''``.
+def writer_fit_line(repo_id: str) -> str:
+    """One writer's size and fit, as its widget tooltip states it:
+    ``'about 9.3 GB; fits mac16-tight nv8-nf4 nv16 nv24'``.
 
-    WHY THE PICKER CARRIES A NUMBER (operator, 2026-08-01): "all dropdowns
-    should state the name of the model and how much VRAM it needs so users
-    select only the one they can use." A dropdown that offers a model the box
-    cannot load is a broken menu, and the failure arrives minutes later as a
-    failed load rather than at the moment of choosing.
+    WHERE THE NUMBER LIVES (operator, 2026-10-14). Until then every dropdown
+    label carried it (operator, 2026-08-01: "all dropdowns should state the name
+    of the model and how much VRAM it needs so users select only the one they
+    can use"), which made a size correction change the SAVED value and orphan
+    every saved graph. The dropdown now shows the bare id, like ComfyUI's own
+    loaders, and the same facts sit in the tooltip.
 
-    It reports the same figure :func:`_estimate_resident_gb` computes, so the
-    badge and the gate cannot drift apart. Remote handles and un-estimable rows
-    get no badge rather than a guess: a wrong number is worse than none (the
-    same reason there is no download-state badge).
+    STATE THE DOWNLOAD, THEN WHERE IT FITS. The size is the measured download
+    (:func:`download_size_text`), true everywhere. The tags carry what changes
+    by machine, from :func:`fit_tags_for` -- the same projection the gate uses,
+    so the two cannot drift. A resident-memory figure is not shown: it is
+    platform-blind (it halves every row on the assumption of an 8-bit/NF4 load,
+    which does not exist on Apple Silicon; the Mac default once read "(4.3 GB)"
+    for a model that measured 14 GB there).
 
-    PBUG-20260829-17 is why no row carries a context term here: a badge priced
+    PBUG-20260829-17 is why nothing here carries a context term: a figure priced
     as weights + KV scales with the context the caller asks for, so a single
-    number means nothing without naming the context it assumed. Every row is a
-    safetensors download whose badge does not move with context, so the number
-    is unconditional by construction rather than by annotation."""
-    try:
-        est = _estimate_resident_gb(repo_id)
-    except Exception:  # noqa: BLE001 -- a badge must never break the picker
-        return ""
-    if not est or est <= 0:
-        return ""
+    number means nothing without naming the context it assumed.
 
-    # STATE THE DOWNLOAD, THEN WHERE IT FITS. The resident estimate stays the
-    # gate's number and is not what the label leads with, because it is
-    # platform-blind: it halves every row on the stated assumption of 8-bit/NF4
-    # loading, which does not exist on Apple Silicon. The shipped Mac default
-    # read "(4.3 GB)" for a model that measured 14 GB there, and a reader who
-    # trusted that badge lost the machine. The download size is true
-    # everywhere; the tags carry what changes.
+    FRICTION IS PART OF "CAN I USE THIS": a row that needs a licence click and
+    an HF_TOKEN says so first, derived from the row's own flag, never typed.
+    The ComfyUI-native rows carry no fit tags (the projection does not rate
+    them) and say so rather than claim a fit."""
     curated = _by_repo_id().get(repo_id)
-    download_gb = float(getattr(curated, "approx_safetensors_gb", 0.0) or 0.0)
-    tags = list(fit_tags_for(repo_id))
-    # FRICTION IS PART OF "CAN I USE THIS", not a separate question. A row that
-    # fits the machine but needs a licence click and an HF_TOKEN is not the
-    # same offer as one that just downloads, and the whole point of the shipped
-    # graphs is that a dropdown choice costs nothing but bandwidth. Derived
-    # from the row's own flag, never typed.
+    parts = []
+    size = download_size_text(repo_id)
+    if size:
+        parts.append(size)
     if repo_id in GATED_CURATED_MODELS or getattr(curated, "requires_auth", False):
-        tags.insert(0, "gated")
-    if download_gb > 0 and tags:
-        return " (%.1f GB download, %s)" % (download_gb, " ".join(tags))
-    if download_gb > 0:
-        # Fits nothing in the table -- say the size and say nothing false.
-        return " (%.1f GB download)" % download_gb
-    # No catalog download size (an uncurated cache hit): the resident
-    # estimate is the only number there is. This line referenced an undefined
-    # `suffix` from 3734162 until 2026-09-25, so such a row raised NameError
-    # inside the dropdown builder instead of getting its badge.
-    return " (%.1f GB)" % float(est)
+        parts.append("gated (needs a Hugging Face licence and HF_TOKEN)")
+    if getattr(curated, "provider", "local") == "comfy_native":
+        parts.append("run by ComfyUI itself; fit not rated by these tags")
+    else:
+        try:
+            tags = fit_tags_for(repo_id)
+        except Exception:  # noqa: BLE001 -- a tooltip must never break INPUT_TYPES
+            tags = ()
+        parts.append("fits " + " ".join(tags) if tags else "fits none of the rated machines")
+    return "; ".join(parts)
+
+
+#: The legend under the per-writer lines -- the same words as apple/WRITERS.md.
+WRITER_FIT_LEGEND = (
+    "nv8 / nv16 / nv24: fits an NVIDIA card of that many GB at full precision; "
+    "-nf4: only as a 4-bit load; mac16: a 16 GB Apple Silicon Mac; -tight: fits "
+    "with nothing to spare. Sizes are the one-time download, not the memory it "
+    "uses while running."
+)
+
+
+def writer_tooltip_table() -> str:
+    """Every local and Comfy-native writer with :func:`writer_fit_line`, then
+    the tag legend -- appended to both writer widgets' tooltips. Network-free
+    and cache-independent, so INPUT_TYPES can call it."""
+    lines = ["Writers -- download size and where each fits:"]
+    for m in _active_curated_models():
+        if getattr(m, "provider", "local") not in ("local", "comfy_native"):
+            continue
+        if m.repo_id == DEFAULT_LLM_NF4:
+            continue
+        lines.append("- %s: %s" % (m.repo_id, writer_fit_line(m.repo_id)))
+    lines.append(WRITER_FIT_LEGEND)
+    return "\n".join(lines)
 
 
 def _top_installed_alternatives(hub_root: Path | None = None) -> list[str]:
@@ -2379,8 +2389,8 @@ def _estimate_resident_gb(
         # FOUND ON A LIVE LEG, 2026-09-21. The Selector printed
         # "vram_fit=FAIL@25.9 GB" for Qwen3.8-27B while that model was
         # resident on the card at 17.1 GB, having loaded without complaint.
-        # 25.9 is this function's own download/2, and vram_badge_for's
-        # docstring promises the badge "reports the same figure
+        # 25.9 is this function's own download/2, and the dropdown badge of
+        # the time (retired 2026-10-14) promised it "reports the same figure
         # _estimate_resident_gb computes, so the badge and the gate cannot
         # drift apart". Teaching fit_tags_for the measured number without
         # teaching this one is exactly that drift: the picker said the card
@@ -2927,6 +2937,9 @@ __all__ = [
     "IGNORE_PATTERNS",
     "download_bytes_for",
     "download_size_text",
+    "writer_fit_line",
+    "writer_tooltip_table",
+    "WRITER_FIT_LEGEND",
     "HARD_VRAM_CONTEXT_LIMIT",
     "CURATED_CONTEXT_OVERRIDES",
     "DEFAULT_VRAM_CEILING_GB",

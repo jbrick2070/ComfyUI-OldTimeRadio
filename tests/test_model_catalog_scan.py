@@ -234,7 +234,7 @@ def test_dropdown_empty_cache_labels_are_bare(empty_hub_root):
     active_ids = {m.repo_id for m in catalog._active_curated_models()}
     assert {e.repo_id for e in entries} == active_ids
     for e in entries:
-        assert e.label == e.repo_id + catalog.vram_badge_for(e.repo_id)
+        assert e.label == e.repo_id
         _assert_no_state_badge(e.label)
 
 
@@ -243,7 +243,7 @@ def test_dropdown_with_mistral_nemo_sets_on_disk_flag(hub_root_with_mistral_nemo
     rows -> False), but the label is the bare id for every row regardless."""
     entries = catalog.build_dropdown_choices(hub_root=hub_root_with_mistral_nemo)
     for e in entries:
-        assert e.label == e.repo_id + catalog.vram_badge_for(e.repo_id)
+        assert e.label == e.repo_id
         _assert_no_state_badge(e.label)
         if e.repo_id == "mistralai/Mistral-Nemo-Instruct-2407":
             assert e.on_disk is True
@@ -683,7 +683,7 @@ def test_curated_local_row_label_is_bare_regardless_of_disk(tmp_path, repo_id, p
         if e.repo_id == repo_id
     )
     assert entry.on_disk is present
-    assert entry.label == repo_id + catalog.vram_badge_for(repo_id)
+    assert entry.label == repo_id
     _assert_no_state_badge(entry.label)
     # A value saved by an OLDER (badge-bearing) workflow still normalizes.
     assert catalog._strip_label_suffix(repo_id + catalog.NOT_DOWNLOADED_SUFFIX) == repo_id
@@ -708,7 +708,7 @@ def test_no_dropdown_label_carries_any_state_badge(
     dropdown shows clean model names for every user regardless of storage."""
     for hub in (hub_root_operator_gemma_mix, empty_hub_root):
         for e in catalog.build_dropdown_choices(hub_root=hub):
-            assert e.label == e.repo_id + catalog.vram_badge_for(e.repo_id)
+            assert e.label == e.repo_id
             _assert_no_state_badge(e.label)
 
     # THE INVARIANT THAT ACTUALLY MATTERS (2026-08-01). The label may now carry
@@ -741,7 +741,7 @@ def test_operator_gemma_mix_labels_bare_on_disk_tracked(hub_root_operator_gemma_
         "google/gemma-4-E2B-it",
         "google/gemma-2-2b-it",
     ):
-        assert by_repo[rid].label == rid + catalog.vram_badge_for(rid)
+        assert by_repo[rid].label == rid
         _assert_no_state_badge(by_repo[rid].label)
     assert by_repo["google/gemma-4-E4B-it"].on_disk is True
     assert by_repo["google/gemma-4-E2B-it"].on_disk is False

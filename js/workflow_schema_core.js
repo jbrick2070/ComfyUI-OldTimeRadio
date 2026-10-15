@@ -68,6 +68,87 @@ export function savedWidgetNames(node) {
     return out;
 }
 
+/**
+ * A COMBO widget's live options, or null. `/object_info` declares a COMBO as its
+ * list of choices; a V2 spec carries them as `["COMBO", {options}]`.
+ */
+export function comboOptions(nodeType, widgetName, lookup) {
+    const input = lookup?.[nodeType]?.nodeData?.input;
+    for (const group of ["required", "optional"]) {
+        const spec = input?.[group]?.[widgetName];
+        if (!Array.isArray(spec)) continue;
+        if (Array.isArray(spec[0])) return spec[0];
+        if (spec[0] === "COMBO" && Array.isArray(spec[1]?.options)) return spec[1].options;
+    }
+    return null;
+}
+
+const LEGACY_LABEL_TAGS = [" [NOT DOWNLOADED]", " [LOCAL HF]"];
+
+/**
+ * A writer label as the backend reads it: the same steps, in the same order, as
+ * `_otr_model_catalog._strip_label_suffix` -- the retired download-state tags,
+ * then a trailing parenthetical badge, cut at its LAST " (" -- followed by
+ * `_canonical_qwen_id`'s one retired spelling. A Hugging Face repo id cannot
+ * contain " (", so nothing real is cut.
+ */
+export function writerName(value) {
+    let s = String(value).trim();
+    for (const tag of LEGACY_LABEL_TAGS) {
+        if (s.endsWith(tag)) s = s.slice(0, -tag.length).trimEnd();
+    }
+    if (s.endsWith(LEGACY_LABEL_TAGS[1])) s = s.slice(0, -LEGACY_LABEL_TAGS[1].length).trimEnd();
+    if (s.endsWith(")") && s.includes(" (")) s = s.slice(0, s.lastIndexOf(" (")).trimEnd();
+    // `_otr_model_catalog.DEFAULT_LLM_NF4` -> `QWEN_LLM` (pinned by a test).
+    return s === "Qwen/Qwen3.5-4B:nf4" ? "Qwen/Qwen3.5-4B" : s;
+}
+
+/**
+ * Saved VALUES this build offers under another spelling, by node type and
+ * widget name. The writer dropdowns offered "repo (8.7 GB download, ...)" until
+ * 2026-10-14 and the bare repo id since; an older graph's value is rewritten to
+ * the option it names before the loader sees it, so the widget shows the pick
+ * instead of a value its list does not hold (the backend's VALIDATE_INPUTS
+ * would run the old spelling anyway -- this is for the person looking at it).
+ */
+const VALUE_RESPELLINGS = {
+    OTR_LedgerScriptWriter: {
+        creative_writing_model: writerName,
+        technical_model: writerName,
+    },
+};
+
+/** Respell ONE node's saved values in place, by widget name. Caller works on a copy. */
+function respellValues(node, lookup) {
+    const rules = VALUE_RESPELLINGS[node.type];
+    const values = node.widgets_values;
+    if (!rules || !Array.isArray(values)) return [];
+    // Which value is which: the file's own names when it carries them one for
+    // one, else this build's order when the count agrees -- never a guess.
+    const saved = savedWidgetNames(node);
+    const live = liveWidgetNames(node.type, lookup);
+    const names = saved.length
+        ? (saved.length === values.length ? saved : null)
+        : (live && live.length === values.length ? live : null);
+    if (!names) return [];
+    const notes = [];
+    for (const [widget, respell] of Object.entries(rules)) {
+        const i = names.indexOf(widget);
+        if (i < 0 || typeof values[i] !== "string") continue;
+        const options = comboOptions(node.type, widget, lookup);
+        if (!options || options.includes(values[i])) continue;
+        const next = respell(values[i]);
+        if (next === values[i] || !options.includes(next)) continue;
+        notes.push(`${node.type}.${widget}: '${values[i]}' -> '${next}'`);
+        values[i] = next;
+        if (node.widgets_values_named && typeof node.widgets_values_named === "object"
+            && widget in node.widgets_values_named) {
+            node.widgets_values_named[widget] = next;
+        }
+    }
+    return notes;
+}
+
 /** Reconcile ONE node in place. Caller works on a copy. */
 function reconcileNode(node, lookup) {
     const live = liveWidgetNames(node.type, lookup);
@@ -213,15 +294,24 @@ export function reconcileGraph(graphData, lookup) {
     const copy = structuredClone(graphData);
     let changed = false;
     const notes = [];
+    let dropped = false;
     for (const node of copy.nodes) {
+        // A respelling touches one value and no input, so it needs no link
+        // repair -- and must not start refusing a file the loader takes today.
+        const respelled = respellValues(node, lookup);
+        if (respelled.length) {
+            changed = true;
+            notes.push(...respelled);
+        }
         const verdict = reconcileNode(node, lookup);
         if (!verdict.ok) return verdict;
         if (verdict.changed) {
             changed = true;
+            dropped = true;
             notes.push(`${node.type}: dropped ${verdict.dropped.join(", ")}`);
         }
     }
-    if (changed) {
+    if (dropped) {
         const problem = repairLinkSlots(copy);
         if (problem?.duplicateId !== undefined) {
             return refuse("duplicate node id in the saved graph",

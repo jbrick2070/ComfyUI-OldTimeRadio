@@ -128,10 +128,11 @@ def test_shipping_writer_split_is_native_12b_where_it_fits_e2b_on_8gb_qwen_on_ma
 
 
 def test_shipping_variant_widgets_carry_the_live_label():
-    """Saved graphs must store the live COMBO label, not a stale bare id."""
+    """Saved graphs must store the live COMBO label -- the bare id since
+    2026-10-14 -- and never a retired size badge."""
     native_label = default_llm_option()
-    from nodes._otr_model_catalog import vram_badge_for
-    qwen_label = SMALL + vram_badge_for(SMALL)
+    qwen_label = SMALL
+    assert native_label == DEFAULT_LLM
     for pid in bv.SHIPPING_SET:
         path = os.path.join(_REPO, "workflows", f"{pid}.json")
         with open(path, encoding="utf-8") as fh:
@@ -147,8 +148,11 @@ def test_shipping_variant_widgets_carry_the_live_label():
             assert "gemini-flash-latest" in text, pid
             assert "gemini-flash-lite-latest" in text, pid
             assert SMALL not in text, pid
+        assert "GB download" not in text, pid
+        if pid.startswith(("otr_cloud_", "otr_google_")) or pid == "otr_cpu_low":
+            pass
         elif pid.startswith(("otr_16gb_", "otr_24gb_", "otr_32gb_")):
-            assert NATIVE_12B + vram_badge_for(NATIVE_12B) in text, pid
+            assert NATIVE_12B in text, pid
             assert SMALL not in text, pid
         elif pid.startswith("otr_8gb_"):
             assert native_label in text, pid

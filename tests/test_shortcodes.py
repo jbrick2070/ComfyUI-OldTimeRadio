@@ -229,11 +229,13 @@ class CompletenessTests(unittest.TestCase):
         from nodes import _otr_model_catalog as cat
         rows = cat._active_curated_models()
         self.assertTrue(rows, "the catalog is empty; this check would pass vacuously")
-        # Both forms that reach it: the badged dropdown label, and the bare id
-        # the ledger stamps (otr_master_audio_mux reads creative_writing_model).
+        # Every form that reaches it: the bare id the dropdown offers and the
+        # ledger stamps (otr_master_audio_mux reads creative_writing_model),
+        # and the size-badged label an older saved graph may still carry
+        # (dropdown labels were badged until 2026-10-14).
         missing = [m.repo_id for m in rows
                    if "unk" in (SC.code_for("llm", m.repo_id),
-                                SC.code_for("llm", m.repo_id + cat.vram_badge_for(m.repo_id)))]
+                                SC.code_for("llm", m.repo_id + " (8.7 GB download, nv8)"))]
         self.assertFalse(
             missing,
             "these writer rows reach the published filename with no code, so "

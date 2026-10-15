@@ -53,23 +53,17 @@ class OneActTemplateTests(unittest.TestCase):
         # when DEFAULT_LLM moved to Qwen the literal did not, so the assertion
         # pinned the drift in place rather than catching it (PBUG-20260906-09).
         # What belongs HERE is the structural half: both writer slots agree,
-        # and the value is a real COMBO label carrying its size suffix.
+        # and the value is a real COMBO label -- since 2026-10-14 the bare id,
+        # with no size badge (the size moved to the widget tooltip, so a
+        # corrected size can never again change a saved value).
         creative = value(writer, "creative_writing_model")
         self.assertEqual(value(writer, "technical_model"), creative,
                          "both writer slots must select the same model")
-        # The badge is `(<download> GB download[, <tags>])` since 2026-09-09 --
-        # the size is the DOWNLOAD (stated explicitly as such, per
-        # otr_model_catalog._model_choice_suffix), and machine-fit tags may
-        # follow it (`mac16`, `mac16-tight`, `nv8`, `gated`, ...). This pattern
-        # used to anchor immediately after `GB)`, which made it a single-number
-        # parser that rejects every current label; the structural claim it is
-        # really making is "a real COMBO value carrying its size", not "exactly
-        # one number".
         self.assertRegex(
             creative,
-            # An HF `org/name` id or a ComfyUI-native `comfy_native:` id.
-            r"^\S+[/:]\S+ \(\d+(\.\d+)? GB( download)?(, [\w\- ]+)?\)$",
-            "the size suffix is part of the COMBO value; a bare "
-            "repo id matches no choice and can resolve to index 0")
+            # An HF `org/name` id or a ComfyUI-native `comfy_native:` id, bare.
+            r"^[^\s()]+[/:][^\s()]+$",
+            "the writer value is the bare id the dropdown offers; a retired "
+            "size badge would match no choice")
         self.assertEqual(len(widget_names(writer)), WRITER_WIDGET_COUNT)
         self.assertEqual(len(writer["widgets_values"]), WRITER_WIDGET_COUNT)
