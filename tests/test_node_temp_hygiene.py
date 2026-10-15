@@ -44,14 +44,10 @@ def _offending_files() -> dict:
     return out
 
 
-# Known failure-edge otr_* system-temp writer (documented debt, NOT an always-persist
-# leak). video_engine writes otr_video_audio.wav and removes it after encode but
-# NOT in a finally, so it leaks only on an ffmpeg failure; it did NOT fire in the
-# 2026-06-30 soak. TODO: route it through nodes/_otr_paths.otr_shared_tmp_dir() + a
-# finally in a follow-up. The ratchet blocks any NEW persistent gettempdir+otr leak.
-_ALLOWLIST = {
-    "nodes/video_engine.py",   # otr_video_audio.wav; removed post-encode (not in a finally)
-}
+# The last known offender, video_engine's shared otr_video_audio.wav, was routed
+# through a per-call mkstemp in otr_shared_tmp_dir() with exit-safe removal
+# (plan item 17, 2026-10-14). The ratchet blocks any NEW gettempdir+otr writer.
+_ALLOWLIST: set = set()
 
 
 def test_no_new_otr_system_temp_writers():

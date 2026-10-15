@@ -1344,6 +1344,95 @@ def _finite(value, default: float = 0.0) -> float:
     return out if math.isfinite(out) else default
 
 
+class _owned_audio_wav:
+    """A per-call 16-bit mono WAV of ``audio_np`` for the base-video encode,
+    removed when the block exits -- on success, failure or cancellation.
+
+    It used to be ONE shared name (``<system temp>/otr_video_audio.wav``),
+    removed only after a successful encode: a failed encode leaked it, and two
+    servers sharing TEMP would write the same file (plan item 17, 2026-10-14).
+    Now a unique ``mkstemp`` name in the pack's swept scratch tier, its creation
+    handle closed before ffmpeg opens it (Windows), and removed only after the
+    owned encoder has stopped using it. Source audio is never touched."""
+
+    def __init__(self, audio_np, sr):
+        self._audio, self._sr, self.path = audio_np, int(sr), None
+
+    def __enter__(self):
+        import tempfile
+        import wave as wave_mod
+        try:
+            from ._otr_paths import otr_shared_tmp_dir
+            tmp_dir = str(otr_shared_tmp_dir())
+            os.makedirs(tmp_dir, exist_ok=True)
+        except Exception:  # noqa: BLE001 -- no output tree: the system temp
+            tmp_dir = None
+        fd, self.path = tempfile.mkstemp(prefix="otr_video_audio_",
+                                         suffix=".wav", dir=tmp_dir)
+        os.close(fd)
+        try:
+            pcm = (self._audio * 32767).astype(np.int16)
+            with wave_mod.open(self.path, "w") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(self._sr)
+                wf.writeframes(pcm.tobytes())
+        except BaseException:
+            self.__exit__(None, None, None)
+            raise
+        return self.path
+
+    def __exit__(self, *_exc):
+        try:
+            if self.path:
+                os.remove(self.path)
+        except OSError:  # cleanup must never hide the primary exception
+            pass
+        return False
+
+
+def _stop_owned_encoder(proc):
+    """Stop and reap the ffmpeg THIS encode spawned -- never another process.
+
+    Closing stdin alone is not enough: the child may still be writing, and a
+    ``poll()`` that reads "running" a moment after the pipe closed proves
+    nothing. Kill the owned handle and wait for it; every step is best-effort,
+    so cleanup cannot replace the error that got us here."""
+    try:
+        if proc.stdin is not None:
+            proc.stdin.close()
+    except Exception:  # noqa: BLE001 -- a broken pipe is why we are here
+        pass
+    try:
+        if proc.poll() is None:
+            proc.kill()
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        proc.wait(timeout=10)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _drain_stderr_log(stderr_file) -> str:
+    """Read, close and remove the encoder's stderr log; never raises."""
+    text = ""
+    try:
+        stderr_file.seek(0)
+        text = stderr_file.read().decode(errors="replace")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        stderr_file.close()
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        os.remove(stderr_file.name)
+    except OSError:
+        pass
+    return text
+
+
 def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
                 width, height, fps):
     ffmpeg = _find_ffmpeg()
@@ -1400,32 +1489,52 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
         mode="w+b", prefix="otr_ffmpeg_", suffix=".log", delete=False
     )
 
-    proc = otr_proc.popen(
-        cmd,
-        stdin=otr_proc.PIPE,
-        stdout=otr_proc.DEVNULL,
-        stderr=stderr_file,
-    )
-
+    # EVERY EXIT OWNS ITS CLEANUP (plan item 17, 2026-10-14). A raise from
+    # spawn, a pipe write/close, the frame iterator or a cancellation used to
+    # skip the stderr read and the close: the child lived on until garbage
+    # collection and the log leaked. Now the owned encoder is stopped and
+    # reaped, the frame generator is closed (so its worker pool unwinds), the
+    # stderr tail is logged, and the ORIGINAL exception propagates. The partial
+    # output file is left as evidence; nothing else is touched.
+    proc = None
+    drained = False
     t0 = _time.time()
-    for i, frame in enumerate(frames_iter):
-        proc.stdin.write(frame.tobytes())
-        if i % max(1, fps * 10) == 0:
-            elapsed = _time.time() - t0
-            pct = int(100 * i / total_frames)
-            log.info("[Video] Encoding: frame %d/%d (%d%%) -- %.1fs elapsed",
-                     i, total_frames, pct, elapsed)
-
-    proc.stdin.close()
-    proc.wait()
-
-    stderr_file.seek(0)
-    stderr_text = stderr_file.read().decode(errors="replace")
-    stderr_file.close()
     try:
-        os.remove(stderr_file.name)
-    except OSError:
-        pass
+        proc = otr_proc.popen(
+            cmd,
+            stdin=otr_proc.PIPE,
+            stdout=otr_proc.DEVNULL,
+            stderr=stderr_file,
+        )
+        try:
+            for i, frame in enumerate(frames_iter):
+                proc.stdin.write(frame.tobytes())
+                if i % max(1, fps * 10) == 0:
+                    elapsed = _time.time() - t0
+                    pct = int(100 * i / total_frames)
+                    log.info("[Video] Encoding: frame %d/%d (%d%%) -- %.1fs elapsed",
+                             i, total_frames, pct, elapsed)
+        finally:
+            _close = getattr(frames_iter, "close", None)
+            if callable(_close):
+                try:
+                    _close()
+                except Exception:  # noqa: BLE001 -- never mask the cause
+                    pass
+        proc.stdin.close()
+        proc.wait()
+    except BaseException:
+        if proc is not None:
+            _stop_owned_encoder(proc)
+        stderr_text = _drain_stderr_log(stderr_file)
+        drained = True
+        _tail = (stderr_text or "").strip().replace("\n", " ")[-400:]
+        log.error("[Video] encode stopped before ffmpeg finished; ffmpeg "
+                  "stderr tail: %s", _tail or "(none captured)")
+        raise
+    finally:
+        if not drained:
+            stderr_text = _drain_stderr_log(stderr_file)
 
     if proc.returncode != 0:
         log.error("[Video] ffmpeg failed:\n%s", stderr_text[-2000:])
@@ -2138,24 +2247,8 @@ class SignalLostVideoRenderer:
         # engine owns: the procedural base video, the title-card plan, and
         # the procgen mp4 that the composite takes as its floor.
 
-        # -- 3. Save audio to temp WAV for ffmpeg ---------------------
-        import tempfile
-        import wave as wave_mod
-
-        tmp_wav = os.path.join(tempfile.gettempdir(), "otr_video_audio.wav")
-        pcm = (audio_np * 32767).astype(np.int16)
-        # This base mp4's OWN audio track is stripped downstream by
-        # OTR_SilentComposite (V-1); the delivered episode audio is the frozen
-        # master muxed on LAST, and the credits roll is a SILENT tail rendered
-        # late by OTR_CreditsRoll (the operator's silent-tail decision). This
-        # node takes no closing audio: the real closing music is
-        # `closing_theme_audio` on the sequencer.
-        pcm_out = pcm
-        with wave_mod.open(tmp_wav, "w") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(sr)
-            wf.writeframes(pcm_out.tobytes())
+        # -- 3. The audio WAV for ffmpeg is written right before the encode
+        # (step 6), where its lifetime is owned -- see _owned_audio_wav.
 
         # -- 4. Determine output path ---------------------------------
         # BUG-LOCAL-020 (Phase G, 2026-05-03): write the procgen mp4
@@ -2280,12 +2373,13 @@ class SignalLostVideoRenderer:
 
         # -- 6. Encode ------------------------------------------------
         _runtime_log(f"Video: Encoding MP4 via ffmpeg -> {os.path.basename(out_path)}")
-        _encode_mp4(_frame_gen(), total_encode_frames, tmp_wav, out_path, W, H, fps)
-
-        try:
-            os.remove(tmp_wav)
-        except OSError:
-            pass
+        # This base mp4's OWN audio track is stripped downstream by
+        # OTR_SilentComposite (V-1); the delivered episode audio is the frozen
+        # master muxed on LAST, and the credits roll is a SILENT tail rendered
+        # late by OTR_CreditsRoll. The WAV is still a real ffmpeg input here.
+        with _owned_audio_wav(audio_np, sr) as tmp_wav:
+            _encode_mp4(_frame_gen(), total_encode_frames, tmp_wav, out_path,
+                        W, H, fps)
 
         size_mb = os.path.getsize(out_path) / (1024 * 1024)
         log.info("[Video] Saved: %s (%.1f MB, %.1fs, %d frames total)",
