@@ -52,8 +52,8 @@ Cold-import clean: ``nvvfx`` and ``torch`` import lazily inside ``load`` /
 from __future__ import annotations
 
 import logging
-import os
 
+from .._otr_shared import env as otr_env
 from .._otr_shared.engine_registry_base import (
     EngineUnusable,
     EngineUsabilityReason,
@@ -90,7 +90,7 @@ def _package_version() -> str:
 
 
 def _quality() -> str:
-    raw = os.environ.get("OTR_RTX_VSR_QUALITY", "").strip().upper()
+    raw = str(otr_env.get("OTR_RTX_VSR_QUALITY", "") or "").strip().upper()
     return raw or DEFAULT_QUALITY
 
 

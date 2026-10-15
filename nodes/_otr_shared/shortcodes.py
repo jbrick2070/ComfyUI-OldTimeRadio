@@ -224,6 +224,7 @@ MUSIC_GEN = {
 UPSCALER = {
     "off": "off",
     "spandrel_esrgan": "esrg",
+    "rtx_vsr": "rtxv",
 }
 
 #: Every dimension, in the order the published name spells them. The name is
