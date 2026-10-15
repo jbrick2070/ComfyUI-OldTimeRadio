@@ -421,9 +421,9 @@ def test_the_roll_module_imports_nothing_that_could_call_a_model():
         # __future__, hashlib, json, logging, os and typing -- stdlib only,
         # the same leaf-closure test env.py passed.
         "json", "_otr_episode_languages", "_LANG",
-        # `ast` (2026-09-27): literal_eval reads a list saved by a 2.3.8 graph
-        # after core str()-coerces it. Stdlib; evaluates literals only.
-        "ast",
+        # (`ast` was allowed 2026-09-27 for literal_eval; the 2026-10-14 shared
+        # bracket grammar reads a 2.3.8 graph's saved list without it, and the
+        # import is gone -- so it is no longer allowed either.)
         # `re` (2026-09-28): the pool compares typed names case- and
         # separator-insensitively. Stdlib text matching; calls nothing.
         "re",

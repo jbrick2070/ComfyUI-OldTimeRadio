@@ -2354,10 +2354,12 @@ def _estimate_resident_gb(
 
     OTR's loader (story_orchestrator._load_llm) uses 8-bit / NF4-style
     quantization by default for the Standard / Obsidian profiles, so
-    peak resident is roughly half the BF16 safetensors download size.
-    Documented numbers per plan section 6:
-        Mistral-Nemo:  ~24 GB disk -> ~12 GB resident.
-        Gemma-4-E2B:    ~6 GB disk -> ~3 GB resident.
+    peak resident is roughly half the catalog's approx_safetensors_gb (the
+    fit basis -- NOT always the download; see CuratedModel). Documented
+    numbers per plan section 6, in that basis:
+        Mistral-Nemo:  24 -> ~12 GB resident.
+        Gemma-4-E2B:    6 -> ~3 GB resident (its download is 10.2 GB; only
+                        the text decoder loads).
 
     A factor-of-2 divisor matches both anchor points for curated entries.
     SPECIAL_VRAM_ESTIMATES_GB (B1d) lets us pin an explicit resident
@@ -2521,7 +2523,9 @@ _MEASURED_DOWNLOAD_BYTES: "dict[str, int]" = {
 
 def download_bytes_for(repo_id: str) -> int:
     """The measured download for a curated writer, else its catalog figure read
-    as GiB, else 0 (a remote handle, or nothing known)."""
+    as GiB, else 0 (a remote handle, or nothing known). A label or the retired
+    ``:nf4`` Qwen spelling is read as the id it names."""
+    repo_id = _canonical_qwen_id(repo_id) if isinstance(repo_id, str) else repo_id
     if repo_id in _MEASURED_DOWNLOAD_BYTES:
         return _MEASURED_DOWNLOAD_BYTES[repo_id]
     curated = _by_repo_id().get(repo_id)
@@ -2557,6 +2561,55 @@ ALLOW_PATTERNS = (
 #: transformers shards that the writer loads (Mistral-Nemo: 24.5 GB twice).
 IGNORE_PATTERNS = ("consolidated*.safetensors",)
 
+
+def _fetched_paths(paths: "list[str]") -> "set[str]":
+    """The repo paths a snapshot download with ALLOW_PATTERNS / IGNORE_PATTERNS
+    fetches, decided by huggingface_hub's own filter, so a size estimate counts
+    exactly what lands (its matching is case-sensitive, on the full path). Only
+    if that helper is missing, the same rule by hand."""
+    try:
+        from huggingface_hub.utils import filter_repo_objects
+        return set(filter_repo_objects(paths, allow_patterns=list(ALLOW_PATTERNS),
+                                       ignore_patterns=list(IGNORE_PATTERNS)))
+    except Exception:  # noqa: BLE001 -- no hub helper: mirror it
+        return {p for p in paths
+                if any(fnmatch.fnmatchcase(p, a) for a in ALLOW_PATTERNS)
+                and not any(fnmatch.fnmatchcase(p, i) for i in IGNORE_PATTERNS)}
+
+
+def _drop_stale_ignored_partials(local_dir: Path) -> "list[str]":
+    """Delete a half-downloaded copy of a file IGNORE_PATTERNS now skips.
+
+    A Mistral-Nemo pull interrupted before 2026-10-14 can leave its
+    consolidated.safetensors as an ``.incomplete`` under
+    ``.cache/huggingface/download/``. The download no longer resumes it, and
+    :func:`_otr_llm_folder.structurally_complete` reads any ``.incomplete`` as a
+    transfer in progress -- so the folder could never be complete again
+    (Sonnet QA on abcd6a3f). huggingface_hub names a partial file by a short
+    hash of its metadata name, so its own path helper is asked which files
+    belong to the ignored name; nothing else is touched. Without that helper
+    (a different huggingface_hub), nothing is deleted."""
+    # A stale partial can only sit in a folder an earlier download started. The
+    # hub helper below CREATES the folder and its .cache as a side effect, so
+    # it is not asked anything unless that download directory already exists.
+    if not (Path(local_dir) / ".cache" / "huggingface" / "download").is_dir():
+        return []
+    try:
+        from huggingface_hub._local_folder import get_local_download_paths
+    except Exception:  # noqa: BLE001 -- a private helper; absent means do nothing
+        return []
+    removed = []
+    for name in ("consolidated.safetensors",):
+        try:
+            paths = get_local_download_paths(Path(local_dir), name)
+            prefix = paths.incomplete_path("ETAG").name.split(".ETAG.")[0]
+            for partial in paths.metadata_path.parent.glob(prefix + ".*.incomplete"):
+                partial.unlink()
+                removed.append(partial.name)
+        except Exception:  # noqa: BLE001 -- best effort; the download still runs
+            continue
+    return removed
+
 # Pre-flight disk-space margin: leave at least 5 GB free after the
 # download lands. Prevents partial-download cleanup brittleness on a
 # near-full disk.
@@ -2575,12 +2628,14 @@ def _format_gated_message(repo_id: str) -> str:
 
 
 def estimate_model_size_gb(repo_id: str, *, _hf_api: object | None = None) -> float:
-    """Estimate total safetensors download size in GB. Used by the
+    """Estimate the weight download in GiB (bytes / 2**30). Used by the
     pre-fetch disk-space check + queue-UI announcement.
 
-    For curated entries, returns the catalog's approx_safetensors_gb
-    immediately (no network call). For uncurated remote ids, calls
-    HfApi().model_info(...) -- this is the only path that fires a
+    For curated entries, returns the MEASURED download
+    (:func:`download_bytes_for`) immediately (no network call). For uncurated
+    remote ids, calls HfApi().model_info(...) and sums exactly the weight files
+    the download would fetch -- ALLOW_PATTERNS minus IGNORE_PATTERNS, matched by
+    huggingface_hub's own filter -- this is the only path that fires a
     network request; callers MUST be on a user-action code path.
 
     `_hf_api` is a test seam: pass a mock object with a model_info()
@@ -2617,15 +2672,13 @@ def estimate_model_size_gb(repo_id: str, *, _hf_api: object | None = None) -> fl
                 f"HfApi.model_info failed ({type(exc).__name__}: {exc})",
             )
         ) from exc
+    siblings = list(getattr(info, "siblings", []) or [])
+    fetched = _fetched_paths([getattr(s, "rfilename", "") or "" for s in siblings])
     total = 0
-    for sibling in getattr(info, "siblings", []) or []:
-        size = getattr(sibling, "size", None) or 0
-        path = (getattr(sibling, "rfilename", "") or "").lower()
-        name = path.rsplit("/", 1)[-1]
-        if any(fnmatch.fnmatch(name, pattern) for pattern in IGNORE_PATTERNS):
-            continue                    # never fetched -- see IGNORE_PATTERNS
-        if path.endswith(".safetensors") or path.endswith(".bin"):
-            total += size
+    for sibling in siblings:
+        path = getattr(sibling, "rfilename", "") or ""
+        if path in fetched and path.lower().endswith((".safetensors", ".bin")):
+            total += getattr(sibling, "size", None) or 0
     if total <= 0:
         return 0.0
     return float(total) / float(1024**3)
@@ -2747,21 +2800,25 @@ def auto_download_if_missing(
     # The disk check measures the drive the bytes actually land on.
     free_bytes = _free_disk_bytes_for(dest_path)
     margin = size_bytes + _DISK_SPACE_MARGIN_BYTES
+    # Printed in decimal GB, the unit a disk or a browser shows and the one the
+    # writer tooltip states (download_size_text); the arithmetic stays in bytes.
     if size_bytes > 0 and (free_bytes - margin) < 0:
-        free_gb = free_bytes / 1024**3
         raise InsufficientDiskSpaceError(
             f"InsufficientDiskSpaceError: downloading {repo_id} requires "
-            f"{size_gb:.1f} GB + {_DISK_SPACE_MARGIN_BYTES / 1024**3:.0f} GB "
-            f"margin = {(size_gb + 5):.1f} GB, but only {free_gb:.1f} GB free "
-            f"at {dest_path}. Free up disk space and retry."
+            f"{size_bytes / 1e9:.1f} GB + {_DISK_SPACE_MARGIN_BYTES / 1e9:.1f} GB "
+            f"margin = {margin / 1e9:.1f} GB, but only {free_bytes / 1e9:.1f} GB "
+            f"free at {dest_path}. Free up disk space and retry."
         )
 
     # Announce download intent to the console (cheap; queue UI gets the
     # ProgressBar separately).
     print(
-        f"[OTR] Downloading {weights_id} -- {size_gb:.1f} GB -> "
+        f"[OTR] Downloading {weights_id} -- {size_bytes / 1e9:.1f} GB -> "
         f"{dest_path} (first run only)"
     )
+    if local_dir is not None:
+        for stale in _drop_stale_ignored_partials(local_dir):
+            print(f"[OTR] Removed a stale partial download of an ignored file: {stale}")
 
     if _snapshot_download is None:
         from huggingface_hub import snapshot_download as _snapshot_download  # type: ignore

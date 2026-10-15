@@ -381,8 +381,11 @@ def writer_rows() -> list:
             "namespace": "writer",
             "friction": "GATED" if gated else "auto",
             "lane": None,
-            "size_gb": float(getattr(m, "approx_safetensors_gb", 0.0) or 0.0),
-            "size_measured": True,
+            # The measured download in GiB, like every size in this doc -- not
+            # approx_safetensors_gb, which is the fit basis and under-states
+            # the multimodal Gemma 4 rows (6.0 for a 10.2 GB download).
+            "size_gb": cat.download_bytes_for(repo) / float(2 ** 30),
+            "size_measured": repo in cat._MEASURED_DOWNLOAD_BYTES,
             # Fit is DERIVED; only the receipts are curated.
             "availability": {mch["key"]: "ok" for mch in MACHINES},
             "memory": hand.get("memory", {}),

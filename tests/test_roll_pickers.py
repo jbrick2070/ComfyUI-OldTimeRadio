@@ -170,7 +170,10 @@ _ODD = ["\t", "\n", "\r", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x1f", "\x85"
         "\xa0", "\u1680", "\u2000", "\u2007", "\u2028", "\u2029", "\u202f", "\u205f",
         "\u3000", "\ufeff", "\x00", "\x7f"]
 _TEMPLATES_PLAIN = ["{a}", "{a}, {b}", "{a};{b}", "{a}\n{b}", "{A}", "{a_sp}", "nonsense",
-                    "{a}, nonsense", "", "  ", "{a},", ",{a}", "{a},,{b}"]
+                    "{a}, nonsense", "", "  ", "{a},", ",{a}", "{a},,{b}",
+                    # what mutation testing of 68119bb6 showed the set lacked
+                    "{a_tab}", "{a}\r{b}", "{a}\r\n{b}", "[;", "[.", "_{a}_", "-{a}-",
+                    "{a},{a}", "{a}, {A}"]
 _TEMPLATES_BRACKET = [
     "[]", "[ ]", '["{a}"]', '["{a}", "{b}"]', '["{a}",]', '[""]', '[" "]', '["", "{a}"]',
     "[1]", "[null]", "[true]", '[["{a}"]]', "[NaN]", '["{a}"] x', '["{a}"]]', '["{a_esc}"]',
@@ -185,12 +188,36 @@ _TEMPLATES_ODD = ["{w}{a}", "{a}{w}", "{a},{w}{b}", '["{w}{a}"]', '["{a}{w}"]',
 
 def _pool_values(a, b):
     fill = {"a": a, "b": b, "A": a.upper(), "a_sp": a.replace("_", " "),
-            "a_esc": "\\u%04x%s" % (ord(a[0]), a[1:])}
+            "a_tab": a.replace("_", "\t"), "a_esc": "\\u%04x%s" % (ord(a[0]), a[1:])}
     values = [t.format(**fill) for t in _TEMPLATES_PLAIN + _TEMPLATES_BRACKET]
     for w in _ODD:
         values += [t.format(w=w, w_esc="\\u%04x" % ord(w), **fill) for t in _TEMPLATES_ODD]
     values += [", ".join([a] * 1000), "[" + "9" * 5000 + "]", "[" * 3000]
+    # exactly at the length limit and one past it, typed and bracketed
+    from nodes._otr_rolls import POOL_TEXT_LIMIT as limit
+    for size in (limit, limit + 1):
+        typed = a + "," * (size - len(a))
+        bracketed = '["%s"' % a + ' ' * (size - len(a) - 5) + "]"
+        values += [typed, bracketed, "  " + typed + "  "]
     return values
+
+
+def test_both_readers_share_one_length_limit_and_an_ascii_alphabet():
+    """The parity rests on two facts; pin them. The JS limit is the backend's,
+    and every choice in every pool is plain [0-9A-Za-z_] (a non-ASCII label --
+    a language named in its own script, say -- would need the trusted alphabet
+    widened first, or its box could never stay ticked)."""
+    from nodes import _otr_episode_languages as LANG
+    from nodes import _otr_lane_rolls as LR
+    from nodes import _otr_rolls as ROLLS
+    js = (_ROOT / "js" / "roll_pickers_core.js").read_text(encoding="utf-8")
+    assert "export const POOL_TEXT_LIMIT = %d;" % ROLLS.POOL_TEXT_LIMIT in js
+    choices = (list(ROLLS.eligible_style_ids()) + list(ROLLS.eligible_bank_ids())
+               + [c for c in LANG.dropdown_choices() if c != LANG.OFF_LABEL]
+               + list(LR.video_roll_choices()) + list(LR.still_roll_choices()))
+    assert choices
+    for c in choices:
+        assert re.fullmatch(r"[0-9A-Za-z_]+", c), c
 
 
 def test_the_checklist_never_reads_as_fine_what_the_backend_refuses():

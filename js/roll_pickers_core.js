@@ -11,19 +11,30 @@
  * NEVER "FINE" WHERE THE BACKEND STOPS. Every value the backend refuses reads
  * here as an entry that is not a choice, so the list warns before the run
  * does. Bracketed text is read by ONE grammar on both sides -- this file and
- * `_otr_rolls._bracket_names` -- so there they agree exactly, both ways.
- * Typed text is trusted only in printable ASCII plus TAB/LF/CR (every choice
- * in every pool is [0-9A-Za-z_], and in that alphabet JS's and Python's
- * trimming, case-folding and `\s` agree); typed text with any other
- * character -- a pasted no-break space, say -- warns although the backend's
- * more forgiving reader may run it. tests/test_roll_pickers.py runs both
- * readers over the same few thousand values.
+ * `_otr_rolls._bracket_names`. Any saved value made of printable ASCII plus
+ * TAB/LF/CR, bracketed or typed, is read identically both ways (every choice
+ * in every pool is [0-9A-Za-z_] -- tests/test_roll_pickers.py asserts it --
+ * and in that alphabet JS's and Python's trimming, case-folding and `\s`
+ * agree). A value with any other character -- a pasted no-break space, even
+ * one just outside the brackets -- is refused here although the backend's
+ * broader strip() may run it: the safe direction. tests/test_roll_pickers.py
+ * runs both readers over the same few thousand values.
  */
 
 /** Same limit as the backend's `POOL_TEXT_LIMIT`. */
 export const POOL_TEXT_LIMIT = 4096;
 const TRUSTED = /^[\x20-\x7e\t\n\r]*$/;
-const trimWs = (s) => s.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "");
+// Linear: an index scan, not a regex -- `/[ \t\r\n]+$/` backtracks on a long
+// run of spaces in the middle of a value (80,000 spaces took 2.8 s, every
+// repaint; Sonnet QA on 68119bb6).
+const WS = " \t\r\n";
+function trimWs(s) {
+    let a = 0;
+    let b = s.length;
+    while (a < b && WS.includes(s[a])) a += 1;
+    while (b > a && WS.includes(s[b - 1])) b -= 1;
+    return s.slice(a, b);
+}
 
 /** How a pool entry is compared -- the same rule as the backend's `_pool_key`. */
 export function poolKey(name) {
@@ -32,9 +43,11 @@ export function poolKey(name) {
 }
 
 /** The entries of a saved pool value: a typed list, a JSON list of strings,
- *  or the str() of a list saved by 2.3.8 ("['anime', 'cartoon']"). Anything
- *  the backend would refuse, or text outside the trusted alphabet, comes back
- *  whole, as one entry that matches no choice. (The widget always holds a
+ *  or the str() of a list saved by 2.3.8 ("['anime', 'cartoon']"). Text that
+ *  cannot be read as names at all -- over the length limit, outside the
+ *  trusted alphabet, or bracketed text the backend's grammar refuses -- comes
+ *  back whole, as one entry that matches no choice; readable names come back
+ *  one by one (some may still not be choices). (The widget always holds a
  *  string: roll_pickers.js stringifies whatever a graph saved.) */
 export function poolEntries(value) {
     const { names, refused } = readEntries(value);

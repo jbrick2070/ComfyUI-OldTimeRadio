@@ -122,6 +122,13 @@ test("bracketed text is read by the backend's one grammar, or reported whole", (
     assert.deepEqual(poolEntries("[ ]"), []);
 });
 
+test("a long run of spaces is read in linear time", () => {
+    const value = "x" + " ".repeat(200000) + "x";
+    const t0 = Date.now();
+    assert.equal(poolSummary(value, STYLES).text, "No valid choice ticked");
+    assert.ok(Date.now() - t0 < 1000, "reading took " + (Date.now() - t0) + " ms");
+});
+
 test("typed text is trusted only in printable ASCII", () => {
     for (const odd of ["anime\u00a0", "\ufeffanime", "anime,\u3000cartoon", "anime\x0b"]) {
         assert.deepEqual(poolEntries(odd).length, 1, JSON.stringify(odd));

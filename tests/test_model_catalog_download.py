@@ -52,7 +52,7 @@ def test_resolve_hf_token_is_cross_platform_safe():
 # ---------------------------------------------------------------------------
 
 
-def test_estimate_curated_returns_catalog_value():
+def test_estimate_curated_returns_the_measured_download():
     # Curated entries skip the network call entirely. Since 2026-10-14 the
     # answer is the MEASURED download (`_MEASURED_DOWNLOAD_BYTES`, in GiB as
     # this function always returned): Qwen/Qwen3.5-4B is 9,319,828,096 bytes,
@@ -296,8 +296,11 @@ def test_auto_download_disk_space_precheck(tmp_path, monkeypatch):
         )
     snap.assert_not_called()
     msg = str(exc.value)
-    assert "8.7" in msg or "13.7" in msg  # 8.68 rounded + 5 margin
-    assert "1.0" in msg or "1 GB" in msg.lower() or "1." in msg
+    # Decimal GB since 2026-10-14, the unit the writer tooltip and a disk use:
+    # 9,319,828,096 bytes = 9.3 GB, + the 5 GiB margin (5.4 GB) = 14.7 GB,
+    # against 1 GiB free = 1.1 GB.
+    assert "9.3 GB" in msg and "14.7 GB" in msg, msg
+    assert "1.1 GB free" in msg, msg
 
 
 def test_auto_download_uncurated_uses_hf_api_for_size(tmp_path, monkeypatch):

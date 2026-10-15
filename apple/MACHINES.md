@@ -133,14 +133,14 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `google/gemma-2-2b-it` | GATED | 5.2 GiB | **proven** | fits | fits | ? | ? |
-| `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | **proven** | **proven** | **OOM** | ? | ? |
-| `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.4 GiB | fits | fits | fits | ? | ? |
+| `google/gemma-2-2b-it` | GATED | 4.9 GiB | **proven** | fits | fits | ? | ? |
+| `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.0 GiB | fits | fits | fits | ? | ? |
 | `Qwen/Qwen3.5-4B` | **auto** | 8.7 GiB | **proven** | **proven** | **proven** | ? | ? |
-| `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | **proven** | **tight** | ? | ? |
-| `google/gemma-4-12b-it` | **auto** | 23.9 GiB | measured | **proven** | **no** | ? | ? |
-| `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** | ? | ? |
-| `Qwen/Qwen3.8-27B` | **auto** | 51.8 GiB | **no** | **24 GB+** | **no** | ? | ? |
+| `google/gemma-4-E2B-it` | **auto** | 9.5 GiB | **proven** | **proven** | **OOM** | ? | ? |
+| `google/gemma-4-E4B-it` | **auto** | 14.9 GiB | measured | **proven** | **tight** | ? | ? |
+| `google/gemma-4-12b-it` | **auto** | 22.3 GiB | measured | **proven** | **no** | ? | ? |
+| `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 22.8 GiB | **no** | **proven** | **no** | ? | ? |
+| `Qwen/Qwen3.8-27B` | **auto** | 51.7 GiB | **no** | **24 GB+** | **no** | ? | ? |
 
 ## Where do the manual weights come from?
 
