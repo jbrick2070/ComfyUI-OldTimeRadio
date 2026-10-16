@@ -547,7 +547,7 @@ class OTRVideoDirector:
             if _eff != _picked:
                 log.warning(
                     "[OTR_VideoDirector] ROUTE FREEZE: role=%s picked=%s -> "
-                    "EFFECTIVE=%s (force map and/or radio-is-host redirect); "
+                    "EFFECTIVE=%s (force map); "
                     "stills, prompts and shots all plan against %s",
                     _role, _picked, _eff, _eff)
 
@@ -635,8 +635,7 @@ class OTRVideoDirector:
             "max_render_frames": max(0, int(max_render_frames or 0)),
             "video_models": resolved_video,
             # THE FROZEN ROUTE (chunk 1b): role -> the engine that will ACTUALLY
-            # render the beat, force map and radio-is-host redirect already
-            # applied. ``video_models`` above stays the PICKED map -- both are
+            # render the beat, force map already applied. ``video_models`` above stays the PICKED map -- both are
             # stamped so an equality failure downstream can be replayed and
             # audited rather than guessed at.
             "effective_video_models": effective_video,

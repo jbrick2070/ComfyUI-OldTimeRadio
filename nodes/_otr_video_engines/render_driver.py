@@ -1542,13 +1542,22 @@ def validate_and_repair_still_spine(ledger):
                               "object_id": segment_oid,
                               "path": segment_path})
         if family == "audio_driven_face":
-            portrait_row = _still_spine_row_for_portrait(rows, char_id)
+            # Same resolution order as build_request_from_shot: the beat's own
+            # cast portrait, else -- on a radio-host bookend (a lineless music
+            # beat has no char_id) -- the episode's radio_host_portrait face.
+            portrait_row = (_still_spine_row_for_portrait(rows, char_id)
+                            if char_id else None)
+            if (portrait_row is None
+                    and _is_radio_host_video_role(_role_of_shot(shot))):
+                portrait_row = _still_spine_row_for_portrait(
+                    rows, _RADIO_HOST_PORTRAIT_ID)
             portrait_path = _still_spine_materialize_row(
                 portrait_row, stills_root)
             if not portrait_row or not portrait_path:
                 raise RenderError(
                     "still-spine handoff missing materialized portrait for "
-                    "shot %s character %s" % (shot.get("shot_id"), char_id)
+                    "shot %s character %s" % (
+                        shot.get("shot_id"), char_id or _RADIO_HOST_PORTRAIT_ID)
                 )
             validated.append({"shot_id": shot.get("shot_id"),
                               "beat_id": beat_id, "engine_id": engine_id,
@@ -2338,7 +2347,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "RADIO FACE LOGIC: announcer_visual shot %s on a HuMo "
                 "(audio_driven_face) engine %r would consume the announcer "
                 "portrait as its init, but that still is radio_host_style=%r "
-                "(need 'console_face'). A faceless radio_object minted HUMO-OFF "
+                "(need 'console_face'). A faceless radio_object minted for a "
+                "non-HuMo announcer "
                 "must NOT drive HuMo (BUG-LOCAL-129 face-only failure). Re-run "
                 "the image phase with HuMo picked for the announcer so the "
                 "announcer portrait is the animatable dial-face. NO FALLBACK." % (
@@ -5694,8 +5704,7 @@ def run_real_episode(ledger, *, canvas=None,
             master_audio_path = _reresolve_master_audio(str(master_audio_path))
         except Exception:  # noqa: BLE001 - never block the render on re-resolve
             pass
-    # THE ROUTE LOCK (2026-07-25): resolve force-map + radio-host redirect in ONE
-    # pass. Idempotent -- OTR_VideoRenderBatch already called this BEFORE the
+    # THE ROUTE LOCK (2026-07-25): resolve the force map in ONE pass. Idempotent -- OTR_VideoRenderBatch already called this BEFORE the
     # still-spine check, which is the point; this call keeps a direct
     # run_real_episode caller (tests, harnesses) correct on its own.
     ledger = resolve_final_shot_engines(ledger)

@@ -741,7 +741,7 @@ def still_consumer_capability(image_policy: dict, role: str):
     """``True`` / ``False`` / ``None`` for one role's init-image consumer.
 
     ``True`` and ``False`` are proven only after resolving the selected engine
-    through the same force-map and radio-host redirect the render path uses.
+    through the same force map the render path uses.
     ``None`` means no proof: a missing/partial policy, unknown role, empty slot,
     or unresolvable effective engine.  Keeping that third state prevents an
     unrelated custom slot from erasing a proven character consumer while still
@@ -1804,7 +1804,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 "generation."
             )
         # A still is generated ONLY for a proven effective consumer.  The shared
-        # tri-state decision accounts for force-map + radio-host redirects, so
+        # tri-state decision accounts for the force map, so
         # this cannot drift from the render engine's actual init-image capability.
         if not capability:
             log.info("[OTR_ImageGenDispatcher] skip %s (role=%s): no proven "

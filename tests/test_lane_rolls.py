@@ -188,12 +188,14 @@ def test_string_switch_values_from_an_api_client_read_as_yes_or_no():
 
 # --- the checklists (operator, 2026-09-28) ---------------------------------
 
-def test_the_video_checklist_offers_every_local_lane_but_humo_and_cloud():
+def test_the_video_checklist_offers_every_local_lane_but_cloud():
     choices = L.video_roll_choices()
     for name in ("ltx098_low_video", "h3_low_video", "still_pan", "viz_green",
                  "ltx25_foley_16gb", "animatediff15_v3_haunted_video"):
         assert name in choices, name
-    assert not [c for c in choices if c.startswith(("humo", "cloud_", "google_"))], choices
+    # HuMo is a lane like any other now (no role swaps it away, 2026-10-15).
+    assert [c for c in choices if c.startswith("humo")], choices
+    assert not [c for c in choices if c.startswith(("cloud_", "google_"))], choices
     assert set(L.still_roll_choices()) == {"flux_gen1", "ideogram4_local",
                                            "lumina_image", "sd15", "z_image_turbo"}
 

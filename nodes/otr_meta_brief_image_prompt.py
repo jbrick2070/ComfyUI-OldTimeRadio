@@ -488,8 +488,7 @@ def _effective_announcer_family(video_models) -> str:
 def _effective_prompt_engine_for_role(video_models, role: str) -> str:
     """VIDEO engine MetaBrief should plan stills against for ``role``.
 
-    Selected per-role engine, then force-map, then the radio-is-host HuMo
-    redirect -- resolved through the ONE route-freeze authority
+    Selected per-role engine, then the force map -- resolved through the ONE route-freeze authority
     (``_otr_shared.route_freeze``, 2026-07-25 chunk 1a) rather than this
     module's own former mirror of the dispatcher's seam. A resolver-import
     failure keeps the selected id (or empty), which is the fail-safe
@@ -615,9 +614,9 @@ def _portrait_free_roles_from_policy(policy_json):
     lane -- an ultra-low-VRAM animatediff, anything -- is covered the day it
     declares its plan, with no edit here.
 
-    Resolves each role through the SAME force-map / radio-host redirect the
-    render phase uses (``_effective_prompt_engine_for_role``), so a run that
-    FORCES or redirects a role is judged on the engine that will actually
+    Resolves each role through the SAME force map the render phase uses
+    (``_effective_prompt_engine_for_role``), so a run that FORCES a role is
+    judged on the engine that will actually
     render. A missing/malformed policy, an unregistered engine, or an adapter
     with no plan yields NO exemption -- the portrait is minted, which is the
     pre-existing behaviour and the safe direction. Pure, tolerant.
@@ -749,11 +748,11 @@ def _still_word_roles_from_policy(policy_json):
     a role_slots import failure in an odd flat-test context, yields an empty set
     -> NO word/title branch (the legacy cinematic scene still). Pure, tolerant.
 
-    Render-effective seam (r3 + radio-is-host): the render-time override/redirect
-    rewrites the engine BEFORE render, and the still dispatcher honors it for
-    still-consumption; so a run that FORCES or redirects a role to still_word must
-    ALSO mint the word/title prompt (else it renders legacy SCENE prompts on a
-    word card). Env-unset/no-redirect -> the resolver returns the id unchanged
+    Render-effective seam (r3): the render-time force map rewrites the engine
+    BEFORE render, and the still dispatcher honors it for still-consumption; so
+    a run that FORCES a role to still_word must ALSO mint the word/title prompt
+    (else it renders legacy SCENE prompts on a word card). Force map unset ->
+    the resolver returns the id unchanged
     -> byte-identical."""
     try:
         pol = json.loads(policy_json or "{}")

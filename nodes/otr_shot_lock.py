@@ -1391,7 +1391,7 @@ def derive_creative_directives(
     del consistency_gate_warn_only  # retained only for saved-workflow ABI
     warnings: list = []
     # The image dispatcher owns effective init-image capability (including
-    # force-map and radio-host redirects).  Ask it lazily so every direct legacy
+    # the force map).  Ask it lazily so every direct legacy
     # caller still behaves as before when it has no complete policy.  A proven
     # ``False`` for character_video lets an all-visualizer run return before
     # resolving the writer LLM; unknown remains author-all.
@@ -1897,8 +1897,7 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
             "ImageGenDispatcher/render gate for engine %r beat %s: %s",
             effective_engine, beat.get("beat_id", ""), exc)
 
-    # build_request_from_shot may still apply an in-place structural redirect;
-    # validate the engine that would actually receive this request.
+    # Validate the engine that would actually receive this request.
     effective_engine = str(shot.get("engine_id") or effective_engine or "")
     fam = engine_family(effective_engine, "")
 
@@ -1907,7 +1906,7 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
     # r3 MUST-FIX 11: no W1-W6 step enforced the operator's three rulings, and
     # an unowned ruling silently lapses. Asked HERE because this is the one
     # place that has the FROZEN route -- the effective engine AFTER the
-    # route-freeze and the radio-is-host redirect -- and the ruling is decided
+    # route-freeze -- and the ruling is decided
     # from the route, never from the beat's prose.
     #
     # It refuses only the case nobody owned: an audio-in beat that is neither a
@@ -3046,7 +3045,7 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
         #
         # EFFECTIVE FROM BIRTH (chunk 1b). Every consumer of this function --
         # the execution GROUPS, the cast-time preflight, and the shot ROWS --
-        # mints the engine that will actually render, so a redirected bookend
+        # mints the engine that will actually render, so a force-mapped role
         # is never validated as one engine and stamped as another. One
         # resolution, three consumers, no divergence.
         #

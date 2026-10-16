@@ -612,11 +612,10 @@ class OTRVideoRenderBatch:
         # fodder.
         # THE ROUTE LOCK, BEFORE the still-spine check (2026-07-25, kibitz
         # per-beat-stills r1 -- codex gpt-5.6-sol high + agy, independently).
-        # The force-map rewrite (run_real_episode) and the radio-is-host
-        # redirect (build_request_from_shot, per shot) rewrite the engine AFTER
+        # The force-map rewrite (run_real_episode) changes the engine AFTER
         # the pick, so a spine validated against the PICKED engine would let a
-        # forced-route or announcer/music-HuMo beat validate its stills against
-        # one engine and render on another. Resolve first, validate
+        # forced-route beat validate its stills against one engine and render
+        # on another. Resolve first, validate
         # against the truth. Idempotent; run_real_episode calls it again.
         ledger = _rd.resolve_final_shot_engines(ledger)
         if _legacy_receipt_bypass_allowed(ledger):

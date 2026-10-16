@@ -94,9 +94,9 @@ def mesh_fodder_roles_from_video_policy(video_policy: dict) -> list:
     policy dict; tolerant (a non-fodder / unknown engine just drops out)."""
     vm = (video_policy or {}).get("video_models") or {}
     roles = set()
-    # Honor render-time engine rewrites (force-map + radio-is-host redirect): this
-    # image-phase fodder decision runs BEFORE render mutates shot engines. Same
-    # seam _still_needed_for_role uses. Env unset/no-redirect -> unchanged.
+    # Honor the render-time engine rewrite (the force map): this image-phase
+    # fodder decision runs BEFORE render mutates shot engines. Same seam
+    # _still_needed_for_role uses. Force map unset -> unchanged.
     try:
         from .otr_image_gen_dispatcher import (  # type: ignore
             _effective_video_engine_for_role as _eff)

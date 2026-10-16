@@ -573,3 +573,48 @@ def test_render_guard_does_not_treat_character_role_as_radio_host(
     shot = _announcer_humo_shot()
     shot.update({"char_id": "c01", "role": "character_video"})
     rd.build_request_from_shot(shot, led)  # role gate keeps this inert
+
+
+# ---------------------------------------------------------------------------
+# Still-spine handoff: a lineless HuMo bookend proves radio_host_portrait
+# ---------------------------------------------------------------------------
+
+def _spine_ledger(tmp_path, monkeypatch, *, with_face):
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
+    stills = tmp_path / "otr" / "episodes" / "ep_x" / "stills"
+    stills.mkdir(parents=True)
+    rows = []
+    if with_face:
+        face = stills / "radio_host_portrait.png"
+        face.write_bytes(b"\x89PNG\r\n\x1a\n" + bytes(120))
+        rows.append({"object_id": rd._RADIO_HOST_PORTRAIT_ID,
+                     "kind": "portrait", "path": str(face)})
+    return {
+        "episode_id": "ep_x",
+        "lines": [{"line_id": "b000", "char_id": "",
+                   "speaker_role": "music_open"}],
+        "images": {"images": rows},
+        "video": {"shots": [{"shot_id": "s0", "source_line_ids": ["b000"],
+                             "engine_id": "humo_1.7B",
+                             "family": "audio_driven_face",
+                             "role": "music_visual"}]},
+    }
+
+
+def test_still_spine_proves_the_radio_host_face_for_a_lineless_humo_bookend(
+        tmp_path, monkeypatch):
+    """The spine runs before every render (otr_video_render_batch). A lineless
+    HuMo music beat has char_id "", so it must resolve radio_host_portrait --
+    the same still build_request_from_shot feeds HuMo -- not a cast portrait."""
+    receipt = rd.validate_and_repair_still_spine(
+        _spine_ledger(tmp_path, monkeypatch, with_face=True))
+    (row,) = receipt["validated"]
+    assert row["kind"] == "portrait" and row["engine_id"] == "humo_1.7B"
+    assert row["path"].endswith("radio_host_portrait.png")
+
+
+def test_still_spine_refuses_a_humo_bookend_with_no_radio_host_face(
+        tmp_path, monkeypatch):
+    with pytest.raises(rd.RenderError, match="radio_host_portrait"):
+        rd.validate_and_repair_still_spine(
+            _spine_ledger(tmp_path, monkeypatch, with_face=False))

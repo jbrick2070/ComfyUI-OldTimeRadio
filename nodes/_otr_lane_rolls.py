@@ -476,9 +476,9 @@ def video_roll_choices() -> "tuple[str, ...]":
 
     Every registered local lane that can take all three roles. Whether it runs
     on THIS machine is decided at run time, so the list is the same on every
-    machine. HuMo is not offered: it voices a face from speech, and the route
-    freeze moves it off the announcer and music roles (the redirect keys on the
-    same ``audio_driven_face`` family), so it could never be drawn.
+    machine. HuMo is offered like any other lane: the picked lane is the lane
+    (2026-10-15), and on the announcer and music roles it animates the
+    radio-with-a-face host.
     """
     try:
         from . import _otr_video_engines  # noqa: F401 -- registers built-ins
@@ -493,7 +493,7 @@ def video_roll_choices() -> "tuple[str, ...]":
     out = []
     for name in vreg.all_engine_names():
         engine = vreg.get_engine(name)
-        if is_cloud_engine(engine) or getattr(engine, "family", "") == "audio_driven_face":
+        if is_cloud_engine(engine):
             continue
         try:
             for role in role_slots.ROLE_TO_VIDEO_SLOT:
