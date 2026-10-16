@@ -429,7 +429,7 @@ of a real episode) are unchanged, so a ~10 min one-act episode saves roughly
 `<output>\otr\episodes\_replay\signal_lost_the_rainbow_boxes_20261014_145758`
 for any future A/B.
 
-### 0r. 8 GB regression on 2.3.25: every 8 GB graph, 1 act, fastest first (MRKT -- open)
+### 0r. 8 GB regression: every 8 GB graph, 1 act, fastest first (MRKT -- open; legs 1-2 passed on 2.3.26)
 
 Operator, 2026-10-14: "run 1 act from fastest to longest 8gb on this rig to
 regress", and again after 2.3.25: "let's remember to run the local Comfy 8 GB
@@ -459,6 +459,29 @@ Per leg, record: episode id, RESULT, obs_publish, wall, sampled peak VRAM,
 acceptance_finding_count, and any Traceback / AttributeError / ImportError
 (an import of a deleted name would surface as one of these). A failure is a
 fix or a revert commit with the reason; a pass closes the row.
+
+**Where it stands (2026-10-16).** The MRKT session ran it on the 2.3.26 tree
+(`ac768f1e`) on 2026-10-14 and recorded this only in its own transcript, so it
+is copied here before it is lost; the laptop then went unreachable (the
+operator: "i crashed").
+
+| leg | result | wall | peak VRAM | grader | notes |
+| --- | --- | --- | --- | --- | --- |
+| 1 `otr_8gb_low` | PASS, obs_publish OK | 14:39 | 7605 MiB | 0 | `floor_confession_20261014_002030`, 73.8 s; slower than the 6-10 min estimate, not investigated |
+| 2 `otr_8gb_still` | PASS, obs_publish OK | 11:43 | 7403 MiB | 0 | 133.7 s mp4 |
+| 3 `otr_8gb_video` | BLOCKED | -- | -- | -- | exit 1: the lane's weights are not on MRKT (Desktop Shared models hold 0 of them); nothing was downloaded |
+| 4-7 | not run | | | | same cause: ltx_8gb 16.1 GB, haunted 3.6 GB, ltx25_16gb 25.4 GB, about 45 GB in all; the download is the operator's call and was still open |
+
+No Traceback, AttributeError, NameError or ImportError on legs 1-2 (only the
+disabled optional triton line), so nothing deleted in 2.3.24-2.3.26 broke the
+two lanes that ran.
+
+**What changed since, and why the rerun is worth more now:** `232e372d`
+(2026-10-15) moved the three 8 GB LTX 2.5 lanes to a single stage decoded at
+832x480, not yet proven on a leg, and `ece6ed34` put every NVIDIA workflow on
+`rtx_vsr`, which installs `nvidia-vfx` itself on first load (`509e88bc`,
+`dd889dcc`). Rerun from current main, not 2.3.26: legs 1-2 again (rtx_vsr is
+new on them), then legs 3-7 once the weights decision is made.
 
 ### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
 
