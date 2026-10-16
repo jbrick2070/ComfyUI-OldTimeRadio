@@ -128,7 +128,8 @@ def test_fingerprint_does_not_import_torch_or_nvvfx():
 
 
 def test_without_the_package_load_refuses_with_the_pip_line(monkeypatch):
-    monkeypatch.setitem(sys.modules, "nvvfx", None)
+    calls = _install_spy(monkeypatch)        # never a real pip, whatever the shell exports
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     with pytest.raises(EngineUnusable, match="pip install nvidia-vfx"):
         V.RtxVsr().load(torch.device("cpu"))
 
@@ -377,6 +378,8 @@ def _install_spy(monkeypatch, ok=True, provide=None):
     monkeypatch.setattr(V, "_pip_install_nvidia_vfx", fake_pip)
     monkeypatch.setattr(V, "_AUTO_INSTALL_OUTCOME", None)
     monkeypatch.setitem(sys.modules, "nvvfx", None)       # absent
+    # An RTX 40-series card unless a test says otherwise.
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (8, 9))
     return calls
 
 
@@ -520,3 +523,67 @@ def test_a_ghost_row_already_at_canvas_keeps_its_declared_chain(monkeypatch):
     assert seen["model"] == 0
     (vf,) = seen["ffmpeg"]
     assert "flags=lanczos" in vf and "unsharp" not in vf and "pad=1920" not in vf
+
+
+def test_a_pre_turing_gtx_card_never_downloads_the_sdk(monkeypatch):
+    calls = _install_spy(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (6, 1))
+    with pytest.raises(EngineUnusable, match="Turing"):
+        V.RtxVsr().load(torch.device("cuda:0"))
+    assert calls == []
+
+
+def test_an_arm_or_mac_host_never_downloads_the_sdk(monkeypatch):
+    import platform
+    calls = _install_spy(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
+    monkeypatch.setattr(platform, "machine", lambda: "aarch64")
+    with pytest.raises(EngineUnusable, match="x86-64"):
+        V.RtxVsr().load(torch.device("cuda:0"))
+    assert calls == []
+
+
+def _fake_proc(monkeypatch, results):
+    from nodes._otr_shared import proc as otr_proc
+    seen = []
+
+    def fake_run(argv, **kw):
+        seen.append(list(argv))
+        rc, out = results.pop(0)
+        return types.SimpleNamespace(returncode=rc, stdout=out, stderr="")
+    monkeypatch.setattr(otr_proc, "run", fake_run)
+    return seen
+
+
+def test_no_pip_falls_back_to_uv_pip(monkeypatch):
+    seen = _fake_proc(monkeypatch, [(1, "No module named pip"), (0, "Installed 1 package")])
+    ok, detail = V._pip_install_nvidia_vfx()
+    assert ok and "uv pip" in detail
+    assert seen[0][1:4] == ["-m", "pip", "install"] and "--no-input" in seen[0]
+    assert seen[1][1:5] == ["-m", "uv", "pip", "install"]
+    assert seen[1][seen[1].index("--python") + 1] == sys.executable
+    from nodes._otr_shared import proc as otr_proc
+    for argv in seen:
+        otr_proc._check(argv)
+
+
+def test_a_real_pip_failure_does_not_try_uv(monkeypatch):
+    seen = _fake_proc(monkeypatch, [(1, "ERROR: No matching distribution found")])
+    ok, detail = V._pip_install_nvidia_vfx()
+    assert not ok and len(seen) == 1 and "No matching distribution" in detail
+
+
+def test_a_failed_install_logs_the_whole_pip_output(monkeypatch, caplog):
+    long_reason = "x" * 400 + " ERROR: No matching distribution found for nvidia-vfx"
+    monkeypatch.setattr(V, "_pip_install_nvidia_vfx", lambda: (False, "pip exit 1: " + long_reason))
+    monkeypatch.setattr(V, "_AUTO_INSTALL_OUTCOME", None)
+    monkeypatch.setitem(sys.modules, "nvvfx", None)
+    import logging
+    with caplog.at_level(logging.WARNING, logger="OTR.upscale.rtx_vsr"):
+        with pytest.raises(ModuleNotFoundError):
+            V._import_nvvfx_installing_if_missing()
+    assert any("No matching distribution found for nvidia-vfx" in r.getMessage()
+               and "x" * 400 in r.getMessage() for r in caplog.records)

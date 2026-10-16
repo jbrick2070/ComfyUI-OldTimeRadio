@@ -159,11 +159,12 @@ This pack cannot fetch them, and no table here can tell you the filename, becaus
 
 ## What the words mean
 
-**How you get the weights.** Three things do the fetching for an **auto** row, and
+**How you get the weights.** Four things do the fetching for an **auto** row, and
 none of them is a script you have to run: the engine's own library pulls it
 through the Hugging Face cache, `OTR_WorkflowValidator` -- a node inside the
-workflow -- downloads it at queue time, or the engine fetches its own pinned file
-when it loads (the upscaler). A **manual** row may still have a helper in
+workflow -- downloads it at queue time, the engine fetches its own pinned file
+when it loads (Real-ESRGAN), or it pip-installs its own runtime package when it
+loads on hardware that can use it (NVIDIA RTX VSR). A **manual** row may still have a helper in
 `scripts/`, but `scripts/` is not in the registry bundle, so from a normal
 install it is a step you take by hand and it is labelled as one.
 

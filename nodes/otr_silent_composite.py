@@ -1771,7 +1771,8 @@ class OTRSilentComposite:
             except Exception as exc:  # noqa: BLE001 -- see the gate just below
                 # AN OPTIONAL ACCELERATOR NEVER COSTS THE EPISODE (2026-10-14).
                 # An engine that declares `degrades_to_off` (rtx_vsr: it needs
-                # an RTX card and a user-installed SDK) falls back to off -- the
+                # an RTX card and NVIDIA's SDK, which it installs itself) falls
+                # back to off -- the
                 # lanczos path -- with a warning when it cannot run here. This is
                 # the last stage of an episode; everything before it is done.
                 # Every other engine keeps its loud refusal.

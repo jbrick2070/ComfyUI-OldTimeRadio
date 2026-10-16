@@ -118,15 +118,24 @@ It needs an RTX card (Turing, the RTX 20 series, or newer) and NVIDIA driver
 570.65 or later on Windows, per NVIDIA's own package notes. It is about
 540 MB, Windows and Linux x86-64 only, under NVIDIA's licence; running an
 NVIDIA workflow on an NVIDIA card is taken as accepting it, as you did for the
-driver. To install it ahead of time, or on a machine whose first run is
-offline, run this with ComfyUI's own Python:
+driver. It skips the download where it could not help: a card older than
+Turing (a GTX 10-series, say), ARM Linux, macOS, or Python older than 3.12.
+If ComfyUI's Python has no pip (some ComfyUI Desktop installs use uv), it
+installs with `uv pip` instead. If an install fails, the whole pip output is in
+the ComfyUI log, and the server does not retry until it restarts. To install it
+ahead of time, or on a machine whose first run is offline, run this with
+ComfyUI's own Python:
 
 ```
-pip install nvidia-vfx
+pip install "nvidia-vfx>=0.2,<0.3"
 ```
+
+Budget about 1.1 GB of disk the first time: the 540 MB package plus pip's
+cached copy of it.
 
 **It never costs you an episode.** If `rtx_vsr` cannot run where you picked
-it -- the package is missing, the card is AMD or a GTX, the machine is a Mac --
+it -- the install failed, the card is AMD or an older GTX, the machine is a
+Mac --
 the composite says why in the log and in its report line, and finishes the
 episode with `off`. The upscaler is the last stage of a run; everything before
 it is already done.
@@ -224,9 +233,9 @@ recommendation there, not an oversight:
 - The composite already resamples and sharpens on the way to the canvas, and
   that path was tuned against a measured comparison.
 - `spandrel_esrgan`'s checkpoint downloads at the end of the first run that
-  uses it, and a failed fetch there costs the whole episode; `rtx_vsr` needs a
-  hand install and an RTX card. The shipped default has to be the one that
-  works on a fresh, offline install of any machine.
+  uses it, and a failed fetch there costs the whole episode; `rtx_vsr` needs an
+  RTX card and a 540 MB NVIDIA package. The shipped default has to be the one
+  that works on a fresh, offline install of any machine.
 - It is a radio drama. The picture is a visualizer or a procedural lane, and
   super-resolution has less to give that than it would give a photograph.
 

@@ -6,9 +6,9 @@ own ComfyUI_Nvidia_VFX_Nodes is built on. An optional second upscaler beside
 ``spandrel_esrgan``. ``off`` stays the canonical workflow's default (operator,
 2026-10-14: "one of 2 upscale options but do not activate by default for
 now"); every NVIDIA workflow variant selects it on ``cuda`` (operator,
-2026-10-15: "every nvidia lane to 1080p"). Where ``nvidia-vfx`` is not
-installed it falls back to ``off`` with a warning, so a variant never fails on
-it.
+2026-10-15: "every nvidia lane to 1080p"). It installs ``nvidia-vfx`` itself
+on a capable NVIDIA card (below); wherever it still cannot run it falls back
+to ``off`` with a warning, so a variant never fails on it.
 
 WHY IT EARNS A DROPDOWN ROW -- measured on the RTX 4060 Laptop (8 GB), 48 real
 frames of a 1472x832 OTR viz clip, 2026-10-14:
@@ -35,9 +35,12 @@ and Linux x86-64; NVIDIA's proprietary licence). It is NOT in requirements.txt,
 because that would put a proprietary 540 MB wheel on every AMD, Intel and Mac
 install for nothing. Instead ``load`` INSTALLS IT ITSELF (operator,
 2026-10-15): only when a workflow has picked this engine -- which only the
-NVIDIA workflow variants do -- and only once the device has proved to be an
-NVIDIA CUDA card, it runs ``python -m pip install nvidia-vfx`` into ComfyUI's
-own interpreter, once per server process, then carries on. Choosing an NVIDIA
+NVIDIA workflow variants do -- and only once the machine has proved it can use
+it (a CUDA device that is not a ROCm build, compute capability 7.5 / Turing or
+newer, Windows or Linux on x86-64, Python 3.12+ for the abi3 wheel), it runs
+``python -m pip install`` into ComfyUI's own interpreter -- or ``uv pip``
+when that interpreter has no pip, as on ComfyUI Desktop installs that alias
+pip to uv -- once per server process, then carries on. Choosing an NVIDIA
 workflow on an NVIDIA machine is taken as accepting NVIDIA's licence for its
 own runtime (operator: the user already accepted NVIDIA's terms with the
 driver). An offline box, a pip failure or a wheel that will not load refuses
@@ -80,6 +83,32 @@ INSTALL_HINT = "pip install nvidia-vfx (NVIDIA RTX card required)"
 #: is a deliberate bump, not something a first run picks up by itself.
 AUTO_INSTALL_REQUIREMENT = "nvidia-vfx>=0.2,<0.3"
 
+#: The SDK's floor: RTX Video Super Resolution runs on Turing (sm_75) or newer.
+#: A Pascal/Maxwell GTX card would download the wheel only to fail the probe.
+MIN_COMPUTE_CAPABILITY = (7, 5)
+
+
+def _install_blocker(torch, dev):
+    """Why installing the SDK here would be pointless, or ``""``. Checked
+    BEFORE any download: the wheel is win_amd64 / manylinux x86-64, abi3 from
+    CPython 3.12, and the effect needs sm_75+. (GTX 16xx is Turing without
+    tensor cores and passes this check; the post-install probe catches it.)"""
+    import platform
+    import sys
+    machine = platform.machine().lower()
+    if sys.platform not in ("win32", "linux") or machine not in ("amd64", "x86_64"):
+        return f"nvidia-vfx ships for Windows/Linux x86-64 only ({sys.platform} {machine})"
+    if sys.version_info < (3, 12):
+        return "nvidia-vfx needs Python 3.12 or newer (this is %d.%d)" % sys.version_info[:2]
+    try:
+        cap = tuple(torch.cuda.get_device_capability(dev))
+    except Exception as exc:  # noqa: BLE001 -- an unreadable card is not a reason to download
+        return f"could not read the card's compute capability ({type(exc).__name__}: {exc})"
+    if cap < MIN_COMPUTE_CAPABILITY:
+        return ("this card is compute capability %d.%d; RTX VSR needs %d.%d "
+                "(Turing) or newer" % (cap + MIN_COMPUTE_CAPABILITY))
+    return ""
+
 #: Ceiling on the one pip run. The wheel is ~540 MB; a slow line still lands
 #: well inside this, and a hung pip must not hold the episode's last stage.
 AUTO_INSTALL_TIMEOUT_S = 1200
@@ -94,21 +123,35 @@ _AUTO_INSTALL_OUTCOME = None
 def _pip_install_nvidia_vfx():
     """Install the SDK into THIS interpreter. Returns ``(ok, detail)``; never
     raises. Spawned through the pack's one subprocess boundary
-    (``otr_proc.run``, whose allowlist admits the ``python`` interpreter)."""
+    (``otr_proc.run``, whose allowlist admits the ``python`` interpreter).
+
+    ``python -m pip`` first; when the interpreter has no pip module (ComfyUI
+    Desktop venvs can be uv-managed with pip aliased to ``uv pip``), the same
+    install through ``python -m uv pip install --python <this interpreter>``.
+    ``--no-input`` so an index that wants credentials fails instead of waiting
+    on stdin until the timeout."""
     import sys
     from .._otr_shared import proc as otr_proc
-    argv = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
-            AUTO_INSTALL_REQUIREMENT]
-    try:
-        r = otr_proc.run(argv, capture_output=True, text=True,
-                         timeout=AUTO_INSTALL_TIMEOUT_S)
-    except Exception as exc:  # noqa: BLE001 -- timeout, spawn failure
-        return False, f"{type(exc).__name__}: {exc}"
-    tail = " ".join(((r.stdout or "") + " " + (r.stderr or "")).split())[-300:]
-    return r.returncode == 0, f"pip exit {r.returncode}: {tail}"
+
+    def attempt(argv):
+        try:
+            r = otr_proc.run(argv, capture_output=True, text=True,
+                             timeout=AUTO_INSTALL_TIMEOUT_S)
+        except Exception as exc:  # noqa: BLE001 -- timeout, spawn failure
+            return False, f"{type(exc).__name__}: {exc}"
+        out = " ".join(((r.stdout or "") + " " + (r.stderr or "")).split())
+        return r.returncode == 0, f"exit {r.returncode}: {out}"
+
+    ok, detail = attempt([sys.executable, "-m", "pip", "install", "--no-input",
+                          "--disable-pip-version-check", AUTO_INSTALL_REQUIREMENT])
+    if ok or "No module named pip" not in detail:
+        return ok, "pip " + detail
+    ok, uv_detail = attempt([sys.executable, "-m", "uv", "pip", "install",
+                             "--python", sys.executable, AUTO_INSTALL_REQUIREMENT])
+    return ok, "pip unavailable; uv pip " + uv_detail
 
 
-def _import_nvvfx_installing_if_missing():
+def _import_nvvfx_installing_if_missing(blocker=""):
     """``import nvvfx``; on an absent package, install it once and retry.
 
     Only ``ModuleNotFoundError`` for ``nvvfx`` itself triggers the install: a
@@ -121,6 +164,10 @@ def _import_nvvfx_installing_if_missing():
     except ModuleNotFoundError as exc:
         if getattr(exc, "name", "nvvfx") not in (None, "nvvfx"):
             raise
+        if blocker:
+            raise ModuleNotFoundError(
+                f"nvvfx is not installed, and installing it here would not "
+                f"help: {blocker}") from exc
         if _AUTO_INSTALL_OUTCOME is not None:
             raise ModuleNotFoundError(
                 f"nvvfx is not installed and this server already tried to "
@@ -129,10 +176,15 @@ def _import_nvvfx_installing_if_missing():
                  "%s into %s (about 540 MB, once)", AUTO_INSTALL_REQUIREMENT,
                  __import__("sys").executable)
     ok, detail = _pip_install_nvidia_vfx()
-    _AUTO_INSTALL_OUTCOME = ("installed" if ok else "failed") + f" -- {detail}"
+    # The refusal is folded to one short line downstream, so the WHOLE pip
+    # output goes to the log here, where a reader can see why it failed.
+    _LOG.log(logging.INFO if ok else logging.WARNING,
+             "[OTR.upscale] rtx_vsr: installing %s %s -- %s",
+             AUTO_INSTALL_REQUIREMENT, "succeeded" if ok else "FAILED", detail)
+    _AUTO_INSTALL_OUTCOME = ("installed" if ok else "failed") + f" -- {detail[-300:]}"
     if not ok:
         raise ModuleNotFoundError(f"installing {AUTO_INSTALL_REQUIREMENT} failed "
-                                  f"({detail})")
+                                  f"({detail[-300:]})")
     import importlib
     importlib.invalidate_caches()
     import nvvfx
@@ -177,7 +229,8 @@ class RtxVsr:
     roles = ("upscale_stage",)
     default_roles = ()               # never an auto-default; explicit pick only
     # The OUTPUT is the user's; the SDK runtime is NVIDIA-proprietary and is
-    # never redistributed by this pack (the user installs it).
+    # never redistributed by this pack (it is pip-installed from NVIDIA's own
+    # PyPI release on the user's machine, see load()).
     commercial_clean = False
     requires_flag = None
 
@@ -241,7 +294,8 @@ class RtxVsr:
         # must never put a 540 MB proprietary wheel on a CPU, Mac or AMD box,
         # so every hardware refusal above runs first.
         try:
-            nvvfx = _import_nvvfx_installing_if_missing()
+            nvvfx = _import_nvvfx_installing_if_missing(
+                blocker=_install_blocker(torch, dev))
         except Exception as exc:  # noqa: BLE001 -- ImportError, a DLL load error
             raise self._refuse(EngineUsabilityReason.MISSING_MODEL,
                                f"the nvidia-vfx package is not usable here "
