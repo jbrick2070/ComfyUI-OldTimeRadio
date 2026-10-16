@@ -140,3 +140,25 @@ def test_a_plain_url_survives_as_the_diagnostic(text):
 def test_a_url_with_a_login_is_redacted(text):
     out = redact(text)
     assert "Q7m9Z2x4" not in out and PH in out, out
+
+
+@pytest.mark.parametrize("url", [
+    "https://h/f?code=Q7m9Z2x4",
+    "https://h/f?st=Q7m9Z2x4",
+    "https://h/f?a=1&sas=Q7m9Z2x4",
+    "https://h/f?k=Q7m9Z2x4",
+    "https://h/f?jwt=Q7m9Z2x4",
+    "https://h/f?hdnts=exp=1~hmac=Q7m9Z2x4",
+    "https://h/cb#access_token=Q7m9Z2x4",
+    "https://h/f?download=true&code=Q7m9Z2x4",
+])
+def test_a_signed_url_loses_its_query_whatever_the_names(url):
+    """Sonnet QA 2026-10-16: signed-URL parameters are not enumerable."""
+    out = redact("failed for url: " + url + " (403)")
+    assert "Q7m9Z2x4" not in out and PH in out, out
+    assert "https://h/" in out and out.endswith(" (403)"), out   # host/path kept
+
+
+def test_a_harmless_query_survives():
+    url = "https://huggingface.co/x/resolve/main/f.safetensors?download=true"
+    assert redact("GET " + url) == "GET " + url

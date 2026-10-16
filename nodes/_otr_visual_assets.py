@@ -1077,6 +1077,25 @@ _REDACT_RE = re.compile(
     + r")"
 )
 
+#: A URL's query string and fragment are where signed-URL secrets live, under
+#: names no stem list can enumerate (?code=, ?sas=, ?jwt=, ?st=, Akamai
+#: hdnts=..., OAuth #access_token=). So the query and fragment of every
+#: scheme:// URL are redacted, EXCEPT a query made only of the harmless
+#: parameters below; scheme, host and path stay as the diagnostic (Sonnet QA,
+#: 2026-10-16).
+_URL_QUERY_RE = re.compile(
+    r'(?i)((?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://[^\s?#"\x27<>)\]}]*)'
+    r'([?#][^\s"\x27<>)\]}]*)')
+_HARMLESS_QUERY_RE = re.compile(
+    r"(?i)^\?(?:(?:download|raw|dl)=(?:true|false|1|0)&?)+$")
+
+
+def _redact_url_query(match):
+    base, rest = match.group(1), match.group(2)
+    if _HARMLESS_QUERY_RE.match(rest):
+        return match.group(0)
+    return base + rest[0] + _REDACTION_SENTINEL
+
 
 def _redact_credentials(message):
     r"""Every credential-bearing run replaced, whatever shape it arrived in.
@@ -1090,8 +1109,10 @@ def _redact_credentials(message):
     a SEPARATOR (``: = -> =>``, percent-encoded too, or end of line then the
     next line) and its VALUE (quoted strings, an auth scheme plus its token,
     comma/semicolon lists, k=v parameters) are matched as one unit and
-    replaced; so is a URL carrying a login (``user:pass@host``) and a bare
-    ``Bearer <value>``. A plain URL survives as the diagnostic it is.
+    replaced; so is a URL carrying a login (``user:pass@host``), the query
+    string and fragment of any URL (unless they are only ``download=true``
+    and the like), and a bare ``Bearer <value>``. A URL's scheme, host and
+    path survive as the diagnostic they are.
 
     WHAT SURVIVES, deliberately: text around a redacted value on the same line
     (a pip error or a Windows path after ``key = value`` is kept), and words
@@ -1107,17 +1128,24 @@ def _redact_credentials(message):
         import urllib.parse
         text = message if isinstance(message, str) else str(message)
         scrubbed = _REDACT_RE.sub(_REDACTION_SENTINEL, text)
+        scrubbed = _URL_QUERY_RE.sub(_redact_url_query, scrubbed)
         out = []
         for token in re.split(r"(\s+)", scrubbed):
             if not token.strip():
                 out.append(token)
                 continue
             if _REDACTION_SENTINEL in token:
-                # A query string whose credential was redacted is redacted
-                # whole: the rest of a signed URL is not worth the risk.
+                # A query string with a redacted parameter is redacted WHOLE
+                # (the other parameters of a signed URL are not worth the
+                # risk), but the address before the "?" is kept: it names the
+                # host and file that failed.
                 if ("?" + _REDACTION_SENTINEL in token
                         or "&" + _REDACTION_SENTINEL in token):
-                    out.append(_REDACTION_SENTINEL)
+                    if "?" in token:
+                        out.append(token.split("?", 1)[0] + "?"
+                                   + _REDACTION_SENTINEL)
+                    else:
+                        out.append(_REDACTION_SENTINEL)
                 else:
                     out.append(token)
                 continue
