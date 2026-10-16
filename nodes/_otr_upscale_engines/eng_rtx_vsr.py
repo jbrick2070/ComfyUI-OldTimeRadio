@@ -243,8 +243,10 @@ class RtxVsr:
     degrades_to_off = True
 
     #: CLEAN FULL FRAME: an exact x2 (rounded up for the SDK, cropped back to
-    #: exact), no sharpening, no crop of the picture, no pad -- then the
-    #: composite's aspect-preserving fit. That honours a row that declared
+    #: exact) with no added sharpening filter, crop or pad, then the
+    #: composite's exact full-frame resize to the canvas (never fit-and-pad).
+    #: VSR does crisp edges itself -- that is its point -- but it adds no
+    #: unsharp pass and invents no texture. That honours a row that declared
     #: ``lanczos_clean_full_frame`` (the AnimateDiff/Ghost lanes), so the
     #: composite upscales those rows with this engine (operator, 2026-10-15:
     #: "run some animated diffs and upscale those too"). Real-ESRGAN does not

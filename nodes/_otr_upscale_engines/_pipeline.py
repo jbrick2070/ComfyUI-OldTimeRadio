@@ -237,6 +237,25 @@ def _validate_engine_output(out, expected_scale: int, in_shape) -> None:
 # ---------------------------------------------------------------------------
 # Fit-and-pad (decrease-fit both directions + black-pad to canvas)
 # ---------------------------------------------------------------------------
+def _fit_full_frame_bhwc(x, canvas_w: int, canvas_h: int):
+    """Resize BHWC to EXACTLY (canvas_h, canvas_w): no aspect fit, no pad.
+
+    The model-path counterpart of the declared ``lanczos_clean_full_frame``
+    chain (``scale=W:H:flags=lanczos``), which also fills the canvas outright.
+    A row that declared that mode keeps its full-frame promise on the model
+    path too, whatever the canvas aspect. Bicubic with antialias (torch has no
+    Lanczos kernel); returns contiguous for the downstream ``.numpy()``.
+    """
+    import torch.nn.functional as F
+
+    if x.ndim != 4:
+        raise ValueError(f"_fit_full_frame_bhwc expects BHWC rank-4; got {x.ndim}")
+    x = x.permute(0, 3, 1, 2).contiguous()
+    x = F.interpolate(x, size=(int(canvas_h), int(canvas_w)), mode="bicubic",
+                      align_corners=False, antialias=True)
+    return x.permute(0, 2, 3, 1).contiguous()
+
+
 def _fit_and_pad_bhwc(x, canvas_w: int, canvas_h: int):
     """Decrease-fit BOTH directions (upscale if under, downscale if over) then
     black-pad to (canvas_h, canvas_w).
@@ -282,4 +301,5 @@ __all__ = [
     "_probe_video_dims",
     "_validate_engine_output",
     "_fit_and_pad_bhwc",
+    "_fit_full_frame_bhwc",
 ]

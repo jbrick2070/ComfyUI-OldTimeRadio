@@ -486,6 +486,7 @@ def _route(monkeypatch, engine, *, mode, src_dims=(512, 288)):
 
     def fake_model(**kw):
         seen["model"] += 1
+        seen["full_frame"] = kw.get("full_frame")
     monkeypatch.setattr(SC, "_run_model_pipeline", fake_model)
     SC._encode_segment("ffmpeg", "clip.mp4", 25, "seg.mp4", w=1920, h=1080,
                        fps=25, sharpen=True, engine=engine,
@@ -505,6 +506,9 @@ def test_a_ghost_row_goes_through_rtx_vsr(monkeypatch):
     import nodes.otr_silent_composite as SC
     seen = _route(monkeypatch, _Clean(), mode=SC.DELIVERY_SCALE_MODE_CLEAN)
     assert seen["model"] == 1 and seen["ffmpeg"] == []
+    assert seen["full_frame"] is True              # filled exactly, never padded
+    legacy = _route(monkeypatch, _Clean(), mode=None)
+    assert legacy["model"] == 1 and legacy["full_frame"] is False
 
 
 def test_a_ghost_row_keeps_clean_lanczos_under_esrgan_or_off(monkeypatch):
@@ -587,3 +591,77 @@ def test_a_failed_install_logs_the_whole_pip_output(monkeypatch, caplog):
             V._import_nvvfx_installing_if_missing()
     assert any("No matching distribution found for nvidia-vfx" in r.getMessage()
                and "x" * 400 in r.getMessage() for r in caplog.records)
+
+
+def test_the_full_frame_fit_fills_any_canvas_with_no_pad():
+    from nodes._otr_upscale_engines._pipeline import (
+        _fit_full_frame_bhwc, _fit_and_pad_bhwc)
+    x = torch.full((1, 576, 1024, 3), 0.5)          # a Ghost clip after VSR x2
+    for w, h in ((1920, 1080), (1472, 832), (1280, 1024)):
+        y = _fit_full_frame_bhwc(x, w, h)
+        assert tuple(y.shape) == (1, h, w, 3)
+        assert float(y.min()) > 0.4                 # no black rows or columns
+    padded = _fit_and_pad_bhwc(x, 1280, 1024)
+    assert float(padded.min()) == 0.0               # the legacy fit letterboxes
+
+
+def _ghost_manifest(tmp_path):
+    import nodes.otr_silent_composite as SC
+    clip = tmp_path / "ghost.mp4"
+    clip.write_bytes(b"fake-mp4")
+    return {"fps": 25, "clips": [{"path": str(clip), "n_frames": 25,
+                                  "exists": True, "type": "clip",
+                                  "delivery_scale_mode": SC.DELIVERY_SCALE_MODE_CLEAN}]}
+
+
+def test_a_ghost_only_episode_loads_rtx_vsr_through_the_real_gate(tmp_path, monkeypatch):
+    """The node's own eligibility call (not a stub) must pass clean_engine."""
+    import nodes.otr_silent_composite as SC
+    loaded = []
+
+    class _CleanEngine:
+        name, intrinsic_scale, degrades_to_off = "rtx_vsr", 2, True
+        clean_full_frame, device = True, None
+
+        def load(self, device):
+            loaded.append(device)
+
+        def unload(self):
+            pass
+
+    off = get_engine("off")
+    monkeypatch.setattr(SC, "_get_upscale_engine",
+                        lambda name: _CleanEngine() if name == "rtx_vsr" else off)
+    monkeypatch.setattr(SC, "_assert_upscale_usable", lambda name, role: name)
+    monkeypatch.setattr(SC, "_resolve_upscale_device", lambda v: torch.device("cpu"))
+    seen = {}
+
+    def assemble(*a, **kw):
+        seen["engine"] = kw["engine"].name
+        return "out.mp4", ["stubbed"]
+    monkeypatch.setattr(SC, "assemble_silent_timeline", assemble)
+    src = tmp_path / "source.mp4"
+    src.write_bytes(b"fake-mp4")
+    SC.OTRSilentComposite().composite(
+        base_video_path=str(src), canvas_w=1920, canvas_h=1080, fps=25,
+        output_path=str(tmp_path / "out.mp4"), gate_in="",
+        clip_manifest_json=json.dumps(_ghost_manifest(tmp_path)),
+        upscale_engine="rtx_vsr", upscale_device="cuda")
+    assert loaded and seen["engine"] == "rtx_vsr"
+
+
+def test_a_ghost_only_key_ignores_unsharp_but_carries_the_engine(tmp_path, monkeypatch):
+    import nodes.otr_silent_composite as SC
+    manifest = json.dumps(_ghost_manifest(tmp_path))
+    src = tmp_path / "source.mp4"
+    src.write_bytes(b"fake-mp4")
+
+    def key(engine, unsharp):
+        monkeypatch.setenv("OTR_COMPOSITE_UNSHARP_AMOUNT", unsharp)
+        return SC.OTRSilentComposite.IS_CHANGED(
+            base_video_path=str(src), canvas_w=1920, canvas_h=1080, fps=25,
+            output_path=str(tmp_path / "out.mp4"), clip_manifest_json=manifest,
+            upscale_engine=engine, upscale_device="cuda")
+    assert key("rtx_vsr", "0.4") == key("rtx_vsr", "0.9")    # no unsharp reaches a Ghost row
+    assert "nvidia_vfx" in key("rtx_vsr", "0.4")             # the model the rows now use
+    assert key("off", "0.4") == key("off", "0.9")

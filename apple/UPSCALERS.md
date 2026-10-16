@@ -183,8 +183,11 @@ ComfyUI console, so read it before assuming a break.
   Real-ESRGAN invents texture, so it is not allowed to overrule that; on an
   episode made entirely of those clips it is not even loaded, and the log line
   begins `upscale SKIPPED: no model-eligible clip`. `rtx_vsr` *does* upscale
-  them (since 2026-10-15): it is an exact 2x with no sharpening, so it keeps
-  the clean full-frame promise.
+  them (since 2026-10-15): it is an exact 2x that crisps edges without adding
+  an unsharp pass or inventing texture, and its result is resized to fill the
+  whole frame, as the clean chain would. The per-clip receipts still name the
+  clips' declared mode (`lanczos_clean_full_frame`); the composite's log line
+  `upscale MODEL PATH` is the record that VSR enlarged them.
 - **The clip is already as big as the canvas.** Upscaling it 2x and shrinking
   it back would change pixels without getting anywhere, so the composite takes
   the ordinary path instead and logs `model skip (source ... >= canvas ...)`.

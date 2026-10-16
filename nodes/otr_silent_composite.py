@@ -836,11 +836,12 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
     black paths remain byte-identical whether a profile picks ``off`` or a real
     engine."""
     # A DECLARED DELIVERY MODE WINS, AND IT IS CHECKED FIRST -- before any
-    # source-size probe, before any engine branch. A mixed manifest may well
-    # have loaded a model for its legacy rows, and this row must not touch it:
-    # the lane declared clean full-frame Lanczos and a model pass is neither
-    # clean nor full-frame. Explicitly first, so no later branch can reach
-    # `_run_model_pipeline` with a declared row.
+    # source-size probe, before any engine branch. The lane declared clean
+    # full-frame Lanczos, so a declared row takes its declared chain UNLESS the
+    # loaded engine declares `clean_full_frame` (rtx_vsr, 2026-10-15): then it
+    # runs the model and is resized to EXACTLY the canvas (full frame, no pad),
+    # never through the legacy fit-and-pad. Real-ESRGAN never gets a declared
+    # row.
     _declared_model = (
         delivery_scale_mode == DELIVERY_SCALE_MODE_CLEAN
         and engine is not None and engine.name != "off" and sharpen
@@ -919,11 +920,13 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
     _run_model_pipeline(fb=fb, src=src, seg_path=seg_path,
                         n_frames=n_frames, w=w, h=h, fps=fps,
                         start_frame=start_frame, loop=loop, engine=engine,
-                        src_w=_src_w, src_h=_src_h)
+                        src_w=_src_w, src_h=_src_h,
+                        full_frame=_declared_model)
 
 
 def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
-                        start_frame, loop, engine, src_w, src_h):
+                        start_frame, loop, engine, src_w, src_h,
+                        full_frame=False):
     """FFMPEG OWNS TIME, MODEL OWNS SPACE (Fable r3 amendment).
 
     Decoder runs the full _seg_vf chain MINUS scale/pad/sharpen:
@@ -941,8 +944,11 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
     from ._otr_upscale_engines._pipeline import (
         _read_frames_exact, _tempfile_stderr, _close_stderr, _tail_path,
         _kill_and_wait_all, _unlink_if_exists,
-        _validate_engine_output, _fit_and_pad_bhwc,
+        _validate_engine_output, _fit_and_pad_bhwc, _fit_full_frame_bhwc,
     )
+    # A declared clean-full-frame row fills the canvas exactly, as its
+    # declared lanczos chain would; every legacy row keeps fit-and-pad.
+    _fit = _fit_full_frame_bhwc if full_frame else _fit_and_pad_bhwc
 
     dec_vf_parts = []
     if int(start_frame) > 0:
@@ -1062,7 +1068,7 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
             _validate_engine_output(
                 out_bhwc, expected_scale=int(engine.intrinsic_scale),
                 in_shape=bhwc.shape)
-            out_bhwc = _fit_and_pad_bhwc(out_bhwc, int(w), int(h))
+            out_bhwc = _fit(out_bhwc, int(w), int(h))
             # .contiguous() before .numpy() -- non-contiguous tensors after a
             # permute would raise or corrupt strides (Antigravity r4 MF-2).
             out_u8 = (out_bhwc.clamp(0, 1) * 255.0).byte().contiguous().cpu().numpy()
@@ -1631,19 +1637,23 @@ class OTRSilentComposite:
                      if isinstance(r, dict)]
             _model_eligible = (not _rows) or _has_model_eligible_clips(
                 manifest, clean_engine=_engine_is_clean_full_frame(upscale_engine))
+            # Legacy rows only: the ones whose chain can carry unsharp. A
+            # declared row upscaled by a clean engine has no unsharp either.
+            _legacy_rows = (not _rows) or _has_model_eligible_clips(manifest)
             parts.append(("delivery_modes", tuple(
                 str(r.get("delivery_scale_mode") or "")
                 for r in ((manifest or {}).get("clips") or [])
                 if isinstance(r, dict))))
             # 4. Environment values that affect output pixels (Codex r4 MF-6).
             #
-            # The unsharp amount is EXCLUDED when no row is model-eligible: the
-            # clean full-frame chain emits no unsharp at all, so folding the env
-            # var in there would invalidate a cached composite for a knob that
+            # The unsharp amount is EXCLUDED when there is no legacy row: the
+            # clean full-frame chain -- and a clean engine's model pass over a
+            # declared row -- emits no unsharp at all, so folding the env var
+            # in there would invalidate a cached composite for a knob that
             # cannot reach a single pixel of it.
             parts.append(("env",
                           (otr_env.get("OTR_COMPOSITE_UNSHARP_AMOUNT", "")
-                           if _model_eligible else ""),
+                           if _legacy_rows else ""),
                           otr_env.get("OTR_MESH_COMPOSITE_STYLE", "")))
             # 5. Engine identity + whatever model state that engine declares.
             #

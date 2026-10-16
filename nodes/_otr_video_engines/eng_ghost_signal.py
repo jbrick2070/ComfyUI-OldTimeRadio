@@ -3,7 +3,8 @@
 THE SHAPE OF THIS LANE IN ONE PARAGRAPH. SD1.5 plus the v2 motion module
 ``mm-p_0.5.pth``, sampled at a fixed 512x288 through AnimateDiff-Evolved's
 NON-LOOPED Standard Static context, then delivered by clean Lanczos straight to
-1920x1080 at 25 fps. It owns its subject entirely: ``accepts_still = False``, so
+1920x1080 at 25 fps (or by RTX VSR x2 then an exact full-frame resize, when
+the workflow selects rtx_vsr -- every NVIDIA workflow since 2026-10-15). It owns its subject entirely: ``accepts_still = False``, so
 the image phase mints NOTHING for it and every pixel traces to text this repo
 composed. That is the whole design -- there is no still to inherit a look from,
 no IPAdapter, no ControlNet, no reference folder.
@@ -1668,8 +1669,9 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         """The silent CanonicalClip dict, with silence and CANVAS both proved.
 
         ONE probe, fed to both checks. The exact-512x288 refusal is what earns
-        the composite's right to trust the declared delivery mode and launch no
-        redundant input probe of its own: the clean-Lanczos path does no
+        the composite's right to trust the declared delivery mode (its clean-
+        Lanczos path launches no input probe of its own; an rtx_vsr model pass
+        probes the source as every model row does): the clean-Lanczos path does no
         aspect-ratio pad or crop, so a source that is not exactly 16:9 would be
         silently distorted on the way to 1920x1080. Asserting it HERE, at the
         seam where the mode is stamped, is what makes that safe.

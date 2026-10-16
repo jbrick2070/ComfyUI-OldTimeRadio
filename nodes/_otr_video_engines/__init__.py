@@ -210,7 +210,8 @@ except Exception:  # noqa: BLE001
 
 # animatediff15_video (Ghost Signal, 2026-08-22): SD1.5 + the mm-p_0.5 v2 motion
 # module through AnimateDiff-Evolved's NON-LOOPED Standard Static context, at a
-# fixed 512x288 delivered by clean Lanczos to 1920x1080.
+# fixed 512x288 delivered by clean Lanczos (or rtx_vsr, when selected) to
+# 1920x1080.
 #
 # THE PROMPT-ONLY LANE, and the first one that declares it. `accepts_still` is
 # False and `still_plan` is EMPTY, so the image phase mints nothing for it --
