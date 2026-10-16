@@ -715,3 +715,16 @@ def test_a_mixed_manifest_key_still_tracks_unsharp(tmp_path, monkeypatch):
             clip_manifest_json=json.dumps(manifest),
             upscale_engine="rtx_vsr", upscale_device="cuda")
     assert key("0.4") != key("0.9")                # the legacy row can carry unsharp
+
+
+def test_the_redactor_fails_closed(monkeypatch):
+    import builtins
+    real_import = builtins.__import__
+
+    def no_assets(name, *a, **kw):
+        if "_otr_visual_assets" in name or (a and a[2] and "_otr_visual_assets" in a[2]):
+            raise ImportError("blocked")
+        return real_import(name, *a, **kw)
+    monkeypatch.setattr(builtins, "__import__", no_assets)
+    out = V._redacted("token=SECRET123")
+    assert "SECRET123" not in out and "withheld" in out

@@ -161,12 +161,13 @@ def _pip_install_nvidia_vfx():
 def _redacted(text):
     """Pip output with any credential-bearing run masked, via the pack's one
     redactor (index URLs or tokens can appear in pip's messages). Never
-    raises: an unimportable redactor leaves the text as-is."""
+    raises, and fails CLOSED: if the redactor cannot run, the output is
+    withheld rather than logged raw."""
     try:
         from .._otr_visual_assets import _redact_credentials
         return _redact_credentials(text)
     except Exception:  # noqa: BLE001 -- logging must never fail the install path
-        return text
+        return "<pip output withheld: the credential redactor was unavailable>"
 
 
 def _import_nvvfx_installing_if_missing(blocker=""):
