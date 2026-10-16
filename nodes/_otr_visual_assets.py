@@ -1059,8 +1059,13 @@ _RX_VALUE = (
 )
 _REDACT_RE = re.compile(
     r"(?i)(?:"
-    # 1. any scheme:// URL, raw or percent-encoded
-    r'(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*(?:://|%3a%2f%2f)[^\s"\x27<>)\]}]+'
+    # 1. a URL carrying a login (user:password@ or token@), raw or
+    #    percent-encoded, with or without a scheme. A PLAIN URL is kept: it is
+    #    the diagnostic (which repo, which file, which index), and a signed
+    #    URL is still redacted whole through its ?...Signature= parameter by
+    #    rule 2 plus the query collapse below (Sonnet QA, 2026-10-16).
+    r'(?:(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*(?:://|%3a%2f%2f)|(?<![:/\w])//)'
+    r'[^\s"\x27<>)\]}/@]*(?:@|%40)[^\s"\x27<>)\]}]*'
     r"|"
     # 2. a credential key (quoted or not) + separator + its value; a separator
     #    at the end of a line takes the value from the next line
@@ -1085,7 +1090,8 @@ def _redact_credentials(message):
     a SEPARATOR (``: = -> =>``, percent-encoded too, or end of line then the
     next line) and its VALUE (quoted strings, an auth scheme plus its token,
     comma/semicolon lists, k=v parameters) are matched as one unit and
-    replaced; so is any ``scheme://`` URL and a bare ``Bearer <value>``.
+    replaced; so is a URL carrying a login (``user:pass@host``) and a bare
+    ``Bearer <value>``. A plain URL survives as the diagnostic it is.
 
     WHAT SURVIVES, deliberately: text around a redacted value on the same line
     (a pip error or a Windows path after ``key = value`` is kept), and words

@@ -117,3 +117,26 @@ def test_it_is_cheap_on_a_large_log():
     start = time.perf_counter()
     redact(blob + "Authorization: Bearer Q7m9Z2x4")
     assert time.perf_counter() - start < 2.0
+
+
+@pytest.mark.parametrize("text", [
+    "401 Client Error: Unauthorized for url: https://huggingface.co/x/resolve/main/f.safetensors",
+    "Looking in indexes: https://pypi.org/simple",
+    "Using cached https://files.pythonhosted.org/x.whl (1 MB)",
+])
+def test_a_plain_url_survives_as_the_diagnostic(text):
+    """Sonnet QA 2026-10-16: wiping every URL erased which repo/file failed."""
+    for url in [w for w in text.split() if "://" in w]:
+        assert url in redact(text), redact(text)
+
+
+@pytest.mark.parametrize("text", [
+    "PIP_INDEX_URL=https://u:Q7m9Z2x4@h/simple",
+    "--index-url https://u:Q7m9Z2x4@h/simple",
+    "git+https://Q7m9Z2x4@github.com/x",
+    "UV_INDEX_URL=//u:Q7m9Z2x4@h/simple",
+    "fetch https%3A%2F%2Fu%3AQ7m9Z2x4%40h%2Fsimple",
+])
+def test_a_url_with_a_login_is_redacted(text):
+    out = redact(text)
+    assert "Q7m9Z2x4" not in out and PH in out, out
