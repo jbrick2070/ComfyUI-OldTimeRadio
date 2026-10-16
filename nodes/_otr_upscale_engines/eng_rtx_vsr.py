@@ -146,9 +146,27 @@ def _pip_install_nvidia_vfx():
                           "--disable-pip-version-check", AUTO_INSTALL_REQUIREMENT])
     if ok or "No module named pip" not in detail:
         return ok, "pip " + detail
-    ok, uv_detail = attempt([sys.executable, "-m", "uv", "pip", "install",
-                             "--python", sys.executable, AUTO_INSTALL_REQUIREMENT])
-    return ok, "pip unavailable; uv pip " + uv_detail
+    uv_args = ["pip", "install", "--python", sys.executable,
+               AUTO_INSTALL_REQUIREMENT]
+    ok, uv_detail = attempt([sys.executable, "-m", "uv"] + uv_args)
+    if not ok and "No module named uv" in uv_detail:
+        # uv shipped as its own executable rather than a module in this venv.
+        import shutil
+        uv_exe = shutil.which("uv")
+        if uv_exe:
+            ok, uv_detail = attempt([uv_exe] + uv_args)
+    return ok, "pip unavailable (%s); uv pip %s" % (detail[:120], uv_detail)
+
+
+def _redacted(text):
+    """Pip output with any credential-bearing run masked, via the pack's one
+    redactor (index URLs or tokens can appear in pip's messages). Never
+    raises: an unimportable redactor leaves the text as-is."""
+    try:
+        from .._otr_visual_assets import _redact_credentials
+        return _redact_credentials(text)
+    except Exception:  # noqa: BLE001 -- logging must never fail the install path
+        return text
 
 
 def _import_nvvfx_installing_if_missing(blocker=""):
@@ -176,6 +194,7 @@ def _import_nvvfx_installing_if_missing(blocker=""):
                  "%s into %s (about 540 MB, once)", AUTO_INSTALL_REQUIREMENT,
                  __import__("sys").executable)
     ok, detail = _pip_install_nvidia_vfx()
+    detail = _redacted(detail)
     # The refusal is folded to one short line downstream, so the WHOLE pip
     # output goes to the log here, where a reader can see why it failed.
     _LOG.log(logging.INFO if ok else logging.WARNING,

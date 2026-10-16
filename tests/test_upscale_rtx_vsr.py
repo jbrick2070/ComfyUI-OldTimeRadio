@@ -378,8 +378,13 @@ def _install_spy(monkeypatch, ok=True, provide=None):
     monkeypatch.setattr(V, "_pip_install_nvidia_vfx", fake_pip)
     monkeypatch.setattr(V, "_AUTO_INSTALL_OUTCOME", None)
     monkeypatch.setitem(sys.modules, "nvvfx", None)       # absent
-    # An RTX 40-series card unless a test says otherwise.
+    # A capable host unless a test says otherwise: an RTX 40-series card on
+    # Windows x86-64 with Python 3.13, so the suite is portable to any runner.
+    import platform
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (8, 9))
+    monkeypatch.setattr(platform, "machine", lambda: "AMD64")
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "version_info", (3, 13, 0, "final", 0))
     return calls
 
 
@@ -665,3 +670,48 @@ def test_a_ghost_only_key_ignores_unsharp_but_carries_the_engine(tmp_path, monke
     assert key("rtx_vsr", "0.4") == key("rtx_vsr", "0.9")    # no unsharp reaches a Ghost row
     assert "nvidia_vfx" in key("rtx_vsr", "0.4")             # the model the rows now use
     assert key("off", "0.4") == key("off", "0.9")
+
+
+def test_a_standalone_uv_executable_is_used_when_uv_is_not_a_module(monkeypatch):
+    import shutil
+    seen = _fake_proc(monkeypatch, [(1, "No module named pip"),
+                                    (1, "No module named uv"), (0, "Installed")])
+    monkeypatch.setattr(shutil, "which", lambda name: r"C:\tools\uv.exe")
+    ok, detail = V._pip_install_nvidia_vfx()
+    assert ok and seen[2][0] == r"C:\tools\uv.exe" and seen[2][1:3] == ["pip", "install"]
+    assert "No module named pip" in detail
+    from nodes._otr_shared import proc as otr_proc
+    otr_proc._check(seen[2])                       # the allowlist admits uv
+
+
+def test_pip_output_is_redacted_before_it_is_logged(monkeypatch, caplog):
+    monkeypatch.setattr(V, "_pip_install_nvidia_vfx", lambda: (
+        False, "pip exit 1: GET https://idx.example/simple?access_key=SECRET123 403"))
+    monkeypatch.setattr(V, "_AUTO_INSTALL_OUTCOME", None)
+    monkeypatch.setitem(sys.modules, "nvvfx", None)
+    import logging
+    with caplog.at_level(logging.WARNING, logger="OTR.upscale.rtx_vsr"):
+        with pytest.raises(ModuleNotFoundError) as exc:
+            V._import_nvvfx_installing_if_missing()
+    assert "SECRET123" not in str(exc.value)
+    assert not any("SECRET123" in r.getMessage() for r in caplog.records)
+
+
+def test_a_mixed_manifest_key_still_tracks_unsharp(tmp_path, monkeypatch):
+    import nodes.otr_silent_composite as SC
+    manifest = _ghost_manifest(tmp_path)
+    legacy = tmp_path / "legacy.mp4"
+    legacy.write_bytes(b"fake-mp4")
+    manifest["clips"].append({"path": str(legacy), "n_frames": 25,
+                              "exists": True, "type": "clip"})
+    src = tmp_path / "source.mp4"
+    src.write_bytes(b"fake-mp4")
+
+    def key(unsharp):
+        monkeypatch.setenv("OTR_COMPOSITE_UNSHARP_AMOUNT", unsharp)
+        return SC.OTRSilentComposite.IS_CHANGED(
+            base_video_path=str(src), canvas_w=1920, canvas_h=1080, fps=25,
+            output_path=str(tmp_path / "out.mp4"),
+            clip_manifest_json=json.dumps(manifest),
+            upscale_engine="rtx_vsr", upscale_device="cuda")
+    assert key("0.4") != key("0.9")                # the legacy row can carry unsharp
