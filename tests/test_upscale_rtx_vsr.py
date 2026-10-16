@@ -789,3 +789,21 @@ def test_every_gpu_spatial_step_sits_inside_the_typed_boundary():
                  "_validate_engine_output(", "_fit(out_bhwc", ".cpu().numpy()"):
         assert step in guarded, step
     assert "enc.stdin.write" not in guarded
+
+
+def test_pip_output_is_redacted_before_it_is_folded_to_one_line(monkeypatch, caplog):
+    """A credential whose value is on the NEXT line of pip output is only
+    visible to the redactor while the line breaks are still there."""
+    seen = _fake_proc(monkeypatch, [(1, "ERROR: 403 for index\nAuthorization:\nQ7m9Z2x4\nbye")])
+    ok, detail = V._pip_install_nvidia_vfx()
+    assert not ok and "\n" in detail                # raw lines kept for the redactor
+    monkeypatch.setattr(V, "_pip_install_nvidia_vfx", lambda: (ok, detail))
+    monkeypatch.setattr(V, "_AUTO_INSTALL_OUTCOME", None)
+    monkeypatch.setitem(sys.modules, "nvvfx", None)
+    import logging
+    with caplog.at_level(logging.WARNING, logger="OTR.upscale.rtx_vsr"):
+        with pytest.raises(ModuleNotFoundError) as exc:
+            V._import_nvvfx_installing_if_missing()
+    assert "Q7m9Z2x4" not in str(exc.value)
+    assert not any("Q7m9Z2x4" in r.getMessage() for r in caplog.records)
+    assert any("ERROR: 403 for index" in r.getMessage() for r in caplog.records)

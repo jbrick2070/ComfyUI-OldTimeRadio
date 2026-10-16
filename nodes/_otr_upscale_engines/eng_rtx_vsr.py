@@ -151,7 +151,9 @@ def _pip_install_nvidia_vfx():
                              timeout=AUTO_INSTALL_TIMEOUT_S)
         except Exception as exc:  # noqa: BLE001 -- timeout, spawn failure
             return False, f"{type(exc).__name__}: {exc}"
-        out = " ".join(((r.stdout or "") + " " + (r.stderr or "")).split())
+        # Lines KEPT: the redactor reads a credential whose value sits on the
+        # next line, so output is redacted before it is folded (below).
+        out = ((r.stdout or "") + "\n" + (r.stderr or "")).strip()
         return r.returncode == 0, f"exit {r.returncode}: {out}"
 
     # --only-binary: NVIDIA publishes wheels only; never build from an sdist.
@@ -209,7 +211,9 @@ def _import_nvvfx_installing_if_missing(blocker=""):
                  "%s into %s (about 540 MB, once)", AUTO_INSTALL_REQUIREMENT,
                  __import__("sys").executable)
     ok, detail = _pip_install_nvidia_vfx()
-    detail = _redacted(detail)
+    # Redact with line breaks intact, THEN fold to one line for the log and
+    # the refusal tail.
+    detail = " ".join(_redacted(detail).split())
     # The refusal is folded to one short line downstream, so the WHOLE pip
     # output goes to the log here, where a reader can see why it failed.
     _LOG.log(logging.INFO if ok else logging.WARNING,

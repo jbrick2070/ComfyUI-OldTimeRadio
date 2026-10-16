@@ -1013,61 +1013,123 @@ def _hf_fetch(spec, metadata, progress=None):
 _CREDENTIAL_KEYS = (
     "signature", "sig", "token", "secret", "credential", "password", "passwd",
     "apikey", "api_key", "api-key", "auth", "access_key", "accesskey",
-    "sessionid", "session_id", "x-amz", "bearer", "hf_token",
+    "sessionid", "session_id", "x-amz", "bearer", "hf_token", "cookie",
+)
+
+#: The visible placeholder, and the sentinel that stands in for it until the
+#: very end so a later pass can never re-scan (and mangle) a redaction.
+_REDACTION_PLACEHOLDER = "<credential redacted>"
+_REDACTION_SENTINEL = "\x00CREDENTIAL_REDACTED\x00"
+
+#: THE VALUE GRAMMAR (kibitz panel 2026-10-16: Codex gpt-6.1-sol + Gemini 4
+#: Argon; the driver judged, Gemini's bounded grammar won because the rtx_vsr
+#: installer's pip output and the HF error both arrive as ONE line, where a
+#: wipe-the-line rule would erase the whole diagnostic).
+#:
+#: KEY: any identifier run containing a credential stem (so X-Authorization-
+#: Token, X-Api-Key, Set-Cookie, hf_token all qualify), optionally quoted --
+#: a JSON or Python-repr headers dict. The lookahead+backreference makes the
+#: identifier match atomic, so a long non-matching run cannot backtrack.
+_RX_KEY_STEMS = "|".join(re.escape(k) for k in _CREDENTIAL_KEYS)
+_RX_KEY_IDENT = (
+    r"(?<![A-Za-z0-9_.-])"
+    r"(?=([A-Za-z0-9_.-]*?(?:" + _RX_KEY_STEMS + r")[A-Za-z0-9_.-]*))\1"
+    r"(?![A-Za-z0-9_.-])"
+)
+#: VALUE: a quoted string (spaces kept whole, closing quote optional so a
+#: truncated line still fails closed) or a bare run that may embed quoted
+#: parts (username="a"), stopping before structural closers.
+_RX_QUOTED = r'(?:"(?:\\.|[^"\\\r\n])*"?|\x27(?:\\.|[^\x27\\\r\n])*\x27?)'
+_RX_ATOM = (
+    r"(?:" + _RX_QUOTED
+    + r'|[^\s"\x27,;}\])\r\n]+(?:' + _RX_QUOTED + r'[^\s"\x27,;}\])\r\n]*)*)'
+)
+#: An auth scheme word is consumed WITH the value after it.
+_RX_SCHEME = (
+    r"(?:(?:bearer|basic|token|digest|negotiate|hoba|mutual|oauth"
+    r"|aws4-hmac-sha256|aws|scram-[a-z0-9-]+)[ \t]+)"
+)
+#: Comma/semicolon lists and k=v parameters continue the value, unless the
+#: next item is itself a quoted dict key.
+_RX_CONT_GUARD = r'(?![ \t]*\\?["\x27][A-Za-z0-9_.-]+\\?["\x27][ \t]*:)'
+_RX_VALUE = (
+    _RX_SCHEME + r"?" + _RX_ATOM
+    + r"(?:[ \t]*[,;][ \t]*" + _RX_CONT_GUARD + _RX_ATOM
+    + r"|[ \t]+[A-Za-z0-9_.-]+=" + _RX_ATOM + r")*"
+)
+_REDACT_RE = re.compile(
+    r"(?i)(?:"
+    # 1. any scheme:// URL, raw or percent-encoded
+    r'(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*(?:://|%3a%2f%2f)[^\s"\x27<>)\]}]+'
+    r"|"
+    # 2. a credential key (quoted or not) + separator + its value; a separator
+    #    at the end of a line takes the value from the next line
+    r'(?:\\?["\x27])?' + _RX_KEY_IDENT + r'(?:\\?["\x27])?'
+    r"[ \t]*(?:[:=]|->|=>|%3[ad])[ \t]*(?:\r?\n[ \t]*)?" + _RX_VALUE
+    + r"|"
+    # 3. a standalone Bearer and its value
+    r"\bbearer[ \t]+" + _RX_VALUE
+    + r")"
 )
 
 
 def _redact_credentials(message):
     r"""Every credential-bearing run replaced, whatever shape it arrived in.
 
-    WHY THIS IS KEY-BASED AND NOT URL-BASED. The first cut redacted only
-    ``scheme://<non-whitespace>`` runs, and an adversarial review broke it five
-    ways out of six -- every one of which a real Hugging Face error can produce:
+    ONE GRAMMAR, NOT LAYERS (kibitz panel, 2026-10-16). The earlier design was
+    a header regex, a Bearer regex and a per-whitespace-token key filter, each
+    blind to the others' shapes; two rounds of fixes still left a value on the
+    next line, a prefixed header name, a quoted dict key, an arrow separator
+    and ``password: <value>`` in the clear. Now a credential KEY (any
+    identifier containing a stem from ``_CREDENTIAL_KEYS``, quoted or not),
+    a SEPARATOR (``: = -> =>``, percent-encoded too, or end of line then the
+    next line) and its VALUE (quoted strings, an auth scheme plus its token,
+    comma/semicolon lists, k=v parameters) are matched as one unit and
+    replaced; so is any ``scheme://`` URL and a bare ``Bearer <value>``.
 
-      * ``cdn-lfs.hf.co/f?X-Amz-Signature=...``  -- a bare host, no scheme
-      * ``Authorization: Bearer ...``            -- a header echoed into the text
-      * ``https%3A%2F%2F...%3FX-Amz-Signature%3D...`` -- percent-encoded
-      * a URL split across a newline, signature on the second line
-      * ``hf_token=...``                         -- not in a URL at all
+    WHAT SURVIVES, deliberately: text around a redacted value on the same line
+    (a pip error or a Windows path after ``key = value`` is kept), and words
+    that merely CONTAIN a stem with no separator after them (``tokenizer.json``,
+    ``unauthorized;``) -- the old per-token rule redacted those and destroyed
+    paths. A percent-encoded token is decoded (twice at most) and re-checked
+    against the same grammar. The placeholder is written through a sentinel,
+    so nothing re-scans a redaction.
 
-    A shape-based rule has to anticipate the shape. A KEY-based rule only has to
-    recognise the name, and the names are few and stable. So each whitespace
-    token is percent-decoded and checked for a credential key or a scheme; a hit
-    redacts the WHOLE token rather than trying to excise part of it, because a
-    partial redaction of a credential is not a redaction.
-
-    Header forms are handled first because they span two tokens
-    (``Authorization:`` then the value), which a per-token rule cannot see.
+    FAILS CLOSED: any internal error returns the placeholder alone.
     """
-    import re
-    import urllib.parse
-
-    # Two-token header forms, before tokenising.
-    # THE WHOLE HEADER VALUE, TO THE END OF ITS LINE. Stopping at a token
-    # left credentials behind every time the value had more than one: the
-    # scheme word alone ("Authorization: Bearer <opaque>"), a quoted value,
-    # Digest's response="...", comma-separated parts (Codex and Sonnet
-    # reviews, 2026-10-16). A diagnostic loses the rest of that one line;
-    # nothing else.
-    message = re.sub(r"(?i)\b(?:proxy-)?authorization\s*[:=][^\r\n]*",
-                     "<credential redacted>", message)
-    message = re.sub(r"(?i)\bbearer\s+\S+", "<credential redacted>", message)
-
-    out = []
-    for token in re.split(r"(\s+)", message):
-        if not token.strip():
-            out.append(token)
-            continue
-        try:
-            probe = urllib.parse.unquote(token)
-        except Exception:                    # noqa: BLE001 -- treat as raw
+    try:
+        import urllib.parse
+        text = message if isinstance(message, str) else str(message)
+        scrubbed = _REDACT_RE.sub(_REDACTION_SENTINEL, text)
+        out = []
+        for token in re.split(r"(\s+)", scrubbed):
+            if not token.strip():
+                out.append(token)
+                continue
+            if _REDACTION_SENTINEL in token:
+                # A query string whose credential was redacted is redacted
+                # whole: the rest of a signed URL is not worth the risk.
+                if ("?" + _REDACTION_SENTINEL in token
+                        or "&" + _REDACTION_SENTINEL in token):
+                    out.append(_REDACTION_SENTINEL)
+                else:
+                    out.append(token)
+                continue
             probe = token
-        low = probe.lower()
-        if "://" in probe or any(k in low for k in _CREDENTIAL_KEYS):
-            out.append("<credential redacted>")
-        else:
-            out.append(token)
-    return "".join(out)
+            for _ in range(2):
+                if "%" not in probe:
+                    break
+                unquoted = urllib.parse.unquote(probe)
+                if unquoted == probe:
+                    break
+                probe = unquoted
+            if probe != token and _REDACT_RE.search(probe):
+                out.append(_REDACTION_SENTINEL)
+            else:
+                out.append(token)
+        return "".join(out).replace(_REDACTION_SENTINEL, _REDACTION_PLACEHOLDER)
+    except Exception:  # noqa: BLE001 -- a redactor must never raise or leak
+        return _REDACTION_PLACEHOLDER
 
 
 def _scrub_transfer_error(exc):
