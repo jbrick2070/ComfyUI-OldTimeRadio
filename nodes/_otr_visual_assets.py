@@ -1095,7 +1095,8 @@ _URL_CLOSERS = "\"')]}>,.;"
 
 def _redact_url_query(match):
     base, rest = match.group(1), match.group(2)
-    if _HARMLESS_QUERY_RE.match(rest):
+    # An empty query/fragment ("...foo/?" ending a sentence) is punctuation.
+    if _HARMLESS_QUERY_RE.match(rest) or rest.rstrip(",.;") in ("?", "#"):
         return match.group(0)
     # The WHOLE URL goes, host included: a signed URL's host is part of what
     # test_a_transfer_failure_never_exposes_a_signed_url forbids exposing.
@@ -1164,8 +1165,10 @@ def _redact_credentials(message):
             # means a "/" before the "?" or a "=" after it, so a sentence
             # ending in "?" is left alone.
             q = probe.find("?")
-            looks_like_query = q >= 0 and ("/" in probe[:q]
-                                           or "=" in probe[q + 1:])
+            # An EMPTY query is a question mark ending a sentence
+            # ("...models/checkpoints?"), not an address.
+            looks_like_query = (q >= 0 and probe[q + 1:] != ""
+                                and ("/" in probe[:q] or "=" in probe[q + 1:]))
             if looks_like_query and not _HARMLESS_QUERY_RE.match(probe[q:]):
                 out.append(_REDACTION_SENTINEL + tail)
                 continue

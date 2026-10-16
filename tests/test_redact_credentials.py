@@ -198,3 +198,13 @@ def test_closing_punctuation_survives_the_redaction(wrapped, kept):
 def test_a_sentence_ending_in_a_question_mark_is_left_alone():
     text = "Is the model on disk? Check C:\ComfyUI-Models first."
     assert redact(text) == text
+
+
+@pytest.mark.parametrize("text", [
+    "Did you mean https://pypi.org/project/foo/?",
+    "Is the file in ComfyUI/models/checkpoints? Check there.",
+    "foo/bar?",
+])
+def test_a_path_ending_a_question_is_left_alone(text):
+    """Sonnet QA 2026-10-16: an empty query is sentence punctuation."""
+    assert redact(text) == text
