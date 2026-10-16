@@ -1776,11 +1776,40 @@ class OTRSilentComposite:
         try:
             try:
                 if assemble:
-                    silent, report = assemble_silent_timeline(
-                        manifest, base_video_path, out, w=int(canvas_w),
-                        h=int(canvas_h), fps=eff_fps, ffmpeg=ffmpeg,
-                        engine=engine,
-                    )
+                    try:
+                        silent, report = assemble_silent_timeline(
+                            manifest, base_video_path, out, w=int(canvas_w),
+                            h=int(canvas_h), fps=eff_fps, ffmpeg=ffmpeg,
+                            engine=engine,
+                        )
+                    except Exception as exc:  # noqa: BLE001 -- gated below
+                        # THE SAME DEGRADE AS AT LOAD, ONE STEP LATER
+                        # (2026-10-15). The load gate above proves an optional
+                        # accelerator starts; it cannot prove it survives a
+                        # real clip -- rtx_vsr reopens its effect per output
+                        # size, so a driver, SDK or VRAM failure can surface
+                        # here instead. For a `degrades_to_off` engine that
+                        # must not cost the episode either: unload it and
+                        # composite again on the off (lanczos) path, which
+                        # overwrites the partial output. Any other engine, or
+                        # a failure the off path repeats, still raises.
+                        if not (_engine_active
+                                and getattr(engine, "degrades_to_off", False)):
+                            raise
+                        _reason = " ".join(str(exc).split())[:300]
+                        _upscale_fallback = (
+                            "%s failed mid-composite (%s: %s); redid it with off"
+                            % (engine.name, type(exc).__name__, _reason))
+                        log.warning("[OTR_SilentComposite] upscale %s",
+                                    _upscale_fallback)
+                        engine.unload()
+                        engine = _get_upscale_engine("off")
+                        _engine_active = False
+                        silent, report = assemble_silent_timeline(
+                            manifest, base_video_path, out, w=int(canvas_w),
+                            h=int(canvas_h), fps=eff_fps, ffmpeg=ffmpeg,
+                            engine=engine,
+                        )
                 else:
                     # normalize_to_silent_canonical is the single-base path;
                     # it does NOT consume the engine (Codex r4 MF-7). The

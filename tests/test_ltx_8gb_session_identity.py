@@ -190,6 +190,12 @@ _ENGINES_WITH_A_SESSION = {
     "ltx25_mime_24gb",
     "ltx25_audio_in_16gb",
     "ltx25_audio_in_24gb",
+    # 2026-10-15 -- the 8 GB single-stage lanes. They inherit their 16 GB
+    # parents' identities; the session keys on the engine name, so an 8 GB
+    # and a 16 GB lane never share a beat session.
+    "ltx25_foley_8gb",
+    "ltx25_mime_8gb",
+    "ltx25_audio_in_8gb",
     "humo",                    # WIRE-W4a, 2026-07-29
     "humo_1.7B",               # WIRE-W4a -- inherits HuMoEngine's
     "humo_1.7B_169",           # WIRE-W4a -- inherits HuMoEngine's
@@ -223,6 +229,7 @@ _ENGINES_WITH_A_SESSION = {
     # even though the lane emits no audio, so a swapped audio VAE correctly
     # opens a new session.
     "ltx25_video",             # 2026-08-19, Chunk A
+    "ltx25_video_8gb",         # 2026-10-15, inherits ltx25_video's
 }
 
 

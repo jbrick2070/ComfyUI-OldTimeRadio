@@ -288,3 +288,77 @@ def test_spandrel_refusal_is_still_loud(tmp_path, monkeypatch):
             output_path=str(tmp_path / "out.mp4"), gate_in="",
             clip_manifest_json=json.dumps({"fps": 25, "clips": [{"path": "x", "n_frames": 1}]}),
             upscale_engine="spandrel_esrgan", upscale_device="cpu")
+
+
+def _composite_with(SC, tmp_path, engine_name):
+    src = tmp_path / "source.mp4"
+    src.write_bytes(b"fake-mp4")
+    return SC.OTRSilentComposite().composite(
+        base_video_path=str(src), canvas_w=1920, canvas_h=1080, fps=25,
+        output_path=str(tmp_path / "out.mp4"), gate_in="",
+        clip_manifest_json=json.dumps({"fps": 25, "clips": [{"path": "x", "n_frames": 1}]}),
+        upscale_engine=engine_name, upscale_device="cuda")
+
+
+def test_rtx_vsr_failing_mid_composite_redoes_it_with_off(tmp_path, monkeypatch):
+    """QA on ece6ed34: the load gate cannot prove the accelerator survives a
+    real clip (rtx_vsr reopens its effect per output size). A failure THERE
+    must also cost only the sharpening: unload, composite again on off."""
+    import nodes.otr_silent_composite as SC
+
+    unloaded = []
+
+    class _DiesMidRun:
+        name, intrinsic_scale, degrades_to_off, device = "rtx_vsr", 2, True, None
+
+        def load(self, device):
+            pass
+
+        def unload(self):
+            unloaded.append(True)
+
+    off = get_engine("off")
+    calls = []
+
+    def assemble(*a, **kw):
+        calls.append(kw["engine"].name)
+        if kw["engine"].name == "rtx_vsr":
+            raise RuntimeError("NvVFX effect.run failed\nat 3328x1920")
+        return "out.mp4", ["engine=" + kw["engine"].name]
+
+    monkeypatch.setattr(SC, "_get_upscale_engine",
+                        lambda name: _DiesMidRun() if name == "rtx_vsr" else off)
+    monkeypatch.setattr(SC, "_assert_upscale_usable", lambda name, role: name)
+    monkeypatch.setattr(SC, "_resolve_upscale_device", lambda v: torch.device("cpu"))
+    monkeypatch.setattr(SC, "assemble_silent_timeline", assemble)
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
+    silent, report = _composite_with(SC, tmp_path, "rtx_vsr")
+    assert silent == "out.mp4" and calls == ["rtx_vsr", "off"]
+    assert unloaded == [True]                 # unloaded once, not again in finally
+    assert "failed mid-composite" in report and "redid it with off" in report
+    assert "at 3328x1920" in report.splitlines()[0]          # folded to one line
+
+
+def test_a_non_degrading_engine_failing_mid_composite_still_raises(tmp_path,
+                                                                   monkeypatch):
+    import nodes.otr_silent_composite as SC
+
+    class _Spandrel:
+        name, intrinsic_scale, device = "spandrel_esrgan", 2, None
+
+        def load(self, device):
+            pass
+
+        def unload(self):
+            pass
+
+    def assemble(*a, **kw):
+        raise RuntimeError("esrgan blew up")
+
+    monkeypatch.setattr(SC, "_get_upscale_engine", lambda name: _Spandrel())
+    monkeypatch.setattr(SC, "_assert_upscale_usable", lambda name, role: name)
+    monkeypatch.setattr(SC, "_resolve_upscale_device", lambda v: torch.device("cpu"))
+    monkeypatch.setattr(SC, "assemble_silent_timeline", assemble)
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
+    with pytest.raises(RuntimeError, match="esrgan blew up"):
+        _composite_with(SC, tmp_path, "spandrel_esrgan")

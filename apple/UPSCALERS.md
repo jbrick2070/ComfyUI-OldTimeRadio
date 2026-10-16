@@ -1,4 +1,4 @@
-# The upscale step -- and why it ships off
+# The upscale step -- on for NVIDIA, off everywhere else
 
 `upscale_engine` lives on the **OTR_SilentComposite** node. That node is the
 one that takes every rendered clip, every still plate and the base video and
@@ -7,8 +7,9 @@ canonical graph and in every saved variant. The upscale step runs
 *inside* that assembly, clip by clip, after the clips are rendered and before
 the captions are burned, the credits rolled and the audio muxed back on.
 
-It is optional, and every shipped graph sets it to **off**. That is a real
-choice, not an unfinished one -- see the end of this page.
+It is optional. The NVIDIA workflows (8, 16 and 24 GB) set it to `rtx_vsr`
+on `cuda`; the canonical graph and the Mac, AMD, cloud and Google workflows set
+it to **off**. See the end of this page for why each.
 
 ---
 
@@ -200,10 +201,18 @@ and its frames are cheap -- see its section above.
 
 ---
 
-## Off is a legitimate place to leave it
+## Which graphs turn it on, and why off is still a fine answer
 
-Every graph this pack ships -- the canonical and every variant -- sets
-`upscale_engine` to `off`, and that is the recommendation, not an oversight:
+Every NVIDIA workflow sets `upscale_engine` to `rtx_vsr` on `cuda` (operator,
+2026-10-15: "every nvidia lane to 1080p"). Several NVIDIA lanes render well
+under 1920x1080 -- 832x480 for HuMo and the 8 GB LTX 2.5 lanes, 512x288 for
+LTX 0.9.8 -- and that is where super-resolution earns its few milliseconds a
+frame. It cannot cost the episode: if `nvidia-vfx` is not installed, the card
+cannot run it, or it fails partway through a clip, the composite logs a
+warning and uses `off` instead.
+
+The canonical graph and every non-NVIDIA workflow keep `off`, and that is the
+recommendation there, not an oversight:
 
 - The composite already resamples and sharpens on the way to the canvas, and
   that path was tuned against a measured comparison.
