@@ -1487,9 +1487,10 @@ class OTRSilentComposite:
                         "directory / black paths are unchanged. off = today's "
                         "lanczos+unsharp, byte-identical. spandrel_esrgan = "
                         "Real-ESRGAN x2 (any device, slow). rtx_vsr = NVIDIA "
-                        "RTX Video Super Resolution (RTX card + `pip install "
-                        "nvidia-vfx`; ~100x faster than ESRGAN; falls back to "
-                        "off with a warning where it cannot run)."
+                        "RTX Video Super Resolution (RTX card; installs NVIDIA's "
+                        "nvidia-vfx package itself on first use, ~540 MB; "
+                        "~100x faster than ESRGAN; falls back to off with a "
+                        "warning where it cannot run)."
                     ),
                 }),
                 "upscale_device": ("STRING", {

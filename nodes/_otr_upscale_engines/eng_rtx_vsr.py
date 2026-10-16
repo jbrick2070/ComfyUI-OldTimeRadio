@@ -29,13 +29,19 @@ frames of a 1472x832 OTR viz clip, 2026-10-14:
   bytes on repeat and after other frames (held-frame reuse stays exact); a
   1001x501 input came back exactly 2002x1002.
 
-WHAT IT NEEDS, AND WHY IT IS NOT A DECLARED DEPENDENCY. An NVIDIA RTX card
-(Turing or newer; driver 570.65+ on Windows) and ``pip install nvidia-vfx`` (about 540 MB; Windows and
-Linux x86-64; NVIDIA's proprietary licence). Declaring it in requirements.txt
-would put a proprietary 540 MB wheel on every AMD, Intel and Mac install for
-nothing -- the Mac Kokoro path's "installs itself and just works" is the
-standard this pack keeps. So it is opt-in, and the tooltip and UPSCALERS.md
-give the pip line.
+WHAT IT NEEDS, AND HOW IT GETS THERE. An NVIDIA RTX card (Turing or newer;
+driver 570.65+ on Windows) and the ``nvidia-vfx`` wheel (about 540 MB; Windows
+and Linux x86-64; NVIDIA's proprietary licence). It is NOT in requirements.txt,
+because that would put a proprietary 540 MB wheel on every AMD, Intel and Mac
+install for nothing. Instead ``load`` INSTALLS IT ITSELF (operator,
+2026-10-15): only when a workflow has picked this engine -- which only the
+NVIDIA workflow variants do -- and only once the device has proved to be an
+NVIDIA CUDA card, it runs ``python -m pip install nvidia-vfx`` into ComfyUI's
+own interpreter, once per server process, then carries on. Choosing an NVIDIA
+workflow on an NVIDIA machine is taken as accepting NVIDIA's licence for its
+own runtime (operator: the user already accepted NVIDIA's terms with the
+driver). An offline box, a pip failure or a wheel that will not load refuses
+like any other unusable case, so the composite degrades to ``off``.
 
 IT NEVER FAILS A RENDER FOR LACK OF HARDWARE. ``degrades_to_off = True``:
 when this engine cannot run here -- no ``nvvfx``, no CUDA, an AMD card, a GTX
@@ -68,6 +74,71 @@ _LOG = logging.getLogger("OTR.upscale.rtx_vsr")
 
 #: The pip line every refusal names.
 INSTALL_HINT = "pip install nvidia-vfx (NVIDIA RTX card required)"
+
+#: What ``load`` installs on an NVIDIA CUDA box that lacks the SDK. Bounded to
+#: the 0.2 line, the one measured on the 4060 (0.2.0.0); a later minor release
+#: is a deliberate bump, not something a first run picks up by itself.
+AUTO_INSTALL_REQUIREMENT = "nvidia-vfx>=0.2,<0.3"
+
+#: Ceiling on the one pip run. The wheel is ~540 MB; a slow line still lands
+#: well inside this, and a hung pip must not hold the episode's last stage.
+AUTO_INSTALL_TIMEOUT_S = 1200
+
+#: ONCE PER PROCESS. ``None`` = not tried; otherwise the outcome text. A failed
+#: install (offline box, pip missing) is not retried on every episode -- each
+#: retry would cost the same wait for the same answer; a server restart tries
+#: again.
+_AUTO_INSTALL_OUTCOME = None
+
+
+def _pip_install_nvidia_vfx():
+    """Install the SDK into THIS interpreter. Returns ``(ok, detail)``; never
+    raises. Spawned through the pack's one subprocess boundary
+    (``otr_proc.run``, whose allowlist admits the ``python`` interpreter)."""
+    import sys
+    from .._otr_shared import proc as otr_proc
+    argv = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
+            AUTO_INSTALL_REQUIREMENT]
+    try:
+        r = otr_proc.run(argv, capture_output=True, text=True,
+                         timeout=AUTO_INSTALL_TIMEOUT_S)
+    except Exception as exc:  # noqa: BLE001 -- timeout, spawn failure
+        return False, f"{type(exc).__name__}: {exc}"
+    tail = " ".join(((r.stdout or "") + " " + (r.stderr or "")).split())[-300:]
+    return r.returncode == 0, f"pip exit {r.returncode}: {tail}"
+
+
+def _import_nvvfx_installing_if_missing():
+    """``import nvvfx``; on an absent package, install it once and retry.
+
+    Only ``ModuleNotFoundError`` for ``nvvfx`` itself triggers the install: a
+    package that is present but fails to load (a DLL error, an old driver) is
+    not fixed by installing it again, so that raises as-is."""
+    global _AUTO_INSTALL_OUTCOME
+    try:
+        import nvvfx
+        return nvvfx
+    except ModuleNotFoundError as exc:
+        if getattr(exc, "name", "nvvfx") not in (None, "nvvfx"):
+            raise
+        if _AUTO_INSTALL_OUTCOME is not None:
+            raise ModuleNotFoundError(
+                f"nvvfx is not installed and this server already tried to "
+                f"install it ({_AUTO_INSTALL_OUTCOME})") from exc
+    _LOG.warning("[OTR.upscale] rtx_vsr: nvidia-vfx is not installed; installing "
+                 "%s into %s (about 540 MB, once)", AUTO_INSTALL_REQUIREMENT,
+                 __import__("sys").executable)
+    ok, detail = _pip_install_nvidia_vfx()
+    _AUTO_INSTALL_OUTCOME = ("installed" if ok else "failed") + f" -- {detail}"
+    if not ok:
+        raise ModuleNotFoundError(f"installing {AUTO_INSTALL_REQUIREMENT} failed "
+                                  f"({detail})")
+    import importlib
+    importlib.invalidate_caches()
+    import nvvfx
+    _LOG.info("[OTR.upscale] rtx_vsr: nvidia-vfx %s installed and imported",
+              _package_version())
+    return nvvfx
 
 #: ``nvvfx.QualityLevel`` member. ULTRA measured the highest SSIM of the
 #: upscaling levels on OTR frames at under 14 ms a 1080p frame on an 8 GB
@@ -145,12 +216,6 @@ class RtxVsr:
         except ImportError as exc:
             raise self._refuse(EngineUsabilityReason.MALFORMED_CONFIG,
                                f"torch is not importable ({exc})")
-        try:
-            import nvvfx
-        except Exception as exc:  # noqa: BLE001 -- ImportError, a DLL load error
-            raise self._refuse(EngineUsabilityReason.MISSING_MODEL,
-                               f"the nvidia-vfx package is not usable here "
-                               f"({type(exc).__name__}: {exc})")
         dev = torch.device(device) if not isinstance(device, torch.device) else device
         if dev.type == "cpu" and torch.cuda.is_available():
             _LOG.info("[OTR.upscale] rtx_vsr runs only on an NVIDIA GPU; "
@@ -163,6 +228,15 @@ class RtxVsr:
             raise self._refuse(EngineUsabilityReason.INCOMPATIBLE_PROFILE,
                                "this is a ROCm (AMD) build of torch; RTX VSR is "
                                "NVIDIA-only")
+        # THE SDK, AFTER THE DEVICE HAS PROVED NVIDIA: the auto-install below
+        # must never put a 540 MB proprietary wheel on a CPU, Mac or AMD box,
+        # so every hardware refusal above runs first.
+        try:
+            nvvfx = _import_nvvfx_installing_if_missing()
+        except Exception as exc:  # noqa: BLE001 -- ImportError, a DLL load error
+            raise self._refuse(EngineUsabilityReason.MISSING_MODEL,
+                               f"the nvidia-vfx package is not usable here "
+                               f"({type(exc).__name__}: {exc})")
         quality = _quality()
         if quality not in getattr(nvvfx.QualityLevel, "__members__", {}):
             raise self._refuse(

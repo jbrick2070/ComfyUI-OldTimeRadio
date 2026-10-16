@@ -1337,6 +1337,11 @@ class Lane(NamedTuple):
 #:              -- the engine fetches its own pinned, hash-checked weights when
 #:                 it loads, through `_otr_visual_assets` rather than the
 #:                 queue-time gate. Auto for the user; still a download.
+#:   "pip_at_load"
+#:              -- the engine pip-installs its own runtime package into
+#:                 ComfyUI's interpreter the first time it loads on hardware
+#:                 that can run it (rtx_vsr: nvidia-vfx, NVIDIA cards only).
+#:                 Auto for the user; still a download.
 #:   "sidecar"  -- installs through its own installer script, not the model
 #:                 provisioner. Friction lives in that installer.
 #:   "remote"   -- a hosted API. No local weights at all, only a credential.
@@ -1376,11 +1381,11 @@ NO_LANE_REASON = {
     # `_otr_visual_assets.ensure_upscale_weights`); only a failed fetch leaves
     # the hand-download instruction.
     "spandrel_esrgan": "fetch_at_load",
-    # NVIDIA RTX VSR (2026-10-14): its models ship inside NVIDIA's own
-    # nvidia-vfx wheel (proprietary, ~540 MB, NVIDIA-only), which the user
-    # installs by hand -- never a pack dependency. Unusable here means the
-    # composite falls back to off, so a missing install costs no episode.
-    "rtx_vsr": "manual_doc",
+    # NVIDIA RTX VSR: its models ship inside NVIDIA's own nvidia-vfx wheel
+    # (proprietary, ~540 MB, NVIDIA-only) -- never a requirements.txt line.
+    # Since 2026-10-15 the engine installs it itself on first load, and only
+    # on an NVIDIA CUDA card; a failed install falls back to off.
+    "rtx_vsr": "pip_at_load",
     # Local video lanes whose weights are documented but have no fetcher lane.
     "mesh_stage": "manual_doc",
 }

@@ -191,7 +191,8 @@ def download_facts() -> dict:
 
 
 #: How an engine with no provisioning lane still gets its weights.
-_NO_LANE_WORD = {"hf_cache": "auto", "fetch_at_load": "auto", "sidecar": "sidecar",
+_NO_LANE_WORD = {"hf_cache": "auto", "fetch_at_load": "auto",
+                 "pip_at_load": "auto", "sidecar": "sidecar",
                  "remote": "none", "manual_doc": "manual", "builtin": "nothing",
                  "remote_unprovisioned": "none*"}
 

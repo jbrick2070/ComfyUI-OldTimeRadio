@@ -117,8 +117,9 @@ except Exception:  # noqa: BLE001
     pass
 
 # rtx_vsr (2026-10-14): NVIDIA RTX Video Super Resolution, opt-in. Its module
-# imports nothing heavy, so it always registers; without nvidia-vfx or an RTX
-# card its load() refuses and the composite falls back to off.
+# imports nothing heavy, so it always registers; on an NVIDIA card its load()
+# installs nvidia-vfx if missing, and anywhere it cannot run it refuses and the
+# composite falls back to off.
 try:  # pragma: no cover - trivial guard
     from . import eng_rtx_vsr as _eng_rtx_vsr  # noqa: F401
 except Exception:  # noqa: BLE001

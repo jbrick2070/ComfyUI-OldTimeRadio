@@ -362,3 +362,87 @@ def test_a_non_degrading_engine_failing_mid_composite_still_raises(tmp_path,
     monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
     with pytest.raises(RuntimeError, match="esrgan blew up"):
         _composite_with(SC, tmp_path, "spandrel_esrgan")
+
+
+# --- auto-install (operator, 2026-10-15) ----------------------------------- #
+
+def _install_spy(monkeypatch, ok=True, provide=None):
+    calls = []
+
+    def fake_pip():
+        calls.append(True)
+        if ok and provide is not None:
+            monkeypatch.setitem(sys.modules, "nvvfx", provide)
+        return ok, "pip exit %d: stub" % (0 if ok else 1)
+    monkeypatch.setattr(V, "_pip_install_nvidia_vfx", fake_pip)
+    monkeypatch.setattr(V, "_AUTO_INSTALL_OUTCOME", None)
+    monkeypatch.setitem(sys.modules, "nvvfx", None)       # absent
+    return calls
+
+
+def test_a_cpu_box_never_installs_the_sdk(monkeypatch):
+    calls = _install_spy(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    with pytest.raises(EngineUnusable, match="NVIDIA CUDA device"):
+        V.RtxVsr().load(torch.device("cpu"))
+    assert calls == []
+
+
+def test_an_amd_box_never_installs_the_sdk(monkeypatch):
+    calls = _install_spy(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", "6.2", raising=False)
+    with pytest.raises(EngineUnusable, match="ROCm"):
+        V.RtxVsr().load(torch.device("cuda:0"))
+    assert calls == []
+
+
+def test_an_nvidia_box_installs_once_and_a_failure_is_not_retried(monkeypatch):
+    calls = _install_spy(monkeypatch, ok=False)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
+    for _ in range(2):
+        with pytest.raises(EngineUnusable, match="pip install nvidia-vfx"):
+            V.RtxVsr().load(torch.device("cuda:0"))
+    assert calls == [True]                      # tried once per process
+    assert V._AUTO_INSTALL_OUTCOME.startswith("failed")
+
+
+def test_a_successful_install_is_imported_in_the_same_process(monkeypatch):
+    fake = types.SimpleNamespace(QualityLevel=types.SimpleNamespace(__members__={}))
+    calls = _install_spy(monkeypatch, ok=True, provide=fake)
+    assert V._import_nvvfx_installing_if_missing() is fake
+    assert calls == [True] and V._AUTO_INSTALL_OUTCOME.startswith("installed")
+    # Present now: no second install.
+    assert V._import_nvvfx_installing_if_missing() is fake and calls == [True]
+
+
+def test_a_present_but_broken_sdk_is_not_reinstalled(monkeypatch):
+    calls = _install_spy(monkeypatch)
+    import builtins
+    real_import = builtins.__import__
+
+    def broken(name, *a, **kw):
+        if name == "nvvfx":
+            raise ImportError("DLL load failed while importing nvvfx")
+        return real_import(name, *a, **kw)
+    monkeypatch.setattr(builtins, "__import__", broken)
+    with pytest.raises(ImportError, match="DLL load failed"):
+        V._import_nvvfx_installing_if_missing()
+    assert calls == []
+
+
+def test_the_install_goes_through_the_pack_subprocess_boundary(monkeypatch):
+    seen = {}
+
+    def fake_run(argv, **kw):
+        seen["argv"], seen["kw"] = list(argv), kw
+        return types.SimpleNamespace(returncode=0, stdout="ok", stderr="")
+    from nodes._otr_shared import proc as otr_proc
+    monkeypatch.setattr(otr_proc, "run", fake_run)
+    ok, _detail = V._pip_install_nvidia_vfx()
+    assert ok and seen["argv"][0] == sys.executable
+    assert seen["argv"][1:4] == ["-m", "pip", "install"]
+    assert seen["argv"][-1] == V.AUTO_INSTALL_REQUIREMENT
+    assert seen["kw"]["timeout"] == V.AUTO_INSTALL_TIMEOUT_S
+    otr_proc._check(seen["argv"])               # the allowlist admits it
