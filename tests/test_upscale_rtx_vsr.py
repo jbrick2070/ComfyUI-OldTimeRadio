@@ -80,12 +80,28 @@ def test_not_a_declared_dependency():
         assert "nvidia-vfx" not in (REPO_ROOT / name).read_text(encoding="utf-8")
 
 
-def test_shipped_graphs_keep_off_as_the_default():
+def test_nvidia_workflows_upscale_with_rtx_vsr_and_the_rest_stay_off():
+    """Operator, 2026-10-15: "every nvidia lane to 1080p". Each NVIDIA
+    workflow variant selects rtx_vsr on cuda; the canonical graph and every
+    non-NVIDIA variant keep off (the 2026-10-14 default)."""
+    matrix = json.loads((REPO_ROOT / "config" / "workflow_matrix.json")
+                        .read_text(encoding="utf-8"))
+    nvidia = {"otr_%s.json" % r["id"].replace("otr_", "", 1)
+              for r in matrix["rows"] if r.get("gpu_vendor") == "nvidia"}
+    assert len(nvidia) >= 10, nvidia
+    seen = set()
     for path in sorted((REPO_ROOT / "workflows").glob("*.json")):
         wf = json.loads(path.read_text(encoding="utf-8"))
         for node in wf.get("nodes", []):
-            if node.get("type") == "OTR_SilentComposite":
-                assert "rtx_vsr" not in node.get("widgets_values", []), path.name
+            if node.get("type") != "OTR_SilentComposite":
+                continue
+            values = node.get("widgets_values", [])
+            if path.name in nvidia:
+                seen.add(path.name)
+                assert values[4:6] == ["rtx_vsr", "cuda"], path.name
+            else:
+                assert "rtx_vsr" not in values, path.name
+    assert seen == nvidia
 
 
 def test_fingerprint_is_metadata_only_and_stable(monkeypatch):

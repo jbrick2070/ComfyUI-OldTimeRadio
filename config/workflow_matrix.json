@@ -61,6 +61,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       }
@@ -89,6 +91,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       }
@@ -119,6 +123,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda"
       },
       "preflight": {
@@ -154,6 +160,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda"
       },
       "preflight": {
@@ -189,6 +197,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       }
@@ -217,6 +227,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       }
@@ -247,6 +259,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },
@@ -288,6 +302,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },
@@ -329,6 +345,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },
@@ -371,6 +389,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda"
       },
       "preflight": {
@@ -805,6 +825,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },
@@ -846,6 +868,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },
@@ -886,6 +910,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },
@@ -926,6 +952,8 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
+        "upscale_stage.device": "cuda",
+        "upscale_stage.engine": "rtx_vsr",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },

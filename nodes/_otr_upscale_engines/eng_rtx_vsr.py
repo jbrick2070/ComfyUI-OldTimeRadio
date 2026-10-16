@@ -3,8 +3,12 @@
 The same super-resolution an RTX card applies to browser video, reached through
 NVIDIA's ``nvidia-vfx`` Python package (``import nvvfx``), the binding Comfy-Org's
 own ComfyUI_Nvidia_VFX_Nodes is built on. An optional second upscaler beside
-``spandrel_esrgan``; ``off`` stays the shipped default (operator, 2026-10-14:
-"one of 2 upscale options but do not activate by default for now").
+``spandrel_esrgan``. ``off`` stays the canonical workflow's default (operator,
+2026-10-14: "one of 2 upscale options but do not activate by default for
+now"); every NVIDIA workflow variant selects it on ``cuda`` (operator,
+2026-10-15: "every nvidia lane to 1080p"). Where ``nvidia-vfx`` is not
+installed it falls back to ``off`` with a warning, so a variant never fails on
+it.
 
 WHY IT EARNS A DROPDOWN ROW -- measured on the RTX 4060 Laptop (8 GB), 48 real
 frames of a 1472x832 OTR viz clip, 2026-10-14:
