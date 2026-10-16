@@ -873,7 +873,7 @@
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },
-      "note": "The 8 GB native tier, 2026-09-23. Operator: \"if it's a lane it should be in the workflows folder\" -- an engine with no matching workflow is not a lane a person can pick, and these had been discussed as lanes while sitting in that state. COSTS NO NEW DOWNLOAD: all three run mix4x8, measured clean at 707.0 s for a 97-frame clip on a 4060.",
+      "note": "The 8 GB native tier: added 2026-09-23 (operator: \"if it's a lane it should be in the workflows folder\"), made single stage 2026-10-15 after the two-stage decode ran out of memory on every 8 GB leg. No new download beyond the 16 GB lane's files (the upscaler is not loaded). Single-stage clip times are not yet measured.",
       "launch": {
         "boot_contract": "default"
       },
@@ -915,7 +915,7 @@
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },
-      "note": "The 8 GB native tier, 2026-09-23. Operator: \"if it's a lane it should be in the workflows folder\" -- an engine with no matching workflow is not a lane a person can pick, and these had been discussed as lanes while sitting in that state. COSTS NO NEW DOWNLOAD: all three run mix4x8, measured clean at 707.0 s for a 97-frame clip on a 4060.",
+      "note": "The 8 GB native tier: added 2026-09-23 (operator: \"if it's a lane it should be in the workflows folder\"), made single stage 2026-10-15 after the two-stage decode ran out of memory on every 8 GB leg. No new download beyond the 16 GB lane's files (the upscaler is not loaded). Single-stage clip times are not yet measured.",
       "launch": {
         "boot_contract": "default"
       },
@@ -957,7 +957,7 @@
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },
-      "note": "The 8 GB native tier, 2026-09-23. Operator: \"if it's a lane it should be in the workflows folder\" -- an engine with no matching workflow is not a lane a person can pick, and these had been discussed as lanes while sitting in that state. COSTS NO NEW DOWNLOAD: all three run mix4x8, measured clean at 707.0 s for a 97-frame clip on a 4060.",
+      "note": "The 8 GB native tier: added 2026-09-23 (operator: \"if it's a lane it should be in the workflows folder\"), made single stage 2026-10-15 after the two-stage decode ran out of memory on every 8 GB leg. No new download beyond the 16 GB lane's files (the upscaler is not loaded). Single-stage clip times are not yet measured.",
       "launch": {
         "boot_contract": "default"
       },
