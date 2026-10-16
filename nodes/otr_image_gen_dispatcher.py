@@ -722,20 +722,14 @@ def _effective_video_engine_for_role(role: str, eng_id: str) -> str:
 
     The image phase runs before ShotLock/video dispatch, so it cannot read the
     final mutated shot row. It still has to mint exactly the stills that final
-    render will require. Mirror the render order:
-
-    1. ``OTR_FORCE_ENGINE_MAP`` rewrites planned shot engines.
-    2. ``render_driver._enforce_radio_is_host`` redirects announcer/music local
-       HuMo-family bookends to the audio-in redirect target when ``OTR_ENABLE_HUMO_HOSTS`` is
-       off. Partner/cloud engines stay cloud.
+    render will require. The only rewrite is ``OTR_FORCE_ENGINE_MAP``; there is
+    no role-based engine swap (the picked lane is the lane, 2026-10-15).
 
     Unknown engines or import failures keep the input id (fail-safe: mint the
     still rather than quietly skipping an asset that render might need).
 
-    DELEGATES to the ONE route-freeze authority (2026-07-25, chunk 1a). It used
-    to hard-code the redirect target as a bare literal rather than reading ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``, so a
-    rename of that constant would have silently desynced the image phase from
-    the render phase. The target now comes from the constant itself."""
+    DELEGATES to the ONE route-freeze authority (2026-07-25, chunk 1a), so the
+    image phase and the render phase can never disagree about the route."""
     try:
         from ._otr_shared import route_freeze as _rf  # type: ignore
     except ImportError:  # pragma: no cover -- flat test imports

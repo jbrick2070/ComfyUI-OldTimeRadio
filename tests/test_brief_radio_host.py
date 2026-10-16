@@ -296,7 +296,6 @@ def test_humo_console_face_prompts_preserve_authored_atmosphere():
 
 
 def test_humo_radio_host_uses_announcer_slot_when_music_is_procedural(monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
         video_models={
@@ -311,8 +310,7 @@ def test_humo_radio_host_uses_announcer_slot_when_music_is_procedural(monkeypatc
 
 
 def test_humo_host_portrait_uses_console_face(monkeypatch):
-    # A HuMo announcer with hosts enabled gets the console_face host portrait.
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    # A HuMo announcer gets the console_face host portrait.
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
         video_models={"announcer_video_model": {"engine_id": "humo"}})
@@ -328,7 +326,7 @@ def test_humo_host_portrait_uses_console_face(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# Chunk 3: radio_host_portrait object mint (TOGGLE-GATED, seed-pinned, aspect)
+# Chunk 3: radio_host_portrait object mint (HuMo-lane-gated, seed-pinned, aspect)
 # --------------------------------------------------------------------------- #
 def _bookend_lines():
     return [
@@ -337,17 +335,23 @@ def _bookend_lines():
     ]
 
 
-def test_radio_host_portrait_not_minted_when_toggle_off(monkeypatch):
-    # Default OFF -> byte-identical: NO extra radio-host object in the payload.
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    out, _w = mbp.derive_image_prompts([], _SPACE_META, llm_fn=None,
-                                       lines=_bookend_lines())
+def test_radio_host_portrait_not_minted_when_no_bookend_lane_is_humo(monkeypatch):
+    # No bookend lane is audio_driven_face -> NO extra radio-host object.
+    out, _w = mbp.derive_image_prompts(
+        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
+        video_models={
+            "announcer_video_model": {"engine_id": "still_flat"},
+            "music_video_model": {"engine_id": "viz_mxc_mandala"},
+        })
     ids = {o["object_id"] for o in out["objects"]}
     assert mbp.RADIO_HOST_PORTRAIT_ID not in ids
+    # and with no policy forwarded at all (family unresolved) -- same, fail safe
+    out, _w = mbp.derive_image_prompts([], _SPACE_META, llm_fn=None,
+                                       lines=_bookend_lines())
+    assert mbp.RADIO_HOST_PORTRAIT_ID not in {o["object_id"] for o in out["objects"]}
 
 
-def test_radio_host_portrait_minted_when_toggle_on(monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+def test_radio_host_portrait_minted_when_music_lane_is_humo(monkeypatch):
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
         still_aspects={"music_visual": "wide"},
@@ -368,27 +372,13 @@ def test_radio_host_portrait_minted_when_toggle_on(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# Chunk 4: OTR_ENABLE_HUMO_HOSTS toggle in render_driver
+# Chunk 4: the picked HuMo lane STAYS HuMo on a radio-host bookend (no redirect)
 # --------------------------------------------------------------------------- #
 def _humo_bookend_shot(role="music_visual"):
     return {"shot_id": "shot_b000", "beat_id": "b000", "engine_id": "humo",
             "role": role, "family": "audio_driven_face",
             "target_frame_count": 25, "source_line_ids": [], "char_id": "",
             "creative": {}}
-
-
-def test_enforce_radio_is_host_redirects_when_toggle_off(monkeypatch):
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    shot = _humo_bookend_shot()
-    rd._enforce_radio_is_host(shot)
-    assert shot["engine_id"] == "ltx25_audio_in_16gb"  # today's behavior byte-for-byte
-
-
-def test_enforce_radio_is_host_noop_when_toggle_on(monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
-    shot = _humo_bookend_shot()
-    rd._enforce_radio_is_host(shot)
-    assert shot["engine_id"] == "humo"             # HuMo radio-host allowed
 
 
 def _bookend_ledger(tmp_path, with_face=True, with_scene_still=False):
@@ -408,28 +398,26 @@ def _bookend_ledger(tmp_path, with_face=True, with_scene_still=False):
             "images": {"images": imgs}}
 
 
-def test_build_request_uses_radio_host_portrait_when_toggle_on(tmp_path, monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+def test_build_request_uses_radio_host_portrait_when_humo_is_picked(tmp_path, monkeypatch):
     led = _bookend_ledger(tmp_path, with_face=True)
     shot = _humo_bookend_shot()
     req = rd.build_request_from_shot(shot, led)
-    assert shot["engine_id"] == "humo"             # not redirected
+    assert shot["engine_id"] == "humo"             # the picked lane is the lane
+    assert shot["family"] == "audio_driven_face"
     assert req["observability"]["init_source"] == "radio_host_portrait"
     assert req["observability"]["init_image"] == "radio_host.png"
 
 
-def test_build_request_fails_loud_without_face_when_toggle_on(tmp_path, monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+def test_build_request_fails_loud_without_face_when_humo_is_picked(tmp_path, monkeypatch):
     led = _bookend_ledger(tmp_path, with_face=False)
     with pytest.raises(rd.RenderError):
         rd.build_request_from_shot(_humo_bookend_shot(), led)
 
 
 def test_humo_host_bookend_uses_ambient_master_audio(monkeypatch):
-    # A lineless music/announcer bookend routed to HuMo under the toggle has no
+    # A lineless music/announcer bookend routed to HuMo has no
     # per-line voice but HuMo hard-requires audio_ref -> it must use the ambient
-    # MASTER slice (host "sings" to the bed). Off / character-face stay excluded.
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+    # MASTER slice (host "sings" to the bed). Character-face stays excluded.
     assert rd._uses_ambient_master_audio("humo", "audio_driven_face",
                                          is_char_face=False, role="music_visual")
     assert rd._uses_ambient_master_audio("humo", "audio_driven_face",
@@ -440,35 +428,21 @@ def test_humo_host_bookend_uses_ambient_master_audio(monkeypatch):
     # character_video (not a bookend role) is not ambient even lineless
     assert not rd._uses_ambient_master_audio("humo", "audio_driven_face",
                                              is_char_face=False, role="character_video")
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    assert not rd._uses_ambient_master_audio("humo", "audio_driven_face",
-                                             is_char_face=False, role="music_visual")
 
 
-def test_build_request_off_redirects_bookend_to_audio_in_lane(tmp_path, monkeypatch):
-    # Toggle OFF: the announcer bookend is redirected off HuMo so the
-    # radio_host_portrait path never triggers. The redirect target conditions
-    # on the beat's minted scene still -- a ledger minted without one fails
-    # LOUD (never a silent black bookend), but the redirect itself must
-    # already be stamped on the shot.
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    led = _bookend_ledger(tmp_path, with_face=False)
-    shot = _humo_bookend_shot(role="announcer_visual")
-    with pytest.raises(rd.RenderError, match="NO scene still"):
-        rd.build_request_from_shot(shot, led)
-    assert shot["engine_id"] == "ltx25_audio_in_16gb"  # redirect happened first
-
-
-def test_build_request_off_redirect_renders_from_the_scene_still(tmp_path, monkeypatch):
-    # No face requirement on the redirect target: the redirected bookend
-    # renders from its scene still.
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+# --------------------------------------------------------------------------- #
+def test_humo_bookend_without_face_fails_loud_and_stays_humo(tmp_path):
+    # "The picked lane is the lane": a HuMo announcer bookend with no
+    # radio_host_portrait FACE still fails LOUD (never a black screen) and is
+    # NEVER silently swapped to another engine -- not even when the beat has a
+    # scene still it could have rendered from.
     led = _bookend_ledger(tmp_path, with_face=False, with_scene_still=True)
-    shot = _humo_bookend_shot()
-    req = rd.build_request_from_shot(shot, led)    # must NOT raise
-    assert shot["engine_id"] == "ltx25_audio_in_16gb"
-    assert req["observability"]["init_source"] == "scene_still"
-    assert req["observability"]["init_image"] == "still_b000.png"
+    shot = _humo_bookend_shot(role="announcer_visual")
+    with pytest.raises(rd.DeferredImageGapError,
+                       match="No radio_host_portrait FACE still is in the ledger"):
+        rd.build_request_from_shot(shot, led)
+    assert shot["engine_id"] == "humo"
+    assert shot["family"] == "audio_driven_face"
 
 
 # --------------------------------------------------------------------------- #
@@ -484,9 +458,11 @@ def _announcer_row(video_models=None, **kw):
     return {o["object_id"]: o for o in out["objects"]}["announcer"]
 
 
-def test_announcer_faceless_radio_object_when_humo_off(monkeypatch):
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    ann = _announcer_row(video_models={"announcer_video_model": {"engine_id": "humo"}})
+def test_announcer_faceless_radio_object_when_lane_is_not_audio_driven(monkeypatch):
+    # An announcer lane that is NOT audio_driven_face (a lip-sync-free LTX lane)
+    # gets the faceless radio_object -- nothing animates a mouth.
+    ann = _announcer_row(
+        video_models={"announcer_video_model": {"engine_id": "ltx25_audio_in_16gb"}})
     assert ann["radio_host_style"] == "radio_object"
     assert ann["prompt"] == mbp.build_radio_host_prompt(
         _SPACE_META, "portrait", "radio_object")
@@ -495,50 +471,45 @@ def test_announcer_faceless_radio_object_when_humo_off(monkeypatch):
     assert ann["negative_prompt"] == mbp.RADIO_CONSOLE_NEG
 
 
-def test_announcer_console_face_when_humo_on_and_audio_driven(monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
+def test_announcer_console_face_when_audio_driven(monkeypatch):
     ann = _announcer_row(video_models={"announcer_video_model": {"engine_id": "humo"}})
     assert ann["radio_host_style"] == "console_face"
     assert ann["prompt"] == mbp.build_radio_host_prompt(
         _SPACE_META, "portrait", "console_face")
 
 
-def test_announcer_faceless_when_humo_on_but_engine_static(monkeypatch):
-    # HUMO on but the announcer engine is a STATIC engine -> nothing animates a
+def test_announcer_faceless_when_engine_static(monkeypatch):
+    # The announcer engine is a STATIC engine -> nothing animates a
     # mouth -> faceless radio_object (the family signal, not the bare flag).
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     ann = _announcer_row(
         video_models={"announcer_video_model": {"engine_id": "still_flat"}})
     assert ann["radio_host_style"] == "radio_object"
 
 
-def test_announcer_faceless_when_humo_on_but_no_video_models(monkeypatch):
+def test_announcer_faceless_when_no_video_models(monkeypatch):
     # No policy forwarded -> family unresolved -> fail SAFE toward faceless.
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     ann = _announcer_row(video_models=None)
     assert ann["radio_host_style"] == "radio_object"
 
 
 def test_announcer_force_map_overrides_to_faceless(monkeypatch):
-    # HUMO on + policy selects HuMo for the announcer, but OTR_FORCE_ENGINE_MAP
+    # policy selects HuMo for the announcer, but OTR_FORCE_ENGINE_MAP
     # forces announcer_visual to a static engine -> the RESOLVED family is
     # static -> faceless radio_object (r4 must-fix: honor the force map).
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "announcer_visual=still_flat")
     ann = _announcer_row(video_models={"announcer_video_model": {"engine_id": "humo"}})
     assert ann["radio_host_style"] == "radio_object"
 
 
 def test_announcer_no_force_with_humo_is_console_face(monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
     ann = _announcer_row(video_models={"announcer_video_model": {"engine_id": "humo"}})
     assert ann["radio_host_style"] == "console_face"
 
 
 # --------------------------------------------------------------------------- #
-# Cross-node provenance guard (fail CLOSED): a ledger minted HUMO-OFF (faceless
-# radio_object announcer portrait) but RENDERED HUMO-ON must NOT feed HuMo the
+# Cross-node provenance guard (fail CLOSED): a ledger minted for a non-HuMo lane (faceless
+# radio_object announcer portrait) but RENDERED on HuMo must NOT feed HuMo the
 # faceless still (the visual-quicktest frozen-ledger reuse path is real).
 # --------------------------------------------------------------------------- #
 def _announcer_humo_shot():
@@ -561,7 +532,6 @@ def _announcer_portrait_ledger(tmp_path, style):
 
 
 def test_render_guard_raises_on_stale_faceless_announcer_init(tmp_path, monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     led = _announcer_portrait_ledger(tmp_path, style="radio_object")
     with pytest.raises(rd.RenderError, match="RADIO FACE LOGIC"):
         rd.build_request_from_shot(_announcer_humo_shot(), led)
@@ -570,7 +540,6 @@ def test_render_guard_raises_on_stale_faceless_announcer_init(tmp_path, monkeypa
 def test_render_guard_raises_on_missing_style_frozen_ledger(tmp_path, monkeypatch):
     # An old/frozen ledger carries NO radio_host_style -> treated as NOT
     # console_face -> fail closed (never only when it equals radio_object).
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     led = _announcer_portrait_ledger(tmp_path, style=None)
     with pytest.raises(rd.RenderError, match="RADIO FACE LOGIC"):
         rd.build_request_from_shot(_announcer_humo_shot(), led)
@@ -579,7 +548,6 @@ def test_render_guard_raises_on_missing_style_frozen_ledger(tmp_path, monkeypatc
 def test_render_guard_passes_when_console_face(tmp_path, monkeypatch):
     # console_face is the animatable dial-face -> the guard does NOT fire; the
     # announcer portrait is consumed as the HuMo init.
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     led = _announcer_portrait_ledger(tmp_path, style="console_face")
     req = rd.build_request_from_shot(_announcer_humo_shot(), led)
     assert req["observability"]["init_source"] == "portrait"
@@ -590,7 +558,6 @@ def test_render_guard_passes_when_console_face(tmp_path, monkeypatch):
 def test_render_guard_rejects_stale_normalized_announcer_id(
         tmp_path, monkeypatch, style):
     """ShotLock's announcer alias normalization must not bypass the guard."""
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     led = _announcer_portrait_ledger(tmp_path, style=style)
     led["images"]["images"][0]["object_id"] = "c01"
     shot = _announcer_humo_shot()
@@ -601,22 +568,8 @@ def test_render_guard_rejects_stale_normalized_announcer_id(
 
 def test_render_guard_does_not_treat_character_role_as_radio_host(
         tmp_path, monkeypatch):
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     led = _announcer_portrait_ledger(tmp_path, style="radio_object")
     led["images"]["images"][0]["object_id"] = "c01"
     shot = _announcer_humo_shot()
     shot.update({"char_id": "c01", "role": "character_video"})
     rd.build_request_from_shot(shot, led)  # role gate keeps this inert
-
-
-def test_render_guard_inert_when_humo_off(tmp_path, monkeypatch):
-    # HUMO off: _enforce_radio_is_host redirects the announcer off HuMo before
-    # the guard's family check, so a faceless radio_object never trips it. The
-    # redirect target renders from the beat's scene still, so the ledger
-    # carries one.
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    led = _announcer_portrait_ledger(tmp_path, style="radio_object")
-    led["images"]["images"].append(
-        {"object_id": "still_b001", "beat_id": "b001", "kind": "scene_beat",
-         "path": str(tmp_path / "still_b001.png")})
-    rd.build_request_from_shot(_announcer_humo_shot(), led)   # must NOT raise

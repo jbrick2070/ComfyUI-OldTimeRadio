@@ -276,23 +276,29 @@ def test_humo_character_beat_preserves_authored_m4_visual_vocabulary():
     assert "lantern glow" in p
 
 
-def test_humo_announcer_beat_keeps_radio_styling(monkeypatch):
-    # NOTE 2026-06-30: _enforce_radio_is_host redirects this fixture's
-    # engine_id="humo" pick to the local LTX audio-in lane before any prompt
-    # logic runs (an announcer_visual beat can no longer stay on a HuMo-family
-    # engine -- "the radio is the host"). The M4-verbatim-prompt handling below
-    # is IDENTICAL on either engine for this exempt (announcer,
-    # gear-not-scrubbed) case, so the assertions are unchanged; only the reason
-    # they hold has shifted.
+def _host_ledger(tmp_path):
+    """_FACE_LEDGER plus a minted radio_host_portrait FACE still on disk."""
+    face = tmp_path / "radio_host.png"
+    face.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+    led = dict(_FACE_LEDGER)
+    led["images"] = {"images": [{"object_id": "radio_host_portrait",
+                                 "kind": "portrait", "path": str(face)}]}
+    return led
+
+
+def test_humo_announcer_beat_keeps_radio_styling(tmp_path):
+    # "The picked lane is the lane": an announcer_visual beat on a HuMo-family
+    # engine STAYS on HuMo (the radio-with-a-face host). The M4-verbatim-prompt
+    # handling is exempt BY DESIGN for the (announcer, gear-not-scrubbed) case.
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     creative = {"text_prompt": ("vintage radio announcer at a chrome "
                                 "microphone, ON AIR sign"), "source": "llm"}
     shot = _face_shot("announcer_visual", creative)
-    req = rd.build_request_from_shot(shot, _FACE_LEDGER)
-    assert shot["engine_id"] == "ltx25_audio_in_16gb"  # redirected off HuMo
+    req = rd.build_request_from_shot(shot, _host_ledger(tmp_path))
+    assert shot["engine_id"] == "humo"                  # NOT redirected
     assert "microphone" in req["text_prompt"].lower()   # exempt BY DESIGN
     assert req["observability"]["prompt_source"] == "shared_video_prompting_engine"
+    assert req["observability"]["init_source"] == "radio_host_portrait"
 
 
 def test_humo_character_beat_missing_creative_uses_world_neutral_fallback():
@@ -305,24 +311,17 @@ def test_humo_character_beat_missing_creative_uses_world_neutral_fallback():
     assert "attire from the story world" in p.lower()
 
 
-def test_announcer_beat_missing_creative_redirects_off_humo_to_radio_console(
-        monkeypatch):
-    """2026-06-30 HuMo-improve plan (reversing Route-A 2026-06-28, "the radio
-    is the host"): render_driver._enforce_radio_is_host now redirects an
-    announcer_visual pick of a HuMo-family engine to the local LTX audio-in
-    lane BEFORE any prompt logic runs (this fixture's ``_face_shot`` still
-    requests engine_id="humo" -- the point is that the driver no longer honors
-    it for this role). A beat with no M4 creative prompt therefore no longer
-    falls to the old hardcoded "1940s radio studio" HuMo default: it flows
-    through the role-driven LTX motion-prompt path, producing an animated
-    RADIO-CONSOLE prompt -- never a human face."""
+def test_announcer_beat_missing_creative_stays_on_humo_with_default_prompt(tmp_path):
+    """No redirect: an announcer_visual pick of a HuMo-family engine stays on
+    HuMo even with no M4 creative prompt, so the beat takes the HuMo default
+    announcer path (never the LTX role-driven motion prompt) and still renders
+    from the radio_host_portrait FACE still."""
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     shot = _face_shot("announcer_visual", {})
-    req = rd.build_request_from_shot(shot, _FACE_LEDGER)
-    assert shot["engine_id"] == "ltx25_audio_in_16gb"  # redirected off HuMo
-    assert req["observability"]["prompt_source"] == "motion_role"
-    assert "console" in req["text_prompt"].lower()
+    req = rd.build_request_from_shot(shot, _host_ledger(tmp_path))
+    assert shot["engine_id"] == "humo"                  # NOT redirected
+    assert req["observability"]["prompt_source"] != "motion_role"
+    assert req["observability"]["init_source"] == "radio_host_portrait"
 
 
 def test_retired_role_a_on_ltx_no_longer_generic(monkeypatch):

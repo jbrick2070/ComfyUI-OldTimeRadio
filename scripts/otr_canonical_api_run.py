@@ -125,13 +125,10 @@ def _apply_video_lane(workflow: dict, schemas: dict, lane: str) -> list[str]:
     # fetches itself; for any other lane a missing file surfaces when the lane
     # loads -- the same as picking it in the app (Sonnet review, 9e677825).
     #
-    # THE LANES THE RUN WILL USE, NOT JUST THE ONE PICKED (4060 cold drill,
-    # 2026-09-29). A lane that serves one role is redirected on the others --
-    # HuMo plays the character only, so the announcer and music beats go to
-    # the LTX 2.5 audio-in lane -- and the preflight fetches those weights
-    # too. This message said "4 weight file(s)" for humo_1.7B while the run
-    # downloaded twelve; it now plans the same frozen role map the preflight
-    # plans, and names any routed lane.
+    # THE LANES THE RUN WILL USE (4060 cold drill, 2026-09-29): plan the same
+    # frozen role map the preflight plans. With no role-based swap
+    # (2026-10-15) this is the picked lane unless OTR_FORCE_ENGINE_MAP routes
+    # a role elsewhere, and any such routed lane is named.
     effective = route_freeze.freeze_role_engines({w: engine for w in VIDEO_LANE_WIDGETS})
     lanes = {resolve_engine_id(v) for v in effective.values() if v} or {engine}
     routed = sorted(lanes - {engine})

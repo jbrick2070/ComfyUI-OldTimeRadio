@@ -38,7 +38,7 @@ from .._otr_shared.aspect import is_wide as _aspect_is_wide
 from .._otr_speaker_role import (
     SPEAKER_ROLE_ANNOUNCER as _SPEAKER_ROLE_ANNOUNCER,
     SPEAKER_ROLE_MUSIC_OPEN as _SPEAKER_ROLE_MUSIC_OPEN,
-    is_never_humo_role as _is_never_humo_role,
+    is_radio_host_role as _is_radio_host_role,
 )
 # The PURE Ghost Signal composer. Safe to import at module scope: it
 # imports only hashlib/re/typing and nothing from this package, so it
@@ -2048,23 +2048,19 @@ def _uses_ambient_master_audio(engine_id, family, is_char_face=False, role=""):
     an audio-in lane on a character beat must use the character's clean own voice,
     never the ambient mix (2026-06-26 role-driven).
 
-    OTR_ENABLE_HUMO_HOSTS (2026-07-01 brief-driven radio-host): when the toggle is ON,
-    a LINELESS announcer/music BOOKEND routes to HuMo (audio_driven_face) as the
-    radio-HOST face. That beat has NO per-line voice (it is the music/announcer bed),
+    RADIO-HOST HuMo (2026-07-01, unconditional since 2026-10-15): a LINELESS
+    announcer/music BOOKEND on HuMo (audio_driven_face) renders the radio-HOST face. That beat has NO per-line voice (it is the music/announcer bed),
     yet HuMo HARD-requires ``audio_ref`` -- so the host is driven by the ambient MASTER
     slice (it "hosts / sings" to the bed; deliberately not real lip-sync). This is the
     ONE local case an audio_driven_face beat uses the master mix, and only for the
-    never-humo bookend roles (a real CHARACTER face beat is still excluded above).
+    radio-host bookend roles (a real CHARACTER face beat is still excluded above).
     Partner/cloud avatar engines are also allowed to use the bounded bookend slice:
-    they are the selected cloud audio-reactive lane, not the historical local HuMo
-    default, and must not fall back to a local LTX rewrite just to satisfy
-    ``audio_ref``."""
+    they are the selected cloud audio-reactive lane."""
     if is_char_face:
         return False
     if (str(family) == "audio_driven_face"
-            and _is_never_humo_video_role(str(role or ""))):
-        return (otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
-                or _is_cloud_video_engine(engine_id))
+            and _is_radio_host_video_role(str(role or ""))):
+        return True
     return (str(family) == "audio_conditioned_video"
             or str(engine_id) in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
                                   "viz_camera"))
@@ -2081,48 +2077,44 @@ def _role_of_shot(shot) -> str:
     return role
 
 
-#: RADIO IS THE HOST: HuMo's finetuned weights only animate a face
-#: (BUG-LOCAL-129), and a radio-face init_image workaround rendered a generic
-#: human host, not a radio -- so bookends are redirected structurally (below),
-#: never fed to HuMo with an init-image trick.
-#:
-#: The engine every announcer_visual / music_visual beat is redirected to when
-#: it would otherwise dispatch a HuMo-family (audio_driven_face) engine: the
-#: local LTX 2.5 audio-in lane (family audio_conditioned_video), which
-#: conditions the radio picture on the beat's own waveform -- exactly the job
-#: the 8 GB audio-in workflow gives it on these two roles. Reused, not a new
-#: engine.
-_NEVER_HUMO_REDIRECT_ENGINE = "ltx25_audio_in_16gb"
+#: RADIO IS THE HOST, AND THE PICKED LANE IS THE LANE (operator 2026-10-15:
+#: "we should always respect the chosen path for music, announcer and char
+#: beats -- no switcheroo"). An announcer_visual / music_visual beat renders on
+#: the engine picked for it. On HuMo (audio_driven_face) that is the
+#: brief-driven radio-with-a-face host below -- never a human face, never a
+#: silent swap to another lane. The former redirect to the LTX 2.5 audio-in
+#: lane made a HuMo run fail on LTX 2.5's memory, not HuMo's.
 
 #: The brief-driven radio-HOST FACE object minted once per episode by MetaBrief
-#: under OTR_ENABLE_HUMO_HOSTS (must match
+#: whenever an announcer/music bookend is on HuMo (must match
 #: otr_meta_brief_image_prompt.RADIO_HOST_PORTRAIT_ID + the dispatcher's seed
 #: pin). Resolved as the HuMo init_image for the lineless announcer/music
-#: bookends when the toggle is ON.
+#: bookends.
 _RADIO_HOST_PORTRAIT_ID = "radio_host_portrait"
 
 
 #: Bridges the VIDEO-ENGINE role vocabulary this module dispatches on
 #: (announcer_visual / music_visual / character_video) to the LEDGER
-#: speaker_role vocabulary nodes._otr_speaker_role.is_never_humo_role
+#: speaker_role vocabulary nodes._otr_speaker_role.is_radio_host_role
 #: actually checks (character / announcer / music_open / music_close /
 #: music_inter). Only ONE representative speaker_role per video role is
-#: needed -- all three MUSIC_* values are equally "never humo" in
-#: _NEVER_HUMO_ROLES, so MUSIC_OPEN stands in for music_visual.
+#: needed -- all three MUSIC_* values are equally radio-host roles in
+#: _RADIO_HOST_ROLES, so MUSIC_OPEN stands in for music_visual.
 #: character_video has no entry -- it is never subject to this guard.
-_VIDEO_ROLE_NEVER_HUMO_PROXY = {
+_VIDEO_ROLE_RADIO_HOST_PROXY = {
     "announcer_visual": _SPEAKER_ROLE_ANNOUNCER,
     "music_visual": _SPEAKER_ROLE_MUSIC_OPEN,
 }
 
 
-def _is_never_humo_video_role(role: str) -> bool:
-    """True iff ``role`` (a VIDEO-engine role) must never dispatch HuMo, per the
+def _is_radio_host_video_role(role: str) -> bool:
+    """True iff ``role`` (a VIDEO-engine role) is a radio-host bookend, per the
     canonical ledger-speaker_role policy table (_otr_speaker_role.py, 2026-05-01,
-    "the radio IS the host") -- consulted through :data:`_VIDEO_ROLE_NEVER_HUMO_PROXY`
-    since the two role vocabularies differ. Pure; unknown role -> False."""
-    proxy = _VIDEO_ROLE_NEVER_HUMO_PROXY.get(role)
-    return bool(proxy) and _is_never_humo_role(proxy)
+    "the radio IS the host") -- consulted through :data:`_VIDEO_ROLE_RADIO_HOST_PROXY`
+    since the two role vocabularies differ. On HuMo such a beat animates the
+    radio-with-a-face host, never a person. Pure; unknown role -> False."""
+    proxy = _VIDEO_ROLE_RADIO_HOST_PROXY.get(role)
+    return bool(proxy) and _is_radio_host_role(proxy)
 
 
 def _is_cloud_video_engine(engine_id: str) -> bool:
@@ -2226,22 +2218,6 @@ def _is_strict_text_only_engine(engine_id: str) -> bool:
         return False
 
 
-def _radio_is_host_redirect_applies(engine_id: str) -> bool:
-    """True iff the radio-host guard should rewrite this selected engine.
-
-    The guard is a LOCAL HuMo-family policy escape hatch. A partner cloud
-    engine could also be an audio-driven-face engine, but such a pick must
-    remain a cloud request; rewriting it to local LTX creates the hybrid
-    cloud/local behavior the cloud profiles exist to avoid.
-    """
-    eid = str(engine_id or "")
-    return (
-        bool(eid)
-        and not _is_cloud_video_engine(eid)
-        and engine_family(eid, "") == "audio_driven_face"
-    )
-
-
 def _section_has_local_video_engine(section: dict) -> bool:
     """True when a rendered section includes at least one non-cloud video engine.
 
@@ -2261,52 +2237,6 @@ def _should_reclaim_between_engines(last_engine: str, this_engine: str) -> bool:
     last = str(last_engine or "")
     this = str(this_engine or "")
     return bool(last and this and this != last and not _is_cloud_video_engine(this))
-
-
-def _enforce_radio_is_host(shot):
-    """Mutate ``shot`` IN PLACE (the ledger's own dict, by reference -- same
-    pattern as the OTR_FORCE_ENGINE_MAP override below) so an announcer_visual /
-    music_visual beat can NEVER dispatch a local HuMo-family (audio_driven_face)
-    engine: "the radio is the host", never a talking human face for the
-    bookends (operator 2026-05-01, re-affirmed 2026-06-30 -- see the
-    :data:`_NEVER_HUMO_REDIRECT_ENGINE` comment above).
-
-    Wires :func:`nodes._otr_speaker_role.is_never_humo_role` into REAL
-    dispatch. A caught
-    pick is LOUDLY redirected to :data:`_NEVER_HUMO_REDIRECT_ENGINE` -- never a
-    hard-fail: this is a structural POLICY correction applied BEFORE any render
-    is attempted, not a render-time failure, so it does not touch the separate
-    NO-FALLBACKS rule in :func:`render_shot` (a render failure still raises
-    LOUD with no engine swap). Must run before any engine-specific request
-    logic (canvas / init_image / audio resolution) so everything downstream
-    sees the corrected engine -- call this FIRST in
-    :func:`build_request_from_shot`. No-op for every other role/engine; pure
-    except for the LOUD log + the in-place mutation.
-
-    OTR_ENABLE_HUMO_HOSTS (2026-07-01 brief-driven radio-host): when the operator
-    opts the toggle ON, the announcer/music bookends are ALLOWED to render a HuMo
-    radio-host FACE (fed the brief-driven radio_host_portrait still downstream),
-    so this redirect is a NO-OP. Default OFF = today's behavior byte-for-byte
-    (HuMo on bookends still redirects to :data:`_NEVER_HUMO_REDIRECT_ENGINE`)."""
-    if otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
-        return
-    role = _role_of_shot(shot)
-    if not _is_never_humo_video_role(role):
-        return
-    eng_id = str(shot.get("engine_id") or "")
-    if not _radio_is_host_redirect_applies(eng_id):
-        return
-    _LOG.warning(
-        "[OTR.render_driver] RADIO-IS-HOST (LOUD): role=%s picked local HuMo-family "
-        "engine %r for shot %s -- HuMo's finetuned weights only animate a "
-        "FACE (2026-05-01 BUG-LOCAL-129, re-confirmed 2026-06-30: an all-HuMo "
-        "bookend eyeballed as a generic human host, not a radio); redirecting "
-        "to %r. Pick a non-local-audio_driven_face engine for this role to "
-        "silence this override.", role, eng_id, shot.get("shot_id"),
-        _NEVER_HUMO_REDIRECT_ENGINE)
-    shot["engine_id"] = _NEVER_HUMO_REDIRECT_ENGINE
-    shot["family"] = engine_family(_NEVER_HUMO_REDIRECT_ENGINE,
-                                   "audio_conditioned_video")
 
 
 def _cumulative_beat_start(ledger, shot, fps):
@@ -2363,20 +2293,6 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     ``phase`` affects diagnostics only: cast preflight precedes image generation,
     so an absent still there is deferred. Render-time checks remain unchanged.
     This value never enters the request payload or its identity hash."""
-    # RADIO IS THE HOST (2026-06-30): must run FIRST, before any engine-keyed
-    # branch below reads shot["engine_id"] -- a caught announcer/music + HuMo
-    # pick is redirected here so every downstream resolution (init_image,
-    # canvas, audio) already sees the corrected engine.
-    #
-    # FROZEN ROUTE WINS (2026-07-25, chunk 1c). ~30 reads of shot["engine_id"]
-    # and shot["family"] follow in this function -- mesh-fodder routing, the
-    # scene-still vs portrait choice, the radio-face raise, the still_pan /
-    # ltx_audio_in branch, the portrait-vs-wide split, LTX-I2V init selection.
-    # They must all see the SAME engine the stills were minted for. When the
-    # ledger carries a frozen route, the row already holds it and re-deriving
-    # here could only introduce a disagreement, so we verify instead of mutate.
-    if not frozen_route_from_ledger(ledger):
-        _enforce_radio_is_host(shot)
     # Chunk A2 (visual-style TOTAL COVERAGE): resolve the episode's visual
     # style ONCE per shot, OUTSIDE any swallow (fail-loud law) -- the
     # console/music motion registers below read pack VALUES; the style id is
@@ -2402,10 +2318,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     init_image = portrait
     init_source = "portrait" if portrait else "none"
     # RADIO FACE LOGIC (2026-07-04) -- cross-node provenance guard, fail CLOSED.
-    # The image node and this driver each read OTR_ENABLE_HUMO_HOSTS independently.
-    # A ledger minted HUMO-OFF stamps the announcer portrait as the FACELESS
-    # "radio_object"; if it is later RENDERED HUMO-ON (e.g. the visual-quicktest
-    # harness REUSES a frozen ledger across runs), that faceless still would feed
+    # The image phase picks the announcer portrait style from the announcer lane.
+    # A ledger minted with a non-HuMo announcer stamps it as the FACELESS
+    # "radio_object"; if it is later RENDERED on HuMo (e.g. a harness REUSES a
+    # frozen ledger across runs), that faceless still would feed
     # HuMo -- the BUG-LOCAL-129 face-only failure. Guard on the POSITIVE: an
     # any portrait-backed announcer_visual + audio_driven_face init MUST carry
     # radio_host_style=="console_face"; anything else (radio_object OR a missing
@@ -2423,9 +2339,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "(audio_driven_face) engine %r would consume the announcer "
                 "portrait as its init, but that still is radio_host_style=%r "
                 "(need 'console_face'). A faceless radio_object minted HUMO-OFF "
-                "must NOT drive HuMo (BUG-LOCAL-129 face-only failure). Re-mint "
-                "the image phase with OTR_ENABLE_HUMO_HOSTS=1 so the announcer "
-                "portrait is the animatable dial-face. NO FALLBACK." % (
+                "must NOT drive HuMo (BUG-LOCAL-129 face-only failure). Re-run "
+                "the image phase with HuMo picked for the announcer so the "
+                "announcer portrait is the animatable dial-face. NO FALLBACK." % (
                     shot.get("shot_id"), _eng_id, _rh_style or "<missing>"))
     # 3D-image-streams (2026-06-21): a requires_mesh_fodder engine (mesh_stage)
     # meshes a SINGLE isolated subject, so it must be fed the clean mesh_fodder
@@ -2589,23 +2505,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                     "FAILS LOUD in render_clip rather than painting a dark floor "
                     "(no fallbacks). Investigate the image phase for beat %s.",
                     _eng, _bid, _bid)
-    # A local HuMo music_visual beat redirects to _NEVER_HUMO_REDIRECT_ENGINE
-    # before _family is computed (see _enforce_radio_is_host above).
-    # Partner/cloud avatar engines may still legitimately reach this point as
-    # audio_driven_face; their own declared init_image requirement is honored by
-    # the scene-still branch above.
-    # OTR_ENABLE_HUMO_HOSTS (2026-07-01 brief-driven radio-host, chunk 4): a
-    # LINELESS announcer/music bookend on a HuMo (audio_driven_face) engine has
-    # char_id="" -> no cast portrait -> empty init_image. Under the toggle, feed
-    # it the episode's ONE brief-driven radio_host_portrait FACE still (minted
-    # once by MetaBrief, kind=portrait, resolved via _portrait_index). Fail LOUD
-    # if the toggle is ON but the face still is absent -- NEVER a black-screen
-    # fallback. (Toggle OFF: _enforce_radio_is_host already redirected these off
-    # HuMo, so this block never triggers -> byte-identical.)
-    if (otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
-            and not init_image
+    # RADIO-HOST HuMo (2026-07-01 brief-driven radio-host, chunk 4; unconditional
+    # since 2026-10-15): a LINELESS announcer/music bookend on a HuMo
+    # (audio_driven_face) engine has char_id="" -> no cast portrait -> empty
+    # init_image. Feed it the episode's ONE brief-driven radio_host_portrait
+    # FACE still (minted once by MetaBrief, kind=portrait, resolved via
+    # _portrait_index). Fail LOUD if the face still is absent -- NEVER a
+    # black-screen fallback.
+    if (not init_image
             and _family == "audio_driven_face"
-            and _is_never_humo_video_role(_role_of_shot(shot))):
+            and _is_radio_host_video_role(_role_of_shot(shot))):
         _rh = _portrait_index(ledger).get(_RADIO_HOST_PORTRAIT_ID, "")
         if _rh:
             init_image = _rh
@@ -2617,11 +2526,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 os.path.basename(_rh))
         else:
             raise DeferredImageGapError(
-                "OTR_ENABLE_HUMO_HOSTS is ON but no radio_host_portrait FACE "
-                "still is in the ledger for the lineless %s bookend shot %s -- "
-                "the HuMo host has no init_image. NO FALLBACK (never a black "
-                "screen): confirm MetaBrief minted radio_host_portrait (it mints "
-                "only when the toggle was ON at the image phase) and the image "
+                "No radio_host_portrait FACE still is in the ledger for the "
+                "lineless %s HuMo bookend shot %s -- the HuMo host has no "
+                "init_image. NO FALLBACK (never a black screen): confirm "
+                "MetaBrief minted radio_host_portrait (it mints when an "
+                "announcer/music lane is HuMo at the image phase) and the image "
                 "dispatcher rendered it." % (_role_of_shot(shot),
                                              shot.get("shot_id")))
     if (not init_image
@@ -6087,30 +5996,25 @@ def assert_coverage_plans(ledger):
 def resolve_final_shot_engines(ledger):
     """THE ROUTE LOCK: resolve every shot's FINAL effective engine, once.
 
-    Both engine mutations in this build run here and nowhere else that matters:
-    the ``OTR_FORCE_ENGINE_MAP`` rewrite (:func:`apply_engine_override`) and
-    the radio-is-host redirect (:func:`_enforce_radio_is_host`). After this
+    The one engine mutation in this build runs here and nowhere else that
+    matters: the ``OTR_FORCE_ENGINE_MAP`` rewrite (:func:`apply_engine_override`).
+    There is no role-based rewrite -- the picked lane is the lane. After this
     returns, ``shot["engine_id"]`` / ``shot["family"]`` are the engine that
     will actually render the beat.
 
     WHY THIS EXISTS: ``otr_video_render_batch`` validates the still spine, and
-    that must happen AFTER both engine mutations -- ``apply_engine_override``
-    fires inside :func:`run_real_episode`, and ``_enforce_radio_is_host``
-    fires per shot inside :func:`build_request_from_shot`, which is later
-    still. Validated before them, with a force map set or on any
-    announcer/music beat whose picked engine is a local HuMo, **the spine is
-    checked against the PICKED engine and the beat is rendered by a
-    DIFFERENT one** -- the aspect/geometry mismatch class this whole
-    still-plans build exists to close.
+    that must happen AFTER the force map -- ``apply_engine_override`` fires
+    inside :func:`run_real_episode`. Validated before it, with a force map
+    set, **the spine is checked against the PICKED engine and the beat is
+    rendered by a DIFFERENT one** -- the aspect/geometry mismatch class this
+    whole still-plans build exists to close.
 
     Calling this before ``validate_and_repair_still_spine`` makes the spine
     check see the real routing. It is IDEMPOTENT by construction -- the
-    override skips a shot already on its target engine, and the redirect
-    no-ops once the engine is no longer HuMo-family -- so the existing
-    downstream calls stay in place as defence in depth and cost nothing.
+    override skips a shot already on its target engine.
 
-    Mutates the ledger's own shot dicts in place (the established pattern for
-    both passes) and returns the ledger for call-site symmetry.
+    Mutates the ledger's own shot dicts in place and returns the ledger for
+    call-site symmetry.
 
     SUPERSEDED BY THE FREEZE FOR OTR_VideoDirector-BUILT LEDGERS (chunk 1c).
     When the ledger carries a frozen route (``video.roles_effective``, stamped
@@ -6125,9 +6029,9 @@ def resolve_final_shot_engines(ledger):
     # that carries a plan is held to it just as a frozen one is (chunk 3b) --
     # but ALWAYS AFTER the route is final (2026-07-26 QA4). On the frozen path
     # the route arrived final, so the check runs immediately. On the legacy
-    # path it must WAIT for the two mutations below: a plan stamped for the
-    # PICKED engine and validated before the force map or the radio-host
-    # redirect swaps it is a plan checked against an engine that does not
+    # path it must WAIT for the force map below: a plan stamped for the
+    # PICKED engine and validated before the force map swaps it is a plan
+    # checked against an engine that does not
     # render the beat -- the same ordering defect this function's own
     # docstring exists to close for the still spine, one contract further
     # down. Checking early is not merely useless there, it is a false
@@ -6140,9 +6044,6 @@ def resolve_final_shot_engines(ledger):
         "hand-built / soak path) -- resolving the effective engines here, as "
         "before the 2026-07-25 route freeze")
     ledger = apply_engine_override(ledger)
-    for shot in ((ledger.get("video") or {}).get("shots") or []):
-        if isinstance(shot, dict):
-            _enforce_radio_is_host(shot)
     assert_coverage_plans(ledger)
     return ledger
 

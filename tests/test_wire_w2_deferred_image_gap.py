@@ -113,7 +113,7 @@ def _raise_roster():
 #: private wording to be protected.
 DEFERRABLE = (
     "has NO scene still",                              # scene-init family
-    "OTR_ENABLE_HUMO_HOSTS is ON but no radio_host_portrait",
+    "No radio_host_portrait FACE still is in the ledger",
 )
 
 #: Must stay TERMINAL. The first three are POST-image still-spine validation:

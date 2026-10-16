@@ -1776,23 +1776,23 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
     try:
         from ._otr_video_engines.render_driver import (
             DeferredImageGapError, FamilyInputGap, _is_character_face_beat,
-            _is_never_humo_video_role, _line_index, _present_request_tokens,
-            _radio_is_host_redirect_applies, _required_inputs_for_engine,
+            _is_radio_host_video_role, _line_index, _present_request_tokens,
+            _required_inputs_for_engine,
             _uses_ambient_master_audio, build_request, build_request_from_shot,
             engine_family, parse_engine_override)
     except ImportError:
         from _otr_video_engines.render_driver import (
             DeferredImageGapError, FamilyInputGap, _is_character_face_beat,
-            _is_never_humo_video_role, _line_index, _present_request_tokens,
-            _radio_is_host_redirect_applies, _required_inputs_for_engine,
+            _is_radio_host_video_role, _line_index, _present_request_tokens,
+            _required_inputs_for_engine,
             _uses_ambient_master_audio, build_request, build_request_from_shot,
             engine_family, parse_engine_override)
 
     def _effective_cast_time_engine(role: str, eng_id: str) -> str:
         """DELEGATES to the ONE route-freeze authority (2026-07-25, chunk 1a).
 
-        This was the THIRD independent copy of force-map + radio-host redirect.
-        It hard-coded the redirect target as a bare literal instead of ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``, and it
+        This was the THIRD independent copy of the routing rules.
+        It hard-coded a redirect target as a bare literal, and it
         SWALLOWED a malformed force map with only a warning while the render
         path treats the identical condition as terminal (``57f4983a``) -- so a
         typo'd map passed cast-time preflight against the UNFORCED plan and

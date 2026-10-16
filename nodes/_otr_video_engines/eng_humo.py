@@ -135,11 +135,9 @@ _HUMO_DEFAULT_UNET = "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"
 #:
 #: The ``aspect="inherit_engine"`` FIELD is unchanged -- the DIMENSIONS follow
 #: the engine's ``render_aspect`` (``OTR_VideoDirector._role_aspects``). Only
-#: the authored layer-2 TEXT is pinned per file. S2's HuMo cutover is the FOUR
-#: hosts-off bookend role-cells (portrait humo / humo_1.7B x announcer / music,
-#: redirected by ``_enforce_radio_is_host`` to the WIDE audio-in lane that
-#: renders them); with ``OTR_ENABLE_HUMO_HOSTS=1`` a portrait HuMo keeps its
-#: portrait still.
+#: the authored layer-2 TEXT is pinned per file. A portrait HuMo on the
+#: announcer / music bookends keeps its portrait still: it renders the
+#: radio-with-a-face host (``radio_host_portrait``), never another lane.
 _HUMO_STILL_PLAN = (
     StillPlanRow(kind="scene_open", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
@@ -237,15 +235,14 @@ class HuMoEngine(_MC.MotionEngineBase):
     still_plan = _HUMO_STILL_PLAN
     # RADIO IS THE HOST: HuMo's finetuned weights only animate a FACE (an
     # eyeballed render of a music/announcer bookend showed a generic human host,
-    # not a radio -- BUG-LOCAL-129, nodes/_otr_speaker_role.py), so HuMo serves
-    # ONLY character_video (real dialogue lip-sync). This tuple is
+    # not a plain radio -- BUG-LOCAL-129, nodes/_otr_speaker_role.py), so its
+    # home role is character_video (real dialogue lip-sync). This tuple is
     # UI-SORT/self-description metadata only (role_compat.engine_fits_role is
     # capability-only and does not consult it -- see the
-    # registry.VideoEngineRegistry docstring); the actual hard gate is
-    # render_driver._enforce_radio_is_host, which wires
-    # _otr_speaker_role.is_never_humo_role into real dispatch and redirects any
-    # announcer_visual/music_visual + audio_driven_face pick to
-    # render_driver._NEVER_HUMO_REDIRECT_ENGINE.
+    # registry.VideoEngineRegistry docstring). Picked for announcer_visual /
+    # music_visual, HuMo renders there too, animating the brief-driven
+    # radio-with-a-face host (render_driver._RADIO_HOST_PORTRAIT_ID); no lane
+    # swap.
     roles = ("character_video",)
     default_roles = ()
     required_inputs = ("audio_ref", "init_image")

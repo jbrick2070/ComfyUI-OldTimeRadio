@@ -291,7 +291,7 @@ def test_the_legacy_path_validates_the_plan_against_the_FINAL_engine(monkeypatch
     """Resolve the route FIRST, then hold the plan to it (2026-07-26, QA4).
 
     The legacy branch used to call ``assert_coverage_plans`` BEFORE
-    ``apply_engine_override`` and the radio-host redirect, so a plan stamped
+    ``apply_engine_override`` (the force map), so a plan stamped
     for the PICKED engine was validated against that engine and then executed
     by a DIFFERENT one -- the ordering defect chunk 1c closed for the still
     spine, reintroduced one contract further down inside the very function
@@ -309,7 +309,6 @@ def test_the_legacy_path_validates_the_plan_against_the_FINAL_engine(monkeypatch
     narrow = fc.FrameContract(min_frames=65, max_frames=161, quantum=8)
     monkeypatch.setattr(forced, "frame_contract", lambda: narrow, raising=False)
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx25_video")
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
 
     with pytest.raises(rd.RenderError, match="cannot execute"):
         rd.resolve_final_shot_engines(ledger)

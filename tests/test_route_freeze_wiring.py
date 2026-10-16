@@ -47,11 +47,10 @@ def _direct(monkeypatch, announcer="humo_1.7B",
     The character slot is ``ltx_8gb``: a local image-to-video lane, registered,
     and role-valid for ``character_video``. Nothing here asserts a
     lane-specific property of the character slot, and the one test that does
-    care about the character route (``test_character_video_is_never_redirected``)
+    care about the character route (``test_character_video_humo_pick_survives``)
     passes its own engine in explicitly.
     """
-    for key in ("OTR_FORCE_ENGINE_MAP", "OTR_ENABLE_HUMO_HOSTS"):
-        monkeypatch.delenv(key, raising=False)
+    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
     for key, val in env.items():
         monkeypatch.setenv(key, val)
     (raw,) = vd.OTRVideoDirector().direct(
@@ -70,42 +69,37 @@ def _direct(monkeypatch, announcer="humo_1.7B",
 # THE REGRESSION THIS CHUNK EXISTS FOR
 # ---------------------------------------------------------------------------
 
-def test_redirected_bookend_gets_a_WIDE_still_not_a_decapitated_portrait(monkeypatch):
-    """THE DECAPITATION BUG. Live under the DEFAULT environment.
+def test_humo_bookend_pick_stays_humo_and_keeps_its_portrait_still(monkeypatch):
+    """THE PICKED LANE IS THE LANE (operator 2026-10-15, no switcheroo).
 
-    Pick a PORTRAIT HuMo for announcer_visual. With OTR_ENABLE_HUMO_HOSTS unset
-    (the default), the radio-is-host guard redirects that beat to the WIDE
-    audio-in lane (``render_driver._NEVER_HUMO_REDIRECT_ENGINE``). Before chunk
-    1b the aspect map was derived from the PICKED portrait engine, so an
-    832x1216 portrait still was minted and the wide render centre-cropped it.
-    The audio-in adapter of the day recorded the outcome verbatim:
-    OTR_VideoDirector "defaulted to a 832x1216 PORTRAIT still that the wide
-    render then centre-cropped, lopping the subject's head off."
-
-    The aspect must now describe the engine that ACTUALLY renders.
-    """
+    A PORTRAIT HuMo picked for announcer_visual freezes to that same HuMo
+    engine -- never the WIDE audio-in lane -- and the still is sized for THAT
+    engine: portrait. (The old radio-is-host redirect used to rewrite it to
+    ``ltx25_audio_in_16gb`` and a HuMo run then planned an LTX lane nobody
+    picked.)"""
     policy = _direct(monkeypatch, announcer="humo_1.7B")
-
-    # The pick is unchanged and still recorded...
     assert policy["video_models"]["announcer_video_model"]["engine_id"] == "humo_1.7B"
-    # ...but the route is frozen to the engine that will really run...
-    assert policy["effective_video_models"]["announcer_visual"] == \
-        rd._NEVER_HUMO_REDIRECT_ENGINE
-    # ...and the still is sized for THAT engine, not for the portrait pick.
-    assert policy["aspects"]["announcer_visual"] == "wide"
-
-
-def test_hosts_on_keeps_the_portrait_still_for_a_portrait_humo(monkeypatch):
-    """The other side of the same contract: with the toggle ON the redirect is
-    a no-op, the portrait HuMo really does render, and a portrait still is
-    correct. A fix that made everything wide would be a different bug."""
-    policy = _direct(monkeypatch, announcer="humo_1.7B", OTR_ENABLE_HUMO_HOSTS="1")
     assert policy["effective_video_models"]["announcer_visual"] == "humo_1.7B"
     assert policy["aspects"]["announcer_visual"] == "portrait"
 
 
-def test_character_video_is_never_redirected(monkeypatch):
-    """character_video is outside the guard, so a HuMo pick there survives."""
+def test_force_map_to_a_wide_lane_gets_a_WIDE_still_not_a_decapitated_portrait(
+        monkeypatch):
+    """THE DECAPITATION BUG, now driven by the only remaining rewrite.
+
+    Pick a PORTRAIT HuMo for announcer_visual but FORCE the wide audio-in lane.
+    The aspect map must describe the engine that ACTUALLY renders (the forced
+    one), not the picked portrait engine, or the wide render centre-crops a
+    portrait still and lops the subject's head off."""
+    policy = _direct(monkeypatch, announcer="humo_1.7B",
+                     OTR_FORCE_ENGINE_MAP="announcer_visual=ltx25_audio_in_16gb")
+    assert policy["video_models"]["announcer_video_model"]["engine_id"] == "humo_1.7B"
+    assert policy["effective_video_models"]["announcer_visual"] ==         "ltx25_audio_in_16gb"
+    assert policy["aspects"]["announcer_visual"] == "wide"
+
+
+def test_character_video_humo_pick_survives(monkeypatch):
+    """A HuMo pick on character_video is the lane that renders."""
     policy = _direct(monkeypatch, character="humo_1.7B")
     assert policy["effective_video_models"]["character_video"] == "humo_1.7B"
 
@@ -117,8 +111,7 @@ def test_character_video_is_never_redirected(monkeypatch):
 def test_policy_carries_both_maps_and_the_snapshot(monkeypatch):
     policy = _direct(monkeypatch)
     assert isinstance(policy["effective_video_models"], dict)
-    assert policy["routing_env_snapshot"] == {
-        "force_engine_map": "", "enable_humo_hosts": False}
+    assert policy["routing_env_snapshot"] == {"force_engine_map": ""}
     # picked and effective are stamped SEPARATELY so a downstream mismatch is
     # replayable rather than a guess.
     assert "video_models" in policy and "effective_video_models" in policy
@@ -140,6 +133,7 @@ def test_image_director_forwards_both_keys(monkeypatch):
     """Its payload is built KEY BY KEY, so a new upstream key is NOT forwarded
     automatically -- node 89 and node 91 would silently never see the freeze."""
     video_policy = _direct(monkeypatch, announcer="humo_1.7B")
+    assert video_policy["aspects"]["announcer_visual"] == "portrait"
     (raw,) = idir.OTRImageDirector().direct(
         fresh_cap=15, seed_mode="request_hash", request_seed=0,
         video_policy_json=json.dumps(video_policy),
@@ -150,7 +144,7 @@ def test_image_director_forwards_both_keys(monkeypatch):
     assert image_policy["routing_env_snapshot"] == \
         video_policy["routing_env_snapshot"]
     # and the derived aspect travels with it
-    assert image_policy["aspects"]["announcer_visual"] == "wide"
+    assert image_policy["aspects"]["announcer_visual"] == "portrait"
 
 
 # ---------------------------------------------------------------------------
@@ -171,8 +165,8 @@ def test_groups_and_shots_are_minted_from_the_frozen_map(monkeypatch):
     """
     policy = _direct(monkeypatch, announcer="humo_1.7B")
     groups, shots = _plan(policy)
-    assert shots[0]["engine_id"] == rd._NEVER_HUMO_REDIRECT_ENGINE
-    assert groups[0]["engine_id"] == rd._NEVER_HUMO_REDIRECT_ENGINE
+    assert shots[0]["engine_id"] == "humo_1.7B"
+    assert groups[0]["engine_id"] == "humo_1.7B"
     # the invariant the r4 panel asked for, stated directly
     assert groups[0]["engine_id"] == shots[0]["engine_id"]
 
@@ -254,14 +248,10 @@ def test_is_changed_tracks_the_routing_environment(node_cls, monkeypatch):
     """Without this ComfyUI serves a cached node across an env change and the
     whole freeze is planned from state the operator already replaced."""
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     base = node_cls.IS_CHANGED()
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_camera")
     forced = node_cls.IS_CHANGED()
-    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
-    hosts = node_cls.IS_CHANGED()
-    assert len({base, forced, hosts}) == 3
+    assert len({base, forced}) == 2
 
 
 def test_both_nodes_share_one_fingerprint(monkeypatch):
@@ -283,7 +273,7 @@ def _frozen_ledger(engine="ltx25_audio_in_16gb", role="announcer_visual",
         "video": {
             "roles_effective": {role: frozen_engine or engine},
             "routing_env_snapshot": env if env is not None else {
-                "force_engine_map": "", "enable_humo_hosts": False},
+                "force_engine_map": ""},
             "execution_groups": [
                 {"group_id": "grp_%s" % role, "kind": "consumer",
                  "engine_id": engine, "depends_on": []}],
@@ -302,7 +292,6 @@ def test_a_frozen_route_is_verified_and_never_mutated(monkeypatch):
     minted stills for, so the two disagreed and only the pixels showed it.
     """
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     ledger = _frozen_ledger()
     before = json.dumps(ledger, sort_keys=True)
     assert rd.assert_frozen_route(ledger) is True
@@ -326,16 +315,14 @@ def test_a_forced_map_does_NOT_rewrite_a_frozen_ledger(monkeypatch):
 
 def test_shot_that_disagrees_with_the_frozen_route_is_terminal(monkeypatch):
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     ledger = _frozen_ledger(engine="humo",
-                            frozen_engine="ltx25_audio_in_16gb")
+                            frozen_engine="ltx25_audio_in_16gb")  # row != frozen
     with pytest.raises(rd.RenderError, match="frozen route says"):
         rd.assert_frozen_route(ledger)
 
 
 def test_shot_that_diverges_from_its_group_is_terminal(monkeypatch):
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     ledger = _frozen_ledger()
     # ANY engine that differs from the shot row proves the divergence check.
     ledger["video"]["execution_groups"][0]["engine_id"] = "ltx_8gb"
@@ -343,13 +330,11 @@ def test_shot_that_diverges_from_its_group_is_terminal(monkeypatch):
         rd.assert_frozen_route(ledger)
 
 
-def test_legacy_ledger_keeps_the_historic_mutating_behaviour(monkeypatch):
+def test_legacy_ledger_has_nothing_to_verify_and_is_not_rewritten(monkeypatch):
     """The legacy CPU fixtures (and, until 2026-09-05, the two POST HTTP
     harness routes that have since been removed) build ledgers by hand
     with no OTR_VideoDirector upstream. A strict assertion would break paths
-    never in this contract, so the mutating branch survives -- NAMED and
-    logged, not silent."""
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+    never in this contract, so such a ledger is simply not verified."""
     legacy = {
         "video": {
             "shots": [{"shot_id": "s1", "role": "announcer_visual",
@@ -358,8 +343,8 @@ def test_legacy_ledger_keeps_the_historic_mutating_behaviour(monkeypatch):
     }
     assert rd.assert_frozen_route(legacy) is False       # nothing to verify
     rd.resolve_final_shot_engines(legacy)
-    # ...and the historic redirect still happens on that path
-    assert legacy["video"]["shots"][0]["engine_id"] == rd._NEVER_HUMO_REDIRECT_ENGINE
+    # ...and the pick is NOT rewritten on that path either (no redirect left)
+    assert legacy["video"]["shots"][0]["engine_id"] == "humo"
 
 
 def test_frozen_route_from_ledger_reads_only_a_real_map():
@@ -372,22 +357,20 @@ def test_frozen_route_from_ledger_reads_only_a_real_map():
     ) == {"announcer_visual": "ltx25_audio_in_16gb"}
 
 
-def test_build_request_from_shot_does_not_redirect_under_a_frozen_route(monkeypatch):
+def test_build_request_from_shot_does_not_rewrite_under_a_frozen_route(monkeypatch):
     """~30 later reads of shot["engine_id"]/["family"] live in that function.
 
     Under a frozen route the row already holds the effective engine, so
     re-deriving could only introduce a disagreement with the minted stills.
     """
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    # A frozen ledger whose row deliberately still says "humo": the old code
-    # would have rewritten it in place here.
+    # A frozen ledger whose row says "humo": it must stay exactly that.
     ledger = _frozen_ledger(engine="humo", frozen_engine="humo")
     shot = ledger["video"]["shots"][0]
     try:
         rd.build_request_from_shot(shot, ledger)
     except Exception:  # noqa: BLE001 -- request building may fail for other reasons
         pass
-    assert shot["engine_id"] == "humo"   # NOT mutated to the redirect target
+    assert shot["engine_id"] == "humo"   # NOT mutated
 
 
 def test_end_to_end_freeze_survives_the_render_boundary(monkeypatch):
@@ -395,8 +378,7 @@ def test_end_to_end_freeze_survives_the_render_boundary(monkeypatch):
     policy = _direct(monkeypatch, announcer="humo_1.7B")
     patched = json.loads(_lock_with(policy)[0])
     # ShotLock stamped the frozen route...
-    assert patched["video"]["roles_effective"]["announcer_visual"] == \
-        rd._NEVER_HUMO_REDIRECT_ENGINE
+    assert patched["video"]["roles_effective"]["announcer_visual"] == "humo_1.7B"
     # ...and the render boundary verifies rather than re-derives it.
     assert rd.assert_frozen_route(patched) is True
 

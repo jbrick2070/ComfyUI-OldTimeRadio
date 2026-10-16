@@ -330,10 +330,13 @@ def test_a_mac_draws_only_lanes_that_list_metal():
     assert "ltx25_foley_16gb" in left_out
 
 
-def test_humo_is_left_out_because_the_route_freeze_redirects_it():
-    _eligible, left_out = L.video_pool(NVIDIA)
+def test_humo_is_drawable_because_no_role_swaps_its_lane():
+    # The picked lane is the lane (2026-10-15): HuMo on the announcer and music
+    # roles animates the radio-with-a-face host instead of being swapped to
+    # another lane, so nothing leaves it out of a roll on a capable card.
+    eligible, left_out = L.video_pool(NVIDIA)
     for name in ("humo", "humo_1.7B"):
-        assert "redirected" in left_out[name], left_out[name]
+        assert name in eligible, left_out.get(name)
 
 
 def test_one_voice_engine_voices_the_whole_cast():

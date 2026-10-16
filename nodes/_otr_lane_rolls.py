@@ -265,20 +265,16 @@ def video_pool(host=None) -> "tuple[tuple[str, ...], dict]":
         from . import _otr_video_engines  # noqa: F401 -- registers built-ins
         from ._otr_video_engines import registry as vreg
         from ._otr_video_engines import wrapper_bridge as bridge
-        from ._otr_shared import boot_contracts, role_slots, route_freeze
+        from ._otr_shared import boot_contracts, role_slots
         from . import _otr_visual_assets as assets
     except ImportError:  # pragma: no cover -- flat test imports
         import _otr_video_engines  # type: ignore  # noqa: F401
         from _otr_video_engines import registry as vreg  # type: ignore
         from _otr_video_engines import wrapper_bridge as bridge  # type: ignore
-        from _otr_shared import boot_contracts, role_slots, route_freeze  # type: ignore
+        from _otr_shared import boot_contracts, role_slots  # type: ignore
         import _otr_visual_assets as assets  # type: ignore
     host = live_host() if host is None else host
     roles = tuple(role_slots.ROLE_TO_VIDEO_SLOT)
-    slots = tuple(role_slots.ROLE_TO_VIDEO_SLOT.values())
-    # The freeze WITHOUT the operator's force map: a forced role renders its
-    # forced engine whatever is picked, exactly as for a saved pick.
-    snapshot = dict(route_freeze.routing_env_snapshot(), force_engine_map="")
     # Asked once. Off a server (the CPU suite, a script) there is no node
     # registry and no boot to read; the render-time checks still stand.
     packs_known = bool(bridge.node_class_mappings())
@@ -297,18 +293,10 @@ def video_pool(host=None) -> "tuple[tuple[str, ...], dict]":
         for role in roles:
             vreg.assert_usable(name, role)
 
-    def not_redirected(name):
-        effective = route_freeze.freeze_role_engines(
-            {slot: name for slot in slots}, snapshot=snapshot)
-        if any(effective.get(role) != name for role in roles):
-            return "is redirected to another lane when picked for every role"
-        return None
-
     def reason_for(name, engine):
         return _first_reason(
             lambda: _host_reason(vreg.CAPABILITIES, name, host),
             lambda: serves_every_role(name),
-            lambda: not_redirected(name),
             lambda: packs_known and assets._refuse_missing_node_packs([name]),
             lambda: boot_known and assets._refuse_unmet_boot_contracts(
                 [name], state=boot),

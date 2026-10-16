@@ -1,23 +1,25 @@
 """THE ONE ROUTE-FREEZE AUTHORITY: role -> EFFECTIVE video engine, once.
 
-Two operator mutations decide which engine actually renders a beat:
+One operator mutation decides which engine actually renders a beat:
+``OTR_FORCE_ENGINE_MAP``, the all-one-engine / per-role experiment knob.
 
-1. ``OTR_FORCE_ENGINE_MAP`` -- the all-one-engine / per-role experiment knob.
-2. The radio-is-host redirect -- an announcer_visual / music_visual beat that
-   picked a LOCAL HuMo-family (``audio_driven_face``) engine is rewritten to
-   the wide LTX audio-in console, unless ``OTR_ENABLE_HUMO_HOSTS=1``.
+There is NO role-based engine rewrite (2026-10-15, operator: "if you choose
+ltx25 as the music or announcer that's fine but it should not auto populate").
+A HuMo pick on announcer_visual / music_visual stays HuMo and renders the
+brief-driven radio-with-a-face host (``radio_host_portrait``); the old
+radio-is-host redirect to the LTX 2.5 audio-in lane is gone, so a HuMo run
+succeeds or fails on HuMo alone.
 
 WHY THIS MODULE EXISTS (2026-07-25, multi-clip coverage chunk 1a; kibitz r4
 codex ``gpt-5.6-sol`` high + agy ``Gemini 3.6 Flash (High)``, then a six-way
-grounded Sonnet fan-out, judge concurring). Before it, that pair of rules was
+grounded Sonnet fan-out, judge concurring). Before it, the routing rules were
 implemented FOUR times: the real authority in ``render_driver``
-(``apply_engine_override`` + ``_enforce_radio_is_host``) and THREE independent
+(``apply_engine_override`` + the since-removed bookend redirect) and THREE independent
 mirrors -- ``otr_meta_brief_image_prompt._effective_prompt_engine_for_role``,
 ``otr_image_gen_dispatcher._effective_video_engine_for_role`` /
 ``_effective_engine_after_force_map``, and ``otr_shot_lock``'s nested
 ``_effective_cast_time_engine``. TWO of the mirrors hard-coded the redirect
-target as a bare literal instead of reading
-``render_driver._NEVER_HUMO_REDIRECT_ENGINE``, and TWO of them SWALLOWED a
+target as a bare literal, and TWO of them SWALLOWED a
 malformed force map that the render path treats as terminal. Four copies of one
 routing rule, disagreeing about both the target and the failure policy, is the
 defect class the whole coverage build exists to close -- so the fix is to
@@ -50,17 +52,11 @@ except ImportError:  # pragma: no cover -- loaded flat
     except ImportError:
         import env as otr_env  # type: ignore  # _otr_shared/ on sys.path
 
-#: The two environment variables that decide effective routing. Any new
-#: routing env var MUST be added here AND to the snapshot, or it escapes the
-#: freeze (the r4 panel's standing warning: an env read outside the snapshot is
-#: a hole in the ledger).
+#: The environment variable that decides effective routing. Any new routing
+#: env var MUST be added here AND to the snapshot, or it escapes the freeze
+#: (the r4 panel's standing warning: an env read outside the snapshot is a hole
+#: in the ledger).
 FORCE_ENGINE_MAP_ENV = "OTR_FORCE_ENGINE_MAP"
-ENABLE_HUMO_HOSTS_ENV = "OTR_ENABLE_HUMO_HOSTS"
-
-#: Roles subject to the radio-is-host guard. Kept as a frozenset here (rather
-#: than importing the speaker-role table) so the pure core stays stdlib-only;
-#: the authoritative predicate is still injected by the caller.
-NEVER_HUMO_VIDEO_ROLES = frozenset({"announcer_visual", "music_visual"})
 
 
 class RouteFreezeError(ValueError):
@@ -82,7 +78,6 @@ def routing_env_snapshot(env=None) -> dict:
     src = otr_env.snapshot() if env is None else env
     return {
         "force_engine_map": str(src.get(FORCE_ENGINE_MAP_ENV, "") or "").strip(),
-        "enable_humo_hosts": str(src.get(ENABLE_HUMO_HOSTS_ENV, "0") or "0") == "1",
     }
 
 
@@ -94,20 +89,14 @@ def snapshot_fingerprint(snapshot) -> str:
     the graph will happily serve a lock taken under a different environment.
     """
     snap = snapshot or {}
-    return "force=%s|humo_hosts=%s" % (
-        str(snap.get("force_engine_map", "") or ""),
-        "1" if snap.get("enable_humo_hosts") else "0",
-    )
+    return "force=%s" % str(snap.get("force_engine_map", "") or "")
 
 
 def snapshots_agree(frozen, current) -> bool:
     """True iff two snapshots describe the same routing environment. Pure."""
     a, b = frozen or {}, current or {}
-    return (
-        str(a.get("force_engine_map", "") or "")
-        == str(b.get("force_engine_map", "") or "")
-        and bool(a.get("enable_humo_hosts")) == bool(b.get("enable_humo_hosts"))
-    )
+    return (str(a.get("force_engine_map", "") or "")
+            == str(b.get("force_engine_map", "") or ""))
 
 
 def forced_engine_for_role(role: str, mapping) -> str:
@@ -119,42 +108,15 @@ def forced_engine_for_role(role: str, mapping) -> str:
     return str(m.get(str(role or "")) or m.get("*") or "")
 
 
-def resolve_effective_engine(role, engine_id, *, snapshot, force_mapping,
-                             redirect_applies, redirect_target,
-                             never_humo_roles=None) -> str:
+def resolve_effective_engine(role, engine_id, *, force_mapping) -> str:
     """THE PURE CORE: one role's FINAL effective engine. No env, no registry.
 
-    Every predicate is injected, so this function is exhaustively testable on
-    CPU with no ComfyUI, no registry and no environment:
-
-    * ``snapshot`` -- from :func:`routing_env_snapshot`.
-    * ``force_mapping`` -- the parsed force map (``{}`` when unset).
-    * ``redirect_applies`` -- callable ``(engine_id) -> bool``; the authority is
-      ``render_driver._radio_is_host_redirect_applies``, which is LOCAL-only by
-      design (a cloud audio-driven-face engine must stay cloud, and is caught
-      by the ``cloud_`` id prefix alone because it carries no
-      ``provider_side`` attribute).
-    * ``redirect_target`` -- the authority is
-      ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``; never a literal.
-
-    ORDER IS THE CONTRACT and matches the render path exactly: force map FIRST,
-    then the redirect evaluated against the FORCED engine. Forcing a HuMo onto
-    an announcer still redirects; forcing a non-HuMo onto one that would have
-    redirected does not.
+    ``force_mapping`` is the parsed force map (``{}`` when unset). The force
+    map is the ONLY rewrite: a role's picked engine is what renders it unless
+    the operator forced another. Pure, so it is exhaustively testable on CPU.
     """
-    role_s = str(role or "")
-    eff = str(engine_id or "")
-    forced = forced_engine_for_role(role_s, force_mapping)
-    if forced:
-        eff = forced
-    if not eff:
-        return ""
-    if (snapshot or {}).get("enable_humo_hosts"):
-        return eff
-    roles = NEVER_HUMO_VIDEO_ROLES if never_humo_roles is None else never_humo_roles
-    if role_s not in roles:
-        return eff
-    return str(redirect_target) if redirect_applies(eff) else eff
+    forced = forced_engine_for_role(str(role or ""), force_mapping)
+    return forced or str(engine_id or "")
 
 
 def _render_driver():
@@ -195,16 +157,9 @@ def effective_engine_for_role(role, engine_id, *, snapshot=None, driver=None) ->
     The convenience wrapper every former mirror now calls. Fail-closed on a
     malformed force map.
     """
-    rd = driver if driver is not None else _render_driver()
     snap = routing_env_snapshot() if snapshot is None else snapshot
-    mapping = parse_force_map(snap.get("force_engine_map", ""), driver=rd)
-    return resolve_effective_engine(
-        role, engine_id,
-        snapshot=snap,
-        force_mapping=mapping,
-        redirect_applies=rd._radio_is_host_redirect_applies,
-        redirect_target=rd._NEVER_HUMO_REDIRECT_ENGINE,
-    )
+    mapping = parse_force_map(snap.get("force_engine_map", ""), driver=driver)
+    return resolve_effective_engine(role, engine_id, force_mapping=mapping)
 
 
 def freeze_role_engines(video_models, *, snapshot=None, driver=None,
@@ -215,9 +170,8 @@ def freeze_role_engines(video_models, *, snapshot=None, driver=None,
     slot is empty are OMITTED (an empty pick has no effective engine, and
     inventing one would let a blank slot silently acquire a route).
     """
-    rd = driver if driver is not None else _render_driver()
     snap = routing_env_snapshot() if snapshot is None else snapshot
-    mapping = parse_force_map(snap.get("force_engine_map", ""), driver=rd)
+    mapping = parse_force_map(snap.get("force_engine_map", ""), driver=driver)
     try:
         from . import role_slots as _rs  # type: ignore
     except ImportError:  # pragma: no cover -- flat test imports
@@ -228,11 +182,6 @@ def freeze_role_engines(video_models, *, snapshot=None, driver=None,
         picked = str(_rs.engine_id_for_role(video_models or {}, role) or "")
         if not picked:
             continue
-        out[str(role)] = resolve_effective_engine(
-            role, picked,
-            snapshot=snap,
-            force_mapping=mapping,
-            redirect_applies=rd._radio_is_host_redirect_applies,
-            redirect_target=rd._NEVER_HUMO_REDIRECT_ENGINE,
-        )
+        out[str(role)] = resolve_effective_engine(role, picked,
+                                                  force_mapping=mapping)
     return out

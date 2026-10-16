@@ -934,12 +934,11 @@ def test_engine_non_invocable_preflight_check(monkeypatch):
     assert res["engine_id"] == "still_pan"
 
 
-def test_preflight_uses_effective_redirected_engine_for_humo_bookend(monkeypatch):
-    """A HuMo policy pick for music/announcer bookends is structurally routed
-    by build_request_from_shot before render. Cast-time preflight must validate
-    that effective audio-in request, not the raw HuMo candidate, or it falsely
-    halts on missing HuMo init_image."""
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+def test_preflight_keeps_humo_bookend_on_humo(monkeypatch):
+    """A HuMo policy pick for a music/announcer bookend stays HuMo (the picked
+    lane is the lane; no redirect). Cast-time preflight validates the HuMo
+    candidate itself, and the missing radio_host_portrait init image defers to
+    the image phase instead of halting at cast time."""
     beats = [{"beat_id": "b1", "role": "music_visual", "char_id": "",
               "dur_s": 2.0}]
     budget = {"total_frames": 50, "per_beat": {"b1": 50}}
@@ -962,12 +961,11 @@ def test_preflight_uses_effective_redirected_engine_for_humo_bookend(monkeypatch
 
 
 def test_preflight_keeps_cloud_engine_bookend_cloud(monkeypatch):
-    """Cloud selections must not be validated as redirected local LTX.
+    """Cloud selections must never be validated as a local LTX lane.
     The selected Partner engine owns the request shape."""
     import nodes._otr_video_engines  # noqa: F401  self-register cloud engines
     from nodes._otr_video_engines import render_driver as rd
 
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     orig_required = rd._required_inputs_for_engine
     seen = []
 
@@ -993,15 +991,13 @@ def test_preflight_keeps_cloud_engine_bookend_cloud(monkeypatch):
     assert groups[0]["engine_id"] == "cloud_wan_i2v"
     assert shots[0]["engine_id"] == "cloud_wan_i2v"
     assert "cloud_wan_i2v" in seen
-    assert rd._NEVER_HUMO_REDIRECT_ENGINE not in seen
+    assert "ltx25_audio_in_16gb" not in seen
 
 
-def test_preflight_accepts_redirected_announcer_bookend(monkeypatch):
-    """The announcer half of the redirect above: a HuMo announcer pick is
-    validated as the effective audio-in request, whose scene still is present
-    and whose ambient audio RenderBatch supplies later, so ShotLock does not
-    halt on it."""
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
+def test_preflight_accepts_humo_announcer_bookend(monkeypatch):
+    """The announcer half of the test above: a HuMo announcer pick stays HuMo,
+    and its radio_host_portrait init image and ambient audio (which RenderBatch
+    supplies later) defer, so ShotLock does not halt on it."""
     beats = [{"beat_id": "b3", "role": "announcer_visual", "char_id": "",
               "dur_s": 2.0}]
     budget = {"total_frames": 50, "per_beat": {"b3": 50}}
@@ -1025,7 +1021,6 @@ def test_preflight_defers_ltx_ambient_audio_to_render_batch(monkeypatch):
     """ShotLock cannot slice the frozen master mix because RenderBatch owns
     master_audio_path. Ambient-audio lanes must not freeze-halt at cast time
     when line timing is absent; render-time still supplies the bounded slice."""
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     beats = [{"beat_id": "b6", "role": "music_visual", "char_id": ""}]
     budget = {"total_frames": 50, "per_beat": {"b6": 50}}
     policy = {"video_models": {"music_video_model": "ltx25_audio_in_16gb"}}
@@ -1057,7 +1052,6 @@ def test_preflight_defers_seedance_scene_still_to_image_phase(monkeypatch):
     """Seedance's engine contract requires init_image even though its family
     minimum is text+audio. ShotLock runs before the image dispatcher writes the
     scene still, so this specific image gap defers instead of freeze-halting."""
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     beats = [{"beat_id": "b000_music_open", "role": "music_visual",
               "char_id": "", "dur_s": 2.0}]
     budget = {"total_frames": 50, "per_beat": {"b000_music_open": 50}}
@@ -1080,7 +1074,6 @@ def test_preflight_defers_humo_init_image_to_image_phase(monkeypatch):
     """ShotLock runs before OTR_ImageGenDispatcher, so a character HuMo pick
     must not freeze-halt just because the portrait row has not been written
     into the ledger yet."""
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     beats = [{"beat_id": "b2", "role": "character_video", "char_id": "c2",
               "dur_s": 2.0}]
     budget = {"total_frames": 50, "per_beat": {"b2": 50}}

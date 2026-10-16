@@ -107,7 +107,6 @@ def test_no_single_clause_covers_both_shipped_engines():
 
 def test_a_forced_seedance_classifies_exactly_as_a_picked_one(monkeypatch):
     """`OTR_FORCE_ENGINE_MAP` must not be able to smuggle a cloud row local."""
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     snap = rf.routing_env_snapshot({"OTR_FORCE_ENGINE_MAP": "*=%s" % SEEDANCE})
     forced = rf.effective_engine_for_role(
         "announcer", "ltx25_high_video", snapshot=snap)
@@ -116,7 +115,6 @@ def test_a_forced_seedance_classifies_exactly_as_a_picked_one(monkeypatch):
 
 
 def test_a_forced_omni_classifies_exactly_as_a_picked_one(monkeypatch):
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     snap = rf.routing_env_snapshot({"OTR_FORCE_ENGINE_MAP": "*=%s" % OMNI})
     forced = rf.effective_engine_for_role(
         "announcer", "ltx25_high_video", snapshot=snap)
@@ -126,7 +124,6 @@ def test_a_forced_omni_classifies_exactly_as_a_picked_one(monkeypatch):
 
 def test_forcing_a_local_engine_over_a_cloud_pick_flips_the_verdict(monkeypatch):
     """The verdict follows the EFFECTIVE engine, not the picked one."""
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     snap = rf.routing_env_snapshot({"OTR_FORCE_ENGINE_MAP": "*=still_flat"})
     forced = rf.effective_engine_for_role("announcer", SEEDANCE,
                                           snapshot=snap)

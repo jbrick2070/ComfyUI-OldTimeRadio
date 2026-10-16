@@ -63,12 +63,14 @@ class TestRoleConstants:
 
 
 # ---------------------------------------------------------------------------
-# is_never_humo_role
+# is_radio_host_role
 # ---------------------------------------------------------------------------
 
-class TestNeverHumoRoles:
-    """Only character dialogue gets a HuMo face render; announcer and the
-    music tiers get radio-console coverage (BUG-LOCAL-134, 2026-05-01)."""
+class TestRadioHostRoles:
+    """Announcer and the music tiers are the RADIO-HOST roles: the radio is the
+    host (BUG-LOCAL-134, 2026-05-01). Character dialogue is not. This table is
+    only a role classifier -- it never rewrites a picked engine (operator
+    2026-10-15: the picked lane is the lane)."""
 
     @pytest.mark.parametrize("role", [
         SR.SPEAKER_ROLE_ANNOUNCER,
@@ -76,13 +78,11 @@ class TestNeverHumoRoles:
         SR.SPEAKER_ROLE_MUSIC_CLOSE,
         SR.SPEAKER_ROLE_MUSIC_INTER,
     ])
-    def test_never_humo_roles_include_announcer_and_music(self, role):
-        # The radio IS the host -- announcer voice plays under the
-        # animated radio, no face render.
-        assert SR.is_never_humo_role(role) is True
+    def test_radio_host_roles_include_announcer_and_music(self, role):
+        assert SR.is_radio_host_role(role) is True
 
-    def test_only_character_can_use_humo(self):
-        assert SR.is_never_humo_role(SR.SPEAKER_ROLE_CHARACTER) is False
-        routed_to_humo = [r for r in SR.VALID_SPEAKER_ROLES
-                          if not SR.is_never_humo_role(r)]
-        assert routed_to_humo == [SR.SPEAKER_ROLE_CHARACTER]
+    def test_only_character_is_not_a_radio_host_role(self):
+        assert SR.is_radio_host_role(SR.SPEAKER_ROLE_CHARACTER) is False
+        non_host = [r for r in SR.VALID_SPEAKER_ROLES
+                    if not SR.is_radio_host_role(r)]
+        assert non_host == [SR.SPEAKER_ROLE_CHARACTER]

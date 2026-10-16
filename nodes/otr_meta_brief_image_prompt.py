@@ -277,19 +277,12 @@ def radio_host_negative(style: str = "console_face") -> str:
         "(radio_head_person was retired 2026-07-04 -- radio-face logic.)"
         % (style, _RADIO_HOST_STYLES))
 
-#: The ONE animatable radio-HOST FACE object minted per episode under
-#: OTR_ENABLE_HUMO_HOSTS (its own object_id, NOT a cast char_id). render_driver
+#: The ONE animatable radio-HOST FACE object minted per episode whenever an
+#: announcer/music bookend is on HuMo (its own object_id, NOT a cast char_id). render_driver
 #: resolves it as the HuMo init_image for the LINELESS announcer/music bookends
 #: (which have no cast portrait). MUST match the render_driver + dispatcher
 #: literals (kept in sync by string, cross-referenced in those files).
 RADIO_HOST_PORTRAIT_ID = "radio_host_portrait"
-
-#: Toggle: default OFF = byte-identical (no radio-host FACE object minted; the
-#: bookends keep today's audio-in animated-console behavior).
-def _humo_hosts_enabled() -> bool:
-    """True iff OTR_ENABLE_HUMO_HOSTS is opted ON (default OFF)."""
-    return otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
-
 
 def _radio_face_overtness(meta) -> str:
     """Brief-driven overtness of the radio face (operator: 'brief-driven mix').
@@ -1962,18 +1955,13 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # radio-host visual contract. The negative is populated on the object row.
         if _is_announcer_row:
             # RADIO FACE LOGIC (2026-07-04): the announcer portrait gets a FACE
-            # only when an AUDIO-DRIVEN engine will animate it -- i.e. HuMo hosts
-            # opted ON AND the RESOLVED announcer engine family (after
-            # OTR_FORCE_ENGINE_MAP) is audio_driven_face. Otherwise (default env,
-            # static/i2v engine, or a force-map to a static engine) it is the
-            # FACELESS radio_object. The env flag stays a conjunct because it
-            # gates whether HuMo survives to the announcer at render (else
-            # _enforce_radio_is_host redirects it to ltx25_audio_in_16gb).
-            # The chosen
+            # only when an AUDIO-DRIVEN engine will animate it -- i.e. the
+            # RESOLVED announcer engine family (after OTR_FORCE_ENGINE_MAP) is
+            # audio_driven_face. Otherwise (static/i2v engine, or a force-map to
+            # a static engine) it is the FACELESS radio_object. The chosen
             # style is STAMPED (radio_host_style) so the cross-node render guard
             # can fail CLOSED on a stale ledger (BUG-LOCAL-129 face-only failure).
-            _humo_face = (_humo_hosts_enabled()
-                          and _effective_announcer_family(video_models)
+            _humo_face = (_effective_announcer_family(video_models)
                           == "audio_driven_face")
             _astyle = "console_face" if _humo_face else "radio_object"
             _aprompt = build_radio_host_prompt(meta, _aspect,
@@ -2123,7 +2111,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             and _effective_video_family_for_role(video_models, role)
             == "audio_driven_face")
     )
-    if _humo_hosts_enabled() and _radio_host_roles:
+    if _radio_host_roles:
         _rh_role = _radio_host_roles[0]
         _rh_aspect = _role_aspects.get(_rh_role) or "portrait"
         _rh_prompt = build_radio_host_prompt(meta, _rh_aspect,

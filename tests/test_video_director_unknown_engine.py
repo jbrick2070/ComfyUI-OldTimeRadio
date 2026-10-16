@@ -42,7 +42,7 @@ def _direct(monkeypatch, announcer="still_flat", music="still_flat",
     Same harness shape as tests/test_route_freeze_wiring.py: routing env
     cleared first so a developer's shell cannot leak a force map into a pin.
     """
-    for key in ("OTR_FORCE_ENGINE_MAP", "OTR_ENABLE_HUMO_HOSTS"):
+    for key in ("OTR_FORCE_ENGINE_MAP",):
         monkeypatch.delenv(key, raising=False)
     for key, val in env.items():
         monkeypatch.setenv(key, val)
@@ -103,25 +103,19 @@ def test_unresolved_custom_slot_is_still_a_warning_not_a_raise(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 4. A redirect's OUTPUT is validated; the check never fires on a valid one.
+# 4. A HuMo bookend pick is frozen AS PICKED (no redirect), and passes.
 # --------------------------------------------------------------------------- #
-def test_humo_redirect_output_is_registered_and_passes(monkeypatch):
-    """With OTR_ENABLE_HUMO_HOSTS unset, a humo pick freezes to the
-    ltx25_audio_in_16gb redirect. Both the pick (humo, registered) and
-    the effective engine (ltx25_audio_in_16gb, registered) satisfy the
-    boundary -- pinning that validation runs on the union without
-    double-charging the redirect.
+def test_humo_bookend_pick_stays_humo_and_passes(monkeypatch):
+    """A humo pick on announcer_visual freezes to humo itself -- the picked
+    lane is the lane (operator 2026-10-15), never ltx25_audio_in_16gb. The
+    pick is registered, so the membership boundary accepts it.
 
-    EXACT on purpose (QA finding, 2026-08-23): the harness deletes
-    OTR_ENABLE_HUMO_HOSTS before every call, so the redirect is deterministic
-    here and `eff` can never legitimately be "humo". The first draft asserted
-    membership in {redirect target, "humo"}, under which a regression that
-    silently disabled the radio-is-host redirect would have slipped through."""
+    EXACT on purpose: the harness deletes OTR_FORCE_ENGINE_MAP before every
+    call, so the effective engine is the picked one and nothing else."""
     policy = _direct(monkeypatch, announcer="humo")
     eff = policy["effective_video_models"]["announcer_visual"]
-    assert eff == "ltx25_audio_in_16gb"
-    # and the director accepted both halves of the redirect pair -- reaching
-    # this line IS the assertion that no ValueError fired.
+    assert eff == "humo"
+    assert eff != "ltx25_audio_in_16gb"
 
 
 # --------------------------------------------------------------------------- #

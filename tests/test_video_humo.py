@@ -42,11 +42,11 @@ def test_humo_registered_and_dark():
     assert eng.default_roles == ()                 # not a default
     assert eng.requires_flag is None               # registry IS the menu (no flag gate)
     assert eng.required_inputs == ("audio_ref", "init_image")
-    # RADIO IS THE HOST (2026-06-30, reversing Route-A 2026-06-28): HuMo serves
-    # ONLY character_video now. This tuple is UI-SORT/self-description metadata
-    # only -- role_compat.engine_fits_role (below) is capability-only and does
-    # not consult it; the actual hard gate against announcer/music is
-    # render_driver._enforce_radio_is_host.
+    # This tuple is UI-SORT/self-description metadata only --
+    # role_compat.engine_fits_role (below) is capability-only and does not
+    # consult it. A HuMo pick on announcer/music is NOT rewritten by anything
+    # (operator 2026-10-15, "the picked lane is the lane"): it stays HuMo and
+    # renders the brief-driven radio-with-a-face host.
     assert eng.roles == ("character_video",)
     assert eng.declared_isolation == mc.ISOLATION_IN_PROCESS
     assert eng.binds_seed is True
@@ -71,11 +71,8 @@ def test_registry_humo_selectable_no_flag(monkeypatch):
     # Registry IS the menu: humo is usable for NO flag gate. assert_usable is
     # CAPABILITY-only (role_compat.engine_fits_role) and does NOT consult the
     # `.roles` whitelist, so it still passes announcer_visual/music_visual here
-    # -- capability-FIT is necessary but no longer SUFFICIENT for those two
-    # roles; render_driver._enforce_radio_is_host is the separate, higher-level
-    # policy gate that redirects any such real dispatch to the configured
-    # never-HuMo audio-in engine (2026-06-30 HuMo-improve plan, "the radio is
-    # the host").
+    # -- and nothing downstream redirects such a pick: the picked lane is the
+    # lane (operator 2026-10-15).
     monkeypatch.delenv("OTR_ENABLE_HUMO", raising=False)
     for role in ("announcer_visual", "music_visual", "character_video"):
         assert vreg.assert_usable("humo", role) == "humo"

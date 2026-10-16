@@ -671,45 +671,32 @@ def test_apply_engine_override_bad_spec_fails_closed(monkeypatch):
 
 
 def test_resolve_final_shot_engines_runs_both_mutations(monkeypatch):
-    """The route lock resolves force map AND radio-host redirect in one pass."""
+    """The route lock resolves the force map in one pass."""
     led = _two_shot_ledger()
     led["video"]["shots"][0]["role"] = "character_video"
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx25_video")
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     out = rd.resolve_final_shot_engines(led)
     assert out["video"]["shots"][0]["engine_id"] == "ltx25_video"
 
 
-def test_resolve_final_shot_engines_redirects_humo_bookend(monkeypatch):
-    """An announcer_visual beat picked onto local HuMo is redirected BEFORE
-    the caller validates the still spine -- the ordering defect this pass
-    exists to close (kibitz per-beat-stills r1, both seats)."""
-    led = _two_shot_ledger()
-    shot = led["video"]["shots"][0]
-    shot["role"] = "announcer_visual"
-    shot["engine_id"] = "humo"
-    shot["family"] = "audio_driven_face"
+def test_resolve_final_shot_engines_leaves_humo_bookend_on_humo(monkeypatch):
+    """THE PICKED LANE IS THE LANE: an announcer_visual / music_visual beat
+    picked onto local HuMo keeps its HuMo engine through the route lock. There
+    is no radio-host redirect to ltx25_audio_in_16gb any more (operator
+    2026-10-15); a HuMo run must never plan an LTX lane nobody picked."""
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    rd.resolve_final_shot_engines(led)
-    assert shot["engine_id"] == rd._NEVER_HUMO_REDIRECT_ENGINE
-    # and it is IDEMPOTENT -- a second pass must not re-redirect or throw
-    rd.resolve_final_shot_engines(led)
-    assert shot["engine_id"] == rd._NEVER_HUMO_REDIRECT_ENGINE
-
-
-def test_resolve_final_shot_engines_humo_hosts_on_keeps_portrait(monkeypatch):
-    """With OTR_ENABLE_HUMO_HOSTS=1 the redirect is a no-op, so a portrait
-    HuMo bookend keeps its portrait engine through the lock."""
-    led = _two_shot_ledger()
-    shot = led["video"]["shots"][0]
-    shot["role"] = "announcer_visual"
-    shot["engine_id"] = "humo"
-    shot["family"] = "audio_driven_face"
-    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
-    rd.resolve_final_shot_engines(led)
-    assert shot["engine_id"] == "humo"
+    for role in ("announcer_visual", "music_visual"):
+        led = _two_shot_ledger()
+        shot = led["video"]["shots"][0]
+        shot["role"] = role
+        shot["engine_id"] = "humo"
+        shot["family"] = "audio_driven_face"
+        rd.resolve_final_shot_engines(led)
+        assert shot["engine_id"] == "humo"
+        assert shot["family"] == "audio_driven_face"
+        # and it is IDEMPOTENT -- a second pass changes nothing
+        rd.resolve_final_shot_engines(led)
+        assert shot["engine_id"] == "humo"
 
 
 # --------------------------------------------------------------------------- #

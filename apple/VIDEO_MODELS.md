@@ -131,9 +131,10 @@ change the sound**, below.
 
 This is the talking-head path: it takes a portrait and the beat's voice track
 and moves the mouth to it. Every HuMo lane is a large download and wants a
-16 GB card. HuMo animates characters only: on the announcer and music roles a
-HuMo pick runs as `ltx25_audio_in_16gb` instead, unless `OTR_ENABLE_HUMO_HOSTS=1`,
-so that lane's files (about 25 GB) download too.
+16 GB card. HuMo only animates faces, so on the announcer and music roles
+a HuMo pick animates a radio with a face, a still made from the story brief.
+It never shows a person and never swaps to another lane. Every role renders
+on the lane you picked for it.
 
 ### MiniMax H3
 

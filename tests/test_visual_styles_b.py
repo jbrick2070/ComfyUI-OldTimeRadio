@@ -87,7 +87,6 @@ _OPEN_STILLS = {"images": [
 @pytest.fixture()
 def _bookend_env(monkeypatch):
     monkeypatch.delenv("OTR_LTX_OPEN_MOTION_KEY", raising=False)
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
 
 
 # ---------------------------------------------------------------------------

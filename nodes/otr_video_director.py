@@ -467,8 +467,7 @@ class OTRVideoDirector:
         """Re-run whenever the ROUTING ENVIRONMENT changes (2026-07-25, 1b).
 
         This node is where effective routing is FROZEN, and it freezes state
-        that lives outside its inputs: ``OTR_FORCE_ENGINE_MAP`` and
-        ``OTR_ENABLE_HUMO_HOSTS``. Without this, ComfyUI would serve a cached
+        that lives outside its inputs: ``OTR_FORCE_ENGINE_MAP``. Without this, ComfyUI would serve a cached
         policy across an env change and every downstream consumer -- MetaBrief,
         ShotLock, the dispatcher -- would plan against a route the operator has
         already changed. Widget-only changes are still handled by ComfyUI's
@@ -650,12 +649,11 @@ class OTRVideoDirector:
             # Opaque to everyone who does not size stills.
             #
             # EFFECTIVE, NOT PICKED (2026-07-25, chunk 1b) -- this was a LIVE
-            # DEFAULT-ENV BUG, not a latent one. Picking a portrait HuMo for
-            # announcer_visual with OTR_ENABLE_HUMO_HOSTS unset redirects the
-            # render to the WIDE audio-in redirect target, but the aspect map was
-            # derived from the PICKED portrait engine -- so a 832x1216 portrait
-            # still was minted and the wide render centre-cropped it, lopping
-            # the subject's head off.
+            # DEFAULT-ENV BUG, not a latent one. When a role was rerouted, the
+            # aspect map was derived from the PICKED engine -- so a 832x1216
+            # portrait still was minted and the wide render centre-cropped it,
+            # lopping the subject's head off. The force map is the one reroute
+            # left, and it is honoured here.
             "aspects": self._role_aspects(resolved_video, effective_video),
             # A '+ Add Custom Model' image pick is resolved HERE, from this
             # node's custom_models_json, and leaves as the bare engine id

@@ -73,9 +73,8 @@ MOUTH_NONE = "none"
 
 #: The video roles the house rule assigns to the CABINET: the announcer (who
 #: IS the station) and the music bookends. Mirrors the role vocabulary
-#: ``render_driver._VIDEO_ROLE_NEVER_HUMO_PROXY`` dispatches on -- the same two
-#: roles that are structurally redirected away from HuMo, for the same reason
-#: ("the radio IS the host", BUG-LOCAL-129).
+#: ``render_driver._VIDEO_ROLE_RADIO_HOST_PROXY`` dispatches on -- the same two
+#: roles that never show a person ("the radio IS the host", BUG-LOCAL-129).
 SET_SPEAKS_ROLES = ("announcer_visual", "music_visual")
 
 

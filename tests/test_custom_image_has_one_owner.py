@@ -21,7 +21,7 @@ SLOTS = ("announcer_image_model", "music_image_model", "character_image_model")
 
 
 def _video_policy(monkeypatch, custom, **image_picks):
-    for key in ("OTR_FORCE_ENGINE_MAP", "OTR_ENABLE_HUMO_HOSTS"):
+    for key in ("OTR_FORCE_ENGINE_MAP",):
         monkeypatch.delenv(key, raising=False)
     picks = {slot: image_picks.get(slot, "flux_gen1") for slot in SLOTS}
     (raw,) = vd.OTRVideoDirector().direct(

@@ -182,7 +182,6 @@ class TestSliceMasterAudio:
 # --------------------------------------------------------------------------- #
 class TestAmbientAudioMusicBeatGap:
     def test_uses_ambient_master_audio_scope(self, monkeypatch):
-        monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
         # The audio-in family + the viz_green engine = ambient master lanes.
         assert rd._uses_ambient_master_audio(
             "ltx25_audio_in_16gb", "audio_conditioned_video") is True
@@ -267,21 +266,48 @@ class TestAmbientAudioMusicBeatGap:
         assert captured["start"] == pytest.approx(1.0)
 
 # --------------------------------------------------------------------------- #
-# 2026-06-30 HuMo-improve plan -- "radio is the host" (reversing Route-A
-# 2026-06-28): announcer_visual / music_visual must NEVER dispatch a HuMo-
-# family (audio_driven_face) engine. Wires the previously-dormant
-# nodes._otr_speaker_role.is_never_humo_role into real render_driver dispatch.
+# Radio-host roles (announcer_visual / music_visual) and the NO-REDIRECT rule.
+# Operator 2026-10-15: "the picked lane is the lane -- no switcheroo". The old
+# radio-is-host guard that rewrote a HuMo bookend pick onto ltx25_audio_in_16gb
+# is deleted; _is_radio_host_video_role (a proxy over the canonical
+# nodes._otr_speaker_role.is_radio_host_role table) now only CLASSIFIES roles
+# (ambient master audio, radio_host_portrait init). It never rewrites an engine.
 # --------------------------------------------------------------------------- #
-class TestRadioIsHostGuard:
-    def test_music_and_announcer_humo_picks_redirect_to_the_audio_in_lane(self):
+class TestRadioHostRoles:
+    def test_music_and_announcer_humo_picks_stay_humo(self):
+        # The operator bug: a HuMo pick on a bookend role must keep its
+        # engine id AND its family through resolve_final_shot_engines -- the
+        # run must never plan the ltx25_audio_in_16gb lane nobody picked.
         for role, engine_id in (("music_visual", "humo"),
                                 ("announcer_visual", "humo_1.7B")):
-            shot = {"shot_id": "s", "beat_id": "b", "role": role,
-                    "engine_id": engine_id, "family": "audio_driven_face"}
-            rd._enforce_radio_is_host(shot)
-            assert shot["engine_id"] == "ltx25_audio_in_16gb", (
-                role, engine_id)
-            assert shot["family"] == "audio_conditioned_video", (role, engine_id)
+            ledger = {"video": {"fps": 25, "shots": [
+                {"shot_id": "s", "beat_id": "b", "role": role,
+                 "engine_id": engine_id, "family": "audio_driven_face"}]}}
+            rd.resolve_final_shot_engines(ledger)
+            shot = ledger["video"]["shots"][0]
+            assert shot["engine_id"] == engine_id, (role, engine_id)
+            assert shot["family"] == "audio_driven_face", (role, engine_id)
+
+    def test_build_request_from_shot_leaves_a_humo_music_shot_on_humo(self, tmp_path):
+        # build_request_from_shot (the REAL episode path) must not rewrite the
+        # shot either: the minted radio_host_portrait FACE is the init image.
+        face = tmp_path / "radio_host.png"
+        face.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
+        ledger = {
+            "video": {"fps": 25, "shots": [
+                {"shot_id": "shot_b000", "target_frame_count": 50}]},
+            "lines": [{"line_id": "b000", "start_s": 0.0, "dur_s": 2.0}],
+            "images": {"images": [{"object_id": "radio_host_portrait",
+                                   "kind": "portrait", "path": str(face)}]},
+        }
+        shot = {"shot_id": "shot_b000", "beat_id": "b000", "role": "music_visual",
+                "engine_id": "humo", "family": "audio_driven_face",
+                "target_frame_count": 50, "source_line_ids": [],
+                "char_id": "", "creative": {}}
+        req = rd.build_request_from_shot(shot, ledger)
+        assert shot["engine_id"] == "humo"
+        assert shot["family"] == "audio_driven_face"
+        assert req["observability"]["init_source"] == "radio_host_portrait"
 
     def test_all_cloud_video_section_skips_local_reclaim(self):
         section = {"shots": [
@@ -304,53 +330,50 @@ class TestRadioIsHostGuard:
             "ltx25_audio_in_16gb", "cloud_seedance_2") is False
 
     def test_character_video_humo_is_untouched(self):
-        # character_video is the ONLY role HuMo may still serve (real dialogue
-        # lip-sync) -- the guard must be a no-op here.
-        shot = {"shot_id": "s", "beat_id": "b", "role": "character_video",
-                "engine_id": "humo_14B_169", "family": "audio_driven_face"}
-        rd._enforce_radio_is_host(shot)
+        # character_video is not a radio-host role and keeps its HuMo pick.
+        ledger = {"video": {"fps": 25, "shots": [
+            {"shot_id": "s", "beat_id": "b", "role": "character_video",
+             "engine_id": "humo_14B_169", "family": "audio_driven_face"}]}}
+        rd.resolve_final_shot_engines(ledger)
+        shot = ledger["video"]["shots"][0]
         assert shot["engine_id"] == "humo_14B_169"
         assert shot["family"] == "audio_driven_face"
 
     def test_non_humo_bookend_engine_is_untouched(self):
-        # A non-audio_driven_face engine on a bookend role is already fine (the
-        # operator picked viz_green / an audio-in lane themselves) -- no-op.
-        shot = {"shot_id": "s", "beat_id": "b", "role": "music_visual",
-                "engine_id": "viz_green", "family": "abstract"}
-        rd._enforce_radio_is_host(shot)
+        # A non-audio_driven_face engine on a bookend role is the operator's
+        # own pick (viz_green / an audio-in lane) -- left exactly as picked.
+        ledger = {"video": {"fps": 25, "shots": [
+            {"shot_id": "s", "beat_id": "b", "role": "music_visual",
+             "engine_id": "viz_green", "family": "abstract"}]}}
+        rd.resolve_final_shot_engines(ledger)
+        shot = ledger["video"]["shots"][0]
         assert shot["engine_id"] == "viz_green"
         assert shot["family"] == "abstract"
 
-    def test_retired_role_a_and_retired_role_b_are_not_gated(self):
-        # These roles cannot supply audio_ref in the first place (role_compat),
-        # so HuMo could never land here in practice -- confirm the guard is
-        # still correctly scoped to only the two bookend roles either way.
+    def test_retired_role_a_and_retired_role_b_are_not_radio_host_roles(self):
         for role in ("retired_role_a", "retired_role_b"):
-            shot = {"shot_id": "s", "beat_id": "b", "role": role,
-                    "engine_id": "humo", "family": "audio_driven_face"}
-            rd._enforce_radio_is_host(shot)
-            assert shot["engine_id"] == "humo"
+            ledger = {"video": {"fps": 25, "shots": [
+                {"shot_id": "s", "beat_id": "b", "role": role,
+                 "engine_id": "humo", "family": "audio_driven_face"}]}}
+            rd.resolve_final_shot_engines(ledger)
+            assert ledger["video"]["shots"][0]["engine_id"] == "humo"
+            assert rd._is_radio_host_video_role(role) is False
 
-    def test_is_never_humo_video_role_proxies_the_canonical_speaker_role_table(self):
+    def test_is_radio_host_video_role_proxies_the_canonical_speaker_role_table(self):
         # The video-role check is a thin proxy over the canonical LEDGER
-        # speaker_role policy (_otr_speaker_role.is_never_humo_role) -- not a
+        # speaker_role policy (_otr_speaker_role.is_radio_host_role) -- not a
         # second, independently-maintained list.
-        assert rd._is_never_humo_video_role("announcer_visual") is True
-        assert rd._is_never_humo_video_role("music_visual") is True
-        assert rd._is_never_humo_video_role("character_video") is False
-        assert rd._is_never_humo_video_role("retired_role_a") is False
-        assert rd._is_never_humo_video_role("not_a_role") is False
+        assert rd._is_radio_host_video_role("announcer_visual") is True
+        assert rd._is_radio_host_video_role("music_visual") is True
+        assert rd._is_radio_host_video_role("character_video") is False
+        assert rd._is_radio_host_video_role("retired_role_a") is False
+        assert rd._is_radio_host_video_role("not_a_role") is False
 
-    def test_build_request_from_shot_applies_guard_before_engine_keyed_logic(self):
-        """End-to-end: build_request_from_shot (the REAL episode path) applies
-        the redirect BEFORE any engine-keyed branch runs, so a HuMo-picked
-        bookend is already the audio-in lane by the time init_image/canvas/audio
-        are resolved -- proving the guard is WIRED IN, not just defined. The
-        redirected bookend then fails LOUD on the missing scene still (this
-        bare ledger mints none) -- which itself proves the ordering: HuMo's
-        audio_driven_face family is excluded from the scene-init requirement,
-        so that check only runs because the redirect already stamped the
-        audio-in lane."""
+    def test_humo_bookend_without_a_face_still_fails_loud_and_stays_humo(self):
+        """End-to-end: with no radio_host_portrait in the ledger, a HuMo
+        announcer bookend fails LOUD (never a black screen, never a silent
+        swap onto another lane) and the shot is still the HuMo the operator
+        picked."""
         import pytest
         ledger = {
             "video": {"fps": 25, "shots": [
@@ -363,10 +386,10 @@ class TestRadioIsHostGuard:
                 "target_frame_count": 50, "source_line_ids": ["b000"],
                 "creative": {}}
         with pytest.raises(rd.DeferredImageGapError,
-                           match="ltx25_audio_in_16gb.*NO scene still"):
+                           match="No radio_host_portrait FACE still is in the ledger"):
             rd.build_request_from_shot(shot, ledger)
-        assert shot["engine_id"] == "ltx25_audio_in_16gb"
-        assert shot["family"] == "audio_conditioned_video"
+        assert shot["engine_id"] == "humo"
+        assert shot["family"] == "audio_driven_face"
 
 
 # --------------------------------------------------------------------------- #
