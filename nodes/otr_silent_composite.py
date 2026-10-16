@@ -463,6 +463,14 @@ def _probe_audio_duration(path):
 #: env read): the underrun check is TERMINAL, so any shortfall is fatal.
 
 
+class UpscaleEngineFailed(RuntimeError):
+    """The upscale MODEL itself failed on a frame (``upscale_frames`` raised or
+    returned output that fails validation). Raised only from the model loop, so
+    the composite can redo the timeline on ``off`` for a ``degrades_to_off``
+    engine WITHOUT swallowing anything else -- an ffmpeg failure, a refused
+    executable, a beat underrun or the frame-count check all propagate as-is."""
+
+
 class ClipUnderrunsItsBeat(RuntimeError):
     """A real clip is SHORTER than the beat it must cover, at composite time.
 
@@ -1064,10 +1072,16 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
             # engine.device (Antigravity r3 MF-3) -- public property, never
             # reach into engine._descriptor.
             bhwc = torch.from_numpy(arr).to(engine.device).float() / 255.0
-            out_bhwc = engine.upscale_frames(bhwc)
-            _validate_engine_output(
-                out_bhwc, expected_scale=int(engine.intrinsic_scale),
-                in_shape=bhwc.shape)
+            try:
+                out_bhwc = engine.upscale_frames(bhwc)
+                _validate_engine_output(
+                    out_bhwc, expected_scale=int(engine.intrinsic_scale),
+                    in_shape=bhwc.shape)
+            except Exception as exc:  # noqa: BLE001 -- re-raised, typed
+                raise UpscaleEngineFailed(
+                    "%s failed on frame %d of %s (%s: %s)" % (
+                        engine.name, frames_written, os.path.basename(src),
+                        type(exc).__name__, exc)) from exc
             out_bhwc = _fit(out_bhwc, int(w), int(h))
             # .contiguous() before .numpy() -- non-contiguous tensors after a
             # permute would raise or corrupt strides (Antigravity r4 MF-2).
@@ -1823,7 +1837,7 @@ class OTRSilentComposite:
                             h=int(canvas_h), fps=eff_fps, ffmpeg=ffmpeg,
                             engine=engine,
                         )
-                    except Exception as exc:  # noqa: BLE001 -- gated below
+                    except UpscaleEngineFailed as exc:
                         # THE SAME DEGRADE AS AT LOAD, ONE STEP LATER
                         # (2026-10-15). The load gate above proves an optional
                         # accelerator starts; it cannot prove it survives a
@@ -1832,8 +1846,11 @@ class OTRSilentComposite:
                         # here instead. For a `degrades_to_off` engine that
                         # must not cost the episode either: unload it and
                         # composite again on the off (lanczos) path, which
-                        # overwrites the partial output. Any other engine, or
-                        # a failure the off path repeats, still raises.
+                        # overwrites the partial output. Only the MODEL's own
+                        # failure (UpscaleEngineFailed) is caught: an ffmpeg
+                        # error, a refused executable or a beat underrun is not
+                        # the upscaler's and propagates untouched. Any other
+                        # engine, or a failure the off path repeats, raises.
                         if not (_engine_active
                                 and getattr(engine, "degrades_to_off", False)):
                             raise

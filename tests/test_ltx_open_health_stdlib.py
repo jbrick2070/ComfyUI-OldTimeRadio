@@ -105,6 +105,9 @@ class LtxOpenHealthTests(unittest.TestCase):
                              "ltx25_mime_24gb",
                              "ltx25_audio_in_16gb",
                              "ltx25_audio_in_24gb",
+                             # 2026-10-15: the 8 GB single-stage lanes.
+                             "ltx25_video_8gb", "ltx25_foley_8gb",
+                             "ltx25_mime_8gb", "ltx25_audio_in_8gb",
                          })
 
     def test_every_registered_ltx25_lane_is_in_the_allowlist(self):

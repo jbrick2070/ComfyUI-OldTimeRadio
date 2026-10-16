@@ -324,7 +324,7 @@ def test_rtx_vsr_failing_mid_composite_redoes_it_with_off(tmp_path, monkeypatch)
     def assemble(*a, **kw):
         calls.append(kw["engine"].name)
         if kw["engine"].name == "rtx_vsr":
-            raise RuntimeError("NvVFX effect.run failed\nat 3328x1920")
+            raise SC.UpscaleEngineFailed("NvVFX effect.run failed\nat 3328x1920")
         return "out.mp4", ["engine=" + kw["engine"].name]
 
     monkeypatch.setattr(SC, "_get_upscale_engine",
@@ -382,6 +382,7 @@ def _install_spy(monkeypatch, ok=True, provide=None):
     # Windows x86-64 with Python 3.13, so the suite is portable to any runner.
     import platform
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (8, 9))
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda d=None: "NVIDIA GeForce RTX 4060 Laptop GPU")
     monkeypatch.setattr(platform, "machine", lambda: "AMD64")
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr(sys, "version_info", (3, 13, 0, "final", 0))
@@ -728,3 +729,47 @@ def test_the_redactor_fails_closed(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", no_assets)
     out = V._redacted("token=SECRET123")
     assert "SECRET123" not in out and "withheld" in out
+
+
+def test_a_non_upscaler_failure_mid_composite_is_not_redone(tmp_path, monkeypatch):
+    """Gemini second opinion: only the model's own failure earns the redo. An
+    ffmpeg error, a refused executable or an underrun propagates at once."""
+    import nodes.otr_silent_composite as SC
+    from nodes._otr_shared.proc import ExecutableNotAllowed
+
+    class _CleanEng:
+        name, intrinsic_scale, degrades_to_off, device = "rtx_vsr", 2, True, None
+
+        def load(self, device):
+            pass
+
+        def unload(self):
+            pass
+
+    calls = []
+
+    def assemble(*a, **kw):
+        calls.append(kw["engine"].name)
+        raise ExecutableNotAllowed("cmd.exe is not an allowed executable")
+    off = get_engine("off")
+    monkeypatch.setattr(SC, "_get_upscale_engine",
+                        lambda name: _CleanEng() if name == "rtx_vsr" else off)
+    monkeypatch.setattr(SC, "_assert_upscale_usable", lambda name, role: name)
+    monkeypatch.setattr(SC, "_resolve_upscale_device", lambda v: torch.device("cpu"))
+    monkeypatch.setattr(SC, "assemble_silent_timeline", assemble)
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m, **kw: True)
+    with pytest.raises(ExecutableNotAllowed):
+        _composite_with(SC, tmp_path, "rtx_vsr")
+    assert calls == ["rtx_vsr"]                    # no second, off pass
+
+
+def test_a_gtx_card_never_downloads_the_sdk(monkeypatch):
+    calls = _install_spy(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (7, 5))
+    monkeypatch.setattr(torch.cuda, "get_device_name",
+                        lambda d=None: "NVIDIA GeForce GTX 1660 SUPER")
+    with pytest.raises(EngineUnusable, match="GTX"):
+        V.RtxVsr().load(torch.device("cuda:0"))
+    assert calls == []

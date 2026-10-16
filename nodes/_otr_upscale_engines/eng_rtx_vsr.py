@@ -107,6 +107,14 @@ def _install_blocker(torch, dev):
     if cap < MIN_COMPUTE_CAPABILITY:
         return ("this card is compute capability %d.%d; RTX VSR needs %d.%d "
                 "(Turing) or newer" % (cap + MIN_COMPUTE_CAPABILITY))
+    # GTX 16xx is Turing (sm_75) without the RTX hardware VSR needs; it passes
+    # the capability floor, so the product name is the only cheap tell.
+    try:
+        name = str(torch.cuda.get_device_name(dev))
+    except Exception:  # noqa: BLE001 -- unknown name: let the probe decide
+        name = ""
+    if "GTX" in name.upper():
+        return f"{name} is a GTX card; RTX VSR needs an RTX card"
     return ""
 
 #: Ceiling on the one pip run. The wheel is ~540 MB; a slow line still lands
@@ -135,19 +143,25 @@ def _pip_install_nvidia_vfx():
 
     def attempt(argv):
         try:
+            # Explicit UTF-8 with replacement: pip/uv progress output is UTF-8,
+            # and a cp1252 decode on Windows could raise AFTER a successful
+            # install, reporting it as a failure.
             r = otr_proc.run(argv, capture_output=True, text=True,
+                             encoding="utf-8", errors="replace",
                              timeout=AUTO_INSTALL_TIMEOUT_S)
         except Exception as exc:  # noqa: BLE001 -- timeout, spawn failure
             return False, f"{type(exc).__name__}: {exc}"
         out = " ".join(((r.stdout or "") + " " + (r.stderr or "")).split())
         return r.returncode == 0, f"exit {r.returncode}: {out}"
 
+    # --only-binary: NVIDIA publishes wheels only; never build from an sdist.
     ok, detail = attempt([sys.executable, "-m", "pip", "install", "--no-input",
-                          "--disable-pip-version-check", AUTO_INSTALL_REQUIREMENT])
+                          "--disable-pip-version-check", "--only-binary", ":all:",
+                          AUTO_INSTALL_REQUIREMENT])
     if ok or "No module named pip" not in detail:
         return ok, "pip " + detail
     uv_args = ["pip", "install", "--python", sys.executable,
-               AUTO_INSTALL_REQUIREMENT]
+               "--only-binary", ":all:", AUTO_INSTALL_REQUIREMENT]
     ok, uv_detail = attempt([sys.executable, "-m", "uv"] + uv_args)
     if not ok and "No module named uv" in uv_detail:
         # uv shipped as its own executable rather than a module in this venv.

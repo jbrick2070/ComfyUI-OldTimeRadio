@@ -33,16 +33,20 @@ def test_every_shipping_ltx_profile_has_complete_model_and_launch_contract(
         if not engines or profile["status"] != "shipping":
             continue
         ltx_rows.append(profile_id)
+        # The upscaler is required only by two-stage lanes; the 8 GB
+        # single-stage lanes (2026-10-15) never load it.
         expected = {
             (e._dit_name(), e._text_encoder_name(), ltx.LTX25_VIDEO_VAE,
-             ltx.LTX25_AUDIO_VAE, ltx.LTX25_UPSCALER_MODEL)
+             ltx.LTX25_AUDIO_VAE)
+            + ((ltx.LTX25_UPSCALER_MODEL,) if e._two_stage else ())
             for e in engines
         }
         assert len(expected) == 1, (
             f"{profile_id} selects LTX 2.5 lanes that load different weights: "
             f"{sorted(expected)}")
+        want = expected.pop()
         models = profile["preflight"]["required_models"]
-        assert tuple(models[:5]) == expected.pop(), profile_id
+        assert tuple(models[:len(want)]) == want, profile_id
         assert profile["launch"] == {
             "boot_contract": "default",
             "sage_attention": False,

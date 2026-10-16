@@ -1161,6 +1161,7 @@ ISOLATED_VOICES = {
 
 _PUBLIC_VIDEO_IDS = {
     "ltx25_high_video": "ltx25_video",
+    "ltx25_low_video": "ltx25_video_8gb",
     "humo14_high_audio_in_portrait": "humo",
     "humo14_high_audio_in_wide": "humo_14B_169",
     "humo17_high_audio_in_portrait": "humo_1.7B",

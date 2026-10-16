@@ -212,11 +212,12 @@ BOOKEND_SCENE_PROMPT_KNOWN_RED = {
             "('radio-styled by design') -- but that 'policy' resolves to "
             "build_request's static string with a style cue prefixed, not a "
             "considered motion decision, and it predates the pack motion "
-            "registers existing. No shipped workflow selects it for a bookend "
-            "(the lab rigs that did were retired 2026-09-25), but the "
-            "dropdown still offers it. OWED: decide whether a face lane should be "
-            "selectable for a console bookend at all; fix it or rip it from "
-            "those roles. Do not leave it silently motionless.",
+            "registers existing. DECIDED 2026-10-15 (operator): a face lane "
+            "IS selectable for a bookend and renders there as the brief-driven "
+            "radio-with-a-face host (radio_host_portrait), and since then the "
+            "lane roll can draw HuMo for every role -- so this prompt is now "
+            "reachable. OWED: judge the HuMo bookend clips on a live render "
+            "before writing a motion-aware bookend formatter for it.",
     "humo_1.7B": "audio-driven face lane in the humo family. OWED: the same "
                  "fix-or-rip decision as humo, and it inherits humo's answer.",
     "humo_1.7B_169": "audio-driven face lane in the humo family. OWED: the same "
