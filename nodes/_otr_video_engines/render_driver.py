@@ -132,6 +132,12 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
     # is handed, which is not a prompt concern either.
     "ltx25_audio_in_16gb",
     "ltx25_audio_in_24gb",
+    # The 8 GB single-stage lanes: same composer, the decode is the only
+    # difference.
+    "ltx25_video_8gb",
+    "ltx25_foley_8gb",
+    "ltx25_mime_8gb",
+    "ltx25_audio_in_8gb",
     "cloud_ltx25_foley_plus",
     "cloud_ltx25_audio_in",
 })
@@ -2019,7 +2025,7 @@ _AUDIO_IN_CHARACTER_ENGINES = (
     # character's own clean audio -- which is what a lip-sync lane wants. The
     # ambient master slice is the
     # LINELESS-beat path, not the character path.
-    "ltx25_audio_in_16gb", "ltx25_audio_in_24gb")
+    "ltx25_audio_in_16gb", "ltx25_audio_in_24gb", "ltx25_audio_in_8gb")
 
 
 def _is_character_face_beat(shot):
@@ -6162,7 +6168,9 @@ _LTX_OPEN_ENGINES = frozenset(
      "ltx25_foley_16gb", "ltx25_foley_24gb",
      "ltx25_foley_blackwell",
      "ltx25_mime_16gb", "ltx25_mime_24gb",
-     "ltx25_audio_in_16gb", "ltx25_audio_in_24gb"})
+     "ltx25_audio_in_16gb", "ltx25_audio_in_24gb",
+     "ltx25_video_8gb", "ltx25_foley_8gb", "ltx25_mime_8gb",
+     "ltx25_audio_in_8gb"})
 #: Roles whose beats are the radio-console OPENER -- expected to render on an
 #: LTX engine, not the procgen/still floor (the 6/15 clips=0 soft-open).
 _LTX_OPEN_ROLES = frozenset({"announcer_visual", "music_visual"})

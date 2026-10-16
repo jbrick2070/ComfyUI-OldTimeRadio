@@ -1177,6 +1177,12 @@ _LTX25_NATIVE_LANES = {
     "ltx25_foley_16gb": "ltx25_16gb",
     "ltx25_mime_16gb": "ltx25_16gb",
     "ltx25_audio_in_16gb": "ltx25_16gb",
+    # The 8 GB lanes load the 16 GB files (no upscaler; fetching it anyway
+    # costs one small file and keeps one fetcher lane).
+    "ltx25_video_8gb": "ltx25_16gb",
+    "ltx25_foley_8gb": "ltx25_16gb",
+    "ltx25_mime_8gb": "ltx25_16gb",
+    "ltx25_audio_in_8gb": "ltx25_16gb",
     "ltx25_foley_24gb": "ltx25_24gb",
     "ltx25_mime_24gb": "ltx25_24gb",
     "ltx25_audio_in_24gb": "ltx25_24gb",

@@ -57,6 +57,7 @@ _TIER = {
     "h3_low_audio_in": "minimax_h3_audio_in",
     # LTX 2.5, 2026-08-19: the silent lane, on the 16 GB mix4x8 DiT.
     "ltx25_high_video": "ltx25_video",
+    "ltx25_low_video": "ltx25_video_8gb",
 }
 
 

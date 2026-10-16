@@ -313,6 +313,8 @@ _LTX25_WEIGHT_ENGINES = frozenset({
     "ltx25_foley_blackwell",
     "ltx25_mime_16gb", "ltx25_mime_24gb",
     "ltx25_audio_in_16gb", "ltx25_audio_in_24gb",
+    "ltx25_video_8gb", "ltx25_foley_8gb", "ltx25_mime_8gb",
+    "ltx25_audio_in_8gb",
 })
 #: Every registered AnimateDiff lane. They load SD 1.5 INSIDE their own graph,
 #: not through an image slot (``accepts_still = False``), so each lane is asked
@@ -836,8 +838,9 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         # ASK EACH LANE, same rule as every branch above: `_dit_name()` and its
         # siblings are what `_weight_paths()` -- the lane's own assert_usable
         # list -- resolves, so the preflight fetches exactly the files the lane
-        # will open, operator env overrides included. Every lane builds the
-        # upscale loader, so every lane requests the upscaler.
+        # will open, operator env overrides included. Only a two-stage lane
+        # builds the upscale loader, so only a two-stage lane requests the
+        # upscaler; the single-stage 8 GB lanes never open it.
         if not ltx25:
             raise VisualAssetError("LTX 2.5 adapter resolution is unavailable")
         for eid in selected_ltx25:
@@ -852,8 +855,9 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
                 explicit=str(env.get("OTR_LTX25_VIDEO_VAE") or ""))
             add("vae", lane._audio_vae_name(),
                 explicit=str(env.get("OTR_LTX25_AUDIO_VAE") or ""))
-            add("latent_upscale_models", lane._upscaler_name(),
-                explicit=str(env.get("OTR_LTX25_UPSCALER") or ""))
+            if lane._two_stage:
+                add("latent_upscale_models", lane._upscaler_name(),
+                    explicit=str(env.get("OTR_LTX25_UPSCALER") or ""))
     selected_h3 = sorted(engines & _MINIMAX_H3_WEIGHT_ENGINES)
     if selected_h3:
         # ASK EACH LANE: `_weight_rows()` is the one table the lane's own

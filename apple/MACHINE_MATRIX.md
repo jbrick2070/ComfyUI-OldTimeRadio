@@ -67,9 +67,9 @@ Nothing here is inferred from "it looks like it should fit". A blank is an unkno
 |---|---|---|---|---|---|---|
 | `otr_8gb_animatediff` | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_8gb_low` | viz_camera | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_8gb_ltx25_audio_in` | ltx25_audio_in_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_8gb_ltx25_foley` | ltx25_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_8gb_ltx25_mime` | ltx25_mime_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_ltx25_audio_in` | ltx25_audio_in_8gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_ltx25_foley` | ltx25_foley_8gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_ltx25_mime` | ltx25_mime_8gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_8gb_still` | still_motion | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_8gb_video` | ltx_8gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 

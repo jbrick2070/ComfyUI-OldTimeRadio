@@ -144,6 +144,11 @@ VIDEO_LANE = {
     "ltx25_mime_24gb": "n24m",
     "ltx25_audio_in_16gb": "n16a",
     "ltx25_audio_in_24gb": "n24a",
+    # The 8 GB single-stage lanes (2026-10-15).
+    "ltx25_video_8gb": "n08v",
+    "ltx25_foley_8gb": "n08f",
+    "ltx25_mime_8gb": "n08m",
+    "ltx25_audio_in_8gb": "n08a",
     "animatediff15_v3_haunted_video": "adhv",
     "animatediff15_v3_stillin_lab_video": "adsl",
     "animatediff15_lightning_video": "adlt",

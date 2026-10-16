@@ -225,18 +225,31 @@ def _resolve(folder, name):
             os.path.dirname(os.path.dirname(here))))), "models", folder, name)
 
 
-def _assert_two_stage_execution(records, frame_count):
-    """Require executor-owned proof of what actually ran: the latent upscale,
-    the refinement sampler and the 1664x960 decode, in that order. It fails
-    closed if a node is missing or the decode canvas is wrong; loosening it to
-    "any shape" would make it unable to catch a silent geometry change, which
-    is the one thing this check is for.
+#: The audited nodes, in execution order, for each graph shape. The two-stage
+#: graph proves the latent upscale, the refinement sampler and the 1664x960
+#: decode; the single-stage 8 GB graph proves the one sampler and the 832x480
+#: decode it feeds directly.
+_TWO_STAGE_AUDIT = (
+    ("latent_upscale", "LTXVLatentUpsampler"),
+    ("refine_sampler", "SamplerCustomAdvanced"),
+    ("decode", "VAEDecodeTiled"),
+)
+_SINGLE_STAGE_AUDIT = (
+    ("sampler", "SamplerCustomAdvanced"),
+    ("decode", "VAEDecodeTiled"),
+)
+
+
+def _assert_two_stage_execution(records, frame_count, *, single_stage=False):
+    """Require executor-owned proof of what actually ran, in order, and the
+    decode canvas that graph shape promises: 1664x960 after the latent upscale
+    and refinement sampler, or 832x480 straight off the one sampler on the
+    single-stage 8 GB lanes. It fails closed if a node is missing or the
+    decode canvas is wrong; loosening it to "any shape" would make it unable
+    to catch a silent geometry change, which is the one thing this check is
+    for.
     """
-    expected = (
-        ("latent_upscale", "LTXVLatentUpsampler"),
-        ("refine_sampler", "SamplerCustomAdvanced"),
-        ("decode", "VAEDecodeTiled"),
-    )
+    expected = _SINGLE_STAGE_AUDIT if single_stage else _TWO_STAGE_AUDIT
     if not isinstance(records, list) or len(records) != len(expected):
         raise RuntimeError(
             "ltx25 two-stage execution proof expected %d node record(s), got %r"
@@ -252,16 +265,19 @@ def _assert_two_stage_execution(records, frame_count):
 
     shapes = records[-1].get("output_shapes")
     shape = shapes[0] if isinstance(shapes, list) and shapes else None
-    want_h = R.LTX25_RENDER_CANVAS_H
-    want_w = R.LTX25_RENDER_CANVAS_W
+    if single_stage:
+        want_w, want_h = R.LTX25_CANVAS_W, R.LTX25_CANVAS_H
+    else:
+        want_w, want_h = R.LTX25_RENDER_CANVAS_W, R.LTX25_RENDER_CANVAS_H
     legal = (isinstance(shape, list) and len(shape) == 4
              and shape[0] == int(frame_count)
              and shape[1:3] == [want_h, want_w]
              and shape[3] in (3, 4))
     if not legal:
         raise RuntimeError(
-            "ltx25 two-stage decode returned %r; expected [%d,%d,%d,3|4]"
-            % (shape, int(frame_count), want_h, want_w))
+            "ltx25 %s decode returned %r; expected [%d,%d,%d,3|4]"
+            % ("single-stage" if single_stage else "two-stage", shape,
+               int(frame_count), want_h, want_w))
     return True
 
 
@@ -425,6 +441,27 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     #: Terminal node: its IMAGE batch becomes the clip.
     _TERMINAL = "decode"
 
+    #: STAGE TWO ON OR OFF. True is the accepted HQ recipe: 2x latent upscale,
+    #: refine, decode at 1664x960. The 8 GB lanes set False and decode the
+    #: stage-one latent at 832x480 -- a quarter of the pixels, because the
+    #: 1664x960 decode peaked at 8,080 MB on a 16 GB card and an 8 GB 4060
+    #: offers ~7,400 MB, so every 8 GB LTX 2.5 leg died at ``decode`` on its
+    #: first shot (4060 heavy runs, 2026-10-15). Operator ruling the same day:
+    #: skip the upscale on 8 GB, leave the 16 GB lanes untouched.
+    _two_stage = True
+
+    #: The stage-two-only node ids. A single-stage graph builds none of them,
+    #: resolves none of their classes and needs none of their weights.
+    _STAGE_TWO_NODES = ("upscale_loader", "latent_upscale", "refine_i2v",
+                        "refine_sigmas", "refine_concat", "refine_sampler",
+                        "refine_separate")
+
+    def _final_separate_node(self):
+        """The node whose slot 0 feeds the decode and whose slot 1 is the
+        sampled audio latent: ``refine_separate`` after stage two,
+        ``separate`` on a single-stage lane."""
+        return "refine_separate" if self._two_stage else "separate"
+
     # ---- weight tokens (env pins name a FILE, they cannot make one exist) ----
     #: The DiT this lane loads. Each tier subclass names its own; the base is
     #: the 16 GB weight, which is what the silent ``ltx25_video`` lane renders.
@@ -500,19 +537,23 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
              _FLOOR_VIDEO_VAE),
             ("LTX 2.5 audio VAE", _resolve("vae", self._audio_vae_name()),
              _FLOOR_AUDIO_VAE),
-            # Every lane builds the upscale loader (stage two is never
-            # skipped), so every lane needs the file.
+        ] + ([
+            # Only a two-stage lane builds the upscale loader; the single-stage
+            # 8 GB lanes never load the file, so they do not require it.
             ("LTX 2.5 latent spatial upscaler",
              _resolve("latent_upscale_models", self._upscaler_name()),
              _FLOOR_UPSCALER),
-        ]
+        ] if self._two_stage else [])
 
     def _output_canvas(self):
         """``(width, height)`` this lane really decodes at: the x2 stage-two
         canvas. The PLAN log, the tail-trim log and the clip RECEIPT all print
         it; the receipt is copied into the canonical clip, carried into the
         manifest by `render_driver`, and printed in the episode's CREDITS text
-        by `otr_credits_roll`."""
+        by `otr_credits_roll`. A single-stage lane decodes the stage-one
+        canvas itself."""
+        if not self._two_stage:
+            return R.LTX25_CANVAS_W, R.LTX25_CANVAS_H
         return R.LTX25_RENDER_CANVAS_W, R.LTX25_RENDER_CANVAS_H
 
     def _quant_label(self):
@@ -531,8 +572,10 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         Several logical nodes intentionally share installed classes (the two
         I2V anchors, AV concat/separate pairs, and samplers). The graph keeps
         their roles distinct while the resolver verifies each installed class.
+        A single-stage lane drops the stage-two classes, so a box missing the
+        upscaler node is not refused for a node its graph never builds.
         """
-        return {
+        cands = {
             "unet": ("UNETLoader",),
             "te": ("CLIPLoader",),
             "videovae": ("VAELoader",),
@@ -563,6 +606,10 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "refine_separate": ("LTXVSeparateAVLatent",),
             "decode": ("VAEDecodeTiled",),
         }
+        if not self._two_stage:
+            for node_id in self._STAGE_TWO_NODES:
+                cands.pop(node_id, None)
+        return cands
 
     # ---- usability: fail CLOSED, cheapest refusal first ----
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -1157,6 +1204,15 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 "temporal_overlap": R.LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP}},
         }
 
+        if not self._two_stage:
+            # SINGLE STAGE (8 GB): the decode reads the stage-one video latent
+            # straight off ``separate``. Same tile settings, a quarter of the
+            # pixels. ``separate`` slot 1 is the audio latent, which the foley
+            # lanes harvest from here instead of ``refine_separate``.
+            for node_id in self._STAGE_TWO_NODES:
+                del graph[node_id]
+            graph["decode"]["inputs"]["samples"] = W("separate", 0)
+
         return graph
 
     # ---- the two Chunk B seams (2026-08-26) ----
@@ -1434,7 +1490,10 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 graph, classes, free_after_use=True,
                 keep={"unet", "modality", self._TERMINAL},
                 external_results=external, on_result=_harvest,
-                audit_node_ids={"latent_upscale", "refine_sampler", "decode"},
+                audit_node_ids={
+                    node_id for node_id, _cls in (
+                        _TWO_STAGE_AUDIT if self._two_stage
+                        else _SINGLE_STAGE_AUDIT)},
                 execution_records=execution_records)
             images = results[self._TERMINAL][0]
         finally:
@@ -1448,7 +1507,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             raise _wb.GraphExecutionError(
                 "%s: run_graph produced no terminal image" % self.name)
         try:
-            _assert_two_stage_execution(execution_records, length)
+            _assert_two_stage_execution(execution_records, length,
+                                        single_stage=not self._two_stage)
         except RuntimeError as exc:
             raise _wb.GraphExecutionError(str(exc)) from exc
         # THE LINE SAYS WHICH GRAPH RAN, because this is the line a reader
@@ -1456,9 +1516,11 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         # runbook counts "TWO-STAGE PASS nodes=3 decode=1664x960" in the
         # server log).
         _LOG.info(
-            "[OTR video] %s TWO-STAGE PASS nodes=3 decode=%dx%d "
+            "[OTR video] %s %s PASS nodes=%d decode=%dx%d "
             "render_elapsed_s=%.3f",
-            self.name, R.LTX25_RENDER_CANVAS_W, R.LTX25_RENDER_CANVAS_H,
+            self.name, "TWO-STAGE" if self._two_stage else "SINGLE-STAGE",
+            len(_TWO_STAGE_AUDIT if self._two_stage else _SINGLE_STAGE_AUDIT),
+            self._output_canvas()[0], self._output_canvas()[1],
             render_elapsed_s)
 
         # PUBLISH ON GRAPH SUCCESS, and only whole.
@@ -1948,9 +2010,10 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
         ``reclaim_idle_models`` is freed VRAM, which is a crash or silent
         garbage rather than a saving.
         """
-        # Stage two re-samples the joint latent, so the audio to keep is
-        # `refine_separate`'s (slot 1), not `separate`'s.
-        if node_id != "refine_separate" or not out or len(out) < 2:
+        # Stage two re-samples the joint latent, so on a two-stage lane the
+        # audio to keep is `refine_separate`'s (slot 1), not `separate`'s. A
+        # single-stage lane has no refine, so `separate` slot 1 IS the audio.
+        if node_id != self._final_separate_node() or not out or len(out) < 2:
             return
         self._pending_audio_latent = self._latent_to_cpu(out[1])
 
@@ -3308,6 +3371,59 @@ class Ltx25NativeMime16gbEngine(Ltx25NativeFoley16gbEngine):
     default_roles = ()
 
 
+# ---------------------------------------------------------------------------
+# THE 8 GB LANES (2026-10-15): the 16 GB lanes, single stage.
+#
+# Same weights, same stage-one recipe, same prompts, same mux rows -- the one
+# difference is ``_two_stage = False``: no 2x latent upscale, no refine pass,
+# and the decode runs on the 832x480 stage-one latent instead of 1664x960.
+# The 4060 heavy runs measured why: every 8 GB LTX 2.5 leg reached its first
+# shot and died with an out-of-memory at ``decode``; the stage-one sampler fit.
+# The 16 GB lanes are untouched; the 8 GB workflows pick these ids instead.
+# ---------------------------------------------------------------------------
+
+@register
+class Ltx25Video8gbEngine(Ltx25VideoEngine):
+    """8 GB silent video: ``ltx25_video`` single stage, decoded at 832x480."""
+
+    name = "ltx25_video_8gb"
+    engine_version = "1"
+    default_roles = ()
+    _two_stage = False
+
+
+@register
+class Ltx25NativeFoley8gbEngine(Ltx25NativeFoley16gbEngine):
+    """8 GB foley: ``ltx25_foley_16gb`` single stage, decoded at 832x480."""
+
+    name = "ltx25_foley_8gb"
+    engine_version = "1"
+    default_roles = ()
+    _two_stage = False
+
+
+@register
+class Ltx25NativeMime8gbEngine(Ltx25NativeMime16gbEngine):
+    """8 GB mime: ``ltx25_mime_16gb`` single stage, decoded at 832x480."""
+
+    name = "ltx25_mime_8gb"
+    engine_version = "1"
+    default_roles = ()
+    _two_stage = False
+
+
+@register
+class Ltx25NativeAudioIn8gbEngine(Ltx25NativeAudioIn16gbEngine):
+    """8 GB audio-in: ``ltx25_audio_in_16gb`` single stage, decoded at
+    832x480."""
+
+    name = "ltx25_audio_in_8gb"
+    engine_version = "1"
+    default_roles = ()
+    required_inputs = ("text_prompt", "init_image", "audio_ref")
+    _two_stage = False
+
+
 @register
 class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
     """The 24 GB AND UP lane as a silent performance. int8.
@@ -3361,10 +3477,14 @@ class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
 # wrong". Found by a cursor QA pass on the commit that introduced it.
 for _tier_cls in (Ltx25NativeFoleyWideEngine,
                   Ltx25NativeFoleyBlackwellEngine,
-                  Ltx25NativeFoley16gbEngine):
+                  Ltx25NativeFoley16gbEngine,
+                  Ltx25NativeFoley8gbEngine):
     _tier_cls.compose_prompt = compose_ltx25_foley_plus
-for _tier_cls in (Ltx25NativeMime16gbEngine, Ltx25NativeMime24gbEngine):
+for _tier_cls in (Ltx25NativeMime16gbEngine, Ltx25NativeMime24gbEngine,
+                  Ltx25NativeMime8gbEngine):
     _tier_cls.compose_prompt = compose_ltx25_mime
+#: The silent 8 GB lane takes its parent's formatter for the same reason.
+Ltx25Video8gbEngine.compose_prompt = compose_ltx25_video
 del _tier_cls
 
 #: EVERY joint-AV lane, not the three that happened to exist when this tuple
@@ -3382,6 +3502,8 @@ _JOINT_AV_ENGINES = _JOINT_AV_ENGINES + (
     "ltx25_foley_blackwell",
     "ltx25_mime_16gb",
     "ltx25_mime_24gb",
+    "ltx25_foley_8gb",
+    "ltx25_mime_8gb",
 )
 
 

@@ -110,6 +110,7 @@ just do not carry the label, which is reserved for the audio-reactive family.
 | `ltx25_foley_blackwell` | the same, on Blackwell-only weights | automatic, about 24 GB |
 | `ltx25_mime_16gb`, `ltx25_mime_24gb` | the same picture, and the model's sound **replaces** the episode audio over those beats | automatic, same files as the foley lane of that size |
 | `ltx25_audio_in_16gb`, `ltx25_audio_in_24gb` | the picture follows the beat's own audio instead of inventing sound | automatic, same files as the foley lane of that size |
+| `ltx25_low_video`, `ltx25_foley_8gb`, `ltx25_mime_8gb`, `ltx25_audio_in_8gb` | the 8 GB versions: same model and sound behaviour, but no refine pass, so the picture stays at 832x480. The large decode does not fit in 8 GB | automatic, the 16 GB files minus the upscaler |
 
 Every LTX row downloads its own weights the first time you queue it -- no
 account, no licence click, no Hugging Face token -- and loads through

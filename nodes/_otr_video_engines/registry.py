@@ -538,6 +538,45 @@ CAPABILITIES = {
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
+    # The 8 GB SINGLE-STAGE lanes (2026-10-15). The 16 GB rows' weights
+    # minus the latent upscaler: these lanes skip stage two, so they never
+    # load it, and preflight must not ask an 8 GB box to fetch it.
+    "ltx25_video_8gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-mix4x8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae"]},
+    "ltx25_foley_8gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-mix4x8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae"]},
+    "ltx25_mime_8gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-mix4x8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae"]},
+    "ltx25_audio_in_8gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-mix4x8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae"]},
     "ltx25_audio_in_24gb": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

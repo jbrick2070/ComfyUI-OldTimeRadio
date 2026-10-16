@@ -88,6 +88,9 @@ _PUBLIC_ENGINES = {
     # public ids on one internal id collapses _INTERNAL_TO_PUBLIC and trips the
     # bijection assert below AT IMPORT (lesson L5).
     "ltx25_high_video": "ltx25_video",
+    # The 8 GB single-stage silent lane (2026-10-15): same model, no 2x
+    # upscale, decoded at 832x480. `low` because it is the 8 GB card's lane.
+    "ltx25_low_video": "ltx25_video_8gb",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- ONE table, read by the

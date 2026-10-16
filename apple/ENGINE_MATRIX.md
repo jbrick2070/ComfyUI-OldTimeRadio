@@ -75,12 +75,16 @@ without that map would play ~4% short.
 | humo_14B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-97 step 4 | 1.32-3.88 s | 25 | soft_reference | yes |
 | ltx25_audio_in_16gb | local | audio_conditioned_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_audio_in_24gb | local | audio_conditioned_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
+| ltx25_audio_in_8gb | local | audio_conditioned_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_foley_16gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_foley_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
+| ltx25_foley_8gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_foley_blackwell | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_mime_16gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_mime_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
+| ltx25_mime_8gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_video | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
+| ltx25_video_8gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 9-161 step 8 | 0.36-6.44 s | 25 | strict_first_frame | yes |
 | mesh_stage | local | image_to_video | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | minimax_h3_audio_in | local | audio_conditioned_video | wide | canvas-negotiated (_aspect_plan) | menu: 129, 146, 164, 182, 200, 217, 235, 253, 270, 288, 306, 323, 341, 359, 377 | menu: 5.16, 5.84, 6.56, 7.28, 8, 8.68, 9.40, 10.12, 10.80, 11.52, 12.24, 12.92, 13.64, 14.36, 15.08 s | 25 | soft_reference | yes |
@@ -115,12 +119,16 @@ without that map would play ~4% short.
 | humo_14B_169 | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | ltx25_audio_in_16gb | text_prompt, init_image, audio_ref | text_prompt REQUIRED |
 | ltx25_audio_in_24gb | text_prompt, init_image, audio_ref | text_prompt REQUIRED |
+| ltx25_audio_in_8gb | text_prompt, init_image, audio_ref | text_prompt REQUIRED |
 | ltx25_foley_16gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_foley_24gb | text_prompt, init_image | text_prompt REQUIRED |
+| ltx25_foley_8gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_foley_blackwell | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_mime_16gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_mime_24gb | text_prompt, init_image | text_prompt REQUIRED |
+| ltx25_mime_8gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_video | text_prompt, init_image | text_prompt REQUIRED |
+| ltx25_video_8gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx_8gb | init_image | text_prompt OPTIONAL (sent when present) |
 | mesh_stage | init_image | no text input |
 | minimax_h3_audio_in | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
@@ -159,12 +167,16 @@ the engine's own `aspect` column above.
 | humo_14B_169 | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | ltx25_audio_in_16gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_audio_in_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
+| ltx25_audio_in_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_foley_16gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_foley_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
+| ltx25_foley_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_foley_blackwell | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_mime_16gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_mime_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
+| ltx25_mime_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
+| ltx25_video_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | mesh_stage | mesh_fodder/wide/always; scene_background_plate/wide/always; portrait/inherit_engine/never |
 | minimax_h3_audio_in | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
@@ -205,12 +217,16 @@ means the adapter sizes itself and IGNORES the request canvas.
 | humo_14B_169 | 832x480 | engine _native_dims |
 | ltx25_audio_in_16gb | 832x480 | declared |
 | ltx25_audio_in_24gb | 832x480 | declared |
+| ltx25_audio_in_8gb | 832x480 | declared |
 | ltx25_foley_16gb | 832x480 | declared |
 | ltx25_foley_24gb | 832x480 | declared |
+| ltx25_foley_8gb | 832x480 | declared |
 | ltx25_foley_blackwell | 832x480 | declared |
 | ltx25_mime_16gb | 832x480 | declared |
 | ltx25_mime_24gb | 832x480 | declared |
+| ltx25_mime_8gb | 832x480 | declared |
 | ltx25_video | 832x480 | declared |
+| ltx25_video_8gb | 832x480 | declared |
 | ltx_8gb | 512x288 | declared |
 | mesh_stage | 1472x832 | declared |
 | minimax_h3_audio_in | 864x480 | declared |
@@ -255,12 +271,16 @@ JUMP plan on a still-consuming lane ever re-mints.
 | humo_14B_169 | jump | 5: 97, 97, 97, 97, 57 | 445 | 442 | 0 |
 | ltx25_audio_in_16gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_audio_in_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
+| ltx25_audio_in_8gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_foley_16gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_foley_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
+| ltx25_foley_8gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_foley_blackwell | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_mime_16gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_mime_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
+| ltx25_mime_8gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_video | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
+| ltx25_video_8gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx_8gb | chain | 3: 161, 161, 129 | 451 | 442 | 0 |
 | mesh_stage | single | 1: 442 | 442 | 442 | 0 |
 | minimax_h3_audio_in | jump | 2: 323, 129 | 452 | 442 | 1 |
@@ -302,12 +322,16 @@ and it read exactly like a measured number until someone looked.
 | humo_14B_169 | 97 | safe_render_frames | `vram-recipe-lab/docs/HUMO_BAKEOFF.md` (sibling lab repo), apple/evidence |
 | ltx25_audio_in_16gb | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx25_audio_in_24gb | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_audio_in_8gb | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx25_foley_16gb | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx25_foley_24gb | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_foley_8gb | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx25_foley_blackwell | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx25_mime_16gb | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx25_mime_24gb | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_mime_8gb | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx25_video | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_video_8gb | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx_8gb | - | contract max | none cited |
 | mesh_stage | - | contract max | none cited |
 | minimax_h3_audio_in | - | contract max | `vram-recipe-lab/docs/ENVELOPE_LADDERS.md` (sibling lab repo), apple/H3_LICENSE_ATTESTATION.md, apple/evidence |
@@ -324,7 +348,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **35**
+* registered engine names: **39**
 * provider-side: **7**
-* local: **28**
-* can chain (strict_first_frame): **11**
+* local: **32**
+* can chain (strict_first_frame): **15**
