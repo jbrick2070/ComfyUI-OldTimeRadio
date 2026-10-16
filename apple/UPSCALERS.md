@@ -167,13 +167,15 @@ row in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) first.
 These make the pack skip the model on purpose. Each one says so in the
 ComfyUI console, so read it before assuming a break.
 
-- **Every clip already stated how it must be enlarged.** The AnimateDiff
-  lanes -- `animatediff15_lightning_video`,
+- **Every clip already stated how it must be enlarged, and the engine is
+  `spandrel_esrgan`.** The AnimateDiff lanes -- `animatediff15_lightning_video`,
   `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video` --
-  declare their own clean full-frame enlargement, and the upscaler is not
-  allowed to overrule it. On an episode made entirely of those, the engine is
-  not even loaded. The log line begins `upscale SKIPPED: no model-eligible
-  clip`.
+  declare a clean full-frame enlargement (no sharpening, no crop, no pad).
+  Real-ESRGAN invents texture, so it is not allowed to overrule that; on an
+  episode made entirely of those clips it is not even loaded, and the log line
+  begins `upscale SKIPPED: no model-eligible clip`. `rtx_vsr` *does* upscale
+  them (since 2026-10-15): it is an exact 2x with no sharpening, so it keeps
+  the clean full-frame promise.
 - **The clip is already as big as the canvas.** Upscaling it 2x and shrinking
   it back would change pixels without getting anywhere, so the composite takes
   the ordinary path instead and logs `model skip (source ... >= canvas ...)`.

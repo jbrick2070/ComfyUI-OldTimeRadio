@@ -230,13 +230,29 @@ DELIVERY_SCALE_MODE_CLEAN = "lanczos_clean_full_frame"
 DELIVERY_SCALE_MODES = frozenset({DELIVERY_SCALE_MODE_CLEAN})
 
 
-def _has_model_eligible_clips(manifest):
+def _engine_is_clean_full_frame(name) -> bool:
+    """True when the upscale engine ``name`` declares ``clean_full_frame``: an
+    exact enlargement with no sharpening, crop or pad, so it honours a row that
+    declared ``lanczos_clean_full_frame``. Never raises (an unknown or
+    unimportable engine is simply not clean)."""
+    if not name or name == "off":
+        return False
+    try:
+        return bool(getattr(_get_upscale_engine(name), "clean_full_frame", False))
+    except Exception:  # noqa: BLE001 -- eligibility must never fail a render
+        return False
+
+
+def _has_model_eligible_clips(manifest, clean_engine=False):
     """PURE: does this manifest contain a row the upscale MODEL could act on?
 
-    True only for a real on-disk video clip (``exists``, a non-empty path, not a
+    True for a real on-disk video clip (``exists``, a non-empty path, not a
     directory handoff) whose ``delivery_scale_mode`` is ``None`` -- the exact
     legacy state. A row that DECLARES an explicit delivery mode has told us how
-    it must be enlarged, and every declared mode today is model-ineligible.
+    it must be enlarged: it is eligible only when ``clean_engine`` is True (the
+    selected engine declares ``clean_full_frame``, i.e. rtx_vsr) and the row's
+    mode is ``lanczos_clean_full_frame`` -- the AnimateDiff/Ghost lanes, which
+    the operator asked to upscale on 2026-10-15. Real-ESRGAN stays excluded.
 
     THIS IS WHAT LETS A PROMPT-OWNED EPISODE IGNORE A STALE ESRGAN SELECTION.
     Without it, an all-Ghost manifest would still resolve, assert and LOAD a
@@ -253,7 +269,9 @@ def _has_model_eligible_clips(manifest):
             continue
         if str(row.get("type") or "") == "directory":
             continue
-        if row.get("delivery_scale_mode") is not None:
+        mode = row.get("delivery_scale_mode")
+        if mode is not None and not (clean_engine
+                                     and mode == DELIVERY_SCALE_MODE_CLEAN):
             continue
         return True
     return False
@@ -823,7 +841,11 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
     # the lane declared clean full-frame Lanczos and a model pass is neither
     # clean nor full-frame. Explicitly first, so no later branch can reach
     # `_run_model_pipeline` with a declared row.
-    if delivery_scale_mode is not None:
+    _declared_model = (
+        delivery_scale_mode == DELIVERY_SCALE_MODE_CLEAN
+        and engine is not None and engine.name != "off" and sharpen
+        and bool(getattr(engine, "clean_full_frame", False)))
+    if delivery_scale_mode is not None and not _declared_model:
         loop_args = ["-stream_loop", "-1"] if loop else []
         cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
                "-vf", _seg_vf(w, h, fps, start_frame,
@@ -835,7 +857,8 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
                 "OTR_SilentComposite: segment encode failed (%s) :: %s"
                 % (os.path.basename(seg_path), p.stderr.strip()[:200]))
         return
-    if engine is None or engine.name == "off" or not sharpen:
+    if not _declared_model and (engine is None or engine.name == "off"
+                                or not sharpen):
         # OBSERVABILITY (2026-08-09). The node's status string -- the only
         # carrier of "upscale=<engine>@<device>" -- never reaches /history, so
         # without a log line a completed render leaves zero evidence whether
@@ -872,8 +895,12 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
             "[OTR_SilentComposite] model skip (source %dx%d >= canvas %dx%d "
             "at 1x); fast path", _src_w, _src_h, int(w), int(h))
         loop_args = ["-stream_loop", "-1"] if loop else []
+        # A declared row keeps its declared chain on this skip too.
+        _skip_vf = (_seg_vf(w, h, fps, start_frame, mode=delivery_scale_mode)
+                    if _declared_model
+                    else _seg_vf(w, h, fps, start_frame, sharpen=True))
         cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
-               "-vf", _seg_vf(w, h, fps, start_frame, sharpen=True),
+               "-vf", _skip_vf,
                "-frames:v", str(int(n_frames))] + _color_args(fb, seg_path)
         p = _run(cmd)
         if p.returncode != 0:
@@ -1602,7 +1629,8 @@ class OTRSilentComposite:
             # ARE clips and every one of them declares its own enlargement".
             _rows = [r for r in ((manifest or {}).get("clips") or [])
                      if isinstance(r, dict)]
-            _model_eligible = (not _rows) or _has_model_eligible_clips(manifest)
+            _model_eligible = (not _rows) or _has_model_eligible_clips(
+                manifest, clean_engine=_engine_is_clean_full_frame(upscale_engine))
             parts.append(("delivery_modes", tuple(
                 str(r.get("delivery_scale_mode") or "")
                 for r in ((manifest or {}).get("clips") or [])
@@ -1719,7 +1747,8 @@ class OTRSilentComposite:
         #   "off" sentinel WITHOUT resolving the stale choice, which is the same
         #   byte-identical path an explicitly-off profile already takes. A MIXED
         #   manifest still loads it once, for the legacy rows that earn it.
-        _model_eligible = _has_model_eligible_clips(manifest)
+        _model_eligible = _has_model_eligible_clips(
+            manifest, clean_engine=_engine_is_clean_full_frame(upscale_engine))
         if assemble and not _model_eligible:
             log.info(
                 "[OTR_SilentComposite] upscale SKIPPED: no model-eligible clip "

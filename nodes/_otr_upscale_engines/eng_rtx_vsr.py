@@ -189,6 +189,15 @@ class RtxVsr:
     #: docstring). Spandrel does not set this: its refusal stays loud.
     degrades_to_off = True
 
+    #: CLEAN FULL FRAME: an exact x2 (rounded up for the SDK, cropped back to
+    #: exact), no sharpening, no crop of the picture, no pad -- then the
+    #: composite's aspect-preserving fit. That honours a row that declared
+    #: ``lanczos_clean_full_frame`` (the AnimateDiff/Ghost lanes), so the
+    #: composite upscales those rows with this engine (operator, 2026-10-15:
+    #: "run some animated diffs and upscale those too"). Real-ESRGAN does not
+    #: declare it: its texture invention is what that contract excludes.
+    clean_full_frame = True
+
     def __init__(self) -> None:
         self.device = None
         self._nvvfx = None

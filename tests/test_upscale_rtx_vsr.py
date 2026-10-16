@@ -214,7 +214,7 @@ def test_composite_falls_back_to_off_when_rtx_vsr_cannot_run(tmp_path, monkeypat
         seen["engine"] = kw["engine"].name
         return "out.mp4", ["stubbed"]
     monkeypatch.setattr(SC, "assemble_silent_timeline", assemble)
-    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m, **kw: True)
     src = tmp_path / "source.mp4"
     src.write_bytes(b"fake-mp4")
     silent, report = SC.OTRSilentComposite().composite(
@@ -251,7 +251,7 @@ def test_a_cuda_typed_on_a_machine_without_cuda_also_falls_back(tmp_path, monkey
     monkeypatch.setattr(SC, "_resolve_upscale_device", no_cuda)
     monkeypatch.setattr(SC, "assemble_silent_timeline",
                         lambda *a, **kw: ("out.mp4", ["engine=" + kw["engine"].name]))
-    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m, **kw: True)
     src = tmp_path / "source.mp4"
     src.write_bytes(b"fake-mp4")
     silent, report = SC.OTRSilentComposite().composite(
@@ -279,7 +279,7 @@ def test_spandrel_refusal_is_still_loud(tmp_path, monkeypatch):
     monkeypatch.setattr(SC, "_get_upscale_engine", lambda name: _Refusing())
     monkeypatch.setattr(SC, "_assert_upscale_usable", lambda name, role: name)
     monkeypatch.setattr(SC, "_resolve_upscale_device", lambda v: torch.device("cpu"))
-    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m, **kw: True)
     src = tmp_path / "source.mp4"
     src.write_bytes(b"fake-mp4")
     with pytest.raises(RuntimeError, match="missing checkpoint"):
@@ -331,7 +331,7 @@ def test_rtx_vsr_failing_mid_composite_redoes_it_with_off(tmp_path, monkeypatch)
     monkeypatch.setattr(SC, "_assert_upscale_usable", lambda name, role: name)
     monkeypatch.setattr(SC, "_resolve_upscale_device", lambda v: torch.device("cpu"))
     monkeypatch.setattr(SC, "assemble_silent_timeline", assemble)
-    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m, **kw: True)
     silent, report = _composite_with(SC, tmp_path, "rtx_vsr")
     assert silent == "out.mp4" and calls == ["rtx_vsr", "off"]
     assert unloaded == [True]                 # unloaded once, not again in finally
@@ -359,7 +359,7 @@ def test_a_non_degrading_engine_failing_mid_composite_still_raises(tmp_path,
     monkeypatch.setattr(SC, "_assert_upscale_usable", lambda name, role: name)
     monkeypatch.setattr(SC, "_resolve_upscale_device", lambda v: torch.device("cpu"))
     monkeypatch.setattr(SC, "assemble_silent_timeline", assemble)
-    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m: True)
+    monkeypatch.setattr(SC, "_has_model_eligible_clips", lambda m, **kw: True)
     with pytest.raises(RuntimeError, match="esrgan blew up"):
         _composite_with(SC, tmp_path, "spandrel_esrgan")
 
@@ -446,3 +446,77 @@ def test_the_install_goes_through_the_pack_subprocess_boundary(monkeypatch):
     assert seen["argv"][-1] == V.AUTO_INSTALL_REQUIREMENT
     assert seen["kw"]["timeout"] == V.AUTO_INSTALL_TIMEOUT_S
     otr_proc._check(seen["argv"])               # the allowlist admits it
+
+
+# --- AnimateDiff / Ghost rows (operator, 2026-10-15) ----------------------- #
+
+def _clip_row(mode=None, **kw):
+    row = {"exists": True, "path": "clip.mp4", "type": "clip",
+           "delivery_scale_mode": mode}
+    row.update(kw)
+    return row
+
+
+def test_a_clean_declared_row_is_eligible_only_for_a_clean_engine():
+    import nodes.otr_silent_composite as SC
+    ghost = {"clips": [_clip_row(SC.DELIVERY_SCALE_MODE_CLEAN)]}
+    assert SC._has_model_eligible_clips(ghost) is False
+    assert SC._has_model_eligible_clips(ghost, clean_engine=True) is True
+    assert SC._has_model_eligible_clips({"clips": [_clip_row()]}) is True
+    assert SC._engine_is_clean_full_frame("rtx_vsr") is True
+    assert SC._engine_is_clean_full_frame("spandrel_esrgan") is False
+    assert SC._engine_is_clean_full_frame("off") is False
+    assert SC._engine_is_clean_full_frame("no_such_engine") is False
+
+
+def _route(monkeypatch, engine, *, mode, src_dims=(512, 288)):
+    import nodes.otr_silent_composite as SC
+    from nodes._otr_upscale_engines import _pipeline as P
+    seen = {"ffmpeg": [], "model": 0}
+
+    def fake_run(cmd):
+        seen["ffmpeg"].append(cmd[cmd.index("-vf") + 1])
+        return types.SimpleNamespace(returncode=0, stderr="")
+    monkeypatch.setattr(SC, "_run", fake_run)
+    monkeypatch.setattr(SC, "_color_args", lambda fb, p: [p])
+    monkeypatch.setattr(P, "_probe_video_dims", lambda fb, src: (*src_dims, 25))
+
+    def fake_model(**kw):
+        seen["model"] += 1
+    monkeypatch.setattr(SC, "_run_model_pipeline", fake_model)
+    SC._encode_segment("ffmpeg", "clip.mp4", 25, "seg.mp4", w=1920, h=1080,
+                       fps=25, sharpen=True, engine=engine,
+                       delivery_scale_mode=mode)
+    return seen
+
+
+class _Clean:
+    name, clean_full_frame, device = "rtx_vsr", True, "cuda:0"
+
+
+class _NotClean:
+    name, device = "spandrel_esrgan", "cpu"
+
+
+def test_a_ghost_row_goes_through_rtx_vsr(monkeypatch):
+    import nodes.otr_silent_composite as SC
+    seen = _route(monkeypatch, _Clean(), mode=SC.DELIVERY_SCALE_MODE_CLEAN)
+    assert seen["model"] == 1 and seen["ffmpeg"] == []
+
+
+def test_a_ghost_row_keeps_clean_lanczos_under_esrgan_or_off(monkeypatch):
+    import nodes.otr_silent_composite as SC
+    for engine in (_NotClean(), None):
+        seen = _route(monkeypatch, engine, mode=SC.DELIVERY_SCALE_MODE_CLEAN)
+        assert seen["model"] == 0
+        (vf,) = seen["ffmpeg"]
+        assert "flags=lanczos" in vf and "unsharp" not in vf and "pad=1920" not in vf
+
+
+def test_a_ghost_row_already_at_canvas_keeps_its_declared_chain(monkeypatch):
+    import nodes.otr_silent_composite as SC
+    seen = _route(monkeypatch, _Clean(), mode=SC.DELIVERY_SCALE_MODE_CLEAN,
+                  src_dims=(1920, 1080))
+    assert seen["model"] == 0
+    (vf,) = seen["ffmpeg"]
+    assert "flags=lanczos" in vf and "unsharp" not in vf and "pad=1920" not in vf
