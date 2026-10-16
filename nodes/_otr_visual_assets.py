@@ -1043,13 +1043,14 @@ def _redact_credentials(message):
     import urllib.parse
 
     # Two-token header forms, before tokenising.
-    # The scheme word (Bearer/Basic/Token/...) is consumed WITH its value: a
-    # rule that stopped at the first token redacted "Authorization: Bearer"
-    # and left the opaque credential after it in the clear (Codex review,
-    # 2026-10-16), since the Bearer rule below then had nothing to match.
-    message = re.sub(
-        r"(?i)\bauthorization\s*:\s*(?:(?:bearer|basic|token|digest|negotiate)\s+)?\S+",
-        "<credential redacted>", message)
+    # THE WHOLE HEADER VALUE, TO THE END OF ITS LINE. Stopping at a token
+    # left credentials behind every time the value had more than one: the
+    # scheme word alone ("Authorization: Bearer <opaque>"), a quoted value,
+    # Digest's response="...", comma-separated parts (Codex and Sonnet
+    # reviews, 2026-10-16). A diagnostic loses the rest of that one line;
+    # nothing else.
+    message = re.sub(r"(?i)\b(?:proxy-)?authorization\s*[:=][^\r\n]*",
+                     "<credential redacted>", message)
     message = re.sub(r"(?i)\bbearer\s+\S+", "<credential redacted>", message)
 
     out = []

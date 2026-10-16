@@ -487,11 +487,21 @@ if __name__ == "__main__":
     "authorization: basic dXNlcjpwYXNz",
     "Proxy-Authorization: Token abc123XYZ",
     "Authorization:Q7m9Z2x4",
+    'Authorization: "Bearer Q7m9Z2x4"',
+    'Authorization: Digest username="a", response="Q7m9Z2x4"',
+    "Authorization: Bearer abc, Q7m9Z2x4",
+    "Authorization = Bearer Q7m9Z2x4",
 ])
 def test_an_opaque_authorization_value_is_redacted(header):
     """Codex review 2026-10-16: the header rule used to stop at the scheme word,
     leaving an opaque token (no key-like substring) in the clear. The earlier
     test's secret contained "SECRET", which the key filter caught by luck."""
-    opaque = header.split()[-1].split(":")[-1]
+    opaque = "Q7m9Z2x4" if "Q7m9Z2x4" in header else header.split()[-1].split(":")[-1]
     out = _visual_assets()._redact_credentials("pip said: %s (403)" % header)
     assert opaque not in out and "redacted" in out, out
+
+
+def test_the_header_redaction_stops_at_the_end_of_its_line():
+    out = _visual_assets()._redact_credentials(
+        "Authorization: Bearer Q7m9Z2x4\nERROR: No matching distribution")
+    assert "Q7m9Z2x4" not in out and "No matching distribution" in out
