@@ -156,9 +156,45 @@ def test_a_signed_url_loses_its_query_whatever_the_names(url):
     """Sonnet QA 2026-10-16: signed-URL parameters are not enumerable."""
     out = redact("failed for url: " + url + " (403)")
     assert "Q7m9Z2x4" not in out and PH in out, out
-    assert "https://h/" in out and out.endswith(" (403)"), out   # host/path kept
+    assert "https://h/" not in out and out.endswith(" (403)"), out   # whole URL
 
 
 def test_a_harmless_query_survives():
     url = "https://huggingface.co/x/resolve/main/f.safetensors?download=true"
     assert redact("GET " + url) == "GET " + url
+
+
+@pytest.mark.parametrize("text", [
+    "cdn-lfs.hf.co/f?code=Q7m9Z2x4",
+    "fail cdn-lfs.hf.co/repos/ab/f.bin?code=Q7m9Z2x4&x=1 end",
+    "www.example.com/f?st=Q7m9Z2x4",
+    "//cdn.x/f?code=Q7m9Z2x4",
+    "GET /f?code=Q7m9Z2x4 HTTP/1.1",
+    "Location: /f?code=Q7m9Z2x4",
+    "HTTPSConnectionPool(host='h', port=443): Max retries exceeded with "
+    "url: /f?code=Q7m9Z2x4 (Caused by X)",
+    "https%3A%2F%2Fh%2Ff%3Fcode%3DQ7m9Z2x4",
+    "https://h/f%3Fcode=Q7m9Z2x4",
+    "https://[::1]/f?code=Q7m9Z2x4",
+])
+def test_every_query_shaped_address_loses_its_query(text):
+    """Sonnet QA 2026-10-16: no scheme, path-only (how requests prints it),
+    percent-encoded, an encoded '?', an IPv6 host."""
+    out = redact(text)
+    assert "Q7m9Z2x4" not in out and PH in out, out
+
+
+@pytest.mark.parametrize("wrapped,kept", [
+    ('"https://h/f?code=Q7m9Z2x4"', '"'),
+    ("(https://h/f?code=Q7m9Z2x4)", ")"),
+    ("[https://h/f?code=Q7m9Z2x4]", "]"),
+    ("see https://h/f?code=Q7m9Z2x4, then retry", ", then retry"),
+])
+def test_closing_punctuation_survives_the_redaction(wrapped, kept):
+    out = redact(wrapped)
+    assert "Q7m9Z2x4" not in out and kept in out, out
+
+
+def test_a_sentence_ending_in_a_question_mark_is_left_alone():
+    text = "Is the model on disk? Check C:\ComfyUI-Models first."
+    assert redact(text) == text

@@ -1089,12 +1089,19 @@ _URL_QUERY_RE = re.compile(
 _HARMLESS_QUERY_RE = re.compile(
     r"(?i)^\?(?:(?:download|raw|dl)=(?:true|false|1|0)&?)+$")
 
+#: Punctuation that closes or ends a URL in prose, kept around a redaction.
+_URL_CLOSERS = "\"')]}>,.;"
+
 
 def _redact_url_query(match):
     base, rest = match.group(1), match.group(2)
     if _HARMLESS_QUERY_RE.match(rest):
         return match.group(0)
-    return base + rest[0] + _REDACTION_SENTINEL
+    # The WHOLE URL goes, host included: a signed URL's host is part of what
+    # test_a_transfer_failure_never_exposes_a_signed_url forbids exposing.
+    # Sentence punctuation after it is not part of the URL and is kept.
+    core = rest.rstrip(",.;")
+    return _REDACTION_SENTINEL + rest[len(core):]
 
 
 def _redact_credentials(message):
@@ -1109,10 +1116,11 @@ def _redact_credentials(message):
     a SEPARATOR (``: = -> =>``, percent-encoded too, or end of line then the
     next line) and its VALUE (quoted strings, an auth scheme plus its token,
     comma/semicolon lists, k=v parameters) are matched as one unit and
-    replaced; so is a URL carrying a login (``user:pass@host``), the query
-    string and fragment of any URL (unless they are only ``download=true``
-    and the like), and a bare ``Bearer <value>``. A URL's scheme, host and
-    path survive as the diagnostic they are.
+    replaced; so is a URL carrying a login (``user:pass@host``), any URL or
+    path that carries a query string or fragment (unless it is only
+    ``download=true`` and the like) -- WHOLE, host included -- and a bare
+    ``Bearer <value>``. A plain URL with no query survives as the diagnostic
+    it is.
 
     WHAT SURVIVES, deliberately: text around a redacted value on the same line
     (a pip error or a Windows path after ``key = value`` is kept), and words
@@ -1130,25 +1138,14 @@ def _redact_credentials(message):
         scrubbed = _REDACT_RE.sub(_REDACTION_SENTINEL, text)
         scrubbed = _URL_QUERY_RE.sub(_redact_url_query, scrubbed)
         out = []
-        for token in re.split(r"(\s+)", scrubbed):
-            if not token.strip():
-                out.append(token)
+        for raw_token in re.split(r"(\s+)", scrubbed):
+            if not raw_token.strip():
+                out.append(raw_token)
                 continue
-            if _REDACTION_SENTINEL in token:
-                # A query string with a redacted parameter is redacted WHOLE
-                # (the other parameters of a signed URL are not worth the
-                # risk), but the address before the "?" is kept: it names the
-                # host and file that failed.
-                if ("?" + _REDACTION_SENTINEL in token
-                        or "&" + _REDACTION_SENTINEL in token):
-                    if "?" in token:
-                        out.append(token.split("?", 1)[0] + "?"
-                                   + _REDACTION_SENTINEL)
-                    else:
-                        out.append(_REDACTION_SENTINEL)
-                else:
-                    out.append(token)
-                continue
+            # Closing punctuation around a URL (quotes, brackets, a trailing
+            # comma or full stop) is kept around whatever replaces it.
+            token = raw_token.rstrip(_URL_CLOSERS)
+            tail = raw_token[len(token):]
             probe = token
             for _ in range(2):
                 if "%" not in probe:
@@ -1157,10 +1154,33 @@ def _redact_credentials(message):
                 if unquoted == probe:
                     break
                 probe = unquoted
+            # ANY address with a query string loses the query -- with or
+            # without a scheme, path-only ("url: /f?code=..." from requests),
+            # IPv6 host, or percent-encoded ("%3F") -- because signed-URL
+            # secrets live there under names no list can enumerate (Sonnet
+            # QA, 2026-10-16). The whole address goes, host included (the
+            # signed-URL contract in test_visual_assets_stdlib); a PLAIN
+            # address with no query survives as the diagnostic. Query-shaped
+            # means a "/" before the "?" or a "=" after it, so a sentence
+            # ending in "?" is left alone.
+            q = probe.find("?")
+            looks_like_query = q >= 0 and ("/" in probe[:q]
+                                           or "=" in probe[q + 1:])
+            if looks_like_query and not _HARMLESS_QUERY_RE.match(probe[q:]):
+                out.append(_REDACTION_SENTINEL + tail)
+                continue
+            if _REDACTION_SENTINEL in token:
+                # A redacted query parameter takes its whole address with it.
+                if ("?" + _REDACTION_SENTINEL in token
+                        or "&" + _REDACTION_SENTINEL in token):
+                    out.append(_REDACTION_SENTINEL + tail)
+                else:
+                    out.append(raw_token)
+                continue
             if probe != token and _REDACT_RE.search(probe):
-                out.append(_REDACTION_SENTINEL)
+                out.append(_REDACTION_SENTINEL + tail)
             else:
-                out.append(token)
+                out.append(raw_token)
         return "".join(out).replace(_REDACTION_SENTINEL, _REDACTION_PLACEHOLDER)
     except Exception:  # noqa: BLE001 -- a redactor must never raise or leak
         return _REDACTION_PLACEHOLDER
