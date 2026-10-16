@@ -140,3 +140,17 @@ def test_the_8gb_workflows_pick_the_8gb_lanes():
         text = (root / wf).read_text(encoding="utf-8")
         assert text.count('"%s (16:9)"' % lane) == 3, wf
         assert "_16gb (16:9)" not in text, wf
+
+
+def test_the_8gb_lanes_stamp_the_single_stage_recipe(monkeypatch):
+    """Codex review 2026-10-16: the clip receipt (manifest, credits) said
+    ltx_2_5_two_stage on lanes that skip the refine pass."""
+    import inspect
+    src = inspect.getsource(E.Ltx25VideoEngine.render_clip)
+    assert "LTX25_SINGLE_STAGE_RECIPE_ID" in src and "self._two_stage" in src
+    assert R.LTX25_SINGLE_STAGE_RECIPE_ID != R.LTX25_TWO_STAGE_RECIPE_ID
+    small = vreg.get_engine("ltx25_foley_8gb")
+    clip = small._clip_from_raw(
+        {"canvas": "832x480", "recipe": R.LTX25_SINGLE_STAGE_RECIPE_ID},
+        {"shot_id": "s"})
+    assert clip["recipe"] == "ltx_2_5_single_stage"

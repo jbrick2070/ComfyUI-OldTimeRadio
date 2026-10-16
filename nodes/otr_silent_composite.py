@@ -1069,23 +1069,30 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
                 continue
             arr = np.frombuffer(buf, dtype=np.uint8).copy()
             arr = arr.reshape((got, int(src_h), int(src_w), 3))
-            # engine.device (Antigravity r3 MF-3) -- public property, never
-            # reach into engine._descriptor.
-            bhwc = torch.from_numpy(arr).to(engine.device).float() / 255.0
+            # THE TYPED BOUNDARY covers every GPU-side spatial step for this
+            # frame -- the transfer to the engine's device, the model, its
+            # output check, the fit to the canvas and the conversion back --
+            # because a CUDA OOM in any of them is the optional upscaler's
+            # failure, not the episode's (Codex review, 2026-10-16). Decode
+            # reads above and the encoder write below stay OUTSIDE it: those
+            # are the timeline's own and must propagate untouched.
             try:
+                # engine.device (Antigravity r3 MF-3) -- public property,
+                # never reach into engine._descriptor.
+                bhwc = torch.from_numpy(arr).to(engine.device).float() / 255.0
                 out_bhwc = engine.upscale_frames(bhwc)
                 _validate_engine_output(
                     out_bhwc, expected_scale=int(engine.intrinsic_scale),
                     in_shape=bhwc.shape)
+                out_bhwc = _fit(out_bhwc, int(w), int(h))
+                # .contiguous() before .numpy() -- non-contiguous tensors after
+                # a permute would raise or corrupt strides (Antigravity r4 MF-2).
+                out_u8 = (out_bhwc.clamp(0, 1) * 255.0).byte().contiguous().cpu().numpy()
             except Exception as exc:  # noqa: BLE001 -- re-raised, typed
                 raise UpscaleEngineFailed(
                     "%s failed on frame %d of %s (%s: %s)" % (
                         engine.name, frames_written, os.path.basename(src),
                         type(exc).__name__, exc)) from exc
-            out_bhwc = _fit(out_bhwc, int(w), int(h))
-            # .contiguous() before .numpy() -- non-contiguous tensors after a
-            # permute would raise or corrupt strides (Antigravity r4 MF-2).
-            out_u8 = (out_bhwc.clamp(0, 1) * 255.0).byte().contiguous().cpu().numpy()
             out_bytes = out_u8.tobytes()
             enc.stdin.write(out_bytes)
             if got == 1:

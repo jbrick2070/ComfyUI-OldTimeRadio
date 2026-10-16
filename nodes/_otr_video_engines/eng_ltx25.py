@@ -1591,7 +1591,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         raw = {
             "out_path": path, "frame_count": n, "vram_peak_mb": peak,
             "render_elapsed_s": render_elapsed_s,
-            "recipe": R.LTX25_TWO_STAGE_RECIPE_ID,
+            "recipe": (R.LTX25_TWO_STAGE_RECIPE_ID if self._two_stage
+                       else R.LTX25_SINGLE_STAGE_RECIPE_ID),
             "unet": os.path.basename(str(self._dit_name())),
             "quant": self._quant_label(), "use_lora": False,
             "canvas": "%dx%d" % self._output_canvas(),

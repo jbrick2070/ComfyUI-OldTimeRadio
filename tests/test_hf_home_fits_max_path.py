@@ -480,3 +480,18 @@ def test_prestartup_stays_ascii_only():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+@pytest.mark.parametrize("header", [
+    "Authorization: Bearer Q7m9Z2x4",
+    "authorization: basic dXNlcjpwYXNz",
+    "Proxy-Authorization: Token abc123XYZ",
+    "Authorization:Q7m9Z2x4",
+])
+def test_an_opaque_authorization_value_is_redacted(header):
+    """Codex review 2026-10-16: the header rule used to stop at the scheme word,
+    leaving an opaque token (no key-like substring) in the clear. The earlier
+    test's secret contained "SECRET", which the key filter caught by luck."""
+    opaque = header.split()[-1].split(":")[-1]
+    out = _visual_assets()._redact_credentials("pip said: %s (403)" % header)
+    assert opaque not in out and "redacted" in out, out

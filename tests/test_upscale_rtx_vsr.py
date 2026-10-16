@@ -773,3 +773,19 @@ def test_a_gtx_card_never_downloads_the_sdk(monkeypatch):
     with pytest.raises(EngineUnusable, match="GTX"):
         V.RtxVsr().load(torch.device("cuda:0"))
     assert calls == []
+
+
+def test_every_gpu_spatial_step_sits_inside_the_typed_boundary():
+    """Codex review 2026-10-16: a CUDA OOM in the device transfer, the fit or
+    the conversion back is the upscaler's failure too, so it must raise
+    UpscaleEngineFailed (and earn the off redo); the encoder write must not."""
+    import inspect
+    import nodes.otr_silent_composite as SC
+    src = inspect.getsource(SC._run_model_pipeline)
+    start = src.index("try:\n                # engine.device")
+    end = src.index("raise UpscaleEngineFailed(", start)
+    guarded = src[start:end]
+    for step in (".to(engine.device)", "engine.upscale_frames(",
+                 "_validate_engine_output(", "_fit(out_bhwc", ".cpu().numpy()"):
+        assert step in guarded, step
+    assert "enc.stdin.write" not in guarded

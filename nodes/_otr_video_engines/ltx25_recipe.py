@@ -252,6 +252,10 @@ LTX25_STAGE2_DECODE_NEEDS_MB = 8300
 #: Python input is ``sigmas``. The value is byte-identical to the lab recipe.
 LTX25_REFINE_SIGMAS = "0.85, 0.7250, 0.4219, 0.0"
 LTX25_TWO_STAGE_RECIPE_ID = "ltx_2_5_two_stage"
+#: The 8 GB lanes' recipe: stage one only, decoded at 832x480 (2026-10-15).
+#: Stamped on their clip receipts, the manifest and the credits so a reader
+#: never sees "two_stage" on a clip that skipped the refine pass.
+LTX25_SINGLE_STAGE_RECIPE_ID = "ltx_2_5_single_stage"
 
 # ---------------------------------------------------------------------------
 # Conditioning -- the first-frame anchor

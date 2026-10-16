@@ -104,8 +104,10 @@ native 1472x832:
 | `off` (lanczos + unsharp) | 37 ms (ffmpeg, same benchmark; 16 ms at the half-size fidelity shape) | PSNR 36.0, SSIM 0.944 |
 
 So it is the upscaler to pick on an RTX card, at roughly a hundredth of
-Real-ESRGAN's cost. It is not on by default: `off` still scores as well on
-fidelity, and no published episode has used `rtx_vsr` yet.
+Real-ESRGAN's cost. `off` scores as well on fidelity -- VSR's gain is crisper
+edges -- so it is the canonical graph's default, while every NVIDIA workflow
+selects `rtx_vsr` (since 2026-10-15). First published with it on the RTX 4060
+on 2026-10-16: AnimateDiff episodes upscaled clip by clip.
 
 **The install happens by itself.** Its models ship inside NVIDIA's own
 package, `nvidia-vfx`, so there is no checkpoint to fetch. The first time the
