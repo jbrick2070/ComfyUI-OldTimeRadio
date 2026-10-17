@@ -304,10 +304,38 @@ def _spoken_words(text: str) -> "list[str]":
     return [w for w in words if w]
 
 
+#: Scripts written without spaces between words: kana, Han, Thai and Lao,
+#: Myanmar, Khmer. In them no character boundary is a word boundary anyone
+#: can see, so word-shaped checks have to stand aside (Sonnet QA on 10b7b2fa:
+#: a Thai doubled line slipped the repeat guard, and Japanese and Chinese
+#: deletions were refused as "mid-word").
+_SPACELESS_RANGES = (
+    ("\u3040", "\u30ff"), ("\u3400", "\u9fff"), ("\u0e00", "\u0eff"),
+    ("\u1000", "\u109f"), ("\u1780", "\u17ff"),
+)
+
+
+def _spaceless_char(ch: str) -> bool:
+    return any(low <= ch <= high for low, high in _SPACELESS_RANGES)
+
+
 def _written_without_spaces(text: str) -> bool:
-    # Hiragana, katakana and the Han ideographs (Japanese and Chinese).
-    return any("぀" <= ch <= "ヿ" or "㐀" <= ch <= "鿿"
-               for ch in text or "")
+    return any(_spaceless_char(ch) for ch in text or "")
+
+
+def _continues_word(edge: str, line: str, index: int, step: int) -> bool:
+    """Does ``line[index]`` carry on the word whose last (or first) letter is
+    ``edge``? Letters do, and so does word-internal punctuation between two
+    letters -- "grid's", "grid-lock", "3.5", "3/4". Never in a spaceless
+    script, where every boundary looks like this."""
+    if not (0 <= index < len(line)) or not _is_word_char(edge) or _spaceless_char(edge):
+        return False
+    ch = line[index]
+    if _is_word_char(ch):
+        return not _spaceless_char(ch)
+    beyond = index + step
+    return (ch in "'\u2019-./" and 0 <= beyond < len(line)
+            and _is_word_char(line[beyond]) and not _spaceless_char(line[beyond]))
 
 
 def _character_pairs(text: str) -> "set[str]":
@@ -328,6 +356,11 @@ def _longest_shared_run(a: "Sequence[str]", b: "Sequence[str]") -> int:
     return best
 
 
+def _bare_word(word: str) -> str:
+    """A word without its possessive: "keeper's" reads as "keeper"."""
+    return word[:-2] if word.endswith("'s") and len(word) > 2 else word
+
+
 def _repeats_kept_speech(replacement: str, kept: str) -> bool:
     """True when a replacement says again what the line already keeps.
 
@@ -341,7 +374,8 @@ def _repeats_kept_speech(replacement: str, kept: str) -> bool:
     of its character pairs in Chinese or Japanese) is that mistake; Python only
     refuses the construction, it writes no prose.
     """
-    rep, keep = _spoken_words(replacement), _spoken_words(kept)
+    rep = [_bare_word(word) for word in _spoken_words(replacement)]
+    keep = [_bare_word(word) for word in _spoken_words(kept)]
     if not rep or not keep:
         return False
     run = _longest_shared_run(rep, keep)
@@ -398,6 +432,16 @@ def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: 
     candidate = "".join(pieces)
     if not candidate.strip():
         raise ValueError("The final spoken row must contain speech")
+    # THE ANSWER THAT CHANGES NOTHING. The marked words handed back as their
+    # own replacement -- or the whole line echoed, a comma off -- leaves every
+    # spoken word in place, and a single-vote reread that happened to pass it
+    # would record the direction as repaired (agy/Gemini 4 and Sonnet QA on
+    # 10b7b2fa). Fixing one span of two is progress and is not this.
+    if _spoken_words(candidate) == _spoken_words(text):
+        raise ValueError(
+            "The replacements change no spoken word of the line -- the marked "
+            "words are all still there. Return what takes their place; an "
+            "empty replacement removes a direction.")
     return candidate
 
 
@@ -447,12 +491,18 @@ def _replacements_from_whole_line(
         if found < 0 or line.count(core) != 1:
             return None
         end = found + len(core)
-        # A kept slice is matched as WORDS, never inside a longer one:
-        # "I see the grids." holds "I see the grid" only as a fragment, and
-        # the "s" would be spliced in as a gap of its own.
-        if ((found > 0 and _is_word_char(core[0]) and _is_word_char(line[found - 1]))
-                or (end < len(line) and _is_word_char(core[-1])
-                    and _is_word_char(line[end]))):
+        # A kept slice that owns the space at a junction keeps it: the model's
+        # line needs a space there too, or "I can (sigh) see" answered "I
+        # can't see" splices to "I can 't see" (agy/Gemini 4 and Sonnet QA on
+        # 10b7b2fa).
+        if piece != piece.rstrip() and end < len(line) and not line[end].isspace():
+            return None
+        if piece != piece.lstrip() and found > 0 and not line[found - 1].isspace():
+            return None
+        # And it is matched as WORDS where its script has them: "I see the
+        # grids." or "the grid's" holds "I see the grid" only as a fragment.
+        if (_continues_word(core[0], line, found - 1, -1)
+                or _continues_word(core[-1], line, end, +1)):
             return None
         cores.append((found, end))
         position = end
@@ -482,10 +532,6 @@ def _replacements_from_whole_line(
         if following < len(kept) and kept[following] != kept[following].lstrip():
             gap = gap.rstrip()
         recovered.append({"span_id": span.span_id, "replacement": gap})
-    quotes = [" ".join(span.quote.split()).casefold() for span in spans]
-    if any(quote and quote in " ".join(item["replacement"].split()).casefold()
-           for quote in quotes for item in recovered):
-        return None
     try:
         _splice_replacements(text, spans, recovered)
     except ValueError:

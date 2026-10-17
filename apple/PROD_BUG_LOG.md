@@ -16553,3 +16553,28 @@ not promote it to the Bug Bible on this evidence alone.
   echo is ignored, and only on already_spoken / unresolved
   (whole_row_direction still takes no spans). The fuzz's garbled count is 0
   of 8,127 whole-line acceptances.
+
+## PBUG-20261016-03 -- second correction: junctions, spaceless scripts, no-op answers
+- agy on Gemini 4 Argon High and a Sonnet QA, both on 10b7b2fa, agreed:
+  1. a kept slice that owns the space at a junction could meet a model line
+     with none ("I can (sigh) see" answered "I can't see" spliced to "I can
+     't see"; also "Thorne's", "grid-lock", "3.5", "3/4") -- every case of
+     that kind in the fuzz came out garbled;
+  2. the letters-only word check refused every Japanese and Chinese mid-line
+     deletion (every CJK character is a letter, and nothing is spaced);
+  3. a span-shaped answer that hands the marked words back as their own
+     replacement, or a whole-line echo a comma off, still read as a repair to
+     a single-vote reread that passed it;
+  4. the echo test reread dirty and so proved nothing.
+- also found, older than this work: the doubled-line guard missed Thai (not
+  in its spaceless set) and possessives ("Keeper's stable." for a kept
+  "Keeper stable.").
+- fix: the junction space is kept or the reading is refused; word-internal
+  punctuation counts as part of the word; spaceless scripts (kana, Han, Thai,
+  Lao, Myanmar, Khmer) skip the word check and join the repeat guard's
+  character-pair path; the splice refuses any answer that changes no spoken
+  word of the line (fixing one span of two is still progress); the repeat
+  guard reads "keeper's" as "keeper"; the echo test rereads clean. The
+  "credit no one" sentence now lets the close name people and places the
+  text itself names, and no longer claims the text was typed in (a real feed
+  with no title would have read that).

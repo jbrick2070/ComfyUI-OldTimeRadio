@@ -1615,14 +1615,66 @@ def test_echoing_the_original_line_is_no_repair(answer):
     assert lcl._replacements_from_whole_line(SHARP, spans, _replacement_reply(answer)["replacements"]) is None
 
 
-def test_an_echoed_original_never_ships_as_repaired_even_past_a_lenient_reread():
+@pytest.mark.parametrize("answer", [
+    INVISIBLE,                                   # the whole line handed back
+    "The door closes behind him.",               # the marked span as its own replacement
+    "The door closes behind him, I told you he would not stay.",  # an echo, one comma off
+])
+def test_an_echoed_original_never_ships_as_repaired_even_past_a_lenient_reread(answer):
+    """The reread is scripted CLEAN here, so only the refusal can stop it.
+    (The first cut of this test reread dirty and proved nothing -- agy/Gemini 4
+    and Sonnet QA on 10b7b2fa.)"""
     ledger = _ledger(INVISIBLE)
-    slot = _Slot(judgements={INVISIBLE: [_dirty_judgement("The door closes behind him.")]},
-                 repairs={INVISIBLE: [_replacement_reply(INVISIBLE)]})
+    slot = _Slot(judgements={INVISIBLE: [_dirty_judgement("The door closes behind him."),
+                                         CLEAN_JUDGEMENT]},
+                 repairs={INVISIBLE: [_replacement_reply(answer)]})
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
     assert ledger["lines"][1]["text"] == INVISIBLE
     assert receipt["rows"][0]["outcome"] != "repaired"
     assert receipt["unclean"] == 1
+
+
+@pytest.mark.parametrize("text, interval, answer", [
+    ("I can (sigh) see the grid.", (6, 12), "I can't see the grid."),
+    ("That is Thorne (sigh) logbook.", (15, 21), "That is Thorne's logbook."),
+    ("I see the grid (sigh)", (15, 21), "I see the grid's lamp."),
+    ("I see the grid (sigh)", (15, 21), "I see the grid-lock."),
+    ("Set it to 3 (beat) now.", (12, 18), "Set it to 3.5 now."),
+])
+def test_a_whole_line_answer_never_splits_a_word_at_the_junction(text, interval, answer):
+    spans = lcl._merge_repair_spans(text, [interval])
+    assert lcl._replacements_from_whole_line(text, spans, _replacement_reply(answer)["replacements"]) is None
+
+
+@pytest.mark.parametrize("text, interval, answer, spoken", [
+    ("彼は(ため息)何かを見ている。", (2, 7), "彼は何かを見ている。", "彼は何かを見ている。"),
+    ("我(叹气)看见了灯塔。", (1, 5), "我看见了灯塔。", "我看见了灯塔。"),
+])
+def test_a_spaceless_script_whole_line_answer_is_still_read_back(text, interval, answer, spoken):
+    spans = lcl._merge_repair_spans(text, [interval])
+    recovered = lcl._replacements_from_whole_line(text, spans, _replacement_reply(answer)["replacements"])
+    assert recovered is not None
+    assert lcl._splice_replacements(text, spans, recovered) == spoken
+
+
+def test_a_word_inside_a_longer_word_is_not_the_marked_span():
+    text = "Turns. I told you he would not stay."
+    spans = lcl._merge_repair_spans(text, [(0, 6)])
+    recovered = lcl._replacements_from_whole_line(
+        text, spans, _replacement_reply("He returns. I told you he would not stay.")["replacements"])
+    assert recovered == [{"span_id": "span_001", "replacement": "He returns."}]
+
+
+@pytest.mark.parametrize("text, interval, answer", [
+    # Thai is written without spaces; the repeat guard reads it by character pairs.
+    ("ฉัน(ถอนหายใจ)เห็นประภาคาร", (3, 13), "ฉันเห็นประภาคาร"),
+    # A possessive is still the same word said twice.
+    ("Keeper (sighs) stable.", (7, 14), "Keeper's stable."),
+])
+def test_the_doubled_line_guard_reads_thai_and_possessives(text, interval, answer):
+    spans = lcl._merge_repair_spans(text, [interval])
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"])
 
 
 @pytest.mark.parametrize("replacements", [

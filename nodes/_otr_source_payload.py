@@ -138,10 +138,11 @@ SOURCE_PAYLOAD_KEYS = frozenset({
 #: the outlet slot carried that label, "A researcher noted ..." once it
 #: carried nothing (both 2026-10-16). One sentence, one owner, every bank.
 NO_NAMED_SOURCE_NOTE = (
-    "NO NAMED SOURCE: nothing here names an outlet, author, archive or "
-    "publication -- this source was typed in for the episode. Credit it to no "
-    "one: do not invent a researcher, institution, archive, publication or "
-    "label as its source."
+    "NO NAMED SOURCE: nothing here names the outlet, author, archive or "
+    "publication this came from. Do not say who reported it, and do not invent "
+    "a researcher, institution, archive, publication or label as its source. "
+    "People, places and institutions the text itself names may still be named "
+    "as part of what it says."
 )
 
 
