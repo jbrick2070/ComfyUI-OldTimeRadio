@@ -274,6 +274,11 @@ try:
 except ImportError:  # pragma: no cover - standalone / test load
     from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
 
+try:
+    from . import _otr_source_payload as _osp
+except ImportError:  # pragma: no cover - standalone / test load
+    import _otr_source_payload as _osp  # type: ignore
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -339,7 +344,8 @@ def _build_user_prompt(
         "technology terms).\n"
         "\n"
         f"{wrapper}\n"
-        "Return ONE JSON object. No prose. No code fences.\n"
+        + (_osp.NO_NAMED_SOURCE_NOTE + "\n" if not _osp.names_a_source(outlet) else "")
+        + "Return ONE JSON object. No prose. No code fences.\n"
     )
 
 

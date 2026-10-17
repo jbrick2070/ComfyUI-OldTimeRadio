@@ -731,8 +731,11 @@ def _build_news_payload(
     origin_label, when present, rides the entry dict; the video HUD
     reads it with "NEWS SEED" as the legacy default.
     """
+    # A typed premise has no outlet: the slot stays empty rather than carry
+    # the provenance label "User Seed", which a model once read as a source
+    # (2026-10-16). `seed_source` is the provenance.
     source = source_label or (
-        "User Seed" if seed_source == "custom_premise" else "RSS Auto-Fetch"
+        "" if seed_source == "custom_premise" else "RSS Auto-Fetch"
     )
     entry = {
         "headline":  headline_override or outline.title,

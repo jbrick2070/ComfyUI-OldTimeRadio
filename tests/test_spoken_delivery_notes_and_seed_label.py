@@ -20,7 +20,12 @@ import json
 
 import pytest
 
+from nodes import _otr_media_archive_interpreter as MEDIA
+from nodes import _otr_public_domain_sources as PUBLIC
 from nodes import _otr_scifi_news_pro as PRO
+from nodes import _otr_shakespeare_sources as BARD
+from nodes import _otr_source_payload as OSP
+from nodes import news_interpreter as SCIENCE
 from nodes.OTR_LedgerScriptWriter import _resolve_inputs
 from nodes._otr_audio_engines import eng_bark, eng_chatterbox, eng_indextts2, eng_kokoro
 from nodes._otr_script_prep import keep_spoken_parentheticals
@@ -119,7 +124,7 @@ def _close_prompt(monkeypatch, article):
 def test_the_close_is_never_handed_a_label_as_its_source(monkeypatch, typed_premise):
     user = _close_prompt(monkeypatch, typed_premise["news_article"])
     assert "User Seed" not in user
-    assert "NO NAMED REPORTER" in user
+    assert OSP.NO_NAMED_SOURCE_NOTE in user
 
 
 def test_a_real_outlet_is_still_offered_to_the_close(monkeypatch):
@@ -131,4 +136,56 @@ def test_a_real_outlet_is_still_offered_to_the_close(monkeypatch):
     }
     user = _close_prompt(monkeypatch, article)
     assert "ScienceDaily" in user
-    assert "NO NAMED REPORTER" not in user
+    assert OSP.NO_NAMED_SOURCE_NOTE not in user
+
+
+# Every bank with a source contract hands a typed premise to its own
+# interpreter, and every one of them is asked for a closing source note --
+# "who found or reported it", "a Folger/noncommercial source note", "a source
+# attribution note". The operator: "there are like 5 different source banks
+# you need to scrub for the same defect fix."
+
+def _prompt_text(messages):
+    return "\n".join(m["content"] for m in messages) if isinstance(messages, list) else messages
+
+
+def _science(article):
+    return SCIENCE._build_user_prompt(
+        headline=article["headline"], outlet=article["source"],
+        pub_date=article["date"], cleaned_body=article["full_text"])
+
+
+BANK_PROMPTS = [
+    ("media_archive", lambda a: _prompt_text(MEDIA._build_prompt(a))),
+    ("public_domain", lambda a: _prompt_text(PUBLIC._build_interpreter_prompt(a))),
+    ("shakespeare", lambda a: _prompt_text(BARD._build_interpreter_prompt(a))),
+    ("science_news", _science),
+]
+
+
+@pytest.mark.parametrize("bank, build", BANK_PROMPTS, ids=[b for b, _ in BANK_PROMPTS])
+def test_every_bank_tells_its_interpreter_a_typed_premise_has_no_one_to_credit(
+        bank, build, typed_premise):
+    prompt = build(dict(typed_premise["news_article"]))
+    assert OSP.NO_NAMED_SOURCE_NOTE in prompt
+    assert "User Seed" not in prompt
+
+
+@pytest.mark.parametrize("bank, build", BANK_PROMPTS, ids=[b for b, _ in BANK_PROMPTS])
+def test_a_fetched_source_with_an_outlet_is_left_alone(bank, build):
+    article = {
+        "headline": "Reel found", "summary": "A lost reel.", "full_text": "A lost reel was found.",
+        "source": "Library of Congress", "date": "2026-10-16", "link": "", "seed_text": "Reel found",
+    }
+    assert OSP.NO_NAMED_SOURCE_NOTE not in build(article)
+
+
+def test_the_news_used_payload_names_no_outlet_for_a_typed_premise():
+    from nodes import _otr_writer_tail as TAIL
+
+    class _Outline:
+        title = "The Thirty Year Echo"
+        premise = PREMISE
+
+    entry = json.loads(TAIL._build_news_payload(_Outline(), PREMISE, "custom_premise"))[0]
+    assert entry["source"] == ""

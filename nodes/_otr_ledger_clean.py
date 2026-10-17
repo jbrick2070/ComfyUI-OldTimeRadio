@@ -418,9 +418,16 @@ def _replacements_from_whole_line(
     line guard still reads every gap. None when the answer cannot be read
     that way -- the old refusal stands.
     """
+    # The same id contract the splice holds every answer to: one reply per
+    # approved span, no unknown or duplicate ids (Sonnet QA on 039bbb55).
+    ids = [item.get("span_id") for item in replacements]
+    if (not spans or any(not isinstance(value, str) for value in ids)
+            or len(ids) != len(set(ids))
+            or set(ids) != {span.span_id for span in spans}):
+        return None
     filled = [item for item in replacements
               if str(item.get("replacement") or "").strip()]
-    if len(filled) != 1 or not spans:
+    if len(filled) != 1:
         return None
     line = str(filled[0].get("replacement") or "")
     kept: "list[str]" = []
@@ -439,8 +446,16 @@ def _replacements_from_whole_line(
         found = line.find(core, position)
         if found < 0 or line.count(core) != 1:
             return None
-        cores.append((found, found + len(core)))
-        position = found + len(core)
+        end = found + len(core)
+        # A kept slice is matched as WORDS, never inside a longer one:
+        # "I see the grids." holds "I see the grid" only as a fragment, and
+        # the "s" would be spliced in as a gap of its own.
+        if ((found > 0 and _is_word_char(core[0]) and _is_word_char(line[found - 1]))
+                or (end < len(line) and _is_word_char(core[-1])
+                    and _is_word_char(line[end]))):
+            return None
+        cores.append((found, end))
+        position = end
     if not any(cores):
         return None
     # Nothing may stand outside the spans: words before the first kept slice
@@ -467,6 +482,10 @@ def _replacements_from_whole_line(
         if following < len(kept) and kept[following] != kept[following].lstrip():
             gap = gap.rstrip()
         recovered.append({"span_id": span.span_id, "replacement": gap})
+    quotes = [" ".join(span.quote.split()).casefold() for span in spans]
+    if any(quote and quote in " ".join(item["replacement"].split()).casefold()
+           for quote in quotes for item in recovered):
+        return None
     try:
         _splice_replacements(text, spans, recovered)
     except ValueError:
@@ -1746,6 +1765,16 @@ def _judge_row(
 # ---------------------------------------------------------------------------
 
 
+#: Authorization verdicts after which the row is left exactly as it was.
+_ROW_UNCHANGED_VERDICTS = frozenset({"already_spoken", "unresolved"})
+
+
+def _echoes_whole_row(text: str, quote: str) -> bool:
+    """Is this quote the whole spoken row, give or take whitespace?"""
+    normalized = " ".join(str(quote or "").split()).casefold()
+    return bool(normalized) and normalized == " ".join(str(text or "").split()).casefold()
+
+
 def _authorize_repair_scope(
     *, slot_fn, speaker: str, text: str, complaint: Sequence[Mapping[str, Any]],
     admissible: frozenset[str], lines_around: Sequence[str], where: str,
@@ -1799,14 +1828,17 @@ def _authorize_repair_scope(
         if result.verdict == "whole_row_direction" and not whole:
             return "Only an original whole-row complaint can authorize whole-row conversion"
         if result.verdict != "localized_defect":
-            # A verdict that needs no spans IGNORES an echoed one, and the echo
-            # grants nothing. 41 refusals in one night were exactly this: an
-            # already_spoken with the whole line copied into `spans`. A span
-            # that lands on PART of the line is still a contradiction.
-            for item in result.spans:
-                interval = _exact_interval(text, item.model_dump(), recover_unique=True)
-                if interval is not None and not _whole_spoken_row(text, interval):
-                    return "Only localized_defect may contain spans"
+            # A verdict that leaves the row as it is IGNORES the whole line
+            # echoed back in `spans`, and the echo grants nothing. 41 refusals
+            # in one night were exactly this: already_spoken with the line
+            # copied in. Any other span -- part of the line, a quote that
+            # occurs twice, one not in the line -- is still a contradiction,
+            # and whole_row_direction, which authorizes the widest rewrite,
+            # still takes no spans at all.
+            if result.spans and not (
+                    result.verdict in _ROW_UNCHANGED_VERDICTS
+                    and all(_echoes_whole_row(text, item.quote) for item in result.spans)):
+                return "Only localized_defect may contain spans"
             return None
         if not result.spans:
             return "localized_defect needs at least one exact original span"
@@ -1880,7 +1912,7 @@ def _authorize_repair_scope(
         record.update(verdict="unresolved", reason=str(exc))
         return "unresolved", (), record
     record.update(result.model_dump())
-    if result.verdict != "localized_defect" and result.spans:
+    if result.verdict in _ROW_UNCHANGED_VERDICTS and result.spans:
         record["ignored_spans"] = record.pop("spans")
         record["spans"] = []
     if result.verdict == "already_spoken":
@@ -1897,6 +1929,16 @@ def _authorize_repair_scope(
     resolved = [_exact_interval(text, item.model_dump(), recover_unique=True)
                 for item in result.spans]
     return "partial", _merge_repair_spans(text, original_partial + resolved), record
+
+
+#: The whole-line repair's worked example. The scoped branch swaps exactly
+#: these lines for a span-shaped one, so they live in one place.
+_WHOLE_LINE_EXAMPLE = (
+    "Example of the move, shape only -- your line is the one above:",
+    '  marked: "The door closes behind him." -- scene report',
+    "  before: The door closes behind him. I told you he would not stay.",
+    "  after:  There he goes -- door and all. I told you he would not stay.",
+)
 
 
 def _repair_prompt(
@@ -1983,11 +2025,7 @@ def _repair_prompt(
         "and is answered by the line after it. Do not contradict either "
         "one.",
         "",
-        "Example of the move, shape only -- your line is the one above:",
-        '  marked: "The door closes behind him." -- scene report',
-        "  before: The door closes behind him. I told you he would not stay.",
-        "  after:  There he goes -- door and all. I told you he would not "
-        "stay.",
+        *_WHOLE_LINE_EXAMPLE,
         "",
         # The judge's own standard, inside the repair. This is what cuts the
         # ping-pong between the two informed attempts.
@@ -2025,8 +2063,8 @@ def _repair_prompt(
         # The whole-line example and self-check below taught small writers to
         # answer a scoped edit with the whole line (29 refusals, 2026-10-16).
         # Show the shape a scoped answer actually has instead.
-        example = parts.index("Example of the move, shape only -- your line is the one above:")
-        parts[example:example + 4] = [
+        example = parts.index(_WHOLE_LINE_EXAMPLE[0])
+        parts[example:example + len(_WHOLE_LINE_EXAMPLE)] = [
             "Example of the move, shape only -- your spans are the ones below:",
             "  line:    (a heavy sigh) I told you he would not stay.",
             '  span:    span_001 = "(a heavy sigh)"',

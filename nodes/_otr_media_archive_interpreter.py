@@ -20,6 +20,11 @@ try:
 except ImportError:  # pragma: no cover - flat test imports
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
 
+try:
+    from . import _otr_source_payload as _osp
+except ImportError:  # pragma: no cover - flat test imports
+    import _otr_source_payload as _osp  # type: ignore
+
 
 PROMPT_VERSION = "media_archive_interpreter_v2"
 SCHEMA_VERSION = "media_archive_briefs_v2"
@@ -208,6 +213,8 @@ def _build_prompt(payload: dict) -> list[dict[str, str]]:
         "source material.\n\n"
         f"{source_block}"
     )
+    if not _osp.names_a_source(source, link):
+        instruction += "\n\n" + _osp.NO_NAMED_SOURCE_NOTE
     return [{"role": "user", "content": instruction}]
 
 

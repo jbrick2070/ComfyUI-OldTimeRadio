@@ -1595,3 +1595,68 @@ def test_the_authorization_prompt_asks_for_spans_only_when_localized():
     prompt = slot.authorization_prompts[0]
     assert "spans: [] for any other verdict" in prompt
     assert "never the whole line" in prompt
+
+
+# Sonnet QA on 039bbb55 -- four ways the whole-line reading let a bad answer in.
+
+@pytest.mark.parametrize("text, interval, answer", [
+    # A kept slice matched inside a longer word: the "s" became its own gap.
+    ("I see the grid (sigh)", (15, 21), "I see the grids."),
+    ("tonight we (d0) stable for now", (11, 15), "tonight well we stable for now"),
+])
+def test_a_kept_slice_is_matched_as_words_never_inside_one(text, interval, answer):
+    spans = lcl._merge_repair_spans(text, [interval])
+    assert lcl._replacements_from_whole_line(text, spans, _replacement_reply(answer)["replacements"]) is None
+
+
+@pytest.mark.parametrize("answer", [SHARP, "(sharp, questioning whisper)  " + SHARP_KEPT])
+def test_echoing_the_original_line_is_no_repair(answer):
+    spans = lcl._merge_repair_spans(SHARP, [(0, 28)])
+    assert lcl._replacements_from_whole_line(SHARP, spans, _replacement_reply(answer)["replacements"]) is None
+
+
+def test_an_echoed_original_never_ships_as_repaired_even_past_a_lenient_reread():
+    ledger = _ledger(INVISIBLE)
+    slot = _Slot(judgements={INVISIBLE: [_dirty_judgement("The door closes behind him.")]},
+                 repairs={INVISIBLE: [_replacement_reply(INVISIBLE)]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == INVISIBLE
+    assert receipt["rows"][0]["outcome"] != "repaired"
+    assert receipt["unclean"] == 1
+
+
+@pytest.mark.parametrize("replacements", [
+    [{"span_id": "zzz", "replacement": SHARP_KEPT}],
+    [{"span_id": "span_001", "replacement": SHARP_KEPT},
+     {"span_id": "span_001", "replacement": ""}],
+])
+def test_the_whole_line_reading_keeps_the_span_id_contract(replacements):
+    spans = lcl._merge_repair_spans(SHARP, [(0, 28)])
+    assert lcl._replacements_from_whole_line(SHARP, spans, replacements) is None
+
+
+@pytest.mark.parametrize("spans", [
+    [{"quote": "(sigh)"}],                                  # occurs twice
+    [{"quote": "(sigh)", "start_char": 1, "end_char": 7}],  # off by one, twice
+    [{"quote": "a line nobody wrote"}],                     # not in the row
+])
+def test_already_spoken_with_anything_but_the_whole_line_is_still_refused(spans):
+    original = "(sigh) Well, we leave at dawn. (sigh) Bring the lamp."
+    slot = _Slot(judgements={original: [_dirty_judgement(original)]},
+                 authorizations={original: [{"verdict": "already_spoken", "spans": spans}]})
+    ledger = _ledger(original)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert slot.authorization_calls == 2
+    assert receipt["rows"][0]["outcome"] == "unresolved" and receipt["unclean"] == 1
+
+
+def test_whole_row_direction_still_takes_no_spans_at_all():
+    original = "He walks away."
+    slot = _Slot(judgements={original: [_dirty_judgement(original)]},
+                 authorizations={original: [{"verdict": "whole_row_direction",
+                                             "spans": [{"quote": original}]}]},
+                 repairs={original: [{"text": "He's gone."}]})
+    ledger = _ledger(original)
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="shakespeare")
+    assert ledger["lines"][1]["text"] == original
+    assert slot.authorization_calls == 2 and slot.repair_calls == 0

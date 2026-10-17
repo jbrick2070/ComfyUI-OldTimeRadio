@@ -16523,3 +16523,33 @@ not promote it to the Bug Bible on this evidence alone.
 - panel: Codex, agy, Muse Wonder Full. The third idea (promote a whole-line
   "localized" span to a whole-row repair) was dropped: Codex and Muse refuted
   it as a bypass of the narrowing step.
+
+## PBUG-20261016-02 -- every bank, not one lane
+- Sonnet QA on 12ff8485: with a typed premise every bank with a source
+  contract hands the premise to its own interpreter with an empty outlet, and
+  every one of them asks for a closing source note -- media_archive "who found
+  or reported it", shakespeare "a Folger/noncommercial source note",
+  public_domain "a source attribution note", the science news interpreter's
+  closing news read. Only scifi_news_pro had been told there is no one to
+  credit, so the others could still invent the "researcher".
+- fix: one sentence, `_otr_source_payload.NO_NAMED_SOURCE_NOTE`, added by all
+  five prompts when the prompt shows no outlet (and, where it shows one, no
+  link). The `news_used` payload's fallback label "User Seed" for a typed
+  premise is gone too (nothing speaks it today; it was the last copy).
+
+## PBUG-20261016-03 -- correction: the first cut let four bad answers in
+- Sonnet QA refuted 039bbb55 with probes and a 40k-case fuzz:
+  1. a kept slice was matched inside a longer word ("I see the grids." for
+     "I see the grid") and the stray "s" was spliced in as a gap -- 11% of
+     whole-line acceptances in the fuzz came out garbled;
+  2. the original line echoed back read as a repair whose gap was the
+     direction itself, and a single-vote reread could pass it as clean;
+  3. the whole-line reading skipped the span_id contract;
+  4. "ignored" spans on a non-localized verdict included ambiguous and invented
+     quotes, so `(sigh) ... (sigh) ...` could ship unflagged as
+     already_spoken.
+- fix: kept slices match on word boundaries; a recovered gap that still holds
+  a span's words is refused; the id contract runs first; only a whole-line
+  echo is ignored, and only on already_spoken / unresolved
+  (whole_row_direction still takes no spans). The fuzz's garbled count is 0
+  of 8,127 whole-line acceptances.

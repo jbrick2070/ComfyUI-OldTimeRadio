@@ -121,6 +121,11 @@ try:
 except ImportError:  # pragma: no cover -- flat test/standalone load
     import _otr_json  # type: ignore
 
+try:
+    from . import _otr_source_payload as _osp
+except ImportError:  # pragma: no cover -- flat test/standalone load
+    import _otr_source_payload as _osp  # type: ignore
+
 # Cast pools: relative in production (package load), absolute under test.
 try:
     from ..config import cast_pools as _POOLS  # type: ignore[no-redef]
@@ -2294,16 +2299,11 @@ def _pass_news_read(
             if native_names else ""
         )
         + (
-            # NOBODY REPORTED A TYPED PREMISE. The seam asks the close to name
-            # "who found or reported it", and with no outlet to name a small
-            # model fills the slot itself: "according to User Seed" when the
-            # outlet field carried that label, "A researcher noted" when it
-            # carried nothing (both 2026-10-16). Say there is no one to credit.
-            "\n\nNO NAMED REPORTER: the provenance names no outlet, author "
-            "or publication. Credit the account to no one -- do not invent "
-            "a researcher, institution, publication or label as its source."
-            if not str(provenance.get("source") or "").strip()
-            and not str(provenance.get("link") or "").strip() else ""
+            # NOBODY REPORTED A TYPED PREMISE; the seam asks who did (see
+            # `_otr_source_payload.NO_NAMED_SOURCE_NOTE`).
+            "\n\n" + _osp.NO_NAMED_SOURCE_NOTE
+            if not _osp.names_a_source(provenance.get("source"),
+                                       provenance.get("link")) else ""
         )
         + "\n\nWrite the closing news read now."
     )

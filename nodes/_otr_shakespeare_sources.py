@@ -651,6 +651,8 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         "}\n\n"
         f"{source_block}"
     )
+    if not _osp.names_a_source(payload.get("source")):
+        instruction += "\n\n" + _osp.NO_NAMED_SOURCE_NOTE
     return [{"role": "user", "content": instruction}]
 
 

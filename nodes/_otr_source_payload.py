@@ -130,6 +130,25 @@ SOURCE_PAYLOAD_KEYS = frozenset({
     "headline", "summary", "full_text", "source", "date", "link", "seed_text",
 })
 
+#: Said to every pass that writes a closing source note when its prompt shows
+#: nothing to credit -- a typed premise has no outlet and no link. Each of
+#: those passes is asked who reported the find ("a researcher, institution,
+#: or publication", "a Folger/noncommercial source note"), and with nothing to
+#: name a small model names something anyway: "according to User Seed" while
+#: the outlet slot carried that label, "A researcher noted ..." once it
+#: carried nothing (both 2026-10-16). One sentence, one owner, every bank.
+NO_NAMED_SOURCE_NOTE = (
+    "NO NAMED SOURCE: nothing here names an outlet, author, archive or "
+    "publication -- this source was typed in for the episode. Credit it to no "
+    "one: do not invent a researcher, institution, archive, publication or "
+    "label as its source."
+)
+
+
+def names_a_source(source: object, link: object = "") -> bool:
+    """Does a prompt that shows this outlet (and link) give a note anyone to credit?"""
+    return bool(str(source or "").strip() or str(link or "").strip())
+
 
 @dataclass(frozen=True)
 class SourceFetchResult:

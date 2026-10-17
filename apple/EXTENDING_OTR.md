@@ -244,8 +244,8 @@ user_packs/source_banks/<bank_id>/
   the fetched payload and hands tail parts to the writer -- use it only if you
   are reproducing that lane's whole seam set. And an end user typing an idea
   into node 1's `custom_premise` is not extending OTR at all: on any bank with
-  a source contract the text becomes a "User Seed" payload that replaces the
-  fetch, and on the original lane it rides as an operator hint beside the
+  a source contract the text becomes a source payload with no outlet that
+  replaces the fetch, and on the original lane it rides as an operator hint beside the
   spark draw. For a story driven by your own idea, characters, plot and setting,
   select `my_story`; see [My Story](MY_STORY_GUIDE.md).
 - **Validation + quarantine.** `otr_check bank <path> --activate` -- the
