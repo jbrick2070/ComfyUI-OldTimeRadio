@@ -96,7 +96,8 @@ def test_every_mismatched_row_is_settled_in_one_pass():
     settled = F2._make_casting_settle(menu, speakers)(raw)
     assert settled is not None
     picks = {c.name: c.timbre for c in settled.cast}
-    assert picks == {"Ziyin": "m07", "Marcus": "m01", "Ada": "m09"}
+    # Marcus gives up m08 as he leaves it, so Ada can take it.
+    assert picks == {"Ziyin": "m07", "Marcus": "m01", "Ada": "m08"}
     assert F2._make_casting_validator(menu, speakers)(settled) is None
 
 
@@ -197,3 +198,70 @@ def test_the_settle_is_wired_into_the_casting_pass():
     source = inspect.getsource(F2._pass_casting)
     assert "on_attempt_complete=_record" in source
     assert "_make_casting_settle(menu, speakers)" in source
+
+
+# --------------------------------------------------------------------------- #
+# QA on 9eebe29a: rows the validator accepts are never rewritten
+# --------------------------------------------------------------------------- #
+def _pool_name(gender: str) -> str:
+    """A first name our OWN pool confidently classifies."""
+    from config import cast_pools
+
+    for candidate in cast_pools.FIRST_NAMES_BY_GENDER[gender]:
+        if cast_pools.gender_of_first_name(candidate) == gender:
+            return candidate
+    raise AssertionError(f"no confidently-{gender} name in the pool")
+
+
+def test_a_row_the_validator_accepts_is_left_exactly_as_written():
+    """Even when the name pool would read the name the other way: the settle
+    repairs the refused row only."""
+    male_name = _pool_name("male")
+    speakers = [male_name, "Zed"]
+    raw = json.dumps({"cast": [
+        _row(male_name, "female", "m07"),     # accepted by the validator
+        _row("Zed", "female", "m05"),         # refused
+    ]})
+    settled = F2._make_casting_settle(_live_menu(), speakers)(raw)
+    assert settled is not None
+    by_name = {c.name: c for c in settled.cast}
+    assert (by_name[male_name].gender, by_name[male_name].timbre) == (
+        "female", "m07")
+    assert (by_name["Zed"].gender, by_name["Zed"].timbre) == ("female", "m08")
+
+
+def test_a_thin_menu_still_settles_when_a_fix_exists():
+    """One male voice, two female: the refused row's old voice is leaving it,
+    so it must not block anyone, and the clean row must not be moved."""
+    male_name = _pool_name("male")
+    speakers = [male_name, "Zed"]
+    menu = F2.VoiceMenu(entries=(
+        F2.VoiceMenuEntry(menu_id="m01", gender="male", description="d",
+                          preset="v2/en_speaker_1"),
+        F2.VoiceMenuEntry(menu_id="m02", gender="female", description="d",
+                          preset="v2/en_speaker_2"),
+        F2.VoiceMenuEntry(menu_id="m03", gender="female", description="d",
+                          preset="v2/en_speaker_3"),
+    ))
+    raw = json.dumps({"cast": [
+        _row(male_name, "female", "m02"),
+        _row("Zed", "female", "m01"),
+    ]})
+    settled = F2._make_casting_settle(menu, speakers)(raw)
+    assert settled is not None
+    assert {c.name: c.timbre for c in settled.cast} == {
+        male_name: "m02", "Zed": "m03"}
+    assert F2._make_casting_validator(menu, speakers)(settled) is None
+
+
+def test_the_pool_siding_with_the_voice_corrects_the_gender_and_keeps_it():
+    male_name = _pool_name("male")
+    speakers = ["K. Lisa Yang", male_name]
+    raw = json.dumps({"cast": [
+        _row("K. Lisa Yang", "female", "m10"),
+        _row(male_name, "female", "m05"),     # the name and the voice agree
+    ]})
+    settled = F2._make_casting_settle(_live_menu(), speakers)(raw)
+    by_name = {c.name: c for c in settled.cast}
+    assert (by_name[male_name].gender, by_name[male_name].timbre) == (
+        "male", "m05")

@@ -4050,19 +4050,36 @@ def _make_casting_rungs(menu: VoiceMenu, speakers: "list[str]"):
         if not isinstance(rows, list) or not all(
                 isinstance(r, dict) for r in rows):
             return None
-        used = {str(r.get("timbre") or "") for r in rows}
-        moved = False
-        for row in rows:
+        # ONLY THE ROWS THE VALIDATOR REFUSES ARE TOUCHED. A row whose voice
+        # already matches its gender is left exactly as written (QA on
+        # 9eebe29a: running the name pool over clean rows rewrote them, and
+        # on a thin menu turned down a cast it could have fixed). A refused
+        # row's old voice is not reserved -- it is leaving that row.
+        def _mismatch(row: dict):
             entry = by_id.get(str(row.get("timbre") or ""))
             gender = str(row.get("gender") or "").strip().lower()
             if entry is None or gender not in legal:
-                continue        # not this defect -- the validator decides
-            gender = _coherent_gender(row, gender)
-            if gender == str(entry.gender):
-                if row.get("gender") != gender:
-                    row["gender"] = gender
-                    moved = True
-                continue
+                return None     # not this defect -- the validator decides
+            return entry if str(entry.gender) != gender else None
+
+        bad = [(row, _mismatch(row)) for row in rows]
+        bad = [(row, entry) for row, entry in bad if entry is not None]
+        bad_ids = {id(row) for row, _entry in bad}
+        used = {str(r.get("timbre") or "") for r in rows
+                if id(r) not in bad_ids}
+        # The pool's word first: a row whose name it confidently genders as
+        # its VOICE's gender keeps that voice, and holds it before any pick.
+        pending = []
+        for row, entry in bad:
+            gender = _coherent_gender(
+                row, str(row.get("gender")).strip().lower())
+            if gender == str(entry.gender) and entry.menu_id not in used:
+                row["gender"] = gender
+                used.add(entry.menu_id)
+            else:
+                pending.append((row, entry, gender))
+        moved = bool(bad)
+        for row, entry, gender in pending:
             pick = next(
                 (e.menu_id for e in menu.entries
                  if str(e.gender) == gender and e.menu_id not in used),

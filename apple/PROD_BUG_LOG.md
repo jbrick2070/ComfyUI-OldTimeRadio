@@ -16780,3 +16780,13 @@ not promote it to the Bug Bible on this evidence alone.
   through `_otr_casting`, which holds gender authoritative and swaps names.
 - tests: tests/test_scifi_news_pro_casting_voice_repair.py (the exact live
   answer through the real ladder; 9 of 11 fail on the unfixed code).
+
+## PBUG-20261017-02 -- QA on 9eebe29a: one defect, fixed
+- Sonnet refuting QA: the hook, assembly, LEMMY, exception and other-bank
+  claims hold. Defect: `_reconcile_voices` ran the name pool over rows the
+  validator had ACCEPTED, so a clean row could be rewritten, and on a thin
+  menu (one male voice) a refused row's old voice stayed reserved and the
+  settle declined a cast it could fix. Fixed: only refused rows are touched,
+  and a refused row's old voice is released before any pick. Three tests
+  added (they fail on 9eebe29a). Harmless wart left: a deterministic-repair
+  return re-reports the previous raw, so one answer is recorded twice.
