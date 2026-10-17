@@ -16790,3 +16790,11 @@ not promote it to the Bug Bible on this evidence alone.
   and a refused row's old voice is released before any pick. Three tests
   added (they fail on 9eebe29a). Harmless wart left: a deterministic-repair
   return re-reports the previous raw, so one answer is recorded twice.
+
+## PBUG-20261017-02 -- QA on 0591f68f: holds; one count corrected
+- second Sonnet refuting QA: no counterexample in a 20k random-cast brute
+  force (settled casts pass the validator, unrefused rows are byte-identical,
+  no decline where a mismatched-rows-only fix exists). Correction to the
+  note above and the 0591f68f message: TWO of the three added tests fail on
+  9eebe29a (plus the changed one-pass test); the pool-keeps-its-voice test
+  passes there too and guards that path, not this fix.
