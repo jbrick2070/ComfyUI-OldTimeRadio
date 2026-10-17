@@ -1450,7 +1450,9 @@ def test_two_spans_that_split_the_kept_line_between_them_are_refused():
     kept speech to refuse, and together they say all of it again."""
     original = "(softly) Go (beat) home."
     spans = lcl._merge_repair_spans(original, [(0, 8), (12, 18)])
-    with pytest.raises(ValueError, match="Together the replacements repeat"):
+    # Refused either way: since 2026-10-16 "home" alone already reads as the
+    # kept speech again to the pair rule, before the joined check runs.
+    with pytest.raises(ValueError, match="repeat"):
         lcl._splice_replacements(original, spans, _replacement_reply("Go", "home")["replacements"])
     assert lcl._splice_replacements(original, spans, _replacement_reply("", "Mm.")["replacements"]) \
         == " Go Mm. home."
@@ -1559,7 +1561,6 @@ def test_the_doubled_line_guard_refuses_the_whole_line_with_one_word_bent(text, 
 
 @pytest.mark.parametrize("text, answer", [
     # Fold-ins that only SHARE letters with the kept speech are edits, not repeats.
-    ("(checks the barometer) The barometer fell.", "Check the barometer."),
     ("(looks at the lamp) The lamp is dead.", "Look at the lamp, dear."),
     ("(stares at the light) The light failed.", "The light -- it's failing."),
 ])
@@ -1686,3 +1687,47 @@ def test_the_authorization_prompt_asks_for_spans_only_when_localized():
     prompt = slot.authorization_prompts[0]
     assert "spans: [] for any other verdict" in prompt
     assert "never the whole line" in prompt
+
+
+# Sonnet QA on f74c9449.
+
+@pytest.mark.parametrize("text, answer, spoken", [
+    # A kept slice never starts inside a longer word: "OK." is not in "Look.".
+    ("(sigh) OK.", "Look.", "Look. OK."),
+    ("(sigh) Now.", "Oh, I know.", "Oh, I know. Now."),
+    ("(he shines the lantern) A light.", "The lantern's dim.", "The lantern's dim. A light."),
+    ("(points at the chart) Here.", "Look over there.", "Look over there. Here."),
+])
+def test_a_short_kept_word_inside_a_fold_in_is_not_the_line_again(text, answer, spoken):
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    assert lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"]) == spoken
+
+
+@pytest.mark.parametrize("text, answer", [
+    # One word bent on a short line -- not exact containment, caught by pairs.
+    ("I do (sigh) not know.", "I don't know."),
+    # Curly and straight apostrophes are one character here.
+    ("Je n’(soupir)ai rien.", "Je n'ai rien."),
+    # Mostly the kept words again: refused, at the price of one retry.
+    ("(checks the barometer) The barometer fell.", "Check the barometer."),
+])
+def test_a_short_line_handed_back_bent_is_refused(text, answer):
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"])
+
+
+def test_the_joined_replacements_are_held_to_the_same_rule():
+    """Each half alone is fine; together they are the whole line again."""
+    text = "I (a) can (b) see."
+    spans = lcl._merge_repair_spans(text, [(2, 5), (10, 13)])
+    with pytest.raises(ValueError, match="Together the replacements repeat"):
+        lcl._splice_replacements(text, spans, _replacement_reply("I can't", "see")["replacements"])
+
+
+@pytest.mark.parametrize("ch", ["ສ", "ក", "က", "々", "ｶ",
+                                "\U00020000", "한", "ㄱ"])
+def test_the_spaceless_set_covers_the_scripts_it_names(ch):
+    # Lao, Khmer, Myanmar, 々, halfwidth katakana, CJK Ext B, Hangul syllable
+    # and compatibility jamo.
+    assert lcl._spaceless_char(ch)

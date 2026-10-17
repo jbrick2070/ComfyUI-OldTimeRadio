@@ -284,6 +284,20 @@ _REPEAT_SHARE = 0.75
 #: shares none. There the measure is pairs of adjacent characters.
 _REPEAT_PAIR_SHARE = 0.6
 
+#: In spaced scripts the same pair measure catches a short line handed back
+#: with one word bent -- "I do (sigh) not know." answered "I don't know." --
+#: but only when the replacement is MADE of the kept speech too: this share
+#: of the replacement's own pairs must come from it. "Look at the lamp, dear."
+#: beside "The lamp is dead." shares letters and is mostly new words, so it
+#: splices; "Check the barometer." beside "The barometer fell." is mostly the
+#: kept words again and is refused -- one informed retry, where a doubled line
+#: is spoken twice (panel: Codex, agy, Muse Wonder Full, 2026-10-16).
+_BENT_LINE_PRECISION = 0.65
+
+#: Below this many distinct pairs the kept speech is too short to measure:
+#: "Fine." against "Finally." is not a repeat.
+_BENT_LINE_MIN_PAIRS = 4
+
 
 def _is_word_char(ch: str) -> bool:
     # Letters, combining marks and digits. The marks matter: Devanagari vowel
@@ -305,8 +319,9 @@ def _spoken_words(text: str) -> "list[str]":
     return [w for w in words if w]
 
 
-#: Scripts written without spaces between words: kana, Han, Thai and Lao,
-#: Myanmar, Khmer. In them no character boundary is a word boundary anyone
+#: Scripts written without spaces between words -- kana, Han, Thai and Lao,
+#: Myanmar, Khmer -- and Hangul, whose particles attach to the noun with no
+#: space ("등대를"). In them no character boundary is a word boundary anyone
 #: can see, so the word-boundary check in ``_still_holds`` stands aside and
 #: the repeat guard reads character pairs (a Thai doubled line slipped it
 #: while only kana and Han were listed -- Sonnet QA, 2026-10-16).
@@ -314,6 +329,7 @@ _SPACELESS_RANGES = (
     ("\u3040", "\u30ff"), ("\u3400", "\u9fff"), ("\u0e00", "\u0eff"),
     ("\u1000", "\u109f"), ("\u1780", "\u17ff"), ("\u3005", "\u3007"),
     ("\uf900", "\ufaff"), ("\uff66", "\uff9f"), ("\U00020000", "\U0003134f"),
+    ("\u1100", "\u11ff"), ("\u3130", "\u318f"), ("\uac00", "\ud7a3"),
 )
 
 
@@ -358,11 +374,6 @@ def _longest_shared_run(a: "Sequence[str]", b: "Sequence[str]") -> int:
     return best
 
 
-def _bare_word(word: str) -> str:
-    """A word without its possessive: "keeper's" reads as "keeper"."""
-    return word[:-2] if word.endswith("'s") and len(word) > 2 else word
-
-
 def _repeats_kept_speech(replacement: str, kept: str) -> bool:
     """True when a replacement says again what the line already keeps.
 
@@ -372,12 +383,12 @@ def _repeats_kept_speech(replacement: str, kept: str) -> bool:
     see the grid. I see the ledger." -- and the judge, which reads for stage
     directions, passed it as clean. A replacement that contains all of the kept
     speech, shares ``_REPEAT_RUN`` consecutive words with it, or holds
-    ``_REPEAT_SHARE`` of its distinct words in any order, or ``_REPEAT_PAIR_SHARE``
-    of its character pairs in any script, is that mistake; Python only refuses
-    the construction, it writes no prose.
+    ``_REPEAT_SHARE`` of its distinct words in any order, ``_REPEAT_PAIR_SHARE``
+    of its character pairs in a spaceless script, or that share plus
+    ``_BENT_LINE_PRECISION`` of its own pairs in a spaced one, is that mistake;
+    Python only refuses the construction, it writes no prose.
     """
-    rep = [_bare_word(word) for word in _spoken_words(replacement)]
-    keep = [_bare_word(word) for word in _spoken_words(kept)]
+    rep, keep = _spoken_words(replacement), _spoken_words(kept)
     if not rep or not keep:
         return False
     run = _longest_shared_run(rep, keep)
@@ -386,11 +397,16 @@ def _repeats_kept_speech(replacement: str, kept: str) -> bool:
     kept_words = set(keep)
     if len(kept_words & set(rep)) >= _REPEAT_SHARE * len(kept_words):
         return True
+    pairs = _character_pairs(kept)
+    said = _character_pairs(replacement)
+    shared = len(pairs & said)
     if _written_without_spaces(kept):
-        pairs = _character_pairs(kept)
-        if pairs and (len(pairs & _character_pairs(replacement))
-                      >= _REPEAT_PAIR_SHARE * len(pairs)):
+        if pairs and shared >= _REPEAT_PAIR_SHARE * len(pairs):
             return True
+    elif (len(pairs) >= _BENT_LINE_MIN_PAIRS and said
+          and shared >= _REPEAT_PAIR_SHARE * len(pairs)
+          and shared >= _BENT_LINE_PRECISION * len(said)):
+        return True
     return False
 
 
@@ -406,18 +422,49 @@ def _holds_every_kept_slice(replacement: str, kept: Sequence[str]) -> bool:
     2026-10-16). A fold-in that only shares letters with the kept speech
     ("Check the barometer." beside "The barometer fell.") is not this.
     """
-    said = " ".join(str(replacement or "").split()).casefold()
-    slices = [" ".join(piece.split()).casefold() for piece in kept]
-    slices = [piece for piece in slices if any(_is_word_char(ch) for ch in piece)]
+    said = " ".join(str(replacement or "").replace("\u2019", "'").split()).casefold()
+    # Edge punctuation off: "see." is still held by an answer ending "see".
+    slices = [_trim_marks(" ".join(piece.replace("\u2019", "'").split()).casefold())
+              for piece in kept]
+    slices = [piece for piece in slices if piece]
     if not slices or sum(len(piece) for piece in slices) < 3:
         return False
     position = 0
     for piece in slices:
         found = said.find(piece, position)
+        while found >= 0 and _found_inside_a_word(piece, said, found):
+            found = said.find(piece, found + 1)
         if found < 0:
             return False
         position = found + len(piece)
     return True
+
+
+def _trim_marks(text: str) -> str:
+    """``text`` without the punctuation at either end."""
+    start, end = 0, len(text)
+    while start < end and not _is_word_char(text[start]):
+        start += 1
+    while end > start and not _is_word_char(text[end - 1]):
+        end -= 1
+    return text[start:end]
+
+
+#: A kept slice this short must also END on a word boundary: "no" is not held
+#: by "nothing", nor "it" by "it's". A longer one ends loose on purpose --
+#: "I can" in "I can't", "Wait 3" in "Wait 35" are the bent words the
+#: containment rule exists to catch.
+_LOOSE_END_MIN = 4
+
+
+def _found_inside_a_word(piece: str, said: str, index: int) -> bool:
+    """Does ``piece`` at ``said[index]`` start inside a longer word -- "OK" in
+    "Look", "now" in "know", "her" in "father" (agy/Gemini 4 and Sonnet QA on
+    f74c9449) -- or, being short, run on into one?"""
+    end = index + len(piece)
+    if _continues_word(piece[0], said, index - 1, -1):
+        return True
+    return len(piece) < _LOOSE_END_MIN and _continues_word(piece[-1], said, end, +1)
 
 
 def _still_holds(replacement: str, quote: str) -> bool:
@@ -2144,6 +2191,11 @@ def _call_repair(
         authorized_spans=authorized_spans if scope_mode == "partial" else None,
         language_instruction=language_instruction,
     )
+
+    def completed(attempt, raw, error):
+        proposal_receipt.setdefault("calls", []).append({
+            "attempt": attempt, "raw_output": raw,
+            "error": None if error is None else f"{type(error).__name__}: {error}"})
     # SHA VERIFY, and this is the exact path where it earned itself: `where`
     # was threaded into this builder's signature and never rendered into the
     # body, so the act was carried all the way here and dropped.
@@ -2176,6 +2228,7 @@ def _call_repair(
             post_validator=_validate,
             max_new_tokens=_MAX_NEW_TOKENS,
             max_attempts=2,
+            on_attempt_complete=completed,
             helper_name="ledger_clean_line_repair",
         )
     except Exception as exc:  # noqa: BLE001 -- the row ships flagged instead
@@ -2569,7 +2622,6 @@ def _repair_row(
     started_with = len(current)
 
     for attempt in range(1, _MAX_ATTEMPTS + 1):
-        receipt["model_calls"] += 1
         proposal: dict[str, Any] = {}
         candidate = _call_repair(
             slot_fn=slot_fn,
@@ -2585,6 +2637,8 @@ def _repair_row(
             sightings=sightings,
             language_instruction=language_instruction,
         )
+        # One per model call the structured ladder actually made.
+        receipt["model_calls"] += max(1, len(proposal.get("calls", ())))
         if not candidate:
             attempts.append({"attempt": attempt, "outcome": "call_failed", **proposal})
             break

@@ -16609,3 +16609,25 @@ not promote it to the Bug Bible on this evidence alone.
   still stands word for word in its replacement. Markup removal is an edit;
   the marked sentence handed back with its punctuation changed is left to
   the reread (documented residual).
+
+## PBUG-20261016-03 -- QA on f74c9449: containment bounded, short bends, receipts
+- Sonnet and agy (Gemini 4 Argon High) on f74c9449: the containment rule
+  matched kept slices inside longer words ("OK." in "Look.", "no" in
+  "nothing", "her" in "father", "the" in "other" -- markup fixes like
+  "Her *father*." refused), and the commit overclaimed: short lines handed
+  back with one word bent that is not exact containment still doubled ("I
+  do (sigh) not know." + "I don't know."; a dropped final period).
+- fix: a kept slice may not start inside a word, and a short one (under 4
+  characters) may not run on into one; edge punctuation is trimmed before
+  matching and curly apostrophes read as straight. In spaced scripts the
+  character-pair measure now catches a short bent line too, held to
+  coverage AND precision (the replacement must be made mostly of the kept
+  speech) so "Look at the lamp, dear." still splices; "Check the
+  barometer." beside "The barometer fell." is refused, at the price of one
+  retry. Hangul joins the spaceless set (particles attach to the noun).
+  `_bare_word` removed ("it's" read as "it"; containment covers the
+  possessive). The receipt now counts every model call the repair ladder
+  makes and keeps the refused raw answers (older than tonight).
+- residuals, documented: a number spelled out ("three" for "3"), a two-
+  character Chinese line, a colloquial Thai reword, and the marked sentence
+  handed back with its punctuation changed; the reread judges those.
