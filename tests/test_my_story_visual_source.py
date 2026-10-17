@@ -481,3 +481,22 @@ def test_cache_hit_clears_removed_source_receipt(image_dispatch):
     ledger, *_ = dispatch(ledger, [obj])
     assert len(calls) == 1
     assert ledger["images"]["images"][-1]["source_rewrite"] is None
+
+
+@pytest.mark.parametrize("gender", ["male", "female"])
+def test_a_gendered_row_keeps_the_source_receipt_matching_the_rendered_prompt(
+        image_dispatch, monkeypatch, gender):
+    """Sonnet QA on 3d9d3812: the gender anchor ran AFTER the source-rewrite
+    receipt was stamped, so the dispatcher saw base_prompt_hash != prompt_hash
+    and marked every gendered my_story still stale. The anchor now runs before
+    the receipt."""
+    monkeypatch.setenv("OTR_BANANA_STILLS", "0")
+    dispatch, calls, _stamps = image_dispatch
+    ledger = _ledger()
+    ledger["cast"][0]["gender"] = gender
+    obj = _scene_object(ledger)
+    assert obj["source_rewrite"]["retained_prompt"] == obj["prompt"]
+    assert obj["source_rewrite"]["base_prompt_hash"] == obj["prompt_hash"]
+    ledger, *_ = dispatch(ledger, [copy.deepcopy(obj)])
+    row = ledger["images"]["images"][-1]
+    assert row["source_rewrite"]["base_matches_rewrite"]

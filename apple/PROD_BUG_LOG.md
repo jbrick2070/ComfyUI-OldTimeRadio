@@ -17178,3 +17178,12 @@ not promote it to the Bug Bible on this evidence alone.
   name but never the row's gender. Fixed: the scene request's appearance is
   gender-anchored like the portrait's, and every composed scene-character
   prompt (model, template, source rewrite) is anchored at its one call site.
+- QA on 3d9d3812 (Sonnet, REFUTED): anchoring the scene prompt at the call
+  site, AFTER My Story's source-rewrite receipt was stamped, made
+  base_prompt_hash != prompt_hash, so the dispatcher would mark every gendered
+  My Story still stale. Fixed: the anchor runs inside every branch of the
+  scene composer before any receipt or hash (the receipt's finishing stages
+  record "gender_anchor"), and only for a row that STATES male or female, as
+  ShotLock does -- a row with no gender is unchanged. Residual: the anchor is
+  skipped when the prompt already holds any gendered word, so a companion's
+  "he" in a two-person scene can leave a female speaker unanchored.

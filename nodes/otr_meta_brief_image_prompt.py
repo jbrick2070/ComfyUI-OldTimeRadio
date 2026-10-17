@@ -97,6 +97,19 @@ _NEUTRAL_PROMPT_TERMS = frozenset({
 })
 
 
+def _anchor_stated_gender(prompt: str, char: dict) -> str:
+    """`_ensure_gender_anchor` for a row that STATES male or female; a row
+    with no gender is left exactly as it was. The per-beat scene still uses
+    this (as ShotLock's appearance lookup does), so a legacy or test row with
+    no gender does not suddenly gain a "person, " prefix."""
+    from ._otr_roster_gender import normalize_gender
+
+    raw = (char or {}).get("gender")
+    if str(raw or "").strip() and normalize_gender(raw) in ("male", "female"):
+        return _ensure_gender_anchor(prompt, char)
+    return str(prompt or "")
+
+
 def _ensure_gender_anchor(prompt: str, char: dict) -> str:
     """Add a cast-gender anchor when the prompt forgot one.
 
@@ -1430,7 +1443,7 @@ def _build_char_scene_request(char: dict, meta: dict, setting: str,
     # The cast row's gender rides in the appearance, exactly as the portrait
     # request does (PBUG-20261017-07: a female row with "severe close-cropped
     # grey hair" and no gender in the request was drawn as a man).
-    appearance = _ensure_gender_anchor(
+    appearance = _anchor_stated_gender(
         _appearance_for_char([char], str(char.get("char_id") or "")), char)
     ln = line if isinstance(line, dict) else {}
     intent = str(ln.get("beat_intent") or "").strip()[:240]
@@ -1621,6 +1634,14 @@ def _rewrite_char_scene_from_source(meta, ce, setting, line, warnings, cid, *,
     # that appearance now can restore a source contradiction the model corrected.
     # Only the no-text render constraint is added after the combined operation.
     finished = prompt if prompt.endswith(NO_TEXT_CLAUSE) else f"{prompt}, {NO_TEXT_CLAUSE}"
+    stages = ["no_text"]
+    # The cast row's gender is anchored HERE, before the receipt is stamped,
+    # so the dispatcher's base_prompt_hash check sees the prompt it renders
+    # (Sonnet QA on 3d9d3812: anchoring after this made every receipt stale).
+    anchored = _anchor_stated_gender(finished, ce)
+    if anchored != finished:
+        stages.append("gender_anchor")
+        finished = anchored
     receipt.update({
         "scope": "scene_character", "scene_context": source_context["scene"],
         "source_context_hash": context_hash,
@@ -1630,7 +1651,7 @@ def _rewrite_char_scene_from_source(meta, ce, setting, line, warnings, cid, *,
         "finishing": {"input_prompt_hash": _content_hash(prompt),
                       "output_prompt_hash": _content_hash(finished),
                       "changed": prompt != finished,
-                      "stages": ["no_text"]},
+                      "stages": stages},
     })
     if corrected is not None:
         receipt["status"] = "rewritten" if prompt != initial else "unchanged"
@@ -1695,13 +1716,13 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
             )
             source = "char_scene_template_after_llm_miss"
         return (
-            compose_still_prompt(
+            _anchor_stated_gender(compose_still_prompt(
                 meta,
                 kind="scene_character",
                 role="character_video",
                 char_entry=ce,
                 style=vstyle,
-            ),
+            ), ce),
             source,
         )
 
@@ -1737,7 +1758,10 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
         prompt = f"{prompt}, {style.image_grade_tail}"
     if not prompt.endswith(NO_TEXT_CLAUSE):
         prompt = f"{prompt}, {NO_TEXT_CLAUSE}"
-    return prompt, source
+    # Every branch of this function returns a prompt anchored on the cast
+    # row's gender (the portrait path already was): the per-beat still is the
+    # frame shown and the video lane's init image.
+    return _anchor_stated_gender(prompt, ce), source
 
 
 def _mesh_fodder_subject_and_source(meta, char_entry, line, setting, role,
@@ -2297,11 +2321,6 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                     source_model_id=source_model_id,
                     source_binding_model_id=source_binding_model_id,
                     source_receipts=_source_receipts)
-                # ONE anchor for every branch (model, template, source
-                # rewrite): the per-beat scene still is what the frame shows
-                # and what the video lane starts from, and it must carry the
-                # cast row's gender as the portrait already does.
-                sprompt = _ensure_gender_anchor(sprompt, _ce or {})
                 _src = _csrc
                 _sfield = "cast:appearance"
             else:

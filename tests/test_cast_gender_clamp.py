@@ -300,9 +300,5 @@ def test_every_composed_scene_still_is_anchored_on_the_row():
     prompt, _src = IMG._compose_char_scene_prompt(
         _BRIEF, _WENDY, "archive vault", _WENDY_LINE, model_draws_a_man, [],
         "c03", max_reseed=0, vstyle=None)
-    anchored = IMG._ensure_gender_anchor(prompt, _WENDY)
-    assert anchored.startswith("adult woman, ")
-    import inspect
-    src = inspect.getsource(IMG)
-    call = src.index("sprompt, _csrc = _compose_char_scene_prompt(")
-    assert "sprompt = _ensure_gender_anchor(sprompt, _ce or {})" in src[call:call + 1200]
+    # anchored INSIDE the composer, so any receipt built there matches it
+    assert prompt.startswith("adult woman, ")
