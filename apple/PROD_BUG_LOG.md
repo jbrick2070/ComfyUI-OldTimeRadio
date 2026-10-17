@@ -16865,3 +16865,18 @@ not promote it to the Bug Bible on this evidence alone.
   no new failure against origin/main after the explicit-gender narrowing.
 - residual: a listener's "Lemmy (she)" still gets Lemmy's recurring voice,
   pinned by name in config/cast_pools.py RECURRING_CHARACTER_VOICES.
+
+## PBUG-20261017-03 -- QA on 4ccbcf10: wiring holds; grammar and ladder fixed
+- Sonnet refuting QA: one cast builder, nothing overwrites the stamped
+  gender, stills/video read the row -- holds. Reproduced holes, now fixed:
+  "Ada, the keeper (she)." / "Ada the keeper (she)." / "Ada, (she)" bound
+  nothing (a marker now falls back to the name its record leads with);
+  "Don (he)" / "Major (he)" missed "Don Quixote" / "Major Tom" (names are
+  also compared as typed); (ella)/(el)/(ela)/(ele)/(lei)/(lui)/(elle)/(il)
+  were ignored; the ladder let "doubts that she saw" make Tom female and
+  "keeps count" / "a fool for love" make a role male (now: role RELATION
+  words only, possessives skipped, then the name pool, then description
+  pronouns not following a clause opener or another cast name, then the
+  coin); a description was whitespace-rewritten even with no stale note.
+- residuals: a marker in Hindi/Japanese/Chinese is not read; the settle
+  still guesses for an unknown name with no evidence (the seeded coin).

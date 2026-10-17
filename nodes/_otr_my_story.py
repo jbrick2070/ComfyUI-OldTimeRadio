@@ -870,40 +870,56 @@ _SUBJECT_PRONOUNS = {
 }
 
 
-def _name_tokens(name: str) -> "tuple[str, ...]":
-    """Casefolded words of a name, punctuation and honorifics dropped."""
+def _name_forms(name: str) -> "tuple[tuple[str, ...], ...]":
+    """A name's word forms: honorifics dropped, and as typed. "Don" against
+    "Don Quixote" and "Major" against "Major Tom" match on the second."""
     try:
         from ._otr_roster_gender import _HONORIFICS
     except ImportError:  # pragma: no cover -- flat load
         from _otr_roster_gender import _HONORIFICS  # type: ignore
-    words = re.findall(r"[^\W_]+(?:['\-][^\W_]+)*", str(name or "").casefold())
+    words = tuple(re.findall(r"[^\W_]+(?:['\-][^\W_]+)*",
+                             str(name or "").casefold()))
     kept = tuple(w for w in words if w not in _HONORIFICS)
-    return kept or tuple(words)
+    return tuple(dict.fromkeys(f for f in (kept, words) if f))
 
 
-def _match_stated(chunk: str, names: "list[str]") -> "list[str]":
-    """The cast names a marker's words refer to, best tier only.
+def _name_tokens(name: str) -> "tuple[str, ...]":
+    """Casefolded words of a name, honorifics dropped (as typed if that
+    leaves nothing)."""
+    forms = _name_forms(name)
+    return forms[0] if forms else ()
 
-    Tier 1 is an exact name. Tier 2 is a whole-word overlap: the marker's
-    last words open the cast name -- "her brother Tom" -> "Tom" or
-    "Tom Reyes", "Ada" -> "Ada Vance". "Ann" never reaches "Anna", and an
-    exact "Ada" beside "Ada Vance" is not ambiguous.
+
+def _match_stated(mark, names: "list[str]") -> "list[str]":
+    """The cast names a marker refers to, best tier only.
+
+    1. exact: the words before the marker ARE a cast name.
+    2. overlap: those words end where a cast name begins -- "her brother
+       Tom" -> "Tom" or "Tom Reyes"; "Ada" -> "Ada Vance".
+    3. record: the marker follows a descriptor ("Ada, the keeper (she)."),
+       so it belongs to the cast name the whole record LEADS with.
+    Whole words only -- "Ann" never reaches "Anna" -- and each tier is tried
+    with honorifics dropped and as typed. A tier with hits ends the search,
+    so an exact "Ada" beside "Ada Vance" is not ambiguous.
     """
-    want = _name_tokens(chunk)
-    if not want:
-        return []
-    exact = [n for n in names if _name_tokens(n) == want]
-    if exact:
-        return exact
-    near = []
-    for n in names:
-        have = _name_tokens(n)
-        if not have:
-            continue
-        if any(want[-k:] == have[:k]
-               for k in range(1, min(len(want), len(have)) + 1)):
-            near.append(n)
-    return near
+    chunk = getattr(mark, "name", mark)
+    record = getattr(mark, "record", "") or ""
+    pairs = [(want, n, have) for want in _name_forms(chunk)
+             for n in names for have in _name_forms(n)]
+    lead = [(want, n, have) for want in _name_forms(record)
+            for n in names for have in _name_forms(n)]
+    tiers = (
+        [n for want, n, have in pairs if want == have],
+        [n for want, n, have in pairs
+         if any(want[-k:] == have[:k]
+                for k in range(1, min(len(want), len(have)) + 1))],
+        [n for want, n, have in lead if want[:len(have)] == have],
+    )
+    for hits in tiers:
+        hits = list(dict.fromkeys(hits))
+        if hits:
+            return hits
+    return []
 
 
 def _bind_stated_genders(markers, names: "list[str]"):
@@ -916,7 +932,7 @@ def _bind_stated_genders(markers, names: "list[str]"):
     claims: "dict[str, set]" = {}
     notes = []
     for mark in markers:
-        hits = _match_stated(mark.name, names)
+        hits = _match_stated(mark, names)
         if len(hits) == 1:
             claims.setdefault(hits[0], set()).add(mark.gender)
         else:
@@ -937,40 +953,62 @@ def _bind_stated_genders(markers, names: "list[str]"):
     return bound, notes
 
 
-def _description_gender(member: "CastMember") -> str:
+#: A pronoun right after one of these usually starts a clause about someone
+#: else ("doubts that she saw lights" is not about the doubter).
+_SUBORDINATORS = frozenset({
+    "that", "whether", "if", "when", "because", "unless", "until", "since",
+    "while", "though", "although", "than", "where", "why", "how", "what",
+    "who", "whom", "whose", "which", "tells", "told", "says", "said", "thinks",
+    "believes", "knows", "hears",
+})
+
+
+def _description_gender(member: "CastMember",
+                        others: "tuple[str, ...]" = ()) -> str:
     """The gender the model's OWN description states of this character.
 
     Only subject and reflexive pronouns count ("the sound she hears"): an
     object or possessive is as often about someone else ("her brother", "his
-    widow"), so it is no evidence. Mixed evidence is no answer.
+    widow"), so it is no evidence. A pronoun within three words after a
+    clause opener or another cast member's name is about that clause or that
+    person, so it is skipped too. Mixed evidence is no answer.
     """
-    seen = {_SUBJECT_PRONOUNS[w] for w in re.findall(
-        r"[a-z]+", str(member.character_description or "").lower())
-        if w in _SUBJECT_PRONOUNS}
+    words = re.findall(r"[^\W_]+", str(member.character_description or "").lower())
+    blockers = _SUBORDINATORS | {w for name in others for w in _name_tokens(name)}
+    seen = {_SUBJECT_PRONOUNS[w] for i, w in enumerate(words)
+            if w in _SUBJECT_PRONOUNS
+            and not blockers.intersection(words[max(0, i - 3):i])}
     return next(iter(seen)) if len(seen) == 1 else ""
 
 
-def _settle_gender(member: "CastMember") -> "tuple[str, str]":
+def _settle_gender(member: "CastMember",
+                   others: "tuple[str, ...]" = ()) -> "tuple[str, str]":
     """``(gender, source)`` for a role nobody gave a usable gender.
 
-    The other lanes' order: what the role says this person IS (relation, then
-    rank -- the roster reader the adaptation lanes use), then what the model's
-    own description says, then our name pool (`_otr_casting`'s classifier),
-    then a coin seeded on the name so the same story casts the same way.
+    The other lanes' order, strongest first: a RELATION the role states
+    ("her brother" -- the roster reader's own vocabulary; ranks and offices
+    are left out, since "keeps count" or "a fool for love" is no gender),
+    then our name pool (`_otr_casting`'s confident classifier), then the
+    model's own description pronouns, then a coin seeded on the name so the
+    same story casts the same way. Possessives are not the role's person:
+    "mother's helper" says nothing about the helper.
     """
     try:
-        from ._otr_character_roster import infer_gender
+        from ._otr_character_roster import (
+            _FEMALE_RELATION, _MALE_RELATION, _scan)
     except ImportError:  # pragma: no cover -- flat load
-        from _otr_character_roster import infer_gender  # type: ignore
-    gender, source = infer_gender(member.name, member.role)
+        from _otr_character_roster import (  # type: ignore
+            _FEMALE_RELATION, _MALE_RELATION, _scan)
+    role = re.sub(r"\b[a-z]+'s\b", " ", str(member.role or "").lower())
+    gender = _scan(re.findall(r"[a-z]+", role), _MALE_RELATION, _FEMALE_RELATION)
     if gender in _GENDERS:
-        return gender, "role_" + source
-    gender = _description_gender(member)
-    if gender:
-        return gender, "description_pronouns"
+        return gender, "role_relation"
     gender = _POOLS.gender_of_first_name(" ".join(_name_tokens(member.name)))
     if gender in _GENDERS:
         return gender, "name_pool"
+    gender = _description_gender(member, others)
+    if gender:
+        return gender, "description_pronouns"
     coin = random.Random("my_story_cast_gender:%s" % _norm_ws(member.name).casefold())
     return ("male" if coin.random() < 0.5 else "female"), "seeded_coin"
 
@@ -992,8 +1030,10 @@ def _settle_cast_genders(treatment: "StoryTreatment",
         elif member.gender in _GENDERS:
             continue
         else:
-            member.gender, source = _settle_gender(member)
-        if member.gender in _GENDERS and member.character_description:
+            member.gender, source = _settle_gender(
+                member, tuple(m.name for m in treatment.cast if m is not member))
+        if member.gender in _GENDERS and _UNSTATED_GENDER_NOTE.search(
+                member.character_description or ""):
             member.character_description = " ".join(_UNSTATED_GENDER_NOTE.sub(
                 " ", member.character_description).split())
         if member.gender != before:

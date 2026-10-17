@@ -179,7 +179,7 @@ def test_the_role_outranks_pronouns_about_someone_else():
 
 
 def test_mixed_pronouns_are_no_evidence():
-    m = _member("Qx1", description="She tells him he is wrong.")
+    m = _member("Qx1", description="She waits by the lamp. He leaves at dawn.")
     gender, source = MS._settle_gender(m)
     assert source == "seeded_coin" and gender in ("male", "female")
 
@@ -278,3 +278,40 @@ def test_the_live_ada_case_stamps_a_female_row_that_stills_and_video_read():
     # stills: the portrait prompt anchors on the same row
     assert IMG._ensure_gender_anchor(ada["character_description"], ada) \
         .startswith("adult woman, ")
+
+
+# --------------------------------------------------------------------------- #
+# Sonnet QA on 4ccbcf10: phrasings and wrong guesses it reproduced
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("text,names,expected", [
+    ("Ada, the keeper (she). Tom (he).", ["Ada", "Tom"],
+     {"Ada": "female", "Tom": "male"}),
+    ("Ada the keeper (she).", ["Ada"], {"Ada": "female"}),
+    ("Ada, (she)", ["Ada"], {"Ada": "female"}),
+    ("Don (he)", ["Don Quixote"], {"Don Quixote": "male"}),
+    ("Major (he)", ["Major Tom"], {"Major Tom": "male"}),
+    ("Ada (ella), Tom (\u00e9l)", ["Ada", "Tom"], {"Ada": "female", "Tom": "male"}),
+])
+def test_natural_phrasings_bind_the_person_they_follow(text, names, expected):
+    bound, _ = MS._bind_stated_genders(SI.stated_genders(text), names)
+    assert bound == expected
+
+
+@pytest.mark.parametrize("role,description,others", [
+    ("skeptic", "Doubts that she saw lights.", ()),
+    ("", "Tells Ada she is wrong.", ("Ada",)),
+    ("keeps count of ships", "", ()),
+    ("a fool for love", "", ()),
+    ("mother's helper", "", ()),
+])
+def test_evidence_about_someone_else_never_decides(role, description, others):
+    gender, source = MS._settle_gender(
+        _member("Qx1", role=role, description=description), others)
+    assert source == "seeded_coin"
+
+
+def test_a_description_without_the_stale_note_is_left_byte_identical():
+    t = _live_treatment()
+    t.cast[1].character_description = "A calm   voice."
+    MS._settle_cast_genders(t, {})
+    assert t.cast[1].character_description == "A calm   voice."

@@ -771,6 +771,9 @@ _GENDER_MARKERS = {
     "man": "male", "boy": "male", "m": "male",
     "they": "other", "them": "other", "they/them": "other",
     "nonbinary": "other", "non-binary": "other",
+    # The romance-language pronouns the episode languages are typed in.
+    "ella": "female", "ela": "female", "lei": "female", "elle": "female",
+    "él": "male", "ele": "male", "lui": "male", "il": "male",
 }
 _MARKER_RE = re.compile(
     r"\(\s*(" + "|".join(sorted((re.escape(k) for k in _GENDER_MARKERS),
@@ -785,21 +788,27 @@ _NAME_ABBREVIATIONS = frozenset({
 
 @dataclass(frozen=True)
 class StatedGender:
-    """One marker as typed: the words before it, and the gender it states."""
+    """One marker as typed: the words right before it, the whole record it
+    sits in, and the gender it states.
+
+    ``record`` is the fallback for a marker typed after a descriptor --
+    "Ada, the keeper (she)." -- where the words right before it name a part,
+    not a person, and the person is whoever the record leads with.
+    """
 
     name: str
     gender: str
     marker: str
+    record: str = ""
 
 
-def _name_before(text: str, end: int) -> str:
-    """The name a marker follows: back to the previous record boundary
-    (newline, ``;``, ``,``, ``:``, a parenthesis, or a full stop that ends a
-    sentence)."""
+def _back_to(text: str, end: int, stops: str) -> str:
+    """The text before ``end`` back to the first ``stops`` character, or to a
+    full stop that ends a sentence ("Dr. Ada" does not end one)."""
     i = end
     while i > 0:
         ch = text[i - 1]
-        if ch in "\n;,:()":
+        if ch in stops:
             break
         if ch == ".":
             word = re.findall(r"[A-Za-z]+$", text[:i - 1])
@@ -807,6 +816,19 @@ def _name_before(text: str, end: int) -> str:
                 break
         i -= 1
     return " ".join(text[i:end].split())
+
+
+def _name_before(text: str, end: int) -> str:
+    """The name a marker follows: back to the previous record boundary
+    (newline, ``;``, ``,``, ``:``, a parenthesis, or a full stop that ends a
+    sentence)."""
+    return _back_to(text, end, "\n;,:()")
+
+
+def _record_before(text: str, end: int) -> str:
+    """The whole record a marker sits in: back to a newline, ``;``, a
+    parenthesis or a sentence end -- commas and colons stay inside it."""
+    return _back_to(text, end, "\n;()").strip(" ,:")
 
 
 def stated_genders(characters: str) -> "tuple[StatedGender, ...]":
@@ -819,10 +841,12 @@ def stated_genders(characters: str) -> "tuple[StatedGender, ...]":
     out = []
     for m in _MARKER_RE.finditer(str(characters or "")):
         name = _name_before(m.string, m.start())
-        if name:
+        record = _record_before(m.string, m.start())
+        if name or record:
             word = m.group(1).lower()
-            out.append(StatedGender(name=name, gender=_GENDER_MARKERS[word],
-                                    marker=word))
+            out.append(StatedGender(name=name or record,
+                                    gender=_GENDER_MARKERS[word],
+                                    marker=word, record=record))
     return tuple(out)
 
 
