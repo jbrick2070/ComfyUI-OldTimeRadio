@@ -1064,8 +1064,10 @@ def _pass_cast_gender(technical_fn, pack, bundle, treatment: "StoryTreatment",
 
     The model, not a word-window heuristic, reads who each pronoun in a
     description refers to (two-strikes panel, 2026-10-17: Codex picked this
-    over a stricter pronoun rule). It sees the whole cast for reference and
-    the listener's own characters text; it decides only the open roles.
+    over a stricter pronoun rule). It sees the whole cast for reference, the
+    listener's own characters text, and per row the interpretation's reading
+    of the listener's fields as a HINT ("listener_text_suggests"); it
+    decides only the open roles.
 
     Never fatal. Any failure -- a refused shape, a name it was not asked
     about, a provider error -- returns {} and Python's ladder decides, so a

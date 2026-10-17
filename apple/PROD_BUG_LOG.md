@@ -17024,3 +17024,6 @@ not promote it to the Bug Bible on this evidence alone.
   for one name could disagree silently. Now the reading goes INTO the pass
   ("listener_text_suggests") and answers only when the pass gives none;
   disagreeing duplicate entries say nothing. Tests adjusted/added.
+- sixth QA (48c37a93): the seam never defined "listener_text_suggests";
+  it now says it is a hint to check against pronouns and relationships, not
+  a ruling. Stale `_pass_cast_gender` docstring corrected.
