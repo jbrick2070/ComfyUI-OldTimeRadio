@@ -50,7 +50,7 @@ class CastPlanSlot:
     it may not change any field here (the validator enforces that)."""
 
     char_id: str
-    gender: str        # male | female | other
+    gender: str        # male | female
     age_band: str      # one of AGE_BANDS
     voice_preset: str  # the Python-decided Bark/Kokoro preset
     dramatic_role: str  # a dramatic function, not a job title

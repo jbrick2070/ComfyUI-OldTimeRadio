@@ -189,16 +189,16 @@ def _pinned_ensemble(names, pins, seed):
 
 
 def test_pinned_source_genders_are_correct_on_every_seed():
-    """Measured before the pin: wrong on 301 rows across 200 seeds."""
+    """Measured before the pin: wrong on 301 rows across 200 seeds. Since
+    2026-10-17 a known source character (the vendored rosters record MALVOLIO
+    male and MARIA female) is right even WITHOUT a pin -- the old defect no
+    longer reproduces, which is the point."""
     pins = {"MALVOLIO": "male", "MARIA": "female"}
-    wrong_unpinned = 0
     for seed in range(200):
         for ens in _pinned_ensemble(["Malvolio", "Maria"], pins, seed):
             assert ens.gender == pins[ens.name.upper()], (seed, ens)
         for ens in _pinned_ensemble(["Malvolio", "Maria"], None, seed):
-            if ens.gender != pins[ens.name.upper()]:
-                wrong_unpinned += 1
-    assert wrong_unpinned > 0, "the defect must still reproduce without the pin"
+            assert ens.gender == pins[ens.name.upper()], (seed, ens)
 
 
 def test_pinning_one_slot_does_not_make_another_deterministic():
@@ -206,37 +206,40 @@ def test_pinning_one_slot_does_not_make_another_deterministic():
 
     Feeding pins into prior_genders would make the allocator push the remaining
     slot the other way -- measured, _plan_gender_distribution(1, ['male'])
-    returns female on 400/400 seeds. HORATIO is left unpinned and its
-    distribution must be IDENTICAL with and without MARCELLUS pinned.
+    returns female on 400/400 seeds. The free slot is left unpinned and its
+    distribution must be IDENTICAL with and without the other pinned. Both
+    names are unknown to every registry (pool, titles, source rosters), so the
+    free one really is the roll -- HORATIO and MARCELLUS were used here until
+    the rosters became a registry (2026-10-17).
     """
     free, pinned = Counter(), Counter()
     for seed in range(400):
-        for ens in _pinned_ensemble(["Marcellus", "Horatio"], None, seed):
-            if ens.name.upper() == "HORATIO":
+        for ens in _pinned_ensemble(["Qorvath", "Ilsenne"], None, seed):
+            if ens.name.upper() == "ILSENNE":
                 free[ens.gender] += 1
         for ens in _pinned_ensemble(
-                ["Marcellus", "Horatio"], {"MARCELLUS": "male"}, seed):
-            if ens.name.upper() == "HORATIO":
+                ["Qorvath", "Ilsenne"], {"QORVATH": "male"}, seed):
+            if ens.name.upper() == "ILSENNE":
                 pinned[ens.gender] += 1
     assert free == pinned
-    assert len(pinned) > 1, f"HORATIO collapsed to one gender: {pinned}"
+    assert len(pinned) > 1, f"ILSENNE collapsed to one gender: {pinned}"
 
 
-def test_unpinned_other_incidence_is_unchanged():
-    """'other' is 20% of the roll and is not servable by the bank. The pin must
-    not change how often it comes up for slots it does not touch.
-    """
+def test_an_unpinned_roll_is_unchanged_by_pins_elsewhere():
+    """The pin must not change the roll of slots it does not touch (the roll
+    is male/female only since 2026-10-17)."""
     free, pinned = Counter(), Counter()
-    names = ["Antipholus", "Dromio", "Adriana"]
+    names = ["Qorvath", "Ilsenne", "Thavren"]
     for seed in range(400):
         for ens in _pinned_ensemble(names, None, seed):
-            if ens.name.upper() == "ADRIANA":
+            if ens.name.upper() == "THAVREN":
                 free[ens.gender] += 1
         for ens in _pinned_ensemble(
-                names, {"ANTIPHOLUS": "male", "DROMIO": "male"}, seed):
-            if ens.name.upper() == "ADRIANA":
+                names, {"QORVATH": "male", "ILSENNE": "male"}, seed):
+            if ens.name.upper() == "THAVREN":
                 pinned[ens.gender] += 1
     assert free == pinned
+    assert set(pinned) <= {"male", "female"}
 
 
 def test_source_owned_slots_keep_their_name_through_the_coherence_repair():

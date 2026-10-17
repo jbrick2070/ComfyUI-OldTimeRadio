@@ -108,6 +108,11 @@ try:
 except ImportError:  # pragma: no cover - standalone / test load
     import _otr_cast_env  # type: ignore
 
+try:
+    from . import _otr_cast_gender
+except ImportError:  # pragma: no cover - standalone / test load
+    import _otr_cast_gender  # type: ignore
+
 # ONE naming authority, enforced at the boundary (Bug Bible 11.61). Shared with
 # the offline archive sweep so the sweep can never certify a different rule than
 # the one runtime enforces.
@@ -605,6 +610,16 @@ def _plan_gender_distribution(
     )
     out_counts = dict(floors)
     idx = 0
+    # A TIE FOR THE LEFTOVER IS DRAWN, NOT DEFAULTED. With an even 50/50 split
+    # every odd count ties, and a stable sort hands the extra slot to the first
+    # weight every time -- a one-character cast was always male (Sonnet QA on
+    # e4be35fc). The draw uses the same rng, so the writer's plan and CastLock's
+    # replay (which re-run this with the same seed) still agree.
+    if remainder > 0 and len(frac_order) > 1:
+        top = frac_order[0][1] - int(frac_order[0][1])
+        tied = sum(1 for _g, v in frac_order if abs((v - int(v)) - top) < 1e-9)
+        if tied > 1:
+            idx = rng.randrange(tied)
     while remainder > 0 and frac_order:
         gender = frac_order[idx % len(frac_order)][0]
         out_counts[gender] += 1
@@ -765,6 +780,14 @@ def precompute_ensemble_slots(
             # assemble_pre_locked_rows upper-cases slot names; the writer's
             # _adapt_names are title-case. Both sides are normalized to UPPER.
             gender = pins.get(str(slot.name or "").strip().upper(), gender)
+        if source_owned and str(slot.name or "").strip().upper() not in pins:
+            # A source character the roster left unknown keeps its roll only
+            # when nothing confident says otherwise: a courtesy title, our
+            # name pool or a known source character ("JULIET") outranks a
+            # coin. No rng is drawn here.
+            said, how = _otr_cast_gender.settle_binary_gender(str(slot.name or ""))
+            if how in ("courtesy_title", "name_pool", "known_character"):
+                gender = said
         ensemble.append(EnsembleSlot(
             char_id=slot.char_id,
             name=slot.name,

@@ -17,6 +17,8 @@ THE LADDER, strongest evidence first (each rung declines rather than guess):
   1. a courtesy title the name LEADS with ("Mrs. Vance", "Sir Toby");
   2. a relation word in the role ("her brother"), possessives skipped;
   3. our name pool, honorifics stripped (unisex / unknown names decline);
+  3b. a known character: a one-word name our vendored source rosters record
+      with one gender ("JULIET" female, "LEAR" male);
   4. subject/reflexive pronouns in the description -- only when the
      description names no other cast member and they all agree;
   5. a coin seeded on the normalized name, so the same name casts the same way.
@@ -98,6 +100,55 @@ def description_gender(description: str, others: Sequence[str] = ()) -> str:
     return next(iter(seen)) if len(seen) == 1 else ""
 
 
+_KNOWN_CHARACTERS: "dict[str, str] | None" = None
+
+
+def known_character_gender(name: str) -> str:
+    """The gender our vendored sources' rosters record for a one-word
+    character name ("JULIET", "LEAR", "PROSPERO"), or "".
+
+    Built once from ``config/source_banks/*/sources/*.provenance.json`` --
+    the gender-stamped rosters the adaptation lanes already pin from -- so the
+    curated first-name pool, which knows modern names, is not the only
+    registry (operator, 2026-10-17: "Juliet should be female"). Only names
+    recorded as a single word, with one gender everywhere they appear, and
+    never a rank or relation word ("NURSE", "FOOL", "PRINCE").
+    """
+    global _KNOWN_CHARACTERS
+    if _KNOWN_CHARACTERS is None:
+        import glob
+        import json
+        import os
+
+        try:
+            from ._otr_character_roster import _FEMALE_TITLE, _MALE_TITLE
+        except ImportError:  # pragma: no cover -- flat load
+            from _otr_character_roster import _FEMALE_TITLE, _MALE_TITLE  # type: ignore
+        vocab = (set(_MALE_TITLE) | set(_FEMALE_TITLE) | set(_MALE_RELATION)
+                 | set(_FEMALE_RELATION) | set(_RG._HONORIFICS))
+        root = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "config", "source_banks")
+        seen: "dict[str, set]" = {}
+        for path in glob.glob(os.path.join(root, "*", "sources",
+                                           "*.provenance.json")):
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    chars = json.load(fh).get("characters") or []
+            except (OSError, ValueError):
+                continue
+            for c in chars:
+                g = binary((c or {}).get("gender"))
+                words = re.findall(r"[^\W_]+(?:['\-][^\W_]+)*",
+                                   str((c or {}).get("name") or "").casefold())
+                if g and len(words) == 1 and len(words[0]) >= 3 \
+                        and words[0] not in vocab:
+                    seen.setdefault(words[0], set()).add(g)
+        _KNOWN_CHARACTERS = {k: next(iter(v)) for k, v in seen.items()
+                             if len(v) == 1}
+    tokens = name_tokens(name)
+    return _KNOWN_CHARACTERS.get(tokens[0], "") if tokens else ""
+
+
 def settle_binary_gender(name: str, role: str = "", description: str = "",
                          others: Sequence[str] = ()) -> "tuple[str, str]":
     """``(gender, source)`` -- always ``male`` or ``female``. See the ladder
@@ -113,6 +164,9 @@ def settle_binary_gender(name: str, role: str = "", description: str = "",
     gender = _POOLS.gender_of_first_name(" ".join(name_tokens(name)))
     if gender in BINARY:
         return gender, "name_pool"
+    gender = known_character_gender(name)
+    if gender:
+        return gender, "known_character"
     gender = description_gender(description, others)
     if gender:
         return gender, "description_pronouns"
@@ -155,5 +209,6 @@ def clamp_cast_rows(rows: Sequence[MutableMapping]) -> "list[dict]":
 
 __all__ = [
     "BINARY", "binary", "clamp_cast_rows", "description_gender",
+    "known_character_gender",
     "name_forms", "name_tokens", "settle_binary_gender",
 ]

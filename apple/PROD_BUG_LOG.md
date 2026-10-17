@@ -17144,3 +17144,15 @@ not promote it to the Bug Bible on this evidence alone.
   falls back to the full pool; an appearance override text that names the
   opposite gender is still only anchored, not rewritten; the one "neutral"
   voice reference (el_river) is no longer reachable from a clamped row.
+- QA on e4be35fc (Sonnet): HOLDS on the invariant; one defect fixed -- the
+  50/50 split handed every odd leftover slot to male (a one-character cast
+  was always male); the tie is now drawn from the same rng, so the writer's
+  plan and CastLock's replay still agree. Also: a source character the roster
+  leaves unknown takes a courtesy title, the name pool or a known character
+  before its roll.
+- operator: "Juliet should be female". The curated first-name pool does not
+  know Juliet/Romeo/Cordelia/...; the 82 vendored source rosters
+  (config/source_banks/*/sources/*.provenance.json) now serve as a second
+  registry for one-word character names with one recorded gender (rank and
+  relation words excluded). JULIET -> female on every lane, not only the
+  Shakespeare bank whose roster already pinned her.

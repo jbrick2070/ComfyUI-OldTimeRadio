@@ -176,3 +176,66 @@ def test_a_clamped_row_reaches_still_and_video_prompts_as_a_man_or_woman():
     video = SL._appearance_for_char({"cast": rows}, "c02")
     assert still.startswith("adult woman, ")
     assert video.startswith("adult woman, ")
+
+
+# --------------------------------------------------------------------------- #
+# Sonnet QA on e4be35fc: the 50/50 tie must not always go to one gender
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("count,prior", [(1, []), (3, []), (5, []), (2, ["female"])])
+def test_an_odd_leftover_slot_is_drawn_not_defaulted(count, prior):
+    from collections import Counter
+    from nodes import _otr_casting as C
+
+    c = Counter()
+    for seed in range(400):
+        c.update(C._plan_gender_distribution(count, prior, random.Random(seed)))
+    assert c["male"] and c["female"]
+    assert set(c) <= {"male", "female"}
+    # neither gender takes every odd slot
+    assert abs(c["male"] - c["female"]) < count * 400 * 0.6
+
+
+@pytest.mark.parametrize("name", ["JULIET", "pool"])
+def test_a_source_character_the_roster_left_unknown_uses_a_confident_name(name):
+    from nodes import _otr_casting as C
+    from config import cast_pools
+
+    if name == "pool":
+        name = next(n for n in cast_pools.FIRST_NAMES_BY_GENDER["female"]
+                    if cast_pools.gender_of_first_name(n) == "female")
+
+    class _Slot:
+        def __init__(self, char_id, name):
+            self.char_id, self.name, self.source_owned = char_id, name, True
+
+    for seed in range(40):
+        ens = C.precompute_ensemble_slots(
+            [_Slot("c02", name.upper())], rng=random.Random(seed),
+            cast_seed=seed, gender_by_name={})
+        assert ens[0].gender == "female"
+
+
+# --------------------------------------------------------------------------- #
+# operator 2026-10-17: "Juliet should be female" -- the vendored rosters are a
+# registry too, not only the curated first-name pool
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("name,expected", [
+    ("JULIET", "female"), ("Juliet", "female"), ("ROMEO", "male"),
+    ("CORDELIA", "female"), ("LEAR", "male"), ("PROSPERO", "male"),
+    ("MIRANDA", "female"),
+])
+def test_known_source_characters_settle_from_their_rosters(name, expected):
+    assert CG.settle_binary_gender(name) == (expected, "known_character")
+
+
+@pytest.mark.parametrize("word", ["NURSE", "FOOL", "PRINCE", "BOY", "FIRST", "J"])
+def test_rank_and_role_words_are_not_known_characters(word):
+    assert CG.known_character_gender(word) == ""
+
+
+def test_juliet_on_any_lane_ends_female_in_the_ledger(tmp_path):
+    led = PL.Ledger(episode_id="ep_juliet", out_dir=str(tmp_path))
+    led.set_cast([{"char_id": "c02", "name": "JULIET", "gender": "",
+                   "character_description": "", "tts_model": "",
+                   "voice_preset": ""}])
+    assert led.data["cast"][0]["gender"] == "female"
