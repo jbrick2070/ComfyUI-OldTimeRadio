@@ -528,3 +528,36 @@ def test_the_cleanup_and_the_rollback_skip_the_same_rows():
     ]
     assert cleanup.mark_unsayable_voiced_rows({"lines": rows}) == ["a", "b"]
     assert [row.get("skip") for row in rows] == [True, True, False, False, True]
+
+
+def test_a_falsy_non_string_text_is_skipped_on_rollback_like_the_cleanup_skips_it():
+    led = _voiced_ledger_with_a_bracket_row()
+    led.data["lines"][1]["text"] = 0
+    stamp_receipt(led.data, owner_bank="bank_a", accepted_artifacts={"final": {"x": 1}})
+    window = txn.open_transaction(led, finalizer=_LaneProof({}, fail_reseal=True))
+    _clean_stage_rewrites(led, "l1", "The lamp is dark.")
+
+    receipt = window.reconcile()
+
+    assert receipt["reskipped_line_ids"] == ["l2"]
+    assert led.data["lines"][1]["text"] == "" and led.data["lines"][1]["skip"] is True
+    assert receipt["restored_state_proved"] is True
+
+
+def test_a_fault_in_the_reskip_never_demotes_a_proved_restore(monkeypatch):
+    from nodes import _otr_ledger_cleanup as cleanup
+
+    def broken(_data):
+        raise RuntimeError("reskip broke")
+
+    monkeypatch.setattr(cleanup, "mark_unsayable_voiced_rows", broken)
+    led = _voiced_ledger_with_a_bracket_row()
+    window = txn.open_transaction(led, finalizer=_LaneProof({}, fail_reseal=True))
+    _clean_stage_rewrites(led, "l1", "The lamp is dark.")
+
+    receipt = window.reconcile()
+
+    assert receipt["outcome"] == "restored_pre_clean"
+    assert receipt["restored_state_proved"] is True
+    assert receipt["reskipped_line_ids"] == []
+    assert receipt["reskip_error"] == "RuntimeError: reskip broke"

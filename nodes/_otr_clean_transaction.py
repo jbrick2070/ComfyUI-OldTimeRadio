@@ -300,8 +300,20 @@ class CleanTransaction:
         # such a row whenever the lane wrote a "(static crackles)" beat -- the
         # proof leaves it out on purpose). Skipping a row the proof never
         # covered keeps the restored proof intact; the check below re-proves
-        # it. Roles and other cleanup fills are NOT re-applied.
-        reskipped = _cleanup().mark_unsayable_voiced_rows(data)
+        # it. Roles and other cleanup fills are NOT re-applied. Guarded: this
+        # is a completion, and a fault in it must not turn a proved restore
+        # into rollback_failed (Sonnet QA on a6d5b27a).
+        reskip_error = None
+        try:
+            reskipped = _cleanup().mark_unsayable_voiced_rows(data)
+        except Exception as reskip_exc:  # noqa: BLE001 -- Law 7
+            log.error(
+                "[clean-transaction] re-skipping unsayable rows after the "
+                "restore failed (%s: %s); the freeze will judge them as restored",
+                type(reskip_exc).__name__, reskip_exc,
+            )
+            reskipped = []
+            reskip_error = f"{type(reskip_exc).__name__}: {reskip_exc}"
         receipt: Dict[str, Any] = {
             "outcome": "restored_pre_clean",
             "authorized_stages": list(CLEAN_WINDOW_STAGES),
@@ -315,6 +327,8 @@ class CleanTransaction:
             # Restored, then normalized: the rows re-skipped after the restore.
             "reskipped_line_ids": reskipped,
         }
+        if reskip_error is not None:
+            receipt["reskip_error"] = reskip_error
         log.error(
             "[clean-transaction] the authorized clean window could not be "
             "proved (%s: %s). The ledger is RESTORED to the accepted text and "

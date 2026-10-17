@@ -17100,3 +17100,22 @@ not promote it to the Bug Bible on this evidence alone.
   is one word (the pair rules stay); the pattern that started it still reads
   a verb of speaking used as narration ("it whispers what...", "fueled by
   whispers") as an attribution verb.
+
+## PBUG-20261017-06 -- QA on ac187652: holds; tests pinned, two residuals named
+- Sonnet refuting QA: HOLDS. 66 spliced answers across every ledger on the
+  box replayed -- only shot_001_b10 newly refused; no realistic correct
+  answer found refused; case, curly-quote, punctuation and ellipsis variants
+  of an echo are refused; French, Spanish, German and Korean echoes too.
+  The "speech"-labelled judge entries are in the r7b slice ("dropped 3 judge
+  finding(s) ... (its own reason: 'speech')"), not in the receipt.
+- tests fixed: the far-side case is now one only this rule catches ("what
+  the light" for "remembers"); per-slice reading is pinned by a two-span row
+  whose answer matches another span's neighbours ("here for me" across (b),
+  answered "softly"), which a joined reading refuses; the case that blessed
+  "...it The sea still remembers what..." is replaced; the comment's "two
+  one-word answers would fuse" is three (the floor is three words).
+- residuals: ONE ADDED WORD defeats the rule ("The sea still remembers"
+  splices beside "The sea remembers.") -- a retried small writer may reword
+  exactly so; and when another span is DELETED its neighbours become
+  adjacent, so an echo of that straddle ("here for me" with (b) answered "")
+  is a real doubling the per-slice reading misses. Unicode NFD, as before.

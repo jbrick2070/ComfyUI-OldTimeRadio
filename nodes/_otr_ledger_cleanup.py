@@ -62,6 +62,7 @@ log = logging.getLogger("OTR.ledger_cleanup")
 __all__ = [
     "LEDGER_CLEANUP_VERSION",
     "LedgerIncompleteError",
+    "mark_unsayable_voiced_rows",
     "required_field_gaps",
     "run_ledger_cleanup",
 ]
@@ -320,16 +321,18 @@ def mark_unsayable_voiced_rows(ledger_data: dict) -> "list[str]":
     unskipped row -- "(voiced, not skipped) cleans to empty spoken text" --
     so the rollback that exists to let the episode ship lost it instead. The
     authorship proof covers only sayable rows, so a row this skips was never
-    proved and the restored proof still holds. Only string (or missing) text
-    is judged: the proof reads `123` as "123" and proves it, where `_text_of`
-    would call it empty (Codex on the fix). Returns the line_ids it skipped.
+    proved and the restored proof still holds. A truthy non-string text is
+    left alone: the proof reads `123` as "123" and proves it, where `_text_of`
+    would call it empty (Codex on the fix). A falsy one (0, [], False) the
+    proof reads as "" too, so it is skipped like the cleanup skips it (Sonnet
+    QA on a6d5b27a). Returns the line_ids it skipped.
     """
     skipped = []
     for row in ledger_data.get("lines") or []:
         if not isinstance(row, dict):
             continue
         text = row.get("text")
-        if text is not None and not isinstance(text, str):
+        if text and not isinstance(text, str):
             continue
         if _skip_if_unsayable(row, str(row.get("speaker_role") or "")):
             skipped.append(str(row.get("line_id") or ""))

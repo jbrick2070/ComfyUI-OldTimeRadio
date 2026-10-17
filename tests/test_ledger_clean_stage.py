@@ -2129,7 +2129,7 @@ def _span_of_word(text, word):
 
 @pytest.mark.parametrize("text, word, answer", [
     (SEA, "whispers", "The sea remembers."),
-    (SEA, "whispers", "what the light cannot"),                   # a run from the far side
+    (SEA, "remembers", "what the light"),                         # a run from the far side
     ("I told you twice. Now (sighs) listen to me.", "(sighs)", "I told you"),
 ])
 def test_an_answer_that_is_only_a_run_the_line_says_is_refused_anywhere(text, word, answer):
@@ -2142,15 +2142,22 @@ def test_an_answer_that_is_only_a_run_the_line_says_is_refused_anywhere(text, wo
     # Two words away from the span: ordinary ("No, no." with the phrase said later).
     ("Stop it. (sighs) Go home. No, no, not again.", "(sighs)", "No, no.",
      "Stop it. No, no. Go home. No, no, not again."),
-    # A run of three with a word of its own is not an echo.
-    (SEA, "whispers", "The sea still remembers",
-     "The sea remembers. And sometimes, it The sea still remembers what the light cannot reach."),
-    # The words either side of the span are not a run anybody says.
-    (SEA, "whispers", "it's what she", "The sea remembers. And sometimes, it it's what she what the light cannot reach."),
+    # Three words that share only two with the line have words of their own.
+    (SEA, "whispers", "calls the sea",
+     "The sea remembers. And sometimes, it calls the sea what the light cannot reach."),
+    # Another span's neighbours are not a run anybody says while that span
+    # keeps words: "here for me" straddles (b), which is answered "softly".
+    ("Go now (a) and wait here (b) for me always.", None, ("here for me", "softly"),
+     "Go now here for me and wait here softly for me always."),
 ])
 def test_an_answer_with_words_of_its_own_or_only_two_still_splices(text, word, answer, spoken):
-    spans = lcl._merge_repair_spans(text, _span_of_word(text, word))
-    assert lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"]) == spoken
+    if word is None:
+        spans = lcl._merge_repair_spans(text, [(7, 10), (25, 28)])
+        replies = _replacement_reply(*answer)["replacements"]
+    else:
+        spans = lcl._merge_repair_spans(text, _span_of_word(text, word))
+        replies = _replacement_reply(answer)["replacements"]
+    assert lcl._splice_replacements(text, spans, replies) == spoken
 
 
 def test_the_echo_of_a_kept_sentence_is_asked_again_through_the_pass():

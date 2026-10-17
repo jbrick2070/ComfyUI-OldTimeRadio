@@ -527,9 +527,10 @@ def _echoes_a_kept_run(replacement: str, kept: Sequence[str]) -> bool:
     reach." (signal_lost_the_fogs_whisper_20261017_153106, Gemma 4 E2B on
     the 4060): a run of 3 is under `_REPEAT_RUN`, and it did not touch the
     seam. Each kept slice is read on its own -- joined, the words on either
-    side of a span would make a run nobody says ("it what") -- and the
-    joined-replacements check does not use this, or two one-word answers
-    would fuse into a run.
+    side of another span would make a run nobody says -- and the
+    joined-replacements check does not use this, or three one-word answers
+    would fuse into a run. One added word defeats it ("The sea still
+    remembers"), as it does every exact rule here.
     """
     rep = [_bare_word(word) for word in _spoken_words(replacement)]
     if len(rep) < _ECHO_RUN_WORDS:
