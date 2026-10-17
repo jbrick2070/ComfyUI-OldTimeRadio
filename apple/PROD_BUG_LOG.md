@@ -16809,3 +16809,26 @@ not promote it to the Bug Bible on this evidence alone.
   did not fire: the fix is proven not to disturb a clean run, and the
   mismatch path stays proven by the s03 live answer replayed through the
   real ladder in tests/test_scifi_news_pro_casting_voice_repair.py.
+
+## PBUG-20261017-03 -- my_story: a character the model calls "she" is voiced male (OPEN)
+- live: 4060 leg r4 (2026-10-17, otr_8gb_low, gemma4-e2b, unseeded server2,
+  --source-bank my_story, fields from tests/test_my_story_runner.py: idea "a
+  keeper hears a voice", characters "Ada, the keeper. Tom."). RESULT SUCCESS,
+  obs voice_fog_20261017_121320__vart__vcam__none__koko__myst__cg4e2__sa3_final.mp4.
+  Episode signal_lost_the_voice_in_the_fog_20261017_121320.
+- defect: Ada's cast row has gender None and Kokoro voice am_liam (male). The
+  model's own casting description for her reads "the sound she hears ...
+  Gender unstated", the treatment says "Tom advises her", the canon "breaks
+  her spirit". Tom is also None (am_adam, coherent by luck).
+- why it is not fixed yet: the lane rule (`_otr_my_story.py` docstring) is
+  "a gender they did not state is never guessed from a name", and the shared
+  `_otr_gender_pronoun_scan` declines below 8 pronouns. Reading one "she" in
+  the model's own description is not a name guess, but it is a threshold
+  call (a description can also say "her" of someone else) -- design, not a
+  deterministic edit.
+- same batch, all RESULT SUCCESS + obs, no ERROR, no doubled row, no
+  parenthetical after clean_spoken_text: r1 (bank rolled media_archive,
+  421 s), r2 media_archive (385 s), r3 shakespeare (586 s); r4 above (411 s)
+  logged one ERROR, my_story_source_rewrite_ledger_clean_spoken exhausted on
+  "Correction must identify an exact ... interval", and the judge then found
+  nothing to clean.
