@@ -16985,3 +16985,27 @@ not promote it to the Bug Bible on this evidence alone.
   RESULT SUCCESS, no ERROR. otr_8gb_low draws procedurally (cast 0/3 with
   portrait), so the still/video character-prompt read is proven by the unit
   test, not by these legs.
+
+## PBUG-20261017-04 -- renumbered: the talk-label entry filed above as -02 (66fb66dd)
+- id collision: -02 and -03 were already taken by the casting entries
+  above. The ledger_clean entry "acted on judge entries that called their
+  own piece talk" (filed as -02, commit 66fb66dd) is PBUG-20261017-04; the
+  "already_spoken cleared a row that still held a bracketed direction"
+  entry (filed as -03, commit 7d009003) is PBUG-20261017-05. Commit
+  messages keep the old ids.
+- Sonnet refuting QA on 66fb66dd: HOLDS on the code (157 entries / 7
+  dropped reproduced; every judge path goes through `_judge_row`; the new
+  tests fail on 233335be with real assertions; "dialogue tag", "spoken
+  aside", "character line", "non-dialogue", "spoken narration" stay
+  findings). Corrections to the entry and commit message:
+  "We have to open them. Three." is from rainbow_candy_20261016_192221 (a
+  my_story run on 10-16), not x1c/x1d; only b5 and b7's retries invented a
+  direction (b8's returned "" again); the 157 count includes 5
+  pattern-only and 10 duplicated entries (the 7 is unaffected).
+- residuals added: the guard is only as wide as the patterns -- a talk
+  label is dropped on "Leave, he cried." ("cried" is not in the verb list),
+  on a title-case "Mary: Leave this house now." (the label pattern is
+  all-caps) and on an unbalanced "(sighs"; a real defect the judge itself
+  mislabels "speech" ("A long pause.") is dropped by design; with
+  JUDGE_VOTES=2 (off by default) a piece named "action" by one read and
+  "speech" by the other is lost.
