@@ -2293,6 +2293,18 @@ def _pass_news_read(
                          ensure_ascii=False, indent=2)
             if native_names else ""
         )
+        + (
+            # NOBODY REPORTED A TYPED PREMISE. The seam asks the close to name
+            # "who found or reported it", and with no outlet to name a small
+            # model fills the slot itself: "according to User Seed" when the
+            # outlet field carried that label, "A researcher noted" when it
+            # carried nothing (both 2026-10-16). Say there is no one to credit.
+            "\n\nNO NAMED REPORTER: the provenance names no outlet, author "
+            "or publication. Credit the account to no one -- do not invent "
+            "a researcher, institution, publication or label as its source."
+            if not str(provenance.get("source") or "").strip()
+            and not str(provenance.get("link") or "").strip() else ""
+        )
         + "\n\nWrite the closing news read now."
     )
     try:

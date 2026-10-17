@@ -458,11 +458,15 @@ def _resolve_inputs(
         # Custom premise path: synthesize the same dict shape RSS
         # would produce so news_interpreter sees a uniform article
         # surface no matter how the story entered the writer.
+        # `source` is the OUTLET slot, and a typed premise has none. It held
+        # the provenance label "User Seed" once, and the scifi_news_pro close
+        # read it as a publication -- "...sank thirty years ago, according to
+        # User Seed." (2026-10-16). Provenance rides `seed_source` below.
         news_article = _otr_source_payload.validate_source_payload({
             "headline":  "",
             "summary":   "",
             "full_text": custom,
-            "source":    "User Seed",
+            "source":    "",
             "date":      "",
             "link":      "",
             "seed_text": custom,

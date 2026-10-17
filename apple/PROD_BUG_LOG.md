@@ -16462,3 +16462,38 @@ not promote it to the Bug Bible on this evidence alone.
   `test_the_ledger_viewer_does_not_ship_without_its_server` went with them.
   With neither half left there is no pair to ship apart: the failure class is
   gone, not uncovered. A Bible entry citing that test should say the same.
+
+## PBUG-20261016-01 -- Kokoro read parenthesised delivery notes aloud
+- heard on air, RTX 4060 8 GB box, 2026-10-16, Gemma 4 E2B/E4B and Qwen3.5-4B
+  writers: "(distorted, urgent static) ...the pressure drops", "(sharp,
+  questioning whisper) Keeper, that is just interference", "(louder, more
+  urgent) ...heavy spray hitting the beam", "(measured, deeply concerned tone)",
+  "(Sound of a heavy metal clasp being forced open)".
+- cause: `eng_kokoro.prepare_text` was the identity ("legacy parity" for the
+  announcer). Bark, Chatterbox and IndexTTS2 drop a parenthetical before they
+  speak, per the 2026-08-05 ruling that the ledger and captions keep the line
+  as written and the voice never speaks the note. On 8 GB boxes Kokoro voices
+  the characters too, so the one engine without the rule spoke every note the
+  ledger_clean repair failed to fold away.
+- fix: Kokoro calls `clean_spoken_text` like Chatterbox and IndexTTS2. Verbatim
+  rows keep their parenthesised speech (the voice node drops their glyphs before
+  any engine prep). Measured on the 20 ledgers on disk: 12 of 186 character rows
+  change, every one a delivery note or sound cue; 0 of 51 announcer rows and 0
+  protected fact rows change.
+- not done, by ruling: stripping the note out of `lines[].text` (captions show
+  it on purpose; the stills read it) and a Python strip ahead of the repair
+  (the repair thinks, it does not strip). Panel: Codex, agy, Muse Wonder Full
+  all refuted the ledger strip and kept the engine fix.
+
+## PBUG-20261016-02 -- a typed premise was credited to "User Seed" on air
+- heard on air, scifi_news_pro with a custom premise, 2026-10-16: "...sank
+  thirty years ago, according to User Seed."
+- cause: the custom-premise article put its provenance label in the OUTLET
+  field (`source: "User Seed"`); the news-read pass is asked to name who
+  reported the find and read the label as a publication. The same field fed
+  the legacy news interpreter's `outlet`.
+- fix: a typed premise has no outlet (`source: ""`; provenance rides
+  `seed_source`), and a close with no outlet and no link is told there is no
+  one to credit -- the other half of the same night's E2B close was "A
+  researcher noted ...", invented. Every bank's custom premise goes through the
+  one resolver, so all of them are covered.

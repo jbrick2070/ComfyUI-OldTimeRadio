@@ -322,10 +322,15 @@ class KokoroEngine:
             backend.close()         # never raises
 
     def prepare_text(self, text, delivery_vector=None):
-        # Legacy parity: the Kokoro announcer spoke the raw (stripped) ledger line
-        # -- no bracket/asterisk cleaning -- so keep this identity to preserve
-        # exactly what listeners heard before.
-        return text
+        """Engine-neutral clean spoken text, as Chatterbox and IndexTTS2 do.
+
+        This was the identity once, for the announcer's sake, and it read every
+        "(distorted, urgent static)" aloud the day Kokoro started voicing the
+        characters on 8 GB boxes (2026-10-16). Verbatim rows are unharmed: the
+        voice node drops their parenthesis glyphs before any engine prep runs.
+        """
+        from .._otr_script_prep import clean_spoken_text
+        return clean_spoken_text(text)
 
     def generate_voice(self, text, voice_ref, delivery_vector, seed):
         """One line -> mono AUDIO {"waveform":[1,1,T], "sample_rate"}.
