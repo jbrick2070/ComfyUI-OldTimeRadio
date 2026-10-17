@@ -1995,9 +1995,32 @@ def _authorize_repair_scope(
         spans = _merge_repair_spans(text, intervals)
         return ("partial" if spans else "unresolved"), spans, record
 
+    # THE MARKUP FLOOR. A bracketed direction or a NAME: label is apparatus on
+    # every bank (`MARKUP_KINDS`), and a row the patterns alone flagged gets it
+    # repaired with no authorization at all (above). Sent here by a whole-row
+    # complaint, the same row was CLEARED when the model answered
+    # already_spoken: "(whispering) What nonsense is that? ..." shipped its
+    # direction with no unclean flag on two 4060 legs (2026-10-17) -- the
+    # louder complaint got less done than none. So the model's verdict decides
+    # everything except these spans. Markup that covers the spoken row is not
+    # a floor; that conversion still needs whole_row_direction.
+    floor = [(finding["start_char"], finding["end_char"]) for finding in patterns
+             if finding["kind"] in _POLICY.MARKUP_KINDS]
+    if _covers_spoken_row(text, floor):
+        floor = []
+
+    def markup_floor(why):
+        """Repair the markup alone; the model's verdict stays on the record."""
+        spans = _merge_repair_spans(text, floor)
+        record.update(scope_decision=f"markup floor ({why})",
+                      markup_floor=[span.quote for span in spans])
+        return "partial", spans, record
+
     parts = _structured()
     if parts is None:
         record.update(verdict="unresolved", reason="structured authorization unavailable")
+        if floor:
+            return markup_floor("no structured authorization")
         return "unresolved", (), record
     _base, _field, structured_call = parts
     # For a whole-row accusation the authorization must establish localized
@@ -2096,17 +2119,19 @@ def _authorize_repair_scope(
         if not _is_exhausted_clean_response(exc):
             raise
         record.update(verdict="unresolved", reason=str(exc))
+        if floor:
+            return markup_floor("authorization exhausted")
         return "unresolved", (), record
     record.update(result.model_dump())
     if result.verdict in _ECHO_IGNORED_VERDICTS and result.spans:
         record["ignored_spans"] = record.pop("spans")
         record["spans"] = []
-    if result.verdict == "already_spoken":
-        return "already_spoken", (), record
     if result.verdict == "whole_row_direction":
         return "whole", (), record
-    if result.verdict == "unresolved":
-        return "unresolved", (), record
+    if result.verdict in ("already_spoken", "unresolved"):
+        if floor:
+            return markup_floor(f"verdict {result.verdict}")
+        return result.verdict, (), record
     # THE ONE CALLER THAT RECOVERS. This is the repair-authorization path the
     # 4060 measured: 5 of 6 rows detected, ZERO repaired, 18 model calls, because
     # an off-by-one on a quote occurring exactly once discarded the finding. It
@@ -2114,7 +2139,15 @@ def _authorize_repair_scope(
     # is left off everywhere else.
     resolved = [_exact_interval(text, item.model_dump(), recover_unique=True)
                 for item in result.spans]
-    return "partial", _merge_repair_spans(text, original_partial + resolved), record
+    scope = original_partial + resolved
+    # The floor joins a localized answer too, unless together they would
+    # cover the row -- that would be a whole-row edit nobody authorized
+    # (Codex on the fix: "(whispering) Stay." localized to "Stay.").
+    if floor and not set(floor) <= set(scope) and not _covers_spoken_row(text, scope + floor):
+        scope += floor
+        record.update(scope_decision="markup floor (joined the localized scope)",
+                      markup_floor=[span.quote for span in _merge_repair_spans(text, floor)])
+    return "partial", _merge_repair_spans(text, scope), record
 
 
 #: The whole-line repair's worked example. The scoped branch swaps exactly

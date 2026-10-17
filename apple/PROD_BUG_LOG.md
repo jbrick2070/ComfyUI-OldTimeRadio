@@ -16926,3 +16926,36 @@ not promote it to the Bug Bible on this evidence alone.
   "monologue") still counts as a finding, as before; an announcer line
   called "speech" is still repaired when a pattern fires inside its quote
   ("fueled by whispers" -- the attribution-verb pattern reads "whispers").
+
+## PBUG-20261017-03 -- already_spoken cleared a row that still held a bracketed direction
+- 4060 legs x1c and x1d (2026-10-17, Gemma 4 E2B, both in otr/obs), row
+  shot_001_b4 both times: "(whispering) What nonsense is that? It's just
+  interference. Old wires playing tricks." The judge quoted the whole line
+  ("delivery note"); the pattern finder had "(whispering)" exactly. A
+  whole-row complaint drops the pattern spans and asks the model to
+  authorize; it answered already_spoken (echo ignored since f74c9449), so
+  the row shipped its direction with NO unclean flag. A row with only the
+  pattern finding goes straight to a partial repair of that span -- the
+  louder complaint got less done than none. The same gap left
+  "(distorted, urgent static)" and "(Sound of a hairdryer whirring once)"
+  unresolved when the model's localization was refused twice.
+- fix: `_authorize_repair_scope` keeps the MARKUP-kind pattern spans
+  (bracketed direction, NAME: label) as a floor the model's verdict cannot
+  clear: on already_spoken, unresolved, an exhausted ladder or no
+  structured call, those spans are the partial scope; a localized answer
+  gets them joined unless together they would cover the row. Markup that
+  covers the spoken row is not a floor (whole_row_direction still decides
+  it); language kinds get none. The record keeps the model's verdict and
+  adds `scope_decision` and `markup_floor`.
+- design check before coding: Codex gpt-6.1-sol (change: also join the
+  floor to a localized answer, re-check the union with `_covers_spoken_row`,
+  keep the verdict as evidence and record the fallback -- all taken; its
+  caution that markup is not proof of non-speech applies equally to the
+  existing pattern-only path, and verbatim rows are skipped before judging).
+- measured: of 51 recorded rows where a model authorization ran, 7 distinct
+  rows change (8 entries, one ledger duplicated) -- the two b4 rows and five
+  "unresolved" rows whose bracketed direction is now repaired. All seven
+  hold a real direction.
+- residual: a literal parenthesis meant to be spoken on a non-verbatim
+  bank ("Say the word (whispering), then stop.") is repaired, as the
+  pattern-only path already did.

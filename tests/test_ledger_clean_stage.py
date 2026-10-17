@@ -1648,7 +1648,12 @@ def test_only_already_spoken_ignores_an_echo_and_only_a_whole_line_one(verdict, 
     ledger = _ledger(original)
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
     assert slot.authorization_calls == 2
-    assert receipt["rows"][0]["outcome"] == "unresolved" and receipt["unclean"] == 1
+    # The contradiction is refused both times. The row's two "(sigh)" are
+    # markup, so the floor still repairs them (PBUG-20261017-03).
+    scope = receipt["rows"][0]["scope"]
+    assert scope["authorization"]["verdict"] == "unresolved"
+    assert scope["authorization"]["scope_decision"] == "markup floor (authorization exhausted)"
+    assert [span["quote"] for span in scope["approved_spans"]] == ["(sigh)", "(sigh)"]
 
 
 def test_whole_row_direction_still_takes_no_spans_at_all():
@@ -2001,3 +2006,83 @@ def test_a_talk_labelled_sibling_cannot_widen_a_real_finding_to_the_whole_row():
 ])
 def test_only_a_reason_of_talk_words_with_nothing_a_pattern_sees_is_talk(quote, why, talk):
     assert lcl._labels_itself_talk(quote, why) is talk
+
+
+# A whole-row complaint the model answered already_spoken cleared a row that
+# still held a bracketed direction (4060 legs x1c and x1d, 2026-10-17, b4).
+
+WHISPER = ("(whispering) What nonsense is that? It’s just interference. "
+           "Old wires playing tricks.")
+
+
+def test_already_spoken_cannot_clear_a_bracketed_direction():
+    ledger = _ledger(WHISPER)
+    slot = _Slot(judgements={WHISPER: [_judgement((WHISPER, "delivery note"))]},
+                 authorizations={WHISPER: [{"verdict": "already_spoken",
+                                            "spans": [{"quote": WHISPER}]}]},
+                 repairs={WHISPER: [_replacement_reply("")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == (
+        " What nonsense is that? It’s just interference. Old wires playing tricks.")
+    row = receipt["rows"][0]
+    assert row["outcome"] == "repaired" and slot.authorization_calls == 1
+    authorization = row["scope"]["authorization"]
+    assert authorization["verdict"] == "already_spoken"
+    assert authorization["scope_decision"] == "markup floor (verdict already_spoken)"
+    assert authorization["markup_floor"] == ["(whispering)"]
+    assert [span["quote"] for span in row["scope"]["approved_spans"]] == ["(whispering)"]
+
+
+@pytest.mark.parametrize("authorization, decision", [
+    ({"verdict": "unresolved", "spans": []}, "markup floor (verdict unresolved)"),
+    # Refused twice: a localized span that is the whole line.
+    ({"verdict": "localized_defect", "spans": [{"quote": WHISPER}]},
+     "markup floor (authorization exhausted)"),
+])
+def test_the_markup_floor_holds_when_the_model_localizes_nothing(authorization, decision):
+    ledger = _ledger(WHISPER)
+    slot = _Slot(judgements={WHISPER: [_judgement((WHISPER, "delivery note"))]},
+                 authorizations={WHISPER: [authorization]},
+                 repairs={WHISPER: [_replacement_reply("")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    row = receipt["rows"][0]
+    assert row["scope"]["authorization"]["scope_decision"] == decision
+    assert row["outcome"] == "repaired"
+    assert ledger["lines"][1]["text"].startswith(" What nonsense")
+
+
+def test_the_markup_floor_joins_a_localized_answer():
+    text = "(whispering) Stay here. The door closes."
+    slot = _Slot(judgements={text: [_judgement((text, "scene report"))]},
+                 authorizations={text: [{"verdict": "localized_defect",
+                                         "spans": [{"quote": "The door closes."}]}]},
+                 repairs={text: [_replacement_reply("", "")]})
+    receipt = lcl.run_ledger_clean(_ledger(text), slot_fn=slot, bank_id="original")
+    scope = receipt["rows"][0]["scope"]
+    assert [span["quote"] for span in scope["approved_spans"]] == ["(whispering)", "The door closes."]
+    assert scope["authorization"]["scope_decision"] == "markup floor (joined the localized scope)"
+
+
+def test_the_markup_floor_never_makes_a_whole_row_edit_nobody_authorized():
+    text = "(whispering) Stay."
+    slot = _Slot(judgements={text: [_judgement((text, "delivery note"))]},
+                 authorizations={text: [{"verdict": "localized_defect",
+                                         "spans": [{"quote": "Stay."}]}]},
+                 repairs={text: [_replacement_reply("Wait.")]})
+    receipt = lcl.run_ledger_clean(_ledger(text), slot_fn=slot, bank_id="original")
+    scope = receipt["rows"][0]["scope"]
+    assert [span["quote"] for span in scope["approved_spans"]] == ["Stay."]
+    assert "scope_decision" not in scope["authorization"]
+
+
+@pytest.mark.parametrize("text", [
+    "(He sighs heavily.)",          # markup that IS the row: whole_row_direction's job
+    "Stay, he said, stay here.",    # a language kind (attribution verb) gets no floor
+])
+def test_already_spoken_still_clears_a_row_with_no_markup_floor(text):
+    slot = _Slot(judgements={text: [_judgement((text, "delivery note"))]},
+                 authorizations={text: [{"verdict": "already_spoken", "spans": []}]})
+    receipt = lcl.run_ledger_clean(_ledger(text), slot_fn=slot, bank_id="original")
+    row = receipt["rows"][0]
+    assert row["outcome"] == "already_spoken" and slot.repair_calls == 0
+    assert "scope_decision" not in row["scope"]["authorization"]
