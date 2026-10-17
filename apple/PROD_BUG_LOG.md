@@ -17074,3 +17074,29 @@ not promote it to the Bug Bible on this evidence alone.
 - seen in r7b, handed to the ledger_clean owner: shot_001_b10 shipped
   "The sea remembers. And sometimes, it The sea remembers. what the light
   cannot reach." -- a one-word span replaced by a sentence the line keeps.
+
+## PBUG-20261017-06 -- ledger_clean spliced in a sentence the line already says, mid-line
+- 4060 leg r7b (8c77ca45, otr_8gb_low, Gemma 4 E2B, my_story, unseeded;
+  signal_lost_the_fogs_whisper_20261017_153106, RESULT SUCCESS, in otr/obs;
+  found by the casting session, see its PBUG-20261017-03 note). Row
+  shot_001_b10 "The sea remembers. And sometimes, it whispers what the light
+  cannot reach.": the attribution-verb pattern scoped "whispers" (the judge's
+  own entries were labelled "speech" and dropped, 66fb66dd), the writer
+  answered "The sea remembers.", and it shipped "...it The sea remembers.
+  what the light cannot reach." Every guard passed it: a shared run of 3 is
+  under `_REPEAT_RUN` (4), it did not touch the seam, and it is not all the
+  kept speech. The reread passed it too (its entries were "speech" labels).
+- fix: `_echoes_a_kept_run` refuses, per span, a replacement of 3+ words
+  that is wholly a run one kept slice already says. Each slice is read on
+  its own (joined, the words either side of a span make a run nobody says);
+  the joined-replacements check does not use it (two one-word answers would
+  fuse); two-word echoes away from the span stay speech ("No, no.").
+- second opinion before coding: agy on Gemini 4 Argon High (change: 3 words
+  not 2, per-slice runs, keep it out of the joined check -- all taken).
+- measured: the 55 spliced answers in the local ledgers replayed -- exactly
+  this row is newly refused.
+- residuals: an echo with its words bent or split ("It's cold." beside "It
+  is cold", "The sea remembered."), and spaceless scripts, where a clause
+  is one word (the pair rules stay); the pattern that started it still reads
+  a verb of speaking used as narration ("it whispers what...", "fueled by
+  whispers") as an attribution verb.

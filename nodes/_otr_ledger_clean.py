@@ -509,6 +509,36 @@ def _overlaps_a_seam(replacement: str, before: str, after: str) -> bool:
     return False
 
 
+#: Words a replacement must have before "all of it is a run the line already
+#: says" counts as the line said twice wherever it lands. Two-word echoes
+#: are ordinary away from the span ("No, no.", "I know.", "Mon Dieu," with
+#: the phrase said elsewhere -- agy/Gemini 4 Argon on the fix); beside the
+#: span, two already refuse (`_SEAM_OWN_WORDS`).
+_ECHO_RUN_WORDS = 3
+
+
+def _echoes_a_kept_run(replacement: str, kept: Sequence[str]) -> bool:
+    """Is the whole replacement a run of words one kept slice already says?
+
+    It has no words of its own, so it says that run a second time, beside
+    the span or anywhere else. "The sea remembers. And sometimes, it
+    whispers what the light cannot reach." with "whispers" answered "The sea
+    remembers." shipped "...it The sea remembers. what the light cannot
+    reach." (signal_lost_the_fogs_whisper_20261017_153106, Gemma 4 E2B on
+    the 4060): a run of 3 is under `_REPEAT_RUN`, and it did not touch the
+    seam. Each kept slice is read on its own -- joined, the words on either
+    side of a span would make a run nobody says ("it what") -- and the
+    joined-replacements check does not use this, or two one-word answers
+    would fuse into a run.
+    """
+    rep = [_bare_word(word) for word in _spoken_words(replacement)]
+    if len(rep) < _ECHO_RUN_WORDS:
+        return False
+    return any(
+        _longest_shared_run(rep, [_bare_word(word) for word in _spoken_words(piece)]) == len(rep)
+        for piece in kept)
+
+
 def _holds_every_kept_slice(replacement: str, kept: Sequence[str]) -> bool:
     """Does a replacement contain ALL of the line's kept speech, in order?
 
@@ -613,6 +643,7 @@ def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: 
     for index, span in enumerate(spans):
         if (_repeats_kept_speech(by_id[span.span_id], kept_speech)
                 or _holds_every_kept_slice(by_id[span.span_id], kept)
+                or _echoes_a_kept_run(by_id[span.span_id], kept)
                 or _overlaps_a_seam(by_id[span.span_id], kept[index], kept[index + 1])):
             raise ValueError(
                 "The replacement for %s repeats words the line already keeps outside "

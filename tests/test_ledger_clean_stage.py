@@ -2113,3 +2113,50 @@ def test_a_reread_with_every_entry_dropped_still_sees_a_pattern_left_behind():
     first = receipt["rows"][0]["attempts"][0]
     assert first["outcome"] == "still_dirty"
     assert [item["quote"] for item in first["remaining"]] == ["(quietly)"]
+
+
+# r7b on 8c77ca45 (signal_lost_the_fogs_whisper_20261017_153106): the pattern
+# scoped "whispers" and the writer answered with a sentence the line already
+# says; it shipped "...it The sea remembers. what the light cannot reach."
+
+SEA = "The sea remembers. And sometimes, it whispers what the light cannot reach."
+
+
+def _span_of_word(text, word):
+    start = text.index(word)
+    return [(start, start + len(word))]
+
+
+@pytest.mark.parametrize("text, word, answer", [
+    (SEA, "whispers", "The sea remembers."),
+    (SEA, "whispers", "what the light cannot"),                   # a run from the far side
+    ("I told you twice. Now (sighs) listen to me.", "(sighs)", "I told you"),
+])
+def test_an_answer_that_is_only_a_run_the_line_says_is_refused_anywhere(text, word, answer):
+    spans = lcl._merge_repair_spans(text, _span_of_word(text, word))
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"])
+
+
+@pytest.mark.parametrize("text, word, answer, spoken", [
+    # Two words away from the span: ordinary ("No, no." with the phrase said later).
+    ("Stop it. (sighs) Go home. No, no, not again.", "(sighs)", "No, no.",
+     "Stop it. No, no. Go home. No, no, not again."),
+    # A run of three with a word of its own is not an echo.
+    (SEA, "whispers", "The sea still remembers",
+     "The sea remembers. And sometimes, it The sea still remembers what the light cannot reach."),
+    # The words either side of the span are not a run anybody says.
+    (SEA, "whispers", "it's what she", "The sea remembers. And sometimes, it it's what she what the light cannot reach."),
+])
+def test_an_answer_with_words_of_its_own_or_only_two_still_splices(text, word, answer, spoken):
+    spans = lcl._merge_repair_spans(text, _span_of_word(text, word))
+    assert lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"]) == spoken
+
+
+def test_the_echo_of_a_kept_sentence_is_asked_again_through_the_pass():
+    ledger = _ledger(SEA)
+    slot = _Slot(repairs={SEA: [_replacement_reply("The sea remembers."), _replacement_reply("speaks")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == "The sea remembers. And sometimes, it speaks what the light cannot reach."
+    attempt = receipt["rows"][0]["attempts"][0]
+    assert [bool(call["error"]) for call in attempt["calls"]] == [True, False]
