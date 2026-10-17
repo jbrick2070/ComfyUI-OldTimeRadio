@@ -16730,3 +16730,22 @@ not promote it to the Bug Bible on this evidence alone.
   now, another transmission."), and an echo that leads with the shared
   words ("Another transmission again." -- the shape of ordinary anaphora,
   "The light burns. The light is all we have.").
+
+## PBUG-20261017-01 -- QA on 7862aeca: holds; wording corrected
+- Sonnet refuting QA: HOLDS. The new tests fail on 3bf8926c; a fuzz of the
+  seam rule (200k Latin + 100k Han triples) against an independent
+  formulation found no mismatch and nothing the three-word rule refused is
+  now passed; all 73 ledgers on the box (162 spliced answers) change only
+  on the two doubled rows; ~52k zh/ja Shakespeare interjection trials gave
+  55 new refusals, nearly all true echoes ("いや" before "いや、").
+- wording fixed: "one shared word stays speech" holds in spaced scripts
+  only. In Chinese and Japanese the unit is a character, so a two-character
+  word handed back alone is refused ("然后" before "然后戏") along with a
+  rare sub-word prefix ("した" before "したり"). The PBUG-20261016-03
+  residual "Han two-character seam stutters" is now narrower: only a
+  stutter with two or more characters of its own still splices.
+- residuals, documented and not chased: an answer in decomposed accents
+  ("Quédate aquí." beside "Quédate aquí.") is not NFC-folded by
+  `_spoken_words` (the old three-word rule had the same hole); a Thai echo is
+  one phrase unit; an answer of two head words plus two tail words passes the
+  seam rule (the 4-word run guard catches it in spaced scripts, not in Han).

@@ -1906,7 +1906,7 @@ def test_an_answer_that_is_little_but_the_words_beside_its_span_is_refused(text,
     ("(echoing) Hello? Is anyone there?", "Hello?", "Hello? Hello? Is anyone there?"),
     # A word the line says elsewhere, not beside the span, still folds in.
     ("(to the Keeper) You are isolated, Keeper.", "Keeper,", "Keeper, You are isolated, Keeper."),
-    # Two shared words with two of its own: the three-word floor still decides.
+    # Two shared words with two of its own: ordinary speech, it splices.
     ("(points) The lamp is dead.", "Look at the lamp.", "Look at the lamp. The lamp is dead."),
 ])
 def test_an_answer_with_words_of_its_own_still_splices(text, answer, spoken):

@@ -444,16 +444,19 @@ def _repeats_kept_speech(replacement: str, kept: str) -> bool:
     return False
 
 
-#: Words shared across a seam before it counts as the line said twice there;
+#: Units shared across a seam that always count as the line said twice there;
 #: "Look at the lamp. The lamp is dead." shares two and is ordinary speech.
 _SEAM_WORDS = 3
 
-#: ...unless the answer has almost nothing else: two shared words with at most
-#: ``_SEAM_OWN_WORDS`` of its own beside them is the neighbours handed back
-#: ("Another transmission." before "Another transmission. Just the usual
+#: ...and two do when the answer has almost nothing else: two shared units with
+#: at most ``_SEAM_OWN_WORDS`` of its own beside them is the neighbours handed
+#: back ("Another transmission." before "Another transmission. Just the usual
 #: hiss.", 2026-10-17), where "Look at" above is two words of its own. One
-#: shared word stays speech: "(gasp) Oh, it's you!" answered "Oh!", "(echoing)
-#: Hello?" answered "Hello?" (Muse Wonder Full on the fix).
+#: shared word stays speech in a spaced script: "(gasp) Oh, it's you!"
+#: answered "Oh!" (Muse Wonder Full on the fix). In Chinese and Japanese the
+#: unit is a character, so a two-character word handed back alone is refused
+#: -- "然后" before "然后戏继续了" says 然后 twice, and the rare sub-word
+#: prefix ("した" before "したり") goes with it (Sonnet QA on 7862aeca).
 _SEAM_OWN_WORDS = 1
 
 
@@ -464,7 +467,7 @@ def _overlaps_a_seam(replacement: str, before: str, after: str) -> bool:
     words too: "...and the play continued." with "continued" answered "and
     the play settled." spliced to "and the play and the play settled" and
     shipped (signal_lost_the_rainbow_boxes_20261014_145758, found by Sonnet
-    QA on 0291b5da). At least ``_SEAM_WORDS`` words must line up -- or, in
+    QA on 0291b5da). ``_SEAM_WORDS`` words lining up refuse it -- or, in
     Chinese and Japanese, where a whole clause reads as one "word", that many
     Han/kana characters: "然后戏继续了" with "继续了" answered "然后戏停了" said
     然后戏 twice (Sonnet QA on 7dc01e7a). Only Han and kana, and only those
@@ -491,8 +494,8 @@ def _overlaps_a_seam(replacement: str, before: str, after: str) -> bool:
     def doubled(width):
         return width >= _SEAM_WORDS or len(rep) - width <= _SEAM_OWN_WORDS
 
-    # The widest match on each side decides it: a narrower one shares less
-    # and leaves the answer more words of its own.
+    # Widths down to two units. The widest match on each side decides it: a
+    # narrower one shares less and leaves the answer more units of its own.
     for width in range(min(len(head), len(rep)), 1, -1):
         if head[-width:] == rep[:width]:
             if doubled(width):
