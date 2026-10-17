@@ -17027,3 +17027,36 @@ not promote it to the Bug Bible on this evidence alone.
 - sixth QA (48c37a93): the seam never defined "listener_text_suggests";
   it now says it is a hint to check against pronouns and relationships, not
   a ruling. Stale `_pass_cast_gender` docstring corrected.
+
+## PBUG-20261017-05 -- QA on 7d009003: holds; one record fixed, the headline narrowed
+- Sonnet refuting QA: HOLDS. 7 distinct rows reproduced over all 100
+  output JSONs; the parent's test file fails only the one test whose
+  assertions follow the design; "*very*", "OK:", "SOS:", "(the captain)"
+  are now stripped after a whole-row complaint answered already_spoken,
+  exactly as the parent already stripped them when no judge complained
+  (consistency, not a new class of edit).
+- fixed: the "joined the localized scope" record was written whenever the
+  floor intervals were not literally in the scope, also when a localized
+  span already held them ("(whispering) What nonsense is that?"). It is now
+  recorded only when the floor changes the merged scope.
+- the headline "a model verdict cannot clear a bracketed direction" is
+  too wide: a row that is ALL bracket is still cleared by already_spoken
+  (whole_row_direction decides it) -- recorded case
+  thirty_year_echo_20261016_205615 shot_001_b16 "(a sudden, sharp intake
+  of breath, then silence)". It is not voiced: ledger_cleanup marks a row
+  with no sayable text as an explicit skip (empty_spoken_text_at_ledger_
+  cleanup), so Kokoro's new cleaning cannot meet it empty.
+- residuals: the floor's repair can still be discarded at the reread
+  when the judge re-complains about the clean line or another pattern
+  fires ("(whispering) Stay, he said, stay here." re-finds "said") -- with
+  one complaint the attempt is not progress, so the original ships
+  FLAGGED (never worse than before: it used to ship unflagged); the repair
+  prompt still shows the judge's whole-line complaint beside the narrower
+  authorized span, as every localized whole-row complaint already did;
+  `_covers_spoken_row` counts leftover punctuation as speech ("Stay"
+  localized without its period), a validator gap older than this.
+- count correction: 7d009003's "8 new tests fail on the parent" is 4 new
+  cases plus the 4 parameters of the one changed test; its "2
+  non-regression guards" are 3 cases.
+- the first QA's test gap is filled here: a reread whose judge entries are
+  all dropped still sees a bracket the writer swapped in.

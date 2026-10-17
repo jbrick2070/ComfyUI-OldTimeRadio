@@ -2142,8 +2142,10 @@ def _authorize_repair_scope(
     scope = original_partial + resolved
     # The floor joins a localized answer too, unless together they would
     # cover the row -- that would be a whole-row edit nobody authorized
-    # (Codex on the fix: "(whispering) Stay." localized to "Stay.").
-    if floor and not set(floor) <= set(scope) and not _covers_spoken_row(text, scope + floor):
+    # (Codex on the fix: "(whispering) Stay." localized to "Stay."). Recorded
+    # only when it changes the scope: a localized span can already hold it.
+    if (floor and _merge_repair_spans(text, scope + floor) != _merge_repair_spans(text, scope)
+            and not _covers_spoken_row(text, scope + floor)):
         scope += floor
         record.update(scope_decision="markup floor (joined the localized scope)",
                       markup_floor=[span.quote for span in _merge_repair_spans(text, floor)])

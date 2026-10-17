@@ -1649,7 +1649,7 @@ def test_only_already_spoken_ignores_an_echo_and_only_a_whole_line_one(verdict, 
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
     assert slot.authorization_calls == 2
     # The contradiction is refused both times. The row's two "(sigh)" are
-    # markup, so the floor still repairs them (PBUG-20261017-03).
+    # markup, so the floor still repairs them (PBUG-20261017-05).
     scope = receipt["rows"][0]["scope"]
     assert scope["authorization"]["verdict"] == "unresolved"
     assert scope["authorization"]["scope_decision"] == "markup floor (authorization exhausted)"
@@ -2086,3 +2086,30 @@ def test_already_spoken_still_clears_a_row_with_no_markup_floor(text):
     row = receipt["rows"][0]
     assert row["outcome"] == "already_spoken" and slot.repair_calls == 0
     assert "scope_decision" not in row["scope"]["authorization"]
+
+
+def test_a_localized_span_that_already_holds_the_floor_records_no_join():
+    text = "(whispering) What nonsense is that? It's just interference."
+    slot = _Slot(judgements={text: [_judgement((text, "delivery note"))]},
+                 authorizations={text: [{"verdict": "localized_defect",
+                                         "spans": [{"quote": "(whispering) What nonsense is that?"}]}]},
+                 repairs={text: [_replacement_reply("")]})
+    receipt = lcl.run_ledger_clean(_ledger(text), slot_fn=slot, bank_id="original")
+    scope = receipt["rows"][0]["scope"]
+    assert [span["quote"] for span in scope["approved_spans"]] == ["(whispering) What nonsense is that?"]
+    assert "scope_decision" not in scope["authorization"]
+
+
+def test_a_reread_with_every_entry_dropped_still_sees_a_pattern_left_behind():
+    """Dropping the talk-labelled entry leaves the reread to the patterns: a
+    new bracket the writer swapped in (as b5 and b7 did live) is still dirty."""
+    original = "(sighs) Stay here."
+    swapped = "(quietly) Stay here."
+    ledger = _ledger(original)
+    slot = _Slot(judgements={original: [_judgement(("(sighs)", "action"))],
+                             swapped: [_judgement(("Stay here.", "dialogue"))]},
+                 repairs={original: [_replacement_reply("(quietly)"), _replacement_reply("")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    first = receipt["rows"][0]["attempts"][0]
+    assert first["outcome"] == "still_dirty"
+    assert [item["quote"] for item in first["remaining"]] == ["(quietly)"]
