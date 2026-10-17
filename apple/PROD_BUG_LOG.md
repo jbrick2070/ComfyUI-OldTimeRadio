@@ -16497,3 +16497,29 @@ not promote it to the Bug Bible on this evidence alone.
   one to credit -- the other half of the same night's E2B close was "A
   researcher noted ...", invented. Every bank's custom premise goes through the
   one resolver, so all of them are covered.
+
+## PBUG-20261016-03 -- the clean pass refused its own writer's right answers
+- measured from the server logs of 47 legs on the 4060, 2026-10-15/16, Gemma 4
+  E2B/E4B and Qwen3.5-4B writers: 41 scope authorizations refused as "Only
+  localized_defect may contain spans" -- every one an `already_spoken` verdict
+  with the whole line echoed in `spans`, mostly announcer scene-setting the
+  judge had wrongly flagged; 29 repairs refused as "repeats words the line
+  already keeps" -- the model had handed back the whole cleaned line
+  ("Keeper, that is just interference. The barometer is stable." for the span
+  "(sharp, questioning whisper)"); 14 refused as "Use whole_row_direction only
+  when ..."; 17 rows shipped `unclean_spoken_text` with the note intact.
+- cause: the protocol, not the model's judgement. The scoped repair prompt kept
+  the whole-line before/after example and self-check from the whole-line
+  prompt, then forbade a whole-line answer; the authorizer was never told to
+  leave `spans` empty on a verdict that needs none.
+- fix (nodes/_otr_ledger_clean.py): the scoped prompt shows a span-shaped
+  example and self-check; the authorizer is told spans are for
+  localized_defect only and never quote the whole line; a whole-line answer is
+  read back by exact partition (every kept slice once, in order, nothing
+  outside them) into the replacements it implies and goes through the same
+  splice and doubled-line guard; an echoed span on a non-localized verdict is
+  ignored and recorded as `ignored_spans` -- a span on PART of the line is
+  still a contradiction and stays refused.
+- panel: Codex, agy, Muse Wonder Full. The third idea (promote a whole-line
+  "localized" span to a whole-row repair) was dropped: Codex and Muse refuted
+  it as a bypass of the narrowing step.

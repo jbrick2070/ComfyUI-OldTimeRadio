@@ -401,6 +401,94 @@ def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: 
     return candidate
 
 
+def _replacements_from_whole_line(
+    text: str, spans: Sequence[_RepairSpan], replacements: Sequence[Mapping[str, Any]],
+) -> "list[dict[str, str]] | None":
+    """The model answered a scoped edit with the WHOLE rewritten line.
+
+    Measured 2026-10-16 (47 legs, 8 GB box): 29 repairs refused as "repeats
+    words the line already keeps" were small writers handing back the full
+    cleaned line -- "Keeper, that is just interference. The barometer is
+    stable." for the span "(sharp, questioning whisper)" -- which is a right
+    answer in the wrong shape. Read it back as the replacements it implies:
+    every kept slice must appear in it exactly once, in order, with nothing
+    outside them but the model's own text in each span's place. Those gaps
+    then go through ``_splice_replacements`` like any answer, so the kept
+    slices are rebuilt from the ORIGINAL row byte for byte and the doubled-
+    line guard still reads every gap. None when the answer cannot be read
+    that way -- the old refusal stands.
+    """
+    filled = [item for item in replacements
+              if str(item.get("replacement") or "").strip()]
+    if len(filled) != 1 or not spans:
+        return None
+    line = str(filled[0].get("replacement") or "")
+    kept: "list[str]" = []
+    cursor = 0
+    for span in spans:
+        kept.append(text[cursor:span.start_char])
+        cursor = span.end_char
+    kept.append(text[cursor:])
+    cores: "list[tuple[int, int] | None]" = []
+    position = 0
+    for piece in kept:
+        core = piece.strip()
+        if not core:
+            cores.append(None)
+            continue
+        found = line.find(core, position)
+        if found < 0 or line.count(core) != 1:
+            return None
+        cores.append((found, found + len(core)))
+        position = found + len(core)
+    if not any(cores):
+        return None
+    # Nothing may stand outside the spans: words before the first kept slice
+    # or after the last one are an edit no span approved.
+    if cores[0] is not None and line[:cores[0][0]].strip():
+        return None
+    if cores[-1] is not None and line[cores[-1][1]:].strip():
+        return None
+    recovered: "list[dict[str, str]]" = []
+    for index, span in enumerate(spans):
+        if cores[index] is None and index > 0:
+            # Adjacent spans share one gap; the first of them carries it.
+            recovered.append({"span_id": span.span_id, "replacement": ""})
+            continue
+        start = cores[index][1] if cores[index] is not None else 0
+        following = index + 1
+        while following < len(cores) and cores[following] is None:
+            following += 1
+        end = cores[following][0] if following < len(cores) else len(line)
+        gap = line[start:end]
+        # The kept slices carry their own spacing into the splice.
+        if cores[index] is None or kept[index] != kept[index].rstrip():
+            gap = gap.lstrip()
+        if following < len(kept) and kept[following] != kept[following].lstrip():
+            gap = gap.rstrip()
+        recovered.append({"span_id": span.span_id, "replacement": gap})
+    try:
+        _splice_replacements(text, spans, recovered)
+    except ValueError:
+        return None
+    return recovered
+
+
+def _scoped_replacements(
+    text: str, spans: Sequence[_RepairSpan], replacements: Sequence[Mapping[str, Any]],
+) -> "tuple[list[dict[str, Any]], bool]":
+    """The replacements a scoped answer stands for, and whether it came as a
+    whole line. Raises the splice's own refusal when it is neither."""
+    try:
+        _splice_replacements(text, spans, replacements)
+        return [dict(item) for item in replacements], False
+    except ValueError:
+        recovered = _replacements_from_whole_line(text, spans, replacements)
+        if recovered is None:
+            raise
+        return recovered, True
+
+
 def _is_exhausted_clean_response(exc: BaseException) -> bool:
     """Only malformed/exhausted structured answers may retain a flagged row."""
     try:
@@ -1711,8 +1799,14 @@ def _authorize_repair_scope(
         if result.verdict == "whole_row_direction" and not whole:
             return "Only an original whole-row complaint can authorize whole-row conversion"
         if result.verdict != "localized_defect":
-            if result.spans:
-                return "Only localized_defect may contain spans"
+            # A verdict that needs no spans IGNORES an echoed one, and the echo
+            # grants nothing. 41 refusals in one night were exactly this: an
+            # already_spoken with the whole line copied into `spans`. A span
+            # that lands on PART of the line is still a contradiction.
+            for item in result.spans:
+                interval = _exact_interval(text, item.model_dump(), recover_unique=True)
+                if interval is not None and not _whole_spoken_row(text, interval):
+                    return "Only localized_defect may contain spans"
             return None
         if not result.spans:
             return "localized_defect needs at least one exact original span"
@@ -1750,6 +1844,8 @@ def _authorize_repair_scope(
                  "Ordinary spoken dialogue, including a short closing line, is already_spoken. "
                  "Choose localized_defect for actual non-speech inside otherwise valid speech; "
                  "give exact quote and zero-based start_char/end_char (end exclusive). "
+                 "A span quotes ONLY the words that are not speech, never the whole line, even "
+                 "when a complaint quoted the whole line. Return spans: [] for any other verdict. "
                  "Repeated quotes need the intended occurrence's offsets. Choose whole_row_direction "
                  "only if the entire spoken row is actually a direction needing conversion. "
                  "Choose unresolved when uncertain. Preserve the speaker's meaning.\n"
@@ -1784,6 +1880,9 @@ def _authorize_repair_scope(
         record.update(verdict="unresolved", reason=str(exc))
         return "unresolved", (), record
     record.update(result.model_dump())
+    if result.verdict != "localized_defect" and result.spans:
+        record["ignored_spans"] = record.pop("spans")
+        record["spans"] = []
     if result.verdict == "already_spoken":
         return "already_spoken", (), record
     if result.verdict == "whole_row_direction":
@@ -1923,6 +2022,28 @@ def _repair_prompt(
                 parts[i] = ("- Every part that already was speech is kept for you, outside "
                             "the spans. A replacement holds only what takes the span's "
                             "place -- often a few words, sometimes nothing.")
+        # The whole-line example and self-check below taught small writers to
+        # answer a scoped edit with the whole line (29 refusals, 2026-10-16).
+        # Show the shape a scoped answer actually has instead.
+        example = parts.index("Example of the move, shape only -- your line is the one above:")
+        parts[example:example + 4] = [
+            "Example of the move, shape only -- your spans are the ones below:",
+            "  line:    (a heavy sigh) I told you he would not stay.",
+            '  span:    span_001 = "(a heavy sigh)"',
+            '  answer:  {"replacements": [{"span_id": "span_001", "replacement": "Well."}]}',
+            '  or, when it carried nothing: {"replacements": [{"span_id": "span_001", '
+            '"replacement": ""}]}',
+            '  never:   "replacement": "I told you he would not stay." -- that part is '
+            "already kept.",
+        ]
+        for i, part in enumerate(parts):
+            if part.startswith("Before you answer, read your rewrite once"):
+                parts[i] = (f"Before you answer, read your rewrite once -- the line with "
+                            f"your replacements in place -- first word to last, the way "
+                            f"the voice actor will. If any word of a replacement is not "
+                            f"something {speaker_label} says out loud, or any marked piece "
+                            f"survives in any form that is not spoken words, fix the "
+                            f"replacement.")
         parts[-1] = ("Return replacements as specified below; the full original row is context, "
                      "not your output or an additional editing surface.")
         parts += ["APPROVED ORIGINAL SPANS:", json.dumps(
@@ -1976,7 +2097,7 @@ def _call_repair(
     def _validate(result) -> str | None:
         try:
             if scope_mode == "partial":
-                _splice_replacements(text, authorized_spans,
+                _scoped_replacements(text, authorized_spans,
                                      [item.model_dump() for item in result.replacements])
             elif not result.text.strip():
                 return "The spoken row is empty"
@@ -2039,9 +2160,16 @@ def _call_repair(
         )
         return ""
     if scope_mode == "partial":
-        replacements = [item.model_dump() for item in result.replacements]
+        replacements, whole_line = _scoped_replacements(
+            text, authorized_spans, [item.model_dump() for item in result.replacements])
         candidate = _splice_replacements(text, authorized_spans, replacements)
         proposal_receipt["replacements"] = replacements
+        if whole_line:
+            # The receipt keeps what the model actually said, beside the
+            # replacements it was read back as.
+            proposal_receipt["answered_whole_line"] = True
+            proposal_receipt["raw_replacements"] = [
+                item.model_dump() for item in result.replacements]
     else:
         candidate = result.text
     proposal_receipt["candidate_sha256"] = hashlib.sha256(candidate.encode("utf-8")).hexdigest()

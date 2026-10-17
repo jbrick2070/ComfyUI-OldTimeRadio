@@ -1456,10 +1456,12 @@ def test_two_spans_that_split_the_kept_line_between_them_are_refused():
         == " Go Mm. home."
 
 
-def test_a_repeated_line_is_refused_and_the_next_answer_is_used():
+def test_a_light_reword_is_refused_and_the_next_answer_is_used():
+    """The kept line reworded inside the span would be said twice. The bare
+    kept line is a different answer now -- see the whole-line tests below."""
     ledger = _ledger(DIRTY)
-    kept = "The lamp has not turned since Tuesday."
-    slot = _Slot(repairs={DIRTY: [_replacement_reply(kept), _replacement_reply(FIXED_REPLACEMENT)]})
+    reword = "The lamp has really not turned since Tuesday."
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(reword), _replacement_reply(FIXED_REPLACEMENT)]})
     lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
     assert ledger["lines"][1]["text"] == FIXED
 
@@ -1483,3 +1485,113 @@ def test_the_scoped_prompt_says_the_kept_speech_is_already_kept():
         speaker="ANA", text="(sighs) I see the grid.", complaint="1. (sighs): action",
         lines_around=[])
     assert "keep the line roughly its original length" in whole[1]["content"]
+
+
+# --------------------------------------------------------------------------- #
+# A small writer's RIGHT answer in the wrong shape (2026-10-16, 47 legs, 8 GB)
+# --------------------------------------------------------------------------- #
+# Counted from the server logs of one night of Gemma 4 E2B/E4B and Qwen3.5-4B
+# writers: 29 repairs refused for "repeats words the line already keeps" --
+# the model had returned the whole cleaned line, which is a correct answer --
+# and 41 authorizations refused because an already_spoken verdict echoed the
+# line in `spans`. The judge was right, the model was right, and the row
+# shipped with "(sharp, questioning whisper)" still in it.
+
+SHARP = ("(sharp, questioning whisper) Keeper, that is just interference. "
+         "The barometer is stable.")
+SHARP_KEPT = "Keeper, that is just interference. The barometer is stable."
+
+
+def test_a_whole_cleaned_line_answering_a_scoped_edit_is_kept():
+    ledger = _ledger(SHARP)
+    slot = _Slot(judgements={SHARP: [_dirty_judgement("(sharp, questioning whisper)")]},
+                 repairs={SHARP: [_replacement_reply(SHARP_KEPT)]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    # Rebuilt from the ORIGINAL kept slice, so its whitespace is the row's own.
+    assert ledger["lines"][1]["text"] == " " + SHARP_KEPT
+    assert slot.repair_calls == 1
+    row = receipt["rows"][0]
+    assert row["outcome"] == "repaired"
+    attempt = row["attempts"][0]
+    assert attempt["answered_whole_line"] is True
+    assert attempt["replacements"] == [{"span_id": "span_001", "replacement": ""}]
+
+
+def test_a_whole_line_answer_that_drops_speech_is_still_refused():
+    """The night's second answer: it lost "The barometer is stable."."""
+    ledger = _ledger(SHARP)
+    slot = _Slot(judgements={SHARP: [_dirty_judgement("(sharp, questioning whisper)")]},
+                 repairs={SHARP: [_replacement_reply("Keeper, that is just interference.")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == SHARP
+    assert receipt["unclean"] == 1
+
+
+@pytest.mark.parametrize("answer", [
+    SHARP_KEPT + " " + SHARP_KEPT,
+    "Keeper, that is just interference. Keeper, that is just interference. "
+    "The barometer is stable.",
+    "Listen. " + SHARP_KEPT + " Listen.",
+])
+def test_a_whole_line_answer_never_doubles_or_adds_outside_the_span(answer):
+    ledger = _ledger(SHARP)
+    slot = _Slot(judgements={SHARP: [_dirty_judgement("(sharp, questioning whisper)")]},
+                 repairs={SHARP: [_replacement_reply(answer)]})
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == SHARP
+
+
+def test_a_whole_line_answer_keeps_what_the_model_folded_into_the_span():
+    original = "Hold on (a long pause) we are not done."
+    slot = _Slot(judgements={original: [_dirty_judgement("(a long pause)")]},
+                 repairs={original: [_replacement_reply("Hold on -- wait -- we are not done.")]})
+    ledger = _ledger(original)
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == "Hold on -- wait -- we are not done."
+
+
+GASLIGHT = ("The gaslight flickers low in the shadowed study as Lemmy and Mina "
+            "Ming wrestle with a secret that threatens to consume them both.")
+
+
+def test_already_spoken_with_the_whole_line_echoed_back_is_accepted():
+    ledger = _ledger(GASLIGHT)
+    slot = _Slot(judgements={GASLIGHT: [_dirty_judgement(GASLIGHT)]},
+                 authorizations={GASLIGHT: [{
+                     "verdict": "already_spoken", "spans": [{"quote": GASLIGHT}],
+                     "reason": "The line is an announcement setting the scene."}]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == GASLIGHT
+    assert slot.authorization_calls == 1 and slot.repair_calls == 0
+    row = receipt["rows"][0]
+    assert row["outcome"] == "already_spoken" and receipt["unclean"] == 0
+    # The echo granted nothing and is not recorded as if it had.
+    authorization = row["scope"]["authorization"]
+    assert authorization["spans"] == []
+    assert [span["quote"] for span in authorization["ignored_spans"]] == [GASLIGHT]
+
+
+def test_scoped_prompts_show_the_shape_of_a_scoped_answer():
+    spans = (lcl._RepairSpan("span_001", 0, 28, "(sharp, questioning whisper)"),)
+    partial = lcl._repair_prompt(
+        speaker="THE COAST WATCHMAN", text=SHARP,
+        complaint="1. (sharp, questioning whisper): delivery note",
+        lines_around=[], authorized_spans=spans)[1]["content"]
+    # The whole-line example taught small writers to answer with the line.
+    assert "There he goes -- door and all." not in partial
+    assert '"replacement": ""' in partial
+    whole = lcl._repair_prompt(
+        speaker="THE COAST WATCHMAN", text=SHARP,
+        complaint="1. (sharp, questioning whisper): delivery note",
+        lines_around=[])[1]["content"]
+    assert "There he goes -- door and all." in whole
+
+
+def test_the_authorization_prompt_asks_for_spans_only_when_localized():
+    original = "(distorted, urgent static) ...the pressure drops. the ice is coming."
+    slot = _Slot(judgements={original: [_dirty_judgement(original)]},
+                 authorizations={original: [{"verdict": "unresolved", "spans": []}]})
+    lcl.run_ledger_clean(_ledger(original), slot_fn=slot, bank_id="original")
+    prompt = slot.authorization_prompts[0]
+    assert "spans: [] for any other verdict" in prompt
+    assert "never the whole line" in prompt
