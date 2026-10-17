@@ -16832,3 +16832,36 @@ not promote it to the Bug Bible on this evidence alone.
   logged one ERROR, my_story_source_rewrite_ledger_clean_spoken exhausted on
   "Correction must identify an exact ... interval", and the judge then found
   nothing to clean.
+
+## PBUG-20261017-03 -- fixed: every My Story role has its gender before a voice
+- operator ruling 2026-10-17 (relayed): "maybe we need to change the my story
+  to define gender for each role"; "give a gender and description to each
+  character, similar to other workflows"; "we need it stamped in the ledger
+  for accurate voice assignment and stills, video prompting accuracy". This
+  supersedes the 2026-09-25 "leave it nebulous" rule for My Story.
+- `story_characters` takes a marker after a name: `Ada (she), the keeper.
+  Tom (he).` ((he)/(she)/(they), also male/female/man/woman). Python reads it
+  (`_otr_story_input.stated_genders`); it is bound into the interpretation
+  before that is recorded and onto the treatment cast, and it is binding.
+  Matching is exact first, then whole-word overlap; conflicts, ambiguous and
+  unmatched markers pin nothing and land in fidelity_discrepancies.
+- every other role is settled to male/female before `_assign_voices`
+  (`_settle_cast_genders`): the role's relation/title words (the roster
+  reader), then subject/reflexive pronouns in the model's own description,
+  then the name pool, then a coin seeded on the name. A stale "Gender
+  unstated." note is dropped from the description. Receipts:
+  meta.my_story.stated_genders / gender_settlement; the model's answer stays
+  in treatment_proposal.
+- one source: the ledger cast row's gender feeds CastLock (stated man/woman,
+  no cross-gender fallback), the still prompts (`_ensure_gender_anchor`, which
+  already read it) and now the video prompts too -- `otr_shot_lock.
+  _appearance_for_char` adds the same anchor, so it reaches every lane's shot
+  directives and video prompts (5080 blast radius: an "adult woman, " /
+  "adult man, " prefix on appearance text that names no gender, ONLY for a
+  cast row that states male or female; a row stating nothing is untouched).
+- tests: tests/test_my_story_stated_gender.py (28; the live Ada row through
+  the real runner to a female ledger row, and that row is what the shot-lock
+  appearance and the still anchor read). Sweep of 271 related test files:
+  no new failure against origin/main after the explicit-gender narrowing.
+- residual: a listener's "Lemmy (she)" still gets Lemmy's recurring voice,
+  pinned by name in config/cast_pools.py RECURRING_CHARACTER_VOICES.

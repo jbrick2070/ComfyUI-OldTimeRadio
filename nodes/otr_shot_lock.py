@@ -193,6 +193,23 @@ def _appearance_for_char(ledger: dict, char_id: str) -> str:
         name = entry.get("name")
         base = str(name) if name else ""
     base = _strip_unrenderable_appearance(base)
+    # THE CAST ROW'S GENDER IS THE ONE SOURCE (PBUG-20261017-03, operator:
+    # "we need it stamped in the ledger for accurate voice assignment and
+    # stills, video prompting accuracy"). The stills already anchor on it;
+    # the video prompts built from this lookup did not, so a description
+    # like "Gender unstated" left the figure to the video model. Same
+    # additive anchor as the stills, never a rewrite -- and EXPLICIT gender
+    # only, as `ghost_signal_prompt` does: `normalize_gender` maps absence to
+    # "other", and a row that states nothing must not gain a "person, ".
+    try:
+        from .otr_meta_brief_image_prompt import _ensure_gender_anchor
+        from ._otr_roster_gender import normalize_gender
+    except ImportError:  # pragma: no cover -- flat load
+        from otr_meta_brief_image_prompt import _ensure_gender_anchor  # type: ignore
+        from _otr_roster_gender import normalize_gender  # type: ignore
+    if str(entry.get("gender") or "").strip() and \
+            normalize_gender(entry.get("gender")) in ("male", "female"):
+        return _ensure_gender_anchor(base, entry)
     return base
 
 

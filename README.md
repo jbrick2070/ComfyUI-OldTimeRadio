@@ -336,7 +336,8 @@ same model only while the same models are available to draw from.
 **Your own story:** set `source_bank` (Story bank on the form) to
 **`my_story`** and fill the My Story boxes: `story_characters`, `story_plot`,
 `story_setting` and `story_author` (on the form: who is in it, what happens,
-where and when, by). That bank exists to produce your idea rather than adapt
+where and when, by). Put `(she)`, `(he)` or `(they)` after a name in
+`story_characters` (`Ada (she), the keeper.`) and that role is voiced to match. That bank exists to produce your idea rather than adapt
 something. The roll can land on it like any other bank: a run that arrives
 with those fields blank writes a standing premise that ships with the pack, so
 it always has something to perform, and anything you type wins over it. When

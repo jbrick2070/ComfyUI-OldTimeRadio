@@ -748,6 +748,84 @@ def _bool_or(value: Any, default: bool) -> bool:
     return bool(value)
 
 
+
+# ---------------------------------------------------------------------------
+# Stated genders -- "Ada (she), the keeper. Tom (he)."
+# ---------------------------------------------------------------------------
+#
+# THE LISTENER STATES A ROLE'S GENDER; CASTING OBEYS IT (operator, 2026-10-17:
+# "maybe we need to change the my story to define gender for each role").
+# Live defect PBUG-20261017-03: "Ada, the keeper." left Ada's gender to the
+# model, which wrote "the sound she hears ... Gender unstated" and she was
+# voiced by a man. A marker is read here, by Python, so no model can drop it.
+#
+# THE GRAMMAR IS ONE PARENTHESIS RIGHT AFTER A NAME whose whole content is a
+# gender word. Any other parenthesis -- "(the keeper)" -- is ordinary notes.
+
+#: Marker word -> the bank gender it states. "they" is a STATED choice too: the
+#: listener asked for a voice from either pool, and that is honoured as written.
+_GENDER_MARKERS = {
+    "she": "female", "her": "female", "she/her": "female", "female": "female",
+    "woman": "female", "girl": "female", "f": "female",
+    "he": "male", "him": "male", "he/him": "male", "male": "male",
+    "man": "male", "boy": "male", "m": "male",
+    "they": "other", "them": "other", "they/them": "other",
+    "nonbinary": "other", "non-binary": "other",
+}
+_MARKER_RE = re.compile(
+    r"\(\s*(" + "|".join(sorted((re.escape(k) for k in _GENDER_MARKERS),
+                                  key=len, reverse=True)) + r")\s*\)",
+    re.IGNORECASE)
+#: A full stop after one of these does not end the name ("Dr. Ada (she)").
+_NAME_ABBREVIATIONS = frozenset({
+    "dr", "mr", "mrs", "ms", "st", "jr", "sr", "prof", "capt", "col", "gen",
+    "lt", "sgt", "rev", "hon", "mme", "mlle", "mx",
+})
+
+
+@dataclass(frozen=True)
+class StatedGender:
+    """One marker as typed: the words before it, and the gender it states."""
+
+    name: str
+    gender: str
+    marker: str
+
+
+def _name_before(text: str, end: int) -> str:
+    """The name a marker follows: back to the previous record boundary
+    (newline, ``;``, ``,``, ``:``, a parenthesis, or a full stop that ends a
+    sentence)."""
+    i = end
+    while i > 0:
+        ch = text[i - 1]
+        if ch in "\n;,:()":
+            break
+        if ch == ".":
+            word = re.findall(r"[A-Za-z]+$", text[:i - 1])
+            if not (word and word[-1].lower() in _NAME_ABBREVIATIONS):
+                break
+        i -= 1
+    return " ".join(text[i:end].split())
+
+
+def stated_genders(characters: str) -> "tuple[StatedGender, ...]":
+    """Every gender marker in the characters field, in the order typed.
+
+    Pure and deterministic. A marker with no name before it is dropped; a
+    name typed twice with two different genders is returned twice, and the
+    caller treats the pair as a conflict rather than letting order decide.
+    """
+    out = []
+    for m in _MARKER_RE.finditer(str(characters or "")):
+        name = _name_before(m.string, m.start())
+        if name:
+            word = m.group(1).lower()
+            out.append(StatedGender(name=name, gender=_GENDER_MARKERS[word],
+                                    marker=word))
+    return tuple(out)
+
+
 __all__ = [
     "ANONYMOUS_ATTRIBUTION",
     "AdmittedWriter",
@@ -761,6 +839,7 @@ __all__ = [
     "QueuedWriter",
     "RawStoryFields",
     "STORY_INPUT_SCHEMA",
+    "StatedGender",
     "StoryInputBundle",
     "StoryInputError",
     "StoryInputPolicy",
@@ -782,5 +861,6 @@ __all__ = [
     "normalize",
     "project_payload",
     "read_queued_fields",
+    "stated_genders",
     "writers_gated_by",
 ]

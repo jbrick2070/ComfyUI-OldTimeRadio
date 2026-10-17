@@ -1006,8 +1006,11 @@ def test_missing_metadata_optional_frame_and_numbering_reach_readonly_freeze():
             return super()._answer(messages)
     led, parts = _run(Sparse(acts=2), act_count=2)
     assert parts.final_title_override is None
-    assert not next(c for c in led.data["cast"] if c["name"] == "Ada")["gender"]
-    assert led.data["meta"]["my_story"]["treatment"]["cast"][0]["gender"] == ""
+    # PBUG-20261017-03: the model's empty gender stays in the proposal as
+    # evidence, and the role is settled before any voice is chosen.
+    assert next(c for c in led.data["cast"] if c["name"] == "Ada")["gender"] in ("male", "female")
+    assert led.data["meta"]["my_story"]["treatment_proposal"]["cast"][0]["gender"] == ""
+    assert [r["name"] for r in led.data["meta"]["my_story"]["gender_settlement"]] == ["Ada", "Tom"]
     story = led.data["meta"]["my_story"]
     assert story["act_number_normalization"]["replies"] == [{"original": 90, "slot": 1}, {"original": 90, "slot": 2}]
     assert story["music_cue_disposition"] == [{"proposal_index": 1, "description": "unused cue", "disposition": "unused_surplus"}]

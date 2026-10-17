@@ -44,6 +44,15 @@ Domain perform the author's own words in another language is in
 standing premise that ships with it (since 2026-09-13), so a rolled My Story
 run still has something to perform. Anything you type wins over it.
 
+**Gender is yours to set, per role.** In `story_characters`, put `(she)`, `(he)`
+or `(they)` right after a name -- `Ada (she), the keeper. Tom (he).`
+(`(female)`, `(male)`, `(woman)`, `(man)` work too). A marked gender is
+binding: Python reads it from your text, and the voice is cast to match. Every
+unmarked role is given a male or female gender before any voice is chosen --
+from what the part says the person is ("her brother"), then how the
+character's own description refers to them, then the name pool, then a coin
+seeded on the name -- so a voice is never picked from a guess at voice time.
+
 **What a different bank does with those boxes depends on how it was chosen.**
 
 - **Picked by hand:** the run stops, with a message naming the boxes and

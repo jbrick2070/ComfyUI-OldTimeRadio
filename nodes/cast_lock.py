@@ -1602,8 +1602,10 @@ class CastLock:
             # Story character whose author never said a gender must not stop the
             # render on the Google lane while the same row takes Kokoro's
             # seeded, gender-agnostic draw below. Provider voices are gendered,
-            # so the pick is a coin the episode seed flips: deterministic, and
-            # _otr_my_story still leaves the gender empty on purpose. A stated
+            # so the pick is a coin the episode seed flips: deterministic. Since
+            # PBUG-20261017-03 _otr_my_story settles every role's gender before
+            # this runs, so this draw is the safety net for a ledger that still
+            # arrives without one (and for a listener's own "(they)"). A stated
             # MAN or WOMAN is still honoured with no cross-gender fallback (see
             # the re-raise in the except below); `other`, which the Google
             # catalogue carries no rows for, takes the draw too.

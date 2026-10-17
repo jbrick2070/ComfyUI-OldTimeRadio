@@ -2324,7 +2324,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     "default": "",
                     "placeholder": (
                         "(optional) who is in it -- names, how they know each "
-                        "other, what they are like"
+                        "other, what they are like. Ada (she), the keeper. "
+                        "Tom (he)."
                     ),
                     "tooltip": (
                         "MY STORY ONLY -- read when Story bank is my_story, or "
@@ -2334,12 +2335,15 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "says so (clear the boxes, pick my_story, or roll). "
                         "Nothing here is ever cleared for you.\n\n"
                         "Character names and notes, in ordinary "
-                        "words: 'Ada, the lighthouse keeper. Her brother Tom, "
-                        "who does not believe her.'\n\n"
+                        "words: 'Ada (she), the lighthouse keeper. Her brother "
+                        "Tom (he), who does not believe her.'\n\n"
                         "Names you write here are kept exactly as you type "
-                        "them. If you say someone is a man or a woman, that is "
-                        "honoured; if you do not say, it is a free choice and "
-                        "is never guessed from the name.\n\n"
+                        "them. To set someone's gender, put (she), (he) or "
+                        "(they) right after the name -- (female), (male), "
+                        "(woman) and (man) work too. That is binding: the "
+                        "voice is cast to match. Anyone you leave unmarked is "
+                        "given a gender that fits their part before a voice "
+                        "is chosen.\n\n"
                         "Someone merely mentioned does not become a speaking "
                         "part. Leave it empty and the cast is invented for you."
                     ),

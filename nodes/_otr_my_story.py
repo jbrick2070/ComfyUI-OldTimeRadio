@@ -23,8 +23,9 @@ when the markup breaks. Here a failed act retries only itself: an act is a
 bounded thing to ask for and a bounded thing to lose.
 
 THE PERSON'S WORDS ARE THE SOURCE. The model adapts their material into the
-selected acts, with a flexible cast guided by their story. A gender they did not state is
-never guessed from a name. Interpretation notes and detected source conflicts
+selected acts, with a flexible cast guided by their story. A gender they marked
+("Ada (she)") is binding; every other role is given a gender before any voice is
+chosen (`_settle_cast_genders`). Interpretation notes and detected source conflicts
 remain in the receipt; requested and actual character counts stay separate.
 
 WHAT THIS LANE DOES NOT DO. It runs no cameo roll: the cast belongs to the
@@ -40,6 +41,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+import re
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
@@ -199,7 +201,9 @@ class CastMember(BaseModel):
     gender: str = Field(default="", description=(
         "Preserve source gender from descriptions, relationships and pronouns in context, "
         "honoring explicit identity first. Keep gender consistent with the character's "
-        "casting description. Never infer from a name; unspecified remains empty."))
+        "casting description. \"male\" or \"female\"; \"other\" only when the "
+        "listener says so. Never empty: an unstated gender is your choice, and the "
+        "description then follows it."))
     age_band: str = "n/a"
     # `speech_register`, not `register`: the bare name shadows a pydantic
     # BaseModel attribute and pydantic warns about it at class construction.
@@ -225,7 +229,8 @@ class CastMember(BaseModel):
     @field_validator("gender", mode="before")
     @classmethod
     def _canonical_gender(cls, value):
-        """Fix synonyms; missing/other values use the shared open voice pool."""
+        """Fix synonyms. A value left empty here is settled before any voice is
+        chosen (`_settle_cast_genders`), never at voice time."""
         try:
             from ._otr_roster_gender import canonical_bank_gender
         except ImportError:  # pragma: no cover -- flat load
@@ -837,6 +842,169 @@ def _pass_frame(creative_fn, pack, bundle, treatment: StoryTreatment,
 # P4 -- voices (pure python, no model call)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Gender, settled BEFORE any voice is chosen (PBUG-20261017-03)
+# ---------------------------------------------------------------------------
+#
+# Operator, 2026-10-17: "maybe we need to change the my story to define gender
+# for each role", and "if a story gen isn't defining gender first we need to at
+# some point before assigning a voice to it give a gender and description to
+# each character, similar to other workflows". Live, "Ada, the keeper." left
+# Ada's gender empty while the model's own description of her read "the sound
+# she hears", and CastLock's open-pool draw gave her a man's voice.
+#
+# Two rules, in this order. A gender the LISTENER marked ("Ada (she)") is
+# binding -- Python reads it from their field, so no model can drop it. Every
+# other role gets a male or female gender here, before `_assign_voices`, so the
+# voice is always drawn FROM a settled gender and never guessed at voice time.
+# This supersedes the 2026-09-25 "leave it nebulous" rule for this lane.
+
+_GENDERS = ("male", "female")
+#: A model's own "Gender unstated." note, which goes stale the moment the role
+#: is given a gender and would then contradict it in every picture prompt.
+_UNSTATED_GENDER_NOTE = re.compile(
+    r"\bgender(?:\s+is)?\s+(?:unstated|unspecified|unknown|not\s+stated)\b[.;,]?\s*",
+    re.IGNORECASE)
+_SUBJECT_PRONOUNS = {
+    "she": "female", "herself": "female", "he": "male", "himself": "male",
+}
+
+
+def _name_tokens(name: str) -> "tuple[str, ...]":
+    """Casefolded words of a name, punctuation and honorifics dropped."""
+    try:
+        from ._otr_roster_gender import _HONORIFICS
+    except ImportError:  # pragma: no cover -- flat load
+        from _otr_roster_gender import _HONORIFICS  # type: ignore
+    words = re.findall(r"[^\W_]+(?:['\-][^\W_]+)*", str(name or "").casefold())
+    kept = tuple(w for w in words if w not in _HONORIFICS)
+    return kept or tuple(words)
+
+
+def _match_stated(chunk: str, names: "list[str]") -> "list[str]":
+    """The cast names a marker's words refer to, best tier only.
+
+    Tier 1 is an exact name. Tier 2 is a whole-word overlap: the marker's
+    last words open the cast name -- "her brother Tom" -> "Tom" or
+    "Tom Reyes", "Ada" -> "Ada Vance". "Ann" never reaches "Anna", and an
+    exact "Ada" beside "Ada Vance" is not ambiguous.
+    """
+    want = _name_tokens(chunk)
+    if not want:
+        return []
+    exact = [n for n in names if _name_tokens(n) == want]
+    if exact:
+        return exact
+    near = []
+    for n in names:
+        have = _name_tokens(n)
+        if not have:
+            continue
+        if any(want[-k:] == have[:k]
+               for k in range(1, min(len(want), len(have)) + 1)):
+            near.append(n)
+    return near
+
+
+def _bind_stated_genders(markers, names: "list[str]"):
+    """``({name: gender}, [discrepancy, ...])`` for the listener's markers.
+
+    Every marker is resolved before any is applied, so order never decides:
+    a name marked two different ways, or a marker that fits several people or
+    nobody, pins nothing and is reported instead.
+    """
+    claims: "dict[str, set]" = {}
+    notes = []
+    for mark in markers:
+        hits = _match_stated(mark.name, names)
+        if len(hits) == 1:
+            claims.setdefault(hits[0], set()).add(mark.gender)
+        else:
+            notes.append({"name": mark.name, "stated": mark.gender,
+                          "kind": ("stated_gender_ambiguous" if hits
+                                   else "stated_gender_unmatched"),
+                          "candidates": hits})
+    bound = {}
+    for name, genders in claims.items():
+        if len(genders) == 1:
+            bound[name] = next(iter(genders))
+        else:
+            notes.append({"name": name, "stated": sorted(genders),
+                          "kind": "stated_gender_conflict"})
+    for note in notes:
+        log.warning("[my_story] gender marker for %r not applied (%s)",
+                    note["name"], note["kind"])
+    return bound, notes
+
+
+def _description_gender(member: "CastMember") -> str:
+    """The gender the model's OWN description states of this character.
+
+    Only subject and reflexive pronouns count ("the sound she hears"): an
+    object or possessive is as often about someone else ("her brother", "his
+    widow"), so it is no evidence. Mixed evidence is no answer.
+    """
+    seen = {_SUBJECT_PRONOUNS[w] for w in re.findall(
+        r"[a-z]+", str(member.character_description or "").lower())
+        if w in _SUBJECT_PRONOUNS}
+    return next(iter(seen)) if len(seen) == 1 else ""
+
+
+def _settle_gender(member: "CastMember") -> "tuple[str, str]":
+    """``(gender, source)`` for a role nobody gave a usable gender.
+
+    The other lanes' order: what the role says this person IS (relation, then
+    rank -- the roster reader the adaptation lanes use), then what the model's
+    own description says, then our name pool (`_otr_casting`'s classifier),
+    then a coin seeded on the name so the same story casts the same way.
+    """
+    try:
+        from ._otr_character_roster import infer_gender
+    except ImportError:  # pragma: no cover -- flat load
+        from _otr_character_roster import infer_gender  # type: ignore
+    gender, source = infer_gender(member.name, member.role)
+    if gender in _GENDERS:
+        return gender, "role_" + source
+    gender = _description_gender(member)
+    if gender:
+        return gender, "description_pronouns"
+    gender = _POOLS.gender_of_first_name(" ".join(_name_tokens(member.name)))
+    if gender in _GENDERS:
+        return gender, "name_pool"
+    coin = random.Random("my_story_cast_gender:%s" % _norm_ws(member.name).casefold())
+    return ("male" if coin.random() < 0.5 else "female"), "seeded_coin"
+
+
+def _settle_cast_genders(treatment: "StoryTreatment",
+                         stated: "dict[str, str]") -> "list[dict]":
+    """Give every treatment role its gender before any voice is picked.
+
+    A marked role takes the listener's gender, whatever the model wrote. Any
+    other role keeps a male/female the model committed to, and otherwise is
+    settled by `_settle_gender`. Returns one receipt row per role it changed.
+    """
+    receipts = []
+    for member in treatment.cast:
+        before = member.gender
+        if member.name in stated:
+            member.gender = stated[member.name]
+            source = "listener"
+        elif member.gender in _GENDERS:
+            continue
+        else:
+            member.gender, source = _settle_gender(member)
+        if member.gender in _GENDERS and member.character_description:
+            member.character_description = " ".join(_UNSTATED_GENDER_NOTE.sub(
+                " ", member.character_description).split())
+        if member.gender != before:
+            log.warning(
+                "[my_story] CAST GENDER SET: %r is %s (%s; the model wrote %r)",
+                member.name, member.gender, source, before)
+            receipts.append({"name": member.name, "gender": member.gender,
+                             "source": source, "model_gender": before})
+    return receipts
+
+
 def _assign_voices(treatment: StoryTreatment, rng: random.Random) -> "list[dict]":
     """Cast rows: announcer c01, then characters c02.. in treatment order.
 
@@ -1167,6 +1335,18 @@ def run_my_story_episode(
                 **source_kwargs(technical_model))
         receipt("interpret", technical_model, _TEMP["interpret"][0],
                 None)
+        # The listener's own gender markers outrank the model's reading of
+        # them, and are bound BEFORE the interpretation is recorded so the
+        # receipt and the treatment prompt both carry the binding value.
+        stated_markers = _SI.stated_genders(bundle.fields.characters)
+        story["stated_genders"] = [
+            {"name": m.name, "gender": m.gender, "marker": m.marker}
+            for m in stated_markers]
+        interp_bound, _notes = _bind_stated_genders(
+            stated_markers, [p.name for p in interp.named_cast])
+        for person in interp.named_cast:
+            if person.name in interp_bound:
+                person.stated_gender = interp_bound[person.name]
         story["interpretation"] = interp.model_dump(mode="json")
         story["cast_plan"] = interp.cast_plan.model_dump(mode="json")
         # A plan the model never wrote is the schema's default of 2, not a
@@ -1205,8 +1385,12 @@ def run_my_story_episode(
         }
         for i, plan in enumerate(treatment.acts, 1):
             plan.n = i
+        # Every role has its gender BEFORE a voice is drawn: the listener's
+        # marker where there is one, otherwise a settled male or female.
+        cast_bound, discrepancies = _bind_stated_genders(
+            stated_markers, [c.name for c in treatment.cast])
+        story["gender_settlement"] = _settle_cast_genders(treatment, cast_bound)
         names = {_norm_ws(c.name).casefold(): c for c in treatment.cast}
-        discrepancies = []
         for person in interp.named_cast:
             member = names.get(_norm_ws(person.name).casefold())
             if person.required and person.speaking and member is None:
