@@ -16749,3 +16749,13 @@ not promote it to the Bug Bible on this evidence alone.
   `_spoken_words` (the old three-word rule had the same hole); a Thai echo is
   one phrase unit; an answer of two head words plus two tail words passes the
   seam rule (the 4-word run guard catches it in spaced scripts, not in Han).
+
+## PBUG-20261017-01 -- QA on 0e67c8c1: holds; one count corrected
+- second Sonnet refuting QA: no behaviour change (AST identical with
+  docstrings stripped), every claim reproduced. Correction to the note
+  above and to the `_SEAM_OWN_WORDS` comment: of the 55 new zh/ja
+  refusals in ~52k interjection trials, about 21 are sub-word coincidences,
+  not echoes -- suffixes on the head side as well as prefixes ("好的"
+  after "美好的。", "した" after "成りました。"). Cost as designed: one retry
+  each. Also: the NFD hole was shared with the three-word rule for
+  three-word echoes; a two-word NFC echo was never refused by that rule.
