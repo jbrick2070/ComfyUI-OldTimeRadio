@@ -16798,3 +16798,14 @@ not promote it to the Bug Bible on this evidence alone.
   note above and the 0591f68f message: TWO of the three added tests fail on
   9eebe29a (plus the changed one-pass test); the pool-keeps-its-voice test
   passes there too and guards that path, not this fix.
+
+## PBUG-20261017-02 -- live legs on 7c431fdb (4060, otr_8gb_ltx25_audio_in)
+- s03c (bank drew media_archive, so casting not exercised): RESULT SUCCESS,
+  4220 s, obs acetate_dust_20261017_082644__vart__n08a__zimg__koko__marc__cg4e2__sa3_final.mp4
+  (50.5 MB, 93 s).
+- s03d (--source-bank scifi_news_pro, gemma4-e2b): RESULT SUCCESS, 7429 s,
+  obs half_rate_20261017_093824__vart__n08a__zimg__koko__news__cg4e2__sa3_final.mp4
+  (90.5 MB, 155 s), no errors. Casting passed on attempt 1, so the settle
+  did not fire: the fix is proven not to disturb a clean run, and the
+  mismatch path stays proven by the s03 live answer replayed through the
+  real ladder in tests/test_scifi_news_pro_casting_voice_repair.py.
