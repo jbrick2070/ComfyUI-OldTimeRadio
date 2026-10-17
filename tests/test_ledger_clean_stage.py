@@ -1774,11 +1774,6 @@ def test_spaceless_kept_slices_drop_their_edge_punctuation():
     assert lcl._holds_every_kept_slice("私はもう行く", ["私", "行く。"])
 
 
-def test_one_spaceless_name_does_not_make_a_line_spaceless():
-    assert not lcl._written_without_spaces("김, come home.")
-    assert lcl._written_without_spaces("등대를 본다.")
-
-
 def test_the_receipt_counts_every_model_call_the_repair_ladder_makes():
     ledger = _ledger(SHARP)
     slot = _Slot(judgements={SHARP: [_dirty_judgement("(sharp, questioning whisper)")]},
@@ -1811,7 +1806,7 @@ def test_the_seam_rule_counts_characters_in_a_spaceless_script(text, answer):
 
 @pytest.mark.parametrize("text, answer, refused", [
     ("(sigh) I can see.", "You can see.", False),        # first word not shared
-    ("(sigh) It is late.", "It was early.", False),      # last word not shared
+    ("(sigh) It is late.", "It is early.", False),       # all but one, last not shared
     ("(sigh) It is late now.", "It was late now.", True),        # 4 words, all but one
     ("(sigh) It is late now.", "It ends now.", False),           # 4 words, only two shared
     ("(sigh) It is very late now.", "It was very late now.", True),  # 5 words: the share rule
@@ -1833,13 +1828,26 @@ def test_the_frame_rule_needs_first_last_and_all_but_one(text, answer, refused):
     ("我们 ok", True),              # exactly half
     ("김, come home.", False),      # 1 of 9
     ("我 okay", False),             # 1 of 5
+    ("我们 okay", False),           # 2 of 6: under half
 ])
 def test_mostly_spaceless_means_at_least_half_the_letters(text, spaceless):
     assert lcl._written_without_spaces(text) is spaceless
 
 
 def test_the_spaceless_pair_path_is_wired_through_the_repeat_guard():
-    # A light Japanese reword shares no "word" and is caught only by pairs.
-    assert lcl._repeats_kept_speech("彼は今何かを見ている", "彼は何かを見ている")
-    # The same idea in a mostly-English line does not take the spaceless path.
-    assert not lcl._repeats_kept_speech("Kim, come now.", "김, come home.")
+    # Japanese kept speech takes the coverage-only pair rule ...
+    assert lcl._repeats_kept_speech("彼は今", "彼は")
+    # ... and a mostly-English line with one Hangul name does not: under the
+    # coverage-only rule this long fold-in would read as the line again.
+    assert not lcl._repeats_kept_speech(
+        "come home with me and stay a good while longer", "김, come home.")
+
+
+@pytest.mark.parametrize("text, answer", [
+    ("ขอบคุณ (ยิ้ม) คุณหมอ", "คุณใจดีมาก"),           # Thai: 3 code points, one syllable
+    ("철수야 (소리치며) 어디 있니?", "철수야!"),       # Korean is spaced; its words work
+    ("我们去 Kim (停顿) 的家", "Kim 说"),               # a Latin name across a space
+])
+def test_the_character_seam_is_for_han_and_kana_only(text, answer):
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"])

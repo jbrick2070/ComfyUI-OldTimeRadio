@@ -337,6 +337,22 @@ def _spaceless_char(ch: str) -> bool:
     return any(low <= ch <= high for low, high in _SPACELESS_RANGES)
 
 
+#: Han ideographs and kana: a character there carries about a word.
+_HAN_KANA_RANGES = (
+    ("\u3040", "\u30ff"), ("\u3400", "\u9fff"), ("\u3005", "\u3007"),
+    ("\uf900", "\ufaff"), ("\uff66", "\uff9f"), ("\U00020000", "\U0003134f"),
+)
+
+
+def _han_or_kana(ch: str) -> bool:
+    return any(low <= ch <= high for low, high in _HAN_KANA_RANGES)
+
+
+def _mostly_han_or_kana(text: str) -> bool:
+    letters = [ch for ch in text or "" if _is_word_char(ch)]
+    return bool(letters) and 2 * sum(map(_han_or_kana, letters)) >= len(letters)
+
+
 def _written_without_spaces(text: str) -> bool:
     """Is most of this text's lettering in a spaceless script?"""
     letters = [ch for ch in text or "" if _is_word_char(ch)]
@@ -440,14 +456,18 @@ def _overlaps_a_seam(replacement: str, before: str, after: str) -> bool:
     words too: "...and the play continued." with "continued" answered "and
     the play settled." spliced to "and the play and the play settled" and
     shipped (signal_lost_the_rainbow_boxes_20261014_145758, found by Sonnet
-    QA on 0291b5da). At least ``_SEAM_WORDS`` words must line up -- or, in a
-    spaceless script, where a whole clause reads as one "word", that many
-    characters: "然后戏继续了" with "继续了" answered "然后戏停了" said 然后戏
-    twice (Sonnet QA on 7dc01e7a).
+    QA on 0291b5da). At least ``_SEAM_WORDS`` words must line up -- or, in
+    Chinese and Japanese, where a whole clause reads as one "word", that many
+    Han/kana characters: "然后戏继续了" with "继续了" answered "然后戏停了" said
+    然后戏 twice (Sonnet QA on 7dc01e7a). Only Han and kana, and only those
+    characters are compared: three Thai code points are one syllable and
+    three Hangul one word (Korean is spaced, so its words already work), and
+    a Latin name in a Chinese line must not match across a space (Sonnet QA
+    on e71a43cf).
     """
-    if _written_without_spaces(before + replacement + after):
+    if _mostly_han_or_kana(before + replacement + after):
         def units(text):
-            return [ch for ch in str(text or "").casefold() if _is_word_char(ch)]
+            return [ch for ch in str(text or "") if _han_or_kana(ch)]
     else:
         units = _spoken_words
     rep = units(replacement)

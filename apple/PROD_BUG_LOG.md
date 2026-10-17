@@ -16668,3 +16668,20 @@ not promote it to the Bug Bible on this evidence alone.
   equivalent mutants (the share rule decides 2- and 5-word lines the same).
 - accepted cost, documented: the frame rule refuses a fold-in shaped like
   the line's frame ("Go on, now." beside "Go home now.") -- one retry.
+
+## PBUG-20261016-03 -- QA on e71a43cf: the character seam is Han/kana only
+- narrow Sonnet QA on e71a43cf: zero change on the real ledgers (no
+  spaceless text in them), no natural false refusal in the shipped zh/ja
+  Shakespeare translations; but three Thai code points are one syllable and
+  three Hangul one word (Korean is spaced -- its word seam already worked),
+  so the character seam refused ordinary Thai and Korean fold-ins, and in
+  character mode a Latin name in a Chinese line matched across a space.
+- fix: the seam counts characters only in a mostly-Han/kana line, and
+  compares only Han/kana characters. Tests pin the pair-path gate, the
+  threshold's lower edge, the Han/kana-only seam and the frame rule's
+  last-word condition with a row that can reach it.
+- correction to e71a43cf's message: the "weak test" it says was dropped
+  was added and removed before that commit -- nothing committed was
+  dropped. The duplicate threshold test goes in this one.
+- residual: Han two-character stutters at a seam (below the 3-character
+  width).
