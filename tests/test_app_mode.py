@@ -40,6 +40,9 @@ MACHINE_TUNING = {
     "llm.device", "llm.quant_policy", "llm.vram_ceiling_gb", "llm.attn_impl",
     "audio.voice_device", "image.dtype_policy", "video.dtype_policy",
     "video.device_policy", "video.max_render_frames",
+    # Where the 1080p upscale runs (cuda on the NVIDIA rows) -- the card's
+    # concern, not a choice a person makes.
+    "upscale_stage.device",
 }
 
 
