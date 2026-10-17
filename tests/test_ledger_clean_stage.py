@@ -1863,3 +1863,12 @@ def test_the_seam_unit_follows_the_script_of_the_whole_seam(text, answer):
     spans = lcl._merge_repair_spans(text, _span_of(text))
     with pytest.raises(ValueError, match="repeats words"):
         lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"])
+
+
+def test_kana_punctuation_is_not_a_seam_unit():
+    """The middle dot inside a katakana name is punctuation, not a unit: the
+    seam reads ロミオモン on both sides and refuses the double."""
+    text = "彼はロミオ・モン(間)"
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(text, spans, _replacement_reply("ロミオモンタ")["replacements"])
