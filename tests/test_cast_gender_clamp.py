@@ -264,3 +264,45 @@ def test_the_index_reads_the_first_word_unless_an_honorific_leads():
     assert CG.known_character_gender("Juliet Capulet") == "female"
     assert CG.known_character_gender("Dr. Harris") == ""
     assert CG.known_character_gender("Mrs. Poole") == ""
+
+
+# --------------------------------------------------------------------------- #
+# Live stills leg s1 (2026-10-17, otr_8gb_still, media_archive): WENDY BOUVIER,
+# female row on a female voice, was DRAWN AS A MAN -- the per-beat scene still
+# request carried her appearance ("severe close-cropped grey hair") but no
+# gender, and only the portrait path anchored. Now both do.
+# --------------------------------------------------------------------------- #
+_WENDY = {"char_id": "c03", "name": "WENDY BOUVIER", "gender": "female",
+          "character_description": (
+              "40s, foil. Face: angular, sharp cheekbones, narrowed, assessing "
+              "eyes beneath a tightly drawn brow, a thin, downturned mouth, "
+              "severe close-cropped grey hair")}
+_BRIEF = {"title": "The Wrong Tension", "visual_style": "sci_fi_radio",
+          "key_terms": {"setting": ["archive vault"]}}
+_WENDY_LINE = {"beat_id": "b003", "text": "Hold on just a moment, Walter.",
+               "beat_intent": "she checks the catalog card", "traits": "wary"}
+
+
+def test_the_scene_still_request_carries_the_rows_gender():
+    from nodes import otr_meta_brief_image_prompt as IMG
+
+    req = IMG._build_char_scene_request(_WENDY, _BRIEF, "archive vault",
+                                        _WENDY_LINE)
+    assert "character_appearance: adult woman, 40s, foil." in req
+
+
+def test_every_composed_scene_still_is_anchored_on_the_row():
+    from nodes import otr_meta_brief_image_prompt as IMG
+
+    def model_draws_a_man(_request):
+        return "a gaunt grey-haired archivist peering at a catalog card"
+
+    prompt, _src = IMG._compose_char_scene_prompt(
+        _BRIEF, _WENDY, "archive vault", _WENDY_LINE, model_draws_a_man, [],
+        "c03", max_reseed=0, vstyle=None)
+    anchored = IMG._ensure_gender_anchor(prompt, _WENDY)
+    assert anchored.startswith("adult woman, ")
+    import inspect
+    src = inspect.getsource(IMG)
+    call = src.index("sprompt, _csrc = _compose_char_scene_prompt(")
+    assert "sprompt = _ensure_gender_anchor(sprompt, _ce or {})" in src[call:call + 1200]

@@ -17162,3 +17162,19 @@ not promote it to the Bug Bible on this evidence alone.
   it, it reads only a name typed as one bare word, and any name an operator
   locked to stay on the roll (ARIEL, PUCK, ROBIN in a character_gender_index)
   is excluded.
+- live stills legs on e4be35fc (4060, otr_8gb_still, gemma4-e2b, unseeded):
+  s1 media_archive RESULT SUCCESS 785 s, obs
+  wrong_tension_20261017_161720__arch__stmo__zimg__koko__marc__cg4e2__sa3_final.mp4
+  -- cast all binary, voices match (WALTER/BARNEY male, WENDY female
+  af_sarah) -- BUT WENDY's beat still (b003) is a grey-haired MAN. s2 my_story
+  "Ada, the keeper. Tom." RESULT SUCCESS 899 s, obs
+  voice_fog_20261017_163207__vstb__stmo__zimg__koko__myst__cg4e2__sa3_final.mp4
+  -- the treatment committed Ada male ("A man ..."), voice am_eric, two frames
+  male, but the b-still for "Ada: Tom? It's you!" draws a man AND a woman.
+  Cause, one: only the PORTRAIT path anchored gender
+  (otr_meta_brief_image_prompt._build_char_prompt_request / line ~2011); the
+  per-beat scene still (_build_char_scene_request / _compose_char_scene_prompt,
+  the frame shown and the video lane's init image) carried the description and
+  name but never the row's gender. Fixed: the scene request's appearance is
+  gender-anchored like the portrait's, and every composed scene-character
+  prompt (model, template, source rewrite) is anchored at its one call site.

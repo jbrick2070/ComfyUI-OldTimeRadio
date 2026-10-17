@@ -1427,7 +1427,11 @@ def _build_char_scene_request(char: dict, meta: dict, setting: str,
     _vstyle = _resolve_style(meta, style)
     _look_line = (f"style_look: {_vstyle.scene_instruction_look}\n"
                   if _vstyle.scene_instruction_look else "")
-    appearance = _appearance_for_char([char], str(char.get("char_id") or ""))
+    # The cast row's gender rides in the appearance, exactly as the portrait
+    # request does (PBUG-20261017-07: a female row with "severe close-cropped
+    # grey hair" and no gender in the request was drawn as a man).
+    appearance = _ensure_gender_anchor(
+        _appearance_for_char([char], str(char.get("char_id") or "")), char)
     ln = line if isinstance(line, dict) else {}
     intent = str(ln.get("beat_intent") or "").strip()[:240]
     mood = str(ln.get("traits") or "").strip()[:80]
@@ -2293,6 +2297,11 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                     source_model_id=source_model_id,
                     source_binding_model_id=source_binding_model_id,
                     source_receipts=_source_receipts)
+                # ONE anchor for every branch (model, template, source
+                # rewrite): the per-beat scene still is what the frame shows
+                # and what the video lane starts from, and it must carry the
+                # cast row's gender as the portrait already does.
+                sprompt = _ensure_gender_anchor(sprompt, _ce or {})
                 _src = _csrc
                 _sfield = "cast:appearance"
             else:
