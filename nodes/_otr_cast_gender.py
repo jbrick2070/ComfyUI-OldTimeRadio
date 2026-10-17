@@ -17,10 +17,11 @@ THE LADDER, strongest evidence first (each rung declines rather than guess):
   1. a courtesy title the name LEADS with ("Mrs. Vance", "Sir Toby");
   2. a relation word in the role ("her brother"), possessives skipped;
   3. our name pool, honorifics stripped (unisex / unknown names decline);
-  3b. a known character: a one-word name our vendored source rosters record
-      with one gender ("JULIET" female, "LEAR" male);
   4. subject/reflexive pronouns in the description -- only when the
      description names no other cast member and they all agree;
+  4b. a known character: a name typed as one bare word that our vendored
+      source rosters record with one gender ("JULIET" female, "LEAR" male),
+      never one the operator locked to stay on the roll;
   5. a coin seeded on the normalized name, so the same name casts the same way.
 
 Pure, deterministic, stdlib + repo modules only.
@@ -143,10 +144,28 @@ def known_character_gender(name: str) -> str:
                 if g and len(words) == 1 and len(words[0]) >= 3 \
                         and words[0] not in vocab:
                     seen.setdefault(words[0], set()).add(g)
+        # An operator ruling "stays on the roll" (a locked entry with no
+        # gender in any bank's character_gender_index.json -- ARIEL, PUCK)
+        # is never overridden by another play's roster.
+        on_the_roll = set()
+        for path in glob.glob(os.path.join(root, "*",
+                                           "character_gender_index.json")):
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    entries = json.load(fh).get("entries") or {}
+            except (OSError, ValueError):
+                continue
+            for key, entry in entries.items():
+                if (entry or {}).get("locked") and not (entry or {}).get("gender"):
+                    on_the_roll.add(str(key).rsplit("|", 1)[-1].casefold())
         _KNOWN_CHARACTERS = {k: next(iter(v)) for k, v in seen.items()
-                             if len(v) == 1}
-    tokens = name_tokens(name)
-    return _KNOWN_CHARACTERS.get(tokens[0], "") if tokens else ""
+                             if len(v) == 1 and k not in on_the_roll}
+    # Only a name typed as ONE bare word: "Dr. Harris" or "Mrs. Poole" is a
+    # surname, not the character the roster means.
+    words = re.findall(r"[^\W_]+(?:['\-][^\W_]+)*", str(name or "").casefold())
+    if len(words) != 1:
+        return ""
+    return _KNOWN_CHARACTERS.get(words[0], "")
 
 
 def settle_binary_gender(name: str, role: str = "", description: str = "",
@@ -164,12 +183,14 @@ def settle_binary_gender(name: str, role: str = "", description: str = "",
     gender = _POOLS.gender_of_first_name(" ".join(name_tokens(name)))
     if gender in BINARY:
         return gender, "name_pool"
-    gender = known_character_gender(name)
-    if gender:
-        return gender, "known_character"
     gender = description_gender(description, others)
     if gender:
         return gender, "description_pronouns"
+    # Below the description: the index holds some surnames and place names
+    # ("Harris", "France"), so a description that says "she" must win.
+    gender = known_character_gender(name)
+    if gender:
+        return gender, "known_character"
     key = " ".join(str(name or "").split()).casefold()
     coin = random.Random("otr_cast_gender:%s" % key)
     return ("male" if coin.random() < 0.5 else "female"), "seeded_coin"

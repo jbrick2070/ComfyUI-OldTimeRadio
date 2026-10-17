@@ -17156,3 +17156,9 @@ not promote it to the Bug Bible on this evidence alone.
   registry for one-word character names with one recorded gender (rank and
   relation words excluded). JULIET -> female on every lane, not only the
   Shakespeare bank whose roster already pinned her.
+- QA on 68f8684e (Sonnet): the roster index holds surnames and places
+  ("Harris", "France", "Nag") and sat above description pronouns, so "Dr.
+  Harris ... she is a surgeon" came out male. Now the description outranks
+  it, it reads only a name typed as one bare word, and any name an operator
+  locked to stay on the roll (ARIEL, PUCK, ROBIN in a character_gender_index)
+  is excluded.

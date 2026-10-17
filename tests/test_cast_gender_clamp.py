@@ -239,3 +239,26 @@ def test_juliet_on_any_lane_ends_female_in_the_ledger(tmp_path):
                    "character_description": "", "tts_model": "",
                    "voice_preset": ""}])
     assert led.data["cast"][0]["gender"] == "female"
+
+
+# Sonnet QA on 68f8684e: the roster index holds surnames and places, so the
+# character's own description outranks it, it reads only a bare one-word name,
+# and an operator "stays on the roll" ruling is never overridden.
+@pytest.mark.parametrize("name,description", [
+    ("Dr. Harris", "She is a surgeon; she works late."),
+    ("France", "She is a diplomat."),
+])
+def test_the_description_outranks_the_roster_index(name, description):
+    assert CG.settle_binary_gender(name, description=description) == (
+        "female", "description_pronouns")
+
+
+@pytest.mark.parametrize("name", ["ARIEL", "PUCK", "ROBIN"])
+def test_an_operator_roll_ruling_is_never_a_known_character(name):
+    assert CG.known_character_gender(name) == ""
+
+
+def test_the_index_reads_only_a_bare_one_word_name():
+    assert CG.known_character_gender("JULIET") == "female"
+    assert CG.known_character_gender("Mrs. Juliet") == ""
+    assert CG.known_character_gender("Juliet Capulet") == ""
