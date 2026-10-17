@@ -16759,3 +16759,24 @@ not promote it to the Bug Bible on this evidence alone.
   after "美好的。", "した" after "成りました。"). Cost as designed: one retry
   each. Also: the NFD hole was shared with the three-word rule for
   three-word echoes; a two-word NFC echo was never refused by that rule.
+
+## PBUG-20261017-02 -- a female character on a male voice killed the episode
+- live: 4060 leg s03 (2026-10-16, otr_8gb_ltx25_audio_in, comfy_native
+  gemma4-e2b writer, scifi_news_pro). Both attempts of
+  `scifi_news_pro_casting_voices` cast "Ziyin" female on m05, a male voice;
+  the validator listed the legal ids (m07-m10), the typed retry repeated the
+  pick, the ladder exhausted after 2 attempts and NewsProCastError killed a
+  finished script 64 s in, before any video.
+  Log: qa-20261015-fresh-install/s03-8gb-ltx25-audioin-1stage.server-slice.log.
+- fix: `_pass_casting` records each answer (`on_attempt_complete`) and, once
+  the ladder is spent, settles the newest answer that settles
+  (`_make_casting_settle`): every row whose voice disagrees with its gender
+  moves to the first unused voice of that gender in menu order (logged
+  WARNING "CASTING VOICE REPAIRED"), the gender stays (the name pool still
+  overrules a confident disagreement, Bug Bible 10.08), an uncast speaker is
+  completed as before, and the real validator judges the result. No free
+  voice of that gender, an unknown id or a shared voice still fails.
+- scope: only scifi_news_pro has this validator; the other banks cast
+  through `_otr_casting`, which holds gender authoritative and swaps names.
+- tests: tests/test_scifi_news_pro_casting_voice_repair.py (the exact live
+  answer through the real ladder; 9 of 11 fail on the unfixed code).

@@ -3734,7 +3734,23 @@ def _pool_gender_for_label(label: str) -> str:
 
 
 def _make_casting_repair(menu: VoiceMenu, speakers: "list[str]"):
-    """RUNG 2 of two: a hedged gender is answered by the VOICE they picked.
+    """The ladder's deterministic rung -- see `_make_casting_rungs`."""
+    return _make_casting_rungs(menu, speakers)[0]
+
+
+def _make_casting_settle(menu: VoiceMenu, speakers: "list[str]"):
+    """The post-ladder settle -- see `_make_casting_rungs`."""
+    return _make_casting_rungs(menu, speakers)[1]
+
+
+def _make_casting_rungs(menu: VoiceMenu, speakers: "list[str]"):
+    """Returns ``(repair, settle)``.
+
+    ``repair`` is the in-ladder deterministic rung documented below.
+    ``settle`` runs AFTER the model's attempts are spent (PBUG-20261017-02,
+    below `_reconcile_voices`).
+
+    RUNG 2 of two: a hedged gender is answered by the VOICE they picked.
 
     THE DEFECT (PBUG-20260824-03). `CastVoice.gender` is
     `Literal["male", "female"]` -- there is no third option, because every
@@ -4007,7 +4023,96 @@ def _make_casting_repair(menu: VoiceMenu, speakers: "list[str]"):
         )
         return fixed
 
-    return _repair
+    def _reconcile_voices(payload: dict) -> "bool | None":
+        """A voice of the wrong gender is moved to an unused voice of the
+        right one. Returns True if a row moved, False if nothing needed it,
+        None if a row needs it and the stock of its gender is exhausted.
+
+        THE DEFECT (4060 leg s03, 2026-10-16, gemma4-e2b writer). Both
+        attempts cast the female "Ziyin" on m05, a male voice, and the
+        validator's own message listed the four legal female ids. The typed
+        retry repeated the same pick, the ladder exhausted, and a finished
+        script died 64 s in, before any video. A voice/gender contradiction
+        is a correctness defect with one checkable right answer, so Python
+        answers it instead of asking again.
+
+        THE GENDER STAYS, THE VOICE MOVES. The gender is the character (the
+        script and description were written for it); the menu id is a pick
+        from a list. `_coherent_gender` still gets its word first, so a name
+        the pool CONFIDENTLY genders keeps the 10.08 law -- and when the pool
+        sides with the voice, the gender is corrected and the voice kept.
+
+        STABLE: the first unused id of that gender in menu order, so the same
+        answer settles the same way every run. Never a shared larynx: if no id
+        of that gender is free this declines and the failure stands.
+        """
+        rows = payload.get("cast")
+        if not isinstance(rows, list) or not all(
+                isinstance(r, dict) for r in rows):
+            return None
+        used = {str(r.get("timbre") or "") for r in rows}
+        moved = False
+        for row in rows:
+            entry = by_id.get(str(row.get("timbre") or ""))
+            gender = str(row.get("gender") or "").strip().lower()
+            if entry is None or gender not in legal:
+                continue        # not this defect -- the validator decides
+            gender = _coherent_gender(row, gender)
+            if gender == str(entry.gender):
+                if row.get("gender") != gender:
+                    row["gender"] = gender
+                    moved = True
+                continue
+            pick = next(
+                (e.menu_id for e in menu.entries
+                 if str(e.gender) == gender and e.menu_id not in used),
+                None,
+            )
+            if pick is None:
+                log.warning(
+                    "[scifi_news_pro] casting voice repair: %r is %s on %s "
+                    "(%s) and no %s voice is left unused -- declining",
+                    row.get("name"), gender, entry.menu_id, entry.gender,
+                    gender,
+                )
+                return None
+            log.warning(
+                "[scifi_news_pro] CASTING VOICE REPAIRED: %r is %s but the "
+                "model gave %s, a %s voice; reassigned to %s (first unused %s "
+                "voice) so the finished script ships",
+                row.get("name"), gender, entry.menu_id, entry.gender, pick,
+                gender,
+            )
+            used.add(pick)
+            row["timbre"] = pick
+            row["gender"] = gender
+            moved = True
+        return moved
+
+    def _settle(failed_output: str) -> "CastingVoices | None":
+        """Settle one of the model's own answers once its attempts are spent.
+
+        Only the two deterministic defects are touched: an incomplete or
+        substituted cast (`_complete_cast`) and a voice of the wrong gender
+        (`_reconcile_voices`). Anything else -- a duplicate name, an unknown
+        id, a schema failure -- is left as the model wrote it, so the caller's
+        re-run of the real validator still refuses it.
+        """
+        try:
+            payload = _otr_json.normalize_json_keys(json.loads(failed_output))
+        except Exception:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        _complete_cast(payload)
+        if _reconcile_voices(payload) is None:
+            return None
+        try:
+            return CastingVoices.model_validate(payload)
+        except ValidationError:
+            return None
+
+    return _repair, _settle
 
 
 def _shapes_for_speakers(treatment: Treatment, speakers: "list[str]",
@@ -4098,6 +4203,15 @@ def _pass_casting(
         f"Return exactly one entry per script speaker, using these EXACT "
         f"names and no others: {', '.join(speakers)}."
     )
+    # Every answer the model gave, newest last, so the post-ladder settle
+    # below works from the model's own words rather than a fresh guess.
+    answers: "list[str]" = []
+
+    def _record(_attempt: int, raw: str, _error) -> None:
+        if raw:
+            answers.append(raw)
+
+    validator = _make_casting_validator(menu, speakers)
     try:
         # LLM slot: technical -- voice-stock assignment only.
         return structured_call(
@@ -4118,11 +4232,28 @@ def _pass_casting(
             repair_prompt_factory=make_dispatching_repair_factory(
                 deterministic_repair=_make_casting_repair(menu, speakers),
             ),
-            post_validator=_make_casting_validator(menu, speakers),
+            post_validator=validator,
             max_new_tokens=None,
             helper_name="scifi_news_pro_casting_voices",
+            on_attempt_complete=_record,
         )
     except StructuredCallFailedError as exc:
+        # THE MODEL HAS HAD ITS ATTEMPTS (PBUG-20261017-02,
+        # `_reconcile_voices`). A cast whose only defect is deterministic -- a
+        # voice of the wrong gender, an uncast speaker -- is settled from the
+        # newest answer that settles, and the REAL validator judges the
+        # result. Nothing else is forgiven: an answer the settle cannot make
+        # valid falls through to the same NewsProCastError as before.
+        settle = _make_casting_settle(menu, speakers)
+        for raw in reversed(answers):
+            settled = settle(raw)
+            if settled is not None and validator(settled) is None:
+                log.warning(
+                    "[scifi_news_pro] casting_voices settled deterministically "
+                    "after %d model attempt(s) (last error: %s)",
+                    exc.attempts, exc.last_error,
+                )
+                return settled
         raise NewsProCastError(
             "casting_voices", str(exc.last_error), exc.attempts
         ) from exc
