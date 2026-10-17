@@ -19,9 +19,9 @@ THE LADDER, strongest evidence first (each rung declines rather than guess):
   3. our name pool, honorifics stripped (unisex / unknown names decline);
   4. subject/reflexive pronouns in the description -- only when the
      description names no other cast member and they all agree;
-  4b. a known character: a name typed as one bare word that our vendored
-      source rosters record with one gender ("JULIET" female, "LEAR" male),
-      never one the operator locked to stay on the roll;
+  4b. a known character: a name whose first word (when no honorific leads)
+      our vendored source rosters record with one gender ("JULIET" female,
+      "LEAR" male), never one the operator locked to stay on the roll;
   5. a coin seeded on the normalized name, so the same name casts the same way.
 
 Pure, deterministic, stdlib + repo modules only.
@@ -160,10 +160,11 @@ def known_character_gender(name: str) -> str:
                     on_the_roll.add(str(key).rsplit("|", 1)[-1].casefold())
         _KNOWN_CHARACTERS = {k: next(iter(v)) for k, v in seen.items()
                              if len(v) == 1 and k not in on_the_roll}
-    # Only a name typed as ONE bare word: "Dr. Harris" or "Mrs. Poole" is a
-    # surname, not the character the roster means.
+    # The name's FIRST word, unless the name opens with an honorific: in "Dr.
+    # Harris" or "Mrs. Poole" the first real word is a surname, not the
+    # character the roster means. "Juliet Capulet" reads "juliet".
     words = re.findall(r"[^\W_]+(?:['\-][^\W_]+)*", str(name or "").casefold())
-    if len(words) != 1:
+    if not words or words[0] in _RG._HONORIFICS:
         return ""
     return _KNOWN_CHARACTERS.get(words[0], "")
 

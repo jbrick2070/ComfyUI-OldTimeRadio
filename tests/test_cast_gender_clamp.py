@@ -243,7 +243,8 @@ def test_juliet_on_any_lane_ends_female_in_the_ledger(tmp_path):
 
 # Sonnet QA on 68f8684e: the roster index holds surnames and places, so the
 # character's own description outranks it, it reads only a bare one-word name,
-# and an operator "stays on the roll" ruling is never overridden.
+# and an operator "stays on the roll" ruling is never overridden. It reads the
+# first word, unless an honorific leads (then that word is a surname).
 @pytest.mark.parametrize("name,description", [
     ("Dr. Harris", "She is a surgeon; she works late."),
     ("France", "She is a diplomat."),
@@ -258,7 +259,8 @@ def test_an_operator_roll_ruling_is_never_a_known_character(name):
     assert CG.known_character_gender(name) == ""
 
 
-def test_the_index_reads_only_a_bare_one_word_name():
+def test_the_index_reads_the_first_word_unless_an_honorific_leads():
     assert CG.known_character_gender("JULIET") == "female"
-    assert CG.known_character_gender("Mrs. Juliet") == ""
-    assert CG.known_character_gender("Juliet Capulet") == ""
+    assert CG.known_character_gender("Juliet Capulet") == "female"
+    assert CG.known_character_gender("Dr. Harris") == ""
+    assert CG.known_character_gender("Mrs. Poole") == ""
