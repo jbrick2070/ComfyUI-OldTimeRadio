@@ -448,6 +448,14 @@ def _repeats_kept_speech(replacement: str, kept: str) -> bool:
 #: "Look at the lamp. The lamp is dead." shares two and is ordinary speech.
 _SEAM_WORDS = 3
 
+#: ...unless the answer has almost nothing else: two shared words with at most
+#: ``_SEAM_OWN_WORDS`` of its own beside them is the neighbours handed back
+#: ("Another transmission." before "Another transmission. Just the usual
+#: hiss.", 2026-10-17), where "Look at" above is two words of its own. One
+#: shared word stays speech: "(gasp) Oh, it's you!" answered "Oh!", "(echoing)
+#: Hello?" answered "Hello?" (Muse Wonder Full on the fix).
+_SEAM_OWN_WORDS = 1
+
 
 def _overlaps_a_seam(replacement: str, before: str, after: str) -> bool:
     """Does a replacement repeat the kept words on either side of its span?
@@ -464,6 +472,13 @@ def _overlaps_a_seam(replacement: str, before: str, after: str) -> bool:
     three Hangul one word (Korean is spaced, so its words already work), and
     a Latin name in a Chinese line must not match across a space (Sonnet QA
     on e71a43cf).
+
+    Two units are enough when the answer is little else. "(strained whisper)
+    Another transmission. Just the usual hiss." answered "Another
+    transmission." and "(harsh, crackling interference) Listen! There! A clear
+    voice!" answered "Listen! There!" both shipped doubled under the three-word
+    floor (signal_lost_the_thirtyyear_echo_20261017_013200, Gemma 4 E2B on the
+    4060); see ``_SEAM_OWN_WORDS``.
     """
     if _mostly_han_or_kana(before + replacement + after):
         def units(text):
@@ -472,12 +487,22 @@ def _overlaps_a_seam(replacement: str, before: str, after: str) -> bool:
         units = _spoken_words
     rep = units(replacement)
     head, tail = units(before), units(after)
-    for width in range(min(len(head), len(rep)), _SEAM_WORDS - 1, -1):
+
+    def doubled(width):
+        return width >= _SEAM_WORDS or len(rep) - width <= _SEAM_OWN_WORDS
+
+    # The widest match on each side decides it: a narrower one shares less
+    # and leaves the answer more words of its own.
+    for width in range(min(len(head), len(rep)), 1, -1):
         if head[-width:] == rep[:width]:
-            return True
-    for width in range(min(len(tail), len(rep)), _SEAM_WORDS - 1, -1):
+            if doubled(width):
+                return True
+            break
+    for width in range(min(len(tail), len(rep)), 1, -1):
         if tail[:width] == rep[-width:]:
-            return True
+            if doubled(width):
+                return True
+            break
     return False
 
 

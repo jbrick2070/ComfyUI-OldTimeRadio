@@ -16701,3 +16701,32 @@ not promote it to the Bug Bible on this evidence alone.
 - the review loop on this guard closes here: seven QA rounds, the last
   three with zero regressions on real data. Live proof is next -- count the
   whole-line refusals and doubled lines on the next 8 GB leg.
+
+## PBUG-20261017-01 -- live leg on 3bf8926c: two-word seam echoes shipped doubled
+- 4060, otr_8gb_low, Gemma 4 E2B writer, scifi_news_pro, lighthouse premise
+  (signal_lost_the_thirtyyear_echo_20261017_013200, RESULT SUCCESS, in
+  otr/obs). Two rows were recorded "repaired" with their first words said
+  twice: "(strained whisper) Another transmission. Just the usual hiss..."
+  + "Another transmission." -> "Another transmission. Another
+  transmission. Just...", and "(harsh, crackling interference) Listen!
+  There! A clear voice!..." + "Listen! There!" -> "Listen! There! Listen!
+  There!...". The answer was only the two kept words beside its span; the
+  seam rule needed three, every other guard missed it, and the reread judge
+  (it reads for stage directions) passed both as clean.
+- fix: at a seam, two shared units are enough when the answer has at most
+  one unit of its own (`_SEAM_OWN_WORDS`); three still decide alone. One
+  shared word stays speech ("(gasp) Oh, it's you!" + "Oh!"), and "Look at
+  the lamp. The lamp is dead." (two of its own) still splices. Design
+  check: one Muse Wonder Full contrarian call -- kept the exact rule, moved
+  its floor from one word to two, and added the one-own-word padding case.
+- measured: the 47 spliced answers in the 23 local ledgers replayed --
+  exactly these 2 are newly refused, nothing else moves.
+- the same leg measured the prompt fix (12ff8485..3bf8926c): 14 repair
+  answers refused, 11 of them the whole line minus its direction, 3 more
+  echoing part of it; 9 rows sent to repair, 2 "repaired" (the 2 above),
+  7 shipped unclean. Kokoro's text carried no parenthetical on any row,
+  and the close credits no one.
+- residuals, documented: a padded echo with two words of its own ("Well
+  now, another transmission."), and an echo that leads with the shared
+  words ("Another transmission again." -- the shape of ordinary anaphora,
+  "The light burns. The light is all we have.").

@@ -1872,3 +1872,55 @@ def test_kana_punctuation_is_not_a_seam_unit():
     spans = lcl._merge_repair_spans(text, _span_of(text))
     with pytest.raises(ValueError, match="repeats words"):
         lcl._splice_replacements(text, spans, _replacement_reply("ロミオモンタ")["replacements"])
+
+
+# The 4060 live leg on 3bf8926c (signal_lost_the_thirtyyear_echo_20261017_013200,
+# Gemma 4 E2B): two rows shipped "repaired" with their first words said twice,
+# because the answer was only the two words beside its span.
+
+TRANSMISSION = ("(strained whisper) Another transmission. Just the usual hiss "
+                "and the sea's complaint.")
+
+
+@pytest.mark.parametrize("text, answer", [
+    (TRANSMISSION, "Another transmission."),
+    ("(harsh, crackling interference) Listen! There! A clear voice! It speaks of the gale!",
+     "Listen! There!"),
+    # One word of its own beside the two handed back (Muse Wonder Full).
+    (TRANSMISSION, "Well, another transmission."),
+    (TRANSMISSION, "Just another transmission."),
+    ("The ship went down thirty years ago tonight. (pause)", "ago tonight."),   # the head side
+    ("The ship went down thirty years ago tonight. (pause)", "ago tonight, yes."),
+    ("他们说(停顿)然后戏继续了。", "然后"),                                       # Han characters
+    ("他们说(停顿)然后戏继续了。", "嗯然后"),
+])
+def test_an_answer_that_is_little_but_the_words_beside_its_span_is_refused(text, answer):
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"])
+
+
+@pytest.mark.parametrize("text, answer, spoken", [
+    # One shared word is a vocalised note, not the line said twice.
+    ("(gasp) Oh, it's you!", "Oh!", "Oh! Oh, it's you!"),
+    ("(echoing) Hello? Is anyone there?", "Hello?", "Hello? Hello? Is anyone there?"),
+    # A word the line says elsewhere, not beside the span, still folds in.
+    ("(to the Keeper) You are isolated, Keeper.", "Keeper,", "Keeper, You are isolated, Keeper."),
+    # Two shared words with two of its own: the three-word floor still decides.
+    ("(points) The lamp is dead.", "Look at the lamp.", "Look at the lamp. The lamp is dead."),
+])
+def test_an_answer_with_words_of_its_own_still_splices(text, answer, spoken):
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    assert lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"]) == spoken
+
+
+def test_the_neighbouring_words_answer_is_asked_again_through_the_pass():
+    ledger = _ledger(TRANSMISSION)
+    slot = _Slot(judgements={TRANSMISSION: [_dirty_judgement("(strained whisper)")]},
+                 repairs={TRANSMISSION: [_replacement_reply("Another transmission."),
+                                         _replacement_reply("")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == (
+        " Another transmission. Just the usual hiss and the sea's complaint.")
+    attempt = receipt["rows"][0]["attempts"][0]
+    assert [bool(call["error"]) for call in attempt["calls"]] == [True, False]
