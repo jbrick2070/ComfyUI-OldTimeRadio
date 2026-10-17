@@ -16959,3 +16959,29 @@ not promote it to the Bug Bible on this evidence alone.
 - residual: a literal parenthesis meant to be spoken on a non-verbatim
   bank ("Say the word (whispering), then stop.") is repaired, as the
   pattern-only path already did.
+## PBUG-20261017-03 -- third QA (233335be) + two-strikes panel: a model pass reads the open roles
+- third Sonnet QA reproduced confidently WRONG genders from the description
+  pronoun reader ("Tom loves her more than he loves life." -> male for the
+  member; "Tom hires a pilot because he needs one."; "The Doctor thinks he
+  is mad.") and relative-clause marker misses ("My boss, who is Tom (he)",
+  "That Tom (he)"). Two fixes had not held, so the two-strikes rule fired:
+  Codex was asked A (strict rule) / B (model pass) / C (drop the rung) and
+  picked B -- a word window cannot read coreference, a model can.
+- now: listener marker -> a gender the treatment committed to -> ONE typed
+  technical pass (`_pass_cast_gender`, seam my_story_cast_gender_system,
+  registered in pipelines.json) for exactly the still-open roles, given the
+  whole cast and the listener's characters text -> Python's ladder as its
+  fallback (relation word, name pool, description pronouns ONLY when the
+  description names no other cast member, seeded coin). The pass never
+  fails the episode: any error or a wrong-names answer falls through.
+- relative-clause markers bind the comma segment before the clause
+  ("Tom, who loves Ada (he)" -> Tom), else the ordinary tiers.
+- live legs on 7abcea1e (before the pass; 4060, otr_8gb_low, gemma4-e2b,
+  unseeded): r5 "Ada, the keeper. Tom." -> Ada female bf_emma, Tom male
+  am_eric (the treatment committed both), "The Sea" (model wrote "other")
+  -> seeded_coin female; obs voice_fog_20261017_144648__vstb__...mp4. r6
+  "Ada (she), the keeper. Tom (he)." -> Ada female af_heart, Tom male
+  am_eric (listener); obs voice_fog_20261017_145902__arch__...mp4. Both
+  RESULT SUCCESS, no ERROR. otr_8gb_low draws procedurally (cast 0/3 with
+  portrait), so the still/video character-prompt read is proven by the unit
+  test, not by these legs.

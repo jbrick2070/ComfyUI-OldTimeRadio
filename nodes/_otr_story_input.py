@@ -800,11 +800,16 @@ class StatedGender:
     gender: str
     marker: str
     record: str = ""
+    #: The comma segment right before ``name`` -- "Tom" in "Tom, who loves
+    #: Ada (he)", where the words before the marker are a clause about the
+    #: person, not the person.
+    antecedent: str = ""
 
 
-def _back_to(text: str, end: int, stops: str) -> str:
-    """The text before ``end`` back to the first ``stops`` character, or to a
-    full stop that ends a sentence ("Dr. Ada" does not end one)."""
+def _back_index(text: str, end: int, stops: str) -> int:
+    """Where the text before ``end`` starts: after the first ``stops``
+    character, or after a full stop that ends a sentence ("Dr. Ada" does not
+    end one)."""
     i = end
     while i > 0:
         ch = text[i - 1]
@@ -815,7 +820,20 @@ def _back_to(text: str, end: int, stops: str) -> str:
             if not (word and word[-1].lower() in _NAME_ABBREVIATIONS):
                 break
         i -= 1
-    return " ".join(text[i:end].split())
+    return i
+
+
+def _back_to(text: str, end: int, stops: str) -> str:
+    """The text before ``end`` back to a boundary (see `_back_index`)."""
+    return " ".join(text[_back_index(text, end, stops):end].split())
+
+
+def _antecedent_before(text: str, end: int) -> str:
+    """The comma segment before the name chunk that ends at ``end``."""
+    start = _back_index(text, end, "\n;,:()")
+    if start < 1 or text[start - 1] != ",":
+        return ""
+    return _back_to(text, start - 1, "\n;,:()")
 
 
 def _name_before(text: str, end: int) -> str:
@@ -844,9 +862,10 @@ def stated_genders(characters: str) -> "tuple[StatedGender, ...]":
         record = _record_before(m.string, m.start())
         if name or record:
             word = m.group(1).lower()
-            out.append(StatedGender(name=name or record,
-                                    gender=_GENDER_MARKERS[word],
-                                    marker=word, record=record))
+            out.append(StatedGender(
+                name=name or record, gender=_GENDER_MARKERS[word],
+                marker=word, record=record,
+                antecedent=_antecedent_before(m.string, m.start())))
     return tuple(out)
 
 

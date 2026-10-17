@@ -226,7 +226,8 @@
         "my_story_interpret_system",
         "my_story_treatment_system",
         "my_story_act_system",
-        "my_story_frame_system"
+        "my_story_frame_system",
+        "my_story_cast_gender_system"
       ],
       "passes": [
         {
@@ -244,6 +245,14 @@
             "my_story_treatment_system"
           ],
           "description": "P1 creative: interpretation -> StoryTreatment (title, dramatic question, setting, cast with voice traits, per-act plan, ending). Cast names are born here."
+        },
+        {
+          "pass_id": "cast_gender",
+          "slot": "technical",
+          "seam_refs": [
+            "my_story_cast_gender_system"
+          ],
+          "description": "P1b technical, ONLY when a role still has no gender after the listener's markers and the treatment: one call -> male/female for exactly those roles, read from the cast's own roles, descriptions and pronouns. A failed call falls back to Python's ladder (relation word, name pool, unambiguous description pronouns, seeded coin); it never fails the episode."
         },
         {
           "pass_id": "acts",

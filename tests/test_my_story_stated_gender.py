@@ -322,7 +322,8 @@ def test_a_description_without_the_stale_note_is_left_byte_identical():
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("description,others,expected", [
     ("Runs the diner and she never sleeps.", ("The Doctor", "The Old Man"), "female"),
-    ("A doctor who loves the sea, and she shows it.", ("The Doctor",), "female"),
+    # names the other cast member, so the fallback abstains (the pass decides)
+    ("A doctor who loves the sea, and she shows it.", ("The Doctor",), ""),
     ("Hears voices; she is afraid.", (), "female"),
     ("A scholar who says he has seen the lights.", (), "male"),
     ("Runs the diner. When she laughs the room goes quiet.", (), "female"),
@@ -339,3 +340,93 @@ def test_a_relative_clause_marker_binds_the_name_its_record_leads_with():
     bound, _ = MS._bind_stated_genders(
         SI.stated_genders("Tom, who loves Ada (he). Ada (she)."), ["Ada", "Tom"])
     assert bound == {"Tom": "male", "Ada": "female"}
+
+
+# --------------------------------------------------------------------------- #
+# Two-strikes panel (Codex): one typed model pass reads the open roles; the
+# deterministic ladder is only its fallback
+# --------------------------------------------------------------------------- #
+class _CastGenderAnswers(_LiveAda):
+    """The live treatment, plus a cast-gender pass that answers ``reply``."""
+
+    def __init__(self, reply, **kw):
+        super().__init__(**kw)
+        self.reply = reply
+        self.gender_prompts = []
+
+    def _answer(self, messages):
+        system = messages[0]["content"] if messages else ""
+        if "You cast voices for a radio drama" in system:
+            self.gender_prompts.append(messages)
+            return json.dumps(self.reply)
+        return super()._answer(messages)
+
+
+def test_the_cast_gender_pass_decides_the_open_roles():
+    slots = _CastGenderAnswers({"cast": [{"name": "Ada", "gender": "female"},
+                                         {"name": "Tom", "gender": "male"}]})
+    led, _ = _run(slots, characters="Ada, the keeper. Tom.")
+    cast = {r["name"]: r["gender"] for r in led.data["cast"]}
+    assert cast["Ada"] == "female" and cast["Tom"] == "male"
+    sources = {r["name"]: r["source"]
+               for r in led.data["meta"]["my_story"]["gender_settlement"]}
+    assert sources == {"Ada": "cast_gender_pass", "Tom": "cast_gender_pass"}
+    user = slots.gender_prompts[0][-1]["content"]
+    assert "DECIDE: Ada, Tom" in user and "the sound she hears" in user
+
+
+def test_the_pass_is_skipped_when_every_role_is_already_settled():
+    slots = _CastGenderAnswers({"cast": []})
+    _run(slots, characters="Ada (she), the keeper. Tom (he).")
+    assert slots.gender_prompts == []
+
+
+def test_a_pass_answer_naming_someone_else_falls_back_to_the_ladder():
+    slots = _CastGenderAnswers({"cast": [{"name": "Mabel", "gender": "male"}]})
+    led, _ = _run(slots, characters="Ada, the keeper. Tom.")
+    story = led.data["meta"]["my_story"]
+    sources = {r["name"]: r["source"] for r in story["gender_settlement"]}
+    assert sources["Ada"] == "description_pronouns"
+    assert next(r for r in led.data["cast"] if r["name"] == "Ada")["gender"] == "female"
+
+
+def test_a_pass_that_raises_never_fails_the_episode():
+    # The plain _LiveAda slots raise on the unknown cast-gender prompt.
+    led, _ = _run(_LiveAda(), characters="Ada, the keeper. Tom.")
+    genders = [r["gender"] for r in led.data["cast"] if r["name"] != "ANNOUNCER"]
+    assert all(g in ("male", "female") for g in genders)
+
+
+@pytest.mark.parametrize("description,others", [
+    ("Tom loves her more than he loves life.", ("Tom",)),
+    ("Tom hires a pilot because he needs one.", ("Tom",)),
+    ("The Doctor thinks he is mad.", ("The Doctor",)),
+    ("Tom, the grizzled old sheriff, hopes he wins.", ("Tom",)),
+])
+def test_the_fallback_abstains_when_another_cast_member_is_named(description, others):
+    assert MS._description_gender(_member("Qx1", description=description),
+                                  others) == ""
+
+
+@pytest.mark.parametrize("text,names,expected", [
+    ("My boss, who is Tom (he).", ["Ada", "Tom"], {"Tom": "male"}),
+    ("That Tom (he).", ["Tom"], {"Tom": "male"}),
+    ("Ada, who runs it, and Tom, who loves Ada (he).", ["Ada", "Tom"], {"Tom": "male"}),
+    ("Ada, that old keeper (she).", ["Ada"], {"Ada": "female"}),
+])
+def test_relative_clause_markers_bind_the_person_before_the_clause(text, names, expected):
+    bound, _ = MS._bind_stated_genders(SI.stated_genders(text), names)
+    assert bound == expected
+
+
+def test_the_cast_gender_seam_is_declared_and_shipped():
+    import json as _json
+    from pathlib import Path
+
+    root = Path(MS.__file__).resolve().parent / "story_packs"
+    pack = _json.loads((root / "my_story" / "my_story.json").read_text(encoding="utf-8"))
+    assert pack["prompt_stages"]["my_story_cast_gender_system"].startswith(
+        "You cast voices for a radio drama")
+    pipes = _json.loads((root / "pipelines.json").read_text(encoding="utf-8"))
+    row = next(p for p in pipes["pipelines"] if p["story_pipeline_id"] == "my_story_multipass")
+    assert "my_story_cast_gender_system" in row["declared_seams"]

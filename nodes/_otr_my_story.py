@@ -43,7 +43,7 @@ import logging
 import random
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Literal, Mapping
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -905,8 +905,13 @@ def _match_stated(mark, names: "list[str]") -> "list[str]":
     chunk = getattr(mark, "name", mark)
     record = getattr(mark, "record", "") or ""
     opener = re.findall(r"[^\W_]+", str(chunk).casefold())[:1]
-    if opener and opener[0] in _RELATIVE_OPENERS and record:
-        chunk = ""          # "who loves Ada" names who is loved, not the role
+    antecedent = getattr(mark, "antecedent", "") or ""
+    if opener and opener[0] in _RELATIVE_OPENERS and antecedent:
+        # "Tom, who loves Ada (he)": the clause names who is loved, the
+        # person is the segment before it. Nobody there -> the usual tiers.
+        hits = _match_stated(antecedent, names)
+        if hits:
+            return hits
     pairs = [(want, n, have) for want in _name_forms(chunk)
              for n in names for have in _name_forms(n)]
     lead = [(want, n, have) for want in _name_forms(record)
@@ -976,17 +981,22 @@ def _description_gender(member: "CastMember",
 
     Only subject and reflexive pronouns count ("the sound she hears"): an
     object or possessive is as often about someone else ("her brother", "his
-    widow"), so it is no evidence. A pronoun right after "that"/"whether", or
-    within three words after another cast member's name (articles aside), is
-    about that clause or that person, so it is skipped too. Mixed evidence is
-    no answer.
+    widow"), so it is no evidence. A pronoun right after "that"/"whether"
+    opens a reported clause and is skipped. A description that names another
+    cast member (articles aside) gives no pronoun evidence at all. Mixed
+    evidence is no answer. This is the FALLBACK behind `_pass_cast_gender`.
     """
     words = re.findall(r"[^\W_]+", str(member.character_description or "").lower())
-    names = {w for name in others for w in _name_tokens(name)} - _NAME_ARTICLES
+    names = {w for name in others for form in _name_forms(name)
+             for w in form} - _NAME_ARTICLES
+    if names.intersection(words):
+        # Another cast member is in the sentence: any pronoun may be theirs,
+        # and no word window tells which (two QA rounds proved it). The model
+        # pass above reads that; this fallback abstains.
+        return ""
     seen = {_SUBJECT_PRONOUNS[w] for i, w in enumerate(words)
             if w in _SUBJECT_PRONOUNS
-            and not (i and words[i - 1] in _SUBORDINATORS)
-            and not names.intersection(words[max(0, i - 3):i])}
+            and not (i and words[i - 1] in _SUBORDINATORS)}
     return next(iter(seen)) if len(seen) == 1 else ""
 
 
@@ -1022,14 +1032,98 @@ def _settle_gender(member: "CastMember",
     return ("male" if coin.random() < 0.5 else "female"), "seeded_coin"
 
 
+def _unresolved_roles(treatment: "StoryTreatment",
+                      stated: "dict[str, str]") -> "list[str]":
+    """Roles with no listener marker and no male/female from the treatment."""
+    return [m.name for m in treatment.cast
+            if m.name not in stated and m.gender not in _GENDERS]
+
+
+class CastGender(BaseModel):
+    name: str = Field(min_length=1)
+    gender: Literal["male", "female"]
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def _canonical(cls, value):
+        try:
+            from ._otr_roster_gender import canonical_bank_gender
+        except ImportError:  # pragma: no cover -- flat load
+            from _otr_roster_gender import canonical_bank_gender  # type: ignore
+        return str(canonical_bank_gender(value) or value or "").strip().lower()
+
+
+class CastGenders(BaseModel):
+    cast: "list[CastGender]" = Field(min_length=1)
+
+
+def _pass_cast_gender(technical_fn, pack, bundle, treatment: "StoryTreatment",
+                      decide: "list[str]") -> "dict[str, str]":
+    """P1b: ONE call that answers male/female for exactly ``decide``.
+
+    The model, not a word-window heuristic, reads who each pronoun in a
+    description refers to (two-strikes panel, 2026-10-17: Codex picked this
+    over a stricter pronoun rule). It sees the whole cast for reference and
+    the listener's own characters text; it decides only the open roles.
+
+    Never fatal. Any failure -- a refused shape, a name it was not asked
+    about, a provider error -- returns {} and Python's ladder decides, so a
+    gender is always settled and the episode always continues.
+    """
+    want = {_norm_ws(n).casefold(): n for n in decide}
+
+    def _check(m: CastGenders) -> "str | None":
+        got = [_norm_ws(c.name).casefold() for c in m.cast]
+        if len(set(got)) != len(got) or set(got) != set(want):
+            return ("return exactly one entry for each name under DECIDE "
+                    "(%s), and no others" % ", ".join(decide))
+        return None
+
+    cast = [{"name": m.name, "role": m.role,
+             "character_description": m.character_description,
+             "gender": m.gender if m.gender in _GENDERS else ""}
+            for m in treatment.cast]
+    try:
+        system = _seam(pack, "my_story_cast_gender_system")
+        result = structured_call(
+            prompt=ProviderCapacityMessages([
+                {"role": "system", "content": system},
+                {"role": "user", "content": (
+                    "THE LISTENER'S CHARACTERS: %s\n\nTHE CAST:\n%s\n\n"
+                    "DECIDE: %s" % (
+                        bundle.fields.characters or "(none typed)",
+                        json.dumps(cast, ensure_ascii=False, indent=2),
+                        ", ".join(decide)))},
+            ]),
+            schema=CastGenders,
+            slot_fn=technical_fn,
+            base_temperature=0.2,
+            structural_retry_temperature=0.1,
+            repair_prompt_factory=make_dispatching_repair_factory(),
+            post_validator=_check,
+            max_new_tokens=None,
+            max_attempts=2,
+            helper_name="my_story_cast_gender",
+        )
+    except Exception as exc:  # noqa: BLE001 -- the ladder below always answers
+        log.warning("[my_story] cast-gender pass did not answer (%s: %s); "
+                    "Python's ladder settles %s", type(exc).__name__, exc,
+                    ", ".join(decide))
+        return {}
+    return {want[_norm_ws(c.name).casefold()]: c.gender for c in result.cast}
+
+
 def _settle_cast_genders(treatment: "StoryTreatment",
-                         stated: "dict[str, str]") -> "list[dict]":
+                         stated: "dict[str, str]",
+                         decided: "dict[str, str] | None" = None) -> "list[dict]":
     """Give every treatment role its gender before any voice is picked.
 
     A marked role takes the listener's gender, whatever the model wrote. Any
-    other role keeps a male/female the model committed to, and otherwise is
-    settled by `_settle_gender`. Returns one receipt row per role it changed.
+    other role keeps a male/female the model committed to; then the
+    cast-gender pass's answer (``decided``); otherwise `_settle_gender`.
+    Returns one receipt row per role it changed.
     """
+    decided = decided or {}
     receipts = []
     for member in treatment.cast:
         before = member.gender
@@ -1038,6 +1132,9 @@ def _settle_cast_genders(treatment: "StoryTreatment",
             source = "listener"
         elif member.gender in _GENDERS:
             continue
+        elif decided.get(member.name) in _GENDERS:
+            member.gender = decided[member.name]
+            source = "cast_gender_pass"
         else:
             member.gender, source = _settle_gender(
                 member, tuple(m.name for m in treatment.cast if m is not member))
@@ -1438,7 +1535,14 @@ def run_my_story_episode(
         # marker where there is one, otherwise a settled male or female.
         cast_bound, discrepancies = _bind_stated_genders(
             stated_markers, [c.name for c in treatment.cast])
-        story["gender_settlement"] = _settle_cast_genders(treatment, cast_bound)
+        decide = _unresolved_roles(treatment, cast_bound)
+        decided = {}
+        if decide:
+            with _helper_ctx(slot_scheduler, "my_story_cast_gender"):
+                decided = _pass_cast_gender(technical_fn, pack, bundle,
+                                            treatment, decide)
+        story["gender_settlement"] = _settle_cast_genders(
+            treatment, cast_bound, decided)
         names = {_norm_ws(c.name).casefold(): c for c in treatment.cast}
         for person in interp.named_cast:
             member = names.get(_norm_ws(person.name).casefold())
