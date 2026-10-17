@@ -278,9 +278,10 @@ _REPEAT_RUN = 4
 #: with exactly that light reword, so the run alone lets the doubled line back in.
 _REPEAT_SHARE = 0.75
 
-#: Chinese and Japanese put no spaces between words, so a clause is one "word"
-#: and a light reword ("彼は今何かを見ている" for "彼は何かを見ている") shares
-#: none. There the measure is pairs of adjacent characters.
+#: Scripts written without spaces (Chinese, Japanese, Thai and the rest of
+#: ``_SPACELESS_RANGES``) put no spaces between words, so a clause is one
+#: "word" and a light reword ("彼は今何かを見ている" for "彼は何かを見ている")
+#: shares none. There the measure is pairs of adjacent characters.
 _REPEAT_PAIR_SHARE = 0.6
 
 
@@ -306,12 +307,13 @@ def _spoken_words(text: str) -> "list[str]":
 
 #: Scripts written without spaces between words: kana, Han, Thai and Lao,
 #: Myanmar, Khmer. In them no character boundary is a word boundary anyone
-#: can see, so word-shaped checks have to stand aside (Sonnet QA on 10b7b2fa:
-#: a Thai doubled line slipped the repeat guard, and Japanese and Chinese
-#: deletions were refused as "mid-word").
+#: can see, so the word-boundary check in ``_still_holds`` stands aside and
+#: the repeat guard reads character pairs (a Thai doubled line slipped it
+#: while only kana and Han were listed -- Sonnet QA, 2026-10-16).
 _SPACELESS_RANGES = (
     ("\u3040", "\u30ff"), ("\u3400", "\u9fff"), ("\u0e00", "\u0eff"),
-    ("\u1000", "\u109f"), ("\u1780", "\u17ff"),
+    ("\u1000", "\u109f"), ("\u1780", "\u17ff"), ("\u3005", "\u3007"),
+    ("\uf900", "\ufaff"), ("\uff66", "\uff9f"), ("\U00020000", "\U0003134f"),
 )
 
 
@@ -370,9 +372,9 @@ def _repeats_kept_speech(replacement: str, kept: str) -> bool:
     see the grid. I see the ledger." -- and the judge, which reads for stage
     directions, passed it as clean. A replacement that contains all of the kept
     speech, shares ``_REPEAT_RUN`` consecutive words with it, or holds
-    ``_REPEAT_SHARE`` of its distinct words in any order (``_REPEAT_PAIR_SHARE``
-    of its character pairs in Chinese or Japanese) is that mistake; Python only
-    refuses the construction, it writes no prose.
+    ``_REPEAT_SHARE`` of its distinct words in any order, or ``_REPEAT_PAIR_SHARE``
+    of its character pairs in any script, is that mistake; Python only refuses
+    the construction, it writes no prose.
     """
     rep = [_bare_word(word) for word in _spoken_words(replacement)]
     keep = [_bare_word(word) for word in _spoken_words(kept)]
@@ -389,6 +391,52 @@ def _repeats_kept_speech(replacement: str, kept: str) -> bool:
         if pairs and (len(pairs & _character_pairs(replacement))
                       >= _REPEAT_PAIR_SHARE * len(pairs)):
             return True
+    return False
+
+
+def _holds_every_kept_slice(replacement: str, kept: Sequence[str]) -> bool:
+    """Does a replacement contain ALL of the line's kept speech, in order?
+
+    Then splicing it in says that speech twice, by construction -- no
+    threshold. The word checks above miss it when the model hands back the
+    whole line with one word bent: "I can (sigh) see." answered "I can't
+    see." spliced to "I can I can't see. see.", and so did "Wait 35 seconds."
+    for "Wait 3 (beat) seconds.", "L'homme" for "L'(soupir)homme", a Korean
+    particle, "私はもう行く。" for "私(ため息)行く。" (agy/Gemini 4 and Sonnet QA,
+    2026-10-16). A fold-in that only shares letters with the kept speech
+    ("Check the barometer." beside "The barometer fell.") is not this.
+    """
+    said = " ".join(str(replacement or "").split()).casefold()
+    slices = [" ".join(piece.split()).casefold() for piece in kept]
+    slices = [piece for piece in slices if any(_is_word_char(ch) for ch in piece)]
+    if not slices or sum(len(piece) for piece in slices) < 3:
+        return False
+    position = 0
+    for piece in slices:
+        found = said.find(piece, position)
+        if found < 0:
+            return False
+        position = found + len(piece)
+    return True
+
+
+def _still_holds(replacement: str, quote: str) -> bool:
+    """Does a replacement still contain the marked piece, word for word?
+
+    Whitespace and case aside, and only on word boundaries where its script
+    has them: "He returns." does not hold "Turns." (agy/Gemini 4, 2026-10-16).
+    """
+    marked = " ".join(str(quote or "").split()).casefold()
+    said = " ".join(str(replacement or "").split()).casefold()
+    if not marked:
+        return False
+    start = said.find(marked)
+    while start >= 0:
+        end = start + len(marked)
+        if not (_continues_word(marked[0], said, start - 1, -1)
+                or _continues_word(marked[-1], said, end, +1)):
+            return True
+        start = said.find(marked, start + 1)
     return False
 
 
@@ -414,7 +462,8 @@ def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: 
     kept.append(text[cursor:])
     kept_speech = " ".join(kept)
     for span in spans:
-        if _repeats_kept_speech(by_id[span.span_id], kept_speech):
+        if (_repeats_kept_speech(by_id[span.span_id], kept_speech)
+                or _holds_every_kept_slice(by_id[span.span_id], kept)):
             raise ValueError(
                 "The replacement for %s repeats words the line already keeps outside "
                 "the approved spans, so the speaker would say them twice. Return only "
@@ -422,8 +471,9 @@ def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: 
                 "direction." % span.span_id)
     # Two spans can split the kept speech between them ("hello" and "world" for
     # a kept "hello world"); each passes alone, and the line says it twice.
-    if len(spans) > 1 and _repeats_kept_speech(
-            " ".join(by_id[span.span_id] for span in spans), kept_speech):
+    joined = " ".join(by_id[span.span_id] for span in spans)
+    if len(spans) > 1 and (_repeats_kept_speech(joined, kept_speech)
+                           or _holds_every_kept_slice(joined, kept)):
         raise ValueError(
             "Together the replacements repeat words the line already keeps outside "
             "the approved spans, so the speaker would say them twice. Return only "
@@ -432,126 +482,22 @@ def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: 
     candidate = "".join(pieces)
     if not candidate.strip():
         raise ValueError("The final spoken row must contain speech")
-    # THE ANSWER THAT CHANGES NOTHING. The marked words handed back as their
-    # own replacement -- or the whole line echoed, a comma off -- leaves every
-    # spoken word in place, and a single-vote reread that happened to pass it
-    # would record the direction as repaired (agy/Gemini 4 and Sonnet QA on
-    # 10b7b2fa). Fixing one span of two is progress and is not this.
-    if _spoken_words(candidate) == _spoken_words(text):
+    # THE ANSWER THAT CHANGES NOTHING: every marked piece still stands, word
+    # for word, inside its own replacement -- handed back as it was, or kept
+    # with words added around it ("The door closes behind him. He left."). A
+    # single-vote reread that happened to pass it would record the direction
+    # as repaired (agy/Gemini 4 and Sonnet QA, 2026-10-16). LITERAL,
+    # punctuation and all, on purpose: "*in vivo*" answered "in vivo" removed
+    # the markup that WAS the defect, "(...)" answered "" removed a piece with
+    # no words in it, and fixing one span of two is progress. What this cannot
+    # see -- the marked sentence handed back with its punctuation changed -- is
+    # left to the reread.
+    if all(_still_holds(by_id[span.span_id], span.quote) for span in spans):
         raise ValueError(
-            "The replacements change no spoken word of the line -- the marked "
-            "words are all still there. Return what takes their place; an "
-            "empty replacement removes a direction.")
+            "Every marked piece is still there, word for word, in its "
+            "replacement. Return what takes its place; an empty replacement "
+            "removes a direction.")
     return candidate
-
-
-def _replacements_from_whole_line(
-    text: str, spans: Sequence[_RepairSpan], replacements: Sequence[Mapping[str, Any]],
-) -> "list[dict[str, str]] | None":
-    """The model answered a scoped edit with the WHOLE rewritten line.
-
-    Measured 2026-10-16 (47 legs, 8 GB box): 29 repairs refused as "repeats
-    words the line already keeps" were small writers handing back the full
-    cleaned line -- "Keeper, that is just interference. The barometer is
-    stable." for the span "(sharp, questioning whisper)" -- which is a right
-    answer in the wrong shape. Read it back as the replacements it implies:
-    every kept slice must appear in it exactly once, in order, with nothing
-    outside them but the model's own text in each span's place. Those gaps
-    then go through ``_splice_replacements`` like any answer, so the kept
-    slices are rebuilt from the ORIGINAL row byte for byte and the doubled-
-    line guard still reads every gap. None when the answer cannot be read
-    that way -- the old refusal stands.
-    """
-    # The same id contract the splice holds every answer to: one reply per
-    # approved span, no unknown or duplicate ids (Sonnet QA on 039bbb55).
-    ids = [item.get("span_id") for item in replacements]
-    if (not spans or any(not isinstance(value, str) for value in ids)
-            or len(ids) != len(set(ids))
-            or set(ids) != {span.span_id for span in spans}):
-        return None
-    filled = [item for item in replacements
-              if str(item.get("replacement") or "").strip()]
-    if len(filled) != 1:
-        return None
-    line = str(filled[0].get("replacement") or "")
-    kept: "list[str]" = []
-    cursor = 0
-    for span in spans:
-        kept.append(text[cursor:span.start_char])
-        cursor = span.end_char
-    kept.append(text[cursor:])
-    cores: "list[tuple[int, int] | None]" = []
-    position = 0
-    for piece in kept:
-        core = piece.strip()
-        if not core:
-            cores.append(None)
-            continue
-        found = line.find(core, position)
-        if found < 0 or line.count(core) != 1:
-            return None
-        end = found + len(core)
-        # A kept slice that owns the space at a junction keeps it: the model's
-        # line needs a space there too, or "I can (sigh) see" answered "I
-        # can't see" splices to "I can 't see" (agy/Gemini 4 and Sonnet QA on
-        # 10b7b2fa).
-        if piece != piece.rstrip() and end < len(line) and not line[end].isspace():
-            return None
-        if piece != piece.lstrip() and found > 0 and not line[found - 1].isspace():
-            return None
-        # And it is matched as WORDS where its script has them: "I see the
-        # grids." or "the grid's" holds "I see the grid" only as a fragment.
-        if (_continues_word(core[0], line, found - 1, -1)
-                or _continues_word(core[-1], line, end, +1)):
-            return None
-        cores.append((found, end))
-        position = end
-    if not any(cores):
-        return None
-    # Nothing may stand outside the spans: words before the first kept slice
-    # or after the last one are an edit no span approved.
-    if cores[0] is not None and line[:cores[0][0]].strip():
-        return None
-    if cores[-1] is not None and line[cores[-1][1]:].strip():
-        return None
-    recovered: "list[dict[str, str]]" = []
-    for index, span in enumerate(spans):
-        if cores[index] is None and index > 0:
-            # Adjacent spans share one gap; the first of them carries it.
-            recovered.append({"span_id": span.span_id, "replacement": ""})
-            continue
-        start = cores[index][1] if cores[index] is not None else 0
-        following = index + 1
-        while following < len(cores) and cores[following] is None:
-            following += 1
-        end = cores[following][0] if following < len(cores) else len(line)
-        gap = line[start:end]
-        # The kept slices carry their own spacing into the splice.
-        if cores[index] is None or kept[index] != kept[index].rstrip():
-            gap = gap.lstrip()
-        if following < len(kept) and kept[following] != kept[following].lstrip():
-            gap = gap.rstrip()
-        recovered.append({"span_id": span.span_id, "replacement": gap})
-    try:
-        _splice_replacements(text, spans, recovered)
-    except ValueError:
-        return None
-    return recovered
-
-
-def _scoped_replacements(
-    text: str, spans: Sequence[_RepairSpan], replacements: Sequence[Mapping[str, Any]],
-) -> "tuple[list[dict[str, Any]], bool]":
-    """The replacements a scoped answer stands for, and whether it came as a
-    whole line. Raises the splice's own refusal when it is neither."""
-    try:
-        _splice_replacements(text, spans, replacements)
-        return [dict(item) for item in replacements], False
-    except ValueError:
-        recovered = _replacements_from_whole_line(text, spans, replacements)
-        if recovered is None:
-            raise
-        return recovered, True
 
 
 def _is_exhausted_clean_response(exc: BaseException) -> bool:
@@ -1811,8 +1757,9 @@ def _judge_row(
 # ---------------------------------------------------------------------------
 
 
-#: Authorization verdicts after which the row is left exactly as it was.
-_ROW_UNCHANGED_VERDICTS = frozenset({"already_spoken", "unresolved"})
+#: The one verdict whose echoed whole-line span is ignored: all 41 measured
+#: refusals were already_spoken. An unresolved answer is still asked again.
+_ECHO_IGNORED_VERDICTS = frozenset({"already_spoken"})
 
 
 def _echoes_whole_row(text: str, quote: str) -> bool:
@@ -1874,15 +1821,13 @@ def _authorize_repair_scope(
         if result.verdict == "whole_row_direction" and not whole:
             return "Only an original whole-row complaint can authorize whole-row conversion"
         if result.verdict != "localized_defect":
-            # A verdict that leaves the row as it is IGNORES the whole line
-            # echoed back in `spans`, and the echo grants nothing. 41 refusals
-            # in one night were exactly this: already_spoken with the line
-            # copied in. Any other span -- part of the line, a quote that
+            # already_spoken IGNORES the whole line echoed back in `spans`,
+            # and the echo grants nothing: 41 refusals in one night were
+            # exactly that. Any other span -- part of the line, a quote that
             # occurs twice, one not in the line -- is still a contradiction,
-            # and whole_row_direction, which authorizes the widest rewrite,
-            # still takes no spans at all.
+            # and every other verdict still takes no spans at all.
             if result.spans and not (
-                    result.verdict in _ROW_UNCHANGED_VERDICTS
+                    result.verdict in _ECHO_IGNORED_VERDICTS
                     and all(_echoes_whole_row(text, item.quote) for item in result.spans)):
                 return "Only localized_defect may contain spans"
             return None
@@ -1958,7 +1903,7 @@ def _authorize_repair_scope(
         record.update(verdict="unresolved", reason=str(exc))
         return "unresolved", (), record
     record.update(result.model_dump())
-    if result.verdict in _ROW_UNCHANGED_VERDICTS and result.spans:
+    if result.verdict in _ECHO_IGNORED_VERDICTS and result.spans:
         record["ignored_spans"] = record.pop("spans")
         record["spans"] = []
     if result.verdict == "already_spoken":
@@ -2181,7 +2126,7 @@ def _call_repair(
     def _validate(result) -> str | None:
         try:
             if scope_mode == "partial":
-                _scoped_replacements(text, authorized_spans,
+                _splice_replacements(text, authorized_spans,
                                      [item.model_dump() for item in result.replacements])
             elif not result.text.strip():
                 return "The spoken row is empty"
@@ -2244,16 +2189,9 @@ def _call_repair(
         )
         return ""
     if scope_mode == "partial":
-        replacements, whole_line = _scoped_replacements(
-            text, authorized_spans, [item.model_dump() for item in result.replacements])
+        replacements = [item.model_dump() for item in result.replacements]
         candidate = _splice_replacements(text, authorized_spans, replacements)
         proposal_receipt["replacements"] = replacements
-        if whole_line:
-            # The receipt keeps what the model actually said, beside the
-            # replacements it was read back as.
-            proposal_receipt["answered_whole_line"] = True
-            proposal_receipt["raw_replacements"] = [
-                item.model_dump() for item in result.replacements]
     else:
         candidate = result.text
     proposal_receipt["candidate_sha256"] = hashlib.sha256(candidate.encode("utf-8")).hexdigest()

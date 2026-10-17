@@ -16578,3 +16578,34 @@ not promote it to the Bug Bible on this evidence alone.
   "credit no one" sentence now lets the close name people and places the
   text itself names, and no longer claims the text was typed in (a real feed
   with no title would have read that).
+
+## PBUG-20261016-03 -- resolution: the read-back is removed (panel, option A)
+- the whole-line read-back failed QA three rounds running (039bbb55,
+  10b7b2fa, 7030e180), each with new classes: contractions, possessives and
+  numbers split at junctions; Spanish, Hindi, French elision, Korean,
+  Arabic and Hebrew over-refused; the spoken-word no-op rule refused real
+  markup fixes ("*in vivo*" -> "in vivo", a real French row); the literal
+  quote guard dropped without saying so. By the two-strikes rule the third
+  fix went to a panel first: Codex, agy on Gemini 4 Argon High and Muse
+  Wonder Full all chose to REMOVE it. All three also refuted the claim that
+  the prompt fix removes most whole-line answers -- unmeasured; count the
+  whole-line refusals on the next live leg.
+- the root fix stays: the scoped prompt's span-shaped example and
+  self-check, the authorizer's spans-only-when-localized ask, and the
+  already_spoken whole-line echo ignored (now already_spoken ONLY -- an
+  unresolved answer is asked again).
+- older than tonight, found by agy: the span splice ran first and its word
+  checks missed the whole line handed back with one word bent ("I can (sigh)
+  see." + "I can't see." -> "I can I can't see. see."; "35" for "3",
+  "L'homme", Korean, short Japanese and Chinese, Thai, "Keeper's"). Closed
+  with an exact rule rather than a threshold: a replacement holding ALL of
+  the kept speech in order is refused, because splicing it says that speech
+  twice by construction. The panel's universal character-pair rule was not
+  taken -- it refuses fold-ins that only share letters ("Check the
+  barometer." beside "The barometer fell."), which the containment rule
+  keeps. Character pairs stay for spaceless scripts, now with Thai, Lao,
+  Myanmar, Khmer, 々, halfwidth kana and the CJK extension blocks.
+- the no-op guard is literal: an answer is refused when every marked piece
+  still stands word for word in its replacement. Markup removal is an edit;
+  the marked sentence handed back with its punctuation changed is left to
+  the reread (documented residual).
