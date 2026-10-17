@@ -338,7 +338,9 @@ def _spaceless_char(ch: str) -> bool:
 
 
 def _written_without_spaces(text: str) -> bool:
-    return any(_spaceless_char(ch) for ch in text or "")
+    """Is most of this text's lettering in a spaceless script?"""
+    letters = [ch for ch in text or "" if _is_word_char(ch)]
+    return bool(letters) and 2 * sum(map(_spaceless_char, letters)) >= len(letters)
 
 
 def _continues_word(edge: str, line: str, index: int, step: int) -> bool:
@@ -374,6 +376,12 @@ def _longest_shared_run(a: "Sequence[str]", b: "Sequence[str]") -> int:
     return best
 
 
+def _bare_word(word: str) -> str:
+    """A word without its 's: "keeper's" reads as "keeper", "it's" as "it" --
+    which is what lets "It was gone." read as "It's gone." said again."""
+    return word[:-2] if word.endswith("'s") and len(word) > 2 else word
+
+
 def _repeats_kept_speech(replacement: str, kept: str) -> bool:
     """True when a replacement says again what the line already keeps.
 
@@ -388,14 +396,24 @@ def _repeats_kept_speech(replacement: str, kept: str) -> bool:
     ``_BENT_LINE_PRECISION`` of its own pairs in a spaced one, is that mistake;
     Python only refuses the construction, it writes no prose.
     """
-    rep, keep = _spoken_words(replacement), _spoken_words(kept)
+    rep = [_bare_word(word) for word in _spoken_words(replacement)]
+    keep = [_bare_word(word) for word in _spoken_words(kept)]
     if not rep or not keep:
         return False
     run = _longest_shared_run(rep, keep)
     if run >= _REPEAT_RUN or run == len(keep):
         return True
     kept_words = set(keep)
-    if len(kept_words & set(rep)) >= _REPEAT_SHARE * len(kept_words):
+    shared_words = kept_words & set(rep)
+    if len(shared_words) >= _REPEAT_SHARE * len(kept_words):
+        return True
+    # A SHORT LINE'S FRAME said again: all but one of its words, its first and
+    # its last among them -- "I can (sigh) see." answered "I could see.", "It
+    # is late." as "It was late.", "Let me in." as "Let him in." (Sonnet QA on
+    # 0291b5da). "The light -- it's failing." beside "The light failed." keeps
+    # the first word but not the last, and splices.
+    if (3 <= len(kept_words) <= 4 and len(shared_words) >= len(kept_words) - 1
+            and keep[0] in shared_words and keep[-1] in shared_words):
         return True
     pairs = _character_pairs(kept)
     said = _character_pairs(replacement)
@@ -407,6 +425,31 @@ def _repeats_kept_speech(replacement: str, kept: str) -> bool:
           and shared >= _REPEAT_PAIR_SHARE * len(pairs)
           and shared >= _BENT_LINE_PRECISION * len(said)):
         return True
+    return False
+
+
+#: Words shared across a seam before it counts as the line said twice there;
+#: "Look at the lamp. The lamp is dead." shares two and is ordinary speech.
+_SEAM_WORDS = 3
+
+
+def _overlaps_a_seam(replacement: str, before: str, after: str) -> bool:
+    """Does a replacement repeat the kept words on either side of its span?
+
+    The model rewrote across the span's edge and handed back the neighbouring
+    words too: "...and the play continued." with "continued" answered "and
+    the play settled." spliced to "and the play and the play settled" and
+    shipped (signal_lost_the_rainbow_boxes_20261014_145758, found by Sonnet
+    QA on 0291b5da). At least ``_SEAM_WORDS`` words must line up.
+    """
+    rep = _spoken_words(replacement)
+    head, tail = _spoken_words(before), _spoken_words(after)
+    for width in range(min(len(head), len(rep)), _SEAM_WORDS - 1, -1):
+        if head[-width:] == rep[:width]:
+            return True
+    for width in range(min(len(tail), len(rep)), _SEAM_WORDS - 1, -1):
+        if tail[:width] == rep[-width:]:
+            return True
     return False
 
 
@@ -423,10 +466,13 @@ def _holds_every_kept_slice(replacement: str, kept: Sequence[str]) -> bool:
     ("Check the barometer." beside "The barometer fell.") is not this.
     """
     said = " ".join(str(replacement or "").replace("\u2019", "'").split()).casefold()
-    # Edge punctuation off: "see." is still held by an answer ending "see".
-    slices = [_trim_marks(" ".join(piece.replace("\u2019", "'").split()).casefold())
-              for piece in kept]
-    slices = [piece for piece in slices if piece]
+    slices = [" ".join(piece.replace("\u2019", "'").split()).casefold() for piece in kept]
+    # Edge punctuation off only in a spaceless script ("行く。" is held by an
+    # answer ending "行く"); in a spaced one the period stays, or a loose end
+    # would read "Quiet." into "Quietly" (Sonnet QA on 0291b5da).
+    slices = [_trim_marks(piece) if _written_without_spaces(piece) else piece
+              for piece in slices]
+    slices = [piece for piece in slices if any(_is_word_char(ch) for ch in piece)]
     if not slices or sum(len(piece) for piece in slices) < 3:
         return False
     position = 0
@@ -508,9 +554,10 @@ def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: 
     pieces.append(text[cursor:])
     kept.append(text[cursor:])
     kept_speech = " ".join(kept)
-    for span in spans:
+    for index, span in enumerate(spans):
         if (_repeats_kept_speech(by_id[span.span_id], kept_speech)
-                or _holds_every_kept_slice(by_id[span.span_id], kept)):
+                or _holds_every_kept_slice(by_id[span.span_id], kept)
+                or _overlaps_a_seam(by_id[span.span_id], kept[index], kept[index + 1])):
             raise ValueError(
                 "The replacement for %s repeats words the line already keeps outside "
                 "the approved spans, so the speaker would say them twice. Return only "

@@ -16631,3 +16631,25 @@ not promote it to the Bug Bible on this evidence alone.
 - residuals, documented: a number spelled out ("three" for "3"), a two-
   character Chinese line, a colloquial Thai reword, and the marked sentence
   handed back with its punctuation changed; the reread judges those.
+
+## PBUG-20261016-03 -- QA on 0291b5da: two regressions undone, frame and seam rules
+- Sonnet QA on 0291b5da: trimming a spaced slice's period let a loose end
+  read "Quiet." into "Quietly" (15 of 20 such probes newly refused);
+  removing `_bare_word` let "It was gone." double "It's gone." (14 new
+  accepts on real rows, all doubles); short bends still doubled ("I could
+  see.", "It was late.", "Let him in."); and a real shipped double --
+  signal_lost_the_rainbow_boxes_20261014_145758, span "continued" answered
+  "and the play settled." -> "...and the play and the play settled.." --
+  went through every version.
+- fix: edge punctuation is trimmed only for mostly-spaceless slices;
+  `_bare_word` is back; a 3-4 word line's FRAME (all but one word, the
+  first and the last among them) handed back is refused; a replacement that
+  repeats 3+ kept words across its span's seam is refused (two is ordinary
+  speech: "Look at the lamp. The lamp is dead."); the pair rule's spaceless
+  path needs mostly-spaceless kept text, not one character. Every branch
+  now has its own test, the receipt count included.
+- residuals: "Waiting for me." for "Wait for me." (bent first word, pair
+  precision 0.64), spelled-out numbers, two-character Chinese lines,
+  colloquial Thai rewords, punctuation-changed echoes; and fold-ins that
+  reuse a short line's key word ("Enough, I say." beside "Enough of
+  this!") are refused at the cost of one retry.

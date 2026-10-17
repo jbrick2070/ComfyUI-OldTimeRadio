@@ -1731,3 +1731,59 @@ def test_the_spaceless_set_covers_the_scripts_it_names(ch):
     # Lao, Khmer, Myanmar, 々, halfwidth katakana, CJK Ext B, Hangul syllable
     # and compatibility jamo.
     assert lcl._spaceless_char(ch)
+
+
+# Sonnet QA on 0291b5da -- each branch pinned on its own.
+
+@pytest.mark.parametrize("text, answer, spoken", [
+    # The period stays on a spaced kept slice, so "Quiet." is not in "Quietly".
+    ("(sigh) Quiet.", "Quietly, now.", "Quietly, now. Quiet."),
+    ("(sigh) Listen.", "Listening, are you?", "Listening, are you? Listen."),
+    # "Look at the lamp. The lamp is dead." shares two words at the seam.
+    ("(looks at the lamp) The lamp is dead.", "Look at the lamp.", "Look at the lamp. The lamp is dead."),
+])
+def test_ordinary_speech_near_the_kept_words_still_splices(text, answer, spoken):
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    assert lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"]) == spoken
+
+
+@pytest.mark.parametrize("text, answer", [
+    ("(sigh) It's gone.", "It was gone."),             # "it's" read as "it"
+    ("I can (sigh) see.", "I could see."),             # a short line's frame again
+    ("(sigh) It is late.", "It was late."),
+    ("(sigh) Let me in.", "Let him in."),
+    # The words on the far side of the seam handed back (a real shipped episode).
+    ("And the play (beat) continued until dawn.", "and the play settled"),
+])
+def test_a_short_frame_or_a_seam_said_twice_is_refused(text, answer):
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"])
+
+
+def test_containment_reads_curly_and_straight_apostrophes_alike():
+    assert lcl._holds_every_kept_slice("I didn't see it at all", ["I didn\u2019t ", " see it at all"])
+
+
+def test_a_short_kept_slice_must_end_on_a_word_boundary():
+    assert not lcl._holds_every_kept_slice("-- nothing more", ["No ", " more."])
+    assert lcl._holds_every_kept_slice("I can't see the grid.", ["I can ", " see the grid."])
+
+
+def test_spaceless_kept_slices_drop_their_edge_punctuation():
+    assert lcl._holds_every_kept_slice("私はもう行く", ["私", "行く。"])
+
+
+def test_one_spaceless_name_does_not_make_a_line_spaceless():
+    assert not lcl._written_without_spaces("김, come home.")
+    assert lcl._written_without_spaces("등대를 본다.")
+
+
+def test_the_receipt_counts_every_model_call_the_repair_ladder_makes():
+    ledger = _ledger(SHARP)
+    slot = _Slot(judgements={SHARP: [_dirty_judgement("(sharp, questioning whisper)")]},
+                 repairs={SHARP: [_replacement_reply(SHARP_KEPT), _replacement_reply("")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert receipt["model_calls"] == slot.summary_calls + slot.judge_calls + slot.repair_calls
+    attempt = receipt["rows"][0]["attempts"][0]
+    assert [bool(call["error"]) for call in attempt["calls"]] == [True, False]
