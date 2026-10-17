@@ -93,6 +93,14 @@ def _transition():
     return _CT
 
 
+def _cleanup():
+    try:
+        from . import _otr_ledger_cleanup as _LC
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        import _otr_ledger_cleanup as _LC  # type: ignore
+    return _LC
+
+
 def _has_authorship_receipt(ledger_data: Mapping[str, Any]) -> bool:
     meta = ledger_data.get("meta")
     if not isinstance(meta, Mapping):
@@ -285,6 +293,15 @@ class CleanTransaction:
                 (data.get("meta") or {}).get("ledger_cleanup")),
         }
         self.restore()
+        # THE ONE THING THE ROLLBACK KEEPS: the explicit skip on a voiced row
+        # with nothing sayable. The restore undid it with everything else, and
+        # the freeze refuses that row unskipped, so the rollback that exists to
+        # let the episode ship would lose it instead (an accepted ledger holds
+        # such a row whenever the lane wrote a "(static crackles)" beat -- the
+        # proof leaves it out on purpose). Skipping a row the proof never
+        # covered keeps the restored proof intact; the check below re-proves
+        # it. Roles and other cleanup fills are NOT re-applied.
+        reskipped = _cleanup().mark_unsayable_voiced_rows(data)
         receipt: Dict[str, Any] = {
             "outcome": "restored_pre_clean",
             "authorized_stages": list(CLEAN_WINDOW_STAGES),
@@ -295,6 +312,8 @@ class CleanTransaction:
             # receipt describing edits that no longer exist would tell every
             # downstream reader the judge touched rows it did not.
             "attempted_receipts": attempted,
+            # Restored, then normalized: the rows re-skipped after the restore.
+            "reskipped_line_ids": reskipped,
         }
         log.error(
             "[clean-transaction] the authorized clean window could not be "

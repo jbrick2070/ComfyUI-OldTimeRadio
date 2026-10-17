@@ -264,18 +264,7 @@ def _complete_deterministic(
                 "action": "cleared_skip_on_row_with_text",
             })
 
-        if (not skipped and role in _SPOKEN_ROLES
-                and not _clean_spoken_text(
-                    text, keep_parentheticals=_row_is_verbatim(row)).strip()):
-            # A voiced row with nothing sayable cannot be voiced. Making the
-            # skip EXPLICIT (with its reason) is completion; leaving it as a
-            # silent hole is what breaks slicing and captions downstream.
-            row["skip"] = True
-            # `set_line_text_metrics` is the canonical atomic owner of text +
-            # its counts; assigning row["text"] directly would leave the two
-            # able to disagree (tests/test_text_metric_ownership.py forbids it).
-            set_line_text_metrics(row, "")
-            row["tts_skip_reason"] = _EMPTY_TEXT_SKIP_REASON
+        if not skipped and _skip_if_unsayable(row, role):
             skipped = True
             text = ""
             actions.append({
@@ -297,6 +286,54 @@ def _complete_deterministic(
         set_line_text_metrics(row, _text_of(row))
 
     return actions
+
+
+def _skip_if_unsayable(row: dict, role: str) -> bool:
+    """Make a voiced row with nothing sayable an explicit skip. True if it did.
+
+    A voiced row with nothing sayable cannot be voiced. Making the skip
+    EXPLICIT (with its reason) is completion; leaving it as a silent hole is
+    what breaks slicing and captions downstream -- and the freeze refuses it.
+    """
+    if (bool(row.get("skip")) or role not in _SPOKEN_ROLES
+            or _clean_spoken_text(
+                _text_of(row), keep_parentheticals=_row_is_verbatim(row)).strip()):
+        return False
+    try:
+        from ._otr_text_metrics import set_line_text_metrics
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        from _otr_text_metrics import set_line_text_metrics  # type: ignore
+    row["skip"] = True
+    # `set_line_text_metrics` is the canonical atomic owner of text + its
+    # counts; assigning row["text"] directly would leave the two able to
+    # disagree (tests/test_text_metric_ownership.py forbids it).
+    set_line_text_metrics(row, "")
+    row["tts_skip_reason"] = _EMPTY_TEXT_SKIP_REASON
+    return True
+
+
+def mark_unsayable_voiced_rows(ledger_data: dict) -> "list[str]":
+    """Re-apply the explicit skip to every voiced row with nothing sayable.
+
+    For a clean-window ROLLBACK (`_otr_clean_transaction`): restoring the
+    accepted ledger also undoes this skip, and the freeze then refuses the
+    unskipped row -- "(voiced, not skipped) cleans to empty spoken text" --
+    so the rollback that exists to let the episode ship lost it instead. The
+    authorship proof covers only sayable rows, so a row this skips was never
+    proved and the restored proof still holds. Only string (or missing) text
+    is judged: the proof reads `123` as "123" and proves it, where `_text_of`
+    would call it empty (Codex on the fix). Returns the line_ids it skipped.
+    """
+    skipped = []
+    for row in ledger_data.get("lines") or []:
+        if not isinstance(row, dict):
+            continue
+        text = row.get("text")
+        if text is not None and not isinstance(text, str):
+            continue
+        if _skip_if_unsayable(row, str(row.get("speaker_role") or "")):
+            skipped.append(str(row.get("line_id") or ""))
+    return skipped
 
 
 # ---------------------------------------------------------------------------

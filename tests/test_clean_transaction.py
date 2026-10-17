@@ -451,3 +451,80 @@ def test_the_delivered_word_receipt_is_restamped_after_the_window(
     receipts = meta["word_budget"]["actual_receipts"]
     assert "writer_final_rows" in receipts
     assert "writer_final_rows_post_clean" in receipts
+
+
+# A ROLLBACK MUST NOT HAND THE FREEZE A ROW IT REFUSES. The proof leaves a
+# voiced row with nothing sayable out on purpose ("(static crackles)"), the
+# cleanup skips it inside the window, and an exact restore undid that skip --
+# so the freeze refused the restored ledger ("cleans to empty spoken text")
+# and the rollback lost the very episode it exists to ship (reproduced in code,
+# 2026-10-17; never seen live).
+
+def _voiced_ledger_with_a_bracket_row(bracket_text="(a sudden, sharp intake of breath)"):
+    data = {
+        "meta": {"source_bank": "bank_a", "episode_title": "The Lamp"},
+        "cast": [{"char_id": "c01", "name": "Ada"}],
+        "beats": [{"beat_id": "b1"}, {"beat_id": "b2"}],
+        "lines": [
+            {"line_id": "l1", "beat_id": "b1", "char_id": "c01", "speaker": "Ada",
+             "speaker_role": "character", "text": "The lamp is out.", "skip": False},
+            {"line_id": "l2", "beat_id": "b2", "char_id": "c01", "speaker": "Ada",
+             "speaker_role": "character", "text": bracket_text, "skip": False},
+        ],
+    }
+    stamp_receipt(data, owner_bank="bank_a", accepted_artifacts={"final": {"x": 1}})
+    return SimpleNamespace(data=data, save=lambda: True)
+
+
+def test_a_rollback_keeps_the_skip_on_a_row_with_nothing_sayable():
+    from nodes import _otr_ledger_cleanup as cleanup
+    from nodes import _otr_ledger_freeze as freeze
+
+    led = _voiced_ledger_with_a_bracket_row()
+    window = txn.open_transaction(led, finalizer=_LaneProof({}, fail_reseal=True))
+    _clean_stage_rewrites(led, "l1", "The lamp is dark.")
+    cleanup.run_ledger_cleanup(led.data, slot_fn=None, bank_id="bank_a")
+
+    receipt = window.reconcile()
+
+    assert receipt["outcome"] == "restored_pre_clean"
+    assert receipt["reskipped_line_ids"] == ["l2"]
+    assert receipt["restored_state_proved"] is True
+    l1, l2 = led.data["lines"]
+    assert l1["text"] == "The lamp is out."            # the repair is still rolled back
+    assert l2["skip"] is True and l2["text"] == ""
+    assert l2["tts_skip_reason"] == "empty_spoken_text_at_ledger_cleanup"
+    errors = freeze.run_gap_audit(led.data, label="post").errors
+    assert not [e for e in errors if "cleans to empty spoken text" in e]
+
+
+def test_a_rollback_never_skips_a_row_the_proof_covers():
+    """`text=123` is sayable to the proof ("123") and empty to `_text_of`;
+    skipping it would break the restored coverage (Codex on the fix)."""
+    led = _voiced_ledger_with_a_bracket_row()
+    led.data["lines"][1]["text"] = 123
+    stamp_receipt(led.data, owner_bank="bank_a", accepted_artifacts={"final": {"x": 1}})
+    window = txn.open_transaction(led, finalizer=_LaneProof({}, fail_reseal=True))
+    _clean_stage_rewrites(led, "l1", "The lamp is dark.")
+
+    receipt = window.reconcile()
+
+    assert receipt["outcome"] == "restored_pre_clean"
+    assert receipt["reskipped_line_ids"] == []
+    assert led.data["lines"][1]["text"] == 123
+    assert receipt["restored_state_proved"] is True
+
+
+def test_the_cleanup_and_the_rollback_skip_the_same_rows():
+    from nodes import _otr_ledger_cleanup as cleanup
+
+    rows = [
+        {"line_id": "a", "speaker_role": "character", "text": "(He sighs.)", "skip": False},
+        {"line_id": "b", "speaker_role": "announcer", "text": "[music]", "skip": False},
+        {"line_id": "c", "speaker_role": "character", "text": "Stay. (beat)", "skip": False},
+        {"line_id": "d", "speaker_role": "music_open", "text": "(strings)", "skip": False},
+        {"line_id": "e", "speaker_role": "character", "text": "(old)", "skip": True,
+         "tts_skip_reason": "x"},
+    ]
+    assert cleanup.mark_unsayable_voiced_rows({"lines": rows}) == ["a", "b"]
+    assert [row.get("skip") for row in rows] == [True, True, False, False, True]
