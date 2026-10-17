@@ -315,3 +315,27 @@ def test_a_description_without_the_stale_note_is_left_byte_identical():
     t.cast[1].character_description = "A calm   voice."
     MS._settle_cast_genders(t, {})
     assert t.cast[1].character_description == "A calm   voice."
+
+
+# --------------------------------------------------------------------------- #
+# Sonnet QA on 7abcea1e: true self-references keep their evidence
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("description,others,expected", [
+    ("Runs the diner and she never sleeps.", ("The Doctor", "The Old Man"), "female"),
+    ("A doctor who loves the sea, and she shows it.", ("The Doctor",), "female"),
+    ("Hears voices; she is afraid.", (), "female"),
+    ("A scholar who says he has seen the lights.", (), "male"),
+    ("Runs the diner. When she laughs the room goes quiet.", (), "female"),
+    ("the sound she hears", ("Tom",), "female"),
+    ("Doubts that she saw lights.", (), ""),
+    ("Tells Ada she is wrong.", ("Ada",), ""),
+])
+def test_description_pronouns_read_the_character_not_others(description, others, expected):
+    assert MS._description_gender(_member("Qx1", description=description),
+                                  others) == expected
+
+
+def test_a_relative_clause_marker_binds_the_name_its_record_leads_with():
+    bound, _ = MS._bind_stated_genders(
+        SI.stated_genders("Tom, who loves Ada (he). Ada (she)."), ["Ada", "Tom"])
+    assert bound == {"Tom": "male", "Ada": "female"}

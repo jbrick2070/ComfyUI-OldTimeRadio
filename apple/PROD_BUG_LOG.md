@@ -16880,3 +16880,13 @@ not promote it to the Bug Bible on this evidence alone.
   coin); a description was whitespace-rewritten even with no stale note.
 - residuals: a marker in Hindi/Japanese/Chinese is not read; the settle
   still guesses for an unknown name with no evidence (the seeded coin).
+
+## PBUG-20261017-03 -- second QA (7abcea1e): two recall holes and one wrong bind, fixed
+- Sonnet refuting QA reproduced: article tokens of another cast name ("The
+  Doctor" -> "the") blocked a character's own pronoun; the speech-verb /
+  "when"/"if" opener list threw away true self-references ("says he has
+  seen the lights", "When she laughs"); "Tom, who loves Ada (he)" pinned
+  Ada male via the overlap tier. Fixed: articles never block; only "that"
+  or "whether" right before the pronoun blocks; a marker whose words open
+  with who/whom/whose/which/that binds the name its record leads with.
+  9 tests added.

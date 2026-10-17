@@ -904,6 +904,9 @@ def _match_stated(mark, names: "list[str]") -> "list[str]":
     """
     chunk = getattr(mark, "name", mark)
     record = getattr(mark, "record", "") or ""
+    opener = re.findall(r"[^\W_]+", str(chunk).casefold())[:1]
+    if opener and opener[0] in _RELATIVE_OPENERS and record:
+        chunk = ""          # "who loves Ada" names who is loved, not the role
     pairs = [(want, n, have) for want in _name_forms(chunk)
              for n in names for have in _name_forms(n)]
     lead = [(want, n, have) for want in _name_forms(record)
@@ -953,14 +956,18 @@ def _bind_stated_genders(markers, names: "list[str]"):
     return bound, notes
 
 
-#: A pronoun right after one of these usually starts a clause about someone
-#: else ("doubts that she saw lights" is not about the doubter).
-_SUBORDINATORS = frozenset({
-    "that", "whether", "if", "when", "because", "unless", "until", "since",
-    "while", "though", "although", "than", "where", "why", "how", "what",
-    "who", "whom", "whose", "which", "tells", "told", "says", "said", "thinks",
-    "believes", "knows", "hears",
-})
+#: A pronoun IMMEDIATELY after one of these opens a reported clause, usually
+#: about someone else ("doubts that she saw lights" is not about the doubter).
+#: Kept to the complementizers on purpose: "when she laughs" and "says he has
+#: seen the lights" are the character, and a wider list threw that away (QA
+#: on 7abcea1e).
+_SUBORDINATORS = frozenset({"that", "whether"})
+#: Words a cast name can contain that are not that person ("The Doctor").
+_NAME_ARTICLES = frozenset({"the", "a", "an", "of", "and", "de", "la", "le",
+                            "el", "los", "las", "du", "von", "van"})
+#: A marker whose words open with one of these follows a clause about someone
+#: else ("Tom, who loves Ada (he)"): it belongs to the name its record leads with.
+_RELATIVE_OPENERS = frozenset({"who", "whom", "whose", "which", "that"})
 
 
 def _description_gender(member: "CastMember",
@@ -969,15 +976,17 @@ def _description_gender(member: "CastMember",
 
     Only subject and reflexive pronouns count ("the sound she hears"): an
     object or possessive is as often about someone else ("her brother", "his
-    widow"), so it is no evidence. A pronoun within three words after a
-    clause opener or another cast member's name is about that clause or that
-    person, so it is skipped too. Mixed evidence is no answer.
+    widow"), so it is no evidence. A pronoun right after "that"/"whether", or
+    within three words after another cast member's name (articles aside), is
+    about that clause or that person, so it is skipped too. Mixed evidence is
+    no answer.
     """
     words = re.findall(r"[^\W_]+", str(member.character_description or "").lower())
-    blockers = _SUBORDINATORS | {w for name in others for w in _name_tokens(name)}
+    names = {w for name in others for w in _name_tokens(name)} - _NAME_ARTICLES
     seen = {_SUBJECT_PRONOUNS[w] for i, w in enumerate(words)
             if w in _SUBJECT_PRONOUNS
-            and not blockers.intersection(words[max(0, i - 3):i])}
+            and not (i and words[i - 1] in _SUBORDINATORS)
+            and not names.intersection(words[max(0, i - 3):i])}
     return next(iter(seen)) if len(seen) == 1 else ""
 
 
