@@ -16685,3 +16685,19 @@ not promote it to the Bug Bible on this evidence alone.
   dropped. The duplicate threshold test goes in this one.
 - residual: Han two-character stutters at a seam (below the 3-character
   width).
+
+## PBUG-20261016-03 -- QA on 55061d2c: gate pinned; review loop closed
+- narrow Sonnet QA on 55061d2c: 0 diffs on the real ledgers and ~122k
+  zh/ja Shakespeare trials. The Han/kana seam gate and the Korean word seam
+  had no pinning test; kana-block punctuation counted as a seam unit. Fixed
+  and pinned.
+- residuals, documented and not chased (each alternative trades one edge
+  for another, none is reachable on the real ledgers): a Thai seam double
+  now on word units (Thai has no spaces); mixed Han+Latin lines -- "他们 ok
+  (停顿) 继续了。" + "他们 ok 停了" splices, "他在 Google 工作" + "在工作中"
+  is refused; Han two-character seam stutters; spelled-out numbers;
+  "Waiting for me." for "Wait for me."; colloquial Thai rewords; the marked
+  sentence handed back with changed punctuation.
+- the review loop on this guard closes here: seven QA rounds, the last
+  three with zero regressions on real data. Live proof is next -- count the
+  whole-line refusals and doubled lines on the next 8 GB leg.

@@ -1851,3 +1851,15 @@ def test_the_spaceless_pair_path_is_wired_through_the_repeat_guard():
 def test_the_character_seam_is_for_han_and_kana_only(text, answer):
     spans = lcl._merge_repair_spans(text, _span_of(text))
     lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"])
+
+
+@pytest.mark.parametrize("text, answer", [
+    # Mostly Latin with one Han character: still WORD units at the seam.
+    ("And the play (beat) continued 灯.", "and the play settled"),
+    # Korean is spaced: its seam is read in words, and refuses a seam double.
+    ("정말 나는 오늘 학교에 (웃으며) 갔다 그리고 집에 왔다", "나는 오늘 학교에 가서"),
+])
+def test_the_seam_unit_follows_the_script_of_the_whole_seam(text, answer):
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"])

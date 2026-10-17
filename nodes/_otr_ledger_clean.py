@@ -467,7 +467,7 @@ def _overlaps_a_seam(replacement: str, before: str, after: str) -> bool:
     """
     if _mostly_han_or_kana(before + replacement + after):
         def units(text):
-            return [ch for ch in str(text or "") if _han_or_kana(ch)]
+            return [ch for ch in str(text or "") if _han_or_kana(ch) and _is_word_char(ch)]
     else:
         units = _spoken_words
     rep = units(replacement)
