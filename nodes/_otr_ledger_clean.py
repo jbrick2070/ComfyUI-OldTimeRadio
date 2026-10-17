@@ -1752,6 +1752,43 @@ def _judge_prompt(
     ]
 
 
+#: The words of a judge's reason that say a piece IS talk -- the prompt's own
+#: name for the clean category, and the synonyms a small judge used for it.
+_TALK_LABEL_WORDS = frozenset({"speech", "talk", "dialogue", "dialog", "spoken", "conversation"})
+
+#: Words that may stand beside them without changing what the reason says.
+_TALK_LABEL_FILLER = frozenset({
+    "word", "words", "line", "lines", "just", "only", "plain", "normal", "ordinary",
+    "regular", "character", "characters", "pure", "actual", "is", "it", "this", "a",
+    "the", "all",
+})
+
+
+def _labels_itself_talk(quote: str, why: str) -> bool:
+    """Does a judge entry say, in its own reason, that its piece is talk?
+
+    The small judge walks the line piece by piece and sometimes lists a talk
+    piece WITH its category instead of leaving it out: after "(voice
+    cracking)" was rightly removed, the reread answered {"quote": "No. I see
+    the lamp. I see the glass...", "why": "dialogue"}, and "spoken dialogue"
+    and "spoken word" did the same -- three correct repairs refused on two
+    4060 legs, 2026-10-17; on first reads "speech" flagged "We have to open
+    them. Three." unclean. Every word of the reason must come from
+    ``_TALK_LABEL_WORDS`` or ``_TALK_LABEL_FILLER``, with one from the first,
+    so "not speech", "quoted speech", "speech attribution" and "speaker
+    label" stay findings, and so does a manner like "talking" or "speaking".
+    Never when a pattern sees anything inside the quote -- brackets, a NAME:
+    label, an attribution verb: "(talking fast)" called "talk" is still a
+    delivery note (Muse Wonder Full on the fix).
+    """
+    words = [_bare_word(word) for word in _spoken_words(why)]
+    if not words or not set(words) <= _TALK_LABEL_WORDS | _TALK_LABEL_FILLER:
+        return False
+    if not any(word in _TALK_LABEL_WORDS for word in words):
+        return False
+    return not _POLICY.f1_findings(quote)
+
+
 def _judge_row(
     *,
     slot_fn: "Callable[..., str]",
@@ -1887,9 +1924,17 @@ def _judge_row(
             # entry goes; the rest of the answer stands.
             dropped.append(f"{quote!r} (not in this line)")
             continue
+        why = " ".join(str(entry.why or "").split())[:120]
+        if _labels_itself_talk(quote, why):
+            # ITS OWN REASON SAYS IT IS TALK. See `_labels_itself_talk`. On
+            # a reread this entry refused a correct removal, and the writer,
+            # told the row was still dirty, invented a new direction to
+            # return ("(whispering)", 2026-10-17).
+            dropped.append(f"{quote!r} (its own reason: {why!r})")
+            continue
         found.append({
             "quote": quote,
-            "why": " ".join(str(entry.why or "").split())[:120],
+            "why": why,
             **({"start_char": entry.start_char, "end_char": entry.end_char}
                if entry.start_char is not None or entry.end_char is not None else {}),
         })

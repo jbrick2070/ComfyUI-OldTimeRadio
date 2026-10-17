@@ -16890,3 +16890,39 @@ not promote it to the Bug Bible on this evidence alone.
   or "whether" right before the pronoun blocks; a marker whose words open
   with who/whom/whose/which/that binds the name its record leads with.
   9 tests added.
+
+## PBUG-20261017-02 -- ledger_clean acted on judge entries that called their own piece talk
+- 4060 legs x1c and x1d (2026-10-17, otr_8gb_low, Gemma 4 E2B judge and
+  writer, scifi_news_pro, lighthouse premise; both published to otr/obs).
+  Three correct repairs were refused: the direction was removed with an
+  empty replacement, and the reread judge answered {"quote": <the whole
+  remaining line>, "why": "dialogue" / "spoken dialogue" / "spoken word"}.
+  `_judge_row` treats every entry as a defect, so the row was recorded
+  still_dirty; on its retry the writer, told the row was dirty, invented a
+  new direction ("(urgent, piercing)", "(whispering)") that the reread then
+  rightly refused. All three rows shipped unclean. On first reads, entries
+  labelled "speech" had flagged "We have to open them. Three." unclean.
+- root cause: the small judge walks the line piece by piece and sometimes
+  lists a talk piece WITH its category; Python ignored the entry's own
+  reason.
+- fix: `_judge_row`'s per-entry filter (one owner for first reads, votes,
+  per-sentence reads and rereads) drops an entry whose reason is made only
+  of talk words (`_TALK_LABEL_WORDS` + `_TALK_LABEL_FILLER`, one talk word at
+  least) and whose quote holds nothing a pattern sees (brackets, a NAME:
+  label, an attribution verb). "not speech", "quoted speech", "speech
+  attribution", "speaker label", "talking" stay findings.
+- design check before coding: Muse Wonder Full (change: keep as a guarded
+  backstop -- the markup guard and dropping "talking" came from it; its
+  alternative, a why enum with a speech value plus a second confirming
+  reread, was not taken: it changes the judge prompt on every box and a
+  strict schema burns the ladder into reread_unresolved) and agy on
+  Gemini 4 Argon High (keep; `_judge_row` is the right owner -- the reread
+  has no authorization gate, a first-read sub-span skips it, and
+  `_judge_votes` intersects without reading `why`).
+- measured: of 157 judge entries in the local ledgers, 7 are now dropped --
+  exactly the three refused rereads (b8 twice), the "We have to open them.
+  Three." pair and one announcer line already cleared as already_spoken.
+- residuals: a talk label in words outside the list ("utterance",
+  "monologue") still counts as a finding, as before; an announcer line
+  called "speech" is still repaired when a pattern fires inside its quote
+  ("fueled by whispers" -- the attribution-verb pattern reads "whispers").

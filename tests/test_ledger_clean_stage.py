@@ -1924,3 +1924,80 @@ def test_the_neighbouring_words_answer_is_asked_again_through_the_pass():
         " Another transmission. Just the usual hiss and the sea's complaint.")
     attempt = receipt["rows"][0]["attempts"][0]
     assert [bool(call["error"]) for call in attempt["calls"]] == [True, False]
+
+
+# The judge's own reason said its piece was talk (4060 legs, 2026-10-17): the
+# reread refused three correct removals, and on first reads a line of pure
+# dialogue was flagged unclean.
+
+def _judgement(*pieces):
+    """A judge reply naming each (quote, why) piece."""
+    return {"segments_read": len(pieces) + 1,
+            "not_speech": [{"quote": quote, "why": why} for quote, why in pieces]}
+
+
+@pytest.mark.parametrize("note, speech, why", [
+    ("(voice cracking)",
+     "No. I see the lamp. I see the glass. It is just the storm tonight.", "dialogue"),
+    ("(louder, more insistent)",
+     "The signal is strong! The warning is real! The water will rise!", "spoken dialogue"),
+    ("(a sudden, overwhelming burst of white noise)",
+     "Believe the signal! Believe the future!", "spoken word"),
+])
+def test_a_reread_entry_that_calls_its_piece_talk_does_not_refuse_the_repair(note, speech, why):
+    original = f"{note} {speech}"
+    ledger = _ledger(original)
+    slot = _Slot(judgements={original: [_judgement((note, "delivery note"))],
+                             speech: [_judgement((speech, why))]},
+                 repairs={original: [_replacement_reply("")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == " " + speech
+    assert receipt["repaired"] == 1 and slot.repair_calls == 1
+    assert any("THE LINE:  " + speech in prompt for prompt in slot.judge_prompts)
+
+
+def test_a_first_read_of_pure_talk_labelled_speech_sends_nothing_to_repair():
+    text = "We have to open them. Three."
+    ledger = _ledger(text)
+    slot = _Slot(judgements={text: [_judgement(("We have to open them.", "speech"),
+                                               ("Three.", "speech"))]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == text
+    assert receipt["rows"] == [] and receipt["unclean"] == 0
+    assert slot.repair_calls == 0 and slot.authorization_calls == 0
+    assert lcl.UNCLEAN_COMPOSE_FLAG not in (ledger["lines"][1].get("compose_flags") or [])
+
+
+def test_a_talk_labelled_sibling_cannot_widen_a_real_finding_to_the_whole_row():
+    """Kept, the talk piece and the real one would cover the row together and
+    send it to whole-row authorization; dropped, the real one is repaired."""
+    text = "(sighs) I can't do this."
+    ledger = _ledger(text)
+    slot = _Slot(judgements={text: [_judgement(("(sighs)", "action"),
+                                               ("I can't do this.", "dialogue"))]},
+                 repairs={text: [_replacement_reply("")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert slot.authorization_calls == 0
+    assert [span["quote"] for span in receipt["rows"][0]["scope"]["approved_spans"]] == ["(sighs)"]
+    assert ledger["lines"][1]["text"] == " I can't do this."
+
+
+@pytest.mark.parametrize("quote, why, talk", [
+    ("No. I see the lamp.", "dialogue", True),
+    ("No. I see the lamp.", "spoken word", True),
+    ("No. I see the lamp.", "Spoken dialogue.", True),
+    ("No. I see the lamp.", "just normal speech", True),
+    ("No. I see the lamp.", "not speech", False),
+    ("No. I see the lamp.", "non-speech", False),
+    ("No. I see the lamp.", "quoted speech", False),
+    ("No. I see the lamp.", "speech attribution", False),
+    ("No. I see the lamp.", "speaker label", False),
+    ("No. I see the lamp.", "delivery note", False),
+    ("No. I see the lamp.", "talking", False),
+    ("No. I see the lamp.", "", False),
+    ("(talking fast)", "talk", False),               # brackets: a pattern sees it
+    ("MARY: Leave!", "character dialogue", False),    # a speaker label
+    ("Go, he said.", "dialogue", False),              # an attribution verb
+])
+def test_only_a_reason_of_talk_words_with_nothing_a_pattern_sees_is_talk(quote, why, talk):
+    assert lcl._labels_itself_talk(quote, why) is talk
