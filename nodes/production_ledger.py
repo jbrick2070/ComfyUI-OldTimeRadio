@@ -1468,7 +1468,19 @@ class Ledger:
 
     def set_cast(self, cast_rows: Iterable[Dict[str, Any]]) -> "Ledger":
         rows: List[Dict[str, Any]] = []
-        for r in cast_rows or []:
+        cast_rows = list(cast_rows or [])
+        # EVERY ROW ENDS MALE OR FEMALE (operator, 2026-10-17). The producers
+        # settle gender before any bio or line is written; this is the safety
+        # net every lane passes through. It mutates the caller's rows so a
+        # writer still reading them after this call sees the ledger's gender.
+        try:
+            from ._otr_cast_gender import clamp_cast_rows
+        except ImportError:  # pragma: no cover -- flat load
+            from _otr_cast_gender import clamp_cast_rows  # type: ignore
+        clamped = clamp_cast_rows([r for r in cast_rows if isinstance(r, dict)])
+        if clamped:
+            self.data.setdefault("meta", {})["gender_clamp"] = clamped
+        for r in cast_rows:
             # Callers MUST supply `character_description`; the legacy
             # `description` input key is not read.
             cdesc = _safe_str(r.get("character_description")) or None

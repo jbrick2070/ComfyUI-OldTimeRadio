@@ -201,9 +201,9 @@ class CastMember(BaseModel):
     gender: str = Field(default="", description=(
         "Preserve source gender from descriptions, relationships and pronouns in context, "
         "honoring explicit identity first. Keep gender consistent with the character's "
-        "casting description. \"male\" or \"female\"; \"other\" only when the "
-        "listener says so. Never empty: an unstated gender is your choice, and the "
-        "description then follows it."))
+        "casting description. \"male\" or \"female\" -- a unisex name is "
+        "fine, the gender is always one of the two. Never empty: an unstated "
+        "gender is your choice, and the description then follows it."))
     age_band: str = "n/a"
     # `speech_register`, not `register`: the bare name shadows a pydantic
     # BaseModel attribute and pydantic warns about it at class construction.
@@ -865,29 +865,16 @@ _GENDERS = ("male", "female")
 _UNSTATED_GENDER_NOTE = re.compile(
     r"\bgender(?:\s+is)?\s+(?:unstated|unspecified|unknown|not\s+stated)\b[.;,]?\s*",
     re.IGNORECASE)
-_SUBJECT_PRONOUNS = {
-    "she": "female", "herself": "female", "he": "male", "himself": "male",
-}
+# The ladder and its helpers live in `_otr_cast_gender`, shared by every lane
+# (operator, 2026-10-17: every cast row ends male or female). These names stay
+# as this module's seams so the matcher and tests read the same functions.
+try:
+    from . import _otr_cast_gender as _CG
+except ImportError:  # pragma: no cover -- flat load
+    import _otr_cast_gender as _CG  # type: ignore
 
-
-def _name_forms(name: str) -> "tuple[tuple[str, ...], ...]":
-    """A name's word forms: honorifics dropped, and as typed. "Don" against
-    "Don Quixote" and "Major" against "Major Tom" match on the second."""
-    try:
-        from ._otr_roster_gender import _HONORIFICS
-    except ImportError:  # pragma: no cover -- flat load
-        from _otr_roster_gender import _HONORIFICS  # type: ignore
-    words = tuple(re.findall(r"[^\W_]+(?:['\-][^\W_]+)*",
-                             str(name or "").casefold()))
-    kept = tuple(w for w in words if w not in _HONORIFICS)
-    return tuple(dict.fromkeys(f for f in (kept, words) if f))
-
-
-def _name_tokens(name: str) -> "tuple[str, ...]":
-    """Casefolded words of a name, honorifics dropped (as typed if that
-    leaves nothing)."""
-    forms = _name_forms(name)
-    return forms[0] if forms else ()
+_name_forms = _CG.name_forms
+_name_tokens = _CG.name_tokens
 
 
 def _match_stated(mark, names: "list[str]") -> "list[str]":
@@ -961,15 +948,6 @@ def _bind_stated_genders(markers, names: "list[str]"):
     return bound, notes
 
 
-#: A pronoun IMMEDIATELY after one of these opens a reported clause, usually
-#: about someone else ("doubts that she saw lights" is not about the doubter).
-#: Kept to the complementizers on purpose: "when she laughs" and "says he has
-#: seen the lights" are the character, and a wider list threw that away (QA
-#: on 7abcea1e).
-_SUBORDINATORS = frozenset({"that", "whether"})
-#: Words a cast name can contain that are not that person ("The Doctor").
-_NAME_ARTICLES = frozenset({"the", "a", "an", "of", "and", "de", "la", "le",
-                            "el", "los", "las", "du", "von", "van"})
 #: A marker whose words open with one of these follows a clause about someone
 #: else ("Tom, who loves Ada (he)"): it belongs to the name its record leads with.
 _RELATIVE_OPENERS = frozenset({"who", "whom", "whose", "which", "that"})
@@ -977,66 +955,24 @@ _RELATIVE_OPENERS = frozenset({"who", "whom", "whose", "which", "that"})
 
 def _description_gender(member: "CastMember",
                         others: "tuple[str, ...]" = ()) -> str:
-    """The gender the model's OWN description states of this character.
-
-    Only subject and reflexive pronouns count ("the sound she hears"): an
-    object or possessive is as often about someone else ("her brother", "his
-    widow"), so it is no evidence. A pronoun right after "that"/"whether"
-    opens a reported clause and is skipped. A description that names another
-    cast member (articles aside) gives no pronoun evidence at all. Mixed
-    evidence is no answer. This is the FALLBACK behind `_pass_cast_gender`.
-    """
-    words = re.findall(r"[^\W_]+", str(member.character_description or "").lower())
-    names = {w for name in others for form in _name_forms(name)
-             for w in form} - _NAME_ARTICLES
-    if names.intersection(words):
-        # Another cast member is in the sentence: any pronoun may be theirs,
-        # and no word window tells which (two QA rounds proved it). The model
-        # pass above reads that; this fallback abstains.
-        return ""
-    seen = {_SUBJECT_PRONOUNS[w] for i, w in enumerate(words)
-            if w in _SUBJECT_PRONOUNS
-            and not (i and words[i - 1] in _SUBORDINATORS)}
-    return next(iter(seen)) if len(seen) == 1 else ""
+    """The gender the model's own description states -- `_otr_cast_gender`."""
+    return _CG.description_gender(member.character_description, others)
 
 
 def _settle_gender(member: "CastMember",
                    others: "tuple[str, ...]" = ()) -> "tuple[str, str]":
-    """``(gender, source)`` for a role nobody gave a usable gender.
-
-    The other lanes' order, strongest first: a RELATION the role states
-    ("her brother" -- the roster reader's own vocabulary; ranks and offices
-    are left out, since "keeps count" or "a fool for love" is no gender),
-    then our name pool (`_otr_casting`'s confident classifier), then the
-    model's own description pronouns, then a coin seeded on the name so the
-    same story casts the same way. Possessives are not the role's person:
-    "mother's helper" says nothing about the helper.
-    """
-    try:
-        from ._otr_character_roster import (
-            _FEMALE_RELATION, _MALE_RELATION, _scan)
-    except ImportError:  # pragma: no cover -- flat load
-        from _otr_character_roster import (  # type: ignore
-            _FEMALE_RELATION, _MALE_RELATION, _scan)
-    role = re.sub(r"\b[a-z]+'s\b", " ", str(member.role or "").lower())
-    gender = _scan(re.findall(r"[a-z]+", role), _MALE_RELATION, _FEMALE_RELATION)
-    if gender in _GENDERS:
-        return gender, "role_relation"
-    gender = _POOLS.gender_of_first_name(" ".join(_name_tokens(member.name)))
-    if gender in _GENDERS:
-        return gender, "name_pool"
-    gender = _description_gender(member, others)
-    if gender:
-        return gender, "description_pronouns"
-    coin = random.Random("my_story_cast_gender:%s" % _norm_ws(member.name).casefold())
-    return ("male" if coin.random() < 0.5 else "female"), "seeded_coin"
+    """``(gender, source)`` for a role nobody gave a usable gender: the shared
+    ladder in `_otr_cast_gender` (courtesy title, role relation, name pool,
+    unambiguous description pronouns, seeded coin)."""
+    return _CG.settle_binary_gender(member.name, member.role,
+                                    member.character_description, others)
 
 
 def _unresolved_roles(treatment: "StoryTreatment",
                       stated: "dict[str, str]") -> "list[str]":
     """Roles with no listener marker and no male/female from the treatment."""
     return [m.name for m in treatment.cast
-            if m.name not in stated and m.gender not in _GENDERS]
+            if stated.get(m.name) not in _GENDERS and m.gender not in _GENDERS]
 
 
 class CastGender(BaseModel):
@@ -1136,7 +1072,7 @@ def _settle_cast_genders(treatment: "StoryTreatment",
     receipts = []
     for member in treatment.cast:
         before = member.gender
-        if member.name in stated:
+        if stated.get(member.name) in _GENDERS:
             member.gender = stated[member.name]
             source = "listener"
         elif member.gender in _GENDERS:

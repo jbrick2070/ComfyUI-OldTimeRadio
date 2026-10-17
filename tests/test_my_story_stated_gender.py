@@ -34,7 +34,8 @@ from tests.test_my_story_runner import Slots, _run, _treatment  # noqa: F401
     ("Ada (She/Her)\nTom (m)", [("Ada", "female"), ("Tom", "male")]),
     ("Dr. Ada Vance (she) and her brother Tom (he)",
      [("Dr. Ada Vance", "female"), ("and her brother Tom", "male")]),
-    ("Mabel (they); Ruth (woman)", [("Mabel", "other"), ("Ruth", "female")]),
+    # "(they)" is ordinary notes: every character ends male or female
+    ("Mabel (they); Ruth (woman)", [("Ruth", "female")]),
 ])
 def test_a_marker_after_a_name_states_that_role_s_gender(text, expected):
     assert [(g.name, g.gender) for g in SI.stated_genders(text)] == expected
@@ -150,10 +151,11 @@ def test_a_listener_marker_beats_what_the_model_wrote():
     assert t.cast[0].gender == "female"
 
 
-def test_a_listener_they_is_kept_as_written():
+def test_a_non_binary_stated_value_is_never_kept():
+    """Operator 2026-10-17: every character ends male or female."""
     t = _live_treatment()
     MS._settle_cast_genders(t, {"Tom": "other"})
-    assert t.cast[1].gender == "other"
+    assert t.cast[1].gender in ("male", "female")
 
 
 def test_a_model_other_without_a_marker_is_still_settled():

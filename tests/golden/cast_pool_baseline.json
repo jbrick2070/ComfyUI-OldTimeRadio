@@ -5,37 +5,37 @@
   "force_lemmy": false,
   "news_seed": "Scientists report a quiet anomaly in the upper atmosphere over the test range.",
   "style": "1950s science fiction radio drama",
-  "seed": 10,
+  "seed": 48,
   "cast": [
     {
       "char_id": "c01",
       "name": "ANNOUNCER",
-      "gender": "male",
-      "voice_preset": "bm_george"
+      "gender": "female",
+      "voice_preset": "bf_emma"
     },
     {
       "char_id": "c02",
-      "name": "MICHAEL SIMPSON",
-      "gender": "male",
-      "voice_preset": "v2/en_speaker_5"
+      "name": "SUNAN SCOTT",
+      "gender": "female",
+      "voice_preset": "v2/en_speaker_4"
     },
     {
       "char_id": "c03",
-      "name": "RUFUS STONE",
+      "name": "PALMER OKAFOR",
       "gender": "male",
       "voice_preset": "v2/en_speaker_3"
     },
     {
       "char_id": "c04",
-      "name": "BARNEY BOUVIER",
-      "gender": "other",
-      "voice_preset": "v2/en_speaker_0"
+      "name": "CLARISSE VOSS",
+      "gender": "female",
+      "voice_preset": "v2/en_speaker_2"
     },
     {
       "char_id": "c05",
-      "name": "MINDY HALLOWAY",
-      "gender": "female",
-      "voice_preset": "v2/en_speaker_2"
+      "name": "RYAN HAYES",
+      "gender": "male",
+      "voice_preset": "v2/en_speaker_8"
     }
   ],
   "known_incoherent_seed": 0,

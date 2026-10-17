@@ -44,14 +44,19 @@ Domain perform the author's own words in another language is in
 standing premise that ships with it (since 2026-09-13), so a rolled My Story
 run still has something to perform. Anything you type wins over it.
 
-**Gender is yours to set, per role.** In `story_characters`, put `(she)`, `(he)`
-or `(they)` right after a name -- `Ada (she), the keeper. Tom (he).`
-(`(female)`, `(male)`, `(woman)`, `(man)` work too). A marked gender is
-binding: Python reads it from your text, and the voice is cast to match. Every
-unmarked role is given a male or female gender before any voice is chosen --
-from what the part says the person is ("her brother"), then how the
-character's own description refers to them, then the name pool, then a coin
-seeded on the name -- so a voice is never picked from a guess at voice time.
+**Gender is yours to set, per role.** In `story_characters`, put `(she)` or
+`(he)` right after a name -- `Ada (she), the keeper. Tom (he).` (`(female)`,
+`(male)`, `(woman)`, `(man)` work too). A marked gender is binding: Python
+reads it from your text, and the voice is cast to match. Every unmarked role
+is given male or female before any voice is chosen -- by a short model pass
+that reads the cast, then (if that cannot answer) a courtesy title, a
+relation word in the part ("her brother"), the name pool, the character's own
+description, and finally a coin seeded on the name.
+
+**Every character on every bank ends male or female** (2026-10-17). A unisex
+name is fine; the gender on the ledger cast row is not left open. The voice
+is cast from that gender, and the still and video prompts anchor on it, so a
+character sounds and looks like one person.
 
 **What a different bank does with those boxes depends on how it was chosen.**
 

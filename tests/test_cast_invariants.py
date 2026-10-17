@@ -126,20 +126,21 @@ def test_r2_c7_byte_identity_vs_golden():
 
 
 # ---------------------------------------------------------------------------
-# R4 -- quota: the 40/40/20 male/female/other split is preserved.
+# R4 -- quota: the 50/50 male/female split, and never a third value
+# (operator 2026-10-17: every cast row ends male or female).
 # ---------------------------------------------------------------------------
-def test_r4_quota_40_40_20():
-    # Exact split at count=10 (largest-remainder of 0.4/0.4/0.2).
+def test_r4_quota_50_50_binary_only():
+    # Exact split at count=10 (largest-remainder of 0.5/0.5).
     genders = _OTRC._plan_gender_distribution(10, [], random.Random(0))
     assert len(genders) == 10
     c = Counter(genders)
-    assert (c["male"], c["female"], c["other"]) == (4, 4, 2), dict(c)
+    assert (c["male"], c["female"]) == (5, 5), dict(c)
     # Parts always sum to the requested count, across seeds + counts.
     for count in range(1, 7):
         for seed in range(5):
             gs = _OTRC._plan_gender_distribution(count, [], random.Random(seed))
             assert len(gs) == count
-            assert set(gs) <= {"male", "female", "other"}
+            assert set(gs) <= {"male", "female"}
 
 
 # ---------------------------------------------------------------------------

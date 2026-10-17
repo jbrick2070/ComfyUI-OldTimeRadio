@@ -13,8 +13,7 @@ for the full architectural spec.
 
 Sprint 3D -- three-stage split. Casting is ONE description-only LLM call per
 open character; gender/timbre/role balance and voice selection are Python's
-job, not the LLM's (there is no static "~40% male / ~40% female / ~20% other"
-prompt line):
+job, not the LLM's (there is no static balance line in any prompt):
 
   1. precompute_ensemble_slots -- PURE PYTHON. Decides the whole
      ensemble's gender / timbre / role distribution up front. Python
@@ -141,21 +140,23 @@ log = logging.getLogger(__name__)
 # Schema
 # ---------------------------------------------------------------------------
 
-_VALID_GENDERS = {"male", "female", "other"}
+#: Every cast row ends male or female (operator, 2026-10-17: "unisex names is
+#: ok but we need to clamp male or female in the ledger and voice and
+#: descriptions"). A unisex NAME may still be drawn; the gender may not.
+_VALID_GENDERS = {"male", "female"}
 # What a SOURCE roster may pin. 'other' is deliberately absent: the roster only
 # ever records male/female/unknown, and an unknown is left to the roll rather
 # than pinned, so CastingResponse._gender_in_set is never handed a novel value.
 _PINNABLE_GENDERS = frozenset({"male", "female"})
 
-# Sprint 3D: the "other" share of the ensemble gender split renders
-# through the Bark voice pool (which today is binary male/female), so
-# an "other"-gender slot is voiced from whichever gender column has the
-# most headroom. Gender on the cast row is the audience-facing label;
-# the voice pool is a TTS implementation detail.
+# The ensemble is split evenly between the two genders the voice pool and the
+# picture prompts can render. The 20% "other" share that lived here until
+# 2026-10-17 drew its voice from the whole pool, was written up by the bio
+# model as "other", and rendered as a neutral "person" -- three readings of
+# one character. The shuffle below still makes exactly the same rng calls.
 _DEFAULT_GENDER_WEIGHTS: tuple[tuple[str, float], ...] = (
-    ("male", 0.40),
-    ("female", 0.40),
-    ("other", 0.20),
+    ("male", 0.50),
+    ("female", 0.50),
 )
 
 
@@ -323,7 +324,7 @@ def _build_user_prompt(
       Style: <style>
 
       Name: <NAME>
-      Gender: <male|female|other>
+      Gender: <male|female>
       Voice: <timbre>
       Role: <role>
 
@@ -566,9 +567,8 @@ def _plan_gender_distribution(
     prior_genders: List[str],
     rng: random.Random,
 ) -> List[str]:
-    """Largest-remainder allocation of the ~40/40/20 male/female/other
-    split across `count` open slots, accounting for genders already
-    locked in the prior cast (LEMMY etc.) so the WHOLE ensemble lands
+    """Largest-remainder allocation of the 50/50 male/female split across
+    `count` open slots, accounting for genders already locked in the prior cast (LEMMY etc.) so the WHOLE ensemble lands
     near target -- not just the open slots in isolation.
 
     Pure Python, deterministic for a given (count, prior_genders, rng).
@@ -664,8 +664,9 @@ def _repair_ensemble_names(
     from a per-character ISOLATED rng -- random.Random(f"{cast_seed}:{char_id}")
     -- so the main cast rng sequence is NEVER perturbed: a no-op (byte-identical)
     for an already-coherent seed, full coherence otherwise. 'unisex'/'unknown'
-    names and 'other'-gender slots are left untouched (coherent with either /
-    any gender). OTR_NAME_CROSS_GENDER_RATE > 0 lets a deterministic fraction of
+    names are left untouched (coherent with either gender; a unisex name is
+    allowed, the gender is not -- it is always male or female now).
+    OTR_NAME_CROSS_GENDER_RATE > 0 lets a deterministic fraction of
     mismatches stand as deliberate cross-gender names.
 
     SOURCE-OWNED slots are exempt. TOBY is Sir Toby Belch whatever the pool
@@ -709,11 +710,11 @@ def precompute_ensemble_slots(
     """Stage 1: decide the whole ensemble's gender / timbre / role
     distribution up front. PURE PYTHON -- no LLM.
 
-    Sprint 3D: this is where ensemble balance lives. A static "~40% male /
-    ~40% female / ~20% other" prompt line cannot enforce a split the LLM has
-    no global view of, so Python decides it deterministically:
+    Sprint 3D: this is where ensemble balance lives. A static balance line in
+    a prompt cannot enforce a split the LLM has no global view of, so Python
+    decides it deterministically:
 
-      * gender -- largest-remainder allocation of the 40/40/20 split
+      * gender -- largest-remainder allocation of the 50/50 split
         across the open slots, offset by the genders the prior cast
         (LEMMY, etc.) already contributes.
       * timbre -- round-robin through `_TIMBRE_VOCAB` so the ensemble
@@ -924,9 +925,9 @@ def python_assign_voice_preset(
     timbre = (slot.timbre or "").strip().lower()
 
     # 1. Gender-matched candidates. The Bark voice pool is binary
-    #    male/female; an "other"-gender slot has no voice column of its
-    #    own, so it draws from the full pool (the cast-row gender label
-    #    still reads "other" -- the voice is a TTS detail).
+    #    male/female, and so is every slot the ensemble plan deals; a slot
+    #    with no binary gender (a legacy ledger replayed) draws from the
+    #    full pool.
     if gender in ("male", "female"):
         gender_pool = [
             (p, s) for p, s in available_voices
@@ -2051,7 +2052,7 @@ def lock_cast(
     # Sprint 3D Stage 1 -- precompute the WHOLE open ensemble's
     # gender/timbre/role distribution ONCE, up front, before any LLM
     # call. Python owns balance here, with a global view of the prior
-    # cast (LEMMY's gender feeds the 40/40/20 allocation).
+    # cast (LEMMY's gender feeds the 50/50 allocation).
     # The source contract carries one entry per RESOLVED source character:
     # {NAME: {gender, evidence, tier, roster_name}}. The pin map is derived from
     # it here so there is exactly one input and one stamped receipt, and the

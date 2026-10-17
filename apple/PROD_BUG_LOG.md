@@ -17119,3 +17119,28 @@ not promote it to the Bug Bible on this evidence alone.
   exactly so; and when another span is DELETED its neighbours become
   adjacent, so an echo of that straddle ("here for me" with (b) answered "")
   is a real doubling the per-slice reading misses. Unicode NFD, as before.
+## PBUG-20261017-07 -- an "other" cast gender reached voice and pictures
+- live: 4060 leg r1/r2 (2026-10-17, otr_8gb_low, media_archive): QUINN STONE
+  and JENNA PHILBIN carried gender "other"; the voice came from the whole pool
+  (QUINN on male bm_george though the name pool reads Quinn female) and the
+  still anchor would have drawn a neutral "person". Source:
+  `_otr_casting._DEFAULT_GENDER_WEIGHTS` dealt 20% "other".
+- operator ruling: "unisex names is ok but we need to clamp male or female in
+  the ledger and voice and descriptions for rendering prompts, stills and
+  video". Design contrarians: Codex and Gemini 4 Argon (agy), both "request
+  changes" on a set_cast-only clamp -- the writer's local rows, the bio
+  prompt ("Gender: other"), CastLock's Bark replay and My Story's acts all
+  read gender BEFORE set_cast.
+- fix: producers settle first -- `_otr_casting` deals 50/50 (same rng calls),
+  `_VALID_GENDERS` is binary, the bio prompt offers male|female; My Story drops
+  the "(they)" marker and never keeps a non-binary stated value. One shared
+  ladder, `nodes/_otr_cast_gender.py` (courtesy title -> role relation ->
+  name pool -> description pronouns only when no other cast name appears ->
+  seeded coin); My Story uses it. `Ledger.set_cast` clamps any non-binary row
+  with it IN PLACE (so callers' rows agree), LOUD, receipt meta.gender_clamp.
+  Golden cast baseline recaptured (it carried BARNEY BOUVIER "other").
+- residuals: a legacy ledger replayed into CastLock without set_cast keeps its
+  agnostic draw (version-1: no migration); Bark's exhausted-gender pool still
+  falls back to the full pool; an appearance override text that names the
+  opposite gender is still only anchored, not rewritten; the one "neutral"
+  voice reference (el_river) is no longer reachable from a clamped row.

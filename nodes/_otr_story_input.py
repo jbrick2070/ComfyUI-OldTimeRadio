@@ -762,15 +762,15 @@ def _bool_or(value: Any, default: bool) -> bool:
 # THE GRAMMAR IS ONE PARENTHESIS RIGHT AFTER A NAME whose whole content is a
 # gender word. Any other parenthesis -- "(the keeper)" -- is ordinary notes.
 
-#: Marker word -> the bank gender it states. "they" is a STATED choice too: the
-#: listener asked for a voice from either pool, and that is honoured as written.
+#: Marker word -> the gender it states. Male and female only: every character
+#: ends male or female (operator, 2026-10-17 -- "unisex names is ok but we need
+#: to clamp male or female"), so "(they)" is ordinary notes and the role is
+#: settled like any unmarked one.
 _GENDER_MARKERS = {
     "she": "female", "her": "female", "she/her": "female", "female": "female",
     "woman": "female", "girl": "female", "f": "female",
     "he": "male", "him": "male", "he/him": "male", "male": "male",
     "man": "male", "boy": "male", "m": "male",
-    "they": "other", "them": "other", "they/them": "other",
-    "nonbinary": "other", "non-binary": "other",
     # The romance-language pronouns the episode languages are typed in.
     "ella": "female", "ela": "female", "lei": "female", "elle": "female",
     "él": "male", "ele": "male", "lui": "male", "il": "male",
