@@ -17016,3 +17016,11 @@ not promote it to the Bug Bible on this evidence alone.
   interpretation's stated_gender, read from ALL the listener's fields ("my
   sister Ada" in the idea), was ignored by the settle. An open role now takes
   it (source "interpretation") before the pass is asked.
+
+## PBUG-20261017-03 -- fifth QA (660a46c5): the interpretation reading is context, not a bypass
+- Sonnet QA (weak refute): letting the interpretation's stated_gender skip
+  the cast-gender pass reopened the pronoun risk the pass exists to close
+  (the interpret seam never asks who a pronoun refers to), and two entries
+  for one name could disagree silently. Now the reading goes INTO the pass
+  ("listener_text_suggests") and answers only when the pass gives none;
+  disagreeing duplicate entries say nothing. Tests adjusted/added.

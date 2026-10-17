@@ -1058,7 +1058,8 @@ class CastGenders(BaseModel):
 
 
 def _pass_cast_gender(technical_fn, pack, bundle, treatment: "StoryTreatment",
-                      decide: "list[str]") -> "dict[str, str]":
+                      decide: "list[str]",
+                      interpreted: "dict[str, str] | None" = None) -> "dict[str, str]":
     """P1b: ONE call that answers male/female for exactly ``decide``.
 
     The model, not a word-window heuristic, reads who each pronoun in a
@@ -1079,9 +1080,11 @@ def _pass_cast_gender(technical_fn, pack, bundle, treatment: "StoryTreatment",
                     "(%s), and no others" % ", ".join(decide))
         return None
 
+    interpreted = interpreted or {}
     cast = [{"name": m.name, "role": m.role,
              "character_description": m.character_description,
-             "gender": m.gender if m.gender in _GENDERS else ""}
+             "gender": m.gender if m.gender in _GENDERS else "",
+             "listener_text_suggests": interpreted.get(m.name, "")}
             for m in treatment.cast]
     try:
         system = _seam(pack, "my_story_cast_gender_system")
@@ -1120,9 +1123,10 @@ def _settle_cast_genders(treatment: "StoryTreatment",
     """Give every treatment role its gender before any voice is picked.
 
     A marked role takes the listener's gender, whatever the model wrote. Any
-    other role keeps a male/female the model committed to; then what the
-    interpretation read from the listener's fields (``interpreted``); then
-    the cast-gender pass's answer (``decided``); otherwise `_settle_gender`.
+    other role keeps a male/female the model committed to; then the
+    cast-gender pass's answer (``decided``); then, when the pass gave none,
+    what the interpretation read from the listener's fields
+    (``interpreted``); otherwise `_settle_gender`.
     Returns one receipt row per role it changed.
     """
     decided = decided or {}
@@ -1135,12 +1139,12 @@ def _settle_cast_genders(treatment: "StoryTreatment",
             source = "listener"
         elif member.gender in _GENDERS:
             continue
-        elif interpreted.get(member.name) in _GENDERS:
-            member.gender = interpreted[member.name]
-            source = "interpretation"
         elif decided.get(member.name) in _GENDERS:
             member.gender = decided[member.name]
             source = "cast_gender_pass"
+        elif interpreted.get(member.name) in _GENDERS:
+            member.gender = interpreted[member.name]
+            source = "interpretation"
         else:
             member.gender, source = _settle_gender(
                 member, tuple(m.name for m in treatment.cast if m is not member))
@@ -1542,21 +1546,27 @@ def run_my_story_episode(
         cast_bound, discrepancies = _bind_stated_genders(
             stated_markers, [c.name for c in treatment.cast])
         # The interpretation read ALL of the listener's fields ("my sister
-        # Ada" in the idea); its stated_gender answers an open role first.
+        # Ada" in the idea). Its reading is CONTEXT for the cast-gender pass
+        # and the answer when that pass fails -- never a way around it: its
+        # prompt does not ask who each pronoun refers to, the pass's does
+        # (QA on 660a46c5). Two entries for one name that disagree say
+        # nothing.
+        by_norm: "dict[str, set]" = {}
+        for p in interp.named_cast:
+            if p.stated_gender in _GENDERS:
+                by_norm.setdefault(_norm_ws(p.name).casefold(), set()).add(
+                    p.stated_gender)
         interp_read = {}
-        by_norm = {_norm_ws(p.name).casefold(): p.stated_gender
-                   for p in interp.named_cast if p.stated_gender in _GENDERS}
         for member in treatment.cast:
-            said = by_norm.get(_norm_ws(member.name).casefold())
-            if said:
-                interp_read[member.name] = said
-        decide = [n for n in _unresolved_roles(treatment, cast_bound)
-                  if n not in interp_read]
+            said = by_norm.get(_norm_ws(member.name).casefold(), set())
+            if len(said) == 1:
+                interp_read[member.name] = next(iter(said))
+        decide = _unresolved_roles(treatment, cast_bound)
         decided = {}
         if decide:
             with _helper_ctx(slot_scheduler, "my_story_cast_gender"):
                 decided = _pass_cast_gender(technical_fn, pack, bundle,
-                                            treatment, decide)
+                                            treatment, decide, interp_read)
         story["gender_settlement"] = _settle_cast_genders(
             treatment, cast_bound, decided, interp_read)
         names = {_norm_ws(c.name).casefold(): c for c in treatment.cast}

@@ -438,19 +438,49 @@ def test_the_cast_gender_seam_is_declared_and_shipped():
     assert "my_story_cast_gender_system" in row["declared_seams"]
 
 
-def test_the_interpretation_s_reading_answers_an_open_role_before_the_pass():
-    """Sonnet QA on 1c0adbc6: "my sister Ada" in the idea is read by the
-    interpretation; the open role takes it, and the pass is not asked."""
+def test_the_interpretation_s_reading_is_context_for_the_pass_not_a_bypass():
+    """QA on 660a46c5: the interpretation's prompt does not resolve pronoun
+    referents, so its reading goes TO the pass, and the pass decides."""
     from tests.test_my_story_runner import _interpretation
 
     interp = _interpretation()
     for p in interp["named_cast"]:
         p["stated_gender"] = "female" if p["name"] == "Ada" else "male"
-    slots = _CastGenderAnswers({"cast": []}, interpretation=interp)
+    slots = _CastGenderAnswers({"cast": [{"name": "Ada", "gender": "female"},
+                                         {"name": "Tom", "gender": "male"}]},
+                               interpretation=interp)
+    led, _ = _run(slots, characters="Ada, the keeper. Tom.")
+    sources = {r["name"]: r["source"]
+               for r in led.data["meta"]["my_story"]["gender_settlement"]}
+    assert sources == {"Ada": "cast_gender_pass", "Tom": "cast_gender_pass"}
+    user = slots.gender_prompts[0][-1]["content"]
+    assert '"listener_text_suggests": "female"' in user
+
+
+def test_the_interpretation_s_reading_answers_when_the_pass_fails():
+    from tests.test_my_story_runner import _interpretation
+
+    interp = _interpretation()
+    for p in interp["named_cast"]:
+        p["stated_gender"] = "female" if p["name"] == "Ada" else "male"
+    slots = _CastGenderAnswers({"cast": [{"name": "Nobody", "gender": "male"}]},
+                               interpretation=interp)
     led, _ = _run(slots, characters="Ada, the keeper. Tom.")
     sources = {r["name"]: r["source"]
                for r in led.data["meta"]["my_story"]["gender_settlement"]}
     assert sources == {"Ada": "interpretation", "Tom": "interpretation"}
-    assert slots.gender_prompts == []
-    cast = {r["name"]: r["gender"] for r in led.data["cast"]}
-    assert cast["Ada"] == "female" and cast["Tom"] == "male"
+
+
+def test_two_interpretation_entries_that_disagree_say_nothing():
+    from tests.test_my_story_runner import _interpretation
+
+    interp = _interpretation(named=("Ada", "Ada", "Tom"))
+    interp["named_cast"][0]["stated_gender"] = "female"
+    interp["named_cast"][1]["stated_gender"] = "male"
+    interp["named_cast"][2]["stated_gender"] = ""
+    slots = _CastGenderAnswers({"cast": [{"name": "Nobody", "gender": "male"}]},
+                               interpretation=interp)
+    led, _ = _run(slots, characters="Ada, the keeper. Tom.")
+    sources = {r["name"]: r["source"]
+               for r in led.data["meta"]["my_story"]["gender_settlement"]}
+    assert sources["Ada"] != "interpretation"
