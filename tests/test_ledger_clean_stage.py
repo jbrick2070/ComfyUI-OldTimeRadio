@@ -1787,3 +1787,59 @@ def test_the_receipt_counts_every_model_call_the_repair_ladder_makes():
     assert receipt["model_calls"] == slot.summary_calls + slot.judge_calls + slot.repair_calls
     attempt = receipt["rows"][0]["attempts"][0]
     assert [bool(call["error"]) for call in attempt["calls"]] == [True, False]
+
+
+# Sonnet QA on 7dc01e7a -- the branches its mutants walked through.
+
+def test_the_seam_rule_reads_both_sides_of_the_span():
+    # Tail side: the replacement ends with the first words after its span.
+    text = "We walked (beat) to the old mill road at dawn."
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(text, spans, _replacement_reply("and walking on to the old")["replacements"])
+
+
+@pytest.mark.parametrize("text, answer", [
+    ("他们说，然后戏(停顿)继续了。", "然后戏停了"),
+    ("彼は言った、そして劇は(間)続いた。", "そして劇は終わった"),
+])
+def test_the_seam_rule_counts_characters_in_a_spaceless_script(text, answer):
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    with pytest.raises(ValueError, match="repeats words"):
+        lcl._splice_replacements(text, spans, _replacement_reply(answer)["replacements"])
+
+
+@pytest.mark.parametrize("text, answer, refused", [
+    ("(sigh) I can see.", "You can see.", False),        # first word not shared
+    ("(sigh) It is late.", "It was early.", False),      # last word not shared
+    ("(sigh) It is late now.", "It was late now.", True),        # 4 words, all but one
+    ("(sigh) It is late now.", "It ends now.", False),           # 4 words, only two shared
+    ("(sigh) It is very late now.", "It was very late now.", True),  # 5 words: the share rule
+    ("(sigh) Go now.", "Go on now.", True),              # 2 words: the old run rule
+])
+def test_the_frame_rule_needs_first_last_and_all_but_one(text, answer, refused):
+    spans = lcl._merge_repair_spans(text, _span_of(text))
+    replacements = _replacement_reply(answer)["replacements"]
+    if refused:
+        with pytest.raises(ValueError, match="repeats words"):
+            lcl._splice_replacements(text, spans, replacements)
+    else:
+        lcl._splice_replacements(text, spans, replacements)
+
+
+@pytest.mark.parametrize("text, spaceless", [
+    ("등대를 본다.", True),         # all Hangul
+    ("彼はA来た", True),            # 3 of 4 letters spaceless
+    ("我们 ok", True),              # exactly half
+    ("김, come home.", False),      # 1 of 9
+    ("我 okay", False),             # 1 of 5
+])
+def test_mostly_spaceless_means_at_least_half_the_letters(text, spaceless):
+    assert lcl._written_without_spaces(text) is spaceless
+
+
+def test_the_spaceless_pair_path_is_wired_through_the_repeat_guard():
+    # A light Japanese reword shares no "word" and is caught only by pairs.
+    assert lcl._repeats_kept_speech("彼は今何かを見ている", "彼は何かを見ている")
+    # The same idea in a mostly-English line does not take the spaceless path.
+    assert not lcl._repeats_kept_speech("Kim, come now.", "김, come home.")

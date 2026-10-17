@@ -440,10 +440,18 @@ def _overlaps_a_seam(replacement: str, before: str, after: str) -> bool:
     words too: "...and the play continued." with "continued" answered "and
     the play settled." spliced to "and the play and the play settled" and
     shipped (signal_lost_the_rainbow_boxes_20261014_145758, found by Sonnet
-    QA on 0291b5da). At least ``_SEAM_WORDS`` words must line up.
+    QA on 0291b5da). At least ``_SEAM_WORDS`` words must line up -- or, in a
+    spaceless script, where a whole clause reads as one "word", that many
+    characters: "然后戏继续了" with "继续了" answered "然后戏停了" said 然后戏
+    twice (Sonnet QA on 7dc01e7a).
     """
-    rep = _spoken_words(replacement)
-    head, tail = _spoken_words(before), _spoken_words(after)
+    if _written_without_spaces(before + replacement + after):
+        def units(text):
+            return [ch for ch in str(text or "").casefold() if _is_word_char(ch)]
+    else:
+        units = _spoken_words
+    rep = units(replacement)
+    head, tail = units(before), units(after)
     for width in range(min(len(head), len(rep)), _SEAM_WORDS - 1, -1):
         if head[-width:] == rep[:width]:
             return True

@@ -16653,3 +16653,18 @@ not promote it to the Bug Bible on this evidence alone.
   colloquial Thai rewords, punctuation-changed echoes; and fold-ins that
   reuse a short line's key word ("Enough, I say." beside "Enough of
   this!") are refused at the cost of one retry.
+
+## PBUG-20261016-03 -- QA on 7dc01e7a: seam in spaceless scripts, branches pinned
+- Sonnet QA on 7dc01e7a: no regression on the real ledgers (42 more bent
+  doubles refused, 0 new accepts over 247 real lines; the shipped
+  rainbow_boxes double refused). The seam rule never fired in Chinese,
+  Japanese or Thai -- a clause is one "word" -- so "然后戏继续了" with
+  "继续了" answered "然后戏停了" still doubled; and several branches had no
+  test that a mutant could not walk past.
+- fix: in a mostly-spaceless line the seam compares characters (3+); tests
+  now pin the seam's tail side, the frame rule's first-word and all-but-one
+  conditions, the mostly-spaceless threshold at its edges, and the pair
+  path's wiring through the repeat guard. The frame rule's size bounds are
+  equivalent mutants (the share rule decides 2- and 5-word lines the same).
+- accepted cost, documented: the frame rule refuses a fold-in shaped like
+  the line's frame ("Go on, now." beside "Go home now.") -- one retry.
