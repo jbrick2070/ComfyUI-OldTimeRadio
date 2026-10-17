@@ -350,6 +350,12 @@ class _CastGenderAnswers(_LiveAda):
     """The live treatment, plus a cast-gender pass that answers ``reply``."""
 
     def __init__(self, reply, **kw):
+        if "interpretation" not in kw:
+            # nothing stated anywhere, so the open roles reach the pass
+            from tests.test_my_story_runner import _interpretation
+            kw["interpretation"] = _interpretation()
+            for p in kw["interpretation"]["named_cast"]:
+                p["stated_gender"] = ""
         super().__init__(**kw)
         self.reply = reply
         self.gender_prompts = []
@@ -430,3 +436,21 @@ def test_the_cast_gender_seam_is_declared_and_shipped():
     pipes = _json.loads((root / "pipelines.json").read_text(encoding="utf-8"))
     row = next(p for p in pipes["pipelines"] if p["story_pipeline_id"] == "my_story_multipass")
     assert "my_story_cast_gender_system" in row["declared_seams"]
+
+
+def test_the_interpretation_s_reading_answers_an_open_role_before_the_pass():
+    """Sonnet QA on 1c0adbc6: "my sister Ada" in the idea is read by the
+    interpretation; the open role takes it, and the pass is not asked."""
+    from tests.test_my_story_runner import _interpretation
+
+    interp = _interpretation()
+    for p in interp["named_cast"]:
+        p["stated_gender"] = "female" if p["name"] == "Ada" else "male"
+    slots = _CastGenderAnswers({"cast": []}, interpretation=interp)
+    led, _ = _run(slots, characters="Ada, the keeper. Tom.")
+    sources = {r["name"]: r["source"]
+               for r in led.data["meta"]["my_story"]["gender_settlement"]}
+    assert sources == {"Ada": "interpretation", "Tom": "interpretation"}
+    assert slots.gender_prompts == []
+    cast = {r["name"]: r["gender"] for r in led.data["cast"]}
+    assert cast["Ada"] == "female" and cast["Tom"] == "male"

@@ -17009,3 +17009,10 @@ not promote it to the Bug Bible on this evidence alone.
   mislabels "speech" ("A long pause.") is dropped by design; with
   JUDGE_VOTES=2 (off by default) a piece named "action" by one read and
   "speech" by the other is lost.
+## PBUG-20261017-03 -- fourth QA (1c0adbc6): HOLDS; one context gap closed
+- Sonnet refuting QA held on all six points (structured_call use, the
+  never-fatal except -- ComfyUI's interrupt is a BaseException and still
+  propagates --, helper name, registry, receipts, tests). Weakness taken: the
+  interpretation's stated_gender, read from ALL the listener's fields ("my
+  sister Ada" in the idea), was ignored by the settle. An open role now takes
+  it (source "interpretation") before the pass is asked.
