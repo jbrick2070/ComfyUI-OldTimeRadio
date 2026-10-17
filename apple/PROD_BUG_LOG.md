@@ -17060,3 +17060,17 @@ not promote it to the Bug Bible on this evidence alone.
   non-regression guards" are 3 cases.
 - the first QA's test gap is filled here: a reread whose judge entries are
   all dropped still sees a bracket the writer swapped in.
+
+## PBUG-20261017-03 -- live legs on the final tree (8c77ca45, includes 5f5bd49f)
+- r7b (4060, otr_8gb_low, gemma4-e2b, unseeded server2, my_story, characters
+  "Ada, the keeper. Tom. The Pilot."): RESULT SUCCESS, 682 s, obs
+  fog_whisper_20261017_153106__arch__vcam__none__koko__myst__cg4e2__sa3_final.mp4
+  (81.4 MB, 117 s), no ERROR. Ada female bf_alice, Tom male am_echo, Pilot
+  male bm_lewis -- the treatment committed every gender, so neither the
+  cast-gender pass nor the ladder ran. The pass itself is proven by tests
+  only; no live leg has yet left a role open after the treatment.
+- r7 (same input) ran on a tree that moved mid-leg (1c0adbc6 -> 8c77ca45)
+  and is not counted; it also published.
+- seen in r7b, handed to the ledger_clean owner: shot_001_b10 shipped
+  "The sea remembers. And sometimes, it The sea remembers. what the light
+  cannot reach." -- a one-word span replaced by a sentence the line keeps.
