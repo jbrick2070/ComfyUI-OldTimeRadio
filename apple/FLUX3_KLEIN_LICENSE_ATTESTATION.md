@@ -53,7 +53,10 @@ Read in full from the mirror's `LICENSE.md` (same blob as BFL's).
   notice. The licence is personal and non-sublicensable: each user is bound
   directly. The pack does not redistribute weights; the user's machine fetches
   them.
-* The Qwen3-VL-4B text encoder and BFL's prompt upsampler are Apache-2.0.
+* Per BFL's model card (the gated repo's public landing page, read 2026-10-18),
+  the Qwen3-VL-4B-Instruct text encoder and the prompt upsampler are Apache-2.0.
+  The mirror's own NOTICE.md carries only the FLUX notice, so this rests on the
+  model card, not on a file the pack fetches; the int8 ConvRot repack is BFL's.
 
 ## 3. The reading this build adopts
 
