@@ -153,8 +153,8 @@ def test_each_h3_lane_is_exactly_its_engine_recipe(monkeypatch):
 
 
 @pytest.mark.parametrize("row_id, video, h3_lane, image_lane", [
-    ("otr_8gb_video", "h3_low_video", "minimax_h3_video", "z_image_int8"),
-    ("otr_16gb_video", "h3_low_audio_in", "minimax_h3_audio_in", "z_image"),
+    ("otr_8gb_video", "h3_low_video", "minimax_h3_video", "flux3_klein"),
+    ("otr_16gb_video", "h3_low_audio_in", "minimax_h3_audio_in", "flux3_klein"),
 ])
 def test_an_h3_profile_routes_its_own_lane_automatically(
         row_id, video, h3_lane, image_lane):
@@ -208,5 +208,5 @@ def test_main_fetches_the_h3_lane_with_the_profile_dependencies(monkeypatch):
     rc = provision.main(["--profile", h3["id"]])
 
     assert rc == 0
-    assert fetched == [["minimax_h3_video", "z_image_int8", "stable_audio_3"]]
+    assert fetched == [["minimax_h3_video", "flux3_klein", "stable_audio_3"]]
     assert verified == []

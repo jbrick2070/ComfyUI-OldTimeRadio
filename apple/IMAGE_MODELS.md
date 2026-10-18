@@ -65,9 +65,9 @@ is exactly what you see below.
 |---|---|---|---|
 | `sd15` | 2.0 GiB | **yes** | Stable Diffusion 1.5. The small one, and the only local engine proven on a 16 GB Mac. Native 512; the pack fits every request down to 768 on the long side, because past that it starts drawing two heads. |
 | `z_image_turbo` | 19.3 GiB | **yes** | The canonical graph's saved pick, and the AMD graph's -- the one with a Radeon receipt. Eight steps a still, so it is quick once the weights are down -- but they are among the largest downloads here; only Ideogram's fp8 set is bigger. |
-| `lumina_image` | 10.0 GiB | **yes** | Lumina-Image 2.0. **The default in the 16 GB NVIDIA graphs** (`otr_16gb_still`, `otr_16gb_video`). Fetches the ungated Comfy-Org split set on first use, same path as `sd15` -- a 5.2 GB model, a 5.2 GB text encoder and the 0.3 GB VAE it shares with `z_image_turbo` (10.0 GiB in all). |
+| `lumina_image` | 10.0 GiB | **yes** | Lumina-Image 2.0. Opt-in; no shipped graph selects it. Fetches the ungated Comfy-Org split set on first use, same path as `sd15` -- a 5.2 GB model, a 5.2 GB text encoder and the 0.3 GB VAE it shares with `z_image_turbo` (10.0 GiB in all). |
 | `flux_gen1` | 16.1 GiB | **yes** | FLUX.1-dev. Its licence is non-commercial. |
-| `flux3_klein` | 10.3 GiB | **yes** | FLUX 3 Image Klein (BFL, released 2026-10-15), text-to-image only for now: 16 steps, no guidance. **Opt-in; needs ComfyUI v0.41.0 or newer.** Its licence is the FLUX Kommunity License: free for non-commercial use, and outputs may be used commercially only if you and your affiliates earn under US$5M a year ([attestation](FLUX3_KLEIN_LICENSE_ATTESTATION.md)). The int8 set (5.8 GB model, 4.9 GB Qwen3-VL encoder, 0.3 GB VAE) comes from an ungated mirror pinned to BFL's exact bytes, because BFL's own repos need a Hugging Face login. Image-edit / face-lock mode is not wired: unmeasured. |
+| `flux3_klein` | 10.3 GiB | **yes** | FLUX 3 Image Klein (BFL, released 2026-10-15), text-to-image only for now: 16 steps, no guidance. **The still engine in every 8 GB and 16 GB NVIDIA graph (2026-10-18); needs ComfyUI v0.41.0 or newer.** About 21 s a still on an RTX 4060 8 GB. Its licence is the FLUX Kommunity License: free for non-commercial use, and outputs may be used commercially only if you and your affiliates earn under US$5M a year ([attestation](FLUX3_KLEIN_LICENSE_ATTESTATION.md)). The int8 set (5.8 GB model, 4.9 GB Qwen3-VL encoder, 0.3 GB VAE) comes from an ungated mirror pinned to BFL's exact bytes, because BFL's own repos need a Hugging Face login. Image-edit / face-lock mode is not wired: unmeasured. |
 | `ideogram4_local` | 27.5 GiB | **yes** | Typography specialist -- built for the `still_word` card, where the script's own words go on screen. Measured at about 95 seconds a card against `z_image_turbo`'s 12, and its licence is non-commercial. An RTX 50-series card fetches the 16.4 GiB nvfp4 set instead of the fp8 one. |
 
 ### Hosted -- no weights, you supply an account
@@ -114,11 +114,11 @@ skips the ones no lane consumes, so declare it or pick from the dropdown.
 
 ## Which ones download themselves
 
-All five local engines: **`sd15`**, **`z_image_turbo`**, **`lumina_image`**,
-**`flux_gen1`** and **`ideogram4_local`**. Pick any of them and a node inside the
+All six local engines: **`sd15`**, **`z_image_turbo`**, **`lumina_image`**,
+**`flux_gen1`**, **`ideogram4_local`** and **`flux3_klein`**. Pick any of them and a node inside the
 graph fetches it at queue time -- no account, no token, no script to run.
-`lumina_image` is what the 16 GB NVIDIA graphs ship, so the default 16 GB path
-downloads itself; `flux_gen1` and `ideogram4_local` joined the list on
+`flux3_klein` is what the 8 GB and 16 GB NVIDIA graphs ship, so the default
+NVIDIA path downloads itself; `flux_gen1` and `ideogram4_local` joined the list on
 2026-09-29. None of them ever quietly substitutes another model.
 
 [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) has the per-machine grid -- which of these

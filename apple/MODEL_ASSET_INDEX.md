@@ -40,6 +40,7 @@ Resolve the models root through `nodes/_otr_models_root.py::_models_root()` rath
 `scripts/otr_fetch_lane_weights.py` installs these public lanes with no account and no manual step:
 
 ```
+python scripts/otr_fetch_lane_weights.py flux3_klein
 python scripts/otr_fetch_lane_weights.py haunted
 python scripts/otr_fetch_lane_weights.py humo
 python scripts/otr_fetch_lane_weights.py lightning
@@ -101,7 +102,7 @@ Anything not listed there is a manual install -- see its row below.
 |---|---|---|---|
 | `cloud_image` | nothing on disk | - | - |
 | `google_image` | nothing on disk | - | - |
-| `flux3_klein` | 3 weight file(s) | manual download | - |
+| `flux3_klein` | 3 weight file(s) | `otr_fetch_lane_weights.py flux3_klein` | - |
 | `flux_gen1` | 1 weight file(s) | manual download | - |
 | `ideogram4_local` | 9 weight file(s) | manual download | - |
 | `lumina_image` | 3 weight file(s) | manual download | - |

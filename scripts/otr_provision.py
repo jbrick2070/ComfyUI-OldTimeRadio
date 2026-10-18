@@ -1432,6 +1432,8 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
             return Lane("z_image_int8" if low_vram else "z_image", False)
         if engine == "sd15":
             return Lane("sd15", False)
+        if engine == "flux3_klein":
+            return Lane("flux3_klein", False)
         if engine in _REMOTE_NO_WEIGHT_IMAGE_ENGINES:
             return None
         return UNROUTED
