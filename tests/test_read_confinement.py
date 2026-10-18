@@ -325,7 +325,8 @@ def test_the_cloud_floor_refuses_a_still_outside_the_folders(roots, monkeypatch)
         rd._render_still_floor({"shot_id": "shot_b003", "source_line_ids": ["b003"]}, {})
 
 
-@pytest.mark.parametrize("bad", ["../../x", "C:/Windows/win", "a/b", r"\\host\s\x", ""])
+@pytest.mark.parametrize("bad", ["../../x", "C:/Windows/win", "a/b", r"\\host\s\x", "",
+                                 "af_heart\n"])
 def test_a_kokoro_voice_id_is_a_bare_name(bad):
     from nodes._otr_audio_engines import eng_kokoro as k
     path = k._kokoro_voice_path(bad)
@@ -369,3 +370,26 @@ def test_the_configured_output_and_mesh_cache_are_read_roots(roots, tmp_path, mo
     assert P.is_readable_in_roots(str(configured / "otr" / "episodes" / "_shared" / "m.glb"))
     assert P.is_readable_in_roots(str(pin / "m.glb"))
     assert not P.is_readable_in_roots(str(configured / "other_pack" / "m.glb"))
+
+
+@pytest.mark.parametrize("preset, ok", [
+    ("v2/en_speaker_6", True), ("v2/de_speaker_4", True),
+    ("v2/../../../x", False), ("v2/en_speaker_6/../../x", False),
+    ("C:/x/voice", False), ("v2/en_speaker_6\n", False), ("", False),
+])
+def test_a_bark_preset_is_a_shipped_speaker_name(preset, ok):
+    # Any other string is np.load()ed as a .npz by transformers' BarkProcessor.
+    from nodes._otr_bark_lib import is_bark_preset
+    assert is_bark_preset(preset) is ok
+
+
+def test_a_value_outside_every_root_is_never_resolved(roots, monkeypatch):
+    # realpath can open a mapped drive's share; only a value under some
+    # root's typed or real spelling is ever resolved.
+    resolved = []
+    real_realpath = os.path.realpath
+    monkeypatch.setattr(os.path, "realpath",
+                        lambda p, *a, **k: resolved.append(str(p)) or real_realpath(p, *a, **k))
+    with pytest.raises(OtrPathContractError, match="outside every permitted"):
+        P.confine_to_read_roots(str(roots["outside"] / "x.wav"), "video_path")
+    assert not [p for p in resolved if "elsewhere" in p]

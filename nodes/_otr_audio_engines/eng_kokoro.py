@@ -97,7 +97,7 @@ def _kokoro_voice_path(voice_id: str) -> str:
     caller's existing "no local voice file" refusal names it -- no stat ever
     leaves the voices folder."""
     name = str(voice_id or "")
-    if not _KOKORO_VOICE_ID.match(name):
+    if not _KOKORO_VOICE_ID.fullmatch(name):
         name = "_refused_voice_id_"
     return os.path.join(_kokoro_model_dir(), "voices", f"{name}.pt")
 

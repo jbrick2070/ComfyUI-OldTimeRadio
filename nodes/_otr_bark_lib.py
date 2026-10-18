@@ -33,6 +33,18 @@ import numpy as np
 
 log = logging.getLogger("OTR")
 
+#: A Bark speaker preset by NAME (``v2/en_speaker_6``). transformers'
+#: BarkProcessor loads any other string as ``np.load(voice_preset + ".npz")``,
+#: and the preset can arrive from the ledger's cast row -- so ``v2/../../x``
+#: read an arbitrary ``.npz`` (Sonnet QA, 2026-10-18; the registry class
+#: "arbitrary-file-read"). Only the shipped speaker names are admitted.
+_BARK_PRESET = re.compile(r"v2/[a-z]{2}_speaker_[0-9]")
+
+
+def is_bark_preset(voice_preset) -> bool:
+    """True for a Bark speaker preset name the processor resolves internally."""
+    return bool(_BARK_PRESET.fullmatch(str(voice_preset or "")))
+
 
 def _move_to_device(obj, device):
     """Recursively move tensors and numpy arrays to the target device.
@@ -780,6 +792,11 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
     # a StopIteration naming this line is a far better bug report than a
     # confusing device-mismatch assertion three lines later.
     _dev = next(model.parameters()).device
+    # The one place a preset reaches the processor's file load: refused here
+    # too, whatever the caller checked.
+    if not is_bark_preset(voice_preset):
+        raise ValueError("bark voice_preset %r is not a v2/<lang>_speaker_<n> "
+                         "name" % (voice_preset,))
 
     for chunk in chunks:
         inputs = processor(chunk, voice_preset=voice_preset)

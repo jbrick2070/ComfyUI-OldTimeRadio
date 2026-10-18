@@ -368,22 +368,26 @@ def _confine(value, field: str, candidates, *, base=None, verb: str = "read") ->
                           os.path.realpath(root_text)))
         except Exception:  # noqa: BLE001 -- an unusable root simply does not match
             continue
-    # THE REAL LOCATION DECIDES (Sonnet QA, 2026-10-18). Gating on the typed
-    # spelling first refused a path the pack itself produced: the mux and the
-    # caption burn hand on `.resolve()`d episode paths, so a root typed through
-    # an 8.3 short name, a junction or a mapped drive no longer matched. The
-    # file read is the one at `real`, so `real` inside a root's real location
-    # is the test; a value that is lexically inside but really outside is the
-    # link escape, refused with its own message. The text refusals above have
-    # already run, so realpath never opens a remote path the value named.
-    try:
-        real = os.path.realpath(lexical)
-    except Exception as exc:  # noqa: BLE001 -- a malformed path is a refusal
-        raise OtrPathContractError(
-            "%s is not a usable path (%r): %s" % (field, text, exc))
-    if any(_inside(real, real_root) for _lex, real_root in roots):
-        return lexical
-    if any(_inside(lexical, lex_root) for lex_root, _real in roots):
+    # EITHER SPELLING OF A ROOT ADMITS, THE REAL LOCATION DECIDES (Sonnet QA,
+    # 2026-10-18). Gating on the typed spelling alone refused paths the pack
+    # itself produced: the mux and the caption burn hand on `.resolve()`d
+    # episode paths, so a root typed through an 8.3 short name or a junction
+    # no longer matched. So a value is considered when it lies lexically under
+    # a root's typed OR real spelling -- and nothing else is ever resolved, so
+    # realpath never touches a value outside every root (a mapped drive, a
+    # device). The file read is the one at `real`, so `real` inside a root's
+    # real location is the test; lexically inside but really outside is the
+    # link escape, refused with its own message. (A mapped drive whose
+    # `.resolve()`d spelling is UNC is still refused by the text check above.)
+    if any(_inside(lexical, lex_root) or _inside(lexical, real_root)
+           for lex_root, real_root in roots):
+        try:
+            real = os.path.realpath(lexical)
+        except Exception as exc:  # noqa: BLE001 -- a malformed path is a refusal
+            raise OtrPathContractError(
+                "%s is not a usable path (%r): %s" % (field, text, exc))
+        if any(_inside(real, real_root) for _lex, real_root in roots):
+            return lexical
         raise OtrPathContractError(
             "%s (%s) leads through a link to %s, outside every permitted %s "
             "root." % (field, lexical, real, verb))

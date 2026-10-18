@@ -177,15 +177,19 @@ class BarkEngine:
             _resolve_bark_inject_anchor,
             _resolve_bark_speech_only,
             bark_reroll_seed,
+            is_bark_preset,
             speech_shape_score,
         )
         from .registry import EngineUnusable, EngineUsabilityReason
 
-        if not voice_preset or not str(voice_preset).startswith("v2/"):
+        # A shipped speaker NAME only (2026-10-18): any other string is loaded
+        # by the processor as a .npz FILE, and the preset rides the ledger.
+        if not is_bark_preset(voice_preset):
             raise EngineUnusable(
                 self.name, getattr(self, "role", "char_voice"),
                 EngineUsabilityReason.MALFORMED_CONFIG,
-                f"bark requires a v2/* voice_preset; got {voice_preset!r}",
+                f"bark requires a v2/<lang>_speaker_<n> voice_preset; got "
+                f"{voice_preset!r}",
             )
         model, processor = _load_bark("suno/bark", device=self._requested_device())
         self._loaded = True
