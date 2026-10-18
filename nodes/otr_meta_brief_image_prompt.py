@@ -1079,7 +1079,7 @@ def compose_still_word_prompt(meta, role, beat_line, style=None):
     _role = str(role or "")
     _style = _resolve_style(meta, style)
     # The era tail is the one piece here spliced from LLM-authored brief text
-    # (atmosphere_line / visual_palette), so it is the one piece that can carry
+    # (visual_palette and the brief terms), so it is the one piece that can carry
     # its own double quotes. Fold it: this function's contract is that the
     # template's outer pair is the ONLY double-quote pair in the card, and a
     # second pair does not merely muddle the prompt -- it SHIELDS whatever it
@@ -1848,7 +1848,7 @@ def _compose_mesh_fodder_prompt(meta, char_entry, line, setting, role,
     if spice and spice.lower() not in out.lower():
         out = "%s, %s" % (out, spice)
     # C4 (2026-07-01): the mesh radio inherits the brief's era TEXTURE (trimmed
-    # still profile: atmosphere line + palette/lighting top-2), so a non-1940s
+    # still profile: palette, lighting and atmosphere terms), so a non-1940s
     # brief carries through to the meshed object. The isolation scaffold above
     # still governs silhouette/plate; the tail only tints the look.
     tail = get_era_tail(meta, profile="still", style=_vstyle)
@@ -2051,7 +2051,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 finish_visual_prompt)
         # era_profile="portrait": never bleeds the episode's ambient
         # colour palette into character faces (sci-fi = blue wash,
-        # period drama = red wash). Only the atmosphere mood line is
+        # period drama = red wash). Only lighting and atmosphere terms are
         # safe; full palette is explicitly excluded (BUG-LOCAL-113).
         # Chunk A1: _vstyle is the ONE entry-resolved pack (no re-resolve).
         prompt = finish_visual_prompt(meta, prompt,

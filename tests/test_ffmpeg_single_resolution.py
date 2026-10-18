@@ -48,8 +48,10 @@ def _names_another_tool(node: ast.Call) -> bool:
     if not (isinstance(arg, ast.Constant) and isinstance(arg.value, str)):
         return False
     # Compare the bare stem, so "/usr/bin/ffmpeg", "ffmpeg.cmd" and
-    # "ffmpeg " still count as the media tool.
-    stem = os.path.splitext(os.path.basename(arg.value.strip().lower()))[0]
+    # "ffmpeg " still count as the media tool; a Windows path splits on any
+    # host.
+    bare = arg.value.strip().lower().replace("\\", "/")
+    stem = os.path.splitext(os.path.basename(bare))[0]
     return stem not in _MEDIA_STEMS
 
 
