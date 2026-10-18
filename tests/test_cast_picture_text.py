@@ -68,19 +68,29 @@ def test_only_casting_labels_are_stripped_wherever_they_sit():
                                still=True) == "grey, green. tall."
 
 
-def test_a_clause_steps_over_abbreviations_and_stops_at_the_next_label():
+def test_a_section_runs_to_the_next_header_not_to_a_period():
+    """Two sentence-based cleaners leaked Voice words through abbreviations
+    (Sonnet QA on 6d8687b2: "e.g." and "a.m."). Sections end at a header."""
+    for voice in ("Voice: low, e.g. gravelly.",
+                  "Voice: starts at 9 a.m. sharp, gravelly.",
+                  "Voice: warm, from St. Louis, gravelly."):
+        for still in (True, False):
+            out = picture_description("Face: oval. " + voice, still=still)
+            assert "gravelly" not in out and "Voice" not in out, (voice, still)
+            assert "oval" in out
+    # Voice is last in the format, so an unlabelled tail goes with it.
     assert picture_description(
-        "Voice: warm, from St. Louis. A scar on the cheek.", still=True) \
-        == "A scar on the cheek."
-    assert picture_description(
-        "Voice: warm, from St. Louis. A scar.", still=False) == "A scar."
-    # "booms." is a sentence end, not the abbreviation "Ms."
-    assert picture_description(
-        "Voice: deep, booms. A scar on the cheek.", still=True) \
-        == "A scar on the cheek."
-    # A missing period stops at the next label instead of eating it.
+        "Face: oval. Voice: warm. A scar on the cheek.", still=True) == "oval."
+    # A missing period still ends a section at the next header.
     assert picture_description(
         "Presence: calm Face: oval, grey eyes.", still=True) == "oval, grey eyes."
+    # A sub-label inside a dropped section cannot bring its words back.
+    assert picture_description(
+        "Presence: He waits. Look: nothing. Face: oval.", still=True) == "oval."
+    # A sub-label used as prose inside a kept section stays prose.
+    assert picture_description(
+        "Face: a hard look: haunted eyes.", still=True) ==         "a hard look: haunted eyes."
+    assert picture_description("Face:oval Voice:low", still=True) == "oval"
 
 
 def test_the_char_scene_composer_reads_the_cleaned_description():

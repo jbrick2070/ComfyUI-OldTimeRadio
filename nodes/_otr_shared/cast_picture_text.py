@@ -20,6 +20,16 @@ distinctive detail -- with the ``Label:`` prefixes removed. ``Presence:`` is
 mood prose, the same class as the atmosphere sentence the still tail already
 dropped. A video prompt keeps ``Presence:``: behaviour is something a video
 model can act on.
+
+SECTIONS, NOT SENTENCES (third attempt, after a panel). Two earlier cleaners
+cut a clause at its first period, and every abbreviation ("St. Louis", "e.g.",
+"a.m.") let the rest of a Voice clause back into the picture. The text is now
+split at its SECTION HEADERS -- Face, Distinctive detail / Detail, Presence,
+Voice -- and a section runs to the next header or the end, with no sentence
+parsing at all. Voice is last in the format, so whatever follows it goes with
+it. Inside a kept section a still also drops the inline sub-labels (Hair:,
+Eyes:, Build: ...) where they open a phrase, so "her look: haunted" is prose
+and stays.
 """
 from __future__ import annotations
 
@@ -27,33 +37,47 @@ import re
 
 __all__ = ["picture_description"]
 
-#: The labels the casting format and its writers use. Only these are stripped,
-#: so ordinary prose with a colon ("She whispers: run.") is left alone.
-_LABEL_WORDS = (r"(?:Face|Distinctive\s+detail|Detail|Presence|Voice|Hair|"
-                r"Eyes|Build|Wardrobe|Clothing|Look|Appearance)")
-#: A clause body runs to the end of its sentence, steps over a common
-#: abbreviation ("St. Louis", "Dr. Ames"), and stops at the next label even
-#: when the writer left out the period.
-_BODY = (r"(?:\b(?:Dr|Mr|Mrs|Ms|St|Jr|Sr|Mt|Ft|Lt|Capt|Col|Gen|Prof|Rev|vs|etc)\.|"
-         r"(?!\b" + _LABEL_WORDS + r"\s*:)[^.])*"
-         r"(?:\.|$|(?=\b" + _LABEL_WORDS + r"\s*:))")
-_VOICE = re.compile(r"\bVoice\s*:\s*" + _BODY, re.IGNORECASE)
-_PRESENCE = re.compile(r"\bPresence\s*:\s*" + _BODY, re.IGNORECASE)
-_LABEL = re.compile(r"\b" + _LABEL_WORDS + r"\s*:\s*", re.IGNORECASE)
+#: The casting format's section headers. A header is recognised wherever it
+#: stands as a whole word before a colon; the format never uses these words
+#: with a colon in prose.
+_SECTION = re.compile(r"\b(Face|Distinctive\s+detail|Detail|Presence|Voice)\s*:\s*",
+                      re.IGNORECASE)
+#: Sub-labels some writers put inside the Face section. Stripped from a still
+#: only where they open a phrase (start, or after , ; .), so prose keeps them.
+_SUBLABEL = re.compile(
+    r"(^|[,;.]\s*)(?:Hair|Eyes|Build|Wardrobe|Clothing|Look|Appearance)\s*:\s*",
+    re.IGNORECASE)
+
+
+def _sections(text: str):
+    """``[(header_or_None, label_text, body), ...]`` in order. The lead before
+    the first header comes back with header ``None``."""
+    out = []
+    last_end, last_header, last_label = 0, None, ""
+    for m in _SECTION.finditer(text):
+        out.append((last_header, last_label, text[last_end:m.start()]))
+        last_header = " ".join(m.group(1).lower().split())
+        last_label, last_end = m.group(0), m.end()
+    out.append((last_header, last_label, text[last_end:]))
+    return out
 
 
 def picture_description(text, *, still: bool) -> str:
     """The cast description with what a picture model cannot draw removed.
 
-    ``still=False`` (video) drops the ``Voice:`` clause only. ``still=True``
-    also drops ``Presence:`` and the casting labels (``Face:``, ``Distinctive
-    detail:`` ...) wherever they sit, keeping the words after them. Never
-    raises; an empty or non-string value returns ``""``.
+    ``still=False`` (video) drops the Voice section only and keeps the rest as
+    written. ``still=True`` also drops Presence and every header and opening
+    sub-label, keeping the words after them. Never raises; an empty or
+    non-string value returns ``""``.
     """
     if not text or not isinstance(text, str):
         return ""
-    cleaned = _VOICE.sub(" ", text)
-    if still:
-        cleaned = _PRESENCE.sub(" ", cleaned)
-        cleaned = _LABEL.sub("", cleaned)
-    return " ".join(cleaned.split()).strip(" ,")
+    kept = []
+    for header, label, body in _sections(text):
+        if header == "voice" or (still and header == "presence"):
+            continue
+        if still:
+            kept.append(_SUBLABEL.sub(r"\1", body))
+        else:
+            kept.append(label + body)
+    return " ".join(" ".join(kept).split()).strip(" ,")
