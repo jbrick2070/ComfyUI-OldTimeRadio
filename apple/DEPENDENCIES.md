@@ -35,6 +35,7 @@ Some lanes resolve node classes that live in ComfyUI CORE, not in any node pack,
 | lane | needs | why |
 |---|---|---|
 | `ltx25` (video / foley_plus / mime) | **ComfyUI >= v0.32.0** | `LTXVDualCFGGuider` and `LTXVModalityGuidance` entered core in commit 57ce8e1a, `Add support for LTX 2.5 (#15499)`, 2026-08-11. First tag containing them is v0.32.0. |
+| `flux3_klein` (the 8 GB and 16 GB NVIDIA still engine) | **ComfyUI >= v0.41.0** | CLIPLoader type `flux3` (Qwen3-VL-4B text encoder) entered core in commit 20b46065, `Support Flux3-image (#17064)`. First tag containing it is v0.41.0. |
 
 Check yours with `git describe --tags` in the ComfyUI directory. A rented pod image measured v0.26.2 (2026-06-30) -- two months and eight minor versions behind -- and the ltx25 lane was unrunnable there for that reason alone, with every weight and node pack correctly installed.
 

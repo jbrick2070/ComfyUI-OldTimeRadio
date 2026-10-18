@@ -33,7 +33,7 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 |---|---|---|---|---|---|---|---|
 | **8 GB NVIDIA (RTX 4060, 3070, 2080)** | Gemma 4 E2B (ComfyUI) | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | flux3_klein | ComfyUI-AnimateDiff-Evolved | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; shipping-set workflows published 2026-09-13 |
 | **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | Gemma 4 12B (ComfyUI) | ltx25_high_video | kokoro | stable_audio_3 | flux3_klein | none | **COMPONENTS MEASURED** -- LTX 2.5 mix4x8 clips on the RTX 5080; exact row tuple and unlisted cards unproven |
-| **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | Gemma 4 E2B (ComfyUI) | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | flux3_klein | ComfyUI-AnimateDiff-Evolved | `draft`, unproven |
+| **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | Gemma 4 E2B (ComfyUI) | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | z_image_turbo | ComfyUI-AnimateDiff-Evolved | `draft`, unproven |
 | **AMD / ROCm (Windows or Linux)** | Qwen3.5-4B | still_motion | kokoro | stable_audio_3 | z_image_turbo | none | `draft`, unproven |
 
 **Use the machine key, not an experimental row's id.** Run these with the exact Python executable that launches ComfyUI (shown as `<ComfyUI Python>`). Preview the install plan first, then run the same command without `--list` to install it.
@@ -183,7 +183,7 @@ The honest use of these numbers is COMPARATIVE -- which lane is heavier than whi
 
 * humo is PROVEN on the RTX 5080 (32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B and humo) and is a RunPod lab candidate elsewhere. Every node class resolves on a rented pod with no patching, and the public `humo` fetch lane now owns all five 14B files (26.7356 GiB) with pinned revisions, sizes, SHA-256 values, and atomic `.part` handling. Only the remote canonical receipt remains.
 
-* Image engine defaults: flux3_klein for the 8/12/16 GB NVIDIA classes (operator 2026-10-18); z_image_turbo stays the shared default (AMD, 24 GB); sd15 remains the practical Mac image engine. Weight follows the card: nvfp4 on Blackwell, bf16 on Ampere/Ada. AnimateDiff accepts no init still, so the 8/12 GB NVIDIA episode planner does not download or gate on an image engine for that video path.
+* Image engine defaults: flux3_klein for the 8 GB and 16 GB NVIDIA classes (operator 2026-10-18); z_image_turbo stays the shared default (12 GB, AMD, 24 GB -- 12 GB was never tested with Klein); sd15 remains the practical Mac image engine. flux3_klein is int8 ConvRot on every card; for z_image_turbo the weight follows the card: nvfp4 on Blackwell, bf16 on Ampere/Ada. AnimateDiff accepts no init still, so the 8/12 GB NVIDIA episode planner does not download or gate on an image engine for that video path.
 
 ## What is NOT here
 

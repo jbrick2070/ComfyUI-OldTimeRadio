@@ -98,9 +98,53 @@ def test_usable_when_installed(monkeypatch, no_flux3_env):
 def test_refuses_an_old_comfyui_core(monkeypatch, no_flux3_env):
     monkeypatch.setattr(FK, "_installed_unets",
                         lambda: ["flux3-image-klein-int8-convrot.safetensors"])
-    monkeypatch.setattr(FK, "_core_has_nodes", lambda: False)
+    monkeypatch.setattr(FK, "_core_problem", lambda mapping=None: FK._CORE_UPDATE_MESSAGE)
     with pytest.raises(EngineUnusable, match="v0.41.0"):
         ireg.get_engine("flux3_klein").assert_usable({}, {"role": "character_image"})
+
+
+def _clip_loader(types):
+    class _CLIPLoader:
+        @staticmethod
+        def INPUT_TYPES():
+            return {"required": {"clip_name": (["x"],), "type": (list(types),)}}
+    return _CLIPLoader
+
+
+def _core(types):
+    return {"EmptyFlux2LatentImage": object, "ModelSamplingFlux": object,
+            "CLIPLoader": _clip_loader(types)}
+
+
+def test_the_core_probe_is_the_flux3_clip_type_not_the_node_names():
+    # v0.40.0 already had EmptyFlux2LatentImage and ModelSamplingFlux (Ideogram 4
+    # uses them); only the CLIPLoader `flux3` type marks v0.41.0.
+    assert FK._core_problem(_core(["flux2", "qwen_image"])) == FK._CORE_UPDATE_MESSAGE
+    assert FK._core_problem(_core(["flux2", "flux3"])) is None
+    assert FK._core_problem({}) is None                     # no registry: never fail
+
+
+def test_the_queue_time_gate_refuses_an_old_core_before_any_download(monkeypatch):
+    from nodes._otr_video_engines import wrapper_bridge as WB
+    mapping = _core(["flux2"])
+    mapping.update({n: object for n in ("UNETLoader", "VAELoader", "CLIPTextEncode",
+                                        "KSampler", "VAEDecode")})
+    monkeypatch.setattr(WB, "node_class_mappings",
+                        lambda m=None: m if m is not None else mapping)
+    with pytest.raises(VA.VisualAssetError, match="v0.41.0") as err:
+        VA._refuse_missing_node_packs({"flux3_klein"})
+    assert "image engine 'flux3_klein'" in str(err.value)
+    assert "Nothing was downloaded" in str(err.value)
+
+
+def test_the_queue_time_gate_passes_a_current_core(monkeypatch):
+    from nodes._otr_video_engines import wrapper_bridge as WB
+    mapping = _core(["flux2", "flux3"])
+    mapping.update({n: object for n in ("UNETLoader", "VAELoader", "CLIPTextEncode",
+                                        "KSampler", "VAEDecode")})
+    monkeypatch.setattr(WB, "node_class_mappings",
+                        lambda m=None: m if m is not None else mapping)
+    VA._refuse_missing_node_packs({"flux3_klein"})
 
 
 def test_base_checkpoints_are_never_auto_picked(monkeypatch):

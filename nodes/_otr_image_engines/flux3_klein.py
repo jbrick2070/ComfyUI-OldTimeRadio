@@ -61,8 +61,14 @@ _DEFAULT_CLIP = "qwen3vl_4b_int8_convrot.safetensors"
 _DEFAULT_VAE = "flux2-vae.safetensors"
 _CLIP_TYPE = "flux3"
 
-#: Stock ComfyUI node classes the graph needs; absent on ComfyUI < v0.41.0.
-_REQUIRED_CORE_NODES = ("EmptyFlux2LatentImage", "ModelSamplingFlux")
+#: Stock ComfyUI node classes the graph needs. Both predate v0.41.0 (Ideogram 4
+#: uses EmptyFlux2LatentImage), so they are necessary but NOT the version test:
+#: that is the ``flux3`` entry in CLIPLoader's type list, added to core by
+#: commit 20b46065 "Support Flux3-image (#17064)", first tagged v0.41.0.
+_REQUIRED_CORE_NODES = ("EmptyFlux2LatentImage", "ModelSamplingFlux", "CLIPLoader")
+_CORE_UPDATE_MESSAGE = (
+    "Update ComfyUI to v0.41.0 or newer: flux3_klein needs the built-in "
+    "CLIPLoader type 'flux3', which this version does not have")
 
 _HYGIENE_NEGATIVE = ""  # the distilled model runs at cfg 1.0: the negative is inert
 
@@ -125,17 +131,30 @@ def _role_of(profile) -> str:
     return str(getattr(profile, "role", "") or "")
 
 
-def _core_has_nodes() -> bool:
-    """True unless ComfyUI is importable AND lacks the Klein core nodes. A probe
-    that cannot run answers True (never fail on a probe)."""
-    try:
-        import nodes as _comfy_nodes
-        mapping = getattr(_comfy_nodes, "NODE_CLASS_MAPPINGS", None)
-    except Exception:  # noqa: BLE001
-        return True
+def _core_problem(mapping=None):
+    """The reason this ComfyUI core cannot run Klein, or ``None``.
+
+    ``mapping`` is ComfyUI's NODE_CLASS_MAPPINGS (the queue-time gate passes the
+    one it already holds); ``None`` reads it from the running server. A probe
+    that cannot run answers ``None`` -- probes never fail a workflow; the
+    loader still raises at render if the core really is too old."""
+    if mapping is None:
+        try:
+            import nodes as _comfy_nodes
+            mapping = getattr(_comfy_nodes, "NODE_CLASS_MAPPINGS", None)
+        except Exception:  # noqa: BLE001
+            return None
     if not mapping:
-        return True
-    return all(n in mapping for n in _REQUIRED_CORE_NODES)
+        return None
+    if not all(n in mapping for n in _REQUIRED_CORE_NODES):
+        return _CORE_UPDATE_MESSAGE
+    try:
+        types = mapping["CLIPLoader"].INPUT_TYPES()["required"]["type"][0]
+    except Exception:  # noqa: BLE001 -- an unreadable schema is not a refusal
+        return None
+    if isinstance(types, (list, tuple)) and "flux3" not in types:
+        return _CORE_UPDATE_MESSAGE
+    return None
 
 
 @register
@@ -256,17 +275,19 @@ class Flux3KleinEngine:
         self._classes = None
         self._loaded = False
 
+    def core_problem(self, mapping=None):
+        """Read by the queue-time gate (``_refuse_missing_node_packs``) so an
+        old core is refused BEFORE the 10 GB fetch, not at the dispatcher."""
+        return _core_problem(mapping)
+
     def assert_usable(self, host_caps, profile, request_template=None):  # noqa: ARG002
         """Fail closed until the diffusion model is INSTALLED and the running
-        ComfyUI core has the Klein nodes (>= v0.41.0)."""
-        if not _core_has_nodes():
+        ComfyUI core can load Klein (>= v0.41.0)."""
+        problem = _core_problem()
+        if problem:
             raise EngineUnusable(
                 self.name, _role_of(profile),
-                EngineUsabilityReason.MISSING_MODEL,
-                "flux3_klein needs ComfyUI >= v0.41.0 (EmptyFlux2LatentImage / "
-                "CLIPLoader type flux3 are built-in nodes this version lacks): "
-                "update ComfyUI",
-                kind="image",
+                EngineUsabilityReason.MISSING_MODEL, problem, kind="image",
             )
         _name, verified = _resolve_unet_name()
         if not verified:

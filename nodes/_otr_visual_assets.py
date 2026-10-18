@@ -1486,10 +1486,31 @@ def _refuse_missing_node_packs(engines):
         return
     problems = []
     for name in sorted(engines):
+        kind = "video"
         try:
             eng = _vreg.get_engine(name)
         except Exception:  # noqa: BLE001
-            continue
+            # An IMAGE engine may declare a core-version probe (flux3_klein needs
+            # a CLIPLoader type added in ComfyUI v0.41.0). Ask it here, at the one
+            # point a refusal is still free, and check its node table below.
+            try:
+                try:
+                    from ._otr_image_engines import registry as _ireg
+                except ImportError:  # pragma: no cover -- flat test imports
+                    from _otr_image_engines import registry as _ireg  # type: ignore
+                eng = _ireg.get_engine(name)
+                kind = "image"
+            except Exception:  # noqa: BLE001
+                continue
+            probe = getattr(eng, "core_problem", None)
+            if callable(probe):
+                try:
+                    message = probe(mapping)
+                except Exception:  # noqa: BLE001 -- probes never fail a workflow
+                    message = None
+                if message:
+                    problems.append("%s -- the image engine '%s'" % (message, name))
+                    continue
         table = getattr(eng, "_node_candidates", None)
         if not callable(table):
             continue
@@ -1526,9 +1547,9 @@ def _refuse_missing_node_packs(engines):
                 else:
                     hint = ("Update ComfyUI: these are built-in ComfyUI nodes that "
                             "this version does not have")
-            problems.append("%s -- the video engine '%s' needs node classes "
+            problems.append("%s -- the %s engine '%s' needs node classes "
                             "that are not registered on this server: %s"
-                            % (hint, name, ", ".join(absent)))
+                            % (hint, kind, name, ", ".join(absent)))
     if problems:
         raise VisualAssetError(
             "%s. Nothing was downloaded or rendered; fix this and press Run "

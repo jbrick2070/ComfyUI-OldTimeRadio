@@ -101,7 +101,7 @@ LANE_INFO = {
     "ltx_8gb": (16.13, "LTX 2b distilled + T5 encoder. Real video diffusion."),
     "sd15": (1.99, "IMAGE model, SD 1.5 fp16. The Mac rows' still engine."),
     "flux3_klein": (10.26, "IMAGE model, FLUX 3 Image Klein int8 + Qwen3-VL-4B "
-                           "int8 encoder + Flux 2 VAE. The 8/12/16 GB NVIDIA "
+                           "int8 encoder + Flux 2 VAE. The 8 GB and 16 GB NVIDIA "
                            "rows' still engine (FLUX Kommunity License)."),
     "ltx25_16gb": (25.38, "LTX 2.5, mix4x8 DiT + w4a8 encoder + VAEs + "
                                  "upscaler. The 16 GB silent, foley, mime and "
@@ -123,8 +123,8 @@ LANE_INFO = {
 
 #: The least you can install and still render an episode. Everything else is a
 #: choice, not a prerequisite.
-MINIMUM_HINT = ("haunted + one z_image precision + stable_audio_3 "
-                "= about 20 GB and one complete episode")
+MINIMUM_HINT = ("haunted + flux3_klein (or one z_image precision) + "
+                "stable_audio_3 = about 17-20 GB and one complete episode")
 
 
 LANES = {
@@ -243,7 +243,7 @@ LANES = {
     # Comfy-Org as usable without Blackwell. The local receipts are 124 model /
     # 129 canvas frames on a 16 GB card; they do not qualify a physical 8 GB
     # card. No shipped workflow selects either lane.
-    # FLUX 3 IMAGE KLEIN (2026-10-18): the 8/12/16 GB NVIDIA still engine. All
+    # FLUX 3 IMAGE KLEIN (2026-10-18): the 8 GB and 16 GB NVIDIA still engine. All
     # three files are `_PINNED_SOURCES` rows -- the two Klein files from the
     # ungated ml-resources mirror (byte-identical to BFL's gated repo), the VAE
     # from the Ideogram 4 repackage with the same SHA-256 -- so this lane and
