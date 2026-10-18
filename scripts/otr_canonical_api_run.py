@@ -261,7 +261,7 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
     applied: list[str] = []
     if args.workflow_id and args.workflow_id.lower() != "none":
         workflow = apply_row_to_workflow(workflow, args.workflow_id, schemas)
-        applied.append(f"profile={args.workflow_id}")
+        applied.append(f"workflow={args.workflow_id}")
         if getattr(args, "video_lane", None):
             # The row's required models belong to the video lane it names,
             # which --video-lane replaces; _apply_video_lane says what, if

@@ -552,7 +552,7 @@ def known_workflow_ids(row_dir: Optional[str] = None) -> tuple:
     return tuple(ordered)
 
 
-def load_workflow_row(profile_id: str, row_dir: Optional[str] = None) -> dict:
+def load_workflow_row(workflow_id: str, row_dir: Optional[str] = None) -> dict:
     """Resolve a workflow id to a shape-validated config. Fail closed.
 
     THE MATRIX IS THE ONLY SOURCE. `config/workflow_matrix.json` carries every
@@ -560,7 +560,7 @@ def load_workflow_row(profile_id: str, row_dir: Optional[str] = None) -> dict:
     that do exist. An explicit `row_dir` reads ``<row_dir>/<id>.json``
     instead, which is how a test hands this a row it built in `tmp_path`.
     """
-    # A WORKFLOW ID NAMES A ROW, NEVER A LOCATION (2026-09-05). `profile_id`
+    # A WORKFLOW ID NAMES A ROW, NEVER A LOCATION (2026-09-05). `workflow_id`
     # reaches here from OTR_WorkflowValidator's free STRING widget, so a
     # `/prompt` caller could send `..\..\..\somewhere\x`; with a
     # directory in play that join would stat and open it -- a UNC spelling would
@@ -568,37 +568,37 @@ def load_workflow_row(profile_id: str, row_dir: Optional[str] = None) -> dict:
     # so a separator or traversal token is refused rather than rewritten: a
     # silently-renamed id would load the wrong workflow, which is worse than a
     # clear failure.
-    if any(tok in str(profile_id or "") for tok in ("/", "\\", "..", "\x00")):
+    if any(tok in str(workflow_id or "") for tok in ("/", "\\", "..", "\x00")):
         raise WorkflowError(
-            f"workflow {profile_id!r}: an id names a workflow, not a path"
+            f"workflow {workflow_id!r}: an id names a workflow, not a path"
         )
 
     if row_dir is None:
         rows = matrix_rows()
-        row = rows.get(profile_id)
+        row = rows.get(workflow_id)
         if row is None:
             raise WorkflowError(
-                f"workflow {profile_id!r}: no such row in workflow_matrix.json; "
+                f"workflow {workflow_id!r}: no such row in workflow_matrix.json; "
                 f"known workflows: {sorted(rows)!r}"
             )
         return validate_workflow_shape(
-            workflow_from_row(row), f"workflow_matrix.json:{profile_id}")
+            workflow_from_row(row), f"workflow_matrix.json:{workflow_id}")
 
-    path = os.path.join(row_dir, f"{profile_id}.json")
+    path = os.path.join(row_dir, f"{workflow_id}.json")
     if not os.path.isfile(path):
         raise WorkflowError(
-            f"workflow {profile_id!r}: no such file {path!r}; known workflows: "
+            f"workflow {workflow_id!r}: no such file {path!r}; known workflows: "
             f"{list(known_workflow_ids(row_dir))!r}"
         )
     with open(path, "r", encoding="utf-8") as f:
         try:
             profile = json.load(f)
         except json.JSONDecodeError as e:
-            raise WorkflowError(f"workflow {profile_id!r}: {path!r} failed to parse: {e}") from e
+            raise WorkflowError(f"workflow {workflow_id!r}: {path!r} failed to parse: {e}") from e
     profile = validate_workflow_shape(profile, source=path)
-    if profile["id"] != profile_id:
+    if profile["id"] != workflow_id:
         raise WorkflowError(
-            f"workflow {profile_id!r}: file {path!r} declares id={profile['id']!r} "
+            f"workflow {workflow_id!r}: file {path!r} declares id={profile['id']!r} "
             f"(filename and id must agree)"
         )
     return profile

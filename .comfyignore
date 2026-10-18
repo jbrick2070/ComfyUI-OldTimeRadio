@@ -312,7 +312,7 @@ scripts/_tmp_*
 # distinction the `assets/` note above has teeth for.
 #
 # The cost of going further was measured, not guessed: removing the 144 JSONs from
-# the repo breaks 31 test files, heaviest in test_capability_profiles.py,
+# the repo breaks 31 test files, heaviest in test_workflow_rows.py,
 # test_build_variants.py, test_cloud_sku_json_parity.py and test_boot_contracts.py.
 # That is a real, finite job and it is the operator's call whether to spend it.
 #

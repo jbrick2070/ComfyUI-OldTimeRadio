@@ -86,7 +86,7 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
     assert rc == 0
     assert "workflows\\otr_canonical.json" in out or \
         "workflows/otr_canonical.json" in out
-    assert "profile=otr_cloud_low" in out
+    assert "workflow=otr_cloud_low" in out
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     director = _node(prompt, "OTR_VideoDirector")
@@ -216,7 +216,7 @@ def test_cloud_row_dry_run_binds_every_slot_it_sets(
         "--dump-prompt", str(dump),
     ])
     assert rc == 0
-    assert f"profile={profile_id}" in out
+    assert f"workflow={profile_id}" in out
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     cast = _node(prompt, "OTR_CastLock")
@@ -243,7 +243,7 @@ def test_cloud_row_dry_run_binds_every_slot_it_sets(
     assert director["inputs"]["character_image_model"] == image_engine
 
 
-def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
+def test_default_dry_run_uses_canonical_values_without_a_workflow_row(tmp_path):
     dump = tmp_path / "prompt.json"
     rc, out = _run_main([
         "--offline-schemas",
@@ -251,7 +251,7 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
         "--dump-prompt", str(dump),
     ])
     assert rc == 0
-    assert "profile=" not in out
+    assert "workflow=otr_" not in out
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     director = _node(prompt, "OTR_VideoDirector")
