@@ -268,3 +268,104 @@ def test_the_dispatcher_copies_the_pool_path_it_trusted(roots, monkeypatch):
     got = disp._trusted_pool_source("otr/episodes/ep/pool.png", str(roots["out"]))
     assert got == os.path.normpath(str(still))
     assert disp._trusted_pool_source(str(roots["outside"] / "x.png"), str(roots["out"])) == ""
+
+
+# ------------------------------------------- Sonnet QA follow-ups, 2026-10-18
+
+def test_a_unc_hidden_behind_the_models_prefix_is_never_statted(monkeypatch):
+    # `models/\host\share\x.wav` passes the text refusals; stripped, it is a
+    # UNC path that os.path.join lets REPLACE the models root.
+    from nodes._otr_audio_engines.base import resolve_voice_ref_path
+    from nodes._otr_voice_node_common import _resolve_ref_to_disk
+    statted = []
+    real_exists = os.path.exists
+    monkeypatch.setattr(os.path, "exists",
+                        lambda p: statted.append(str(p)) or real_exists(p))
+    b = chr(92)
+    for ref in ("models/" + b + b + "attacker" + b + "share" + b + "x.wav",
+                "models//attacker/share/x.wav", "models/C:/Windows/win.ini"):
+        assert resolve_voice_ref_path(ref) == ""
+        assert _resolve_ref_to_disk(ref) is None
+    assert not [p for p in statted if "attacker" in p or "win.ini" in p]
+
+
+def test_the_per_segment_voice_slice_reads_only_confined_audio():
+    # The line wav and the master both feed ffmpeg in the slicers, BEFORE the
+    # request-boundary guard: the confinement must sit at the source.
+    import inspect
+    from nodes._otr_video_engines import render_driver as rd
+    src = inspect.getsource(rd.build_request_from_shot)
+    assert "_confined_ledger_path(_voice_audio_for_line(line)" in src
+    assert src.index("_confined_ledger_path(master_audio_path") < src.index(
+        "_slice_master_audio(")
+
+
+def test_a_master_outside_the_folders_is_never_sliced(roots, monkeypatch):
+    from nodes._otr_video_engines import render_driver as rd
+    master = roots["outside"] / "master.wav"
+    master.write_bytes(b"RIFF")
+    sliced = []
+    monkeypatch.setattr(rd, "_slice_master_audio",
+                        lambda path, *a, **k: sliced.append(path) or "")
+    led = _humo_ledger(str(roots["episodes"] / "c07.png"), "")
+    led["lines"][0].pop("bark_wav_path")
+    rd.build_request_from_shot(led["video"]["shots"][0], led,
+                               master_audio_path=str(master))
+    assert sliced == []
+
+
+def test_the_cloud_floor_refuses_a_still_outside_the_folders(roots, monkeypatch):
+    from nodes._otr_video_engines import render_driver as rd
+    from nodes._otr_video_engines.render_errors import RenderError
+    still = roots["outside"] / "b003.png"
+    still.write_bytes(b"\x89PNG")
+    monkeypatch.setattr(rd, "_still_index", lambda _led: {"b003": str(still)})
+    monkeypatch.setattr(rd, "render_shot", lambda *a, **k: pytest.fail("rendered"))
+    with pytest.raises(RenderError, match="no clip"):
+        rd._render_still_floor({"shot_id": "shot_b003", "source_line_ids": ["b003"]}, {})
+
+
+@pytest.mark.parametrize("bad", ["../../x", "C:/Windows/win", "a/b", r"\\host\s\x", ""])
+def test_a_kokoro_voice_id_is_a_bare_name(bad):
+    from nodes._otr_audio_engines import eng_kokoro as k
+    path = k._kokoro_voice_path(bad)
+    assert os.path.dirname(path) == k._kokoro_voices_dir()
+    assert os.path.basename(path) == "_refused_voice_id_.pt"
+    assert os.path.basename(k._kokoro_voice_path("af_heart")) == "af_heart.pt"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="NTFS junctions are Windows-only")
+def test_a_root_typed_through_a_junction_still_admits_its_real_spelling(
+        tmp_path, monkeypatch):
+    # The mux and caption burn hand on `.resolve()`d paths; a root typed
+    # through a junction (or an 8.3 name, or a mapped drive) must still match.
+    import _winapi
+    real_out = tmp_path / "real_output"
+    (real_out / "otr" / "episodes" / "ep").mkdir(parents=True)
+    typed_out = tmp_path / "typed_output"
+    _winapi.CreateJunction(str(real_out), str(typed_out))
+    try:
+        monkeypatch.setenv("OTR_OUTPUT_DIR", str(typed_out))
+        monkeypatch.delenv("OTR_EXTRA_OUTPUT_ROOTS", raising=False)
+        resolved = real_out / "otr" / "episodes" / "ep" / "x.mp4"
+        assert P.confine_to_read_roots(str(resolved), "video_path")
+        assert P.confine_to_read_roots(
+            str(typed_out / "otr" / "episodes" / "ep" / "x.mp4"), "video_path")
+        with pytest.raises(OtrPathContractError):
+            P.confine_to_read_roots(str(real_out / "secret.txt"), "video_path")
+    finally:
+        os.rmdir(str(typed_out))
+
+
+def test_the_configured_output_and_mesh_cache_are_read_roots(roots, tmp_path, monkeypatch):
+    import sys
+    import types
+    configured = tmp_path / "configured_output"
+    fake = types.ModuleType("folder_paths")
+    fake.get_output_directory = lambda: str(configured)
+    monkeypatch.setitem(sys.modules, "folder_paths", fake)
+    pin = tmp_path / "mesh_pin"
+    monkeypatch.setenv("OTR_MESH_CACHE_DIR", str(pin))
+    assert P.is_readable_in_roots(str(configured / "otr" / "episodes" / "_shared" / "m.glb"))
+    assert P.is_readable_in_roots(str(pin / "m.glb"))
+    assert not P.is_readable_in_roots(str(configured / "other_pack" / "m.glb"))

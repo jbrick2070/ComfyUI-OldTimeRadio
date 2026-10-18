@@ -37,6 +37,7 @@ from __future__ import annotations
 import logging
 import os
 import random
+import re
 
 from .registry import register
 
@@ -83,9 +84,22 @@ def _kokoro_model_dir() -> str:
         )
 
 
+#: A Kokoro voice id is a bare name (``af_heart``, ``bm_george``). It becomes a
+#: FILENAME, and it can arrive from the ledger's ``voice_ref_id`` -- so a
+#: separator, drive or ``..`` in it walked out of the voices folder, or named a
+#: UNC host for the existence check (Sonnet QA, 2026-10-18).
+_KOKORO_VOICE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
 def _kokoro_voice_path(voice_id: str) -> str:
-    """Local path to the voice .pt. LOCAL-DISK only -- never downloads (C-7)."""
-    return os.path.join(_kokoro_model_dir(), "voices", f"{voice_id}.pt")
+    """Local path to the voice .pt. LOCAL-DISK only -- never downloads (C-7).
+    An id that is not a bare name maps to a path that never exists, so every
+    caller's existing "no local voice file" refusal names it -- no stat ever
+    leaves the voices folder."""
+    name = str(voice_id or "")
+    if not _KOKORO_VOICE_ID.match(name):
+        name = "_refused_voice_id_"
+    return os.path.join(_kokoro_model_dir(), "voices", f"{name}.pt")
 
 
 def _kokoro_voices_dir() -> str:

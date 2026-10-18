@@ -175,6 +175,13 @@ def _resolve_voice_ref_unconfined(ref):
         return ref
     rp = str(ref).replace("\\", "/")
     stripped = rp[len("models/"):] if rp.startswith("models/") else rp
+    # What the prefix HID must not be a root of its own (Sonnet QA,
+    # 2026-10-18): `models/\\host\share\x.wav` passes the text refusals, and
+    # once stripped `os.path.join(root, "//host/share/x.wav")` DISCARDS the
+    # root -- the `exists` below then opened an SMB session to that host.
+    if (stripped.startswith("/") or os.path.splitdrive(stripped)[0]
+            or os.path.isabs(stripped)):
+        return ""
     if any(otr_env.get(name, "").strip() for name in (
             "OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT")):
         # Delegate precedence and expansion to the pack's one models-root

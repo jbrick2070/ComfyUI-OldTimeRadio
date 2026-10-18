@@ -288,8 +288,12 @@ def _extra_output_roots() -> list:
         text = chunk.strip()
         if not text:
             continue
+        # As TYPED, not `.resolve()`d (2026-10-18): resolving turns a mapped
+        # drive into its UNC spelling, so `U:\refs\x.wav` stopped matching the
+        # root the operator named. `_confine` compares both the typed and the
+        # real spelling of every root itself.
         try:
-            out.append(Path(text).expanduser().resolve())
+            out.append(Path(os.path.abspath(os.path.expanduser(text))))
         except Exception:  # noqa: BLE001 -- a bad entry must not break writing
             continue
     return out
@@ -364,14 +368,22 @@ def _confine(value, field: str, candidates, *, base=None, verb: str = "read") ->
                           os.path.realpath(root_text)))
         except Exception:  # noqa: BLE001 -- an unusable root simply does not match
             continue
+    # THE REAL LOCATION DECIDES (Sonnet QA, 2026-10-18). Gating on the typed
+    # spelling first refused a path the pack itself produced: the mux and the
+    # caption burn hand on `.resolve()`d episode paths, so a root typed through
+    # an 8.3 short name, a junction or a mapped drive no longer matched. The
+    # file read is the one at `real`, so `real` inside a root's real location
+    # is the test; a value that is lexically inside but really outside is the
+    # link escape, refused with its own message. The text refusals above have
+    # already run, so realpath never opens a remote path the value named.
+    try:
+        real = os.path.realpath(lexical)
+    except Exception as exc:  # noqa: BLE001 -- a malformed path is a refusal
+        raise OtrPathContractError(
+            "%s is not a usable path (%r): %s" % (field, text, exc))
+    if any(_inside(real, real_root) for _lex, real_root in roots):
+        return lexical
     if any(_inside(lexical, lex_root) for lex_root, _real in roots):
-        try:
-            real = os.path.realpath(lexical)
-        except Exception as exc:  # noqa: BLE001 -- a malformed path is a refusal
-            raise OtrPathContractError(
-                "%s is not a usable path (%r): %s" % (field, text, exc))
-        if any(_inside(real, real_root) for _lex, real_root in roots):
-            return lexical
         raise OtrPathContractError(
             "%s (%s) leads through a link to %s, outside every permitted %s "
             "root." % (field, lexical, real, verb))
@@ -397,9 +409,16 @@ def read_roots() -> list:
     ``otr/episodes``, the publication folder ``otr/obs``, ComfyUI's input
     folder (where a user drops media, and where ComfyUI's own upload writes),
     its temp folder, and ``$OTR_EXTRA_OUTPUT_ROOTS``. Not the rest of the
-    output tree: other packs' files are not this pack's to read."""
+    output tree: other packs' files are not this pack's to read.
+
+    Plus the two places the 3D mesh stage writes when they differ from the
+    above (Sonnet QA, 2026-10-18): ``otr/episodes`` under ComfyUI's CONFIGURED
+    output folder (SaveGLB must write there, and it can differ from
+    ``OTR_OUTPUT_DIR``), and ``$OTR_MESH_CACHE_DIR``. Both are server
+    configuration, never a workflow value."""
     candidates = []
-    for _root in (otr_episodes_root, otr_obs_dir, comfy_input_dir, _comfy_temp_dir):
+    for _root in (otr_episodes_root, otr_obs_dir, comfy_input_dir, _comfy_temp_dir,
+                  _configured_output_episodes, _mesh_cache_pin):
         try:
             found = _root()
         except Exception:  # noqa: BLE001 -- an unusable root simply does not match
@@ -407,6 +426,20 @@ def read_roots() -> list:
         if found:
             candidates.append(found)
     return candidates + _extra_output_roots()
+
+
+def _configured_output_episodes() -> Optional[str]:
+    try:
+        import folder_paths  # type: ignore
+
+        out = folder_paths.get_output_directory()
+        return os.path.join(out, "otr", "episodes") if out else None
+    except Exception:  # noqa: BLE001 -- outside ComfyUI there is no configured output
+        return None
+
+
+def _mesh_cache_pin() -> Optional[str]:
+    return (otr_env.get("OTR_MESH_CACHE_DIR") or "").strip() or None
 
 
 def voice_read_roots() -> list:

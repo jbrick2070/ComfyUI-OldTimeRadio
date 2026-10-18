@@ -1956,8 +1956,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 and getattr(_safe_engine(engine_id),
                             "accepts_reference_image", False)
                 and otr_env.get("OTR_PORTRAIT_REFERENCE", "1") != "0"):
-            _cand = str(portrait_row.get("pool_path")
-                        or portrait_row.get("path") or "")
+            # Confined before the stat (Sonnet QA, 2026-10-18): the row is
+            # ledger data; outside the approved folders it reads as absent.
+            _cand = _confined_or_empty(str(portrait_row.get("pool_path")
+                                           or portrait_row.get("path") or ""))
             if not _cand or not os.path.isfile(_cand):
                 try:
                     _cand = str(_pl.portrait_path_for_hash(
@@ -2247,7 +2249,11 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             # (see the reuse branch above), so a legitimately reused image is
             # in ``this_dispatch_ids`` like any freshly rendered one.
             stale = oid not in this_dispatch_ids
-            if not row or not path or not os.path.isfile(path) or stale:
+            # `stale` before the stat, and the stat only on the confined
+            # spelling (Sonnet QA, 2026-10-18): an inherited row's path is
+            # ledger data and must not be probed outside the approved folders.
+            if (not row or not path or stale
+                    or not os.path.isfile(_confined_or_empty(path) or "")):
                 # ONE deterministic status per target, so logs and tests can
                 # assert on it instead of parsing a sentence.
                 if not row:

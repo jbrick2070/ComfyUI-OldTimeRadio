@@ -430,12 +430,16 @@ class TestSliceCurveCacheKeySplit:
         (the 7.3 mechanics: the signature gained the hash)."""
         ledger = _ledger_with_line("b009", wav_path="", start_s=1.0, dur_s=2.0)
         shot = _shot("b009")
+        # Inside the approved folders: the master is confined before slicing
+        # (2026-10-18), so a path outside them is never handed to ffmpeg.
+        from nodes._otr_paths import otr_episodes_root
+        master = str(otr_episodes_root() / "ep" / "m.mp4")
         with mock.patch("nodes._otr_video_engines.render_driver."
                         "_slice_master_audio", return_value="") as m:
             with mock.patch("nodes._otr_video_engines.render_driver."
                             "os.path.isfile", return_value=True):
                 rd.build_request_from_shot(shot, ledger,
-                                           master_audio_path="/fake/m.mp4")
+                                           master_audio_path=master)
         assert m.call_count == 1
         assert m.call_args.kwargs.get("master_hash") == _FROZEN_AUDIO_SHA
 

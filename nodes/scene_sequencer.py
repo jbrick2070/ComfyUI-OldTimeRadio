@@ -1916,9 +1916,17 @@ class EpisodeAssembler:
                 pass
 
             if _wav_dir is None:
-                # Headless / no ledger: fall back to a stable temp location
-                import tempfile as _tempfile
-                _wav_dir = _pathlib.Path(_tempfile.gettempdir())
+                # Headless / no ledger: the pack's own in-tree tmp tier, so the
+                # mux and the render batch -- which read only inside the
+                # approved folders (2026-10-18) -- can still open it. The
+                # system temp dir is the last resort when even that is
+                # unresolvable.
+                try:
+                    from ._otr_paths import otr_shared_tmp_dir as _tmp_tier
+                    _wav_dir = _pathlib.Path(str(_tmp_tier()))
+                except Exception:  # noqa: BLE001
+                    import tempfile as _tempfile
+                    _wav_dir = _pathlib.Path(_tempfile.gettempdir())
                 _ep_id = "otr_episode"
 
             _wav_dir.mkdir(parents=True, exist_ok=True)

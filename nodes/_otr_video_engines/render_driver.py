@@ -2590,7 +2590,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _LOG.warning("[OTR.render_driver] talking-head shot %s char_id=%r has "
                      "NO portrait-index entry -- HuMo will fail closed LOUD "
                      "(NO FALLBACKS)", shot.get("shot_id"), char_id)
-    audio = _voice_audio_for_line(line)
+    # CONFINED AT THE SOURCE (Sonnet QA, 2026-10-18): both feed ffmpeg `-i`
+    # in the slicers below, BEFORE the request-boundary guard further down
+    # ever sees them -- that guard only saw the in-tree slice.
+    audio = _confined_ledger_path(_voice_audio_for_line(line), "audio_ref")
+    master_audio_path = _confined_ledger_path(master_audio_path,
+                                              "master_audio_path")
     # A PER-LINE VOICE WAV IS SLICED PER SEGMENT TOO (WIRE-W4e, 2026-07-29).
     #
     # W4b/W4c gave the MASTER-slice path its per-segment window, and that left
@@ -5020,7 +5025,11 @@ def _render_still_floor(shot, ledger, *, host_caps=None, profile=None,
     """
     sid = str((shot or {}).get("shot_id") or "")
     bid = _beat_id_for_shot(shot or {})
-    still = _still_index(ledger).get(str(bid), "")
+    # Confined before the stat and the engine (Sonnet QA, 2026-10-18): the
+    # still index is built from ledger rows. Outside the approved folders it
+    # reads as "no still", which is this function's own LOUD refusal.
+    still = _confined_ledger_path(_still_index(ledger).get(str(bid), ""),
+                                  "cloud floor still")
     if not still or not os.path.isfile(still):
         raise RenderError(
             "CLOUD FLOOR shot %s (beat %s): the provider returned no clip and "
@@ -6865,7 +6874,11 @@ def build_clip_manifest(result, *, episode_id=""):
         # LOUD and the composite falls back to the floor/black (never silent).
         # The field is OPTIONAL: every non-mesh row omits it -> byte-identical.
         if exists and ctype == "directory" and str(eid) == "mesh_stage":
-            _plate = _still_index(led).get(bid, "")
+            # Confined first (Sonnet QA, 2026-10-18): a plate outside the
+            # approved folders degrades to the floor here, LOUD, rather than
+            # riding the manifest into a composite that would refuse it.
+            _plate = _confined_ledger_path(_still_index(led).get(bid, ""),
+                                           "bg_still_path")
             if _plate and os.path.isfile(_plate):
                 row["bg_still_path"] = _plate
             else:
