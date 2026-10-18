@@ -236,8 +236,12 @@ def _import_nvvfx_installing_if_missing(blocker=""):
 DEFAULT_QUALITY = "ULTRA"
 
 #: The SDK wants output sides in multiples of 8 (Comfy-Org's node rounds the
-#: same way). The engine asks for the rounded-up size and crops to exact.
+#: same way). The engine asks for the rounded-up size and resizes to exact.
 _SIDE_MULTIPLE = 8
+
+#: The largest per-side enlargement one VSR pass is used for. Measured: up to
+#: 2x one pass wins; past it VSR x2 plus bicubic wins (see upscale_frames_to).
+ONE_PASS_MAX_SCALE = 2
 
 
 def _round_up(value: int, multiple: int = _SIDE_MULTIPLE) -> int:
@@ -261,7 +265,8 @@ def _quality() -> str:
 
 @register
 class RtxVsr:
-    """NVIDIA RTX Video Super Resolution, x2."""
+    """NVIDIA RTX Video Super Resolution: straight to the composite's target
+    size in one pass (``upscale_frames_to``), x2 for the registry contract."""
 
     name = "rtx_vsr"
     roles = ("upscale_stage",)
@@ -303,7 +308,10 @@ class RtxVsr:
         """The SDK's models ship INSIDE the ``nvidia-vfx`` wheel, so its version
         is the checkpoint identity; the quality level picks the model. Pure:
         package metadata and the environment, never load state."""
-        return (("nvidia_vfx", _package_version()), ("quality", _quality()))
+        # "to_canvas": the composite now asks for its target size in one pass
+        # (2026-10-18), so composites cached from the x2 era are not reused.
+        return (("nvidia_vfx", _package_version()), ("quality", _quality()),
+                ("sizing", "to_canvas"))
 
     # -----------------------------------------------------------------
     def _refuse(self, reason, message):
@@ -411,13 +419,55 @@ class RtxVsr:
     def upscale_frames(self, frames):
         """BHWC float32 [0, 1] on ``self.device`` -> BHWC upscaled x2.
 
-        Deterministic and stateless per frame (no temporal history is fed), so
-        the composite's held-frame reuse stays exact."""
+        The registry's fixed-scale contract (``intrinsic_scale``); the load
+        probe uses it. The composite calls :meth:`upscale_frames_to`."""
         assert self._nvvfx is not None, "engine.load(device) must run first"
-        import torch
+        _, h, w, _ = frames.shape
+        return self._run(frames, int(w) * 2, int(h) * 2)
 
-        b, h, w, _ = frames.shape
-        want_w, want_h = int(w) * 2, int(h) * 2
+    def upscale_frames_to(self, frames, out_w: int, out_h: int):
+        """BHWC float32 [0, 1] -> BHWC at EXACTLY ``(out_h, out_w)``, in one
+        VSR pass (2026-10-18), when one pass is the better picture.
+
+        The fixed x2 doubled a 1472x832 LTX frame to 2944x1664 only for the
+        composite to shrink it back to 1920x1080. Asking VSR for 1080p
+        directly is better on every frame measured. Comfy-Org's
+        Nvidia_RTX_Nodes_ComfyUI exposes the same target-size mode.
+
+        MEASURED ON THE 4060, 16 native Klein stills (no upscaler had touched
+        them), area-downscaled and brought back, luma SSIM:
+          * 1.3x  -- one pass 0.869, x2 then shrink 0.863 (16/16 stills)
+          * 2x    -- identical (the same pass)
+          * 4x    -- one pass 0.514, x2 then bicubic 0.526 (0/16 for one pass)
+        VSR is tuned for about 2x; past that, its own x2 plus a bicubic
+        remainder is the better picture. So a target more than
+        :data:`ONE_PASS_MAX_SCALE` on either side -- the AnimateDiff 512x288
+        to 1080p case -- or smaller than the frame returns ``None``, and the
+        caller takes the x2 path, as before."""
+        assert self._nvvfx is not None, "engine.load(device) must run first"
+        _, h, w, _ = frames.shape
+        out_w, out_h = int(out_w), int(out_h)
+        if (out_w < int(w) or out_h < int(h)
+                or out_w > int(w) * ONE_PASS_MAX_SCALE
+                or out_h > int(h) * ONE_PASS_MAX_SCALE):
+            return None
+        return self._run(frames, out_w, out_h)
+
+    def _run(self, frames, want_w: int, want_h: int):
+        """Deterministic and stateless per frame (no temporal history is fed),
+        so the composite's held-frame reuse stays exact.
+
+        The SDK wants sides in multiples of 8. Off that grid it is asked for
+        the rounded-up size and the result is RESIZED back to exact, never
+        cropped: the SDK scales the whole picture to the size it was given,
+        so a crop cut the right and bottom edges off a picture that was also
+        stretched by those pixels (measured 2026-10-18 on native Klein stills:
+        a 393x222 frame doubled that way scored 18.3 dB, plain bicubic 23.4).
+        The shipped sizes (1024x576, 2944x1664, 1920x1080) are on the grid."""
+        import torch
+        import torch.nn.functional as F
+
+        b = frames.shape[0]
         out_w, out_h = _round_up(want_w), _round_up(want_h)
         effect = self._effect_for(out_w, out_h)
         outs = []
@@ -426,6 +476,10 @@ class RtxVsr:
                 chw = frames[i, :, :, :3].to(self.device, torch.float32) \
                     .movedim(-1, 0).contiguous()
                 img = torch.from_dlpack(effect.run(chw).image).clone()
-                outs.append(img.movedim(0, -1)[:want_h, :want_w, :])
+                if (out_w, out_h) != (want_w, want_h):
+                    img = F.interpolate(img[None].float(), size=(want_h, want_w),
+                                        mode="bicubic", align_corners=False,
+                                        antialias=True)[0]
+                outs.append(img.movedim(0, -1))
             out = torch.stack(outs).clamp_(0.0, 1.0).contiguous()
         return out

@@ -44,11 +44,12 @@ class _FakeEffect:
     def run(self, chw):
         assert self.loaded and chw.dim() == 3 and chw.shape[0] == 3
         self.runs += 1
-        # Pixel-doubled into the top-left of the requested (rounded-up) frame,
-        # so the engine's crop back to exact x2 is checkable byte for byte.
-        up = chw.repeat_interleave(2, 1).repeat_interleave(2, 2)
-        frame = torch.zeros((3, self.output_height, self.output_width))
-        frame[:, :up.shape[1], :up.shape[2]] = up
+        # Like the real SDK, the WHOLE picture is scaled to the requested
+        # (rounded-up) size -- nearest-neighbour, so exact multiples stay
+        # byte-checkable.
+        frame = torch.nn.functional.interpolate(
+            chw[None], size=(self.output_height, self.output_width),
+            mode="nearest")[0]
         return types.SimpleNamespace(image=frame.contiguous())
 
 
@@ -109,7 +110,8 @@ def test_fingerprint_is_metadata_only_and_stable(monkeypatch):
     eng = V.RtxVsr()
     first = eng.model_fingerprint_parts()
     assert first == eng.model_fingerprint_parts()
-    assert first == (("nvidia_vfx", "0.2.0.0"), ("quality", "ULTRA"))
+    assert first == (("nvidia_vfx", "0.2.0.0"), ("quality", "ULTRA"),
+                     ("sizing", "to_canvas"))
     monkeypatch.setattr(V, "_package_version", lambda: "absent")
     assert eng.model_fingerprint_parts() != first        # installing it moves the key
     monkeypatch.setenv("OTR_RTX_VSR_QUALITY", "high")
@@ -160,9 +162,11 @@ def test_a_bad_quality_level_refuses(monkeypatch, quality, match):
         V.RtxVsr().load(torch.device("cuda:0"))
 
 
-def test_upscale_is_exact_x2_with_sides_rounded_for_the_sdk_and_cropped():
-    """1001x501 asks the SDK for 2008x1008 (multiples of 8) and crops to the
-    exact 2002x1002 the composite validates; one effect serves a size."""
+def test_upscale_is_exact_x2_with_sides_rounded_for_the_sdk_and_resized():
+    """1001x501 asks the SDK for 2008x1008 (multiples of 8) and RESIZES to the
+    exact 2002x1002 the composite validates -- a crop would cut off the right
+    and bottom edges of a picture the SDK scaled whole (2026-10-18). One
+    effect serves a size."""
     eng = V.RtxVsr()
     eng._nvvfx = types.SimpleNamespace(
         VideoSuperRes=_FakeEffect,
@@ -178,10 +182,16 @@ def test_upscale_is_exact_x2_with_sides_rounded_for_the_sdk_and_cropped():
         assert tuple(out.shape) == (2, 1002, 2002, 3)
         assert (_FakeEffect.instances[-1].output_width,
                 _FakeEffect.instances[-1].output_height) == (2008, 1008)
-        assert torch.equal(out[0, ::2, ::2], frames[0])          # nearest stand-in
+        # The right-most input column must reach the right-most output
+        # column; a crop to 2002 dropped it (it lands at 2006-2007 of 2008).
+        edge = torch.zeros((1, 501, 1001, 3))
+        edge[:, :, -1, :] = 1.0
+        assert eng.upscale_frames(edge)[0, :, -1, :].min() > 0.5
         eng.upscale_frames(torch.rand((1, 501, 1001, 3)))
         assert len(_FakeEffect.instances) == 1                    # reused
-        eng.upscale_frames(torch.rand((1, 100, 100, 3)))
+        # An on-grid size needs no resize: exact pixel doubling survives.
+        on_grid = torch.rand((1, 100, 100, 3))
+        assert torch.equal(eng.upscale_frames(on_grid)[0, ::2, ::2], on_grid[0])
         assert len(_FakeEffect.instances) == 2 and _FakeEffect.instances[0].closed
         eng.unload()
         assert _FakeEffect.instances[1].closed and eng.device is None

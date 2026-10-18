@@ -198,9 +198,11 @@ def _probe_video_dims(ffmpeg: str, src: str):
 # ---------------------------------------------------------------------------
 # Engine output validation
 # ---------------------------------------------------------------------------
-def _validate_engine_output(out, expected_scale: int, in_shape) -> None:
-    """Assert BHWC rank-4, batch preserved, `H_out = H_in * expected_scale`,
-    dtype float, finite values.
+def _validate_engine_output(out, expected_scale: int, in_shape,
+                            expected_size=None) -> None:
+    """Assert BHWC rank-4, batch preserved, `H_out = H_in * expected_scale`
+    (or, with ``expected_size=(h, w)``, exactly that size -- the one-pass
+    target-size path), dtype float, finite values.
 
     Raises :class:`RuntimeError` on any mismatch so a malformed adapter output
     fails LOUD at the pipe layer instead of corrupting the encoded segment.
@@ -222,7 +224,13 @@ def _validate_engine_output(out, expected_scale: int, in_shape) -> None:
     if out_c != in_c:
         raise RuntimeError(
             f"channel dim changed: in={in_c} out={out_c}")
-    if out_h != in_h * int(expected_scale) or out_w != in_w * int(expected_scale):
+    if expected_size is not None:
+        want_h, want_w = int(expected_size[0]), int(expected_size[1])
+        if (out_h, out_w) != (want_h, want_w):
+            raise RuntimeError(
+                f"target size wrong: asked ({want_h},{want_w}) but got "
+                f"({out_h},{out_w})")
+    elif out_h != in_h * int(expected_scale) or out_w != in_w * int(expected_scale):
         raise RuntimeError(
             f"spatial scale wrong: in=({in_h},{in_w}) x{expected_scale} = "
             f"({in_h*expected_scale},{in_w*expected_scale}) but got "
@@ -256,6 +264,15 @@ def _fit_full_frame_bhwc(x, canvas_w: int, canvas_h: int):
     return x.permute(0, 2, 3, 1).contiguous()
 
 
+def _decrease_fit_size(w: int, h: int, canvas_w: int, canvas_h: int) -> tuple:
+    """``(new_w, new_h)``: the largest size of a ``w`` x ``h`` frame that fits
+    the canvas at its own aspect. The one rule ``_fit_and_pad_bhwc`` resizes
+    by, and the size the composite asks a target-size engine for."""
+    scale = min(float(canvas_w) / float(w), float(canvas_h) / float(h))
+    return (max(1, int(round(float(w) * scale))),
+            max(1, int(round(float(h) * scale))))
+
+
 def _fit_and_pad_bhwc(x, canvas_w: int, canvas_h: int):
     """Decrease-fit BOTH directions (upscale if under, downscale if over) then
     black-pad to (canvas_h, canvas_w).
@@ -274,9 +291,7 @@ def _fit_and_pad_bhwc(x, canvas_w: int, canvas_h: int):
     if x.ndim != 4:
         raise ValueError(f"_fit_and_pad_bhwc expects BHWC rank-4; got {x.ndim}")
     _, h, w, _ = x.shape
-    scale = min(float(canvas_w) / float(w), float(canvas_h) / float(h))
-    new_w = max(1, int(round(float(w) * scale)))
-    new_h = max(1, int(round(float(h) * scale)))
+    new_w, new_h = _decrease_fit_size(w, h, canvas_w, canvas_h)
     # BHWC -> BCHW for interpolate + pad
     x = x.permute(0, 3, 1, 2).contiguous()
     x = F.interpolate(x, size=(new_h, new_w), mode="bicubic",

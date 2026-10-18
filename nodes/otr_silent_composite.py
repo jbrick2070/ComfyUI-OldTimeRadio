@@ -953,10 +953,21 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
         _read_frames_exact, _tempfile_stderr, _close_stderr, _tail_path,
         _kill_and_wait_all, _unlink_if_exists,
         _validate_engine_output, _fit_and_pad_bhwc, _fit_full_frame_bhwc,
+        _decrease_fit_size,
     )
     # A declared clean-full-frame row fills the canvas exactly, as its
     # declared lanczos chain would; every legacy row keeps fit-and-pad.
     _fit = _fit_full_frame_bhwc if full_frame else _fit_and_pad_bhwc
+    # The size a target-size engine is asked for: the canvas itself on a
+    # full-frame row, else the aspect-fit size the padded row resizes to.
+    _one_pass = getattr(engine, "upscale_frames_to", None)
+    if not callable(_one_pass):
+        _one_pass = None
+    if full_frame:
+        _target_w, _target_h = int(w), int(h)
+    else:
+        _target_w, _target_h = _decrease_fit_size(int(src_w), int(src_h),
+                                                  int(w), int(h))
 
     dec_vf_parts = []
     if int(start_frame) > 0:
@@ -1080,11 +1091,27 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
                 # engine.device (Antigravity r3 MF-3) -- public property,
                 # never reach into engine._descriptor.
                 bhwc = torch.from_numpy(arr).to(engine.device).float() / 255.0
-                out_bhwc = engine.upscale_frames(bhwc)
-                _validate_engine_output(
-                    out_bhwc, expected_scale=int(engine.intrinsic_scale),
-                    in_shape=bhwc.shape)
-                out_bhwc = _fit(out_bhwc, int(w), int(h))
+                # ONE PASS TO THE TARGET (2026-10-18). An engine that can
+                # upscale to any size (rtx_vsr) is asked for the exact canvas
+                # on a full-frame row, or the aspect-fit size a padded row
+                # resizes to, instead of doubling a 1472x832 frame only to
+                # shrink it back. It answers None where one pass is not the
+                # better picture (rtx_vsr: past 2x, measured), and the fixed
+                # x2 path runs.
+                out_bhwc = None
+                if _one_pass is not None:
+                    out_bhwc = _one_pass(bhwc, _target_w, _target_h)
+                    if out_bhwc is not None:
+                        _validate_engine_output(
+                            out_bhwc, expected_scale=1, in_shape=bhwc.shape,
+                            expected_size=(_target_h, _target_w))
+                if out_bhwc is None:
+                    out_bhwc = engine.upscale_frames(bhwc)
+                    _validate_engine_output(
+                        out_bhwc, expected_scale=int(engine.intrinsic_scale),
+                        in_shape=bhwc.shape)
+                if tuple(out_bhwc.shape[1:3]) != (int(h), int(w)) or not full_frame:
+                    out_bhwc = _fit(out_bhwc, int(w), int(h))
                 # .contiguous() before .numpy() -- non-contiguous tensors after
                 # a permute would raise or corrupt strides (Antigravity r4 MF-2).
                 out_u8 = (out_bhwc.clamp(0, 1) * 255.0).byte().contiguous().cpu().numpy()
