@@ -120,3 +120,16 @@ def test_off_format_voice_and_presence_headers_are_dropped_too():
     for text in ("Face: oval. Demeanor: calm.", "Face: oval. Manner: calm."):
         assert picture_description(text, still=True) == "oval.", text
         assert "calm" in picture_description(text, still=False), text
+
+
+def test_a_drifted_header_word_inside_prose_stays_prose():
+    """Sonnet QA on f7c63539: "manner", "tone", "speech" are prose words too."""
+    assert picture_description(
+        "Face: A weathered man of fifty, his manner: gruff but kind. Voice: low.",
+        still=True) == "A weathered man of fifty, his manner: gruff but kind."
+    assert "weary, resigned" in picture_description(
+        "Face: Gaunt, with a look of one who speaks in a tone: weary, resigned.",
+        still=False)
+    # Opening a sentence, the same word is still a header.
+    assert picture_description(
+        "Face: Round cheeks. Tone: slow and warm.", still=True) == "Round cheeks."

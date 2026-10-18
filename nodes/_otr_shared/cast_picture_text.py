@@ -37,12 +37,15 @@ import re
 
 __all__ = ["picture_description"]
 
-#: The casting format's section headers. A header is recognised wherever it
-#: stands as a whole word before a colon; the format never uses these words
-#: with a colon in prose.
+#: The casting format's section headers. The four the format prescribes are
+#: recognised wherever they stand as a whole word before a colon. The drifted
+#: names (Manner, Tone, Speech ...) are ordinary prose words too -- "his
+#: manner: gruff but kind" is a face detail (Sonnet QA on f7c63539) -- so they
+#: count only where they open the text or a sentence.
 _SECTION = re.compile(
-    r"\b(Face|Distinctive\s+detail|Detail|Presence|Demeanou?r|Manner|"
-    r"Voice\s+cue|Vocal\s+quality|Voice|Speech|Tone)\s*[:：]\s*",
+    r"(?:\b(Face|Distinctive\s+detail|Detail|Presence|Voice)"
+    r"|(?:^|(?<=[.;!?\n]))\s*(Demeanou?r|Manner|Voice\s+cue|Vocal\s+quality|"
+    r"Speech|Tone))\s*[:：]\s*",
     re.IGNORECASE)
 #: Header words that mean the voice section, or the presence section, under
 #: another name (Sonnet QA on 04d1f6e2: the casting prompt asks for
@@ -63,7 +66,7 @@ def _sections(text: str):
     last_end, last_header, last_label = 0, None, ""
     for m in _SECTION.finditer(text):
         out.append((last_header, last_label, text[last_end:m.start()]))
-        last_header = " ".join(m.group(1).lower().split())
+        last_header = " ".join((m.group(1) or m.group(2)).lower().split())
         last_label, last_end = m.group(0), m.end()
     out.append((last_header, last_label, text[last_end:]))
     return out
