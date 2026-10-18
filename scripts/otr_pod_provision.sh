@@ -80,35 +80,28 @@ else
 fi
 cd "$OTR_ROOT" || fail "cannot enter OTR checkout"
 
-# The matrix is the ordinary stranger-facing owner. Explicit profiles remain
-# an override for named HuMo/LTX qualification labs; they are never the hidden
-# default for a new renter.
+# The workflow JSONs are the only machine answer -- there are no machine
+# classes (operator, 2026-10-18). Name a workflow with OTR_PROVISION_PROFILE, or
+# let the detected VRAM pick one: 16 GB and up gets the 16 GB video workflow,
+# anything from 8 GB up to that gets the 8 GB AnimateDiff workflow (a 10-15 GB
+# card runs the 8 GB set; a renter who wants to risk a 16 GB one names it).
 VRAM_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null \
   | head -1 | tr -dc '0-9')
 PROFILE="${OTR_PROVISION_PROFILE:-}"
-MACHINE=""
-if [ -n "$PROFILE" ]; then
-  PROVISION_ARGS=(--profile "$PROFILE")
-  SELECTOR="$PROFILE"
-else
-  MACHINE="${OTR_PROVISION_MACHINE:-}"
-  if [ -z "$MACHINE" ]; then
-    [ -n "${VRAM_MIB:-}" ] \
-      || fail "could not detect NVIDIA VRAM; set an exact OTR_PROVISION_MACHINE or OTR_PROVISION_PROFILE"
-    if [ "$VRAM_MIB" -lt 8000 ] 2>/dev/null; then
-      fail "detected ${VRAM_MIB} MiB VRAM, below the supported 8 GB machine floor"
-    fi
-    if [ "${VRAM_MIB:-0}" -ge 16000 ] 2>/dev/null; then
-      MACHINE="16gb"
-    elif [ "${VRAM_MIB:-0}" -ge 10000 ] 2>/dev/null; then
-      MACHINE="12gb"
-    else
-      MACHINE="8gb"
-    fi
+if [ -z "$PROFILE" ]; then
+  [ -n "${VRAM_MIB:-}" ] \
+    || fail "could not detect NVIDIA VRAM; set OTR_PROVISION_PROFILE to a workflow id"
+  if [ "$VRAM_MIB" -lt 8000 ] 2>/dev/null; then
+    fail "detected ${VRAM_MIB} MiB VRAM, below the supported 8 GB floor"
   fi
-  PROVISION_ARGS=(--machine "$MACHINE")
-  SELECTOR="machine:$MACHINE"
+  if [ "${VRAM_MIB:-0}" -ge 16000 ] 2>/dev/null; then
+    PROFILE="otr_16gb_video"
+  else
+    PROFILE="otr_8gb_animatediff"
+  fi
 fi
+PROVISION_ARGS=(--profile "$PROFILE")
+SELECTOR="$PROFILE"
 VOICE_ARGS=()
 [ "${OTR_WITH_INDEXTTS2:-0}" = "1" ] && VOICE_ARGS+=(--with-indextts2)
 [ "${OTR_WITH_ALL_VOICES:-0}" = "1" ] && VOICE_ARGS=(--with-all-voices)
@@ -353,7 +346,6 @@ OTR_INDEXTTS2_DIR="${OTR_INDEXTTS2_DIR:-$OTR_INDEXTTS2_ROOT/checkpoints}"
 OTR_INDEXTTS2_WORKER="${OTR_INDEXTTS2_WORKER:-$OTR_ROOT/scripts/_otr_indextts2_worker.py}"
 OTR_VOICE_REFERENCE_BANK="${OTR_VOICE_REFERENCE_BANK:-/workspace/otr-config/voice_reference_bank.portable.json}"
 OTR_PROVISION_PROFILE="$PROFILE"
-OTR_PROVISION_MACHINE="$MACHINE"
 OTR_PROVISION_SELECTOR="$SELECTOR"
 OTR_PROVISION_GENERATION=$(cat /proc/sys/kernel/random/uuid 2>/dev/null \
   || printf '%s-%s' "$(date -u +%Y%m%dT%H%M%SZ)" "$$")
@@ -361,7 +353,7 @@ OTR_HEADLESS_PORT="${OTR_HEADLESS_PORT:-8188}"
 OTR_RUNTIME_SECRETS_FILE="${OTR_RUNTIME_SECRETS_FILE:-/workspace/otr-config/otr-secrets.env}"
 export OTR_REPO_ROOT COMFY_PY OTR_INDEXTTS2_ROOT OTR_INDEXTTS2_DIR
 export OTR_INDEXTTS2_WORKER OTR_VOICE_REFERENCE_BANK OTR_PROVISION_PROFILE
-export OTR_PROVISION_MACHINE OTR_PROVISION_SELECTOR OTR_PROVISION_GENERATION
+export OTR_PROVISION_SELECTOR OTR_PROVISION_GENERATION
 export OTR_HEADLESS_PORT OTR_RUNTIME_SECRETS_FILE
 
 OTR_RUNTIME_ENV="${OTR_RUNTIME_ENV:-/workspace/otr-config/otr-runtime.env}"
@@ -424,7 +416,7 @@ RUNTIME_TMP=$(mktemp "$RUNTIME_DIR/.otr-runtime.env.XXXXXX") \
 RUNTIME_KEYS=(
   OTR_COMFY_ROOT OTR_REPO_ROOT COMFY_PY OTR_COMFYUI_MODELS_ROOT HF_HOME
   OTR_INDEXTTS2_ROOT OTR_INDEXTTS2_DIR OTR_INDEXTTS2_WORKER
-  OTR_VOICE_REFERENCE_BANK OTR_PROVISION_PROFILE OTR_PROVISION_MACHINE
+  OTR_VOICE_REFERENCE_BANK OTR_PROVISION_PROFILE
   OTR_PROVISION_SELECTOR OTR_PROVISION_GENERATION OTR_HEADLESS_PORT
   OTR_RUNTIME_SECRETS_FILE
 )

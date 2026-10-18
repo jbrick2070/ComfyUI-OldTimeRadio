@@ -47,7 +47,7 @@ def test_the_row_claims_mps_and_that_claim_has_a_receipt():
     backends = list(row["device_backends"])
     assert "mps" in backends, (
         "sd15 published episodes on a Mac mini M4 on 2026-09-08; "
-        "config/machine_classes.json carries the receipt")
+        "config/workflow_matrix.json carries the receipt")
     assert "cuda" in backends, "removing cuda would strand every NVIDIA profile"
     assert row["model_requirements"], (
         "sd15 needs a checkpoint and the row must say so, or preflight cannot "

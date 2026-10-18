@@ -197,7 +197,7 @@ def render() -> str:
       "recorded. `scripts/otr_fetch_lane_weights.py --list` shows which lanes "
       "install with one command.\n")
     A("### The image model depends on your GPU\n")
-    A("`z_image_turbo` is the image engine every machine class uses, and "
+    A("`z_image_turbo` is the shared default image engine (the canonical and AMD), and "
       "it ships in three precisions. The adapter ranks whatever is "
       "installed nvfp4 > fp8 > bf16 and takes the best -- which is a trap "
       "if you install the wrong one, because nvfp4 needs hardware fp4 "

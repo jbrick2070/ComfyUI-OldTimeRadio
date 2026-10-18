@@ -54,8 +54,9 @@ Hugging Face token).
 
 `workflows/otr_canonical.json` is the source. The 25 presets for specific
 machines are produced from it by `scripts/build_variants.py` using the rows in
-`config/workflow_matrix.json` (`config/machine_classes.json` feeds the machine
-matrix doc, not the graphs); `python scripts/build_variants.py --check`
+`config/workflow_matrix.json`, which also holds the receipts the machine
+matrix doc renders. There are no machine classes and no profiles -- the workflow
+JSONs are the whole machine answer; `python scripts/build_variants.py --check`
 confirms they are in sync. Widget
 values are positional, so a new widget is only ever appended at the end of a
 node's list.

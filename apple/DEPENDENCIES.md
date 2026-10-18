@@ -130,7 +130,7 @@ See [MODEL_ASSET_INDEX.md](MODEL_ASSET_INDEX.md) -- generated from the engine co
 
 ### The image model depends on your GPU
 
-`z_image_turbo` is the image engine every machine class uses, and it ships in three precisions. The adapter ranks whatever is installed nvfp4 > fp8 > bf16 and takes the best -- which is a trap if you install the wrong one, because nvfp4 needs hardware fp4 (Blackwell, sm_120) and an older card cannot execute it. The ranking still chooses it, so the engine picks the one file that fails.
+`z_image_turbo` is the shared default image engine (the canonical and AMD), and it ships in three precisions. The adapter ranks whatever is installed nvfp4 > fp8 > bf16 and takes the best -- which is a trap if you install the wrong one, because nvfp4 needs hardware fp4 (Blackwell, sm_120) and an older card cannot execute it. The ranking still chooses it, so the engine picks the one file that fails.
 
 ```bash
 python scripts/otr_fetch_lane_weights.py z_image            # bf16, any NVIDIA

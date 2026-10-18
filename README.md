@@ -532,8 +532,9 @@ will not.
 so it is correct as shipped on NVIDIA, Apple Silicon and CPU. If you would rather
 skip the dropdowns, the pack also ships **a generated workflow per machine, right
 beside the canonical in Browse Templates** (and in
-`custom_nodes/ComfyUI-OldTimeRadio/workflows/`) -- one per machine class and
-episode kind, named `otr_<machine>_<kind>`. Pick one from the menu, drag the file
+`custom_nodes/ComfyUI-OldTimeRadio/workflows/`) -- one per card and episode
+kind, named `otr_<card>_<kind>`. A 10-15 GB card runs an `otr_8gb_*` one, or
+tries an `otr_16gb_*` one at its own risk. Pick one from the menu, drag the file
 onto the canvas, or open it with Workflow → Open. Never hand-edit one; each is
 the canonical with its dropdowns set, regenerated from it, and checked against
 it.

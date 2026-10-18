@@ -143,12 +143,13 @@ def test_episode_of_prompt_names_native_episode_paths(
     assert canonical.episode_of_prompt("native-title-prompt") == episode
 
 
-def test_runner_rejects_machine_and_profile_as_competing_selectors():
+def test_runner_has_no_machine_selector():
+    """Machine classes are gone (operator, 2026-10-18): a workflow id is the
+    only selector, so --machine is an unknown argument."""
     with pytest.raises(SystemExit) as exc:
         canonical.main([
             "--offline-schemas", "--dry-run",
             "--machine", "8gb",
-            "--profile", "otr_8gb_animatediff",
         ])
 
     assert exc.value.code == 2
@@ -421,7 +422,7 @@ def test_video_lane_humo_plays_every_role_and_the_preflight_fetches_only_humo(tm
 def test_video_lane_that_serves_every_role_names_no_routed_lane(tmp_path):
     rc, out = _run_main([
         "--offline-schemas", "--dry-run",
-        "--machine", "16gb",
+        "--profile", "otr_16gb_video",
         "--video-lane", "h3_low_video",
         "--dump-prompt", str(tmp_path / "prompt.json"),
     ])
@@ -430,11 +431,11 @@ def test_video_lane_that_serves_every_role_names_no_routed_lane(tmp_path):
     assert "routed to" not in out
 
 
-def test_video_lane_applies_after_a_machine_key_too(tmp_path):
+def test_video_lane_applies_after_a_workflow_profile(tmp_path):
     dump = tmp_path / "prompt.json"
     rc, out = _run_main([
         "--offline-schemas", "--dry-run",
-        "--machine", "16gb",
+        "--profile", "otr_16gb_video",
         "--video-lane", "h3_low_video",
         "--dump-prompt", str(dump),
     ])

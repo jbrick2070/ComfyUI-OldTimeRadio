@@ -189,8 +189,7 @@ python custom_nodes/ComfyUI-OldTimeRadio/scripts/otr_canonical_api_run.py \
 ls -la output/otr/obs/
 ```
 
-**Use `--workflow`, not `--machine amd`** -- that shortcut expands to an
-unaudited in-memory bundle, not the graph this page is about.
+**Use `--workflow`** -- it runs the exact graph this page is about.
 
 Success is an mp4 in `output/otr/obs/`. Win or lose, an issue titled
 `ROCm: <your card>` with the leg log, the ComfyUI terminal, the ledger

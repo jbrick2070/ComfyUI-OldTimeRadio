@@ -161,7 +161,7 @@ def test_pod_script_publishes_one_atomic_non_secret_runtime_receipt():
         "OTR_COMFYUI_MODELS_ROOT", "HF_HOME", "OTR_INDEXTTS2_ROOT",
         "OTR_INDEXTTS2_DIR", "OTR_INDEXTTS2_WORKER",
         "OTR_VOICE_REFERENCE_BANK", "OTR_PROVISION_PROFILE",
-        "OTR_PROVISION_MACHINE", "OTR_PROVISION_SELECTOR",
+        "OTR_PROVISION_SELECTOR",
         "OTR_PROVISION_GENERATION",
         "OTR_HEADLESS_PORT", "OTR_RUNTIME_SECRETS_FILE",
     ]
@@ -199,17 +199,17 @@ def test_pod_script_publishes_one_atomic_non_secret_runtime_receipt():
     assert 'OTR_REPO_ROOT="${OTR_REPO_ROOT:-$OTR_ROOT}"' not in text
 
 
-def test_pod_default_uses_machine_matrix_and_profiles_are_explicit_overrides():
+def test_pod_picks_a_workflow_from_vram_and_has_no_machine_class():
+    """No machine classes (operator, 2026-10-18): the detected VRAM picks a
+    workflow id directly, and a 10-15 GB card gets the 8 GB set."""
     text = POD.read_text(encoding="utf-8")
 
     assert 'PROFILE="${OTR_PROVISION_PROFILE:-}"' in text
-    assert 'MACHINE="${OTR_PROVISION_MACHINE:-}"' in text
-    assert 'MACHINE="16gb"' in text
-    assert 'MACHINE="12gb"' in text
-    assert 'MACHINE="8gb"' in text
-    assert 'PROVISION_ARGS=(--machine "$MACHINE")' in text
+    assert 'PROFILE="otr_16gb_video"' in text
+    assert 'PROFILE="otr_8gb_animatediff"' in text
     assert 'PROVISION_ARGS=(--profile "$PROFILE")' in text
-    assert 'SELECTOR="machine:$MACHINE"' in text
+    assert "MACHINE" not in text
+    assert "--machine" not in text
     assert '[ -n "${VRAM_MIB:-}" ]' in text
     assert '[ "$VRAM_MIB" -lt 8000 ]' in text
-    assert "below the supported 8 GB machine floor" in text
+    assert "below the supported 8 GB floor" in text

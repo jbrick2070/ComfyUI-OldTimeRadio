@@ -259,16 +259,7 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
     workflow = load_workflow(str(wf_path))
 
     applied: list[str] = []
-    if getattr(args, "machine", None):
-        # A machine key expands to the same dict a profile file would have
-        # produced. No file, no second applier -- config/machine_classes.json
-        # is the only place any of these values exist.
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from otr_machine_profile import build_profile, resolve
-        _prof = build_profile(resolve(args.machine))
-        workflow = apply_profile_to_workflow(workflow, _prof, schemas)
-        applied.append("machine=%s" % args.machine)
-    elif args.profile and args.profile.lower() != "none":
+    if args.profile and args.profile.lower() != "none":
         workflow = apply_profile_to_workflow(workflow, args.profile, schemas)
         applied.append(f"profile={args.profile}")
         if getattr(args, "video_lane", None):
@@ -497,17 +488,10 @@ def main(argv: list[str] | None = None) -> int:
         help="running ComfyUI base URL (Desktop normally "
              "http://127.0.0.1:8188; env/default remains available)",
     )
-    selector = parser.add_mutually_exclusive_group()
-    selector.add_argument(
+    parser.add_argument(
         "--profile", default="none",
-        help="a row id of config/workflow_matrix.json, e.g. otr_16gb_video, "
-             "or none",
-    )
-    selector.add_argument(
-        "--machine", default=None,
-        help="a machine key from config/machine_classes.json "
-             "(8gb, 12gb, 16gb, amd). Expands to settings IN MEMORY -- "
-             "there is no per-machine profile file.",
+        help="a workflow id -- a row of config/workflow_matrix.json, e.g. "
+             "otr_8gb_low or otr_16gb_video -- or none",
     )
     parser.add_argument("--title", default=None,
                         help="NAME THE EPISODE. This fills the episode_title "
@@ -531,7 +515,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="set the announcer, character and music video "
                              "dropdowns to this video lane (e.g. "
                              "h3_low_video), as picking it in the app does; "
-                             "applied after --profile/--machine. Not with "
+                             "applied after --profile. Not with "
                              "--replay-from: a replay keeps its bundle's "
                              "engine (derive a bundle with "
                              "otr_freeze_replay_bundle.py --derive-engine)")

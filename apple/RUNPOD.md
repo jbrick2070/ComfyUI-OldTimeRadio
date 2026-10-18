@@ -41,20 +41,22 @@ receipt.
 For automatic selection by VRAM, clear the overrides, then run the script:
 
 ```bash
-unset OTR_PROVISION_PROFILE OTR_PROVISION_MACHINE OTR_WITH_INDEXTTS2
+unset OTR_PROVISION_PROFILE OTR_WITH_INDEXTTS2
 bash scripts/otr_pod_provision.sh
 ```
 
-Run it from the OTR checkout. Or force a specific class instead of letting it
-detect the card:
+Run it from the OTR checkout. It picks `otr_16gb_video` on a 16 GB or larger
+card and `otr_8gb_animatediff` on anything from 8 GB up to that. Or name the
+workflow yourself instead of letting it detect the card:
 
 ```bash
-export OTR_PROVISION_MACHINE=16gb
+export OTR_PROVISION_PROFILE=otr_16gb_low
 bash scripts/otr_pod_provision.sh
 ```
 
-The class keys are `8gb`, `12gb`, `16gb` and `amd` — the names in
-`config/machine_classes.json`, not the human labels the matrix prints.
+Any workflow id works -- the `otr_*` names in `workflows/`. There are no machine
+classes; a 10-15 GB card runs an 8 GB workflow, or tries a 16 GB one at its own
+risk.
 
 Read the receipt it prints before launching anything. It is the difference
 between "the weights are there" and "the weights were attempted."
@@ -71,7 +73,7 @@ GATED; everything else downloads without an account.
 After provisioning, boot ComfyUI on the pod with
 `main.py --listen 0.0.0.0 --port 8188`, then drive one leg with
 `scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188`
-and the workflow row you provisioned (`--profile` or `--machine`). The full
+and the workflow you provisioned (`--profile <workflow id>`). The full
 boot-and-qualify recipe is in `apple/RUNPOD_INSTALL.md` section 5. You can
 instead load `workflows/otr_canonical.json` in the UI, set the dropdowns for
 the lane you rented the box for, and queue one episode.

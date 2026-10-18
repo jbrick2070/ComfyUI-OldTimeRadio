@@ -80,10 +80,10 @@ def test_amd_profiles_plan_their_exact_image_and_music_dependencies():
     }
 
 
-def test_amd_machine_selector_has_a_complete_dry_run_plan(capsys):
+def test_amd_workflow_has_a_complete_dry_run_plan(capsys):
     provision = _provisioner()
 
-    assert provision.main(["--machine", "amd", "--list"]) == 0
+    assert provision.main(["--profile", "otr_amd_still", "--list"]) == 0
     output = capsys.readouterr().out
     assert "automatic    : z_image_int8" in output or "automatic    : z_image" in output
     assert "manual       : none" in output
@@ -93,7 +93,7 @@ def test_amd_machine_selector_has_a_complete_dry_run_plan(capsys):
 
 def test_kokoro_profiles_fail_early_on_python_313_but_bark_does_not():
     provision = _provisioner()
-    kokoro = provision.load_machine_profile("8gb")
+    kokoro = provision.load_profile("otr_8gb_low")
     bark = copy.deepcopy(provision.load_profile("otr_8gb_animatediff"))
     bark["slot_overrides"]["char_voice_engine"] = "bark"
     bark["slot_overrides"]["announcer_voice_engine"] = "bark"
@@ -112,7 +112,7 @@ def test_machine_readable_plan_check_rejects_kokoro_on_python_314(
     provision = _provisioner()
     monkeypatch.setattr(provision.sys, "version_info", (3, 14, 0))
 
-    assert provision.main(["--machine", "8gb", "--check-plan"]) == 1
+    assert provision.main(["--profile", "otr_8gb_low", "--check-plan"]) == 1
     rejected = capsys.readouterr().out
     assert "MISSING" in rejected
     assert "no backend packaged for Python 3.14" in rejected
@@ -144,18 +144,15 @@ def test_procedural_low_rows_do_not_require_an_uninvoked_image_lane(
     }
 
 
-@pytest.mark.parametrize("machine_key", ["8gb", "12gb"])
-def test_haunted_machine_paths_do_not_require_unconsumed_klein_weights(
-        machine_key):
+@pytest.mark.parametrize("profile_id", ["otr_8gb_animatediff", "otr_16gb_animatediff"])
+def test_haunted_workflows_do_not_require_unconsumed_klein_weights(profile_id):
+    """AnimateDiff takes no init still, so the Klein image lane is never planned."""
     provision = _provisioner()
 
-    # stable_audio_3 is provisioned too since 2026-09-26: the machine classes
-    # now default to the music engine every local workflow ships, not MusicGen.
-    assert provision.profile_lanes(
-        provision.load_machine_profile(machine_key)) == {
-            "automatic": ["haunted", "stable_audio_3"],
-            "manual": [],
-        }
+    assert provision.profile_lanes(profile_id) == {
+        "automatic": ["haunted", "stable_audio_3"],
+        "manual": [],
+    }
 
 
 @pytest.mark.parametrize("missing_image", ["lumina_image", "flux_gen1"])

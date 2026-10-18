@@ -75,21 +75,20 @@ ComfyUI-Manager cannot install this alpha pack reliably. Provision from the
 `main` branch. The bootstrap below locates the template's real ComfyUI
 tree, pins ComfyUI core and partner packs, repairs the measured CUDA mismatch,
 clones or fast-forwards OTR, downloads automatic lanes, warms the selected
-writer, verifies manual tiers, and prints one receipt. Ordinary installs use
-the same `--machine` keys as the generated machine matrix.
+writer, verifies manual tiers, and prints one receipt. It installs one
+workflow, named by its id.
 
-For automatic NVIDIA selection, clear both overrides:
+For automatic NVIDIA selection, clear the overrides:
 
 ```bash
-unset OTR_PROVISION_PROFILE OTR_PROVISION_MACHINE
+unset OTR_PROVISION_PROFILE
 unset OTR_WITH_INDEXTTS2
 
-# Optional: force a matrix row instead of VRAM auto-selection.
-# export OTR_PROVISION_MACHINE=16gb
+# Optional: name the workflow instead of VRAM auto-selection.
+# export OTR_PROVISION_PROFILE=otr_16gb_low
 ```
 
-Use an explicit profile only for a named qualification lane. It overrides a
-previously loaded machine selection:
+Or name a qualification lane:
 
 ```bash
 # Or HuMo 14B:
@@ -118,11 +117,11 @@ automatic path; sections 3 and 4 give the complete manual work that cannot be
 automated.
 
 If no override is exported, the script fails honestly when NVIDIA VRAM cannot
-be read or is below the supported 8 GB floor. It selects matrix key `8gb` from
-8 GB to below 10 GB, `12gb` from 10 through 15 GB, and `16gb` at 16 GB or
-more. Those are the exact rows in `config/machine_classes.json`; the old hidden
-`otr_runpod_starter` default is gone. A set `OTR_PROVISION_PROFILE` remains the
-explicit lab override for HuMo, LTX, or another named experiment.
+be read or is below the supported 8 GB floor. It selects `otr_16gb_video` at
+16 GB or more and `otr_8gb_animatediff` from 8 GB up to that -- a 10-15 GB card
+gets the 8 GB set; name a 16 GB workflow to try one at your own risk. There are
+no machine classes. A set `OTR_PROVISION_PROFILE` names any other workflow or a
+lab lane (HuMo, LTX, another named experiment).
 
 Before the profile pass, provisioning writes two mode-0600 files:
 
@@ -360,7 +359,7 @@ This operator's H3 weights never go to RunPod. The boundary is recorded in
 ```
 
 The five-file lane totals 63,440,965,087 bytes and is never automatically
-selected by a public machine class or pod roster. The public
+selected by the pod's VRAM auto-pick or any shipped workflow. The public
 `mkhamra/quibble-h3` repository is a Ref2VA workflow/case study, not an OTR
 node-pack download source. The physical RTX 4060 has isolated 90-frame H3 clip
 receipts, below OTR's 124-model-frame floor; it does not yet have a full
@@ -441,8 +440,7 @@ PY
 }
 ```
 
-Qualify the provisioned workflow row (machine keys use `--machine`; named rows
-use `--profile` on the runner -- the flag name is historical):
+Qualify the provisioned workflow (`--profile <workflow id>` on the runner):
 
 ```bash
 SAFE_SELECTOR="${OTR_PROVISION_SELECTOR//:/-}"
@@ -452,11 +450,7 @@ export OTR_SERVER_LOG="$QUAL_DIR/server.log"
 
 boot_comfy_for_row "${OTR_PROVISION_SELECTOR}" || exit $?
 
-RUN_SELECTION=()
-case "$OTR_PROVISION_SELECTOR" in
-  machine:*) RUN_SELECTION=(--machine "${OTR_PROVISION_SELECTOR#machine:}") ;;
-  *) RUN_SELECTION=(--profile "$OTR_PROVISION_SELECTOR") ;;
-esac
+RUN_SELECTION=(--profile "$OTR_PROVISION_SELECTOR")
 
 cd "$OTR_REPO_ROOT"
 "$COMFY_PY" scripts/otr_canonical_api_run.py \

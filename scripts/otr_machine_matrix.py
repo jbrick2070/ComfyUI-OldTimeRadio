@@ -10,10 +10,12 @@ all computers -- they don't need a story, just a matrix of what we think will
 work and what has been tested."* He is right. A reader arriving with a card in
 their machine wants one row, not a narrative of how the row was discovered.
 
-WHY IT IS GENERATED. The stranger-facing machine answer, proof receipts, and
-measurements come from `config/machine_classes.json`; experimental workflow
-detail comes from `config/workflow_matrix.json`. A hand-written compatibility table
-is the single most rot-prone document a project can own.
+WHY IT IS GENERATED. Everything comes from `config/workflow_matrix.json`: the
+workflows themselves and the receipts beside them (engine evidence, hardware
+episode receipts, measured peaks, known limits). There are no machine classes
+and no profiles (operator, 2026-10-18: "no machine classes, no profiles, just
+JSONs"). A hand-written compatibility table is the single most rot-prone
+document a project can own.
 
 THE CONFIDENCE LEVELS ARE NOT THE SAME CLAIM, and the table says which:
   * `shipping` / `draft` come from the workflow's own `status` field -- the
@@ -37,23 +39,14 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 
-#: Machine classes are DECLARED in config/machine_classes.json, not here.
-#: Facts in a generator rot invisibly -- nobody greps a script for truth -- so
-#: the judgement lives in data and this module only validates and renders it.
-_CLASS_FILE = os.path.join(_REPO, "config", "machine_classes.json")
+#: The receipts live in config/workflow_matrix.json beside the workflows, not
+#: here. Facts in a generator rot invisibly -- nobody greps a script for truth --
+#: so the judgement lives in data and this module only validates and renders it.
+_MATRIX_FILE = os.path.join(_REPO, "config", "workflow_matrix.json")
 
 #: Not a profile: a mapping config that lives in the same directory and would
 #: otherwise render as a "draft workflow not vouched for".
 _NOT_PROFILES = {"widget_mapping"}
-
-
-class ClassValidationError(Exception):
-    """A declared machine class is incomplete, duplicated, or impossible.
-
-    Raised rather than warned. A compatibility table that quietly disagrees
-    with the profiles is worse than no table: README told users an 8 GB card
-    had "rendered nothing" after six documented episodes published from one.
-    """
 
 
 class EvidenceValidationError(Exception):
@@ -66,12 +59,12 @@ _EVIDENCE_LEVELS = {"PROVEN", "LAB-PROVEN"}
 def load_engine_evidence() -> list:
     """Load and validate receipt-backed engine/hardware proof rows.
 
-    This is deliberately separate from machine-class proof. A class receipt
-    says its recommended full workflow published; an engine evidence row can
-    also preserve a narrower isolated lab result without promoting that workflow.
+    This is deliberately separate from the hardware episode receipts. A
+    hardware receipt says full workflows published; an engine evidence row can
+    also preserve a narrower isolated lab result without promoting a workflow.
     """
     try:
-        doc = json.load(io.open(_CLASS_FILE, encoding="utf-8"))
+        doc = json.load(io.open(_MATRIX_FILE, encoding="utf-8"))
     except OSError:
         return []
     out, problems, seen = [], [], set()
@@ -110,7 +103,7 @@ def load_engine_evidence() -> list:
         out.append(item)
     if problems:
         raise EvidenceValidationError(
-            "config/machine_classes.json has invalid engine evidence:\n  - "
+            "config/workflow_matrix.json has invalid engine evidence:\n  - "
             + "\n  - ".join(problems))
     return out
 
@@ -120,122 +113,56 @@ def _md_cell(value) -> str:
     return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
 
 
-def load_classes():
-    """Load complete, self-contained machine rows; no profile indirection."""
+def load_hardware_receipts() -> list:
+    """Hardware episode receipts: which workflows published on which card.
+
+    Each one carries an exact scope; its presence does NOT silently certify the
+    complete current tuple. Engine-level evidence stays separate. Keeping it
+    honest matters more than keeping it full: PROVEN is the difference between
+    "we think" and "we know".
+    """
     try:
-        doc = json.load(io.open(_CLASS_FILE, encoding="utf-8"))
+        doc = json.load(io.open(_MATRIX_FILE, encoding="utf-8"))
     except OSError:
         return []
-    out, problems, seen = [], [], set()
-    defaults = doc.get("defaults") or {}
-    required = (
-        "key", "label", "gpu_vendor", "vram_min_gb",
-        "writer", "writer_model", "writer_ceiling_gb", "video", "image",
-        "char_voice",
-    )
-    for index, row in enumerate(doc.get("classes", [])):
+    out, problems = [], []
+    for index, row in enumerate(doc.get("hardware_receipts", [])):
         if not isinstance(row, dict):
-            problems.append("classes[%d] is not an object" % index)
+            problems.append("hardware_receipts[%d] is not an object" % index)
             continue
-        merged = dict(defaults)
-        merged.update(row)
-        missing = [name for name in required if merged.get(name) in (None, "")]
-        if missing:
-            problems.append("classes[%d] is missing %s"
-                            % (index, ", ".join(missing)))
-            continue
-        if "vram_max_gb" not in row:
-            problems.append(
-                "classes[%d] is missing vram_max_gb (use null for open-ended)"
-                % index)
-            continue
-        key = str(row["key"])
-        if key in seen:
-            problems.append("duplicate machine key %r" % key)
-            continue
-        seen.add(key)
+        missing = [name for name in (
+            "workflows", "hardware", "episodes", "date", "scope", "evidence"
+        ) if not row.get(name)]
         try:
-            lo = float(row["vram_min_gb"])
-            hi = (None if row["vram_max_gb"] is None
-                  else float(row["vram_max_gb"]))
+            episodes = int(row.get("episodes") or 0)
         except (TypeError, ValueError):
-            problems.append("machine %r has a non-numeric VRAM range" % key)
+            episodes = 0
+        if missing or episodes <= 0:
+            problems.append("hardware_receipts[%d] has %s" % (
+                index, "missing %s" % ", ".join(missing) if missing
+                else "a non-positive episode count"))
             continue
-        if lo <= 0 or (hi is not None and hi < lo):
-            problems.append("machine %r has impossible VRAM range %s-%s"
-                            % (key, row["vram_min_gb"], row["vram_max_gb"]))
-            continue
-        receipts = row.get("proven") or []
-        if receipts and not row.get("proof_summary"):
-            problems.append("machine %r has receipts but no proof_summary" % key)
-            continue
-        bad_receipt = False
-        for receipt_index, receipt in enumerate(receipts):
-            if not isinstance(receipt, dict):
-                problems.append("machine %r receipt[%d] is not an object"
-                                % (key, receipt_index))
-                bad_receipt = True
-                continue
-            receipt_missing = [name for name in (
-                "hardware", "episodes", "date", "scope", "evidence"
-            ) if not receipt.get(name)]
-            try:
-                episode_count = int(receipt.get("episodes") or 0)
-            except (TypeError, ValueError):
-                episode_count = 0
-            if receipt_missing or episode_count <= 0:
-                detail = ("missing %s" % ", ".join(receipt_missing)
-                          if receipt_missing else "non-positive episode count")
-                problems.append("machine %r receipt[%d] has %s"
-                                % (key, receipt_index, detail))
-                bad_receipt = True
-        if bad_receipt:
-            continue
-        out.append(row)
+        out.append(dict(row))
     if problems:
-        raise ClassValidationError(
-            "config/machine_classes.json has invalid machine rows:\n  - "
+        raise EvidenceValidationError(
+            "config/workflow_matrix.json has invalid hardware receipts:\n  - "
             + "\n  - ".join(problems))
     return out
 
-#: Hardware episode receipts live on the declared class row, in its `proven`
-#: list. Each one carries an exact scope; their presence does NOT silently
-#: certify the complete current tuple. Engine-level evidence remains separate.
-#:
-#: Keeping it honest matters more than keeping it full: PROVEN is the difference
-#: between "we think" and "we know", and a padded list destroys the only reason
-#: the table is worth reading.
-def merged_row(row):
-    """defaults <- row, through the ONE merge the profile builder uses.
 
-    Reused from otr_machine_profile rather than repeated here: a second
-    merge would be a second definition of what a machine class means, and
-    the doc and the applied profile could then disagree without either
-    being wrong on its own terms.
-    """
-    import sys
-    if _HERE not in sys.path:
-        sys.path.insert(0, _HERE)
-    from otr_machine_profile import _merged, load_matrix
-    return _merged(load_matrix(), row)
-
-
-def proven_receipts(obj) -> list:
-    """Proof receipts, read from a MATRIX ROW.
-
-    Deliberately not from a profile file. Operator, 2026-08-31: "no profiles,
-    no proven in the code, they just live there" -- there being
-    config/machine_classes.json. Putting receipts on profiles also broke
-    `build_variants --check` on an unknown-key guard, which was that guard
-    correctly refusing a shape nobody had declared.
-    """
-    return [r for r in ((obj or {}).get("proven") or []) if isinstance(r, dict)]
+def load_known_limits() -> list:
+    """Failures written down when they were found -- a record, not a gate."""
+    try:
+        doc = json.load(io.open(_MATRIX_FILE, encoding="utf-8"))
+    except OSError:
+        return []
+    return [str(item) for item in (doc.get("known_limits") or []) if item]
 
 
 def load_measurements() -> list:
     """Load exact measured values and their conditions from matrix data."""
     try:
-        doc = json.load(io.open(_CLASS_FILE, encoding="utf-8"))
+        doc = json.load(io.open(_MATRIX_FILE, encoding="utf-8"))
     except OSError:
         return []
     out, problems = [], []
@@ -252,7 +179,7 @@ def load_measurements() -> list:
         out.append(dict(row))
     if problems:
         raise EvidenceValidationError(
-            "config/machine_classes.json has invalid measurements:\n  - "
+            "config/workflow_matrix.json has invalid measurements:\n  - "
             + "\n  - ".join(problems))
     return out
 
@@ -319,23 +246,28 @@ def load_profiles() -> list:
     return out
 
 
-def _tier(vram):
-    """Group experimental profiles by their declared writer VRAM ceiling."""
-    if not vram:
-        return "unstated"
-    ceiling = float(vram)
-    if ceiling <= 9:
-        return "8 GB"
-    # A 14.5 GB writer ceiling is the established 16 GB-card class: the
-    # process still needs allocator/headroom outside that declared writer
-    # budget. The middle machine row deliberately caps its writer at 10 GB;
-    # experimental 10-12 GB ceilings stay in that detail band.
-    if ceiling <= 12:
-        return "10-15 GB"
-    return "16 GB+"
+#: Workflows are grouped by the card their NAME says they are for -- the JSON
+#: is the machine answer, nothing derives a class from a VRAM number.
+_GROUPS = (
+    ("otr_8gb_", "8 GB NVIDIA"),
+    ("otr_16gb_", "16 GB NVIDIA"),
+    ("otr_24gb_", "24 GB NVIDIA"),
+    ("otr_mac16_", "Apple Silicon (16 GB)"),
+    ("otr_amd_", "AMD / ROCm"),
+    ("otr_cloud_", "Cloud"),
+    ("otr_google_", "Cloud"),
+)
 
 
-_ORDER = ["8 GB", "10-15 GB", "16 GB+", "unstated"]
+def _group(profile_id: str) -> str:
+    for prefix, label in _GROUPS:
+        if str(profile_id).startswith(prefix):
+            return label
+    return "Any machine"
+
+
+_ORDER = ["8 GB NVIDIA", "16 GB NVIDIA", "24 GB NVIDIA", "Apple Silicon (16 GB)",
+          "AMD / ROCm", "Cloud", "Any machine"]
 
 
 #: ENGINE -> the third-party ComfyUI node pack it needs, and whether its weights
@@ -379,14 +311,12 @@ def render() -> str:
     A = L.append
     A("# Machine matrix -- what runs where\n")
     A("**GENERATED by `scripts/otr_machine_matrix.py` from "
-      "`config/machine_classes.json` (the receipts) and `config/workflow_matrix.json` (the workflows). "
+      "`config/workflow_matrix.json` (the workflows and their receipts). "
       "Do not hand-edit; regenerate.**\n")
-    A("Find your listed machine in **What works on what machine**. Apple "
-      "Silicon and CPU-only systems still have experimental rows rather "
-      "than a stranger-facing machine key; find those in the tier details.\n")
+    A("Open the workflow named for your card. There are no machine classes and "
+      "no profiles: the workflow JSONs are the whole machine answer.\n")
 
     # ---- evidence first, then the front-door machine answer ----------------
-    classes = load_classes()
     A("## Engine proof by hardware\n")
     A("Only receipt-backed rows appear here. **PROVEN** means a full OTR "
       "episode published on the named hardware. **LAB-PROVEN** means an "
@@ -411,78 +341,50 @@ def render() -> str:
     A("Do not grep `episode_canon.json` for engine names: it records none, "
       "and matches land in PROSE -- searching it for `humo` finds the word "
       "`humorous` and invents a receipt.\n")
-    A("## What works on what machine\n")
-    A("**Read the `extra install` column before you pick a row.** A lane that "
-      "needs a third-party ComfyUI node pack cannot say so in "
+    A("## Which workflow to open\n")
+    A("| your card | open |")
+    A("|---|---|")
+    A("| 8 GB NVIDIA (RTX 4060, 3070, 2080) | an `otr_8gb_*` workflow |")
+    A("| 10-15 GB NVIDIA (RTX 4070, 3080) | an `otr_8gb_*` workflow -- or try an "
+      "`otr_16gb_*` one at your own risk |")
+    A("| 16 GB NVIDIA and up (RTX 5080, 3090, 4090) | an `otr_16gb_*` workflow; "
+      "`otr_24gb_foley` targets a 24 GB card |")
+    A("| Apple Silicon, 16 GB | an `otr_mac16_*` workflow |")
+    A("| AMD / ROCm | `otr_amd_still` (unproven) |")
+    A("| no GPU, or not sure | `otr_canonical` -- it resolves the device at run time |")
+    A("")
+    A("**Read the `extra install` column in the tables below before you pick a "
+      "row.** A lane that needs a third-party ComfyUI node pack cannot say so in "
       "`requirements.txt` or `pyproject.toml`, because a node pack is not a pip "
       "distribution -- so the requirement is invisible until the render fails "
-      "with a missing class. That has already cost one divergence between the "
-      "PROVEN path and the DOCUMENTED path (PBUG-20260829-09), when the box "
-      "that proved the lane had git-cloned the pack by hand. `gated` means the "
-      "weights need a Hugging Face licence acceptance before they download.\n")
-    A("| your machine | writer | video | voice | music | image | extra install | status |")
-    A("|---|---|---|---|---|---|---|---|")
-    for row in classes:
-        label = row.get("label", "?")
-        # Read the ROW, never a profile it may not name. Every machine value
-        # lives in config/machine_classes.json (operator, 2026-08-31: "no
-        # profiles in the code"), and no row carries `recommended`, so a
-        # profile-linked branch would print "no profile yet" for ALL FOUR
-        # classes while the matrix holds real, proven values -- and the
-        # front-door table of the guide would tell every newcomer that
-        # nothing runs anywhere.
-        cells = merged_row(row)
-        conf = (row.get("proof_summary")
-                or "`%s`, unproven" % cells.get("status", "draft"))
-        A("| **%s** | %s | %s | %s | %s | %s | %s | %s |" % (
-            label, cells.get("writer", "--"), cells.get("video", "--"),
-            cells.get("char_voice", "--"), cells.get("music", "--"),
-            cells.get("image", "--"), extra_install_for(cells), conf))
-    A("")
-    A("**Use the machine key, not an experimental row's id.** Run these "
-      "with the exact Python executable that launches ComfyUI (shown as "
-      "`<ComfyUI Python>`). Preview the install plan first, then run the same "
-      "command without `--list` to install it.\n")
-    for row in classes:
-        A("* **%s** -> `<ComfyUI Python> scripts/otr_provision.py --machine %s --list`"
-          % (row.get("label"), row.get("key")))
-    A("\nProvisioning installs and verifies artifacts; it does not rewrite the "
-      "saved workflow. To apply one row atomically to the real canonical workflow "
-      "on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/"
+      "with a missing class (PBUG-20260829-09).\n")
+    A("Run these with the exact Python executable that launches ComfyUI (shown "
+      "as `<ComfyUI Python>`). Preview a workflow's install plan first, then run "
+      "the same command without `--list` to install it:\n")
+    A("* `<ComfyUI Python> scripts/otr_provision.py --profile otr_8gb_low --list` "
+      "-- replace `otr_8gb_low` with the workflow you picked.\n")
+    A("Provisioning installs and verifies artifacts; it does not rewrite the "
+      "saved workflow. To apply one workflow to the real canonical graph on a "
+      "normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/"
       "otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 "
-      "--machine 8gb --act-count 1 --source-bank original --visual-style "
-      "sci_fi_radio --timeout 0`, replacing only the exact machine key. To use "
-      "an explicit workflow row instead, replace `--machine 8gb` with `--profile "
-      "<exact-profile-id>`; the two selectors are intentionally exclusive "
-      "(`--profile` is the flag name on both scripts; it selects a row by id). "
-      "Every machine row selects the Kokoro voice. On the Python 3.13 that "
-      "ComfyUI Desktop and the portable build ship it runs through kokoro-onnx "
-      "on the CPU (the same voices, about six times faster than realtime), or "
-      "on CUDA by itself when onnxruntime-gpu is installed; on "
-      "Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro "
-      "backend packaged yet; there, switch the OTR_CastLock voice dropdowns "
-      "to bark.")
+      "--profile otr_8gb_low --act-count 1 --source-bank original "
+      "--visual-style sci_fi_radio --timeout 0`. Every NVIDIA and Mac workflow "
+      "selects the Kokoro voice. On the Python 3.13 that ComfyUI Desktop and the "
+      "portable build ship it runs through kokoro-onnx on the CPU (the same "
+      "voices, about six times faster than realtime), or on CUDA by itself when "
+      "onnxruntime-gpu is installed; on Python 3.12 through the torch kokoro "
+      "package. Python 3.14 has no kokoro backend packaged yet; there, switch "
+      "the OTR_CastLock voice dropdowns to bark.")
     A("\nApple Silicon runs the `otr_mac16_*` workflows, PROVEN on a named "
-      "physical system -- a "
-      "Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and "
-      "2026-09-08, including local `sd15` stills and local `ltx_8gb` video "
-      "diffusion. It is not promoted to a machine key: a machine key implies a "
-      "measured VRAM tier, and one 16 GB Mac is one data point, not a tier. "
-      "Read `apple/MAC.md` before starting -- it ships with the pack, unlike "
-      "`docs/`. CPU-ONLY IS PROVEN ON THE CANONICAL ITSELF, 2026-09-13: "
-      "ComfyUI launched with `--cpu` on an x86 laptop, the GPU present and "
-      "unused, ran `otr_canonical` with no row override and no other overrides -- "
-      "exactly what the quickstart tells a stranger to open -- and published "
-      "a 2m07s episode to `otr/obs/` in 19 minutes 54 seconds. The writer is "
-      "nearly all of that: Qwen3.5-4B generates at about 3 tokens a second "
-      "on a CPU, while Kokoro runs at 0.12x realtime and the procedural "
-      "video lanes draw their own frames. A second CPU-only workflow published "
-      "the same day in 34.5 minutes; that workflow (`otr_cpu_low`) was retired "
-      "on 2026-09-23 because its writer was a Comfy Credits slot, which made "
-      "it a cloud tier with procedural visuals -- `otr_cloud_low` pays the "
-      "same writer and gets real stills and cloud video. The canonical "
-      "receipt above is unaffected and is the one that matters: CPU-only "
-      "works on the workflow the quickstart actually tells you to open.\n")
+      "physical system -- a Mac mini M4 / 16 GB published episodes to "
+      "`otr/obs/` on 2026-09-07 and 2026-09-08, including local `sd15` stills "
+      "and local `ltx_8gb` video diffusion. Read `apple/MAC.md` before "
+      "starting. CPU-ONLY IS PROVEN ON THE CANONICAL ITSELF, 2026-09-13: "
+      "ComfyUI launched with `--cpu` on an x86 laptop ran `otr_canonical` with "
+      "no overrides and published a 2m07s episode to `otr/obs/` in 19 minutes "
+      "54 seconds. The writer is nearly all of that: Qwen3.5-4B generates at "
+      "about 3 tokens a second on a CPU, while Kokoro runs at 0.12x realtime "
+      "and the procedural video lanes draw their own frames.\n")
     A("")
 
     A("## How to read the confidence column\n")
@@ -500,15 +402,15 @@ def render() -> str:
 
     by = {}
     for p in profs:
-        by.setdefault(_tier(p["vram"]), []).append(p)
+        by.setdefault(_group(p["id"]), []).append(p)
 
-    for tier in _ORDER:
-        rows = by.get(tier) or []
+    for group in _ORDER:
+        rows = by.get(group) or []
         if not rows:
             continue
         ship = sum(1 for r in rows if r["status"] == "shipping")
-        A("## %s  --  %d experimental workflow(s), %d shipping\n"
-          % (tier, len(rows), ship))
+        A("## %s  --  %d workflow(s), %d shipping\n"
+          % (group, len(rows), ship))
         # Only PROVEN and shipping rows are tabled. A tier holding 76 drafts is
         # a dump, not a guide: a reader picking a row cannot tell which of 76 to
         # trust. Drafts are counted and folded away, listed by the engine they
@@ -516,16 +418,19 @@ def render() -> str:
         headline = [r for r in rows if r["status"] == "shipping"]
         drafts = [r for r in rows if r not in headline]
         if headline:
-            A("| row | video | voice | music | image | confidence | install recipe |")
-            A("|---|---|---|---|---|---|---|")
+            A("| row | video | voice | music | image | extra install | confidence | install recipe |")
+            A("|---|---|---|---|---|---|---|---|")
             for r in sorted(headline, key=lambda x: x["id"]):
                 conf = "`%s`" % r["status"]
-                A("| `%s` | %s | %s | %s | %s | %s | %s |" % (
+                extra = extra_install_for({
+                    "video": r["video"], "image": r["image"],
+                    "music": r["music"], "char_voice": r["voice"]})
+                A("| `%s` | %s | %s | %s | %s | %s | %s | %s |" % (
                     r["id"], r["video"], r["voice"], r["music"], r["image"],
-                    conf, r["install_recipe"]))
+                    extra, conf, r["install_recipe"]))
             A("")
         else:
-            A("**No shipping row at this tier.**\n")
+            A("**No shipping workflow in this group.**\n")
         if drafts:
             eng = sorted({r["video"] for r in drafts})
             A("<details><summary>%d draft workflow(s) here -- not vouched for"
@@ -541,11 +446,9 @@ def render() -> str:
     _voice_engines_table(A)
 
     A("## A bigger card does not currently get you more\n")
-    A("The machine class is `16 GB+`: there is no separate 24/32 GB machine "
-      "key, so the install planner selects the 16 GB+ row for any card that "
-      "size. One shipped workflow targets a bigger card on purpose -- "
-      "`otr_24gb_foley`, LTX 2.5 on the int8 DiT with a 22 GB writer "
-      "ceiling -- and you open it by hand.\n")
+    A("A 24 or 32 GB card runs the `otr_16gb_*` workflows. One shipped "
+      "workflow targets a bigger card on purpose -- `otr_24gb_foley`, LTX 2.5 "
+      "on the int8 DiT with a 22 GB writer ceiling -- and you open it by hand.\n")
     A("**That matters when you are paying by the hour.** A rented 24 GB card "
       "ran the 16 GB haunted workflow and peaked at 15,990 MB, and rented "
       "Ampere has published LTX-2b, so the smaller lanes reach well beyond the "
@@ -554,13 +457,10 @@ def render() -> str:
       "hardware/software/RAM receipt.\n")
 
     A("## Hardware episode receipts, with their exact scope\n")
-    for row in classes:
-        for r in proven_receipts(row):
-            A("* **%s** on %s -- %s episode(s), %s. Scope: %s. Evidence: %s"
-              % (row.get("label", row.get("key", "?")),
-                 r.get("hardware", "?"), r.get("episodes", "?"),
-                 r.get("date", "?"), r.get("scope", "?"),
-                 r.get("evidence", "")))
+    for r in load_hardware_receipts():
+        A("* **`%s`** on %s -- %s episode(s), %s. Scope: %s. Evidence: %s"
+          % (r["workflows"], r["hardware"], r["episodes"], r["date"],
+             r["scope"], r.get("evidence", "")))
     A("")
     A("## Measured peaks, with their conditions\n")
     A("A VRAM number without its conditions is how somebody buys the wrong card.\n")
@@ -586,15 +486,10 @@ def render() -> str:
       "27.53 GiB of system RAM while using 13.06 GiB VRAM. Its public recipe "
       "therefore asks for at least 32 GiB host RAM. The legal-length H3 receipt "
       "did not capture host RAM, so it provides no H3 host-memory minimum.\n")
-    # KNOWN LIMITS ARE DECLARED IN config/machine_classes.json AND WERE A DEAD
-    # CHANNEL: the field was read by nothing and rendered nowhere, so a limit
-    # someone took the trouble to write down never reached the person it was
-    # written for. A limit nobody sees is not a limit.
-    try:
-        with open(_CLASS_FILE, encoding="utf-8") as fh:
-            _limits = (json.load(fh) or {}).get("known_limits") or []
-    except Exception:  # noqa: BLE001 -- the doc still renders without them
-        _limits = []
+    # KNOWN LIMITS WERE ONCE A DEAD CHANNEL: the field was read by nothing and
+    # rendered nowhere, so a limit someone took the trouble to write down never
+    # reached the person it was written for. A limit nobody sees is not a limit.
+    _limits = load_known_limits()
     if _limits:
         A("## Known limits, written down when they were found\n")
         for _lim in _limits:
@@ -625,7 +520,7 @@ _END = "<!-- END GENERATED: machine-matrix -->"
 
 
 def inject_readme(check_only: bool = False) -> bool:
-    """REMOVE the class table from README. True if README already has none.
+    """REMOVE the old machine table from README. True if README has none.
 
     The name is kept because `--check` and `main` both call it and the job is
     still "make README agree with this generator" -- the agreement is now that
@@ -692,7 +587,7 @@ def _voice_engines_table(A) -> None:
         # doing exactly that: run under a torch-less interpreter, this branch
         # replaced the whole voice table in the shipped doc with one
         # parenthetical, and the write reported success. `render()` may still
-        # degrade -- callers that only want the class table depend on it -- so
+        # degrade -- callers that only want the front tables depend on it -- so
         # the flag is what main() refuses on.
         global _DEGRADED
         _DEGRADED = "voice-engine table (%s)" % exc
@@ -701,7 +596,7 @@ def _voice_engines_table(A) -> None:
         return
     A("## Voice engines\n")
     A("What each voice engine needs, read from the audio registry. Kokoro is the "
-      "shipped default for both voice slots on every machine row; the others stay in "
+      "shipped default for both voice slots on every NVIDIA and Mac workflow; the others stay in "
       "the `OTR_CastLock` dropdowns as install-it-yourself upgrades.\n")
     A("| engine | roles | runs on | usable without a GPU | sidecar / vendor | ships with the pack |")
     A("|---|---|---|---|---|---|")

@@ -1020,7 +1020,7 @@ def render_apple(rows: list) -> str:
              "anywhere and resolves your device at run time, it is the "
              "otr_canonical entry in Browse Templates, and it fetches no video or "
              "image weights -- "
-             "which is why every machine class below can run it. The per-machine "
+             "which is why every machine below can run it. The per-machine "
              "rows are a STEP UP once that has worked: each one is the canonical "
              "with its dropdowns pinned to heavier lanes, so the first queue on "
              "one of them downloads whatever those lanes need.\n\n")

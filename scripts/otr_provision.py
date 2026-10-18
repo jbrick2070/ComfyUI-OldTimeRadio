@@ -1286,21 +1286,6 @@ def load_profile(profile_id: str) -> dict:
             "%r is not a row of config/workflow_matrix.json: %s" % (profile_id, exc))
 
 
-def load_machine_profile(machine_key: str) -> dict:
-    path = os.path.join(_HERE, "otr_machine_profile.py")
-    spec = importlib.util.spec_from_file_location("otr_machine_profile_provision", path)
-    if spec is None or spec.loader is None:
-        raise ProvisionFailure("cannot load machine matrix helper")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    try:
-        matrix = module.load_matrix()
-        row = module.resolve(machine_key, matrix)
-        return module.build_profile(row, matrix)
-    except SystemExit as exc:
-        raise ProvisionFailure(str(exc))
-
-
 class _Unrouted:
     """No provisioning lane is DECLARED for this engine.
 
@@ -1574,12 +1559,10 @@ def _print_receipt(success: str = "everything installed.") -> int:
 def main(argv=None) -> int:
     _LOG.clear()
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    selector = ap.add_mutually_exclusive_group()
-    selector.add_argument("--profile",
-                          help="exact row id from config/workflow_matrix.json "
-                               "(default: otr_8gb_animatediff)")
-    selector.add_argument("--machine",
-                          help="exact config/machine_classes.json key")
+    ap.add_argument("--profile",
+                    help="a workflow id -- an exact row of "
+                         "config/workflow_matrix.json "
+                         "(default: otr_8gb_animatediff)")
     ap.add_argument("--with-all-voices", action="store_true",
                     help="build EVERY isolated voice engine: indextts2, "
                          "chatterbox. Large; each gets its own venv.")
@@ -1601,10 +1584,7 @@ def main(argv=None) -> int:
     routes = None
     if not args.packs_only:
         try:
-            if args.machine:
-                profile = load_machine_profile(args.machine)
-            else:
-                profile = load_profile(args.profile or "otr_8gb_animatediff")
+            profile = load_profile(args.profile or "otr_8gb_animatediff")
             routes = profile_lanes(profile)
         except ProvisionFailure as exc:
             say("FAILED", "profile selection", str(exc))

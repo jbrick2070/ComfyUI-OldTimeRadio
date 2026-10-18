@@ -1099,7 +1099,7 @@ def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
     # killer.
     #
     # The model: the dropdown decides, the workflow runs it, and a real
-    # failure is written into config/machine_classes.json under `known_limits`
+    # failure is written into config/workflow_matrix.json under `known_limits`
     # -- the matrix is the RECORD, never the controller. The code does not
     # consult it for permission.
     #
