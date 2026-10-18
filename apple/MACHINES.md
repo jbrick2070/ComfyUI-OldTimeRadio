@@ -87,6 +87,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
+| `flux3_klein` | **auto** | ? | ? | ? | not offered | ? | not offered |
 | `sd15` | **auto** | 2.0 GiB | fits | **proven** | **proven** | ? | too slow |
 | `lumina_image` | **auto** | 10.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `flux_gen1` | **auto** | 16.1 GiB | **OOM** | **proven** | not offered | ? | not offered |

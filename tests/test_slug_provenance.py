@@ -381,6 +381,9 @@ ENGINE_COVERAGE = {
     # collect -- the four artifacts are resolved through folder_paths exactly
     # like the other local image engines.
     "ideogram4_local": "local",
+    # flux3_klein (2026-10-18): LOCAL weights fetched from a pinned mirror; no
+    # provider slug to collect.
+    "flux3_klein": "local",
     # --- image: cloud ---------------------------------------------------------
     "google_image": "collected", "cloud_nano_banana_2": "collected",
     "cloud_seedream_2": "collected", "cloud_krea_2_turbo": "collected",

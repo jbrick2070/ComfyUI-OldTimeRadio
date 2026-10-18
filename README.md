@@ -849,6 +849,10 @@ IndexTTS2 engines -- thanks to all of their authors.
 off-by-default pieces carry restricted terms:
 
 - `flux_gen1` (Flux.1-dev) -- BFL non-commercial licence.
+- `flux3_klein` (FLUX 3 Image Klein) -- FLUX Kommunity License: free to use, and
+  outputs are commercial-use only for a Qualifying User (under US$5M annual revenue
+  with affiliates). BFL's repos are gated, so the pack fetches byte-identical files
+  from a pinned, ungated mirror; see `apple/FLUX3_KLEIN_LICENSE_ATTESTATION.md`.
 - `ideogram4_local` -- non-commercial model agreement. The pack does not ship the
   weights; it fetches them on first use from Comfy-Org's public Ideogram-4
   repackage on Hugging Face, under that agreement.

@@ -196,7 +196,7 @@ def test_the_video_checklist_offers_every_local_lane_but_cloud():
     # HuMo is a lane like any other now (no role swaps it away, 2026-10-15).
     assert [c for c in choices if c.startswith("humo")], choices
     assert not [c for c in choices if c.startswith(("cloud_", "google_"))], choices
-    assert set(L.still_roll_choices()) == {"flux_gen1", "ideogram4_local",
+    assert set(L.still_roll_choices()) == {"flux_gen1", "flux3_klein", "ideogram4_local",
                                            "lumina_image", "sd15", "z_image_turbo"}
 
 

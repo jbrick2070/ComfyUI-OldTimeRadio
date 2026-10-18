@@ -116,6 +116,28 @@ _PINNED_SOURCES = (
     ("vae", "Comfy-Org/Ideogram-4", "vae/flux2-vae.safetensors",
      "2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d", 336_211_292,
      "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3"),
+    # FLUX 3 IMAGE KLEIN, added 2026-10-18 (operator: add it as an optional
+    # still-image dropdown, auto-download proven BEFORE it is baked into any
+    # workflow JSON). BFL's own repos are GATED (HTTP 401 without a token), so the
+    # pack fetches from the ungated third-party mirror ml-resources/
+    # flux-3-image-klein-comfy (Hub API gated:false, anonymous 302, 2026-10-18).
+    # It is a straight copy: for every file under diffusion_models/,
+    # text_encoders/ and vae/ the mirror's git blob id and size equal BFL's gated
+    # repo's (the blob id is the hash of the LFS pointer, which embeds the
+    # SHA-256), and its LICENSE.md / NOTICE.md are the same blobs. The int8
+    # ConvRot pair is the smallest universal precision (nvfp4 is Blackwell-only).
+    # The Flux 2 VAE is NOT a new row: `vae/flux2-vae.safetensors` above carries
+    # the identical SHA-256 (868fe7b3...) from the Ideogram 4 repackage, and
+    # MANIFEST is keyed on (category, basename).
+    # LICENCE: FLUX Kommunity License v1.0 -- apple/FLUX3_KLEIN_LICENSE_ATTESTATION.md.
+    ("diffusion_models", "ml-resources/flux-3-image-klein-comfy",
+     "diffusion_models/flux3-image-klein-int8-convrot.safetensors",
+     "3ba0f7064cbb1666a71e2820d3cc5c2273bb6cd0", 5_827_874_779,
+     "847d8933548afd93df4af2cac2498e70891bf28d9dae06d695f536992e168fe2"),
+    ("text_encoders", "ml-resources/flux-3-image-klein-comfy",
+     "text_encoders/qwen3vl_4b_int8_convrot.safetensors",
+     "3ba0f7064cbb1666a71e2820d3cc5c2273bb6cd0", 4_858_559_240,
+     "32de113cbf8282b02cbff0794b637b9d6676da09314a1db5a30bcea9bf4ee01c"),
     # FLUX.1-DEV, added 2026-09-29 for the same directive. The all-in-one fp8
     # checkpoint flux_gen1 loads through CheckpointLoaderSimple (model, CLIP
     # and VAE in one file). Comfy-Org/flux1-dev is public and ungated, unlike
@@ -334,7 +356,7 @@ _MINIMAX_H3_WEIGHT_ENGINES = frozenset({
 #: ``_weight_tokens()``, so a 1.7B tier never pulls the 14B DiT or the LoRA.
 _HUMO_WEIGHT_ENGINES = frozenset({"humo", "humo_14B_169", "humo_1.7B", "humo_1.7B_169"})
 _COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image",
-                      "ideogram4_local", "flux_gen1"}
+                      "ideogram4_local", "flux_gen1", "flux3_klein"}
                      | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES
                      | _ANIMATEDIFF_WEIGHT_ENGINES | _MINIMAX_H3_WEIGHT_ENGINES
                      | _HUMO_WEIGHT_ENGINES)
@@ -676,7 +698,8 @@ def _same_file(left, right):
 
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
                     sd15=None, lumina=None, ideogram=None, flux=None, ltx25=None,
-                    animatediff=None, minimax_h3=None, humo=None, env=None,
+                    animatediff=None, minimax_h3=None, humo=None, flux3=None,
+                    env=None,
                     writer_models=(), upscale_models=()):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
@@ -820,6 +843,24 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
             raise VisualAssetError("flux_gen1 adapter resolution is unavailable")
         add("checkpoints", flux._flux_params({})["ckpt_name"],
             explicit=str(env.get("OTR_FLUX_CKPT") or ""))
+    if "flux3_klein" in engines:
+        # ASK THE ADAPTER: `_resolve_unet_name` is what assert_usable and the
+        # loader share. The encoder and the VAE follow the env-or-default
+        # basename rule; the Flux 2 VAE token is the Ideogram 4 row's.
+        if flux3 is None:
+            raise VisualAssetError("flux3_klein adapter resolution is unavailable")
+        token, verified = flux3._resolve_unet_name()
+        if verified and _native_path(folder_paths, "diffusion_models", token) is None:
+            raise VisualAssetError("FLUX 3 Klein adapter reports an installed selection "
+                                   "that the native loader cannot resolve; no "
+                                   "replacement/path repair")
+        add("diffusion_models", token, explicit=str(env.get(flux3.MODEL_ENV) or ""))
+        for category, key, default in (
+            ("text_encoders", flux3.CLIP_ENV, flux3._DEFAULT_CLIP),
+            ("vae", flux3.VAE_ENV, flux3._DEFAULT_VAE),
+        ):
+            explicit = str(env.get(key) or "")
+            add(category, os.path.basename(explicit or default), explicit=explicit)
     selected_animatediff = sorted(engines & _ANIMATEDIFF_WEIGHT_ENGINES)
     if selected_animatediff:
         # ASK EACH LANE: `_weight_tokens()` names the files its own
@@ -1300,7 +1341,7 @@ def _load_adapters(engines):
     ``engines`` -- no adapter module is imported for a lane nobody selected."""
     adapters = dict.fromkeys(
         ("zimage", "ltx", "sa3", "sd15", "lumina", "ideogram", "flux", "ltx25",
-         "animatediff", "minimax_h3", "humo"))
+         "animatediff", "minimax_h3", "humo", "flux3"))
     if "z_image_turbo" in engines:
         from ._otr_image_engines import z_image_turbo
         adapters["zimage"] = z_image_turbo
@@ -1319,6 +1360,9 @@ def _load_adapters(engines):
     if "ideogram4_local" in engines:
         from ._otr_image_engines import ideogram4_local
         adapters["ideogram"] = ideogram4_local
+    if "flux3_klein" in engines:
+        from ._otr_image_engines import flux3_klein
+        adapters["flux3"] = flux3_klein
     if "flux_gen1" in engines:
         from ._otr_image_engines.flux_gen1 import FluxGen1ImageEngine
         adapters["flux"] = FluxGen1ImageEngine()

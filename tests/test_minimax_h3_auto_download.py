@@ -313,6 +313,9 @@ def test_only_the_pinned_sources_carry_a_pin():
         ("text_encoders", "qwen3vl_8b_fp8_scaled.safetensors"),
         ("vae", "flux2-vae.safetensors"),
         ("checkpoints", "flux1-dev-fp8.safetensors"),
+        # FLUX 3 Image Klein (2026-10-18); its VAE is the flux2-vae row above.
+        ("diffusion_models", "flux3-image-klein-int8-convrot.safetensors"),
+        ("text_encoders", "qwen3vl_4b_int8_convrot.safetensors"),
     }
     humo = {
         ("diffusion_models", "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"),

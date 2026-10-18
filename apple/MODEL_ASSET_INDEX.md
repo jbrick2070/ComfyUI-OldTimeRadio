@@ -101,6 +101,7 @@ Anything not listed there is a manual install -- see its row below.
 |---|---|---|---|
 | `cloud_image` | nothing on disk | - | - |
 | `google_image` | nothing on disk | - | - |
+| `flux3_klein` | 3 weight file(s) | manual download | - |
 | `flux_gen1` | 1 weight file(s) | manual download | - |
 | `ideogram4_local` | 9 weight file(s) | manual download | - |
 | `lumina_image` | 3 weight file(s) | manual download | - |
@@ -224,6 +225,12 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 - `stable_audio_3_small_music.safetensors`
 - `stable_audio_3_small_music_base.safetensors`
 - `t5gemma_b_b_ul2.safetensors`
+
+**`flux3_klein`** -- `nodes/_otr_image_engines/flux3_klein.py`
+
+- `flux2-vae.safetensors`
+- `flux3-image-klein-int8-convrot.safetensors`
+- `qwen3vl_4b_int8_convrot.safetensors`
 
 **`flux_gen1`** -- `nodes/_otr_image_engines/flux_gen1.py`
 

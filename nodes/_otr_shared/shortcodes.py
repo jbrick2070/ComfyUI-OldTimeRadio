@@ -186,6 +186,7 @@ IMAGE_GEN = {
     "cloud_nano_banana_2": "cnb2",
     "cloud_seedream_2": "csd2",
 
+    "flux3_klein": "fk3i",
     "flux_gen1": "flg1",
     "google_image": "gimg",
     "ideo": "ideo",

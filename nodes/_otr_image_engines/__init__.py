@@ -114,6 +114,15 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# FLUX 3 Image Klein (LOCAL weights, 2026-10-18) -- OPT-IN (default_roles=()).
+# commercial_clean=False (FLUX Kommunity License: outputs only for Qualifying
+# Users; apple/FLUX3_KLEIN_LICENSE_ATTESTATION.md). Needs ComfyUI >= v0.41.0.
+# Greyed by assert_usable until the diffusion model is installed. Own guard.
+try:  # pragma: no cover - trivial guard
+    from . import flux3_klein as _flux3_klein  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 # Cloud partner STILLS adapters (S1 stills lane, 2026-07-03): flux_pro
 # / nano_banana_2 / seedream_2 -- the model-agnostic layer's first CLOUD image
 # engines. Register unconditionally with EMPTY default_roles (selectable, never
