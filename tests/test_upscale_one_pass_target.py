@@ -133,3 +133,19 @@ def test_rtx_vsr_declines_what_one_pass_cannot_reach():
     assert eng.upscale_frames_to(f, 150, 100) is None          # narrower
     assert eng.upscale_frames_to(f, 200 * MAX_SCALE + 8, 400) is None
     assert eng.upscale_frames_to(f, 400, 100 * MAX_SCALE + 8) is None
+
+
+def test_each_segment_logs_which_branch_ran(monkeypatch, caplog):
+    """The MODEL PATH line reads the same for both branches; the 8 GB leg on
+    c7c3e375 could not tell them apart (2026-10-18). One INFO line names it."""
+    import logging
+    with caplog.at_level(logging.INFO, logger="OTR"):
+        _run(monkeypatch, TargetEngine(), n=3, src_w=8, src_h=4,
+             out_w=48, out_h=24, full_frame=True)
+    lines = [r.getMessage() for r in caplog.records if "one pass to 48x24" in r.getMessage()]
+    assert len(lines) == 1, [r.getMessage() for r in caplog.records]
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="OTR"):
+        _run(monkeypatch, TargetEngine(answer=False), n=2, src_w=8, src_h=4,
+             out_w=48, out_h=24, full_frame=True)
+    assert any("x2 then resize" in r.getMessage() for r in caplog.records)

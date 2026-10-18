@@ -1061,6 +1061,7 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
     prev_in_bytes = None
     prev_out_bytes = None
     frames_reused = 0
+    _branch_logged = False
     try:
         while frames_written < int(n_frames):
             want = min(BATCH, int(n_frames) - frames_written)
@@ -1110,6 +1111,15 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
                     _validate_engine_output(
                         out_bhwc, expected_scale=int(engine.intrinsic_scale),
                         in_shape=bhwc.shape)
+                    _branch = "x%d then resize" % int(engine.intrinsic_scale)
+                else:
+                    _branch = "one pass to %dx%d" % (_target_w, _target_h)
+                # Which spatial branch ran, once per segment: the MODEL PATH
+                # line reads the same for both, and a green leg must show it.
+                if not _branch_logged:
+                    _branch_logged = True
+                    log.info("[OTR_SilentComposite] upscale %s for %s: %s",
+                             engine.name, os.path.basename(seg_path), _branch)
                 if tuple(out_bhwc.shape[1:3]) != (int(h), int(w)) or not full_frame:
                     out_bhwc = _fit(out_bhwc, int(w), int(h))
                 # .contiguous() before .numpy() -- non-contiguous tensors after
