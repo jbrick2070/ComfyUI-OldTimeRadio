@@ -519,8 +519,17 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
         # Both lead with the CHARACTER's own description; scene_character just
         # frames them in a wide environment instead of a tight portrait.
         ce = char_entry if isinstance(char_entry, dict) else {}
-        subject = str(ce.get("portrait_prompt") or ce.get("appearance")
-                      or ce.get("character_description") or "").strip()
+        # Only the drawable part of the description: no Voice/Presence prose
+        # and no "Label:" prefixes, which FLUX 3 Klein letters into the
+        # picture (PBUG-20261018-03).
+        try:
+            from ._otr_shared.cast_picture_text import picture_description
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared.cast_picture_text import picture_description  # type: ignore
+        subject = picture_description(
+            str(ce.get("portrait_prompt") or ce.get("appearance")
+                or ce.get("character_description") or "").strip(),
+            still=True)
         # (separator sanitize now happens once on the COMPOSED string below,
         # so `setting` and any other authored field is covered too)
         if not subject:

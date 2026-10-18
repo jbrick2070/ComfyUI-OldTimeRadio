@@ -27,25 +27,33 @@ import re
 
 __all__ = ["picture_description"]
 
-#: A labelled clause the picture cannot draw, up to the end of its sentence.
-_VOICE = re.compile(r"\bVoice:\s*[^.]*(?:\.|$)", re.IGNORECASE)
-_PRESENCE = re.compile(r"\bPresence:\s*[^.]*(?:\.|$)", re.IGNORECASE)
-#: A ``Label:`` at the start of the text or of a sentence ("Face:",
-#: "Distinctive detail:"). Letters only, so a time like 10:30 is untouched.
-_LABEL = re.compile(r"(^|[.;!?]\s+)[A-Za-z][A-Za-z]*(?:\s+[A-Za-z]+){0,2}:\s+")
+#: The labels the casting format and its writers use. Only these are stripped,
+#: so ordinary prose with a colon ("She whispers: run.") is left alone.
+_LABEL_WORDS = (r"(?:Face|Distinctive\s+detail|Detail|Presence|Voice|Hair|"
+                r"Eyes|Build|Wardrobe|Clothing|Look|Appearance)")
+#: A clause body runs to the end of its sentence, steps over a common
+#: abbreviation ("St. Louis", "Dr. Ames"), and stops at the next label even
+#: when the writer left out the period.
+_BODY = (r"(?:\b(?:Dr|Mr|Mrs|Ms|St|Jr|Sr|Mt|Ft|Lt|Capt|Col|Gen|Prof|Rev|vs|etc)\.|"
+         r"(?!\b" + _LABEL_WORDS + r"\s*:)[^.])*"
+         r"(?:\.|$|(?=\b" + _LABEL_WORDS + r"\s*:))")
+_VOICE = re.compile(r"\bVoice\s*:\s*" + _BODY, re.IGNORECASE)
+_PRESENCE = re.compile(r"\bPresence\s*:\s*" + _BODY, re.IGNORECASE)
+_LABEL = re.compile(r"\b" + _LABEL_WORDS + r"\s*:\s*", re.IGNORECASE)
 
 
 def picture_description(text, *, still: bool) -> str:
     """The cast description with what a picture model cannot draw removed.
 
     ``still=False`` (video) drops the ``Voice:`` clause only. ``still=True``
-    also drops ``Presence:`` and every ``Label:`` prefix. Never raises; an
-    empty or non-string value returns ``""``.
+    also drops ``Presence:`` and the casting labels (``Face:``, ``Distinctive
+    detail:`` ...) wherever they sit, keeping the words after them. Never
+    raises; an empty or non-string value returns ``""``.
     """
     if not text or not isinstance(text, str):
         return ""
     cleaned = _VOICE.sub(" ", text)
     if still:
         cleaned = _PRESENCE.sub(" ", cleaned)
-        cleaned = _LABEL.sub(r"\1", " ".join(cleaned.split()))
+        cleaned = _LABEL.sub("", cleaned)
     return " ".join(cleaned.split()).strip(" ,")

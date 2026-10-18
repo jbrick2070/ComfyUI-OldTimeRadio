@@ -56,3 +56,43 @@ def test_the_still_lookup_and_its_fallback_both_clean_the_row():
     row2 = {"char_id": "c02", "portrait_prompt": RASHIDA,
             "character_description": "ignored"}
     assert "Voice" not in ip._appearance_for_char([row2], "c02")
+
+
+def test_only_casting_labels_are_stripped_wherever_they_sit():
+    """Ordinary prose with a colon is not a label (Sonnet QA on ba27903e)."""
+    assert picture_description("She whispers: run. Face: oval.", still=True) \
+        == "She whispers: run. oval."
+    assert picture_description("Note the scar: it runs deep.", still=True) \
+        == "Note the scar: it runs deep."
+    assert picture_description("Hair: grey, eyes: green. Build: tall.",
+                               still=True) == "grey, green. tall."
+
+
+def test_a_clause_steps_over_abbreviations_and_stops_at_the_next_label():
+    assert picture_description(
+        "Voice: warm, from St. Louis. A scar on the cheek.", still=True) \
+        == "A scar on the cheek."
+    assert picture_description(
+        "Voice: warm, from St. Louis. A scar.", still=False) == "A scar."
+    # "booms." is a sentence end, not the abbreviation "Ms."
+    assert picture_description(
+        "Voice: deep, booms. A scar on the cheek.", still=True) \
+        == "A scar on the cheek."
+    # A missing period stops at the next label instead of eating it.
+    assert picture_description(
+        "Presence: calm Face: oval, grey eyes.", still=True) == "oval, grey eyes."
+
+
+def test_the_char_scene_composer_reads_the_cleaned_description():
+    """compose_still_prompt built the scene_character subject from the raw row
+    -- the deterministic char-scene fallback's whole prompt (Sonnet QA)."""
+    from nodes import _otr_story_brief_helpers as helpers
+    from nodes._otr_visual_styles import get_visual_style
+    row = {"char_id": "c02", "character_description": RASHIDA}
+    for kind in ("scene_character", "portrait"):
+        p = helpers.compose_still_prompt(
+            {}, kind=kind, role="character_visual", beat_id="b002",
+            char_entry=row, style=get_visual_style({}))
+        assert "deep-set eyes" in p, kind
+        for gone in ("Voice", "Presence", "Face:", "carefully placed stone"):
+            assert gone not in p, (kind, gone)
