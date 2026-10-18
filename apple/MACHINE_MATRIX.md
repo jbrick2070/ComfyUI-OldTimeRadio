@@ -33,7 +33,7 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 | 10-15 GB NVIDIA (RTX 4070, 3080) | an `otr_8gb_*` workflow -- or try an `otr_16gb_*` one at your own risk |
 | 16 GB NVIDIA and up (RTX 5080, 3090, 4090) | an `otr_16gb_*` workflow; `otr_24gb_foley` targets a 24 GB card |
 | Apple Silicon, 16 GB | an `otr_mac16_*` workflow |
-| AMD / ROCm | `otr_amd_still` (unproven) |
+| AMD / ROCm | `otr_amd_still` -- PROVEN end to end on a Radeon AI PRO R9700 under ROCm 7.2 (see apple/ROCM.md) |
 | no GPU, or not sure | `otr_canonical` -- it resolves the device at run time |
 
 **Read the `extra install` column in the tables below before you pick a row.** A lane that needs a third-party ComfyUI node pack cannot say so in `requirements.txt` or `pyproject.toml`, because a node pack is not a pip distribution -- so the requirement is invisible until the render fails with a missing class (PBUG-20260829-09).
@@ -106,19 +106,11 @@ Video engines they select: `ltx25_foley_24gb`
 | `otr_mac16_still` | still_motion | kokoro | stable_audio_3 | sd15 | none | `shipping` | complete; Python <=3.13 |
 | `otr_mac16_video` | ltx098_low_video | kokoro | stable_audio_3 | sd15 | none | `shipping` | complete; Python <=3.13 |
 
-## AMD / ROCm  --  1 workflow(s), 0 shipping
+## AMD / ROCm  --  1 workflow(s), 1 shipping
 
-**No shipping workflow in this group.**
-
-<details><summary>1 draft workflow(s) here -- not vouched for</summary>
-
-Video engines they select: `still_motion`
-
-| row | video | voice |
-|---|---|---|
-| `otr_amd_still` | still_motion | kokoro |
-
-</details>
+| row | video | voice | music | image | extra install | confidence | install recipe |
+|---|---|---|---|---|---|---|---|
+| `otr_amd_still` | still_motion | kokoro | stable_audio_3 | z_image_turbo | none | `shipping` | complete; Python <=3.13 |
 
 ## Cloud  --  6 workflow(s), 6 shipping
 
@@ -157,6 +149,7 @@ A 24 or 32 GB card runs the `otr_16gb_*` workflows. One shipped workflow targets
 * **`otr_16gb_*`** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-30. Scope: AnimateDiff-haunted episode; not the current row tuple. Evidence: 1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK
 * **`otr_16gb_*`** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-31. Scope: AnimateDiff-haunted episode; not the current row tuple. Evidence: animatediff + sci_fi_radio + scifi_news_pro, 1-act: 187.6 s, 1920x1080 h264 + aac, 3621 s render, obs_publish OK. DRAM canary tripped at 1.64 GB available and the blend proceeded anyway -- advisory, not a degrade; the published episode is full quality.
 * **`otr_16gb_*`** on RTX A4500 20 GB (rented, Ampere sm_86) -- 1 episode(s), 2026-09-01. Scope: LTX-2b episode with the z_image bf16 image path exercised; not the current row tuple. Evidence: ltx_8gb (LTX-2b-0.9.8-distilled): 9 beats -> 1100 frames, 63.8 s 1920x1080 h264 + aac, 1925 s, obs_publish OK. First meaty video-diffusion lane proven on a NON-Blackwell card. Same run confirmed the architecture-aware image lane: compute_cap 86 selected z_image bf16 over nvfp4, which this card cannot execute.
+* **`otr_amd_*`** on AMD Radeon AI PRO R9700, 32 GB (RDNA4, gfx1201) -- 1 episode(s), 2026-09-14. Scope: otr_amd_still exactly as shipped, no graph edits; Ubuntu 24.04.4 in Docker, ROCm 7.2, PyTorch 2.9.1+rocm7.2.4, ComfyUI 0.35.1, pack 0b38424; an outside tester's box. Evidence: apple/ROCM.md -- script, cast, voices, music, stills, captions, credits, muxed; clean pass, no traceback
 
 ## Measured peaks, with their conditions
 
@@ -200,7 +193,7 @@ The honest use of these numbers is COMPARATIVE -- which lane is heavier than whi
 
 * `install recipe` describes whether every selected artifact has one exact automatic or manual owner. It is not a hardware result.
 
-* AMD/ROCm is largely unexplored -- `otr_amd_still` ships and is not proven. **Apple Silicon is NOT in that bucket**: it has published episodes on a Mac mini M4 / 16 GB, and the engine-proof table above carries its receipts (`viz_camera`, `sd15`, `ltx_8gb`, and all four `still_*` lanes). This line used to say non-NVIDIA generally was unproven, four lines below the rows disproving it.
+* AMD/ROCm has one proven workflow, `otr_amd_still`, on one card (a Radeon AI PRO R9700 under ROCm 7.2); other AMD cards and lanes are untested. Apple Silicon has published episodes on a Mac mini M4 / 16 GB, and the engine-proof table above carries its receipts (`viz_camera`, `sd15`, `ltx_8gb`, and all four `still_*` lanes).
 
 * Where a lane needs weights, see [MODEL_ASSET_INDEX.md](MODEL_ASSET_INDEX.md) for the exact files and where to get them. That generated index is the cross-reference owner; the single RunPod playbook may repeat exact manual recipes where a stranger needs them at install time.
 

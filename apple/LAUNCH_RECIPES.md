@@ -627,7 +627,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 - file: `workflows/otr_amd_still.json`
 - workflow: `otr_amd_still` (AMD ROCm (an outside tester published an episode from this workflow on a Radeon AI PRO R9700 under ROCm 7.2, 2026-09-14, no edits). A still image with motion, Kokoro voices, Stable Audio 3. quant_policy is 'none' because bitsandbytes on ROCm is unmeasured -- see apple/ROCM.md.)
-- status: draft
+- status: shipping
 - platform/backend/vendor: any/cuda/amd
 - master_hash: `879d877e08c1d0f8b355aef3a5e0b29314e3a42238f9c2dc049ac315165246e2`
 

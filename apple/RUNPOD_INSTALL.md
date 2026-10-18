@@ -416,8 +416,6 @@ boot_comfy_for_row () {
   local row="$1"
   local -a boot_args=()
   case "$row" in
-    machine:*)
-      ;; # public machine rows use the stock ComfyUI boot (default contract)
     *)
       mapfile -t boot_args < <(
         "$COMFY_PY" - "$OTR_REPO_ROOT" "$row" <<'PY'

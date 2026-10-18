@@ -544,7 +544,7 @@
     {
       "id": "otr_amd_still",
       "display_name": "AMD ROCm (an outside tester published an episode from this workflow on a Radeon AI PRO R9700 under ROCm 7.2, 2026-09-14, no edits). A still image with motion, Kokoro voices, Stable Audio 3. quant_policy is 'none' because bitsandbytes on ROCm is unmeasured -- see apple/ROCM.md.",
-      "status": "draft",
+      "status": "shipping",
       "device_backend": "cuda",
       "gpu_vendor": "amd",
       "ships": true,
@@ -1114,6 +1114,14 @@
       "date": "2026-09-01",
       "scope": "LTX-2b episode with the z_image bf16 image path exercised; not the current row tuple",
       "evidence": "ltx_8gb (LTX-2b-0.9.8-distilled): 9 beats -> 1100 frames, 63.8 s 1920x1080 h264 + aac, 1925 s, obs_publish OK. First meaty video-diffusion lane proven on a NON-Blackwell card. Same run confirmed the architecture-aware image lane: compute_cap 86 selected z_image bf16 over nvfp4, which this card cannot execute."
+    },
+    {
+      "workflows": "otr_amd_*",
+      "hardware": "AMD Radeon AI PRO R9700, 32 GB (RDNA4, gfx1201)",
+      "episodes": 1,
+      "date": "2026-09-14",
+      "scope": "otr_amd_still exactly as shipped, no graph edits; Ubuntu 24.04.4 in Docker, ROCm 7.2, PyTorch 2.9.1+rocm7.2.4, ComfyUI 0.35.1, pack 0b38424; an outside tester's box",
+      "evidence": "apple/ROCM.md -- script, cast, voices, music, stills, captions, credits, muxed; clean pass, no traceback"
     }
   ],
   "measurements": [

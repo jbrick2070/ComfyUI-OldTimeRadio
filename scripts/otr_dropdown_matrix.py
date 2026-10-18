@@ -59,7 +59,7 @@ _APPLE = os.path.join(_REPO, "apple", "MACHINES.md")
 _BEGIN = "<!-- BEGIN GENERATED: dropdown-matrix -->"
 _END = "<!-- END GENERATED: dropdown-matrix -->"
 
-#: The machine classes the table has columns for, in reading order. Each names
+#: The machines the table has columns for, in reading order. Each names
 #: a REAL row of `config/workflow_matrix.json` -- the availability answer is that
 #: row's, not an invented one, and it is also the graph a person on that machine
 #: should open, so every cell is reproducible from the variant it names. The CPU
@@ -87,7 +87,7 @@ _REGISTRIES = (
 #: Why the code refuses an engine on a machine -> what to say in a cell. The
 #: wording matters: none of these mean "your hardware cannot do this", and a
 #: table that implies they do sends people to buy a machine they already own.
-#: The machine classes `_otr_model_catalog.fit_tags_for` actually evaluates.
+#: The card sizes `_otr_model_catalog.fit_tags_for` actually evaluates.
 #: Anything outside this set gets no derived verdict, only "?".
 _WRITER_FIT_KEYS = frozenset({"mac16", "nv8", "nv16", "nv24"})
 

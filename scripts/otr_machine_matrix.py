@@ -350,7 +350,8 @@ def render() -> str:
     A("| 16 GB NVIDIA and up (RTX 5080, 3090, 4090) | an `otr_16gb_*` workflow; "
       "`otr_24gb_foley` targets a 24 GB card |")
     A("| Apple Silicon, 16 GB | an `otr_mac16_*` workflow |")
-    A("| AMD / ROCm | `otr_amd_still` (unproven) |")
+    A("| AMD / ROCm | `otr_amd_still` -- PROVEN end to end on a Radeon AI PRO R9700 "
+      "under ROCm 7.2 (see apple/ROCM.md) |")
     A("| no GPU, or not sure | `otr_canonical` -- it resolves the device at run time |")
     A("")
     A("**Read the `extra install` column in the tables below before you pick a "
@@ -501,12 +502,11 @@ def render() -> str:
     A("* A `draft` row is not a promise. Most have never been run end to end.\n")
     A("* `install recipe` describes whether every selected artifact has one "
       "exact automatic or manual owner. It is not a hardware result.\n")
-    A("* AMD/ROCm is largely unexplored -- `otr_amd_still` ships and is not "
-      "proven. **Apple Silicon is NOT in that bucket**: it has "
-      "published episodes on a Mac mini M4 / 16 GB, and the engine-proof table "
-      "above carries its receipts (`viz_camera`, `sd15`, `ltx_8gb`, and all "
-      "four `still_*` lanes). This line used to say non-NVIDIA generally was "
-      "unproven, four lines below the rows disproving it.\n")
+    A("* AMD/ROCm has one proven workflow, `otr_amd_still`, on one card (a "
+      "Radeon AI PRO R9700 under ROCm 7.2); other AMD cards and lanes are "
+      "untested. Apple Silicon has published episodes on a Mac mini M4 / 16 GB, "
+      "and the engine-proof table above carries its receipts (`viz_camera`, "
+      "`sd15`, `ltx_8gb`, and all four `still_*` lanes).\n")
     A("* Where a lane needs weights, see "
       "[MODEL_ASSET_INDEX.md](MODEL_ASSET_INDEX.md) for the exact files and "
       "where to get them. That generated index is the cross-reference owner; "

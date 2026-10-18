@@ -1842,7 +1842,7 @@ _METAL_BF16_RESIDENT_FACTOR = 14.0 / 8.68
 #: host down when something else is. Above it, it cannot fit at all.
 _MAC16_PHYSICAL_GB = 16.0
 
-#: What each machine class can actually give a writer, in GB. The NVIDIA rows
+#: What each card size can actually give a writer, in GB. The NVIDIA rows
 #: are the card minus what the rest of the pipeline needs; 14.5 for the 16 GB
 #: class is this repo's own DEFAULT_VRAM_CEILING_GB. The Mac row is a
 #: JUDGEMENT, not a measurement: 16 GB shared with macOS, and the measured
@@ -1950,7 +1950,7 @@ def metal_resident_gb(repo_id: str, download_gb: float) -> tuple:
 
 
 def fit_tags_for(repo_id: str) -> tuple:
-    """Machine classes this writer FITS, smallest first. Derived, never typed.
+    """Card sizes this writer FITS, smallest first. Derived, never typed.
 
     WHY THE PICKER NEEDS THIS AND A SIZE IS NOT ENOUGH. The operator's rule
     (2026-08-01) is that the picker states "how much VRAM it needs so users
