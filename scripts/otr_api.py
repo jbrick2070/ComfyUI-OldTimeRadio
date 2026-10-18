@@ -1086,10 +1086,9 @@ def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
     if isinstance(profile, str):
         profile = load_profile(profile)
     else:
-        # Machine rows are built in memory rather than loaded through
-        # load_profile(), so this is their production shape boundary. This is
-        # schema validation only; there is no capability/VRAM gate (see below).
-        profile = validate_profile_shape(profile, source="machine profile")
+        # A dict handed in directly (tests build one) is shape-checked here.
+        # This is schema validation only; there is no capability/VRAM gate.
+        profile = validate_profile_shape(profile, source="in-memory workflow row")
     # NO CAPABILITY CROSS-VALIDATION (operator directive 2026-08-31: "I don't
     # want to maintain any warning gate either", after "let's power through
     # testing without inviting some artificial profile gate"). Refusing a
