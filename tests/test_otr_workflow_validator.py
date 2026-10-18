@@ -88,6 +88,12 @@ class TestCanonicalWorkflow:
 # ---------------------------------------------------------------------------
 
 class TestAdversarialWorkflow:
+    @pytest.fixture(autouse=True)
+    def _workflows_in_the_input_folder(self, tmp_path, monkeypatch):
+        # The validator reads only from workflow folders (registry review,
+        # 2026-10); a test workflow lives in the input folder like a user's.
+        monkeypatch.setenv("OTR_INPUT_DIR", str(tmp_path))
+
     def test_missing_workflow_file_raises_file_not_found(self, tmp_path):
         """An invalid workflow path raises FileNotFoundError -- the
         node refuses to silently no-op on a misconfigured widget."""

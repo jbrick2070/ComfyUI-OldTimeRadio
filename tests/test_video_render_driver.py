@@ -7,6 +7,8 @@ Here we prove the model-agnostic glue the driver is responsible for: a failed
 shot is labelled and fails once, LOUD, and requests are deterministic.
 """
 
+import os
+
 import pytest
 
 from nodes._otr_video_engines import cheap_families  # noqa: F401 (register)
@@ -147,11 +149,15 @@ def test_still_flat_character_beat_uses_landscape_scene_still_not_portrait():
                 "char_id": cid, "creative": {}}
 
     # CHARACTER beat: the 16:9 character scene still, NOT the vertical portrait.
+    # Compared by NAME: the request carries the confined absolute spelling of
+    # the still it picked (2026-10-18), and the choice is what is pinned here.
+    def picked(req):
+        return os.path.basename(req["asset_refs"].get("init_image") or "")
     req_char = rd.build_request_from_shot(shot("b002", "c01"), ledger)
-    assert req_char["asset_refs"].get("init_image") == "scene_b002.png"
-    assert req_char["asset_refs"].get("init_image") != "portrait_c01.png"
+    assert picked(req_char) == "scene_b002.png"
+    assert picked(req_char) != "portrait_c01.png"
     req_music = rd.build_request_from_shot(shot("b003", ""), ledger)
-    assert req_music["asset_refs"].get("init_image") == "scene_b003.png"
+    assert picked(req_music) == "scene_b003.png"
 
 
 def test_still_flat_character_beat_missing_still_clears_init_no_portrait_leak():

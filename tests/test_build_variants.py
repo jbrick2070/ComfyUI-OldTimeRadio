@@ -233,6 +233,8 @@ def test_build_variant_leaves_canonical_untouched(canonical, schemas,
 def test_validator_asserts_master_hash(tmp_path, canonical, schemas,
                                        mapping, monkeypatch):
     from nodes._otr_workflow_validator import WorkflowValidator
+    # The validator reads only from workflow folders (2026-10-18).
+    monkeypatch.setenv("OTR_INPUT_DIR", str(tmp_path))
     from nodes._otr_shared import boot_contracts as bc
 
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
@@ -270,6 +272,8 @@ def test_validator_runs_cpu_snapshot_on_a_gpu_server(
     """otr_cloud_low on the 5080 refused with "needs --cpu ON" (2026-09-30).
     A cloud workflow runs on a GPU server too; the stamp still passes."""
     from nodes._otr_workflow_validator import WorkflowValidator
+    # The validator reads only from workflow folders (2026-10-18).
+    monkeypatch.setenv("OTR_INPUT_DIR", str(tmp_path))
     from nodes._otr_shared import boot_contracts as bc
 
     variant, _rel, _recipe = bv.build_variant(

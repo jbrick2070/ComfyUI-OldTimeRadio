@@ -21,6 +21,14 @@ from nodes import otr_shot_lock as _sl                               # noqa: E40
 
 
 @pytest.fixture(autouse=True)
+def _fixture_paths_pass_the_read_guard(monkeypatch):
+    """These paths are spellings, never files: the tests pin WHICH still a lane
+    is handed. The read confinement at the request boundary is proven on its
+    own in tests/test_read_confinement.py."""
+    monkeypatch.setattr(_rd, "_confined_ledger_path", lambda path, _field: path)
+
+
+@pytest.fixture(autouse=True)
 def _prompt_only_lanes_get_a_still(monkeypatch, tmp_path):
     """These tests exercise PROMPT COMPOSITION and mint no image assets.
 

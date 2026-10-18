@@ -17218,3 +17218,37 @@ not promote it to the Bug Bible on this evidence alone.
   reads `lines[].text` as what was said (otr_meta_brief_image_prompt.py).
   The voice never speaks it (clean_spoken_text at every engine, Kokoro since
   12ff8485). Status unchanged: OPEN, WILL-NOT-FIX.
+
+## PBUG-20261018-01 -- the registry flagged 2.3.21/2.3.22: path inputs were read anywhere
+- evidence: `GET api.comfy.org/nodes/comfyui-old-time-radio/versions?include_status_reason=true`
+  -- 2.3.21 Flagged "policy-v0.6: arbitrary-file-read"; 2.3.22 Flagged
+  "policy-v0.6: arbitrary-file-read, path-traversal" (reflag-pending-review).
+  2.3.20 is the last Active version; 2.3.23-2.3.33 sit Pending.
+- cause: only REMOTE paths were refused on the read side. A node input -- or a
+  path riding inside a JSON input or the ledger, all settable through ComfyUI's
+  unauthenticated /prompt -- reached ffmpeg, open(), json.load, an engine or
+  a stat verbatim, so a workflow could read any file on the box into an output
+  it then fetched over /view. The workflow validator also joined a relative
+  path to its own folder, so "../" climbed out (the path-traversal half).
+- fix: one `_confine` core in nodes/_otr_paths.py (text refusals first -- NUL,
+  UNC/URL, "..", drive-relative, alternate data streams -- then containment
+  lexically AND after realpath), shared by the existing write guard and the new
+  read guard. Read roots are otr/episodes, otr/obs, ComfyUI input and temp,
+  plus $OTR_EXTRA_OUTPUT_ROOTS (operator: "only approved folder ... usually
+  otr/episodes"); voice references add the models roots, confined inside the
+  ONE resolver (`resolve_voice_ref_path`) so the node's check and the engine's
+  open still agree. Wired at the validator, caption burn, mux (inputs, foley
+  stems, IS_CHANGED hash), silent composite (input, clip manifest, IS_CHANGED,
+  sibling master probe), credits roll, render batch, replay import, the render
+  driver's engine-bound init_image/audio_ref and still fast path, the image
+  dispatcher's pool trust probe and replay verify, the portrait hash (hex
+  only), episode ids (":" refused), and /otr/latest_ledger.
+- policy: a direct node input that is refused RAISES (the operator typed it);
+  a ledger-carried path that is refused DEGRADES LOUD to "absent" (Law 7: a
+  render does not die over one still or one reference), and the degrade path
+  opens the confined absolute spelling it checked, never the raw value.
+- reviews: Codex (gpt-6.1-sol) and agy (gemini-4-argon) inventories before
+  code; Cursor (Auto -- Grok 4.7 is not on the free plan) REFUTED the first
+  diff on check-A/open-B, which this entry's commit closes. comfyui-darkroom's
+  Flagged -> Active fix (utils/paths.py) was the recipe.
+- status: FIXED in code; awaiting the registry's re-scan of the next version.

@@ -134,14 +134,44 @@ def resolve_voice_ref_path(ref):
     ORDER IS THE CONTRACT: an explicit models-root override wins because it is
     the provisioner's location authority. With no override, the historical
     candidate remains first, so an existing box resolves exactly as it always
-    did. When nothing exists it returns the absolute-path fallback -- a path the
-    caller will fail LOUDLY on, which is better than a bare ``None`` the worker
-    would report as an empty filename.
+    did. When nothing exists it returns the FIRST candidate as a named miss --
+    a path the caller will fail LOUDLY on, which is better than a bare ``None``
+    the worker would report as an empty filename. (Until 2026-10-18 the miss was
+    ``abspath(ref)``, i.e. relative to the process CWD -- the same place as the
+    first candidate when ComfyUI runs from its own folder, and outside every
+    approved folder when it does not.)
 
-    Passthrough for empty and for an already-absolute path, matching every
-    caller's existing expectation.
+    Passthrough for empty. Every other answer -- an already-absolute value
+    too -- is CONFINED to the models roots and the episode folders, and ``""``
+    otherwise (2026-10-18): registry review flagged "arbitrary-file-read,
+    path-traversal" because an absolute reference passed straight through, a
+    relative one could climb with ``../``, and the engines then read the
+    bytes. Confined HERE, in the one resolver, so the node's existence check
+    and the engine's open still answer the same question the same way.
     """
-    if not ref or os.path.isabs(ref):
+    if not ref:
+        return ref
+    try:
+        from .._otr_paths import confined_or_empty, refused_by_text, voice_read_roots
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import (  # type: ignore
+            confined_or_empty, refused_by_text, voice_read_roots)
+    # The spelling first: the search below STATS candidates built from `ref`,
+    # so a `../` or UNC value must be refused before any of them is touched.
+    confined = ("" if refused_by_text(ref) else
+                confined_or_empty(_resolve_voice_ref_unconfined(ref),
+                                  roots=voice_read_roots()))
+    if not confined:
+        log.warning(
+            "[OTR voice] refusing voice reference %r: it resolves outside the "
+            "models roots and the episode folders", ref)
+    return confined
+
+
+def _resolve_voice_ref_unconfined(ref):
+    """The candidate search behind :func:`resolve_voice_ref_path`. Never call
+    it directly: what it returns has not been confined."""
+    if os.path.isabs(ref):
         return ref
     rp = str(ref).replace("\\", "/")
     stripped = rp[len("models/"):] if rp.startswith("models/") else rp
@@ -182,7 +212,7 @@ def resolve_voice_ref_path(ref):
     for cand in candidates:
         if cand and os.path.exists(cand):
             return cand
-    return os.path.abspath(ref)
+    return os.path.abspath(candidates[0])
 
 
 def supported_kwargs(fn, **kwargs) -> dict:

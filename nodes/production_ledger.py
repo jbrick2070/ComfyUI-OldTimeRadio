@@ -627,6 +627,17 @@ def _safe_relative(rel: str) -> str:
     return norm
 
 
+def _confine_replay(value, field, roots=None) -> str:
+    """A replay path proven inside the read roots (or ``roots``), else
+    ``OtrPathContractError`` -- the error a UNC ``replay_from`` already raised
+    here, so no caller sees a new exception type."""
+    try:
+        from ._otr_paths import confine_to_read_roots
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confine_to_read_roots  # type: ignore
+    return confine_to_read_roots(value, field, roots=roots)
+
+
 def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
     """Read and validate a bundle's manifest: schema, relative paths, no
     duplicates (case-folded), every file present with the recorded size and
@@ -635,12 +646,10 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
     # WIDGET, i.e. unauthenticated /prompt input. A UNC value would make
     # this machine open an SMB session and authenticate to the host the
     # workflow named, on the very first isfile() below (2026-09-04).
-    try:
-        from ._otr_paths import reject_remote_path as _reject_remote
-    except ImportError:  # pragma: no cover -- flat (sys.path) load
-        from _otr_paths import reject_remote_path as _reject_remote  # type: ignore
-    _reject_remote(bundle_dir, "replay_from")
-    bundle = os.path.abspath(bundle_dir)
+    # AND CONFINED (2026-10-18): registry review flagged "arbitrary-file-read";
+    # a bundle may only be read from the approved folders -- the exporter's
+    # default is <episodes>/_replay. The confinement refuses a remote path first.
+    bundle = _confine_replay(bundle_dir, "replay_from")
     mpath = os.path.join(bundle, REPLAY_MANIFEST_NAME)
     if not os.path.isfile(mpath):
         raise ReplayBundleError("no %s under %s" % (REPLAY_MANIFEST_NAME, bundle))
@@ -661,6 +670,9 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
         full = os.path.join(bundle, *rel.split("/"))
         if os.path.islink(full):
             raise ReplayBundleError("manifest entry is a link: %r" % (rel,))
+        # A link ANYWHERE on the way, not only at the leaf: a linked folder or
+        # junction inside the bundle would lead out of it (2026-10-18).
+        _confine_replay(full, "replay entry %r" % (rel,), roots=[bundle])
         if not os.path.isfile(full):
             raise ReplayBundleError("manifest entry missing on disk: %r" % (rel,))
         size = os.path.getsize(full)
@@ -736,12 +748,10 @@ def import_replay_bundle(bundle_dir: str, new_episode_id: Optional[str] = None) 
     # WIDGET, i.e. unauthenticated /prompt input. A UNC value would make
     # this machine open an SMB session and authenticate to the host the
     # workflow named, on the very first isfile() below (2026-09-04).
-    try:
-        from ._otr_paths import reject_remote_path as _reject_remote
-    except ImportError:  # pragma: no cover -- flat (sys.path) load
-        from _otr_paths import reject_remote_path as _reject_remote  # type: ignore
-    _reject_remote(bundle_dir, "replay_from")
-    bundle = os.path.abspath(bundle_dir)
+    # AND CONFINED (2026-10-18): registry review flagged "arbitrary-file-read";
+    # a bundle may only be read from the approved folders -- the exporter's
+    # default is <episodes>/_replay. The confinement refuses a remote path first.
+    bundle = _confine_replay(bundle_dir, "replay_from")
     manifest = load_replay_manifest(bundle)
     source_id = str(manifest["source_episode_id"])
     new_id = str(new_episode_id or "").strip() or replay_episode_id(source_id)

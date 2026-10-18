@@ -659,12 +659,16 @@ class TestVideoRenderBatchMasterAudioInput:
             received.append(master_audio_path)
             return ({"ok": False, "error": "stub"}, "", "stub.json")
 
+        # A master inside the episodes tree: reads are confined to the
+        # approved folders (registry review, 2026-10-18).
+        from nodes._otr_paths import otr_episodes_root
+        master = str(otr_episodes_root() / "ep" / "master.mp4")
         node = OTRVideoRenderBatch()
         with mock.patch.object(OTRVideoRenderBatch, "_render_episode",
                                staticmethod(_fake_render_episode)):
-            node.render(master_audio_path="/my/master.mp4")
+            node.render(master_audio_path=master)
 
-        assert received == ["/my/master.mp4"], \
+        assert received == [master], \
             "master_audio_path must reach _render_episode"
 
     def test_the_render_node_has_no_widget_slots(self):

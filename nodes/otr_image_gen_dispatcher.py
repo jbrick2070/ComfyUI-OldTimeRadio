@@ -628,8 +628,19 @@ def _reresolve_episode_stills_dir(ep, ep_dir, warnings, ledger=None):
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 
-def _trusted_pool_source(src, output_dir) -> bool:
-    """True iff ``src`` is a still this pack itself wrote. NEVER raises.
+def _confined_or_empty(path) -> str:
+    try:
+        from ._otr_paths import confined_or_empty
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confined_or_empty  # type: ignore
+    return confined_or_empty(path)
+
+
+def _trusted_pool_source(src, output_dir) -> str:
+    """The confined absolute path of ``src`` when it is a still this pack
+    itself wrote, else ``""``. NEVER raises. The caller copies THIS path, not
+    ``src``: a relative ``src`` is checked against ``output_dir`` and would
+    otherwise be opened against the process CWD (Cursor review, 2026-10-18).
 
     The cache index and the image rows both arrive in ``script_json``, i.e. from
     an unauthenticated ``/prompt`` body. Before this check the only gate was
@@ -646,33 +657,33 @@ def _trusted_pool_source(src, output_dir) -> bool:
         test;
       * a real PNG of at least ``_MIN_PNG_BYTES``.
 
-    A False answer is not an error: the caller falls into the existing
+    An empty answer is not an error: the caller falls into the existing
     "no on-disk file; regenerating (LOUD)" path, which is exactly right -- an
     untrusted cache entry should simply not be a cache hit.
     """
     try:
         text = str(src or "").strip()
         if not text:
-            return False
+            return ""
+        # Inside this run's own otr/ tree LEXICALLY AND AFTER REALPATH
+        # (2026-10-18): the abspath check alone let a link inside otr/ lead
+        # out of it -- registry review flagged "arbitrary-file-read". The
+        # helper refuses a remote path first, and anchors a relative value at
+        # the SAME output base the root is built from.
         try:
-            from ._otr_paths import is_remote_path
+            from ._otr_paths import confined_or_empty
         except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_paths import is_remote_path  # type: ignore
-        if is_remote_path(text):
-            return False
-        root = os.path.normcase(os.path.abspath(
-            os.path.join(_pl._output_base(output_dir), "otr")))
-        real = os.path.normcase(os.path.abspath(text))
-        if os.path.commonpath([real, root]) != root:
-            return False
-        if not os.path.isfile(real):
-            return False
+            from _otr_paths import confined_or_empty  # type: ignore
+        base = _pl._output_base(output_dir)
+        real = confined_or_empty(text, roots=[os.path.join(base, "otr")], base=base)
+        if not real or not os.path.isfile(real):
+            return ""
         if os.path.getsize(real) < _MIN_PNG_BYTES:
-            return False
+            return ""
         with open(real, "rb") as handle:
-            return handle.read(len(_PNG_MAGIC)) == _PNG_MAGIC
+            return real if handle.read(len(_PNG_MAGIC)) == _PNG_MAGIC else ""
     except Exception:  # noqa: BLE001 -- a trust probe must never raise
-        return False
+        return ""
 
 
 def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
@@ -1174,9 +1185,13 @@ def verify_replay_images(ledger: dict):
     for row in rows:
         if not isinstance(row, dict):
             continue
-        path = str(row.get("path") or "")
+        raw = str(row.get("path") or "")
+        # Statted only inside the approved folders (2026-10-18): a row naming
+        # anything else counts as missing rather than probing the disk, and the
+        # stat reads the checked spelling, not the raw one.
+        path = _confined_or_empty(raw) if raw else ""
         if not (path and os.path.isfile(path) and os.path.getsize(path) > 0):
-            missing.append(str(row.get("image_id") or path or "?"))
+            missing.append(str(row.get("image_id") or raw or "?"))
     if missing:
         raise RuntimeError(
             "[OTR_ImageGenDispatcher] REPLAY: %d imported image row(s) have no file on "
@@ -1998,7 +2013,9 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     break
             # An untrusted cache source is simply NOT A HIT: fall through to
             # the LOUD regenerate below rather than copying it (2026-09-05).
-            if src and _trusted_pool_source(src, output_dir):
+            trusted = _trusted_pool_source(src, output_dir) if src else ""
+            if trusted:
+                src = trusted   # the checked spelling is the one copied
                 try:
                     dst = _materialize_episode_copy(
                         src, ep_dir, oid,

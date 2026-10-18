@@ -91,6 +91,18 @@ def _replay_master_audio(meta):
         return _silence(1.0), "no master named; 1s fallback"
 
     path = os.path.join(bundle, *rel.split("/"))
+    # AND NOTHING OUTSIDE THE APPROVED FOLDERS (2026-10-18): registry review
+    # flagged "arbitrary-file-read, path-traversal" -- the master must lie in a
+    # read root and inside its own bundle ("../" or a link out is refused).
+    try:
+        from ._otr_paths import is_readable_in_roots as _readable
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import is_readable_in_roots as _readable  # type: ignore
+    if not (_readable(bundle) and _readable(path, roots=[bundle])):
+        log.warning("[SceneSequencer] REPLAY: the frozen master %r is outside the "
+                    "approved folders; refusing to read it, falling back to a "
+                    "one-second batch", path)
+        return _silence(1.0), "replay master outside the approved folders; 1s fallback"
     if not os.path.isfile(path):
         log.warning("[SceneSequencer] REPLAY: frozen master not found at %s; "
                     "falling back to a one-second batch", path)
@@ -1407,6 +1419,15 @@ class EpisodeAssembler:
         rel = str(meta.get("replay_master_audio") or "")
         want = str(meta.get("replay_master_sha256") or "")
         src = os.path.join(bundle, *rel.split("/")) if rel else ""
+        # Confined before the stat and the copy (2026-10-18): in a read root and
+        # inside its own bundle -- "../" or a link out of it is refused.
+        try:
+            from ._otr_paths import is_readable_in_roots as _readable
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import is_readable_in_roots as _readable  # type: ignore
+        if src and not (_readable(bundle) and _readable(src, roots=[bundle])):
+            raise RuntimeError("[OTR_EpisodeAssembler] REPLAY: bundle master %r is outside "
+                               "the approved folders" % (src,))
         if not (src and os.path.isfile(src) and want):
             raise RuntimeError("[OTR_EpisodeAssembler] REPLAY: bundle master missing: %r" % (src,))
         import pathlib as _pathlib

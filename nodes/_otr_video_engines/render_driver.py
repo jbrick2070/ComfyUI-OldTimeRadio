@@ -959,9 +959,15 @@ def _still_spine_materialize_row(row, stills_root):
     if current and _is_remote_row(current):
         current = ""
     try:
-        if current and os.path.isfile(current):
-            if os.path.commonpath((root, current)) == root:
-                return current
+        # The fast return is proven inside the stills directory LEXICALLY AND
+        # AFTER REALPATH (2026-10-18): commonpath on abspath let a link inside
+        # it lead out, and this return skips the trust probe below.
+        try:
+            from .._otr_paths import is_readable_in_roots as _readable
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import is_readable_in_roots as _readable  # type: ignore
+        if current and _readable(current, roots=[root]) and os.path.isfile(current):
+            return current
     except (OSError, ValueError):
         pass
     source = ""
@@ -1606,6 +1612,31 @@ def _line_index(ledger):
             if lid:
                 out.setdefault(lid, ln)
     return out
+
+
+def _confined_ledger_path(path, field):
+    """The CONFINED absolute path when ``path`` lies in the approved read
+    folders, else ``""`` (with a warning). The ledger fields this guards are
+    DATA from the workflow, and an engine opens whatever they name -- so it
+    gets the spelling that was checked, never the raw one: a relative value is
+    checked against the output folder and would otherwise be opened against the
+    process CWD (Cursor review, 2026-10-18).
+
+    Degrades rather than raises, deliberately (Law 7): a still or a voice
+    reference that is missing renders as a shot without it, and an engine
+    treats "" exactly as it treats a row that never had the field."""
+    if not path:
+        return path
+    try:
+        from .._otr_paths import confined_or_empty
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confined_or_empty  # type: ignore
+    confined = confined_or_empty(path)
+    if confined:
+        return confined
+    _LOG.warning("[OTR.render_driver] %s %r is outside the approved folders; "
+                 "treated as absent", field, path)
+    return ""
 
 
 def _voice_audio_for_line(line):
@@ -2752,6 +2783,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             "plate, not the mesh subject", int(segment_index or 0),
             shot.get("shot_id"), os.path.basename(_segment_still))
     frame_count = segment_render_frames(shot, segment_index)
+    # THE TWO FILES AN ENGINE WILL OPEN ARE CONFINED HERE, where every lookup
+    # above converges (2026-10-18). Each rode in on the ledger -- a portrait,
+    # still or fodder row's `path`, a line's `*_wav_path` -- and the ledger can
+    # arrive from a /prompt body; registry review flagged
+    # "arbitrary-file-read". Outside the approved folders reads as absent.
+    init_image = _confined_ledger_path(init_image, "init_image")
+    audio = _confined_ledger_path(audio, "audio_ref")
     req = build_request(shot, {"init_image": init_image, "audio_ref": audio},
                         frame_count, canvas)
     # 3D image streams (chunk 5): hand the mesher the STABLE subject id so its

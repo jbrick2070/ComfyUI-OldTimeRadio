@@ -93,7 +93,10 @@ def test_the_refusal_names_the_field_and_the_value():
 ])
 def test_the_sink_refuses_remote_paths(rel, why):
     src = (REPO / rel).read_text(encoding="utf-8")
-    assert "_reject_remote(" in src, "%s does not refuse a remote path (%s)" % (rel, why)
+    # `confine_to_read_roots` (2026-10-18) refuses a remote path before it
+    # resolves anything, so a sink that confines its reads refuses them too.
+    assert "_reject_remote(" in src or "confine_to_read_roots(" in src, (
+        "%s does not refuse a remote path (%s)" % (rel, why))
 
 
 def test_the_replay_import_refuses_a_unc_bundle():

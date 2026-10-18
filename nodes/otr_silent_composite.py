@@ -1312,8 +1312,15 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
             import glob as _glob
             _sib = os.path.join(os.path.dirname(base_video_path),
                                 "*_master.wav")
+            try:
+                from ._otr_paths import is_readable_in_roots as _readable
+            except ImportError:  # pragma: no cover -- flat (sys.path) load
+                from _otr_paths import is_readable_in_roots as _readable  # type: ignore
             for _cand in _glob.glob(_sib):
-                master_dur = max(master_dur, _probe_audio_duration(_cand))
+                # A sibling found by glob can still be a link out of the
+                # folder: probed only inside the read roots (2026-10-18).
+                if _readable(_cand):
+                    master_dur = max(master_dur, _probe_audio_duration(_cand))
         except Exception:  # noqa: BLE001 -- best-effort; fallbacks below
             pass
         if master_dur <= 0:
@@ -1581,11 +1588,18 @@ class OTRSilentComposite:
             # No remote path is STATTED during fingerprinting (2026-09-05):
             # IS_CHANGED runs before the execute-time guard, so a UNC value
             # would authenticate to the workflow's chosen host right here.
+            # Nor anything OUTSIDE THE APPROVED READ FOLDERS (2026-10-18):
+            # registry review flagged "arbitrary-file-read", and statting and
+            # listing a path the workflow named is a probe of its own. The
+            # predicate refuses remote paths too.
             try:
-                from ._otr_paths import is_remote_path as _is_remote
+                from ._otr_paths import is_readable_in_roots
             except ImportError:  # pragma: no cover -- flat (sys.path) load
-                from _otr_paths import is_remote_path as _is_remote  # type: ignore
-            if (base_video_path and not _is_remote(base_video_path)
+                from _otr_paths import is_readable_in_roots  # type: ignore
+
+            def _unreadable(path):
+                return not is_readable_in_roots(path)
+            if (base_video_path and not _unreadable(base_video_path)
                     and os.path.isfile(base_video_path)):
                 st = os.stat(base_video_path)
                 parts.append(("base", base_video_path, st.st_mtime_ns, st.st_size))
@@ -1599,7 +1613,7 @@ class OTRSilentComposite:
                     p = row.get(k)
                     if not p:
                         continue
-                    if _is_remote(p):
+                    if _unreadable(p):
                         continue
                     if os.path.isfile(p):
                         st = os.stat(p)
@@ -1626,7 +1640,7 @@ class OTRSilentComposite:
             # steps 1 and 2 got the remote check and this one did not, so a UNC
             # `base_video_path` still reached `os.listdir(dirname(...))` during
             # fingerprinting -- the SMB session the commit set out to prevent.
-            if base_video_path and not _is_remote(base_video_path):
+            if base_video_path and not _unreadable(base_video_path):
                 base_dir = os.path.dirname(base_video_path)
                 if os.path.isdir(base_dir):
                     try:
@@ -1719,6 +1733,14 @@ class OTRSilentComposite:
             from _otr_paths import otr_episodes_root  # type: ignore
         stem = os.path.splitext(os.path.basename(base_video_path or "episode"))[0]
         out_dir = os.path.join(str(otr_episodes_root()), stem)
+        # Confined BEFORE the folder is made (2026-10-18): a stem of ".."
+        # would otherwise create a folder one level up before the caller's
+        # check on the finished path ever ran.
+        try:
+            from ._otr_paths import confine_to_output_tree
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            from _otr_paths import confine_to_output_tree  # type: ignore
+        confine_to_output_tree(out_dir, "base_video_path")
         os.makedirs(out_dir, exist_ok=True)
         return os.path.join(out_dir, f"{stem}_silent.mp4")
 
@@ -1736,11 +1758,15 @@ class OTRSilentComposite:
         # on the first stat -- BEFORE any spawn -- so the refusal belongs
         # here, where provenance is known, not at the spawn (2026-09-04).
         try:
-            from ._otr_paths import confine_to_output_tree, reject_remote_paths
+            from ._otr_paths import (
+                confine_to_output_tree, confine_to_read_roots, reject_remote_paths)
         except ImportError:  # pragma: no cover -- flat (sys.path) load
             from _otr_paths import (  # type: ignore
-                confine_to_output_tree, reject_remote_paths)
+                confine_to_output_tree, confine_to_read_roots, reject_remote_paths)
         reject_remote_paths(base_video_path=base_video_path, output_path=output_path)
+        # THE READS ARE CONFINED TOO (2026-10-18): registry review flagged
+        # "arbitrary-file-read" -- ffmpeg opened whatever the workflow named.
+        base_video_path = confine_to_read_roots(base_video_path, "base_video_path")
         out = output_path.strip() or self._default_out(base_video_path)
         # AND THE DESTINATION MUST LAND IN THE OUTPUT TREE (2026-09-05): it went
         # to `ffmpeg -y` and to a `.qa.json` `json.dump` beside it, both
@@ -1755,6 +1781,13 @@ class OTRSilentComposite:
                 manifest = m
         except (ValueError, TypeError):
             manifest = {}
+        # Every clip and background-still path rides in on a JSON input:
+        # confined before ffmpeg or the frame reader opens one (2026-10-18).
+        for row in (manifest.get("clips") or []):
+            if isinstance(row, dict):
+                for key in ("path", "bg_still_path"):
+                    if row.get(key):
+                        row[key] = confine_to_read_roots(row[key], "clip %s" % key)
         assemble = bool(manifest.get("clips"))
         # the assemble timeline follows the audio-derived budget fps when present
         eff_fps = int(manifest.get("fps") or fps) if assemble else int(fps)

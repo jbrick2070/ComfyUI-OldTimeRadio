@@ -147,9 +147,26 @@ def test_the_old_private_resolver_would_have_MISSED_it():
 # ---------------------------------------------------------------------------
 # Nothing else moved
 # ---------------------------------------------------------------------------
-def test_an_absolute_path_passes_through_untouched():
-    p = os.path.join("C:\\somewhere", "else.wav")
-    assert resolve_voice_ref_path(p) == p
+def test_an_absolute_path_passes_through_only_inside_the_approved_folders(
+        monkeypatch, tmp_path):
+    """Changed 2026-10-18 (registry review, "arbitrary-file-read"): an absolute
+    reference used to pass through whatever it named. Inside a models root it
+    still does; anywhere else the resolver answers "" -- and so does the node,
+    because it delegates."""
+    root = tmp_path / "models-root"
+    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(root))
+    inside = os.path.join(str(root), "TTS", "refs", "x.wav")
+    assert resolve_voice_ref_path(inside) == os.path.normpath(inside)
+    outside = os.path.join(str(tmp_path.parent.parent), "somewhere", "else.wav")
+    assert resolve_voice_ref_path(outside) == ""
+    assert _resolve_ref_to_disk(outside) is None
+
+
+def test_a_climbing_reference_is_refused_before_any_candidate_is_statted(monkeypatch):
+    statted = []
+    monkeypatch.setattr(os.path, "exists", lambda p: statted.append(p) or False)
+    assert resolve_voice_ref_path("models/TTS/refs/../../../../secret.wav") == ""
+    assert statted == []
 
 
 def test_an_empty_ref_passes_through_and_the_node_still_answers_None():

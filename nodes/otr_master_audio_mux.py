@@ -830,11 +830,14 @@ def _quiet_file_sha256(path: str) -> str:
     # workflow inputs -- before the execute-time reject_remote_paths guard. A
     # UNC value would make this open() authenticate to the host the workflow
     # named. "" is this function's own existing answer for "cannot read it".
+    # AND NEVER ONE OUTSIDE THE APPROVED READ FOLDERS (2026-10-18): registry
+    # review flagged "arbitrary-file-read"; hashing any path a workflow named
+    # was a read primitive of its own. The predicate refuses remote paths too.
     try:
-        from ._otr_paths import is_remote_path as _is_remote
+        from ._otr_paths import is_readable_in_roots
     except ImportError:  # pragma: no cover -- flat (sys.path) load
-        from _otr_paths import is_remote_path as _is_remote  # type: ignore
-    if _is_remote(path):
+        from _otr_paths import is_readable_in_roots  # type: ignore
+    if not is_readable_in_roots(path):
         return ""
     try:
         digest = hashlib.sha256()
@@ -1049,8 +1052,15 @@ def _compile_foley_master(master_audio_path: str, receipts_json: str,
                 "un-levelled provisional master would be a quiet 20%% "
                 "loudness error nobody sees until playback" % exc)
     bearing = [r for r in rows if r.get("foley_path")]
+    try:
+        from ._otr_paths import confine_to_output_tree, confine_to_read_roots
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confine_to_output_tree, confine_to_read_roots  # type: ignore
     for row in bearing:
         row.pop("foley_speech_duck", None)
+        # Each stem path rides in from a JSON input: confined like any other
+        # read (2026-10-18), before the mix opens it.
+        row["foley_path"] = confine_to_read_roots(row["foley_path"], "foley_path")
     speech_rows = [row for row in bearing
                    if _fs.is_speech_duck_lane(row.get("engine_id"))]
     speech_receipt, speech_ledger_path = (
@@ -1080,6 +1090,9 @@ def _compile_foley_master(master_audio_path: str, receipts_json: str,
 
     root, _ext = os.path.splitext(master_audio_path)
     mixed_path = root + "_foley.wav"
+    # Written BESIDE the master the input named, so it is a write the input
+    # steers: confined to the output tree like every other (2026-10-18).
+    confine_to_output_tree(mixed_path, "foley master")
     _fs.write_pcm16_wav(mixed_path, levelled, master_rate)
 
     # Report actual mixed ducks; an unpositioned/out-of-range stem is not one.
@@ -2317,15 +2330,22 @@ class OTRMasterAudioMux:
         # on the first stat -- BEFORE any spawn -- so the refusal belongs
         # here, where provenance is known, not at the spawn (2026-09-04).
         try:
-            from ._otr_paths import confine_to_output_tree, reject_remote_paths
+            from ._otr_paths import (
+                confine_to_output_tree, confine_to_read_roots, reject_remote_paths)
         except ImportError:  # pragma: no cover -- flat (sys.path) load
             from _otr_paths import (  # type: ignore
-                confine_to_output_tree, reject_remote_paths)
+                confine_to_output_tree, confine_to_read_roots, reject_remote_paths)
         reject_remote_paths(silent_video_path=silent_video_path, master_audio_path=master_audio_path,
                              output_path=output_path)
+        # THE READS ARE CONFINED TOO (2026-10-18), before any probe: registry
+        # review flagged "arbitrary-file-read" -- ffprobe/ffmpeg and the WAV
+        # reader opened whatever path the workflow named.
+        silent_video_path = confine_to_read_roots(silent_video_path, "silent_video_path")
+        master_audio_path = confine_to_read_roots(master_audio_path, "master_audio_path")
         if _must_publish:
             _assert_delivery_binding(_intent, _episode_stem(silent_video_path))
-        master_audio_path = _reresolve_master_audio(master_audio_path)
+        master_audio_path = confine_to_read_roots(
+            _reresolve_master_audio(master_audio_path), "master_audio_path")
         # THE RIGHTS RECEIPT IS ADVISORY, NEVER A GATE (operator ruling
         # 2026-10-15: "always have the episode in otr/obs regardless of
         # rights"). The verdict is still read and still reported, so an episode

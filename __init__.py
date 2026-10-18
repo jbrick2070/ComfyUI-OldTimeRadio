@@ -435,6 +435,18 @@ try:
                               "and no ledger under output/otr/episodes/",
                 }, headers=_OTR_CORS_HEADERS)
             latest = str(latest_p)
+            # ONLY A LEDGER INSIDE THE APPROVED FOLDERS (2026-10-18): the walker
+            # follows a linked candidate, and this route needs no login --
+            # registry review flagged "arbitrary-file-read".
+            try:
+                from .nodes._otr_paths import is_readable_in_roots
+            except Exception:  # noqa: BLE001
+                from _otr_paths import is_readable_in_roots  # type: ignore
+            if not is_readable_in_roots(latest):
+                return _otr_web.json_response({
+                    "ok": False,
+                    "reason": "no ledger found inside the approved folders",
+                }, headers=_OTR_CORS_HEADERS)
             with open(latest, "r", encoding="utf-8") as f:
                 ledger = _otr_json.load(f)
             # NO ABSOLUTE PATH IN THE RESPONSE (2026-09-05). This route is

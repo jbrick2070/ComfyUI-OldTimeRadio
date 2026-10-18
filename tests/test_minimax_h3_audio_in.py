@@ -31,6 +31,14 @@ from nodes._otr_video_engines import render_driver as rd
 from nodes._otr_video_engines import wrapper_bridge as wb
 
 
+@pytest.fixture(autouse=True)
+def _fixture_paths_pass_the_read_guard(monkeypatch):
+    """These paths are spellings, never files: the tests pin WHICH still a lane
+    is handed. The read confinement at the request boundary is proven on its
+    own in tests/test_read_confinement.py."""
+    monkeypatch.setattr(rd, "_confined_ledger_path", lambda path, _field: path)
+
+
 LANE = "minimax_h3_audio_in"
 SIBLING = "minimax_h3_video"
 

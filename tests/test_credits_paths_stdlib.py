@@ -173,6 +173,9 @@ class CreditsPathTests(unittest.TestCase):
         paths = types.ModuleType(self.namespace + "._otr_paths")
         paths.confine_to_output_tree = mock.Mock()
         paths.reject_remote_paths = mock.Mock()
+        # The read guard (2026-10-18) returns the path it was handed when the
+        # path lies in a read root; the stub hands it straight back.
+        paths.confine_to_read_roots = mock.Mock(side_effect=lambda value, field, **_k: value)
         self.paths = paths
         self.stack.enter_context(mock.patch.dict(sys.modules, {
             ledger.__name__: ledger, paths.__name__: paths}))
@@ -302,6 +305,7 @@ class CreditsPathTests(unittest.TestCase):
         self.assertNotIn(BODY, self.fs.removed)
         self.assertTrue(self.fs.exists(out))
         self.paths.reject_remote_paths.assert_called_once_with(video_path=BODY)
+        self.paths.confine_to_read_roots.assert_called_once_with(BODY, "video_path")
         self.paths.confine_to_output_tree.assert_called_once_with(out, "video_path")
         self.assertEqual(len(self.commands), 3)  # extract, render, concat
         self.assertEqual(self.commands[0][self.commands[0].index("-i") + 1], BODY)

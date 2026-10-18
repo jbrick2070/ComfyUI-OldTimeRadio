@@ -295,6 +295,197 @@ def _extra_output_roots() -> list:
     return out
 
 
+#: ``C:`` not followed by a separator: a DRIVE-RELATIVE path, which resolves
+#: against that drive's current directory -- wherever that happens to be.
+_DRIVE_RELATIVE = _re.compile(r"^[A-Za-z]:(?![\\/])")
+#: A drive letter that IS followed by a separator: the one colon a Windows path
+#: may carry. Any other colon names an NTFS alternate data stream or a device.
+_DRIVE_ABSOLUTE = _re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def _refuse_by_text(text: str, field: str) -> None:
+    """The refusals that need no filesystem: decided on the value as typed.
+
+    In this order because every later step TOUCHES the disk (``realpath``
+    resolves links, and on Windows a UNC value opens an SMB session), so
+    anything that can be refused from the string alone is refused first.
+    """
+    if "\x00" in text:
+        raise OtrPathContractError("%s contains a NUL character." % field)
+    reject_remote_path(text, field)
+    if ".." in text.replace("\\", "/").split("/"):
+        raise OtrPathContractError(
+            "%s contains a '..' traversal segment (%r). Name the file directly; "
+            "it must lie inside a permitted folder." % (field, text))
+    if os.name == "nt":
+        if _DRIVE_RELATIVE.match(text):
+            raise OtrPathContractError(
+                "%s is drive-relative (%r); give a full path such as C:\\..." % (field, text))
+        body = text[2:] if _DRIVE_ABSOLUTE.match(text) else text
+        if ":" in body:
+            raise OtrPathContractError(
+                "%s names an alternate data stream or device (%r)." % (field, text))
+
+
+def _inside(path: str, root: str) -> bool:
+    """Is ``path`` ``root`` or below it? Case-insensitive where the OS is."""
+    try:
+        path_n, root_n = os.path.normcase(path), os.path.normcase(root)
+        return os.path.commonpath([path_n, root_n]) == root_n
+    except ValueError:  # different drives, or a relative/absolute mix
+        return False
+
+
+def _confine(value, field: str, candidates, *, base=None, verb: str = "read") -> str:
+    """The containment both directions share: ``value`` proven inside a root.
+
+    The recipe the registry's reviewers accept (comfyui-darkroom went from
+    Flagged to Active on it, 2026-10-01): refuse by text first, anchor a
+    relative path, then require the path inside a root TWICE -- lexically
+    (case-folded ``commonpath`` on the normalized absolute path, before any
+    link is followed) and again after ``realpath`` (so a symlink or junction
+    inside a root that points out of it is refused). Returns the LEXICAL
+    absolute path: a mapped network drive's realpath is a UNC path, which the
+    next node's remote check would refuse.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return text
+    _refuse_by_text(text, field)
+    path = os.path.expanduser(text)
+    if not os.path.isabs(path) and base is not None:
+        path = os.path.join(str(base), path)
+    lexical = os.path.normpath(os.path.abspath(path))
+    roots = []
+    for root in candidates:
+        try:
+            root_text = os.path.expanduser(str(root))
+            roots.append((os.path.normpath(os.path.abspath(root_text)),
+                          os.path.realpath(root_text)))
+        except Exception:  # noqa: BLE001 -- an unusable root simply does not match
+            continue
+    if any(_inside(lexical, lex_root) for lex_root, _real in roots):
+        try:
+            real = os.path.realpath(lexical)
+        except Exception as exc:  # noqa: BLE001 -- a malformed path is a refusal
+            raise OtrPathContractError(
+                "%s is not a usable path (%r): %s" % (field, text, exc))
+        if any(_inside(real, real_root) for _lex, real_root in roots):
+            return lexical
+        raise OtrPathContractError(
+            "%s (%s) leads through a link to %s, outside every permitted %s "
+            "root." % (field, lexical, real, verb))
+    raise OtrPathContractError(
+        "%s resolves to %s, which is outside every permitted %s root (%s). "
+        "Set OTR_EXTRA_OUTPUT_ROOTS to authorize another one."
+        % (field, lexical, verb, ", ".join(lex for lex, _real in roots) or "none"))
+
+
+def _comfy_temp_dir() -> Optional[Path]:
+    try:
+        import folder_paths  # type: ignore
+
+        api_dir = folder_paths.get_temp_directory()
+        return Path(api_dir) if api_dir else None
+    except Exception:  # noqa: BLE001 -- outside ComfyUI there is no temp root
+        return None
+
+
+def read_roots() -> list:
+    """Where a node may READ a path its inputs name -- the approved folders
+    only (operator, 2026-10-18: "usually otr/episodes for most files"):
+    ``otr/episodes``, the publication folder ``otr/obs``, ComfyUI's input
+    folder (where a user drops media, and where ComfyUI's own upload writes),
+    its temp folder, and ``$OTR_EXTRA_OUTPUT_ROOTS``. Not the rest of the
+    output tree: other packs' files are not this pack's to read."""
+    candidates = []
+    for _root in (otr_episodes_root, otr_obs_dir, comfy_input_dir, _comfy_temp_dir):
+        try:
+            found = _root()
+        except Exception:  # noqa: BLE001 -- an unusable root simply does not match
+            continue
+        if found:
+            candidates.append(found)
+    return candidates + _extra_output_roots()
+
+
+def voice_read_roots() -> list:
+    """The read roots plus the models roots, where a voice bank's reference
+    WAVs live (``models/TTS/refs/...``): ComfyUI's ``models_dir``, the pack's
+    models-root authority, and the migrated ``C:\\ComfyUI-Models`` tree the
+    voice resolver also searches."""
+    candidates = read_roots()
+    try:
+        import folder_paths  # type: ignore
+
+        candidates.append(folder_paths.models_dir)
+    except Exception:  # noqa: BLE001 -- outside ComfyUI there is no models_dir
+        pass
+    try:
+        try:
+            from ._otr_models_root import _models_root
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_models_root import _models_root  # type: ignore
+        candidates.append(_models_root())
+    except Exception:  # noqa: BLE001 -- ModelsRootUnresolved off Windows
+        pass
+    if os.name == "nt":
+        candidates.append("C:\\ComfyUI-Models")
+    return candidates
+
+
+def confine_to_read_roots(value, field: str, *, roots=None, base=None) -> str:
+    """``value`` as an absolute path PROVEN inside a read root, else raise.
+
+    The read twin of :func:`confine_to_output_tree`. Registry review flagged
+    2.3.21 and 2.3.22 "policy-v0.6: arbitrary-file-read, path-traversal": a
+    path input reached ffmpeg / ``open()`` / ``json.load`` verbatim, so a
+    workflow sent to ComfyUI's unauthenticated ``/prompt`` could read any
+    file on the box into an output it then fetched. A relative value is
+    anchored at ``base`` (default: the ComfyUI output folder, where every
+    episode lives). An empty value returns ``""``: callers read it as "use my
+    default", and the defaults are in-tree.
+    """
+    if base is None:
+        base = comfy_output_dir()
+    return _confine(value, field, read_roots() if roots is None else roots,
+                    base=base, verb="read")
+
+
+def confined_or_empty(value, *, roots=None, base=None) -> str:
+    """The confined absolute path, or ``""`` -- never raises. For the places
+    that DEGRADE rather than fail (ledger data, cache fingerprints): they must
+    then open THIS path, not the value they were handed, or a relative value
+    is checked against one folder and opened against the process CWD (Cursor
+    review, 2026-10-18)."""
+    try:
+        return confine_to_read_roots(value, "_probe", roots=roots, base=base)
+    except Exception:  # noqa: BLE001 -- a degrade path must never raise
+        return ""
+
+
+def refused_by_text(value) -> bool:
+    """True when ``value`` is refused from its spelling alone (NUL, remote,
+    ``..``, drive-relative, alternate data stream) -- for a search that would
+    otherwise stat candidates built from it before any containment check.
+    Never raises, never touches the disk."""
+    try:
+        _refuse_by_text(str(value or "").strip(), "_probe")
+        return False
+    except Exception:  # noqa: BLE001 -- a predicate must never raise
+        return True
+
+
+def is_readable_in_roots(value, *, roots=None, base=None) -> bool:
+    """The non-raising twin, for ``IS_CHANGED`` hooks: they run before a node
+    executes, on the raw workflow inputs, and must neither touch an
+    out-of-root path nor raise. False means "do not stat it"."""
+    try:
+        return bool(confine_to_read_roots(value, "_probe", roots=roots, base=base))
+    except Exception:  # noqa: BLE001 -- a predicate must never raise
+        return False
+
+
 def confine_to_output_tree(value, field: str, *, roots=None) -> str:
     """``value`` resolved, PROVEN to land under a permitted write root, else raise.
 
@@ -338,26 +529,10 @@ def confine_to_output_tree(value, field: str, *, roots=None) -> str:
     because Windows collapses ``..`` lexically in some spellings before the
     filesystem ever sees it.
     """
-    text = str(value or "").strip()
-    if not text:
-        return text
-    # REFUSE A REMOTE PATH HERE TOO, NOT ONLY AT THE CALLER (2026-09-05).
-    # `Path(...).resolve()` below OPENS an SMB session for a UNC value -- a
-    # measured 42 seconds against an unreachable host, and an NTLM handshake
-    # against a reachable one -- so a caller that forgot the refusal would have
-    # this function perform the exact coercion it sits next to. Callers still
-    # call `reject_remote_path` first (the ordering is pinned by a test); this
-    # is the belt, and it costs one string compare. Idempotent by construction.
-    reject_remote_path(text, field)
-    if ".." in text.replace("\\", "/").split("/"):
-        raise OtrPathContractError(
-            "%s contains a '..' traversal segment (%r). Name the destination "
-            "directly; it must land inside the output tree." % (field, text))
-    try:
-        resolved = Path(text).expanduser().resolve()
-    except Exception as exc:  # noqa: BLE001 -- a malformed path is a refusal
-        raise OtrPathContractError(
-            "%s is not a usable path (%r): %s" % (field, text, exc))
+    # ONE CORE FOR BOTH DIRECTIONS (2026-10-18): the write guard now runs the
+    # same text refusals and the same lexical-then-realpath containment as
+    # `confine_to_read_roots`. Its roots are unchanged. A relative value still
+    # anchors at the process CWD, as `Path.resolve()` did.
     if roots is None:
         candidates = [comfy_output_dir()]
         # `otr_obs_dir()` runs `_validate_contract`, and `comfy_input_dir()`
@@ -373,22 +548,7 @@ def confine_to_output_tree(value, field: str, *, roots=None) -> str:
         candidates += _extra_output_roots()
     else:
         candidates = list(roots)
-    permitted = []
-    for root in candidates:
-        try:
-            permitted.append(Path(root).expanduser().resolve())
-        except Exception:  # noqa: BLE001 -- an unresolvable root simply does not match
-            continue
-    for root in permitted:
-        try:
-            if resolved == root or root in resolved.parents:
-                return str(resolved)
-        except Exception:  # noqa: BLE001
-            continue
-    raise OtrPathContractError(
-        "%s resolves to %s, which is outside every permitted write root (%s). "
-        "Set OTR_EXTRA_OUTPUT_ROOTS to authorize another one."
-        % (field, resolved, ", ".join(str(p) for p in permitted) or "none"))
+    return _confine(value, field, candidates, base=None, verb="write")
 
 
 def _validate_episode_id(episode_id: str) -> str:
@@ -402,7 +562,9 @@ def _validate_episode_id(episode_id: str) -> str:
             "empty episode_id: per-episode output helpers REQUIRE a real "
             "episode_id (the _legacy_* fallbacks were removed by the "
             "output-tree contract, 2026-06-11)")
-    if any(t in eid for t in ("/", "\\", "..", "\x00")):
+    # ":" too (2026-10-18): on Windows `Path(root) / "C:"` RESETS to a
+    # drive-relative path, so an id of "C:" walked out of the episodes root.
+    if any(t in eid for t in ("/", "\\", "..", "\x00", ":")):
         raise OtrPathContractError(
             "episode_id %r contains a path separator/traversal token" % eid)
     if set(eid) == {"."}:

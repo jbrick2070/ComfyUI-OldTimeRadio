@@ -96,7 +96,10 @@ def _resolve_ref_to_disk(ref_path):
             ref_path)
         return None
     from ._otr_audio_engines.base import resolve_voice_ref_path
-    return resolve_voice_ref_path(ref_path)
+    # The shared resolver also answers "" for a reference outside the approved
+    # folders (2026-10-18) -- confined THERE, not here, so the engine that
+    # opens the file and this check can never disagree.
+    return resolve_voice_ref_path(ref_path) or None
 
 def sha256_of_file(path: str) -> "Optional[str]":
     """Hash a file, or None if it cannot be read. Never raises.
@@ -175,7 +178,11 @@ def _bank_identity_fingerprint(engine, voice_ref_id):
         # An empty path is UNRESOLVED, not a provider identity. Treating it as
         # one would invent a stable key for a row that names no bytes.
         return None
-    full = _resolve_ref_to_disk(ref_path) or ref_path
+    # A refused or unresolvable reference names no bytes this pack may read:
+    # never hash the raw path in its place (2026-10-18).
+    full = _resolve_ref_to_disk(ref_path)
+    if not full:
+        return None
     return sha256_of_file(full)
 
 

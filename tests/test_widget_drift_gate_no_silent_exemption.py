@@ -27,6 +27,13 @@ import pytest
 from nodes import _otr_workflow_validator as V
 
 
+@pytest.fixture(autouse=True)
+def _workflows_in_the_input_folder(tmp_path, monkeypatch):
+    # The validator reads only from workflow folders (registry review,
+    # 2026-10-18); these graphs live in the input folder, like a user's.
+    monkeypatch.setenv("OTR_INPUT_DIR", str(tmp_path))
+
+
 class _Healthy:
     @classmethod
     def INPUT_TYPES(cls):

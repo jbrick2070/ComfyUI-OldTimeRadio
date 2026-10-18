@@ -117,16 +117,38 @@ def _resolve_workflow_path(path: str) -> Path:
     if not path:
         return _DEFAULT_WORKFLOW_PATH
     # `workflow_json_path` is an ordinary editable widget, so this value
-    # can arrive from an unauthenticated /prompt request (2026-09-04).
+    # can arrive from an unauthenticated /prompt request (2026-09-04). It is
+    # CONFINED to the folders a workflow lives in (2026-10-18): registry review
+    # flagged "arbitrary-file-read, path-traversal" -- an absolute path was
+    # taken as-is, and a relative one joined onto the repo root walked out of
+    # it with "../".
     try:
-        from ._otr_paths import reject_remote_path as _reject_remote
+        from ._otr_paths import confine_to_read_roots
     except ImportError:  # pragma: no cover -- flat (sys.path) load
-        from _otr_paths import reject_remote_path as _reject_remote  # type: ignore
-    _reject_remote(path, "workflow_json_path")
-    p = Path(path)
-    if not p.is_absolute():
-        p = _REPO_ROOT / p
-    return p
+        from _otr_paths import confine_to_read_roots  # type: ignore
+    return Path(confine_to_read_roots(
+        path, "workflow_json_path", roots=_workflow_read_roots(), base=_REPO_ROOT))
+
+
+def _workflow_read_roots() -> list:
+    """Where a workflow JSON may be read from: this pack's own ``workflows/``,
+    ComfyUI's saved-workflow folders (``user/<name>/workflows``) and its input
+    folder. Not the whole user folder -- it holds settings and credentials."""
+    roots = [_REPO_ROOT / "workflows"]
+    try:
+        import folder_paths  # type: ignore
+
+        user_dir = Path(folder_paths.get_user_directory())
+        if user_dir.is_dir():
+            roots += [child / "workflows" for child in user_dir.iterdir() if child.is_dir()]
+    except Exception:  # noqa: BLE001 -- outside ComfyUI there are no user folders
+        pass
+    try:
+        from ._otr_paths import comfy_input_dir
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import comfy_input_dir  # type: ignore
+    roots.append(comfy_input_dir())
+    return roots
 
 
 def _load_workflow(path: str) -> dict[str, Any]:
@@ -441,7 +463,7 @@ class WorkflowValidator:
         try:
             p = _resolve_workflow_path(workflow_json_path)
             mtime = p.stat().st_mtime_ns if p.is_file() else 0
-        except OSError:
+        except (OSError, ValueError):  # ValueError: refused before any stat
             mtime = 0
         return (f"{workflow_json_path}|{mtime}|{validate_anyway}|"
                 f"{strict_unknown_types}|{profile_id}|{master_hash}|"
@@ -674,7 +696,7 @@ class WorkflowValidator:
             if p.is_file():
                 import hashlib
                 snapshot_hash = hashlib.sha256(p.read_bytes()).hexdigest()
-        except OSError:
+        except (OSError, ValueError):  # ValueError: refused before any read
             pass
         otr_env.pin("OTR_SNAPSHOT_HASH", snapshot_hash)
         msg = (f"stamp OK: profile={profile_id} "

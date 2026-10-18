@@ -540,10 +540,14 @@ class OTRVideoRenderBatch:
         # the host the workflow named on the first stat. Same refusal, same
         # place (the execute method), as the five ffmpeg nodes.
         try:
-            from ._otr_paths import reject_remote_paths
+            from ._otr_paths import confine_to_read_roots, reject_remote_paths
         except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_paths import reject_remote_paths  # type: ignore
+            from _otr_paths import confine_to_read_roots, reject_remote_paths  # type: ignore
         reject_remote_paths(master_audio_path=master_audio_path)
+        # AND CONFINED to the approved read folders (2026-10-18): registry
+        # review flagged "arbitrary-file-read" -- ffmpeg sliced whatever file
+        # the workflow named.
+        master_audio_path = confine_to_read_roots(master_audio_path, "master_audio_path")
         from ._otr_video_engines import render_driver as _rd
         report, manifest_payload, name = self._render_episode(
             _rd, patched_ledger_json,

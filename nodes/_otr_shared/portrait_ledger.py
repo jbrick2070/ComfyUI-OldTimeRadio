@@ -29,6 +29,7 @@ importing this module pulls in nothing heavy (invariant V-12, cold-import).
 from __future__ import annotations
 
 import hashlib
+import re
 import logging
 from pathlib import Path
 from typing import Optional
@@ -87,10 +88,16 @@ def episode_stills_dir(episode_id: str,
     # directory out of the episodes root. String check only: the _validate_contract
     # half resolves against comfy_output_dir() and would refuse the output_dir
     # override this function exists to honour.
-    if any(tok in ep for tok in ("/", "\\", "..", "\x00")):
+    # ":" too (2026-10-18): on Windows `Path(root) / "C:"` RESETS to a
+    # drive-relative path, so an id of "C:" walked out of the episodes root.
+    if any(tok in ep for tok in ("/", "\\", "..", "\x00", ":")):
         raise PortraitUnresolved(
             "episode_id %r contains a path separator or traversal token" % (ep,))
     return Path(_output_base(output_dir)) / "otr" / "episodes" / ep / "stills"
+
+
+#: A content digest: hex, 8 to 128 characters (sha256 is 64).
+_HEX_DIGEST = re.compile(r"^[0-9a-fA-F]{8,128}$")
 
 
 def compute_portrait_hash(decoded_pixels) -> str:
@@ -119,6 +126,11 @@ def portrait_path_for_hash(portrait_content_hash: str,
     h = str(portrait_content_hash or "").strip()
     if not h:
         raise PortraitUnresolved("empty portrait_content_hash")
+    # The hash becomes a FILENAME, and it can arrive from the workflow's ledger:
+    # a hex digest only, so it can never name a separator, ".." or a drive
+    # (2026-10-18, registry review: "path-traversal").
+    if not _HEX_DIGEST.match(h):
+        raise PortraitUnresolved("portrait_content_hash %r is not a hex digest" % (h,))
     return stills_root(output_dir) / f"{h}.png"
 
 

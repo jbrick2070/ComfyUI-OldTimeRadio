@@ -178,10 +178,18 @@ def test_every_write_destination_is_confined(filename, spec):
 def test_the_guard_runs_after_the_remote_refusal_not_before():
     """Resolving first would launder a UNC spelling into a local-looking path,
     so `reject_remote_path` has to see the value as typed."""
-    for filename in ("otr_caption_burn.py", "otr_master_audio_mux.py",
-                     "otr_silent_composite.py", "otr_credits_roll.py"):
+    # Read WITHIN each node's execute method: module-level helpers also confine
+    # (the foley master write, `_default_out`'s folder, 2026-10-18), on values
+    # the execute method has already refused and confined.
+    for filename, method in (("otr_caption_burn.py", "def burn("),
+                             ("otr_master_audio_mux.py", "def mux("),
+                             ("otr_silent_composite.py", "def composite("),
+                             ("otr_credits_roll.py", "def roll(")):
         src = (_NODES / filename).read_text(encoding="utf-8")
-        assert src.index("reject_remote_paths(") < src.index("confine_to_output_tree("), (
+        body = src[src.index(method):]
+        confines = [i for i in (body.find("confine_to_output_tree("),
+                                body.find("confine_to_read_roots(")) if i >= 0]
+        assert body.index("reject_remote_paths(") < min(confines), (
             "%s confines before it refuses a remote path" % filename)
 
 
@@ -290,14 +298,15 @@ def test_the_composite_fingerprint_hook_checks_every_step():
     src = (_NODES / "otr_silent_composite.py").read_text(encoding="utf-8")
     i = src.index("# 3. Sibling master WAV")
     window = src[i:i + 800]
-    assert "_is_remote(base_video_path)" in window
+    # The read-root predicate (2026-10-18) refuses remote paths too.
+    assert "_unreadable(base_video_path)" in window
     assert "os.listdir" in window, "anchor drifted: this step should still listdir"
 
 
 # --------------------------------------------------------------------------
 # a voice reference -- a UNC path arriving inside a JSON document
 # --------------------------------------------------------------------------
-def test_a_remote_voice_reference_is_refused_before_it_is_statted():
+def test_a_remote_voice_reference_is_refused_before_it_is_statted(monkeypatch):
     """A cast row's voice reference is read straight off the ledger, and
     `resolve_voice_ref_path` passes an
     already-absolute value straight through (`base.py:140`) -- so a
@@ -313,9 +322,16 @@ def test_a_remote_voice_reference_is_refused_before_it_is_statted():
     assert _resolve_ref_to_disk("//attacker/share/x.wav") is None
     assert _resolve_ref_to_disk("") is None
     # ...and the legitimate shapes still resolve. A mapped drive is a drive
-    # letter, not a UNC spelling, so the operator's transfer drive keeps working.
+    # letter, not a UNC spelling, so the operator's transfer drive keeps
+    # working -- once the operator names it in OTR_EXTRA_OUTPUT_ROOTS
+    # (2026-10-18, registry review "arbitrary-file-read": an absolute reference
+    # on an arbitrary drive is exactly the read a workflow must not choose).
     assert _resolve_ref_to_disk("models/TTS/refs/indextts2/ix_male_warm.wav")
-    assert _resolve_ref_to_disk("U:" + b + "refs" + b + "x.wav")
+    transfer = "U:" + b + "refs" + b + "x.wav"
+    monkeypatch.setenv("OTR_EXTRA_OUTPUT_ROOTS", "")
+    assert _resolve_ref_to_disk(transfer) is None
+    monkeypatch.setenv("OTR_EXTRA_OUTPUT_ROOTS", "U:" + b + "refs")
+    assert _resolve_ref_to_disk(transfer)
 
 
 def test_the_guard_lives_in_the_one_resolver():

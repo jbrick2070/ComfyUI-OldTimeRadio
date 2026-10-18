@@ -531,10 +531,11 @@ class OTRCaptionBurn:
         # on the first stat -- BEFORE any spawn -- so the refusal belongs
         # here, where provenance is known, not at the spawn (2026-09-04).
         try:
-            from ._otr_paths import confine_to_output_tree, reject_remote_paths
+            from ._otr_paths import (
+                confine_to_output_tree, confine_to_read_roots, reject_remote_paths)
         except ImportError:  # pragma: no cover -- flat (sys.path) load
             from _otr_paths import (  # type: ignore
-                confine_to_output_tree, reject_remote_paths)
+                confine_to_output_tree, confine_to_read_roots, reject_remote_paths)
         reject_remote_paths(video_path=video_path, ledger_path=ledger_path, output_path=output_path)
         # THE HERO TITLE IS NOT A CAPTION, and this node has FIVE no-error
         # passthrough exits. That was harmless while the title was baked into
@@ -557,7 +558,16 @@ class OTRCaptionBurn:
         if not bool(burn_captions) and not title_required:
             return (video_path, "OTR_CaptionBurn: captions OFF (clean master) -- passthrough")
         style = str(otr_env.get("OTR_CAPTION_STYLE", "") or caption_style).strip() or _DEFAULT_CAPTION_STYLE
+        # THE READS ARE CONFINED (2026-10-18) -- here, after the clean-master
+        # passthrough above, which reads nothing (the same placement as the
+        # write check below), and before the first stat, glob or open: registry
+        # review flagged "arbitrary-file-read" -- ffmpeg and the caption loader
+        # opened whatever path the workflow named. The discovered ledger too:
+        # the sibling glob follows the video's folder.
+        video_path = confine_to_read_roots(video_path, "video_path")
+        ledger_path = confine_to_read_roots(ledger_path, "ledger_path")
         led = ledger_path.strip() or _resolve_ledger_path(video_path) or ""
+        led = confine_to_read_roots(led, "ledger_path")
         if not led and not title_required:
             log.warning("[OTR_CaptionBurn] no timed ledger found; passthrough (no captions)")
             return (video_path, "OTR_CaptionBurn: no timed ledger; passthrough")

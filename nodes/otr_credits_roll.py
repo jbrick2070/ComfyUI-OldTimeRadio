@@ -1864,11 +1864,15 @@ class OTRCreditsRoll:
         # video_path arrives from the workflow; refuse a remote one before
         # the first stat (2026-09-05).
         try:
-            from ._otr_paths import confine_to_output_tree, reject_remote_paths
+            from ._otr_paths import (
+                confine_to_output_tree, confine_to_read_roots, reject_remote_paths)
         except ImportError:  # pragma: no cover -- flat (sys.path) load
             from _otr_paths import (  # type: ignore
-                confine_to_output_tree, reject_remote_paths)
+                confine_to_output_tree, confine_to_read_roots, reject_remote_paths)
         reject_remote_paths(video_path=video_path)
+        # THE READ IS CONFINED TOO (2026-10-18), before the existence check and
+        # the probe: registry review flagged "arbitrary-file-read".
+        video_path = confine_to_read_roots(video_path, "video_path")
         if not video_path or not os.path.exists(video_path):
             raise CreditsDataError(
                 f"credits input video missing: {video_path!r}")

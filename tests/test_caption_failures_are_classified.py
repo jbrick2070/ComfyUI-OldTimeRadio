@@ -121,6 +121,8 @@ def test_a_PLANNED_TITLE_passes_the_clean_master_through_on_a_capability_gap(
                         lambda *a, **k: None, raising=False)
     monkeypatch.setattr(paths, "reject_remote_paths",
                         lambda **k: None, raising=False)
+    monkeypatch.setattr(paths, "confine_to_read_roots",
+                        lambda value, *a, **k: value, raising=False)
 
     node = burn_mod.OTRCaptionBurn()
     out, report = node.burn(
