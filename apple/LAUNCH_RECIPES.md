@@ -290,10 +290,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_24gb_foley
 
 - file: `workflows/otr_24gb_foley.json`
-- workflow: `otr_24gb_foley` (24 GB AND UP, ANY modern NVIDIA (Ada, Ampere or Blackwell) -- video that generates its own sound. Lane ltx25_foley_24gb (int8, stock ComfyUI loaders), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 12.1 GB int8). Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.)
+- workflow: `otr_24gb_foley` (24 GB AND UP, ANY modern NVIDIA (Ada, Ampere or Blackwell) -- video that generates its own sound. Lane ltx25_foley_24gb (int8, stock ComfyUI loaders), flux3_klein stills, Kokoro voices, Stable Audio 3. Writer Gemma 4 12B, run by ComfyUI itself (comfy_native, 12.1 GB int8). Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.)
 - status: draft
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `5efc9f3f240ec0c777467d65d1ff024160cdabea399ac2baf3a971148643d5c8`
+- master_hash: `c51839ff3ece7e83e558a2b4b66dad78cc1eab859550bb0eac1ce17762d3fa3d`
 
 ### ComfyUI launch
 
