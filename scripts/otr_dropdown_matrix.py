@@ -65,15 +65,15 @@ _END = "<!-- END GENERATED: dropdown-matrix -->"
 #: should open, so every cell is reproducible from the variant it names. The CPU
 #: column reads the no-GPU cloud row: a machine with no GPU runs the hosted lanes.
 MACHINES = (
-    {"key": "nv8", "label": "8 GB NVIDIA", "profile": "otr_8gb_video",
+    {"key": "nv8", "label": "8 GB NVIDIA", "workflow": "otr_8gb_video",
      "blurb": "RTX 4060 / 3070 / 2080 class"},
-    {"key": "nv16", "label": "16 GB+ NVIDIA", "profile": "otr_16gb_video",
+    {"key": "nv16", "label": "16 GB+ NVIDIA", "workflow": "otr_16gb_video",
      "blurb": "RTX 5080 / 4080 / 3090 class"},
-    {"key": "mac16", "label": "Mac 16 GB", "profile": "otr_mac16_video",
+    {"key": "mac16", "label": "Mac 16 GB", "workflow": "otr_mac16_video",
      "blurb": "Apple Silicon, unified memory"},
-    {"key": "amd", "label": "AMD ROCm", "profile": "otr_amd_still",
+    {"key": "amd", "label": "AMD ROCm", "workflow": "otr_amd_still",
      "blurb": "Windows or Linux -- and read \u0022What the words mean\u0022 at the foot of this page before trusting any AMD cell"},
-    {"key": "cpu", "label": "CPU only", "profile": "otr_cloud_low",
+    {"key": "cpu", "label": "CPU only", "workflow": "otr_cloud_low",
      "blurb": "no GPU at all"},
 )
 
@@ -132,16 +132,16 @@ def registry_capabilities() -> dict:
 
 def availability_grid(caps: dict) -> dict:
     """``{(namespace, engine): {machine_key: reason}}`` -- fully derived."""
-    profiles = _load("nodes/_otr_shared/capability_profiles.py", "_odm_profiles")
-    # `load_profile` resolves a matrix row through relative imports, which a
+    profiles = _load("nodes/_otr_shared/workflow_rows.py", "_odm_profiles")
+    # `load_workflow_row` resolves a matrix row through relative imports, which a
     # module loaded by file path cannot make -- so the row comes from the
     # package, and `availability` (dependency-free) still from the file.
     if _REPO not in sys.path:
         sys.path.insert(0, _REPO)
-    from nodes._otr_shared.capability_profiles import load_profile
+    from nodes._otr_shared.workflow_rows import load_workflow_row
     grid = {}
     for machine in MACHINES:
-        profile = load_profile(machine["profile"])
+        profile = load_workflow_row(machine["workflow"])
         for namespace, table in caps.items():
             for engine, reason in profiles.availability(profile, table).items():
                 grid.setdefault((namespace, engine), {})[machine["key"]] = reason
@@ -233,7 +233,7 @@ def graph_fetched_engines() -> set:
     so they never reach this function -- they resolve through
     ``NO_LANE_REASON["hf_cache"]``, which already says "auto" for that reason.
 
-    **ALSO NOT A CONTRADICTION:** ``otr_provision.profile_lanes`` still reports
+    **ALSO NOT A CONTRADICTION:** ``otr_provision.workflow_lanes`` still reports
     ``humo`` as "automatic". That answers a DIFFERENT question -- can the
     dev-tree provisioner fetch it during setup -- and it is right.
 
@@ -709,7 +709,7 @@ def render_doc(rows: list) -> str:
          "| column | machine | reproduce with |\n|---|---|---|\n"]
     for machine in MACHINES:
         L.append("| %s | %s | `%s` |\n" % (
-            machine["label"], machine["blurb"], _variant_for(machine["profile"])))
+            machine["label"], machine["blurb"], _variant_for(machine["workflow"])))
     L.append("\n## Every dropdown\n")
     L.append(render_table(rows))
     L.append(_LEGEND)
@@ -720,7 +720,7 @@ def render_doc(rows: list) -> str:
                  "the engines themselves are registered and selectable. But no "
                  "shipping workflow selects one, so they were never added to the "
                  "provisioner's remote route, and `scripts/otr_provision.py` "
-                 "REFUSES a `--profile` (its own flag name) that names one rather "
+                 "REFUSES a `--workflow-id` (its own flag name) that names one rather "
                  "than guessing. Using one today means selecting it in the "
                  "canonical workflow by hand, not through a shipped one. Worth "
                  "closing before shipping.\n\n")
@@ -848,7 +848,7 @@ def _variant_for(profile_id: str) -> str:
     """The saved workflow a matrix row emits, by `build_variants.py`'s own rule.
 
     `build_variants._variant_stem` prefixes `otr_` unless the id already carries
-    it, and `_committed_profile_ids` refuses outright when a bare `X` would
+    it, and `_committed_workflow_ids` refuses outright when a bare `X` would
     collide with an `otr_X`. So the mapping is total and unambiguous.
     """
     stem = profile_id if profile_id.startswith("otr_") else "otr_%s" % profile_id
@@ -964,9 +964,9 @@ def recommended_graph(profile_id: str) -> tuple:
         sys.path.insert(0, _REPO)
     status = ""
     try:
-        from nodes._otr_shared.capability_profiles import ProfileError, load_profile
-        status = str(load_profile(profile_id).get("status", ""))
-    except ProfileError:
+        from nodes._otr_shared.workflow_rows import WorkflowError, load_workflow_row
+        status = str(load_workflow_row(profile_id).get("status", ""))
+    except WorkflowError:
         status = ""          # no such workflow; the canonical is the answer below
     graph = _variant_for(profile_id)
     full = os.path.join(_REPO, graph)
@@ -1030,7 +1030,7 @@ def render_apple(rows: list) -> str:
              "(Workflow &rarr; Browse Templates &rarr; Extensions &rarr; "
              "Old-Time Radio) | nothing |\n")
     for machine in MACHINES:
-        graph, caveat = recommended_graph(machine["profile"])
+        graph, caveat = recommended_graph(machine["workflow"])
         if caveat:
             # The canonical is the fallback, and its engines are what needs
             # installing -- not the rejected graph's.
@@ -1040,7 +1040,7 @@ def render_apple(rows: list) -> str:
             cell = "`%s` &mdash; %s" % (graph, caveat)
         else:
             needed = sorted({packs[e]
-                             for e in _profile_engines(machine["profile"])
+                             for e in _workflow_engines(machine["workflow"])
                              if e in packs})
             cell = "`%s`" % graph
         L.append("| %s -- %s | %s | %s |\n" % (
@@ -1148,15 +1148,15 @@ def render_apple(rows: list) -> str:
     return "".join(L)
 
 
-def _profile_engines(profile_id: str) -> set:
+def _workflow_engines(profile_id: str) -> set:
     """Every engine id a workflow selects, public labels resolved to real ids.
 
-    Reads the workflow matrix via `resolved_profile`, so a row that INHERITS a lane
+    Reads the workflow matrix via `resolved_workflow`, so a row that INHERITS a lane
     from the canonical still reports it. Reading the raw row would under-report
     exactly the lanes a row does not override, which is the opposite of what this
     function is for.
 
-    `resolved_profile` returns the PUBLIC spelling -- it deliberately does not apply
+    `resolved_workflow` returns the PUBLIC spelling -- it deliberately does not apply
     `resolve_engine_id` -- so the resolution to internal ids below is this function's
     own job and not a duplicate of something already done. An earlier version of this
     comment claimed the opposite and was wrong.
@@ -1167,14 +1167,14 @@ def _profile_engines(profile_id: str) -> set:
     # imports, which fail for a module loaded with no parent package.
     if _REPO not in sys.path:
         sys.path.insert(0, _REPO)
-    from nodes._otr_workflow_apply import resolved_profile
-    from nodes._otr_shared.capability_profiles import ProfileError
+    from nodes._otr_workflow_apply import resolved_workflow
+    from nodes._otr_shared.workflow_rows import WorkflowError
     canonical_path = os.path.join(_REPO, "workflows", "otr_canonical.json")
     with io.open(canonical_path, encoding="utf-8") as fh:
         canonical = json.load(fh)
     try:
-        data = resolved_profile(profile_id, canonical)
-    except ProfileError:
+        data = resolved_workflow(profile_id, canonical)
+    except WorkflowError:
         # Only "no such workflow" is tolerated. Anything else is a real
         # fault and must not be swallowed into an empty set that reads as
         # "this workflow selects no engines".

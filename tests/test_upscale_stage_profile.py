@@ -4,14 +4,14 @@ Asserts:
 * `upscale_stage` is an OPTIONAL top-level section; a profile that omits it
   passes validation (every `config/workflow_matrix.json` row that states none
   is the load-bearing case).
-* A profile that names an UNKNOWN engine fails cross_validate_profile with
-  an accumulated `ProfileError` (not a raw ImportError).
+* A profile that names an UNKNOWN engine fails cross_validate_workflow with
+  an accumulated `WorkflowError` (not a raw ImportError).
 * A profile that specifies `engine` but omits `device` is legal (Sonnet 5
   MF-3: device is in _SECTION_OPTIONAL_KEYS).
 
 No matrix row carries an upscale stage, so the documents that do are a real
 row (`BASE_ROW`) with the section added, written into `tmp_path` where the
-case needs `load_profile` itself.
+case needs `load_workflow_row` itself.
 """
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ import json
 
 import pytest
 
-from nodes._otr_shared.capability_profiles import (
-    ProfileError, known_profile_ids, load_profile, load_widget_mapping,
-    cross_validate_profile,
+from nodes._otr_shared.workflow_rows import (
+    WorkflowError, known_workflow_ids, load_workflow_row, load_widget_mapping,
+    cross_validate_workflow,
 )
 
 #: A cuda row, so a `cuda:0` upscale device is the natural pairing.
@@ -38,7 +38,7 @@ def _decls():
 
 
 def _row_with_upscale(new_id, upscale_stage):
-    src = copy.deepcopy(load_profile(BASE_ROW))
+    src = copy.deepcopy(load_workflow_row(BASE_ROW))
     src["id"] = new_id
     src["upscale_stage"] = upscale_stage
     return src
@@ -49,16 +49,16 @@ def test_a_full_upscale_stage_loads_and_cross_validates(tmp_path):
                             {"engine": "spandrel_esrgan", "device": "cuda:0"})
     (tmp_path / "otr_upscale_full_test.json").write_text(
         json.dumps(src), encoding="utf-8")
-    p = load_profile("otr_upscale_full_test", profile_dir=str(tmp_path))
+    p = load_workflow_row("otr_upscale_full_test", row_dir=str(tmp_path))
     assert p["upscale_stage"]["engine"] == "spandrel_esrgan"
     assert p["upscale_stage"]["device"] == "cuda:0"
-    cross_validate_profile(p, load_widget_mapping(), _decls())
+    cross_validate_workflow(p, load_widget_mapping(), _decls())
 
 
 def test_profile_without_upscale_stage_still_loads():
     """A row that states no upscale_stage section must keep loading."""
-    without = [rid for rid in known_profile_ids()
-               if "upscale_stage" not in load_profile(rid)]
+    without = [rid for rid in known_workflow_ids()
+               if "upscale_stage" not in load_workflow_row(rid)]
     assert without, "every matrix row states an upscale_stage -- nothing to prove"
 
 
@@ -70,15 +70,15 @@ def test_partial_upscale_stage_engine_only_is_legal(tmp_path):
     src["display_name"] = "test only"
     (tmp_path / "otr_upscale_partial_test.json").write_text(
         json.dumps(src), encoding="utf-8")
-    loaded = load_profile("otr_upscale_partial_test", profile_dir=str(tmp_path))
+    loaded = load_workflow_row("otr_upscale_partial_test", row_dir=str(tmp_path))
     assert loaded["upscale_stage"] == {"engine": "spandrel_esrgan"}
 
 
 def test_unknown_engine_raises_profile_error():
     src = _row_with_upscale("otr_upscale_bad",
                             {"engine": "not_a_real_engine", "device": "cpu"})
-    with pytest.raises(ProfileError) as excinfo:
-        cross_validate_profile(src, load_widget_mapping(), _decls())
+    with pytest.raises(WorkflowError) as excinfo:
+        cross_validate_workflow(src, load_widget_mapping(), _decls())
     assert "upscale_stage.engine" in str(excinfo.value)
     assert "not registered" in str(excinfo.value)
 
@@ -91,8 +91,8 @@ def test_retired_engine_raises_profile_error():
     orig = reg.RETIRED_UPSCALE_ENGINE_IDS
     reg.RETIRED_UPSCALE_ENGINE_IDS = frozenset({"some_retired_id"})
     try:
-        with pytest.raises(ProfileError) as excinfo:
-            cross_validate_profile(src, load_widget_mapping(), _decls())
+        with pytest.raises(WorkflowError) as excinfo:
+            cross_validate_workflow(src, load_widget_mapping(), _decls())
         assert "retired" in str(excinfo.value)
     finally:
         reg.RETIRED_UPSCALE_ENGINE_IDS = orig
@@ -101,7 +101,7 @@ def test_retired_engine_raises_profile_error():
 def test_widget_mapping_upscale_registry_is_valid():
     """The `upscale_stage.engine` widget-mapping entry uses `registry:
     "upscale"` -- adding a new registry token requires updating
-    `_REGISTRY_NAMES` in capability_profiles.py. Validate the mapping
+    `_REGISTRY_NAMES` in workflow_rows.py. Validate the mapping
     parses cleanly under the extended validator."""
     m = load_widget_mapping()
     entry = m["managed"].get("upscale_stage.engine")

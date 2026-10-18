@@ -1,7 +1,7 @@
 """Shipping LTX 2.5 matrix rows name every artifact and safe launch fact."""
 from __future__ import annotations
 
-from nodes._otr_shared.capability_profiles import known_profile_ids, load_profile
+from nodes._otr_shared.workflow_rows import known_workflow_ids, load_workflow_row
 from nodes._otr_shared.public_engines import resolve_engine_id
 from nodes._otr_video_engines import eng_ltx25
 from nodes._otr_video_engines import ltx25_recipe as ltx
@@ -27,8 +27,8 @@ def test_every_shipping_ltx_profile_has_complete_model_and_launch_contract(
     monkeypatch.delenv("OTR_LTX25_NATIVE_DIT", raising=False)
     monkeypatch.delenv("OTR_LTX25_NATIVE_TE", raising=False)
     ltx_rows = []
-    for profile_id in known_profile_ids():
-        profile = load_profile(profile_id)
+    for profile_id in known_workflow_ids():
+        profile = load_workflow_row(profile_id)
         engines = _ltx25_engines(profile)
         if not engines or profile["status"] != "shipping":
             continue

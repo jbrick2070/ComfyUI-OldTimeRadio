@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 from nodes import _otr_visual_assets as VA
-from nodes._otr_shared import capability_profiles as cp
+from nodes._otr_shared import workflow_rows as cp
 
 _SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 if str(_SCRIPTS) not in sys.path:
@@ -42,7 +42,7 @@ def _runner():
 def _gate(monkeypatch, profile):
     """Run the gate against ``profile`` on a server that can see nothing."""
     runner = _runner()
-    monkeypatch.setattr(cp, "load_profile", lambda _name: profile)
+    monkeypatch.setattr(cp, "load_workflow_row", lambda _name: profile)
     monkeypatch.setattr(runner, "_server_visible_model_names", lambda _s: set())
     return runner._assert_profile_models_present("synthetic", {})
 
@@ -104,8 +104,8 @@ def test_every_matrix_row_gates_only_what_its_own_engines_do_not_fetch(monkeypat
     engine of that row downloads at queue time."""
     runner = _runner()
     monkeypatch.setattr(runner, "_server_visible_model_names", lambda _s: set())
-    load = cp.load_profile
-    for rid in cp.known_profile_ids():
+    load = cp.load_workflow_row
+    for rid in cp.known_workflow_ids():
         profile = load(rid)
         picks = set((profile.get("role_overrides") or {}).values())
         slots = profile.get("slot_overrides") or {}
@@ -153,8 +153,8 @@ def test_no_shipping_row_is_refused_on_an_empty_server(monkeypatch):
     runner = _runner()
     monkeypatch.setattr(runner, "_server_visible_model_names", lambda _s: set())
     refused = {}
-    for rid in cp.known_profile_ids():
-        if cp.load_profile(rid).get("status") != "shipping":
+    for rid in cp.known_workflow_ids():
+        if cp.load_workflow_row(rid).get("status") != "shipping":
             continue
         try:
             runner._assert_profile_models_present(rid, {})

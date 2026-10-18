@@ -51,7 +51,7 @@ asked early; this module decides nothing about fit on its own.
 * Local: the adapter module is not ``eng_cloud*`` or ``eng_google*``, the
   naming every cloud adapter in the three registries follows.
 * This machine: the shared capability rules
-  (``capability_profiles.availability``) against core's own device and vendor,
+  (``workflow_rows.availability``) against core's own device and vendor,
   so a CUDA box started with ``--cpu`` reads as cpu.
 * An engine that runs in its own install: that install is on disk
   (``install_gaps``, the check its ``load`` refuses on).
@@ -165,7 +165,7 @@ def is_cloud_engine(engine) -> bool:
 
 
 def live_host() -> dict:
-    """This machine, in the shape ``capability_profiles.availability`` reads.
+    """This machine, in the shape ``workflow_rows.availability`` reads.
 
     The device is core's own answer, through the resolver CastLock uses for
     ``default``. No engine declares a toolchain today, so none is claimed;
@@ -202,9 +202,9 @@ def _first_reason(*checks):
 
 def _host_reason(capabilities, name, host):
     try:
-        from ._otr_shared import capability_profiles as cp
+        from ._otr_shared import workflow_rows as cp
     except ImportError:  # pragma: no cover -- flat test imports
-        from _otr_shared import capability_profiles as cp  # type: ignore
+        from _otr_shared import workflow_rows as cp  # type: ignore
     declaration = capabilities.get(name)
     if not declaration:
         return "has no capability row"

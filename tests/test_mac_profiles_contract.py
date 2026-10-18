@@ -6,11 +6,11 @@ shipped for months naming `viz_mxc_mandala`
 image roles (12.3 GB, OOMs at 16 GB; its int8 build hits `aten::_int_mm`, which
 MPS does not implement), a required `OTR_GOOGLE_API_KEY` for images that are
 local, and an `llm.lane_allowlist` MISSING "transformers" -- which is
-NO-FALLBACK enforced, so `--profile otr_mac_mps` would have refused the very
+NO-FALLBACK enforced, so `--workflow-id otr_mac_mps` would have refused the very
 writer the platform was proven with. Every one of those was a foot-gun aimed at
 the one reader most likely to trust the profile over the docs.
 
-None of it was caught by a test, because `tests/test_capability_profiles.py`
+None of it was caught by a test, because `tests/test_workflow_rows.py`
 drove a fixed tier tuple that did not include a Mac profile. This file is the
 missing coverage, and it is deliberately written against the SPECIFIC failures
 rather than as a generic schema check -- a schema check would have passed on
@@ -30,7 +30,7 @@ _REPO = os.path.dirname(_HERE)
 sys.path.insert(0, _REPO)
 
 from nodes._otr_image_engines import registry as ireg  # noqa: E402
-from nodes._otr_shared import capability_profiles as cp  # noqa: E402
+from nodes._otr_shared import workflow_rows as cp  # noqa: E402
 from nodes._otr_shared.llm_policy import ALL_LANES  # noqa: E402
 from nodes._otr_shared.public_engines import resolve_engine_id  # noqa: E402
 from nodes._otr_video_engines import registry as vreg  # noqa: E402
@@ -65,13 +65,13 @@ BANNED_ON_MAC = {
 
 
 def _profile(name):
-    return cp.load_profile(name)
+    return cp.load_workflow_row(name)
 
 
 def test_the_mac_rows_are_every_apple_silicon_row_in_the_matrix():
     """The tuple above is hand-kept, so a new Mac row must be added to it."""
-    mac = tuple(rid for rid in cp.known_profile_ids()
-                if cp.load_profile(rid)["platform"] == "mac")
+    mac = tuple(rid for rid in cp.known_workflow_ids()
+                if cp.load_workflow_row(rid)["platform"] == "mac")
     assert mac == MAC_PROFILES
 
 

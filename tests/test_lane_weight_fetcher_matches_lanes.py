@@ -85,9 +85,9 @@ def test_every_weight_a_profile_demands_is_in_its_bundle(profile_id):
     for lane in fetcher.BUNDLES[profile_id]:
         fetched |= _filenames(fetcher, fetcher.LANES[lane])
 
-    from nodes._otr_shared.capability_profiles import load_profile
+    from nodes._otr_shared.workflow_rows import load_workflow_row
 
-    profile = load_profile(profile_id)
+    profile = load_workflow_row(profile_id)
     demanded = [m for m in profile["preflight"]["required_models"] if "/" not in m]
     assert demanded, "%s preflights no weight file, so nothing is checked" % profile_id
 

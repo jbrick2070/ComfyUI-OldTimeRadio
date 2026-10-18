@@ -156,15 +156,15 @@ def test_machine_columns_name_real_shipped_profiles():
     """
     if _REPO not in sys.path:
         sys.path.insert(0, _REPO)
-    from nodes._otr_shared.capability_profiles import known_profile_ids
+    from nodes._otr_shared.workflow_rows import known_workflow_ids
 
     M = _generator()
-    rows = known_profile_ids()
+    rows = known_workflow_ids()
     for machine in M.MACHINES:
-        assert machine["profile"] in rows, (
+        assert machine["workflow"] in rows, (
             "column %r names profile %r, which is not a workflow_matrix row"
-            % (machine["label"], machine["profile"]))
-        variant = os.path.join(_REPO, M._variant_for(machine["profile"]))
+            % (machine["label"], machine["workflow"]))
+        variant = os.path.join(_REPO, M._variant_for(machine["workflow"]))
         assert os.path.exists(variant), (
             "column %r reproduces with %r, which does not exist"
             % (machine["label"], variant))

@@ -33,16 +33,16 @@ def _pinned_profiles():
     five configurations whose broken pairing this test exists for were shipped
     rows -- the graphs a stranger opens.
 
-    Resolved through `load_profile`, which reads matrix rows and nothing else.
+    Resolved through `load_workflow_row`, which reads matrix rows and nothing else.
     """
-    from nodes._otr_shared.capability_profiles import (
-        ProfileError, known_profile_ids, load_profile)
+    from nodes._otr_shared.workflow_rows import (
+        WorkflowError, known_workflow_ids, load_workflow_row)
 
     rows = []
-    for pid in known_profile_ids():
+    for pid in known_workflow_ids():
         try:
-            data = load_profile(pid)
-        except ProfileError:
+            data = load_workflow_row(pid)
+        except WorkflowError:
             continue
         so = data.get("slot_overrides") or {}
         engine = str(so.get("char_voice_engine") or "").strip()

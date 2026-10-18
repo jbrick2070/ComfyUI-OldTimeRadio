@@ -261,11 +261,11 @@ __all__.append("EngineCore")
 
 # ---------------------------------------------------------------------------
 # GATE B S1 -- per-engine capability DECLARATIONS (the registry TABLE, not the
-# adapters). Consumed by nodes/_otr_shared/capability_profiles.py to DERIVE the
+# adapters). Consumed by nodes/_otr_shared/workflow_rows.py to DERIVE the
 # per-profile enable-set -- never hand-listed per profile. A new engine ships
 # its own row here; zero profile edits.
 #
-# Keys per row (validated by capability_profiles.validate_declaration):
+# Keys per row (validated by workflow_rows.validate_declaration):
 #   required_toolchain     None, or "cu128_toolkit" (source builds; operator-
 #                          blocked per the 3D plan -- keeps hunyuan/trellis dark).
 #   requires_sidecar       True when the engine runs in an isolated sidecar venv.

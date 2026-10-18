@@ -50,7 +50,7 @@ Python 3.12 or earlier. The provisioner reports the actual interpreter and
 fails before model-weight downloads if a selected voice cannot install. On an NVIDIA image
 that ships Python 3.13, either use a Python 3.12 ComfyUI image or explicitly
 select the Bark procedural floor with
-`export OTR_PROVISION_PROFILE=otr_4060_floor` before provisioning.
+`export OTR_PROVISION_WORKFLOW=otr_4060_floor` before provisioning.
 
 Before spending download time, verify the real limits:
 
@@ -81,22 +81,22 @@ workflow, named by its id.
 For automatic NVIDIA selection, clear the overrides:
 
 ```bash
-unset OTR_PROVISION_PROFILE
+unset OTR_PROVISION_WORKFLOW
 unset OTR_WITH_INDEXTTS2
 
 # Optional: name the workflow instead of VRAM auto-selection.
-# export OTR_PROVISION_PROFILE=otr_16gb_low
+# export OTR_PROVISION_WORKFLOW=otr_16gb_low
 ```
 
 Or name a qualification lane:
 
 ```bash
 # Or HuMo 14B:
-# export OTR_PROVISION_PROFILE=otr_w45_humo_14b_169
+# export OTR_PROVISION_WORKFLOW=otr_w45_humo_14b_169
 # export OTR_WITH_INDEXTTS2=1
 
 # Or LTX 2.5 high video:
-# export OTR_PROVISION_PROFILE=otr_ltx25_high_video
+# export OTR_PROVISION_WORKFLOW=otr_ltx25_high_video
 # export OTR_WITH_INDEXTTS2=1
 ```
 
@@ -120,7 +120,7 @@ If no override is exported, the script fails honestly when NVIDIA VRAM cannot
 be read or is below the supported 8 GB floor. It selects `otr_16gb_video` at
 16 GB or more and `otr_8gb_animatediff` from 8 GB up to that -- a 10-15 GB card
 gets the 8 GB set; name a 16 GB workflow to try one at your own risk. There are
-no machine classes. A set `OTR_PROVISION_PROFILE` names any other workflow or a
+no machine classes. A set `OTR_PROVISION_WORKFLOW` names any other workflow or a
 lab lane (HuMo, LTX, another named experiment).
 
 Before the profile pass, provisioning writes two mode-0600 files:
@@ -274,7 +274,7 @@ fetch_exact () {
 ### HuMo 14B: automatic public lane
 
 ```bash
-export OTR_PROVISION_PROFILE=otr_w45_humo_14b_169
+export OTR_PROVISION_WORKFLOW=otr_w45_humo_14b_169
 export OTR_WITH_INDEXTTS2=1
 bash "$OTR_REPO_ROOT/scripts/otr_pod_provision.sh"
 ```
@@ -336,7 +336,7 @@ what the selected lane needs the first time the graph is queued. No Hugging
 Face token, no terms click, no `fetch_exact` call:
 
 ```bash
-export OTR_PROVISION_PROFILE=otr_16gb_video
+export OTR_PROVISION_WORKFLOW=otr_16gb_video
 export OTR_WITH_INDEXTTS2=1
 bash "$OTR_REPO_ROOT/scripts/otr_pod_provision.sh"
 ```
@@ -354,7 +354,7 @@ This operator's H3 weights never go to RunPod. The boundary is recorded in
 `apple/H3_LICENSE_ATTESTATION.md`. On authorized owned/offline hardware only:
 
 ```bash
-"$COMFY_PY" scripts/otr_provision.py --profile otr_w45_minimax_h3_video --list
+"$COMFY_PY" scripts/otr_provision.py --workflow-id otr_w45_minimax_h3_video --list
 "$COMFY_PY" scripts/otr_fetch_lane_weights.py minimax_h3
 ```
 
@@ -422,8 +422,8 @@ boot_comfy_for_row () {
 import sys
 sys.path.insert(0, sys.argv[1])
 from nodes._otr_shared.boot_contracts import contract_for_profile, launch_args_for
-from nodes._otr_shared.capability_profiles import load_profile
-print("\n".join(launch_args_for(contract_for_profile(load_profile(sys.argv[2])))))
+from nodes._otr_shared.workflow_rows import load_workflow_row
+print("\n".join(launch_args_for(contract_for_profile(load_workflow_row(sys.argv[2])))))
 PY
       )
       ;;
@@ -438,7 +438,7 @@ PY
 }
 ```
 
-Qualify the provisioned workflow (`--profile <workflow id>` on the runner):
+Qualify the provisioned workflow (`--workflow-id <workflow id>` on the runner):
 
 ```bash
 SAFE_SELECTOR="${OTR_PROVISION_SELECTOR//:/-}"
@@ -448,7 +448,7 @@ export OTR_SERVER_LOG="$QUAL_DIR/server.log"
 
 boot_comfy_for_row "${OTR_PROVISION_SELECTOR}" || exit $?
 
-RUN_SELECTION=(--profile "$OTR_PROVISION_SELECTOR")
+RUN_SELECTION=(--workflow-id "$OTR_PROVISION_SELECTOR")
 
 cd "$OTR_REPO_ROOT"
 "$COMFY_PY" scripts/otr_canonical_api_run.py \
@@ -572,7 +572,7 @@ for row in $WORKFLOW_ROWS; do
   cd "$OTR_REPO_ROOT"
   "$COMFY_PY" scripts/otr_canonical_api_run.py \
     --comfyui-url "http://127.0.0.1:${OTR_HEADLESS_PORT:-8188}" \
-    --profile "$row" --act-count "$ACT_COUNT" \
+    --workflow-id "$row" --act-count "$ACT_COUNT" \
     --source-bank original --visual-style sci_fi_radio --timeout 0 \
     | tee "$LEG_LOG"
 done

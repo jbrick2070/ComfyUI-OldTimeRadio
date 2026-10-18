@@ -40,8 +40,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from nodes._otr_shared.capability_profiles import (  # noqa: E402
-    load_profile, shipping_ids,
+from nodes._otr_shared.workflow_rows import (  # noqa: E402
+    load_workflow_row, shipping_ids,
 )
 from nodes._otr_shared.boot_contracts import (  # noqa: E402
     contract_for_profile, launch_args_for,
@@ -329,7 +329,7 @@ def _profile_id_from_stem(stem: str) -> str:
     return stem
 
 
-def _committed_profile_ids() -> list[str]:
+def _committed_workflow_ids() -> list[str]:
     """The ids `--all` emits: exactly what the matrix says ships.
 
     THE MATRIX, NOT THE FOLDER, DECIDES WHAT IS EMITTED. Globbing
@@ -363,7 +363,7 @@ def build_variant(profile_id: str, *, schemas=None, mapping=None,
     mapping = mapping or load_widget_mapping()
     canonical = canonical if canonical is not None else _load_canonical()
 
-    profile = load_profile(profile_id)
+    profile = load_workflow_row(profile_id)
     ratify = profile.get("ratify_before_emit") or []
     if ratify:
         raise EmitRefused(
@@ -376,12 +376,12 @@ def build_variant(profile_id: str, *, schemas=None, mapping=None,
     # overrides against every registry's enable-set BEFORE applying it. Catches
     # a bad upscale_stage.engine, a stale role/slot override, etc., before any
     # canonical mutation. Codex r4 MF-3.
-    from nodes._otr_shared.capability_profiles import cross_validate_profile
+    from nodes._otr_shared.workflow_rows import cross_validate_workflow
     from nodes._otr_audio_engines.registry import CAPABILITIES as _AUDIO_CAPS
     from nodes._otr_video_engines.registry import CAPABILITIES as _VIDEO_CAPS
     from nodes._otr_image_engines.registry import CAPABILITIES as _IMAGE_CAPS
     from nodes._otr_upscale_engines.registry import CAPABILITIES as _UPSCALE_CAPS
-    cross_validate_profile(profile, mapping, {
+    cross_validate_workflow(profile, mapping, {
         "audio": _AUDIO_CAPS, "video": _VIDEO_CAPS,
         "image": _IMAGE_CAPS, "upscale": _UPSCALE_CAPS,
     })
@@ -606,7 +606,7 @@ def _card_for(target: Path):
         return _cards.CANONICAL_CARD
     if target.stem == _app_path().stem:
         return _cards.APP_CARD
-    return _cards.card_for_profile(load_profile(target.stem))
+    return _cards.card_for_profile(load_workflow_row(target.stem))
 
 
 def _write_thumbnails() -> None:
@@ -885,7 +885,7 @@ def main(argv=None) -> int:
     if args.check:
         return cmd_check()
     if args.all:
-        ids = _committed_profile_ids()
+        ids = _committed_workflow_ids()
         rc = cmd_emit(ids, explicit=False)
         if not args.no_docs:
             doc_rc = cmd_regenerate_docs()
@@ -896,7 +896,7 @@ def main(argv=None) -> int:
             if rc == 0:
                 rc = doc_rc
         return rc
-    return cmd_emit([s.strip() for s in args.profiles.split(",") if
+    return cmd_emit([s.strip() for s in args.workflow_ids.split(",") if
                      s.strip()], explicit=True)
 
 

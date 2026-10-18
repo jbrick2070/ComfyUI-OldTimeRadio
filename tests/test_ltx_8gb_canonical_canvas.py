@@ -249,9 +249,9 @@ def test_the_profile_canvas_matches_the_declaration():
     own; the rate reaches the graph through the variant's director widget,
     which the next test pins.
     """
-    from nodes._otr_shared.capability_profiles import load_profile
+    from nodes._otr_shared.workflow_rows import load_workflow_row
 
-    profile = load_profile("otr_8gb_video")
+    profile = load_workflow_row("otr_8gb_video")
     render = profile.get("render") or {}
     assert (int(render.get("canvas_w")), int(render.get("canvas_h"))) == DECLARED
     assert (profile.get("role_overrides") or {}).get(

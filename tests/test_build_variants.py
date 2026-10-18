@@ -21,7 +21,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import build_variants as bv  # noqa: E402
 from nodes import _otr_workflow_apply as wa  # noqa: E402
-from nodes._otr_shared import capability_profiles as cp  # noqa: E402
+from nodes._otr_shared import workflow_rows as cp  # noqa: E402
 from tests._support.writer_slots import value  # noqa: E402
 
 #: The cpu-backend row the stamp / self-check / validator tests emit: it names the
@@ -48,13 +48,13 @@ def canonical():
 def tmp_rows(tmp_path, monkeypatch):
     """Route `build_variant` at documents this test writes into `tmp_path`.
 
-    `load_profile` resolves only matrix rows unless it is handed a
-    `profile_dir`; `build_variant` passes none, so its import is pointed at
+    `load_workflow_row` resolves only matrix rows unless it is handed a
+    `row_dir`; `build_variant` passes none, so its import is pointed at
     the test's own directory. Each document starts from a REAL matrix row and
     changes only the key under test.
     """
     def write(base_id, new_id, **changes):
-        doc = copy.deepcopy(cp.load_profile(base_id))
+        doc = copy.deepcopy(cp.load_workflow_row(base_id))
         doc["id"] = new_id
         for key, val in changes.items():
             if isinstance(val, dict) and isinstance(doc.get(key), dict):
@@ -66,8 +66,8 @@ def tmp_rows(tmp_path, monkeypatch):
         return new_id
 
     monkeypatch.setattr(
-        bv, "load_profile",
-        lambda pid: cp.load_profile(pid, profile_dir=str(tmp_path)))
+        bv, "load_workflow_row",
+        lambda pid: cp.load_workflow_row(pid, row_dir=str(tmp_path)))
     return write
 
 

@@ -9,7 +9,7 @@ the HARDWARE the graph is built for, then the video LANE it renders with --
 "NVIDIA 8 GB" over "LTX VIDEO", "MAC 16 GB" over "ANIMATEDIFF".
 
 THE WORDS COME FROM THE MATRIX. ``build_variants`` hands each card the graph's
-profile (``config/workflow_matrix.json`` through ``load_profile``): the
+profile (``config/workflow_matrix.json`` through ``load_workflow_row``): the
 hardware from the row's ``gpu_vendor`` and the size in its id, the lane from
 its ``character_visual`` engine. There is no second list of graph names. A
 shipping row whose vendor or engine has no words here raises, and ``--check``

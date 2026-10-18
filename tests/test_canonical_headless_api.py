@@ -79,7 +79,7 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
     rc, out = _run_main([
         "--offline-schemas",
         "--dry-run",
-        "--profile", "otr_cloud_low",
+        "--workflow-id", "otr_cloud_low",
         "--source-bank", "scifi_news_pro",
         "--dump-prompt", str(dump),
     ])
@@ -175,7 +175,7 @@ def test_visual_style_override_does_not_patch_story_fields(tmp_path):
     rc, out = _run_main([
         "--offline-schemas",
         "--dry-run",
-        "--profile", "none",
+        "--workflow-id", "none",
         "--visual-style", "video_art",
         "--dump-prompt", str(dump),
     ])
@@ -207,7 +207,7 @@ def test_cloud_row_dry_run_binds_every_slot_it_sets(
     rc, out = _run_main([
         "--offline-schemas",
         "--dry-run",
-        "--profile", profile_id,
+        "--workflow-id", profile_id,
         "--source-bank", "media_archive",
         "--creative-model", "google_api:slot-a",
         "--technical-model", "google_api:slot-b",
@@ -321,7 +321,7 @@ def test_set_reaches_the_space_saver_on_a_workflow_row(tmp_path):
     rc, _out = _run_main([
         "--offline-schemas",
         "--dry-run",
-        "--profile", "otr_24gb_foley",
+        "--workflow-id", "otr_24gb_foley",
         "--act-count", "3",
         "--set", "OTR_LedgerScriptWriter.asset_cleanup=" + full,
         "--dump-prompt", str(dump),
@@ -362,7 +362,7 @@ def test_video_lane_sets_the_three_video_dropdowns_as_the_app_does(tmp_path):
     dump = tmp_path / "prompt.json"
     rc, out = _run_main([
         "--offline-schemas", "--dry-run",
-        "--profile", "otr_16gb_video",
+        "--workflow-id", "otr_16gb_video",
         "--video-lane", "h3_low_video",
         "--dump-prompt", str(dump),
     ])
@@ -378,7 +378,7 @@ def test_video_lane_sets_the_three_video_dropdowns_as_the_app_does(tmp_path):
     assert "row model check skipped" in out
     assert "preflight downloads and checks" in out
     rc, _ = _run_main([
-        "--offline-schemas", "--dry-run", "--profile", "otr_16gb_video",
+        "--offline-schemas", "--dry-run", "--workflow-id", "otr_16gb_video",
         "--dump-prompt", str(tmp_path / "row.json"),
     ])
     row_director = _node(json.loads((tmp_path / "row.json").read_text(
@@ -393,7 +393,7 @@ def test_video_lane_warns_when_nothing_checks_the_lanes_weights(tmp_path):
     no preflight checks its weights; the runner must say so, not imply one does."""
     rc, out = _run_main([
         "--offline-schemas", "--dry-run",
-        "--profile", "otr_16gb_video",
+        "--workflow-id", "otr_16gb_video",
         "--video-lane", "mesh_stage",
         "--dump-prompt", str(tmp_path / "prompt.json"),
     ])
@@ -408,7 +408,7 @@ def test_video_lane_humo_plays_every_role_and_the_preflight_fetches_only_humo(tm
     the preflight promises HuMo's own weights and no others."""
     rc, out = _run_main([
         "--offline-schemas", "--dry-run",
-        "--profile", "otr_16gb_video",
+        "--workflow-id", "otr_16gb_video",
         "--video-lane", "humo_1.7B",
         "--dump-prompt", str(tmp_path / "prompt.json"),
     ])
@@ -422,7 +422,7 @@ def test_video_lane_humo_plays_every_role_and_the_preflight_fetches_only_humo(tm
 def test_video_lane_that_serves_every_role_names_no_routed_lane(tmp_path):
     rc, out = _run_main([
         "--offline-schemas", "--dry-run",
-        "--profile", "otr_16gb_video",
+        "--workflow-id", "otr_16gb_video",
         "--video-lane", "h3_low_video",
         "--dump-prompt", str(tmp_path / "prompt.json"),
     ])
@@ -435,7 +435,7 @@ def test_video_lane_applies_after_a_workflow_profile(tmp_path):
     dump = tmp_path / "prompt.json"
     rc, out = _run_main([
         "--offline-schemas", "--dry-run",
-        "--profile", "otr_16gb_video",
+        "--workflow-id", "otr_16gb_video",
         "--video-lane", "h3_low_video",
         "--dump-prompt", str(dump),
     ])
@@ -453,7 +453,7 @@ def test_video_lane_refuses_a_replay_and_names_the_derive_command(tmp_path):
     with pytest.raises(SystemExit, match="--derive-engine ltx25_video"):
         _run_main([
             "--offline-schemas", "--dry-run",
-            "--profile", "otr_16gb_video",
+            "--workflow-id", "otr_16gb_video",
             "--video-lane", "ltx25_high_video",
             "--replay-from", str(tmp_path / "bundle"),
             "--dump-prompt", str(tmp_path / "prompt.json"),

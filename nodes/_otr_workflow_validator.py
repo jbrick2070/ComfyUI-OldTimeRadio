@@ -536,13 +536,13 @@ class WorkflowValidator:
         profile id (every execution -- stale values from a previous prompt
         are overwritten). The VRAM OOM budget is owned by the operator's
         tier JSON now, so no ceiling is exported."""
-        from ._otr_shared.capability_profiles import ProfileError, load_profile
+        from ._otr_shared.workflow_rows import WorkflowError, load_workflow_row
         from ._otr_shared.boot_contracts import (
             BootContractError, assert_running_server, contract_for_profile,
         )
         try:
-            profile = load_profile(profile_id)
-        except ProfileError as e:
+            profile = load_workflow_row(profile_id)
+        except WorkflowError as e:
             # A MISSING PROFILE LETS THE WORKFLOW RUN (operator, 2026-09-23:
             # "just let the workflow run").
             #

@@ -27,7 +27,7 @@ import pytest
 import nodes._otr_video_engines  # noqa: F401  -- populate the registry
 from nodes import otr_video_director as vd
 from nodes._otr_shared import boot_contracts as bc
-from nodes._otr_shared.capability_profiles import ProfileError, load_profile
+from nodes._otr_shared.workflow_rows import WorkflowError, load_workflow_row
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import render_driver as rd
 
@@ -49,8 +49,8 @@ def engine():
 @pytest.fixture()
 def profile(tmp_path):
     """The hero lane's cast, built from a live matrix row and read back
-    through ``load_profile`` so the shape validator still runs."""
-    prof = copy.deepcopy(load_profile(BASE_ROW))
+    through ``load_workflow_row`` so the shape validator still runs."""
+    prof = copy.deepcopy(load_workflow_row(BASE_ROW))
     prof["id"] = "humo_hero_cast"
     for role in ("announcer_visual", "music_visual", "character_visual"):
         prof["role_overrides"][role] = LANE
@@ -60,7 +60,7 @@ def profile(tmp_path):
     prof["launch"]["boot_contract"] = bc.DEFAULT
     (tmp_path / "humo_hero_cast.json").write_text(
         json.dumps(prof), encoding="utf-8")
-    return load_profile("humo_hero_cast", profile_dir=str(tmp_path))
+    return load_workflow_row("humo_hero_cast", row_dir=str(tmp_path))
 
 
 # ---------------------------------------------------------------------------
@@ -197,11 +197,11 @@ def test_every_shipped_profile_still_validates_with_the_new_optional_key():
     """`boot_contract` is OPTIONAL because the launch key set is
     closed-validated: a required key would have broken all ~20 profiles at
     once."""
-    from nodes._otr_shared.capability_profiles import known_profile_ids
-    ids = sorted(known_profile_ids())
+    from nodes._otr_shared.workflow_rows import known_workflow_ids
+    ids = sorted(known_workflow_ids())
     assert len(ids) >= 20
     for pid in ids:
-        prof = load_profile(pid)
+        prof = load_workflow_row(pid)
         name = bc.contract_for_profile(prof)
         assert bc.known_contract(name), (
             "profile %s selects unknown boot contract %r" % (pid, name))
@@ -210,11 +210,11 @@ def test_every_shipped_profile_still_validates_with_the_new_optional_key():
 def test_a_malformed_boot_contract_value_is_refused_by_the_schema():
     """An OPTIONAL key still gets VALIDATED when present. A typo'd value
     silently doing nothing is the drift class the closed validator kills."""
-    from nodes._otr_shared import capability_profiles as cp
-    prof = load_profile(BASE_ROW)
+    from nodes._otr_shared import workflow_rows as cp
+    prof = load_workflow_row(BASE_ROW)
     prof["launch"]["boot_contract"] = 17
-    with pytest.raises(ProfileError) as exc:
-        cp.validate_profile_shape(prof, source="synthetic")
+    with pytest.raises(WorkflowError) as exc:
+        cp.validate_workflow_shape(prof, source="synthetic")
     assert "boot_contract" in str(exc.value)
 
 

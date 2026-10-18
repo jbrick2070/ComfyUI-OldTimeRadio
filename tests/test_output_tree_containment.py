@@ -205,10 +205,10 @@ def test_the_render_batch_rejects_remote_paths_at_all():
 # token whitelist: a caller-supplied label may name a FILE, never a LOCATION
 # --------------------------------------------------------------------------
 def test_a_profile_id_names_a_workflow_not_a_path():
-    from nodes._otr_shared import capability_profiles as cp
+    from nodes._otr_shared import workflow_rows as cp
     for bad in ("../../../etc/hosts", r"..\..\x", "a/b", "a\\b"):
-        with pytest.raises(cp.ProfileError, match="names a workflow, not a path"):
-            cp.load_profile(bad)
+        with pytest.raises(cp.WorkflowError, match="names a workflow, not a path"):
+            cp.load_workflow_row(bad)
 
 
 # --------------------------------------------------------------------------

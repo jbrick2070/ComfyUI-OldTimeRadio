@@ -128,7 +128,7 @@ def test_packs_only_never_resolves_models_or_fetches_weights(tmp_path, monkeypat
     monkeypatch.setattr(provision, "comfy_root", lambda: str(comfy))
     monkeypatch.setattr(provision, "install_node_packs", lambda root: calls.append("packs"))
     monkeypatch.setattr(provision, "install_requirements", lambda: calls.append("otr-deps"))
-    for name in ("models_root", "profile_lanes", "ensure_hf_home", "fetch_lane_weights"):
+    for name in ("models_root", "workflow_lanes", "ensure_hf_home", "fetch_lane_weights"):
         monkeypatch.setattr(
             provision,
             name,

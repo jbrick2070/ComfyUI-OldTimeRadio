@@ -16,7 +16,7 @@ import sys
 import pytest
 
 from nodes import otr_video_director as vd
-from nodes._otr_shared import capability_profiles as cp
+from nodes._otr_shared import workflow_rows as cp
 from nodes._otr_shared import public_engines as pub
 from nodes._otr_shared.public_engines import resolve_engine_id
 from nodes._otr_video_engines import registry as vreg
@@ -185,7 +185,7 @@ def test_profile_apply_writes_public_menu_option():
     # And never a LEGACY id: an applier still writing one would be writing a
     # string that resolves but is no longer in the menu the UI offers. No row
     # names one, so this is a real row with one role spelled the old way.
-    legacy = copy.deepcopy(cp.load_profile("otr_8gb_still"))
+    legacy = copy.deepcopy(cp.load_workflow_row("otr_8gb_still"))
     legacy["role_overrides"]["announcer_visual"] = "still_kenburns"
     wv = _director_values(legacy)
     assert vd.exact_menu_option_for("still_motion") in wv
@@ -236,17 +236,17 @@ def test_parse_engine_override_resolves_public_and_legacy():
 # boundary: capability cross-validation resolves a public id
 # --------------------------------------------------------------------------- #
 def test_cross_validate_resolves_public_id():
-    from nodes._otr_shared import capability_profiles as cp
+    from nodes._otr_shared import workflow_rows as cp
     from nodes._otr_audio_engines import registry as areg
     from nodes._otr_image_engines import registry as ireg
     decls = {"video": vreg.CAPABILITIES, "audio": areg.CAPABILITIES,
              "image": ireg.CAPABILITIES}
     mapping = cp.load_widget_mapping()
-    prof = dict(cp.load_profile("otr_8gb_video"))
+    prof = dict(cp.load_workflow_row("otr_8gb_video"))
     # Baseline: this matrix row names its lane by the INTERNAL id ltx_8gb.
     # AMD rows are images-only, so they are not a valid vehicle for this
     # public-video-id boundary.
-    cp.cross_validate_profile(prof, mapping, decls)
+    cp.cross_validate_workflow(prof, mapping, decls)
     # Swap every ltx_8gb override to the LIVE PUBLIC id; it must STILL
     # validate. Legacy alias coverage lives in the dedicated alias boundary
     # below.
@@ -259,7 +259,7 @@ def test_cross_validate_resolves_public_id():
                 swapped += 1
         prof[section] = sec
     assert swapped >= 1, "otr_8gb_video should carry an ltx_8gb override"
-    cp.cross_validate_profile(prof, mapping, decls)   # public id resolves -> OK
+    cp.cross_validate_workflow(prof, mapping, decls)   # public id resolves -> OK
 
 
 # --------------------------------------------------------------------------- #

@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from nodes import _otr_workflow_apply as wa
-from nodes._otr_shared import capability_profiles as cp
+from nodes._otr_shared import workflow_rows as cp
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -76,7 +76,7 @@ def _flatten(obj, prefix=""):
 
 
 def _load_profile(pid):
-    return cp.load_profile(pid)
+    return cp.load_workflow_row(pid)
 
 
 def _profile_diffs(a, b):

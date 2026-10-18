@@ -224,7 +224,7 @@ box. Never paste a key into a workflow.
 
 ## Hosted lanes no shipped workflow provisions
 
-These need no weights and no VRAM -- only a credential -- and the engines themselves are registered and selectable. But no shipping workflow selects one, so they were never added to the provisioner's remote route, and `scripts/otr_provision.py` REFUSES a `--profile` (its own flag name) that names one rather than guessing. Using one today means selecting it in the canonical workflow by hand, not through a shipped one. Worth closing before shipping.
+These need no weights and no VRAM -- only a credential -- and the engines themselves are registered and selectable. But no shipping workflow selects one, so they were never added to the provisioner's remote route, and `scripts/otr_provision.py` REFUSES a `--workflow-id` (its own flag name) that names one rather than guessing. Using one today means selecting it in the canonical workflow by hand, not through a shipped one. Worth closing before shipping.
 
 * `cloud_seedance_2` (video)
 

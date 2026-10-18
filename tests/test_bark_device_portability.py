@@ -8,7 +8,7 @@ a Mac, an Intel box, or any CUDA-less install the model loaded happily on CPU
 and the FIRST spoken line blew up.
 
 Nothing gated it, either. The CAPABILITIES row declares bark
-``device_backends: ["cuda"]``, but that table feeds ``capability_profiles`` to
+``device_backends: ["cuda"]``, but that table feeds ``workflow_rows`` to
 derive per-profile enable-sets and is NOT consulted at voice dispatch --
 ``registry.assert_usable`` only checks "registered + role-compatible". bark is
 the zero-setup voice engine a fresh install reaches for (it auto-downloads

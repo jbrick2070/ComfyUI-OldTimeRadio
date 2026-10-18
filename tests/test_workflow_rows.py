@@ -31,12 +31,12 @@ import pathlib
 
 import pytest
 
-from nodes._otr_shared import capability_profiles as cp
+from nodes._otr_shared import workflow_rows as cp
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 MASTER = REPO_ROOT / "workflows" / "otr_canonical.json"
-#: Every workflow the pack runs -- the matrix is the only source `load_profile` reads.
-MATRIX_IDS = cp.known_profile_ids()
+#: Every workflow the pack runs -- the matrix is the only source `load_workflow_row` reads.
+MATRIX_IDS = cp.known_workflow_ids()
 #: The rows the host-shape tests stand on. Named, not picked by position, so a
 #: matrix reorder never silently moves a test onto a different kind of machine.
 NV16 = "otr_16gb_low"       # 16 GB NVIDIA, sidecars allowed
@@ -52,7 +52,7 @@ def _a_row_stating(section, key=None):
     row that has it rather than inventing a document.
     """
     for rid in MATRIX_IDS:
-        prof = cp.load_profile(rid)
+        prof = cp.load_workflow_row(rid)
         if section in prof and (key is None or key in prof[section]):
             return copy.deepcopy(prof)
     wanted = f"{section}.{key}" if key else section
@@ -100,7 +100,7 @@ def _declarations_by_registry():
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("profile_id", MATRIX_IDS)
 def test_every_matrix_row_loads_and_validates(profile_id):
-    profile = cp.load_profile(profile_id)
+    profile = cp.load_workflow_row(profile_id)
     assert profile["id"] == profile_id
 
 
@@ -119,7 +119,7 @@ _ROW_SECTIONS = tuple(sorted(
 
 @pytest.mark.parametrize("profile_id", MATRIX_IDS)
 def test_v2_sections_present_on_every_matrix_row(profile_id):
-    prof = cp.load_profile(profile_id)
+    prof = cp.load_workflow_row(profile_id)
     assert {"llm", "video", "audio", "preflight"} <= set(_ROW_SECTIONS)
     for section in _ROW_SECTIONS:
         assert isinstance(prof[section], dict), section
@@ -142,15 +142,15 @@ def test_v2_sections_present_on_every_matrix_row(profile_id):
 def test_v2_bad_section_values_rejected(section, key, value, match):
     bad = _a_row_stating(section)
     bad[section][key] = value
-    with pytest.raises(cp.ProfileError, match=match):
-        cp.validate_profile_shape(bad)
+    with pytest.raises(cp.WorkflowError, match=match):
+        cp.validate_workflow_shape(bad)
 
 
 def test_v2_unknown_llm_key_rejected():
-    bad = copy.deepcopy(cp.load_profile(NV16))
+    bad = copy.deepcopy(cp.load_workflow_row(NV16))
     bad["llm"]["surprise_lane"] = "x"
-    with pytest.raises(cp.ProfileError, match="unknown llm key"):
-        cp.validate_profile_shape(bad)
+    with pytest.raises(cp.WorkflowError, match="unknown llm key"):
+        cp.validate_workflow_shape(bad)
 
 
 #: `toolchains` was in this list and came out on 2026-09-24. It describes the
@@ -176,7 +176,7 @@ def test_an_absent_section_is_legal(section):
     """
     doc = _a_row_stating(section)
     del doc[section]
-    assert cp.validate_profile_shape(doc) is doc
+    assert cp.validate_workflow_shape(doc) is doc
 
 
 @pytest.mark.parametrize("section,key", [
@@ -193,7 +193,7 @@ def test_a_section_may_state_one_key_and_omit_the_rest(section, key):
     """
     full = _a_row_stating(section, key)
     doc = _probe(**{section: {key: full[section][key]}})
-    assert cp.validate_profile_shape(doc) is doc
+    assert cp.validate_workflow_shape(doc) is doc
 
 
 @pytest.mark.parametrize("section", ["render", "llm", "seed_policy"])
@@ -207,8 +207,8 @@ def test_a_typo_inside_a_partial_section_is_still_fatal(section):
     trip over it.
     """
     doc = _probe(**{section: {"ths_is_not_a_key": 1}})
-    with pytest.raises(cp.ProfileError, match="unknown"):
-        cp.validate_profile_shape(doc)
+    with pytest.raises(cp.WorkflowError, match="unknown"):
+        cp.validate_workflow_shape(doc)
 
 
 def test_v2_llm_section_matches_runtime_policy_enums():
@@ -219,7 +219,7 @@ def test_v2_llm_section_matches_runtime_policy_enums():
     the validator itself does -- an unstated key takes the dataclass default."""
     from nodes._otr_shared.llm_policy import LLMRuntimePolicy
 
-    prof = cp.load_profile(CPU_ROW)
+    prof = cp.load_workflow_row(CPU_ROW)
     stated = {k: prof["llm"][k] for k in cp._LLM_RUNTIME_KEYS if k in prof["llm"]}
     pol = LLMRuntimePolicy(**stated)
     assert pol.device == "cpu"
@@ -253,7 +253,7 @@ def test_v1_cpu_ok_row_cannot_survive_v2_semantics():
     keys. The old false bark row cannot come back."""
     v1_bark = {"required_toolchain": None, "requires_sidecar": False,
                "cpu_ok": True, "model_requirements": ["suno-bark"]}
-    with pytest.raises(cp.ProfileError, match="unknown key"):
+    with pytest.raises(cp.WorkflowError, match="unknown key"):
         cp.validate_declaration("bark", v1_bark)
 
 
@@ -267,14 +267,14 @@ def test_v2_vendor_pins_gate_amd_hosts():
     """indextts2 / chatterbox (cu128 sidecars) are vendor-locked
     nvidia: an AMD cuda profile must see REASON_REQUIRES_VENDOR, an nvidia
     one REASON_OK-or-sidecar-gated."""
-    amd = copy.deepcopy(cp.load_profile(NV16))
+    amd = copy.deepcopy(cp.load_workflow_row(NV16))
     amd["gpu_vendor"] = "amd"
     decls = _declarations_by_registry()
     audio_avail = cp.availability(amd, decls["audio"])
     for eng in ("indextts2", "chatterbox"):
         assert audio_avail[eng] == cp.REASON_REQUIRES_VENDOR, eng
 
-    nv = cp.load_profile(NV16)
+    nv = cp.load_workflow_row(NV16)
     nv_audio = cp.availability(nv, decls["audio"])
     assert nv_audio["indextts2"] == cp.REASON_OK
 
@@ -290,9 +290,9 @@ def test_v2_bark_excluded_from_cpu_but_fine_on_cuda():
     (cuda was genuinely the only backend) to REASON_IMPRACTICAL_ON_CPU (cpu
     works, it is just not a cpu host's job to offer it)."""
     decls = _declarations_by_registry()["audio"]
-    floor = cp.load_profile(CPU_ROW)
+    floor = cp.load_workflow_row(CPU_ROW)
     assert cp.availability(floor, decls)["bark"] == cp.REASON_IMPRACTICAL_ON_CPU
-    nv = cp.load_profile(NV16)
+    nv = cp.load_workflow_row(NV16)
     assert cp.availability(nv, decls)["bark"] == cp.REASON_OK
 
 
@@ -313,7 +313,7 @@ def test_v2_humo_fp8_dependency_is_table_visible():
     assert decls["humo_1.7B"]["needs_fp8_te"] is False
 
 
-#: The keys `validate_profile_shape` requires: an identity plus the four that
+#: The keys `validate_workflow_shape` requires: an identity plus the four that
 #: describe the HOST. A probe document needs them before it can exercise anything
 #: else, because they are checked first.
 #:
@@ -338,21 +338,21 @@ def _probe(**extra):
 
 
 def test_unknown_top_level_key_rejected():
-    profile = cp.load_profile(NV16)
+    profile = cp.load_workflow_row(NV16)
     bad = copy.deepcopy(profile)
     bad["surprise_knob"] = 1
-    with pytest.raises(cp.ProfileError, match="unknown top-level key"):
-        cp.validate_profile_shape(bad)
+    with pytest.raises(cp.WorkflowError, match="unknown top-level key"):
+        cp.validate_workflow_shape(bad)
 
 
 @pytest.mark.parametrize("key", ["id", "platform", "device_backend",
                                  "toolchains", "allow_sidecars"])
 def test_a_required_key_cannot_be_omitted(key):
     """The complete required set, one key per case so a failure names it."""
-    doc = copy.deepcopy(cp.load_profile(NV16))
+    doc = copy.deepcopy(cp.load_workflow_row(NV16))
     del doc[key]
-    with pytest.raises(cp.ProfileError, match="missing required key"):
-        cp.validate_profile_shape(doc)
+    with pytest.raises(cp.WorkflowError, match="missing required key"):
+        cp.validate_workflow_shape(doc)
 
 
 def test_the_host_identity_keys_stay_required():
@@ -371,9 +371,9 @@ def test_the_host_identity_keys_stay_required():
     unreadable profile still lets the workflow run. A document with only an id
     validated cleanly and then raised a bare KeyError mid-render.
     """
-    with pytest.raises(cp.ProfileError, match="missing required key"):
-        cp.validate_profile_shape({"id": "probe"})
-    assert cp.validate_profile_shape(_probe()) == _probe()
+    with pytest.raises(cp.WorkflowError, match="missing required key"):
+        cp.validate_workflow_shape({"id": "probe"})
+    assert cp.validate_workflow_shape(_probe()) == _probe()
 
 
 def test_availability_refuses_an_incomplete_profile_rather_than_raising_keyerror():
@@ -383,7 +383,7 @@ def test_availability_refuses_an_incomplete_profile_rather_than_raising_keyerror
     which is what a `.get()` default inside `_fit_reason` would have produced.
     """
     from nodes._otr_audio_engines.registry import CAPABILITIES
-    with pytest.raises(cp.ProfileError, match="missing"):
+    with pytest.raises(cp.WorkflowError, match="missing"):
         cp.availability({"id": "probe"}, CAPABILITIES)
 
 
@@ -398,9 +398,9 @@ def test_availability_refuses_an_incomplete_profile_rather_than_raising_keyerror
     ("gpu_vendor", "apple"),
 ])
 def test_v2_enum_values_accepted(key, value):
-    prof = copy.deepcopy(cp.load_profile(NV16))
+    prof = copy.deepcopy(cp.load_workflow_row(NV16))
     prof[key] = value
-    assert cp.validate_profile_shape(prof) is prof
+    assert cp.validate_workflow_shape(prof) is prof
 
 
 @pytest.mark.parametrize("key,value,match", [
@@ -410,31 +410,31 @@ def test_v2_enum_values_accepted(key, value):
     ("gpu_vendor", "intel", "gpu_vendor"),
 ])
 def test_bad_enum_values_rejected(key, value, match):
-    bad = copy.deepcopy(cp.load_profile(NV16))
+    bad = copy.deepcopy(cp.load_workflow_row(NV16))
     bad[key] = value
-    with pytest.raises(cp.ProfileError, match=match):
-        cp.validate_profile_shape(bad)
+    with pytest.raises(cp.WorkflowError, match=match):
+        cp.validate_workflow_shape(bad)
 
 
 def test_unknown_seed_policy_key_rejected():
     bad = _a_row_stating("seed_policy")
     bad["seed_policy"]["seed"] = 7  # the companion-trap name does not belong here
-    with pytest.raises(cp.ProfileError, match="seed_policy"):
-        cp.validate_profile_shape(bad)
+    with pytest.raises(cp.WorkflowError, match="seed_policy"):
+        cp.validate_workflow_shape(bad)
 
 
 def test_id_filename_agreement_enforced(tmp_path):
-    profile = copy.deepcopy(cp.load_profile(NV16))
+    profile = copy.deepcopy(cp.load_workflow_row(NV16))
     assert profile["id"] == NV16
     p = tmp_path / "wrong_name.json"
     p.write_text(json.dumps(profile), encoding="utf-8")
-    with pytest.raises(cp.ProfileError, match="filename and id"):
-        cp.load_profile("wrong_name", profile_dir=str(tmp_path))
+    with pytest.raises(cp.WorkflowError, match="filename and id"):
+        cp.load_workflow_row("wrong_name", row_dir=str(tmp_path))
 
 
 def test_unknown_profile_id_names_known_profiles():
-    with pytest.raises(cp.ProfileError, match=NV16):
-        cp.load_profile("no_such_tier")
+    with pytest.raises(cp.WorkflowError, match=NV16):
+        cp.load_workflow_row("no_such_tier")
 
 
 # ---------------------------------------------------------------------------
@@ -448,14 +448,14 @@ def test_mapping_loads_and_validates():
 def test_mapping_raw_node_id_banned():
     mapping = copy.deepcopy(cp.load_widget_mapping())
     mapping["managed"]["role_overrides.announcer_visual"]["targets"] = [["87", "announcer_video_model"]]
-    with pytest.raises(cp.ProfileError, match="raw node id"):
+    with pytest.raises(cp.WorkflowError, match="raw node id"):
         cp.validate_widget_mapping_shape(mapping)
 
 
 def test_mapping_companion_trap_widget_banned():
     mapping = copy.deepcopy(cp.load_widget_mapping())
     mapping["managed"]["seed_policy.request_seed"]["targets"] = [["OTR_VideoDirector", "seed"]]
-    with pytest.raises(cp.ProfileError, match="forbidden widget"):
+    with pytest.raises(cp.WorkflowError, match="forbidden widget"):
         cp.validate_widget_mapping_shape(mapping)
 
 
@@ -479,7 +479,7 @@ def test_16gb_profile_is_separate_from_lean_canonical_values():
     """The saved workflow is the quick 30-word canonical. otr_16gb_low is a
     named heavier row and must not be assumed to equal the saved canvas."""
     mapping = cp.load_widget_mapping()
-    profile = cp.load_profile(NV16)
+    profile = cp.load_workflow_row(NV16)
     wf = json.loads(MASTER.read_text(encoding="utf-8"))
     nodes_by_type = {n["type"]: n for n in wf["nodes"]}
 
@@ -526,7 +526,7 @@ def test_all_declarations_validate():
 
 
 def test_declaration_unknown_key_rejected():
-    with pytest.raises(cp.ProfileError, match="unknown key"):
+    with pytest.raises(cp.WorkflowError, match="unknown key"):
         cp.validate_declaration("x", {
             "required_toolchain": None,
             "requires_sidecar": False,
@@ -566,14 +566,14 @@ def test_availability_reason_codes():
                     "practical_without_gpu": True, "sidecar_conditional": False,
                     "model_requirements": []},
     }
-    lite = cp.load_profile(NV8)
+    lite = cp.load_workflow_row(NV8)
     avail = cp.availability(lite, decls)
     assert avail["gpu_heavy"] == cp.REASON_OK          # no VRAM cap -> fits
     assert avail["side"] == cp.REASON_SIDECARS_DISABLED
     assert avail["compiled"] == cp.REASON_MISSING_TOOLCHAIN
     assert avail["procgen"] == cp.REASON_OK
 
-    floor = cp.load_profile(CPU_ROW)
+    floor = cp.load_workflow_row(CPU_ROW)
     avail = cp.availability(floor, decls)
     assert avail["gpu_heavy"] == cp.REASON_REQUIRES_CUDA
     assert avail["procgen"] == cp.REASON_OK
@@ -581,23 +581,23 @@ def test_availability_reason_codes():
 
 @pytest.mark.parametrize("profile_id", MATRIX_IDS)
 def test_cross_validation_green_for_every_matrix_row(profile_id):
-    profile = cp.load_profile(profile_id)
+    profile = cp.load_workflow_row(profile_id)
     mapping = cp.load_widget_mapping()
-    cp.cross_validate_profile(profile, mapping, _declarations_by_registry())
+    cp.cross_validate_workflow(profile, mapping, _declarations_by_registry())
 
 
 def test_cross_validation_rejects_disabled_engine():
-    profile = copy.deepcopy(cp.load_profile(CPU_ROW))
+    profile = copy.deepcopy(cp.load_workflow_row(CPU_ROW))
     profile["role_overrides"]["character_visual"] = "humo"  # GPU-only on a cpu host
-    with pytest.raises(cp.ProfileError, match="requires_cuda"):
-        cp.cross_validate_profile(profile, cp.load_widget_mapping(), _declarations_by_registry())
+    with pytest.raises(cp.WorkflowError, match="requires_cuda"):
+        cp.cross_validate_workflow(profile, cp.load_widget_mapping(), _declarations_by_registry())
 
 
 def test_cross_validation_rejects_typoed_override_key():
-    profile = copy.deepcopy(cp.load_profile(NV16))
+    profile = copy.deepcopy(cp.load_workflow_row(NV16))
     profile["role_overrides"]["announcer_visualz"] = "ltx25_video"
-    with pytest.raises(cp.ProfileError, match="no widget-mapping entry"):
-        cp.cross_validate_profile(profile, cp.load_widget_mapping(), _declarations_by_registry())
+    with pytest.raises(cp.WorkflowError, match="no widget-mapping entry"):
+        cp.cross_validate_workflow(profile, cp.load_widget_mapping(), _declarations_by_registry())
 
 
 # ---------------------------------------------------------------------------
@@ -614,7 +614,7 @@ def test_cold_import_gate_profile_layer_pulls_no_heavy_libs():
     import sys as _sys
     code = (
         "import sys;"
-        "import nodes._otr_shared.capability_profiles;"
+        "import nodes._otr_shared.workflow_rows;"
         "import nodes._otr_shared.engine_registry_base;"
         "import nodes._otr_video_engines.registry;"
         "import nodes._otr_image_engines.registry;"
@@ -632,7 +632,7 @@ def test_two_heavy_roles_still_validate():
     """Regression pinned by the spec: per-engine fit ONLY -- a profile with two
     heavy roles yields a valid enable-set (single-heavy residency is
     wrapper_bridge's RUNTIME invariant, never a static profile rejection)."""
-    profile = cp.load_profile(NV16)
+    profile = cp.load_workflow_row(NV16)
     # S6 ratification (2026-07-10): the 16 GB row is REGENERATED from
     # canonical (viz lanes + z_image_turbo) -- the old humo/flux pins moved
     # out. This test's subject is the two-heavy STATIC rule, so it forces
@@ -649,4 +649,4 @@ def test_two_heavy_roles_still_validate():
                if reason == cp.REASON_OK]
     assert "ltx25_audio_in_16gb" in enabled and "humo" in enabled
     assert "humo_1.7B" in enabled       # legacy selectable engine stays registered
-    cp.cross_validate_profile(profile, cp.load_widget_mapping(), decls)
+    cp.cross_validate_workflow(profile, cp.load_widget_mapping(), decls)

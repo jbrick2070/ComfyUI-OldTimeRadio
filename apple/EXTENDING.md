@@ -265,7 +265,7 @@ the one that would otherwise lie.
 Set `"ships"` false (or delete the row), **and delete** the matching
 `workflows/<id>.json` that `--all` emitted, then re-run `--all` so its section
 leaves `apple/LAUNCH_RECIPES.md`. Leaving the files is not enough to fail `--check`: a row that still
-exists -- even with `"ships"` false -- is what `load_profile` reads, so the
+exists -- even with `"ships"` false -- is what `load_workflow_row` reads, so the
 leftover workflow regenerates cleanly.
 
 ### The proof

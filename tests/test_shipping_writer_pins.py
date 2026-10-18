@@ -21,7 +21,7 @@ from nodes._otr_model_catalog import (  # noqa: E402
     DEFAULT_LLM,
     default_llm_option,
 )
-from nodes._otr_shared import capability_profiles as cp  # noqa: E402
+from nodes._otr_shared import workflow_rows as cp  # noqa: E402
 import build_variants as bv  # noqa: E402
 
 SMALL = "Qwen/Qwen3.5-4B"
@@ -41,7 +41,7 @@ STALE = (
 
 
 def _profile(name: str) -> dict:
-    return cp.load_profile(name)
+    return cp.load_workflow_row(name)
 
 
 def test_dropdown_default_is_the_native_writer_and_qwen_stays_curated():
@@ -90,7 +90,7 @@ def _shipped_writer_models(pid):
     schemas = wa.build_offline_schemas()
     logging.disable(logging.CRITICAL)
     try:
-        graph = wa.apply_profile(canonical, cp.load_profile(pid))
+        graph = wa.apply_profile(canonical, cp.load_workflow_row(pid))
     finally:
         logging.disable(logging.NOTSET)
     names = wa.serialized_slot_names("OTR_LedgerScriptWriter", schemas)

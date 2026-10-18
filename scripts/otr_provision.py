@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Install everything a machine needs to render, unattended. THE DOER.
 
-    python scripts/otr_provision.py --profile otr_8gb_animatediff
-    python scripts/otr_provision.py --profile otr_16gb_video --with-indextts2
+    python scripts/otr_provision.py --workflow-id otr_8gb_animatediff
+    python scripts/otr_provision.py --workflow-id otr_16gb_video --with-indextts2
     python scripts/otr_provision.py --list
 
 WHY THIS EXISTS, AND WHY IT IS NOT A CHECKER. Operator, 2026-08-31: *"I need a
@@ -1270,18 +1270,18 @@ _REMOTE_NO_WEIGHT_IMAGE_ENGINES = {
 _PROFILE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
-def load_profile(profile_id: str) -> dict:
+def load_workflow_row(profile_id: str) -> dict:
     """One row of `config/workflow_matrix.json`, resolved and shape-validated."""
     profile_id = str(profile_id or "")
     if not _PROFILE_ID_RE.fullmatch(profile_id):
         raise ProvisionFailure("invalid profile id: %r" % profile_id)
     if _REPO not in sys.path:
         sys.path.insert(0, _REPO)
-    from nodes._otr_shared.capability_profiles import (
-        ProfileError, load_profile as _load_row)
+    from nodes._otr_shared.workflow_rows import (
+        WorkflowError, load_workflow_row as _load_row)
     try:
         return _load_row(profile_id)
-    except ProfileError as exc:
+    except WorkflowError as exc:
         raise ProvisionFailure(
             "%r is not a row of config/workflow_matrix.json: %s" % (profile_id, exc))
 
@@ -1335,7 +1335,7 @@ class Lane(NamedTuple):
 #:              -- a hosted API that NO SHIPPING PROFILE SELECTS. It is
 #:                 deliberately absent from _REMOTE_NO_WEIGHT_VIDEO_ENGINES,
 #:                 whose comment restricts that set to routes a shipping
-#:                 profile exercises -- so profile_lanes still RAISES on it.
+#:                 profile exercises -- so workflow_lanes still RAISES on it.
 #:                 The engine works; provisioning a profile that names it does
 #:                 not, and a matrix that painted it like its provisioned
 #:                 siblings would be telling a stranger it is ready.
@@ -1380,7 +1380,7 @@ NO_LANE_REASON = {
 def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
     """Route ONE engine id to its provisioning lane. The single router.
 
-    ``profile_lanes`` walks a profile's selections through this; the dropdown
+    ``workflow_lanes`` walks a profile's selections through this; the dropdown
     matrix generator walks every registered engine through it. They must not
     disagree, so there is exactly one copy of the table and it lives here.
 
@@ -1427,7 +1427,7 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
         # other voice/music engine either auto-downloads through the HF cache
         # on first use or installs through its own sidecar, and neither is a
         # provisioning lane. Returning a lane for any of them here would make
-        # profile_lanes emit a name `_fetcher_lane_names()` does not know and
+        # workflow_lanes emit a name `_fetcher_lane_names()` does not know and
         # fail every profile that selects it -- so they fall through to
         # UNROUTED, which every caller either ignores or explains through
         # NO_LANE_REASON.
@@ -1439,10 +1439,10 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
     return UNROUTED
 
 
-def profile_lanes(profile) -> dict:
+def workflow_lanes(profile) -> dict:
     """Resolve one exact profile dict into automatic lanes and manual downloads."""
     if isinstance(profile, str):
-        profile = load_profile(profile)
+        profile = load_workflow_row(profile)
     if not isinstance(profile, dict):
         raise ProvisionFailure("profile router requires a profile dict or exact id")
     pid = str(profile.get("id") or "").strip()
@@ -1520,7 +1520,7 @@ def profile_requires_indextts2(profile: dict) -> bool:
     )
 
 
-def profile_python_issue(profile: dict, version_info=None) -> str:
+def workflow_python_issue(profile: dict, version_info=None) -> str:
     """Return the deterministic interpreter/voice incompatibility, if any."""
     version_info = sys.version_info if version_info is None else version_info
     slots = profile.get("slot_overrides", {}) or {}
@@ -1559,7 +1559,7 @@ def _print_receipt(success: str = "everything installed.") -> int:
 def main(argv=None) -> int:
     _LOG.clear()
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--profile",
+    ap.add_argument("--workflow-id",
                     help="a workflow id -- an exact row of "
                          "config/workflow_matrix.json "
                          "(default: otr_8gb_animatediff)")
@@ -1584,14 +1584,14 @@ def main(argv=None) -> int:
     routes = None
     if not args.packs_only:
         try:
-            profile = load_profile(args.profile or "otr_8gb_animatediff")
-            routes = profile_lanes(profile)
+            profile = load_workflow_row(args.workflow_id or "otr_8gb_animatediff")
+            routes = workflow_lanes(profile)
         except ProvisionFailure as exc:
             say("FAILED", "profile selection", str(exc))
             return _print_receipt()
 
         if args.check_plan:
-            issue = profile_python_issue(profile)
+            issue = workflow_python_issue(profile)
             if issue:
                 say("MISSING", "selected voice runtime", issue)
                 return _print_receipt()
@@ -1611,7 +1611,7 @@ def main(argv=None) -> int:
             print("  IndexTTS2    : %s" %
                   ("required by profile" if profile_requires_indextts2(profile)
                    else "not selected by profile"))
-            issue = profile_python_issue(profile)
+            issue = workflow_python_issue(profile)
             print("  Python       : %s" % (issue or "compatible"))
             for download_id in routes["manual"]:
                 artifacts = MANUAL_DOWNLOADS[download_id]
@@ -1626,7 +1626,7 @@ def main(argv=None) -> int:
                            "  TERMS/TOKEN" if item.get("gated") else ""))
             return 0
 
-        issue = profile_python_issue(profile)
+        issue = workflow_python_issue(profile)
         if issue:
             say("MISSING", "selected voice runtime", issue)
             return _print_receipt()

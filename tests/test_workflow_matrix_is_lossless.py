@@ -60,7 +60,7 @@ def matrix():
 @pytest.fixture(scope="module")
 def modules():
     import build_variants as bv
-    from _otr_shared import capability_profiles as cp
+    from _otr_shared import workflow_rows as cp
     from nodes import _otr_workflow_apply as wa
     return bv, cp, wa
 
@@ -263,7 +263,7 @@ def test_a_key_a_row_omits_follows_the_canonical(pid, probe_key, matrix, modules
 
     logging.disable(logging.CRITICAL)
     try:
-        rendered = wa.apply_profile(moved, cp.load_profile(pid))
+        rendered = wa.apply_profile(moved, cp.load_workflow_row(pid))
     finally:
         logging.disable(logging.NOTSET)
     got = next(n for n in rendered["nodes"]
@@ -278,7 +278,7 @@ def test_a_key_a_row_omits_follows_the_canonical(pid, probe_key, matrix, modules
 @pytest.mark.parametrize("pid", [r["id"] for r in json.loads(
     MATRIX_PATH.read_text(encoding="utf-8"))["rows"]])
 def test_resolved_values_are_already_in_profile_form(pid, modules, canonical):
-    """ONE SPELLING OUT OF `resolved_profile`, WHICHEVER BRANCH ANSWERED.
+    """ONE SPELLING OUT OF `resolved_workflow`, WHICHEVER BRANCH ANSWERED.
 
     It has two: a value the row STATES, and a value inherited from the canonical.
     They must agree on spelling, or a caller gets `ltx25_high_video` or
@@ -294,7 +294,7 @@ def test_resolved_values_are_already_in_profile_form(pid, modules, canonical):
     _, _, wa = modules
     logging.disable(logging.CRITICAL)
     try:
-        resolved = wa.resolved_profile(pid, canonical)
+        resolved = wa.resolved_workflow(pid, canonical)
         flat = wa._flatten_profile_values(resolved)
     finally:
         logging.disable(logging.NOTSET)
@@ -303,7 +303,7 @@ def test_resolved_values_are_already_in_profile_form(pid, modules, canonical):
                 if wa._to_profile_form(v) != v}
     assert not drifting, (
         "row %s resolves %d value(s) that are not in profile form -- applying the "
-        "projection again changes them, which means one branch of resolved_profile "
+        "projection again changes them, which means one branch of resolved_workflow "
         "skipped it and the two branches disagree on spelling:\n  %s"
         % (pid, len(drifting),
            "\n  ".join("%s: %r -> %r" % (k, a, b) for k, (a, b) in sorted(drifting.items()))))

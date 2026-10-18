@@ -443,7 +443,7 @@ peer window was reachable; this is the 4060's (MRKT) row. Pull to 2.3.25
 Same driver and settings as the 2026-10-13 MRKT receipt, one leg at a time,
 reset between legs (section 4), each leg must reach `otr/obs/`:
 
-    python scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --profile <id> --act-count 1
+    python scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --workflow-id <id> --act-count 1
 
 | order | profile | expected 1-act wall (from earlier MRKT receipts) |
 | --- | --- | --- |
@@ -751,7 +751,7 @@ Operator: "no graph, no profile, no variant, just workflow". A person reads
 "workflow" for every shipped JSON file. Re-verified 2026-09-26: 641 passed
 in the scoped tests and `build_variants.py --check` clean. The hits that
 remain were each read in context and are meant: the canvas or execution
-graph, an OS user profile folder, the literal `--profile` flag, a model
+graph, an OS user profile folder, the literal `--profile` flag (renamed `--workflow-id` 2026-10-18), a model
 variant, the `workflows/variants/` path, operator quotes. Generated docs
 change only through their generators.
 

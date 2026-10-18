@@ -73,7 +73,7 @@ def _h3_profile(provision, row_id, video):
     No shipped row selects H3, so the profile is built from a real row rather
     than read from one.
     """
-    profile = copy.deepcopy(provision.load_profile(row_id))
+    profile = copy.deepcopy(provision.load_workflow_row(row_id))
     profile["id"] = "%s_%s" % (row_id, video)
     for key in ("announcer_visual", "music_visual", "character_visual"):
         profile["role_overrides"][key] = video
@@ -161,7 +161,7 @@ def test_an_h3_profile_routes_its_own_lane_automatically(
     provision = _provisioner()
     profile = _h3_profile(provision, row_id, video)
 
-    routes = provision.profile_lanes(profile)
+    routes = provision.workflow_lanes(profile)
     assert routes == {
         "automatic": [h3_lane, image_lane, "stable_audio_3"],
         "manual": [],
@@ -203,9 +203,9 @@ def test_main_fetches_the_h3_lane_with_the_profile_dependencies(monkeypatch):
 
     monkeypatch.setattr(provision, "verify_manual_download", verify)
     h3 = _h3_profile(provision, "otr_8gb_video", "h3_low_video")
-    monkeypatch.setattr(provision, "load_profile", lambda _profile_id: h3)
+    monkeypatch.setattr(provision, "load_workflow_row", lambda _profile_id: h3)
 
-    rc = provision.main(["--profile", h3["id"]])
+    rc = provision.main(["--workflow-id", h3["id"]])
 
     assert rc == 0
     assert fetched == [["minimax_h3_video", "flux3_klein", "stable_audio_3"]]

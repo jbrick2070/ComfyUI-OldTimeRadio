@@ -34,8 +34,8 @@ import pytest
 
 from nodes import _otr_workflow_apply as wa
 from nodes.otr_video_director import exact_menu_option_for
-from nodes._otr_shared import capability_profiles as cp
-from nodes._otr_shared.capability_profiles import ProfileError
+from nodes._otr_shared import workflow_rows as cp
+from nodes._otr_shared.workflow_rows import WorkflowError
 from nodes._otr_shared.public_engines import resolve_engine_id
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -151,7 +151,7 @@ def test_apply_otr_16gb_video_lands_its_overrides(schemas, master_copy, mapping)
     """The one matrix row that states a seed as well as its lanes, so all three
     managed kinds -- a role, a slot and the seed policy -- are proven to land."""
     applied = wa.apply_profile(master_copy, "otr_16gb_video", schemas=schemas)
-    prof = cp.load_profile("otr_16gb_video")
+    prof = cp.load_workflow_row("otr_16gb_video")
     nodes_by_type = {n["type"]: n for n in applied["nodes"]}
     for dotted, value in (
         ("role_overrides.announcer_visual", prof["role_overrides"]["announcer_visual"]),
@@ -315,9 +315,9 @@ def test_apply_otr_cloud_deluxe_audio_in_3act_is_sonnet_luna_and_ltx25_a2v(
 
 
 def test_apply_profile_rejects_typoed_key(schemas, master_copy):
-    prof = copy.deepcopy(cp.load_profile("otr_cloud_low"))
+    prof = copy.deepcopy(cp.load_workflow_row("otr_cloud_low"))
     prof["role_overrides"]["announcer_visualz"] = "ltx25_video"
-    with pytest.raises(ProfileError, match="no widget-mapping entry"):
+    with pytest.raises(WorkflowError, match="no widget-mapping entry"):
         wa.apply_profile(master_copy, prof, schemas=schemas)
 
 
@@ -327,7 +327,7 @@ def test_apply_profile_rejects_ambiguous_node_type(schemas, master_copy):
         [n for n in dup["nodes"] if n["type"] == "OTR_VideoDirector"][0])
     clone["id"] = 9999
     dup["nodes"].append(clone)
-    with pytest.raises(ProfileError, match="occurs 2x"):
+    with pytest.raises(WorkflowError, match="occurs 2x"):
         wa.apply_profile(dup, "otr_cloud_low", schemas=schemas)
 
 
@@ -390,7 +390,7 @@ def test_coverage_direction2_every_engine_combo_is_managed(schemas, master_copy,
     )
 
 
-@pytest.mark.parametrize("profile_id", cp.known_profile_ids())
+@pytest.mark.parametrize("profile_id", cp.known_workflow_ids())
 def test_apply_every_committed_profile_patches_clean(
         schemas, master_copy, mapping, profile_id):
     """S2: every workflow_matrix.json row applies onto the canonical master
@@ -502,7 +502,7 @@ def test_whitelisting_the_cameo_did_not_open_a_route_or_engine_field():
 
 def test_patch_creative_refuses_managed_engine_widget(schemas, master_copy):
     director = [n for n in master_copy["nodes"] if n["type"] == "OTR_VideoDirector"][0]
-    with pytest.raises(ProfileError, match="not on the creative whitelist"):
+    with pytest.raises(WorkflowError, match="not on the creative whitelist"):
         wa.patch_creative(master_copy, director["id"], "announcer_video_model",
                           "still_motion", schemas=schemas)
 
@@ -524,7 +524,7 @@ def test_script_patch_creative_refuses_managed_names(schemas, master_copy):
 def test_apply_profile_to_workflow_headless_seam(schemas, master_copy, capsys):
     """The script-lane seam drives the SAME applier and prints the resolved
     profile so a headless mutation is visible in logs."""
-    applied = otr_api.apply_profile_to_workflow(master_copy, "otr_cloud_low", schemas)
+    applied = otr_api.apply_row_to_workflow(master_copy, "otr_cloud_low", schemas)
     out = capsys.readouterr().out
     assert "RESOLVED PROFILE otr_cloud_low" in out
     assert wa.workflow_to_api_prompt(applied, schemas) != \
@@ -553,4 +553,4 @@ def test_scripts_never_direct_patch_managed_widget_names(mapping):
                     offenders.append(f"{py.name}: {name}")
     assert not offenders, (
         "managed widgets patched directly in scripts (use "
-        "apply_profile_to_workflow / --profile instead): %r" % offenders)
+        "apply_row_to_workflow / --workflow-id instead): %r" % offenders)

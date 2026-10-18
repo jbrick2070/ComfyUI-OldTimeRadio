@@ -188,13 +188,13 @@ def test_every_cpu_row_is_runnable_on_cpu():
     disappearing."""
     from nodes._otr_audio_engines import registry as areg
     from nodes._otr_image_engines import registry as ireg_caps
-    from nodes._otr_shared import capability_profiles as cp
+    from nodes._otr_shared import workflow_rows as cp
 
-    cpu_rows = [rid for rid in cp.known_profile_ids()
-                if cp.load_profile(rid)["device_backend"] == "cpu"]
+    cpu_rows = [rid for rid in cp.known_workflow_ids()
+                if cp.load_workflow_row(rid)["device_backend"] == "cpu"]
     assert cpu_rows, "no cpu-backend row in workflow_matrix.json to check"
     for rid in cpu_rows:
-        prof = cp.load_profile(rid)
+        prof = cp.load_workflow_row(rid)
         avail = cp.availability(prof, areg.CAPABILITIES)
         assert avail["bark"] == cp.REASON_IMPRACTICAL_ON_CPU, rid
         for slot in ("announcer_voice_engine", "char_voice_engine",

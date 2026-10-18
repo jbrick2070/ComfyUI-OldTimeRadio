@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from nodes._otr_shared import capability_profiles as cp
+from nodes._otr_shared import workflow_rows as cp
 from nodes.otr_video_director import exact_menu_option_for
 from tests._support.writer_slots import value
 
@@ -43,7 +43,7 @@ def _node(graph, node_type):
 
 
 def test_the_row_ships_on_the_cpu_and_names_its_key():
-    row = cp.load_profile(ROW_ID)
+    row = cp.load_workflow_row(ROW_ID)
     assert row["device_backend"] == "cpu"
     assert row["preflight"]["required_keys"] == ["OTR_GOOGLE_API_KEY"]
     assert WORKFLOW.is_file()
@@ -55,7 +55,7 @@ def test_it_runs_on_an_ordinary_comfyui_too():
     contract would refuse every user who opens this from their usual
     ComfyUI."""
     from nodes._otr_shared.boot_contracts import DEFAULT, contract_for_profile
-    assert contract_for_profile(cp.load_profile(ROW_ID)) == DEFAULT
+    assert contract_for_profile(cp.load_workflow_row(ROW_ID)) == DEFAULT
 
 
 def test_the_shape_and_every_device_are_what_the_card_says(graph):
@@ -101,5 +101,5 @@ def test_nothing_downloads():
     spec = importlib.util.spec_from_file_location("_otr_provision_google_still", path)
     provision = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(provision)
-    lanes = provision.profile_lanes(ROW_ID)
+    lanes = provision.workflow_lanes(ROW_ID)
     assert lanes["automatic"] == [] and lanes["manual"] == [], lanes

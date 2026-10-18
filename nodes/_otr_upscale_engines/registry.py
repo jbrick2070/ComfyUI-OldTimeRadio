@@ -133,7 +133,7 @@ assert_usable = _UPSCALE_REGISTRY.assert_usable
 # ---------------------------------------------------------------------------
 # Per-engine capability DECLARATIONS (the registry TABLE, mirroring
 # _otr_video_engines/registry.py:CAPABILITIES). Consumed by
-# nodes/_otr_shared/capability_profiles.py cross-validation. A new engine
+# nodes/_otr_shared/workflow_rows.py cross-validation. A new engine
 # ships its own row here; zero per-profile edits.
 #
 # MPS ADDED 2026-09-09, on the receipt the first ship asked for. The original
@@ -168,7 +168,7 @@ CAPABILITIES = {
     # TWO VOCABULARIES, DELIBERATELY, AND THEY ARE NOT INTERCHANGEABLE
     # (2026-08-23). `model_requirements` here is a LOGICAL id -- it answers
     # "what capability does this engine need", which is what
-    # capability_profiles derives enable-sets from. A profile's
+    # workflow_rows derives enable-sets from. A profile's
     # `preflight.required_models` is a different question with a different
     # answer: "what FILENAME must the running server be able to see", because
     # the canonical runner checks it against /object_info, which enumerates

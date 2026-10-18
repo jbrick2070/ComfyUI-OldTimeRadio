@@ -242,7 +242,7 @@ receipt that lies. Section 6's table missed it entirely.
 
 | surface | why it is not optional |
 |---|---|
-| `registry.py` `CAPABILITIES` dict | `tests/test_capability_profiles.py:393` asserts `set(vreg.CAPABILITIES) == set(vreg.all_engine_names())`. Registering without it FAILS CI. |
+| `registry.py` `CAPABILITIES` dict | `tests/test_workflow_rows.py:393` asserts `set(vreg.CAPABILITIES) == set(vreg.all_engine_names())`. Registering without it FAILS CI. |
 | engine class `still_plan` | non-empty `StillPlanRow` entries, or no stills are minted (above) |
 | `tests/fixtures/still_plan_matrix.json` | parity test; needs regeneration |
 | `content_oracle.py` `_FAMILY_FALLBACK` | bare-script family resolution |

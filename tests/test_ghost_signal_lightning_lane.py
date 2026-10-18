@@ -363,7 +363,7 @@ def test_it_is_not_routed_through_the_haunted_fetch_bundle():
         "membership there routes this lane to the v3 weights it never loads")
     # And prove the route it DOES take, so "not haunted" cannot quietly become
     # "not provisioned at all". ASKED, not grepped: this used to read the
-    # source of profile_lanes, which meant moving the router (2026-09-09, into
+    # source of workflow_lanes, which meant moving the router (2026-09-09, into
     # the shared lane_for_engine) failed the test while the invariant it
     # guards was perfectly intact. Calling the router asserts the behaviour
     # itself and survives the next move.
@@ -393,9 +393,9 @@ def test_the_profile_plans_the_lightning_bundle_and_no_image_weights():
     provisioner lane at all -- so planning them would raise, not just add a
     download."""
     m = _provision_module()
-    prof = m.load_profile("otr_mac16_animatediff")
+    prof = m.load_workflow_row("otr_mac16_animatediff")
     assert prof["role_overrides"]["character_visual"] == ENGINE_ID
-    plan = m.profile_lanes(prof)
+    plan = m.workflow_lanes(prof)
     assert plan["automatic"] == ["lightning", "stable_audio_3"], plan
     assert not any("z_image" in lane for lane in plan["automatic"])
     assert not plan.get("manual"), plan
@@ -404,10 +404,10 @@ def test_the_profile_plans_the_lightning_bundle_and_no_image_weights():
 def test_the_haunted_lane_still_plans_exactly_what_it_did():
     """CLAUDE.md 0B in one assertion: the sibling is provably unchanged."""
     m = _provision_module()
-    prof = m.load_profile("otr_8gb_animatediff")
+    prof = m.load_workflow_row("otr_8gb_animatediff")
     assert prof["role_overrides"]["character_visual"] == (
         "animatediff15_v3_haunted_video")
-    assert m.profile_lanes(prof)["automatic"] == ["haunted", "stable_audio_3"]
+    assert m.workflow_lanes(prof)["automatic"] == ["haunted", "stable_audio_3"]
 
 
 def test_the_fetch_bundle_is_fully_pinned():

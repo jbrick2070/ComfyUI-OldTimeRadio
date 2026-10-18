@@ -10,7 +10,7 @@ even use. The profile schema now refuses any entry that is not a weight file,
 so the gate has one kind of entry and checks all of it.
 
 Every profile read here is a `config/workflow_matrix.json` row: the matrix is
-the only source `load_profile` resolves.
+the only source `load_workflow_row` resolves.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from nodes._otr_shared import capability_profiles as cp
+from nodes._otr_shared import workflow_rows as cp
 
 _SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 if str(_SCRIPTS) not in sys.path:
@@ -37,7 +37,7 @@ def _gate():
 
 def _real_row_declaring(name):
     """A complete matrix row whose preflight declares only ``name``."""
-    row = cp.load_profile("otr_8gb_low")
+    row = cp.load_workflow_row("otr_8gb_low")
     return dict(row, preflight={"required_models": [name], "required_keys": []})
 
 
@@ -47,7 +47,7 @@ def _row_declaring(monkeypatch, *names):
         "role_overrides": {"announcer_visual": "viz_green"},
         "preflight": {"required_models": list(names)},
     }
-    monkeypatch.setattr(cp, "load_profile", lambda _name: profile)
+    monkeypatch.setattr(cp, "load_workflow_row", lambda _name: profile)
     return "synthetic"
 
 
@@ -59,7 +59,7 @@ def _row_declaring(monkeypatch, *names):
     "model.onnx",
 ])
 def test_weight_filenames_are_accepted(name):
-    cp.validate_profile_shape(_real_row_declaring(name))
+    cp.validate_workflow_shape(_real_row_declaring(name))
 
 
 @pytest.mark.parametrize("name", [
@@ -70,13 +70,13 @@ def test_weight_filenames_are_accepted(name):
     "google/gemma-4-12b-it",
 ])
 def test_a_row_naming_an_id_is_refused_at_load(name):
-    with pytest.raises(cp.ProfileError, match="required_models"):
-        cp.validate_profile_shape(_real_row_declaring(name))
+    with pytest.raises(cp.WorkflowError, match="required_models"):
+        cp.validate_workflow_shape(_real_row_declaring(name))
 
 
 def test_every_matrix_row_declares_only_weight_files():
-    for rid in cp.known_profile_ids():
-        names = ((cp.load_profile(rid).get("preflight") or {})
+    for rid in cp.known_workflow_ids():
+        names = ((cp.load_workflow_row(rid).get("preflight") or {})
                  .get("required_models") or [])
         assert all(cp.is_weight_filename(n) for n in names), (rid, names)
 

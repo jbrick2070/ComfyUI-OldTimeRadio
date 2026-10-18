@@ -104,7 +104,7 @@ edits.**
    otherwise.
 
 4. **Add one CAPABILITIES row** in `_otr_image_engines/registry.py`. One row per
-   engine and vice versa; `tests/test_capability_profiles.py` holds that
+   engine and vice versa; `tests/test_workflow_rows.py` holds that
    bijection. Set `device_backends` HONESTLY -- see the warning below.
 
 5. **Run the preflight.** If your provider can REFUSE a prompt, read Gate IG4
@@ -241,10 +241,10 @@ raises `EngineUnusable` on a Mac. That is **wrong**, and a codex review caught
 it. Grep it yourself -- outside the registries and the tests, exactly two things
 read the row:
 
-* `nodes/_otr_shared/capability_profiles.py` `_fit_reason()`, which decides
+* `nodes/_otr_shared/workflow_rows.py` `_fit_reason()`, which decides
   whether one engine fits one *profile* (`REASON_REQUIRES_CUDA` when the
   profile's `device_backend` is not in the list). It feeds `availability()`
-  and `cross_validate_profile()` -- i.e. which engines a
+  and `cross_validate_workflow()` -- i.e. which engines a
   profile admits into its enable set. The live non-test callers are
   `scripts/build_variants.py` (variant-emit time), `scripts/otr_dropdown_matrix.py`
   and, at run time, `nodes/_otr_lane_rolls.py` (the randomizers' host-fit check);

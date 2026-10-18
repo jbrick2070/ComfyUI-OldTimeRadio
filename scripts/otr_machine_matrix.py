@@ -184,7 +184,7 @@ def load_measurements() -> list:
     return out
 
 
-def load_profiles() -> list:
+def load_workflow_rows() -> list:
     if _HERE not in sys.path:
         sys.path.insert(0, _HERE)
     import otr_provision as provision
@@ -192,33 +192,33 @@ def load_profiles() -> list:
     # EVERY WORKFLOW THE MATRIX KNOWS -- not a folder glob.
     if _REPO not in sys.path:
         sys.path.insert(0, _REPO)
-    from nodes._otr_shared.capability_profiles import (
-        ProfileError, known_profile_ids)
-    from nodes._otr_workflow_apply import resolved_profile
+    from nodes._otr_shared.workflow_rows import (
+        WorkflowError, known_workflow_ids)
+    from nodes._otr_workflow_apply import resolved_workflow
 
     canonical = json.load(io.open(
         os.path.join(_REPO, "workflows", "otr_canonical.json"), encoding="utf-8"))
 
     out = []
-    for pid in known_profile_ids():
+    for pid in known_workflow_ids():
         if pid in _NOT_PROFILES:
             continue
         # RESOLVED, not raw. This table prints a workflow's video lane, image lane,
         # voice and ceiling; a matrix row omits whichever of those it inherits, so a
         # raw read would print "-" for values the workflow really has.
-        # ONLY "no such workflow" is tolerated: `known_profile_ids` can name an id
+        # ONLY "no such workflow" is tolerated: `known_workflow_ids` can name an id
         # whose file disappears between the listing and the read. Anything else is
         # a fault and must not be swallowed -- a bare `except Exception: continue`
         # here would silently drop rows from this table, and the doc's own count
         # would change without a word.
         try:
-            d = resolved_profile(pid, canonical)
-        except ProfileError:
+            d = resolved_workflow(pid, canonical)
+        except WorkflowError:
             continue
         ro = d.get("role_overrides", {}) or {}
         so = d.get("slot_overrides", {}) or {}
         try:
-            routes = provision.profile_lanes(d)
+            routes = provision.workflow_lanes(d)
         except provision.ProvisionFailure:
             install_recipe = "missing exact owner"
         else:
@@ -227,7 +227,7 @@ def load_profiles() -> list:
                 install_recipe = "complete; manual download"
             else:
                 install_recipe = "complete"
-            if provision.profile_python_issue(d, (3, 14)):
+            if provision.workflow_python_issue(d, (3, 14)):
                 install_recipe += "; Python <=3.13"
         out.append({
             "id": pid,
@@ -306,7 +306,7 @@ def render() -> str:
     # same process would otherwise inherit the first one's verdict.
     global _DEGRADED
     _DEGRADED = ""
-    profs = load_profiles()
+    profs = load_workflow_rows()
     L = []
     A = L.append
     A("# Machine matrix -- what runs where\n")
@@ -362,13 +362,13 @@ def render() -> str:
     A("Run these with the exact Python executable that launches ComfyUI (shown "
       "as `<ComfyUI Python>`). Preview a workflow's install plan first, then run "
       "the same command without `--list` to install it:\n")
-    A("* `<ComfyUI Python> scripts/otr_provision.py --profile otr_8gb_low --list` "
+    A("* `<ComfyUI Python> scripts/otr_provision.py --workflow-id otr_8gb_low --list` "
       "-- replace `otr_8gb_low` with the workflow you picked.\n")
     A("Provisioning installs and verifies artifacts; it does not rewrite the "
       "saved workflow. To apply one workflow to the real canonical graph on a "
       "normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/"
       "otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 "
-      "--profile otr_8gb_low --act-count 1 --source-bank original "
+      "--workflow-id otr_8gb_low --act-count 1 --source-bank original "
       "--visual-style sci_fi_radio --timeout 0`. Every NVIDIA and Mac workflow "
       "selects the Kokoro voice. On the Python 3.13 that ComfyUI Desktop and the "
       "portable build ship it runs through kokoro-onnx on the CPU (the same "
@@ -564,7 +564,7 @@ _VOICE_SHIP_NOTES = {
 #: here because a reader who assumed "any degraded section" would trust this
 #: flag further than it deserves. Two other soft failures do NOT set it: a
 #: known-limits load that falls back to an empty section, and a corrupt profile
-#: JSON that load_profiles skips. Widening it means setting it there too.
+#: JSON that load_workflow_rows skips. Widening it means setting it there too.
 #:
 #: A degraded render is fine to LOOK at and fatal to SAVE, so it gates writing
 #: and --check, not rendering. --stdout deliberately still prints: nothing is

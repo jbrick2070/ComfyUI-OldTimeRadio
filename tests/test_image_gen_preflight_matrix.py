@@ -19,7 +19,7 @@ image engine is covered the day it registers.
 
 NOT RE-ASSERTED HERE, because they are already enforced elsewhere and one
 invariant deserves one owner: registry/CAPABILITIES parity for the image
-registry lives in `tests/test_capability_profiles.py` (`set(ireg.CAPABILITIES)
+registry lives in `tests/test_workflow_rows.py` (`set(ireg.CAPABILITIES)
 == set(ireg.all_engine_names())`) and `tests/test_cloud_image_adapters.py`.
 
 Pure CPU: no ComfyUI runtime, no GPU, no image model, no network.

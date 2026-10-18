@@ -1,4 +1,4 @@
-"""Capability profiles -- GATE B S0/S1 of the switchable-workflow architecture.
+"""Workflow rows -- GATE B S0/S1 of the switchable-workflow architecture.
 
 Spec: the 2026-06-10 switchable-workflow-architecture decision-and-plan
 (sections 3 + 5); sequencing: the 2026-06-09 3D toolkit plan, section 0
@@ -18,15 +18,15 @@ S1 -- DERIVED ENABLE-SET, never hand-listed:
     (``nodes/_otr_video_engines/registry.py`` etc., ``CAPABILITIES`` dict --
     NOT in adapter modules);
   * ``availability(profile, declarations)`` -> the shared availability object
-    with one reason code per engine. Its consumers are ``cross_validate_profile``
+    with one reason code per engine. Its consumers are ``cross_validate_workflow``
     (called by ``scripts/build_variants.py`` at emit time), the lane randomizers'
     host-fit check (``nodes/_otr_lane_rolls.py``, at run time) and the
     dropdown-matrix generator. The workflow validator does NOT use it -- it
-    imports ``load_profile`` and ``ProfileError`` and nothing else -- and the
+    imports ``load_workflow_row`` and ``WorkflowError`` and nothing else -- and the
     "wizard" named in older comments here and in the video registry was never
     built: grep the repo and the word survives only in comments describing what
     it would have asked for;
-  * ``cross_validate_profile`` -- every profile override must be in the
+  * ``cross_validate_workflow`` -- every profile override must be in the
     enable-set of its namespace (per-engine fit ONLY; NO static co-residency
     rejection -- residency is wrapper_bridge's runtime invariant).
 
@@ -41,18 +41,18 @@ import os
 from typing import Any, Optional
 
 __all__ = [
-    "ProfileError",
-    "load_profile",
+    "WorkflowError",
+    "load_workflow_row",
     "load_widget_mapping",
-    "validate_profile_shape",
+    "validate_workflow_shape",
     "validate_widget_mapping_shape",
     "availability",
-    "cross_validate_profile",
+    "cross_validate_workflow",
 ]
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 #: THERE IS NO PROFILE FOLDER. Every workflow this pack runs is a row in
-#: `config/workflow_matrix.json`, and `load_profile` resolves nothing else
+#: `config/workflow_matrix.json`, and `load_workflow_row` resolves nothing else
 #: (operator: "the only thing we have is the canonical and 24 variants in the
 #: workflows folder.").
 
@@ -63,8 +63,8 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__f
 WIDGET_MAPPING_PATH = os.path.join(_REPO_ROOT, "config", "widget_map.json")
 
 
-class ProfileError(ValueError):
-    """A profile / mapping file failed validation. FAIL CLOSED -- the caller
+class WorkflowError(ValueError):
+    """A workflow row / mapping file failed validation. FAIL CLOSED -- the caller
     must not proceed with a half-understood capability policy."""
 
 
@@ -271,28 +271,28 @@ def _validate_llm_section(sub: Any, source: str) -> None:
     allowed = set(_LLM_MODEL_KEYS) | set(_LLM_RUNTIME_KEYS)
     unknown = set(sub) - allowed
     if unknown:
-        raise ProfileError(f"profile {source}: unknown llm key(s) {sorted(unknown)!r}")
+        raise WorkflowError(f"workflow {source}: unknown llm key(s) {sorted(unknown)!r}")
     for k in _LLM_MODEL_KEYS:
         if k not in sub:
             continue
         v = sub[k]
         if not isinstance(v, str):
-            raise ProfileError(f"profile {source}: llm.{k} must be a str; got {v!r}")
+            raise WorkflowError(f"workflow {source}: llm.{k} must be a str; got {v!r}")
         if k in ("creative_model", "technical_model") and not v:
-            raise ProfileError(f"profile {source}: llm.{k} must be non-empty")
+            raise WorkflowError(f"workflow {source}: llm.{k} must be non-empty")
     from .llm_policy import LLMPolicyError, LLMRuntimePolicy
     stated = {k: sub[k] for k in _LLM_RUNTIME_KEYS if k in sub}
     if "lane_allowlist" in stated:
         try:
             stated["lane_allowlist"] = tuple(stated["lane_allowlist"])
         except TypeError as e:
-            raise ProfileError(
-                f"profile {source}: llm.lane_allowlist must be a sequence; "
+            raise WorkflowError(
+                f"workflow {source}: llm.lane_allowlist must be a sequence; "
                 f"got {sub['lane_allowlist']!r}") from e
     try:
         LLMRuntimePolicy(**stated)
     except (LLMPolicyError, TypeError) as e:
-        raise ProfileError(f"profile {source}: llm section invalid: {e}") from e
+        raise WorkflowError(f"workflow {source}: llm section invalid: {e}") from e
 
 
 def _is_str_dict(v: Any) -> bool:
@@ -301,9 +301,9 @@ def _is_str_dict(v: Any) -> bool:
     )
 
 
-def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
+def validate_workflow_shape(profile: Any, source: str = "<dict>") -> dict:
     """S0 shape validator. Returns the config on success; raises
-    :class:`ProfileError` naming the first offending key otherwise.
+    :class:`WorkflowError` naming the first offending key otherwise.
 
     UNKNOWN KEYS ARE REJECTED -- a typo'd key silently doing nothing is the
     drift class this validator exists to kill.
@@ -321,17 +321,17 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
     mention follows the canonical forever, by construction.
     """
     if not isinstance(profile, dict):
-        raise ProfileError(f"profile {source}: expected a JSON object, got {type(profile).__name__}")
+        raise WorkflowError(f"workflow {source}: expected a JSON object, got {type(profile).__name__}")
 
     unknown = set(profile) - set(_TOP_LEVEL_KEYS)
     if unknown:
-        raise ProfileError(f"profile {source}: unknown top-level key(s) {sorted(unknown)!r}")
+        raise WorkflowError(f"workflow {source}: unknown top-level key(s) {sorted(unknown)!r}")
     missing = [k for k, (req, _, _) in _TOP_LEVEL_KEYS.items() if req and k not in profile]
     if missing:
-        raise ProfileError(f"profile {source}: missing required key(s) {missing!r}")
+        raise WorkflowError(f"workflow {source}: missing required key(s) {missing!r}")
     for k, (_, check, desc) in _TOP_LEVEL_KEYS.items():
         if k in profile and not check(profile[k]):
-            raise ProfileError(f"profile {source}: key {k!r} must be {desc}; got {profile[k]!r}")
+            raise WorkflowError(f"workflow {source}: key {k!r} must be {desc}; got {profile[k]!r}")
 
     for sub_name, sub_spec in (
         ("seed_policy", _SEED_POLICY_KEYS),
@@ -354,19 +354,19 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
         optional_spec = _SECTION_OPTIONAL_KEYS.get(sub_name, {})
         unknown = set(sub) - set(sub_spec) - set(optional_spec)
         if unknown:
-            raise ProfileError(f"profile {source}: unknown {sub_name} key(s) {sorted(unknown)!r}")
+            raise WorkflowError(f"workflow {source}: unknown {sub_name} key(s) {sorted(unknown)!r}")
         # A SECTION MAY BE PARTIAL. Any key it omits takes the canonical's
         # value, exactly as an omitted top-level section does. What a section
         # may NOT do is carry a key nobody declared -- that check is above and
         # is unchanged, because a typo must never be silently accepted.
         for k, check in sub_spec.items():
             if k in sub and not check(sub[k]):
-                raise ProfileError(f"profile {source}: {sub_name}.{k} has invalid value {sub[k]!r}")
+                raise WorkflowError(f"workflow {source}: {sub_name}.{k} has invalid value {sub[k]!r}")
         # Optional keys: absent is legal, present is validated (a typo'd value
         # silently doing nothing is the drift class this whole validator kills).
         for k, check in optional_spec.items():
             if k in sub and not check(sub[k]):
-                raise ProfileError(f"profile {source}: {sub_name}.{k} has invalid value {sub[k]!r}")
+                raise WorkflowError(f"workflow {source}: {sub_name}.{k} has invalid value {sub[k]!r}")
 
     # v2: the llm section (constructor-based validation; ONE enum truth).
     # Guarded because the section is optional now; absent means "the canonical
@@ -380,8 +380,8 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
     # `int`, so the order of this check does not matter -- both pass.
     for k, v in (profile.get("features") or {}).items():
         if not isinstance(k, str) or not isinstance(v, (bool, str, int)):
-            raise ProfileError(
-                f"profile {source}: features.{k} must be bool, str or int; "
+            raise WorkflowError(
+                f"workflow {source}: features.{k} must be bool, str or int; "
                 f"got {v!r}"
             )
     return profile
@@ -396,17 +396,17 @@ MATRIX_PATH = os.path.join(_REPO_ROOT, "config", "workflow_matrix.json")
 
 
 def load_matrix(path: Optional[str] = None) -> dict:
-    """The matrix document. Raises :class:`ProfileError` if it is unusable."""
+    """The matrix document. Raises :class:`WorkflowError` if it is unusable."""
     p = path or MATRIX_PATH
     try:
         with open(p, "r", encoding="utf-8") as fh:
             doc = json.load(fh)
     except OSError as e:
-        raise ProfileError(f"workflow matrix {p!r} cannot be read: {e}") from e
+        raise WorkflowError(f"workflow matrix {p!r} cannot be read: {e}") from e
     except json.JSONDecodeError as e:
-        raise ProfileError(f"workflow matrix {p!r} is not valid JSON: {e}") from e
+        raise WorkflowError(f"workflow matrix {p!r} is not valid JSON: {e}") from e
     if not isinstance(doc, dict) or not isinstance(doc.get("rows"), list):
-        raise ProfileError(
+        raise WorkflowError(
             f"workflow matrix {p!r}: expected an object with a 'rows' list")
     return doc
 
@@ -421,10 +421,10 @@ def matrix_rows(path: Optional[str] = None) -> dict:
     rows = {}
     for row in load_matrix(path)["rows"]:
         if not isinstance(row, dict) or not row.get("id"):
-            raise ProfileError("workflow matrix: a row has no 'id'")
+            raise WorkflowError("workflow matrix: a row has no 'id'")
         rid = row["id"]
         if rid in rows:
-            raise ProfileError(f"workflow matrix: duplicate row id {rid!r}")
+            raise WorkflowError(f"workflow matrix: duplicate row id {rid!r}")
         rows[rid] = row
     return rows
 
@@ -454,7 +454,7 @@ def _unflatten(pairs: dict) -> dict:
         for part in parts[:-1]:
             nxt = node.setdefault(part, {})
             if not isinstance(nxt, dict):
-                raise ProfileError(
+                raise WorkflowError(
                     f"workflow matrix: delta key {dotted!r} collides with a "
                     f"value already set at {part!r}")
             node = nxt
@@ -467,7 +467,7 @@ def _unflatten(pairs: dict) -> dict:
 _ROW_MERGE_SECTIONS = ("launch", "preflight")
 
 
-def profile_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
+def workflow_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
     """Expand one matrix row into the dict every consumer reads.
 
     TWO KINDS OF KEY, TWO DEFAULT SOURCES, and the distinction is the whole
@@ -490,7 +490,7 @@ def profile_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
     if defaults is None:
         try:
             defaults = load_matrix().get("defaults") or {}
-        except ProfileError:
+        except WorkflowError:
             defaults = {}
 
     doc = {"id": row["id"]}
@@ -509,7 +509,7 @@ def profile_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
 
     deltas = row.get("deltas") or {}
     if not isinstance(deltas, dict):
-        raise ProfileError(
+        raise WorkflowError(
             f"workflow matrix row {row['id']!r}: 'deltas' must be an object")
 
     # NO BASELINE. A key the row does not state is NOT WRITTEN, so `apply_profile`
@@ -530,15 +530,15 @@ def profile_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
     return doc
 
 
-def known_profile_ids(profile_dir: Optional[str] = None) -> tuple:
-    """Every id `load_profile` can resolve, in matrix order.
+def known_workflow_ids(row_dir: Optional[str] = None) -> tuple:
+    """Every id `load_workflow_row` can resolve, in matrix order.
 
-    With an explicit `profile_dir` the answer is that folder's ``*.json`` stems
+    With an explicit `row_dir` the answer is that folder's ``*.json`` stems
     instead -- the one way a test points this at a directory it wrote itself.
     """
-    if profile_dir is not None:
+    if row_dir is not None:
         try:
-            names = sorted(os.listdir(profile_dir))
+            names = sorted(os.listdir(row_dir))
         except OSError:
             names = []
         return tuple(n[:-5] for n in names if n.endswith(".json"))
@@ -552,15 +552,15 @@ def known_profile_ids(profile_dir: Optional[str] = None) -> tuple:
     return tuple(ordered)
 
 
-def load_profile(profile_id: str, profile_dir: Optional[str] = None) -> dict:
+def load_workflow_row(profile_id: str, row_dir: Optional[str] = None) -> dict:
     """Resolve a workflow id to a shape-validated config. Fail closed.
 
     THE MATRIX IS THE ONLY SOURCE. `config/workflow_matrix.json` carries every
     workflow this pack runs; an id with no row is refused by name, with the ids
-    that do exist. An explicit `profile_dir` reads ``<profile_dir>/<id>.json``
-    instead, which is how a test hands this a profile it built in `tmp_path`.
+    that do exist. An explicit `row_dir` reads ``<row_dir>/<id>.json``
+    instead, which is how a test hands this a row it built in `tmp_path`.
     """
-    # A PROFILE ID NAMES A ROW, NEVER A LOCATION (2026-09-05). `profile_id`
+    # A WORKFLOW ID NAMES A ROW, NEVER A LOCATION (2026-09-05). `profile_id`
     # reaches here from OTR_WorkflowValidator's free STRING widget, so a
     # `/prompt` caller could send `..\..\..\somewhere\x`; with a
     # directory in play that join would stat and open it -- a UNC spelling would
@@ -569,36 +569,36 @@ def load_profile(profile_id: str, profile_dir: Optional[str] = None) -> dict:
     # silently-renamed id would load the wrong workflow, which is worse than a
     # clear failure.
     if any(tok in str(profile_id or "") for tok in ("/", "\\", "..", "\x00")):
-        raise ProfileError(
-            f"profile {profile_id!r}: an id names a workflow, not a path"
+        raise WorkflowError(
+            f"workflow {profile_id!r}: an id names a workflow, not a path"
         )
 
-    if profile_dir is None:
+    if row_dir is None:
         rows = matrix_rows()
         row = rows.get(profile_id)
         if row is None:
-            raise ProfileError(
-                f"profile {profile_id!r}: no such row in workflow_matrix.json; "
+            raise WorkflowError(
+                f"workflow {profile_id!r}: no such row in workflow_matrix.json; "
                 f"known workflows: {sorted(rows)!r}"
             )
-        return validate_profile_shape(
-            profile_from_row(row), f"workflow_matrix.json:{profile_id}")
+        return validate_workflow_shape(
+            workflow_from_row(row), f"workflow_matrix.json:{profile_id}")
 
-    path = os.path.join(profile_dir, f"{profile_id}.json")
+    path = os.path.join(row_dir, f"{profile_id}.json")
     if not os.path.isfile(path):
-        raise ProfileError(
-            f"profile {profile_id!r}: no such file {path!r}; known profiles: "
-            f"{list(known_profile_ids(profile_dir))!r}"
+        raise WorkflowError(
+            f"workflow {profile_id!r}: no such file {path!r}; known workflows: "
+            f"{list(known_workflow_ids(row_dir))!r}"
         )
     with open(path, "r", encoding="utf-8") as f:
         try:
             profile = json.load(f)
         except json.JSONDecodeError as e:
-            raise ProfileError(f"profile {profile_id!r}: {path!r} failed to parse: {e}") from e
-    profile = validate_profile_shape(profile, source=path)
+            raise WorkflowError(f"workflow {profile_id!r}: {path!r} failed to parse: {e}") from e
+    profile = validate_workflow_shape(profile, source=path)
     if profile["id"] != profile_id:
-        raise ProfileError(
-            f"profile {profile_id!r}: file {path!r} declares id={profile['id']!r} "
+        raise WorkflowError(
+            f"workflow {profile_id!r}: file {path!r} declares id={profile['id']!r} "
             f"(filename and id must agree)"
         )
     return profile
@@ -619,44 +619,44 @@ def validate_widget_mapping_shape(mapping: Any, source: str = "<dict>") -> dict:
     ``[node_type, widget_name]`` string pairs; anything that looks like a raw
     node id (an int, or a digit-string node_type) is REJECTED."""
     if not isinstance(mapping, dict):
-        raise ProfileError(f"mapping {source}: expected a JSON object")
+        raise WorkflowError(f"mapping {source}: expected a JSON object")
     unknown = set(mapping) - set(_MAPPING_KEYS)
     if unknown:
-        raise ProfileError(f"mapping {source}: unknown key(s) {sorted(unknown)!r}")
+        raise WorkflowError(f"mapping {source}: unknown key(s) {sorted(unknown)!r}")
     for section in _MAPPING_SECTIONS:
         entries = mapping.get(section)
         if not isinstance(entries, dict):
-            raise ProfileError(f"mapping {source}: section {section!r} must be a dict")
+            raise WorkflowError(f"mapping {source}: section {section!r} must be a dict")
         for key, entry in entries.items():
             if not isinstance(entry, dict) or set(entry) != {"registry", "targets"}:
-                raise ProfileError(
+                raise WorkflowError(
                     f"mapping {source}: entry {key!r} must have exactly "
                     f"'registry' + 'targets'"
                 )
             reg = entry["registry"]
             if reg is not None and reg not in _REGISTRY_NAMES:
-                raise ProfileError(
+                raise WorkflowError(
                     f"mapping {source}: entry {key!r} registry must be one of "
                     f"{_REGISTRY_NAMES} or null; got {reg!r}"
                 )
             targets = entry["targets"]
             if not isinstance(targets, list) or not targets:
-                raise ProfileError(f"mapping {source}: entry {key!r} targets must be a non-empty list")
+                raise WorkflowError(f"mapping {source}: entry {key!r} targets must be a non-empty list")
             for t in targets:
                 if (not isinstance(t, list) or len(t) != 2
                         or not all(isinstance(x, str) and x for x in t)):
-                    raise ProfileError(
+                    raise WorkflowError(
                         f"mapping {source}: entry {key!r} target {t!r} must be "
                         f"[node_type, widget_name] (two non-empty strings)"
                     )
                 if t[0].isdigit():
-                    raise ProfileError(
+                    raise WorkflowError(
                         f"mapping {source}: entry {key!r} target {t!r} looks like a "
                         f"raw node id -- node ids are BANNED; use the node TYPE"
                     )
                 never = mapping.get("never_patch_widget_names") or []
                 if t[1] in never:
-                    raise ProfileError(
+                    raise WorkflowError(
                         f"mapping {source}: entry {key!r} targets forbidden widget "
                         f"name {t[1]!r} (companion-slot trap)"
                     )
@@ -666,17 +666,17 @@ def validate_widget_mapping_shape(mapping: Any, source: str = "<dict>") -> dict:
     ewn = mapping.get("exempt_widget_names")
     if ewn is not None:
         if not isinstance(ewn, dict):
-            raise ProfileError(
+            raise WorkflowError(
                 f"mapping {source}: exempt_widget_names must be a dict of "
                 f"node_type -> [widget names]")
         for ntype, names in ewn.items():
             if not isinstance(ntype, str) or not ntype or ntype.isdigit():
-                raise ProfileError(
+                raise WorkflowError(
                     f"mapping {source}: exempt_widget_names key {ntype!r} "
                     f"must be a node TYPE (raw ids banned)")
             if not isinstance(names, list) or not names or not all(
                     isinstance(n, str) and n for n in names):
-                raise ProfileError(
+                raise WorkflowError(
                     f"mapping {source}: exempt_widget_names[{ntype!r}] must "
                     f"be a non-empty list of widget names")
     return mapping
@@ -725,16 +725,16 @@ REASON_IMPRACTICAL_ON_CPU = "impractical_on_cpu"
 def validate_declaration(name: str, decl: Any, source: str = "<registry>") -> dict:
     """Validate ONE engine capability declaration (registry-table row)."""
     if not isinstance(decl, dict):
-        raise ProfileError(f"{source}: declaration for {name!r} must be a dict")
+        raise WorkflowError(f"{source}: declaration for {name!r} must be a dict")
     unknown = set(decl) - set(_DECL_KEYS)
     if unknown:
-        raise ProfileError(f"{source}: declaration {name!r} has unknown key(s) {sorted(unknown)!r}")
+        raise WorkflowError(f"{source}: declaration {name!r} has unknown key(s) {sorted(unknown)!r}")
     missing = [k for k in _DECL_KEYS if k not in decl]
     if missing:
-        raise ProfileError(f"{source}: declaration {name!r} missing key(s) {missing!r}")
+        raise WorkflowError(f"{source}: declaration {name!r} missing key(s) {missing!r}")
     for k, check in _DECL_KEYS.items():
         if not check(decl[k]):
-            raise ProfileError(f"{source}: declaration {name!r} key {k!r} invalid: {decl[k]!r}")
+            raise WorkflowError(f"{source}: declaration {name!r} key {k!r} invalid: {decl[k]!r}")
     return decl
 
 
@@ -765,7 +765,7 @@ def _fit_reason(decl: dict, profile: dict) -> str:
 
 
 #: What `_fit_reason` indexes on the profile. All three are REQUIRED top-level
-#: keys, so a document that came through `validate_profile_shape` always has them;
+#: keys, so a document that came through `validate_workflow_shape` always has them;
 #: this exists for a caller handing us a raw dict.
 _FIT_REQUIRES = ("device_backend", "toolchains", "allow_sidecars")
 
@@ -782,7 +782,7 @@ def availability(profile: dict, declarations: dict) -> dict:
     """
     missing = [k for k in _FIT_REQUIRES if k not in profile]
     if missing:
-        raise ProfileError(
+        raise WorkflowError(
             f"availability: profile {profile.get('id')!r} is missing {missing!r}; "
             f"engine fit cannot be decided without the host keys")
     out: dict[str, str] = {}
@@ -792,11 +792,11 @@ def availability(profile: dict, declarations: dict) -> dict:
     return out
 
 
-def cross_validate_profile(profile: dict, mapping: dict,
+def cross_validate_workflow(profile: dict, mapping: dict,
                            declarations_by_registry: dict) -> None:
     """S1 capability cross-checks: every engine-valued override in the profile
     must be in ``enabled(P)`` of its namespace (the mapping names the
-    namespace). Raises :class:`ProfileError` listing every violation.
+    namespace). Raises :class:`WorkflowError` listing every violation.
 
     Deliberately NO static co-residency rejection: a profile with two heavy
     roles is VALID (single-heavy residency is wrapper_bridge's runtime
@@ -869,7 +869,7 @@ def cross_validate_profile(profile: dict, mapping: dict,
                     f"in the upscale namespace"
                 )
     if problems:
-        raise ProfileError(
-            f"profile {profile.get('id')!r} failed capability cross-validation:\n  "
+        raise WorkflowError(
+            f"workflow {profile.get('id')!r} failed capability cross-validation:\n  "
             + "\n  ".join(problems)
         )

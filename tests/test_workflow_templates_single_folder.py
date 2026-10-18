@@ -41,7 +41,7 @@ def test_gallery_lists_exactly_the_ruled_graphs():
     by build_variants), plus exactly the rows the workflow matrix ships -- no
     hand-authored stray (it would list in the menu with no row behind it), and
     no shipping row whose graph is missing (the menu would be one short)."""
-    from nodes._otr_shared.capability_profiles import shipping_ids
+    from nodes._otr_shared.workflow_rows import shipping_ids
     listed = sorted(p.stem for p in (REPO / "workflows").glob("*.json"))
     expected = sorted(["otr_canonical", "otr_app"] + [
         pid if pid.startswith("otr_") else "otr_" + pid

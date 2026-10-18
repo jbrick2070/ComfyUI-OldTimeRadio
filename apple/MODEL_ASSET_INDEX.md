@@ -274,7 +274,7 @@ The shortest complete path, all ungated, no token:
 python scripts/otr_fetch_lane_weights.py haunted
 # writer, voices and music download themselves on first use
 # (where each kind lands: apple/INSTALL.md)
-python scripts/otr_canonical_api_run.py --profile otr_8gb_animatediff --act-count 1
+python scripts/otr_canonical_api_run.py --workflow-id otr_8gb_animatediff --act-count 1
 ```
 
 That video lane is `animatediff15_v3_haunted_video`, proven on 8 GB, 16 GB and 24 GB cards.

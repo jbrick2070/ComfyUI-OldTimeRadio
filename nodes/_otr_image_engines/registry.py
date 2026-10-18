@@ -109,7 +109,7 @@ assert_usable = _IMAGE_REGISTRY.assert_usable
 
 # ---------------------------------------------------------------------------
 # GATE B S1 -- per-engine capability DECLARATIONS (the registry TABLE, not the
-# adapters). Consumed by nodes/_otr_shared/capability_profiles.py to DERIVE
+# adapters). Consumed by nodes/_otr_shared/workflow_rows.py to DERIVE
 # the per-profile enable-set -- never hand-listed per profile. A new engine
 # ships its own row here; zero profile edits.
 # ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ CAPABILITIES = {
         "model_requirements": ["z-image-turbo"]},
     # Cloud partner STILLS (S1 stills lane 2026-07-03): no local weights, no
     # VRAM, CPU-side (the provider does the compute; canonicalize_image is a
-    # pure PIL op). The registry-consistency invariant (test_capability_profiles
+    # pure PIL op). The registry-consistency invariant (test_workflow_rows
     # :217) requires ONE row per registered engine and vice versa.
     "cloud_flux_pro": {"required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,

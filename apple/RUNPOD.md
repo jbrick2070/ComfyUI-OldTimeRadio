@@ -41,7 +41,7 @@ receipt.
 For automatic selection by VRAM, clear the overrides, then run the script:
 
 ```bash
-unset OTR_PROVISION_PROFILE OTR_WITH_INDEXTTS2
+unset OTR_PROVISION_WORKFLOW OTR_WITH_INDEXTTS2
 bash scripts/otr_pod_provision.sh
 ```
 
@@ -50,7 +50,7 @@ card and `otr_8gb_animatediff` on anything from 8 GB up to that. Or name the
 workflow yourself instead of letting it detect the card:
 
 ```bash
-export OTR_PROVISION_PROFILE=otr_16gb_low
+export OTR_PROVISION_WORKFLOW=otr_16gb_low
 bash scripts/otr_pod_provision.sh
 ```
 
@@ -73,7 +73,7 @@ GATED; everything else downloads without an account.
 After provisioning, boot ComfyUI on the pod with
 `main.py --listen 0.0.0.0 --port 8188`, then drive one leg with
 `scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188`
-and the workflow you provisioned (`--profile <workflow id>`). The full
+and the workflow you provisioned (`--workflow-id <workflow id>`). The full
 boot-and-qualify recipe is in `apple/RUNPOD_INSTALL.md` section 5. You can
 instead load `workflows/otr_canonical.json` in the UI, set the dropdowns for
 the lane you rented the box for, and queue one episode.

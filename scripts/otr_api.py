@@ -1008,7 +1008,7 @@ def poll_history(
 #: Headless creative whitelist -- MIRROR of
 #: nodes._otr_workflow_apply.CREATIVE_WHITELIST (parity-pinned by
 #: tests/test_workflow_apply.py). Engine/feature widgets are NEVER patched
-#: directly by scripts; they go through apply_profile_to_workflow.
+#: directly by scripts; they go through apply_row_to_workflow.
 CREATIVE_WHITELIST = frozenset({
     "num_characters", "act_count", "request_seed",
     "seed_mode",
@@ -1058,18 +1058,18 @@ def patch_creative(workflow: dict, node_id: int, widget_name: str, value: Any,
                    schemas: dict) -> None:
     """The ONLY sanctioned direct-widget patch for headless scripts: refuses
     any widget not on the creative whitelist (managed engine/feature widgets
-    are applied via :func:`apply_profile_to_workflow` -- the ONE applier)."""
+    are applied via :func:`apply_row_to_workflow` -- the ONE applier)."""
     if widget_name not in CREATIVE_WHITELIST:
         raise ValueError(
             f"patch_creative: widget {widget_name!r} is not on the creative "
             f"whitelist; managed widgets are patched ONLY via "
-            f"apply_profile_to_workflow(--profile). Whitelist: "
+            f"apply_row_to_workflow(--workflow-id). Whitelist: "
             f"{sorted(CREATIVE_WHITELIST)!r}"
         )
     patch_widget_by_name(workflow, node_id, widget_name, value, schemas)
 
 
-def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
+def apply_row_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
     """Apply a capability profile to a loaded workflow via the ONE applier
     (``nodes._otr_workflow_apply.apply_profile``) using THESE (live) schemas,
     and print the resolved profile LOUD (decision doc section 8). ``profile``
@@ -1078,17 +1078,17 @@ def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
-    from nodes._otr_shared.capability_profiles import (
-        load_profile, load_widget_mapping, validate_profile_shape,
+    from nodes._otr_shared.workflow_rows import (
+        load_workflow_row, load_widget_mapping, validate_workflow_shape,
     )
     from nodes._otr_workflow_apply import apply_profile
 
     if isinstance(profile, str):
-        profile = load_profile(profile)
+        profile = load_workflow_row(profile)
     else:
         # A dict handed in directly (tests build one) is shape-checked here.
         # This is schema validation only; there is no capability/VRAM gate.
-        profile = validate_profile_shape(profile, source="in-memory workflow row")
+        profile = validate_workflow_shape(profile, source="in-memory workflow row")
     # NO CAPABILITY CROSS-VALIDATION (operator directive 2026-08-31: "I don't
     # want to maintain any warning gate either", after "let's power through
     # testing without inviting some artificial profile gate"). Refusing a
@@ -1134,7 +1134,7 @@ __all__ = [
     "fetch_schemas",
     "patch_widget_by_name",
     "patch_creative",
-    "apply_profile_to_workflow",
+    "apply_row_to_workflow",
     "CREATIVE_WHITELIST",
     "workflow_to_api_prompt",
     "submit_prompt",

@@ -19,7 +19,7 @@ The morning starts in `otr/obs/`, not the editor.
    `scripts/otr_render_watchdog.ps1 -LegLog <leg.log>` (exit 2 = stalled 300 s
    or the server went away; it reports, it does not reset).
 3. **The runner.** One leg:
-   `python scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:<port> --profile <row> --act-count 1 --timeout 0 --run-label <label>`.
+   `python scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:<port> --workflow-id <row> --act-count 1 --timeout 0 --run-label <label>`.
    `--timeout 0` waits for a terminal result. Use `--run-label`, never
    `--title` (`--title` names the episode and the title card). Exit 0 =
    SUCCESS; exit 1 = anything else. A missing weight the row cannot download

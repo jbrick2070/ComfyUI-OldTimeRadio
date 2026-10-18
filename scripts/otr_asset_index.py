@@ -191,10 +191,10 @@ def collect_profiles() -> dict:
     video_keys = {"character_visual", "announcer_visual", "music_visual"}
     if _REPO not in sys.path:
         sys.path.insert(0, _REPO)
-    from nodes._otr_shared.capability_profiles import (
-        known_profile_ids, load_profile)
-    for pid in known_profile_ids():
-        doc = load_profile(pid)
+    from nodes._otr_shared.workflow_rows import (
+        known_workflow_ids, load_workflow_row)
+    for pid in known_workflow_ids():
+        doc = load_workflow_row(pid)
         roles = doc.get("role_overrides", {}) or {}
         slots = doc.get("slot_overrides", {}) or {}
         for key in ("character_visual", "announcer_visual", "music_visual",
@@ -406,7 +406,7 @@ def render() -> str:
       "python scripts/otr_fetch_lane_weights.py haunted\n"
       "# writer, voices and music download themselves on first use\n"
       "# (where each kind lands: apple/INSTALL.md)\n"
-      "python scripts/otr_canonical_api_run.py --profile otr_8gb_animatediff "
+      "python scripts/otr_canonical_api_run.py --workflow-id otr_8gb_animatediff "
       "--act-count 1\n"
       "```\n")
     # The VIDEO lane only: music is its own dropdown, not tied to a video lane

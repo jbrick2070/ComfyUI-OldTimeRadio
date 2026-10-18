@@ -773,7 +773,7 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
     #
     # `_load_bark` is device-aware (it picks the device and builds
     # device_map/dtype from that), and nothing else gates a CUDA-less install:
-    # the CAPABILITIES table feeds capability_profiles to derive per-profile
+    # the CAPABILITIES table feeds workflow_rows to derive per-profile
     # enable-sets and is NOT consulted at voice dispatch --
     # `registry.assert_usable` only checks "registered + role-compatible". A
     # hardcoded "cuda" here would raise on the FIRST spoken line, after the

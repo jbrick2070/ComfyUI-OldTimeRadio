@@ -46,18 +46,18 @@ def _with_every_visual(profile: dict, video: str) -> dict:
 def test_remote_video_profile_skips_remote_video_download():
     """A remote-video profile must not mint a local video fetch lane."""
     provision = _provisioner()
-    lanes = provision.profile_lanes("otr_cloud_deluxe_audio_in_3act")
+    lanes = provision.workflow_lanes("otr_cloud_deluxe_audio_in_3act")
     assert "cloud_ltx25_audio_in" not in lanes["automatic"]
     assert "cloud_ltx25_audio_in" not in lanes["manual"]
 
 
 def test_razzle_ltx_8gb_profile_uses_the_ltx_8gb_weight_lane():
     provision = _provisioner()
-    ltx_8gb = provision.load_profile("otr_8gb_video")
+    ltx_8gb = provision.load_workflow_row("otr_8gb_video")
     razzle = _with_every_visual(ltx_8gb, "razzle_ltx_8gb")
 
-    assert provision.profile_lanes(razzle) == provision.profile_lanes(ltx_8gb)
-    assert "ltx_8gb" in provision.profile_lanes(razzle)["automatic"]
+    assert provision.workflow_lanes(razzle) == provision.workflow_lanes(ltx_8gb)
+    assert "ltx_8gb" in provision.workflow_lanes(razzle)["automatic"]
 
 
 def test_amd_profiles_plan_their_exact_image_and_music_dependencies():
@@ -74,7 +74,7 @@ def test_amd_profiles_plan_their_exact_image_and_music_dependencies():
     """
     provision = _provisioner()
 
-    assert provision.profile_lanes("otr_amd_still") == {
+    assert provision.workflow_lanes("otr_amd_still") == {
         "automatic": ["z_image_int8", "stable_audio_3"],
         "manual": [],
     }
@@ -83,7 +83,7 @@ def test_amd_profiles_plan_their_exact_image_and_music_dependencies():
 def test_amd_workflow_has_a_complete_dry_run_plan(capsys):
     provision = _provisioner()
 
-    assert provision.main(["--profile", "otr_amd_still", "--list"]) == 0
+    assert provision.main(["--workflow-id", "otr_amd_still", "--list"]) == 0
     output = capsys.readouterr().out
     assert "automatic    : z_image_int8" in output or "automatic    : z_image" in output
     assert "manual       : none" in output
@@ -93,18 +93,18 @@ def test_amd_workflow_has_a_complete_dry_run_plan(capsys):
 
 def test_kokoro_profiles_fail_early_on_python_313_but_bark_does_not():
     provision = _provisioner()
-    kokoro = provision.load_profile("otr_8gb_low")
-    bark = copy.deepcopy(provision.load_profile("otr_8gb_animatediff"))
+    kokoro = provision.load_workflow_row("otr_8gb_low")
+    bark = copy.deepcopy(provision.load_workflow_row("otr_8gb_animatediff"))
     bark["slot_overrides"]["char_voice_engine"] = "bark"
     bark["slot_overrides"]["announcer_voice_engine"] = "bark"
 
     # 2026-09-02: 3.13 runs kokoro through kokoro-onnx; only 3.14+ is flagged.
-    assert provision.profile_python_issue(kokoro, (3, 13)) == ""
+    assert provision.workflow_python_issue(kokoro, (3, 13)) == ""
     assert "no backend packaged for Python 3.14" in \
-        provision.profile_python_issue(kokoro, (3, 14))
-    assert provision.profile_python_issue(kokoro, (3, 12)) == ""
-    assert provision.profile_python_issue(bark, (3, 13)) == ""
-    assert provision.profile_python_issue(bark, (3, 14)) == ""
+        provision.workflow_python_issue(kokoro, (3, 14))
+    assert provision.workflow_python_issue(kokoro, (3, 12)) == ""
+    assert provision.workflow_python_issue(bark, (3, 13)) == ""
+    assert provision.workflow_python_issue(bark, (3, 14)) == ""
 
 
 def test_machine_readable_plan_check_rejects_kokoro_on_python_314(
@@ -112,14 +112,14 @@ def test_machine_readable_plan_check_rejects_kokoro_on_python_314(
     provision = _provisioner()
     monkeypatch.setattr(provision.sys, "version_info", (3, 14, 0))
 
-    assert provision.main(["--profile", "otr_8gb_low", "--check-plan"]) == 1
+    assert provision.main(["--workflow-id", "otr_8gb_low", "--check-plan"]) == 1
     rejected = capsys.readouterr().out
     assert "MISSING" in rejected
     assert "no backend packaged for Python 3.14" in rejected
 
     # A row with no Kokoro voice at all (hosted voices) is ready on 3.14.
     assert provision.main([
-        "--profile", "otr_cloud_deluxe_3act", "--check-plan"
+        "--workflow-id", "otr_cloud_deluxe_3act", "--check-plan"
     ]) == 0
     ready = capsys.readouterr().out
     assert "READY: complete provision plan for otr_cloud_deluxe_3act" in ready
@@ -138,7 +138,7 @@ def test_procedural_low_rows_do_not_require_an_uninvoked_image_lane(
     """
     provision = _provisioner()
 
-    assert provision.profile_lanes(profile_id) == {
+    assert provision.workflow_lanes(profile_id) == {
         "automatic": ["stable_audio_3"],
         "manual": [],
     }
@@ -149,7 +149,7 @@ def test_haunted_workflows_do_not_require_unconsumed_klein_weights(profile_id):
     """AnimateDiff takes no init still, so the Klein image lane is never planned."""
     provision = _provisioner()
 
-    assert provision.profile_lanes(profile_id) == {
+    assert provision.workflow_lanes(profile_id) == {
         "automatic": ["haunted", "stable_audio_3"],
         "manual": [],
     }
@@ -161,7 +161,7 @@ def test_mixed_role_plan_includes_every_video_and_rejects_unowned_images(
     provision = _provisioner()
     # One role moves off its procedural visualizer onto a still-consuming
     # video and pins an image engine that has no provisioner lane.
-    mixed = copy.deepcopy(provision.load_profile("otr_16gb_low"))
+    mixed = copy.deepcopy(provision.load_workflow_row("otr_16gb_low"))
     mixed["id"] = "mixed_role_%s" % missing_image
     mixed["role_overrides"]["character_visual"] = "still_motion"
     mixed["role_overrides"]["character_image"] = missing_image
@@ -169,13 +169,13 @@ def test_mixed_role_plan_includes_every_video_and_rejects_unowned_images(
     with pytest.raises(
             provision.ProvisionFailure,
             match="unrecognized image engine %r" % missing_image):
-        provision.profile_lanes(mixed)
+        provision.workflow_lanes(mixed)
 
 
 def test_remote_profiles_need_no_local_video_or_image_weights():
     provision = _provisioner()
 
-    assert provision.profile_lanes("otr_cloud_deluxe_3act") == {
+    assert provision.workflow_lanes("otr_cloud_deluxe_3act") == {
         "automatic": [],
         "manual": [],
     }
@@ -185,7 +185,7 @@ def test_profile_selector_rejects_path_traversal():
     provision = _provisioner()
 
     with pytest.raises(provision.ProvisionFailure, match="invalid profile id"):
-        provision.load_profile("../otr_8gb_animatediff")
+        provision.load_workflow_row("../otr_8gb_animatediff")
 
 
 def test_profile_selector_rejects_an_id_that_is_not_a_matrix_row():
@@ -194,4 +194,4 @@ def test_profile_selector_rejects_an_id_that_is_not_a_matrix_row():
     with pytest.raises(
             provision.ProvisionFailure,
             match="'requested' is not a row of config/workflow_matrix.json"):
-        provision.load_profile("requested")
+        provision.load_workflow_row("requested")

@@ -39,9 +39,9 @@ import json
 import logging
 from typing import Any, Optional
 
-from ._otr_shared.capability_profiles import (
-    ProfileError,
-    load_profile,
+from ._otr_shared.workflow_rows import (
+    WorkflowError,
+    load_workflow_row,
     load_widget_mapping,
 )
 
@@ -342,7 +342,7 @@ def _node_by_type(workflow: dict, node_type: str) -> dict:
     (the mapping's unique-match assertion, enforced at apply time too)."""
     found = [n for n in workflow.get("nodes", []) if n.get("type") == node_type]
     if len(found) != 1:
-        raise ProfileError(
+        raise WorkflowError(
             f"apply_profile: node type {node_type!r} occurs {len(found)}x in the "
             f"workflow (the widget mapping requires exactly 1)"
         )
@@ -465,11 +465,11 @@ def _to_profile_form(value: Any) -> Any:
 
     IT DELIBERATELY DOES NOT CALL `resolve_engine_id`. That maps PUBLIC spellings to
     INTERNAL ones (`ltx25_high_video` -> `ltx25_video`), and applying it here made
-    `resolved_profile` answer in two different spellings depending on whether a row
+    `resolved_workflow` answer in two different spellings depending on whether a row
     stated a key or inherited it. Public is the right one to keep: it is what rows
     state, it is what a person picks in the dropdown so the generated docs read like
     the menu, and the one consumer that wants internal ids
-    (`otr_dropdown_matrix._profile_engines`) resolves them itself.
+    (`otr_dropdown_matrix._workflow_engines`) resolves them itself.
     """
     if not isinstance(value, str):
         return value
@@ -477,7 +477,7 @@ def _to_profile_form(value: Any) -> Any:
     return _strip_label_suffix(value)
 
 
-def resolved_profile(profile, canonical: dict, mapping: Optional[dict] = None,
+def resolved_workflow(profile, canonical: dict, mapping: Optional[dict] = None,
                      schemas: Optional[dict] = None) -> dict:
     """Every profile-managed value a row RESOLVES to, for the generated docs.
 
@@ -496,7 +496,7 @@ def resolved_profile(profile, canonical: dict, mapping: Optional[dict] = None,
     mapping = mapping if mapping is not None else load_widget_mapping()
     schemas = schemas if schemas is not None else build_offline_schemas()
     if isinstance(profile, str):
-        profile = load_profile(profile)
+        profile = load_workflow_row(profile)
 
     # A PURE READ -- deliberately NOT a render. Routing this through
     # `apply_profile` made it environment-sensitive (the applier validates each
@@ -831,7 +831,7 @@ def apply_profile(workflow: dict, profile, mapping: Optional[dict] = None,
     (the queue-start availability line's apply-side sibling).
     """
     if isinstance(profile, str):
-        profile = load_profile(profile)
+        profile = load_workflow_row(profile)
     mapping = mapping if mapping is not None else load_widget_mapping()
     schemas = schemas if schemas is not None else build_offline_schemas()
 
@@ -842,7 +842,7 @@ def apply_profile(workflow: dict, profile, mapping: Optional[dict] = None,
     for dotted in sorted(flat):
         entry = managed.get(dotted)
         if entry is None:
-            raise ProfileError(
+            raise WorkflowError(
                 f"apply_profile: profile key {dotted!r} has no widget-mapping "
                 f"entry (typo'd key, or the mapping needs updating)"
             )
@@ -947,7 +947,7 @@ def patch_creative(workflow: dict, node_id: int, widget_name: str, value: Any,
     CREATIVE (whitelisted) widget by name. Engine/feature widgets must go
     through ``apply_profile`` -- this helper refuses them."""
     if widget_name not in CREATIVE_WHITELIST:
-        raise ProfileError(
+        raise WorkflowError(
             f"patch_creative: widget {widget_name!r} is not on the creative "
             f"whitelist {sorted(CREATIVE_WHITELIST)!r}; managed widgets are "
             f"patched ONLY via apply_profile"

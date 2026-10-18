@@ -276,7 +276,7 @@ class TestStampAssertion:
         device at run time and is the proven CPU-only path)."""
         import re
 
-        from nodes._otr_shared import capability_profiles as cp
+        from nodes._otr_shared import workflow_rows as cp
 
         monkeypatch.setattr(WorkflowValidator, "_detect_host",
                             staticmethod(lambda: _host(has_cuda=False)))
@@ -286,7 +286,7 @@ class TestStampAssertion:
                           profile_id=NV16)
         suggested = re.findall(r"suggested workflow: (\S+)", str(excinfo.value))
         assert suggested, str(excinfo.value)
-        real = set(cp.known_profile_ids()) | {"otr_canonical"}
+        real = set(cp.known_workflow_ids()) | {"otr_canonical"}
         assert set(suggested) <= real, (
             "the abort suggests a workflow nobody can open: %r" % suggested)
 

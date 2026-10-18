@@ -28,7 +28,7 @@ import pytest
 import nodes._otr_video_engines  # noqa: F401  (self-registers every engine)
 from nodes import _otr_workflow_apply as wa
 from nodes._otr_shared import role_compat as rc
-from nodes._otr_shared.capability_profiles import load_profile
+from nodes._otr_shared.workflow_rows import load_workflow_row
 from nodes._otr_video_engines import registry as vreg
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent

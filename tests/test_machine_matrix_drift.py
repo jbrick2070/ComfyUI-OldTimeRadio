@@ -67,7 +67,7 @@ def test_the_front_door_names_workflows_and_sends_mid_cards_to_8gb():
     assert "## Which workflow to open" in text
     assert ("| 10-15 GB NVIDIA (RTX 4070, 3080) | an `otr_8gb_*` workflow -- "
             "or try an `otr_16gb_*` one at your own risk |") in text
-    assert "scripts/otr_provision.py --profile otr_8gb_low --list" in text
+    assert "scripts/otr_provision.py --workflow-id otr_8gb_low --list" in text
     assert "--machine" not in text
     assert "machine key" not in text
     assert "`widget_mapping`" not in text
@@ -90,7 +90,7 @@ def test_workflows_are_grouped_by_the_card_their_name_names():
 
 def test_shipping_status_is_separate_from_install_ownership():
     M = _generator()
-    profiles = {row["id"]: row for row in M.load_profiles()}
+    profiles = {row["id"]: row for row in M.load_workflow_rows()}
     # EVERY SHIPPED WORKFLOW HAS AN EXACT INSTALL OWNER (2026-09-25).
     shipping = [pid for pid, row in profiles.items() if row["status"] == "shipping"]
     assert shipping, "the matrix ships nothing; this test would prove nothing"

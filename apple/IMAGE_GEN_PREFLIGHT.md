@@ -80,7 +80,7 @@ is gated at `VIDEO_LANE_PREFLIGHT.md` G3.6; the image half is Gate IG3 below.
   DECLARATION check and says so.
 - **IG2.3 One `CAPABILITIES` row per registered engine and vice versa.**
   *Not re-asserted by this file's matrix on purpose - one invariant, one owner:
-  it is enforced in `tests/test_capability_profiles.py` and
+  it is enforced in `tests/test_workflow_rows.py` and
   `tests/test_cloud_image_adapters.py`.*
 
 ## Gate IG3 - The operator's pick is what renders

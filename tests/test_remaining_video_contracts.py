@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from nodes._otr_shared import capability_profiles as cp
+from nodes._otr_shared import workflow_rows as cp
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -50,28 +50,28 @@ def _pinned_variant(tmp_path, monkeypatch):
     sys.path.insert(0, str(REPO / "scripts"))
     import build_variants as bv
 
-    doc = copy.deepcopy(cp.load_profile(PINNED_BASE))
+    doc = copy.deepcopy(cp.load_workflow_row(PINNED_BASE))
     doc["id"] = "otr_8gb_ceiling_probe"
     doc["video"]["max_render_frames"] = PINNED_CEILING
     (tmp_path / "otr_8gb_ceiling_probe.json").write_text(
         json.dumps(doc), encoding="utf-8")
     monkeypatch.setattr(
-        bv, "load_profile",
-        lambda pid: cp.load_profile(pid, profile_dir=str(tmp_path)))
+        bv, "load_workflow_row",
+        lambda pid: cp.load_workflow_row(pid, row_dir=str(tmp_path)))
     graph, _rel, _recipe = bv.build_variant("otr_8gb_ceiling_probe")
     return graph
 
 
 def test_max_render_frames_is_optional_but_range_checked():
-    profile = cp.load_profile(PINNED_BASE)
+    profile = cp.load_workflow_row(PINNED_BASE)
     profile["video"]["max_render_frames"] = PINNED_CEILING
-    assert cp.validate_profile_shape(profile, source="<pinned>")  # legal
+    assert cp.validate_workflow_shape(profile, source="<pinned>")  # legal
     del profile["video"]["max_render_frames"]
-    assert cp.validate_profile_shape(profile, source="<absent>")  # legal
+    assert cp.validate_workflow_shape(profile, source="<absent>")  # legal
     for bad in (999, -1, "17", True):
         profile["video"]["max_render_frames"] = bad
-        with pytest.raises(cp.ProfileError, match="max_render_frames"):
-            cp.validate_profile_shape(profile, source="<bad>")
+        with pytest.raises(cp.WorkflowError, match="max_render_frames"):
+            cp.validate_workflow_shape(profile, source="<bad>")
 
 
 def test_canonical_director_ships_the_ceiling_unpinned():

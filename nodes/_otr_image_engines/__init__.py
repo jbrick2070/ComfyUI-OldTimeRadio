@@ -51,7 +51,7 @@ HOW TO ADD YOUR OWN IMAGE ENGINE (same shape as the other three namespaces):
    ``render_image`` (lazy-import torch/comfy INSIDE it), ``teardown``.
 
 4. Add a CAPABILITIES row in :mod:`registry` (one row per engine and vice
-   versa -- tests/test_capability_profiles.py holds the bijection).
+   versa -- tests/test_workflow_rows.py holds the bijection).
 
 5. Run the preflight: apple/IMAGE_GEN_PREFLIGHT.md, enforced by
    tests/test_image_gen_preflight_matrix.py, which sweeps the LIVE registry --

@@ -2129,7 +2129,7 @@ the same green push that closes a row.
 | Window | Scope | Rung | Gate | Size |
 |---|---|---|---|---|
 | **CODER** (the default) | Take THE CURRENT STEP from the top; ignore older `NEXT` labels below it. Use the `CLAUDE.md` design-choice test before code, then one clean independent finished-diff review; one green pushed chunk at a time | cheapest competent local triage; full local arc only for a real design fork | none | evidence-driven |
-| RENDER | GPU legs only: acceptance legs for whatever the coder just landed, and the soak. Reset per CLAUDE.md section 4 before every leg; the soak restarts ONLY in its `--profile` form | local production + Codex-app monitor | a coder chunk needing live proof | GPU hours |
+| RENDER | GPU legs only: acceptance legs for whatever the coder just landed, and the soak. Reset per CLAUDE.md section 4 before every leg; the soak restarts ONLY in its `--workflow-id` form | local production + Codex-app monitor | a coder chunk needing live proof | GPU hours |
 | PLANNER | The archive split this file still owes; Bug Bible operator fan-out; the `check_compatibility` fork | rungs 2-4 | parallel with any coder window | docs |
 
 **THE STORY LAB ROW WAS REMOVED 2026-08-16.** The lab is RETIRED (see its

@@ -179,7 +179,7 @@ def assert_usable(name: str, role: str) -> str:
 
 # ---------------------------------------------------------------------------
 # GATE B S1 -- per-engine capability DECLARATIONS (the registry TABLE, not the
-# adapters). Consumed by nodes/_otr_shared/capability_profiles.py to DERIVE
+# adapters). Consumed by nodes/_otr_shared/workflow_rows.py to DERIVE
 # the per-profile enable-set. DATA ONLY: this block changes no audio runtime
 # behavior (the frozen audio spine is untouched).
 # ---------------------------------------------------------------------------

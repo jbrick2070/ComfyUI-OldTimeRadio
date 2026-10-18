@@ -246,17 +246,17 @@ def test_a_pinned_frame_ceiling_reaches_the_variant_by_name(tmp_path,
     import sys
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
     import build_variants as bv
-    from nodes._otr_shared import capability_profiles as _cp
+    from nodes._otr_shared import workflow_rows as _cp
 
     expected = 81
-    doc = copy.deepcopy(_cp.load_profile("otr_8gb_video"))
+    doc = copy.deepcopy(_cp.load_workflow_row("otr_8gb_video"))
     doc["id"] = "otr_8gb_ceiling_probe"
     doc["video"]["max_render_frames"] = expected
     (tmp_path / "otr_8gb_ceiling_probe.json").write_text(
         json.dumps(doc), encoding="utf-8")
     monkeypatch.setattr(
-        bv, "load_profile",
-        lambda pid: _cp.load_profile(pid, profile_dir=str(tmp_path)))
+        bv, "load_workflow_row",
+        lambda pid: _cp.load_workflow_row(pid, row_dir=str(tmp_path)))
     data, _variant_rel, _recipe = bv.build_variant("otr_8gb_ceiling_probe")
     node = next(n for n in data["nodes"]
                 if str(n.get("type") or "") == "OTR_VideoDirector")

@@ -673,15 +673,15 @@ def _load_profiles():
 
     # The shipped workflows, from the matrix.
     try:
-        from nodes._otr_shared.capability_profiles import ProfileError, shipping_ids
-        from nodes._otr_workflow_apply import resolved_profile
+        from nodes._otr_shared.workflow_rows import WorkflowError, shipping_ids
+        from nodes._otr_workflow_apply import resolved_workflow
         canonical = json.load(open(
             os.path.join(REPO_ROOT, "workflows", "otr_canonical.json"),
             encoding="utf-8"))
         for pid in shipping_ids():
             try:
-                out[pid] = resolved_profile(pid, canonical)
-            except ProfileError:
+                out[pid] = resolved_workflow(pid, canonical)
+            except WorkflowError:
                 continue
     except Exception:  # noqa: BLE001 -- a gate reads what it can, and other
         pass           # tests own the matrix's health

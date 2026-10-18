@@ -95,9 +95,9 @@ def test_spandrel_engine_shape():
 
 def test_capabilities_row_shape_matches_decl_keys():
     """Every CAPABILITIES row must pass validate_declaration
-    (nodes/_otr_shared/capability_profiles.py:validate_declaration)."""
+    (nodes/_otr_shared/workflow_rows.py:validate_declaration)."""
     from nodes._otr_upscale_engines.registry import CAPABILITIES
-    from nodes._otr_shared.capability_profiles import validate_declaration
+    from nodes._otr_shared.workflow_rows import validate_declaration
     for name, decl in CAPABILITIES.items():
         validate_declaration(name, decl, source=f"upscale/{name}")
 

@@ -19,15 +19,15 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 import build_variants as bv  # noqa: E402
 import gallery_thumbs as gt  # noqa: E402
-from nodes._otr_shared.capability_profiles import (  # noqa: E402
-    load_profile, shipping_ids,
+from nodes._otr_shared.workflow_rows import (  # noqa: E402
+    load_workflow_row, shipping_ids,
 )
 
 
 def _all_cards():
     cards = {"otr_canonical": gt.CANONICAL_CARD, "otr_app": gt.APP_CARD}
     for pid in shipping_ids():
-        cards[pid] = gt.card_for_profile(load_profile(pid))
+        cards[pid] = gt.card_for_profile(load_workflow_row(pid))
     return cards
 
 
@@ -41,7 +41,7 @@ def test_every_shipped_graph_has_a_card_that_says_something_different():
 
 def test_the_mac_and_amd_cards_lead_with_their_hardware():
     for pid in shipping_ids():
-        profile = load_profile(pid)
+        profile = load_workflow_row(pid)
         card = gt.card_for_profile(profile)
         vendor = profile.get("gpu_vendor")
         if vendor == "apple":
@@ -60,7 +60,7 @@ def test_each_hardware_class_has_its_own_background():
 
 
 def test_an_nvidia_row_with_no_size_in_its_id_says_so():
-    profile = dict(load_profile("otr_8gb_video"), id="otr_nvidia_video")
+    profile = dict(load_workflow_row("otr_8gb_video"), id="otr_nvidia_video")
     with pytest.raises(ValueError, match="VRAM size in the id"):
         gt.card_for_profile(profile)
 
@@ -76,7 +76,7 @@ def test_a_palette_change_makes_every_card_stale(monkeypatch):
 
 
 def test_a_lane_with_no_words_is_refused_by_name():
-    profile = dict(load_profile("otr_8gb_video"))
+    profile = dict(load_workflow_row("otr_8gb_video"))
     profile["role_overrides"] = dict(profile["role_overrides"],
                                      character_visual="some_new_engine")
     with pytest.raises(ValueError, match="some_new_engine"):
@@ -88,7 +88,7 @@ def test_a_drawn_card_carries_its_words_in_the_jpeg():
     from PIL import Image
 
     master = gt.MASTER_ART.read_bytes()
-    card = gt.card_for_profile(load_profile("otr_mac16_video"))
+    card = gt.card_for_profile(load_workflow_row("otr_mac16_video"))
     comment = gt.comment_for(card, master)
     data = gt.render(card, master, comment)
     assert gt.jpeg_comment(data) == comment

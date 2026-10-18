@@ -686,9 +686,9 @@ def _wire_main_stubs(provision, monkeypatch, profile, *, verify_result=True):
     # Own that CLI-process state through monkeypatch so an in-process unit test
     # cannot redirect unrelated resolver tests after this fixture returns.
     monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", "C:/models")
-    monkeypatch.setattr(provision, "load_profile", lambda _pid: profile)
+    monkeypatch.setattr(provision, "load_workflow_row", lambda _pid: profile)
     monkeypatch.setattr(
-        provision, "profile_lanes",
+        provision, "workflow_lanes",
         lambda _profile: {"automatic": [], "manual": []})
     monkeypatch.setattr(provision, "comfy_root", lambda: "C:/ComfyUI")
     monkeypatch.setattr(provision, "models_root", lambda _comfy: "C:/models")
@@ -723,7 +723,7 @@ def test_selected_profile_verifies_index_without_install_flag(monkeypatch):
     calls = _wire_main_stubs(
         provision, monkeypatch, profile, verify_result=False)
 
-    assert provision.main(["--profile", "needs-index"]) == 1
+    assert provision.main(["--workflow-id", "needs-index"]) == 1
     assert calls == {"install": 0, "verify": 1, "other": []}
     assert any(row[1] == "selected profile requires IndexTTS2"
                for row in provision._LOG)
@@ -739,7 +739,7 @@ def test_index_flags_install_once_and_all_voices_adds_only_other_engines(
     calls = _wire_main_stubs(provision, monkeypatch, profile)
 
     assert provision.main([
-        "--profile", "needs-index", "--with-indextts2", "--with-all-voices",
+        "--workflow-id", "needs-index", "--with-indextts2", "--with-all-voices",
     ]) == 0
     assert calls == {"install": 1, "verify": 0, "other": ["one", "two"]}
 
@@ -752,5 +752,5 @@ def test_profile_without_index_skips_both_install_and_verification(monkeypatch):
     }
     calls = _wire_main_stubs(provision, monkeypatch, profile)
 
-    assert provision.main(["--profile", "kokoro-only"]) == 0
+    assert provision.main(["--workflow-id", "kokoro-only"]) == 0
     assert calls == {"install": 0, "verify": 0, "other": []}

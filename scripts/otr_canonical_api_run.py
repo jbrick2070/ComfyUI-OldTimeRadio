@@ -34,7 +34,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from otr_api import (  # noqa: E402
     COMFYUI_URL,
-    apply_profile_to_workflow,
+    apply_row_to_workflow,
     fetch_schemas,
     load_workflow,
     patch_creative,
@@ -259,9 +259,9 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
     workflow = load_workflow(str(wf_path))
 
     applied: list[str] = []
-    if args.profile and args.profile.lower() != "none":
-        workflow = apply_profile_to_workflow(workflow, args.profile, schemas)
-        applied.append(f"profile={args.profile}")
+    if args.workflow_id and args.workflow_id.lower() != "none":
+        workflow = apply_row_to_workflow(workflow, args.workflow_id, schemas)
+        applied.append(f"profile={args.workflow_id}")
         if getattr(args, "video_lane", None):
             # The row's required models belong to the video lane it names,
             # which --video-lane replaces; _apply_video_lane says what, if
@@ -270,7 +270,7 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
                   "--video-lane replaces the row's video lane", flush=True)
         else:
             checked = _assert_profile_models_present(
-                args.profile, schemas, offline=bool(args.offline_schemas))
+                args.workflow_id, schemas, offline=bool(args.offline_schemas))
             if checked:
                 print("[canonical-api] preflight: %d required model(s) "
                       "visible to the server: %s"
@@ -353,12 +353,12 @@ def _assert_profile_models_present(profile_name, schemas, offline=False) -> list
     # a read finds no file for any id and silently checks nothing.
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
-    from nodes._otr_shared.capability_profiles import ProfileError, load_profile
+    from nodes._otr_shared.workflow_rows import WorkflowError, load_workflow_row
     from nodes._otr_shared.public_engines import resolve_engine_id
     from nodes._otr_visual_assets import VisualAssetError, planned_downloads
     try:
-        profile = load_profile(profile_name)
-    except ProfileError:
+        profile = load_workflow_row(profile_name)
+    except WorkflowError:
         return []                  # "none", or no such row: nothing declared
     required = ((profile.get("preflight") or {}).get("required_models") or [])
     # A FILE THE PACK FETCHES FOR THIS ROW IS NOT A REFUSAL. The validator's
@@ -489,7 +489,7 @@ def main(argv: list[str] | None = None) -> int:
              "http://127.0.0.1:8188; env/default remains available)",
     )
     parser.add_argument(
-        "--profile", default="none",
+        "--workflow-id", default="none",
         help="a workflow id -- a row of config/workflow_matrix.json, e.g. "
              "otr_8gb_low or otr_16gb_video -- or none",
     )
@@ -515,7 +515,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="set the announcer, character and music video "
                              "dropdowns to this video lane (e.g. "
                              "h3_low_video), as picking it in the app does; "
-                             "applied after --profile. Not with "
+                             "applied after --workflow-id. Not with "
                              "--replay-from: a replay keeps its bundle's "
                              "engine (derive a bundle with "
                              "otr_freeze_replay_bundle.py --derive-engine)")
