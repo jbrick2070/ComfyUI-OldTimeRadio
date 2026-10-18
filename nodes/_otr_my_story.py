@@ -1026,6 +1026,7 @@ def _pass_cast_gender(technical_fn, pack, bundle, treatment: "StoryTreatment",
             for m in treatment.cast]
     try:
         system = _seam(pack, "my_story_cast_gender_system")
+        # LLM slot: technical -- reads each open role's gender off the cast.
         result = structured_call(
             prompt=ProviderCapacityMessages([
                 {"role": "system", "content": system},

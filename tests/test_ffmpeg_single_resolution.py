@@ -6,11 +6,12 @@ sat in ``scope_draw`` -- a claim in prose reads as coverage and stops the next
 reader from looking. So the claim here is made by an AST walk over ``nodes/``:
 
 * ``OTR_FFMPEG`` is read in exactly one module, the ffmpeg owner.
-* ``which(...)`` is called only by the two tool owners -- the ffmpeg owner
-  and the probe owner (``ffprobe.py``). Nothing else in the pack has a
-  legitimate reason to search PATH; as of 2026-09-04 nothing else did, once
-  the twelve ffmpeg copies were retired. A new copy fails this test the day
-  it is written, whether it spells the tool as a constant or as a variable.
+* ``which(...)`` on ffmpeg, ffprobe or a variable is called only by the two
+  tool owners -- the ffmpeg owner and the probe owner (``ffprobe.py``). As of
+  2026-09-04 nothing else did, once the twelve ffmpeg copies were retired. A
+  new copy fails this test the day it is written, whether it spells the tool
+  as a constant or as a variable. A literal naming some other tool (the RTX
+  VSR installer's ``which("uv")``, 2026-10-16) is not an ffmpeg decision.
 """
 from __future__ import annotations
 
@@ -34,6 +35,19 @@ def _call_name(node: ast.Call) -> str:
     return ""
 
 
+_MEDIA_TOOLS = _BARE | {"ffprobe", "ffprobe.exe"}
+
+
+def _names_another_tool(node: ast.Call) -> bool:
+    """A which() whose argument is a literal naming some OTHER tool (the RTX
+    VSR installer's ``which("uv")``) is not an ffmpeg decision. A variable
+    argument still counts -- it could hold "ffmpeg" -- so the ratchet keeps
+    its teeth for every spelling that can reach the media tools."""
+    arg = node.args[0] if node.args else None
+    return (isinstance(arg, ast.Constant) and isinstance(arg.value, str)
+            and arg.value.lower() not in _MEDIA_TOOLS)
+
+
 def _offenders(path: pathlib.Path) -> list:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     rel = path.relative_to(REPO)
@@ -43,7 +57,8 @@ def _offenders(path: pathlib.Path) -> list:
                 and path != FFMPEG_OWNER:
             out.append(f"{rel}:{node.lineno} reads OTR_FFMPEG")
         elif isinstance(node, ast.Call) and _call_name(node) == "which" \
-                and path not in _WHICH_OWNERS:
+                and path not in _WHICH_OWNERS \
+                and not _names_another_tool(node):
             out.append(f"{rel}:{node.lineno} calls which(...)")
         elif isinstance(node, (ast.List, ast.Tuple)) and node.elts \
                 and isinstance(node.elts[0], ast.Constant) \
