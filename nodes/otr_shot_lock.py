@@ -41,6 +41,7 @@ log = logging.getLogger("OTR")
 from ._otr_shared import resolver as _resolver
 from ._otr_shared.role_compat import Role
 from ._otr_shared import role_slots as _role_slots
+from ._otr_shared.cast_picture_text import picture_description
 
 try:
     from ._otr_shared import env as otr_env
@@ -131,41 +132,12 @@ def _read_setting(meta: dict) -> str:
     return ", ".join(setting[:2]) if setting else _FALLBACK_SETTING
 
 
-#: Clauses in a cast description that NO picture model can render.
-#:
-#: The writer authors one character description that serves several consumers,
-#: and casting deliberately asks it for a `Voice:` clause -- TTS needs a timbre.
-#: Every caller of `_appearance_for_char`, though, is a VIDEO or STILL prompt
-#: composer (8 sites across otr_shot_lock.py and otr_meta_brief_image_prompt.py,
-#: checked), and none of them can draw a voice.
-#:
-#: On the JOINT AUDIO-VIDEO lanes it is worse than dead weight. Those models
-#: read one prompt for picture AND sound, and the standing ruling is that voice
-#: and identity words never reach them because they get VOCALIZED. Measured on
-#: shipped ledgers before this fix: `Voice:` appeared in 18 of 20 joint-AV
-#: prompts (90%) -- e.g. a mime lane receiving "Voice: raspy, deliberate,
-#: punctuated by heavy breaths." Every one of those was the banned case.
-#:
-#: `Face:` and `Presence:` are deliberately KEPT. Presence is behaviour --
-#: "alert, scanning the room with restless, guarded intensity" -- which is
-#: exactly the kind of thing a video model can act on.
-_UNRENDERABLE_APPEARANCE_CLAUSE = re.compile(
-    r"\bVoice:\s*[^.]*(?:\.|$)", re.IGNORECASE)
-
-
-def _strip_unrenderable_appearance(text: str) -> str:
-    """Drop the clauses of a cast description a picture model cannot draw."""
-    if not text:
-        return text
-    cleaned = _UNRENDERABLE_APPEARANCE_CLAUSE.sub(" ", str(text))
-    return " ".join(cleaned.split()).strip(" ,")
-
-
 def _appearance_for_char(ledger: dict, char_id: str) -> str:
     """Appearance LOOKUP by char_id (alias-safe), never by display name.
 
-    Non-renderable clauses (see :data:`_UNRENDERABLE_APPEARANCE_CLAUSE`) are
-    removed: every consumer of this function draws a picture.
+    The ``Voice:`` clause is removed (``_otr_shared.cast_picture_text``):
+    every consumer of this function draws a picture. ``Presence:`` is kept --
+    these are video prompts, and behaviour is something a video model acts on.
     """
     if not char_id:
         return ""
@@ -192,7 +164,7 @@ def _appearance_for_char(ledger: dict, char_id: str) -> str:
     if not base:
         name = entry.get("name")
         base = str(name) if name else ""
-    base = _strip_unrenderable_appearance(base)
+    base = picture_description(base, still=False)
     # THE CAST ROW'S GENDER IS THE ONE SOURCE (PBUG-20261017-03, operator:
     # "we need it stamped in the ledger for accurate voice assignment and
     # stills, video prompting accuracy"). The stills already anchor on it;

@@ -36,6 +36,11 @@ try:
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared.route_freeze import RouteFreezeError as _RouteFreezeError
 
+try:
+    from ._otr_shared.cast_picture_text import picture_description
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared.cast_picture_text import picture_description  # type: ignore
+
 log = logging.getLogger("OTR")
 
 def _content_hash(obj) -> str:
@@ -77,9 +82,20 @@ def _appearance_for_char(cast: list, char_id: str) -> str:
     cid = str(char_id or "")
     for c in cast or []:
         if isinstance(c, dict) and str(c.get("char_id") or "") == cid:
-            return str(c.get("portrait_prompt") or c.get("appearance")
-                       or c.get("character_description") or "").strip()
+            return _row_picture_text(c)
     return ""
+
+
+def _row_picture_text(row) -> str:
+    """The cast row's description as a STILL may read it: the drawable lead,
+    face and detail, no ``Voice:``/``Presence:`` prose and no ``Label:``
+    prefixes, which FLUX 3 Klein letters into the picture (PBUG-20261018-03).
+    """
+    row = row or {}
+    return picture_description(
+        str(row.get("portrait_prompt") or row.get("appearance")
+            or row.get("character_description") or "").strip(),
+        still=True)
 
 
 _FEMALE_PROMPT_TERMS = frozenset({
@@ -1359,10 +1375,7 @@ def compose_image_prompt_fallback(meta: dict, char: dict, aspect: str = "portrai
     # (2026-06-10): this fallback is what actually runs whenever the LLM is
     # unavailable, and it read only the two empty keys -- every character got
     # the identical setting+anchor prompt -> ONE shared portrait.
-    appearance = str(
-        (char or {}).get("portrait_prompt") or (char or {}).get("appearance")
-        or (char or {}).get("character_description") or ""
-    ).strip()
+    appearance = _row_picture_text(char)
     setting = _read_setting(meta)
     parts = []
     if appearance:

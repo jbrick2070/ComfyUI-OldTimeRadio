@@ -17271,3 +17271,19 @@ not promote it to the Bug Bible on this evidence alone.
 - reviews: agy (gemini-4-argon-high) design call before code, recommending
   this combination; Sonnet QA on the pushed diff.
 - status: FIXED in code; live proof is the next 8 GB Klein leg.
+
+## PBUG-20261018-03 -- FLUX 3 Klein lettered a cast description's Voice/Presence lines
+- evidence: 8 GB rerun on 554ec6f6 (otr_8gb_still, storybook_engraving),
+  published `tide_choice_20261018_154201__sbke__stmo__fk3i__koko__orig__cg4e2__sa3_final.mp4`.
+  The atmosphere sentence (PBUG-20261018-02) is gone, but b002 and b005, both
+  RASHIDA VOLKOV, carry "Presence. ..." and "Voice: Warm ... each word a
+  carefully placed stone on a precarious path." painted in. 6 of 8 stills clean.
+- cause: the still path's appearance lookup in otr_meta_brief_image_prompt.py
+  (and its no-LLM portrait fallback) passed the cast description whole. The
+  video lookup in otr_shot_lock.py already dropped `Voice:`; the still path
+  never had that strip. The labelled sentences ("Label: prose.") read as copy.
+- fix: one shared cleaner, nodes/_otr_shared/cast_picture_text.py. Every picture
+  prompt drops `Voice:`; a still also drops `Presence:` and every `Label:`
+  prefix, keeping the age/role lead, face and distinctive detail. Video keeps
+  Presence (behaviour a video model acts on), byte-identical to before.
+- status: FIXED in code; live proof is the next 8 GB Klein leg.

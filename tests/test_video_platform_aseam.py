@@ -23,6 +23,7 @@ import pytest
 from nodes._otr_shared import engine_registry_base as base  # noqa: F401
 from nodes._otr_shared import role_compat as rc
 from nodes._otr_shared import resolver as rs
+from nodes._otr_shared.cast_picture_text import picture_description
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import schemas as sc
 # (lean-mean order 5, 2026-08-23) OTR_VideoProbe is retired; the two shells
@@ -416,17 +417,18 @@ def test_a_voice_clause_never_reaches_a_picture_model():
             "heavy-lidded eyes with deep shadows. Presence: alert, scanning "
             "the room with restless, guarded intensity. Voice: raspy, "
             "deliberate, punctuated by heavy breaths.")
-    out = sl._strip_unrenderable_appearance(real)
+    out = picture_description(real, still=False)
     assert "Voice:" not in out and "raspy" not in out
     assert "Face:" in out and "high cheekbones" in out
     assert "Presence:" in out and "scanning the room" in out
     # A voice clause in the MIDDLE must not swallow what follows it.
-    mid = sl._strip_unrenderable_appearance(
-        "Face: sharp. Voice: low and gravelly. Presence: still and watchful.")
+    mid = picture_description(
+        "Face: sharp. Voice: low and gravelly. Presence: still and watchful.",
+        still=False)
     assert mid == "Face: sharp. Presence: still and watchful."
     # Absent / empty are no-ops, not crashes.
-    assert sl._strip_unrenderable_appearance("Face: sharp.") == "Face: sharp."
-    assert sl._strip_unrenderable_appearance("") == ""
+    assert picture_description("Face: sharp.", still=False) == "Face: sharp."
+    assert picture_description("", still=False) == ""
 
 
 def test_the_appearance_lookup_applies_the_strip():
