@@ -17198,3 +17198,23 @@ not promote it to the Bug Bible on this evidence alone.
   Every cast row binary, every face matches its row and voice. (s1b's captions
   show two ledger_clean "unclean" stage directions; not spoken -- ledger_clean
   owner's area.)
+
+## PBUG-20260817-07 -- measured on the 8 GB writer, 2026-10-17; the rulings stand
+- measured: on the last three 8 GB legs (Gemma 4 E2B writer; x1c and x1d
+  signal_lost_the_thirtyyear_echo_20261017_013200 / _075651, and the
+  casting session's s1b signal_lost_unspooling_the_thread_20261017_165212),
+  16 of the 17 rows that shipped `unclean_spoken_text` were scoped ONLY to a
+  bracketed direction ("(voice cracking) No. I see the lamp...", "(Sound of a
+  heavy tape spool being carefully unspooled) Flimsy or not, Walter, ...").
+  The right repair for each is the empty replacement; the small writer
+  answers with the whole line or an echo, the doubled-speech guards refuse
+  it (correctly), and the row ships flagged with the direction in captions
+  and stills. The 17th (s1b b003) also carried a pattern false positive:
+  "says" inside reported speech ("it just says 'R-77-B'").
+- considered and DECLINED by the operator (2026-10-17): Python removing a
+  bracket-only span when the writer fails. It would chase exactly the
+  residue the 2026-08-17 ruling declines, and the 2026-08-05 ruling keeps the
+  raw line on purpose -- the caption easter egg, and the scene-still prompt
+  reads `lines[].text` as what was said (otr_meta_brief_image_prompt.py).
+  The voice never speaks it (clean_spoken_text at every engine, Kokoro since
+  12ff8485). Status unchanged: OPEN, WILL-NOT-FIX.
