@@ -242,11 +242,21 @@ def get_era_tail(meta: Any, profile: str = "full", *, style: Any) -> str:
     failure path degrades, fail-soft.
 
     ``profile="still"`` (still-spine ST-1): the TRIMMED tail for still-image
-    prompts -- atmosphere line + palette top-2 + lighting and atmosphere terms, capped at
-    ~120 chars on a word boundary. Stills carry their subject up front; the
-    full tail diet would push FLUX toward atmosphere soup. The per-episode
-    palette color (e.g. Mars = red) comes through HERE by design -- the
-    still profile trims the tail, never deletes it.
+    prompts -- palette top-2 + lighting and atmosphere terms, capped at ~120
+    chars on a word boundary. Stills carry their subject up front; the full
+    tail diet would push FLUX toward atmosphere soup. The per-episode palette
+    color (e.g. Mars = red) comes through HERE by design -- the still profile
+    trims the tail, never deletes it.
+
+    NO PROSE SENTENCE IN AN IMAGE TAIL (2026-10-18). ``still`` and
+    ``portrait`` carry TERMS only, never ``atmosphere_line``. FLUX 3 Klein's
+    Qwen3-VL encoder reads a whole sentence among visual tags as copy to
+    typeset, and at cfg 1.0 no negative can veto it: an 8 GB leg lettered
+    "The weight of the unknown rests heavily upon the surface before them",
+    misspelled, into two engraving stills. The sentence also spent most of
+    the 120-char budget and trimmed off the concrete lighting terms behind
+    it. The mood survives as the palette, lighting and atmosphere terms the
+    same brief writes. ``full`` keeps the sentence.
     """
     _era_default = style.era_tail
     atmosphere_line = ""
@@ -269,16 +279,15 @@ def get_era_tail(meta: Any, profile: str = "full", *, style: Any) -> str:
         # Portrait era tail: NEVER includes the episode's ambient colour
         # palette (which skews blue on sci-fi, red on period drama and bleeds
         # directly into every character face). Lighting terms (quality/mood,
-        # not palette colours) are safe and preserved (BUG-LOCAL-113).
+        # not palette colours) are safe and preserved (BUG-LOCAL-113). The
+        # atmosphere TERMS stand in for the retired atmosphere sentence.
         parts = []
-        if atmosphere_line:
-            parts.append(atmosphere_line)
         m2 = _meta(meta)
         terms2 = m2.get("story_brief_terms") or {}
         if isinstance(terms2, dict):
-            lighting = [str(t).strip() for t in (terms2.get("lighting") or [])
-                        if str(t).strip()]
-            parts.extend(lighting)
+            for key in ("lighting", "atmosphere"):
+                parts.extend(str(t).strip() for t in (terms2.get(key) or [])
+                             if str(t).strip())
         return ", ".join(parts) or _era_default
     if profile == "still":
         m = _meta(meta)
@@ -290,8 +299,6 @@ def get_era_tail(meta: Any, profile: str = "full", *, style: Any) -> str:
         atmosphere = [str(t).strip() for t in (terms.get("atmosphere") or [])
                       if str(t).strip()][:2]
         parts = []
-        if atmosphere_line:
-            parts.append(atmosphere_line)
         parts.extend(palette[:2])
         parts.extend(lighting)
         parts.extend(atmosphere)

@@ -17252,3 +17252,22 @@ not promote it to the Bug Bible on this evidence alone.
   diff on check-A/open-B, which this entry's commit closes. comfyui-darkroom's
   Flagged -> Active fix (utils/paths.py) was the recipe.
 - status: FIXED in code; awaiting the registry's re-scan of the next version.
+
+## PBUG-20261018-02 -- FLUX 3 Klein lettered the atmosphere sentence into stills
+- evidence: 8 GB leg on 218b7e2f (otr_8gb_still, storybook_engraving, Gemma 4
+  E2B), published `ice_crossing_20261018_144707__sbke__stmo__fk3i__koko__orig__cg4e2__sa3_final.mp4`.
+  Beats b002 and b003 carry "The weight of the unknown rests heavily upon the
+  surface before them" painted in as a misspelled caption ("heawlgn", "heavly").
+- cause: get_era_tail put the brief's whole atmosphere_line sentence first in
+  the still and portrait tails. Klein's Qwen3-VL encoder reads a sentence among
+  visual tags as copy to typeset, and the engraving pack asked for an
+  "illustrated plate" -- a printed page that carries a caption. Klein runs at
+  cfg 1.0, so the pack's negative "text, watermark" is inert (z_image_turbo
+  also runs at cfg 1.0; it was simply weaker at typesetting).
+- fix: the still and portrait tails carry terms only (palette, lighting,
+  atmosphere); the full tail keeps the sentence. storybook_engraving says
+  print/illustration/scene instead of plate. No positive "no lettering"
+  phrase was added: at cfg 1.0 a negated noun attends to the concept.
+- reviews: agy (gemini-4-argon-high) design call before code, recommending
+  this combination; Sonnet QA on the pushed diff.
+- status: FIXED in code; live proof is the next 8 GB Klein leg.

@@ -128,15 +128,31 @@ class TestEraTailProfiles:
 
     def test_still_profile_content(self):
         tail = helpers.get_era_tail(_meta_ok(), profile="still", style=_STYLE)
-        assert "thin red dust hangs in the dusk air" in tail
         assert "rust red" in tail and "burnt amber" in tail
         assert "steel grey" not in tail            # palette top-2 only
         assert "red dusk glow" in tail and "panel backlight" in tail
         assert "hard rim" not in tail              # lighting top-2 only
 
+    def test_image_tails_carry_no_prose_sentence(self):
+        """FLUX 3 Klein letters a whole sentence into the picture (2026-10-18),
+        so the still and portrait tails carry terms only. The full tail keeps
+        the sentence for the paths that are not an image prompt."""
+        meta = _meta_ok()
+        line = meta["atmosphere_line"]
+        for profile in ("still", "portrait"):
+            tail = helpers.get_era_tail(meta, profile=profile, style=_STYLE)
+            assert line not in tail, profile
+            assert "red dusk glow" in tail, profile   # mood rides the terms
+        assert line in helpers.get_era_tail(meta, "full", style=_STYLE)
+        for kind, role in (("scene_open", "music_visual"),
+                           ("portrait", "character_visual")):
+            p = helpers.compose_still_prompt(meta, kind=kind, role=role,
+                                             beat_id="b001")
+            assert line not in p, kind
+
     def test_still_profile_cap(self):
         meta = _meta_ok()
-        meta["atmosphere_line"] = "x" * 60 + " " + "y" * 80
+        meta["visual_palette"] = ["x" * 60, "y" * 80]
         tail = helpers.get_era_tail(meta, profile="still", style=_STYLE)
         assert len(tail) <= 120
         assert not tail.endswith(",")
@@ -160,7 +176,7 @@ class TestComposeStillPrompt:
         i_subj = p.find(subject)
         i_set = p.find("relay station, martian flats")
         i_frame = p.find(helpers.STILL_FRAMING_OPEN)
-        i_tail = p.find("thin red dust")
+        i_tail = p.find("rust red")
         i_style = p.find(_STYLE.positive_tail)
         assert -1 not in (i_subj, i_set, i_frame, i_tail, i_style)
         assert i_subj < i_set < i_frame < i_tail < i_style
@@ -1170,3 +1186,14 @@ class TestDeterministicComposerPathGuard:
                       STILL_FRAMING_PORTRAIT, STILL_FRAMING_SCENE_BEAT,
                       STILL_FRAMING_SCENE_CHARACTER):
             assert "/" not in const and "\\" not in const, const
+
+
+def test_engraving_pack_names_no_printed_plate():
+    """A storybook "plate" is an inset page with an engraved caption under it,
+    and FLUX 3 Klein drew one (2026-10-18). The engraving pack's prompt tails
+    say print or illustration instead."""
+    from nodes._otr_visual_styles import resolve_visual_style
+    pack = resolve_visual_style("storybook_engraving")
+    for field in ("positive_tail", "broadcast_tail", "era_tail",
+                  "radio_object_look", "still_word_title_mood_style"):
+        assert "plate" not in getattr(pack, field).lower(), field

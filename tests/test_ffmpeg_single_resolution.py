@@ -16,6 +16,7 @@ reader from looking. So the claim here is made by an AST walk over ``nodes/``:
 from __future__ import annotations
 
 import ast
+import os
 import pathlib
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -35,7 +36,7 @@ def _call_name(node: ast.Call) -> str:
     return ""
 
 
-_MEDIA_TOOLS = _BARE | {"ffprobe", "ffprobe.exe"}
+_MEDIA_STEMS = {"ffmpeg", "ffprobe"}
 
 
 def _names_another_tool(node: ast.Call) -> bool:
@@ -44,8 +45,12 @@ def _names_another_tool(node: ast.Call) -> bool:
     argument still counts -- it could hold "ffmpeg" -- so the ratchet keeps
     its teeth for every spelling that can reach the media tools."""
     arg = node.args[0] if node.args else None
-    return (isinstance(arg, ast.Constant) and isinstance(arg.value, str)
-            and arg.value.lower() not in _MEDIA_TOOLS)
+    if not (isinstance(arg, ast.Constant) and isinstance(arg.value, str)):
+        return False
+    # Compare the bare stem, so "/usr/bin/ffmpeg", "ffmpeg.cmd" and
+    # "ffmpeg " still count as the media tool.
+    stem = os.path.splitext(os.path.basename(arg.value.strip().lower()))[0]
+    return stem not in _MEDIA_STEMS
 
 
 def _offenders(path: pathlib.Path) -> list:
