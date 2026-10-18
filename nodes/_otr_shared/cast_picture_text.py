@@ -40,12 +40,19 @@ __all__ = ["picture_description"]
 #: The casting format's section headers. A header is recognised wherever it
 #: stands as a whole word before a colon; the format never uses these words
 #: with a colon in prose.
-_SECTION = re.compile(r"\b(Face|Distinctive\s+detail|Detail|Presence|Voice)\s*:\s*",
-                      re.IGNORECASE)
+_SECTION = re.compile(
+    r"\b(Face|Distinctive\s+detail|Detail|Presence|Demeanou?r|Manner|"
+    r"Voice\s+cue|Vocal\s+quality|Voice|Speech|Tone)\s*[:：]\s*",
+    re.IGNORECASE)
+#: Header words that mean the voice section, or the presence section, under
+#: another name (Sonnet QA on 04d1f6e2: the casting prompt asks for
+#: Voice/Presence, but a writer can drift). A full-width colon counts too.
+_VOICE_HEADERS = frozenset({"voice", "voice cue", "vocal quality", "speech", "tone"})
+_PRESENCE_HEADERS = frozenset({"presence", "demeanor", "demeanour", "manner"})
 #: Sub-labels some writers put inside the Face section. Stripped from a still
 #: only where they open a phrase (start, or after , ; .), so prose keeps them.
 _SUBLABEL = re.compile(
-    r"(^|[,;.]\s*)(?:Hair|Eyes|Build|Wardrobe|Clothing|Look|Appearance)\s*:\s*",
+    r"(^|[,;.]\s*)(?:Hair|Eyes|Build|Wardrobe|Clothing|Look|Appearance)\s*[:：]\s*",
     re.IGNORECASE)
 
 
@@ -74,7 +81,7 @@ def picture_description(text, *, still: bool) -> str:
         return ""
     kept = []
     for header, label, body in _sections(text):
-        if header == "voice" or (still and header == "presence"):
+        if header in _VOICE_HEADERS or (still and header in _PRESENCE_HEADERS):
             continue
         if still:
             kept.append(_SUBLABEL.sub(r"\1", body))

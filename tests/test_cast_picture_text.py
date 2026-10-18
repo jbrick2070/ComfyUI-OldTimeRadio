@@ -106,3 +106,17 @@ def test_the_char_scene_composer_reads_the_cleaned_description():
         assert "deep-set eyes" in p, kind
         for gone in ("Voice", "Presence", "Face:", "carefully placed stone"):
             assert gone not in p, (kind, gone)
+
+
+def test_off_format_voice_and_presence_headers_are_dropped_too():
+    """Sonnet QA on 04d1f6e2: a writer that drifts from Voice/Presence."""
+    for text in ("40s. Face：oval. Voice：warm low.",
+                 "Face: oval. Vocal quality: gravelly warm low.",
+                 "Face: oval. Voice cue: gravelly warm low.",
+                 "Face: oval. Speech: clipped warm low.",
+                 "Face: oval. Tone: warm low."):
+        out = picture_description(text, still=True)
+        assert "low" not in out and "oval" in out, text
+    for text in ("Face: oval. Demeanor: calm.", "Face: oval. Manner: calm."):
+        assert picture_description(text, still=True) == "oval.", text
+        assert "calm" in picture_description(text, still=False), text
