@@ -17187,3 +17187,14 @@ not promote it to the Bug Bible on this evidence alone.
   ShotLock does -- a row with no gender is unchanged. Residual: the anchor is
   skipped when the prompt already holds any gendered word, so a companion's
   "he" in a two-person scene can leave a female speaker unanchored.
+- live stills legs on 3d9d3812 (scene-still anchor; 7c0d0e2a only moves it
+  ahead of My Story's receipt): s1b media_archive RESULT SUCCESS 708 s, obs
+  thread_unspool_20261017_165212__pori__stmo__zimg__koko__marc__cg4e2__sa3_final.mp4
+  -- AYO OKAFOR female af_heart drawn as a woman in both beats; DUANE FLANDERS
+  and WALTER KANE male, drawn as men. s2b my_story "Ada, the keeper. Tom."
+  RESULT SUCCESS 1154 s, obs
+  voice_fog_20261017_170537__rfrc__stmo__zimg__koko__myst__cg4e2__sa3_final.mp4
+  -- Ada female af_alloy, a woman in every frame; Tom male am_santa, a man.
+  Every cast row binary, every face matches its row and voice. (s1b's captions
+  show two ledger_clean "unclean" stage directions; not spoken -- ledger_clean
+  owner's area.)
