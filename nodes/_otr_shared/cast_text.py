@@ -82,7 +82,8 @@ _NO_APPEARANCE = frozenset({
 _BODILESS_LEAD = re.compile(
     r"^(?:\d{1,2}0?s\s+(?:woman|man|person),\s*)?(?:(?:a|an|the)\s+)?"
     r"(?:no\s+(?:physical|visible)\s+(?:appearance|form|body)"
-    r"|(?:disembodied|bodiless)\s+(?:voice|presence|sound|entity)"
+    r"|(?:disembodied|bodiless|unseen|invisible)\s+"
+    r"(?:voice|presence|sound|entity|narrator|speaker)"
     r"|(?:just|only)\s+a\s+voice\b(?!\s+(?:like|of|actor))"
     r"|voice\s+(?:only|alone)"
     r"|heard,?\s+(?:but\s+)?not\s+seen)\b",

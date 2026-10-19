@@ -249,7 +249,8 @@ def test_bodiless_means_the_refusal_leads_the_appearance():
                   "no physical appearance, represented only by an auditory effect",
                   "A disembodied voice in the fog", "bodiless presence",
                   "40s woman, no physical form, only her voice",
-                  "heard but not seen, a cold draught"):
+                  "heard but not seen, a cold draught",
+                  "an unseen narrator", "Invisible voice", "an unseen presence"):
         assert CT.is_bodiless({"appearance": ghost}), ghost
 
 
