@@ -1541,7 +1541,10 @@ def _scene_source_context(meta, cast, lines, target, line, ledger_context=None):
     # review, 2026-10-18; PBUG-20261018-03).
     _DRAWABLE = ("name", "role", "gender", "age_band", "appearance")
     still_treatment = {**treatment, "cast": [
-        {k: row.get(k) for k in _DRAWABLE if k in row} for row in planned_cast]}
+        {**{k: row.get(k) for k in _DRAWABLE if k in row},
+         # "none"/"n/a" is no look at all; the still author gets nothing
+         "appearance": _CAST_TEXT.picture_appearance(row)}
+        for row in planned_cast]}
 
     def character_context(row):
         # Ledger rows do not retain all treatment casting fields. Join only a

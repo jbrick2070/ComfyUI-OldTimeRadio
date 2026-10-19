@@ -1369,7 +1369,9 @@ def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
         author, correction = captured
         target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
         scope, tail = scope_tail.split("\n\n", 1)
-        assert tail == "Write act %d now." % number
+        # The act prompt ends on the spoken-only rule (2026-10-18).
+        assert tail.startswith("Write act %d now." % number)
+        assert "nothing in parentheses or brackets" in tail
         expected = ending if is_last and ending.strip() else local
         assert target_area.endswith("\n- where it should leave the story: " + expected)
         assert ("NOT YET HEARD IN THIS STORY" in target_area) == bool(must_speak)

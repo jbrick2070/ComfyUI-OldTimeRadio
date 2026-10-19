@@ -801,8 +801,10 @@ def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
                 "%s\n\nTHIS ACT (act %d of %d):\n"
                 "- where: %s\n- what it accomplishes: %s\n- its beats: %s\n"
                 "- where it should leave the story: %s\nACT SCOPE: %s\n\n"
-                "Write act %d now."
-                % (json.dumps(treatment.model_dump(by_alias=True), ensure_ascii=False), cast_block, unheard,
+                "Write act %d now. Every line is only words spoken aloud -- no "
+                "stage directions, no delivery or sound notes, nothing in "
+                "parentheses or brackets."
+                % (json.dumps(_act_treatment_view(treatment), ensure_ascii=False), cast_block, unheard,
                    _prior_digest(prev, prev_plan), plan.n, len(treatment.acts),
                    plan.scene_setting or treatment.setting, plan.purpose,
                    "; ".join(plan.turns) or "as the story needs",
@@ -1116,6 +1118,18 @@ def _settle_cast_genders(treatment: "StoryTreatment",
             receipts.append({"name": member.name, "gender": member.gender,
                              "source": source, "model_gender": before})
     return receipts
+
+
+def _act_treatment_view(treatment: "StoryTreatment") -> dict:
+    """The treatment as the act writer sees it: without each cast member's
+    `timbre` -- a SOUND ("low, weathered") a text model can only obey with a
+    "(whispering)"-style note (agy review, 2026-10-18; "(Whispering) Tom..."
+    shipped from this pass). The register stays: that is word choice."""
+    view = treatment.model_dump(by_alias=True)
+    for member in view.get("cast") or []:
+        if isinstance(member, dict):
+            member.pop("timbre", None)
+    return view
 
 
 def voice_cue_of(member: "CastMember") -> str:

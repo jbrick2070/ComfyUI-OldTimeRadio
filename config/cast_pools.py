@@ -504,7 +504,7 @@ def pick_announcer(rng: random.Random) -> dict:
         # populate when the LLM call learns to pick params.
         "voice_params": None,
         "appearance": "Period radio announcer at a studio microphone",
-        "presence": "reads the science story and frames the drama between beats",
+        "presence": "at the studio desk, framing the drama between beats",
         # No gender in the cue: CastLock may re-cast the announcer voice by
         # episode seed, and the row's gender follows THAT voice (2026-10-18).
         "voice_cue": "measured period-radio announcer delivery",

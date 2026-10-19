@@ -2335,8 +2335,13 @@ def _repair_prompt(
                             f"something {speaker_label} says out loud, or any marked piece "
                             f"survives in any form that is not spoken words, fix the "
                             f"replacement.")
+        # This REPLACES the answer-format line above, so it must carry the
+        # spoken-only rule itself (agy review, 2026-10-18: the parentheses
+        # ban vanished on every span-scoped repair).
         parts[-1] = ("Return replacements as specified below; the full original row is context, "
-                     "not your output or an additional editing surface.")
+                     "not your output or an additional editing surface. A replacement is "
+                     "only spoken words -- no brackets or parentheses, no description of "
+                     "anyone doing anything.")
         parts += ["APPROVED ORIGINAL SPANS:", json.dumps(
             [span._asdict() for span in authorized_spans], ensure_ascii=False),
             "Return JSON with a replacements LIST, exactly one {span_id, replacement} per "

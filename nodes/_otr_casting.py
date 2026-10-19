@@ -486,7 +486,8 @@ def _build_user_prompt(
     parts.append(
         '{"appearance":"<as above>","presence":"<as above>",'
         '"voice_cue":"<as above>",'
-        '"speech_signature":"<spoken delivery note>"}'
+        '"speech_signature":"<word-choice and sentence-length habit, '
+        'never a vocal sound>"}'
     )
     return "\n".join(parts)
 

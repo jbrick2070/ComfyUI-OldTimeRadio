@@ -177,7 +177,6 @@ def repair_zero_coverage_cast(
             row.get("traits")
             or " ".join(p for p in (
                 _CAST_TEXT.field(row, "presence"),
-                _CAST_TEXT.field(row, "voice_cue"),
                 _CAST_TEXT.field(row, "appearance")) if p)
             or name
         )

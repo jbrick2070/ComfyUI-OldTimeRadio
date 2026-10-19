@@ -107,8 +107,8 @@ def test_the_readers_take_only_what_they_need():
     video = CT.video_text(row)
     assert "holds the line" in video and "gravel" not in video
     card = CT.card_text(row)
-    assert card == ("40s, the keeper, square jaw. Presence: holds the line. "
-                    "Voice: gravel and smoke.")
+    # No voice cue for the writing passes (agy review, 2026-10-18).
+    assert card == "40s, the keeper, square jaw. Presence: holds the line."
     assert video == "40s, the keeper, square jaw. holds the line"
     ids = CT.identity_fields(row)
     assert ids == {"appearance": "40s, the keeper, square jaw",
@@ -116,23 +116,24 @@ def test_the_readers_take_only_what_they_need():
                    "voice_cue": "gravel and smoke", "speech_signature": "terse"}
 
 
-def test_a_capped_card_keeps_presence_and_voice():
-    """Codex r1: an appearance-first cut lost presence entirely at 200."""
+def test_a_capped_card_keeps_presence_and_never_carries_voice():
+    """Codex r1: an appearance-first cut lost presence entirely at 200. The
+    voice cue never reaches a writing pass (agy review, 2026-10-18)."""
     row = {"appearance": "x " * 200, "presence": "carries the weight",
            "voice_cue": "dry and quick"}
     card = CT.card_text(row, cap=120)
     assert len(card) <= 120
     assert "Presence: carries the weight" in card
-    assert "Voice: dry and quick" in card
+    assert "dry and quick" not in card
 
 
 def test_a_field_too_long_to_fit_a_word_spends_no_budget():
-    """agy code review: an emptied field still charged its label's length."""
-    # At cap 20 the presence share cannot hold its own label, so presence is
-    # dropped whole -- and voice still gets the room it left.
-    row = {"appearance": "a", "presence": "carries the weight", "voice_cue": "dry"}
+    """agy code review: an emptied field still charged its label's length.
+    At cap 20 the presence share cannot hold its own label, so presence is
+    dropped whole and the card stays inside the cap."""
+    row = {"appearance": "a" * 30, "presence": "carries the weight"}
     card = CT.card_text(row, cap=20)
-    assert card == "a. Voice: dry."
+    assert "Presence" not in card and len(card) <= 20
 
 
 def test_the_prior_cast_echo_is_the_age_and_role_lead():

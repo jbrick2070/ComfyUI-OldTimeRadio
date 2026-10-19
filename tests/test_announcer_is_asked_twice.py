@@ -48,7 +48,7 @@ def test_a_bracketed_opening_is_handed_back_not_replaced():
 
     assert said.calls == 2, "the model must be asked again, not replaced"
     # It was TOLD what was wrong -- that is the whole point.
-    assert "brackets or braces" in said.prompts[1]
+    assert "brackets, braces or parentheses" in said.prompts[1]
     assert BRACKETED in said.prompts[1], "it must see its own bad line"
     # The model's second line ships. No Python prose anywhere.
     assert result.text == CLEAN

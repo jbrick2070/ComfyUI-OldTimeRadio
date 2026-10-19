@@ -342,7 +342,7 @@ def build_exchange_prompt(
         hidden = getattr(c, "hidden_pressure", "") if c else ""
         must_turn = bool(getattr(c, "must_turn", False)) if c else False
         intent = (slot.intent or "").strip()
-        parts = [f"  {slot.dialogue_slot_id} ({slot.speaker}):"]
+        parts = [f"  {slot.dialogue_slot_id} -- {slot.speaker}:"]
         if intent:
             parts.append(f"    beat intent: {intent}")
         if line_job:

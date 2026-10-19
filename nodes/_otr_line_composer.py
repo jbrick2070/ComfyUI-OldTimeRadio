@@ -448,7 +448,7 @@ def render_current_beat(outline_or_beats, current_beat_id: str) -> str:
     land).
 
     Returns:
-      "CURRENT BEAT\n  bNNN SPEAKER (mood): intent"
+      "CURRENT BEAT\n  bNNN SPEAKER: intent -- tone: mood"
         for character / announcer beats
       "CURRENT BEAT\n  bNNN [role]: intent"
         for music beats
@@ -536,7 +536,7 @@ def build_voice_card(cast_row) -> str:
     if not name:
         return ""
     if name == "ANNOUNCER" and not desc:
-        return "ANNOUNCER (omniscient narrator)"
+        return "ANNOUNCER -- omniscient narrator"
     bits: list[str] = []
     if gender:
         bits.append(gender)
@@ -549,8 +549,10 @@ def build_voice_card(cast_row) -> str:
     # whose model left it blank still pins a register.
     if has_sig:
         bits.append(f"speaks: {sig or 'plain spoken'}")
+    # "NAME -- a; b", never "NAME (a, b)": a parenthesised card beside the
+    # write slot is the shape of "(Whispering)" (agy review, 2026-10-18).
     if bits:
-        return f"{name} ({', '.join(bits)})"
+        return f"{name} -- {'; '.join(bits)}"
     return name
 
 
@@ -922,7 +924,7 @@ def _build_user_prompt(req: LineRequest) -> str:
             f"{_pron[0]}/{_pron[1]} pronouns for {req.speaker}. Do not "
             f"mis-gender or mis-title {req.speaker}."
         )
-    parts.append(f"Mood: {req.mood}.")
+    parts.append(f"Tone: {req.mood} -- carried by the words, never named.")
     parts.append(f"Beat: {req.intent}.")
     parts.append("Use the natural spoken length of this thought; do not pad or compress it to meet a count.")
     # Sprint 3 (2026-05-28): output constraint -- the anti-decorative
@@ -950,7 +952,7 @@ def _build_user_prompt(req: LineRequest) -> str:
         "Output ONLY the words the character says aloud. No stage "
         "directions, no delivery or sound notes, nothing in parentheses or "
         "brackets -- not before, after or inside the line. How it is said "
-        "-- a whisper, a sigh, a pause -- lives in the words themselves."
+        "lives in the words themselves."
     )
     if req.beat_turn:
         indirect += " The situation must be different after this line."
@@ -1177,10 +1179,10 @@ def clean_one_line(text: str) -> str:
 #: that the model is TOLD, not silently replaced.
 _ANNOUNCER_COMPLAINT = (
     "Your last line cannot be used: it came back empty or it contained "
-    "brackets or braces. A voice actor reads this line aloud exactly as "
-    "written, so [ ] { } are script apparatus and would be performed as "
-    "speech. Write the same opening again as plain spoken words -- no "
-    "brackets, no braces, no speaker label, no stage direction."
+    "brackets, braces or parentheses. A voice actor reads this line aloud "
+    "exactly as written, so they are script apparatus and would be performed "
+    "as speech. Write the same opening again as plain spoken words -- no "
+    "brackets, braces or parentheses, no speaker label, no stage direction."
 )
 
 
@@ -1352,7 +1354,7 @@ def validate_announcer_line(text: str) -> tuple[bool, str]:
     cleaned = clean_one_line(text)
     if not cleaned:
         return False, ""
-    if any(ch in cleaned for ch in "[]{}"):
+    if any(ch in cleaned for ch in "[]{}()"):
         return False, ""
     return True, cleaned
 
@@ -1684,7 +1686,7 @@ def validate_news_coda_bridge(text) -> tuple[bool, str]:
     cleaned = clean_one_line(text).rstrip(" :;,-")
     if not cleaned:
         return False, ""
-    if any(ch in cleaned for ch in "[]{}"):
+    if any(ch in cleaned for ch in "[]{}()"):
         return False, ""
     return True, cleaned
 

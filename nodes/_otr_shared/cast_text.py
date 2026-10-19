@@ -111,7 +111,13 @@ def video_text(row, *, cap: int = 0) -> str:
 
 def card_text(row, *, cap: int = 0) -> str:
     """The character for an LLM context pass:
-    ``"<appearance>. Presence: <presence>. Voice: <voice_cue>."``.
+    ``"<appearance>. Presence: <presence>."``.
+
+    NO VOICE CUE (agy review, 2026-10-18). A text model cannot make a line
+    sound husky; handed "Voice: husky whisper" beside the slot it writes, a
+    small model obeys with "(whispering)". ``voice_cue`` stays on the row for
+    traceability and is read by nothing that writes a line. The speech
+    register reaches the line writer as ``speech_signature`` -- word choice.
 
     ``cap`` (characters) budgets each field SEPARATELY -- an equal share of
     what is left, so a short field passes its spare on -- and a capped
@@ -119,8 +125,7 @@ def card_text(row, *, cap: int = 0) -> str:
     voice instead of losing them to a long appearance. A field that cannot fit
     a word is dropped whole and spends nothing."""
     labelled = [("", field(row, "appearance")),
-                ("Presence: ", field(row, "presence")),
-                ("Voice: ", field(row, "voice_cue"))]
+                ("Presence: ", field(row, "presence"))]
     labelled = [(label, text) for label, text in labelled if text]
     if not (cap and cap > 0):
         return " ".join(label + _sentence(text) for label, text in labelled)
