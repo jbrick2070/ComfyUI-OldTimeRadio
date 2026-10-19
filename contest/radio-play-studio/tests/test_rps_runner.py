@@ -7,8 +7,8 @@ import pytest
 
 from radio_play_studio.graph import ServerUnreachable
 from radio_play_studio.runner import (
-    EpisodeMissing, Studio, describe_failure, is_transient, make_client, normalize_event,
-    pick_episode_output, settle,
+    EpisodeMissing, ProgressClock, Studio, describe_failure, is_transient, load_timing, make_client,
+    normalize_event, pick_episode_output, settle, timing_path,
 )
 
 
@@ -304,3 +304,69 @@ def test_describe_failure_includes_node_detail_when_the_sdk_gives_it():
         error = "boom"
     assert describe_failure(E("failed")) == "E: failed (boom)"
     assert describe_failure(ValueError("x")) == "ValueError: x"
+
+
+class FakeClock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+
+def test_the_clock_has_nothing_to_say_without_a_history():
+    clock = ProgressClock({}, now=FakeClock())
+    assert not clock.calibrated
+
+
+def test_the_clock_weights_each_node_by_its_last_run_seconds():
+    # Last run: writer 600 s, video 3000 s, mux 400 s (4000 s in all).
+    t = FakeClock()
+    clock = ProgressClock({"1": 600, "92": 3000, "85": 400}, now=t)
+    clock.observe("1")
+    t.t = 300
+    assert clock.share() == pytest.approx(300 / 4000)
+    t.t = 600
+    clock.observe("92")              # writer finished: its full 600 s counts
+    t.t = 600 + 1500
+    assert clock.share() == pytest.approx((600 + 1500) / 4000)
+    assert clock.seconds_left() == pytest.approx(4000 - 2100)
+    t.t = 600 + 9000                 # far slower than last time: held under the node's share
+    assert clock.share() == pytest.approx((600 + 0.95 * 3000) / 4000)
+    clock.observe(None)
+    assert clock.timings() == {"1": 600, "92": 9000}
+
+
+def test_a_good_run_saves_its_times_and_the_next_run_reads_the_clock(settings, schemas):
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+
+    class Ticking:
+        t = 0.0
+
+        def __call__(self):
+            self.t += 10.0
+            return self.t
+
+    def job():
+        j = _good_job()
+        j._events = [RealProgress(value=1.0, nodes_done=1, nodes_total=1, current_node="1")] + list(j._events)
+        return j
+
+    first = list(Studio(settings, client_factory=lambda url: FakeClient(job()),
+                        fetch=lambda url: schemas, now=Ticking()).stream({}))
+    assert first[-1]["type"] == "done"
+    assert "minutes_left" not in [e for e in first if e["type"] == "progress"][0]
+    saved = timing_path(settings.out_dir, settings.workflow_path, "1")   # the fixture's act_count
+    assert load_timing(saved).get("1", 0) > 0
+
+    second = list(Studio(settings, client_factory=lambda url: FakeClient(job()),
+                         fetch=lambda url: schemas, now=Ticking()).stream({}))
+    calibrated = [e for e in second if e["type"] == "progress"]
+    assert calibrated and all("minutes_left" in e and 0.0 <= e["value"] <= 0.99 for e in calibrated)
+
+
+def test_a_failed_run_saves_no_times(settings, schemas):
+    studio, _ = _studio(settings, schemas, FakeJob([StatusChange("running")], [], fail=RuntimeError("boom")))
+    assert list(studio.stream({}))[-1]["type"] == "error"
+    assert not (settings.out_dir / "timing").exists()

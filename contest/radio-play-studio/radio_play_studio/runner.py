@@ -7,6 +7,7 @@ bridge address first: a missing setting must never turn into a cloud run.
 from __future__ import annotations
 
 import copy
+import json
 import os
 import time
 import uuid
@@ -14,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 
 from .config import Settings, validate_url
-from .form import EPISODE_NODE_TYPE, apply_choices, describe_form, locate_nodes
+from .form import EPISODE_NODE_TYPE, WRITER, apply_choices, describe_form, locate_nodes
 from .graph import fetch_object_info, load_workflow, workflow_to_api_prompt
 
 VIDEO_SUFFIXES = (".mp4", ".webm", ".mov", ".mkv")
@@ -131,10 +132,12 @@ class Studio:
     """One configured connection to a ComfyUI + the Old-Time Radio pack."""
 
     def __init__(self, settings: Settings, *, client_factory: Callable[[str], Any] = make_client,
-                 fetch: Callable[[str], dict] = fetch_object_info) -> None:
+                 fetch: Callable[[str], dict] = fetch_object_info,
+                 now: Callable[[], float] = time.monotonic) -> None:
         self.settings = settings
         self._client_factory = client_factory
         self._fetch = fetch
+        self._now = now
 
     def options(self) -> list:
         workflow = load_workflow(self.settings.workflow_path)
@@ -159,12 +162,21 @@ class Studio:
         last event, so the page and the command line show the same ending."""
         try:
             graph, node_ids = self.build_graph(choices)
+            acts = graph.get(node_ids.get(WRITER, ""), {}).get("inputs", {}).get("act_count", "default")
+            timing_file = timing_path(self.settings.out_dir, self.settings.workflow_path, acts)
+            clock = ProgressClock(load_timing(timing_file), now=self._now)
             client = self._client_factory(self.settings.api_url)
             job = client.submit(client.workflows.from_json(graph))
             yield {"type": "submitted"}
             try:
                 for event in job.events():
                     note = normalize_event(event, len(graph))
+                    if note and note["type"] in ("progress", "step"):
+                        clock.observe(getattr(event, "current_node", None))
+                        if clock.calibrated:
+                            note = {"type": "progress", "value": clock.share(),
+                                    "message": note.get("message", ""),
+                                    "minutes_left": round(clock.seconds_left() / 60.0)}
                     if note:
                         yield note
             except Exception as exc:  # noqa: BLE001 - the stream is a view, settle() is the truth
@@ -177,10 +189,100 @@ class Studio:
             out.to_file(str(dest))
             if not dest.is_file() or dest.stat().st_size == 0:
                 raise EpisodeMissing(f"the episode was not saved to {dest}")
+            clock.observe(None)
+            if clock.timings():
+                save_timing(timing_file, clock.timings())
         except Exception as exc:  # noqa: BLE001 - reported to the person, not swallowed
             yield {"type": "error", "message": describe_failure(exc)}
             return
         yield {"type": "done", "path": str(dest), "run": dest_dir.name, "file": dest.name}
+
+
+class ProgressClock:
+    """The episode's share done, by this machine's own clock.
+
+    Counting nodes cannot track time: on the first live 16 GB run one node of 22
+    (the video render) took most of the hour, so a node-count bar sat near 80%
+    for it. The clock times each node while comfy-api-proxy names it as running,
+    and once a run has succeeded those times are the weights: the bar is the
+    finished nodes' last-run seconds plus the running node's elapsed seconds
+    (held under its last-run length) over the last-run total. Without a history
+    it has nothing to say and the caller keeps the node count.
+
+    Nodes too quick to be named between two throttled frames are never timed;
+    they took about no time, so they weigh about nothing."""
+
+    #: A node running longer than last time stops short of its full share.
+    RUNNING_CAP = 0.95
+
+    def __init__(self, history: dict | None = None, now: Callable[[], float] = time.monotonic) -> None:
+        self.history = {}
+        for node, seconds in (history or {}).items():
+            if isinstance(seconds, (int, float)) and seconds > 0:
+                self.history[str(node)] = float(seconds)
+        self.total = sum(self.history.values())
+        self._now = now
+        self.current: str | None = None
+        self._since = 0.0
+        self.spent: dict = {}
+        self.finished: set = set()
+
+    @property
+    def calibrated(self) -> bool:
+        return self.total > 0
+
+    def observe(self, node_id: Any) -> None:
+        """The node the server says is running now (None between nodes)."""
+        node = None if node_id is None else str(node_id)
+        if node == self.current:
+            return
+        now = self._now()
+        if self.current is not None:
+            self.spent[self.current] = self.spent.get(self.current, 0.0) + now - self._since
+            self.finished.add(self.current)
+        self.current, self._since = node, now
+        if node is not None:
+            self.finished.discard(node)
+
+    def share(self) -> float:
+        done = sum(self.history.get(n, 0.0) for n in self.finished)
+        running = 0.0
+        if self.current is not None:
+            expected = self.history.get(self.current, 0.0)
+            elapsed = self.spent.get(self.current, 0.0) + self._now() - self._since
+            running = min(elapsed, self.RUNNING_CAP * expected)
+        return max(0.0, min(0.99, (done + running) / self.total))
+
+    def seconds_left(self) -> float:
+        return max(0.0, self.total * (1.0 - self.share()))
+
+    def timings(self) -> dict:
+        """Seconds each named node ran, the running one up to now."""
+        out = dict(self.spent)
+        if self.current is not None:
+            out[self.current] = out.get(self.current, 0.0) + self._now() - self._since
+        return out
+
+
+def timing_path(out_dir: Path, workflow_path: Path, acts: Any) -> Path:
+    """Where this machine's node times for one workflow and act count are kept.
+    The act count is in the key because a three-act play renders about three
+    times the beats of a one-act one."""
+    return Path(out_dir) / "timing" / f"{Path(workflow_path).stem}.acts-{acts}.json"
+
+
+def load_timing(path: Path) -> dict:
+    try:
+        nodes = json.loads(Path(path).read_text(encoding="utf-8")).get("nodes", {})
+    except (OSError, ValueError, AttributeError):
+        return {}
+    return nodes if isinstance(nodes, dict) else {}
+
+
+def save_timing(path: Path, nodes: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = {"nodes": {k: round(v, 1) for k, v in nodes.items()}, "total_s": round(sum(nodes.values()), 1)}
+    path.write_text(json.dumps(body, indent=1) + "\n", encoding="utf-8")
 
 
 def describe_failure(exc: BaseException) -> str:
