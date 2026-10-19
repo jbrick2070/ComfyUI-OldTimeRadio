@@ -133,9 +133,52 @@ def _strip_trailing_commas(blob: str) -> str:
     return "".join(out)
 
 
+def _collapse_doubled_key_quotes(blob: str) -> str:
+    """Drop the stray quote in ``,""presence":`` and ``{""appearance":``.
+
+    Gemma 4 12B wrote the casting reply's second key with two opening
+    quotes on every attempt of a live 16 GB render (2026-10-19, the FOOL in
+    Twelfth Night), so the retry ladder could not get past it. An empty
+    string followed straight by a letter or underscore is never valid JSON,
+    so this only touches text strict JSON already rejects, and only where a
+    key is expected (after ``{`` or ``,``). A real empty key (``"":``) and an
+    empty value (``""}``) are left alone.
+    """
+    out: list[str] = []
+    in_string = False
+    escape = False
+    i = 0
+    n = len(blob)
+    while i < n:
+        ch = blob[i]
+        if in_string:
+            out.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if ch == '"':
+            after = blob[i + 2] if i + 2 < n else ""
+            if blob.startswith('""', i) and (after.isalpha() or after == "_"):
+                prev = next((c for c in reversed(out) if c not in " \t\r\n"), None)
+                if prev in ("{", ","):
+                    i += 1  # the second quote opens the key
+                    continue
+            in_string = True
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _repair_llm_json(blob: str) -> str:
-    """Apply the two Gemma JSON defects that strict ``raw_decode`` rejects."""
-    return _strip_trailing_commas(_escape_raw_controls_in_strings(blob))
+    """Apply the three Gemma JSON defects that strict ``raw_decode`` rejects."""
+    return _strip_trailing_commas(
+        _collapse_doubled_key_quotes(_escape_raw_controls_in_strings(blob))
+    )
 
 
 #: How the repair writes a raw control character it finds inside a string.
@@ -145,8 +188,9 @@ _ESCAPED_CONTROLS = {"\n": "\\n", "\r": "\\r", "\t": "\\t"}
 def _origin_of(repaired: str, original: str) -> "list | None":
     """For each index of ``repaired``, and its end, the index in ``original``
     it came from. The repair only writes a raw control character in a string
-    as its escape and drops a trailing comma, so the two align greedily; None
-    if they ever do not (a repair this does not know about)."""
+    as its escape, drops a trailing comma and drops a doubled key quote, so
+    the two align greedily; None if they ever do not (a repair this does not
+    know about)."""
     origin: list = []
     i = j = 0
     while j < len(repaired):
@@ -163,7 +207,7 @@ def _origin_of(repaired: str, original: str) -> "list | None":
                 i += 1
                 j += len(escaped)
                 continue
-            if ch == ",":
+            if ch in ',"':
                 i += 1
                 continue
         return None

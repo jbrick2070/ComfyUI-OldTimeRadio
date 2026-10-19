@@ -78,6 +78,34 @@ def test_trailing_comma_before_closing_brace_parses():
     assert parsed["lines"][0]["speaker"] == "Stomp"
 
 
+def test_doubled_quote_before_a_key_parses():
+    # Live Gemma 4 12B casting reply, 2026-10-19 (all three ladder attempts).
+    raw = ('{"appearance":"40s man, weary household steward, heavy square jaw",'
+           '""presence":"Shoulders hunched forward","voice_cue":"dry, slow",'
+           '"speech_signature":"short sentences"}')
+    parsed = OJ.parse_first_json_object(raw)
+    assert parsed["presence"] == "Shoulders hunched forward"
+    assert parsed["voice_cue"] == "dry, slow"
+    assert OJ.parse_first_json_object('{""appearance":"a man"}') == {"appearance": "a man"}
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ('{"a": "", "b": 1}', {"a": "", "b": 1}),
+    ('{"a": ["", "x"]}', {"a": ["", "x"]}),
+    ('{"a": "say \\"\\"hi"}', {"a": 'say ""hi'}),
+])
+def test_valid_empty_strings_are_untouched_by_the_key_quote_repair(raw, expected):
+    assert OJ._collapse_doubled_key_quotes(raw) == raw
+    assert OJ.parse_first_json_object(raw) == expected
+
+
+def test_doubled_quote_in_value_position_stays_a_syntax_miss():
+    # After a colon there is no key to rescue; inventing the value's text is not
+    # the repair's job.
+    with pytest.raises(json.JSONDecodeError):
+        OJ.parse_first_json_object('{"a": ""b"}')
+
+
 def test_fence_preamble_plus_raw_newline_together_parse():
     body = (
         "Here is the repaired act:\n"
