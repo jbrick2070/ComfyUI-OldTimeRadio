@@ -162,7 +162,7 @@ class TestComposedDelta:
 # --------------------------------------------------------------------------- #
 def _cast():
     return [{"char_id": "c01",
-             "character_description": "a weathered inspector in an oilskin coat"}]
+             "appearance": "a weathered inspector in an oilskin coat"}]
 
 
 def _lines():

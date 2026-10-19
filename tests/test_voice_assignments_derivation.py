@@ -47,7 +47,7 @@ def test_voice_assignments_excludes_announcer():
 
 
 def test_voice_assignments_no_notes_field():
-    """Sprint 6.2 retired the notes field. character_description lives
+    """Sprint 6.2 retired the notes field. appearance lives
     on visual_plan.characters[name].portrait_prompt only."""
     led = {
         "cast": [
@@ -55,7 +55,7 @@ def test_voice_assignments_no_notes_field():
                 "char_id": "c01",
                 "name": "LEMMY",
                 "voice_preset": "v2/en_speaker_8",
-                "character_description": "Worn space-trucker, baritone",
+                "appearance": "Worn space-trucker, baritone",
             },
         ],
     }

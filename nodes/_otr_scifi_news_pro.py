@@ -19,6 +19,11 @@ UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 """
 from __future__ import annotations
 
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 import hashlib
 import json
 import logging
@@ -408,7 +413,11 @@ class Treatment(BaseModel):
 class CastVoice(BaseModel):
     name: str
     role: str
-    character_description: str
+    # THE CHARACTER IN THREE FIELDS (2026-10-18), the split every source bank
+    # writes. `appearance` is only what the portrait artist sees; the row's
+    # `presence` comes from `pressure` and its `voice_cue` from `register`,
+    # which this pass already writes -- one source per field, never two.
+    appearance: str
     gender: Literal["male", "female"]
     age_band: Literal["20s", "30s", "40s", "50s", "60s", "n/a"] = "n/a"
 
@@ -1999,7 +2008,7 @@ def _cameo_prompt_clause(decision) -> str:
     return (
         f"RECURRING CAMEO -- this episode includes {LEMMY_NAME}, and he must be "
         f"one of the cast shapes, spelled exactly {LEMMY_NAME}.\n"
-        f"He is: {_POOLS.LEMMY_PROFILE['character_description']}\n"
+        f"He is: {_CAST_TEXT.card_text(_POOLS.LEMMY_PROFILE)}\n"
         f"Give him a real reason to be in THIS story -- his own want and his own "
         f"pressure, like any other character. He is a small part, not the lead.\n"
     )
@@ -3926,7 +3935,7 @@ def _make_casting_rungs(menu: VoiceMenu, speakers: "list[str]"):
                 return False
             used.add(pick)
             rows.append({
-                "name": name, "role": "", "character_description": "",
+                "name": name, "role": "", "appearance": "",
                 "gender": tag, "timbre": pick, "register": "",
                 "want": "", "pressure": "",
             })
@@ -4308,8 +4317,9 @@ def _assign_voices(casting: CastingVoices, menu: VoiceMenu,
             rows.append({
                 "char_id": f"c{i + 2:02d}",
                 "name": LEMMY_NAME,
-                "character_description":
-                    _POOLS.LEMMY_PROFILE["character_description"],
+                "appearance": _POOLS.LEMMY_PROFILE["appearance"],
+                "presence": _POOLS.LEMMY_PROFILE["presence"],
+                "voice_cue": _POOLS.LEMMY_PROFILE["voice_cue"],
                 "gender": _POOLS.LEMMY_PROFILE["gender"],
                 "tts_model": "bark",
                 "voice_preset": _POOLS.LEMMY_PROFILE["voice_preset"],
@@ -4332,7 +4342,9 @@ def _assign_voices(casting: CastingVoices, menu: VoiceMenu,
         rows.append({
             "char_id": f"c{i + 2:02d}",
             "name": cv.name,
-            "character_description": cv.character_description,
+            "appearance": cv.appearance,
+            "presence": cv.pressure,
+            "voice_cue": cv.register,
             "gender": cv.gender,
             "tts_model": "",
             "voice_preset": "",
@@ -5575,10 +5587,6 @@ def run_scifi_news_pro_episode(
                 "role": "",
                 "age_band": "",
                 "speech_signature": signature,
-                "description_digest": hashlib.sha1(
-                    str(lemmy_row.get("character_description") or "")
-                    .encode("utf-8")
-                ).hexdigest()[:12],
             }
     delivery = _OTRWD.stamp_actual(
         led.data, stage="scifi_news_pro_assembled"

@@ -28,6 +28,11 @@ Pure, deterministic, stdlib + repo modules only.
 """
 from __future__ import annotations
 
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 import logging
 import random
 import re
@@ -217,7 +222,7 @@ def clamp_cast_rows(rows: Sequence[MutableMapping]) -> "list[dict]":
         others = [n for j, n in enumerate(names) if j != i]
         g, source = settle_binary_gender(
             names[i], str(row.get("role") or ""),
-            str(row.get("character_description") or ""), others)
+            " ".join(_CAST_TEXT.identity_fields(row).values()), others)
         row["gender"] = g
         receipts.append({"char_id": str(row.get("char_id") or ""),
                          "name": names[i], "gender": g, "source": source,

@@ -40,7 +40,7 @@ def _golden() -> dict:
 
 def _stub(messages, *, temperature, max_new_tokens):  # noqa: ARG001
     return json.dumps({
-        "character_description":
+        "appearance":
             "A steady, weathered field operator who keeps the crew grounded.",
     })
 

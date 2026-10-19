@@ -41,7 +41,7 @@ log = logging.getLogger("OTR")
 from ._otr_shared import resolver as _resolver
 from ._otr_shared.role_compat import Role
 from ._otr_shared import role_slots as _role_slots
-from ._otr_shared.cast_picture_text import picture_description
+from ._otr_shared import cast_text as _CAST_TEXT
 
 try:
     from ._otr_shared import env as otr_env
@@ -135,9 +135,10 @@ def _read_setting(meta: dict) -> str:
 def _appearance_for_char(ledger: dict, char_id: str) -> str:
     """Appearance LOOKUP by char_id (alias-safe), never by display name.
 
-    The ``Voice:`` clause is removed (``_otr_shared.cast_picture_text``):
-    every consumer of this function draws a picture. ``Presence:`` is kept --
-    these are video prompts, and behaviour is something a video model acts on.
+    Appearance then presence (``_otr_shared.cast_text.video_text``): every
+    consumer of this function is a video prompt, and behaviour is something a
+    video model acts on. ``voice_cue`` never reaches it -- joint audio-video
+    models vocalize what they read.
     """
     if not char_id:
         return ""
@@ -151,20 +152,12 @@ def _appearance_for_char(ledger: dict, char_id: str) -> str:
             if isinstance(c, dict) and str(c.get("char_id") or "") == str(char_id):
                 entry = c
                 break
-    # character_description added 2026-06-10 (operator look-QA): the writer's
-    # RICH per-character physical description lives under that key on the
-    # cast row; without it the M4 prompts lost the character grounding.
-    base = ""
-    for key in ("portrait_prompt", "appearance", "description",
-                "character_description"):
-        val = entry.get(key)
-        if isinstance(val, str) and val.strip():
-            base = val.strip()
-            break
+    # The writer's per-character description (operator look-QA 2026-06-10:
+    # without it the M4 prompts lost the character grounding).
+    base = _CAST_TEXT.video_text(entry)
     if not base:
         name = entry.get("name")
         base = str(name) if name else ""
-    base = picture_description(base, still=False)
     # THE CAST ROW'S GENDER IS THE ONE SOURCE (PBUG-20261017-03, operator:
     # "we need it stamped in the ledger for accurate voice assignment and
     # stills, video prompting accuracy"). The stills already anchor on it;

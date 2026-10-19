@@ -2428,7 +2428,7 @@ def identity_leaks_in(positive, *, appearance="", names=()):
     THE MODEL SPEAKS WHAT IT READS. On the mime and foley lanes the
     picture and the audio decode from ONE latent, so the positive prompt is
     also an audio script -- proven live 2026-08-28, where a mime beat rendered
-    a woman SAYING "Queen of the Fairies" because her `character_description`
+    a woman SAYING "Queen of the Fairies" because her character description
     opened with that title. Identity belongs in the conditioning STILL, whose
     scene_character row already mints the face unobstructed.
 
@@ -2671,7 +2671,7 @@ def _ltx25_parts(inputs, *, include_appearance=True):
     exists for exactly one reason (2026-08-28, proven on a published episode):
     on the JOINT-AV lanes the picture and the audio decode from ONE latent, so
     the prompt is also an audio script, and the model SPEAKS the proper nouns
-    in it. `character_description` opens with a title -- "30s, Queen of the
+    in it. A character's appearance opens with a title -- "30s, Queen of the
     Fairies", "40s, rustic weaver" -- and a mime beat rendered a woman saying
     "Queen of the Fairies" aloud. Identity is already carried by the
     conditioning STILL, whose scene_character row mints the face unobstructed,
@@ -2835,7 +2835,7 @@ def compose_ltx25_mime(self, inputs):
 
     NO IDENTITY WALL, for the same reason as its foley sibling -- this lane
     rendered a woman saying "Queen of the Fairies" out loud because her
-    `character_description` began with that title. See ``_ltx25_joint_av_core``.
+    appearance began with that title. See ``_ltx25_joint_av_core``.
 
     **NOT an audio-in lane either.** The performance carries the beat with no
     speech at all, so the action reads larger than its siblings and lands on a

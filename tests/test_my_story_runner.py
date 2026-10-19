@@ -63,7 +63,7 @@ def _treatment(acts=1, cast=("Ada", "Tom")):
         "setting": "a rock lighthouse",
         "time_of_day": "midnight",
         "cast": [
-            {"name": n, "role": "lead", "character_description": "%s, at the light" % n,
+            {"name": n, "role": "lead", "appearance": "%s, at the light" % n,
              "gender": "female" if n == "Ada" else "male",
              "age_band": "30s", "register": "plain", "timbre": "warm"}
             for n in cast
@@ -687,7 +687,7 @@ def test_story_treatment_accepts_padded_cast_and_acts_keys_via_parse():
         "time_of_day": body["time_of_day"],
         "cast ": [
             {"name ": row["name"], "role": row["role"],
-             "character_description": row["character_description"],
+             "appearance": row["appearance"],
              "gender": row["gender"], "age_band": row["age_band"],
              "register ": row["register"], "timbre": row["timbre"]}
             for row in body["cast"]

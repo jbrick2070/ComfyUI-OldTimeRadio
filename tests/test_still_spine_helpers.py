@@ -189,21 +189,27 @@ class TestComposeStillPrompt:
     def test_portrait_no_no_text_clause(self):
         p = helpers.compose_still_prompt(
             _meta_ok(), kind="portrait",
-            char_entry={"portrait_prompt": "a weathered radio engineer"})
+            char_entry={"appearance": "a weathered radio engineer"})
         assert not p.endswith(helpers.NO_TEXT_CLAUSE)
 
     def test_portrait_leads_with_character(self):
         p = helpers.compose_still_prompt(
             _meta_ok(), kind="portrait",
-            char_entry={"portrait_prompt": "a weathered engineer, kind eyes"})
+            char_entry={"appearance": "a weathered engineer, kind eyes"})
         assert p.startswith("a weathered engineer, kind eyes")
         assert helpers.STILL_FRAMING_PORTRAIT in p
 
-    def test_portrait_key_chain(self):
-        for key in ("portrait_prompt", "appearance", "character_description"):
+    def test_portrait_reads_appearance_only(self):
+        """The character is three fields (2026-10-18); a still reads only
+        `appearance`. The retired keys are not read."""
+        p = helpers.compose_still_prompt(
+            _meta_ok(), kind="portrait", char_entry={"appearance": "marker-xyz"})
+        assert p.startswith("marker-xyz")
+        for key in ("portrait_prompt", "character_description", "presence",
+                    "voice_cue"):
             p = helpers.compose_still_prompt(
                 _meta_ok(), kind="portrait", char_entry={key: "marker-xyz"})
-            assert p.startswith("marker-xyz"), key
+            assert "marker-xyz" not in p, key
 
     def test_never_empty_on_bare_meta(self):
         for kind in ("scene_open", "scene_beat", "portrait"):
@@ -234,7 +240,7 @@ class TestComposeStillPrompt:
         (a person, not a radio set) -- the restore touches scene stills only."""
         p = helpers.compose_still_prompt(
             _meta_ok(), kind="portrait",
-            char_entry={"portrait_prompt": "a weathered engineer"})
+            char_entry={"appearance": "a weathered engineer"})
         assert _STYLE.broadcast_tail not in p
         assert _STYLE.image_grade_tail not in p
 
@@ -246,7 +252,7 @@ class TestComposeStillPrompt:
         p = helpers.compose_still_prompt(
             _meta_ok(), kind="scene_character", role="character_video",
             beat_id="b002",
-            char_entry={"portrait_prompt": "a weathered engineer, kind eyes"})
+            char_entry={"appearance": "a weathered engineer, kind eyes"})
         assert p.startswith("a weathered engineer, kind eyes")
         assert helpers.STILL_FRAMING_SCENE_CHARACTER in p
         assert helpers.STILL_FRAMING_PORTRAIT not in p
@@ -264,12 +270,12 @@ class TestComposeStillPrompt:
         assert "vintage radio set" not in p
 
     def test_scene_character_key_chain_and_fallback(self):
-        # leads with any of the three character keys; bare entry -> a person, never
+        # leads with the appearance field; bare entry -> a person, never
         # empty / never a radio set.
-        for key in ("portrait_prompt", "appearance", "character_description"):
-            p = helpers.compose_still_prompt(
-                _meta_ok(), kind="scene_character", char_entry={key: "marker-xyz"})
-            assert p.startswith("marker-xyz"), key
+        p = helpers.compose_still_prompt(
+            _meta_ok(), kind="scene_character",
+            char_entry={"appearance": "marker-xyz"})
+        assert p.startswith("marker-xyz")
         bare = helpers.compose_still_prompt(_meta_ok(), kind="scene_character")
         assert bare and "character" in bare.lower()
 
@@ -308,7 +314,7 @@ class TestComposeStillPrompt:
         kind on a different branch and still needs its character legible, and the
         portrait branch is untouched. If a future tidy-up hoists the cabinet
         wording onto these, this is what names it."""
-        char = {"portrait_prompt": "a weathered engineer, kind eyes"}
+        char = {"appearance": "a weathered engineer, kind eyes"}
         for kind in ("scene_character", "portrait"):
             p = helpers.compose_still_prompt(
                 _meta_ok(), kind=kind, role="character_video",
@@ -595,7 +601,7 @@ class TestSceneStillObjects:
 
     def test_payload_versioned_and_portraits_migrated(self):
         from nodes import otr_meta_brief_image_prompt as mbp
-        cast = [{"char_id": "c01", "portrait_prompt": "a stocky engineer"}]
+        cast = [{"char_id": "c01", "appearance": "a stocky engineer"}]
         payload, _w = mbp.derive_image_prompts(
             cast, _meta_ok(), llm_fn=None, lines=_lines_timed())
         assert payload["version"] == 1

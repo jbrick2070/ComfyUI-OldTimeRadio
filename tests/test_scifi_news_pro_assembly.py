@@ -77,17 +77,17 @@ _CAST_ROWS = [
     {"char_id": "c01", "name": "ANNOUNCER", "gender": "female",
      "tts_model": "kokoro", "voice_preset": "bf_lily",
      "voice_params": None,
-     "character_description": "Period radio announcer."},
+     "appearance": "Period radio announcer."},
     {"char_id": "c02", "name": "VERA", "gender": "female",
      "tts_model": "bark", "voice_preset": "v2/en_speaker_9",
      "voice_params": None,
-     "character_description": (
+     "appearance": (
          "Mid-forties, wind-burned, one pencil behind the ear, taps the "
          "barometer twice before speaking.")},
     {"char_id": "c03", "name": "DOKU", "gender": "male",
      "tts_model": "bark", "voice_preset": "v2/en_speaker_6",
      "voice_params": None,
-     "character_description": (
+     "appearance": (
          "Broad-shouldered liaison in a mended coat, keeps a pocket "
          "ledger, folds every argument into a story.")},
 ]
@@ -418,7 +418,7 @@ def test_speaker_set_gate_fails_loud(tmp_path):
 # writer-stage contract this lane must match excludes them, so they are
 # absent here.
 _LEGACY_CAST_KEYS = frozenset({
-    "char_id", "character_description", "gender", "line_count", "name",
+    "char_id", "appearance", "presence", "voice_cue", "gender", "line_count", "name",
     "tts_model", "voice_params", "voice_preset", "word_count"})
 _LEGACY_LINE_KEYS = frozenset({
     "arc_phase", "bark_wav_path", "beat_id", "beat_intent", "boundary",

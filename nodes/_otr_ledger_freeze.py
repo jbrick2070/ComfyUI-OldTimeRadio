@@ -489,11 +489,13 @@ def _check_per_cast_invariants(
             )
         # traits / voice_preset are WARN-only -- some retro test
         # fixtures populate only the minimum cast row shape.
-        traits = row.get("traits") or row.get("character_description")
-        if traits is None:
+        traits = row.get("traits") or row.get("appearance")
+        # set_cast writes "" (never None) for a field a producer left empty,
+        # so an empty string must warn too (agy code review, 2026-10-18).
+        if not traits:
             warnings.append(
                 f"cast[{idx}] (char_id={char_id!r}) has no traits/"
-                f"character_description"
+                f"appearance"
             )
         elif not isinstance(traits, (str, list)):
             errors.append(

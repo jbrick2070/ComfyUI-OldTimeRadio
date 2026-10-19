@@ -36,7 +36,7 @@ from nodes import _otr_casting as _OTRC  # noqa: E402
 
 def _lock():
     def fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
-        return '{"character_description": "a voice on the wire"}'
+        return '{"appearance": "a voice on the wire"}'
 
     _cast, meta = _OTRC.lock_cast(
         creative_fn=fn, num_characters=2, news_seed="x", style="open",

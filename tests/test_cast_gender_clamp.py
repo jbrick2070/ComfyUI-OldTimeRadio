@@ -104,10 +104,10 @@ def test_set_cast_stamps_binary_and_records_the_clamp(tmp_path):
     led = PL.Ledger(episode_id="ep_clamp", out_dir=str(tmp_path))
     caller_rows = [
         {"char_id": "c01", "name": "ANNOUNCER", "gender": "male",
-         "character_description": "", "tts_model": "kokoro",
+         "appearance": "", "tts_model": "kokoro",
          "voice_preset": "bm_george"},
         {"char_id": "c02", "name": "QUINN STONE", "gender": "other",
-         "character_description": "A pilot.", "tts_model": "",
+         "appearance": "A pilot.", "tts_model": "",
          "voice_preset": ""},
     ]
     led.set_cast(caller_rows)
@@ -121,7 +121,7 @@ def test_set_cast_stamps_binary_and_records_the_clamp(tmp_path):
 def test_a_binary_cast_leaves_no_clamp_receipt(tmp_path):
     led = PL.Ledger(episode_id="ep_clean", out_dir=str(tmp_path))
     led.set_cast([{"char_id": "c02", "name": "ADA", "gender": "female",
-                   "character_description": "", "tts_model": "",
+                   "appearance": "", "tts_model": "",
                    "voice_preset": ""}])
     assert "gender_clamp" not in (led.data.get("meta") or {})
 
@@ -130,7 +130,7 @@ def test_a_binary_cast_leaves_no_clamp_receipt(tmp_path):
 # the producers: no lane deals "other" any more
 # --------------------------------------------------------------------------- #
 def _stub(messages, *, temperature, max_new_tokens):  # noqa: ARG001
-    return json.dumps({"character_description": "A steady field operator."})
+    return json.dumps({"appearance": "A steady field operator."})
 
 
 def test_the_legacy_caster_never_deals_other():
@@ -170,9 +170,9 @@ def test_a_clamped_row_reaches_still_and_video_prompts_as_a_man_or_woman():
     from nodes import otr_shot_lock as SL
 
     rows = [{"char_id": "c02", "name": "MRS. QUINN", "gender": "other",
-             "character_description": "A pilot in a flight jacket."}]
+             "appearance": "A pilot in a flight jacket."}]
     CG.clamp_cast_rows(rows)
-    still = IMG._ensure_gender_anchor(rows[0]["character_description"], rows[0])
+    still = IMG._ensure_gender_anchor(rows[0]["appearance"], rows[0])
     video = SL._appearance_for_char({"cast": rows}, "c02")
     assert still.startswith("adult woman, ")
     assert video.startswith("adult woman, ")
@@ -236,7 +236,7 @@ def test_rank_and_role_words_are_not_known_characters(word):
 def test_juliet_on_any_lane_ends_female_in_the_ledger(tmp_path):
     led = PL.Ledger(episode_id="ep_juliet", out_dir=str(tmp_path))
     led.set_cast([{"char_id": "c02", "name": "JULIET", "gender": "",
-                   "character_description": "", "tts_model": "",
+                   "appearance": "", "tts_model": "",
                    "voice_preset": ""}])
     assert led.data["cast"][0]["gender"] == "female"
 
@@ -273,7 +273,7 @@ def test_the_index_reads_the_first_word_unless_an_honorific_leads():
 # gender, and only the portrait path anchored. Now both do.
 # --------------------------------------------------------------------------- #
 _WENDY = {"char_id": "c03", "name": "WENDY BOUVIER", "gender": "female",
-          "character_description": (
+          "appearance": (
               "40s, foil. Face: angular, sharp cheekbones, narrowed, assessing "
               "eyes beneath a tightly drawn brow, a thin, downturned mouth, "
               "severe close-cropped grey hair")}

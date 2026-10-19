@@ -242,7 +242,7 @@ def _canned(responses):
 
 def _desc(n):
     import json
-    return [json.dumps({"character_description":
+    return [json.dumps({"appearance":
                         "Sharp-eyed scientist, 30s, anxious about the data."})
             for _ in range(n)]
 

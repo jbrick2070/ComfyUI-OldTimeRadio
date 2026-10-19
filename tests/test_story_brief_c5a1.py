@@ -83,9 +83,9 @@ def _mk_ledger(num_lines: int = 6, with_period: str | None = None) -> dict:
     return {
         "cast": [
             {"char_id": "JONES", "name": "Jones",
-             "character_description": f"Tall detective.{desc_extra}"},
+             "appearance": f"Tall detective.{desc_extra}"},
             {"char_id": "SMITH", "name": "Smith",
-             "character_description": "Quiet suspect, sweating."},
+             "appearance": "Quiet suspect, sweating."},
         ],
         "lines": lines,
         "meta":  {"episode_title": "The Bulkhead Closes",

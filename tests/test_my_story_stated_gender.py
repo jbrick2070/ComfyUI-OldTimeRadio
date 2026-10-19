@@ -100,7 +100,7 @@ def test_a_marker_that_fits_two_people_pins_neither():
 # --------------------------------------------------------------------------- #
 def _member(name, gender="", role="", description=""):
     return MS.CastMember(name=name, gender=gender, role=role,
-                         character_description=description)
+                         appearance=description)
 
 
 # The exact rows the live leg's treatment returned.
@@ -256,7 +256,7 @@ class _LiveAda(Slots):
             live = {"Ada": _LIVE_ADA, "Tom": _LIVE_TOM}
             for c in t["cast"]:
                 c["gender"] = ""
-                c["character_description"] = live[c["name"]]["description"]
+                c["appearance"] = live[c["name"]]["description"]
             return json.dumps(t)
         return super()._answer(messages)
 
@@ -268,8 +268,8 @@ def test_the_live_ada_case_stamps_a_female_row_that_stills_and_video_read():
     led, _ = _run(_LiveAda(), characters="Ada, the keeper. Tom.")
     ada = next(r for r in led.data["cast"] if r["name"] == "Ada")
     assert ada["gender"] == "female"
-    assert "unstated" not in ada["character_description"].lower()
-    assert "the sound she hears" in ada["character_description"]
+    assert "unstated" not in ada["appearance"].lower()
+    assert "the sound she hears" in ada["appearance"]
     # the treatment receipt the still prompts fall back to agrees with the row
     planned = {c["name"]: c["gender"]
                for c in led.data["meta"]["my_story"]["treatment"]["cast"]}
@@ -278,7 +278,7 @@ def test_the_live_ada_case_stamps_a_female_row_that_stills_and_video_read():
     assert SL._appearance_for_char(led.data, ada["char_id"]).startswith(
         "adult woman, ")
     # stills: the portrait prompt anchors on the same row
-    assert IMG._ensure_gender_anchor(ada["character_description"], ada) \
+    assert IMG._ensure_gender_anchor(ada["appearance"], ada) \
         .startswith("adult woman, ")
 
 
@@ -314,9 +314,9 @@ def test_evidence_about_someone_else_never_decides(role, description, others):
 
 def test_a_description_without_the_stale_note_is_left_byte_identical():
     t = _live_treatment()
-    t.cast[1].character_description = "A calm   voice."
+    t.cast[1].appearance = "A calm   voice."
     MS._settle_cast_genders(t, {})
-    assert t.cast[1].character_description == "A calm   voice."
+    assert t.cast[1].appearance == "A calm   voice."
 
 
 # --------------------------------------------------------------------------- #

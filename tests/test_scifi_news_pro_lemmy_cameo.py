@@ -62,7 +62,7 @@ def test_the_prompt_names_him_on_a_hit_and_says_nothing_on_a_miss():
     clause = PRO._cameo_prompt_clause(_hit())
 
     assert PRO.LEMMY_NAME in clause
-    assert POOLS.LEMMY_PROFILE["character_description"] in clause
+    assert POOLS.LEMMY_PROFILE["appearance"] in clause
     assert PRO._cameo_prompt_clause(_miss()) == ""
     assert PRO._cameo_prompt_clause(None) == ""
 
@@ -156,7 +156,7 @@ def test_the_menu_withholds_his_preset_so_nobody_else_draws_it():
 
 def _casting(*names):
     return PRO.CastingVoices(cast=[
-        PRO.CastVoice(name=n, role="r", character_description="d",
+        PRO.CastVoice(name=n, role="r", appearance="d",
                       gender="female", timbre=f"m{i + 1:02d}")
         for i, n in enumerate(names)
     ])
@@ -174,11 +174,33 @@ def test_the_cameo_row_is_synthesized_from_the_profile_not_the_casting_llm():
     lemmy = next(r for r in rows if PRO._is_lemmy(r["name"]))
     assert lemmy["voice_preset"] == _LEMMY_PRESET
     assert lemmy["gender"] == POOLS.LEMMY_PROFILE["gender"]
-    assert lemmy["character_description"] == \
-        POOLS.LEMMY_PROFILE["character_description"]
+    assert lemmy["appearance"] == \
+        POOLS.LEMMY_PROFILE["appearance"]
     # He keeps his real position in the script, which is what makes the
     # assembly gate (speaker set == cast rows) hold by construction.
     assert [r["name"] for r in rows] == ["ANNOUNCER", "SARAH", PRO.LEMMY_NAME]
+
+
+def test_house_rows_split_appearance_presence_and_voice_cue():
+    """THE CHARACTER IN THREE FIELDS (2026-10-18), the same split every bank
+    writes: appearance from the casting pass, presence from its `pressure`,
+    voice_cue from its performed `register` -- one source per field. LEMMY
+    keeps the hand-split profile, accent in voice_cue."""
+    menu = PRO._deal_voice_menu(1, taken={_LEMMY_PRESET})
+    casting = PRO.CastingVoices(cast=[PRO.CastVoice(
+        name="SARAH", role="pilot", appearance="40s, cropped grey hair",
+        gender="female", timbre="m01", register="clipped, dry",
+        pressure="the board wants her grounded")])
+    rows = PRO._assign_voices(casting, menu, random.Random(7),
+                              ["SARAH", "LEMMY"], _hit())
+    sarah = next(r for r in rows if r["name"] == "SARAH")
+    assert (sarah["appearance"], sarah["presence"], sarah["voice_cue"]) == (
+        "40s, cropped grey hair", "the board wants her grounded", "clipped, dry")
+    lemmy = next(r for r in rows if PRO._is_lemmy(r["name"]))
+    assert (lemmy["presence"], lemmy["voice_cue"]) == (
+        POOLS.LEMMY_PROFILE["presence"], POOLS.LEMMY_PROFILE["voice_cue"])
+    for row in rows:
+        assert "character_description" not in row
 
 
 def test_no_two_characters_share_a_voice_on_a_cameo_episode():

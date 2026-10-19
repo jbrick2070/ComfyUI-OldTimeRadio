@@ -344,9 +344,9 @@ def _mk_ledger() -> dict:
     return {
         "cast": [
             {"char_id": "JONES", "name": "Jones",
-             "character_description": "Tall detective."},
+             "appearance": "Tall detective."},
             {"char_id": "SMITH", "name": "Smith",
-             "character_description": "Quiet suspect."},
+             "appearance": "Quiet suspect."},
         ],
         "lines": [
             {"speaker_role": "scene", "text": "=== SCENE 1 ==="},

@@ -27,7 +27,7 @@ _GOLDEN = pathlib.Path(__file__).resolve().parent / "golden" / "cast_pool_baseli
 def _stub_description(messages, *, temperature, max_new_tokens):  # noqa: ARG001
     # cast_one_character -> llm_write_description; this step draws NO cast rng,
     # so the stubbed LLM does not perturb the voice-assignment sequence.
-    return json.dumps({"character_description": "a steady, weathered operator"})
+    return json.dumps({"appearance": "a steady, weathered operator"})
 
 
 def _writer_voices(cast):

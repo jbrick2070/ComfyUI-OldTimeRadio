@@ -287,10 +287,10 @@ def test_no_hardcoded_image_engine_name(clean_image_registry):
 
 def test_meta_brief_appearance_by_char_id():
     assert mbp._appearance_for_char(
-        [{"char_id": "c1", "name": "BABA", "portrait_prompt": "unique-token"}], "c1"
+        [{"char_id": "c1", "name": "BABA", "appearance": "unique-token"}], "c1"
     ) == "unique-token"
     assert mbp._appearance_for_char(
-        [{"char_id": "c1", "name": "BABA", "portrait_prompt": "unique-token"}], "BABA"
+        [{"char_id": "c1", "name": "BABA", "appearance": "unique-token"}], "BABA"
     ) == ""   # never by display name
 
 
@@ -302,7 +302,7 @@ def test_meta_brief_all_visualizers_bypass_prompt_authoring():
         raise AssertionError("all-visualizer run must not author image prompts")
 
     payload, warnings = mbp.derive_image_prompts(
-        [{"char_id": "c1", "name": "BABA", "portrait_prompt": "weathered spacer"}],
+        [{"char_id": "c1", "name": "BABA", "appearance": "weathered spacer"}],
         {"story_brief_terms": {"setting": ["orbital station"]}},
         llm_fn=must_not_run,
         video_models=_complete_video_models(character="viz_camera"),
@@ -320,7 +320,7 @@ def test_meta_brief_node_bypasses_before_writer_resolution(monkeypatch):
     )
     script = json.dumps({
         "meta": {"story_brief_terms": {"setting": ["orbital station"]}},
-        "cast": [{"char_id": "c1", "name": "BABA", "portrait_prompt": "weathered spacer"}],
+        "cast": [{"char_id": "c1", "name": "BABA", "appearance": "weathered spacer"}],
         "lines": [],
     })
     payload_json, report = mbp.OTRMetaBriefImagePromptGen().generate(
@@ -338,7 +338,7 @@ def test_meta_brief_mixed_policy_authors_only_proven_consumer_roles():
         return "weathered spacer in the orbital station, face visible"
 
     payload, _warnings = mbp.derive_image_prompts(
-        [{"char_id": "c1", "name": "BABA", "portrait_prompt": "weathered spacer"}],
+        [{"char_id": "c1", "name": "BABA", "appearance": "weathered spacer"}],
         {"story_brief_terms": {"setting": ["orbital station"]}},
         llm_fn=writer,
         lines=[

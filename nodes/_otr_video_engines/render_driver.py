@@ -3693,7 +3693,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
 
         # THE MODEL SPEAKS WHAT IT READS (2026-08-28, proven on a published
         # episode: a mime beat said "Queen of the Fairies" aloud because that
-        # was the opening of her character_description). The two formatters no
+        # was the opening of her character description). The two formatters no
         # longer pass appearance through, so this guard exists for every OTHER
         # path -- a setting naming a character's bower, a motion clause
         # carrying a name, an operator override, a future formatter. It

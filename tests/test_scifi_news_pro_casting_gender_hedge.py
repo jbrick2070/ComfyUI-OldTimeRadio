@@ -60,7 +60,7 @@ def _menu():
 def _payload(gender, timbre="v1"):
     return json.dumps({"cast": [{
         "name": "Dr. Chen", "role": "lead",
-        "character_description": "a tired physicist",
+        "appearance": "a tired physicist",
         "gender": gender, "timbre": timbre,
     }]})
 
@@ -84,7 +84,7 @@ def _gender_error(gender, timbre="v1") -> ValidationError:
 ])
 def test_a_correct_answer_in_a_refused_spelling_is_accepted(raw, expected):
     row = F2.CastVoice(
-        name="X", role="r", character_description="d",
+        name="X", role="r", appearance="d",
         gender=raw, timbre="v1",
     )
     assert row.gender == expected
@@ -97,7 +97,7 @@ def test_a_genuine_hedge_is_NOT_silently_resolved_at_rung_1(hedge):
     would never run. A hedge must still fail here."""
     with pytest.raises(ValidationError):
         F2.CastVoice(
-            name="X", role="r", character_description="d",
+            name="X", role="r", appearance="d",
             gender=hedge, timbre="v1",
         )
 
@@ -211,7 +211,7 @@ def _mixed_menu():
 def _named_payload(name, gender, timbre):
     return json.dumps({"cast": [{
         "name": name, "role": "lead",
-        "character_description": "a tired physicist",
+        "appearance": "a tired physicist",
         "gender": gender, "timbre": timbre,
     }]})
 
@@ -324,7 +324,7 @@ _COVERAGE_ERROR = PostValidationError(
 
 def _one_row(name="Dr. Domitilla Del Vecchio", gender="female", timbre="f1"):
     return {"cast": [{"name": name, "role": "r",
-                      "character_description": "d",
+                      "appearance": "d",
                       "gender": gender, "timbre": timbre}]}
 
 
@@ -411,7 +411,7 @@ def test_a_row_naming_nobody_in_the_sealed_script_is_dropped():
     repair = F2._make_casting_repair(_stocked_menu(), speakers)
     payload = _one_row()
     payload["cast"].append({"name": "Dr. Michael Elowitz", "role": "r",
-                            "character_description": "d",
+                            "appearance": "d",
                             "gender": "male", "timbre": "m1"})
 
     fixed = repair(json.dumps(payload), _COVERAGE_ERROR)

@@ -499,8 +499,7 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     constraint stills must carry; portraits never need it).
 
     ``kind``: ``"portrait"`` leads with the character's own description
-    (``portrait_prompt`` -> ``appearance`` -> ``character_description`` on
-    ``char_entry``); ``"scene_character"`` (BUG 1, 2026-06-20) ALSO leads with
+    (its ``appearance`` field, via ``_otr_shared.cast_text.still_text``); ``"scene_character"`` (BUG 1, 2026-06-20) ALSO leads with
     the character description but composes a WIDE 16:9 medium shot (the landscape
     still-only character beat -- still_flat/still_pan/the video engines) and DROPS the
     radio-booth tail; every other scene kind (``scene_open`` / ``scene_beat``)
@@ -523,13 +522,10 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
         # and no "Label:" prefixes, which FLUX 3 Klein letters into the
         # picture (PBUG-20261018-03).
         try:
-            from ._otr_shared.cast_picture_text import picture_description
+            from ._otr_shared.cast_text import still_text
         except ImportError:  # pragma: no cover -- flat test imports
-            from _otr_shared.cast_picture_text import picture_description  # type: ignore
-        subject = picture_description(
-            str(ce.get("portrait_prompt") or ce.get("appearance")
-                or ce.get("character_description") or "").strip(),
-            still=True)
+            from _otr_shared.cast_text import still_text  # type: ignore
+        subject = still_text(ce)
         # (separator sanitize now happens once on the COMPOSED string below,
         # so `setting` and any other authored field is covered too)
         if not subject:

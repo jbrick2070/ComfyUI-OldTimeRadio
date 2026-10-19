@@ -2,7 +2,7 @@ r"""
 nodes/_otr_casting.py -- cast contract caller (PROSE-PLANE).
 
 Plane assignment: PROSE (Content LLM). The cast row carries an
-audience-facing field (character_description) written by the same
+audience-facing fields (appearance / presence / voice_cue) written by the same
 model that writes dialogue, polishes title, and generates visual
 prompts. Voice-pool validation and ensemble balance are Python
 concerns; they are NOT a reason to route casting to the structural
@@ -50,7 +50,6 @@ cross-model safety net. See
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 import random
 from dataclasses import dataclass, replace
@@ -121,6 +120,12 @@ try:
 except ImportError:  # pragma: no cover - standalone / test load
     import _otr_name_authority as _NAMES  # type: ignore
 
+# The one reader of a cast row's character fields (2026-10-18).
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 # CastPlanner (S4) + Pass-1 validator (S7). Only consulted on the llm_slot_fill
 # path; pool mode never imports-uses them at runtime.
 try:
@@ -182,24 +187,46 @@ class DescriptionResponse(BaseModel):
     # _format_prior_entry already trims the echoed description to 60 chars,
     # so the stored length never touches prompt budget. Local Mistral's
     # short descriptions are unaffected.
-    character_description: str = Field(..., min_length=1)
+    # THE CHARACTER IN THREE FIELDS (operator, 2026-10-18: "clean split for
+    # traceability"). One labelled string had to be regex-split by every
+    # picture consumer, and FLUX 3 Klein lettered its Voice/Presence sentences
+    # into stills (PBUG-20261018-03). `_otr_shared/cast_text.py` is the one
+    # reader. `appearance` is what can be DRAWN and is required; `presence`
+    # and `voice_cue` may come back empty and are backfilled by lock_cast.
+    appearance: str = Field(..., min_length=1)
+    presence: str = ""
+    voice_cue: str = ""
     # F5 (story-engine v1): a <=5-word speech register/signature ("clipped,
     # formal", "warm, rambling") the line composer threads into the cast card
     # so each character reads as a distinct voice. Optional (default "") so a
     # model that omits it never fails the schema; backfilled downstream.
     speech_signature: str = ""
 
-    @field_validator("character_description")
+    @field_validator("presence", "voice_cue", "speech_signature", mode="before")
     @classmethod
-    def _strip_desc(cls, v: str) -> str:
+    def _null_is_empty(cls, v):
+        # A model that writes null for an optional field answered "none";
+        # that must not burn a retry (agy code review, 2026-10-18).
+        return "" if v is None else v
+
+    @field_validator("appearance", "presence", "voice_cue")
+    @classmethod
+    def _strip_text(cls, v: str) -> str:
         return v.strip()
+
+    @field_validator("appearance")
+    @classmethod
+    def _appearance_not_blank(cls, v: str) -> str:
+        if not v:
+            raise ValueError("appearance must describe what can be drawn")
+        return v
 
 
 class CastingResponse(BaseModel):
     """Assembled casting result for one open character.
 
     Sprint 3D: this is not a raw LLM-response shape. The LLM produces
-    only `character_description` (see DescriptionResponse);
+    only the character text (see DescriptionResponse);
     `gender` is decided by precompute_ensemble_slots and `voice_preset`
     by python_assign_voice_preset, both pure Python. cast_one_character
     composes the three stages and returns this combined object so the
@@ -212,7 +239,9 @@ class CastingResponse(BaseModel):
     construction.
     """
 
-    character_description: str = Field(..., min_length=1)
+    appearance: str = Field(..., min_length=1)
+    presence: str = ""
+    voice_cue: str = ""
     gender: str = Field(..., min_length=1)
     # F5 (story-engine v1): speech register/signature, assembled from the
     # description call. Optional (default "") -> backfilled to "plain spoken".
@@ -234,9 +263,9 @@ class CastingResponse(BaseModel):
             )
         return v_norm
 
-    @field_validator("character_description")
+    @field_validator("appearance", "presence", "voice_cue")
     @classmethod
-    def _strip_desc(cls, v: str) -> str:
+    def _strip_text(cls, v: str) -> str:
         return v.strip()
 
     @field_validator("voice_preset")
@@ -339,7 +368,8 @@ def _build_user_prompt(
       - BOB   (M, weary doctor, 40s, dry humor)
 
       JSON only:
-      {"character_description":"<vivid, 1-2 sentences>"}
+      {"appearance":"...","presence":"...","voice_cue":"...",
+       "speech_signature":"..."}
 
     The Gender / Voice / Role lines are emitted only when the caller
     supplies them; legacy callers and tests that pass none still get a
@@ -395,28 +425,28 @@ def _build_user_prompt(
             parts.append(f"- {_format_prior_entry(c)}")
 
     # Sprint 9 (Narrative Face): CHARACTER VISUAL CONTRACT block.
-    # The casting LLM's output is the single source of truth for BOTH
-    # voice-cast prose AND FLUX portrait composition (the writer K.5
-    # copies character_description verbatim into
-    # meta.visual_plan.characters[NAME].portrait_prompt). For FLUX to
-    # paint visually distinct faces, the description has to carry
-    # concrete facial geometry instead of mood adjectives. The
-    # CONTRACT below tells the LLM *how* to compose; the JSON template
-    # shows the format it must fit. Explicit rules survive model
-    # swaps better than examples alone.
+    # The casting LLM's output feeds the portrait AND the writing passes.
+    # Since 2026-10-18 it comes back as THREE fields (appearance / presence /
+    # voice_cue) instead of one labelled string: the picture readers take
+    # only `appearance`, so the face must carry concrete geometry, and voice
+    # or mood words there would be painted (PBUG-20261018-03). The CONTRACT
+    # tells the LLM *how* to compose; the JSON template shows the shape.
     parts.append("")
     parts.append("CHARACTER VISUAL CONTRACT:")
     parts.append(
-        "Write one compact character_description that serves both "
-        "audio and portrait generation."
+        "Write this character as three separate fields."
     )
     parts.append("")
     parts.append(
-        'Format: "<age decade>, <story-linked role>. Face: <face '
-        'shape>, <eyes/brow>, <nose/mouth/jaw>, <hair/hairline>, '
-        '<one distinctive story-linked detail>. Presence: <how the '
-        'character carries the episode pressure>. Voice: <radio-'
-        'performance cue>."'
+        'appearance: "<age decade>, <story-linked role>, <face shape>, '
+        '<eyes/brow>, <nose/mouth/jaw>, <hair/hairline>, <one '
+        'distinctive story-linked detail>" -- only what a painter can see.'
+    )
+    parts.append(
+        'presence: how the character carries the episode pressure.'
+    )
+    parts.append(
+        'voice_cue: a radio-performance cue for how they sound.'
     )
     parts.append("")
     parts.append("Rules:")
@@ -440,13 +470,18 @@ def _build_user_prompt(
         "stock-photo language."
     )
     parts.append(
+        "- appearance holds no labels, no voice and no mood words: "
+        "nothing that cannot be drawn."
+    )
+    parts.append(
         "- Also give a brief speech_signature naming how this character "
         "talks. This is generation guidance, not an acceptance score."
     )
     parts.append("")
     parts.append("JSON only:")
     parts.append(
-        '{"character_description":"<as above>",'
+        '{"appearance":"<as above>","presence":"<as above>",'
+        '"voice_cue":"<as above>",'
         '"speech_signature":"<spoken delivery note>"}'
     )
     return "\n".join(parts)
@@ -472,7 +507,14 @@ def _format_prior_entry(row: dict) -> str:
     name = (row.get("name") or "?").upper()
     g = (row.get("gender") or "?").lower()
     g_short = "M" if g == "male" else "F" if g == "female" else "X"
-    desc = (row.get("character_description") or "").strip()
+    desc = _CAST_TEXT.field(row, "appearance")
+    # The echo is the AGE + ROLE lead, not the face: the appearance format is
+    # "<age decade>, <story-linked role>, <face>, ..." (2026-10-18), so the
+    # first two comma parts are that lead. A hand-written row with a period
+    # inside them keeps the sentence trim below.
+    _parts = [p.strip() for p in desc.split(",")]
+    if len(_parts) > 2 and "." not in ", ".join(_parts[:2]):
+        desc = ", ".join(_parts[:2])
     # Sprint 9: smart trim. Within the same 120-char cap (lean prompt
     # discipline -- the lead sentence of the CONTRACT format target is
     # ~30-60 chars), prefer trimming at the first period so the echo
@@ -525,8 +567,8 @@ _ROLE_VOCAB: tuple[str, ...] = (
 
 # Sprint 9 (Narrative Face): story-causal face-pressure anchors keyed
 # off the same _ROLE_VOCAB Python already rotates across the ensemble.
-# Each entry is a phrase the LLM weaves into the FACE block of the
-# character_description -- a structural anchor that does not depend on
+# Each entry is a phrase the LLM weaves into the face part of the
+# appearance field -- a structural anchor that does not depend on
 # the LLM faithfully following the CHARACTER VISUAL CONTRACT rules
 # alone. The pattern matches the existing Python-decides /
 # LLM-writes-prose split (gender / timbre / role rotation): Python
@@ -820,7 +862,7 @@ def llm_write_description(
     prior_cast: List[dict],
     max_attempts: int = 3,
     base_temperature: float = 0.7,
-    max_new_tokens: int = 250,
+    max_new_tokens: int = 400,
     casting_brief: str = "",
 ) -> DescriptionResponse:
     """Stage 2: the LLM writes ONLY the prose description for one slot.
@@ -1062,7 +1104,7 @@ def cast_one_character(
     available_voices: List[tuple[str, str]],
     max_attempts: int = 3,
     base_temperature: float = 0.7,
-    max_new_tokens: int = 250,
+    max_new_tokens: int = 400,
     casting_brief: str = "",
     ensemble_slot: Optional[EnsembleSlot] = None,
     rng: Optional[random.Random] = None,
@@ -1079,7 +1121,7 @@ def cast_one_character(
       3. python_assign_voice_preset -- Python picks the voice.
 
     The writer-facing contract (one validated CastingResponse per open
-    slot, carrying character_description + gender + voice_preset) is
+    slot, carrying appearance/presence/voice_cue + gender + voice_preset) is
     preserved so lock_cast and its callers are unchanged in shape.
 
     `ensemble_slot`: when None (a standalone single-character call),
@@ -1141,7 +1183,9 @@ def cast_one_character(
     voice_preset = ""
 
     response = CastingResponse(
-        character_description=description.character_description,
+        appearance=description.appearance,
+        presence=description.presence,
+        voice_cue=description.voice_cue,
         gender=slot.gender,
         voice_preset=voice_preset,
         speech_signature=str(
@@ -1498,7 +1542,7 @@ def assemble_pre_locked_rows(
         (pre_locked_rows, open_slots, lemmy_hit)
         - pre_locked_rows: list of fully-populated cast row dicts
             (ANNOUNCER plus LEMMY if hit). Each row has char_id,
-            name, gender, voice_preset, character_description.
+            name, gender, voice_preset, appearance, presence, voice_cue.
         - open_slots: list of CastSlot for the remaining open
             characters (Python rolled names, LLM fills the rest).
         - lemmy_hit: True if LEMMY was rolled in, False otherwise.
@@ -1763,8 +1807,8 @@ def _apply_llm_slot_fill(
 # ---------------------------------------------------------------------------
 
 
-def _deterministic_identity_floor(slot: "EnsembleSlot") -> str:
-    """A valid, on-format description built from Python-owned slot facts only.
+def _deterministic_identity_floor(slot: "EnsembleSlot") -> dict:
+    """The three character fields built from Python-owned slot facts only.
 
     THE LAST RUNG, and it exists because no mechanism in this item may fail an
     episode. It is deliberately NOT a fixed string: BUG-098 was one generic
@@ -1776,11 +1820,17 @@ def _deterministic_identity_floor(slot: "EnsembleSlot") -> str:
     role = (getattr(slot, "role", "") or "featured player").strip()
     timbre = (getattr(slot, "timbre", "") or "clear").strip()
     pressure = _FACE_PRESSURE_BY_ROLE.get(role.lower(), "steady, unhurried features")
-    return (
-        f"Adult, the story's {role}. Face: {pressure}. "
-        f"Presence: carries the episode's pressure without flourish. "
-        f"Voice: {timbre}, plainly spoken."
-    )
+    return {
+        "appearance": f"Adult, the story's {role}, {pressure}",
+        "presence": "carries the episode's pressure without flourish",
+        "voice_cue": f"{timbre}, plainly spoken",
+    }
+
+
+def _response_fields(response) -> dict:
+    """The model-written prose fields of a casting response, separately."""
+    return {name: str(getattr(response, name, "") or "")
+            for name in (*_CAST_TEXT.CAST_TEXT_FIELDS, "speech_signature")}
 
 
 def _enforce_name_authority(
@@ -1815,10 +1865,10 @@ def _enforce_name_authority(
     if not superseded_names:
         return response, None
 
-    fields = {
-        "character_description": response.character_description,
-        "speech_signature": getattr(response, "speech_signature", "") or "",
-    }
+    # Every prose field SEPARATELY: the detector reports which field failed
+    # and reads the words before a name ("foil to"), so joining would hide
+    # both (Codex r1, 2026-10-18).
+    fields = _response_fields(response)
     hits = _NAMES.find_foreign_identities(fields, superseded_names, roster_names)
     # The model can also copy the neutral LABEL out of the reconciled brief --
     # "30s, CHARACTER A." is not a wrong-person description but it is broken
@@ -1868,15 +1918,14 @@ def _enforce_name_authority(
             max_attempts=1,
             casting_brief=casting_brief,
         )
-        retry_fields = {
-            "character_description": clean.character_description,
-            "speech_signature": getattr(clean, "speech_signature", "") or "",
-        }
+        retry_fields = _response_fields(clean)
         if not _NAMES.find_foreign_identities(
                 retry_fields, superseded_names, roster_names)                 and not _NAMES.find_leaked_labels(retry_fields, labels):
             event["rung"] = "regenerated"
             return response.model_copy(update={
-                "character_description": clean.character_description,
+                "appearance": clean.appearance,
+                "presence": clean.presence,
+                "voice_cue": clean.voice_cue,
                 "speech_signature": (
                     getattr(clean, "speech_signature", "") or ""
                 ).strip(),
@@ -1892,7 +1941,7 @@ def _enforce_name_authority(
         event.get("retry_error") or "regeneration was also contaminated",
     )
     return response.model_copy(update={
-        "character_description": _deterministic_identity_floor(slot),
+        **_deterministic_identity_floor(slot),
         "speech_signature": "plain spoken",
     }), event
 
@@ -1923,7 +1972,9 @@ def lock_cast(
         "name":                  "ALICE",
         "gender":                "female",
         "voice_preset":          "v2/en_speaker_4",
-        "character_description": "...",
+        "appearance":            "...",
+        "presence":              "...",
+        "voice_cue":             "...",
       }
 
     meta dict has: lemmy_hit, casting_attempts (list of attempt
@@ -2249,7 +2300,14 @@ def lock_cast(
             # defaults). Phase 2 expands the casting LLM call to ask
             # for per-character knobs (Bark temperature, Kokoro speed).
             "voice_params":          None,
-            "character_description": response.character_description,
+            # THE CHARACTER IN THREE FIELDS (2026-10-18). presence and
+            # voice_cue are backfilled from Python-owned slot facts when the
+            # model left them empty, so every locked row reads the same.
+            "appearance":            response.appearance,
+            "presence":              (response.presence
+                                      or "carries the episode's pressure"),
+            "voice_cue":             (response.voice_cue
+                                      or "%s, plainly spoken" % (ens.timbre or "clear")),
             # F5 (story-engine v1): deterministic backfill so EVERY locked
             # cast row carries a non-empty speech_signature for the composer.
             "speech_signature":      (response.speech_signature or "plain spoken"),
@@ -2319,9 +2377,8 @@ def lock_cast(
     # match a bank voice on timbre / age_band (not just gender). The cast ROW
     # schema is frozen and carries no timbre/role/age, so these ride free-form
     # meta. The voice-fit facts come from the Python-decided ensemble slots
-    # (timbre/role/age_band); gender + speech_signature come off the locked row;
-    # description_digest is a short, PII-free sha1 of the prose (lets CastLock /
-    # the hybrid caster key on description identity without storing the text).
+    # (timbre/role/age_band); gender + speech_signature come off the locked row.
+    # (A description_digest rode here until 2026-10-18; nothing read it.)
     ens_by_id = {e.char_id: e for e in ensemble_slots}
     cast_voice_slots: dict = {}
     for row in cast:
@@ -2331,10 +2388,6 @@ def lock_cast(
         if not cid:
             continue
         ens = ens_by_id.get(cid)
-        desc = str(row.get("character_description") or "")
-        digest = (
-            hashlib.sha1(desc.encode("utf-8")).hexdigest()[:12] if desc else ""
-        )
         cast_voice_slots[cid] = {
             "gender":             str(row.get("gender") or ""),
             # timbre is a LIST so it feeds the bank caster's set-intersection
@@ -2344,7 +2397,6 @@ def lock_cast(
             "role":              (ens.role if ens else ""),
             "age_band":          (ens.age_band if ens else ""),
             "speech_signature":   str(row.get("speech_signature") or ""),
-            "description_digest": digest,
         }
 
     meta.update({

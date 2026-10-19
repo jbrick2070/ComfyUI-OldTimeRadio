@@ -33,6 +33,11 @@ UTF-8, no BOM, ASCII source.
 """
 from __future__ import annotations
 
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 import hashlib
 import json
 import logging
@@ -1268,8 +1273,9 @@ class WriterTailMixin:
         # _otr_ledger_consumers.voice_assignments_from_cast (S6.2). Cast is the
         # canonical source; persisting a derived view invites drift.
         #
-        # portrait_prompt is the cast row's character_description and the only
-        # character description surface (S6.2). The seam that appends era_tail +
+        # portrait_prompt is the cast row's appearance (2026-10-18: the
+        # character is three fields; appearance is the drawable one) and the
+        # only character description surface (S6.2). The seam that appends era_tail +
         # style_tail is _otr_story_brief_helpers.finish_visual_prompt, called by
         # ShotLock M4, the image-prompt deriver, and the render driver's scene
         # composer, so this short, content-focused field is the right Tier-1
@@ -1285,7 +1291,7 @@ class WriterTailMixin:
             _name = _row.get("name")
             if not _name:
                 continue
-            _desc = (_row.get("character_description") or "").strip()
+            _desc = _CAST_TEXT.field(_row, "appearance")
             _visual_chars[_name] = {
                 "portrait_prompt": _desc,
             }

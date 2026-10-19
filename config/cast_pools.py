@@ -351,7 +351,12 @@ LEMMY_PROFILE = {
     "dialogue_orthography": "standard_english",
     "speech_signature": "Warm, quick-witted Cockney phrasing and rhythm using standard English spelling",
     "voice_preset": "v2/en_speaker_8",  # English native - gravelly, confident, 40s-50s. Avoids Bark hallucination from de_speaker
-    "character_description": "Genial communications officer, 50s, broad friendly Cockney accent, quick-witted and humorous with a warm grin, brandishing a handheld brass communicator that looks like a polycorder crossed with a harmonica",
+    # THE CHARACTER IN THREE FIELDS (2026-10-18), the split every cast row
+    # carries: appearance is the drawable part, presence the manner, voice_cue
+    # the delivery. The Cockney accent is a voice, so it is not painted.
+    "appearance": "Genial communications officer, 50s, warm grin, brandishing a handheld brass communicator that looks like a polycorder crossed with a harmonica",
+    "presence": "quick-witted and humorous",
+    "voice_cue": "broad friendly Cockney, gravelly and warm",
     "notes": "Male, gravelly/raspy, 50s, warm characterful voice, iconic",
 }
 
@@ -498,10 +503,9 @@ def pick_announcer(rng: random.Random) -> dict:
         # "temperature", Kokoro "speed"). None today; Phase 2 will
         # populate when the LLM call learns to pick params.
         "voice_params": None,
-        "character_description": (
-            "Period radio announcer; reads the science story and "
-            "frames the drama between beats."
-        ),
+        "appearance": "Period radio announcer at a studio microphone",
+        "presence": "reads the science story and frames the drama between beats",
+        "voice_cue": vocal_desc,
         "notes": vocal_desc,
     }
 
@@ -532,7 +536,9 @@ def lemmy_row() -> dict:
         # at None permanently if we don't want per-episode variation
         # on his voice.
         "voice_params":          None,
-        "character_description": LEMMY_PROFILE["character_description"],
+        "appearance":            LEMMY_PROFILE["appearance"],
+        "presence":              LEMMY_PROFILE["presence"],
+        "voice_cue":             LEMMY_PROFILE["voice_cue"],
     }
 
 

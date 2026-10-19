@@ -35,7 +35,7 @@ def _canned_fn(n):
     def fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
         i = next(seq)
         return json.dumps({
-            "character_description": f"A weathered colonist number {i} who keeps the relay alive.",
+            "appearance": f"A weathered colonist number {i} who keeps the relay alive.",
             "speech_signature": "clipped and terse",
         })
     return fn
@@ -73,7 +73,7 @@ def test_lock_cast_stamps_cast_voice_slots():
         s = slots[cid]
         assert set(s) == {
             "gender", "timbre", "role", "age_band",
-            "speech_signature", "description_digest",
+            "speech_signature",
         }
         assert isinstance(s["timbre"], list)  # list -> bank set-intersection
         assert s["gender"] == row.get("gender", "")
@@ -84,22 +84,18 @@ def test_lock_cast_stamps_cast_voice_slots():
     assert sample["timbre"] and sample["timbre"][0] in _OTRC._TIMBRE_VOCAB
     assert sample["age_band"] == "adult"
     assert sample["role"] in _OTRC._ROLE_VOCAB
-    assert len(sample["description_digest"]) == 12  # sha1[:12], PII-free
 
 
-def test_cast_voice_slots_digest_tracks_description():
-    """description_digest is a stable sha1 of the prose (no raw text leak)."""
-    import hashlib
+def test_cast_voice_slots_carry_no_description_digest():
+    """The digest was written and never read; it left with the split
+    (2026-10-18). A slot holds voice-fit facts only."""
     cast, meta = _OTRC.lock_cast(
         creative_fn=_canned_fn(8), num_characters=2,
         news_seed="x", style="open", rng=random.Random(7), cast_seed=7,
         force_lemmy=False,
     )
-    slots = meta["cast_voice_slots"]
     for row in cast:
-        desc = row.get("character_description") or ""
-        expect = hashlib.sha1(desc.encode("utf-8")).hexdigest()[:12] if desc else ""
-        assert slots[row["char_id"]]["description_digest"] == expect
+        assert "description_digest" not in meta["cast_voice_slots"][row["char_id"]]
 
 
 # --------------------------------------------------------------------------- #

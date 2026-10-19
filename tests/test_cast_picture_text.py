@@ -47,14 +47,14 @@ def test_edges_never_raise_and_leave_plain_text_alone():
 
 
 def test_the_still_lookup_and_its_fallback_both_clean_the_row():
-    row = {"char_id": "c02", "character_description": RASHIDA}
+    row = {"char_id": "c02", "appearance": RASHIDA}
     for text in (ip._appearance_for_char([row], "c02"),
                  ip._row_picture_text(row)):
         assert "Voice" not in text and "Presence" not in text
         assert "Face:" not in text and "deep-set eyes" in text
     # portrait_prompt wins the key chain and is cleaned the same way.
     row2 = {"char_id": "c02", "portrait_prompt": RASHIDA,
-            "character_description": "ignored"}
+            "appearance": "ignored"}
     assert "Voice" not in ip._appearance_for_char([row2], "c02")
 
 
@@ -98,7 +98,7 @@ def test_the_char_scene_composer_reads_the_cleaned_description():
     -- the deterministic char-scene fallback's whole prompt (Sonnet QA)."""
     from nodes import _otr_story_brief_helpers as helpers
     from nodes._otr_visual_styles import get_visual_style
-    row = {"char_id": "c02", "character_description": RASHIDA}
+    row = {"char_id": "c02", "appearance": RASHIDA}
     for kind in ("scene_character", "portrait"):
         p = helpers.compose_still_prompt(
             {}, kind=kind, role="character_visual", beat_id="b002",

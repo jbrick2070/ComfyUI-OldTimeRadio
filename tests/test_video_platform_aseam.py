@@ -344,7 +344,7 @@ def test_clip_budget_is_pure_per_beat():
 def _char_ledger():
     return {
         "cast": [{"char_id": "c1", "name": "BABA",
-                  "portrait_prompt": "a tall weathered spacer with a scar"}],
+                  "appearance": "a tall weathered spacer with a scar"}],
         "lines": [],
         "meta": {"story_brief_terms": {"setting": ["a derelict orbital station"]}},
     }
@@ -435,7 +435,7 @@ def test_the_appearance_lookup_applies_the_strip():
     """The seam that matters: every caller of _appearance_for_char draws a
     picture, so the strip belongs in the lookup, not at each of the 8 sites."""
     ledger = {"cast": [{"char_id": "c1", "name": "BABA",
-                        "portrait_prompt": "a tall weathered spacer. "
+                        "appearance": "a tall weathered spacer. "
                                            "Voice: gravel and smoke."}]}
     got = sl._appearance_for_char(ledger, "c1")
     assert "Voice:" not in got, got
@@ -494,7 +494,7 @@ def test_shotlock_all_visualizers_skip_writer_visual_directives(monkeypatch):
     monkeypatch.setattr(sl, "_resolve_writer_llm", must_not_resolve)
     ledger = {
         "cast": [{"char_id": "c1", "name": "BABA",
-                  "portrait_prompt": "a tall weathered spacer with a scar"}],
+                  "appearance": "a tall weathered spacer with a scar"}],
         "lines": [{"line_id": "b1", "char_id": "c1",
                    "speaker_role": "character", "text": "The station is failing.",
                    "samples": 24000, "sample_rate": 24000}],
@@ -616,7 +616,7 @@ def test_authored_visual_prompt_is_preserved_for_both_compatibility_values():
 
 def test_appearance_lookup_by_char_id():
     led = {"cast": [{"char_id": "c1", "name": "BABA",
-                     "portrait_prompt": "unique-portrait-token"}],
+                     "appearance": "unique-portrait-token"}],
            "lines": [], "meta": {}}
     assert sl._appearance_for_char(led, "c1") == "unique-portrait-token"
     assert sl._appearance_for_char(led, "BABA") == ""   # NOT by display name
@@ -655,7 +655,7 @@ def test_cheap_family_no_creative_llm_call():
 def test_batch_beats_no_truncation():
     import re
 
-    cast = [{"char_id": f"c{i}", "name": f"N{i}", "portrait_prompt": f"portrait{i}"}
+    cast = [{"char_id": f"c{i}", "name": f"N{i}", "appearance": f"portrait{i}"}
             for i in range(20)]
     led = {"cast": cast, "lines": [],
            "meta": {"story_brief_terms": {"setting": ["a station"]}}}
@@ -692,7 +692,7 @@ def test_creative_derivation_render_twice():
 
 def test_shotlock_end_to_end_stamps_video_section():
     led = {
-        "cast": [{"char_id": "c1", "name": "BABA", "portrait_prompt": "a spacer"}],
+        "cast": [{"char_id": "c1", "name": "BABA", "appearance": "a spacer"}],
         "lines": [
             {"line_id": "l1", "char_id": "c1", "speaker_role": "char_voice",
              "text": "hello", "samples": 24000, "sample_rate": 24000},

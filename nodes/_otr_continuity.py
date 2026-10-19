@@ -47,6 +47,11 @@ UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 """
 from __future__ import annotations
 
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 import logging
 from typing import Any, Callable, Optional
 
@@ -338,15 +343,10 @@ def _cast_name(row: Any) -> str:
 
 
 def _cast_description(row: Any) -> str:
-    """Extract a character description from a cast row (dict or object)."""
-    if isinstance(row, dict):
-        value = row.get("character_description") or row.get("description")
-    else:
-        value = (
-            getattr(row, "character_description", None)
-            or getattr(row, "description", None)
-        )
-    return _safe_text(value, _CAST_DESC_CHAR_CAP)
+    """The character card for a cast row (dict or object), each field
+    budgeted inside the cap so presence and voice survive it."""
+    return _safe_text(_CAST_TEXT.card_text(row, cap=_CAST_DESC_CHAR_CAP),
+                      _CAST_DESC_CHAR_CAP)
 
 
 def _render_cast_block(cast_rows: Any) -> str:
@@ -438,7 +438,7 @@ def build_continuity_ledger(
         for tests / early-stage callers.
       cast_rows
         The locked cast -- a list of dicts (production-ledger shape:
-        `name`, `char_id`, `character_description`) or objects.
+        `name`, `char_id`, `appearance`/`presence`/`voice_cue`) or objects.
       technical_repo_id
         OPTIONAL. The technical-slot model id, for log attribution
         only. Accepted as a STRING per Prime Directive 6; this module

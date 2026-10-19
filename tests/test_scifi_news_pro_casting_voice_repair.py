@@ -39,7 +39,7 @@ _SPEAKERS = ["K. Lisa Yang", "Ziyin"]
 
 
 def _row(name, gender, timbre):
-    return {"name": name, "role": "r", "character_description": "d",
+    return {"name": name, "role": "r", "appearance": "d",
             "gender": gender, "age_band": "30s", "timbre": timbre}
 
 

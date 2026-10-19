@@ -38,6 +38,11 @@ UTF-8, no BOM, ASCII source.
 """
 from __future__ import annotations
 
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 import json
 import logging
 import random
@@ -197,11 +202,16 @@ class StoryInterpretation(BaseModel):
 class CastMember(BaseModel):
     name: str = Field(min_length=1)
     role: str = ""
-    character_description: str = ""
+    # THE CHARACTER IN THREE FIELDS (2026-10-18), the same split every source
+    # bank writes: `appearance` is what can be drawn (stills read only this),
+    # `presence` is the dramatic hook, and `voice_cue` is derived from the
+    # register and timbre this pass already writes (see `voice_cue_of`).
+    appearance: str = ""
+    presence: str = ""
     gender: str = Field(default="", description=(
         "Preserve source gender from descriptions, relationships and pronouns in context, "
         "honoring explicit identity first. Keep gender consistent with the character's "
-        "casting description. \"male\" or \"female\" -- a unisex name is "
+        "appearance and presence. \"male\" or \"female\" -- a unisex name is "
         "fine, the gender is always one of the two. Never empty: an unstated "
         "gender is your choice, and the description then follows it."))
     age_band: str = "n/a"
@@ -213,6 +223,11 @@ class CastMember(BaseModel):
     timbre: str = ""
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("appearance", "presence", mode="before")
+    @classmethod
+    def _null_is_empty(cls, value):
+        return "" if value is None else value
 
     @field_validator("name", mode="before")
     @classmethod
@@ -746,7 +761,7 @@ def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
     base, retry = _TEMP["act"]
     cast_block = "\n".join(
         "- %s (%s, %s): %s" % (c.name, c.gender, c.role or "in the story",
-                               c.character_description)
+                               _CAST_TEXT.card_text(_member_row(c)))
         for c in treatment.cast
     )
     global_ending = treatment.ending if is_last and treatment.ending.strip() else ""
@@ -956,7 +971,7 @@ _RELATIVE_OPENERS = frozenset({"who", "whom", "whose", "which", "that"})
 def _description_gender(member: "CastMember",
                         others: "tuple[str, ...]" = ()) -> str:
     """The gender the model's own description states -- `_otr_cast_gender`."""
-    return _CG.description_gender(member.character_description, others)
+    return _CG.description_gender(_member_text(member), others)
 
 
 def _settle_gender(member: "CastMember",
@@ -965,7 +980,7 @@ def _settle_gender(member: "CastMember",
     ladder in `_otr_cast_gender` (courtesy title, role relation, name pool,
     unambiguous description pronouns, seeded coin)."""
     return _CG.settle_binary_gender(member.name, member.role,
-                                    member.character_description, others)
+                                    _member_text(member), others)
 
 
 def _unresolved_roles(treatment: "StoryTreatment",
@@ -1020,7 +1035,8 @@ def _pass_cast_gender(technical_fn, pack, bundle, treatment: "StoryTreatment",
 
     interpreted = interpreted or {}
     cast = [{"name": m.name, "role": m.role,
-             "character_description": m.character_description,
+             "appearance": m.appearance,
+             "presence": m.presence,
              "gender": m.gender if m.gender in _GENDERS else "",
              "listener_text_suggests": interpreted.get(m.name, "")}
             for m in treatment.cast]
@@ -1087,10 +1103,12 @@ def _settle_cast_genders(treatment: "StoryTreatment",
         else:
             member.gender, source = _settle_gender(
                 member, tuple(m.name for m in treatment.cast if m is not member))
-        if member.gender in _GENDERS and _UNSTATED_GENDER_NOTE.search(
-                member.character_description or ""):
-            member.character_description = " ".join(_UNSTATED_GENDER_NOTE.sub(
-                " ", member.character_description).split())
+        if member.gender in _GENDERS:
+            for _f in ("appearance", "presence"):
+                _v = getattr(member, _f) or ""
+                if _UNSTATED_GENDER_NOTE.search(_v):
+                    setattr(member, _f, " ".join(
+                        _UNSTATED_GENDER_NOTE.sub(" ", _v).split()))
         if member.gender != before:
             log.warning(
                 "[my_story] CAST GENDER SET: %r is %s (%s; the model wrote %r)",
@@ -1098,6 +1116,25 @@ def _settle_cast_genders(treatment: "StoryTreatment",
             receipts.append({"name": member.name, "gender": member.gender,
                              "source": source, "model_gender": before})
     return receipts
+
+
+def voice_cue_of(member: "CastMember") -> str:
+    """The radio-performance cue, from the register and timbre the treatment
+    already writes ("blunt, practical; low, weathered"). Derived, not asked
+    for again: one delivery instruction per character, never two."""
+    return "; ".join(p for p in (member.speech_register.strip(),
+                                 member.timbre.strip()) if p)
+
+
+def _member_row(member: "CastMember") -> dict:
+    """A cast member as the three-field row ``cast_text`` reads."""
+    return {"appearance": member.appearance, "presence": member.presence,
+            "voice_cue": voice_cue_of(member)}
+
+
+def _member_text(member: "CastMember") -> str:
+    """Every prose field of a member, for the gender ladder's pronoun read."""
+    return " ".join(p for p in (member.appearance, member.presence) if p)
 
 
 def _assign_voices(treatment: StoryTreatment, rng: random.Random) -> "list[dict]":
@@ -1116,7 +1153,9 @@ def _assign_voices(treatment: StoryTreatment, rng: random.Random) -> "list[dict]
         rows.append({
             "char_id": "c%02d" % (i + 2),
             "name": member.name,
-            "character_description": member.character_description,
+            "appearance": member.appearance,
+            "presence": member.presence,
+            "voice_cue": voice_cue_of(member),
             "gender": member.gender,
             "tts_model": "",
             "voice_preset": "",

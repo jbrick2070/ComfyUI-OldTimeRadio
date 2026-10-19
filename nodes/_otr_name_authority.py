@@ -517,7 +517,7 @@ def find_foreign_identities(
 
     ``fields`` maps a field name to its generated text -- pass every model-owned
     prose field, not just the headline one. ``speech_signature`` is demonstrably
-    contaminated in the archive alongside ``character_description``, and a guard
+    contaminated in the archive alongside the description, and a guard
     that checks one field certifies half a row.
     """
     found: List[ForeignIdentity] = []

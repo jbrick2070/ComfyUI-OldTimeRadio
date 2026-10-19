@@ -43,8 +43,8 @@ def _ledger() -> dict:
     return {
         "meta": {"episode_title": "The Brittle Reel", "style": "noir_archive"},
         "cast": [
-            {"name": "Mara Voss", "character_description": "an archivist"},
-            {"name": "Tom Hale", "character_description": "a projectionist"},
+            {"name": "Mara Voss", "appearance": "an archivist"},
+            {"name": "Tom Hale", "appearance": "a projectionist"},
         ],
         "lines": lines,
     }

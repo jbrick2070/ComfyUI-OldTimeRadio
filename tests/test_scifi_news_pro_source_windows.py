@@ -793,7 +793,7 @@ def test_runner_restamps_coverage_after_assembly_rebind(
             F2.CastVoice(
                 name="SELA",
                 role="relay keeper",
-                character_description="A steady relay keeper.",
+                appearance="A steady relay keeper.",
                 gender="female",
                 timbre="m01",
             )

@@ -119,7 +119,7 @@ def test_shotlock_m4_prompt_hash_matches_finished_prompt():
     ledger = {
         "meta": _OK_META,
         "cast": [{"char_id": "c1", "name": "KEEPER",
-                  "character_description": "60s, weathered face"}],
+                  "appearance": "60s, weathered face"}],
         "lines": [{"line_id": "b001", "char_id": "c1",
                    "speaker_role": "char_voice", "text": "The storm speaks.",
                    "dur_s": 4.0}],

@@ -389,7 +389,7 @@ class OutlineRequest:
                              # leak-prone and is now extinct.
     cast_descriptions: tuple[tuple[str, str, str], ...] = ()
                              # OPTIONAL. Per-character (name, gender,
-                             # character_description) tuples from the
+                             # card text) tuples from the
                              # LOCKED cast (the cast LLM's output via
                              # _otr_casting.lock_cast). When non-empty,
                              # the prompt's `Cast` line expands from a

@@ -69,7 +69,7 @@ def _lines():
 
 def _cast():
     return [{"char_id": "c01",
-             "character_description": "a weathered dock inspector in an oilskin coat"}]
+             "appearance": "a weathered dock inspector in an oilskin coat"}]
 
 
 def test_fork_mints_fodder_and_plate_not_scene_still():

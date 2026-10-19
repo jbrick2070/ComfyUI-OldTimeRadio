@@ -17,6 +17,11 @@ the writer slot. Cold-import clean. UTF-8 no BOM, ASCII-only.
 """
 from __future__ import annotations
 
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 import hashlib
 import json
 import logging
@@ -35,11 +40,6 @@ try:
     from ._otr_shared.route_freeze import RouteFreezeError as _RouteFreezeError
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared.route_freeze import RouteFreezeError as _RouteFreezeError
-
-try:
-    from ._otr_shared.cast_picture_text import picture_description
-except ImportError:  # pragma: no cover -- flat test imports
-    from _otr_shared.cast_picture_text import picture_description  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -72,13 +72,11 @@ def _read_setting(meta: dict) -> str:
 def _appearance_for_char(cast: list, char_id: str) -> str:
     """Appearance text looked up by char_id ONLY (BUG-098), never display name.
 
-    Key chain includes ``character_description`` (operator look-QA
-    2026-06-10): the writer stamps the RICH per-character physical
-    description on the cast row as ``character_description`` (the
-    ``portrait_prompt`` mirror lives under meta.visual_plan keyed by NAME,
-    not on the row), so without this key every character fell to the same
-    generic setting+anchor fallback -> ONE shared portrait for the whole
-    cast, styled as an actor in a radio booth."""
+    Reads the row's ``appearance`` (2026-10-18: the character is three
+    fields, and appearance is the drawable one). Without a per-character
+    description every character fell to the same generic setting+anchor
+    fallback -> ONE shared portrait for the whole cast (operator look-QA
+    2026-06-10)."""
     cid = str(char_id or "")
     for c in cast or []:
         if isinstance(c, dict) and str(c.get("char_id") or "") == cid:
@@ -87,15 +85,11 @@ def _appearance_for_char(cast: list, char_id: str) -> str:
 
 
 def _row_picture_text(row) -> str:
-    """The cast row's description as a STILL may read it: the drawable lead,
-    face and detail, no ``Voice:``/``Presence:`` prose and no ``Label:``
-    prefixes, which FLUX 3 Klein letters into the picture (PBUG-20261018-03).
-    """
-    row = row or {}
-    return picture_description(
-        str(row.get("portrait_prompt") or row.get("appearance")
-            or row.get("character_description") or "").strip(),
-        still=True)
+    """The cast row's character as a STILL may read it: the appearance
+    field only, cleaned (``_otr_shared.cast_text.still_text``). Voice and
+    presence prose is what FLUX 3 Klein letters into the picture
+    (PBUG-20261018-03)."""
+    return _CAST_TEXT.still_text(row)
 
 
 _FEMALE_PROMPT_TERMS = frozenset({
@@ -1371,8 +1365,7 @@ def compose_image_prompt_fallback(meta: dict, char: dict, aspect: str = "portrai
     except ImportError:  # pragma: no cover -- flat test imports
         from _otr_story_brief_helpers import _resolve_style  # type: ignore
     _vstyle = _resolve_style(meta, style)
-    # Same key chain as _appearance_for_char incl. character_description
-    # (2026-06-10): this fallback is what actually runs whenever the LLM is
+    # Same reader as _appearance_for_char (2026-06-10): this fallback is what actually runs whenever the LLM is
     # unavailable, and it read only the two empty keys -- every character got
     # the identical setting+anchor prompt -> ONE shared portrait.
     appearance = _row_picture_text(char)

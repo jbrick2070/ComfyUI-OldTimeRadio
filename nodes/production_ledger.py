@@ -1491,9 +1491,10 @@ class Ledger:
         if clamped:
             self.data.setdefault("meta", {})["gender_clamp"] = clamped
         for r in cast_rows:
-            # Callers MUST supply `character_description`; the legacy
-            # `description` input key is not read.
-            cdesc = _safe_str(r.get("character_description")) or None
+            # THE CHARACTER IN THREE FIELDS (2026-10-18): appearance /
+            # presence / voice_cue, read only through _otr_shared/cast_text.
+            # Every row carries all three keys, "" where a producer had none
+            # (scifi's repair rung ships an uncast speaker with no prose).
             # tts_model: routing column that says which TTS family the
             # voice_preset belongs to ("bark", "kokoro", future: "fish_speech",
             # "cosyvoice", ...). Lets downstream consumers route by reading
@@ -1517,7 +1518,9 @@ class Ledger:
             row = {
                 "char_id":               _safe_str(r.get("char_id")),
                 "name":                  _safe_str(r.get("name")),
-                "character_description": cdesc,
+                "appearance":            _safe_str(r.get("appearance")),
+                "presence":              _safe_str(r.get("presence")),
+                "voice_cue":             _safe_str(r.get("voice_cue")),
                 "gender":                _safe_str(r.get("gender")) or None,
                 "tts_model":             tts_model,
                 "voice_preset":          voice_preset,

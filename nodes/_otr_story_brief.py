@@ -31,6 +31,11 @@ UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 """
 from __future__ import annotations
 
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 import json
 import logging
 import re
@@ -328,9 +333,7 @@ def _build_reflection_input(led: Any) -> str:
         name = str(row.get("name") or "").strip()
         if not name:
             continue
-        desc = _truncate(
-            str(row.get("character_description") or "").strip(), 200,
-        )
+        desc = _truncate(_CAST_TEXT.card_text(row, cap=200), 200)
         parts.append(f"  - {name}: {desc}" if desc else f"  - {name}")
 
     scene_rows = [

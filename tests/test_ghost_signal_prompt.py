@@ -164,18 +164,15 @@ def test_a_missing_cast_row_is_legal_and_never_calls_another_author():
         "read into a hidden mutation and a credit spend")
 
 
-def test_the_source_priority_is_the_declared_order():
-    assert gsp.SIGIL_SOURCE_FIELDS == (
-        "portrait_prompt", "appearance", "description", "character_description")
-    row = {"name": "X", "portrait_prompt": "a gaunt figure",
-           "appearance": "a burly figure", "description": "a squat figure"}
+def test_the_sigil_reads_the_appearance_field_only():
+    """The drawable field (2026-10-18). The retired keys and the voice and
+    presence prose are not sigil sources."""
+    assert gsp.SIGIL_SOURCE_FIELDS == ("appearance",)
+    row = {"name": "X", "appearance": "a burly figure",
+           "portrait_prompt": "a gaunt figure", "presence": "a squat figure"}
     top = gsp.distill_subject_sigil(row, episode_seed=1, char_id="c1",
                                     style_id="s")
-    assert top.startswith("a gaunt figure")
-    del row["portrait_prompt"]
-    second = gsp.distill_subject_sigil(row, episode_seed=1, char_id="c1",
-                                       style_id="s")
-    assert second.startswith("a burly figure")
+    assert top.startswith("a burly figure")
 
 
 def test_the_name_alone_never_becomes_the_subject():

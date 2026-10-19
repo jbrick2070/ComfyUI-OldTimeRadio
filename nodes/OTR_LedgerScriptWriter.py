@@ -103,6 +103,11 @@ Notes:
 """
 from __future__ import annotations
 
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 import hashlib
 import json
 import uuid
@@ -4659,7 +4664,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             meta, contract=contract, scaffold_enabled=_style_grammar_on)
 
         # LLM slot: creative -- cast lock generates per-character
-        # narrative descriptions (gender + character_description).
+        # narrative descriptions (gender + appearance/presence/voice_cue).
         # slot-interleave: technical (news_interpreter) -> creative
         # (here). One transition when the two slot ids differ.
         # S32 B1 paired-contract wiring: pass BOTH generators.
@@ -4761,7 +4766,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 len(meta["name_authority"]["events"]),
             )
         # VC chunk 3 (2026-06-22): carry the per-character voice-fit slots
-        # (gender/timbre/role/age_band/speech_signature/description_digest) into
+        # (gender/timbre/role/age_band/speech_signature) into
         # the frozen ledger meta so OTR_CastLock's bank caster can match on
         # timbre/age, not just gender. Free-form meta -> ledger schema unchanged.
         # THE CAMEO ROLL RECEIPT. This copy is REQUIRED for the same reason the
@@ -4878,7 +4883,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # drift (CastContractError).
         #
         # cast_descriptions wires the casting LLM's per-character
-        # output (gender + character_description) into the outline
+        # output (gender + the character card) into the outline
         # prompt's Cast block so the outline LLM can plan beats that
         # exploit each character's distinct personality + stakes.
         # Order MUST match character_cast 1:1 (OutlineRequest
@@ -4890,7 +4895,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             (
                 row["name"],
                 str(row.get("gender") or ""),
-                str(row.get("character_description") or ""),
+                _CAST_TEXT.card_text(row),
             )
             for row in cast_rows
             if row["name"] != "ANNOUNCER"

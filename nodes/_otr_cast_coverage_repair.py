@@ -48,6 +48,11 @@ exactly like every other line in that lane already does.
 """
 from __future__ import annotations
 
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 import logging
 from typing import Any, Callable, Optional
 
@@ -165,8 +170,16 @@ def repair_zero_coverage_cast(
     for char_id, name in gaps:
         receipt["attempted"].append(char_id)
         row = cast_by_id.get(char_id) or {}
+        # Performance and pressure first: this card asks the model to give
+        # a silent character lines, so how they carry themselves and sound
+        # matters more than their face.
         voice_card = str(
-            row.get("traits") or row.get("character_description") or name
+            row.get("traits")
+            or " ".join(p for p in (
+                _CAST_TEXT.field(row, "presence"),
+                _CAST_TEXT.field(row, "voice_cue"),
+                _CAST_TEXT.field(row, "appearance")) if p)
+            or name
         )
         matching = [
             ln for ln in (data.get("lines") or [])

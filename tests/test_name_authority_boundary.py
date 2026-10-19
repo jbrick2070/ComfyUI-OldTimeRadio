@@ -76,7 +76,7 @@ class PromptCapturingStub:
                 desc = f"40s, {identity}. Face: square jaw, level brow."
                 break
         return json.dumps({
-            "character_description": desc,
+            "appearance": desc,
             "speech_signature": "even, unhurried delivery",
         })
 
@@ -170,7 +170,7 @@ def test_guard_goes_red_when_reconciliation_is_disabled(monkeypatch):
         "both open slots should still be filled after the guard fired"
     )
     for row in cast:
-        assert row["character_description"].strip()
+        assert row["appearance"].strip()
 
 
 def test_no_contaminated_row_survives_into_the_locked_cast(monkeypatch):
@@ -188,7 +188,7 @@ def test_no_contaminated_row_survives_into_the_locked_cast(monkeypatch):
     assert sup, "superseded_identities returned [] -- this test proves nothing"
     for row in cast:
         found = _NA.find_foreign_identities(
-            {"character_description": row["character_description"],
+            {"appearance": row["appearance"],
              "speech_signature": row.get("speech_signature", "")},
             sup, roster,
         )
@@ -214,7 +214,7 @@ def test_a_generator_that_always_contaminates_still_yields_a_full_cast(monkeypat
         def __call__(self, messages, **kwargs):
             super().__call__(messages, **kwargs)
             return json.dumps({
-                "character_description": "40s, CAPTAIN JONAS REED. Face: square jaw.",
+                "appearance": "40s, CAPTAIN JONAS REED. Face: square jaw.",
                 "speech_signature": "MARTHA HONEYWELL speaks softly",
             })
 
@@ -225,9 +225,9 @@ def test_a_generator_that_always_contaminates_still_yields_a_full_cast(monkeypat
     roster = [r["name"] for r in cast]
     sup = _NA.superseded_identities(UPSTREAM, roster)
     for row in cast:
-        assert row["character_description"].strip()
+        assert row["appearance"].strip()
         assert not _NA.find_foreign_identities(
-            {"d": row["character_description"], "s": row.get("speech_signature", "")},
+            {"d": row["appearance"], "s": row.get("speech_signature", "")},
             sup, roster,
         ), "the deterministic floor is itself contaminated"
 
@@ -253,13 +253,13 @@ def test_a_raising_generator_on_the_retry_still_completes(monkeypatch):
         if state["n"] % 2 == 0:
             raise RuntimeError("loader exploded")
         return json.dumps({
-            "character_description": "40s, CAPTAIN JONAS REED. Face: square jaw.",
+            "appearance": "40s, CAPTAIN JONAS REED. Face: square jaw.",
             "speech_signature": "even delivery",
         })
 
     cast, meta = _lock(flaky)
     assert any(e["rung"] == "floor" for e in meta["name_authority"]["events"])
-    assert all(r["character_description"].strip() for r in cast)
+    assert all(r["appearance"].strip() for r in cast)
 
 
 # --------------------------------------------------------------------------- #
@@ -372,7 +372,7 @@ def test_a_row_is_never_flagged_for_its_own_name():
     # detector returns [] for an empty identity list, so that assertion would
     # hold even if the detector flagged every string it was ever given.
     assert _NA.find_foreign_identities(
-        {"character_description": "30s, Rick Steiner, lead pilot."},
+        {"appearance": "30s, Rick Steiner, lead pilot."},
         ["RICK STEINER"], roster) == [], (
         "the detector flagged a row for its own assigned name"
     )
@@ -392,7 +392,7 @@ def test_aliases_are_detected_not_just_canonical_names(identity, surface_form):
     """
     roster = ["PHYLLIS TERWILLIGER"]
     found = _NA.find_foreign_identities(
-        {"character_description": f"40s, {surface_form} Gray - the timekeeper."},
+        {"appearance": f"40s, {surface_form} Gray - the timekeeper."},
         [identity], roster)
     assert found, f"surface form {surface_form!r} of {identity!r} was not detected"
 
@@ -420,7 +420,7 @@ def test_enforce_never_raises_even_when_the_generator_explodes():
         timbre="warm", role="lead",
     )
     contaminated = _OTRC.CastingResponse(
-        character_description="40s, CAPTAIN JONAS REED. Face: square jaw.",
+        appearance="40s, CAPTAIN JONAS REED. Face: square jaw.",
         gender="female", voice_preset="", speech_signature="even delivery",
     )
 
@@ -442,9 +442,9 @@ def test_enforce_never_raises_even_when_the_generator_explodes():
     # must keep carrying them.
     assert isinstance(out, _OTRC.CastingResponse)
     assert out.gender == "female", "a non-prose field was lost in the copy"
-    assert out.character_description.strip()
+    assert out.appearance.strip()
     assert out.speech_signature.strip()
-    assert "JONAS" not in out.character_description.upper()
+    assert "JONAS" not in out.appearance.upper()
 
 
 def test_the_deterministic_floor_is_distinct_across_an_ensemble():
@@ -461,12 +461,16 @@ def test_the_deterministic_floor_is_distinct_across_an_ensemble():
         )
         for i, role in enumerate(roles, start=2)
     ]
-    assert len(set(floors)) == len(floors), (
-        f"the deterministic floor collapsed to {len(set(floors))} distinct "
-        f"descriptions across {len(floors)} rows -- BUG-098 all over again"
+    looks = [f["appearance"] for f in floors]
+    assert len(set(looks)) == len(looks), (
+        f"the deterministic floor collapsed to {len(set(looks))} distinct "
+        f"appearances across {len(looks)} rows -- BUG-098 all over again"
     )
-    for text in floors:
-        assert text.strip() and "Face:" in text
+    for f in floors:
+        # Three fields (2026-10-18); the drawable one carries no labels.
+        assert set(f) == {"appearance", "presence", "voice_cue"}
+        assert all(v.strip() for v in f.values())
+        assert "Face:" not in f["appearance"] and "Voice" not in f["appearance"]
 
 
 # --------------------------------------------------------------------------- #
@@ -574,7 +578,7 @@ def test_legitimate_relational_prose_is_never_flagged():
     """
     roster = ["ELLIE TERWILLIGER", "ANNOUNCER"]
     assert not _NA.find_foreign_identities(
-        {"character_description":
+        {"appearance":
             "40s, foil to Hiram's meticulous obsession. Face: oval, hooded eyes."},
         ["HIRAM BLEEK"], roster)
     # relational connectors, not just possessives
@@ -582,7 +586,7 @@ def test_legitimate_relational_prose_is_never_flagged():
                   "50s, daughter of Hiram Bleek.",
                   "30s, confidante to Hiram Bleek."):
         assert not _NA.find_foreign_identities(
-            {"character_description": prose}, ["HIRAM BLEEK"], roster), prose
+            {"appearance": prose}, ["HIRAM BLEEK"], roster), prose
 
 
 def test_a_bare_identity_claim_is_still_flagged():
@@ -592,7 +596,7 @@ def test_a_bare_identity_claim_is_still_flagged():
                   "40s, Lizzie Gray - The Timekeeper. Face: oval."):
         ident = ["HENRY 'HANK' GRISWOLD"] if "Griswold" in prose else ["ELIZABETH 'LIZZIE' GRAY"]
         assert _NA.find_foreign_identities(
-            {"character_description": prose}, ident, roster), prose
+            {"appearance": prose}, ident, roster), prose
 
 
 def test_an_ordinary_word_surname_does_not_maul_innocent_prose():
@@ -655,7 +659,7 @@ def test_a_leaked_placeholder_is_caught_and_replaced():
         def __call__(self, messages, **kwargs):
             super().__call__(messages, **kwargs)
             return json.dumps({
-                "character_description": "30s, CHARACTER A. Face: square jaw.",
+                "appearance": "30s, CHARACTER A. Face: square jaw.",
                 "speech_signature": "even delivery",
             })
 
@@ -670,7 +674,7 @@ def test_a_leaked_placeholder_is_caught_and_replaced():
     assert events, "a leaked placeholder shipped with no guard event"
     assert any(e.get("leaked_labels") for e in events)
     for row in cast:
-        assert "CHARACTER A" not in row["character_description"], (
+        assert "CHARACTER A" not in row["appearance"], (
             "the placeholder shipped into the locked cast"
         )
 
@@ -684,7 +688,7 @@ def test_a_mention_does_not_shadow_a_later_claim():
     """
     roster = ["ELLIE TERWILLIGER"]
     found = _NA.find_foreign_identities(
-        {"character_description": "foil to Jonas's obsession. But I am Jonas!"},
+        {"appearance": "foil to Jonas's obsession. But I am Jonas!"},
         ["JONAS REED"], roster)
     assert found, "a claim hiding behind an earlier mention was missed"
 
@@ -702,7 +706,7 @@ def test_a_possessive_is_a_mention_whatever_punctuation_follows(prose):
     by the relational-connector path instead.
     """
     assert not _NA.find_foreign_identities(
-        {"character_description": prose}, ["JONAS REED"], ["ELLIE TERWILLIGER"]), prose
+        {"appearance": prose}, ["JONAS REED"], ["ELLIE TERWILLIGER"]), prose
 
 
 def test_no_source_file_carries_a_stray_control_character():

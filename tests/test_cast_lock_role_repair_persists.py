@@ -143,11 +143,11 @@ def test_only_allowlisted_fields_can_be_patched(fresh_singleton):
 # --------------------------------------------------------------------------- #
 _CAST = [
     {"char_id": "c1", "name": "MONTY", "gender": "male", "tts_model": "bark",
-     "voice_preset": "v2/en_speaker_1", "character_description": "x" * 30},
+     "voice_preset": "v2/en_speaker_1", "appearance": "x" * 30},
     {"char_id": "c2", "name": "VERA", "gender": "female", "tts_model": "bark",
-     "voice_preset": "v2/en_speaker_9", "character_description": "y" * 30},
+     "voice_preset": "v2/en_speaker_9", "appearance": "y" * 30},
     {"char_id": "a1", "name": "ANNOUNCER", "gender": "male", "tts_model": "bark",
-     "voice_preset": "v2/en_speaker_6", "character_description": "z" * 30},
+     "voice_preset": "v2/en_speaker_6", "appearance": "z" * 30},
 ]
 _ROUNDTRIP_LINES = [
     # The mis-stamped row the repair targets: the announcer marker, role "character".

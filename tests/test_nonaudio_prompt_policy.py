@@ -47,7 +47,7 @@ _LINE = "we have to leave now"
 def _ledger():
     return {
         "cast": [{"char_id": "c1", "name": "BABA",
-                  "portrait_prompt": "a tall weathered spacer with a scar"}],
+                  "appearance": "a tall weathered spacer with a scar"}],
         "lines": [],
         "meta": {"story_brief_terms":
                  {"setting": ["a derelict orbital station"]}},
@@ -785,7 +785,7 @@ def test_a_joint_av_prompt_carries_NO_character_identity():
 
     On `signal_lost_the_weaver_of_dreams_20260828_003427` a mime beat rendered
     a woman SAYING "Queen of the Fairies" aloud. Nobody wrote that line -- the
-    ledger's `character_description` opens with that title and `_ltx25_parts`
+    ledger's `appearance` opens with that title and `_ltx25_parts`
     put `appearance` FIRST, so the joint audio-video latent read the identity
     label out loud. The mux was proven innocent by correlation (1.000 against
     the TTS master in the announcer window, ~0.00 in every mime window).
@@ -842,7 +842,7 @@ def test_the_identity_guard_catches_the_REAL_shipped_prompt():
     the bug that motivated it is theatre.
 
     `signal_lost_the_weaver_of_dreams_20260828_003427`, beat b003: the prompt
-    opened with TITANIA's character_description and the model said "Queen of
+    opened with TITANIA's appearance and the model said "Queen of
     the Fairies" out loud."""
     look = ("30s, Queen of the Fairies. Face: heart-shaped, high arched brows, "
             "thin straight nose, sharp-pointed chin")

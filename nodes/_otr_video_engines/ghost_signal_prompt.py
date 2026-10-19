@@ -496,9 +496,7 @@ def _trim_to(text, ceiling) -> str:
 
 #: Cast-row source priority. ``name`` is present only as a SIGNAL that the row
 #: is sparse; the name itself is never emitted (see :func:`_strip_name`).
-SIGIL_SOURCE_FIELDS = (
-    "portrait_prompt", "appearance", "description", "character_description",
-)
+SIGIL_SOURCE_FIELDS = ("appearance",)  # the drawable field (2026-10-18)
 
 
 def distill_sigil_components(cast_row, *, episode_seed, char_id,

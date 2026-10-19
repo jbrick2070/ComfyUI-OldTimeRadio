@@ -71,7 +71,7 @@ def test_bark_preset_gender_unknown_is_empty():
 def test_casting_response_accepts_verbose_voice_preset():
     long_id = "indextts2/" + ("a" * 200)  # > 80 chars
     resp = CastingResponse(
-        character_description="A weary engineer who fixes the relay.",
+        appearance="A weary engineer who fixes the relay.",
         gender="male", voice_preset=long_id,
     )
     assert resp.voice_preset == long_id

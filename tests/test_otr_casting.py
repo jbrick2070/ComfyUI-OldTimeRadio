@@ -65,7 +65,7 @@ def _desc_response(
 ):
     """Sprint 3D: the LLM produces description ONLY. Gender and
     voice_preset are no longer LLM concerns."""
-    return json.dumps({"character_description": description})
+    return json.dumps({"appearance": description})
 
 
 # ---------------------------------------------------------------------------
@@ -564,7 +564,7 @@ def test_precompute_ensemble_slots_accounts_for_prior_cast_gender():
     the prior cast (LEMMY is male), so the open slots compensate."""
     # 5 open slots + 1 prior male (LEMMY). Whole ensemble = 6.
     prior = [{"name": "LEMMY", "gender": "male",
-              "character_description": "engineer"}]
+              "appearance": "engineer"}]
     ensemble = _OTRC.precompute_ensemble_slots(
         _slots(5), prior_cast=prior, rng=random.Random("prior-gender"),
     )
@@ -610,12 +610,12 @@ def test_llm_write_description_returns_description_response():
         prior_cast=[],
     )
     assert isinstance(r, _OTRC.DescriptionResponse)
-    assert r.character_description == "A keen-eyed pilot."
+    assert r.appearance == "A keen-eyed pilot."
 
 
 def test_llm_write_description_output_has_no_gender_or_voice():
     """Sprint 3D core invariant: the LLM's response object exposes
-    ONLY character_description -- gender and voice_preset are NOT
+    ONLY appearance -- gender and voice_preset are NOT
     fields the LLM produces anymore."""
     gen = _make_canned_generate_fn([_desc_response()])
     r = _OTRC.llm_write_description(
@@ -626,8 +626,9 @@ def test_llm_write_description_output_has_no_gender_or_voice():
     # F5 (story-engine v1): the description call now ALSO carries an optional
     # speech_signature (a voice-register artifact, like the description).
     # gender + voice_preset remain Python-owned and are NOT LLM fields.
-    assert fields == {"character_description", "speech_signature"}, \
-        f"DescriptionResponse must carry description + speech_signature, got {fields!r}"
+    assert fields == {"appearance", "presence", "voice_cue",
+                      "speech_signature"}, \
+        f"DescriptionResponse must carry the three character fields + speech_signature, got {fields!r}"
     assert not hasattr(r, "gender")
     assert not hasattr(r, "voice_preset")
 
@@ -637,7 +638,7 @@ def test_llm_write_description_ignores_extra_gender_voice_keys():
     the DescriptionResponse schema silently drops the extra keys --
     the LLM's voice/gender opinion is discarded, not honoured."""
     fat = json.dumps({
-        "character_description": "Weathered detective, 50s, gravel voice.",
+        "appearance": "Weathered detective, 50s, gravel voice.",
         "gender": "male",
         "voice_preset": "v2/en_speaker_0",
     })
@@ -646,7 +647,7 @@ def test_llm_write_description_ignores_extra_gender_voice_keys():
         gen, slot=_ens_slot(gender="female"), news_seed="s", style="noir",
         prior_cast=[],
     )
-    assert r.character_description.startswith("Weathered detective")
+    assert r.appearance.startswith("Weathered detective")
     assert not hasattr(r, "voice_preset")
 
 
@@ -659,7 +660,7 @@ def test_llm_write_description_rerolls_on_invalid_json():
         gen, slot=_ens_slot(), news_seed="story", style="noir",
         prior_cast=[],
     )
-    assert r.character_description
+    assert r.appearance
 
 
 def test_llm_write_description_max_attempts_zero_rejected():
@@ -823,14 +824,14 @@ def test_open_voice_pool_short_descriptions_are_deterministic():
 
 def test_description_response_accepts_valid():
     r = _OTRC.DescriptionResponse(
-        character_description="Female, 40s, weary broadcaster",
+        appearance="Female, 40s, weary broadcaster",
     )
-    assert r.character_description.startswith("Female")
+    assert r.appearance.startswith("Female")
 
 
 def test_description_response_preserves_short_description():
-    r = _OTRC.DescriptionResponse(character_description="terse")
-    assert r.character_description == "terse"
+    r = _OTRC.DescriptionResponse(appearance="terse")
+    assert r.appearance == "terse"
 
 
 def test_casting_response_accepts_valid():
@@ -838,7 +839,7 @@ def test_casting_response_accepts_valid():
     voice_preset). Sprint 3D: gender/voice come from Python, not the
     LLM, but the combined shape is unchanged for the writer."""
     r = _OTRC.CastingResponse(
-        character_description="Female, 40s, weary broadcaster",
+        appearance="Female, 40s, weary broadcaster",
         gender="female",
         voice_preset="v2/en_speaker_4",
     )
@@ -850,7 +851,7 @@ def test_casting_response_rejects_bad_gender():
     from pydantic import ValidationError
     with pytest.raises(ValidationError):
         _OTRC.CastingResponse(
-            character_description="Female, 40s, weary",
+            appearance="Female, 40s, weary",
             gender="non-binary",  # not in {male,female,other}
             voice_preset="v2/en_speaker_4",
         )
@@ -858,16 +859,16 @@ def test_casting_response_rejects_bad_gender():
 
 def test_casting_response_preserves_short_description():
     r = _OTRC.CastingResponse(
-        character_description="terse",
+        appearance="terse",
         gender="male",
         voice_preset="v2/en_speaker_0",
     )
-    assert r.character_description == "terse"
+    assert r.appearance == "terse"
 
 
 def test_casting_response_normalizes_gender_case():
     r = _OTRC.CastingResponse(
-        character_description="Some valid description text",
+        appearance="Some valid description text",
         gender="MALE",
         voice_preset="v2/en_speaker_0",
     )
@@ -899,7 +900,7 @@ def test_cast_one_character_first_attempt_success():
     # (OTR_CastLock stamps the bark voice after the freeze).
     assert r.gender in _OTRC._VALID_GENDERS
     assert r.voice_preset == ""  # Sprint 2 (a): CastLock assigns the bark voice post-freeze; cast_one_character no longer does
-    assert r.character_description
+    assert r.appearance
 
 
 def test_cast_one_character_voice_always_in_pool():
@@ -1042,7 +1043,7 @@ def test_cast_one_character_survives_trailing_object_after_json():
     top-level JSON object. The shared _otr_json extractor takes the
     first complete object and ignores the trailing one."""
     first = _desc_response("a sharp-eyed scientist")
-    trailing = '\n{"character_description":"a stray hallucinated second"}'
+    trailing = '\n{"appearance":"a stray hallucinated second"}'
     gen = _make_canned_generate_fn([first + trailing])
     r = _OTRC.cast_one_character(
         gen,
@@ -1050,7 +1051,7 @@ def test_cast_one_character_survives_trailing_object_after_json():
         prior_cast=[], available_voices=_three_voices(),
         rng=random.Random("c-trailing"),
     )
-    assert r.character_description.startswith("a sharp-eyed scientist")
+    assert r.appearance.startswith("a sharp-eyed scientist")
 
 
 def test_cast_one_character_survives_trailing_prose_after_json():
@@ -1065,7 +1066,7 @@ def test_cast_one_character_survives_trailing_prose_after_json():
         prior_cast=[], available_voices=_three_voices(),
         rng=random.Random("c-prose"),
     )
-    assert r.character_description.startswith("a weary broadcaster")
+    assert r.appearance.startswith("a weary broadcaster")
 
 
 def test_cast_one_character_repair_attempt_used():
@@ -1081,7 +1082,7 @@ def test_cast_one_character_repair_attempt_used():
         prior_cast=[], available_voices=_three_voices(),
         max_attempts=3, rng=random.Random("c-repair"),
     )
-    assert r.character_description
+    assert r.appearance
 
 
 def test_cast_one_character_raises_after_all_attempts_fail():
@@ -1170,7 +1171,7 @@ def test_prompt_omits_cast_so_far_block_when_prior_empty():
 def test_prompt_includes_cast_so_far_when_prior_nonempty():
     prior = [
         {"name": "LEMMY", "gender": "male",
-         "character_description": "Grizzled wrench-wielding engineer, 50s"},
+         "appearance": "Grizzled wrench-wielding engineer, 50s"},
     ]
     prompt = _OTRC._build_user_prompt(
         name="ALICE",
@@ -1207,7 +1208,7 @@ def test_prompt_is_description_only_no_voice_block_no_balance_line():
     assert "40%" not in prompt and "Aim" not in prompt, \
         "the ensemble-balance instruction must be gone from the prompt"
     # The JSON contract asks for description only.
-    assert '"character_description"' in prompt
+    assert '"appearance"' in prompt
     assert '"voice_preset"' not in prompt
     assert '"gender":"male|female|other"' not in prompt
 

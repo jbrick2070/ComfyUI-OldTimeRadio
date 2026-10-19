@@ -9,6 +9,11 @@ ledger exists.
 """
 from __future__ import annotations
 
+try:
+    from ._otr_shared import cast_text as _CAST_TEXT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import cast_text as _CAST_TEXT  # type: ignore
+
 import logging
 import re
 from dataclasses import dataclass, field
@@ -493,7 +498,8 @@ def build_voice_card(cast_row) -> str:
     consumed:
       name                     ALL-CAPS canonical name
       gender                   optional, "male" / "female" / ...
-      character_description    optional, freeform trait line
+      appearance / presence / voice_cue
+                               optional, read as one card (cast_text)
 
     Returns a string like:
         ALICE (female, weary forensic engineer in her 40s, dry humor)
@@ -509,7 +515,7 @@ def build_voice_card(cast_row) -> str:
     if isinstance(cast_row, dict):
         name = str(cast_row.get("name") or "").strip()
         gender = str(cast_row.get("gender") or "").strip()
-        desc = str(cast_row.get("character_description") or "").strip()
+        desc = _CAST_TEXT.card_text(cast_row)
         has_sig = "speech_signature" in cast_row
         sig = str(cast_row.get("speech_signature") or "").strip()
     else:
@@ -520,7 +526,7 @@ def build_voice_card(cast_row) -> str:
         # construction and still guards any attribute-style row.)
         name = str(getattr(cast_row, "name", "") or "").strip()
         gender = str(getattr(cast_row, "gender", "") or "").strip()
-        desc = str(getattr(cast_row, "character_description", "") or "").strip()
+        desc = _CAST_TEXT.card_text(cast_row)
         has_sig = hasattr(cast_row, "speech_signature")
         sig = str(getattr(cast_row, "speech_signature", "") or "").strip()
     if not name:

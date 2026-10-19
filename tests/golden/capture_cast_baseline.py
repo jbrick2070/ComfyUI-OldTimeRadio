@@ -10,7 +10,7 @@ SystemRandom LEMMY cameo (decoupled from the C7 seed by design) cannot perturb
 determinism.
 
 The cast STRUCTURE (char_id, name, gender, voice_preset) is the byte-identity
-surface the R2 C7 test pins; character_description is LLM/stub output and is
+surface the R2 C7 test pins; appearance is LLM/stub output and is
 deliberately excluded.
 
 The baseline seed is the lowest seed whose rolled names are already
@@ -46,7 +46,7 @@ STYLE = "1950s science fiction radio drama"
 
 def _stub(messages, *, temperature, max_new_tokens):  # noqa: ARG001
     return json.dumps({
-        "character_description":
+        "appearance":
             "A steady, weathered field operator who keeps the crew grounded.",
     })
 

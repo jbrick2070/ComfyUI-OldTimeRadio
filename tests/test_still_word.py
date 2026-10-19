@@ -553,7 +553,7 @@ def test_render_clip_fails_loud_without_a_still():
 # --------------------------------------------------------------------------- #
 def _cast():
     return [{"char_id": "c01",
-             "character_description": "a weathered dock inspector in an oilskin coat"}]
+             "appearance": "a weathered dock inspector in an oilskin coat"}]
 
 
 def _lines():

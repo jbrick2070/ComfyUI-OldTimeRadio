@@ -50,9 +50,9 @@ def _ledger():
                 "setting": "Los Angeles", "author": "Not a story fact"}}},
         },
         "cast": [
-            {"char_id": "c1", "name": "Ada", "character_description": "round face, dark curls"},
-            {"char_id": "c2", "name": "Mother", "character_description": "silver hair, kind eyes"},
-            {"char_id": "c3", "name": "Tom", "character_description": "tall gardener in overalls"}],
+            {"char_id": "c1", "name": "Ada", "appearance": "round face, dark curls"},
+            {"char_id": "c2", "name": "Mother", "appearance": "silver hair, kind eyes"},
+            {"char_id": "c3", "name": "Tom", "appearance": "tall gardener in overalls"}],
         "lines": [
             {"line_id": "l1", "shot_id": "shot1", "speaker_role": "character", "char_id": "c1",
              "speaker": "Ada", "text": "Mother, sit beside me. " + "We talk. " * 40 + "A shared meal.",
@@ -192,7 +192,7 @@ def test_scene_unknown_treatment_age_is_absent_and_known_row_age_wins():
 
 def test_corrected_narrative_appearance_is_not_prepended_back_into_prompt():
     ledger = _ledger()
-    ledger["cast"][0]["character_description"] = "round face, mourning her dead mother, waiting alone"
+    ledger["cast"][0]["appearance"] = "round face, mourning her dead mother, waiting alone"
     (prompt, _), receipt = _compose(Slot(), ledger=ledger)
     assert "dead mother" not in prompt and "waiting alone" not in prompt
     assert "living mother" in prompt

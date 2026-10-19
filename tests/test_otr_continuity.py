@@ -72,9 +72,9 @@ def _cast_stub() -> list[dict]:
     """A locked-cast stub shaped like the production-ledger cast rows."""
     return [
         {"name": "MARA", "char_id": "c01",
-         "character_description": "A night-shift radio operator."},
+         "appearance": "A night-shift radio operator."},
         {"name": "DELL", "char_id": "c02",
-         "character_description": "A weary station supervisor."},
+         "appearance": "A weary station supervisor."},
     ]
 
 

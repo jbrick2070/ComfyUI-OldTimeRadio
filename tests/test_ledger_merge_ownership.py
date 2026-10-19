@@ -36,7 +36,7 @@ def test_intentionally_cleared_text_survives_save_roundtrip(tmp_path):
                          out_dir=str(tmp_path / "ep"))
     led.set_cast([{"char_id": "c02", "name": "SELA", "tts_model": "bark",
                    "voice_preset": "v2/en_speaker_4",
-                   "character_description": "x" * 40, "gender": "female",
+                   "appearance": "x" * 40, "gender": "female",
                    "voice_params": None}])
     led.set_lines([_row()])
     led.save()

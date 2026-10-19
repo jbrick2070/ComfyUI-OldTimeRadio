@@ -48,7 +48,7 @@ def _make_llm(pass1_response):
         if "JSON array" in content:
             return pass1_response
         return json.dumps({
-            "character_description":
+            "appearance":
                 "A steady operator who keeps the crew grounded and focused."})
     return gen
 
@@ -231,7 +231,7 @@ def test_r8_naming_llm_raise_is_loud(monkeypatch):
         content = messages[0]["content"] if messages else ""
         if "JSON array" in content:
             raise RuntimeError("naming model unavailable")
-        return json.dumps({"character_description": "A steady operator."})
+        return json.dumps({"appearance": "A steady operator."})
 
     with pytest.raises(_OTRC.CastValidationLLMError, match="no-fallback rip"):
         _lock(1, generate_fn=_boom)

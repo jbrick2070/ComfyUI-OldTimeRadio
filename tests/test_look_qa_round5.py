@@ -258,7 +258,7 @@ class TestPersonAnchor:
                   "char_id": "c02", "text": "It's alive.",
                   "samples": None, "sample_rate": None, "dur_s": 2.0}]
         led = {"cast": [{"char_id": "c02", "name": "HAYES VANCE",
-                         "portrait_prompt": "a stocky engineer in grey"}],
+                         "appearance": "a stocky engineer in grey"}],
                "lines": []}
         meta = {"story_brief_terms": {"setting": ["foundry"]}}
         llm = (lambda prompt:
@@ -280,7 +280,7 @@ class TestPersonAnchor:
                   "char_id": "c02", "text": "It's alive.",
                   "samples": None, "sample_rate": None, "dur_s": 2.0}]
         led = {"cast": [{"char_id": "c02", "name": "HAYES VANCE",
-                         "portrait_prompt": "a stocky engineer in grey"}],
+                         "appearance": "a stocky engineer in grey"}],
                "lines": []}
         meta = {"story_brief_terms": {"setting": ["foundry"]}}
         llm = (lambda prompt:
@@ -299,7 +299,7 @@ class TestPersonAnchor:
                   "char_id": "c02", "text": "It's alive.",
                   "samples": None, "sample_rate": None, "dur_s": 2.0}]
         led = {"cast": [{"char_id": "c02", "name": "HAYES VANCE",
-                         "portrait_prompt": "a stocky engineer in grey"}],
+                         "appearance": "a stocky engineer in grey"}],
                "lines": []}
         meta = {"story_brief_terms": {"setting": ["foundry"]}}
         creative, warnings = _sl.derive_creative_directives(
@@ -314,7 +314,7 @@ class TestPersonAnchor:
                   "char_id": "c02", "text": "It's alive.",
                   "samples": None, "sample_rate": None, "dur_s": 2.0}]
         led = {"cast": [{"char_id": "c02", "name": "HAYES VANCE",
-                         "portrait_prompt": "a stocky engineer in grey"}],
+                         "appearance": "a stocky engineer in grey"}],
                "lines": []}
         creative, _ = _sl.derive_creative_directives(beats, {}, led,
                                                      llm_fn=None)
@@ -370,7 +370,7 @@ class TestPortraitPromptGuidance:
     def test_instruction_guides_world_grounding_and_upper_body(self):
         from nodes import otr_meta_brief_image_prompt as mb
         req = mb._build_char_prompt_request(
-            {"char_id": "c02", "portrait_prompt": "an engineer"}, {}, "lab")
+            {"char_id": "c02", "appearance": "an engineer"}, {}, "lab")
         assert "Do not mention radios" in req
         assert "head and upper body" in req
 

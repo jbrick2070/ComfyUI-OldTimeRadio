@@ -66,8 +66,8 @@ stamped timeline (`start_s`, `dur_s`) and the clips manifest.
 
 **Shot direction / video:** `speaker_role` maps to a video role with NO
 FALLBACK -- an unknown role stops the render loudly. Also read: `line_id`,
-`skip`, `boundary`, `beats[].beat_id`, cast appearance (`portrait_prompt` /
-`appearance` / `character_description`, else `name`), `meta.episode_id`,
+`skip`, `boundary`, `beats[].beat_id`, the cast row's `appearance` and
+`presence` (else `name`; `voice_cue` is LLM context only), `meta.episode_id`,
 `meta.story_brief_terms.setting`, music `cue_id`, `visual_prompt`.
 
 **Captions:** per line `start_s`, `dur_s`, `text`, `speaker_role`, `char_id`;
