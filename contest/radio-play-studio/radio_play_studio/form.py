@@ -24,6 +24,8 @@ class Field:
     input: str
     help: str
     group: str
+    #: Choices the pack lists but cannot run (a dropdown row that fails loud).
+    exclude: tuple = ()
 
 
 #: In the order they appear on the page.
@@ -31,7 +33,7 @@ FIELDS: tuple = (
     Field("bank", "Story bank", WRITER, "source_bank",
           "Where the story comes from. Pick shakespeare or public_domain to adapt a "
           "classic, my_story to use your own details below, or roll to be surprised.",
-          "The show"),
+          "The show", exclude=("custom_source_bank",)),
     Field("source_ref", "Source to adapt", WRITER, "source_ref",
           "Optional. Name the classic to adapt (needs a named bank, not the roll).",
           "The show"),
@@ -42,7 +44,9 @@ FIELDS: tuple = (
     Field("cast_size", "Cast size", WRITER, "num_characters",
           "Speaking parts.", "The show"),
     Field("style", "Visual style", WRITER, "visual_style",
-          "The look of the picture. Leave it on roll to be surprised.", "The show"),
+          "Restyles the still and video prompts, so it shows once a video lane draws from "
+          "stills. On the audio-reactive lanes it changes the file name, not the picture.",
+          "The show"),
     Field("my_characters", "Characters", WRITER, "story_characters",
           "Used when the story bank is my_story.", "My story"),
     Field("my_plot", "Plot", WRITER, "story_plot",
@@ -73,7 +77,7 @@ def describe_form(schemas: dict, api_prompt: dict | None = None, node_ids: dict 
     would; without it, a row starts on the node's default."""
     rows = []
     for f in FIELDS:
-        info = describe_input(schemas, f.node_type, f.input)
+        info = _usable(describe_input(schemas, f.node_type, f.input), f)
         default = info["default"]
         if api_prompt is not None and node_ids is not None:
             saved = api_prompt.get(node_ids[f.node_type], {}).get("inputs", {}).get(f.input)
@@ -104,9 +108,16 @@ def apply_choices(api_prompt: dict, schemas: dict, node_ids: dict, choices: dict
             raise GraphError(f"the graph has no {f.node_type} node")
         if isinstance(node["inputs"].get(f.input), list):
             raise GraphError(f"{f.label} is wired to another node in this workflow; it cannot be set here")
-        info = describe_input(schemas, f.node_type, f.input)
+        info = _usable(describe_input(schemas, f.node_type, f.input), f)
         node["inputs"][f.input] = coerce_value(info, _blank_to_text(value, info), f.label)
     return api_prompt
+
+
+def _usable(info: dict, f: Field) -> dict:
+    """`info` without the choices this field must not offer or accept."""
+    if f.exclude and info["kind"] == "choice":
+        info = dict(info, choices=[c for c in info["choices"] if c not in f.exclude])
+    return info
 
 
 def _blank_to_text(value: Any, info: dict) -> Any:

@@ -8,15 +8,23 @@ from __future__ import annotations
 
 import copy
 import os
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
-from .config import Settings
+from .config import Settings, validate_url
 from .form import EPISODE_NODE_TYPE, apply_choices, describe_form, locate_nodes
 from .graph import fetch_object_info, load_workflow, workflow_to_api_prompt
 
 VIDEO_SUFFIXES = (".mp4", ".webm", ".mov", ".mkv")
+
+#: How long one poll waits for the job before looking again, how many failed
+#: polls in a row are forgiven (a restart of the bridge, a dropped connection),
+#: and the longest pause between them. About ten minutes of outage in all.
+POLL_WINDOW_S = 60.0
+MAX_TRANSIENT = 20
+BACKOFF_CAP_S = 30.0
 
 
 class EpisodeMissing(RuntimeError):
@@ -26,7 +34,7 @@ class EpisodeMissing(RuntimeError):
 
 def make_client(api_url: str) -> Any:
     """A Comfy SDK client aimed at the local bridge, never at Comfy Cloud."""
-    os.environ["COMFY_BASE_URL"] = api_url
+    os.environ["COMFY_BASE_URL"] = validate_url("the bridge address", api_url)
     try:
         from comfy_sdk import Comfy
     except ImportError as exc:  # pragma: no cover - exercised by `doctor`
@@ -51,16 +59,52 @@ def normalize_event(event: Any) -> dict | None:
 
 
 def pick_episode_output(job: Any, node_id: str) -> Any:
-    """The finished episode's video among a job's outputs: the mux node's first,
-    then any video in the job."""
-    for pool in (job.get_outputs(node_id), job.outputs):
-        for out in pool or []:
-            if str(getattr(out, "name", "")).lower().endswith(VIDEO_SUFFIXES):
-                return out
+    """The finished episode's video, from the mux node and nowhere else.
+
+    The silent cut (`OTR_SignalLostVideo`) also publishes a video, so "any video
+    in the job" would hand back the wrong file as the finished episode; if the
+    mux node offers none, the run fails rather than guess."""
+    for out in job.get_outputs(node_id) or []:
+        if str(getattr(out, "name", "")).lower().endswith(VIDEO_SUFFIXES):
+            return out
     raise EpisodeMissing(
-        "the run finished but returned no video. Look in your ComfyUI output folder "
-        "under otr/obs/ and in the ComfyUI console for 'MasterAudioMux FAILED'."
+        "the run finished but the final mux returned no video to download. The episode may "
+        "still have been published: look in your ComfyUI output folder under otr/obs/ (or "
+        "your OTR_OBS_DIR). If it is not there, the ComfyUI console says why "
+        "('MasterAudioMux FAILED')."
     )
+
+
+def is_transient(exc: BaseException) -> bool:
+    """A failure of the connection or the bridge, not a verdict on the job."""
+    if isinstance(exc, OSError):
+        return True
+    status = getattr(exc, "http_status", None)
+    if isinstance(status, int) and (status == 429 or status >= 500):
+        return True
+    return type(exc).__module__.split(".")[0] == "httpx"
+
+
+def settle(job: Any, sleep=time.sleep) -> Any:
+    """Wait for the job to end and return it, raising `JobFailed` if it failed.
+
+    The live event stream is only a view; this poll is the truth. It rides out a
+    bridge restart or a dropped connection (the render is still running on the
+    GPU) instead of reporting a healthy multi-hour render as stopped."""
+    failures = 0
+    while True:
+        try:
+            job.wait(timeout=POLL_WINDOW_S)
+            return job.result()
+        except TimeoutError:
+            failures = 0  # the server answered; the job is simply still running
+        except Exception as exc:  # noqa: BLE001 - decided below
+            if not is_transient(exc):
+                raise
+            failures += 1
+            if failures > MAX_TRANSIENT:
+                raise
+            sleep(min(BACKOFF_CAP_S, 2.0 ** failures))
 
 
 class Studio:
@@ -98,11 +142,14 @@ class Studio:
             client = self._client_factory(self.settings.api_url)
             job = client.submit(client.workflows.from_json(graph))
             yield {"type": "submitted"}
-            for event in job.events():
-                note = normalize_event(event)
-                if note:
-                    yield note
-            job.result()  # authoritative: polls the job and raises JobFailed
+            try:
+                for event in job.events():
+                    note = normalize_event(event)
+                    if note:
+                        yield note
+            except Exception as exc:  # noqa: BLE001 - the stream is a view, settle() is the truth
+                yield {"type": "note", "message": f"live progress was lost ({exc}); still waiting on the job"}
+            settle(job)
             out = pick_episode_output(job, node_ids[EPISODE_NODE_TYPE])
             dest_dir = self.settings.out_dir / uuid.uuid4().hex[:12]
             dest_dir.mkdir(parents=True, exist_ok=True)

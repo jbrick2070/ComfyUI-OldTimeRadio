@@ -147,16 +147,27 @@ async function loadOptions() {
 
 function watch(id) {
   const es = new EventSource("/api/episodes/" + id + "/events");
+  let finished = false, high = 0;   // the bar only moves forward
+  es.onerror = () => {
+    if (finished || es.readyState !== EventSource.CLOSED) return;   // otherwise the browser is reconnecting
+    es.close();
+    $("error").textContent = "Lost the connection to the app. If you restarted it, the run is no longer tracked here, but it may still be rendering on your ComfyUI; its episode lands in otr/obs.";
+    $("error").hidden = false;
+    $("status").textContent = "Disconnected.";
+    go.disabled = false;
+  };
   es.onmessage = (m) => {
     const ev = JSON.parse(m.data);
     if (ev.type === "progress") {
-      $("fill").style.width = Math.round(ev.value * 100) + "%";
-      $("status").textContent = Math.round(ev.value * 100) + "% " + ev.message;
+      high = Math.max(high, Math.round(ev.value * 100));
+      $("fill").style.width = high + "%";
+      $("status").textContent = high + "% " + ev.message;
     } else if (ev.type === "submitted") {
       $("status").textContent = "Queued on your ComfyUI. A full episode takes a while; the bar moves in steps.";
     } else if (ev.type === "status") {
       $("status").textContent = "Status: " + ev.status;
     } else if (ev.type === "done") {
+      finished = true;
       es.close();
       $("fill").style.width = "100%";
       $("status").textContent = "Finished.";
@@ -170,6 +181,7 @@ function watch(id) {
       $("result").hidden = false;
       go.disabled = false;
     } else if (ev.type === "error") {
+      finished = true;
       es.close();
       $("error").textContent = ev.message;
       $("error").hidden = false;

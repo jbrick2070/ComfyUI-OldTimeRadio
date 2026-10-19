@@ -7,7 +7,8 @@ import pytest
 
 from radio_play_studio.graph import ServerUnreachable
 from radio_play_studio.runner import (
-    EpisodeMissing, Studio, describe_failure, make_client, normalize_event, pick_episode_output,
+    EpisodeMissing, Studio, describe_failure, is_transient, make_client, normalize_event,
+    pick_episode_output, settle,
 )
 
 
@@ -47,6 +48,9 @@ class FakeJob:
 
     def events(self):
         yield from self._events
+
+    def wait(self, timeout=None):
+        return self
 
     def result(self):
         if self._fail:
@@ -163,21 +167,102 @@ def test_bad_choices_end_the_stream_before_anything_is_submitted(settings, schem
     assert last["type"] == "error" and client.submitted is None
 
 
-def test_pick_episode_output_prefers_the_mux_node_then_any_video():
+def test_pick_episode_output_takes_only_the_mux_nodes_video():
     mux_video = FakeOutput("a.mp4")
     mux_video.node_id = "9"
-    other = FakeOutput("b.webm")
-    other.node_id = "4"
+    silent_cut = FakeOutput("silent_cut.mp4")
+    silent_cut.node_id = "4"
 
     class Job:
-        outputs = [other]
+        outputs = [silent_cut, mux_video]
         def get_outputs(self, node_id):
-            return [mux_video] if node_id == "9" else []
+            return [o for o in self.outputs if o.node_id == node_id]
     assert pick_episode_output(Job(), "9") is mux_video
-    assert pick_episode_output(Job(), "55") is other
-    Job.outputs = []
-    with pytest.raises(EpisodeMissing):
+    with pytest.raises(EpisodeMissing, match="OTR_OBS_DIR"):
         pick_episode_output(Job(), "55")
+
+
+def test_the_silent_cut_is_never_reported_as_the_episode(settings, schemas):
+    """Seen against the real SDK: with the published file outside ComfyUI's
+    output folder the mux node offers no video, and the silent cut's mp4 was
+    the only one left."""
+    silent_cut = FakeOutput("silent_cut.mp4")
+    silent_cut.node_id = "4"
+    poster = FakeOutput("poster.png")
+    poster.node_id = "9"
+    studio, _ = _studio(settings, schemas, FakeJob([], [silent_cut, poster]))
+    events = list(studio.stream({}))
+    assert events[-1]["type"] == "error" and not any(e["type"] == "done" for e in events)
+    assert not settings.out_dir.exists() or not any(settings.out_dir.rglob("silent_cut.mp4"))
+
+
+class Flaky(Exception):
+    def __init__(self, status):
+        super().__init__(f"HTTP {status}")
+        self.http_status = status
+
+
+class PollingJob(FakeJob):
+    """A job whose first polls fail the way a restarting bridge does."""
+    def __init__(self, failures, still_running=0, **kw):
+        super().__init__([], [], **kw)
+        self._failures, self._running = list(failures), still_running
+
+    def wait(self, timeout=None):
+        if self._failures:
+            raise self._failures.pop(0)
+        if self._running:
+            self._running -= 1
+            raise TimeoutError("not terminal yet")
+        return self
+
+
+def test_settle_rides_out_a_restarting_bridge_and_a_long_render():
+    pauses = []
+    job = PollingJob([Flaky(503), ConnectionError("reset"), Flaky(429)], still_running=3)
+    assert settle(job, sleep=pauses.append) is job
+    assert pauses == [2.0, 4.0, 8.0] and job.seen_result
+
+
+def test_settle_gives_up_on_a_bridge_that_stays_down():
+    job = PollingJob([Flaky(503)] * 50)
+    with pytest.raises(Flaky):
+        settle(job, sleep=lambda s: None)
+
+
+def test_settle_does_not_retry_a_verdict():
+    class JobFailed(Exception):
+        error = "node died"
+    job = PollingJob([], fail=JobFailed("failed"))
+    with pytest.raises(JobFailed):
+        settle(job, sleep=lambda s: pytest.fail("a failed job must not be retried"))
+    with pytest.raises(Flaky):                       # a 404 is the job being gone, not a blip
+        settle(PollingJob([Flaky(404)]), sleep=lambda s: None)
+
+
+def test_is_transient_reads_status_and_connection_errors():
+    assert is_transient(Flaky(502)) and is_transient(Flaky(429)) and is_transient(ConnectionResetError())
+    assert not is_transient(Flaky(404)) and not is_transient(ValueError("x"))
+
+
+def test_a_lost_event_stream_does_not_stop_a_healthy_run(settings, schemas):
+    class DeadStream(FakeJob):
+        def events(self):
+            raise Flaky(503)
+            yield  # pragma: no cover - makes this a generator
+    video = FakeOutput("otr_episode.mp4")
+    video.node_id = "9"
+    studio, _ = _studio(settings, schemas, DeadStream([], [video]))
+    events = list(studio.stream({}))
+    assert [e["type"] for e in events] == ["submitted", "note", "done"]
+
+
+def test_make_client_refuses_a_blank_bridge_address(monkeypatch):
+    monkeypatch.setenv("COMFY_BASE_URL", "http://127.0.0.1:8189")
+    for bad in ("", " ", "/", "cloud.comfy.org", "ftp://host"):
+        with pytest.raises(ValueError):
+            make_client(bad)
+    assert os.environ["COMFY_BASE_URL"] == "http://127.0.0.1:8189"
 
 
 def test_options_come_from_the_live_server(settings, schemas):

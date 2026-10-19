@@ -90,3 +90,13 @@ def test_the_real_workflow_has_each_node_the_form_addresses():
     ids = locate_nodes(json.loads(path.read_text(encoding="utf-8")))
     assert set(ids) == {f.node_type for f in FIELDS} | {"OTR_MasterAudioMux"}
     assert FIELDS_BY_KEY["bank"].input == "source_bank"
+
+
+def test_a_bank_the_pack_cannot_run_is_not_offered_or_accepted(schemas, workflow):
+    banks = schemas["OTR_LedgerScriptWriter"]["input"]["required"]["source_bank"]
+    banks[0].append("custom_source_bank")
+    rows = {r["key"]: r for r in describe_form(schemas)}
+    assert "custom_source_bank" not in rows["bank"]["choices"]
+    graph, ids = _graph(workflow, schemas)
+    with pytest.raises(ValueError, match="Story bank"):
+        apply_choices(graph, schemas, ids, {"bank": "custom_source_bank"})

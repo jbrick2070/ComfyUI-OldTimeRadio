@@ -14,6 +14,7 @@ two to the same output.
 from __future__ import annotations
 
 import json
+import math
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -225,9 +226,16 @@ def coerce_value(info: dict, value: Any, label: str) -> Any:
         if isinstance(value, bool):
             raise ValueError(f"{label}: expected a number, got {value!r}")
         try:
-            number = int(value) if kind == "int" else float(value)
-        except (TypeError, ValueError):
+            number = float(value) if kind == "float" else value
+            if kind == "int":
+                # 2.7 is not a whole number of anything; do not quietly make it 2.
+                if isinstance(value, float) and not value.is_integer():
+                    raise ValueError("not a whole number")
+                number = int(value)
+        except (TypeError, ValueError, OverflowError):
             raise ValueError(f"{label}: expected a number, got {value!r}") from None
+        if kind == "float" and not math.isfinite(number):
+            raise ValueError(f"{label}: expected a number, got {value!r}")
         lo, hi = info.get("min"), info.get("max")
         if (lo is not None and number < lo) or (hi is not None and number > hi):
             raise ValueError(f"{label}: {number} is outside {lo}..{hi}")

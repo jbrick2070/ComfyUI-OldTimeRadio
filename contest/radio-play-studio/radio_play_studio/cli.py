@@ -63,7 +63,13 @@ def _choices(args: argparse.Namespace) -> dict:
     return {f.key: getattr(args, f.key) for f in FIELDS if getattr(args, f.key, None) is not None}
 
 
+LOOPBACK_BINDS = ("127.0.0.1", "localhost", "::1")
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
+    if args.host not in LOOPBACK_BINDS:
+        raise ValueError(f"--host {args.host!r}: this app has no login, so it only listens on this "
+                         f"machine ({', '.join(LOOPBACK_BINDS)})")
     studio = Studio(_settings(args))
     server = make_server(studio, args.host, args.port)
     print(f"Radio Play Studio on http://{args.host}:{args.port}  (ComfyUI {studio.settings.comfyui_url}, "

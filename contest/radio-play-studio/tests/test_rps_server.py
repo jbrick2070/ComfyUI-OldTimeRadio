@@ -116,3 +116,32 @@ def test_an_unknown_episode_is_a_404(app):
     port, _ = app
     status, _, _ = _request(port, "GET", "/api/episodes/000000000000/events")
     assert status == 404
+
+
+def test_non_finite_and_fractional_numbers_are_400_not_a_dropped_connection(app):
+    port, _ = app
+    for body in (b'{"choices": {"cast_size": Infinity}}', b'{"choices": {"cast_size": 2.7}}'):
+        status, _, reply = _request(port, "POST", "/api/episodes", body, {"Content-Type": "application/json"})
+        assert status == 400 and "Cast size" in json.loads(reply)["error"]
+
+
+def test_a_nul_in_an_episode_path_is_a_404(app):
+    port, _ = app
+    status, _, _ = _request(port, "GET", "/episodes/%00")
+    assert status == 404
+
+
+def test_an_unexpected_failure_is_a_json_500_not_an_empty_reply(app, monkeypatch):
+    port, _ = app
+    monkeypatch.setattr(Studio, "options", lambda self: (_ for _ in ()).throw(RuntimeError("boom")))
+    status, headers, reply = _request(port, "GET", "/api/options")
+    assert status == 500 and "internal error" in json.loads(reply)["error"]
+
+
+def test_a_negative_last_event_id_replays_from_the_start(app):
+    port, _ = app
+    _, _, body = _post(port, {})
+    run_id = json.loads(body)["id"]
+    status, _, data = _request(port, "GET", f"/api/episodes/{run_id}/events", headers={"Last-Event-ID": "-5"})
+    ids = [int(line[4:]) for line in data.decode().splitlines() if line.startswith("id: ")]
+    assert status == 200 and ids[0] == 0 and min(ids) >= 0

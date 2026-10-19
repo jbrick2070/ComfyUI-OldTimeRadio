@@ -10,6 +10,7 @@ import json
 import mimetypes
 import re
 import threading
+import traceback
 import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -101,10 +102,32 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.FORBIDDEN, {"error": "this app only answers on localhost"})
         return False
 
-    # -- routes -------------------------------------------------------------
-    def do_GET(self) -> None:  # noqa: N802 - http.server's name
+    def _serve(self, route) -> None:
+        """Run a route so that no failure inside it ends as an empty reply: a
+        person gets a JSON error, the console gets the traceback, and a browser
+        that closed the tab mid-reply is not an error at all."""
         if not self._guard():
             return
+        try:
+            route()
+        except ConnectionError:
+            return
+        except Exception:  # noqa: BLE001 - last line of defence for the handler thread
+            traceback.print_exc()
+            try:
+                self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR,
+                                {"error": "internal error; the app's console has the details"})
+            except Exception:  # noqa: BLE001 - the reply was already under way
+                pass
+
+    # -- routes -------------------------------------------------------------
+    def do_GET(self) -> None:  # noqa: N802 - http.server's name
+        self._serve(self._get)
+
+    def do_POST(self) -> None:  # noqa: N802
+        self._serve(self._post)
+
+    def _get(self) -> None:
         path = unquote(urlsplit(self.path).path)
         if path == "/":
             return self._send_file(STATIC_DIR / "index.html", "text/html; charset=utf-8")
@@ -117,9 +140,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._episode_file(path[len("/episodes/"):])
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
-    def do_POST(self) -> None:  # noqa: N802
-        if not self._guard():
-            return
+    def _post(self) -> None:
         if urlsplit(self.path).path != "/api/episodes":
             return self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
@@ -153,7 +174,7 @@ class Handler(BaseHTTPRequestHandler):
         if run is None:
             return self._send_json(HTTPStatus.NOT_FOUND, {"error": "no such episode"})
         try:
-            sent = int(self.headers.get("Last-Event-ID", "-1")) + 1
+            sent = max(0, int(self.headers.get("Last-Event-ID", "-1")) + 1)
         except ValueError:
             sent = 0
         self.send_response(HTTPStatus.OK)
@@ -177,12 +198,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.flush()
                 if finished and sent >= len(run.events):
                     return
-        except (BrokenPipeError, ConnectionResetError):
+        except ConnectionError:
             return
 
     def _episode_file(self, rel: str) -> None:
         root = self.runs.studio.settings.out_dir.resolve()
-        target = (root / rel).resolve()
+        try:
+            target = (root / rel).resolve()
+        except (ValueError, OSError):  # an embedded NUL, an unusable name
+            return self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         if root != target and root not in target.parents:
             return self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         self._send_file(target, mimetypes.guess_type(target.name)[0] or "application/octet-stream")
@@ -223,7 +247,7 @@ class Handler(BaseHTTPRequestHandler):
                         break
                     self.wfile.write(chunk)
                     remaining -= len(chunk)
-        except (BrokenPipeError, ConnectionResetError):
+        except ConnectionError:
             return
 
     def _send_range_error(self, size: int) -> None:

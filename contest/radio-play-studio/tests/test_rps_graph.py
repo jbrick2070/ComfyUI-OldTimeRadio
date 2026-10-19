@@ -115,6 +115,9 @@ def test_coerce_value_accepts_what_the_server_accepts(info, value, expected):
     ({"kind": "int"}, "many"),
     ({"kind": "text"}, 5),
     ({"kind": "bool"}, "yes"),
+    ({"kind": "int"}, float("inf")),
+    ({"kind": "int"}, 2.7),
+    ({"kind": "float"}, float("nan")),
 ])
 def test_coerce_value_refuses_what_the_server_would(info, value):
     with pytest.raises(ValueError):

@@ -85,6 +85,13 @@ video lane) keeps the workflow's own setting.
 - **A finished job is not a finished episode.** The run ends in success only when the video file is on disk.
 - **Local only.** The web app listens on loopback, refuses other Host headers and only accepts JSON posts.
 
+## Known limits
+
+- There is no cancel button. Cancel a run from ComfyUI's own queue.
+- Restarting the app drops its memory of a run. The render keeps going on your ComfyUI and its episode still
+  lands in `otr/obs/`, but the page cannot re-attach to it.
+- The app listens only on this machine and has no login, so it refuses `--host` values beyond loopback.
+
 ## Tests
 
 ```
