@@ -17337,3 +17337,21 @@ not promote it to the Bug Bible on this evidence alone.
   speaker's beat is a scene_beat target. "represented by/as/through" leads as
   bodiless. A repeated adjacent appearance part is said once.
 - status: FIXED in code; live proof is the next public_domain and my_story legs.
+
+## PBUG-20261019-01 -- the 16 GB writer doubled the quote on a cast key; casting died on every retry
+- evidence: first live Radio Play Studio leg (comfy-sdk 0.5.0 -> comfy-api-proxy
+  0.1.6 -> :8000), `workflows/otr_16gb_video.json`, shakespeare, 1 act, ComfyUI
+  v0.42.1. Gemma 4 12B int8 (comfy_native) cast Twelfth Night's FOOL as
+  `{"appearance":"...from chronic stress",""presence":"..."}` on all three
+  ladder attempts (temperature 0.7, 0.35, 0.1). Casting raised
+  CastValidationLLMError after 12m09s; nothing rendered.
+- cause: the three-field cast reply (2026-10-18) was proven only on the 4060's
+  8 GB writer; the 12B model writes a stray empty string before the second key
+  and does it deterministically, so the retry ladder cannot help. The JSON
+  repair knew raw newlines and trailing commas, not this.
+- fix: `_otr_json._collapse_doubled_key_quotes` joins the repair: outside a
+  string, after `{` or `,`, a `""` followed by a letter or underscore loses one
+  quote. Never valid JSON otherwise, so valid replies are untouched; a doubled
+  quote after a colon stays a syntax miss. `_origin_of` maps the dropped quote
+  so errors still point at the text as written.
+- status: FIXED in code; live proof is the next 16 GB leg.
