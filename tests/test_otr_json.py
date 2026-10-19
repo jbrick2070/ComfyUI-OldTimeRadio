@@ -89,6 +89,13 @@ def test_doubled_quote_before_a_key_parses():
     assert OJ.parse_first_json_object('{""appearance":"a man"}') == {"appearance": "a man"}
 
 
+def test_doubled_key_quote_then_a_raw_newline_in_a_later_value_parses():
+    # The newline escape must see the collapsed key, or it reads every later
+    # quote inside-out and leaves this newline raw (Sonnet QA on 3e8affa1).
+    raw = '{"a":"x",""b":"y\nz","c":"w"}'
+    assert OJ.parse_first_json_object(raw) == {"a": "x", "b": "y\nz", "c": "w"}
+
+
 @pytest.mark.parametrize("raw, expected", [
     ('{"a": "", "b": 1}', {"a": "", "b": 1}),
     ('{"a": ["", "x"]}', {"a": ["", "x"]}),

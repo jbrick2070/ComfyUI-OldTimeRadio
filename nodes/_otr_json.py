@@ -175,9 +175,14 @@ def _collapse_doubled_key_quotes(blob: str) -> str:
 
 
 def _repair_llm_json(blob: str) -> str:
-    """Apply the three Gemma JSON defects that strict ``raw_decode`` rejects."""
+    """Apply the three Gemma JSON defects that strict ``raw_decode`` rejects.
+
+    The doubled key quote is collapsed FIRST: the other two passes track
+    where strings open and close, and an uncollapsed ``""`` reads to them as
+    an empty string, so every quote after it is read inside-out and a raw
+    newline in a later value is never escaped (Sonnet QA on 3e8affa1)."""
     return _strip_trailing_commas(
-        _collapse_doubled_key_quotes(_escape_raw_controls_in_strings(blob))
+        _escape_raw_controls_in_strings(_collapse_doubled_key_quotes(blob))
     )
 
 
