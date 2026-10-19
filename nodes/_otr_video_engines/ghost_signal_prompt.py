@@ -519,12 +519,13 @@ def distill_sigil_components(cast_row, *, episode_seed, char_id,
     row = cast_row if isinstance(cast_row, dict) else {}
     name = str(row.get("name") or "")
 
-    source_text = ""
-    for field in SIGIL_SOURCE_FIELDS:
-        value = _normalize_ws(row.get(field))
-        if value:
-            source_text = value
-            break
+    # The drawable appearance, with "none"/"n/a" read as empty (cast_text):
+    # a sigil distilled from the word "none" is a picture of nothing.
+    try:
+        from .._otr_shared.cast_text import picture_appearance
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared.cast_text import picture_appearance  # type: ignore
+    source_text = _normalize_ws(picture_appearance(row))
 
     seed_int = _sigil_hash(episode_seed, char_id, style_id, source_text)
 

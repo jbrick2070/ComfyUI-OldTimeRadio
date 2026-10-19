@@ -426,8 +426,12 @@ def render_outline_spine(outline_or_beats) -> str:
         mood = _g("mood")
         intent = _g("intent")
         if role in ("character", "announcer"):
-            mood_blurb = f" ({mood})" if mood else ""
-            lines.append(f"  {beat_id} {speaker}{mood_blurb}: {intent}")
+            # The tone goes AFTER the intent, never as "(mood)" beside the
+            # speaker: a parenthesised tone right before the slot the model
+            # writes into is the exact shape of "(Whispering) Tom..." --
+            # measured in the spoken text on every bank (2026-10-18 audit).
+            tone = f" -- tone: {mood}" if mood else ""
+            lines.append(f"  {beat_id} {speaker}: {intent}{tone}")
         else:
             role_label = f"[{role}]" if role else "[beat]"
             lines.append(f"  {beat_id} {role_label}: {intent}")
@@ -484,8 +488,8 @@ def render_current_beat(outline_or_beats, current_beat_id: str) -> str:
         if beat_id != target:
             continue
         if role in ("character", "announcer"):
-            mood_blurb = f" ({mood})" if mood else ""
-            return f"CURRENT BEAT\n  {beat_id} {speaker}{mood_blurb}: {intent}"
+            tone = f" -- tone: {mood}" if mood else ""   # never "(mood)"; see above
+            return f"CURRENT BEAT\n  {beat_id} {speaker}: {intent}{tone}"
         role_label = f"[{role}]" if role else "[beat]"
         return f"CURRENT BEAT\n  {beat_id} {role_label}: {intent}"
     return ""
@@ -587,10 +591,10 @@ You write one spoken line for a character in a radio drama.
 OUTPUT FORMAT - strict:
 - Only the words the character speaks out loud.
 - No character name, no colon, no quotation marks.
-- No stage directions. No actions in parentheses or brackets.
-- NEVER prefix the line with an action description. Do NOT begin with words
-  like "twirls his pen", "clenches jaw", "pauses, sets pen down". Start the
-  output directly with the first spoken word.
+- No stage directions, no delivery or sound notes, nothing in parentheses
+  or brackets. How a line is said lives in its words.
+- NEVER prefix the line with an action description. Start the output
+  directly with the first spoken word.
 - No "he said" / "she added" / narration of any kind.
 - Output the single line and stop. Nothing before it, nothing after.
 
@@ -939,11 +943,14 @@ def _build_user_prompt(req: LineRequest) -> str:
         "Do not explain the turn. Perform the objective indirectly. "
         "Speak in the first person; never narrate your own actions in "
         "the third person and never say your own name. "
-        # D1 (2026-06-22, story-quality lift): the leak persists AFTER a closing "
-        # quote ("...this." adjusts the dials) and mid-line. Forbid every shape.
-        "Output ONLY the words the character says aloud -- no stage directions "
-        "anywhere: not before, not after, and not between quotation marks "
-        "(no \"adjusts the dial\", \"clutches her ring\", \"taps his cane\")."
+        # D1 (2026-06-22): the leak persists AFTER a closing quote and
+        # mid-line. Forbid every shape -- and name no example action or
+        # delivery cue here: a quoted example is itself the bait
+        # (2026-10-18 audit: "(Whispering)" still reached spoken text).
+        "Output ONLY the words the character says aloud. No stage "
+        "directions, no delivery or sound notes, nothing in parentheses or "
+        "brackets -- not before, after or inside the line. How it is said "
+        "-- a whisper, a sigh, a pause -- lives in the words themselves."
     )
     if req.beat_turn:
         indirect += " The situation must be different after this line."

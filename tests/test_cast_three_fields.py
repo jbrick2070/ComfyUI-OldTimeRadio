@@ -159,3 +159,31 @@ def test_a_capped_video_text_keeps_presence():
     text = CT.video_text(row, cap=140)
     assert len(text) <= 140
     assert "holds the line under pressure" in text and "gravel" not in text
+
+
+def test_an_appearance_that_says_nothing_is_empty_for_pictures():
+    """Live legs, 2026-10-18: "none" (a disembodied voice) and "n/a" (two
+    scifi leads) reached a picture prompt as "adult woman, none."."""
+    for word in ("none", "n/a", "N/A.", "unknown", "invisible", "disembodied"):
+        row = {"appearance": word, "presence": "drifts through the fog"}
+        assert CT.still_text(row) == "", word
+        assert CT.video_text(row) == "drifts through the fog", word
+        assert word in CT.card_text(row)       # the writing passes still see it
+
+
+def test_no_writer_prompt_invites_a_stage_direction():
+    """2026-10-18 audit: the line composer showed every beat as
+    "SPEAKER (mood):", the exact shape of "(Whispering) Tom...", and the scifi
+    script prompt allowed parentheses and brackets in spoken text."""
+    from nodes import _otr_line_composer as LC
+    spine = LC.render_outline_spine(
+        [{"beat_id": "b001", "speaker": "ADA", "speaker_role": "character",
+          "mood": "hushed", "intent": "warn Tom"}])
+    assert "(hushed)" not in spine and "tone: hushed" in spine
+    import json as _json
+    from pathlib import Path as _P
+    scifi = _json.loads((_P(REPO) / "nodes/story_packs/scifi_news_pro/"
+                         "scifi_news_pro.json").read_text(encoding="utf-8"))
+    script = scifi["prompt_stages"]["scifi_news_pro_script_system"]
+    assert "including quotation marks, parentheses" not in script
+    assert "never carries parentheses or brackets" in script

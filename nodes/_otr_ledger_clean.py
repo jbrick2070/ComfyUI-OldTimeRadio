@@ -1536,8 +1536,8 @@ def _f2_fix(
         "someone else, in this moment.",
         "",
         'Answer JSON: {"text": "the fixed line"}. The spoken line only -- no '
-        "speaker name in front, no brackets, no quotation marks around the "
-        "whole line.",
+        "speaker name in front, no stage directions, nothing in parentheses "
+        "or brackets, no quotation marks around the whole line.",
     ]
     language_instruction = str(language_instruction or "").strip()
     if language_instruction:

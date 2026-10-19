@@ -1546,6 +1546,20 @@ class CastLock:
                         announcer_engine, bank=bank_entries,
                         episode_seed=episode_seed, language=language)
                     _stamp_row(entry, ref)
+                    # THE ANNOUNCER'S GENDER IS THE VOICE THAT SPEAKS. The
+                    # announcer is a 50/50 roll (operator), but the writer's
+                    # pick_announcer rolled one gender and this lock re-rolls
+                    # the voice by episode seed, so a bf_* writer row could be
+                    # spoken by bm_fable and stay stamped female (live leg,
+                    # 2026-10-18). The ledger follows the voice actually cast.
+                    _ref_gender = str(getattr(ref, "gender", "") or "").lower()
+                    if (_ref_gender in ("male", "female")
+                            and str(entry.get("gender") or "").lower() != _ref_gender):
+                        report.append(
+                            f"  {char_id or 'ANNOUNCER'}: gender "
+                            f"{entry.get('gender') or '-'} -> {_ref_gender} "
+                            f"(follows the cast voice {ref.voice_ref_id})")
+                        entry["gender"] = _ref_gender
                     announcer_clean = _delivered_commercial_clean(entry, ref)
                     gated += 0 if announcer_clean else 1
                     report.append(

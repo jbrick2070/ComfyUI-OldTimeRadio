@@ -414,10 +414,19 @@ class CastVoice(BaseModel):
     name: str
     role: str
     # THE CHARACTER IN THREE FIELDS (2026-10-18), the split every source bank
-    # writes. `appearance` is only what the portrait artist sees; the row's
-    # `presence` comes from `pressure` and its `voice_cue` from `register`,
-    # which this pass already writes -- one source per field, never two.
+    # writes. `appearance` is only what the portrait artist sees; `presence`
+    # is body and behaviour, asked for here; the row's `voice_cue` comes from
+    # `register`, which this pass already writes. `presence` was first mapped
+    # from the treatment's `pressure`, but that is plot ("the skepticism of
+    # the townspeople") and reached the video prompts as a look (live leg,
+    # 2026-10-18).
     appearance: str
+    presence: str = ""
+
+    @field_validator("presence", mode="before")
+    @classmethod
+    def _presence_null_is_empty(cls, value):
+        return "" if value is None else value
     gender: Literal["male", "female"]
     age_band: Literal["20s", "30s", "40s", "50s", "60s", "n/a"] = "n/a"
 
@@ -2630,9 +2639,9 @@ def _script_user_prompt(
         + "compress, or mention a word quota.\n\n"
         + "FORMAT REMINDER: every nonblank row uses one structural label: "
         + "TITLE, MUSIC, SCENE, ANNOUNCER, a cast roster label, CODA, or END. "
-        + "Spoken text may use ordinary punctuation, including quotation marks, "
-        + "parentheses, brackets, and internal colons. Add no unlabelled stage-"
-        + "direction rows. ANNOUNCER speaks only in the intro and outro. End in "
+        + "Spoken text may use quotation marks and internal colons, never "
+        + "parentheses or brackets, stage directions, or delivery or sound "
+        + "notes. Add no unlabelled stage-direction rows. ANNOUNCER speaks only in the intro and outro. End in "
         + "this order: ANNOUNCER outro, CODA, closing MUSIC, END. The ANNOUNCER "
         + "outro and CODA both stay strictly in-story -- no real-world "
         + "statistic, date, named institution, or named real person in either "
@@ -4343,7 +4352,7 @@ def _assign_voices(casting: CastingVoices, menu: VoiceMenu,
             "char_id": f"c{i + 2:02d}",
             "name": cv.name,
             "appearance": cv.appearance,
-            "presence": cv.pressure,
+            "presence": cv.presence,
             "voice_cue": cv.register,
             "gender": cv.gender,
             "tts_model": "",

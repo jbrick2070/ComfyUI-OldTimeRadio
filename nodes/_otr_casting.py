@@ -443,7 +443,8 @@ def _build_user_prompt(
         'distinctive story-linked detail>" -- only what a painter can see.'
     )
     parts.append(
-        'presence: how the character carries the episode pressure.'
+        "presence: body, posture and behaviour under the story's pressure "
+        "-- never voice, speech or sound."
     )
     parts.append(
         'voice_cue: a radio-performance cue for how they sound.'
@@ -460,6 +461,9 @@ def _build_user_prompt(
     )
     parts.append(
         "- Use concrete facial geometry, not vague mood words."
+    )
+    parts.append(
+        "- A character with no body -- a voice, a spirit -- still gets an appearance: what the camera shows of them, such as a glow, a shadow or an object. Never none or n/a."
     )
     parts.append(
         "- Make this character visually distinct from the rest of "

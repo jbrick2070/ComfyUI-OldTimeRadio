@@ -505,7 +505,9 @@ def pick_announcer(rng: random.Random) -> dict:
         "voice_params": None,
         "appearance": "Period radio announcer at a studio microphone",
         "presence": "reads the science story and frames the drama between beats",
-        "voice_cue": vocal_desc,
+        # No gender in the cue: CastLock may re-cast the announcer voice by
+        # episode seed, and the row's gender follows THAT voice (2026-10-18).
+        "voice_cue": "measured period-radio announcer delivery",
         "notes": vocal_desc,
     }
 

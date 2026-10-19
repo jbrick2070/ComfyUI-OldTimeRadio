@@ -183,19 +183,21 @@ def test_the_cameo_row_is_synthesized_from_the_profile_not_the_casting_llm():
 
 def test_house_rows_split_appearance_presence_and_voice_cue():
     """THE CHARACTER IN THREE FIELDS (2026-10-18), the same split every bank
-    writes: appearance from the casting pass, presence from its `pressure`,
-    voice_cue from its performed `register` -- one source per field. LEMMY
+    writes: appearance and presence (body and behaviour) from the casting
+    pass, voice_cue from its performed `register`. The plot `pressure` is NOT
+    presence (live leg, 2026-10-18: it reached video as a look). LEMMY
     keeps the hand-split profile, accent in voice_cue."""
     menu = PRO._deal_voice_menu(1, taken={_LEMMY_PRESET})
     casting = PRO.CastingVoices(cast=[PRO.CastVoice(
         name="SARAH", role="pilot", appearance="40s, cropped grey hair",
         gender="female", timbre="m01", register="clipped, dry",
+        presence="shoulders squared, never sits",
         pressure="the board wants her grounded")])
     rows = PRO._assign_voices(casting, menu, random.Random(7),
                               ["SARAH", "LEMMY"], _hit())
     sarah = next(r for r in rows if r["name"] == "SARAH")
     assert (sarah["appearance"], sarah["presence"], sarah["voice_cue"]) == (
-        "40s, cropped grey hair", "the board wants her grounded", "clipped, dry")
+        "40s, cropped grey hair", "shoulders squared, never sits", "clipped, dry")
     lemmy = next(r for r in rows if PRO._is_lemmy(r["name"]))
     assert (lemmy["presence"], lemmy["voice_cue"]) == (
         POOLS.LEMMY_PROFILE["presence"], POOLS.LEMMY_PROFILE["voice_cue"])

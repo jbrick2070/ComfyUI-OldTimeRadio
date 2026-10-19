@@ -17287,3 +17287,33 @@ not promote it to the Bug Bible on this evidence alone.
   prefix, keeping the age/role lead, face and distinctive detail. Video keeps
   Presence (behaviour a video model acts on), byte-identical to before.
 - status: FIXED in code; live proof is the next 8 GB Klein leg.
+
+## PBUG-20261018-04 -- writer prompts invited stage directions; cast text carried speech into presence
+- evidence: 8 GB legs on 3f95016f (asset_cleanup off). my_story
+  `voice_foghorn_20261018_200521`: Ada's line shipped as "(Whispering) Tom..."
+  (flagged unclean_spoken_text); her presence read "speaks with a strained
+  quietness"; The Voice had appearance "none" and its voice description in
+  presence, so a video prompt read "adult woman, none. Ethereal ... whisper".
+  scifi_news_pro `lung_fingerprint_20261018_194559`: two leads had appearance
+  "n/a"; presence held plot ("the skepticism of the townspeople"); the
+  announcer was stamped female (bf_emma roll) but voiced bm_fable.
+- cause: (1) the line composer showed every beat as "SPEAKER (mood):", a
+  parenthesised tone right before the slot it writes into; quoted example
+  actions sat in its own rules; the scifi script prompt ALLOWED parentheses
+  and brackets in spoken text; the exchange pass said "Internal pauses (...)"
+  and asked for a "physical action"; three packs named no parenthesis or sound
+  rule and shakespeare asked for "radio business". (2) the casting prompts let
+  presence carry speech manner and let appearance say "none"/"n/a"; scifi
+  presence was mapped from plot. (3) CastLock re-rolls the announcer voice by
+  episode seed and never updated the row's gender.
+- fix: tone after the intent ("-- tone: x"), no quoted example actions; one
+  spoken-only rule (no stage directions, delivery/sound notes, parentheses or
+  brackets) in every bank's line-composer and exchange seam, the scifi script
+  prompt, the my_story frame, the exchange pass, the ledger_clean fix and the
+  my_story source rewrite. Casting, every bank: presence is body and behaviour,
+  never voice or speech; a bodiless character still gets a drawable
+  appearance; scifi asks for presence itself. Readers treat "none"/"n/a"
+  appearance as empty for pictures (cast_text.picture_appearance). The
+  announcer's gender follows the voice CastLock casts; its voice_cue carries no
+  gender. The announcer stays a 50/50 roll (operator).
+- status: FIXED in code; live proof is the next per-bank legs.

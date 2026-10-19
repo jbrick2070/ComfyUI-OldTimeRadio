@@ -360,7 +360,8 @@ def build_exchange_prompt(
     grounding = _grounding_pool(beat_group, contracts)
     grounding_clause = (
         "Ground the exchange in ONE concrete detail -- a single object or "
-        "physical action somewhere in these lines, not one per line. "
+        "action the speakers TALK ABOUT somewhere in these lines, not one per "
+        "line; never describe it outside the spoken words. "
         + (
             f"Draw it from: {', '.join(grounding[:8])}."
             if grounding
@@ -389,8 +390,10 @@ def build_exchange_prompt(
         + "\n".join(f"  {sid}|SPEAKER: <line>" for sid in slot_ids)
         + "\n\n"
         "Keep each slot id and its speaker EXACTLY as given -- do not add, "
-        "drop, reorder, merge, or rename slots. Internal pauses (...) are "
-        "fine inside a line, but emit one line per slot id."
+        "drop, reorder, merge, or rename slots. A pause inside a line is an "
+        "ellipsis; emit one line per slot id. Each line is only the words "
+        "spoken aloud: no stage directions, no delivery or sound notes, "
+        "nothing in parentheses or brackets."
     )
 
     user_parts = [

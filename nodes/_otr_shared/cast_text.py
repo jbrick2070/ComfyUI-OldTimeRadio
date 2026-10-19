@@ -34,7 +34,8 @@ except ImportError:  # pragma: no cover -- flat test imports
     from cast_picture_text import picture_description  # type: ignore
 
 __all__ = [
-    "CAST_TEXT_FIELDS", "field", "still_text", "video_text", "card_text",
+    "CAST_TEXT_FIELDS", "field", "picture_appearance", "still_text",
+    "video_text", "card_text",
     "identity_fields",
 ]
 
@@ -52,9 +53,27 @@ def field(row, name: str) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
+#: An appearance that says there is nothing to draw. Live legs wrote "none"
+#: (a disembodied voice) and "n/a" (two scifi leads, 2026-10-18); a picture
+#: prompt then read "adult woman, none." These count as empty for pictures --
+#: the writing passes still see them, where "none" is information.
+_NO_APPEARANCE = frozenset({
+    "none", "n/a", "na", "n.a.", "nil", "null", "unknown", "unspecified",
+    "not specified", "not stated", "invisible", "unseen", "not visible",
+    "disembodied", "no body", "no physical form", "-", "--", "?", "tbd",
+})
+
+
+def picture_appearance(row) -> str:
+    """The appearance as a picture may use it: ``""`` when it says there is
+    nothing to draw."""
+    text = field(row, "appearance")
+    return "" if text.strip(" .;,!").lower() in _NO_APPEARANCE else text
+
+
 def still_text(row) -> str:
     """What a STILL or PORTRAIT may draw: the appearance, cleaned."""
-    return picture_description(field(row, "appearance"), still=True)
+    return picture_description(picture_appearance(row), still=True)
 
 
 def _sentence(text: str) -> str:
@@ -71,7 +90,7 @@ def video_text(row, *, cap: int = 0) -> str:
     ``cap`` budgets the two fields separately, as ``card_text`` does, so a
     capped consumer (ShotLock's 160-char beat batch) keeps the presence a
     plain slice of a long appearance would cut off (Codex wiring review)."""
-    parts = [picture_description(field(row, "appearance"), still=False),
+    parts = [picture_description(picture_appearance(row), still=False),
              picture_description(field(row, "presence"), still=False)]
     parts = [p for p in parts if p]
     if cap and cap > 0:
