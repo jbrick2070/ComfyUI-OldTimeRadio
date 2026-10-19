@@ -7,6 +7,7 @@ bridge address first: a missing setting must never turn into a cloud run.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import time
@@ -163,14 +164,22 @@ class Studio:
         try:
             graph, node_ids = self.build_graph(choices)
             acts = graph.get(node_ids.get(WRITER, ""), {}).get("inputs", {}).get("act_count", "default")
-            timing_file = timing_path(self.settings.out_dir, self.settings.workflow_path, acts)
+            timing_file = timing_path(self.settings.out_dir, self.settings.workflow_path, acts, graph)
             clock = ProgressClock(load_timing(timing_file), now=self._now)
             client = self._client_factory(self.settings.api_url)
             job = client.submit(client.workflows.from_json(graph))
             yield {"type": "submitted"}
-            stream_whole = True
+            stream_whole, last_status = True, None
             try:
                 for event in job.events():
+                    if type(event).__name__ == "StatusChange":
+                        status = str(getattr(event, "status", ""))
+                        # comfy-api-proxy opens every connection with the job's
+                        # status, so a repeat means the SDK reconnected and the
+                        # frames in between are gone.
+                        if status == last_status:
+                            stream_whole = False
+                        last_status = status
                     note = normalize_event(event, len(graph))
                     if note and note["type"] in ("progress", "step"):
                         node = getattr(event, "current_node", None)
@@ -196,7 +205,7 @@ class Studio:
             out.to_file(str(dest))
             if not dest.is_file() or dest.stat().st_size == 0:
                 raise EpisodeMissing(f"the episode was not saved to {dest}")
-            # A lost stream leaves the wait after it billed to whichever node was
+            # A lost or reconnected stream bills its gap to whichever node was
             # seen last, and those times would mislead every later run.
             if stream_whole and clock.timings():
                 save_timing(timing_file, clock.timings())
@@ -272,11 +281,18 @@ class ProgressClock:
         return out
 
 
-def timing_path(out_dir: Path, workflow_path: Path, acts: Any) -> Path:
+def timing_path(out_dir: Path, workflow_path: Path, acts: Any, graph: dict | None = None) -> Path:
     """Where this machine's node times for one workflow and act count are kept.
+
     The act count is in the key because a three-act play renders about three
-    times the beats of a one-act one."""
-    return Path(out_dir) / "timing" / f"{Path(workflow_path).stem}.acts-{acts}.json"
+    times the beats of a one-act one. So is the graph's shape (each node id and
+    its type): a re-saved workflow can renumber its nodes, and times kept under
+    old ids would weigh nodes that no longer exist."""
+    shape = ""
+    if graph:
+        pairs = sorted((str(k), str(v.get("class_type", ""))) for k, v in graph.items())
+        shape = "." + hashlib.sha256(json.dumps(pairs).encode("utf-8")).hexdigest()[:8]
+    return Path(out_dir) / "timing" / f"{Path(workflow_path).stem}.acts-{acts}{shape}.json"
 
 
 def load_timing(path: Path) -> dict:

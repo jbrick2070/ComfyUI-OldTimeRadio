@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -357,7 +358,7 @@ def test_a_good_run_saves_its_times_and_the_next_run_reads_the_clock(settings, s
                         fetch=lambda url: schemas, now=Ticking()).stream({}))
     assert first[-1]["type"] == "done"
     assert "minutes_left" not in [e for e in first if e["type"] == "progress"][0]
-    saved = timing_path(settings.out_dir, settings.workflow_path, "1")   # the fixture's act_count
+    saved = next((settings.out_dir / "timing").glob("*.acts-1.*.json"))   # the fixture's act_count
     assert load_timing(saved).get("1", 0) > 0
 
     second = list(Studio(settings, client_factory=lambda url: FakeClient(job()),
@@ -400,7 +401,8 @@ def test_saved_times_keep_nodes_this_run_served_from_cache(tmp_path):
 def test_a_step_frame_without_a_node_does_not_end_the_running_node(settings, schemas):
     pytest.importorskip("comfy_sdk")
     from comfy_sdk.events import Progress as RealProgress
-    save_timing(timing_path(settings.out_dir, settings.workflow_path, "1"), {"1": 100.0, "2": 100.0})
+    graph, _ = Studio(settings, fetch=lambda url: schemas).build_graph({})
+    save_timing(timing_path(settings.out_dir, settings.workflow_path, "1", graph), {"1": 100.0, "2": 100.0})
     good = _good_job()
     good._events = [RealProgress(value=0.0, nodes_done=0, nodes_total=1, current_node="1"),
                     RealProgress(value=0.5, nodes_done=0, nodes_total=0, current_node=None, step=1, steps=2)]
@@ -409,3 +411,18 @@ def test_a_step_frame_without_a_node_does_not_end_the_running_node(settings, sch
     shares = [e["value"] for e in studio.stream({}) if e["type"] == "progress"]
     # Had the node-less frame closed node 1, its full 100 s would count: 0.5.
     assert shares == [0.0, 0.0]
+
+
+def test_a_reconnected_stream_saves_no_times(settings, schemas):
+    good = _good_job()
+    good._events = [StatusChange("running"), Progress(0.5), StatusChange("running")] + list(good._events[1:])
+    studio, _ = _studio(settings, schemas, good)
+    assert list(studio.stream({}))[-1]["type"] == "done"
+    assert not (settings.out_dir / "timing").exists()
+
+
+def test_a_renumbered_graph_does_not_read_old_times(tmp_path):
+    a = {"1": {"class_type": "W"}, "92": {"class_type": "V"}}
+    b = {"1": {"class_type": "W"}, "93": {"class_type": "V"}}
+    assert timing_path(tmp_path, Path("w.json"), 1, a) != timing_path(tmp_path, Path("w.json"), 1, b)
+    assert timing_path(tmp_path, Path("w.json"), 1, a) == timing_path(tmp_path, Path("w.json"), 1, dict(a))
