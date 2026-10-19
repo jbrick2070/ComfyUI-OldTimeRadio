@@ -64,12 +64,27 @@ def _sentence(text: str) -> str:
     return text if not text or text[-1] in ".!?" else text + "."
 
 
-def video_text(row) -> str:
+def video_text(row, *, cap: int = 0) -> str:
     """What a VIDEO prompt may show: appearance then presence, cleaned of any
-    voice wording (joint audio-video models VOCALIZE what they read)."""
+    voice wording (joint audio-video models VOCALIZE what they read).
+
+    ``cap`` budgets the two fields separately, as ``card_text`` does, so a
+    capped consumer (ShotLock's 160-char beat batch) keeps the presence a
+    plain slice of a long appearance would cut off (Codex wiring review)."""
     parts = [picture_description(field(row, "appearance"), still=False),
              picture_description(field(row, "presence"), still=False)]
     parts = [p for p in parts if p]
+    if cap and cap > 0:
+        out, budget = [], int(cap)
+        for i, text in enumerate(parts):
+            room = max(0, budget // (len(parts) - i) - 1)
+            if len(text) > room:
+                head = text[:room]
+                text = (head.rsplit(" ", 1)[0] if " " in head else head).rstrip(" ,;:.")
+            if text:
+                out.append(text)
+                budget -= len(text) + 2
+        parts = out
     if len(parts) == 2:
         parts[0] = _sentence(parts[0])
     return " ".join(parts)

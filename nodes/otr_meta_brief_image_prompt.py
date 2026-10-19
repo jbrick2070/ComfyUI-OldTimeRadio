@@ -1535,6 +1535,13 @@ def _scene_source_context(meta, cast, lines, target, line, ledger_context=None):
     cid = str(target.get("char_id") or "")
     treatment = (meta.get("my_story") or {}).get("treatment") or {}
     planned_cast = [row for row in treatment.get("cast", []) if isinstance(row, dict)]
+    # The rewrite model writes a STILL, so its copy of the treatment carries
+    # only the drawable cast fields -- no presence, register or timbre, which
+    # are the voice and manner prose FLUX letters into pictures (Codex wiring
+    # review, 2026-10-18; PBUG-20261018-03).
+    _DRAWABLE = ("name", "role", "gender", "age_band", "appearance")
+    still_treatment = {**treatment, "cast": [
+        {k: row.get(k) for k in _DRAWABLE if k in row} for row in planned_cast]}
 
     def character_context(row):
         # Ledger rows do not retain all treatment casting fields. Join only a
@@ -1569,7 +1576,7 @@ def _scene_source_context(meta, cast, lines, target, line, ledger_context=None):
         "beat": dict(beat), "current_line": scene_line(line), "shot": dict(shot),
         "scene": dict(scene), "ordered_scene_dialogue": ordered_lines,
         "candidate_companions": companions,
-        "working_treatment": treatment,
+        "working_treatment": still_treatment,
     }
     # A primitive copy prevents later pipeline mutation from changing the receipt.
     return json.loads(json.dumps({"raw_fields": raw, "scene": context}, ensure_ascii=False))

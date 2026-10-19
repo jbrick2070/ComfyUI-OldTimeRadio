@@ -132,7 +132,7 @@ def _read_setting(meta: dict) -> str:
     return ", ".join(setting[:2]) if setting else _FALLBACK_SETTING
 
 
-def _appearance_for_char(ledger: dict, char_id: str) -> str:
+def _appearance_for_char(ledger: dict, char_id: str, *, cap: int = 0) -> str:
     """Appearance LOOKUP by char_id (alias-safe), never by display name.
 
     Appearance then presence (``_otr_shared.cast_text.video_text``): every
@@ -154,7 +154,7 @@ def _appearance_for_char(ledger: dict, char_id: str) -> str:
                 break
     # The writer's per-character description (operator look-QA 2026-06-10:
     # without it the M4 prompts lost the character grounding).
-    base = _CAST_TEXT.video_text(entry)
+    base = _CAST_TEXT.video_text(entry, cap=cap)
     if not base:
         name = entry.get("name")
         base = str(name) if name else ""
@@ -1233,7 +1233,9 @@ def _build_batch_prompt(batch: list, meta: dict, ledger: dict, setting: str) -> 
         "Beats:",
     ]
     for b in batch:
-        appearance = _appearance_for_char(ledger, b["char_id"])
+        # Budgeted per field so presence survives the 160-char slice; 140
+        # leaves room for the gender anchor the lookup may prepend.
+        appearance = _appearance_for_char(ledger, b["char_id"], cap=140)
         lines.append(
             json.dumps({
                 "beat_id": b["beat_id"],
@@ -1314,7 +1316,7 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
         lines.append("Objects on hand: %s" % ", ".join(key_objects[:8]))
     lines.append("Beats:")
     for b in batch:
-        appearance = _appearance_for_char(ledger, b["char_id"])
+        appearance = _appearance_for_char(ledger, b["char_id"], cap=140)
         payload = {
             "beat_id": b["beat_id"],
             "character": appearance[:160],

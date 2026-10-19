@@ -149,3 +149,13 @@ def test_a_null_optional_field_does_not_fail_the_schema():
         {"appearance": "30s, the clerk", "presence": None, "voice_cue": None,
          "speech_signature": None})
     assert (r.presence, r.voice_cue, r.speech_signature) == ("", "", "")
+
+
+def test_a_capped_video_text_keeps_presence():
+    """Codex wiring review: ShotLock sliced appearance+presence at 160, so a
+    long appearance cut presence off."""
+    row = {"appearance": "40s, the keeper, " + "weathered " * 30,
+           "presence": "holds the line under pressure", "voice_cue": "gravel"}
+    text = CT.video_text(row, cap=140)
+    assert len(text) <= 140
+    assert "holds the line under pressure" in text and "gravel" not in text
