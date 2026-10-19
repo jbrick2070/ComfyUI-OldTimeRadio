@@ -42,26 +42,33 @@ def make_client(api_url: str) -> Any:
     return Comfy(client_info="radio-play-studio")
 
 
-def normalize_event(event: Any) -> dict | None:
+def normalize_event(event: Any, graph_size: int = 0) -> dict | None:
     """One SDK event as a plain dict for the page, or None for kinds the page
     does not show (previews). Matched by class name so the app does not depend
-    on where the SDK keeps its event classes."""
+    on where the SDK keeps its event classes.
+
+    `graph_size` is the number of nodes submitted. comfy-api-proxy's own
+    fraction cannot be the episode's: its per-node frames (nodes_total=0) are
+    one sampler's steps, and its graph-wide frames count only the nodes ComfyUI
+    has STARTED (core drops pending nodes from progress_state), so either read
+    100% at the first finished still. The page's bar only moves forward, and on
+    the first live 16 GB run (2026-10-19) it sat at 100% for the hour of video
+    that followed. The share of the episode is finished nodes out of the graph."""
     kind = type(event).__name__
     if kind == "Progress":
         value = float(getattr(event, "value", 0.0) or 0.0)
         nodes_total = getattr(event, "nodes_total", None)
+        step, steps = getattr(event, "step", None), getattr(event, "steps", None)
         if nodes_total == 0:
-            # comfy-api-proxy sends ComfyUI's per-node sampler progress with
-            # nodes_total=0: the share of ONE node's steps, not of the episode.
-            # On the bar it read 100% at the first still and stayed there for
-            # the hour of video that followed (first live 16 GB run, 2026-10-19).
-            return {"type": "step", "value": value,
-                    "step": getattr(event, "step", None), "steps": getattr(event, "steps", None)}
+            return {"type": "step", "value": value, "step": step, "steps": steps}
         note = {"type": "progress", "value": value,
                 "message": str(getattr(event, "message", "") or "")}
-        if nodes_total:
-            note["nodes_done"] = int(getattr(event, "nodes_done", 0) or 0)
-            note["nodes_total"] = int(nodes_total)
+        if nodes_total and graph_size:
+            done = int(getattr(event, "nodes_done", 0) or 0)
+            running = (step / steps) if step is not None and steps else 0.0
+            note["value"] = max(0.0, min(1.0, (done + min(running, 1.0)) / graph_size))
+            note["nodes_done"] = min(done, graph_size)
+            note["nodes_total"] = graph_size
         return note
     if kind == "StatusChange":
         return {"type": "status", "status": str(getattr(event, "status", ""))}
@@ -157,7 +164,7 @@ class Studio:
             yield {"type": "submitted"}
             try:
                 for event in job.events():
-                    note = normalize_event(event)
+                    note = normalize_event(event, len(graph))
                     if note:
                         yield note
             except Exception as exc:  # noqa: BLE001 - the stream is a view, settle() is the truth

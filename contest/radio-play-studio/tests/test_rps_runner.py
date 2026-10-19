@@ -106,9 +106,17 @@ def test_one_stage_steps_never_read_as_the_episode_share():
     from comfy_sdk.events import Progress as RealProgress
     sampler = RealProgress(value=1.0, nodes_done=0, nodes_total=0, current_node="7", step=16, steps=16)
     assert normalize_event(sampler) == {"type": "step", "value": 1.0, "step": 16, "steps": 16}
-    graph = RealProgress(value=0.4, nodes_done=8, nodes_total=20, current_node="7", step=3, steps=16)
-    assert normalize_event(graph) == {"type": "progress", "value": 0.4, "message": "",
-                                      "nodes_done": 8, "nodes_total": 20}
+
+    # progress_state counts only STARTED nodes, so one finished node is 1 of 1
+    # (value 1.0) from the proxy; out of a 22-node graph it is 1 of 22.
+    first = RealProgress(value=1.0, nodes_done=1, nodes_total=1, current_node=None)
+    assert normalize_event(first, 22) == {"type": "progress", "value": 1 / 22, "message": "",
+                                          "nodes_done": 1, "nodes_total": 22}
+    # A running node adds its own share of one node's width.
+    mid = RealProgress(value=0.59, nodes_done=1, nodes_total=2, current_node="7", step=4, steps=16)
+    assert normalize_event(mid, 20)["value"] == pytest.approx((1 + 0.25) / 20)
+    # Without the graph size there is nothing better than the proxy's own number.
+    assert normalize_event(first)["value"] == 1.0
 
 
 def test_normalize_event_reads_the_real_sdk_classes():

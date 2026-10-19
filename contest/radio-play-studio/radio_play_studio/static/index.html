@@ -133,11 +133,15 @@ function collect() {
 }
 
 async function loadOptions() {
+  // A ComfyUI that is busy rendering takes about 40 s to list its nodes.
+  $("notice").textContent = "Asking your ComfyUI what it can make... (slower while it is rendering)";
+  $("notice").hidden = false;
   try {
     const res = await fetch("/api/options");
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
     build(body.fields);
+    $("notice").hidden = true;
   } catch (err) {
     $("notice").textContent = "Cannot reach your ComfyUI: " + err.message +
       "  Start ComfyUI, then reload. (python -m radio_play_studio doctor says what is missing.)";
