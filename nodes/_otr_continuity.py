@@ -344,7 +344,7 @@ def _cast_name(row: Any) -> str:
 
 def _cast_description(row: Any) -> str:
     """The character card for a cast row (dict or object), each field
-    budgeted inside the cap so presence and voice survive it."""
+    budgeted inside the cap so presence survives it."""
     return _safe_text(_CAST_TEXT.card_text(row, cap=_CAST_DESC_CHAR_CAP),
                       _CAST_DESC_CHAR_CAP)
 

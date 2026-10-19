@@ -6,8 +6,10 @@ A cast row carries its character as three fields, never one blended string:
   distinctive detail. Stills, portraits and the Ghost sigil read only this.
 * ``presence``   -- how the character carries the episode's pressure.
   Behaviour a VIDEO model can act on; LLM context.
-* ``voice_cue``  -- the radio-performance cue. LLM context only. No picture
-  model ever reads it; voice CASTING reads ``meta.cast_voice_slots`` instead.
+* ``voice_cue``  -- the radio-performance cue, kept for traceability. No
+  picture model and no line writer reads it (a text model can only obey a
+  sound cue with "(whispering)"); voice CASTING reads
+  ``meta.cast_voice_slots`` instead.
 
 WHY THE SPLIT. The old ``character_description`` packed all three into one
 labelled string ("... Face: ... Presence: ... Voice: ...") and every picture

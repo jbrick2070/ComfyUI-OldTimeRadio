@@ -5466,7 +5466,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # Fallback ANNOUNCER card if for some reason the cast row's
         # voice_card came out empty (e.g. unset description).
         if not voice_card_by_name.get("ANNOUNCER"):
-            voice_card_by_name["ANNOUNCER"] = "ANNOUNCER (omniscient narrator)"
+            voice_card_by_name["ANNOUNCER"] = "ANNOUNCER -- omniscient narrator"
         log.info(
             "[OTR_LedgerScriptWriter] phase 1 prompt context built: "
             "spine=%d chars, voice_cards=%d entries",
@@ -5646,7 +5646,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             prev_speaker = _derive_prev_speaker(last_lines, speaker)
             voice_card = (
                 voice_card_by_name.get(
-                    "ANNOUNCER", "ANNOUNCER (omniscient narrator)",
+                    "ANNOUNCER", "ANNOUNCER -- omniscient narrator",
                 )
                 if is_announcer
                 else voice_card_by_name.get(beat.speaker, beat.speaker)

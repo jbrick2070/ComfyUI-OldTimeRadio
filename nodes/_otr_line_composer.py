@@ -506,9 +506,9 @@ def build_voice_card(cast_row) -> str:
                                optional, read as one card (cast_text)
 
     Returns a string like:
-        ALICE (female, weary forensic engineer in her 40s, dry humor)
+        ALICE -- female; weary forensic engineer in her 40s; speaks: dry humor
     Or for the ANNOUNCER stub (no gender/desc populated):
-        ANNOUNCER (omniscient narrator)
+        ANNOUNCER -- omniscient narrator
     Or for a bare-name row:
         BOB
 
