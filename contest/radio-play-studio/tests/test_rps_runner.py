@@ -8,7 +8,7 @@ import pytest
 from radio_play_studio.graph import ServerUnreachable
 from radio_play_studio.runner import (
     EpisodeMissing, ProgressClock, Studio, describe_failure, is_transient, load_timing, make_client,
-    normalize_event, pick_episode_output, settle, timing_path,
+    normalize_event, pick_episode_output, save_timing, settle, timing_path,
 )
 
 
@@ -370,3 +370,42 @@ def test_a_failed_run_saves_no_times(settings, schemas):
     studio, _ = _studio(settings, schemas, FakeJob([StatusChange("running")], [], fail=RuntimeError("boom")))
     assert list(studio.stream({}))[-1]["type"] == "error"
     assert not (settings.out_dir / "timing").exists()
+
+
+def test_a_lost_stream_saves_no_times(settings, schemas):
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+
+    class Dropping(FakeJob):
+        def events(self):
+            yield RealProgress(value=0.1, nodes_done=0, nodes_total=1, current_node="1")
+            raise ConnectionError("stream dropped")
+
+    good = _good_job()
+    job = Dropping(list(good._events), good.outputs)
+    studio, _ = _studio(settings, schemas, job)
+    events = list(studio.stream({}))
+    assert events[-1]["type"] == "done"
+    assert not (settings.out_dir / "timing").exists()
+
+
+def test_saved_times_keep_nodes_this_run_served_from_cache(tmp_path):
+    path = tmp_path / "timing" / "w.acts-1.json"
+    save_timing(path, {"1": 600.0, "92": 3000.0})
+    save_timing(path, {"92": 2800.0})          # node 1 came from ComfyUI's cache
+    assert load_timing(path) == {"1": 600.0, "92": 2800.0}
+    assert list(path.parent.iterdir()) == [path]   # no side file left behind
+
+
+def test_a_step_frame_without_a_node_does_not_end_the_running_node(settings, schemas):
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    save_timing(timing_path(settings.out_dir, settings.workflow_path, "1"), {"1": 100.0, "2": 100.0})
+    good = _good_job()
+    good._events = [RealProgress(value=0.0, nodes_done=0, nodes_total=1, current_node="1"),
+                    RealProgress(value=0.5, nodes_done=0, nodes_total=0, current_node=None, step=1, steps=2)]
+    studio = Studio(settings, client_factory=lambda url: FakeClient(good), fetch=lambda url: schemas,
+                    now=FakeClock())          # time stands still
+    shares = [e["value"] for e in studio.stream({}) if e["type"] == "progress"]
+    # Had the node-less frame closed node 1, its full 100 s would count: 0.5.
+    assert shares == [0.0, 0.0]

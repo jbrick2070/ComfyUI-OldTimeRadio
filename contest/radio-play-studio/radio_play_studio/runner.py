@@ -168,11 +168,16 @@ class Studio:
             client = self._client_factory(self.settings.api_url)
             job = client.submit(client.workflows.from_json(graph))
             yield {"type": "submitted"}
+            stream_whole = True
             try:
                 for event in job.events():
                     note = normalize_event(event, len(graph))
                     if note and note["type"] in ("progress", "step"):
-                        clock.observe(getattr(event, "current_node", None))
+                        node = getattr(event, "current_node", None)
+                        # Only a graph-wide frame can say "between nodes"; a
+                        # per-node frame without a node id says nothing.
+                        if node is not None or note["type"] == "progress":
+                            clock.observe(node)
                         if clock.calibrated:
                             note = {"type": "progress", "value": clock.share(),
                                     "message": note.get("message", ""),
@@ -180,7 +185,9 @@ class Studio:
                     if note:
                         yield note
             except Exception as exc:  # noqa: BLE001 - the stream is a view, settle() is the truth
+                stream_whole = False
                 yield {"type": "note", "message": f"live progress was lost ({exc}); still waiting on the job"}
+            clock.observe(None)  # the stream is over: no node is running any more
             settle(job)
             out = pick_episode_output(job, node_ids[EPISODE_NODE_TYPE])
             dest_dir = self.settings.out_dir / uuid.uuid4().hex[:12]
@@ -189,8 +196,9 @@ class Studio:
             out.to_file(str(dest))
             if not dest.is_file() or dest.stat().st_size == 0:
                 raise EpisodeMissing(f"the episode was not saved to {dest}")
-            clock.observe(None)
-            if clock.timings():
+            # A lost stream leaves the wait after it billed to whichever node was
+            # seen last, and those times would mislead every later run.
+            if stream_whole and clock.timings():
                 save_timing(timing_file, clock.timings())
         except Exception as exc:  # noqa: BLE001 - reported to the person, not swallowed
             yield {"type": "error", "message": describe_failure(exc)}
@@ -280,9 +288,17 @@ def load_timing(path: Path) -> dict:
 
 
 def save_timing(path: Path, nodes: dict) -> None:
+    """Fold this run's node times into the saved ones. A node this run did not
+    time (ComfyUI served it from cache) keeps its last measured time, so a
+    mostly cached run cannot shrink the history the next full run is read
+    against. Written to a side file and swapped in, so a reader never sees half."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    body = {"nodes": {k: round(v, 1) for k, v in nodes.items()}, "total_s": round(sum(nodes.values()), 1)}
-    path.write_text(json.dumps(body, indent=1) + "\n", encoding="utf-8")
+    merged = {k: v for k, v in load_timing(path).items() if isinstance(v, (int, float))}
+    merged.update({k: round(v, 1) for k, v in nodes.items()})
+    body = {"nodes": merged, "total_s": round(sum(merged.values()), 1)}
+    side = path.with_name(f"{path.name}.{uuid.uuid4().hex[:8]}.tmp")
+    side.write_text(json.dumps(body, indent=1) + "\n", encoding="utf-8", newline="\n")
+    os.replace(side, path)
 
 
 def describe_failure(exc: BaseException) -> str:
