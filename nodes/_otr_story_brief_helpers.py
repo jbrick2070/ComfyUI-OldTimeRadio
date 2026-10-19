@@ -492,7 +492,7 @@ STILL_FRAMING_SCENE_CHARACTER = (
 
 def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
                          beat_id: str = "", char_entry: Any = None,
-                         style: Any = None) -> str:
+                         style: Any = None, unoccupied: bool = False) -> str:
     """ONE still-image prompt in the legacy 5-layer order: subject /
     setting top-2 / framing hint / TRIMMED era tail (still profile) /
     style tail. Scene kinds append the :data:`NO_TEXT_CLAUSE` (a render
@@ -533,6 +533,12 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     else:
         subject = get_open_subject(role, synthetic=(kind == "scene_open"),
                                    meta=meta, style=_style)
+        if unoccupied:
+            # A BODILESS speaker's beat (a voice, the sea): the room is said to
+            # be empty, positively -- FLUX 3 Klein runs at cfg 1.0, where no
+            # negative can keep a figure out, and the stage style put one at
+            # the radio in 3 of 5 such beats (live leg on ebee190c).
+            subject = subject + ", alone in an empty, unoccupied room"
     m = _meta(meta)
     terms = m.get("story_brief_terms") or {}
     if not isinstance(terms, dict):

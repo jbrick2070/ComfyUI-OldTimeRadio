@@ -2355,7 +2355,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             else:
                 sprompt = compose_still_prompt(
                     meta, kind=tgt["kind"], role=tgt["role"],
-                    beat_id=tgt["beat_id"], style=_vstyle)
+                    beat_id=tgt["beat_id"], style=_vstyle,
+                    unoccupied=tgt.get("source") == "scene_role_map_bodiless")
                 # Chunk A2 provenance: the open/beat scene still leads with
                 # the pack open_subjects template -- stamp the exact key via
                 # the SAME pure selector compose_still_prompt used.

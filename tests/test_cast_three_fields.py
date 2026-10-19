@@ -309,3 +309,16 @@ def test_two_rows_differing_only_by_accent_each_keep_their_own():
     rows = [{"name": "JOS\u00c9", "gender": "male"}, {"name": "JOSE", "gender": "female"}]
     assert RG.resolve_roster_gender("JOS\u00c9", rows).gender == "male"
     assert RG.resolve_roster_gender("JOSE", rows).gender == "female"
+
+
+def test_a_bodiless_speakers_scene_still_says_the_room_is_empty():
+    """Live leg on ebee190c: The Voice's beats became scene stills, but the
+    stage style put a figure at the radio in 3 of 5. Klein runs at cfg 1, so
+    the emptiness is stated positively."""
+    from nodes import _otr_story_brief_helpers as helpers
+    from nodes._otr_visual_styles import get_visual_style
+    plain = helpers.compose_still_prompt({}, kind="scene_beat", role="character_video",
+                                         style=get_visual_style({}))
+    empty = helpers.compose_still_prompt({}, kind="scene_beat", role="character_video",
+                                         style=get_visual_style({}), unoccupied=True)
+    assert "empty, unoccupied room" in empty and "unoccupied" not in plain
