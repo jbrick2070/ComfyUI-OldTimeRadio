@@ -69,12 +69,18 @@ _NO_APPEARANCE = frozenset({
 #: Prose that says the same thing at sentence length: the six-bank leg's
 #: my_story Voice wrote "no physical appearance, represented only by an
 #: auditory effect" (2026-10-18). Any of these anywhere marks it bodiless.
-#: Phrases only, never single words a real look can contain ("an unseen
-#: scar", "an invisible limp"): those stay whole-string matches above.
+#: Whole phrases that only a bodiless character's appearance says. Never a
+#: bare "no physical" / "never seen" / "auditory": real looks carry "no
+#: physical scars", "never seen without his hat", "an auditory implant"
+#: (Sonnet QA on fe35b8d5). Missing a bodiless phrasing costs little -- the
+#: casting prompt already asks for a glow, a shadow or an object instead.
 _BODILESS_MARKS = (
-    "no physical", "no visible form", "no visible body", "no body",
-    "bodiless", "disembodied", "only a voice", "voice only", "auditory",
-    "only by sound", "only as sound", "heard but not seen", "never seen",
+    "no physical appearance", "no physical form", "no physical body",
+    "no visible form", "no visible body", "has no body", "without a body",
+    "bodiless", "disembodied", "only a voice", "only as a voice",
+    "just a voice", "a voice only", "voice alone", "faceless voice",
+    "auditory effect", "auditory presence", "represented only by",
+    "heard but not seen", "felt but not seen", "felt, not seen",
 )
 
 

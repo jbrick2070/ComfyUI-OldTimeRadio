@@ -154,6 +154,11 @@ def _appearance_for_char(ledger: dict, char_id: str, *, cap: int = 0) -> str:
                 break
     # The writer's per-character description (operator look-QA 2026-06-10:
     # without it the M4 prompts lost the character grounding).
+    # A bodiless character has nothing to show: no name stand-in and no
+    # gender anchor, or a joint audio-video prompt reads "adult woman, THE
+    # VOICE" and may speak the name (Sonnet QA on fe35b8d5).
+    if _CAST_TEXT.is_bodiless(entry):
+        return ""
     base = _CAST_TEXT.video_text(entry, cap=cap)
     if not base:
         name = entry.get("name")

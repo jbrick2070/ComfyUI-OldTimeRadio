@@ -227,3 +227,28 @@ def test_appearance_names_the_gender_in_every_casting_prompt():
                            .read_text(encoding="utf-8"))["prompt_stages"][key]
         assert "a woman or a man" in seam, rel
     assert "a man in his 50s" in POOLS.LEMMY_PROFILE["appearance"]
+
+
+def test_bodiless_marks_are_whole_phrases_not_words_a_real_look_carries():
+    """Sonnet QA on fe35b8d5: bare "no physical", "never seen", "auditory" and
+    "no body" blanked real characters."""
+    for look in ("no body armour, a tall man", "a woman never seen without gloves",
+                 "a man with no physical scars, 40s",
+                 "tall man, auditory implant behind ear",
+                 "no physical resemblance to his brother, tall man",
+                 "a nobody clerk, a woman of thirty"):
+        assert not CT.is_bodiless({"appearance": look}), look
+    for ghost in ("just a voice on the wire", "a presence felt, not seen",
+                  "a faceless voice", "disembodied, a cold draught",
+                  "no physical appearance, represented only by sound"):
+        assert CT.is_bodiless({"appearance": ghost}), ghost
+
+
+def test_a_bodiless_character_gives_video_no_name_and_no_anchor():
+    """Sonnet QA on fe35b8d5: the empty video text fell back to the NAME, so a
+    joint-AV prompt read "adult woman, THE VOICE"."""
+    from nodes import otr_shot_lock as SL
+    ledger = {"cast": [{"char_id": "c04", "name": "THE VOICE", "gender": "female",
+                        "appearance": "just a voice in the fog",
+                        "presence": "a sigh that becomes speech"}]}
+    assert SL._appearance_for_char(ledger, "c04") == ""
