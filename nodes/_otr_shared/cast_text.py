@@ -87,6 +87,10 @@ _BODILESS_LEAD = re.compile(
     r"|(?:just|only)\s+a\s+voice\b(?!\s+(?:like|of|actor))"
     r"|voice\s+(?:only|alone)"
     r"|represented\s+(?:only\s+)?(?:by|as|through)"
+    # "unseen, only heard through the static" (live leg on dfa4df49, two
+    # characters): the bare word, then a break, then how it is perceived.
+    r"|(?:unseen|invisible)(?=\s*[,;:—-])"
+    r"|(?:only\s+heard|heard\s+only)"
     r"|heard,?\s+(?:but\s+)?not\s+seen)\b",
     re.IGNORECASE)
 
