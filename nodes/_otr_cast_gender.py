@@ -95,7 +95,10 @@ def description_gender(description: str, others: Sequence[str] = ()) -> str:
     description that names another cast member (articles aside) gives no
     pronoun evidence at all -- no word window can tell whose pronoun it is.
     """
-    words = re.findall(r"[^\W_]+", str(description or "").lower())
+    # Folded like the names (name_forms folds accents), or "Désirée" in the
+    # text would never meet the cast name and the other-member guard would
+    # skip (Sonnet QA on 0749cbd6).
+    words = re.findall(r"[^\W_]+", _RG.fold_accents(str(description or "")).lower())
     names = {w for name in others for form in name_forms(name)
              for w in form} - _NAME_ARTICLES
     if names.intersection(words):

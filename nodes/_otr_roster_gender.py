@@ -560,6 +560,14 @@ def resolve_roster_gender(slot_name, characters: Iterable) -> RosterGenderVerdic
     def _allowed(candidates):
         return [r for r in candidates if not _contradicts(stated, r)]
 
+    # The spelling as written wins first: a roster that holds both JOSÉ and
+    # JOSE must give each its own row, not abstain on the folded collision
+    # (Sonnet QA on 0749cbd6). Only then does the accent-folded key try.
+    _as_written = _norm(slot_name)
+    exact = [r for r in rows if _as_written in tuple(
+        _norm(r.get(k)) for k in ("name", "roster_name") if _norm(r.get(k)))]
+    if exact:
+        return _verdict_from(exact, "exact")
     exact = [r for r in rows if slot in _candidate_names(r)]
     if exact:
         return _verdict_from(exact, "exact")

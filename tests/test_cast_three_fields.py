@@ -294,3 +294,18 @@ def test_an_accented_cast_name_finds_its_unaccented_source_gender():
     verdict = RG.resolve_roster_gender(
         "DÉSIRÉE", [{"name": "DESIREE", "gender": "female"}])
     assert getattr(verdict, "gender", None) == "female"
+
+
+def test_an_accented_other_member_in_the_description_still_blocks_pronouns():
+    """Sonnet QA on 0749cbd6: names folded, description not -- "Desiree's
+    husband; he is stern" (accented) gave 'male' from the wrong person."""
+    from nodes import _otr_cast_gender as CG
+    desc = "D\u00e9sir\u00e9e's husband; he is stern and hides what he knows"
+    assert CG.description_gender(desc, ["D\u00e9sir\u00e9e"]) == ""
+
+
+def test_two_rows_differing_only_by_accent_each_keep_their_own():
+    from nodes import _otr_roster_gender as RG
+    rows = [{"name": "JOS\u00c9", "gender": "male"}, {"name": "JOSE", "gender": "female"}]
+    assert RG.resolve_roster_gender("JOS\u00c9", rows).gender == "male"
+    assert RG.resolve_roster_gender("JOSE", rows).gender == "female"
