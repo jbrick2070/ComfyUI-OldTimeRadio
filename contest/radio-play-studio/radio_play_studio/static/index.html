@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Play Studio</title>
+<style>
+  :root {
+    --bg: #f4efe6; --panel: #fffdf8; --ink: #2a2118; --muted: #6f6254;
+    --line: #d9ccb8; --accent: #b4491f; --accent-ink: #fff8f0; --ok: #2f6b3a; --bad: #a3261a;
+    --bar: #e5d9c5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17130f; --panel: #211b15; --ink: #f0e6d6; --muted: #a89a86;
+      --line: #3a3026; --accent: #e0703f; --accent-ink: #1a1007; --ok: #7ec28a; --bad: #f08a7e;
+      --bar: #3a3026;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 Georgia, "Times New Roman", serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 2rem; margin: 0 0 4px; letter-spacing: .02em; }
+  .tag { color: var(--muted); margin: 0 0 24px; }
+  fieldset { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+             padding: 16px; margin: 0 0 16px; }
+  legend { padding: 0 8px; font-weight: bold; }
+  label { display: block; margin: 12px 0 4px; font-weight: bold; }
+  .help { color: var(--muted); font-size: .875rem; margin: 2px 0 0; }
+  select, input, textarea { width: 100%; padding: 8px 10px; font: inherit; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+  textarea { min-height: 72px; resize: vertical; }
+  button { font: inherit; font-weight: bold; padding: 12px 22px; border: 0; border-radius: 8px;
+           background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #bar { height: 10px; background: var(--bar); border-radius: 5px; overflow: hidden; margin: 12px 0 6px; }
+  #fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  #status { color: var(--muted); min-height: 1.5em; }
+  #error { color: var(--bad); white-space: pre-wrap; }
+  #notice { color: var(--bad); }
+  video { width: 100%; border-radius: 8px; background: #000; margin-top: 12px; }
+  .done a { color: var(--ok); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Radio Play Studio</h1>
+  <p class="tag">Press the button. Your own ComfyUI writes, casts, performs and films a radio play.</p>
+
+  <p id="notice" hidden></p>
+  <form id="form"></form>
+  <button id="go" type="submit" form="form" disabled>Make the episode</button>
+
+  <section id="run" hidden aria-live="polite">
+    <div id="bar"><div id="fill"></div></div>
+    <p id="status"></p>
+    <p id="error" hidden></p>
+    <div id="result" class="done" hidden></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const form = $("form"), go = $("go");
+let fields = [];
+
+function control(f) {
+  let el;
+  if (f.kind === "choice") {
+    el = document.createElement("select");
+    for (const c of f.choices) {
+      const o = document.createElement("option");
+      o.value = o.textContent = String(c);
+      el.appendChild(o);
+    }
+    if (f.default != null) el.value = String(f.default);
+  } else if (f.kind === "int" || f.kind === "float") {
+    el = document.createElement("input");
+    el.type = "number";
+    if (f.min != null) el.min = f.min;
+    if (f.max != null) el.max = f.max;
+    el.step = f.kind === "int" ? 1 : "any";
+    if (f.default != null) el.value = f.default;
+  } else if (f.multiline) {
+    el = document.createElement("textarea");
+    el.value = f.default || "";
+  } else {
+    el = document.createElement("input");
+    el.type = "text";
+    el.value = f.default || "";
+  }
+  el.id = "f_" + f.key;
+  return el;
+}
+
+function build(list) {
+  fields = list;
+  form.textContent = "";
+  let group = null, box = null;
+  for (const f of list) {
+    if (f.group !== group) {
+      group = f.group;
+      box = document.createElement("fieldset");
+      const lg = document.createElement("legend");
+      lg.textContent = group;
+      box.appendChild(lg);
+      form.appendChild(box);
+    }
+    const label = document.createElement("label");
+    label.htmlFor = "f_" + f.key;
+    label.textContent = f.label;
+    box.appendChild(label);
+    box.appendChild(control(f));
+    const help = document.createElement("p");
+    help.className = "help";
+    help.textContent = f.help;
+    box.appendChild(help);
+  }
+  go.disabled = false;
+}
+
+function collect() {
+  const out = {};
+  for (const f of fields) {
+    const el = $("f_" + f.key);
+    if (f.kind === "text" && el.value === "" ) continue;   // blank = the workflow's own value
+    out[f.key] = (f.kind === "int" || f.kind === "float") ? Number(el.value) : el.value;
+  }
+  return out;
+}
+
+async function loadOptions() {
+  try {
+    const res = await fetch("/api/options");
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    build(body.fields);
+  } catch (err) {
+    $("notice").textContent = "Cannot reach your ComfyUI: " + err.message +
+      "  Start ComfyUI, then reload. (python -m radio_play_studio doctor says what is missing.)";
+    $("notice").hidden = false;
+  }
+}
+
+function watch(id) {
+  const es = new EventSource("/api/episodes/" + id + "/events");
+  es.onmessage = (m) => {
+    const ev = JSON.parse(m.data);
+    if (ev.type === "progress") {
+      $("fill").style.width = Math.round(ev.value * 100) + "%";
+      $("status").textContent = Math.round(ev.value * 100) + "% " + ev.message;
+    } else if (ev.type === "submitted") {
+      $("status").textContent = "Queued on your ComfyUI. A full episode takes a while; the bar moves in steps.";
+    } else if (ev.type === "status") {
+      $("status").textContent = "Status: " + ev.status;
+    } else if (ev.type === "done") {
+      es.close();
+      $("fill").style.width = "100%";
+      $("status").textContent = "Finished.";
+      const url = "/episodes/" + ev.run + "/" + encodeURIComponent(ev.file);
+      const v = document.createElement("video");
+      v.controls = true; v.src = url;
+      const a = document.createElement("a");
+      a.href = url; a.download = ev.file; a.textContent = "Download " + ev.file;
+      $("result").textContent = "";
+      $("result").append(v, a);
+      $("result").hidden = false;
+      go.disabled = false;
+    } else if (ev.type === "error") {
+      es.close();
+      $("error").textContent = ev.message;
+      $("error").hidden = false;
+      $("status").textContent = "The run stopped.";
+      go.disabled = false;
+    }
+  };
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  go.disabled = true;
+  $("run").hidden = false; $("error").hidden = true; $("result").hidden = true;
+  $("fill").style.width = "0"; $("status").textContent = "Checking your choices...";
+  try {
+    const res = await fetch("/api/episodes", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({choices: collect()}),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    watch(body.id);
+  } catch (err) {
+    $("error").textContent = err.message; $("error").hidden = false;
+    $("status").textContent = "Not started."; go.disabled = false;
+  }
+});
+
+loadOptions();
+</script>
+</body>
+</html>
