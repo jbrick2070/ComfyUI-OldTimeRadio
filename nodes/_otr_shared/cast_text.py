@@ -89,7 +89,9 @@ _BODILESS_LEAD = re.compile(
     r"|represented\s+(?:only\s+)?(?:by|as|through)"
     # "unseen, only heard through the static" (live leg on dfa4df49, two
     # characters): the bare word, then a break, then how it is perceived.
-    r"|(?:unseen|invisible)(?=\s*[,;:—-])"
+    # A hyphen counts only standing alone ("Invisible - a draught"), not as
+    # a compound ("Invisible-looking pale man"; Sonnet QA on ead68057).
+    r"|(?:unseen|invisible)(?=\s*[,;:—]|\s+-)"
     r"|(?:only\s+heard|heard\s+only)"
     r"|heard,?\s+(?:but\s+)?not\s+seen)\b",
     re.IGNORECASE)
