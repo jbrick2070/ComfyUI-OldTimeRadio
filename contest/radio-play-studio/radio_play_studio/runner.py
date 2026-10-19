@@ -48,8 +48,21 @@ def normalize_event(event: Any) -> dict | None:
     on where the SDK keeps its event classes."""
     kind = type(event).__name__
     if kind == "Progress":
-        return {"type": "progress", "value": float(getattr(event, "value", 0.0) or 0.0),
+        value = float(getattr(event, "value", 0.0) or 0.0)
+        nodes_total = getattr(event, "nodes_total", None)
+        if nodes_total == 0:
+            # comfy-api-proxy sends ComfyUI's per-node sampler progress with
+            # nodes_total=0: the share of ONE node's steps, not of the episode.
+            # On the bar it read 100% at the first still and stayed there for
+            # the hour of video that followed (first live 16 GB run, 2026-10-19).
+            return {"type": "step", "value": value,
+                    "step": getattr(event, "step", None), "steps": getattr(event, "steps", None)}
+        note = {"type": "progress", "value": value,
                 "message": str(getattr(event, "message", "") or "")}
+        if nodes_total:
+            note["nodes_done"] = int(getattr(event, "nodes_done", 0) or 0)
+            note["nodes_total"] = int(nodes_total)
+        return note
     if kind == "StatusChange":
         return {"type": "status", "status": str(getattr(event, "status", ""))}
     if kind == "OutputReady":

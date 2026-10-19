@@ -88,7 +88,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     code = 1
     for event in studio.stream(_choices(args)):
         if event["type"] == "progress":
-            print(f"{event['value']:.0%} {event['message']}".rstrip(), flush=True)
+            stages = (f" ({event['nodes_done']} of {event['nodes_total']} stages)"
+                      if event.get("nodes_total") else "")
+            print(f"{event['value']:.0%}{stages} {event['message']}".rstrip(), flush=True)
         elif event["type"] == "done":
             print(f"DONE -> {event['path']}")
             code = 0

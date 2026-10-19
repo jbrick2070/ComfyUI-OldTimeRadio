@@ -161,7 +161,12 @@ function watch(id) {
     if (ev.type === "progress") {
       high = Math.max(high, Math.round(ev.value * 100));
       $("fill").style.width = high + "%";
-      $("status").textContent = high + "% " + ev.message;
+      const parts = ev.nodes_total ? " (" + ev.nodes_done + " of " + ev.nodes_total + " stages)" : "";
+      $("status").textContent = high + "%" + parts + (ev.message ? " " + ev.message : "");
+    } else if (ev.type === "step") {
+      // one stage's own steps; the bar is the whole episode, so it stays put
+      const stage = ev.steps ? "this stage: step " + ev.step + " of " + ev.steps : "";
+      $("status").textContent = high + "%" + (stage ? ", " + stage : "");
     } else if (ev.type === "submitted") {
       $("status").textContent = "Queued on your ComfyUI. A full episode takes a while; the bar moves in steps.";
     } else if (ev.type === "status") {

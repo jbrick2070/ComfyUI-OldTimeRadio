@@ -99,6 +99,18 @@ def test_normalize_event_keeps_what_the_page_shows():
     assert normalize_event(Preview()) is None
 
 
+def test_one_stage_steps_never_read_as_the_episode_share():
+    # The shapes comfy-api-proxy 0.1.6 sends: ComfyUI's per-node `progress`
+    # (nodes_total=0) and the graph-wide `progress_state`.
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    sampler = RealProgress(value=1.0, nodes_done=0, nodes_total=0, current_node="7", step=16, steps=16)
+    assert normalize_event(sampler) == {"type": "step", "value": 1.0, "step": 16, "steps": 16}
+    graph = RealProgress(value=0.4, nodes_done=8, nodes_total=20, current_node="7", step=3, steps=16)
+    assert normalize_event(graph) == {"type": "progress", "value": 0.4, "message": "",
+                                      "nodes_done": 8, "nodes_total": 20}
+
+
 def test_normalize_event_reads_the_real_sdk_classes():
     sdk = pytest.importorskip("comfy_sdk")
     from comfy_sdk.events import OutputReady as RealOutput, Progress as RealProgress, StatusChange as RealStatus
