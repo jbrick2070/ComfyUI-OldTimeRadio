@@ -229,18 +229,27 @@ def test_appearance_names_the_gender_in_every_casting_prompt():
     assert "a man in his 50s" in POOLS.LEMMY_PROFILE["appearance"]
 
 
-def test_bodiless_marks_are_whole_phrases_not_words_a_real_look_carries():
-    """Sonnet QA on fe35b8d5: bare "no physical", "never seen", "auditory" and
-    "no body" blanked real characters."""
+def test_bodiless_means_the_refusal_leads_the_appearance():
+    """Third attempt, after a panel: two substring versions blanked real
+    people (Sonnet QA on fe35b8d5 and 8b74e6f2). The refusal must OPEN the
+    appearance; a real look mentions such words only after a subject."""
     for look in ("no body armour, a tall man", "a woman never seen without gloves",
                  "a man with no physical scars, 40s",
                  "tall man, auditory implant behind ear",
                  "no physical resemblance to his brother, tall man",
-                 "a nobody clerk, a woman of thirty"):
+                 "a nobody clerk, a woman of thirty",
+                 "40s man, has no body hair, gaunt",
+                 "a man with just a voice like gravel",
+                 "just a voice actor in a booth, a woman of thirty",
+                 "a woman who felt, not seen, the cold",
+                 "a disembodied shadow on the wall, a woman's silhouette",
+                 "only a voice of authority, a tall man"):
         assert not CT.is_bodiless({"appearance": look}), look
-    for ghost in ("just a voice on the wire", "a presence felt, not seen",
-                  "a faceless voice", "disembodied, a cold draught",
-                  "no physical appearance, represented only by sound"):
+    for ghost in ("none", "n/a", "just a voice on the wire", "a voice alone",
+                  "no physical appearance, represented only by an auditory effect",
+                  "A disembodied voice in the fog", "bodiless presence",
+                  "40s woman, no physical form, only her voice",
+                  "heard but not seen, a cold draught"):
         assert CT.is_bodiless({"appearance": ghost}), ghost
 
 

@@ -30,6 +30,8 @@ Stdlib only; cold-import clean.
 """
 from __future__ import annotations
 
+import re
+
 try:
     from .cast_picture_text import picture_description
 except ImportError:  # pragma: no cover -- flat test imports
@@ -69,25 +71,28 @@ _NO_APPEARANCE = frozenset({
 #: Prose that says the same thing at sentence length: the six-bank leg's
 #: my_story Voice wrote "no physical appearance, represented only by an
 #: auditory effect" (2026-10-18). Any of these anywhere marks it bodiless.
-#: Whole phrases that only a bodiless character's appearance says. Never a
-#: bare "no physical" / "never seen" / "auditory": real looks carry "no
-#: physical scars", "never seen without his hat", "an auditory implant"
-#: (Sonnet QA on fe35b8d5). Missing a bodiless phrasing costs little -- the
-#: casting prompt already asks for a glow, a shadow or an object instead.
-_BODILESS_MARKS = (
-    "no physical appearance", "no physical form", "no physical body",
-    "no visible form", "no visible body", "has no body", "without a body",
-    "bodiless", "disembodied", "only a voice", "only as a voice",
-    "just a voice", "a voice only", "voice alone", "faceless voice",
-    "auditory effect", "auditory presence", "represented only by",
-    "heard but not seen", "felt but not seen", "felt, not seen",
-)
+#: A bodiless appearance LEADS with the refusal; a real look only mentions
+#: such words after a subject is established ("has no body hair", "just a
+#: voice like gravel", "no physical scars"). So the phrase must open the text
+#: (third attempt, after a panel: two substring versions blanked real people,
+#: Sonnet QA on fe35b8d5 and 8b74e6f2). An optional article, and the template's
+#: "<age> woman|man," lead, may come first. "disembodied"/"bodiless" count only
+#: before voice/presence/sound/entity -- "a disembodied shadow on the wall" is
+#: the drawable stand-in the casting prompt asks for.
+_BODILESS_LEAD = re.compile(
+    r"^(?:\d{1,2}0?s\s+(?:woman|man|person),\s*)?(?:(?:a|an|the)\s+)?"
+    r"(?:no\s+(?:physical|visible)\s+(?:appearance|form|body)"
+    r"|(?:disembodied|bodiless)\s+(?:voice|presence|sound|entity)"
+    r"|(?:just|only)\s+a\s+voice\b(?!\s+(?:like|of|actor))"
+    r"|voice\s+(?:only|alone)"
+    r"|heard,?\s+(?:but\s+)?not\s+seen)\b",
+    re.IGNORECASE)
 
 
 def is_bodiless(row) -> bool:
     """True when the appearance says there is nothing to draw."""
-    text = field(row, "appearance").strip(" .;,!").lower()
-    return text in _NO_APPEARANCE or any(m in text for m in _BODILESS_MARKS)
+    text = field(row, "appearance").strip(" .;,!")
+    return text.lower() in _NO_APPEARANCE or bool(_BODILESS_LEAD.match(text))
 
 
 def picture_appearance(row) -> str:
