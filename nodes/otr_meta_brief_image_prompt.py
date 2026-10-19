@@ -1169,7 +1169,8 @@ def _iter_beat_lines(lines):
 
 
 def derive_scene_still_targets(lines, fps: int = 25,
-                               *, include_synthetic_closing: bool = False):
+                               *, include_synthetic_closing: bool = False,
+                               bodiless_char_ids=frozenset()):
     """Still-spine ST-2: the SCENE-STILL targets derived from the LINES via pure
     helpers, never from ``video.shots`` (graph order: image gen runs BEFORE
     ShotLock). Returns ``(targets, warnings)``; each target is
@@ -1255,8 +1256,17 @@ def derive_scene_still_targets(lines, fps: int = 25,
             # per-beat 16:9 CHARACTER still (kind=scene_character) leading with the
             # character's appearance -- NOT a generic radio scene still and NOT the
             # vertical portrait.
-            _add(bid, "scene_character", role, "scene_role_map",
-                 char_id=str(ln.get("char_id") or ""))
+            _cid = str(ln.get("char_id") or "")
+            if _cid and _cid in bodiless_char_ids:
+                # A BODILESS speaker (a voice, the sea) has no figure, so its
+                # beat gets a plain scene still. As a scene_character beat the
+                # composer substituted "a period-dressed character" for the
+                # empty look and drew a stranger (six-bank leg, 2026-10-18:
+                # my_story's "unseen" Tom drawn as a man in a coat).
+                _add(bid, "scene_beat", role, "scene_role_map_bodiless")
+            else:
+                _add(bid, "scene_character", role, "scene_role_map",
+                     char_id=_cid)
         else:
             _add(bid, "scene_beat", role, "scene_role_map")
     if True:
@@ -2181,6 +2191,9 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         try:
             scene_targets, scene_warns = derive_scene_still_targets(
                 lines, fps=fps,
+                bodiless_char_ids=frozenset(
+                    str(c.get("char_id") or "") for c in (cast or [])
+                    if isinstance(c, dict) and _CAST_TEXT.is_bodiless(c)),
                 include_synthetic_closing=bool(
                     still_capabilities is None
                     or still_capabilities.get("music_visual") is not False))

@@ -86,6 +86,7 @@ _BODILESS_LEAD = re.compile(
     r"(?:voice|presence|sound|entity|narrator|speaker)"
     r"|(?:just|only)\s+a\s+voice\b(?!\s+(?:like|of|actor))"
     r"|voice\s+(?:only|alone)"
+    r"|represented\s+(?:only\s+)?(?:by|as|through)"
     r"|heard,?\s+(?:but\s+)?not\s+seen)\b",
     re.IGNORECASE)
 
@@ -99,7 +100,16 @@ def is_bodiless(row) -> bool:
 def picture_appearance(row) -> str:
     """The appearance as a picture may use it: ``""`` when it says there is
     nothing to draw."""
-    return "" if is_bodiless(row) else field(row, "appearance")
+    if is_bodiless(row):
+        return ""
+    # A part repeated back to back ("mid-thirties woman, woman, oval": the
+    # model put the gender in the role slot too) is said once.
+    parts = [p.strip() for p in field(row, "appearance").split(",")]
+    def _repeats(prev: str, part: str) -> bool:
+        prev, part = prev.lower(), part.lower()
+        return bool(part) and (part == prev or prev.endswith(" " + part))
+    kept = [p for i, p in enumerate(parts) if not (i and _repeats(parts[i - 1], p))]
+    return ", ".join(kept)
 
 
 def still_text(row) -> str:

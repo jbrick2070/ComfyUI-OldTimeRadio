@@ -262,3 +262,35 @@ def test_a_bodiless_character_gives_video_no_name_and_no_anchor():
                         "appearance": "just a voice in the fog",
                         "presence": "a sigh that becomes speech"}]}
     assert SL._appearance_for_char(ledger, "c04") == ""
+
+
+def test_a_bodiless_speakers_beat_gets_a_scene_still_not_a_stranger():
+    """Six-bank leg on 8b74e6f2: my_story's "unseen" Tom was drawn as a man in
+    a coat -- his scene_character beat had no look, so the composer
+    substituted "a period-dressed character"."""
+    from nodes import otr_meta_brief_image_prompt as IP
+    lines = [{"line_id": "b001", "beat_id": "b001", "speaker_role": "character",
+              "char_id": "c03", "text": "Ada!"},
+             {"line_id": "b002", "beat_id": "b002", "speaker_role": "character",
+              "char_id": "c02", "text": "Tom?"}]
+    targets, _ = IP.derive_scene_still_targets(lines, bodiless_char_ids={"c03"})
+    by = {t["beat_id"]: t for t in targets}
+    assert by["b001"]["kind"] == "scene_beat"
+    assert by["b002"]["kind"] == "scene_character"
+    assert CT.is_bodiless({"appearance": "represented by intense, rushing sound effects"})
+
+
+def test_a_repeated_appearance_part_is_said_once():
+    row = {"appearance": "mid-thirties woman, woman, oval face, dark eyes"}
+    assert CT.picture_appearance(row) == "mid-thirties woman, oval face, dark eyes"
+
+
+def test_an_accented_cast_name_finds_its_unaccented_source_gender():
+    """Six-bank leg: Chopin's DESIREE (female in the source index) was cast
+    male because the cast name carried accents and the lookup did not fold."""
+    from nodes import _otr_roster_gender as RG
+    assert RG._match_norm("DÉSIRÉE") == RG._match_norm("Desiree") == "DESIREE"
+    assert RG._norm("DÉSIRÉE") == "DÉSIRÉE"   # output keys keep the spelling
+    verdict = RG.resolve_roster_gender(
+        "DÉSIRÉE", [{"name": "DESIREE", "gender": "female"}])
+    assert getattr(verdict, "gender", None) == "female"

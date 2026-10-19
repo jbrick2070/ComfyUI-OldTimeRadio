@@ -17317,3 +17317,23 @@ not promote it to the Bug Bible on this evidence alone.
   announcer's gender follows the voice CastLock casts; its voice_cue carries no
   gender. The announcer stays a 50/50 roll (operator).
 - status: FIXED in code; live proof is the next per-bank legs.
+
+## PBUG-20261018-05 -- an accented cast name missed its source gender; a bodiless speaker's still drew a stranger
+- evidence: six-bank 8 GB leg on 8b74e6f2 (all six published; no "(", "[",
+  "*" in any spoken line; 0 unclean rows). public_domain
+  `ledger_judgment_20261018_223717`: Chopin's DESIREE (female in the source)
+  cast male, am_echo, drawn as a man. my_story `voice_fog_20261018_232222`:
+  Tom's appearance "unseen" (caught as bodiless) yet his beat's still drew a
+  dark-haired man; The Sea "represented by intense, rushing sound effects"
+  was not caught. original: "mid-thirties woman, woman, oval".
+- cause: resolve_roster_gender compared names by upper-casing only, so
+  "DESIREE" with accents never met the roster row; a bodiless speaker's beat
+  was still a scene_character target, and the composer substitutes "a
+  period-dressed character" for an empty look.
+- fix: name MATCHING folds accents on both sides (_match_norm in
+  resolve_roster_gender and _candidate_names; the name-index lookups in
+  _otr_cast_gender) while every output key keeps the spoken spelling (a French
+  Lear's CORDELIA with accents is still the key lock_cast reads). A bodiless
+  speaker's beat is a scene_beat target. "represented by/as/through" leads as
+  bodiless. A repeated adjacent appearance part is said once.
+- status: FIXED in code; live proof is the next public_domain and my_story legs.

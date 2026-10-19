@@ -299,8 +299,25 @@ def load_roster_characters(text_path) -> tuple:
     return tuple(out)
 
 
+def fold_accents(value) -> str:
+    """``value`` with its diacritics removed: "DÉSIRÉE" -> "DESIREE". A cast
+    name keeps its accents while a roster or index may not (six-bank leg,
+    2026-10-18: Chopin's DÉSIRÉE missed her source row "female" and was cast
+    male), so every name comparison folds both sides."""
+    import unicodedata
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    return "".join(ch for ch in text if not unicodedata.combining(ch))
+
+
 def _norm(value) -> str:
     return str(value or "").strip().upper()
+
+
+def _match_norm(value) -> str:
+    """The comparison key: ``_norm`` with accents folded. Only for MATCHING a
+    slot against roster names -- every OUTPUT stays keyed by ``_norm`` (the
+    spoken name lock_cast looks up, "CORDÉLIA" in a French Lear)."""
+    return fold_accents(_norm(value))
 
 
 def strip_honorifics(name: str) -> str:
@@ -401,7 +418,7 @@ def _candidate_names(row: Mapping) -> tuple:
     names = []
     row_name = ""
     for key in ("name", "roster_name"):
-        n = _norm(row.get(key))
+        n = _match_norm(row.get(key))
         if n and n not in names:
             names.append(n)
         if not row_name:
@@ -409,7 +426,7 @@ def _candidate_names(row: Mapping) -> tuple:
     aliases = row.get("aliases")
     if isinstance(aliases, (list, tuple)):
         for a in aliases:
-            n = _norm(a)
+            n = _match_norm(a)
             if n and n not in names and _alias_is_a_join_key(a, row_name):
                 names.append(n)
     return tuple(names)
@@ -530,7 +547,7 @@ def resolve_roster_gender(slot_name, characters: Iterable) -> RosterGenderVerdic
     pronoun rung with real textual evidence, and a title rung running earlier
     would throw that evidence away to restate the same value with less standing.
     """
-    slot = _norm(slot_name)
+    slot = _match_norm(slot_name)
     rows = [dict(r) for r in (characters or []) if isinstance(r, Mapping)]
     stated = slot_honorific_gender(slot)
     if not slot or not rows:

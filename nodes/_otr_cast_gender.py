@@ -75,7 +75,7 @@ def binary(raw) -> str:
 def name_forms(name: str) -> "tuple[tuple[str, ...], ...]":
     """A name's word forms: honorifics dropped, and as typed."""
     words = tuple(re.findall(r"[^\W_]+(?:['\-][^\W_]+)*",
-                             str(name or "").casefold()))
+                             _RG.fold_accents(str(name or "")).casefold()))
     kept = tuple(w for w in words if w not in _RG._HONORIFICS)
     return tuple(dict.fromkeys(f for f in (kept, words) if f))
 
@@ -145,7 +145,7 @@ def known_character_gender(name: str) -> str:
             for c in chars:
                 g = binary((c or {}).get("gender"))
                 words = re.findall(r"[^\W_]+(?:['\-][^\W_]+)*",
-                                   str((c or {}).get("name") or "").casefold())
+                                   _RG.fold_accents(str((c or {}).get("name") or "")).casefold())
                 if g and len(words) == 1 and len(words[0]) >= 3 \
                         and words[0] not in vocab:
                     seen.setdefault(words[0], set()).add(g)
@@ -162,13 +162,13 @@ def known_character_gender(name: str) -> str:
                 continue
             for key, entry in entries.items():
                 if (entry or {}).get("locked") and not (entry or {}).get("gender"):
-                    on_the_roll.add(str(key).rsplit("|", 1)[-1].casefold())
+                    on_the_roll.add(_RG.fold_accents(str(key).rsplit("|", 1)[-1]).casefold())
         _KNOWN_CHARACTERS = {k: next(iter(v)) for k, v in seen.items()
                              if len(v) == 1 and k not in on_the_roll}
     # The name's FIRST word, unless the name opens with an honorific: in "Dr.
     # Harris" or "Mrs. Poole" the first real word is a surname, not the
     # character the roster means. "Juliet Capulet" reads "juliet".
-    words = re.findall(r"[^\W_]+(?:['\-][^\W_]+)*", str(name or "").casefold())
+    words = re.findall(r"[^\W_]+(?:['\-][^\W_]+)*", _RG.fold_accents(str(name or "")).casefold())
     if not words or words[0] in _RG._HONORIFICS:
         return ""
     return _KNOWN_CHARACTERS.get(words[0], "")
