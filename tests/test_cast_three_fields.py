@@ -168,7 +168,8 @@ def test_an_appearance_that_says_nothing_is_empty_for_pictures():
     for word in ("none", "n/a", "N/A.", "unknown", "invisible", "disembodied"):
         row = {"appearance": word, "presence": "drifts through the fog"}
         assert CT.still_text(row) == "", word
-        assert CT.video_text(row) == "drifts through the fog", word
+        # Bodiless: nothing to show, and its presence is how it sounds.
+        assert CT.video_text(row) == "", word
         assert word in CT.card_text(row)       # the writing passes still see it
 
 
@@ -188,3 +189,41 @@ def test_no_writer_prompt_invites_a_stage_direction():
     script = scifi["prompt_stages"]["scifi_news_pro_script_system"]
     assert "including quotation marks, parentheses" not in script
     assert "never carries parentheses or brackets" in script
+
+
+def test_a_bodiless_character_in_prose_draws_nothing_and_voices_nothing():
+    """Six-bank leg on 4f7f5602: my_story's Voice wrote its appearance as a
+    sentence the none/n/a list missed, and its presence was sound."""
+    row = {"appearance": "no physical appearance, represented only by an "
+                         "auditory effect",
+           "presence": "Starts as a faint, mournful sigh, builds into clear, "
+                       "urgent speech, and finally fades into crashing waves"}
+    assert CT.is_bodiless(row)
+    assert CT.still_text(row) == "" and CT.video_text(row) == ""
+    # A real look that merely contains "unseen" or "invisible" stays drawable.
+    for look in ("a woman in her forties, an unseen scar under the collar",
+                 "a man with an invisible limp only his wife notices"):
+        real = {"appearance": look, "presence": "stands very still"}
+        assert not CT.is_bodiless(real), look
+        assert CT.still_text(real) == look
+
+
+def test_appearance_names_the_gender_in_every_casting_prompt():
+    """Six-bank leg: public_domain's BARRETT, a female row whose appearance
+    never said woman, was drawn as a man."""
+    import json as _json
+    from pathlib import Path as _P
+    from nodes import _otr_casting as C
+    slot = C.EnsembleSlot(char_id="c02", name="ALICE", gender="female",
+                          timbre="warm", role="lead")
+    assert C._deterministic_identity_floor(slot)["appearance"].startswith("Adult woman")
+    prompt = C._build_user_prompt("ALICE", "x", "noir", [],
+                                  gender="female", timbre="warm", role="lead")
+    assert "<woman|man>" in prompt and "a woman or a man" in prompt
+    for rel, key in (("my_story/my_story.json", "my_story_treatment_system"),
+                     ("scifi_news_pro/scifi_news_pro.json",
+                      "scifi_news_pro_casting_system")):
+        seam = _json.loads((_P(REPO) / "nodes/story_packs" / rel)
+                           .read_text(encoding="utf-8"))["prompt_stages"][key]
+        assert "a woman or a man" in seam, rel
+    assert "a man in his 50s" in POOLS.LEMMY_PROFILE["appearance"]

@@ -438,7 +438,7 @@ def _build_user_prompt(
     )
     parts.append("")
     parts.append(
-        'appearance: "<age decade>, <story-linked role>, <face shape>, '
+        'appearance: "<age decade> <woman|man>, <story-linked role>, <face shape>, '
         '<eyes/brow>, <nose/mouth/jaw>, <hair/hairline>, <one '
         'distinctive story-linked detail>" -- only what a painter can see.'
     )
@@ -461,6 +461,9 @@ def _build_user_prompt(
     )
     parts.append(
         "- Use concrete facial geometry, not vague mood words."
+    )
+    parts.append(
+        "- The appearance names the character's gender plainly -- a woman or a man -- so the picture cannot guess it."
     )
     parts.append(
         "- A character with no body -- a voice, a spirit -- still gets an appearance: what the camera shows of them, such as a glow, a shadow or an object. Never none or n/a."
@@ -1826,7 +1829,12 @@ def _deterministic_identity_floor(slot: "EnsembleSlot") -> dict:
     timbre = (getattr(slot, "timbre", "") or "clear").strip()
     pressure = _FACE_PRESSURE_BY_ROLE.get(role.lower(), "steady, unhurried features")
     return {
-        "appearance": f"Adult, the story's {role}, {pressure}",
+        # The gender is in the drawable text itself (six-bank leg, 2026-10-18:
+        # a female row whose appearance never said "woman" was drawn as a man).
+        "appearance": "Adult %s, the story's %s, %s" % (
+            {"female": "woman", "male": "man"}.get(
+                str(getattr(slot, "gender", "") or "").lower(), "person"),
+            role, pressure),
         "presence": "carries the episode's pressure without flourish",
         "voice_cue": f"{timbre}, plainly spoken",
     }

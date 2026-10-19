@@ -354,8 +354,8 @@ LEMMY_PROFILE = {
     # THE CHARACTER IN THREE FIELDS (2026-10-18), the split every cast row
     # carries: appearance is the drawable part, presence the manner, voice_cue
     # the delivery. The Cockney accent is a voice, so it is not painted.
-    "appearance": "Genial communications officer, 50s, warm grin, brandishing a handheld brass communicator that looks like a polycorder crossed with a harmonica",
-    "presence": "quick-witted and humorous",
+    "appearance": "Genial communications officer, a man in his 50s, warm grin, brandishing a handheld brass communicator that looks like a polycorder crossed with a harmonica",
+    "presence": "rocks on his heels, waves the communicator as he talks, grin never leaves",
     "voice_cue": "broad friendly Cockney, gravelly and warm",
     "notes": "Male, gravelly/raspy, 50s, warm characterful voice, iconic",
 }

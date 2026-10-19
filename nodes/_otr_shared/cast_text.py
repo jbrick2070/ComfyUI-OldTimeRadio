@@ -36,7 +36,7 @@ except ImportError:  # pragma: no cover -- flat test imports
     from cast_picture_text import picture_description  # type: ignore
 
 __all__ = [
-    "CAST_TEXT_FIELDS", "field", "picture_appearance", "still_text",
+    "CAST_TEXT_FIELDS", "field", "is_bodiless", "picture_appearance", "still_text",
     "video_text", "card_text",
     "identity_fields",
 ]
@@ -66,11 +66,28 @@ _NO_APPEARANCE = frozenset({
 })
 
 
+#: Prose that says the same thing at sentence length: the six-bank leg's
+#: my_story Voice wrote "no physical appearance, represented only by an
+#: auditory effect" (2026-10-18). Any of these anywhere marks it bodiless.
+#: Phrases only, never single words a real look can contain ("an unseen
+#: scar", "an invisible limp"): those stay whole-string matches above.
+_BODILESS_MARKS = (
+    "no physical", "no visible form", "no visible body", "no body",
+    "bodiless", "disembodied", "only a voice", "voice only", "auditory",
+    "only by sound", "only as sound", "heard but not seen", "never seen",
+)
+
+
+def is_bodiless(row) -> bool:
+    """True when the appearance says there is nothing to draw."""
+    text = field(row, "appearance").strip(" .;,!").lower()
+    return text in _NO_APPEARANCE or any(m in text for m in _BODILESS_MARKS)
+
+
 def picture_appearance(row) -> str:
     """The appearance as a picture may use it: ``""`` when it says there is
     nothing to draw."""
-    text = field(row, "appearance")
-    return "" if text.strip(" .;,!").lower() in _NO_APPEARANCE else text
+    return "" if is_bodiless(row) else field(row, "appearance")
 
 
 def still_text(row) -> str:
@@ -92,6 +109,11 @@ def video_text(row, *, cap: int = 0) -> str:
     ``cap`` budgets the two fields separately, as ``card_text`` does, so a
     capped consumer (ShotLock's 160-char beat batch) keeps the presence a
     plain slice of a long appearance would cut off (Codex wiring review)."""
+    if is_bodiless(row):
+        # Nothing to show: a bodiless character's "presence" is how it SOUNDS
+        # ("a faint, mournful sigh ... crashing waves", the same leg), and a
+        # joint audio-video model would voice it.
+        return ""
     parts = [picture_description(picture_appearance(row), still=False),
              picture_description(field(row, "presence"), still=False)]
     parts = [p for p in parts if p]
