@@ -25,7 +25,7 @@ the operator ratifies each named decision and clears the list first.
 
 Usage:
   python scripts/build_variants.py --all
-  python scripts/build_variants.py --profiles otr_8gb_low,otr_16gb_low
+  python scripts/build_variants.py --workflow-ids otr_8gb_low,otr_16gb_low
   python scripts/build_variants.py --check
 """
 from __future__ import annotations
@@ -874,7 +874,7 @@ def main(argv=None) -> int:
     g.add_argument("--all", action="store_true",
                    help="emit every shipping matrix row "
                         "(ratify-gated ones are reported + skipped)")
-    g.add_argument("--profiles", help="comma-separated profile ids "
+    g.add_argument("--workflow-ids", help="comma-separated workflow ids "
                                       "(ratify-gated => exit 1)")
     g.add_argument("--check", action="store_true",
                    help="regenerate + diff committed variants and the recipes doc; "

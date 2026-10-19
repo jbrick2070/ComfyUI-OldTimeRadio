@@ -444,3 +444,17 @@ def test_the_committed_variants_match_their_source(capsys):
         "expected the full shipped set, found %d -- this test would be "
         "passing by checking almost nothing" % len(committed))
     assert "no committed variants yet" not in out
+
+
+def test_the_workflow_ids_flag_reaches_the_emitter(monkeypatch):
+    """`--workflow-ids` (was `--profiles`, renamed 2026-10-18). The rename
+    once left the flag spelled --profiles while main() read
+    args.workflow_ids, so every explicit emit died with AttributeError and
+    nothing noticed -- this drives main() through the real parser."""
+    seen = {}
+    monkeypatch.setattr(bv, "cmd_emit",
+                        lambda ids, explicit: seen.update(ids=ids, explicit=explicit) or 0)
+    assert bv.main(["--workflow-ids", "otr_8gb_low, otr_16gb_low"]) == 0
+    assert seen == {"ids": ["otr_8gb_low", "otr_16gb_low"], "explicit": True}
+    with pytest.raises(SystemExit):
+        bv.main(["--profiles", "otr_8gb_low"])
