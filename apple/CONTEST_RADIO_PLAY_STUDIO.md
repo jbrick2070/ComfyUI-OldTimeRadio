@@ -140,6 +140,15 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       video cUeZMUGCxrw, 2026-10-19.
 - [ ] 1080p upscale on cuda and CaptionBurn on: check what the foley workflow ships
       (OTR_SilentComposite upscale_engine, OTR_CaptionBurn) and decide with the operator.
+- [ ] **OPERATOR QUESTION (asked 2026-10-19 late; unanswered): face consistency.** Peek at the
+      MagnoliaRex stills: she holds steady, Jeffrey's face drifts between beats, and "her dark gray
+      cat" was drawn as a big cat. Today's consistency is text + a portrait-derived identity SEED; the
+      dispatcher can pass the portrait as a REFERENCE but every local engine has it off (z_image:
+      grid artefact, measured 2026-08-20; flux3_klein: supports 10 refs, unwired/unmeasured;
+      moss_image: no reference mode). Options: (1) wire Klein reference mode for character stills
+      only + A/B (~half a day; Klein faces again); (2) keep MOSS and sharpen the weak character's
+      locked appearance text (a correctness fix per CLAUDE.md). Default until he answers: judge the
+      finished video first; build nothing.
 - [ ] Voice engine per role (OTR_CastLock rows in `config/app_mode.json`): operator's ear decides.
 - [ ] Any winning change to a shipped workflow: edit `workflows/otr_canonical.json` on main, then
       `python scripts/build_variants.py --all` and `--check`, plus the four section-0 tests.
