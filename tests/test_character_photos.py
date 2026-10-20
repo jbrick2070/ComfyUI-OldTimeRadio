@@ -340,3 +340,9 @@ def test_a_first_name_finds_a_two_word_cast_name_when_it_is_unique():
     # Two Magnolias: the bare first name is ambiguous, so neither is guessed.
     assert mbp.co_present_char_ids("Magnolia waves", cast, "c02") == []
     assert mbp.co_present_char_ids("Magnolia Rex waves", cast, "c02") == ["c03"]
+
+
+def test_a_title_is_never_taken_for_a_first_name():
+    cast = {"c02": {"name": "Lady Macbeth"}, "c03": {"name": "Macbeth"}}
+    assert mbp.co_present_char_ids("Lady Macduff weeps", cast, "c03") == []
+    assert mbp.co_present_char_ids("Lady Macbeth weeps", cast, "c03") == ["c02"]

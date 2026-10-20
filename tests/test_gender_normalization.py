@@ -242,3 +242,32 @@ def test_a_person_with_an_animal_is_still_anchored_as_a_person(appearance):
     out = _ensure_gender_anchor("a figure in the rain", {"gender": "female",
                                                          "appearance": appearance})
     assert out.startswith("adult woman, ")
+
+
+
+@pytest.mark.parametrize("appearance", [
+    "A cat burglar in a black coat",
+    "Fox Mulder-type agent",
+    "A dog trainer in her forties",
+    "A rat-faced informant",
+    "Bear-chested sailor",
+    "A fish merchant",
+    "Captain Wolf",
+    "Robot dancer",
+])
+def test_an_animal_word_that_only_modifies_a_person_keeps_the_person(appearance):
+    """Sonnet QA on d1414a7d: each of these is a person, and must keep the
+    anchor the gender row gives them."""
+    out = _ensure_gender_anchor("a figure in the rain",
+                                {"gender": "male", "appearance": appearance})
+    assert out.startswith("adult man, ")
+
+
+@pytest.mark.parametrize("appearance", [
+    "A cat with green eyes and a torn ear",
+    "Two black ravens",
+    "An old dog called Biscuit",
+])
+def test_the_animal_as_the_subject_is_read_as_an_animal(appearance):
+    char = {"gender": "female", "appearance": appearance}
+    assert _ensure_gender_anchor(appearance, char) == appearance
