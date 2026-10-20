@@ -27,6 +27,11 @@ _WIDGET_PRIMITIVE_TYPES = frozenset({"STRING", "INT", "FLOAT", "BOOLEAN", "BOOL"
 _COMPANION_INT_WIDGETS = ("seed", "noise_seed")
 _COMPANION_SUFFIX = "__control_after_generate"
 _COMPANION_VALUES = frozenset({"fixed", "randomize", "increment", "decrement"})
+#: A picker declared with an upload button saves one more slot right after it
+#: ("image", "video" or "audio"), as core's LoadImage saves ["file.png", "image"].
+_UPLOAD_SUFFIX = "__upload"
+_UPLOAD_VALUES = frozenset({"image", "video", "audio"})
+_UPLOAD_KEYS = ("image_upload", "video_upload", "audio_upload")
 
 
 class GraphError(ValueError):
@@ -94,6 +99,9 @@ def serialized_slot_names(node_type: str, schemas: dict) -> list:
         if (isinstance(type_def, str) and type_def.upper() == "INT"
                 and name in _COMPANION_INT_WIDGETS):
             slots.append(name + _COMPANION_SUFFIX)
+        opts = spec[1] if isinstance(spec, (list, tuple)) and len(spec) > 1 else None
+        if isinstance(opts, dict) and any(opts.get(k) for k in _UPLOAD_KEYS):
+            slots.append(name + _UPLOAD_SUFFIX)
     return slots
 
 
@@ -143,13 +151,14 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
 
         cursor = 0
         for name in slots:
-            if name.endswith(_COMPANION_SUFFIX):
+            if name.endswith(_COMPANION_SUFFIX) or name.endswith(_UPLOAD_SUFFIX):
+                allowed = _UPLOAD_VALUES if name.endswith(_UPLOAD_SUFFIX) else _COMPANION_VALUES
                 if cursor < len(values):
-                    if values[cursor] not in _COMPANION_VALUES:
+                    if values[cursor] not in allowed:
                         raise GraphError(
                             f"node {node_id} ({node_type}): value {values[cursor]!r} at "
-                            f"position {cursor} should be a seed control "
-                            f"({sorted(_COMPANION_VALUES)}); the widget order has drifted."
+                            f"position {cursor} should be one of {sorted(allowed)}; "
+                            f"the widget order has drifted."
                         )
                     cursor += 1
                 continue

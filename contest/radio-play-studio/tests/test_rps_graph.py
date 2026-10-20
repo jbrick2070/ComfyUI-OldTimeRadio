@@ -122,3 +122,22 @@ def test_coerce_value_accepts_what_the_server_accepts(info, value, expected):
 def test_coerce_value_refuses_what_the_server_would(info, value):
     with pytest.raises(ValueError):
         coerce_value(info, value, "x")
+
+
+def test_a_picker_with_an_upload_button_saves_one_more_slot():
+    """The canvas saves an image_upload picker as [.., "file.png", "image"] --
+    the upload button's own slot, as core's LoadImage does -- and the
+    converter reads past it (OTR_CharacterPhoto, 2026-10-20)."""
+    schemas = {"OTR_CharacterPhoto": {"input": {
+        "required": {"name": ("STRING", {"default": ""}),
+                     "image": (["jeff.png"], {"image_upload": True})},
+        "optional": {"photos_in": ("OTR_CHARACTER_PHOTOS", {})}}}}
+
+    def wf(values):
+        return {"nodes": [{"id": 98, "type": "OTR_CharacterPhoto", "inputs": [],
+                           "widgets_values": values}], "links": []}
+
+    out = workflow_to_api_prompt(wf(["Jeffrey", "jeff.png", "image"]), schemas)
+    assert out["98"]["inputs"] == {"name": "Jeffrey", "image": "jeff.png"}
+    with pytest.raises(GraphError, match="drifted"):
+        workflow_to_api_prompt(wf(["Jeffrey", "jeff.png", "oops"]), schemas)
