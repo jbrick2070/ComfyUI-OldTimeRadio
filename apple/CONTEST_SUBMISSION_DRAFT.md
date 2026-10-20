@@ -59,12 +59,17 @@ converts to an API graph against the server's live /object_info.
 - **Kokoro** -- a voice for every character and the announcer.
 - **Stable Audio 3** -- the theme music.
 - Upscale: **Real-ESRGAN** if switched (see blockers); today's default is NVIDIA RTX VSR.
-- Optional in the app's Still pictures picker: FLUX 3 Klein.
+- **FLUX 3 Image Klein** (Black Forest Labs, FLUX Kommunity License) -- the My Story demo's stills,
+  each drawn from the portraits of the characters in the frame (reference latents), so every face
+  holds from shot to shot; a person's own photo can be the reference for a character's portrait.
 
 ## Q9. Other tools or techniques used
 - comfy-api-proxy (Comfy API v2 bridge) and a standard-library Python web app (no build step).
 - Cast lock (each character keeps one face and one voice) and shot lock (each beat's camera,
   expression and motion planned before filming).
+- Reference stills: a portrait per character, and every still conditioned on the portraits of
+  everyone in the frame (the speaker, the characters the shot names, the person spoken to).
+- Cast cards: one card per character in Tell my own story, with an optional photo.
 - A progress bar that learns each stage's time on the user's own machine and follows the video
   node's own "frames rendered" bar: within 4 points of the wall clock on a 68-minute episode.
 - Captions burned in (SDH), ffmpeg mux, every weight fetched tokenless from public repos.
