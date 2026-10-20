@@ -251,7 +251,13 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         C:\Users\jeffr\Pictures\otr_magnoliarex_ref_c\ (front, three-quarter, dark-violet portrait;
         sheet sent, operator: "perfect"). Her look text in the launcher matches it. The earlier
         platinum and gold sets (otr_magnoliarex_ref, _ref_b) are superseded.
-      NOW: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
+      [x] VERIFIED 15:58 -- 3-act demo with BOTH leads' references: RESULT succeeded, obs_publish OK,
+        5:15:25 render, 5:48 episode, sha f5524300, app + obs copies byte-identical (cmp), timing
+        saved (episodes/timing/otr_16gb_foley.acts-3.5ab87708.json; video 15,766 s of 18,558 s).
+        Faces hold in motion as in the stills. Highlight: output/otr/episodes/demo_cuts/
+        magnolia_both_refs_seoul.mp4 (238-298 s, the Seoul ending; sent). Supersedes the 05:18
+        demo. NEXT: his true story as My Story's built-in default with his photos bundled.
+      WAS: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
         white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
         Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
         demo_photos2.py). The Jeffrey-only render (08:32) was stopped at the operator's word ("u can
