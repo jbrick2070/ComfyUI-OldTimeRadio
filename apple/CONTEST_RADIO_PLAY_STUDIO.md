@@ -58,10 +58,16 @@ branch, then do the first unchecked step. Update this file in the same commit as
 - [x] App fixes, each Sonnet-QA'd: progress bar (4812a65b, 06d0a475, e71c8664, 3544cfd7, c84e790a:
       clock-based bar with minutes left, learned per machine), loading notice, foley default
       (3ea1eda0), "Tell my own story" (84f34439, be39d460, 4aa044ca, 74e662c8, 9411772d).
-- [ ] **Browser run in flight** (started 16:46 on 10-19, job f8e1cc49): when it succeeds,
-      `contest/radio-play-studio/episodes/timing/otr_16gb_foley.acts-1.<hash>.json` must exist.
-- [ ] **Prove the clock bar:** one more `--acts 1` foley run through `serve`; record the page's
-      % and "min left" against the wall clock every ~5 min; target within +/-10 points.
+- [x] Browser run (pressed on the page, shakespeare, 1 act, foley): 75 min 53 s, obs_publish OK,
+      `two_berries_20261019_164732_..._final.mp4` (139 MB, 1920x1080, 2m18s), sha f09e2c20,
+      byte-identical in otr/obs and episodes/2f74674b184c/.
+- [x] It saved WRONG timings (all 76 min on the writer): a curl recorder on the same job took
+      ComfyUI's one-socket-per-client-id (server.py `sockets[sid] = ws`) and starved the app's
+      stream. Guard: a stream that never saw half the graph finish saves nothing. The history was
+      rebuilt from that recorder's complete log: writer 64 s, stills ~2 min, video 4,209 s of 4,400.
+- [ ] **Prove the clock bar:** one more `--acts 1` foley run (CLI or serve). **Never attach a
+      second listener to the job's SSE** -- read the app's own output or its
+      `/api/episodes/<id>/events`. Log % and min left against the wall clock; target +/-10 points.
 
 ## Phase 2 -- quality budget (target Oct 25)
 

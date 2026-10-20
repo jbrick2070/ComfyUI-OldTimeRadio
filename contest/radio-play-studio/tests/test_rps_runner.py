@@ -426,3 +426,18 @@ def test_a_renumbered_graph_does_not_read_old_times(tmp_path):
     b = {"1": {"class_type": "W"}, "93": {"class_type": "V"}}
     assert timing_path(tmp_path, Path("w.json"), 1, a) != timing_path(tmp_path, Path("w.json"), 1, b)
     assert timing_path(tmp_path, Path("w.json"), 1, a) == timing_path(tmp_path, Path("w.json"), 1, dict(a))
+
+
+def test_a_starved_stream_saves_no_times(settings, schemas):
+    # A second listener on the same ComfyUI client id takes the job's messages:
+    # this stream then sees the first node or two and then nothing until the end.
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    good = _good_job()
+    graph, _ = Studio(settings, fetch=lambda url: schemas).build_graph({})
+    starved = [RealProgress(value=0.0, nodes_done=0, nodes_total=1, current_node="1")]
+    good._events = starved + list(good._events)
+    studio, _ = _studio(settings, schemas, good)
+    assert len(graph) >= 2
+    assert list(studio.stream({}))[-1]["type"] == "done"
+    assert not (settings.out_dir / "timing").exists()
