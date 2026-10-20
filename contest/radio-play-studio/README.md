@@ -6,8 +6,8 @@ Built for the Comfy [Open Source Higgsfield](https://comfy.org/open-source-higgs
 An open-source take on Higgsfield's Cinema Studio: where Cinema Studio directs a concept into
 shots, Radio Play Studio writes the whole story, casts it, and directs every beat. Every character
 keeps the same face and voice from shot to shot, and every shot is filmed with LTX on your own
-card, with voices, music and foley mixed under the picture. Open weights only, MIT licensed,
-nothing to pay per episode.
+card, with voices, music and foley mixed under the picture. Open weights only, nothing to pay
+per episode; the app is MIT licensed, and each model keeps its own license (see License).
 
 > **Demo video:** to be recorded before submission.
 
@@ -40,7 +40,8 @@ episode. The app makes no Comfy Router or Comfy Cloud calls and holds no API key
 - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) v0.42.0 or newer running on your machine
   (v0.41.0 for FLUX 3 Klein; MOSS-Image needs v0.42.0), with the **Old-Time Radio** pack installed
   (ComfyUI Manager: `comfyui-old-time-radio`, or clone it into `custom_nodes/`). One node pack;
-  every model downloads itself on first use at a pinned revision, with no Hugging Face token.
+  every model downloads itself from public, ungated repos with no Hugging Face token -- the
+  writer and still models at pinned revisions, the rest checked against their published SHA-256.
 - By default, an NVIDIA card with 16 GB. Other cards run one of the pack's other workflows (see
   "Pick the workflow for your GPU"). The first run downloads tens of GB of open weights.
 - Python 3.10 or newer for this app (its only packages are the Comfy SDK and the bridge). Built and run on Windows.
@@ -77,8 +78,9 @@ publishes it to its own `output/otr/obs/` folder.
 
 - **Reload-proof.** A reload, or a second tab, picks the episode back up where it is.
 - **One at a time.** A second episode while one is being made is refused, not queued behind it.
-- **The GPU goes back.** About two and a half minutes after the last tab closes, with nothing
-  being made, the app asks ComfyUI to free the models its episodes loaded.
+- **The GPU goes back.** Within seconds of the last tab closing (two and a half minutes if the
+  browser vanishes without saying goodbye), with nothing being made, the app asks ComfyUI to
+  free the models its episodes loaded.
 
 From the command line:
 
@@ -138,7 +140,7 @@ Everything else (voices, music, the video lane) keeps the workflow's own setting
 | One-act episode, 16 GB foley workflow (LTX 2.5 with sound), five runs | 57, 64, 64, 68 and 76 min |
 | One-act episode, 16 GB LTX video workflow (silent picture) | 65 min |
 | One-act episode, 16 GB stills-with-motion workflow | 5 min |
-| Where a foley hour goes | video about 95% (60 of 64 min); the writer about 1 min; all stills about 2 min |
+| Where a foley hour goes (averaged over the runs) | video about 95% (60 of 64 min); the writer about 1 min; all stills about 2 min |
 | Progress bar against the wall clock, a 68-minute episode | within 4 points throughout |
 
 Run length follows the story: the number and length of the beats decide how many frames LTX films.
@@ -196,5 +198,8 @@ against the pack's real node definitions.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Model weights carry their own licenses; the pack fetches each from a
-pinned source listed in its `nodes/_otr_visual_assets.py` and documents them in `apple/IMAGE_MODELS.md`.
+The app is MIT, see [LICENSE](LICENSE). Model weights carry their own licenses, documented in the
+pack's `apple/IMAGE_MODELS.md` with their sources in `nodes/_otr_visual_assets.py`. Note that the
+default still model, FLUX 3 Klein, is under the FLUX Kommunity License: free for non-commercial use,
+with commercial use of its outputs limited to qualifying users. MOSS-Image (the other Still pictures
+choice) is Apache-2.0.
