@@ -803,6 +803,10 @@ def beat_partner_char_ids(lines, cast_by_id):
             continue
         own = str(ln.get("char_id") or "")
         shot = ln.get("shot_id")
+        if not shot:
+            # No shot id (a repaired line): no scene to share, so no partner --
+            # None == None would otherwise pair lines across scenes.
+            continue
         found = []
         for j in (i - 1, i + 1):
             if 0 <= j < len(beats):
@@ -2398,7 +2402,11 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         _cast_by_id = {str(c.get("char_id") or ""): c
                        for c in roster if isinstance(c, dict)}
         _line_by_beat = {bid: ln for bid, ln in _iter_beat_lines(lines)}
-        _partners = beat_partner_char_ids(lines, _cast_by_id)
+        # A bodiless speaker (a voice, the sea) has no face to lend a frame:
+        # its "portrait" is a drawn stranger (Sonnet QA on 2b30170e).
+        _with_body = {cid: row for cid, row in _cast_by_id.items()
+                      if not (isinstance(row, dict) and _CAST_TEXT.is_bodiless(row))}
+        _partners = beat_partner_char_ids(lines, _with_body)
         _fodder_roles = set(mesh_fodder_roles or ())
         _still_word_roles = set(still_word_roles or ())
         for tgt in scene_targets:
@@ -2559,7 +2567,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             if _cid:
                 _obj["char_id"] = _cid     # traceability; engine resolves by role
                 if tgt["kind"] == "scene_character":
-                    _co = co_present_char_ids(sprompt, _cast_by_id, _cid)
+                    _co = co_present_char_ids(sprompt, _with_body, _cid)
                     for _pid in _partners.get(tgt["beat_id"], ()):
                         if _pid != _cid and _pid not in _co:
                             _co.append(_pid)
