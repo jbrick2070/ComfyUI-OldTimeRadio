@@ -37,6 +37,7 @@ from ._otr_image_engines import registry as _ireg
 from ._otr_video_engines import registry as _vreg
 from ._otr_shared import role_compat as _rc
 from ._otr_shared import role_slots as _role_slots
+from ._otr_shared import character_photos as _photos
 
 #: Sentinel COMBO entry that opens the "declare a custom model" path (mirrors the
 #: video director). The custom engine id is read from ``custom_models_json``.
@@ -218,6 +219,20 @@ class OTRImageDirector:
                                "engine currently reads it to choose a "
                                "precision.",
                 }),
+                # CHARACTER PHOTOS (2026-10-20), appended LAST (BUG-LOCAL-097).
+                "character_photos": ("STRING", {
+                    "multiline": True, "default": "",
+                    "tooltip": (
+                        "Optional. One line per character, Name = file, naming a "
+                        "picture in ComfyUI's input folder. That character's "
+                        "portrait is painted FROM the photo, in the episode's "
+                        "style, and every still of them follows the portrait. "
+                        "Needs a still engine that takes a reference image "
+                        "(flux3_klein); with any other the photo is reported "
+                        "and not used. A name that matches no one in the cast "
+                        "is reported too."
+                    ),
+                }),
             },
         }
 
@@ -228,8 +243,10 @@ class OTRImageDirector:
     # ------------------------------------------------------------------ #
     def direct(self, fresh_cap, seed_mode, request_seed, video_policy_json="",
                custom_models_json="{}", gate_in="",
-               dtype_policy="fp8_ok"):
+               dtype_policy="fp8_ok", character_photos=""):
         warnings: list = []
+        photos, photo_problems = _photos.parse_photo_lines(character_photos)
+        warnings.extend("character_photos: " + p for p in photo_problems)
         custom = self._parse_json_obj(custom_models_json, "custom_models_json", warnings)
         video_policy = self._parse_video_policy_required(video_policy_json)
         descriptors = _registry_descriptors()
@@ -322,6 +339,9 @@ class OTRImageDirector:
             "mesh_fodder_roles": mesh_fodder_roles_from_video_policy(video_policy),
             "fresh_cap": cap,
             "seed": {"mode": seed_mode, "request_seed": int(request_seed)},
+            # {name: file in ComfyUI's input folder}; MetaBrief matches the
+            # names to the cast. {} -> no photos (every graph saved before it).
+            "character_photos": photos,
             "warnings": warnings,
         }
         for w in warnings:

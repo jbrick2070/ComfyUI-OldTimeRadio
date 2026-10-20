@@ -685,6 +685,77 @@ def _portrait_free_roles_from_policy(policy_json):
     return roles
 
 
+def _reference_still_roles_from_policy(policy_json):
+    """Roles whose STILL engine draws from a reference image.
+
+    A lane whose video engine never needs a portrait (``required="never"``)
+    still needs one when the still engine can take it: the portrait is the
+    reference every still of that character is drawn from, which is what keeps
+    one face across the beats (operator, 2026-10-19: "all lanes should generate
+    ref images for char stills so we have consistency"). Subtracted from the
+    portrait-free set, so the exemption stands only where nothing would read
+    the portrait. A refusing engine is never on this list (Ideogram takes no
+    reference), so the 2026-08-22 refusal stays fixed. Missing or malformed
+    policy, or an unregistered engine: no roles -- the old behaviour.
+    """
+    try:
+        pol = json.loads(policy_json or "{}")
+    except (ValueError, TypeError):
+        return set()
+    models = pol.get("image_models") if isinstance(pol, dict) else None
+    if not isinstance(models, dict):
+        return set()
+    try:
+        try:
+            from ._otr_image_engines import registry as _ireg  # type: ignore
+            from ._otr_shared import role_slots as _rs  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_image_engines import registry as _ireg  # type: ignore
+            from _otr_shared import role_slots as _rs  # type: ignore
+    except Exception:  # noqa: BLE001 -- never block prompts on a resolver import
+        return set()
+    roles = set()
+    for role in _rs.ROLE_TO_VIDEO_SLOT:
+        # An absent bookend slot draws on the character slot, as the dispatcher's
+        # resolve_engine_for_role does.
+        pick = (models.get(_rs.image_slot_for_role(role))
+                or models.get("character_image_model"))
+        engine_id = str((pick.get("engine_id") if isinstance(pick, dict) else pick) or "")
+        try:
+            if engine_id and getattr(_ireg.get_engine(engine_id),
+                                     "accepts_reference_image", False):
+                roles.add(role)
+        except Exception:  # noqa: BLE001 -- an unknown engine keeps the exemption
+            continue
+    return roles
+
+
+def _identity_photos_from_policy(policy_json, cast, warnings):
+    """``{char_id: photo file}`` for the image policy's character photos.
+
+    The ONE place a photo's name is matched to the cast (OTR_ImageDirector
+    only parses the lines): by the folded name, to exactly one cast member.
+    A name no one has, or two share, is a warning and the photo is unused --
+    never a guess. A missing or malformed policy means no photos.
+    """
+    try:
+        pol = json.loads(policy_json or "{}")
+    except (ValueError, TypeError):
+        return {}
+    photos = pol.get("character_photos") if isinstance(pol, dict) else None
+    if not isinstance(photos, dict) or not photos:
+        return {}
+    try:
+        from ._otr_shared import character_photos as _photos  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import character_photos as _photos  # type: ignore
+    matched, problems = _photos.match_cast(cast, photos)
+    for problem in problems:
+        warnings.append("character_photos: " + problem)
+        log.warning("[OTR_MetaBrief] character_photos: %s", problem)
+    return matched
+
+
 def _identity_roles_from_policy(policy_json):
     """Roles whose paired VIDEO lane declares its character stills need a FACE.
 
@@ -1930,7 +2001,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                          still_word_roles=None, video_models=None,
                          portrait_free_roles=None, identity_roles=None,
                          ledger_context=None, source_slot_fn=None, source_model_id=None,
-                         source_binding_model_id=None):
+                         source_binding_model_id=None, identity_photos=None):
     """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
     (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
     schema in the same patch; no dual-schema shims).
@@ -2112,6 +2183,10 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     _role_aspects = still_aspects or {}
     objects: list = []
     _portrait_free = set(portrait_free_roles or ())
+    # {char_id: photo file}: a character the person gave a photo keeps its
+    # portrait on every lane -- the photo is what the portrait is painted from,
+    # and the portrait is what every still of them follows.
+    _identity_photos = dict(identity_photos or {})
     # `_role` is POPPED below, so capture the map first -- the identity
     # transport further down needs each character's role to ask the lane
     # what that role declared, and by then the key is gone.
@@ -2125,7 +2200,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # / still_word_roles -- portraits were simply the one
         # kind minted unconditionally, which every engine tolerated until one
         # refused to draw a face.
-        if _role in _portrait_free:
+        if _role in _portrait_free and cid not in _identity_photos:
             continue
         _pw, _ph = still_dims_for_aspect(
             _role_aspects.get(_role, "portrait"), PORTRAIT_W, PORTRAIT_H)
@@ -2149,6 +2224,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # radio_object is about to feed a HuMo (audio_driven_face) announcer init.
         if pinfo.get("radio_host_style"):
             _pobj["radio_host_style"] = pinfo["radio_host_style"]
+        if cid in _identity_photos:
+            _pobj["identity_photo"] = _identity_photos[cid]
         objects.append(_pobj)
 
     # RADIO-HOST FACE object (2026-07-01, chunk 3) -- the ONE animatable radio
@@ -2574,12 +2651,15 @@ class OTRMetaBriefImagePromptGen:
             mesh_fodder_roles=_mesh_fodder_roles_from_policy(image_policy_json),
             still_word_roles=_still_word_roles_from_policy(image_policy_json),
             video_models=video_models,
-            portrait_free_roles=_portrait_free_roles_from_policy(
-                image_policy_json),
+            portrait_free_roles=(
+                _portrait_free_roles_from_policy(image_policy_json)
+                - _reference_still_roles_from_policy(image_policy_json)),
             identity_roles=_identity_roles_from_policy(image_policy_json),
             ledger_context=led, source_slot_fn=source_slot_fn,
             source_model_id=source_model_id,
             source_binding_model_id=source_binding_model_id,
+            identity_photos=_identity_photos_from_policy(
+                image_policy_json, cast, warnings),
         )  # aspects + mesh-fodder + still_word + identity roles + video_models ride in image_policy_json
         warnings.extend(warn2)
 
