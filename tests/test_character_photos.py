@@ -219,3 +219,33 @@ def test_a_different_photo_is_a_different_portrait(monkeypatch, tmp_path):
     (tmp_path / "input" / "otr_cast_ab.png").write_bytes(PNG + b"other")
     _led, second, _ = _run(monkeypatch, tmp_path, accepts=True)
     assert first and second, "a changed photo must mint again, not hit the cache"
+
+
+# --------------------------------------------------------------------------- #
+# End to end through the enumerator (Sonnet QA, 2026-10-20)
+# --------------------------------------------------------------------------- #
+_CAST = [{"char_id": "c02", "name": "JANE", "gender": "female",
+          "portrait_prompt": "a tall weathered spacer with a scar"}]
+_META = {"episode_id": "ep_photo", "episode_title": "The Toll",
+         "story_brief_terms": {"setting": ["a dockside station"]}}
+
+
+def _portraits(payload):
+    return [o for o in payload.get("objects") or [] if o.get("kind") == "portrait"]
+
+
+def test_the_photo_rides_the_portrait_object():
+    payload, _ = mbp.derive_image_prompts(_CAST, _META, portrait_free_roles=set(),
+                                          identity_photos={"c02": "jane.png"})
+    assert [o.get("identity_photo") for o in _portraits(payload)] == ["jane.png"]
+
+
+def test_a_photo_never_forces_a_portrait_onto_a_lane_that_cannot_use_it():
+    """A role left in the portrait-free set has a still engine that takes no
+    reference. Minting its portrait anyway would hand a refusing engine
+    (Ideogram, 2026-08-22) a text-only face; the photo is reported instead."""
+    payload, warnings = mbp.derive_image_prompts(
+        _CAST, _META, portrait_free_roles={"character_video"},
+        identity_photos={"c02": "jane.png"})
+    assert _portraits(payload) == []
+    assert any("jane.png" in w and "NOT USED" in w for w in warnings)

@@ -2183,9 +2183,13 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     _role_aspects = still_aspects or {}
     objects: list = []
     _portrait_free = set(portrait_free_roles or ())
-    # {char_id: photo file}: a character the person gave a photo keeps its
-    # portrait on every lane -- the photo is what the portrait is painted from,
-    # and the portrait is what every still of them follows.
+    # {char_id: photo file}: the photo a person gave a character. It is the
+    # REFERENCE that character's portrait is painted from, so it rides the
+    # portrait object. A role still in `_portrait_free` here has a still engine
+    # that takes no reference (the caller already subtracted the ones that do),
+    # so its portrait is skipped exactly as before -- a photo must not force a
+    # text-only face onto an engine that may refuse it (Ideogram, 2026-08-22)
+    # -- and the photo is reported unused instead of silently dropped.
     _identity_photos = dict(identity_photos or {})
     # `_role` is POPPED below, so capture the map first -- the identity
     # transport further down needs each character's role to ask the lane
@@ -2200,7 +2204,12 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         # / still_word_roles -- portraits were simply the one
         # kind minted unconditionally, which every engine tolerated until one
         # refused to draw a face.
-        if _role in _portrait_free and cid not in _identity_photos:
+        if _role in _portrait_free:
+            if cid in _identity_photos:
+                warnings.append(
+                    f"character_photos: {cid}'s photo {_identity_photos[cid]!r} is NOT "
+                    "USED -- this lane mints no portrait and its still engine takes no "
+                    "reference image; pick flux3_klein for the character stills")
             continue
         _pw, _ph = still_dims_for_aspect(
             _role_aspects.get(_role, "portrait"), PORTRAIT_W, PORTRAIT_H)
