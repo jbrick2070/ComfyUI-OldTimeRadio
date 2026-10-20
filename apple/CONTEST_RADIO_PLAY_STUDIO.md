@@ -160,6 +160,31 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       only + A/B (~half a day; Klein faces again); (2) keep MOSS and sharpen the weak character's
       locked appearance text (a correctness fix per CLAUDE.md). Default until he answers: judge the
       finished video first; build nothing.
+- [ ] **REFERENCE STILLS FOR EVERY LANE (operator, 2026-10-19 23:50 -- his main point).** "All
+      lanes should generate ref images for char stills so we have consistency." Not a one-off for
+      the demo: "we can use the photos if we give an architecture for other people to use their own
+      photos too ... it's not a sleight-of-hand hack."
+      WHAT EXISTS: every lane already mints a canonical PORTRAIT per character (the 3-act run made
+      c01-c04 + announcer on MOSS), and the dispatcher already hands that portrait as
+      `reference_image` to any engine advertising `accepts_reference_image`
+      (otr_image_gen_dispatcher.py ~1954). No local engine advertised it, so every still was text +
+      identity seed only -> Jeffrey's face drifted.
+      ENGINES: MOSS-Image has NO reference path in core (MOSSImage.extra_conds is text only; no
+      open edit/ref MOSS weights on HF as of 10-19). FLUX 3 Klein takes reference latents natively.
+      DONE: main 86e821bd -- Klein reference chain (LoadImage -> ImageScale 768h -> VAEEncode ->
+      ReferenceLatent on both conds), opt-in `OTR_FLUX3_REFERENCE=1`, default off = byte-identical
+      t2i graph. Sonnet QA HOLDS (minor: ref height not in the cache key; staged otr_ref_* files
+      accumulate in ComfyUI/input). Test hygiene fix main 8c511b8c.
+      NOW: measuring -- 1-act stills run, same My Story boxes, Klein + references, C7 seeds
+      (tmp/rps_live/ref_klein_1act.log). Baseline: the canceled 3-act MOSS run's 70 stills.
+      NEXT (design, gets one contrarian before code): (a) if Klein+ref holds clean faces -> flip the
+      default and make it the 16 GB character engine; (b) if the operator still prefers MOSS's look
+      -> portraits keep MOSS, character beats go Klein+ref (needs a portrait slot split from
+      character_image_model); (c) OWN PHOTO: a general per-character photo input in the app (and
+      the pack) that REPLACES the minted portrait as the anchor, so the same reference path uses it.
+      CONTEST RISK for the operator: the rules say "no real-person likenesses". A user's own photo is
+      the feature; the DEMO using his own face may still read as a real-person likeness to judges.
+      His call -- the feature can ship either way.
 - [ ] Voice engine per role (OTR_CastLock rows in `config/app_mode.json`): operator's ear decides.
 - [ ] Any winning change to a shipped workflow: edit `workflows/otr_canonical.json` on main, then
       `python scripts/build_variants.py --all` and `--check`, plus the four section-0 tests.
