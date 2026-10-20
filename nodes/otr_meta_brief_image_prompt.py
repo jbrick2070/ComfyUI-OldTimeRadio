@@ -141,6 +141,12 @@ def _ensure_gender_anchor(prompt: str, char: dict) -> str:
     text = str(prompt or "").strip()
     if not text:
         return text
+    if _is_non_human(char):
+        # A cat, a robot, a dragon: the VOICE still needs a binary (the bank
+        # has no other references), but "adult woman, " in front of "an
+        # Egyptian-type adult cat" drew a cat-woman -- the live proof of
+        # 2026-10-20, and the "cat drawn as a man" of the night before.
+        return text
     gender = normalize_gender((char or {}).get("gender"))
     words = set(re.findall(r"[a-z]+", text.lower()))
     if gender == "female":
@@ -157,6 +163,31 @@ def _ensure_gender_anchor(prompt: str, char: dict) -> str:
     if words & (_NEUTRAL_PROMPT_TERMS | _FEMALE_PROMPT_TERMS | _MALE_PROMPT_TERMS):
         return text
     return f"person, {text}"
+
+
+#: Nouns that make a character something other than a person. Read from the
+#: OPENING of the character's own appearance text, where a writer names what
+#: the character is ("An Egyptian-type adult cat, slender..."), never from the
+#: whole prompt, which may mention a pet or a drone beside a person.
+_NON_HUMAN_TERMS = frozenset({
+    "cat", "kitten", "dog", "puppy", "hound", "horse", "pony", "donkey", "goat",
+    "bird", "owl", "raven", "crow", "parrot", "penguin", "eagle", "fox", "wolf",
+    "bear", "rabbit", "hare", "mouse", "rat", "squirrel", "snake", "lizard",
+    "frog", "fish", "whale", "dolphin", "octopus", "monkey", "ape", "lion",
+    "tiger", "elephant", "robot", "android", "automaton", "drone", "dragon",
+    "creature", "beast", "animal", "alien",
+})
+_PERSON_TERMS = (_FEMALE_PROMPT_TERMS | _MALE_PROMPT_TERMS
+                 | frozenset({"person", "human", "humanoid", "people"}))
+
+
+def _is_non_human(char) -> bool:
+    """True when the character's appearance opens by naming a non-human kind
+    and no person: the first clause, up to the first comma or full stop."""
+    look = str((char or {}).get("appearance") or "").lower()
+    first = re.split(r"[.,;:]", look, maxsplit=1)[0]
+    words = set(re.findall(r"[a-z]+", first))
+    return bool(words & _NON_HUMAN_TERMS) and not words & _PERSON_TERMS
 
 
 #: Shared portrait style anchor (operator look-QA 2026-06-10): portraits must
@@ -744,14 +775,28 @@ def co_present_char_ids(prompt, cast_by_id, speaker_id):
     member's name, at most CO_REFERENCE_LIMIT, never the speaker again.
     """
     text = str(prompt or "").casefold()
+    names = {cid: " ".join(str((row or {}).get("name") or "").split()).casefold()
+             for cid, row in (cast_by_id or {}).items()}
+    # A prompt often says "Jeffrey" for a cast row named "Jeffrey Brick": the
+    # first name counts too, when it is at least three letters and no other
+    # cast member's name starts with it.
+    firsts: dict = {}
+    for cid, name in names.items():
+        if name:
+            firsts.setdefault(name.split()[0], []).append(cid)
     found = []
-    for cid, row in (cast_by_id or {}).items():
-        name = " ".join(str((row or {}).get("name") or "").split()).casefold()
+    for cid, name in names.items():
         if not cid or cid == speaker_id or len(name) < 2:
             continue
-        hit = re.search(r"(?<![\w])" + re.escape(name) + r"(?![\w])", text)
-        if hit:
-            found.append((hit.start(), str(cid)))
+        forms = [name]
+        first = name.split()[0]
+        if first != name and len(first) >= 3 and firsts.get(first) == [cid]:
+            forms.append(first)
+        hits = [m.start() for form in forms
+                for m in [re.search(r"(?<![\w])" + re.escape(form) + r"(?![\w])", text)]
+                if m]
+        if hits:
+            found.append((min(hits), str(cid)))
     return [cid for _pos, cid in sorted(found)][:CO_REFERENCE_LIMIT]
 
 

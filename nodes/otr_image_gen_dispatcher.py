@@ -2025,6 +2025,12 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 if _co_png:
                     co_references.append(_co_png)
                     anchor_hash = f"{anchor_hash}+{_co_hash}"
+                else:
+                    # As LOUD as a missing speaker portrait: this person in the
+                    # frame is drawn from text alone and may change face.
+                    report.append(
+                        f"{oid}: no portrait for {_co_id!r}, who is in this "
+                        f"frame; they are drawn without a reference (LOUD)")
 
         seed, anchor_mode = resolve_seed_and_mode(
             seed_cfg, oid, prompt_hash, kind=kind, char_id=char_id,
