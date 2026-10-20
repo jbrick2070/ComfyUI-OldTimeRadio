@@ -169,7 +169,112 @@ def test_the_helper_has_production_callers_only_at_those_three_sites():
     assert callers == ["nodes/OTR_LedgerScriptWriter.py",
                        "nodes/_otr_voice_node_common.py",
                        "nodes/scene_sequencer.py"]
-    assert np_mod.__all__ == ["NodeProgress"]
+    assert np_mod.__all__ == ["NodeProgress", "QuietInnerBars", "WeightedProgress"]
+
+
+# ---------------------------------------------------------------------------
+# The local video walk: frames rendered of the episode, inner bars quiet
+# ---------------------------------------------------------------------------
+
+def test_weighted_beats_start_where_the_beats_before_them_end(fake_comfy):
+    calls, _ = fake_comfy
+    bar = np_mod.WeightedProgress([97, 0, 194], "video frames")
+    bar.begin(0)
+    bar.part(97)
+    bar.begin(1)          # a floored beat moves the bar the same as a rendered one
+    bar.begin(2)
+    bar.part(97)
+    bar.part(500)         # never past the beat's own end
+    bar.finish()
+    assert calls == [("new", 291), ("at", 0, 291), ("at", 97, 291), ("at", 97, 291),
+                     ("at", 97, 291), ("at", 194, 291), ("at", 291, 291), ("at", 291, 291)]
+
+
+def test_a_beat_that_fails_part_way_is_not_counted_twice(fake_comfy):
+    calls, _ = fake_comfy
+    bar = np_mod.WeightedProgress([100, 100], "video frames")
+    bar.begin(0)
+    bar.part(60)          # one segment rendered, then the beat was floored
+    bar.begin(1)
+    assert calls[-1] == ("at", 100, 200)
+
+
+@pytest.fixture()
+def fake_hook(monkeypatch):
+    sent, interrupts = [], []
+    utils = types.ModuleType("comfy.utils")
+    mm = types.ModuleType("comfy.model_management")
+
+    def real(value, total, preview, prompt_id=None, node_id=None):
+        sent.append((value, total))
+
+    utils.PROGRESS_BAR_HOOK = real
+
+    def set_hook(fn):
+        utils.PROGRESS_BAR_HOOK = fn
+
+    utils.set_progress_bar_global_hook = set_hook
+    mm.throw_exception_if_processing_interrupted = lambda: interrupts.append(1)
+    comfy = types.ModuleType("comfy")
+    comfy.utils, comfy.model_management = utils, mm
+    monkeypatch.setitem(sys.modules, "comfy", comfy)
+    monkeypatch.setitem(sys.modules, "comfy.utils", utils)
+    monkeypatch.setitem(sys.modules, "comfy.model_management", mm)
+    return utils, real, sent, interrupts
+
+
+def test_inner_bars_on_the_render_thread_show_nothing_but_still_check_cancel(fake_hook):
+    utils, real, sent, interrupts = fake_hook
+    with np_mod.QuietInnerBars():
+        utils.PROGRESS_BAR_HOOK(3, 8, None, node_id=None)
+    assert sent == [] and interrupts == [1]
+    assert utils.PROGRESS_BAR_HOOK is real
+
+
+def test_other_threads_keep_the_real_bar_while_the_walk_is_quiet(fake_hook):
+    import threading
+    utils, real, sent, _ = fake_hook
+    with np_mod.QuietInnerBars():
+        hook = utils.PROGRESS_BAR_HOOK
+        worker = threading.Thread(target=lambda: hook(1, 2, None, node_id="5"))
+        worker.start()
+        worker.join()
+    assert sent == [(1, 2)]
+
+
+def test_close_never_overwrites_a_hook_someone_else_installed(fake_hook):
+    utils, real, _, _ = fake_hook
+    quiet = np_mod.QuietInnerBars().open()
+    other = lambda *a, **k: None  # noqa: E731
+    utils.set_progress_bar_global_hook(other)
+    quiet.close()
+    quiet.close()
+    assert utils.PROGRESS_BAR_HOOK is other
+
+
+def test_without_comfy_the_quiet_is_a_no_op(monkeypatch):
+    monkeypatch.setitem(sys.modules, "comfy.utils", None)
+    with np_mod.QuietInnerBars() as quiet:
+        assert quiet._hook is None
+
+
+def test_the_local_video_walk_draws_frames_and_quiets_its_inner_bars():
+    tree = _tree("nodes/_otr_video_engines/render_driver.py")
+    (loop,) = _loops_over(tree, "enumerate(section['shots'])")
+    assert _first_call(loop) == "_video_progress.begin(_beat_no)"
+    assert _assigned(tree, "_video_progress") == [
+        "_WeightedProgress([beat_render_frames(s) for s in section['shots']], 'video frames')"]
+    src = ast.unparse(tree)
+    assert "on_segment_done=_video_progress.part" in src
+    assert "_video_progress.finish()" in src
+    (run,) = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "run_episode"]
+    run_src = ast.unparse(run)
+    assert "_quiet_bars = _QuietInnerBars()" in run_src and "_quiet_bars.open()" in run_src
+    finals = [ast.unparse(st) for n in ast.walk(run) if isinstance(n, ast.Try) for st in n.finalbody]
+    assert "_quiet_bars.close()" in finals
+    # The quiet never opens inside render_beat_coverage, which cloud worker threads run.
+    (beat,) = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "render_beat_coverage"]
+    assert "QuietInnerBars" not in ast.unparse(beat) and "_quiet_bars" not in ast.unparse(beat)
 
 
 def test_the_fanout_reports_each_finished_job_on_the_calling_thread():
