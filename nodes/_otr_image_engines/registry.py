@@ -154,6 +154,16 @@ CAPABILITIES = {
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["flux3-image-klein-int8-convrot",
                                "qwen3vl-4b-int8-convrot", "flux2-vae"]},
+    # MOSS-Image SFT (2026-10-19): int8 ConvRot 5.4 GB diffusion + 7.3 GB
+    # Qwen3.5-9B w4a8 encoder (offloaded before sampling) + 0.25 GB small Flux 2
+    # VAE. Declared cuda only: unmeasured on mps/cpu here. Needs ComfyUI core
+    # >= v0.42.0 (checked by the adapter's assert_usable and core_problem).
+    "moss_image": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["moss-image-sft-int8-convrot",
+                               "qwen3.5-9b-w4a8-gptq", "flux2-vae-small"]},
     # SD 1.5 (2026-09-07): the SMALL local image engine, and the only one that
     # fits a 16 GB Apple Silicon box. mps IS DECLARED EXPLICITLY AND ON PURPOSE
     # -- copying z_image_turbo's ["cuda"] row (directly below) would have made

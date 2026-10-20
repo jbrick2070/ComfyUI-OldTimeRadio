@@ -843,8 +843,8 @@ that actually failed in a real run get in.
 
 The pack is [MIT](LICENSE). It is built on ComfyUI and the open-weight LTX, Wan,
 HuMo, AnimateDiff, Z-Image-Turbo, Lumina, Kokoro, Stable Audio,
-Qwen and Gemma ecosystems, plus the optional Chatterbox, Bark, MusicGen and
-IndexTTS2 engines -- thanks to all of their authors.
+Qwen and Gemma ecosystems, plus the optional MOSS-Image, Chatterbox, Bark,
+MusicGen and IndexTTS2 engines -- thanks to all of their authors.
 
 **The shipped defaults are not a blanket commercial clearance.** A few optional,
 off-by-default pieces carry restricted terms:

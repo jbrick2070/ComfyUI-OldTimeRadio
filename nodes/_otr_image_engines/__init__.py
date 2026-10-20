@@ -123,6 +123,15 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# MOSS-Image SFT (LOCAL weights, 2026-10-19) -- OPT-IN (default_roles=()).
+# commercial_clean=True (Apache-2.0; Comfy-Org/MOSS-Image is ungated). Needs
+# ComfyUI >= v0.42.0. Greyed by assert_usable until the diffusion model is
+# installed. Own guard.
+try:  # pragma: no cover - trivial guard
+    from . import moss_image as _moss_image  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 # Cloud partner STILLS adapters (S1 stills lane, 2026-07-03): flux_pro
 # / nano_banana_2 / seedream_2 -- the model-agnostic layer's first CLOUD image
 # engines. Register unconditionally with EMPTY default_roles (selectable, never

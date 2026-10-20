@@ -77,6 +77,7 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 | `sd15` | **auto** | 2.0 GiB | fits | **proven** | **proven** | ? | too slow |
 | `lumina_image` | **auto** | 10.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `flux3_klein` | **auto** | 10.3 GiB | ? | ? | not offered | ? | not offered |
+| `moss_image` | **auto** | 12.1 GiB | ? | ? | not offered | ? | not offered |
 | `flux_gen1` | **auto** | 16.1 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `z_image_turbo` | **auto** | 19.3 GiB | **proven** | **proven** | not offered | **proven** | not offered |
 | `ideogram4_local` | **auto** | 27.5 GiB | **no** | **proven** | not offered | not offered | not offered |

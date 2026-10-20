@@ -123,6 +123,11 @@ def render() -> str:
       "CLIPLoader type `flux3` (Qwen3-VL-4B text encoder) entered core in "
       "commit 20b46065, `Support Flux3-image (#17064)`. First tag containing "
       "it is v0.41.0. |")
+    A("| `moss_image` (opt-in still engine) | **ComfyUI >= v0.42.0** | "
+      "CLIPLoader type `moss_image` (Qwen3.5-9B text encoder) and "
+      "`comfy/ldm/moss_image` entered core in commit e087d8f6, `feat: Add "
+      "MOSS-image support (#17095)`, 2026-10-16. First tag containing it "
+      "is v0.42.0. |")
     A("\nCheck yours with `git describe --tags` in the ComfyUI directory. A "
       "rented pod image measured v0.26.2 (2026-06-30) -- two months and "
       "eight minor versions behind -- and the ltx25 lane was unrunnable there "

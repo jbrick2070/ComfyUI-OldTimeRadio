@@ -68,6 +68,7 @@ is exactly what you see below.
 | `lumina_image` | 10.0 GiB | **yes** | Lumina-Image 2.0. Opt-in; no shipped graph selects it. Fetches the ungated Comfy-Org split set on first use, same path as `sd15` -- a 5.2 GB model, a 5.2 GB text encoder and the 0.3 GB VAE it shares with `z_image_turbo` (10.0 GiB in all). |
 | `flux_gen1` | 16.1 GiB | **yes** | FLUX.1-dev. Its licence is non-commercial. |
 | `flux3_klein` | 10.3 GiB | **yes** | FLUX 3 Image Klein (BFL, released 2026-10-15), text-to-image only for now: 16 steps, no guidance. **The still engine in every 8 GB and 16 GB NVIDIA graph (2026-10-18); needs ComfyUI v0.41.0 or newer.** About 21 s a still on an RTX 4060 8 GB. Its licence is the FLUX Kommunity License: free for non-commercial use, and outputs may be used commercially only if you and your affiliates earn under US$5M a year ([attestation](FLUX3_KLEIN_LICENSE_ATTESTATION.md)). The int8 set (5.8 GB model, 4.9 GB Qwen3-VL encoder, 0.3 GB VAE) comes from an ungated mirror pinned to BFL's exact bytes, because BFL's own repos need a Hugging Face login. Image-edit / face-lock mode is not wired: unmeasured. |
+| `moss_image` | 12.1 GiB | **yes** | MOSS-Image SFT (OpenMOSS-Team), text-to-image only: Comfy's own template recipe, 25 steps, cfg 2.5, er_sde. **Opt-in; no shipped graph selects it; needs ComfyUI v0.42.0 or newer.** Apache-2.0, so its outputs carry no commercial restriction. Fetches Comfy-Org's ungated repackage on first use: the 5.4 GB int8 SFT model, the 7.3 GB Qwen3.5-9B w4a8 text encoder and the 0.25 GB small Flux 2 VAE. Comfy's prompt upsampler is not used (the pack writes its own full caption), and no machine has run it yet: unmeasured. |
 | `ideogram4_local` | 27.5 GiB | **yes** | Typography specialist -- built for the `still_word` card, where the script's own words go on screen. Measured at about 95 seconds a card against `z_image_turbo`'s 12, and its licence is non-commercial. An RTX 50-series card fetches the 16.4 GiB nvfp4 set instead of the fp8 one. |
 
 ### Hosted -- no weights, you supply an account
@@ -114,8 +115,8 @@ skips the ones no lane consumes, so declare it or pick from the dropdown.
 
 ## Which ones download themselves
 
-All six local engines: **`sd15`**, **`z_image_turbo`**, **`lumina_image`**,
-**`flux_gen1`**, **`ideogram4_local`** and **`flux3_klein`**. Pick any of them and a node inside the
+All seven local engines: **`sd15`**, **`z_image_turbo`**, **`lumina_image`**,
+**`flux_gen1`**, **`ideogram4_local`**, **`flux3_klein`** and **`moss_image`**. Pick any of them and a node inside the
 graph fetches it at queue time -- no account, no token, no script to run.
 `flux3_klein` is what the 8 GB and 16 GB NVIDIA graphs ship, so the default
 NVIDIA path downloads itself; `flux_gen1` and `ideogram4_local` joined the list on

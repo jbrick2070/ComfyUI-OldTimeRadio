@@ -197,7 +197,8 @@ def test_the_video_checklist_offers_every_local_lane_but_cloud():
     assert [c for c in choices if c.startswith("humo")], choices
     assert not [c for c in choices if c.startswith(("cloud_", "google_"))], choices
     assert set(L.still_roll_choices()) == {"flux_gen1", "flux3_klein", "ideogram4_local",
-                                           "lumina_image", "sd15", "z_image_turbo"}
+                                           "lumina_image", "moss_image", "sd15",
+                                           "z_image_turbo"}
 
 
 def test_ticked_lanes_narrow_the_draw_and_forgive_how_they_are_typed():
