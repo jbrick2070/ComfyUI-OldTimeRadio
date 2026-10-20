@@ -138,8 +138,8 @@ _PINNED_SOURCES = (
      "text_encoders/qwen3vl_4b_int8_convrot.safetensors",
      "3ba0f7064cbb1666a71e2820d3cc5c2273bb6cd0", 4_858_559_240,
      "32de113cbf8282b02cbff0794b637b9d6676da09314a1db5a30bcea9bf4ee01c"),
-    # MOSS-IMAGE SFT, added 2026-10-19 (opt-in still engine; no workflow JSON
-    # selects it). Comfy-Org/MOSS-Image is Comfy's own repackage of OpenMOSS-
+    # MOSS-IMAGE SFT, added 2026-10-19; the 16 GB NVIDIA graphs' still engine
+    # since 7a8bdce8. Comfy-Org/MOSS-Image is Comfy's own repackage of OpenMOSS-
     # Team's Apache-2.0 weights: public and ungated (Hub API gated:false, tag
     # license:apache-2.0, read 2026-10-19). The int8 ConvRot SFT model and the
     # w4a8 GPTQ Qwen3.5-9B encoder are the files Comfy's own template loads.
@@ -1531,7 +1531,8 @@ def _refuse_missing_node_packs(engines):
             eng = _vreg.get_engine(name)
         except Exception:  # noqa: BLE001
             # An IMAGE engine may declare a core-version probe (flux3_klein needs
-            # a CLIPLoader type added in ComfyUI v0.41.0). Ask it here, at the one
+            # a CLIPLoader type added in ComfyUI v0.41.0, moss_image one added in
+            # v0.42.0). Ask it here, at the one
             # point a refusal is still free, and check its node table below.
             try:
                 try:
