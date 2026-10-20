@@ -389,3 +389,25 @@ def test_a_bodiless_speaker_lends_no_face():
     assert "_partners = beat_partner_char_ids(lines, _with_body)" in src
     assert "co_present_char_ids(sprompt, _with_body, _cid)" in src
     assert "_CAST_TEXT.is_bodiless(row)" in src
+
+
+@pytest.mark.parametrize("voice_look, expect", [
+    ("unseen", []),                                   # a voice: lends no face
+    ("a stooped old harbour pilot in oilskins", ["c03"]),  # a body: lends one
+])
+def test_end_to_end_a_voice_lends_no_face_and_a_body_does(voice_look, expect):
+    """Through the real enumerator (Sonnet QA on c2301ff3: the only coverage
+    of the bodiless filter was source text)."""
+    cast = [{"char_id": "c02", "name": "JANE", "gender": "female",
+             "appearance": "a tall weathered spacer with a scar"},
+            {"char_id": "c03", "name": "TOM", "gender": "male",
+             "appearance": voice_look}]
+    lines = [{"line_id": "b1", "char_id": "c03", "shot_id": "s1",
+              "speaker_role": "character", "text": "Who goes there?"},
+             {"line_id": "b2", "char_id": "c02", "shot_id": "s1",
+              "speaker_role": "character", "text": "Only me."}]
+    payload, _ = mbp.derive_image_prompts(cast, _META, lines=lines,
+                                          portrait_free_roles=set())
+    jane = next(o for o in payload["objects"]
+                if o.get("kind") == "scene_character" and o.get("char_id") == "c02")
+    assert jane.get("co_char_ids", []) == expect
