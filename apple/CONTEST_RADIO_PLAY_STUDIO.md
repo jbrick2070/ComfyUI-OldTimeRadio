@@ -158,8 +158,13 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       fetch, registry, fixtures), so it is a build, not a setting. Caution: it knows celebrities and
       brands, and the contest forbids likenesses/unlicensed IP. Source: operator-shared AI Search
       video cUeZMUGCxrw, 2026-10-19.
-- [ ] 1080p upscale on cuda and CaptionBurn on: check what the foley workflow ships
+- [x] 1080p upscale on cuda and CaptionBurn on: check what the foley workflow ships
       (OTR_SilentComposite upscale_engine, OTR_CaptionBurn) and decide with the operator.
+      CHECKED 10-20 16:30: BOTH ALREADY ON in workflows/otr_16gb_foley.json -- node 84
+      OTR_SilentComposite [1920, 1080, 25, '', 'rtx_vsr', 'cuda'] and node 86 OTR_CaptionBurn
+      [True, 'sdh_standard', 25, ...]. The verified 15:58 demo measures h264 1920x1080 25 fps with
+      captions burned in (visible in every highlight he has watched). Nothing to change; if he
+      wants a caption-free cut for the video, that is one widget (OTR_CaptionBurn enabled=False).
 - [x] **Face consistency -- ANSWERED 2026-10-19 23:45: option (2), by text.** The operator sent
       ten photos of himself and chose "restart now" with Jeffrey described from them: a mime, lean,
       long straight nose, wide grin, wavy light-brown hair, white face paint with small red cheek
