@@ -108,7 +108,11 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       Klein (rendered before the MOSS switch). Eye check: the title cards show glitchy lettering and
       two frames (0:36, 0:52) flash as negatives -- intended Signal Lost glitches, or a defect?
       Form + demo drafts: apple/CONTEST_SUBMISSION_DRAFT.md, apple/CONTEST_DEMO_SCRIPT.md.
-- [ ] **Demo episode, My Story half: RENDERING (started 22:53 on 10-19, 3 acts, foley, MOSS).**
+- [ ] **Demo episode, My Story half: RENDERING (restarted 23:46 on 10-19, 3 acts, foley, MOSS).**
+      The 22:53 run was canceled at the stills stage (log kept as
+      tmp/rps_live/mystory_magnolia_generic_canceled.log) so Jeffrey could be drawn from the
+      operator's own photos -- he is the author and the character is him, so this is his own
+      likeness, not a third party's.
       Operator: "make my story the fictional tale of Jeffrey and MagnoliaRex, the later chapters
       ... it's my published book, I own the rights" (his book "Mime Lung Music Festival", Part 2;
       the book's own disclaimer lists the fiction chapters). He approved the four boxes as drafted.
@@ -140,7 +144,14 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       video cUeZMUGCxrw, 2026-10-19.
 - [ ] 1080p upscale on cuda and CaptionBurn on: check what the foley workflow ships
       (OTR_SilentComposite upscale_engine, OTR_CaptionBurn) and decide with the operator.
-- [ ] **OPERATOR QUESTION (asked 2026-10-19 late; unanswered): face consistency.** Peek at the
+- [x] **Face consistency -- ANSWERED 2026-10-19 23:45: option (2), by text.** The operator sent
+      ten photos of himself and chose "restart now" with Jeffrey described from them: a mime, lean,
+      long straight nose, wide grin, wavy light-brown hair, white face paint with small red cheek
+      marks, black knit beanie, blue-and-white checkered satin costume. No photo is fed to any
+      model; the words go in the Characters box.
+      THEN (23:50, operator): "all lanes should generate ref images for char stills so we have
+      consistency" -- reference images become a build for every lane (row below). Original
+      question: Peek at the
       MagnoliaRex stills: she holds steady, Jeffrey's face drifts between beats, and "her dark gray
       cat" was drawn as a big cat. Today's consistency is text + a portrait-derived identity SEED; the
       dispatcher can pass the portrait as a REFERENCE but every local engine has it off (z_image:
