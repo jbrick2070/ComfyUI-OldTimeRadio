@@ -170,11 +170,18 @@ def _pool_names(raw: Any) -> list:
     if isinstance(raw, dict) and "__value__" in raw:
         raw = raw["__value__"]
     if isinstance(raw, (list, tuple)):
-        return [str(x).strip() for x in raw if str(x).strip()]
-    if isinstance(raw, str):
+        names = (str(x).strip() for x in raw)
+    elif isinstance(raw, str):
         names = (x.strip(" \t'\"[]") for x in re.split(r"[,;\n]", raw))
-        return [x for x in names if x]
-    return []
+    else:
+        return []
+    # One bank however it is spelled or repeated: "Public-Domain, public_domain".
+    seen: dict = {}
+    for name in names:
+        key = re.sub(r"[\s-]+", "_", name.lower())
+        if key:
+            seen.setdefault(key, name)
+    return list(seen.values())
 
 
 def _usable(info: dict, f: Field) -> dict:

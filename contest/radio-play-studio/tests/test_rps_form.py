@@ -141,3 +141,10 @@ def test_a_classic_with_the_roll_is_refused_unless_the_pool_is_one_bank(schemas,
     graph = workflow_to_api_prompt(workflow, schemas)
     graph[ids["OTR_LedgerScriptWriter"]]["inputs"]["bank_roll_pool"] = "shakespeare"
     apply_choices(graph, schemas, ids, {"bank": roll, "source_ref": "Hamlet"})   # one name is a pick
+
+
+def test_a_repeated_or_respelled_bank_in_the_pool_is_still_one_pick(schemas, workflow):
+    graph = workflow_to_api_prompt(workflow, schemas)
+    ids = locate_nodes(workflow)
+    graph[ids["OTR_LedgerScriptWriter"]]["inputs"]["bank_roll_pool"] = "Public-Domain, public_domain"
+    apply_choices(graph, schemas, ids, {"bank": "roll (any eligible bank)", "source_ref": "Moby Dick"})
