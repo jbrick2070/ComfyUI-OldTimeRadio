@@ -130,7 +130,12 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       fictional tale of Jeffrey and MagnoliaRex ... it's my published book, I own the rights".
 - [ ] Compare by eye on the same shot and seed: foley (default) vs `otr_16gb_video.json` vs a
       procedural lane. LTX stays core if it holds up (LTX bonus).
-- [ ] Stills: FLUX 3 Klein is the shipped NVIDIA engine; confirm it looks right on the episode.
+      10-20 05:30: RENDERING the video-lane side -- act 1 of the same example story (cast cards,
+      flux3_klein + references, C7 seeds), tmp/rps_live/compare_video_1act.log. The foley side is the
+      3-act demo above (its act 1 = the first ~1:50). The writer may not repeat the script word for
+      word, so compare the LOOK and the motion, not the lines. Operator's eye decides.
+- [x] Stills: superseded -- MOSS-Image is the 16 GB default (operator, 10-19), and FLUX 3 Klein is
+      the reference-stills engine; both looked right by eye on their episodes (Midsummer, MagnoliaRex).
 - [x] **MOSS-Image A/B vs Klein -- DECIDED: "MOSS everywhere" (operator, 2026-10-19, by eye).**
       Same scene (Midsummer, Bottom and Titania), same style (Shakespeare stage realism), 8 stills
       each, sheet tmp/rps_live/ab/klein_vs_moss_midsummer_shakespeare_stage_realism.jpg. His reason:
