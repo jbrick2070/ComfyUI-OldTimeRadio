@@ -991,6 +991,10 @@ def _live_widget_order(input_types: dict) -> list[str]:
     for name, spec in list(req.items()) + list(opt.items()):
         if _wv_is_widget_backed(spec) and not _wv_has_force_input(spec):
             out.append(name)
+            opts = spec[1] if isinstance(spec, (list, tuple)) and len(spec) > 1 else None
+            if isinstance(opts, dict) and any(
+                    opts.get(k) for k in ("image_upload", "video_upload", "audio_upload")):
+                out.append("upload")      # the frontend's upload button slot
     return out
 
 

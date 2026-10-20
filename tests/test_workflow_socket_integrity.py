@@ -82,6 +82,10 @@ def _declared_inputs(cls):
     for section in ("required", "optional"):
         for name, value in (spec.get(section) or {}).items():
             out[name] = value[0] if isinstance(value, tuple) and value else None
+            opts = value[1] if isinstance(value, tuple) and len(value) > 1 else None
+            if isinstance(opts, dict) and any(
+                    opts.get(k) for k in ("image_upload", "video_upload", "audio_upload")):
+                out["upload"] = "IMAGEUPLOAD"   # the frontend's upload button
     return out
 
 

@@ -136,6 +136,22 @@ _WIDGET_PRIMITIVE_TYPES = {"STRING", "INT", "FLOAT", "BOOLEAN", "BOOL", "COMBO"}
 _COMPANION_INT_WIDGETS = ("seed", "noise_seed")
 _COMPANION_VALUES = frozenset({"fixed", "randomize", "increment", "decrement"})
 
+# The UPLOAD BUTTON companion (2026-10-20, OTR_CharacterPhoto). A COMBO declared
+# with image_upload / video_upload / audio_upload gets a client-side upload
+# button that the editor SAVES as one more widgets_values slot right after the
+# combo ("image", "video" or "audio"), exactly as core's LoadImage saves
+# ["file.png", "image"]. Like control_after_generate it is not an input: the
+# slot is consumed, checked, and never sent.
+_UPLOAD_KEYS = ("image_upload", "video_upload", "audio_upload")
+_UPLOAD_VALUES = frozenset({"image", "video", "audio"})
+
+
+def _spec_has_upload(spec) -> bool:
+    if not isinstance(spec, (list, tuple)) or len(spec) < 2:
+        return False
+    opts = spec[1]
+    return isinstance(opts, dict) and any(opts.get(k) for k in _UPLOAD_KEYS)
+
 _OPENROUTER_SLOT_WIDGETS = frozenset({
     "openrouter_slot_a_model", "openrouter_slot_b_model",
 })
@@ -215,6 +231,8 @@ def serialized_slot_names(node_type: str, schemas: dict) -> list:
         if (isinstance(type_def, str) and type_def.upper() == "INT"
                 and name in _COMPANION_INT_WIDGETS):
             slots.append(f"{name}__control_after_generate")
+        if _spec_has_upload(spec):
+            slots.append(f"{name}__upload")
     return slots
 
 
@@ -573,7 +591,8 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
         if ntype in schemas:
             serialized_slots = serialized_slot_names(ntype, schemas)
             companion_slot_names = {
-                n for n in serialized_slots if n.endswith("__control_after_generate")
+                n for n in serialized_slots
+                if n.endswith("__control_after_generate") or n.endswith("__upload")
             }
             wv = node.get("widgets_values", []) or []
             linked_widget_count = sum(1 for n in serialized_slots if n in linked_names)
@@ -597,7 +616,9 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
                 if slot_name in companion_slot_names:
                     if wv_idx < len(wv):
                         val = wv[wv_idx]
-                        if val not in _COMPANION_VALUES:
+                        allowed = (_UPLOAD_VALUES if slot_name.endswith("__upload")
+                                   else _COMPANION_VALUES)
+                        if val not in allowed:
                             raise ValueError(
                                 f"node {nid} ({ntype}) companion slot at position "
                                 f"{wv_idx} expected a control_after_generate value; "

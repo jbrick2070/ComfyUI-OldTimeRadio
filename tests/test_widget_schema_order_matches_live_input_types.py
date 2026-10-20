@@ -84,6 +84,9 @@ def live_widget_order(cls) -> list:
                 continue  # a wire, never a widget
             if isinstance(declared_type, (list, tuple)):
                 out.append(str(name))            # COMBO
+                if any(opts.get(k) for k in ("image_upload", "video_upload",
+                                             "audio_upload")):
+                    out.append("upload")         # its upload button's saved slot
             elif isinstance(declared_type, str) and declared_type in _WIDGET_PRIMITIVES:
                 out.append(str(name))
     return out

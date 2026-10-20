@@ -46,6 +46,11 @@ export function liveWidgetNames(nodeType, lookup) {
                 || ["INT", "FLOAT", "STRING", "BOOLEAN", "COMBO"].includes(typeDef);
             if (!isWidget) continue;
             names.push(name);
+            // A picker declared with an upload button gets the frontend's
+            // `upload` widget, saved right after it (as core's LoadImage).
+            if (opts && (opts.image_upload || opts.video_upload || opts.audio_upload)) {
+                names.push("upload");
+            }
         }
     }
     return names;

@@ -2781,6 +2781,15 @@
             "name": "image"
           },
           "link": null
+        },
+        {
+          "localized_name": "upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -2802,7 +2811,8 @@
       },
       "widgets_values": [
         "",
-        ""
+        "",
+        "image"
       ],
       "color": "#432",
       "bgcolor": "#653"

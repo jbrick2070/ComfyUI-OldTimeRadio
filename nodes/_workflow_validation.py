@@ -223,6 +223,16 @@ def validate_workflow_contract(
         decl_required = set((declared.get("required") or {}).keys())
         decl_optional = set((declared.get("optional") or {}).keys())
         decl_all = decl_required | decl_optional
+        # A picker declared with an upload button gets a client-side `upload`
+        # widget the editor saves next to it (core's LoadImage does the same);
+        # it is the class's own, not a rogue socket.
+        if any(isinstance(spec, (list, tuple)) and len(spec) > 1
+               and isinstance(spec[1], dict)
+               and any(spec[1].get(k) for k in ("image_upload", "video_upload",
+                                                 "audio_upload"))
+               for block in (declared.get("required") or {}, declared.get("optional") or {})
+               for spec in block.values()):
+            decl_all = decl_all | {"upload"}
 
         actual_inputs = node.get("inputs") or []
         actual = {i.get("name") for i in actual_inputs if isinstance(i, dict)}
