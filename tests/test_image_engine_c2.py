@@ -163,11 +163,13 @@ def _zimage():
     return ireg.get_engine("z_image_turbo")
 
 
-def test_no_shipping_image_engine_advertises_unproven_reference_conditioning():
+def test_no_shipping_image_engine_advertises_unproven_reference_conditioning(monkeypatch):
     """A generic installed node is not evidence that a checkpoint was trained
     for that semantic path. Z-Image's matched A/B reproduced square-grid
-    corruption, so every shipping image adapter is reference-OFF today.
+    corruption, so every shipping image adapter is reference-OFF by default
+    (flux3_klein's path is opt-in via OTR_FLUX3_REFERENCE, cleared here).
     """
+    monkeypatch.delenv("OTR_FLUX3_REFERENCE", raising=False)
     from nodes._otr_image_engines import registry as ireg
 
     for name in ireg.all_engine_names():
