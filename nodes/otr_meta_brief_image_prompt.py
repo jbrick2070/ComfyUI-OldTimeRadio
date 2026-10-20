@@ -181,13 +181,39 @@ _PERSON_TERMS = (_FEMALE_PROMPT_TERMS | _MALE_PROMPT_TERMS
                  | frozenset({"person", "human", "humanoid", "people"}))
 
 
+#: Words that may follow the subject noun of an appearance's first clause.
+#: "A cat with green eyes" is a cat; "a cat burglar" is a burglar.
+_AFTER_SUBJECT = frozenset({
+    "with", "who", "that", "which", "whose", "of", "in", "on", "at", "from",
+    "named", "called", "and", "wearing", "whom", "for", "like",
+})
+
+
 def _is_non_human(char) -> bool:
-    """True when the character's appearance opens by naming a non-human kind
-    and no person: the first clause, up to the first comma or full stop."""
-    look = str((char or {}).get("appearance") or "").lower()
+    """True when the SUBJECT of the character's appearance is a non-human kind.
+
+    Read from the first clause (up to the first comma, full stop, semicolon or
+    colon). The non-human word must be the head of that phrase: it ends the
+    clause, or a connecting word follows it ("a cat with green eyes"). So "a
+    cat burglar", "a dog trainer", "a fish merchant", "Robot dancer" and
+    "rat-faced informant" stay people -- the animal word is a modifier there --
+    and a capitalised word after the first ("Captain Wolf") is a name. Any
+    person word in the clause keeps the character a person.
+    """
+    look = str((char or {}).get("appearance") or "")
     first = re.split(r"[.,;:]", look, maxsplit=1)[0]
-    words = set(re.findall(r"[a-z]+", first))
-    return bool(words & _NON_HUMAN_TERMS) and not words & _PERSON_TERMS
+    tokens = re.findall(r"[A-Za-z]+", first)
+    lowered = [t.lower() for t in tokens]
+    if set(lowered) & _PERSON_TERMS:
+        return False
+    for i, (tok, low) in enumerate(zip(tokens, lowered)):
+        kind = low if low in _NON_HUMAN_TERMS else (
+            low[:-1] if low.endswith("s") and low[:-1] in _NON_HUMAN_TERMS else "")
+        if not kind or (i > 0 and tok[:1].isupper()):
+            continue
+        if i + 1 == len(tokens) or lowered[i + 1] in _AFTER_SUBJECT:
+            return True
+    return False
 
 
 #: Shared portrait style anchor (operator look-QA 2026-06-10): portraits must
@@ -761,6 +787,16 @@ def _reference_still_roles_from_policy(policy_json):
     return roles
 
 
+#: Leading words of a name that are titles, never a first name on their own.
+_TITLE_WORDS = frozenset({
+    "lord", "lady", "king", "queen", "sir", "dame", "mrs", "miss", "duke",
+    "duchess", "prince", "princess", "captain", "doctor", "father", "mother",
+    "sister", "brother", "saint", "the", "old", "young", "little", "big",
+    "uncle", "aunt", "professor", "general", "count", "countess", "master",
+    "mistress", "madame", "monsieur", "senor", "senora", "officer", "inspector",
+    "detective", "sergeant", "major", "colonel", "judge", "mister",
+})
+
 #: At most this many other characters' portraits ride along with the speaker's.
 CO_REFERENCE_LIMIT = 3
 
@@ -784,13 +820,15 @@ def co_present_char_ids(prompt, cast_by_id, speaker_id):
     for cid, name in names.items():
         if name:
             firsts.setdefault(name.split()[0], []).append(cid)
+    # A title is not a first name: "Lady Macduff" must not find "Lady Macbeth".
     found = []
     for cid, name in names.items():
         if not cid or cid == speaker_id or len(name) < 2:
             continue
         forms = [name]
         first = name.split()[0]
-        if first != name and len(first) >= 3 and firsts.get(first) == [cid]:
+        if (first != name and len(first) >= 3 and first not in _TITLE_WORDS
+                and firsts.get(first) == [cid]):
             forms.append(first)
         hits = [m.start() for form in forms
                 for m in [re.search(r"(?<![\w])" + re.escape(form) + r"(?![\w])", text)]
