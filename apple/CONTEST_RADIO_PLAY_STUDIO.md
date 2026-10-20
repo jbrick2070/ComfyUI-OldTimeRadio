@@ -227,6 +227,11 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       16 GB foley, flux3_klein + OTR_FLUX3_REFERENCE=1, C7 seeds, the example cast cards as the
       app composes them, NO photo (written descriptions only). When it lands: verify, cut the
       highlight, check the stills for real names, and update the demo script (shot 5).
+      01:27 check-in: stills stage done -- 31 mints, 21 drawn with co-references (12 with one other
+      portrait, 9 with two), no LOUD reports; video stage at 76%. Since the demo started: main
+      c2301ff3 (bodiless speakers and shot-less lines lend no face; Sonnet HOLDS) and fd3019e3 (the
+      end-to-end test Sonnet asked for). The demo run predates c2301ff3; its cast has no voice-only
+      character, so it is unaffected.
       OPERATOR DECISION (morning): how references switch on for everyone. Today it is the opt-in
       server env OTR_FLUX3_REFERENCE=1 (default off = both boxes byte-identical). Options: (a) flip
       Klein's default ON -- reaches the 8 GB lane, needs a 4060 VRAM measurement first (no 4060
