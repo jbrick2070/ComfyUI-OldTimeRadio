@@ -98,9 +98,12 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
 - [x] Comedy demo candidate rendered: A Midsummer Night's Dream, Bottom and Titania
       (`--source-ref folger-midsummer:act3-scene1-bottom-titania`), 1 act foley, above. Awaits the
       operator's eye.
-- [ ] Pick the demo source: a **comedy**, SFW, public domain (Shakespeare comedies are in the
-      bank: As You Like It, Twelfth Night, A Midsummer Night's Dream, Much Ado). Use the form's
-      Source to adapt with the shakespeare bank. Also make one **My Story** episode for the demo.
+- [x] **Demo episode, classic half: OPERATOR PICKED MIDSUMMER (2026-10-19).**
+      `output/otr/obs/bird_song_20261019_191143__cart__n16f__fk3i__koko__sspr__cg412__sa3_final.mp4`
+      (A Midsummer Night's Dream, Bottom and Titania; 1 act foley; 71 MB, 1m45s; sha 0c8953bd).
+      Keep it: do not re-render or overwrite. The demo shows a highlight cut of it (ffmpeg, no render).
+- [ ] Demo episode, My Story half: render one My Story episode AFTER the Klein/MOSS still pick,
+      with the winning still model, 1 act foley.
 - [ ] Compare by eye on the same shot and seed: foley (default) vs `otr_16gb_video.json` vs a
       procedural lane. LTX stays core if it holds up (LTX bonus).
 - [ ] Stills: FLUX 3 Klein is the shipped NVIDIA engine; confirm it looks right on the episode.
