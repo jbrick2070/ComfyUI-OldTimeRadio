@@ -96,6 +96,15 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
 - [ ] Compare by eye on the same shot and seed: foley (default) vs `otr_16gb_video.json` vs a
       procedural lane. LTX stays core if it holds up (LTX bonus).
 - [ ] Stills: FLUX 3 Klein is the shipped NVIDIA engine; confirm it looks right on the episode.
+- [ ] **Optional, AFTER the demo is locked, operator's eye decides: MOSS-Image A/B vs Klein.**
+      Apache-2.0, native in ComfyUI core since v0.42.0 (comfy/ldm/moss_image), repackaged at
+      hf.co/Comfy-Org/MOSS-Image: int8-convrot DiT 5.4 GB, Qwen3.5-9B text encoder w4a8 7.3 GB,
+      flux2-vae_small; 8-step DMD LoRA (lodestones) for ~3-4x speed at CFG 1.0. NOT smaller than
+      Klein on 8 GB (Klein proven 7.5 GB peak on the 4060); "4 GB" claims mean GGUF, which stays
+      out (auto-download ruling). Needs a new engine in nodes/_otr_image_engines/ (pinned tokenless
+      fetch, registry, fixtures), so it is a build, not a setting. Caution: it knows celebrities and
+      brands, and the contest forbids likenesses/unlicensed IP. Source: operator-shared AI Search
+      video cUeZMUGCxrw, 2026-10-19.
 - [ ] 1080p upscale on cuda and CaptionBurn on: check what the foley workflow ships
       (OTR_SilentComposite upscale_engine, OTR_CaptionBurn) and decide with the operator.
 - [ ] Voice engine per role (OTR_CastLock rows in `config/app_mode.json`): operator's ear decides.
