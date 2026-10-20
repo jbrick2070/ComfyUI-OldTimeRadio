@@ -220,7 +220,7 @@ function watch(id) {
   es.onerror = () => {
     if (finished || es.readyState !== EventSource.CLOSED) return;   // otherwise the browser is reconnecting
     es.close();
-    $("error").textContent = "Lost the connection to the app. If you restarted it, the run is no longer tracked here, but it may still be rendering on your ComfyUI; its episode lands in otr/obs.";
+    $("error").textContent = "Lost the connection to the app. Reload to pick the episode back up; if the app was restarted it is no longer tracked here, but it may still be rendering on your ComfyUI, and its episode lands in otr/obs.";
     $("error").hidden = false;
     $("status").textContent = "Disconnected.";
     go.disabled = false;
@@ -279,6 +279,7 @@ form.addEventListener("submit", async (e) => {
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
+    history.replaceState(null, "", "#run=" + body.id);   // a reload picks it back up
     watch(body.id);
   } catch (err) {
     $("error").textContent = err.message; $("error").hidden = false;
@@ -286,7 +287,48 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
-loadOptions();
+// A reload, or a second tab, finds the episode being made and shows it from the
+// start: the app keeps every event of a run and replays them to a new page.
+async function resume() {
+  const wanted = (location.hash.match(/^#run=([0-9a-f]{12})$/) || [])[1];
+  let list = [];
+  try {
+    list = (await (await fetch("/api/episodes")).json()).episodes || [];
+  } catch (err) { return; }
+  const run = list.find((r) => r.id === wanted) || list.find((r) => !r.finished);
+  if (!run) {
+    if (wanted) {
+      $("run").hidden = false;
+      $("error").textContent = "That episode is not tracked any more (the app was restarted). " +
+        "If it was still rendering, it lands in your ComfyUI output folder under otr/obs.";
+      $("error").hidden = false;
+      history.replaceState(null, "", location.pathname);
+    }
+    return;
+  }
+  history.replaceState(null, "", "#run=" + run.id);
+  $("run").hidden = false; $("error").hidden = true; $("result").hidden = true;
+  $("status").textContent = run.finished ? "" : "Picking the episode back up...";
+  go.disabled = !run.finished;
+  watch(run.id);
+}
+
+// The page tells the app it is open; once every page has been closed for a
+// minute and nothing is being made, the app asks ComfyUI to free the GPU.
+const PAGE_ID = Math.random().toString(16).slice(2, 14);
+function presence(closing) {
+  try {
+    fetch("/api/presence", {
+      method: "POST", headers: {"Content-Type": "application/json"}, keepalive: true,
+      body: JSON.stringify({page: PAGE_ID, closing: !!closing}),
+    }).catch(() => {});
+  } catch (err) { /* the app is gone; nothing to tell */ }
+}
+presence(false);
+setInterval(() => presence(false), 20000);
+addEventListener("pagehide", () => presence(true));
+
+loadOptions().then(resume);
 </script>
 </body>
 </html>

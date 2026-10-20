@@ -10,7 +10,9 @@ import json
 import mimetypes
 import re
 import threading
+import time
 import traceback
+import urllib.request
 import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -23,6 +25,10 @@ from .runner import Studio
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "[::1]"})
 HEARTBEAT_S = 15.0
+#: A page says it is open this often; with none heard for GPU_IDLE_S, and no
+#: episode being made, the app asks ComfyUI to drop the models it loaded.
+PRESENCE_S = 20.0
+GPU_IDLE_S = 60.0
 _RANGE = re.compile(r"^bytes=(\d*)-(\d*)$")
 
 
@@ -33,6 +39,7 @@ class Run:
         self.id = run_id
         self.events: list = []
         self.finished = False
+        self.started = time.time()
         self.cond = threading.Condition()
 
     def add(self, event: dict) -> None:
@@ -43,21 +50,68 @@ class Run:
             self.cond.notify_all()
 
 
+class Busy(RuntimeError):
+    """An episode is already being made; one GPU makes one at a time."""
+
+
+_BUSY = "an episode is already being made; the page shows its progress"
+
+
 class Runs:
-    def __init__(self, studio: Studio) -> None:
+    def __init__(self, studio: Studio, *, now=time.monotonic) -> None:
         self.studio = studio
         self._runs: dict = {}
         self._lock = threading.Lock()
+        self._now = now
+        self._pages: dict = {}          # page id -> when it last said it is open
+        self._gpu_dirty = False         # this app has rendered since its last free
+
+    def _busy(self) -> bool:
+        return any(not r.finished for r in self._runs.values())
 
     def start(self, choices: dict) -> Run:
         """Check the choices against the server, then run the episode on a thread.
-        A bad choice raises here, before any thread starts."""
+        A bad choice raises here, before any thread starts. A second episode while
+        one is being made is refused: it would wait an hour behind it on the GPU."""
+        with self._lock:
+            if self._busy():
+                raise Busy(_BUSY)
         self.studio.build_graph(choices)
         run = Run(uuid.uuid4().hex[:12])
         with self._lock:
+            if self._busy():
+                raise Busy(_BUSY)
             self._runs[run.id] = run
+            self._gpu_dirty = True
         threading.Thread(target=self._drive, args=(run, choices), daemon=True).start()
         return run
+
+    def listing(self) -> list:
+        """Every episode this app has started since it was launched, newest first."""
+        with self._lock:
+            runs = sorted(self._runs.values(), key=lambda r: r.started, reverse=True)
+        return [{"id": r.id, "finished": r.finished, "started": r.started} for r in runs]
+
+    # -- the GPU goes back when the last page closes -----------------------
+    def page_open(self, page_id: str) -> None:
+        with self._lock:
+            self._pages[page_id] = self._now()
+
+    def page_closed(self, page_id: str) -> None:
+        with self._lock:
+            self._pages.pop(page_id, None)
+
+    def should_free_gpu(self) -> bool:
+        """True once: no page heard from for GPU_IDLE_S, nothing being made, and
+        this app has rendered since it last freed -- so it only ever releases
+        models its own episodes loaded, never someone else's idle canvas."""
+        with self._lock:
+            now = self._now()
+            self._pages = {k: t for k, t in self._pages.items() if now - t < GPU_IDLE_S}
+            if self._pages or self._busy() or not self._gpu_dirty:
+                return False
+            self._gpu_dirty = False
+            return True
 
     def _drive(self, run: Run, choices: dict) -> None:
         for event in self.studio.stream(choices):
@@ -133,6 +187,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_file(STATIC_DIR / "index.html", "text/html; charset=utf-8")
         if path == "/api/options":
             return self._options()
+        if path == "/api/episodes":
+            return self._send_json(HTTPStatus.OK, {"episodes": self.runs.listing()})
         match = re.fullmatch(r"/api/episodes/([0-9a-f]{12})/events", path)
         if match:
             return self._events(match.group(1))
@@ -141,10 +197,13 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
     def _post(self) -> None:
-        if urlsplit(self.path).path != "/api/episodes":
+        path = urlsplit(self.path).path
+        if path not in ("/api/episodes", "/api/presence"):
             return self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
             return self._send_json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "send application/json"})
+        if path == "/api/presence":
+            return self._presence()
         try:
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}")
@@ -157,11 +216,27 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"bad request: {exc}"})
         try:
             run = self.runs.start(choices)
+        except Busy as exc:
+            return self._send_json(HTTPStatus.CONFLICT, {"error": str(exc)})
         except ServerUnreachable as exc:
             return self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
         except (ValueError, GraphError) as exc:
             return self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         self._send_json(HTTPStatus.ACCEPTED, {"id": run.id})
+
+    def _presence(self) -> None:
+        """A page saying it is open, or closing: {"page": id, "closing": bool}."""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(length) or b"{}")
+            page = str(body["page"])[:64]
+        except (ValueError, TypeError, KeyError):
+            return self._send_json(HTTPStatus.BAD_REQUEST, {"error": "send {'page': id}"})
+        if body.get("closing"):
+            self.runs.page_closed(page)
+        else:
+            self.runs.page_open(page)
+        self._send_json(HTTPStatus.OK, {"ok": True})
 
     def _options(self) -> None:
         try:
@@ -257,8 +332,32 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
+def free_comfyui_models(comfyui_url: str) -> None:
+    """Ask ComfyUI to unload its models and free memory (POST /free), so the
+    card is free for whatever the person does next. ComfyUI applies it between
+    prompts; it never stops a render. Best effort: a failure is only printed."""
+    req = urllib.request.Request(
+        comfyui_url.rstrip("/") + "/free", method="POST",
+        data=json.dumps({"unload_models": True, "free_memory": True}).encode("utf-8"),
+        headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+        print("Radio Play Studio: every page is closed, so ComfyUI was asked to free its models.")
+    except OSError as exc:
+        print(f"Radio Play Studio: could not ask ComfyUI to free its models ({exc}).")
+
+
+def _watch_gpu(runs: Runs, free=free_comfyui_models, sleep=time.sleep) -> None:
+    while True:
+        sleep(PRESENCE_S / 2)
+        if runs.should_free_gpu():
+            free(runs.studio.settings.comfyui_url)
+
+
 def make_server(studio: Studio, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
     server = ThreadingHTTPServer((host, port), Handler)
     server.daemon_threads = True
     server.runs = Runs(studio)  # type: ignore[attr-defined]
+    threading.Thread(target=_watch_gpu, args=(server.runs,), daemon=True).start()
     return server

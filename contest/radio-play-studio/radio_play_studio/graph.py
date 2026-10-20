@@ -44,9 +44,10 @@ def load_workflow(path: Path) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def fetch_object_info(base_url: str, timeout: float = 30.0) -> dict:
+def fetch_object_info(base_url: str, timeout: float = 120.0) -> dict:
     """GET `<base_url>/object_info`: every node type the server has and what
-    each one accepts."""
+    each one accepts. A ComfyUI that is rendering took 25 to 39 s to answer on
+    the 5080 (2026-10-19), so the timeout is well above that."""
     url = base_url.rstrip("/") + "/object_info"
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:

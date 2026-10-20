@@ -145,3 +145,58 @@ def test_a_negative_last_event_id_replays_from_the_start(app):
     status, _, data = _request(port, "GET", f"/api/episodes/{run_id}/events", headers={"Last-Event-ID": "-5"})
     ids = [int(line[4:]) for line in data.decode().splitlines() if line.startswith("id: ")]
     assert status == 200 and ids[0] == 0 and min(ids) >= 0
+
+
+def test_a_reloaded_page_finds_its_episode_in_the_list(app):
+    port, _ = app
+    status, _, body = _post(port, {"bank": "shakespeare"})
+    run_id = json.loads(body)["id"]
+    _events(port, run_id)                                    # let it finish
+    status, _, body = _request(port, "GET", "/api/episodes")
+    listed = json.loads(body)["episodes"]
+    assert status == 200 and listed[0]["id"] == run_id and listed[0]["finished"] is True
+
+
+def test_a_second_episode_while_one_is_being_made_is_a_409(settings, schemas):
+    from radio_play_studio.server import Busy, Runs
+    gate = threading.Event()
+
+    class SlowStudio(Studio):
+        def stream(self, choices):
+            gate.wait(5)
+            yield {"type": "done", "path": "x", "run": "r", "file": "f"}
+
+    runs = Runs(SlowStudio(settings, client_factory=lambda url: None, fetch=lambda url: schemas))
+    runs.start({})
+    with pytest.raises(Busy):
+        runs.start({})
+    gate.set()
+
+
+def test_the_gpu_is_freed_once_after_the_last_page_closes(settings, schemas):
+    from radio_play_studio.server import GPU_IDLE_S, Runs
+    clock = {"t": 0.0}
+    studio = Studio(settings, client_factory=lambda url: FakeClient(_good_job()), fetch=lambda url: schemas)
+    runs = Runs(studio, now=lambda: clock["t"])
+    assert runs.should_free_gpu() is False                   # never rendered: nothing of ours to free
+    runs.page_open("p1")
+    run = runs.start({})
+    for _ in range(200):
+        if run.finished:
+            break
+        threading.Event().wait(0.01)
+    assert run.finished
+    assert runs.should_free_gpu() is False                   # a page is still open
+    clock["t"] += GPU_IDLE_S + 1                             # the page stopped checking in
+    assert runs.should_free_gpu() is True
+    assert runs.should_free_gpu() is False                   # once, not every tick
+
+
+def test_presence_takes_open_and_closing(app):
+    port, _ = app
+    for body in ({"page": "abc"}, {"page": "abc", "closing": True}):
+        status, _, _ = _request(port, "POST", "/api/presence", json.dumps(body),
+                                {"Content-Type": "application/json"})
+        assert status == 200
+    status, _, _ = _request(port, "POST", "/api/presence", "{}", {"Content-Type": "application/json"})
+    assert status == 400
