@@ -695,10 +695,8 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
                         if val not in allowed:
                             raise ValueError(
                                 f"node {nid} ({ntype}) companion slot at "
-                                f"position {wv_idx} expected a "
-                                f"control_after_generate value "
-                                f"(one of "
-                                f"{sorted(_COMPANION_VALUES)!r}); got "
+                                f"position {wv_idx} expected one of "
+                                f"{sorted(allowed)!r}; got "
                                 f"{val!r}. Workflow widget drift; refusing "
                                 f"API prompt conversion."
                             )

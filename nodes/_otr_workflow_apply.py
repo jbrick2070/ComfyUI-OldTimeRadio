@@ -621,7 +621,7 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
                         if val not in allowed:
                             raise ValueError(
                                 f"node {nid} ({ntype}) companion slot at position "
-                                f"{wv_idx} expected a control_after_generate value; "
+                                f"{wv_idx} expected one of {sorted(allowed)!r}; "
                                 f"got {val!r}. Workflow widget drift; refusing."
                             )
                         wv_idx += 1
