@@ -122,6 +122,12 @@ def mesh_fodder_roles_from_video_policy(video_policy: dict) -> list:
 _RECEIPT_GRANULARITY = "per_object"
 
 
+def _chained_photos(value) -> dict:
+    """``{name: [file, ...]}`` from a Character Photo chain (or nothing)."""
+    photos = (value or {}).get("photos") if isinstance(value, dict) else None
+    return {k: _photos.photo_list(v) for k, v in (photos or {}).items()}
+
+
 class OTRImageDirector:
     """Registered as ``OTR_ImageDirector``. Fresh-cap / seed / dtype policy;
     image-model picks come from OTR_VideoDirector via video_policy_json."""
@@ -234,6 +240,17 @@ class OTRImageDirector:
                         "is reported too."
                     ),
                 }),
+                # THE CANVAS PICKER (2026-10-20), appended LAST: a chain of
+                # Character Photo nodes. A socket, not a widget, so saved
+                # widget values never move; merged with the typed lines above,
+                # which win for a name both give.
+                "character_photos_in": ("OTR_CHARACTER_PHOTOS", {
+                    "tooltip": (
+                        "Character Photo nodes, chained: each one is a photo "
+                        "(image picker with upload and preview) for one "
+                        "character. Same use as the typed lines above."
+                    ),
+                }),
             },
         }
 
@@ -241,13 +258,22 @@ class OTRImageDirector:
     def VALIDATE_INPUTS(cls, **kwargs):
         return True
 
+    @classmethod
+    def IS_CHANGED(cls, character_photos="", **_):
+        # The typed photos' bytes (the Character Photo nodes hash their own):
+        # a new picture under the same file name must re-run the image phase.
+        # No photos -> a constant, so caching is exactly what it was.
+        typed, _problems = _photos.parse_photo_lines(character_photos)
+        return _photos.photos_fingerprint(typed) if typed else ""
+
     # ------------------------------------------------------------------ #
     def direct(self, fresh_cap, seed_mode, request_seed, video_policy_json="",
                custom_models_json="{}", gate_in="",
-               dtype_policy="fp8_ok", character_photos=""):
+               dtype_policy="fp8_ok", character_photos="", character_photos_in=None):
         warnings: list = []
-        photos, photo_problems = _photos.parse_photo_lines(character_photos)
+        typed, photo_problems = _photos.parse_photo_lines(character_photos)
         warnings.extend("character_photos: " + p for p in photo_problems)
+        photos = _photos.merge_photos(_chained_photos(character_photos_in), typed)
         custom = self._parse_json_obj(custom_models_json, "custom_models_json", warnings)
         video_policy = self._parse_video_policy_required(video_policy_json)
         descriptors = _registry_descriptors()

@@ -38,7 +38,7 @@ def test_lines_parse_into_a_name_to_file_map():
 
 
 @pytest.mark.parametrize("line", ["no equals sign", "= otr.png", "Ada = ../secret.png",
-                                  "Ada = C:/x.png", "Ada = sub/x.png", "Ada = x.exe"])
+                                  "Ada = C:/x.png", "Ada = sub/../x.png", "Ada = x.exe"])
 def test_a_bad_line_is_reported_and_skipped(line):
     photos, problems = cp.parse_photo_lines(line)
     assert photos == {} and len(problems) == 1
@@ -101,9 +101,11 @@ def test_a_graph_saved_before_the_widget_has_no_photos():
     assert json.loads(raw)["character_photos"] == {}
 
 
-def test_the_widget_is_the_last_one_on_the_node():
+def test_the_widget_is_the_last_widget_on_the_node():
+    # Only the Character Photo socket comes after it, and a socket stores no
+    # widget value, so saved values never move.
     optional = list(OTRImageDirector.INPUT_TYPES()["optional"])
-    assert optional[-1] == "character_photos"
+    assert optional[-2:] == ["character_photos", "character_photos_in"]
 
 
 # --------------------------------------------------------------------------- #

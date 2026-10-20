@@ -189,7 +189,10 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # the new OTR_ComfyCredential node's token into the Workflow Validator's
     # appended `credential` socket. Neither node 85 nor node 92 is touched,
     # and link 278 and its fanout below are byte-identical.
-    assert wf["last_link_id"] == 293
+    # NINTH bump, 294 (2026-10-20): [294, 98, 0, 88, 8, "OTR_CHARACTER_PHOTOS"],
+    # the blank Character Photo node into Image Director's appended
+    # `character_photos_in` socket. Neither node 85 nor node 92 is touched.
+    assert wf["last_link_id"] == 294
     # `ffmpeg` left node 85's inputs on 2026-09-13 (the widget was discarded at
     # the method boundary since 2026-09-04 and had no live effect; the
     # declaration closed the channel rather than keep sanitising it). It sat

@@ -26,9 +26,14 @@ from typing import Iterable, Mapping
 #: At most this many photos per character; each is one more reference latent.
 PHOTOS_PER_CHARACTER = 3
 
-#: A bare picture name inside ComfyUI's input folder -- no separator, no "..".
-SAFE_PHOTO_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,95}\.(png|jpg|jpeg|webp)$",
-                             re.IGNORECASE)
+#: A picture as ComfyUI's own picker names it: a path relative to the input
+#: folder (a paste lands in "pasted/"), optionally annotated " [input]",
+#: " [output]" or " [temp]" the way core's folder_paths reads it. Never an
+#: absolute path, a backslash or a ".." segment; resolve_photo confines it.
+SAFE_PHOTO_NAME = re.compile(
+    r"^(?![/.])[A-Za-z0-9_ ./()-]{1,190}\.(png|jpg|jpeg|webp)( \[(input|output|temp)\])?$",
+    re.IGNORECASE)
+_ANNOTATION = re.compile(r"^(?P<path>.+?) \[(?P<root>input|output|temp)\]$")
 
 
 def name_key(name: str) -> str:
@@ -126,16 +131,79 @@ def input_dir() -> str:
         return os.path.join(comfy, "input")
 
 
+def _root_dir(kind: str) -> str:
+    """ComfyUI's input, output or temp folder."""
+    try:
+        import folder_paths  # type: ignore
+        return {"output": folder_paths.get_output_directory,
+                "temp": folder_paths.get_temp_directory}.get(
+                    kind, folder_paths.get_input_directory)()
+    except Exception:  # noqa: BLE001 -- headless or test: siblings of input
+        base = input_dir()
+        return base if kind == "input" else os.path.join(os.path.dirname(base), kind)
+
+
 def resolve_photo(filename: str, base: "str | None" = None) -> str:
-    """The absolute path of a photo inside the input folder, or "" when the
-    name is unsafe, escapes the folder, or names no file."""
-    if not SAFE_PHOTO_NAME.match(str(filename or "")) or ".." in str(filename):
+    """The absolute path of a photo, or "" when the name is unsafe, escapes
+    its folder, or names no file. Accepts what ComfyUI's picker writes --
+    "a.png", "pasted/a.png", "a.png [output]" -- and confines the result to
+    that root (``base`` stands in for the input folder in tests)."""
+    name = str(filename or "")
+    if not SAFE_PHOTO_NAME.match(name) or ".." in name.replace("\\", "/").split("/"):
         return ""
-    root = os.path.realpath(base or input_dir())
-    path = os.path.realpath(os.path.join(root, filename))
-    if os.path.dirname(path) != root or not os.path.isfile(path):
-        return ""
-    return path
+    kind = "input"
+    found = _ANNOTATION.match(name)
+    if found:
+        name, kind = found.group("path"), found.group("root")
+    root = os.path.realpath(base if (base and kind == "input") else _root_dir(kind))
+    path = os.path.realpath(os.path.join(root, name))
+    try:
+        inside = os.path.commonpath([root, path]) == root and path != root
+    except ValueError:      # another drive
+        inside = False
+    return path if inside and os.path.isfile(path) else ""
+
+
+def add_photo(photos: Mapping, name: str, ref: str) -> dict:
+    """``photos`` with ``ref`` added to ``name``'s pictures: the same folded
+    name gathers its photos (an amalgamation), a repeat is dropped, and more
+    than PHOTOS_PER_CHARACTER raises -- a chain past the limit is a mistake
+    to say out loud, not to trim quietly."""
+    out = {k: list(v) for k, v in (photos or {}).items()}
+    key = name_key(name)
+    held = next((k for k in out if name_key(k) == key), " ".join(str(name).split()))
+    files = out.setdefault(held, [])
+    if ref not in files:
+        files.append(ref)
+    if len(files) > PHOTOS_PER_CHARACTER:
+        raise ValueError(f"{held}: more than {PHOTOS_PER_CHARACTER} photos; a character "
+                         f"takes at most {PHOTOS_PER_CHARACTER}")
+    return out
+
+
+def merge_photos(chained: Mapping, typed: Mapping) -> dict:
+    """The canvas chain's photos, then the typed widget's: a name the widget
+    also gives takes the widget's photos (the app and the command line write
+    the widget, so they stay authoritative)."""
+    out = {k: photo_list(v) for k, v in (chained or {}).items()}
+    for name, files in (typed or {}).items():
+        for k in [k for k in out if name_key(k) == name_key(name)]:
+            del out[k]
+        out[name] = photo_list(files)
+    return out
+
+
+def photos_fingerprint(photos: Mapping) -> str:
+    """A stable digest of every photo's bytes (a missing file by its name):
+    the IS_CHANGED value that makes ComfyUI re-run when a picture changes
+    under the same name."""
+    digest = hashlib.sha256()
+    for name in sorted(photos or {}):
+        for ref in photo_list((photos or {})[name]):
+            path = resolve_photo(ref)
+            digest.update(f"{name_key(name)}={ref}:".encode("utf-8"))
+            digest.update((photo_hash(path) if path else "missing").encode("ascii"))
+    return digest.hexdigest()
 
 
 def photo_hash(path: str) -> str:
@@ -148,5 +216,5 @@ def photo_hash(path: str) -> str:
 
 
 __all__ = ["SAFE_PHOTO_NAME", "PHOTOS_PER_CHARACTER", "name_key", "parse_photo_lines",
-           "photo_list", "match_cast",
+           "photo_list", "match_cast", "add_photo", "merge_photos", "photos_fingerprint",
            "input_dir", "resolve_photo", "photo_hash"]

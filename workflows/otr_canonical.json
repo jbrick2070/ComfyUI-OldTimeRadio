@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 97,
-  "last_link_id": 293,
+  "last_node_id": 98,
+  "last_link_id": 294,
   "nodes": [
     {
       "id": 63,
@@ -2270,6 +2270,13 @@
             "name": "character_photos"
           },
           "link": null
+        },
+        {
+          "localized_name": "character_photos_in",
+          "name": "character_photos_in",
+          "shape": 7,
+          "type": "OTR_CHARACTER_PHOTOS",
+          "link": 294
         }
       ],
       "outputs": [
@@ -2734,6 +2741,71 @@
       "widgets_values": [],
       "color": "#323",
       "bgcolor": "#535"
+    },
+    {
+      "id": 98,
+      "type": "OTR_CharacterPhoto",
+      "pos": [
+        800,
+        2136
+      ],
+      "size": [
+        400,
+        330
+      ],
+      "flags": {},
+      "order": 25,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "photos_in",
+          "name": "photos_in",
+          "shape": 7,
+          "type": "OTR_CHARACTER_PHOTOS",
+          "link": null
+        },
+        {
+          "localized_name": "name",
+          "name": "name",
+          "type": "STRING",
+          "widget": {
+            "name": "name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "character_photos",
+          "name": "character_photos",
+          "type": "OTR_CHARACTER_PHOTOS",
+          "slot_index": 0,
+          "links": [
+            294
+          ]
+        }
+      ],
+      "title": "Character Photo (optional)",
+      "properties": {
+        "Node name for S&R": "OTR_CharacterPhoto",
+        "cnr_id": "comfyui-old-time-radio",
+        "ver": "2.3.35"
+      },
+      "widgets_values": [
+        "",
+        ""
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
     }
   ],
   "links": [
@@ -3208,6 +3280,14 @@
       63,
       6,
       "STRING"
+    ],
+    [
+      294,
+      98,
+      0,
+      88,
+      8,
+      "OTR_CHARACTER_PHOTOS"
     ]
   ],
   "groups": [

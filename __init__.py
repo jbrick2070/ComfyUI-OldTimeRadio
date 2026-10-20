@@ -207,6 +207,7 @@ _NODE_MODULES = {
     # nothing downstream changes. Cold-import clean; the live render is GPU.
     # =========================================================================
     "OTR_ImageDirector":           (".nodes.otr_image_director",          "OTRImageDirector",           " ImageDirector (image policy)"),
+    "OTR_CharacterPhoto":          (".nodes.otr_character_photo",         "OTRCharacterPhoto",          " Character Photo"),
     "OTR_MetaBriefImagePromptGen": (".nodes.otr_meta_brief_image_prompt", "OTRMetaBriefImagePromptGen", " Meta-Brief Image Prompt Gen"),
     "OTR_ImageGenDispatcher":      (".nodes.otr_image_gen_dispatcher",    "OTRImageGenDispatcher",      " Image Gen Dispatcher (cache + ledger + image_done)"),
 
