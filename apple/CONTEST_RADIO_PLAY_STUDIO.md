@@ -216,9 +216,17 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       obs_publish OK. Sheet tmp/rps_live/ab/photo_reference_proof.jpg (sent to the operator). Photo ->
       portrait kept the face; Jeffrey held in 7/7 of his stills, MagnoliaRex in 7/7 of hers; the
       OTHER person in a two-shot drifted (-> co-references) and the Cat was humanoid (-> non-human fix).
-      NOW: LIVE PROOF 2 rendering (tmp/rps_live/photo_proof2_1act.log, same inputs, with both fixes).
-      THEN: if it holds, re-render the 3-act MagnoliaRex demo with the example cast on flux3_klein +
-      references (that IS the demo of the feature).
+      LIVE PROOF 2 (00:44-00:56, same inputs + co-references; server still on d1414a7d): published.
+      Sheet tmp/rps_live/ab/photo_reference_proof2.jpg (sent). Jeffrey's 7 stills: he, MagnoliaRex
+      AND a real gray cat all hold. MagnoliaRex's stills: she holds, the man beside her drifted in
+      4 of 6 -- her prompts DESCRIBED him instead of naming him -> main 2b30170e adds the beat's
+      script partners (who speaks just before/after in the same shot) to the co-references.
+      NOTE: the cat was a real cat in proof 2 because that server still ran the (since reverted)
+      word-list rule; until the KIND field lands the Cat portrait is a cat-woman again.
+      NOW: THE 3-ACT DEMO is rendering (started 00:59, tmp/rps_live/mystory_magnolia_ref.log):
+      16 GB foley, flux3_klein + OTR_FLUX3_REFERENCE=1, C7 seeds, the example cast cards as the
+      app composes them, NO photo (written descriptions only). When it lands: verify, cut the
+      highlight, check the stills for real names, and update the demo script (shot 5).
       OPERATOR DECISION (morning): how references switch on for everyone. Today it is the opt-in
       server env OTR_FLUX3_REFERENCE=1 (default off = both boxes byte-identical). Options: (a) flip
       Klein's default ON -- reaches the 8 GB lane, needs a 4060 VRAM measurement first (no 4060
