@@ -99,25 +99,49 @@ any-machine graph. The default is `otr_16gb_foley.json`.
 
 ## Tell your own story
 
-Press **Tell my own story** at the top of the page. Four boxes come first, each showing an
-example, and every one of them is optional:
+Press **Tell my own story** at the top of the page. Everything here is optional.
+
+**Who is in it** is a card per character (**Add a character**):
+
+| On the card | What to write |
+|---|---|
+| Name | What the story calls them. |
+| Voice | he or she (the pack voices every character as a man or a woman), or leave it to the writer. |
+| Who they are | Their part in the story and what they are like. |
+| How they look | In fixed terms: age, build, face, hair, the clothes they always wear. Fixed terms are what keep a face the same from shot to shot. |
+| Photo (optional) | A picture of them. Their portrait is painted **from** it, in the episode's own style, and every still of them follows that portrait. The photo itself never appears in the episode. |
+
+**Load the example** fills the cards and the boxes below with a ready story: the author's own
+Jeffrey and MagnoliaRex, from his novel *Mime Lung Music Festival*.
+
+Then the three boxes:
 
 | Box | What to write | Example |
 |---|---|---|
-| Who is in it | Names, how they know each other, what they are like. Put `(she)` or `(he)` right after a name and that character is voiced and drawn that way. | `Ada (she), the lighthouse keeper. Tom (he), her brother, who does not believe her.` |
 | What happens | Events, the trouble, a twist, the ending you want. Rough notes are fine. | `A ship's bell rings from the fog every night, but no ship has come in thirty years. Ada rows out to find it.` |
 | Where and when | Place, era, weather, mood: the story's world, not its look. | `A rock lighthouse off Maine, winter 1921.` |
 | Written by | Your name or a pen name. The announcer says it and the credits print it. | `Your Name` |
 
 What you write outranks anything the writer would rather invent; what you leave out is invented
-to fit. Leave all four empty and the pack writes its own standing premise. Then set the language,
-acts, cast size, visual style and still model as usual and press **Make the episode**.
+to fit. Leave everything empty and the pack writes its own standing premise. Then set the
+language, acts, cast size, visual style and still model as usual and press **Make the episode**.
 
-From the command line, the same boxes are flags:
+### Same faces in every shot
+
+Every character gets a portrait, and each still is drawn **from** the portraits of everyone in
+the frame -- the speaker and the others the shot names -- so a face does not change from beat to
+beat. This needs a still model that takes reference images: pick **flux3_klein** under Still
+pictures and start ComfyUI with `OTR_FLUX3_REFERENCE=1` (off by default while it is measured on
+every card). With another still model, the cast cards still work and a photo is reported as
+unused; the faces then rest on the written description alone.
+
+From the command line, the same boxes are flags. A card is one line of `--my-characters`, and a
+photo is a `Name = file` line naming a picture in ComfyUI's input folder:
 
 ```
-python -m radio_play_studio run --bank my_story --acts 1 ^
-  --my-characters "Ada (she), the lighthouse keeper. Tom (he), her brother." ^
+python -m radio_play_studio run --bank my_story --acts 1 --stills flux3_klein ^
+  --my-characters "Ada (she): the lighthouse keeper. Looks: 40, weathered, a grey wool coat." ^
+  --my-photos "Ada = ada.png" ^
   --my-plot "A ship's bell rings from the fog every night. Ada rows out to find it." ^
   --my-setting "A rock lighthouse off Maine, winter 1921." --my-author "Your Name"
 ```
@@ -129,7 +153,7 @@ before anything is sent, because the pack would stop that run.
 ## What a person can choose
 
 Story bank, the classic to adapt, language, acts, cast size, visual style, the still model
-(**Still pictures**: local engines only, MOSS-Image by default) and the four My Story boxes.
+(**Still pictures**: local engines only, MOSS-Image by default), the cast cards and the My Story boxes.
 Every dropdown is read live from your ComfyUI, so it offers exactly what your installed pack has.
 Everything else (voices, music, the video lane) keeps the workflow's own setting.
 
