@@ -130,10 +130,14 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       fictional tale of Jeffrey and MagnoliaRex ... it's my published book, I own the rights".
 - [ ] Compare by eye on the same shot and seed: foley (default) vs `otr_16gb_video.json` vs a
       procedural lane. LTX stays core if it holds up (LTX bonus).
-      10-20 05:30: RENDERING the video-lane side -- act 1 of the same example story (cast cards,
-      flux3_klein + references, C7 seeds), tmp/rps_live/compare_video_1act.log. The foley side is the
-      3-act demo above (its act 1 = the first ~1:50). The writer may not repeat the script word for
-      word, so compare the LOOK and the motion, not the lines. Operator's eye decides.
+      10-20 05:30-07:23: the video-lane side RENDERED and verified -- act 1 of the same example story
+      (cast cards, flux3_klein + references, C7 seeds) on otr_16gb_video: 2:38, render 1h49m,
+      obs_publish OK, both copies byte-identical, timing saved (otr_16gb_video.acts-1.f16920c1.json).
+      otr/obs/last_circuit_20261020_053349__shst__l25v__...; frame sheet
+      tmp/rps_live/ab/compare_video_lane_frames.jpg (sent). It rolled stage-realism (the foley demo
+      rolled comic art), so compare the motion and sound, not the look. By eye: MagnoliaRex holds, a
+      real gray cat at 0:30, but the duet frame (~1:30) shows two strangers. OPERATOR'S EYE DECIDES
+      foley vs video; the procedural third arm is not rendered (say if wanted).
 - [x] Stills: superseded -- MOSS-Image is the 16 GB default (operator, 10-19), and FLUX 3 Klein is
       the reference-stills engine; both looked right by eye on their episodes (Midsummer, MagnoliaRex).
 - [x] **MOSS-Image A/B vs Klein -- DECIDED: "MOSS everywhere" (operator, 2026-10-19, by eye).**
@@ -200,7 +204,15 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         reference=none, before this.
       * main c41dbe25 -- CO-REFERENCES: each still also takes the portraits of the other cast members
         its prompt names (up to 3); Klein chains one ReferenceLatent per portrait.
-      * NON-HUMAN characters (OPEN, TWO STRIKES): _ensure_gender_anchor puts "adult woman, " in front
+      * NON-HUMAN characters -- BUILT 10-20 (operator: "do it here"; "person? how about human?"):
+        main 2da9297e + f77dca36. kind = human | animal | machine | creature on the cast row
+        ("person" reads as human), written by My Story's treatment, kept by the ledger only for a
+        non-human, read by every picture prompt; every row without it is byte-identical (Sonnet
+        HOLDS; Codex r2 BROKEN on the first plan, all six points folded in). My Story's act-writer
+        JSON now shows "kind": "human" per cast member (My Story only). The generic casting and
+        scifi_news_pro writers do not write kind yet -- an animal there is still drawn as a person.
+        LIVE PROOF rendering (tmp/rps_live/kind_proof_1act.log, 1-act stills, the example cast).
+        History of the bug: _ensure_gender_anchor puts "adult woman, " in front
         of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug). Two word-list fixes
         (d1414a7d, 9b0ed9ea) both failed Sonnet as BLOCKERs -- people like "Sailor with a parrot" lost
         their anchor -- and were REVERTED in main 83375f0f (prompts byte-identical to before; titles-
