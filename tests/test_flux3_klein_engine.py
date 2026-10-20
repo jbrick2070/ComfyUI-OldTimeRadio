@@ -36,8 +36,32 @@ def test_registered_opt_in_and_flagged_non_commercial_clean():
     assert tuple(eng.default_roles) == ()          # never automatic
     assert eng.commercial_clean is False           # FLUX Kommunity: Qualifying Users
     assert eng.requires_flag is None
-    # Edit / multi-reference mode is unmeasured for face identity: OFF.
+    # The portrait-reference path is opt-in until a measured A/B flips it.
     assert getattr(eng, "accepts_reference_image", False) is False
+
+
+def test_reference_switch_advertises_and_wires_the_portrait(monkeypatch, no_flux3_env):
+    eng = ireg.get_engine("flux3_klein")
+    request = {"prompt": "a fox", "seed": 7, "reference_image": "C:/p/c02.png"}
+    monkeypatch.delenv("OTR_FLUX3_REFERENCE", raising=False)
+    # Off: the reference is dropped at the adapter, so the base graph runs.
+    assert eng._params(request)["reference_image"] == ""
+    monkeypatch.setenv("OTR_FLUX3_REFERENCE", "1")
+    assert eng.accepts_reference_image is True
+    p = eng._params(request)
+    assert p["reference_image"] == "C:/p/c02.png"
+    g = eng._build_graph(p, lambda node, slot: ("wire", node, slot))
+    assert set(g) - set(eng._node_candidates()) == set(eng._REF_CANDIDATES)
+    assert g["load_ref"]["inputs"]["image"] == "C:/p/c02.png"
+    assert g["scale_ref"]["inputs"]["height"] == 768
+    assert g["ksampler"]["inputs"]["positive"] == ("wire", "ref_pos", 0)
+    assert g["ksampler"]["inputs"]["negative"] == ("wire", "ref_neg", 0)
+    assert g["ref_pos"]["inputs"]["conditioning"] == ("wire", "pos", 0)
+    assert g["ref_pos"]["inputs"]["latent"] == ("wire", "encode_ref", 0)
+    # A request with no reference renders the plain t2i graph even when on.
+    plain = eng._build_graph(eng._params({"prompt": "a fox"}),
+                             lambda node, slot: ("wire", node, slot))
+    assert set(plain) == set(eng._node_candidates())
 
 
 def test_a_fresh_install_fetches_the_int8_set(no_flux3_env):

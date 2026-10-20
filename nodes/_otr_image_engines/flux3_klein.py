@@ -23,12 +23,16 @@ ln(alpha), alpha 16 (the model's reference is 6.93). The prompt upsampler BFL
 ships (a 9.7 GB Qwen3.5-9B) is NOT used: the pack composes its own full scene
 caption, and that choice is unmeasured -- override nothing, A/B it.
 
-REFERENCE IMAGES ARE OFF (``accepts_reference_image = False``). The model takes
-up to 10 references (``ReferenceMultiLatent``) and BFL says they "anchor content,
-they do not lock structure". Whether that holds a character's face between beats
-is an OPEN, UNMEASURED question, and ``z_image_turbo`` shows what a generic
-reference path can do untested (a grid artefact, 2026-08-20). Flip it only on a
-measured F2-fixture run.
+REFERENCE IMAGES ARE OPT-IN (``OTR_FLUX3_REFERENCE=1``; default off). With it
+on, the adapter advertises ``accepts_reference_image`` and the dispatcher hands
+every character still the character's canonical portrait, which conditions the
+mint through core's ``ReferenceLatent`` (LoadImage -> ImageScale -> VAEEncode ->
+ReferenceLatent on both conditionings; the negative is inert at cfg 1.0 but is
+referenced too so a raised cfg stays coherent). BFL says references "anchor
+content, they do not lock structure"; whether that holds a face between beats is
+being measured on the stills workflow, and ``z_image_turbo`` shows what an
+unmeasured generic reference path can do (a grid artefact, 2026-08-20). The
+default flips only on that measurement.
 
 Cold-import clean: only the dep-free registry, role vocabulary and stdlib at
 module scope. torch / comfy are lazy inside ``render_image`` (via wrapper_bridge).
@@ -80,6 +84,11 @@ def _snap(value: int) -> int:
     """Nearest multiple of 16, floored at 256 (the Flux 2 latent is 16x down)."""
     v = max(_CANVAS_FLOOR, int(value))
     return max(_CANVAS_FLOOR, int(round(v / _CANVAS_MULTIPLE)) * _CANVAS_MULTIPLE)
+
+
+def _reference_enabled() -> bool:
+    """True when the operator switched the portrait-reference path on."""
+    return str(otr_env.get("OTR_FLUX3_REFERENCE", "0")).strip() == "1"
 
 
 def _installed_unets():
@@ -168,7 +177,23 @@ class Flux3KleinEngine:
     requires_flag = None
     required_inputs = ("text_prompt",)
     engine_version = "1"
-    accepts_reference_image = False  # edit / multi-reference mode: unmeasured, OFF
+
+    @property
+    def accepts_reference_image(self) -> bool:
+        """Read per call so the switch needs no re-registration."""
+        return _reference_enabled()
+
+    #: Resolved SEPARATELY and merged only when a reference is present, so the
+    #: base graph and its cached class map stay exactly the nine-node t2i graph.
+    #: ImageScale, never FluxKontextImageScale: resolve_graph_classes binds the
+    #: first installed name, and FluxKontextImageScale.execute takes ``image`` only.
+    _REF_CANDIDATES = {
+        "load_ref": ("LoadImage",),
+        "scale_ref": ("ImageScale",),
+        "encode_ref": ("VAEEncode",),
+        "ref_pos": ("ReferenceLatent",),
+        "ref_neg": ("ReferenceLatent",),
+    }
 
     _TERMINAL = "decode"
 
@@ -210,6 +235,14 @@ class Flux3KleinEngine:
             "scheduler": otr_env.get("OTR_FLUX3_SCHEDULER", "simple"),
             "width": width,
             "height": height,
+            # Admission is enforced HERE too, not only by the dispatcher's
+            # capability read: with the switch off, a request that carries a
+            # reference still renders the plain t2i graph.
+            "reference_image": (str(get("reference_image") or "")
+                                if _reference_enabled() else ""),
+            # Capped under the portrait's native height so the reference adds
+            # about 1.5k latent tokens, not 4k.
+            "reference_height": _eint("OTR_FLUX3_REFERENCE_HEIGHT", 768),
         }
 
     def _node_candidates(self, params=None):  # noqa: ARG002
@@ -226,7 +259,37 @@ class Flux3KleinEngine:
         }
 
     def _build_graph(self, params, wire):
-        """Pure: BFL's distilled t2i graph in ``wrapper_bridge.run_graph`` form."""
+        """Pure: BFL's distilled t2i graph in ``wrapper_bridge.run_graph`` form,
+        plus the reference chain when ``params["reference_image"]`` names a
+        staged input file."""
+        W = wire
+        graph = self._build_base_graph(params, W)
+        ref = str(params.get("reference_image") or "")
+        if not ref:
+            return graph
+        # ImageScale takes all five arguments and run_graph calls it straight
+        # off this dict. width=0 derives the width from the image, keeping the
+        # portrait's aspect so no face is cropped.
+        graph["load_ref"] = {"class": "load_ref", "inputs": {"image": ref}}
+        graph["scale_ref"] = {
+            "class": "scale_ref",
+            "inputs": {"image": W("load_ref", 0), "upscale_method": "lanczos",
+                       "width": 0, "height": int(params["reference_height"]),
+                       "crop": "disabled"}}
+        graph["encode_ref"] = {
+            "class": "encode_ref",
+            "inputs": {"pixels": W("scale_ref", 0), "vae": W("vae", 0)}}
+        graph["ref_pos"] = {
+            "class": "ref_pos",
+            "inputs": {"conditioning": W("pos", 0), "latent": W("encode_ref", 0)}}
+        graph["ref_neg"] = {
+            "class": "ref_neg",
+            "inputs": {"conditioning": W("neg", 0), "latent": W("encode_ref", 0)}}
+        graph["ksampler"]["inputs"]["positive"] = W("ref_pos", 0)
+        graph["ksampler"]["inputs"]["negative"] = W("ref_neg", 0)
+        return graph
+
+    def _build_base_graph(self, params, wire):
         W = wire
         return {
             "unet": {"class": "unet",
@@ -312,6 +375,16 @@ class Flux3KleinEngine:
         classes = getattr(self, "_classes", None) \
             or _wb.resolve_graph_classes(self._node_candidates(params))
         self._classes = classes
+        ref_src = params["reference_image"]
+        if ref_src:
+            # Staged under a content-addressed name so two characters never
+            # overwrite each other's file in ComfyUI's input dir.
+            import hashlib
+            with open(ref_src, "rb") as fh:
+                digest = hashlib.sha256(fh.read()).hexdigest()[:16]
+            params = dict(params, reference_image=_wb.stage_into_comfy_input(
+                ref_src, "otr_ref_%s%s" % (digest, os.path.splitext(ref_src)[1] or ".png")))
+            classes = dict(classes, **_wb.resolve_graph_classes(self._REF_CANDIDATES))
         graph = self._build_graph(params, _wb.Wire)
         try:
             # Drop the Qwen3-VL encoder the moment its consumers have run so the
@@ -323,8 +396,9 @@ class Flux3KleinEngine:
         finally:
             _wb.reclaim_idle_models(reason="flux3_klein post-decode")
         log.info("[OTR.image.flux3_klein] minted still %dx%d seed=%d steps=%d "
-                 "cfg=%.2f shift=%.4f", params["width"], params["height"],
-                 params["seed"], params["steps"], params["cfg"], params["shift"])
+                 "cfg=%.2f shift=%.4f reference=%s", params["width"],
+                 params["height"], params["seed"], params["steps"], params["cfg"],
+                 params["shift"], params["reference_image"] or "none")
         return frames[0]
 
     def teardown(self, prepared) -> None:  # pragma: no cover
