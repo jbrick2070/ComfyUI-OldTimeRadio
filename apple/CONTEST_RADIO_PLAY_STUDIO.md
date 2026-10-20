@@ -217,9 +217,21 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         (its portrait is a cat's face in a period robe -- the stage-realism style's costume look);
         Jeffrey and MagnoliaRex hold everywhere, and the man beside MagnoliaRex is now Jeffrey in
         all six of her stills (the script-partner co-references, 2b30170e, proven live).
-        NOW: the 3-act MagnoliaRex demo RE-RENDERING with the kind fix (started ~08:13 on main
-        f77dca36, same inputs as the 05:18 demo; tmp/rps_live/mystory_magnolia_kind.log; ~4.5 h).
-        The 05:18 demo and its Athens highlight stay as they are until the new one is verified.
+      * main 807e8e07 + 089e48e6 -- SEVERAL PHOTOS PER CHARACTER (operator: "feel free to make an
+        amalgamation"): Name = a.png, b.png (up to 3); the first is the portrait's reference, the
+        others ride along as further references; each hash joins the cache anchor (Sonnet HOLDS).
+      HIS PHOTOS (operator 10-20 08:2x: "please use my images as a ref image"; he is the author and
+        the character is him, and he chose this knowing the "no real-person likenesses" rule):
+        six photos in C:\Users\jeffr\Pictures\otr_jeffrey_ref\ (kept OUT of the public repo).
+        Codex (gpt-5.6-sol, its image_generation tool -- a CLOSED model; the reference is an input
+        picture, the pipeline stays open weights; say so if entering Open Weights Only) blended
+        them into jeffrey_reference.png (front-facing, mime paint, plain black shirt, grey
+        background, no logos). Jeffrey's references = that + two clean crops (Barcelona mime,
+        barbershop close-up); his "How they look" describes the photos.
+      NOW: the 3-act demo RENDERING with his photos (started 08:32 on main 089e48e6;
+        tmp/rps_live/mystory_magnolia_photos.log; launcher scratchpad demo_photos.py; ~4.2 h). The
+        07:57 kind-only re-render was canceled at 12% for this. The 05:18 demo and its Athens
+        highlight stay until the new one is verified.
         History of the bug: _ensure_gender_anchor puts "adult woman, " in front
         of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug). Two word-list fixes
         (d1414a7d, 9b0ed9ea) both failed Sonnet as BLOCKERs -- people like "Sailor with a parrot" lost
