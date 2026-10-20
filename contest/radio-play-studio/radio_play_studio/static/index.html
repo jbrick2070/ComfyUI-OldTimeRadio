@@ -74,6 +74,7 @@
 const $ = (id) => document.getElementById(id);
 const form = $("form"), go = $("go");
 let fields = [];
+let running = false;   // an episode is being made: Make stays off
 
 function control(f) {
   let el;
@@ -142,7 +143,7 @@ function build(list) {
     $("f_bank").addEventListener("change", () => setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic"));
     setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic");
   }
-  go.disabled = false;
+  go.disabled = running;
 }
 
 function modeSwitch() {
@@ -223,7 +224,7 @@ function watch(id) {
     $("error").textContent = "Lost the connection to the app. Reload to pick the episode back up; if the app was restarted it is no longer tracked here, but it may still be rendering on your ComfyUI, and its episode lands in otr/obs.";
     $("error").hidden = false;
     $("status").textContent = "Disconnected.";
-    go.disabled = false;
+    running = false; go.disabled = false;
   };
   es.onmessage = (m) => {
     const ev = JSON.parse(m.data);
@@ -255,14 +256,14 @@ function watch(id) {
       $("result").textContent = "";
       $("result").append(v, a);
       $("result").hidden = false;
-      go.disabled = false;
+      running = false; go.disabled = false;
     } else if (ev.type === "error") {
       finished = true;
       es.close();
       $("error").textContent = ev.message;
       $("error").hidden = false;
       $("status").textContent = "The run stopped.";
-      go.disabled = false;
+      running = false; go.disabled = false;
     }
   };
 }
@@ -280,6 +281,7 @@ form.addEventListener("submit", async (e) => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
     history.replaceState(null, "", "#run=" + body.id);   // a reload picks it back up
+    running = true;
     watch(body.id);
   } catch (err) {
     $("error").textContent = err.message; $("error").hidden = false;
@@ -309,7 +311,8 @@ async function resume() {
   history.replaceState(null, "", "#run=" + run.id);
   $("run").hidden = false; $("error").hidden = true; $("result").hidden = true;
   $("status").textContent = run.finished ? "" : "Picking the episode back up...";
-  go.disabled = !run.finished;
+  running = !run.finished;
+  go.disabled = running || !fields.length;
   watch(run.id);
 }
 
@@ -328,7 +331,8 @@ presence(false);
 setInterval(() => presence(false), 20000);
 addEventListener("pagehide", () => presence(true));
 
-loadOptions().then(resume);
+resume();
+loadOptions();
 </script>
 </body>
 </html>

@@ -28,7 +28,9 @@ HEARTBEAT_S = 15.0
 #: A page says it is open this often; with none heard for GPU_IDLE_S, and no
 #: episode being made, the app asks ComfyUI to drop the models it loaded.
 PRESENCE_S = 20.0
-GPU_IDLE_S = 60.0
+#: Browsers slow a hidden tab's timers to about once a minute, so the idle
+#: window is well above that: a background tab still counts as open.
+GPU_IDLE_S = 150.0
 _RANGE = re.compile(r"^bytes=(\d*)-(\d*)$")
 
 
