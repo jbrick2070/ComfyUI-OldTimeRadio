@@ -65,9 +65,17 @@ branch, then do the first unchecked step. Update this file in the same commit as
       ComfyUI's one-socket-per-client-id (server.py `sockets[sid] = ws`) and starved the app's
       stream. Guard: a stream that never saw half the graph finish saves nothing. The history was
       rebuilt from that recorder's complete log: writer 64 s, stills ~2 min, video 4,209 s of 4,400.
-- [ ] **Prove the clock bar:** one more `--acts 1` foley run (CLI or serve). **Never attach a
-      second listener to the job's SSE** -- read the app's own output or its
-      `/api/episodes/<id>/events`. Log % and min left against the wall clock; target +/-10 points.
+- [x] **Clock bar, measured:** proof run (CLI, shakespeare, 1 act, foley) 63 min 41 s,
+      obs_publish OK, `carved_bark_20261019_180624_..._final.mp4` (73 MB, 1920x1080, 1m54s),
+      sha 9a7027e8, byte-identical in both places; timings saved for every stage.
+      Bar vs clock (5-minute rows): -3, -4, -5, -5, -7, -8, -9, -10, -11, -12, -13, -14 points;
+      worst 15, "min left" over by up to 11. The SHAPE is right (node count sat near 80% for the
+      whole video stage); the SCALE trails because this story's video took 3,501 s against the
+      4,209 s it was calibrated on (one-act foley ran 64-76 min today, beats follow the story).
+      Fix: saved times are now a running average (half old, half new), and the history is the
+      mean of the two clean runs (video 3,855 s, total 4,050 s). **+/-10 is NOT yet proven**:
+      the next run is the check. **Never attach a second listener to the job's SSE** -- read the
+      app's own output or its `/api/episodes/<id>/events`.
 
 ## Phase 2 -- quality budget (target Oct 25)
 

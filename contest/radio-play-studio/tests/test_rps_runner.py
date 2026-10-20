@@ -395,7 +395,8 @@ def test_saved_times_keep_nodes_this_run_served_from_cache(tmp_path):
     path = tmp_path / "timing" / "w.acts-1.json"
     save_timing(path, {"1": 600.0, "92": 3000.0})
     save_timing(path, {"92": 2800.0})          # node 1 came from ComfyUI's cache
-    assert load_timing(path) == {"1": 600.0, "92": 2800.0}
+    # Node 1 keeps its time; node 92 moves halfway to this run's (a running average).
+    assert load_timing(path) == {"1": 600.0, "92": 2900.0}
     assert list(path.parent.iterdir()) == [path]   # no side file left behind
 
 

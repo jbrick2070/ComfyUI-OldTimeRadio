@@ -318,14 +318,26 @@ def load_timing(path: Path) -> dict:
     return nodes if isinstance(nodes, dict) else {}
 
 
+#: How much one run moves the saved time of a node it timed. One-act foley runs
+#: on the 5080 took 64 to 76 minutes on 2026-10-19 (the beat count follows the
+#: story), so the last run alone is a noisy guess: the proof run came in 13%
+#: under the one before and the bar trailed the clock by up to 15 points.
+#: Averaging halves the pull of any one long or short story.
+TIMING_WEIGHT = 0.5
+
+
 def save_timing(path: Path, nodes: dict) -> None:
-    """Fold this run's node times into the saved ones. A node this run did not
-    time (ComfyUI served it from cache) keeps its last measured time, so a
-    mostly cached run cannot shrink the history the next full run is read
-    against. Written to a side file and swapped in, so a reader never sees half."""
+    """Fold this run's node times into the saved ones, as a running average. A
+    node this run did not time (ComfyUI served it from cache) keeps its saved
+    time, so a mostly cached run cannot shrink the history the next full run is
+    read against. Written to a side file and swapped in, so a reader never sees
+    half."""
     path.parent.mkdir(parents=True, exist_ok=True)
     merged = {k: v for k, v in load_timing(path).items() if isinstance(v, (int, float))}
-    merged.update({k: round(v, 1) for k, v in nodes.items()})
+    for node, seconds in nodes.items():
+        old = merged.get(node)
+        blended = seconds if old is None else (1 - TIMING_WEIGHT) * old + TIMING_WEIGHT * seconds
+        merged[node] = round(blended, 1)
     body = {"nodes": merged, "total_s": round(sum(merged.values()), 1)}
     side = path.with_name(f"{path.name}.{uuid.uuid4().hex[:8]}.tmp")
     side.write_text(json.dumps(body, indent=1) + "\n", encoding="utf-8", newline="\n")
