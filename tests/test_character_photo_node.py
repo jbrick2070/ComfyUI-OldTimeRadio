@@ -116,8 +116,43 @@ def test_the_socket_is_the_last_input_and_the_node_is_registered():
 def test_the_canonical_ships_one_blank_node_wired_to_image_director():
     wf = json.loads((REPO / "workflows" / "otr_canonical.json").read_text(encoding="utf-8"))
     photo = [n for n in wf["nodes"] if n["type"] == "OTR_CharacterPhoto"]
-    assert len(photo) == 1 and photo[0]["widgets_values"] == ["", ""]
+    # The upload button saves "image" in its own slot, as core's LoadImage does.
+    assert len(photo) == 1 and photo[0]["widgets_values"] == ["", "", "image"]
     director = next(n for n in wf["nodes"] if n["type"] == "OTR_ImageDirector")
     link_id = next(i["link"] for i in director["inputs"] if i["name"] == "character_photos_in")
     link = next(lk for lk in wf["links"] if lk[0] == link_id)
     assert (link[1], link[3]) == (photo[0]["id"], director["id"])
+
+
+# --------------------------------------------------------------------------- #
+# The upload button saves a slot, and every converter reads past it
+# (live canvas check, 2026-10-20: the frontend serializes the node as
+# ["", "<file>", "image"] -- the same shape as core's LoadImage)
+# --------------------------------------------------------------------------- #
+def _schemas():
+    return {"OTR_CharacterPhoto": {"input": OTR_INPUTS()}}
+
+
+def OTR_INPUTS():
+    spec = N.OTRCharacterPhoto.INPUT_TYPES()
+    spec["required"]["image"] = (["jeff.png"], {"image_upload": True})
+    return spec
+
+
+def _node(values):
+    return {"id": 98, "type": "OTR_CharacterPhoto", "inputs": [], "widgets_values": values}
+
+
+@pytest.mark.parametrize("values", [["Jeffrey", "jeff.png", "image"]])
+def test_the_pack_converters_read_past_the_upload_slot(values):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("otr_api", REPO / "scripts" / "otr_api.py")
+    api = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(api)
+    assert api._serialized_slot_names("OTR_CharacterPhoto", _schemas()) == [
+        "name", "image", "image__upload"]
+    from nodes import _otr_workflow_apply as wa
+    assert wa.serialized_slot_names("OTR_CharacterPhoto", _schemas()) == [
+        "name", "image", "image__upload"]
+    from nodes import _otr_workflow_validator as wv
+    assert wv._expected_slot_count(OTR_INPUTS()) == 3

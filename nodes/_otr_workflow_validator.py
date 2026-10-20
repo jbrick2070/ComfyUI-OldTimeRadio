@@ -231,6 +231,10 @@ def _expected_slot_count(input_types: dict) -> int:
         t = _wv_type_of(spec)
         if isinstance(t, str) and t.upper() == "INT" and name in _COMPANION_INT_WIDGETS:
             n += 1  # hidden control_after_generate companion slot
+        opts = spec[1] if isinstance(spec, (list, tuple)) and len(spec) > 1 else None
+        if isinstance(opts, dict) and any(
+                opts.get(k) for k in ("image_upload", "video_upload", "audio_upload")):
+            n += 1  # the upload button's saved slot (as core's LoadImage)
     return n
 
 
