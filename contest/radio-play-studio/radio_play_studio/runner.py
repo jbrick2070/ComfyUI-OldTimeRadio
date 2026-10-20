@@ -274,6 +274,7 @@ class ProgressClock:
         self.finished: set = set()
         self._bars: dict = {}           # node -> (step, steps) last seen
         self._distrusted: set = set()
+        self._best: dict = {}           # node -> the most of its share shown so far
 
     @property
     def calibrated(self) -> bool:
@@ -326,6 +327,10 @@ class ProgressClock:
                 running = min(f, self.RUNNING_CAP) * expected
             else:
                 running = min(self._elapsed(), self.RUNNING_CAP * expected)
+            # A bar that was trusted and then reset falls back to time, which can
+            # be lower: a node's share never goes back down (Cursor QA, e53c6cdf).
+            running = max(running, self._best.get(self.current, 0.0))
+            self._best[self.current] = running
         return max(0.0, min(0.99, (done + running) / self.total))
 
     def seconds_left(self) -> float:

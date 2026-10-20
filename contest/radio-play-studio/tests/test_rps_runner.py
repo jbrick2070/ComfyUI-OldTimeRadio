@@ -507,3 +507,14 @@ def test_the_stream_reads_the_running_nodes_own_bar(settings, schemas):
                     now=FakeClock())          # time stands still: only the bar can move the share
     shares = [e["value"] for e in studio.stream({}) if e["type"] == "progress"]
     assert shares[-1] == pytest.approx(0.5)
+
+
+def test_a_node_whose_bar_resets_never_moves_the_episode_back():
+    t = FakeClock()
+    clock = ProgressClock({"91": 100.0}, now=t)
+    clock.observe("91")
+    clock.bar("91", 80, 100)
+    high = clock.share()
+    t.t = 10
+    clock.bar("91", 1, 100)                  # reset: distrusted, time says 10%
+    assert clock.share() == pytest.approx(high)
