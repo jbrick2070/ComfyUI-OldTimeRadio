@@ -457,3 +457,53 @@ def test_a_stream_starved_late_mid_node_saves_no_times(settings, schemas):
     studio, _ = _studio(settings, schemas, good)
     assert list(studio.stream({}))[-1]["type"] == "done"
     assert not (settings.out_dir / "timing").exists()
+
+
+def test_a_node_that_draws_its_own_forward_bar_moves_the_episode_by_it():
+    # Video (92) draws render frames done of the episode since ec55add4.
+    t = FakeClock()
+    clock = ProgressClock({"1": 100.0, "92": 900.0}, now=t)
+    clock.observe("1")
+    t.t = 100
+    clock.observe("92")
+    clock.bar("92", 0, 1)                   # ComfyUI's start frame: ignored
+    clock.bar("92", 291, 2910)
+    assert clock.fraction() == pytest.approx(0.1)
+    assert clock.share() == pytest.approx((100 + 0.1 * 900) / 1000)
+    t.t = 100 + 120                          # a tenth done after two minutes
+    assert clock.seconds_left() == pytest.approx(120 * 0.9 / 0.1)
+
+
+def test_a_bar_that_resets_is_never_trusted_again():
+    t = FakeClock()
+    clock = ProgressClock({"91": 100.0}, now=t)
+    clock.observe("91")
+    clock.bar("91", 7, 8)
+    clock.bar("91", 1, 8)                    # the next picture's sampler starts over
+    clock.bar("91", 8, 8)
+    assert clock.fraction() is None
+    t.t = 30
+    assert clock.share() == pytest.approx(30 / 100)
+
+
+def test_early_in_a_node_the_saved_time_says_how_long_is_left():
+    t = FakeClock()
+    clock = ProgressClock({"92": 900.0}, now=t)
+    clock.observe("92")
+    clock.bar("92", 10, 1000)                # 1% in: too early to trust its pace
+    t.t = 40
+    assert clock.seconds_left() == pytest.approx(900 - 40)
+
+
+def test_the_stream_reads_the_running_nodes_own_bar(settings, schemas):
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    graph, _ = Studio(settings, fetch=lambda url: schemas).build_graph({})
+    save_timing(timing_path(settings.out_dir, settings.workflow_path, "1", graph), {"9": 1000.0})
+    good = _good_job()
+    good._events = [RealProgress(value=0.0, nodes_done=0, nodes_total=1, current_node="9", step=0, steps=1),
+                    RealProgress(value=0.5, nodes_done=0, nodes_total=0, current_node="9", step=500, steps=1000)]
+    studio = Studio(settings, client_factory=lambda url: FakeClient(good), fetch=lambda url: schemas,
+                    now=FakeClock())          # time stands still: only the bar can move the share
+    shares = [e["value"] for e in studio.stream({}) if e["type"] == "progress"]
+    assert shares[-1] == pytest.approx(0.5)

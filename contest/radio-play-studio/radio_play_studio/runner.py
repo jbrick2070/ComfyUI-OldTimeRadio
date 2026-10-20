@@ -193,6 +193,7 @@ class Studio:
                         # per-node frame without a node id says nothing.
                         if node is not None or note["type"] == "progress":
                             clock.observe(node)
+                        clock.bar(node, getattr(event, "step", None), getattr(event, "steps", None))
                         if clock.calibrated:
                             note = {"type": "progress", "value": clock.share(),
                                     "message": note.get("message", ""),
@@ -242,10 +243,23 @@ class ProgressClock:
     it has nothing to say and the caller keeps the node count.
 
     Nodes too quick to be named between two throttled frames are never timed;
-    they took about no time, so they weigh about nothing."""
+    they took about no time, so they weigh about nothing.
+
+    A NODE'S OWN BAR, WHEN IT CAN BE TRUSTED. Run length follows the story
+    (one-act foley took 57 to 76 minutes on the 5080), so last-run seconds
+    alone left the bar up to 17 points behind the clock. Since ec55add4 the
+    video node -- most of the run -- draws "render frames done of the episode"
+    on its own bar. A node's bar is trusted while it moves forward under one
+    total; ComfyUI's start frame (0 of 1) is ignored, and a bar that ever
+    resets (an image node's per-picture sampler) is distrusted for the run.
+    A trusted node's share comes from its bar, and once it is a tenth of the
+    way through and has run a minute, its minutes left come from its own pace."""
 
     #: A node running longer than last time stops short of its full share.
     RUNNING_CAP = 0.95
+    #: How far into a node, and how long, before its pace says how long it has left.
+    PACE_MIN_FRACTION = 0.10
+    PACE_MIN_SECONDS = 60.0
 
     def __init__(self, history: dict | None = None, now: Callable[[], float] = time.monotonic) -> None:
         self.history = {}
@@ -258,6 +272,8 @@ class ProgressClock:
         self._since = 0.0
         self.spent: dict = {}
         self.finished: set = set()
+        self._bars: dict = {}           # node -> (step, steps) last seen
+        self._distrusted: set = set()
 
     @property
     def calibrated(self) -> bool:
@@ -276,17 +292,54 @@ class ProgressClock:
         if node is not None:
             self.finished.discard(node)
 
+    def bar(self, node_id: Any, step: Any, steps: Any) -> None:
+        """A node's own progress bar, as the server last reported it."""
+        if node_id is None or not isinstance(step, (int, float)) or not isinstance(steps, (int, float)):
+            return
+        if steps <= 1:
+            return                      # ComfyUI's start frame for every node
+        node = str(node_id)
+        seen = self._bars.get(node)
+        if seen is not None and (steps != seen[1] or step < seen[0]):
+            self._distrusted.add(node)
+        self._bars[node] = (step, steps)
+
+    def fraction(self) -> float | None:
+        """How far the running node is by its own bar, or None if it has none
+        worth trusting."""
+        node = self.current
+        if node is None or node in self._distrusted or node not in self._bars:
+            return None
+        step, steps = self._bars[node]
+        return max(0.0, min(1.0, step / steps))
+
+    def _elapsed(self) -> float:
+        return self.spent.get(self.current, 0.0) + self._now() - self._since
+
     def share(self) -> float:
         done = sum(self.history.get(n, 0.0) for n in self.finished)
         running = 0.0
         if self.current is not None:
             expected = self.history.get(self.current, 0.0)
-            elapsed = self.spent.get(self.current, 0.0) + self._now() - self._since
-            running = min(elapsed, self.RUNNING_CAP * expected)
+            f = self.fraction()
+            if f is not None:
+                running = min(f, self.RUNNING_CAP) * expected
+            else:
+                running = min(self._elapsed(), self.RUNNING_CAP * expected)
         return max(0.0, min(0.99, (done + running) / self.total))
 
     def seconds_left(self) -> float:
-        return max(0.0, self.total * (1.0 - self.share()))
+        if self.current is None:
+            return max(0.0, self.total * (1.0 - self.share()))
+        later = sum(v for n, v in self.history.items()
+                    if n not in self.finished and n != self.current)
+        elapsed = self._elapsed()
+        f = self.fraction()
+        if f is not None and f >= self.PACE_MIN_FRACTION and elapsed >= self.PACE_MIN_SECONDS:
+            node_left = elapsed * (1.0 - f) / f
+        else:
+            node_left = max(0.0, self.history.get(self.current, 0.0) - elapsed)
+        return node_left + later
 
     def timings(self) -> dict:
         """Seconds each named node ran, the running one up to now."""
