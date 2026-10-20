@@ -16,8 +16,8 @@ Footage needed (all on the 5080):
 | 2 | 0:08-0:22 | The app: the two cards, "A classic, or surprise me" / "Tell my own story"; pick Shakespeare, Midsummer, 1 act; the Still pictures picker on MOSS-Image | "Pick a classic, or tell your own story. Choose a language, the acts, the cast size, the look." |
 | 3 | 0:22-0:32 | Press Make the episode; the bar with "about N min left"; reload the tab -- it picks the run back up | "It runs on your machine. The bar learns how long each stage takes on your GPU -- within four points of the clock -- and a reload never loses it." |
 | 4 | 0:32-0:58 | `midsummer_highlight.mp4` (Bottom and Titania) | (let the episode's own voices and foley play; no narration) |
-| 5 | 0:58-1:24 | "Tell my own story" boxes filled with Jeffrey and MagnoliaRex, then `magnolia_highlight.mp4` | "Or tell your own. This is my own published novel -- Jeffrey and MagnoliaRex -- turned into a three-act radio play." |
-| 6 | 1:24-1:46 | A simple diagram: browser -> Radio Play Studio -> Comfy SDK -> comfy-api-proxy -> ComfyUI + Old-Time Radio pack; then the model list | "Built on the Comfy SDK and comfy-api-proxy, driving my Old-Time Radio node pack on ComfyUI. Gemma 4 writes it. MOSS-Image paints every beat. Kokoro gives each character a voice. Stable Audio 3 scores it. And LTX 2.5 films every beat with its own sound." |
+| 5 | 0:58-1:24 | "Tell my own story": press **Load the example**, the three cast cards fill (Jeffrey, MagnoliaRex, the Cat), then `magnolia_highlight.mp4` | "Or tell your own. A card for each character -- even a photo. This is my own published novel, turned into a three-act radio play, and every face stays the same from shot to shot." |
+| 6 | 1:24-1:46 | A simple diagram: browser -> Radio Play Studio -> Comfy SDK -> comfy-api-proxy -> ComfyUI + Old-Time Radio pack; then the model list | "Built on the Comfy SDK and comfy-api-proxy, driving my Old-Time Radio node pack on ComfyUI. Gemma 4 writes it. MOSS-Image and FLUX 3 Klein paint every beat -- Klein drawing each one from the characters' portraits. Kokoro gives each character a voice. Stable Audio 3 scores it. And LTX 2.5 films every beat with its own sound." |
 | 7 | 1:46-1:55 | End card: repo URL, #OpenSourceHiggsfield | "Every face and voice stays the same from shot to shot. Open weights, MIT, no cloud -- a whole story, not one clip." |
 
 Why it is innovative (say it in shots 1, 5 and 7; the line is the point):
@@ -31,5 +31,7 @@ Kokoro; Stable Audio 3; LTX 2.5; the upscaler actually used in the demo episodes
 Midsummer episode -- or Real-ESRGAN if the operator switches it before re-rendering); Comfy SDK;
 comfy-api-proxy; ComfyUI; the Old-Time Radio node pack.
 
-Note: the Midsummer demo episode was rendered with FLUX 3 Klein stills (before the MOSS switch).
-Either say "FLUX 3 Klein" over shot 4, or use the MOSS-era episode for shot 4 instead.
+Note: both demo episodes were rendered with FLUX 3 Klein stills -- Midsummer before the MOSS
+switch, MagnoliaRex with reference stills (2026-10-20) -- so name FLUX 3 Klein in shot 6.
+`magnolia_highlight.mp4` is the Athens scene (0:30-0:56 of the episode, no Cat); the alternate
+`magnolia_highlight_ending.mp4` shows the open humanoid-Cat defect.

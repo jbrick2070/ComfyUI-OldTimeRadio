@@ -108,19 +108,26 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       Klein (rendered before the MOSS switch). Eye check: the title cards show glitchy lettering and
       two frames (0:36, 0:52) flash as negatives -- intended Signal Lost glitches, or a defect?
       Form + demo drafts: apple/CONTEST_SUBMISSION_DRAFT.md, apple/CONTEST_DEMO_SCRIPT.md.
-- [ ] **Demo episode, My Story half: RENDERING (restarted 23:46 on 10-19, 3 acts, foley, MOSS).**
-      The 22:53 run was canceled at the stills stage (log kept as
-      tmp/rps_live/mystory_magnolia_generic_canceled.log) so Jeffrey could be drawn from the
-      operator's own photos -- he is the author and the character is him, so this is his own
-      likeness, not a third party's.
-      Operator: "make my story the fictional tale of Jeffrey and MagnoliaRex, the later chapters
-      ... it's my published book, I own the rights" (his book "Mime Lung Music Festival", Part 2;
-      the book's own disclaimer lists the fiction chapters). He approved the four boxes as drafted.
-      CONTEST CARE: MagnoliaRex is a thin disguise for a real musician, so the boxes carry NO real
-      names (no artists, no Nam June Paik, no real artworks) and describe her only by the text's
-      personality. The exact boxes are in the launcher scratchpad script mystory_magnolia.sh and
-      the run log tmp/rps_live/mystory_magnolia.log. When it lands: verify, then check the stills
-      and script for any real name before it goes in the demo.
+- [x] **Demo episode, My Story half: DONE 10-20 05:18 -- WITH REFERENCE STILLS.** "The Last Loop of
+      the Afterlife", 3 acts, 5:29, 16 GB foley, flux3_klein + OTR_FLUX3_REFERENCE=1 (main 2b30170e
+      loaded), C7 seeds, the app's example cast cards (the operator's own Veo-Moovie-Maker
+      descriptions of Jeffrey, MagnoliaRex and the Cat), NO photo. Render 4:19:00 (01:00-05:18; the
+      reference stills add little -- the LTX video stage is the hours). Verified: RESULT succeeded,
+      obs_publish OK, the app's copy (contest/radio-play-studio/episodes/c869a6266614/) and
+      otr/obs/afterlife_loop_20261020_010758__cart__n16f__fk3i__koko__myst__cg412__sa3_final.mp4
+      byte-identical (cmp), timing saved (episodes/timing/otr_16gb_foley.acts-3.f16920c1.json).
+      Stills: 31 mints, 21 drawn with co-references, no LOUD reports. By eye (frame sheet
+      tmp/rps_live/ab/demo3_frames.jpg): Jeffrey (stocky, round face, pink shirt) and MagnoliaRex
+      (star-speckled hair, purple/gold jacket) hold in EVERY frame; the Cat is a real small black
+      cat in Athens but a humanoid cat figure in act 2 (the open KIND row). Real-name check: captions
+      and credits name only Jeffrey, MagnoliaRex, Cat; the boxes carried no real names (the ledger
+      and stills were removed by the workflow's Space saver after publish).
+      Highlights (output/otr/episodes/demo_cuts/): magnolia_highlight.mp4 = 0:30-0:56, Athens, act 1
+      (both faces, no Cat; sent to the operator) -- the demo-script cut; magnolia_highlight_ending.mp4
+      = 3:25-3:51 (the duet and the countdown; shows the humanoid Cat at ~0:20).
+      History: the 22:53 (generic) and 23:46 (mime look from his photos) MOSS runs were canceled
+      when the operator made reference stills his main point; operator: "make my story the
+      fictional tale of Jeffrey and MagnoliaRex ... it's my published book, I own the rights".
 - [ ] Compare by eye on the same shot and seed: foley (default) vs `otr_16gb_video.json` vs a
       procedural lane. LTX stays core if it holds up (LTX bonus).
 - [ ] Stills: FLUX 3 Klein is the shipped NVIDIA engine; confirm it looks right on the episode.
@@ -223,7 +230,8 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       script partners (who speaks just before/after in the same shot) to the co-references.
       NOTE: the cat was a real cat in proof 2 because that server still ran the (since reverted)
       word-list rule; until the KIND field lands the Cat portrait is a cat-woman again.
-      NOW: THE 3-ACT DEMO is rendering (started 00:59, tmp/rps_live/mystory_magnolia_ref.log):
+      DONE 05:18 -- THE 3-ACT DEMO (see the My Story demo row above; started 00:59,
+      tmp/rps_live/mystory_magnolia_ref.log):
       16 GB foley, flux3_klein + OTR_FLUX3_REFERENCE=1, C7 seeds, the example cast cards as the
       app composes them, NO photo (written descriptions only). When it lands: verify, cut the
       highlight, check the stills for real names, and update the demo script (shot 5).
