@@ -138,6 +138,24 @@ _PINNED_SOURCES = (
      "text_encoders/qwen3vl_4b_int8_convrot.safetensors",
      "3ba0f7064cbb1666a71e2820d3cc5c2273bb6cd0", 4_858_559_240,
      "32de113cbf8282b02cbff0794b637b9d6676da09314a1db5a30bcea9bf4ee01c"),
+    # MOSS-IMAGE SFT, added 2026-10-19 (opt-in still engine; no workflow JSON
+    # selects it). Comfy-Org/MOSS-Image is Comfy's own repackage of OpenMOSS-
+    # Team's Apache-2.0 weights: public and ungated (Hub API gated:false, tag
+    # license:apache-2.0, read 2026-10-19). The int8 ConvRot SFT model and the
+    # w4a8 GPTQ Qwen3.5-9B encoder are the files Comfy's own template loads.
+    # The VAE is a NEW row, not the Ideogram 4 one above: `flux2-vae_small` is a
+    # different file (249,521,340 bytes, its own SHA-256) from `flux2-vae`.
+    ("diffusion_models", "Comfy-Org/MOSS-Image",
+     "diffusion_models/moss_image_sft_int8_convrot.safetensors",
+     "3284a1dbb351e3396d70f39f2a71cbf6ed2ef1bb", 5_413_698_958,
+     "b4d1475bc7eeffd7b809e82ea13a1fba1fb85c4e18365af3813722faa5c0fe4f"),
+    ("text_encoders", "Comfy-Org/MOSS-Image",
+     "text_encoders/qwen3.5_9b_w4a8_gptq.safetensors",
+     "3284a1dbb351e3396d70f39f2a71cbf6ed2ef1bb", 7_343_591_088,
+     "4cc6a1543ad2061806da46f35f90cadb4801dcba246c44782cf42ec0feb6407c"),
+    ("vae", "Comfy-Org/MOSS-Image", "vae/flux2-vae_small.safetensors",
+     "3284a1dbb351e3396d70f39f2a71cbf6ed2ef1bb", 249_521_340,
+     "d8d52ba036475f5fb07c8b435e176d3d97ebfa82f0d1a1c317f9cc1e25bd013b"),
     # FLUX.1-DEV, added 2026-09-29 for the same directive. The all-in-one fp8
     # checkpoint flux_gen1 loads through CheckpointLoaderSimple (model, CLIP
     # and VAE in one file). Comfy-Org/flux1-dev is public and ungated, unlike
@@ -356,7 +374,8 @@ _MINIMAX_H3_WEIGHT_ENGINES = frozenset({
 #: ``_weight_tokens()``, so a 1.7B tier never pulls the 14B DiT or the LoRA.
 _HUMO_WEIGHT_ENGINES = frozenset({"humo", "humo_14B_169", "humo_1.7B", "humo_1.7B_169"})
 _COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image",
-                      "ideogram4_local", "flux_gen1", "flux3_klein"}
+                      "ideogram4_local", "flux_gen1", "flux3_klein",
+                      "moss_image"}
                      | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES
                      | _ANIMATEDIFF_WEIGHT_ENGINES | _MINIMAX_H3_WEIGHT_ENGINES
                      | _HUMO_WEIGHT_ENGINES)
@@ -699,7 +718,7 @@ def _same_file(left, right):
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
                     sd15=None, lumina=None, ideogram=None, flux=None, ltx25=None,
                     animatediff=None, minimax_h3=None, humo=None, flux3=None,
-                    env=None,
+                    moss=None, env=None,
                     writer_models=(), upscale_models=()):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
@@ -858,6 +877,24 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         for category, key, default in (
             ("text_encoders", flux3.CLIP_ENV, flux3._DEFAULT_CLIP),
             ("vae", flux3.VAE_ENV, flux3._DEFAULT_VAE),
+        ):
+            explicit = str(env.get(key) or "")
+            add(category, os.path.basename(explicit or default), explicit=explicit)
+    if "moss_image" in engines:
+        # ASK THE ADAPTER, exactly as for flux3_klein above: `_resolve_unet_name`
+        # is what assert_usable and the loader share; the encoder and the small
+        # Flux 2 VAE follow the env-or-default basename rule.
+        if moss is None:
+            raise VisualAssetError("moss_image adapter resolution is unavailable")
+        token, verified = moss._resolve_unet_name()
+        if verified and _native_path(folder_paths, "diffusion_models", token) is None:
+            raise VisualAssetError("MOSS-Image adapter reports an installed selection "
+                                   "that the native loader cannot resolve; no "
+                                   "replacement/path repair")
+        add("diffusion_models", token, explicit=str(env.get(moss.MODEL_ENV) or ""))
+        for category, key, default in (
+            ("text_encoders", moss.CLIP_ENV, moss._DEFAULT_CLIP),
+            ("vae", moss.VAE_ENV, moss._DEFAULT_VAE),
         ):
             explicit = str(env.get(key) or "")
             add(category, os.path.basename(explicit or default), explicit=explicit)
@@ -1341,7 +1378,7 @@ def _load_adapters(engines):
     ``engines`` -- no adapter module is imported for a lane nobody selected."""
     adapters = dict.fromkeys(
         ("zimage", "ltx", "sa3", "sd15", "lumina", "ideogram", "flux", "ltx25",
-         "animatediff", "minimax_h3", "humo", "flux3"))
+         "animatediff", "minimax_h3", "humo", "flux3", "moss"))
     if "z_image_turbo" in engines:
         from ._otr_image_engines import z_image_turbo
         adapters["zimage"] = z_image_turbo
@@ -1363,6 +1400,9 @@ def _load_adapters(engines):
     if "flux3_klein" in engines:
         from ._otr_image_engines import flux3_klein
         adapters["flux3"] = flux3_klein
+    if "moss_image" in engines:
+        from ._otr_image_engines import moss_image
+        adapters["moss"] = moss_image
     if "flux_gen1" in engines:
         from ._otr_image_engines.flux_gen1 import FluxGen1ImageEngine
         adapters["flux"] = FluxGen1ImageEngine()
