@@ -2335,7 +2335,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         if _role in _portrait_free:
             if cid in _identity_photos:
                 warnings.append(
-                    f"character_photos: {cid}'s photo {_identity_photos[cid]!r} is NOT "
+                    f"character_photos: {cid}'s photo(s) {_identity_photos[cid]!r} are NOT "
                     "USED -- this lane mints no portrait and its still engine takes no "
                     "reference image; pick flux3_klein for the character stills")
             continue
@@ -2362,7 +2362,13 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         if pinfo.get("radio_host_style"):
             _pobj["radio_host_style"] = pinfo["radio_host_style"]
         if cid in _identity_photos:
-            _pobj["identity_photo"] = _identity_photos[cid]
+            # The first photo leads; any others join it (an amalgamation of
+            # several pictures into one face).
+            _held = _identity_photos[cid]   # one name (a string) or a list
+            _files = [_held] if isinstance(_held, str) else list(_held)
+            _pobj["identity_photo"] = _files[0]
+            if _files[1:]:
+                _pobj["identity_photo_more"] = _files[1:]
         objects.append(_pobj)
 
     # RADIO-HOST FACE object (2026-07-01, chunk 3) -- the ONE animatable radio

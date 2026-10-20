@@ -33,7 +33,7 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 def test_lines_parse_into_a_name_to_file_map():
     photos, problems = cp.parse_photo_lines(
         "Jeffrey = otr_cast_ab.png\n\n  Magnolia Rex =otr_cast_cd.jpg  ")
-    assert photos == {"Jeffrey": "otr_cast_ab.png", "Magnolia Rex": "otr_cast_cd.jpg"}
+    assert photos == {"Jeffrey": ["otr_cast_ab.png"], "Magnolia Rex": ["otr_cast_cd.jpg"]}
     assert problems == []
 
 
@@ -44,9 +44,16 @@ def test_a_bad_line_is_reported_and_skipped(line):
     assert photos == {} and len(problems) == 1
 
 
-def test_a_name_given_two_photos_uses_neither():
+def test_a_name_given_on_two_lines_uses_neither():
     photos, problems = cp.parse_photo_lines("Ada = a.png\nADA = b.png")
-    assert photos == {} and "two photos" in problems[0]
+    assert photos == {} and "two lines" in problems[0]
+
+
+def test_several_photos_make_one_face_up_to_the_limit():
+    photos, problems = cp.parse_photo_lines("Ada = a.png, b.jpg, a.png, c.png, d.png")
+    assert photos == {"Ada": ["a.png", "b.jpg", "c.png"]}
+    assert any("first 3 are used" in p for p in problems)
+    assert cp.photo_list("old.png") == ["old.png"]      # a policy from before
 
 
 def test_names_match_by_folded_name_to_exactly_one_cast_member():
@@ -55,7 +62,7 @@ def test_names_match_by_folded_name_to_exactly_one_cast_member():
             {"char_id": "c04", "name": "Twin"}, {"char_id": "c05", "name": "twin"}]
     matched, problems = cp.match_cast(cast, {"jeffrey": "a.png", "magnolia rex": "b.png",
                                              "Twin": "c.png", "Nobody": "d.png"})
-    assert matched == {"c02": "a.png", "c03": "b.png"}
+    assert matched == {"c02": ["a.png"], "c03": ["b.png"]}
     assert any("share that name" in p for p in problems)
     assert any("no character by that name" in p for p in problems)
 
@@ -84,7 +91,7 @@ def test_the_image_policy_carries_the_photos_and_reports_bad_lines():
         15, "request_hash", 42, video_policy_json=_video_policy(),
         character_photos="Ada = otr_cast_ab.png\nBob = ../x.png")
     policy = json.loads(raw)
-    assert policy["character_photos"] == {"Ada": "otr_cast_ab.png"}
+    assert policy["character_photos"] == {"Ada": ["otr_cast_ab.png"]}
     assert any(w.startswith("character_photos: Bob") for w in policy["warnings"])
 
 
@@ -139,7 +146,7 @@ def test_photos_match_the_cast_through_the_policy():
     policy = json.dumps({"character_photos": {"Ada": "a.png", "Zed": "z.png"}})
     got = mbp._identity_photos_from_policy(
         policy, [{"char_id": "c02", "name": "Ada"}], warnings)
-    assert got == {"c02": "a.png"}
+    assert got == {"c02": ["a.png"]}
     assert any("Zed" in w for w in warnings)
     assert mbp._identity_photos_from_policy("{}", [], []) == {}
 
@@ -411,3 +418,40 @@ def test_end_to_end_a_voice_lends_no_face_and_a_body_does(voice_look, expect):
     jane = next(o for o in payload["objects"]
                 if o.get("kind") == "scene_character" and o.get("char_id") == "c02")
     assert jane.get("co_char_ids", []) == expect
+
+
+def test_several_photos_ride_the_portrait_and_reach_the_engine(monkeypatch, tmp_path):
+    payload, _ = mbp.derive_image_prompts(_CAST, _META, portrait_free_roles=set(),
+                                          identity_photos={"c02": ["a.png", "b.png"]})
+    obj = _portraits(payload)[0]
+    assert (obj["identity_photo"], obj["identity_photo_more"]) == ("a.png", ["b.png"])
+
+
+def test_the_second_photo_reaches_the_engine_as_one_more_reference(monkeypatch, tmp_path):
+    inputs = tmp_path / "input"
+    inputs.mkdir()
+    (inputs / "otr_cast_ab.png").write_bytes(PNG)
+    (inputs / "otr_cast_cd.png").write_bytes(PNG + b"second")
+    monkeypatch.setattr(cp, "input_dir", lambda: str(inputs))
+    monkeypatch.setattr(disp._ireg, "assert_usable", lambda engine_id, role: None)
+    monkeypatch.setattr(disp._ireg, "get_engine", lambda engine_id: _Engine(True))
+    seen = []
+
+    def gen(request):
+        seen.append(dict(request))
+        return np.full((64, 64, 3), 99, dtype=np.uint8)
+
+    from nodes._otr_shared import role_slots as rs
+    payload = _portrait_payload("otr_cast_ab.png")
+    payload["objects"][0]["identity_photo_more"] = ["otr_cast_cd.png"]
+    policy = {"policy_version": 2, "seed": {"request_seed": 0},
+              "video_models": {s: "still_motion" for s in rs.ROLE_TO_VIDEO_SLOT.values()},
+              "image_models": {"character_image_model": {"engine_id": "flux3_klein"}}}
+    led, *_ = disp.dispatch_images(
+        {"episode_id": "ep_two", "cast": [{"char_id": "c02", "name": "Ada"}]},
+        policy, payload, gen_fn=gen, output_dir=str(tmp_path / "out"),
+        lockdir=tmp_path / "lease.lockdir")
+    assert seen[0]["reference_image"].endswith("otr_cast_ab.png")
+    assert [p.split("\\")[-1].split("/")[-1] for p in seen[0]["reference_images"]] == [
+        "otr_cast_cd.png"]
+    assert _portrait_row(led)["identity_photo_more"] == ["otr_cast_cd.png"]

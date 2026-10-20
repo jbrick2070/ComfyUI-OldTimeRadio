@@ -1358,6 +1358,8 @@ def _commit_minted_still(job, pixels, content_hash, lap, ctx):
         row["radio_host_style"] = job["radio_host_style"]
     if job.get("identity_photo"):
         row["identity_photo"] = job["identity_photo"]
+    if job.get("identity_photo_more"):
+        row["identity_photo_more"] = list(job["identity_photo_more"])
     if job["lettering_style"]:
         row["lettering_style"] = job["lettering_style"]
     if job["backdrop_family"]:
@@ -1983,6 +1985,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # The photo's own hash is the anchor, so a different photo is a
         # different portrait and never a cache hit on the old one.
         identity_photo = str(obj.get("identity_photo") or "")
+        photo_more: list = []
         if kind == "portrait" and identity_photo:
             _photo_path = _photos.resolve_photo(identity_photo)
             if not _photo_path:
@@ -2002,8 +2005,21 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             else:
                 reference_image = _photo_path
                 anchor_hash = _photos.photo_hash(_photo_path)
+                # Further photos of the same person ride along as references
+                # of their own, and each joins the cache anchor.
+                for _more in obj.get("identity_photo_more") or ():
+                    _more_path = _photos.resolve_photo(str(_more))
+                    if _more_path:
+                        photo_more.append(_more_path)
+                        anchor_hash = f"{anchor_hash}+{_photos.photo_hash(_more_path)}"
+                    else:
+                        report.append(
+                            f"{oid}: photo {_more!r} is not in ComfyUI's input "
+                            f"folder; the portrait uses the others (LOUD)")
                 log.info("[OTR_ImageGenDispatcher] %s: portrait painted from the "
-                         "photo %s", oid, identity_photo)
+                         "photo(s) %s", oid,
+                         ", ".join([identity_photo] + [str(m) for m in
+                                                       obj.get("identity_photo_more") or ()]))
 
         # THE OTHER PEOPLE IN THE FRAME (2026-10-20). A character still follows
         # its speaker's portrait, but a two-shot drew the OTHER person from
@@ -2013,7 +2029,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # one's portrait rides along as a further reference, and every hash
         # joins the cache anchor so a new portrait of anyone in the frame is a
         # new still.
-        co_references: list = []
+        co_references: list = list(photo_more)
         if reference_image and kind == "scene_character":
             for _co_id in obj.get("co_char_ids") or ():
                 _co_row = next(
@@ -2257,6 +2273,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             # Recorded on the row only when the photo truly conditioned it.
             "identity_photo": (identity_photo if reference_image and kind == "portrait"
                                else ""),
+            "identity_photo_more": ([str(m) for m in obj.get("identity_photo_more") or ()]
+                                    if photo_more else []),
             "lettering_style": lettering_style,
             "backdrop_family": backdrop_family,
             "obj": obj, "obj_w": obj_w, "obj_h": obj_h,
