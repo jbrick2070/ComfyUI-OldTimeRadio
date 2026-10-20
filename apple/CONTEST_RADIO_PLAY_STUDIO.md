@@ -273,7 +273,8 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         Unverified: the still prompts are not persisted (no ledger row, no PNG text), so a stray
         "cat-eye" alone could also trip the whole-word match. DONE main bd752dd3: each scene still
         now logs "co-references for <still> (<speaker>): <id> <- named: ...<prompt words>... |
-        script partner in this shot", so the next render answers it from the server log (no
+        script partner in this shot", so the next render answers it from the server log (Sonnet
+        HOLDS; its one minor -- a casefold offset shifting the quote -- fixed in main 28d56993; no
         behaviour change; 1315 tests green across every module test file).
         History of the bug: _ensure_gender_anchor puts "adult woman, " in front
         of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug). Two word-list fixes
