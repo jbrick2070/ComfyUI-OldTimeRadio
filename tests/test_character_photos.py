@@ -275,7 +275,7 @@ def test_names_match_whole_words_only_and_the_count_is_capped():
 
 def test_co_presence_is_wired_where_scene_stills_are_built():
     import inspect
-    assert "co_present_char_ids(sprompt, _cast_by_id, _cid)" in inspect.getsource(mbp)
+    assert "co_present_char_ids(sprompt, _with_body, _cid)" in inspect.getsource(mbp)
 
 
 def test_the_other_peoples_portraits_ride_with_the_speakers(monkeypatch, tmp_path):
@@ -370,5 +370,22 @@ def test_the_person_spoken_to_is_in_the_frame():
 def test_partners_are_wired_into_the_co_references():
     import inspect
     src = inspect.getsource(mbp)
-    assert "_partners = beat_partner_char_ids(lines, _cast_by_id)" in src
+    assert "_partners = beat_partner_char_ids(lines, _with_body)" in src
     assert "_partners.get(tgt[\"beat_id\"], ())" in src
+
+
+def test_a_line_with_no_shot_has_no_partner():
+    cast = {"c02": {"name": "Jeffrey"}, "c03": {"name": "MagnoliaRex"}}
+    lines = [{"line_id": "b1", "char_id": "c02", "shot_id": None},
+             {"line_id": "b2", "char_id": "c03", "shot_id": None}]
+    assert mbp.beat_partner_char_ids(lines, cast) == {}
+
+
+def test_a_bodiless_speaker_lends_no_face():
+    """Sonnet QA on 2b30170e: the cast passed to both co-reference sources is
+    the cast with a body, so an unseen voice is never a partner or a name hit."""
+    import inspect
+    src = inspect.getsource(mbp)
+    assert "_partners = beat_partner_char_ids(lines, _with_body)" in src
+    assert "co_present_char_ids(sprompt, _with_body, _cid)" in src
+    assert "_CAST_TEXT.is_bodiless(row)" in src
