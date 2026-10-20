@@ -1381,7 +1381,7 @@ def segment_render_frames(shot, segment_index):
         % (shot.get("shot_id"), index))
 
 
-def beat_render_frames(shot):
+def beat_render_frames(shot, default_frames=1):
     """The frames one beat asks its engine to render, all segments together.
 
     The video node's progress bar is weighted by this (2026-10-19): render time
@@ -1398,11 +1398,15 @@ def beat_render_frames(shot):
             except ImportError:  # pragma: no cover -- flat test imports
                 import coverage_plan as _cp  # type: ignore
             plan = _cp.CoveragePlan.from_dict(raw)
-            if plan.requires_coverage_execution:
-                return max(1, sum(int(s.render_frames) for s in plan.segments))
-        return max(1, int(segment_render_frames(shot, 0)))
+            if plan.segments:
+                if plan.requires_coverage_execution:
+                    return max(1, sum(int(s.render_frames) for s in plan.segments))
+                return max(1, int(plan.segments[0].render_frames))
+        # No plan, or one with no segments: the beat renders its own length,
+        # or the episode's frame_count when the shot names none.
+        return max(1, int(shot.get("target_frame_count") or default_frames or 1))
     except Exception:  # noqa: BLE001 -- display weight only
-        return 1
+        return max(1, int(default_frames or 1))
 
 
 def validate_and_repair_still_spine(ledger):
@@ -4396,8 +4400,11 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         # what the plan OWES rather than how many pieces it is in.
         single = request if request is not None else request_builder(
             shot, ledger, canvas=canvas)
-        return render_shot(shot, single, host_caps=host_caps,
-                           profile=profile)
+        result = render_shot(shot, single, host_caps=host_caps,
+                             profile=profile)
+        if on_segment_done is not None:
+            on_segment_done(beat_render_frames(shot))
+        return result
 
     if request_builder is None:
         raise RenderError(
@@ -5492,7 +5499,8 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
             # walk -- never inside render_beat_coverage, which also runs on
             # cloud worker threads -- and closed in the ``finally`` below.
             _video_progress = _WeightedProgress(
-                [beat_render_frames(s) for s in section["shots"]], "video frames")
+                [beat_render_frames(s, frame_count) for s in section["shots"]],
+                "video frames")
             _quiet_bars.open()
             for _beat_no, shot in enumerate(section["shots"]):
                 _video_progress.begin(_beat_no)

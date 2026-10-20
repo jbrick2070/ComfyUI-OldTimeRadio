@@ -165,17 +165,23 @@ class QuietInnerBars:
         except Exception as exc:  # noqa: BLE001 -- headless, tests, or an old Comfy
             log.debug("[OTR progress] no ComfyUI hook to quiet (%s)", exc)
             return self
-        real = getattr(utils, "PROGRESS_BAR_HOOK", None)
-        if real is None or self._hook is not None:
+        current = getattr(utils, "PROGRESS_BAR_HOOK", None)
+        if current is None or self._hook is not None:
             return self
+        # Opened over another quiet: keep the REAL hook, never the other quiet,
+        # so whichever closes last cannot leave a quiet installed with no owner.
+        real = getattr(current, "_otr_real_hook", current)
         owner = threading.get_ident()
 
         def hook(value, total, preview_image=None, *args, **kwargs):
-            if threading.get_ident() != owner:
+            # A bar keeps the hook it was built with, so one built while this
+            # was open and used after it closed must show normally again.
+            if self._hook is not hook or threading.get_ident() != owner:
                 return real(value, total, preview_image, *args, **kwargs)
             mm.throw_exception_if_processing_interrupted()
             return None
 
+        hook._otr_real_hook = real
         self._utils, self._real, self._hook = utils, real, hook
         utils.set_progress_bar_global_hook(hook)
         return self
