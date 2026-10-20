@@ -178,7 +178,7 @@ def _pool_names(raw: Any) -> list:
     # One bank however it is spelled or repeated: "Public-Domain, public_domain".
     seen: dict = {}
     for name in names:
-        key = re.sub(r"[\s-]+", "_", name.lower())
+        key = re.sub(r"[\s_-]+", "_", name.strip()).strip("_").casefold()   # the pack's _pool_key
         if key:
             seen.setdefault(key, name)
     return list(seen.values())
