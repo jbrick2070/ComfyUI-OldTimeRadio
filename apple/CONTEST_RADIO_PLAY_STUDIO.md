@@ -243,13 +243,20 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       HIS PHOTOS MAY SHIP PUBLIC (operator 10-20: "my photos can be public and ship with it ... it's
         my story"). NEXT, if the demo is good: make his true Jeffrey/MagnoliaRex story My Story's
         built-in default (the cast cards + the three boxes) with Jeffrey's photos bundled.
-      MAGNOLIAREX REFERENCE: operator supplied generated art of the character (09:15); Codex made
-        three clean variations (C:\Users\jeffr\Pictures\otr_magnoliarex_ref\, sheet sent). Operator:
-        use them AFTER the current render -- a second demo render with Jeffrey's AND her references.
-      NOW: the 3-act demo RENDERING with his photos (started 08:32 on main 089e48e6;
-        tmp/rps_live/mystory_magnolia_photos.log; launcher scratchpad demo_photos.py; ~4.2 h). The
-        07:57 kind-only re-render was canceled at 12% for this. The 05:18 demo and its Athens
-        highlight stay until the new one is verified.
+      MAGNOLIAREX REFERENCE -- FINAL LOOK (operator 10-20 10:35: "this is the final magnolia rex";
+        "remove the title"; then "make the outfit whitish like a magnolia, white silver not yellow").
+        Codex made three references from his final art (long wavy honey-brown hair, pastel pink/teal
+        streaks, curtain bangs, high collar, glowing petal shoulders), title text and DJ gear left out,
+        then re-coloured the outfit magnolia white + silver, no gold. Set used:
+        C:\Users\jeffr\Pictures\otr_magnoliarex_ref_c\ (front, three-quarter, dark-violet portrait;
+        sheet sent, operator: "perfect"). Her look text in the launcher matches it. The earlier
+        platinum and gold sets (otr_magnoliarex_ref, _ref_b) are superseded.
+      NOW: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
+        white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
+        Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
+        demo_photos2.py). The Jeffrey-only render (08:32) was stopped at the operator's word ("u can
+        kill the current renders"), as was a 10:39 start with the gold outfit. The 05:18 demo and its
+        Athens highlight stay until the new one is verified.
         History of the bug: _ensure_gender_anchor puts "adult woman, " in front
         of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug). Two word-list fixes
         (d1414a7d, 9b0ed9ea) both failed Sonnet as BLOCKERs -- people like "Sailor with a parrot" lost
