@@ -101,11 +101,11 @@ LANE_INFO = {
     "ltx_8gb": (16.13, "LTX 2b distilled + T5 encoder. Real video diffusion."),
     "sd15": (1.99, "IMAGE model, SD 1.5 fp16. The Mac rows' still engine."),
     "flux3_klein": (10.26, "IMAGE model, FLUX 3 Image Klein int8 + Qwen3-VL-4B "
-                           "int8 encoder + Flux 2 VAE. The 8 GB and 16 GB NVIDIA "
-                           "rows' still engine (FLUX Kommunity License)."),
+                           "int8 encoder + Flux 2 VAE. The 8 GB NVIDIA and 24 GB "
+                           "foley rows' still engine (FLUX Kommunity License)."),
     "moss_image": (12.11, "IMAGE model, MOSS-Image SFT int8 + Qwen3.5-9B w4a8 "
-                          "encoder + small Flux 2 VAE. Opt-in; no shipped "
-                          "workflow selects it (Apache-2.0)."),
+                          "encoder + small Flux 2 VAE. The 16 GB NVIDIA rows' "
+                          "still engine (Apache-2.0)."),
     "ltx25_16gb": (25.38, "LTX 2.5, mix4x8 DiT + w4a8 encoder + VAEs + "
                                  "upscaler. The 16 GB silent, foley, mime and "
                                  "audio-in lanes all load exactly these."),
@@ -246,7 +246,8 @@ LANES = {
     # Comfy-Org as usable without Blackwell. The local receipts are 124 model /
     # 129 canvas frames on a 16 GB card; they do not qualify a physical 8 GB
     # card. No shipped workflow selects either lane.
-    # FLUX 3 IMAGE KLEIN (2026-10-18): the 8 GB and 16 GB NVIDIA still engine. All
+    # FLUX 3 IMAGE KLEIN (2026-10-18): the 8 GB NVIDIA and 24 GB foley still engine
+    # (the 16 GB rows moved to moss_image on 2026-10-19). All
     # three files are `_PINNED_SOURCES` rows -- the two Klein files from the
     # ungated ml-resources mirror (byte-identical to BFL's gated repo), the VAE
     # from the Ideogram 4 repackage with the same SHA-256 -- so this lane and
@@ -256,8 +257,8 @@ LANES = {
         _PINNED["qwen3vl_4b_int8_convrot.safetensors"],
         _PINNED["flux2-vae.safetensors"],
     ],
-    # MOSS-IMAGE SFT (2026-10-19): an opt-in still engine, no shipped workflow
-    # selects it. All three files are `_PINNED_SOURCES` rows from Comfy-Org's
+    # MOSS-IMAGE SFT (2026-10-19): the 16 GB NVIDIA still engine (operator, by
+    # eye, after an A/B against Klein). All three files are `_PINNED_SOURCES` rows from Comfy-Org's
     # ungated Apache-2.0 repackage, so this lane and the queue-time preflight
     # cannot pin different bytes.
     "moss_image": [
