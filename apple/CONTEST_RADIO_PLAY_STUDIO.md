@@ -80,7 +80,15 @@ branch, then do the first unchecked step. Update this file in the same commit as
       met**, and averaging cannot meet it: one-act foley ran 57, 64, 64 and 76 min today because
       the beat count follows the story, and the app cannot see beats during the video node. The
       only real fix is a beats-done signal from the pack (OTR_VideoRenderBatch), which reopens the
-      refuted hook-swap design -- operator's call whether it is worth it before Oct 30. **Never attach a second listener to the job's SSE** -- read the
+      refuted hook-swap design -- operator's call whether it is worth it before Oct 30.
+- [x] **Beat-level bar, PROVEN (operator chose "fix bar with beats").** Pack: the video node draws
+      render frames done of the episode, inner sampler bars quieted on the render thread only
+      (main ec55add4 + 94b0d32e; v1 and v2 refuted by Opus, Codex findings fixed). App: a node's
+      own forward-only bar drives its share and its pace drives minutes left (e53c6cdf, c5194eac).
+      Live: Twelfth Night (Malvolio's letter), 1 act foley, 67 min 34 s, obs_publish OK,
+      `shadows_box_20261019_204048_..._final.mp4` (82 MB, 1920x1080, 1m45s), sha 66376b14, both
+      places. Bar vs clock every 5 min: 0, -3, -3, -3, -2, -1, 0, 0, 0, 0, 0, 0, +1, -3; **worst 4
+      points** (was 15 and 17). Minutes left within 2 from minute 20 on; 7 at the very start. **Never attach a second listener to the job's SSE** -- read the
       app's own output or its `/api/episodes/<id>/events`.
 
 ## Phase 2 -- quality budget (target Oct 25)
@@ -96,7 +104,10 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
 - [ ] Compare by eye on the same shot and seed: foley (default) vs `otr_16gb_video.json` vs a
       procedural lane. LTX stays core if it holds up (LTX bonus).
 - [ ] Stills: FLUX 3 Klein is the shipped NVIDIA engine; confirm it looks right on the episode.
-- [ ] **Optional, AFTER the demo is locked, operator's eye decides: MOSS-Image A/B vs Klein.**
+- [ ] **MOSS-Image A/B vs Klein -- operator said build it now (2026-10-19); his eye decides.**
+      Engine built and pushed opt-in (main 49fc8eb0, Sonnet holds); the app's "Still pictures"
+      picker sets it (e0b2d329). Next: stills-only 16 GB workflow, same scene and pinned seeds,
+      klein vs moss.
       Apache-2.0, native in ComfyUI core since v0.42.0 (comfy/ldm/moss_image), repackaged at
       hf.co/Comfy-Org/MOSS-Image: int8-convrot DiT 5.4 GB, Qwen3.5-9B text encoder w4a8 7.3 GB,
       flux2-vae_small; 8-step DMD LoRA (lodestones) for ~3-4x speed at CFG 1.0. NOT smaller than
