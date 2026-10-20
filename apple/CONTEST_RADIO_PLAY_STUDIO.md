@@ -271,8 +271,10 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         writes each beat, we can't necessarily change that ... unless we go to a full beat-by-beat
         writer" -- ACCEPTED AS IS; a beat-by-beat writer is a separate, larger decision, not taken.
         Unverified: the still prompts are not persisted (no ledger row, no PNG text), so a stray
-        "cat-eye" alone could also trip the whole-word match; logging WHY each co-reference was
-        attached is the cheap way to tell next time.
+        "cat-eye" alone could also trip the whole-word match. DONE main bd752dd3: each scene still
+        now logs "co-references for <still> (<speaker>): <id> <- named: ...<prompt words>... |
+        script partner in this shot", so the next render answers it from the server log (no
+        behaviour change; 1315 tests green across every module test file).
         History of the bug: _ensure_gender_anchor puts "adult woman, " in front
         of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug). Two word-list fixes
         (d1414a7d, 9b0ed9ea) both failed Sonnet as BLOCKERs -- people like "Sailor with a parrot" lost
