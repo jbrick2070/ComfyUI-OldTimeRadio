@@ -358,7 +358,9 @@ function addPhoto(c, file, state) {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || res.statusText);
-      if (!c.photos.some((ph) => ph.file === body.file)) {
+      // Two uploads started before either returned must not pass the cap.
+      if (c.photos.length < PHOTOS_PER_CHARACTER
+          && !c.photos.some((ph) => ph.file === body.file)) {
         c.photos.push({file: body.file, thumb: reader.result});
       }
       drawCast();
