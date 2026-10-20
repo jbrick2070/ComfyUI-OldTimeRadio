@@ -208,7 +208,8 @@ def describe_input(schemas: dict, node_type: str, name: str) -> dict:
     elif type_def in ("BOOLEAN", "BOOL"):
         info.update(kind="bool")
     elif type_def == "STRING":
-        info.update(kind="text", multiline=bool(opts.get("multiline")))
+        info.update(kind="text", multiline=bool(opts.get("multiline")),
+                    placeholder=str(opts.get("placeholder") or ""))
     else:
         raise GraphError(f"{node_type}.{name} is a {type_def!r}, not something a form can set")
     return info

@@ -52,9 +52,11 @@ python -m radio_play_studio doctor     # checks ComfyUI, the pack, the SDK and t
 python -m radio_play_studio serve      # open http://127.0.0.1:8765
 ```
 
-Pick a story bank (or leave it on roll), press **Make the episode**, and watch the
-progress bar. A one-act episode took about an hour on an RTX 5080 Laptop (16 GB),
-most of it filming the beats. The first run's bar counts the graph's stages; after one
+Choose **A classic, or surprise me** or **Tell my own story** (see below), press
+**Make the episode**, and watch the progress bar. The form starts on the workflow's own
+settings, which for the 16 GB foley workflow is three acts; a one-act episode took about
+an hour on an RTX 5080 Laptop (16 GB), most of it filming the beats, and more acts take
+longer. The first run's bar counts the graph's stages; after one
 finished run the app knows how long each stage takes on your machine, and the bar follows
 the clock and says about how many minutes are left. The finished video is saved under
 `./episodes/<id>/` and plays in the page; ComfyUI also publishes it to its own
@@ -75,13 +77,42 @@ machine each one is tuned for, for example `workflows/otr_8gb_ltx25_foley.json` 
 `workflows/otr_app.json` for the pack's any-machine graph. The default is
 `otr_16gb_foley.json`: LTX 2.5 films every beat with its own sound, mixed under the voices.
 
+## Tell your own story
+
+Press **Tell my own story** at the top of the page. Four boxes come first, each
+showing an example, and every one of them is optional:
+
+| Box | What to write | Example |
+|---|---|---|
+| Who is in it | Names, how they know each other, what they are like. Put `(she)` or `(he)` right after a name and that character is voiced and drawn that way. | `Ada (she), the lighthouse keeper. Tom (he), her brother, who does not believe her.` |
+| What happens | Events, the trouble, a twist, the ending you want. Rough notes are fine. | `A ship's bell rings from the fog every night, but no ship has come in thirty years. Ada rows out to find it.` |
+| Where and when | Place, era, weather, mood: the story's world, not its look. | `A rock lighthouse off Maine, winter 1921.` |
+| Written by | Your name or a pen name. The announcer says it and the credits print it. | `Your Name` |
+
+What you write outranks anything the writer would rather invent; what you leave out
+is invented to fit. Leave all four empty and the pack writes its own standing premise.
+Then set the language, acts, cast size and visual style as usual and press **Make the
+episode**.
+
+From the command line, the same boxes are flags:
+
+```
+python -m radio_play_studio run --bank my_story --acts 1 ^
+  --my-characters "Ada (she), the lighthouse keeper. Tom (he), her brother." ^
+  --my-plot "A ship's bell rings from the fog every night. Ada rows out to find it." ^
+  --my-setting "A rock lighthouse off Maine, winter 1921." --my-author "Your Name"
+```
+
+(`^` continues a line in the Windows command prompt; use `\` on macOS and Linux.) The
+boxes are read only with the `my_story` bank: text in them with another bank picked by
+hand is refused before anything is sent, because the pack would stop that run.
+
 ## What a person can choose
 
-Story bank, the classic to adapt, language, acts, cast size, visual style, and
-the "My story" details (characters, plot, setting, in the style of). Every
-dropdown is read live from your ComfyUI, so it offers exactly the banks and
-styles your installed pack has. Everything else (models, voices, music, the
-video lane) keeps the workflow's own setting.
+Story bank, the classic to adapt, language, acts, cast size, visual style, and the four
+My Story boxes above. Every dropdown is read live from your ComfyUI, so it offers exactly
+the banks and styles your installed pack has. Everything else (models, voices, music,
+the video lane) keeps the workflow's own setting.
 
 ## How it stays honest
 

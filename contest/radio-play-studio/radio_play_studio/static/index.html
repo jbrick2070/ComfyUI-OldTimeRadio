@@ -41,6 +41,14 @@
   #notice { color: var(--bad); }
   video { width: 100%; border-radius: 8px; background: #000; margin-top: 12px; }
   .done a { color: var(--ok); }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 16px; }
+  @media (max-width: 560px) { .modes { grid-template-columns: 1fr; } }
+  .mode { display: block; margin: 0; padding: 14px 16px; border: 2px solid var(--line);
+          border-radius: 10px; background: var(--panel); cursor: pointer; font-weight: normal; }
+  .mode strong { display: block; font-size: 1.1rem; }
+  .mode span { color: var(--muted); font-size: .875rem; }
+  .mode input { width: auto; margin: 0 6px 0 0; }
+  .mode:has(input:checked) { border-color: var(--accent); }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -92,39 +100,94 @@ function control(f) {
     el.type = "text";
     el.value = f.default || "";
   }
+  if (f.kind === "text" && f.placeholder) el.placeholder = f.placeholder;   // the pack's own example
   el.id = "f_" + f.key;
   return el;
 }
 
+// The bank that reads the four My Story boxes (the pack's own name for it).
+const MY_STORY_BANK = "my_story", MY_STORY_GROUP = "My story";
+let lastBank = null;
+
 function build(list) {
   fields = list;
   form.textContent = "";
-  let group = null, box = null;
+  const boxes = {};
   for (const f of list) {
-    if (f.group !== group) {
-      group = f.group;
-      box = document.createElement("fieldset");
+    if (!boxes[f.group]) {
+      const box = document.createElement("fieldset");
+      box.id = "group_" + f.group.replace(/\W+/g, "_");
       const lg = document.createElement("legend");
-      lg.textContent = group;
+      lg.textContent = f.group;
       box.appendChild(lg);
-      form.appendChild(box);
+      boxes[f.group] = box;
     }
+    const row = document.createElement("div");
+    row.id = "row_" + f.key;
     const label = document.createElement("label");
     label.htmlFor = "f_" + f.key;
     label.textContent = f.label;
-    box.appendChild(label);
-    box.appendChild(control(f));
     const help = document.createElement("p");
     help.className = "help";
     help.textContent = f.help;
-    box.appendChild(help);
+    row.append(label, control(f), help);
+    boxes[f.group].appendChild(row);
+  }
+  const bank = list.find((f) => f.key === "bank");
+  const ownStory = boxes[MY_STORY_GROUP] && bank && bank.choices.includes(MY_STORY_BANK);
+  if (ownStory) form.appendChild(modeSwitch());
+  if (ownStory) form.appendChild(boxes[MY_STORY_GROUP]);
+  for (const [name, box] of Object.entries(boxes)) if (!(ownStory && name === MY_STORY_GROUP)) form.appendChild(box);
+  if (ownStory) {
+    $("f_bank").addEventListener("change", () => setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic"));
+    setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic");
   }
   go.disabled = false;
 }
 
+function modeSwitch() {
+  const wrap = document.createElement("div");
+  wrap.className = "modes";
+  wrap.setAttribute("role", "radiogroup");
+  wrap.setAttribute("aria-label", "What story?");
+  for (const [mode, title, text] of [
+    ["classic", "A classic, or surprise me", "Adapt Shakespeare or a public-domain story, or roll the dice."],
+    ["own", "Tell my own story", "Write who is in it, what happens and where. The rest is filled in for you."],
+  ]) {
+    const card = document.createElement("label");
+    card.className = "mode";
+    const radio = document.createElement("input");
+    radio.type = "radio"; radio.name = "mode"; radio.value = mode; radio.id = "mode_" + mode;
+    radio.addEventListener("change", () => setMode(mode));
+    const strong = document.createElement("strong");
+    strong.append(radio, title);
+    const span = document.createElement("span");
+    span.textContent = text;
+    card.append(strong, span);
+    wrap.appendChild(card);
+  }
+  return wrap;
+}
+
+function setMode(mode) {
+  const own = mode === "own", bank = $("f_bank");
+  $("mode_" + mode).checked = true;
+  if (own && bank.value !== MY_STORY_BANK) { lastBank = bank.value; bank.value = MY_STORY_BANK; }
+  if (!own && bank.value === MY_STORY_BANK) bank.value = lastBank || bank.options[0].value;
+  $("group_" + MY_STORY_GROUP.replace(/\W+/g, "_")).hidden = !own;
+  for (const key of ["bank", "source_ref"]) if ($("row_" + key)) $("row_" + key).hidden = own;
+  if (own) $("f_my_characters") && $("f_my_characters").focus({preventScroll: true});
+}
+
 function collect() {
   const out = {};
+  const bank = $("f_bank") ? $("f_bank").value : null;
   for (const f of fields) {
+    // The My Story boxes travel only with my_story: the pack stops a run whose
+    // hand-picked bank is another one while they hold text, and text left in
+    // the hidden boxes must not ride along with a roll the person meant as
+    // "surprise me".
+    if (f.group === MY_STORY_GROUP && bank !== MY_STORY_BANK) continue;
     const el = $("f_" + f.key);
     if (f.kind === "text" && el.value === "" ) continue;   // blank = the workflow's own value
     out[f.key] = (f.kind === "int" || f.kind === "float") ? Number(el.value) : el.value;

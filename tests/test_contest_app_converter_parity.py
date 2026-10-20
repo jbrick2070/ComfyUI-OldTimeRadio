@@ -80,8 +80,8 @@ def test_a_representative_choice_lands_on_the_real_writer(schemas):
     graph = rps_graph.workflow_to_api_prompt(workflow, schemas)
     node_ids = rps_form.locate_nodes(workflow)
     rows = {r["key"]: r for r in rps_form.describe_form(schemas, graph, node_ids)}
-    choices = {"bank": "shakespeare", "acts": rows["acts"]["choices"][-1],
+    choices = {"bank": "my_story", "acts": rows["acts"]["choices"][-1],
                "cast_size": rows["cast_size"]["min"] or 1, "my_plot": "A quiet lighthouse."}
     rps_form.apply_choices(graph, schemas, node_ids, choices)
     inputs = graph[node_ids[rps_form.WRITER]]["inputs"]
-    assert inputs["source_bank"] == "shakespeare" and inputs["story_plot"] == "A quiet lighthouse."
+    assert inputs["source_bank"] == "my_story" and inputs["story_plot"] == "A quiet lighthouse."

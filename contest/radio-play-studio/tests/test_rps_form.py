@@ -38,10 +38,10 @@ def test_a_row_starts_on_the_workflows_own_value(schemas, workflow):
 def test_choices_land_on_the_writer_node_and_nothing_else_moves(schemas, workflow):
     graph, ids = _graph(workflow, schemas)
     before = json.loads(json.dumps(graph))
-    apply_choices(graph, schemas, ids, {"bank": "shakespeare", "acts": 2, "cast_size": "4",
+    apply_choices(graph, schemas, ids, {"bank": "my_story", "acts": 2, "cast_size": "4",
                                         "my_plot": "A lighthouse goes quiet."})
     inputs = graph["7"]["inputs"]
-    assert (inputs["source_bank"], inputs["act_count"], inputs["num_characters"]) == ("shakespeare", "2", 4)
+    assert (inputs["source_bank"], inputs["act_count"], inputs["num_characters"]) == ("my_story", "2", 4)
     assert inputs["story_plot"] == "A lighthouse goes quiet."
     inputs.update({k: before["7"]["inputs"][k] for k in ("source_bank", "act_count", "num_characters", "story_plot")})
     assert graph == before
@@ -100,3 +100,25 @@ def test_a_bank_the_pack_cannot_run_is_not_offered_or_accepted(schemas, workflow
     graph, ids = _graph(workflow, schemas)
     with pytest.raises(ValueError, match="Story bank"):
         apply_choices(graph, schemas, ids, {"bank": "custom_source_bank"})
+
+
+def test_my_story_boxes_with_another_hand_picked_bank_are_refused_before_submitting(schemas, workflow):
+    graph = workflow_to_api_prompt(workflow, schemas)
+    ids = locate_nodes(workflow)
+    with pytest.raises(ValueError, match="my_story"):
+        apply_choices(graph, schemas, ids, {"bank": "shakespeare", "my_plot": "A storm cuts the island off."})
+
+
+def test_my_story_boxes_go_with_my_story_or_a_roll(schemas, workflow):
+    for bank in ("my_story", "roll (any eligible bank)"):
+        graph = workflow_to_api_prompt(workflow, schemas)
+        ids = locate_nodes(workflow)
+        apply_choices(graph, schemas, ids, {"bank": bank, "my_characters": "Ada (she), the keeper."})
+        assert graph[ids["OTR_LedgerScriptWriter"]]["inputs"]["story_characters"] == "Ada (she), the keeper."
+
+
+def test_the_author_box_is_the_credit_not_a_style():
+    # The pack's story_author is who the story is BY: the announcer says it and
+    # the credits print it. It was once labelled "In the style of".
+    f = FIELDS_BY_KEY["my_author"]
+    assert f.input == "story_author" and f.label == "Written by"

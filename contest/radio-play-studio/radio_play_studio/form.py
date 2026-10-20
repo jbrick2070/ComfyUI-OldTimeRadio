@@ -15,6 +15,10 @@ from .graph import GraphError, coerce_value, describe_input, node_id_for_type
 
 WRITER = "OTR_LedgerScriptWriter"
 
+#: The story bank that reads the four My Story boxes, and their group on the page.
+MY_STORY_BANK = "my_story"
+MY_STORY = "My story"
+
 
 @dataclass(frozen=True)
 class Field:
@@ -47,14 +51,22 @@ FIELDS: tuple = (
           "Restyles the still and video prompts, so it shows once a video lane draws from "
           "stills. On the audio-reactive lanes it changes the file name, not the picture.",
           "The show"),
-    Field("my_characters", "Characters", WRITER, "story_characters",
-          "Used when the story bank is my_story.", "My story"),
-    Field("my_plot", "Plot", WRITER, "story_plot",
-          "Used when the story bank is my_story.", "My story"),
-    Field("my_setting", "Setting", WRITER, "story_setting",
-          "Used when the story bank is my_story.", "My story"),
-    Field("my_author", "In the style of", WRITER, "story_author",
-          "Used when the story bank is my_story.", "My story"),
+    Field("my_characters", "Who is in it", WRITER, "story_characters",
+          "Names, how they know each other, what they are like. Put (she) or (he) "
+          "right after a name and that character is voiced and drawn that way; "
+          "anyone unmarked is cast to fit the part. Leave it empty and the cast is "
+          "invented for you.", MY_STORY),
+    Field("my_plot", "What happens", WRITER, "story_plot",
+          "Events, the trouble, a twist, the ending you want. Rough notes are fine: "
+          "what you ask for outranks anything the writer would rather invent, and "
+          "what you leave out is invented to fit.", MY_STORY),
+    Field("my_setting", "Where and when", WRITER, "story_setting",
+          "Place, era, weather, mood. This is the story's world, not its look: the "
+          "Visual style choice sets the look.", MY_STORY),
+    Field("my_author", "Written by", WRITER, "story_author",
+          "Your name, a pen name, or whoever you want it credited to. The announcer "
+          "says it and the closing credits print it; leave it empty and the episode "
+          "credits one of our listeners.", MY_STORY),
 )
 
 FIELDS_BY_KEY: dict = {f.key: f for f in FIELDS}
@@ -88,6 +100,7 @@ def describe_form(schemas: dict, api_prompt: dict | None = None, node_ids: dict 
             "kind": info["kind"], "default": default,
             "choices": info.get("choices"), "min": info.get("min"),
             "max": info.get("max"), "multiline": info.get("multiline", False),
+            "placeholder": info.get("placeholder", ""),
         })
     return rows
 
@@ -110,7 +123,25 @@ def apply_choices(api_prompt: dict, schemas: dict, node_ids: dict, choices: dict
             raise GraphError(f"{f.label} is wired to another node in this workflow; it cannot be set here")
         info = _usable(describe_input(schemas, f.node_type, f.input), f)
         node["inputs"][f.input] = coerce_value(info, _blank_to_text(value, info), f.label)
+    _check_my_story(api_prompt, node_ids)
     return api_prompt
+
+
+def _check_my_story(api_prompt: dict, node_ids: dict) -> None:
+    """The pack stops a run whose story bank was picked by hand as anything but
+    my_story while a My Story box holds text (a roll reads the boxes if it lands
+    on My Story and ignores them otherwise). Say so before submitting, not
+    minutes into the run."""
+    writer = api_prompt.get(node_ids.get(WRITER, ""), {}).get("inputs", {})
+    bank = writer.get(FIELDS_BY_KEY["bank"].input)
+    if not isinstance(bank, str) or bank == MY_STORY_BANK or bank.startswith("roll"):
+        return
+    filled = [f.label for f in FIELDS if f.group == MY_STORY
+              and isinstance(writer.get(f.input), str) and writer[f.input].strip()]
+    if filled:
+        raise ValueError(
+            f"the story bank is {bank}, but My story has text in: {', '.join(filled)}. "
+            f"Pick the {MY_STORY_BANK} bank to tell your own story, or clear those boxes.")
 
 
 def _usable(info: dict, f: Field) -> dict:
