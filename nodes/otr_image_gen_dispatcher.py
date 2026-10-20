@@ -40,6 +40,7 @@ from typing import NamedTuple
 
 log = logging.getLogger("OTR")
 
+from ._otr_shared import character_photos as _photos
 from ._otr_shared import gpu_residency as _lease
 from ._otr_shared import portrait_ledger as _pl
 from ._otr_shared import role_slots as _role_slots
@@ -230,17 +231,6 @@ def resolve_seed_and_mode(
     return (int(digest[:8], 16), "")
 
 
-#: ImageDirector slot per object ROLE (still-spine ST-3: the slots finally
-#: honored -- announcer stills render on the announcer slot, music/open stills
-#: on the music slot; character portraits + character-associated scene stills on
-#: the character slot). That slot, character_image_model, serves only the
-#: character_video lane.
-_ROLE_TO_IMAGE_SLOT = {
-    "announcer_visual": "announcer_image_model",
-    "music_visual": "music_image_model",
-}
-
-
 def resolve_engine_for_role(image_policy, role):
     """``(engine_id, slot_name, fallback_used)`` for an object role.
 
@@ -252,7 +242,7 @@ def resolve_engine_for_role(image_policy, role):
     model configured, so it uses the character slot (a DEFAULT, not a silent model
     swap; still flagged ``fallback_used=True`` for observability)."""
     models = (image_policy or {}).get("image_models") or {}
-    slot = _ROLE_TO_IMAGE_SLOT.get(str(role or ""), "character_image_model")
+    slot = _role_slots.image_slot_for_role(role)
 
     def _eid(entry):
         if isinstance(entry, dict):
@@ -1352,6 +1342,8 @@ def _commit_minted_still(job, pixels, content_hash, lap, ctx):
         row["beat_id"] = job["beat_id"]
     if job["radio_host_style"]:
         row["radio_host_style"] = job["radio_host_style"]
+    if job.get("identity_photo"):
+        row["identity_photo"] = job["identity_photo"]
     if job["lettering_style"]:
         row["lettering_style"] = job["lettering_style"]
     if job["backdrop_family"]:
@@ -1979,6 +1971,35 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     "[OTR_ImageGenDispatcher] %s: portrait reference not on "
                     "disk for char_id %r; mint proceeds unanchored", oid, char_id)
 
+        # A PERSON'S OWN PHOTO (character_photos, 2026-10-20). MetaBrief matched
+        # it to this character and tagged the portrait; the photo is the
+        # portrait's REFERENCE, so the portrait is painted in the episode's
+        # style and every still of the character then follows the portrait.
+        # The photo's own hash is the anchor, so a different photo is a
+        # different portrait and never a cache hit on the old one.
+        identity_photo = str(obj.get("identity_photo") or "")
+        if kind == "portrait" and identity_photo:
+            _photo_path = _photos.resolve_photo(identity_photo)
+            if not _photo_path:
+                report.append(
+                    f"{oid}: photo {identity_photo!r} is not in ComfyUI's input "
+                    f"folder; the portrait is painted from the text only (LOUD)")
+                log.warning("[OTR_ImageGenDispatcher] %s: photo %r not found in "
+                            "the input folder", oid, identity_photo)
+            elif not getattr(_safe_engine(engine_id), "accepts_reference_image", False):
+                report.append(
+                    f"{oid}: photo {identity_photo!r} NOT USED -- still engine "
+                    f"{engine_id!r} cannot take a reference image; pick "
+                    f"flux3_klein for the character stills (LOUD)")
+                log.warning("[OTR_ImageGenDispatcher] %s: engine %r takes no "
+                            "reference; photo %r unused", oid, engine_id,
+                            identity_photo)
+            else:
+                reference_image = _photo_path
+                anchor_hash = _photos.photo_hash(_photo_path)
+                log.info("[OTR_ImageGenDispatcher] %s: portrait painted from the "
+                         "photo %s", oid, identity_photo)
+
         seed, anchor_mode = resolve_seed_and_mode(
             seed_cfg, oid, prompt_hash, kind=kind, char_id=char_id,
             portrait_prompt_hash=identity_basis,
@@ -2060,6 +2081,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     fresh["beat_id"] = beat_id
                 if radio_host_style:
                     fresh["radio_host_style"] = radio_host_style
+                if reference_image and identity_photo and kind == "portrait":
+                    fresh["identity_photo"] = identity_photo
                 if lettering_style:
                     fresh["lettering_style"] = lettering_style
                 if backdrop_family:
@@ -2196,6 +2219,9 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "source_context_hash": source_context_hash,
             "source_rewrite": source_rewrite,
             "radio_host_style": radio_host_style,
+            # Recorded on the row only when the photo truly conditioned it.
+            "identity_photo": (identity_photo if reference_image and kind == "portrait"
+                               else ""),
             "lettering_style": lettering_style,
             "backdrop_family": backdrop_family,
             "obj": obj, "obj_w": obj_w, "obj_h": obj_h,

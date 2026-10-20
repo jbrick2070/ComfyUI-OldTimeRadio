@@ -29,6 +29,20 @@ ROLE_TO_VIDEO_SLOT = {
     Role.CHARACTER_VIDEO.value: "character_video_model",
 }
 
+#: role -> the IMAGE slot its stills render on. Only the two bookend roles
+#: have their own; every other role (characters) draws on
+#: ``character_image_model`` -- see :func:`image_slot_for_role`.
+ROLE_TO_IMAGE_SLOT = {
+    Role.ANNOUNCER_VISUAL.value: "announcer_image_model",
+    Role.MUSIC_VISUAL.value: "music_image_model",
+}
+
+
+def image_slot_for_role(role) -> str:
+    """The image slot a role's stills render on."""
+    return ROLE_TO_IMAGE_SLOT.get(str(role or ""), "character_image_model")
+
+
 #: video slot -> the role(s) it must be capability-compatible with (the
 #: fail-closed ``role_compat`` filter input). The inverse of
 #: :data:`ROLE_TO_VIDEO_SLOT`.

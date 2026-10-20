@@ -77,9 +77,10 @@ def test_canonical_image_director_granularity_widgets_are_retired():
     names = [i.get("name") for i in n88["inputs"]]
     assert not set(_RETIRED_GRANULARITY) & set(names)
     assert names[:2] == ["video_policy_json", "gate_in"]
+    # character_photos (2026-10-20) is appended after them, never between.
     assert names[2:] == ["fresh_cap", "seed_mode", "request_seed",
-                         "custom_models_json", "dtype_policy"]
-    assert n88["widgets_values"] == [15, "request_hash", 42, "{}", "fp8_ok"]
+                         "custom_models_json", "dtype_policy", "character_photos"]
+    assert n88["widgets_values"] == [15, "request_hash", 42, "{}", "fp8_ok", ""]
     from nodes.otr_image_director import OTRImageDirector
     schema = OTRImageDirector.INPUT_TYPES()
     for name in _RETIRED_GRANULARITY:

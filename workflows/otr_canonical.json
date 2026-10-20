@@ -2260,6 +2260,16 @@
             "name": "dtype_policy"
           },
           "link": null
+        },
+        {
+          "localized_name": "character_photos",
+          "name": "character_photos",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "character_photos"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -2285,7 +2295,8 @@
         "request_hash",
         42,
         "{}",
-        "fp8_ok"
+        "fp8_ok",
+        ""
       ],
       "color": "#432",
       "bgcolor": "#653"

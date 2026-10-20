@@ -86,7 +86,8 @@ def test_the_form_follows_his_order():
     (2026-09-28) sits above the pickers it replaces. Every checklist -- the
     language, bank and style pools and the video and still pools -- closes the
     form, after Space saver (operator, 2026-09-28: "all the clickbox sections
-    are at the bottom after space saver")."""
+    are at the bottom after space saver"). Character photos (2026-10-20) sit
+    under "who is in it", the cast they belong to."""
     names = [w for _t, w in (tuple(e[:2]) for e in CONFIG["form"])]
     assert names == [
         "episode_language",
@@ -106,7 +107,8 @@ def test_the_form_follows_his_order():
         "google_api_slot_a_model", "google_api_slot_b_model",
         "upscale_engine",
         "lemmy_cameo",
-        "story_characters", "story_plot", "story_setting", "story_author",
+        "story_characters", "character_photos",
+        "story_plot", "story_setting", "story_author",
         "music_style",
         "asset_cleanup",
         "language_roll_pool", "bank_roll_pool", "style_roll_pool",
