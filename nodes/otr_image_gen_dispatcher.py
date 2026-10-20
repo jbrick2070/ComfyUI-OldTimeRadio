@@ -618,6 +618,20 @@ def _reresolve_episode_stills_dir(ep, ep_dir, warnings, ledger=None):
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 
+def _portrait_png(portrait_row, portrait_hash, output_dir) -> str:
+    """The portrait row's PNG on disk, or "". Confined before the stat (Sonnet
+    QA, 2026-10-18): the row is ledger data, so outside the approved folders it
+    reads as absent; the content-addressed pool path is the fallback."""
+    cand = _confined_or_empty(str((portrait_row or {}).get("pool_path")
+                                  or (portrait_row or {}).get("path") or ""))
+    if not cand or not os.path.isfile(cand):
+        try:
+            cand = str(_pl.portrait_path_for_hash(portrait_hash, output_dir) or "")
+        except Exception:  # noqa: BLE001 -- resolver is best-effort
+            cand = ""
+    return cand if cand and os.path.isfile(cand) else ""
+
+
 def _confined_or_empty(path) -> str:
     try:
         from ._otr_paths import confined_or_empty
@@ -1948,17 +1962,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 and getattr(_safe_engine(engine_id),
                             "accepts_reference_image", False)
                 and otr_env.get("OTR_PORTRAIT_REFERENCE", "1") != "0"):
-            # Confined before the stat (Sonnet QA, 2026-10-18): the row is
-            # ledger data; outside the approved folders it reads as absent.
-            _cand = _confined_or_empty(str(portrait_row.get("pool_path")
-                                           or portrait_row.get("path") or ""))
-            if not _cand or not os.path.isfile(_cand):
-                try:
-                    _cand = str(_pl.portrait_path_for_hash(
-                        anchor_hash, output_dir) or "")
-                except Exception:  # noqa: BLE001 -- resolver is best-effort
-                    _cand = ""
-            if _cand and os.path.isfile(_cand):
+            _cand = _portrait_png(portrait_row, anchor_hash, output_dir)
+            if _cand:
                 reference_image = _cand
             else:
                 # Fail SOFT and LOUD. An unanchored mint is exactly as good as
@@ -1999,6 +2004,27 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 anchor_hash = _photos.photo_hash(_photo_path)
                 log.info("[OTR_ImageGenDispatcher] %s: portrait painted from the "
                          "photo %s", oid, identity_photo)
+
+        # THE OTHER PEOPLE IN THE FRAME (2026-10-20). A character still follows
+        # its speaker's portrait, but a two-shot drew the OTHER person from
+        # text alone, so they changed face beat to beat (live proof, 00:30: the
+        # man beside MagnoliaRex was a stranger in every one of her stills).
+        # MetaBrief lists the other cast members the scene prompt names; each
+        # one's portrait rides along as a further reference, and every hash
+        # joins the cache anchor so a new portrait of anyone in the frame is a
+        # new still.
+        co_references: list = []
+        if reference_image and kind == "scene_character":
+            for _co_id in obj.get("co_char_ids") or ():
+                _co_row = next(
+                    (r for r in reversed(images)
+                     if isinstance(r, dict) and r.get("kind") == "portrait"
+                     and str(r.get("object_id") or "") == str(_co_id)), None)
+                _co_hash = str((_co_row or {}).get("portrait_content_hash") or "")
+                _co_png = _portrait_png(_co_row, _co_hash, output_dir) if _co_row else ""
+                if _co_png:
+                    co_references.append(_co_png)
+                    anchor_hash = f"{anchor_hash}+{_co_hash}"
 
         seed, anchor_mode = resolve_seed_and_mode(
             seed_cfg, oid, prompt_hash, kind=kind, char_id=char_id,
@@ -2190,6 +2216,9 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             # can condition on one. Empty string on every other path, so an
             # adapter that never opts in sees exactly the request it always saw.
             "reference_image": reference_image,
+            # The portraits of the other characters the prompt names; empty
+            # unless the engine took the speaker's reference above.
+            "reference_images": co_references,
             # w/h end-to-end (pass-02 Gem-1): the engine call reads
             # width/height (flux_gen1._flux_params request precedence), so
             # landscape scene stills are REAL, not env defaults.

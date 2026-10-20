@@ -249,3 +249,85 @@ def test_a_photo_never_forces_a_portrait_onto_a_lane_that_cannot_use_it():
         identity_photos={"c02": "jane.png"})
     assert _portraits(payload) == []
     assert any("jane.png" in w and "NOT USED" in w for w in warnings)
+
+
+# --------------------------------------------------------------------------- #
+# The other people in the frame (live proof 2026-10-20 00:30: the man beside
+# MagnoliaRex was a stranger in every one of her stills)
+# --------------------------------------------------------------------------- #
+_BY_ID = {"c01": {"name": "The Announcer"}, "c02": {"name": "Jeffrey"},
+          "c03": {"name": "MagnoliaRex"}, "c04": {"name": "Cat"},
+          "c05": {"name": "Al"}}
+
+
+def test_the_prompt_names_the_people_in_the_frame():
+    prompt = "MagnoliaRex beside JEFFREY in a frozen Seoul; a gray cat at their feet"
+    assert mbp.co_present_char_ids(prompt, _BY_ID, "c03") == ["c02", "c04"]
+    assert mbp.co_present_char_ids(prompt, _BY_ID, "c02") == ["c03", "c04"]
+
+
+def test_names_match_whole_words_only_and_the_count_is_capped():
+    assert mbp.co_present_char_ids("a scattering of albums", _BY_ID, "c02") == []
+    crowd = {f"c{i:02d}": {"name": f"Person{i}"} for i in range(10)}
+    text = " ".join(f"Person{i}" for i in range(10))
+    assert len(mbp.co_present_char_ids(text, crowd, "c00")) == mbp.CO_REFERENCE_LIMIT
+
+
+def test_co_presence_is_wired_where_scene_stills_are_built():
+    import inspect
+    assert "co_present_char_ids(sprompt, _cast_by_id, _cid)" in inspect.getsource(mbp)
+
+
+def test_the_other_peoples_portraits_ride_with_the_speakers(monkeypatch, tmp_path):
+    from nodes._otr_shared import role_slots as rs
+    monkeypatch.setattr(disp._ireg, "assert_usable", lambda engine_id, role: None)
+    monkeypatch.setattr(disp._ireg, "get_engine", lambda engine_id: _Engine(True))
+    seen = []
+
+    def gen(request):
+        seen.append(dict(request))
+        shade = 40 + 60 * len(seen)          # a different picture per mint
+        return np.full((64, 64, 3), shade % 256, dtype=np.uint8)
+
+    def portrait(cid):
+        return {"object_id": cid, "kind": "portrait", "role": "character_video",
+                "char_id": cid, "w": 64, "h": 64, "prompt": "portrait of " + cid}
+
+    scene = {"object_id": "still_b001", "kind": "scene_character",
+             "role": "character_video", "char_id": "c02", "beat_id": "b001",
+             "co_char_ids": ["c03"], "w": 64, "h": 64,
+             "prompt": "Jeffrey and MagnoliaRex on a frozen street"}
+    policy = {"policy_version": 2, "seed": {"request_seed": 0},
+              "video_models": {s: "still_motion" for s in rs.ROLE_TO_VIDEO_SLOT.values()},
+              "image_models": {"character_image_model": {"engine_id": "flux3_klein"}}}
+    disp.dispatch_images(
+        {"episode_id": "ep_co", "cast": [{"char_id": "c02", "name": "Jeffrey"},
+                                         {"char_id": "c03", "name": "MagnoliaRex"}]},
+        policy, {"version": 1, "objects": [portrait("c02"), portrait("c03"), scene],
+                 "required_scene_targets": [{"object_id": "still_b001",
+                                             "kind": "scene_character",
+                                             "role": "character_video",
+                                             "beat_id": "b001"}]},
+        gen_fn=gen, output_dir=str(tmp_path / "out"), lockdir=tmp_path / "lease.lockdir")
+    still = next(r for r in seen if r["object_id"] == "still_b001")
+    assert still["reference_image"] and len(still["reference_images"]) == 1
+    assert still["reference_images"][0] != still["reference_image"]
+    assert not any(r.get("reference_images") for r in seen if r["object_id"] != "still_b001")
+
+
+def test_klein_chains_one_reference_latent_per_portrait(monkeypatch):
+    from nodes._otr_image_engines import registry as ireg
+    monkeypatch.setenv("OTR_FLUX3_REFERENCE", "1")
+    eng = ireg.get_engine("flux3_klein")
+    p = eng._params({"prompt": "two people", "seed": 1, "reference_image": "a.png",
+                     "reference_images": ["b.png", "c.png"]})
+    g = eng._build_graph(p, lambda node, slot: ("wire", node, slot))
+    assert [g[k]["inputs"]["image"] for k in ("load_ref", "load_ref_1", "load_ref_2")] == [
+        "a.png", "b.png", "c.png"]
+    assert g["ref_pos_1"]["inputs"]["conditioning"] == ("wire", "ref_pos", 0)
+    assert g["ref_pos_2"]["inputs"]["conditioning"] == ("wire", "ref_pos_1", 0)
+    assert g["ksampler"]["inputs"]["positive"] == ("wire", "ref_pos_2", 0)
+    assert g["ksampler"]["inputs"]["negative"] == ("wire", "ref_neg_2", 0)
+    # Companions never stand in for a missing speaker reference.
+    lone = eng._params({"prompt": "x", "reference_images": ["b.png"]})
+    assert lone["reference_images"] == [] and lone["reference_image"] == ""

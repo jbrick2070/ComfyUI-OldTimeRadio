@@ -730,6 +730,31 @@ def _reference_still_roles_from_policy(policy_json):
     return roles
 
 
+#: At most this many other characters' portraits ride along with the speaker's.
+CO_REFERENCE_LIMIT = 3
+
+
+def co_present_char_ids(prompt, cast_by_id, speaker_id):
+    """The other cast members a scene prompt names, in order of first mention.
+
+    A two-shot's second person is drawn from text alone unless their portrait
+    goes with the speaker's, and then they change face from beat to beat. The
+    composed prompt is what the still engine draws, so the people it names are
+    the people in the frame: a whole-word, case-folded match on each cast
+    member's name, at most CO_REFERENCE_LIMIT, never the speaker again.
+    """
+    text = str(prompt or "").casefold()
+    found = []
+    for cid, row in (cast_by_id or {}).items():
+        name = " ".join(str((row or {}).get("name") or "").split()).casefold()
+        if not cid or cid == speaker_id or len(name) < 2:
+            continue
+        hit = re.search(r"(?<![\w])" + re.escape(name) + r"(?![\w])", text)
+        if hit:
+            found.append((hit.start(), str(cid)))
+    return [cid for _pos, cid in sorted(found)][:CO_REFERENCE_LIMIT]
+
+
 def _identity_photos_from_policy(policy_json, cast, warnings):
     """``{char_id: photo file}`` for the image policy's character photos.
 
@@ -2471,6 +2496,10 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 _obj["source_context_hash"] = _source_receipts[-1]["source_context_hash"]
             if _cid:
                 _obj["char_id"] = _cid     # traceability; engine resolves by role
+                if tgt["kind"] == "scene_character":
+                    _co = co_present_char_ids(sprompt, _cast_by_id, _cid)
+                    if _co:
+                        _obj["co_char_ids"] = _co
                 # IDENTITY TRANSPORT (2026-08-26). A scene_character still seeds
                 # from the CHARACTER'S PORTRAIT prompt so every beat of that
                 # character draws one face (commit 89e82181). When the video lane
