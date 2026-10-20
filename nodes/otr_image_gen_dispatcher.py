@@ -1986,6 +1986,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # different portrait and never a cache hit on the old one.
         identity_photo = str(obj.get("identity_photo") or "")
         photo_more: list = []
+        photo_more_names: list = []   # the extras actually used, for the row
         if kind == "portrait" and identity_photo:
             _photo_path = _photos.resolve_photo(identity_photo)
             if not _photo_path:
@@ -2011,6 +2012,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     _more_path = _photos.resolve_photo(str(_more))
                     if _more_path:
                         photo_more.append(_more_path)
+                        photo_more_names.append(str(_more))
                         anchor_hash = f"{anchor_hash}+{_photos.photo_hash(_more_path)}"
                     else:
                         report.append(
@@ -2273,8 +2275,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             # Recorded on the row only when the photo truly conditioned it.
             "identity_photo": (identity_photo if reference_image and kind == "portrait"
                                else ""),
-            "identity_photo_more": ([str(m) for m in obj.get("identity_photo_more") or ()]
-                                    if photo_more else []),
+            "identity_photo_more": list(photo_more_names),
             "lettering_style": lettering_style,
             "backdrop_family": backdrop_family,
             "obj": obj, "obj_w": obj_w, "obj_h": obj_h,
