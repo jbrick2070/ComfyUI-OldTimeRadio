@@ -103,6 +103,11 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       `output/otr/obs/bird_song_20261019_191143__cart__n16f__fk3i__koko__sspr__cg412__sa3_final.mp4`
       (A Midsummer Night's Dream, Bottom and Titania; 1 act foley; 71 MB, 1m45s; sha 0c8953bd).
       Keep it: do not re-render or overwrite. The demo shows a highlight cut of it (ffmpeg, no render).
+      CUT MADE: output/otr/episodes/demo_cuts/midsummer_highlight.mp4 (39.5-66 s of the episode,
+      26.6 s, Titania wakes -> Bottom's song -> "I love thee"; 0.5 s fades). Its stills are FLUX 3
+      Klein (rendered before the MOSS switch). Eye check: the title cards show glitchy lettering and
+      two frames (0:36, 0:52) flash as negatives -- intended Signal Lost glitches, or a defect?
+      Form + demo drafts: apple/CONTEST_SUBMISSION_DRAFT.md, apple/CONTEST_DEMO_SCRIPT.md.
 - [ ] **Demo episode, My Story half: RENDERING (started 22:53 on 10-19, 3 acts, foley, MOSS).**
       Operator: "make my story the fictional tale of Jeffrey and MagnoliaRex, the later chapters
       ... it's my published book, I own the rights" (his book "Mime Lung Music Festival", Part 2;
