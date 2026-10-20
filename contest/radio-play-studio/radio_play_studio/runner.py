@@ -169,7 +169,7 @@ class Studio:
             client = self._client_factory(self.settings.api_url)
             job = client.submit(client.workflows.from_json(graph))
             yield {"type": "submitted"}
-            stream_whole, last_status, most_done = True, None, 0
+            stream_whole, last_status, most_done, settled = True, None, 0, False
             try:
                 for event in job.events():
                     if type(event).__name__ == "StatusChange":
@@ -181,8 +181,12 @@ class Studio:
                             stream_whole = False
                         last_status = status
                     note = normalize_event(event, len(graph))
-                    if note and note["type"] == "progress":
-                        most_done = max(most_done, int(getattr(event, "nodes_done", 0) or 0))
+                    if note and note["type"] == "progress" and getattr(event, "nodes_total", None):
+                        done = int(getattr(event, "nodes_done", 0) or 0)
+                        most_done = max(most_done, done)
+                        # Every node ComfyUI started has finished and none is running.
+                        settled = (done == int(event.nodes_total)
+                                   and getattr(event, "current_node", None) is None)
                     if note and note["type"] in ("progress", "step"):
                         node = getattr(event, "current_node", None)
                         # Only a graph-wide frame can say "between nodes"; a
@@ -214,8 +218,11 @@ class Studio:
             # messages and this stream goes quiet with no error. On 2026-10-19 a
             # recorder did that 30 s in; the app saw 2 of 22 nodes finish and
             # billed the whole 76 minutes to the writer. A stream that never saw
-            # most of the graph finish is not a measurement.
-            if stream_whole and most_done * 2 >= len(graph) and clock.timings():
+            # most of the graph finish is not a measurement, and neither is one
+            # whose last graph-wide frame still had a node running (starved late,
+            # mid-video: that node's hour would be billed to whatever came last).
+            if (stream_whole and settled and most_done * 2 >= len(graph)
+                    and clock.timings()):
                 save_timing(timing_file, clock.timings())
         except Exception as exc:  # noqa: BLE001 - reported to the person, not swallowed
             yield {"type": "error", "message": describe_failure(exc)}

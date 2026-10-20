@@ -351,7 +351,8 @@ def test_a_good_run_saves_its_times_and_the_next_run_reads_the_clock(settings, s
 
     def job():
         j = _good_job()
-        j._events = [RealProgress(value=1.0, nodes_done=1, nodes_total=1, current_node="1")] + list(j._events)
+        j._events = [RealProgress(value=0.5, nodes_done=1, nodes_total=2, current_node="2"),
+                     RealProgress(value=1.0, nodes_done=2, nodes_total=2, current_node=None)] + list(j._events)
         return j
 
     first = list(Studio(settings, client_factory=lambda url: FakeClient(job()),
@@ -359,7 +360,7 @@ def test_a_good_run_saves_its_times_and_the_next_run_reads_the_clock(settings, s
     assert first[-1]["type"] == "done"
     assert "minutes_left" not in [e for e in first if e["type"] == "progress"][0]
     saved = next((settings.out_dir / "timing").glob("*.acts-1.*.json"))   # the fixture's act_count
-    assert load_timing(saved).get("1", 0) > 0
+    assert load_timing(saved).get("2", 0) > 0
 
     second = list(Studio(settings, client_factory=lambda url: FakeClient(job()),
                          fetch=lambda url: schemas, now=Ticking()).stream({}))
@@ -439,5 +440,19 @@ def test_a_starved_stream_saves_no_times(settings, schemas):
     good._events = starved + list(good._events)
     studio, _ = _studio(settings, schemas, good)
     assert len(graph) >= 2
+    assert list(studio.stream({}))[-1]["type"] == "done"
+    assert not (settings.out_dir / "timing").exists()
+
+
+def test_a_stream_starved_late_mid_node_saves_no_times(settings, schemas):
+    # Half the graph finished, then the stream went quiet while a node was still
+    # running: the last graph-wide frame never says "all started nodes done".
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    good = _good_job()
+    graph, _ = Studio(settings, fetch=lambda url: schemas).build_graph({})
+    late = [RealProgress(value=0.9, nodes_done=len(graph), nodes_total=len(graph) + 1, current_node="9")]
+    good._events = late + list(good._events)
+    studio, _ = _studio(settings, schemas, good)
     assert list(studio.stream({}))[-1]["type"] == "done"
     assert not (settings.out_dir / "timing").exists()
