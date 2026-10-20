@@ -24,7 +24,9 @@ def test_the_form_offers_the_servers_live_choices(schemas):
     banks = schemas["OTR_LedgerScriptWriter"]["input"]["required"]["source_bank"][0]
     assert rows["bank"]["choices"] == banks
     assert rows["cast_size"]["min"] == 1 and rows["cast_size"]["max"] == 6
-    assert [r["key"] for r in describe_form(schemas)] == [f.key for f in FIELDS]
+    # The stand-in pack predates character photos, so that optional row is left off.
+    assert [r["key"] for r in describe_form(schemas)] == [
+        f.key for f in FIELDS if f.key != "my_photos"]
 
 
 def test_a_row_starts_on_the_workflows_own_value(schemas, workflow):

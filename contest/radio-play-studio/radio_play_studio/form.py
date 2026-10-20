@@ -12,9 +12,10 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from .graph import GraphError, coerce_value, describe_input, node_id_for_type
+from .graph import GraphError, coerce_value, describe_input, has_input, node_id_for_type
 
 WRITER = "OTR_LedgerScriptWriter"
+IMAGE_DIRECTOR = "OTR_ImageDirector"
 
 #: The story bank that reads the four My Story boxes, and their group on the page.
 MY_STORY_BANK = "my_story"
@@ -36,6 +37,9 @@ class Field:
     also: tuple = ()
     #: Never offer a choice that starts with one of these.
     exclude_prefixes: tuple = ()
+    #: An input an older pack may not have yet: left off the form there, and
+    #: refused only if a run actually tries to set it.
+    optional: bool = False
 
 
 #: In the order they appear on the page.
@@ -71,6 +75,12 @@ FIELDS: tuple = (
           "right after a name and that character is voiced and drawn that way; "
           "anyone unmarked is cast to fit the part. Leave it empty and the cast is "
           "invented for you.", MY_STORY),
+    Field("my_photos", "Character photos", IMAGE_DIRECTOR, "character_photos",
+          "Optional. One line per character, Name = file, naming a picture in "
+          "ComfyUI's input folder. The character's portrait is painted from it, "
+          "in the episode's style, and every still follows the portrait. The "
+          "cast cards fill this in when you add a photo.",
+          MY_STORY, optional=True),
     Field("my_plot", "What happens", WRITER, "story_plot",
           "Events, the trouble, a twist, the ending you want. Rough notes are fine: "
           "what you ask for outranks anything the writer would rather invent, and "
@@ -91,9 +101,26 @@ EPISODE_NODE_TYPE = "OTR_MasterAudioMux"
 
 
 def locate_nodes(workflow: dict) -> dict:
-    """`{node_type: node_id}` for every node type the form or the run needs."""
-    types = {f.node_type for f in FIELDS} | {EPISODE_NODE_TYPE}
-    return {t: node_id_for_type(workflow, t) for t in sorted(types)}
+    """`{node_type: node_id}` for every node type the form or the run needs.
+
+    A type only optional fields use may be missing from a workflow (an
+    audio-only graph has no still pictures to give a photo to); it maps to None
+    and those rows are left off."""
+    needed = {f.node_type for f in FIELDS if not f.optional} | {EPISODE_NODE_TYPE}
+    ids = {t: node_id_for_type(workflow, t) for t in sorted(needed)}
+    for t in sorted({f.node_type for f in FIELDS} - needed):
+        present = [n for n in workflow.get("nodes") or [] if n.get("type") == t]
+        ids[t] = node_id_for_type(workflow, t) if present else None
+    return ids
+
+
+def _offered(f: Field, schemas: dict, node_ids: dict | None) -> bool:
+    """False for an optional field this server or this workflow cannot take."""
+    if not f.optional:
+        return True
+    if node_ids is not None and node_ids.get(f.node_type) is None:
+        return False
+    return has_input(schemas, f.node_type, f.input)
 
 
 def describe_form(schemas: dict, api_prompt: dict | None = None, node_ids: dict | None = None) -> list:
@@ -104,6 +131,8 @@ def describe_form(schemas: dict, api_prompt: dict | None = None, node_ids: dict 
     would; without it, a row starts on the node's default."""
     rows = []
     for f in FIELDS:
+        if not _offered(f, schemas, node_ids):
+            continue
         info = _usable(describe_input(schemas, f.node_type, f.input), f)
         default = info["default"]
         if api_prompt is not None and node_ids is not None:
@@ -137,6 +166,14 @@ def apply_choices(api_prompt: dict, schemas: dict, node_ids: dict, choices: dict
         raise ValueError(f"unknown field(s): {', '.join(unknown)}")
     for key, value in choices.items():
         f = FIELDS_BY_KEY[key]
+        if not _offered(f, schemas, node_ids):
+            if value in (None, ""):
+                continue
+            if node_ids.get(f.node_type) is None:
+                raise GraphError(f"{f.label}: this workflow has no {f.node_type}, so it "
+                                 "draws no stills to use them in")
+            raise GraphError(f"{f.label} needs a newer Old-Time Radio pack: this ComfyUI's "
+                             f"{f.node_type} has no {f.input!r} input")
         node = api_prompt.get(node_ids[f.node_type])
         if node is None:
             raise GraphError(f"the graph has no {f.node_type} node")

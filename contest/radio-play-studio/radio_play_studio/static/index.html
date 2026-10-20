@@ -50,6 +50,21 @@
   .mode input { width: auto; margin: 0 6px 0 0; }
   .mode:has(input:checked) { border-color: var(--accent); }
   [hidden] { display: none !important; }
+  .cast { display: grid; gap: 12px; margin-top: 8px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg);
+          display: grid; grid-template-columns: 96px 1fr; gap: 12px; }
+  @media (max-width: 560px) { .card { grid-template-columns: 1fr; } }
+  .face { width: 96px; height: 96px; border-radius: 8px; border: 1px dashed var(--line);
+          display: flex; align-items: center; justify-content: center; overflow: hidden;
+          color: var(--muted); font-size: 2rem; background: var(--panel); }
+  .face img { width: 100%; height: 100%; object-fit: cover; }
+  .card .who { display: grid; grid-template-columns: 1fr 120px; gap: 8px; }
+  .card label { margin: 6px 0 2px; font-size: .875rem; }
+  .card textarea { min-height: 56px; }
+  .card .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .small { padding: 6px 12px; font-size: .875rem; }
+  .quiet { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .castbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -133,6 +148,9 @@ function build(list) {
     help.textContent = f.help;
     row.append(label, control(f), help);
     boxes[f.group].appendChild(row);
+    // The characters box is written by the cast cards, and the photos box with it.
+    if (f.key === "my_characters") boxes[f.group].appendChild(castEditor());
+    if (f.key === "my_characters" || f.key === "my_photos") row.hidden = true;
   }
   const bank = list.find((f) => f.key === "bank");
   const ownStory = boxes[MY_STORY_GROUP] && bank && bank.choices.includes(MY_STORY_BANK);
@@ -144,6 +162,195 @@ function build(list) {
     setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic");
   }
   go.disabled = running;
+}
+
+// -- The cast cards: one per character, each with an optional photo ---------
+// They write the "Who is in it" text the pack's writer reads, one line per
+// character, and the "Name = file" photo lines. A photo is the reference the
+// character's portrait is painted from, and every still of them follows it.
+let cast = [];
+// The pack voices and draws every character as a man or a woman, so the card
+// offers exactly that, or leaves it to the writer.
+const VOICES = [["", "voice: any"], ["he", "he"], ["she", "she"]];
+
+// The example: the author's own story and characters (Jeffrey A. Brick,
+// "Mime Lung Music Festival", Part 2) -- the cast of Veo-Moovie-Maker's sample.
+const EXAMPLE = {
+  cast: [
+    {name: "Jeffrey", pronoun: "he",
+     who: "A former VJ who died of lung cancer in 2061 and lives on as a preserved mind in a government-run virtual afterlife; shy, devoted, makes live video art.",
+     look: "52 years old, 5 foot 7, about 192 pounds, chubby and stocky. Clean-shaven, short to medium-length hair that is slightly unkempt, a round face with gentle features. Loose, comfortable casual clothes in pinks, soft pastels, muted reds and light blues. Approachable, peaceful, slightly disheveled."},
+    {name: "MagnoliaRex", pronoun: "she",
+     who: "An electronic music artist preserved in the same program in 2095; cool, guarded, science-literate, secretly tender.",
+     look: "An ageless adult woman, tall, slim and elegant. Symmetrical features, high cheekbones, a defined jawline. Long, dark, voluminous hair with subtle asymmetry and faint star-like speckling. Eclectic pop clothing with layered textures in violet, black, metallic gold and electric accents. Confident, iconic, composed."},
+    {name: "Cat", pronoun: "",
+     who: "A talking cat in Cairo who gives Jeffrey a clue.",
+     look: "An Egyptian-type adult cat, slender and long-limbed. Very short, smooth, dark gray to charcoal fur, a wedge-shaped head, large almond-shaped eyes, large upright ears, a long tapered tail. Elegant, alert, intelligent."},
+  ],
+  my_plot: "Act 1: Jeffrey wins MagnoliaRex's contest prize, a day with a fan, at a UN festival in Athens celebrating the cure for cancer, and the day never ends. She warns, 'We won't be like this forever.' Act 2: a 207-concert charity world tour, a Valentine's riddle chase from the space station to Cairo to Zurich, alien sculptors on a far planet; meanwhile in the real world, climate collapse is breaking the machines that keep the preserved minds alive. Act 3: a self-flying copper plane takes them to a frozen, empty Seoul with ten days left. A meteor has wrecked the generator that keeps them running, and their satellite lasers go astray. She says 'I love you,' then plays him a duet she secretly made from his recorded voice. At 11:59 p.m. on January 25: 'Bon voyage, Jeffrey! Have a wonderful time!'",
+  my_setting: "A virtual afterlife in the year 2095, where minds borrow robots and drones; Athens, festival grounds, a world tour, a frozen, empty Seoul in January.",
+  my_author: "Jeffrey A. Brick",
+};
+
+function castLines() {
+  const people = cast.filter((c) => c.name.trim());
+  const text = people.map((c) => {
+    const name = c.name.trim() + (c.pronoun ? " (" + c.pronoun + ")" : "");
+    const who = c.who.trim(), look = c.look.trim();
+    return name + (who ? ": " + who : "") + (look ? (who ? " " : ": ") + "Looks: " + look : "");
+  }).join("\n");
+  const photos = people.filter((c) => c.file)
+    .map((c) => c.name.trim().replace(/=/g, " ") + " = " + c.file).join("\n");
+  return {text, photos};
+}
+
+function syncCast() {
+  const {text, photos} = castLines();
+  if ($("f_my_characters")) $("f_my_characters").value = text;
+  if ($("f_my_photos")) $("f_my_photos").value = photos;
+}
+
+function castEditor() {
+  const wrap = document.createElement("div");
+  wrap.id = "cast_editor";
+  const label = document.createElement("label");
+  label.textContent = "Who is in it";
+  const help = document.createElement("p");
+  help.className = "help";
+  help.textContent = "One card per character. Say how they look in fixed terms (age, build, face, " +
+    "hair, clothes) so they look the same in every shot, and add a photo if you like: their " +
+    "portrait is painted from it, in the episode's style, and every still follows that portrait. " +
+    "Photos need the flux3_klein still pictures. Leave the cards empty and the cast is invented for you.";
+  const list = document.createElement("div");
+  list.className = "cast"; list.id = "cast_list";
+  const bar = document.createElement("div");
+  bar.className = "castbar";
+  const add = document.createElement("button");
+  add.type = "button"; add.className = "small"; add.textContent = "Add a character";
+  add.addEventListener("click", () => { cast.push(blankCard()); drawCast(); });
+  const example = document.createElement("button");
+  example.type = "button"; example.className = "small quiet"; example.id = "load_example";
+  example.textContent = "Load the example (Jeffrey and MagnoliaRex)";
+  example.addEventListener("click", loadExample);
+  bar.append(add, example);
+  wrap.append(label, help, list, bar);
+  return wrap;
+}
+
+function blankCard() { return {name: "", pronoun: "", who: "", look: "", file: "", thumb: ""}; }
+
+function drawCast() {
+  const list = $("cast_list");
+  if (!list) return;
+  list.textContent = "";
+  cast.forEach((c, i) => list.appendChild(castCard(c, i)));
+  syncCast();
+}
+
+function labelled(text, el) {
+  const l = document.createElement("label");
+  l.textContent = text;
+  const box = document.createElement("div");
+  box.append(l, el);
+  return box;
+}
+
+function castCard(c, i) {
+  const el = document.createElement("div");
+  el.className = "card";
+  const face = document.createElement("div");
+  face.className = "face";
+  if (c.thumb) {
+    const img = document.createElement("img");
+    img.src = c.thumb; img.alt = c.name;
+    face.appendChild(img);
+  } else {
+    face.textContent = (c.name.trim()[0] || "?").toUpperCase();
+  }
+  const body = document.createElement("div");
+
+  const name = document.createElement("input");
+  name.type = "text"; name.value = c.name; name.placeholder = "Name";
+  name.addEventListener("input", () => { c.name = name.value; syncCast(); });
+  const voice = document.createElement("select");
+  for (const [value, text] of VOICES) {
+    const o = document.createElement("option");
+    o.value = value; o.textContent = text;
+    voice.appendChild(o);
+  }
+  voice.value = c.pronoun;
+  voice.addEventListener("change", () => { c.pronoun = voice.value; syncCast(); });
+  const top = document.createElement("div");
+  top.className = "who";
+  top.append(labelled("Name", name), labelled("Voice", voice));
+
+  const who = document.createElement("textarea");
+  who.value = c.who; who.placeholder = "Who they are: their part in the story, what they are like.";
+  who.addEventListener("input", () => { c.who = who.value; syncCast(); });
+  const look = document.createElement("textarea");
+  look.value = c.look;
+  look.placeholder = "How they look, in fixed terms: age, build, face, hair, the clothes they always wear.";
+  look.addEventListener("input", () => { c.look = look.value; syncCast(); });
+
+  const tools = document.createElement("div");
+  tools.className = "tools";
+  const pick = document.createElement("input");
+  pick.type = "file"; pick.accept = "image/png,image/jpeg,image/webp"; pick.hidden = true;
+  const photo = document.createElement("button");
+  photo.type = "button"; photo.className = "small quiet";
+  photo.textContent = c.file ? "Change photo" : "Add a photo";
+  photo.addEventListener("click", () => pick.click());
+  const state = document.createElement("span");
+  state.className = "help";
+  pick.addEventListener("change", () => addPhoto(c, pick.files[0], state));
+  tools.append(photo, pick, state);
+  if (c.file) {
+    const drop = document.createElement("button");
+    drop.type = "button"; drop.className = "small quiet"; drop.textContent = "Remove photo";
+    drop.addEventListener("click", () => { c.file = ""; c.thumb = ""; drawCast(); });
+    tools.appendChild(drop);
+  }
+  const remove = document.createElement("button");
+  remove.type = "button"; remove.className = "small quiet"; remove.textContent = "Remove character";
+  remove.addEventListener("click", () => { cast.splice(i, 1); drawCast(); });
+  tools.appendChild(remove);
+
+  body.append(top, labelled("Who they are", who), labelled("How they look", look), tools);
+  el.append(face, body);
+  return el;
+}
+
+function addPhoto(c, file, state) {
+  if (!file) return;
+  if (!$("f_my_photos")) {
+    state.textContent = "This ComfyUI's Old-Time Radio pack is too old for photos; update it.";
+    return;
+  }
+  state.textContent = "Sending the photo to your ComfyUI...";
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const res = await fetch("/api/photos", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({data: reader.result}),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || res.statusText);
+      c.file = body.file; c.thumb = reader.result;
+      drawCast();
+    } catch (err) {
+      state.textContent = "Photo not added: " + err.message;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadExample() {
+  cast = EXAMPLE.cast.map((c) => Object.assign(blankCard(), c));
+  for (const key of ["my_plot", "my_setting", "my_author"]) {
+    if ($("f_" + key)) $("f_" + key).value = EXAMPLE[key];
+  }
+  drawCast();
 }
 
 function modeSwitch() {
@@ -180,6 +387,7 @@ function setMode(mode) {
 }
 
 function collect() {
+  if ($("cast_list")) syncCast();   // the cards are the truth for both boxes
   const out = {};
   const bank = $("f_bank") ? $("f_bank").value : null;
   for (const f of fields) {

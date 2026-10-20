@@ -20,6 +20,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from .graph import GraphError, ServerUnreachable
+from .photos import MAX_PHOTO_BYTES, PhotoError, upload_photo
 from .runner import Studio
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -200,12 +201,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def _post(self) -> None:
         path = urlsplit(self.path).path
-        if path not in ("/api/episodes", "/api/presence"):
+        if path not in ("/api/episodes", "/api/presence", "/api/photos"):
             return self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
             return self._send_json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "send application/json"})
         if path == "/api/presence":
             return self._presence()
+        if path == "/api/photos":
+            return self._photo()
         try:
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}")
@@ -239,6 +242,20 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.runs.page_open(page)
         self._send_json(HTTPStatus.OK, {"ok": True})
+
+    def _photo(self) -> None:
+        """A character's photo: {"data": data URL} -> {"file": stored name}."""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > MAX_PHOTO_BYTES * 4 // 3 + 4096:
+                raise PhotoError(f"the picture is over {MAX_PHOTO_BYTES // (1024 * 1024)} MB")
+            body = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(body, dict):
+                raise PhotoError("send {'data': picture}")
+            stored = upload_photo(self.runs.studio.settings.comfyui_url, body.get("data"))
+        except (PhotoError, ValueError, TypeError) as exc:
+            return self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        self._send_json(HTTPStatus.OK, {"file": stored})
 
     def _options(self) -> None:
         try:

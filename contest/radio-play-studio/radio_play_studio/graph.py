@@ -181,6 +181,12 @@ def node_id_for_type(workflow: dict, node_type: str) -> str:
 # ---------------------------------------------------------------------------
 # What an input accepts
 # ---------------------------------------------------------------------------
+def has_input(schemas: dict, node_type: str, name: str) -> bool:
+    """True when the server's `node_type` takes an input called `name`."""
+    schema = (schemas.get(node_type) or {}).get("input") or {}
+    return any(name in (schema.get(section) or {}) for section in ("required", "optional"))
+
+
 def describe_input(schemas: dict, node_type: str, name: str) -> dict:
     """One input's rules, normalised across the two shapes a server reports a
     dropdown in (a bare list, or `("COMBO", {"options": [...]})`)."""
