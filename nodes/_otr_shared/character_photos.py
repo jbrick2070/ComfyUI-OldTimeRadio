@@ -1,7 +1,9 @@
 """Character photos: a person's own picture as a character's identity.
 
 OTR_ImageDirector's ``character_photos`` widget takes one line per character,
-``Name = file``, naming a picture in ComfyUI's input folder. The parsed map
+``Name = file`` -- or ``Name = a.png, b.png`` for up to PHOTOS_PER_CHARACTER
+pictures that together make one face (operator, 2026-10-20: "feel free to make
+an amalgamation") -- naming pictures in ComfyUI's input folder. The parsed map
 rides the image policy as ``character_photos``. MetaBrief matches each name to
 the cast ONCE (``match_cast``) and tags that character's portrait object with
 ``identity_photo``; the dispatcher then hands the photo to the still engine as
@@ -21,6 +23,9 @@ import os
 import re
 from typing import Iterable, Mapping
 
+#: At most this many photos per character; each is one more reference latent.
+PHOTOS_PER_CHARACTER = 3
+
 #: A bare picture name inside ComfyUI's input folder -- no separator, no "..".
 SAFE_PHOTO_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,95}\.(png|jpg|jpeg|webp)$",
                              re.IGNORECASE)
@@ -33,10 +38,11 @@ def name_key(name: str) -> str:
 
 
 def parse_photo_lines(text: str) -> "tuple[dict, list]":
-    """``({name: file}, problems)`` from ``Name = file`` lines.
+    """``({name: [file, ...]}, problems)`` from ``Name = file[, file...]`` lines.
 
     A malformed line, an unsafe file name or a name given twice is a problem,
-    reported and skipped -- the episode still renders."""
+    reported and skipped -- the episode still renders. Past
+    PHOTOS_PER_CHARACTER, the rest of a line is reported and dropped."""
     photos: dict = {}
     seen: dict = {}
     problems: list = []
@@ -44,27 +50,46 @@ def parse_photo_lines(text: str) -> "tuple[dict, list]":
         line = raw.strip()
         if not line:
             continue
-        name, sep, filename = line.rpartition("=")
-        name, filename = " ".join(name.split()), filename.strip()
+        name, sep, listed = line.rpartition("=")
+        name = " ".join(name.split())
         if not sep or not name:
             problems.append(f"{line!r}: write it as Name = file")
             continue
-        if not SAFE_PHOTO_NAME.match(filename) or ".." in filename:
-            problems.append(f"{name}: {filename!r} is not a picture name in ComfyUI's "
-                            "input folder (png, jpg or webp, no folders)")
+        files = []
+        for filename in (f.strip() for f in listed.split(",")):
+            if not filename:
+                continue
+            if not SAFE_PHOTO_NAME.match(filename) or ".." in filename:
+                problems.append(f"{name}: {filename!r} is not a picture name in ComfyUI's "
+                                "input folder (png, jpg or webp, no folders)")
+            elif filename not in files:
+                files.append(filename)
+        if len(files) > PHOTOS_PER_CHARACTER:
+            problems.append(f"{name}: {len(files)} photos; the first "
+                            f"{PHOTOS_PER_CHARACTER} are used")
+            files = files[:PHOTOS_PER_CHARACTER]
+        if not files:
             continue
         key = name_key(name)
         if key in seen:
-            problems.append(f"{name}: given two photos; neither is used")
+            problems.append(f"{name}: given on two lines; neither is used")
             photos.pop(seen[key], None)
             continue
         seen[key] = name
-        photos[name] = filename
+        photos[name] = files
     return photos, problems
 
 
+def photo_list(value) -> list:
+    """A character's photos as a list: a policy written before several photos
+    were allowed carries one file name as a string."""
+    if isinstance(value, str):
+        return [value] if value else []
+    return [str(v) for v in (value or []) if v]
+
+
 def match_cast(cast: Iterable, photos: Mapping) -> "tuple[dict, list]":
-    """``({char_id: file}, problems)``: each photo's name matched to exactly one
+    """``({char_id: [file, ...]}, problems)``: each photo's name matched to exactly one
     cast member by ``name_key``. A name no cast member has, or that two share,
     is a problem -- never a guess."""
     by_key: dict = {}
@@ -79,7 +104,7 @@ def match_cast(cast: Iterable, photos: Mapping) -> "tuple[dict, list]":
     for name, filename in (photos or {}).items():
         ids = by_key.get(name_key(name), [])
         if len(ids) == 1:
-            matched[ids[0]] = filename
+            matched[ids[0]] = photo_list(filename)
         elif not ids:
             problems.append(f"{name}: no character by that name in this episode's cast; "
                             "the photo is not used")
@@ -122,5 +147,6 @@ def photo_hash(path: str) -> str:
     return digest.hexdigest()
 
 
-__all__ = ["SAFE_PHOTO_NAME", "name_key", "parse_photo_lines", "match_cast",
+__all__ = ["SAFE_PHOTO_NAME", "PHOTOS_PER_CHARACTER", "name_key", "parse_photo_lines",
+           "photo_list", "match_cast",
            "input_dir", "resolve_photo", "photo_hash"]

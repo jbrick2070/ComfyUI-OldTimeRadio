@@ -223,8 +223,9 @@ class OTRImageDirector:
                 "character_photos": ("STRING", {
                     "multiline": True, "default": "",
                     "tooltip": (
-                        "Optional. One line per character, Name = file, naming a "
-                        "picture in ComfyUI's input folder. That character's "
+                        "Optional. One line per character, Name = file (or "
+                        "Name = a.png, b.png for up to three photos of one "
+                        "face), naming pictures in ComfyUI's input folder. That character's "
                         "portrait is painted FROM the photo, in the episode's "
                         "style, and every still of them follows the portrait. "
                         "Needs a still engine that takes a reference image "
