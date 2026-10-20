@@ -107,6 +107,33 @@ _NEUTRAL_PROMPT_TERMS = frozenset({
 })
 
 
+def _subject_clause(char) -> str:
+    """What the picture MUST show, by the cast row's kind. A human's clause is
+    byte-identical to the one every request carried before the field."""
+    kind = _CAST_TEXT.kind_of(char)
+    if kind == "human":
+        return "a person with a clearly visible face"
+    if kind == "machine":
+        return "the machine its appearance describes, fully in view"
+    return f"the {kind} its appearance describes, its face clearly visible"
+
+
+def _kind_entry(row) -> dict:
+    """``{"kind": ...}`` for a non-human row, ``{}`` for a human -- so every
+    context and hash built from a human row is exactly what it was."""
+    kind = _CAST_TEXT.kind_of(row)
+    return {} if kind == "human" else {"kind": kind}
+
+
+def _world_clause(char) -> str:
+    """'a person in' for a human (byte-identical); 'an animal in', 'a machine
+    in', 'a creature in' otherwise."""
+    kind = _CAST_TEXT.kind_of(char)
+    if kind == "human":
+        return "a person in"
+    return f"{'an' if kind[0] in 'aeiou' else 'a'} {kind} in"
+
+
 def _anchor_stated_gender(prompt: str, char: dict) -> str:
     """`_ensure_gender_anchor` for a row that STATES male or female; a row
     with no gender is left exactly as it was. The per-beat scene still uses
@@ -140,6 +167,12 @@ def _ensure_gender_anchor(prompt: str, char: dict) -> str:
 
     text = str(prompt or "").strip()
     if not text:
+        return text
+    if _CAST_TEXT.kind_of(char) != "human":
+        # A cat, a robot, a dragon, as its WRITER says (the cast row's kind,
+        # never a guess from prose -- two word-list attempts both dropped
+        # real people's anchors). The voice still needs a binary; the picture
+        # gets no "adult woman, " -- that drew the Cat as a cat-woman.
         return text
     gender = normalize_gender((char or {}).get("gender"))
     words = set(re.findall(r"[a-z]+", text.lower()))
@@ -1580,7 +1613,7 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
     return (
         "Write ONE vivid still-image portrait prompt (a single comma-separated "
         "line, no preamble) for this character. The image MUST depict the "
-        "CHARACTER THEMSELVES -- a person with a clearly visible face, "
+        f"CHARACTER THEMSELVES -- {_subject_clause(char)}, "
         f"{framing} -- IN CHARACTER "
         "inside the story's world. NEVER an empty room, an object, or scenery "
         "alone. Ground it in the appearance and the story setting; keep it "
@@ -1592,7 +1625,7 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
         "Do not include film-stock, film-grain, or lighting-style terms; "
         "they are appended automatically later.\n"
         "Do not mention radios, microphones, studios, or any broadcasting "
-        "equipment anywhere in the prompt -- the character is a person in "
+        f"equipment anywhere in the prompt -- the character is {_world_clause(char)} "
         "the STORY's world, not a performer at a station.\n"
         "Return only the prompt line."
     )
@@ -1640,8 +1673,8 @@ def _build_char_scene_request(char: dict, meta: dict, setting: str,
     return (
         "Write ONE vivid cinematic STILL-image prompt (a single comma-separated "
         "line, no preamble) for a 16:9 LANDSCAPE shot of this character at THIS "
-        "moment of the scene. The image MUST show the CHARACTER THEMSELVES -- a "
-        "person with a clearly visible face -- as the subject, a medium/wide shot "
+        "moment of the scene. The image MUST show the CHARACTER THEMSELVES -- "
+        f"{_subject_clause(char)} -- as the subject, a medium/wide shot "
         "with the full head and headroom, framed inside the story's world; "
         f"{scene_direction} -- do NOT write the "
         "character's name, dialogue, narration, or any on-screen text. NEVER an "
@@ -1656,7 +1689,7 @@ def _build_char_scene_request(char: dict, meta: dict, setting: str,
         "Do not include film-stock, film-grain, or lighting-style terms; "
         "they are appended automatically later.\n"
         "Do not mention radios, microphones, studios, or any broadcasting "
-        "equipment -- the character is a person in the STORY's world.\n"
+        f"equipment -- the character is {_world_clause(char)} the STORY's world.\n"
         "Return only the prompt line."
     )
 
@@ -1713,6 +1746,8 @@ def _scene_source_context(meta, cast, lines, target, line, ledger_context=None):
     _DRAWABLE = ("name", "role", "gender", "age_band", "appearance")
     still_treatment = {**treatment, "cast": [
         {**{k: row.get(k) for k in _DRAWABLE if k in row},
+         # A non-human's kind only: a human's entry stays byte-identical.
+         **_kind_entry(row),
          # "none"/"n/a" is no look at all; the still author gets nothing
          "appearance": _CAST_TEXT.picture_appearance(row)}
         for row in planned_cast]}
@@ -1731,7 +1766,10 @@ def _scene_source_context(meta, cast, lines, target, line, ledger_context=None):
         return {"char_id": str(row.get("char_id") or ""), "name": name,
                 "appearance": _appearance_for_char([row], str(row.get("char_id") or "")),
                 "age_band": age,
-                "gender": row.get("gender") or planned.get("gender") or ""}
+                "gender": row.get("gender") or planned.get("gender") or "",
+                # The correction model must know a cat is a cat, or it
+                # re-humanizes the still it is rewriting (non-human only).
+                **_kind_entry(row if row.get("kind") else planned)}
 
     companions = [
         {**character_context(row),

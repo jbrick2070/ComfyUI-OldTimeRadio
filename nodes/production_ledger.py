@@ -1531,6 +1531,12 @@ class Ledger:
             acc = _safe_str(r.get("accent"))
             if acc:
                 row["accent"] = acc
+            # What the character is (2026-10-20). Kept ONLY when it is not
+            # human, so every human row -- every row any lane wrote before --
+            # has exactly the keys it had.
+            kind = _safe_str(r.get("kind")).strip().lower()
+            if kind in ("animal", "machine", "creature"):
+                row["kind"] = kind
             dorth = _safe_str(r.get("dialogue_orthography"))
             if dorth:
                 row["dialogue_orthography"] = dorth

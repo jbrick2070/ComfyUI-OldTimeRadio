@@ -529,7 +529,13 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
         # (separator sanitize now happens once on the COMPOSED string below,
         # so `setting` and any other authored field is covered too)
         if not subject:
-            subject = "a period-dressed character, face clearly visible"
+            try:
+                from ._otr_shared.cast_text import kind_of
+            except ImportError:  # pragma: no cover -- flat test imports
+                from _otr_shared.cast_text import kind_of  # type: ignore
+            _kind = kind_of(ce)
+            subject = ("a period-dressed character, face clearly visible"
+                       if _kind == "human" else f"a {_kind}, clearly visible")
     else:
         subject = get_open_subject(role, synthetic=(kind == "scene_open"),
                                    meta=meta, style=_style)
