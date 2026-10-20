@@ -128,13 +128,22 @@ def apply_choices(api_prompt: dict, schemas: dict, node_ids: dict, choices: dict
 
 
 def _check_my_story(api_prompt: dict, node_ids: dict) -> None:
-    """The pack stops a run whose story bank was picked by hand as anything but
+    """Two runs the pack stops, said before submitting instead of minutes in
+    (nodes/_otr_story_input.py): a story bank picked by hand as anything but
     my_story while a My Story box holds text (a roll reads the boxes if it lands
-    on My Story and ignores them otherwise). Say so before submitting, not
-    minutes into the run."""
+    on My Story and ignores them otherwise), and my_story with a classic named
+    in Source to adapt, which that bank has no way to fetch."""
     writer = api_prompt.get(node_ids.get(WRITER, ""), {}).get("inputs", {})
     bank = writer.get(FIELDS_BY_KEY["bank"].input)
-    if not isinstance(bank, str) or bank == MY_STORY_BANK or bank.startswith("roll"):
+    if bank == MY_STORY_BANK:
+        ref = writer.get(FIELDS_BY_KEY["source_ref"].input)
+        if isinstance(ref, str) and ref.strip():
+            raise ValueError(
+                f"{MY_STORY_BANK} tells your own story, so it has no classic to fetch, "
+                f"but Source to adapt says {ref.strip()!r}. Clear it, or pick a bank "
+                "that adapts a classic (shakespeare, public_domain).")
+        return
+    if not isinstance(bank, str) or bank.startswith("roll"):
         return
     filled = [f.label for f in FIELDS if f.group == MY_STORY
               and isinstance(writer.get(f.input), str) and writer[f.input].strip()]

@@ -176,7 +176,6 @@ function setMode(mode) {
   if (!own && bank.value === MY_STORY_BANK) bank.value = lastBank || bank.options[0].value;
   $("group_" + MY_STORY_GROUP.replace(/\W+/g, "_")).hidden = !own;
   for (const key of ["bank", "source_ref"]) if ($("row_" + key)) $("row_" + key).hidden = own;
-  if (own) $("f_my_characters") && $("f_my_characters").focus({preventScroll: true});
 }
 
 function collect() {
@@ -188,6 +187,9 @@ function collect() {
     // the hidden boxes must not ride along with a roll the person meant as
     // "surprise me".
     if (f.group === MY_STORY_GROUP && bank !== MY_STORY_BANK) continue;
+    // ...and my_story has no classic to adapt: the pack stops a run that names
+    // one (_otr_story_input.py), so it is sent empty, over any saved value.
+    if (f.key === "source_ref" && bank === MY_STORY_BANK) { out[f.key] = ""; continue; }
     const el = $("f_" + f.key);
     if (f.kind === "text" && el.value === "" ) continue;   // blank = the workflow's own value
     out[f.key] = (f.kind === "int" || f.kind === "float") ? Number(el.value) : el.value;

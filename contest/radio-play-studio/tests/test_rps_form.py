@@ -122,3 +122,11 @@ def test_the_author_box_is_the_credit_not_a_style():
     # the credits print it. It was once labelled "In the style of".
     f = FIELDS_BY_KEY["my_author"]
     assert f.input == "story_author" and f.label == "Written by"
+
+
+def test_my_story_with_a_classic_named_is_refused_before_submitting(schemas, workflow):
+    graph = workflow_to_api_prompt(workflow, schemas)
+    ids = locate_nodes(workflow)
+    with pytest.raises(ValueError, match="Source to adapt"):
+        apply_choices(graph, schemas, ids, {"bank": "my_story", "source_ref": "Hamlet",
+                                            "my_plot": "A storm cuts the island off."})
