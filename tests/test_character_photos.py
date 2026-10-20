@@ -346,3 +346,29 @@ def test_a_title_is_never_taken_for_a_first_name():
     cast = {"c02": {"name": "Lady Macbeth"}, "c03": {"name": "Macbeth"}}
     assert mbp.co_present_char_ids("Lady Macduff weeps", cast, "c03") == []
     assert mbp.co_present_char_ids("Lady Macbeth weeps", cast, "c03") == ["c02"]
+
+
+def test_the_person_spoken_to_is_in_the_frame():
+    """Live proof 2: the prompt described the man beside MagnoliaRex instead of
+    naming him; the script says he speaks the line before and after hers."""
+    cast = {"c01": {"name": "The Announcer"}, "c02": {"name": "Jeffrey"},
+            "c03": {"name": "MagnoliaRex"}, "c04": {"name": "Cat"}}
+    lines = [
+        {"line_id": "b1", "char_id": "c01", "shot_id": "s1", "speaker_role": "announcer"},
+        {"line_id": "b2", "char_id": "c02", "shot_id": "s1"},
+        {"line_id": "b3", "char_id": "c03", "shot_id": "s1"},
+        {"line_id": "b4", "char_id": "c02", "shot_id": "s1"},
+        {"line_id": "b5", "char_id": "c04", "shot_id": "s2"},
+    ]
+    got = mbp.beat_partner_char_ids(lines, cast)
+    assert got["b3"] == ["c02"]          # the man she is talking to
+    assert got["b2"] == ["c03"]          # never the announcer before him
+    assert "b5" not in got               # a new shot: no carry-over
+    assert "b1" not in got
+
+
+def test_partners_are_wired_into_the_co_references():
+    import inspect
+    src = inspect.getsource(mbp)
+    assert "_partners = beat_partner_char_ids(lines, _cast_by_id)" in src
+    assert "_partners.get(tgt[\"beat_id\"], ())" in src
