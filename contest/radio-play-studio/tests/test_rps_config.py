@@ -45,7 +45,7 @@ def test_a_workflow_named_by_the_person_must_exist(monkeypatch, tmp_path):
 
 def test_a_configured_pack_dir_wins_over_the_checkout(monkeypatch, tmp_path):
     (tmp_path / "workflows").mkdir()
-    target = tmp_path / "workflows" / "otr_app.json"
+    target = tmp_path / "workflows" / config.WORKFLOW_NAME
     target.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("OTR_PACK_DIR", str(tmp_path))
     assert find_workflow() == target

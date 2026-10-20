@@ -82,11 +82,11 @@ def test_every_field_is_a_row_in_the_packs_own_app_form():
 
 
 def test_the_real_workflow_has_each_node_the_form_addresses():
-    """Against the shipped otr_app.json: each type the form names is there exactly once."""
+    """Against the default shipped workflow: each type the form names is there exactly once."""
     try:
         path = find_workflow()
     except FileNotFoundError:
-        pytest.skip("otr_app.json is not reachable from here")
+        pytest.skip("the default workflow is not reachable from here")
     ids = locate_nodes(json.loads(path.read_text(encoding="utf-8")))
     assert set(ids) == {f.node_type for f in FIELDS} | {"OTR_MasterAudioMux"}
     assert FIELDS_BY_KEY["bank"].input == "source_bank"

@@ -14,12 +14,15 @@ from urllib.parse import urlsplit
 
 DEFAULT_COMFYUI_URL = "http://127.0.0.1:8188"
 DEFAULT_API_URL = "http://127.0.0.1:8189"
-WORKFLOW_NAME = "otr_app.json"
+#: The contest default (operator, 2026-10-19: "i like foley better"): the 16 GB
+#: NVIDIA lane where LTX 2.5 films each beat with its own sound under the voices.
+#: Any other shipped graph runs with --workflow.
+WORKFLOW_NAME = "otr_16gb_foley.json"
 PACK_DIR_NAME = "ComfyUI-OldTimeRadio"
 
 
 class WorkflowNotFound(FileNotFoundError):
-    """No `otr_app.json` where the caller said it would be, or anywhere usual."""
+    """No workflow where the caller said it would be, or anywhere usual."""
 
 
 @dataclass(frozen=True)
@@ -68,7 +71,7 @@ def find_workflow(explicit: str | None = None) -> Path:
     environment variable) must exist: a missing path is an error, never a quiet
     fall-through to some other graph, which on a small card would run the wrong
     machine's workflow. Only when nothing was named is a checkout's own
-    `workflows/otr_app.json` used."""
+    `workflows/<WORKFLOW_NAME>` used."""
     if explicit:
         path = Path(explicit).expanduser()
         if not path.is_file():

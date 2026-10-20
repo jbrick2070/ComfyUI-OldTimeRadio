@@ -25,7 +25,7 @@ from .server import make_server
 def _add_common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--comfyui", help=f"your ComfyUI (default {DEFAULT_COMFYUI_URL})")
     p.add_argument("--api", help=f"comfy-api-proxy, the bridge the Comfy SDK uses (default {DEFAULT_API_URL})")
-    p.add_argument("--workflow", help="path to otr_app.json (default: found from OTR_PACK_DIR / COMFYUI_DIR)")
+    p.add_argument("--workflow", help="path to a shipped workflow (default: otr_16gb_foley.json, found from OTR_PACK_DIR / COMFYUI_DIR)")
     p.add_argument("--out", help="folder finished episodes are saved to (default ./episodes)")
 
 

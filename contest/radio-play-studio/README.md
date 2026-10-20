@@ -3,8 +3,8 @@
 Press one button and your own ComfyUI writes, casts, performs, scores and films an
 old-time radio play. Radio Play Studio is a small local web app built on the
 [Comfy SDK](https://docs.comfy.org/development/api-development/sdks): it reads the
-[Old-Time Radio](https://github.com/jbrick2070/ComfyUI-OldTimeRadio) pack's app
-workflow, turns it into an API graph against your server's live node definitions,
+[Old-Time Radio](https://github.com/jbrick2070/ComfyUI-OldTimeRadio) pack's 16 GB
+foley workflow, turns it into an API graph against your server's live node definitions,
 sets the few things a person chooses, runs it through the SDK and plays the
 finished episode.
 
@@ -21,7 +21,10 @@ browser  ->  Radio Play Studio  ->  Comfy SDK  ->  comfy-api-proxy  ->  your Com
 
 - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) running on your machine, with the
   **Old-Time Radio** pack installed (ComfyUI Manager: `comfyui-old-time-radio`, or clone it into
-  `custom_nodes/`). Its README lists the GPU it needs; 8 GB NVIDIA cards work with the 8 GB workflows.
+  `custom_nodes/`), on ComfyUI v0.41.0 or newer (the FLUX 3 Klein stills need it).
+- By default, an NVIDIA card with 16 GB. Other cards run one of the pack's other workflows
+  (see "Pick the workflow for your GPU" below). The first run downloads the open weights it
+  needs (tens of GB), with no Hugging Face token.
 - Python 3.10 or newer for this app.
 
 ## Set up
@@ -32,15 +35,15 @@ pip install -r requirements.txt     # comfy-sdk and comfy-api-proxy
 comfy-api-proxy                     # leave running: serves the Comfy API v2 on :8189 for your ComfyUI on :8188
 ```
 
-Tell the app where the pack's `otr_app.json` is, by any one of:
+Tell the app where the pack is, by any one of:
 
 ```
 set OTR_PACK_DIR=C:\path\to\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio     (or export on macOS/Linux)
 set COMFYUI_DIR=C:\path\to\ComfyUI
-python -m radio_play_studio ... --workflow C:\path\to\otr_app.json
+python -m radio_play_studio ... --workflow C:\path\to\otr_16gb_foley.json
 ```
 
-(Run from a checkout of the pack and it finds `workflows/otr_app.json` itself.)
+(Run from a checkout of the pack and it finds `workflows/otr_16gb_foley.json` itself.)
 
 ## Run
 
@@ -50,9 +53,12 @@ python -m radio_play_studio serve      # open http://127.0.0.1:8765
 ```
 
 Pick a story bank (or leave it on roll), press **Make the episode**, and watch the
-progress bar. A full episode takes minutes on a 16 GB card and hours on an 8 GB card;
-the bar moves in steps. The finished video is saved under `./episodes/<id>/` and plays
-in the page.
+progress bar. A one-act episode took about an hour on an RTX 5080 Laptop (16 GB),
+most of it filming the beats. The first run's bar counts the graph's stages; after one
+finished run the app knows how long each stage takes on your machine, and the bar follows
+the clock and says about how many minutes are left. The finished video is saved under
+`./episodes/<id>/` and plays in the page; ComfyUI also publishes it to its own
+`output/otr/obs/` folder.
 
 From the command line:
 
@@ -64,8 +70,10 @@ python -m radio_play_studio export-graph graph_api.json     # the exact graph th
 ### Pick the workflow for your GPU
 
 `--workflow` takes any of the pack's shipped graphs, so the same app runs on the
-machine each one is tuned for, for example `workflows/otr_8gb_video.json` on an
-8 GB card or `workflows/otr_16gb_video.json` on 16 GB. The default is `otr_app.json`.
+machine each one is tuned for, for example `workflows/otr_8gb_ltx25_foley.json` on an
+8 GB card, `workflows/otr_16gb_video.json` for silent LTX video on 16 GB, or
+`workflows/otr_app.json` for the pack's any-machine graph. The default is
+`otr_16gb_foley.json`: LTX 2.5 films every beat with its own sound, mixed under the voices.
 
 ## What a person can choose
 
