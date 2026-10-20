@@ -1,0 +1,100 @@
+# Radio Play Studio -- Comfy Open Source Higgsfield contest plan
+
+The resume point for any session working the contest. Read this, then `git log` on the
+branch, then do the first unchecked step. Update this file in the same commit as the work.
+
+## The contest
+
+- Submission closes **Oct 30, 9:00 am PT**, through the Typeform. Comfy Build Night LA is Oct 29.
+- One submission per person. SFW. No unlicensed IP, no real-person likenesses.
+- Open-source license plus a runnable setup. MIT is already in `contest/radio-play-studio/LICENSE`.
+- Built on the Comfy Developer Platform: here, the Comfy SDK (`comfy-sdk` 0.5.0) through
+  `comfy-api-proxy` 0.1.6.
+- The demo video must name every model and tool used.
+- **Open weights only** (Open Weights prize): no Comfy Router, no partner nodes, no cloud writer.
+- LTX as the core video model also qualifies for the **$2,000 LTX VFX bonus**.
+
+## Where things are
+
+- **Branch:** `claude/sharp-heisenberg-no3hzt` (draft PR #8, jbrick2070/ComfyUI-OldTimeRadio).
+  Push here. Never merge to `main` until the operator says so.
+- **Pack fixes** (anything under `nodes/`) go to `main` first, then `git merge main` into the branch.
+- **Never edit `pyproject.toml`** (it auto-publishes). Never tag or release.
+- **App:** `contest/radio-play-studio/`. Its venv is `C:\Users\jeffr\Documents\ComfyUI\.venv-rps`
+  (Python 3.12, comfy-sdk 0.5.0, comfy-api-proxy 0.1.6, pytest).
+- **App tests:** from `contest/radio-play-studio`:
+  `C:\Users\jeffr\Documents\ComfyUI\.venv-rps\Scripts\python.exe -m pytest -q -p no:cacheprovider tests`
+  (95 pass as of 9411772d). Repo side: `tests/test_contest_app_converter_parity.py` with the ComfyUI
+  venv (30 pass).
+- **Default workflow:** `workflows/otr_16gb_foley.json` (operator: "i like foley better", and
+  "always 16 GB foley"). It ships 3 acts; the test runs use `--acts 1`.
+
+## How to run it live on the 5080
+
+1. Reset (CLAUDE.md section 4): nothing on :8000, VRAM at about 1.5 GB.
+2. Boot: `Start-Process -FilePath scripts\_otr_soak_server_launch.cmd -ArgumentList "<log>"` (port 8000).
+   ComfyUI core must be **v0.41.0+** (FLUX 3 Klein); the 5080 is on **v0.42.1** since 2026-10-19.
+3. Bridge: `C:\Users\jeffr\Documents\ComfyUI\.venv-rps\Scripts\comfy-api-proxy.exe run --comfyui http://127.0.0.1:8000 --port 8189`
+4. `python -m radio_play_studio doctor --comfyui http://127.0.0.1:8000` (every line ok), then
+   `run --comfyui http://127.0.0.1:8000 --bank shakespeare --acts 1`, or `serve --port 8766 --comfyui ...`
+   (`.claude/launch.json` has `radio-play-studio` on 8766 and `radio-play-studio-ui` on 8767).
+5. Success = `RESULT`/`DONE`, `obs_publish OK` in the server log, the mp4 in `output\otr\obs\`
+   AND in `contest\radio-play-studio\episodes\<id>\`, byte-identical.
+
+## Phase 1 -- the live loop (target Oct 22): DONE 2026-10-19
+
+- [x] App venv, requirements, doctor all ok.
+- [x] ComfyUI 0.39.2 -> 0.42.1 (the shipped 16 GB graphs need FLUX 3 Klein's CLIPLoader type).
+- [x] Pack bug: Gemma 4 12B wrote `",""presence"` on every casting retry. JSON repair on main:
+      3e8affa1 + 9e81e879 (PBUG-20261019-01).
+- [x] Live, video lane: As You Like It, 1 act, 65 min, RESULT SUCCESS, obs_publish OK,
+      `bark_etchings_20261019_143717_..._final.mp4` (74 MB, 1920x1080, 1m52s), sha d713cf92.
+- [x] Live, foley lane: 1 act, 63 min 37 s, obs_publish OK,
+      `boxtree_secrets_20261019_154309_..._final.mp4` (81 MB, 1920x1080, 1m48s), sha 20be0dc4.
+- [x] Settled live: SDK events + progress through the proxy; mp4 from OTR_MasterAudioMux ("gifs"
+      -> video); a 65-minute job survives the SDK's timeouts; file in otr/obs and ./episodes.
+      The `__value__` wrap: no shipped graph produces one; the proxy forwards the graph untouched
+      and core unwraps it (execution.py:996), by reading.
+- [x] App fixes, each Sonnet-QA'd: progress bar (4812a65b, 06d0a475, e71c8664, 3544cfd7, c84e790a:
+      clock-based bar with minutes left, learned per machine), loading notice, foley default
+      (3ea1eda0), "Tell my own story" (84f34439, be39d460, 4aa044ca, 74e662c8, 9411772d).
+- [ ] **Browser run in flight** (started 16:46 on 10-19, job f8e1cc49): when it succeeds,
+      `contest/radio-play-studio/episodes/timing/otr_16gb_foley.acts-1.<hash>.json` must exist.
+- [ ] **Prove the clock bar:** one more `--acts 1` foley run through `serve`; record the page's
+      % and "min left" against the wall clock every ~5 min; target within +/-10 points.
+
+## Phase 2 -- quality budget (target Oct 25)
+
+Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase prose or score.
+
+- [ ] Pick the demo source: a **comedy**, SFW, public domain (Shakespeare comedies are in the
+      bank: As You Like It, Twelfth Night, A Midsummer Night's Dream, Much Ado). Use the form's
+      Source to adapt with the shakespeare bank. Also make one **My Story** episode for the demo.
+- [ ] Compare by eye on the same shot and seed: foley (default) vs `otr_16gb_video.json` vs a
+      procedural lane. LTX stays core if it holds up (LTX bonus).
+- [ ] Stills: FLUX 3 Klein is the shipped NVIDIA engine; confirm it looks right on the episode.
+- [ ] 1080p upscale on cuda and CaptionBurn on: check what the foley workflow ships
+      (OTR_SilentComposite upscale_engine, OTR_CaptionBurn) and decide with the operator.
+- [ ] Voice engine per role (OTR_CastLock rows in `config/app_mode.json`): operator's ear decides.
+- [ ] Any winning change to a shipped workflow: edit `workflows/otr_canonical.json` on main, then
+      `python scripts/build_variants.py --all` and `--check`, plus the four section-0 tests.
+      Pickers the app lacks go in `FIELDS` in `contest/radio-play-studio/radio_play_studio/form.py`.
+
+## Phase 3 -- demo and submission (Oct 26-29)
+
+- [ ] Record the demo: the app (both cards: a classic, and Tell my own story), the progress bar
+      with minutes left, then the finished episode.
+- [ ] Name every model and tool in the video: writer Gemma 4 12B (comfy_native int8); FLUX 3 Klein
+      stills; LTX 2.5 foley (mix4x8 DiT) video; Kokoro voices; Stable Audio 3 music; the upscaler
+      the workflow uses; comfy-sdk 0.5.0; comfy-api-proxy 0.1.6; ComfyUI 0.42.1; the OTR pack.
+- [ ] Why it is new: one press yields a cast-locked, shot-locked radio play on local open weights.
+- [ ] README final pass (`contest/radio-play-studio/README.md`).
+- [ ] Submit through the Typeform. **The operator submits** (it is his entry and his account).
+
+## Rules for any session here
+
+- Every code change: scoped suite green, push to the branch, then Sonnet QA briefed to REFUTE
+  the pushed diff; a finding is the next commit.
+- Shared pack code changes must show the 4060 path is unchanged (CLAUDE.md section 0B).
+- Never two renders at once on the 5080. Before starting one, check `:8000/queue` is empty.
+- Report: commit hashes, RESULT + obs_publish OK + file path, render time, what the app got wrong.
