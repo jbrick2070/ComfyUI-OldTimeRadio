@@ -130,3 +130,14 @@ def test_my_story_with_a_classic_named_is_refused_before_submitting(schemas, wor
     with pytest.raises(ValueError, match="Source to adapt"):
         apply_choices(graph, schemas, ids, {"bank": "my_story", "source_ref": "Hamlet",
                                             "my_plot": "A storm cuts the island off."})
+
+
+def test_a_classic_with_the_roll_is_refused_unless_the_pool_is_one_bank(schemas, workflow):
+    roll = "roll (any eligible bank)"
+    graph = workflow_to_api_prompt(workflow, schemas)
+    ids = locate_nodes(workflow)
+    with pytest.raises(ValueError, match="roll"):
+        apply_choices(graph, schemas, ids, {"bank": roll, "source_ref": "Hamlet"})
+    graph = workflow_to_api_prompt(workflow, schemas)
+    graph[ids["OTR_LedgerScriptWriter"]]["inputs"]["bank_roll_pool"] = "shakespeare"
+    apply_choices(graph, schemas, ids, {"bank": roll, "source_ref": "Hamlet"})   # one name is a pick

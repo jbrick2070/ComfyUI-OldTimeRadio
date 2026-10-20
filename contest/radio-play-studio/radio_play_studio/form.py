@@ -8,6 +8,7 @@ story banks, styles and languages the installed pack really has.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -128,11 +129,12 @@ def apply_choices(api_prompt: dict, schemas: dict, node_ids: dict, choices: dict
 
 
 def _check_my_story(api_prompt: dict, node_ids: dict) -> None:
-    """Two runs the pack stops, said before submitting instead of minutes in
-    (nodes/_otr_story_input.py): a story bank picked by hand as anything but
-    my_story while a My Story box holds text (a roll reads the boxes if it lands
-    on My Story and ignores them otherwise), and my_story with a classic named
-    in Source to adapt, which that bank has no way to fetch."""
+    """Three runs the pack stops, said before submitting instead of minutes in:
+    a story bank picked by hand as anything but my_story while a My Story box
+    holds text (a roll reads the boxes if it lands on My Story and ignores them
+    otherwise); my_story with a classic named in Source to adapt, which that bank
+    has no way to fetch (both nodes/_otr_story_input.py); and a real roll with a
+    classic named, which belongs to one bank (nodes/_otr_rolls.py)."""
     writer = api_prompt.get(node_ids.get(WRITER, ""), {}).get("inputs", {})
     bank = writer.get(FIELDS_BY_KEY["bank"].input)
     if bank == MY_STORY_BANK:
@@ -143,7 +145,15 @@ def _check_my_story(api_prompt: dict, node_ids: dict) -> None:
                 f"but Source to adapt says {ref.strip()!r}. Clear it, or pick a bank "
                 "that adapts a classic (shakespeare, public_domain).")
         return
-    if not isinstance(bank, str) or bank.startswith("roll"):
+    if isinstance(bank, str) and bank.startswith("roll"):
+        ref = writer.get(FIELDS_BY_KEY["source_ref"].input)
+        if isinstance(ref, str) and ref.strip() and len(_pool_names(writer.get("bank_roll_pool"))) != 1:
+            raise ValueError(
+                f"Source to adapt says {ref.strip()!r}, but the story bank is the roll. A "
+                "classic belongs to one bank: pick it (shakespeare, public_domain), or clear "
+                "Source to adapt to roll.")
+        return
+    if not isinstance(bank, str):
         return
     filled = [f.label for f in FIELDS if f.group == MY_STORY
               and isinstance(writer.get(f.input), str) and writer[f.input].strip()]
@@ -151,6 +161,20 @@ def _check_my_story(api_prompt: dict, node_ids: dict) -> None:
         raise ValueError(
             f"the story bank is {bank}, but My story has text in: {', '.join(filled)}. "
             f"Pick the {MY_STORY_BANK} bank to tell your own story, or clear those boxes.")
+
+
+def _pool_names(raw: Any) -> list:
+    """The bank names in a roll pool, as the pack reads one (_otr_rolls.py
+    parse_roll_pool): commas, semicolons or new lines between names, or a list.
+    One name is a pick, not a roll, so a classic may go with it."""
+    if isinstance(raw, dict) and "__value__" in raw:
+        raw = raw["__value__"]
+    if isinstance(raw, (list, tuple)):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    if isinstance(raw, str):
+        names = (x.strip(" \t'\"[]") for x in re.split(r"[,;\n]", raw))
+        return [x for x in names if x]
+    return []
 
 
 def _usable(info: dict, f: Field) -> dict:
