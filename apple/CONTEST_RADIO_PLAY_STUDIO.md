@@ -211,7 +211,12 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         HOLDS; Codex r2 BROKEN on the first plan, all six points folded in). My Story's act-writer
         JSON now shows "kind": "human" per cast member (My Story only). The generic casting and
         scifi_news_pro writers do not write kind yet -- an animal there is still drawn as a person.
-        LIVE PROOF rendering (tmp/rps_live/kind_proof_1act.log, 1-act stills, the example cast).
+        LIVE PROOF PASSED 07:29-07:41 (1-act still_motion, flux3_klein + references, the example
+        cast): obs_publish OK, copies byte-identical, timing saved. Sheet
+        tmp/rps_live/ab/kind_proof.jpg (sent). The Cat is a real four-legged gray cat in every beat
+        (its portrait is a cat's face in a period robe -- the stage-realism style's costume look);
+        Jeffrey and MagnoliaRex hold everywhere, and the man beside MagnoliaRex is now Jeffrey in
+        all six of her stills (the script-partner co-references, 2b30170e, proven live).
         History of the bug: _ensure_gender_anchor puts "adult woman, " in front
         of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug). Two word-list fixes
         (d1414a7d, 9b0ed9ea) both failed Sonnet as BLOCKERs -- people like "Sailor with a parrot" lost
