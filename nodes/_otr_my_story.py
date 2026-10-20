@@ -215,6 +215,12 @@ class CastMember(BaseModel):
         "fine, the gender is always one of the two. Never empty: an unstated "
         "gender is your choice, and the description then follows it."))
     age_band: str = "n/a"
+    # WHAT THE CHARACTER IS (2026-10-20): human, animal, machine or creature.
+    # Pictures read it (otr_meta_brief_image_prompt): only a human's picture
+    # is anchored "adult woman/man" -- a cat with that anchor was drawn as a
+    # cat-woman. Optional with a human default, so a treatment that omits it
+    # is exactly what it was.
+    kind: str = "human"
     # `speech_register`, not `register`: the bare name shadows a pydantic
     # BaseModel attribute and pydantic warns about it at class construction.
     # The seam asks for "register"; the alias keeps the prompt's word while
@@ -228,6 +234,11 @@ class CastMember(BaseModel):
     @classmethod
     def _null_is_empty(cls, value):
         return "" if value is None else value
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _one_kind(cls, value):
+        return _CAST_TEXT.normalize_kind(value)
 
     @field_validator("name", mode="before")
     @classmethod
@@ -627,7 +638,7 @@ def _make_treatment_validator(act_count: int):
                 "appear in act turns or ending, replace that misplaced frame "
                 "material with the source's dramatic events and conclusion; "
                 "keep already-correct dramatic material. Do not rename the house "
-                "announcer as a story person or remove legitimate dramatic people. "
+                "announcer as a story character or remove legitimate dramatic characters. "
                 "The frame pass supplies the intro, outro and coda.")
         if len(model.acts) != act_count:
             problems.append("acts has %d entries; the selected count is %d"
@@ -644,11 +655,11 @@ def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
     treatment_fn = bind_schema(StoryTreatment) if callable(bind_schema) else creative_fn
     source_kwargs["source_rewrite_instruction"] = (
         "This artifact plans only the drama inside the announcer frame. Keep "
-        "cast, acts and ending about dramatic people and their source-grounded "
+        "cast, acts and ending about dramatic characters and their source-grounded "
         "actions and conclusion. The separate frame pass supplies the house "
         "announcer intro, outro and coda. Correct misplaced frame material "
         "throughout the treatment when present; preserve legitimate dramatic "
-        "people and the source's intended conclusion.")
+        "characters and the source's intended conclusion.")
     return _call(
         "treatment", bundle, attempt_receipts=attempt_receipts, **source_kwargs,
         prompt=[
@@ -657,7 +668,7 @@ def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
                 "THE INTERPRETATION:\n%s\n\n"
                 "SELECTED ACTS: %d (binding). REQUESTED SPEAKING CHARACTERS: %d "
                 "(flexible, announcer excluded).\n"
-                "Let the supplied story guide the cast; preserve its people. Music cues between acts: %d.\n"
+                "Let the supplied story guide the cast; preserve its characters. Music cues between acts: %d.\n"
                 "Plan the episode now."
                 % (json.dumps(interp.model_dump(), ensure_ascii=False, indent=2),
                    act_count, requested_characters,
@@ -672,7 +683,7 @@ def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
             "Return exactly %d acts. If the act count is already correct, "
             "preserve its grouping unless the named defect requires a change. "
             "The requested character count is flexible; preserve the listener's "
-            "dramatic people, story material, relationships and intended "
+            "dramatic characters, story material, relationships and intended "
             "dramatic conclusion."
             % act_count),
         post_validator=_make_treatment_validator(act_count),
@@ -1171,6 +1182,7 @@ def _assign_voices(treatment: StoryTreatment, rng: random.Random) -> "list[dict]
             "presence": member.presence,
             "voice_cue": voice_cue_of(member),
             "gender": member.gender,
+            "kind": member.kind,
             "tts_model": "",
             "voice_preset": "",
             "voice_params": None,

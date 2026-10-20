@@ -40,8 +40,28 @@ except ImportError:  # pragma: no cover -- flat test imports
 __all__ = [
     "CAST_TEXT_FIELDS", "field", "is_bodiless", "picture_appearance", "still_text",
     "video_text", "card_text",
-    "identity_fields",
+    "identity_fields", "CHARACTER_KINDS", "normalize_kind", "kind_of",
 ]
+
+#: What a character IS, as the writer states it on the cast row. A row
+#: without the field -- every row before 2026-10-20, and every lane whose
+#: writer does not set it -- is human, so nothing it renders changes.
+#: "human", not "person" (operator, 2026-10-20): a talking cat can be a
+#: person in a story; it is never a human.
+CHARACTER_KINDS = ("human", "animal", "machine", "creature")
+
+
+def normalize_kind(value) -> str:
+    """One of CHARACTER_KINDS; "person" reads as human, and anything else
+    (missing, empty, a typo) is "human", the behaviour every row had before
+    the field existed."""
+    kind = str(value or "").strip().lower()
+    return kind if kind in CHARACTER_KINDS else "human"
+
+
+def kind_of(row) -> str:
+    """The cast row's kind (see normalize_kind)."""
+    return normalize_kind((row or {}).get("kind") if isinstance(row, dict) else None)
 
 #: The three character fields every cast row carries, in reading order.
 CAST_TEXT_FIELDS = ("appearance", "presence", "voice_cue")
