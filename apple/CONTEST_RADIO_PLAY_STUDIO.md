@@ -228,6 +228,24 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         them into jeffrey_reference.png (front-facing, mime paint, plain black shirt, grey
         background, no logos). Jeffrey's references = that + two clean crops (Barcelona mime,
         barbershop close-up); his "How they look" describes the photos.
+      * main b6408675 + ed9789f9 -- CHARACTER PHOTO NODE (operator: "is that all best practice for
+        comfy workflows?"; then "build it ... design review first"). Photos already landed where
+        ComfyUI puts user images (input/, via its own /upload/image; core's opt-in asset system would
+        tag them input). The canvas side is now Comfy-native: OTR_CharacterPhoto = name + ONE image
+        picker declared like core's LoadImage (upload, paste, preview), chained one node per photo
+        (up to 3 per name) into Image Director's appended character_photos_in socket; the typed
+        lines win for a name both give. Canonical ships one BLANK node (98) wired in. IS_CHANGED
+        hashes the picture. Design: Codex contrarian (REFUTED draft 1; one picker per node, core's
+        annotated paths, IS_CHANGED, typed chain, wired blank node). Live canvas check on a CPU
+        ComfyUI (port 8001): a blank node loads blank and sends {name:"", image:""}; the frontend
+        SAVES the upload button as one more slot ("image") -- every converter and guard now reads it
+        (ed9789f9; app f138851c). Sonnet HOLDS on b6408675.
+      HIS PHOTOS MAY SHIP PUBLIC (operator 10-20: "my photos can be public and ship with it ... it's
+        my story"). NEXT, if the demo is good: make his true Jeffrey/MagnoliaRex story My Story's
+        built-in default (the cast cards + the three boxes) with Jeffrey's photos bundled.
+      MAGNOLIAREX REFERENCE: operator supplied generated art of the character (09:15); Codex made
+        three clean variations (C:\Users\jeffr\Pictures\otr_magnoliarex_ref\, sheet sent). Operator:
+        use them AFTER the current render -- a second demo render with Jeffrey's AND her references.
       NOW: the 3-act demo RENDERING with his photos (started 08:32 on main 089e48e6;
         tmp/rps_live/mystory_magnolia_photos.log; launcher scratchpad demo_photos.py; ~4.2 h). The
         07:57 kind-only re-render was canceled at 12% for this. The 05:18 demo and its Athens
