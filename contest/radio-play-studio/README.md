@@ -1,15 +1,15 @@
 # Radio Play Studio
 
-Press one button and your own ComfyUI writes, casts, performs, scores and films an
-old-time radio play. Radio Play Studio is a small local web app built on the
-[Comfy SDK](https://docs.comfy.org/development/api-development/sdks): it reads the
-[Old-Time Radio](https://github.com/jbrick2070/ComfyUI-OldTimeRadio) pack's 16 GB
-foley workflow, turns it into an API graph against your server's live node definitions,
-sets the few things a person chooses, runs it through the SDK and plays the
-finished episode.
+**Press one button. Your own GPU writes, casts, voices, scores and films a whole radio play.**
 
-Everything that renders is open weights on your own GPU. The app makes no Comfy
-Router or Comfy Cloud calls and holds no API key.
+Built for the Comfy [Open Source Higgsfield](https://comfy.org/open-source-higgsfield) challenge.
+An open-source take on Higgsfield's Cinema Studio: where Cinema Studio directs a concept into
+shots, Radio Play Studio writes the whole story, casts it, and directs every beat. Every character
+keeps the same face and voice from shot to shot, and every shot is filmed with LTX on your own
+card, with voices, music and foley mixed under the picture. Open weights only, MIT licensed,
+nothing to pay per episode.
+
+> **Demo video:** to be recorded before submission.
 
 ```
 browser  ->  Radio Play Studio  ->  Comfy SDK  ->  comfy-api-proxy  ->  your ComfyUI + Old-Time Radio pack
@@ -17,15 +17,33 @@ browser  ->  Radio Play Studio  ->  Comfy SDK  ->  comfy-api-proxy  ->  your Com
   player)       graph + events)      jobs, events)                         scores and films the episode)
 ```
 
+## What it does
+
+One press runs the [Old-Time Radio](https://github.com/jbrick2070/ComfyUI-OldTimeRadio) node pack
+(on the Comfy registry as `comfyui-old-time-radio`) end to end on your machine:
+
+| Stage | Open-weights model (default 16 GB foley workflow) |
+|---|---|
+| Story, cast and every line | Gemma 4 12B, run by ComfyUI itself (int8) |
+| A still for every beat | FLUX 3 Klein; MOSS-Image as an option (the **Still pictures** picker) |
+| Voices, one per character | Kokoro |
+| Theme music | Stable Audio 3 |
+| Video, with its own sound | LTX 2.5 (16 GB foley lane: each beat filmed and given foley, mixed under the voices) |
+
+The app reads the pack's shipped workflow, turns it into an API graph against your server's live
+node definitions, sets what a person chose, submits it through the Comfy SDK, follows it with a
+progress bar that knows how long each stage takes on *your* machine, and plays the finished
+episode. The app makes no Comfy Router or Comfy Cloud calls and holds no API key.
+
 ## What you need
 
-- [ComfyUI](https://github.com/comfyanonymous/ComfyUI) running on your machine, with the
-  **Old-Time Radio** pack installed (ComfyUI Manager: `comfyui-old-time-radio`, or clone it into
-  `custom_nodes/`), on ComfyUI v0.41.0 or newer (the FLUX 3 Klein stills need it).
-- By default, an NVIDIA card with 16 GB. Other cards run one of the pack's other workflows
-  (see "Pick the workflow for your GPU" below). The first run downloads the open weights it
-  needs (tens of GB), with no Hugging Face token.
-- Python 3.10 or newer for this app.
+- [ComfyUI](https://github.com/comfyanonymous/ComfyUI) v0.42.0 or newer running on your machine
+  (v0.41.0 for FLUX 3 Klein; MOSS-Image needs v0.42.0), with the **Old-Time Radio** pack installed
+  (ComfyUI Manager: `comfyui-old-time-radio`, or clone it into `custom_nodes/`). One node pack;
+  every model downloads itself on first use at a pinned revision, with no Hugging Face token.
+- By default, an NVIDIA card with 16 GB. Other cards run one of the pack's other workflows (see
+  "Pick the workflow for your GPU"). The first run downloads tens of GB of open weights.
+- Python 3.10 or newer for this app (its only packages are the Comfy SDK and the bridge). Built and run on Windows.
 
 ## Set up
 
@@ -52,35 +70,35 @@ python -m radio_play_studio doctor     # checks ComfyUI, the pack, the SDK and t
 python -m radio_play_studio serve      # open http://127.0.0.1:8765
 ```
 
-Choose **A classic, or surprise me** or **Tell my own story** (see below), press
-**Make the episode**, and watch the progress bar. The form starts on the workflow's own
-settings, which for the 16 GB foley workflow is three acts; a one-act episode took about
-an hour on an RTX 5080 Laptop (16 GB), most of it filming the beats, and more acts take
-longer. The first run's bar counts the graph's stages; after one
-finished run the app knows how long each stage takes on your machine, and the bar follows
-the clock and says about how many minutes are left. The finished video is saved under
-`./episodes/<id>/` and plays in the page; ComfyUI also publishes it to its own
-`output/otr/obs/` folder.
+Choose **A classic, or surprise me** or **Tell my own story**, press **Make the episode**, and watch
+the bar. The form starts on the workflow's own settings (three acts on the 16 GB foley workflow).
+The finished video plays in the page, is saved under `./episodes/<id>/`, and ComfyUI also
+publishes it to its own `output/otr/obs/` folder.
+
+- **Reload-proof.** A reload, or a second tab, picks the episode back up where it is.
+- **One at a time.** A second episode while one is being made is refused, not queued behind it.
+- **The GPU goes back.** About two and a half minutes after the last tab closes, with nothing
+  being made, the app asks ComfyUI to free the models its episodes loaded.
 
 From the command line:
 
 ```
-python -m radio_play_studio run --bank shakespeare --acts 1
+python -m radio_play_studio run --bank shakespeare --source-ref "folger-midsummer:act3-scene1-bottom-titania" --acts 1
 python -m radio_play_studio export-graph graph_api.json     # the exact graph the app would submit
 ```
 
 ### Pick the workflow for your GPU
 
-`--workflow` takes any of the pack's shipped graphs, so the same app runs on the
-machine each one is tuned for, for example `workflows/otr_8gb_ltx25_foley.json` on an
-8 GB card, `workflows/otr_16gb_video.json` for silent LTX video on 16 GB, or
-`workflows/otr_app.json` for the pack's any-machine graph. The default is
-`otr_16gb_foley.json`: LTX 2.5 films every beat with its own sound, mixed under the voices.
+`--workflow` takes any of the pack's shipped graphs, so the same app runs on the machine each
+one is tuned for: for example `workflows/otr_8gb_ltx25_foley.json` on an 8 GB card,
+`workflows/otr_16gb_video.json` for silent LTX video on 16 GB, `workflows/otr_16gb_still.json`
+for a still with motion (minutes, not an hour), or `workflows/otr_app.json` for the pack's
+any-machine graph. The default is `otr_16gb_foley.json`.
 
 ## Tell your own story
 
-Press **Tell my own story** at the top of the page. Four boxes come first, each
-showing an example, and every one of them is optional:
+Press **Tell my own story** at the top of the page. Four boxes come first, each showing an
+example, and every one of them is optional:
 
 | Box | What to write | Example |
 |---|---|---|
@@ -89,10 +107,9 @@ showing an example, and every one of them is optional:
 | Where and when | Place, era, weather, mood: the story's world, not its look. | `A rock lighthouse off Maine, winter 1921.` |
 | Written by | Your name or a pen name. The announcer says it and the credits print it. | `Your Name` |
 
-What you write outranks anything the writer would rather invent; what you leave out
-is invented to fit. Leave all four empty and the pack writes its own standing premise.
-Then set the language, acts, cast size and visual style as usual and press **Make the
-episode**.
+What you write outranks anything the writer would rather invent; what you leave out is invented
+to fit. Leave all four empty and the pack writes its own standing premise. Then set the language,
+acts, cast size, visual style and still model as usual and press **Make the episode**.
 
 From the command line, the same boxes are flags:
 
@@ -103,33 +120,68 @@ python -m radio_play_studio run --bank my_story --acts 1 ^
   --my-setting "A rock lighthouse off Maine, winter 1921." --my-author "Your Name"
 ```
 
-(`^` continues a line in the Windows command prompt; use `\` on macOS and Linux.) The
-boxes are read only with the `my_story` bank: text in them with another bank picked by
-hand is refused before anything is sent, because the pack would stop that run.
+(`^` continues a line in the Windows command prompt; use `\` on macOS and Linux.) The boxes are
+read only with the `my_story` bank: text in them with another bank picked by hand is refused
+before anything is sent, because the pack would stop that run.
 
 ## What a person can choose
 
-Story bank, the classic to adapt, language, acts, cast size, visual style, and the four
-My Story boxes above. Every dropdown is read live from your ComfyUI, so it offers exactly
-the banks and styles your installed pack has. Everything else (models, voices, music,
-the video lane) keeps the workflow's own setting.
+Story bank, the classic to adapt, language, acts, cast size, visual style, the still model
+(**Still pictures**: local engines only, FLUX 3 Klein by default) and the four My Story boxes.
+Every dropdown is read live from your ComfyUI, so it offers exactly what your installed pack has.
+Everything else (voices, music, the video lane) keeps the workflow's own setting.
+
+## Measured timings (RTX 5080 Laptop, 16 GB, ComfyUI 0.42.1, through the SDK and proxy)
+
+| Job | Time |
+|---|---|
+| One-act episode, 16 GB foley workflow (LTX 2.5 with sound), five runs | 57, 64, 64, 68 and 76 min |
+| One-act episode, 16 GB LTX video workflow (silent picture) | 65 min |
+| One-act episode, 16 GB stills-with-motion workflow | 5 min |
+| Where a foley hour goes | video about 95% (60 of 64 min); the writer about 1 min; all stills about 2 min |
+| Progress bar against the wall clock, a 68-minute episode | within 4 points throughout |
+
+Run length follows the story: the number and length of the beats decide how many frames LTX films.
+
+## Recipes that took real renders to find
+
+- **ComfyUI keeps one websocket per client id.** A second listener on a running job (a debugging
+  `curl` on the proxy's event stream) silently takes its messages, and the first stream goes quiet
+  with no error. The app now refuses to learn timings from a stream that never saw the graph settle.
+- **The video node's own bar was the inner sampler's.** One LTX clip runs three inner progress bars
+  in a row, so the node's bar restarted at 0 several times a clip. The pack now quiets inner bars on
+  the render thread and draws "frames rendered of the episode"; the app trusts a node's bar only
+  while it moves forward under one total.
+- **Counting nodes does not track time.** One node of 22 is about 95% of the hour, so a node-count
+  bar sat near 80% for most of the run. Time-weighted bars still trailed by up to 17 points,
+  because stories differ in length; only the video node's frame count fixed it.
+- **The 12B writer doubled a quote before a JSON key** (`",""presence":`) on every retry. The pack's
+  JSON repair now drops the stray quote, and touches only text strict JSON already rejects.
+- **`/object_info` takes up to 40 s while ComfyUI is rendering.** The app waits up to 120 s and
+  says what it is waiting for, and a reload picks a run back up without waiting for it at all.
+- **FLUX 3 Klein needs ComfyUI v0.41.0** (its CLIPLoader type); an older core is refused before the
+  10 GB download, with the update message, not after it.
 
 ## How it stays honest
 
-- **Live node definitions.** A saved workflow's widget values mean nothing without the node's input order, so the
-  graph is built against your server's `/object_info`. A pack and a workflow from different versions are refused
-  with a message naming the node, never sent.
-- **Never the cloud by accident.** The Comfy SDK talks to Comfy Cloud when `COMFY_BASE_URL` is unset. The app
-  always sets it to your local bridge first.
-- **A finished job is not a finished episode.** The run ends in success only when the video file is on disk.
-- **Local only.** The web app listens on loopback, refuses other Host headers and only accepts JSON posts.
+- **Live node definitions.** A saved workflow's widget values mean nothing without the node's input
+  order, so the graph is built against your server's `/object_info`. A pack and a workflow from
+  different versions are refused with a message naming the node, never sent.
+- **Never the cloud by accident.** The Comfy SDK talks to Comfy Cloud when `COMFY_BASE_URL` is unset.
+  The app always sets it to your local bridge first, and never offers a cloud model in its pickers.
+- **A finished job is not a finished episode.** The run ends in success only when the video file is
+  on disk.
+- **Local only.** The web app listens on loopback, refuses other Host headers and only accepts JSON
+  posts.
 
 ## Known limits
 
 - There is no cancel button. Cancel a run from ComfyUI's own queue.
-- Restarting the app drops its memory of a run. The render keeps going on your ComfyUI and its episode still
-  lands in `otr/obs/`, but the page cannot re-attach to it.
-- The app listens only on this machine and has no login, so it refuses `--host` values beyond loopback.
+- Restarting the app drops its memory of a run. The render keeps going on your ComfyUI and its
+  episode still lands in `otr/obs/`, but the page cannot re-attach to it.
+- No per-shot camera control: the pack's director picks each beat's camera move.
+- The app listens only on this machine and has no login, so it refuses `--host` values beyond
+  loopback.
 
 ## Tests
 
@@ -139,9 +191,10 @@ python -m pytest tests          # no ComfyUI, GPU or pack needed
 ```
 
 From the pack's repo root, `tests/test_contest_app_converter_parity.py` pins the app's
-standard-library graph converter to the pack's own on every shipped workflow, and checks
-the form against the pack's real node definitions.
+standard-library graph converter to the pack's own on every shipped workflow, and checks the form
+against the pack's real node definitions.
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). Model weights carry their own licenses; the pack fetches each from a
+pinned source listed in its `nodes/_otr_visual_assets.py` and documents them in `apple/IMAGE_MODELS.md`.
