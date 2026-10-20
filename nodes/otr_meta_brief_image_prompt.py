@@ -781,6 +781,41 @@ def co_present_char_ids(prompt, cast_by_id, speaker_id):
     return [cid for _pos, cid in sorted(found)][:CO_REFERENCE_LIMIT]
 
 
+def beat_partner_char_ids(lines, cast_by_id):
+    """``{beat_id: [char_id, ...]}``: who speaks just before and just after each
+    beat in the same shot -- the person being spoken to in a two-hander.
+
+    The composed scene prompt often DESCRIBES the other person ("a stocky man in
+    pink") instead of naming him, so a name match alone missed him: live proof
+    2, 2026-10-20, the man beside MagnoliaRex still drifted in 4 of her 6
+    stills. The script itself says who shares the scene. Only cast members
+    count (never the announcer or a music sentinel), never the beat's own
+    speaker, previous speaker first.
+    """
+    beats = list(_iter_beat_lines(lines))
+    known = {cid for cid in (cast_by_id or {}) if cid}
+    out: dict = {}
+    def _is_announcer(line):
+        return str(line.get("speaker_role") or "").lower() == "announcer"
+
+    for i, (bid, ln) in enumerate(beats):
+        if _is_announcer(ln):
+            continue
+        own = str(ln.get("char_id") or "")
+        shot = ln.get("shot_id")
+        found = []
+        for j in (i - 1, i + 1):
+            if 0 <= j < len(beats):
+                other = beats[j][1]
+                cid = str(other.get("char_id") or "")
+                if (other.get("shot_id") == shot and cid in known and cid != own
+                        and cid not in found and not _is_announcer(other)):
+                    found.append(cid)
+        if found:
+            out[bid] = found
+    return out
+
+
 def _identity_photos_from_policy(policy_json, cast, warnings):
     """``{char_id: photo file}`` for the image policy's character photos.
 
@@ -2363,6 +2398,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
         _cast_by_id = {str(c.get("char_id") or ""): c
                        for c in roster if isinstance(c, dict)}
         _line_by_beat = {bid: ln for bid, ln in _iter_beat_lines(lines)}
+        _partners = beat_partner_char_ids(lines, _cast_by_id)
         _fodder_roles = set(mesh_fodder_roles or ())
         _still_word_roles = set(still_word_roles or ())
         for tgt in scene_targets:
@@ -2524,8 +2560,11 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 _obj["char_id"] = _cid     # traceability; engine resolves by role
                 if tgt["kind"] == "scene_character":
                     _co = co_present_char_ids(sprompt, _cast_by_id, _cid)
-                    if _co:
-                        _obj["co_char_ids"] = _co
+                    for _pid in _partners.get(tgt["beat_id"], ()):
+                        if _pid != _cid and _pid not in _co:
+                            _co.append(_pid)
+                    if _co[:CO_REFERENCE_LIMIT]:
+                        _obj["co_char_ids"] = _co[:CO_REFERENCE_LIMIT]
                 # IDENTITY TRANSPORT (2026-08-26). A scene_character still seeds
                 # from the CHARACTER'S PORTRAIT prompt so every beat of that
                 # character draws one face (commit 89e82181). When the video lane
