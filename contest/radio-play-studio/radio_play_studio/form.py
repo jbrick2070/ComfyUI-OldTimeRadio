@@ -110,6 +110,12 @@ def describe_form(schemas: dict, api_prompt: dict | None = None, node_ids: dict 
             saved = api_prompt.get(node_ids[f.node_type], {}).get("inputs", {}).get(f.input)
             if saved is not None and not isinstance(saved, list):
                 default = saved
+        choices = info.get("choices")
+        if info["kind"] == "choice" and choices and default not in choices:
+            # A workflow can save a choice this form never offers (a cloud still
+            # engine on a cloud graph). Start on the first one the page lists, so
+            # what it shows is what it sends.
+            default = choices[0]
         rows.append({
             "key": f.key, "label": f.label, "group": f.group, "help": f.help,
             "kind": info["kind"], "default": default,

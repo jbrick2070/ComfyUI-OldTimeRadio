@@ -165,3 +165,12 @@ def test_the_still_picker_offers_open_weights_only(schemas, workflow):
     assert rows["stills"]["choices"] == ["flux3_klein", "moss_image", "z_image_turbo"]
     with pytest.raises(ValueError):
         apply_choices(graph, schemas, locate_nodes(workflow), {"stills": "cloud_flux_pro"})
+
+
+def test_a_saved_cloud_still_engine_starts_the_picker_on_a_listed_one(schemas, workflow):
+    for node in workflow["nodes"]:
+        if node["type"] == "OTR_VideoDirector":
+            node["widgets_values"] = ["cloud_flux_pro"] * 3
+    graph = workflow_to_api_prompt(workflow, schemas)
+    rows = {r["key"]: r for r in describe_form(schemas, graph, locate_nodes(workflow))}
+    assert rows["stills"]["default"] in rows["stills"]["choices"]
