@@ -31,6 +31,11 @@ class Field:
     group: str
     #: Choices the pack lists but cannot run (a dropdown row that fails loud).
     exclude: tuple = ()
+    #: More inputs on the same node that take the same value (one picker, several
+    #: widgets), each checked against its own dropdown.
+    also: tuple = ()
+    #: Never offer a choice that starts with one of these.
+    exclude_prefixes: tuple = ()
 
 
 #: In the order they appear on the page.
@@ -52,6 +57,15 @@ FIELDS: tuple = (
           "Restyles the still and video prompts, so it shows once a video lane draws from "
           "stills. On the audio-reactive lanes it changes the file name, not the picture.",
           "The show"),
+    Field("stills", "Still pictures", "OTR_VideoDirector", "character_image_model",
+          "The open model that paints every still the video starts from -- the "
+          "characters, the announcer and the music. flux3_klein is the shipped pick; "
+          "moss_image is MOSS-Image (Apache-2.0, about 13 GB the first time).",
+          "The show", also=("announcer_image_model", "music_image_model"),
+          # Open weights only: the app makes no cloud calls (README), so the cloud
+          # and partner lanes the pack's dropdown also lists are never offered.
+          exclude=("google_image", "ideo", "+ Add Custom Model"),
+          exclude_prefixes=("cloud_",)),
     Field("my_characters", "Who is in it", WRITER, "story_characters",
           "Names, how they know each other, what they are like. Put (she) or (he) "
           "right after a name and that character is voiced and drawn that way; "
@@ -122,8 +136,12 @@ def apply_choices(api_prompt: dict, schemas: dict, node_ids: dict, choices: dict
             raise GraphError(f"the graph has no {f.node_type} node")
         if isinstance(node["inputs"].get(f.input), list):
             raise GraphError(f"{f.label} is wired to another node in this workflow; it cannot be set here")
-        info = _usable(describe_input(schemas, f.node_type, f.input), f)
-        node["inputs"][f.input] = coerce_value(info, _blank_to_text(value, info), f.label)
+        for name in (f.input, *f.also):
+            if isinstance(node["inputs"].get(name), list):
+                raise GraphError(f"{f.label} is wired to another node in this workflow; "
+                                 "it cannot be set here")
+            info = _usable(describe_input(schemas, f.node_type, name), f)
+            node["inputs"][name] = coerce_value(info, _blank_to_text(value, info), f.label)
     _check_my_story(api_prompt, node_ids)
     return api_prompt
 
@@ -186,8 +204,10 @@ def _pool_names(raw: Any) -> list:
 
 def _usable(info: dict, f: Field) -> dict:
     """`info` without the choices this field must not offer or accept."""
-    if f.exclude and info["kind"] == "choice":
-        info = dict(info, choices=[c for c in info["choices"] if c not in f.exclude])
+    if (f.exclude or f.exclude_prefixes) and info["kind"] == "choice":
+        info = dict(info, choices=[
+            c for c in info["choices"]
+            if c not in f.exclude and not any(str(c).startswith(x) for x in f.exclude_prefixes)])
     return info
 
 

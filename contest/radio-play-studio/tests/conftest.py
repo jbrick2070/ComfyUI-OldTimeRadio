@@ -16,6 +16,10 @@ from radio_play_studio.form import EPISODE_NODE_TYPE, WRITER  # noqa: E402
 
 BANKS = ["roll (any eligible bank)", "original", "shakespeare", "my_story"]
 STYLES = ["roll (any style)", "noir", "pastel"]
+DIRECTOR = "OTR_VideoDirector"
+#: As the pack lists them: local engines, cloud lanes and the custom row together.
+STILL_ENGINES = ["cloud_flux_pro", "flux3_klein", "google_image", "ideo", "moss_image",
+                 "z_image_turbo", "+ Add Custom Model"]
 
 
 def writer_schema() -> dict:
@@ -39,14 +43,23 @@ def writer_schema() -> dict:
     }}
 
 
+def director_schema() -> dict:
+    """The video director's three still-engine dropdowns, in the pack's order."""
+    pick = lambda: (STILL_ENGINES, {"default": "flux3_klein"})  # noqa: E731
+    return {"input": {"required": {"announcer_image_model": pick(),
+                                   "character_image_model": pick(),
+                                   "music_image_model": pick()}}}
+
+
 @pytest.fixture
 def schemas() -> dict:
-    return {WRITER: writer_schema(), EPISODE_NODE_TYPE: {"input": {"required": {}}}}
+    return {WRITER: writer_schema(), EPISODE_NODE_TYPE: {"input": {"required": {}}},
+            DIRECTOR: director_schema()}
 
 
 @pytest.fixture
 def workflow(schemas) -> dict:
-    """A two-node canvas workflow whose saved widget values are the defaults."""
+    """A small canvas workflow whose saved widget values are the defaults."""
     spec = schemas[WRITER]["input"]
     values = [opts[1]["default"] if isinstance(opts[0], str) else opts[1]["default"]
               for opts in list(spec["required"].values()) + list(spec["optional"].values())]
@@ -54,6 +67,8 @@ def workflow(schemas) -> dict:
         "nodes": [
             {"id": 7, "type": WRITER, "inputs": [], "widgets_values": values},
             {"id": 9, "type": EPISODE_NODE_TYPE, "inputs": [], "widgets_values": []},
+            {"id": 5, "type": DIRECTOR, "inputs": [],
+             "widgets_values": ["flux3_klein", "flux3_klein", "flux3_klein"]},
             {"id": 12, "type": "MarkdownNote", "widgets_values": ["note"]},
         ],
         "links": [],

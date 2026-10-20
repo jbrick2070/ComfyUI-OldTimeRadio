@@ -148,3 +148,20 @@ def test_a_repeated_or_respelled_bank_in_the_pool_is_still_one_pick(schemas, wor
     ids = locate_nodes(workflow)
     graph[ids["OTR_LedgerScriptWriter"]]["inputs"]["bank_roll_pool"] = "Public-Domain, public__domain, _public_domain"
     apply_choices(graph, schemas, ids, {"bank": "roll (any eligible bank)", "source_ref": "Moby Dick"})
+
+
+def test_the_still_picker_sets_all_three_still_dropdowns(schemas, workflow):
+    graph = workflow_to_api_prompt(workflow, schemas)
+    ids = locate_nodes(workflow)
+    apply_choices(graph, schemas, ids, {"stills": "moss_image"})
+    director = graph[ids["OTR_VideoDirector"]]["inputs"]
+    assert [director[k] for k in ("character_image_model", "announcer_image_model",
+                                  "music_image_model")] == ["moss_image"] * 3
+
+
+def test_the_still_picker_offers_open_weights_only(schemas, workflow):
+    graph = workflow_to_api_prompt(workflow, schemas)
+    rows = {r["key"]: r for r in describe_form(schemas, graph, locate_nodes(workflow))}
+    assert rows["stills"]["choices"] == ["flux3_klein", "moss_image", "z_image_turbo"]
+    with pytest.raises(ValueError):
+        apply_choices(graph, schemas, locate_nodes(workflow), {"stills": "cloud_flux_pro"})
