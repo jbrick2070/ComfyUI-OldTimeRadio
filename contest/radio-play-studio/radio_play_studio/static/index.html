@@ -53,11 +53,17 @@
   .cast { display: grid; gap: 12px; margin-top: 8px; }
   .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg);
           display: grid; grid-template-columns: 96px 1fr; gap: 12px; }
-  @media (max-width: 560px) { .card { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) { .card, .card .who { grid-template-columns: 1fr; } }
   .face { width: 96px; height: 96px; border-radius: 8px; border: 1px dashed var(--line);
           display: flex; align-items: center; justify-content: center; overflow: hidden;
           color: var(--muted); font-size: 2rem; background: var(--panel); }
   .face img { width: 100%; height: 100%; object-fit: cover; }
+  .thumbs { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .thumb { position: relative; width: 48px; height: 48px; border-radius: 6px; overflow: hidden;
+           border: 1px solid var(--line); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .thumb button { position: absolute; top: 0; right: 0; padding: 0 5px; font-size: .75rem;
+                  border-radius: 0 0 0 6px; }
   .card .who { display: grid; grid-template-columns: 1fr 120px; gap: 8px; }
   .card label { margin: 6px 0 2px; font-size: .875rem; }
   .card textarea { min-height: 56px; }
@@ -199,8 +205,10 @@ function castLines() {
     const who = c.who.trim(), look = c.look.trim();
     return name + (who ? ": " + who : "") + (look ? (who ? " " : ": ") + "Looks: " + look : "");
   }).join("\n");
-  const photos = people.filter((c) => c.file)
-    .map((c) => c.name.trim().replace(/=/g, " ") + " = " + c.file).join("\n");
+  // Several photos of one face make one portrait (up to PHOTOS_PER_CHARACTER).
+  const photos = people.filter((c) => c.photos.length)
+    .map((c) => c.name.trim().replace(/=/g, " ") + " = " +
+         c.photos.map((ph) => ph.file).join(", ")).join("\n");
   return {text, photos};
 }
 
@@ -218,7 +226,8 @@ function castEditor() {
   const help = document.createElement("p");
   help.className = "help";
   help.textContent = "One card per character. Say how they look in fixed terms (age, build, face, " +
-    "hair, clothes) so they look the same in every shot, and add a photo if you like: their " +
+    "hair, clothes) so they look the same in every shot, and add up to three photos of them if " +
+    "you like: their " +
     "portrait is painted from it, in the episode's style, and every still follows that portrait. " +
     "Photos need the flux3_klein still pictures. Leave the cards empty and the cast is invented for you.";
   const list = document.createElement("div");
@@ -237,7 +246,10 @@ function castEditor() {
   return wrap;
 }
 
-function blankCard() { return {name: "", pronoun: "", who: "", look: "", file: "", thumb: ""}; }
+// The pack takes up to three photos of one character (one face, an amalgamation).
+const PHOTOS_PER_CHARACTER = 3;
+
+function blankCard() { return {name: "", pronoun: "", who: "", look: "", photos: []}; }
 
 function drawCast() {
   const list = $("cast_list");
@@ -260,9 +272,9 @@ function castCard(c, i) {
   el.className = "card";
   const face = document.createElement("div");
   face.className = "face";
-  if (c.thumb) {
+  if (c.photos.length) {
     const img = document.createElement("img");
-    img.src = c.thumb; img.alt = c.name;
+    img.src = c.photos[0].thumb; img.alt = c.name;
     face.appendChild(img);
   } else {
     face.textContent = (c.name.trim()[0] || "?").toUpperCase();
@@ -298,24 +310,34 @@ function castCard(c, i) {
   pick.type = "file"; pick.accept = "image/png,image/jpeg,image/webp"; pick.hidden = true;
   const photo = document.createElement("button");
   photo.type = "button"; photo.className = "small quiet";
-  photo.textContent = c.file ? "Change photo" : "Add a photo";
+  photo.textContent = c.photos.length ? "Add another photo" : "Add a photo";
+  photo.disabled = c.photos.length >= PHOTOS_PER_CHARACTER;
+  photo.title = "Up to " + PHOTOS_PER_CHARACTER + " photos of the same face";
   photo.addEventListener("click", () => pick.click());
   const state = document.createElement("span");
   state.className = "help";
   pick.addEventListener("change", () => addPhoto(c, pick.files[0], state));
   tools.append(photo, pick, state);
-  if (c.file) {
-    const drop = document.createElement("button");
-    drop.type = "button"; drop.className = "small quiet"; drop.textContent = "Remove photo";
-    drop.addEventListener("click", () => { c.file = ""; c.thumb = ""; drawCast(); });
-    tools.appendChild(drop);
-  }
+  const thumbs = document.createElement("div");
+  thumbs.className = "thumbs";
+  c.photos.forEach((ph, k) => {
+    const t = document.createElement("div");
+    t.className = "thumb";
+    const img = document.createElement("img");
+    img.src = ph.thumb; img.alt = c.name + " photo " + (k + 1);
+    const x = document.createElement("button");
+    x.type = "button"; x.className = "quiet"; x.textContent = "x";
+    x.title = "Remove this photo";
+    x.addEventListener("click", () => { c.photos.splice(k, 1); drawCast(); });
+    t.append(img, x);
+    thumbs.appendChild(t);
+  });
   const remove = document.createElement("button");
   remove.type = "button"; remove.className = "small quiet"; remove.textContent = "Remove character";
   remove.addEventListener("click", () => { cast.splice(i, 1); drawCast(); });
   tools.appendChild(remove);
 
-  body.append(top, labelled("Who they are", who), labelled("How they look", look), tools);
+  body.append(top, labelled("Who they are", who), labelled("How they look", look), tools, thumbs);
   el.append(face, body);
   return el;
 }
@@ -336,7 +358,9 @@ function addPhoto(c, file, state) {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || res.statusText);
-      c.file = body.file; c.thumb = reader.result;
+      if (!c.photos.some((ph) => ph.file === body.file)) {
+        c.photos.push({file: body.file, thumb: reader.result});
+      }
       drawCast();
     } catch (err) {
       state.textContent = "Photo not added: " + err.message;
