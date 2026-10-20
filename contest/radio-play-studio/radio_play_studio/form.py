@@ -59,8 +59,8 @@ FIELDS: tuple = (
           "The show"),
     Field("stills", "Still pictures", "OTR_VideoDirector", "character_image_model",
           "The open model that paints every still the video starts from -- the "
-          "characters, the announcer and the music. flux3_klein is the shipped pick; "
-          "moss_image is MOSS-Image (Apache-2.0, about 13 GB the first time).",
+          "characters, the announcer and the music. moss_image (MOSS-Image, Apache-2.0, "
+          "about 13 GB the first time) is the 16 GB pick; flux3_klein is a little faster.",
           "The show", also=("announcer_image_model", "music_image_model"),
           # Open weights only: the app makes no cloud calls (README), so the cloud
           # and partner lanes the pack's dropdown also lists are never offered.

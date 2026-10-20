@@ -107,7 +107,13 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
 - [ ] Compare by eye on the same shot and seed: foley (default) vs `otr_16gb_video.json` vs a
       procedural lane. LTX stays core if it holds up (LTX bonus).
 - [ ] Stills: FLUX 3 Klein is the shipped NVIDIA engine; confirm it looks right on the episode.
-- [ ] **MOSS-Image A/B vs Klein -- operator said build it now (2026-10-19); his eye decides.**
+- [x] **MOSS-Image A/B vs Klein -- DECIDED: "MOSS everywhere" (operator, 2026-10-19, by eye).**
+      Same scene (Midsummer, Bottom and Titania), same style (Shakespeare stage realism), 8 stills
+      each, sheet tmp/rps_live/ab/klein_vs_moss_midsummer_shakespeare_stage_realism.jpg. His reason:
+      Klein's faces carried big black smudges he did not like (Titania, b003 and b005). Stills
+      episode 7 min on MOSS vs 4.7 on Klein. The six otr_16gb_* graphs switched on main 7a8bdce8;
+      8 GB and 24 GB stay Klein. FOLLOW-UP: check whether Klein's smudges come from the model or
+      the prompt (a dirt/mud appearance detail) on the lanes still using it.
       Engine built and pushed opt-in (main 49fc8eb0, Sonnet holds); the app's "Still pictures"
       picker sets it (e0b2d329). Next: stills-only 16 GB workflow, same scene and pinned seeds,
       klein vs moss.

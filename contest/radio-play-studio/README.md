@@ -25,7 +25,7 @@ One press runs the [Old-Time Radio](https://github.com/jbrick2070/ComfyUI-OldTim
 | Stage | Open-weights model (default 16 GB foley workflow) |
 |---|---|
 | Story, cast and every line | Gemma 4 12B, run by ComfyUI itself (int8) |
-| A still for every beat | FLUX 3 Klein; MOSS-Image as an option (the **Still pictures** picker) |
+| A still for every beat | MOSS-Image; FLUX 3 Klein as an option (the **Still pictures** picker) |
 | Voices, one per character | Kokoro |
 | Theme music | Stable Audio 3 |
 | Video, with its own sound | LTX 2.5 (16 GB foley lane: each beat filmed and given foley, mixed under the voices) |
@@ -38,7 +38,7 @@ episode. The app makes no Comfy Router or Comfy Cloud calls and holds no API key
 ## What you need
 
 - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) v0.42.0 or newer running on your machine
-  (v0.41.0 for FLUX 3 Klein; MOSS-Image needs v0.42.0), with the **Old-Time Radio** pack installed
+  (MOSS-Image, the default still model, needs v0.42.0), with the **Old-Time Radio** pack installed
   (ComfyUI Manager: `comfyui-old-time-radio`, or clone it into `custom_nodes/`). One node pack;
   every model downloads itself from public, ungated repos with no Hugging Face token -- the
   writer and still models at pinned revisions, the rest checked against their published SHA-256.
@@ -129,7 +129,7 @@ before anything is sent, because the pack would stop that run.
 ## What a person can choose
 
 Story bank, the classic to adapt, language, acts, cast size, visual style, the still model
-(**Still pictures**: local engines only, FLUX 3 Klein by default) and the four My Story boxes.
+(**Still pictures**: local engines only, MOSS-Image by default) and the four My Story boxes.
 Every dropdown is read live from your ComfyUI, so it offers exactly what your installed pack has.
 Everything else (voices, music, the video lane) keeps the workflow's own setting.
 
@@ -200,6 +200,6 @@ against the pack's real node definitions.
 
 The app is MIT, see [LICENSE](LICENSE). Model weights carry their own licenses, documented in the
 pack's `apple/IMAGE_MODELS.md` with their sources in `nodes/_otr_visual_assets.py`. Note that the
-default still model, FLUX 3 Klein, is under the FLUX Kommunity License: free for non-commercial use,
-with commercial use of its outputs limited to qualifying users. MOSS-Image (the other Still pictures
-choice) is Apache-2.0.
+default still model, MOSS-Image, is Apache-2.0. FLUX 3 Klein (the other Still pictures choice) is
+under the FLUX Kommunity License: free for non-commercial use, with commercial use of its outputs
+limited to qualifying users.
