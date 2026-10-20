@@ -175,16 +175,42 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       ReferenceLatent on both conds), opt-in `OTR_FLUX3_REFERENCE=1`, default off = byte-identical
       t2i graph. Sonnet QA HOLDS (minor: ref height not in the cache key; staged otr_ref_* files
       accumulate in ComfyUI/input). Test hygiene fix main 8c511b8c.
-      NOW: measuring -- 1-act stills run, same My Story boxes, Klein + references, C7 seeds
-      (tmp/rps_live/ref_klein_1act.log). Baseline: the canceled 3-act MOSS run's 70 stills.
-      NEXT (design, gets one contrarian before code): (a) if Klein+ref holds clean faces -> flip the
-      default and make it the 16 GB character engine; (b) if the operator still prefers MOSS's look
-      -> portraits keep MOSS, character beats go Klein+ref (needs a portrait slot split from
-      character_image_model); (c) OWN PHOTO: a general per-character photo input in the app (and
-      the pack) that REPLACES the minted portrait as the anchor, so the same reference path uses it.
-      CONTEST RISK for the operator: the rules say "no real-person likenesses". A user's own photo is
-      the feature; the DEMO using his own face may still read as a real-person likeness to judges.
-      His call -- the feature can ship either way.
+      BUILT OVERNIGHT 10-20 (all pushed; Sonnet QA on every commit):
+      * main e815e37d + d4d994bc -- CHARACTER PHOTOS: OTR_ImageDirector trailing widget
+        `character_photos` ("Name = file" in ComfyUI/input) -> image policy -> MetaBrief matches the
+        name to the cast ONCE and tags the portrait `identity_photo` -> the dispatcher uses the photo
+        as the PORTRAIT's reference (portrait painted in the episode style; raw photo never in the
+        episode; photo sha in the cache key). Unusable photo = LOUD report. Design: Codex contrarian
+        (BROKEN on draft 1, every grounded point folded in).
+      * same commit -- PORTRAITS ON EVERY LANE where the still engine takes a reference: the
+        portrait-free exemption (still_flat/pan/motion/word, ltx_8gb, cloud) no longer applies to a
+        reference-capable still engine. Measured live first: a still_motion run minted 23 stills, all
+        reference=none, before this.
+      * main c41dbe25 -- CO-REFERENCES: each still also takes the portraits of the other cast members
+        its prompt names (up to 3); Klein chains one ReferenceLatent per portrait.
+      * main d1414a7d + 9b0ed9ea -- NON-HUMAN characters keep their body: _ensure_gender_anchor put
+        "adult woman, " in front of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug).
+        Head-noun rule after a Sonnet BLOCKER ("a cat burglar" stays a person).
+      * branch e5a18331 + bd4ce4ae + 861a2b5e -- APP CAST CARDS: one card per character (name, voice
+        he/she/any, who they are, how they look, optional photo) after Veo-Moovie-Maker's Cast Bank;
+        "Load the example" = Jeffrey, MagnoliaRex, Cat with the operator's own Veo descriptions;
+        POST /api/photos stores the photo in ComfyUI/input by content hash. README updated.
+      LIVE PROOF 1 (00:14-00:30, 1-act still_motion, flux3_klein + OTR_FLUX3_REFERENCE=1, the example
+      cast, a STAND-IN photo = the generic MOSS Jeffrey portrait, never the operator's pictures):
+      obs_publish OK. Sheet tmp/rps_live/ab/photo_reference_proof.jpg (sent to the operator). Photo ->
+      portrait kept the face; Jeffrey held in 7/7 of his stills, MagnoliaRex in 7/7 of hers; the
+      OTHER person in a two-shot drifted (-> co-references) and the Cat was humanoid (-> non-human fix).
+      NOW: LIVE PROOF 2 rendering (tmp/rps_live/photo_proof2_1act.log, same inputs, with both fixes).
+      THEN: if it holds, re-render the 3-act MagnoliaRex demo with the example cast on flux3_klein +
+      references (that IS the demo of the feature).
+      OPERATOR DECISION (morning): how references switch on for everyone. Today it is the opt-in
+      server env OTR_FLUX3_REFERENCE=1 (default off = both boxes byte-identical). Options: (a) flip
+      Klein's default ON -- reaches the 8 GB lane, needs a 4060 VRAM measurement first (no 4060
+      window was live overnight); (b) a separate dropdown choice "flux3_klein with references"
+      (~10 registry/fixture edits, zero blast radius); (c) leave it opt-in. MOSS (the 16 GB default,
+      his pick by eye) has no reference path at all, so a photo there is reported unused.
+      CONTEST RISK: rules say "no real-person likenesses" -- the feature is fine; a demo built on his
+      own face is his call. The demo uses written descriptions, not his photos.
 - [ ] Voice engine per role (OTR_CastLock rows in `config/app_mode.json`): operator's ear decides.
 - [ ] Any winning change to a shipped workflow: edit `workflows/otr_canonical.json` on main, then
       `python scripts/build_variants.py --all` and `--check`, plus the four section-0 tests.
