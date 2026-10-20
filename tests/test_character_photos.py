@@ -292,6 +292,14 @@ def test_each_name_hit_carries_the_words_that_matched():
     assert mbp.co_present_char_ids(prompt, _BY_ID, "c03") == ["c04"]
 
 
+def test_the_quote_survives_letters_that_casefold_longer():
+    """Sonnet QA on bd752dd3: "ß" casefolds to "ss", so a position found in the
+    casefolded text points past the name in the prompt itself."""
+    prompt = "Straße " * 60 + "and the Cat sits by the fountain"
+    (cid, quote), = mbp.co_present_mentions(prompt, _BY_ID, "c03")
+    assert cid == "c04" and "the Cat sits" in quote
+
+
 def test_the_reason_for_each_co_reference_is_logged():
     import inspect
     src = inspect.getsource(mbp)

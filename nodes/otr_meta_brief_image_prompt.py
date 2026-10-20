@@ -816,14 +816,23 @@ def co_present_mentions(prompt, cast_by_id, speaker_id):
         if (first != name and len(first) >= 3 and first not in _TITLE_WORDS
                 and firsts.get(first) == [cid]):
             forms.append(first)
-        hits = [m.start() for form in forms
+        hits = [(m.start(), form) for form in forms
                 for m in [re.search(r"(?<![\w])" + re.escape(form) + r"(?![\w])", text)]
                 if m]
         if hits:
-            found.append((min(hits), str(cid)))
+            pos, form = min(hits)
+            found.append((pos, str(cid), form))
     source = str(prompt or "")
-    return [(cid, " ".join(source[max(0, pos - 40):pos + 40].split()))
-            for pos, cid in sorted(found)][:CO_REFERENCE_LIMIT]
+
+    def quote(form):
+        # Positions above are in the casefolded text, which can be longer than
+        # the prompt ("Strasse" for "Straße"), so the quote is found again in
+        # the prompt itself.
+        m = re.search(r"(?<![\w])" + re.escape(form) + r"(?![\w])", source, re.IGNORECASE)
+        at = m.start() if m else 0
+        return " ".join(source[max(0, at - 40):at + 40].split())
+
+    return [(cid, quote(form)) for _pos, cid, form in sorted(found)][:CO_REFERENCE_LIMIT]
 
 
 def beat_partner_char_ids(lines, cast_by_id):
