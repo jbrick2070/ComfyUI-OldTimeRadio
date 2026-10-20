@@ -141,12 +141,6 @@ def _ensure_gender_anchor(prompt: str, char: dict) -> str:
     text = str(prompt or "").strip()
     if not text:
         return text
-    if _is_non_human(char):
-        # A cat, a robot, a dragon: the VOICE still needs a binary (the bank
-        # has no other references), but "adult woman, " in front of "an
-        # Egyptian-type adult cat" drew a cat-woman -- the live proof of
-        # 2026-10-20, and the "cat drawn as a man" of the night before.
-        return text
     gender = normalize_gender((char or {}).get("gender"))
     words = set(re.findall(r"[a-z]+", text.lower()))
     if gender == "female":
@@ -163,57 +157,6 @@ def _ensure_gender_anchor(prompt: str, char: dict) -> str:
     if words & (_NEUTRAL_PROMPT_TERMS | _FEMALE_PROMPT_TERMS | _MALE_PROMPT_TERMS):
         return text
     return f"person, {text}"
-
-
-#: Nouns that make a character something other than a person. Read from the
-#: OPENING of the character's own appearance text, where a writer names what
-#: the character is ("An Egyptian-type adult cat, slender..."), never from the
-#: whole prompt, which may mention a pet or a drone beside a person.
-_NON_HUMAN_TERMS = frozenset({
-    "cat", "kitten", "dog", "puppy", "hound", "horse", "pony", "donkey", "goat",
-    "bird", "owl", "raven", "crow", "parrot", "penguin", "eagle", "fox", "wolf",
-    "bear", "rabbit", "hare", "mouse", "rat", "squirrel", "snake", "lizard",
-    "frog", "fish", "whale", "dolphin", "octopus", "monkey", "ape", "lion",
-    "tiger", "elephant", "robot", "android", "automaton", "drone", "dragon",
-    "creature", "beast", "animal", "alien",
-})
-_PERSON_TERMS = (_FEMALE_PROMPT_TERMS | _MALE_PROMPT_TERMS
-                 | frozenset({"person", "human", "humanoid", "people"}))
-
-
-#: Words that may follow the subject noun of an appearance's first clause.
-#: "A cat with green eyes" is a cat; "a cat burglar" is a burglar.
-_AFTER_SUBJECT = frozenset({
-    "with", "who", "that", "which", "whose", "of", "in", "on", "at", "from",
-    "named", "called", "and", "wearing", "whom", "for", "like",
-})
-
-
-def _is_non_human(char) -> bool:
-    """True when the SUBJECT of the character's appearance is a non-human kind.
-
-    Read from the first clause (up to the first comma, full stop, semicolon or
-    colon). The non-human word must be the head of that phrase: it ends the
-    clause, or a connecting word follows it ("a cat with green eyes"). So "a
-    cat burglar", "a dog trainer", "a fish merchant", "Robot dancer" and
-    "rat-faced informant" stay people -- the animal word is a modifier there --
-    and a capitalised word after the first ("Captain Wolf") is a name. Any
-    person word in the clause keeps the character a person.
-    """
-    look = str((char or {}).get("appearance") or "")
-    first = re.split(r"[.,;:]", look, maxsplit=1)[0]
-    tokens = re.findall(r"[A-Za-z]+", first)
-    lowered = [t.lower() for t in tokens]
-    if set(lowered) & _PERSON_TERMS:
-        return False
-    for i, (tok, low) in enumerate(zip(tokens, lowered)):
-        kind = low if low in _NON_HUMAN_TERMS else (
-            low[:-1] if low.endswith("s") and low[:-1] in _NON_HUMAN_TERMS else "")
-        if not kind or (i > 0 and tok[:1].isupper()):
-            continue
-        if i + 1 == len(tokens) or lowered[i + 1] in _AFTER_SUBJECT:
-            return True
-    return False
 
 
 #: Shared portrait style anchor (operator look-QA 2026-06-10): portraits must
