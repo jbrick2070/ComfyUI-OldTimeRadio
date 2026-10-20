@@ -35,6 +35,8 @@ import time
 from .._otr_shared import still_receipt as _receipt
 from .._otr_shared.ffmpeg import resolve_ffmpeg as _resolve_ffmpeg
 from .._otr_shared.aspect import is_wide as _aspect_is_wide
+from .._otr_shared.node_progress import (
+    QuietInnerBars as _QuietInnerBars, WeightedProgress as _WeightedProgress)
 from .._otr_speaker_role import (
     SPEAKER_ROLE_ANNOUNCER as _SPEAKER_ROLE_ANNOUNCER,
     SPEAKER_ROLE_MUSIC_OPEN as _SPEAKER_ROLE_MUSIC_OPEN,
@@ -1377,6 +1379,30 @@ def segment_render_frames(shot, segment_index):
         "request without a plan is a caller bug. NO FALLBACK to the beat's "
         "length -- that renders the WHOLE beat under a segment's name."
         % (shot.get("shot_id"), index))
+
+
+def beat_render_frames(shot):
+    """The frames one beat asks its engine to render, all segments together.
+
+    The video node's progress bar is weighted by this (2026-10-19): render time
+    follows frames, and one-act foley episodes ran 57 to 76 minutes on the same
+    card because the beat count and length follow the story. Display only --
+    never a render decision -- so a beat whose plan cannot be read weighs 1
+    rather than raising here, and the render itself raises where it always has.
+    """
+    try:
+        raw = shot.get("coverage_plan")
+        if isinstance(raw, dict) and raw:
+            try:
+                from . import coverage_plan as _cp  # type: ignore
+            except ImportError:  # pragma: no cover -- flat test imports
+                import coverage_plan as _cp  # type: ignore
+            plan = _cp.CoveragePlan.from_dict(raw)
+            if plan.requires_coverage_execution:
+                return max(1, sum(int(s.render_frames) for s in plan.segments))
+        return max(1, int(segment_render_frames(shot, 0)))
+    except Exception:  # noqa: BLE001 -- display weight only
+        return 1
 
 
 def validate_and_repair_still_spine(ledger):
@@ -4298,7 +4324,8 @@ def render_shot(shot, request, *, host_caps=None, profile=None, segment=None):
 
 
 def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
-                         canvas=None, host_caps=None, profile=None):
+                         canvas=None, host_caps=None, profile=None,
+                         on_segment_done=None):
     """Render ONE BEAT -- as one clip, or as its plan's segments assembled.
 
     Multi-clip coverage chunk 6c/6d (2026-07-26). This is the loop the whole
@@ -4321,6 +4348,11 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     Returns ``(clip, out_shot, attempts, observed_peak_mb)`` -- the same tuple
     :func:`render_shot` returns, because the caller must not care how many
     renders it took to make one beat.
+
+    ``on_segment_done(render_frames)``, when given, is called after each
+    segment of a multi-segment beat renders -- the local walk's progress bar.
+    This function also runs on cloud fan-out worker threads, which never pass
+    it, so nothing thread-bound ever happens in here.
     """
     try:
         # ``acceptance`` owns the beat frame arithmetic, and it lives THERE
@@ -4518,6 +4550,8 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
             clip, out_shot, seg_attempts, seg_used = render_shot(
                 shot, request, host_caps=host_caps, profile=profile,
                 segment=_bs.SegmentSlot(session, index, beat_id))
+            if on_segment_done is not None:
+                on_segment_done(int(segment.render_frames))
             attempts = list(attempts) + list(seg_attempts or ())
             if seg_used is not None:
                 peak_used = (int(seg_used) if peak_used is None
@@ -5349,6 +5383,8 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
         row["floor_render"] = CLOUD_FLOOR_RENDER_ENGINE
         new_shots.append(row)
 
+    # Opened only by the LOCAL walk below; closed in this function's finally.
+    _quiet_bars = _QuietInnerBars()
     try:
         # Beats whose required still the image model REFUSED. Read once, not
         # per beat: the receipt is frozen by the time the render starts.
@@ -5448,7 +5484,18 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                 _last_engine = str(out_shot.get("engine_id") or "")
         else:
             cloud_spend_halt = False
-            for shot in section["shots"]:
+            # THE NODE'S BAR IS FRAMES RENDERED OF THE EPISODE (2026-10-19).
+            # Built BEFORE the inner bars are quieted, so it keeps ComfyUI's
+            # real hook; each beat starts where the beats before it end, so a
+            # floored or skipped beat moves it the same as a rendered one. The
+            # quiet is opened here, on the render thread, around the whole
+            # walk -- never inside render_beat_coverage, which also runs on
+            # cloud worker threads -- and closed in the ``finally`` below.
+            _video_progress = _WeightedProgress(
+                [beat_render_frames(s) for s in section["shots"]], "video frames")
+            _quiet_bars.open()
+            for _beat_no, shot in enumerate(section["shots"]):
+                _video_progress.begin(_beat_no)
                 # A SANCTIONED GAP IS SKIPPED WHOLE, AND SKIPPED HERE (2026-08-28).
                 #
                 # HERE is load-bearing. The obvious place looks like the request
@@ -5545,7 +5592,8 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                         request_builder=request_builder,
                         canvas=canvas,
                         host_caps=_episode_host_caps,
-                        profile=_episode_profile)
+                        profile=_episode_profile,
+                        on_segment_done=_video_progress.part)
                 except Exception as exc:
                     sid = str(shot.get("shot_id") or "")
                     if _cloud_budget_floor_sid(sid, {sid: exc}, ()):
@@ -5648,7 +5696,9 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                 # CS-3: remember what ACTUALLY rendered (post-fallback final_engine) so
                 # the next beat reclaims only when it crosses to a different engine.
                 _last_engine = str(out_shot.get("engine_id") or "")
+            _video_progress.finish()
     finally:
+        _quiet_bars.close()
         # THE SCOPES CLOSE EVEN WHEN THE EPISODE DOES NOT FINISH. A raise
         # anywhere in the loop -- an OOM, a refused beat, a bad ledger row --
         # must still release the episode's heavy handles, or a failed render
