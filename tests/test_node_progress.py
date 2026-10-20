@@ -263,7 +263,7 @@ def test_the_local_video_walk_draws_frames_and_quiets_its_inner_bars():
     (loop,) = _loops_over(tree, "enumerate(section['shots'])")
     assert _first_call(loop) == "_video_progress.begin(_beat_no)"
     assert _assigned(tree, "_video_progress") == [
-        "_WeightedProgress([beat_render_frames(s) for s in section['shots']], 'video frames')"]
+        "_WeightedProgress([beat_render_frames(s, frame_count) for s in section['shots']], 'video frames')"]
     src = ast.unparse(tree)
     assert "on_segment_done=_video_progress.part" in src
     assert "_video_progress.finish()" in src
@@ -299,3 +299,31 @@ def test_the_fanout_reports_each_finished_job_on_the_calling_thread():
 def test_only_partner_engines_count_as_drawing_the_bar(name, heartbeat):
     from nodes._otr_shared.cloud_fanout import adapter_draws_partner_heartbeat
     assert adapter_draws_partner_heartbeat(types.SimpleNamespace(name=name)) is heartbeat
+
+
+def test_overlapping_quiets_always_end_on_the_real_hook(fake_hook):
+    utils, real, _, _ = fake_hook
+    a = np_mod.QuietInnerBars().open()
+    b = np_mod.QuietInnerBars().open()
+    a.close()
+    b.close()
+    assert utils.PROGRESS_BAR_HOOK is real
+
+
+def test_a_bar_built_while_quiet_shows_again_after_close(fake_hook):
+    utils, real, sent, _ = fake_hook
+    quiet = np_mod.QuietInnerBars().open()
+    kept = utils.PROGRESS_BAR_HOOK          # what a ProgressBar built now would hold
+    quiet.close()
+    kept(2, 4, None, node_id=None)
+    assert sent == [(2, 4)]
+
+
+def test_a_beat_weighs_the_frames_it_renders():
+    from nodes._otr_video_engines.render_driver import beat_render_frames
+    plan = {"target_visible_frames": 100, "join_mode": "chain",
+            "segments": [{"index": 0, "render_frames": 97}, {"index": 1, "render_frames": 49, "drop_head": 1}]}
+    assert beat_render_frames({"target_frame_count": 100, "coverage_plan": plan}) == 146
+    assert beat_render_frames({"target_frame_count": 50}) == 50
+    assert beat_render_frames({}, 25) == 25
+    assert beat_render_frames({"target_frame_count": 50, "coverage_plan": {"target_visible_frames": 50, "segments": []}}) == 50
