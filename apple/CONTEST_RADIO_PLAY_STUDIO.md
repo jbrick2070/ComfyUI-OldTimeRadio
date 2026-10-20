@@ -44,7 +44,8 @@ branch, then do the first unchecked step. Update this file in the same commit as
 ## Phase 1 -- the live loop (target Oct 22): DONE 2026-10-19
 
 - [x] App venv, requirements, doctor all ok.
-- [x] ComfyUI 0.39.2 -> 0.42.1 (the shipped 16 GB graphs need FLUX 3 Klein's CLIPLoader type).
+- [x] ComfyUI 0.39.2 -> 0.42.1 (Klein needed v0.41.0; the 16 GB graphs now use MOSS-Image, which
+      needs v0.42.0).
 - [x] Pack bug: Gemma 4 12B wrote `",""presence"` on every casting retry. JSON repair on main:
       3e8affa1 + 9e81e879 (PBUG-20261019-01).
 - [x] Live, video lane: As You Like It, 1 act, 65 min, RESULT SUCCESS, obs_publish OK,
@@ -102,8 +103,15 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       `output/otr/obs/bird_song_20261019_191143__cart__n16f__fk3i__koko__sspr__cg412__sa3_final.mp4`
       (A Midsummer Night's Dream, Bottom and Titania; 1 act foley; 71 MB, 1m45s; sha 0c8953bd).
       Keep it: do not re-render or overwrite. The demo shows a highlight cut of it (ffmpeg, no render).
-- [ ] Demo episode, My Story half: render one My Story episode AFTER the Klein/MOSS still pick,
-      with the winning still model, 1 act foley.
+- [ ] **Demo episode, My Story half: RENDERING (started 22:53 on 10-19, 3 acts, foley, MOSS).**
+      Operator: "make my story the fictional tale of Jeffrey and MagnoliaRex, the later chapters
+      ... it's my published book, I own the rights" (his book "Mime Lung Music Festival", Part 2;
+      the book's own disclaimer lists the fiction chapters). He approved the four boxes as drafted.
+      CONTEST CARE: MagnoliaRex is a thin disguise for a real musician, so the boxes carry NO real
+      names (no artists, no Nam June Paik, no real artworks) and describe her only by the text's
+      personality. The exact boxes are in the launcher scratchpad script mystory_magnolia.sh and
+      the run log tmp/rps_live/mystory_magnolia.log. When it lands: verify, then check the stills
+      and script for any real name before it goes in the demo.
 - [ ] Compare by eye on the same shot and seed: foley (default) vs `otr_16gb_video.json` vs a
       procedural lane. LTX stays core if it holds up (LTX bonus).
 - [ ] Stills: FLUX 3 Klein is the shipped NVIDIA engine; confirm it looks right on the episode.
