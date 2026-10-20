@@ -778,7 +778,17 @@ CO_REFERENCE_LIMIT = 3
 
 
 def co_present_char_ids(prompt, cast_by_id, speaker_id):
-    """The other cast members a scene prompt names, in order of first mention.
+    """The other cast members a scene prompt names, in order of first mention."""
+    return [cid for cid, _quote in co_present_mentions(prompt, cast_by_id, speaker_id)]
+
+
+def co_present_mentions(prompt, cast_by_id, speaker_id):
+    """``[(char_id, quote), ...]``: co_present_char_ids plus the words that matched.
+
+    The quote is the prompt text around the first mention, so a log can say WHY
+    a portrait rode along -- the still prompts are not saved anywhere else, and
+    "the writer put the Cat in Athens" and "a stray 'cat-eye' matched" look the
+    same in a finished picture.
 
     A two-shot's second person is drawn from text alone unless their portrait
     goes with the speaker's, and then they change face from beat to beat. The
@@ -811,7 +821,9 @@ def co_present_char_ids(prompt, cast_by_id, speaker_id):
                 if m]
         if hits:
             found.append((min(hits), str(cid)))
-    return [cid for _pos, cid in sorted(found)][:CO_REFERENCE_LIMIT]
+    source = str(prompt or "")
+    return [(cid, " ".join(source[max(0, pos - 40):pos + 40].split()))
+            for pos, cid in sorted(found)][:CO_REFERENCE_LIMIT]
 
 
 def beat_partner_char_ids(lines, cast_by_id):
@@ -2611,12 +2623,19 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             if _cid:
                 _obj["char_id"] = _cid     # traceability; engine resolves by role
                 if tgt["kind"] == "scene_character":
-                    _co = co_present_char_ids(sprompt, _with_body, _cid)
+                    _why = {pid: "named: ...%s..." % quote for pid, quote
+                            in co_present_mentions(sprompt, _with_body, _cid)}
+                    _co = list(_why)
                     for _pid in _partners.get(tgt["beat_id"], ()):
                         if _pid != _cid and _pid not in _co:
                             _co.append(_pid)
+                            _why[_pid] = "script partner in this shot"
                     if _co[:CO_REFERENCE_LIMIT]:
                         _obj["co_char_ids"] = _co[:CO_REFERENCE_LIMIT]
+                        log.info("[OTR_MetaBriefImagePromptGen] co-references for %s (%s): %s",
+                                 _obj["object_id"], _cid,
+                                 "; ".join("%s <- %s" % (pid, _why[pid])
+                                           for pid in _co[:CO_REFERENCE_LIMIT]))
                 # IDENTITY TRANSPORT (2026-08-26). A scene_character still seeds
                 # from the CHARACTER'S PORTRAIT prompt so every beat of that
                 # character draws one face (commit 89e82181). When the video lane

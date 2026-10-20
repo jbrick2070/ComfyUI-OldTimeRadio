@@ -282,9 +282,26 @@ def test_names_match_whole_words_only_and_the_count_is_capped():
     assert len(mbp.co_present_char_ids(text, crowd, "c00")) == mbp.CO_REFERENCE_LIMIT
 
 
+def test_each_name_hit_carries_the_words_that_matched():
+    """The still prompts are not saved, so the log line is the only record of
+    WHY a portrait rode along (the Cat in Athens, 2026-10-20)."""
+    prompt = "MagnoliaRex at the Athens festival, sharp cat-eye liner, crowds behind"
+    hits = mbp.co_present_mentions(prompt, _BY_ID, "c03")
+    assert [cid for cid, _quote in hits] == ["c04"]
+    assert "cat-eye liner" in hits[0][1]
+    assert mbp.co_present_char_ids(prompt, _BY_ID, "c03") == ["c04"]
+
+
+def test_the_reason_for_each_co_reference_is_logged():
+    import inspect
+    src = inspect.getsource(mbp)
+    assert '_why[_pid] = "script partner in this shot"' in src
+    assert "co-references for %s (%s): %s" in src
+
+
 def test_co_presence_is_wired_where_scene_stills_are_built():
     import inspect
-    assert "co_present_char_ids(sprompt, _with_body, _cid)" in inspect.getsource(mbp)
+    assert "co_present_mentions(sprompt, _with_body, _cid)" in inspect.getsource(mbp)
 
 
 def test_the_other_peoples_portraits_ride_with_the_speakers(monkeypatch, tmp_path):
@@ -396,7 +413,7 @@ def test_a_bodiless_speaker_lends_no_face():
     import inspect
     src = inspect.getsource(mbp)
     assert "_partners = beat_partner_char_ids(lines, _with_body)" in src
-    assert "co_present_char_ids(sprompt, _with_body, _cid)" in src
+    assert "co_present_mentions(sprompt, _with_body, _cid)" in src
     assert "_CAST_TEXT.is_bodiless(row)" in src
 
 
