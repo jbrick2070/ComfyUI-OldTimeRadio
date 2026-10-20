@@ -257,6 +257,22 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         demo_photos2.py). The Jeffrey-only render (08:32) was stopped at the operator's word ("u can
         kill the current renders"), as was a 10:39 start with the gold outfit. The 05:18 demo and its
         Athens highlight stay until the new one is verified.
+      MEASURED (11:30, stills done, video still rendering): 54 stills, every character still carries a
+        reference (server_ref_on.log: Jeffrey's portrait 618a, MagnoliaRex's d564, the Cat's 22d0;
+        reference=none only on the radio/music cards). FACES HOLD across all three acts -- his mime
+        face and black shirt, her face, streaked hair and white-silver petal outfit, Athens to the
+        desert to frozen Seoul. Two small drifts: a few frames draw a second Jeffrey, and two desert
+        frames soften her into an illustrated look.
+      THE CAT IN ATHENS AND SEOUL is the per-beat still WRITER's choice, not the reference code: the
+        script gives the Cat lines in shot_002 only, but each beat's still prompt is rewritten by the
+        writer LLM (my_story_source_rewrite_scene_*), which sees the whole cast as
+        candidate_companions and puts the Cat into Athens/Seoul frames; the co-reference matcher then
+        correctly attaches the Cat's portrait because the prompt names it. Operator 10-20: "the llm
+        writes each beat, we can't necessarily change that ... unless we go to a full beat-by-beat
+        writer" -- ACCEPTED AS IS; a beat-by-beat writer is a separate, larger decision, not taken.
+        Unverified: the still prompts are not persisted (no ledger row, no PNG text), so a stray
+        "cat-eye" alone could also trip the whole-word match; logging WHY each co-reference was
+        attached is the cheap way to tell next time.
         History of the bug: _ensure_gender_anchor puts "adult woman, " in front
         of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug). Two word-list fixes
         (d1414a7d, 9b0ed9ea) both failed Sonnet as BLOCKERs -- people like "Sailor with a parrot" lost
