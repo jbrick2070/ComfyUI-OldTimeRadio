@@ -73,14 +73,23 @@ branch, then do the first unchecked step. Update this file in the same commit as
       whole video stage); the SCALE trails because this story's video took 3,501 s against the
       4,209 s it was calibrated on (one-act foley ran 64-76 min today, beats follow the story).
       Fix: saved times are now a running average (half old, half new), and the history is the
-      mean of the two clean runs (video 3,855 s, total 4,050 s). **+/-10 is NOT yet proven**:
-      the next run is the check. **Never attach a second listener to the job's SSE** -- read the
+      mean of the two clean runs (video 3,855 s, total 4,050 s).
+- [x] **Second check (Midsummer, averaged history):** 57 min 06 s, obs_publish OK,
+      `bird_song_20261019_191143_..._final.mp4` (71 MB, 1920x1080, 1m45s), sha 0c8953bd, both
+      places. Bar trailed by -3 at 5 min to -17 at 55; min-left over by up to 12. **+/-10 NOT
+      met**, and averaging cannot meet it: one-act foley ran 57, 64, 64 and 76 min today because
+      the beat count follows the story, and the app cannot see beats during the video node. The
+      only real fix is a beats-done signal from the pack (OTR_VideoRenderBatch), which reopens the
+      refuted hook-swap design -- operator's call whether it is worth it before Oct 30. **Never attach a second listener to the job's SSE** -- read the
       app's own output or its `/api/episodes/<id>/events`.
 
 ## Phase 2 -- quality budget (target Oct 25)
 
 Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase prose or score.
 
+- [x] Comedy demo candidate rendered: A Midsummer Night's Dream, Bottom and Titania
+      (`--source-ref folger-midsummer:act3-scene1-bottom-titania`), 1 act foley, above. Awaits the
+      operator's eye.
 - [ ] Pick the demo source: a **comedy**, SFW, public domain (Shakespeare comedies are in the
       bank: As You Like It, Twelfth Night, A Midsummer Night's Dream, Much Ado). Use the form's
       Source to adapt with the shakespeare bank. Also make one **My Story** episode for the demo.
