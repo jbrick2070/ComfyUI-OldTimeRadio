@@ -193,9 +193,20 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         (d1414a7d, 9b0ed9ea) both failed Sonnet as BLOCKERs -- people like "Sailor with a parrot" lost
         their anchor -- and were REVERTED in main 83375f0f (prompts byte-identical to before; titles-
         not-first-names and the LOUD co-portrait report kept). Third attempt goes through a panel
-        first (CLAUDE.md): Codex design round running on "the character's kind as DATA" -- writer
-        cast field vs a My Story card choice vs an LLM classification
-        (tmp/rps_live/codex_kind_design.txt).
+        first (CLAUDE.md). PANEL DONE (Codex gpt-5.6-sol, one lane, 10-20 00:50): PICK = design A,
+        the character's KIND as data on the cast row (person | animal | machine | creature; missing or
+        invalid = person, so frozen/replayed ledgers are unchanged). Refuted: a My-Story-only card
+        choice (other lanes stay broken), an LLM classification at MetaBrief (no stable owner; replay
+        makes no call), any free-text reading. Change list, all grounded: _otr_casting.py (casting
+        LLM writes `kind`; CastingResponse; generic/adaptation rows ~2301), _otr_my_story.py
+        (CastMember.kind; _assign_voices ~1154), _otr_scifi_news_pro.py (~4297; repair rows =
+        person), production_ledger.py set_cast allowlist (~1518 -- it DROPS unknown keys),
+        otr_meta_brief_image_prompt.py (anchor only for person; drop the hard-coded "a person with a
+        clearly visible face" at ~1541/~1601 for non-person), otr_shot_lock.py ~175. CAUTION: the
+        casting prompts insist appearance names "a woman or a man" (_otr_casting.py ~441,
+        story_packs/my_story/my_story.json:10, scifi_news_pro.json:13) and story packs are sha256-pinned
+        -- no REQUIRED pack key. This is a schema/ledger change: per the 08-17 rule it gets a design
+        arc before code; parked for a daytime session, not built unattended.
       * branch e5a18331 + bd4ce4ae + 861a2b5e -- APP CAST CARDS: one card per character (name, voice
         he/she/any, who they are, how they look, optional photo) after Veo-Moovie-Maker's Cast Bank;
         "Load the example" = Jeffrey, MagnoliaRex, Cat with the operator's own Veo descriptions;
