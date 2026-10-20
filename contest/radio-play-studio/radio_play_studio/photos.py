@@ -1,9 +1,9 @@
 """A character's photo, from the page to ComfyUI's input folder.
 
 In My Story a person may give any character a photo. The pack reads it from
-ComfyUI's input folder by file name (the writer's `story_character_photos`
-widget, one `Name = file` line per character) and uses it as that character's
-portrait, so every still of the character is drawn from the same face.
+ComfyUI's input folder by file name (OTR_ImageDirector's `character_photos`
+widget, one `Name = file` line per character) and paints that character's
+portrait from it, so every still of the character follows the same face.
 
 Standard library only. The image is never decoded here: its first bytes must be
 a PNG, JPEG or WebP signature, it must fit under MAX_PHOTO_BYTES, and ComfyUI's

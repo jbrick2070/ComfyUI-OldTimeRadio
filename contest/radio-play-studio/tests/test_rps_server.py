@@ -200,3 +200,11 @@ def test_presence_takes_open_and_closing(app):
         assert status == 200
     status, _, _ = _request(port, "POST", "/api/presence", "{}", {"Content-Type": "application/json"})
     assert status == 400
+
+
+def test_a_negative_content_length_is_refused_not_read_to_the_end():
+    from radio_play_studio.server import _body_length
+    assert _body_length({"Content-Length": "12"}) == 12
+    assert _body_length({}) == 0
+    with pytest.raises(ValueError, match="negative"):
+        _body_length({"Content-Length": "-1"})

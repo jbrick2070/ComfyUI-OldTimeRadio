@@ -53,6 +53,15 @@ class Run:
             self.cond.notify_all()
 
 
+def _body_length(headers) -> int:
+    """The request body's declared length. A negative one is refused: reading
+    -1 bytes would block until the client hung up."""
+    length = int(headers.get("Content-Length") or 0)
+    if length < 0:
+        raise ValueError("a negative Content-Length")
+    return length
+
+
 class Busy(RuntimeError):
     """An episode is already being made; one GPU makes one at a time."""
 
@@ -210,7 +219,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/photos":
             return self._photo()
         try:
-            length = int(self.headers.get("Content-Length") or 0)
+            length = _body_length(self.headers)
             body = json.loads(self.rfile.read(length) or b"{}")
             if not isinstance(body, dict):
                 raise ValueError("the body must be a JSON object")
@@ -232,7 +241,7 @@ class Handler(BaseHTTPRequestHandler):
     def _presence(self) -> None:
         """A page saying it is open, or closing: {"page": id, "closing": bool}."""
         try:
-            length = int(self.headers.get("Content-Length") or 0)
+            length = _body_length(self.headers)
             body = json.loads(self.rfile.read(length) or b"{}")
             page = str(body["page"])[:64]
         except (ValueError, TypeError, KeyError):
@@ -246,7 +255,7 @@ class Handler(BaseHTTPRequestHandler):
     def _photo(self) -> None:
         """A character's photo: {"data": data URL} -> {"file": stored name}."""
         try:
-            length = int(self.headers.get("Content-Length") or 0)
+            length = _body_length(self.headers)
             if length > MAX_PHOTO_BYTES * 4 // 3 + 4096:
                 raise PhotoError(f"the picture is over {MAX_PHOTO_BYTES // (1024 * 1024)} MB")
             body = json.loads(self.rfile.read(length) or b"{}")
