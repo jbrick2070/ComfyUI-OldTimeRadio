@@ -154,7 +154,7 @@ def test_each_h3_lane_is_exactly_its_engine_recipe(monkeypatch):
 
 @pytest.mark.parametrize("row_id, video, h3_lane, image_lane", [
     ("otr_8gb_video", "h3_low_video", "minimax_h3_video", "flux3_klein"),
-    ("otr_16gb_video", "h3_low_audio_in", "minimax_h3_audio_in", "flux3_klein"),
+    ("otr_16gb_video", "h3_low_audio_in", "minimax_h3_audio_in", "moss_image"),
 ])
 def test_an_h3_profile_routes_its_own_lane_automatically(
         row_id, video, h3_lane, image_lane):
