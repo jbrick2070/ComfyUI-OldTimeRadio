@@ -76,12 +76,12 @@ Nothing here is inferred from "it looks like it should fit". A blank is an unkno
 
 | row | video | voice | music | image | extra install | confidence | install recipe |
 |---|---|---|---|---|---|---|---|
-| `otr_16gb_animatediff` | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | flux3_klein | ComfyUI-AnimateDiff-Evolved | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_foley` | ltx25_foley_16gb | kokoro | stable_audio_3 | flux3_klein | none | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_low` | viz_camera | kokoro | stable_audio_3 | flux3_klein | none | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_mime` | ltx25_mime_16gb | kokoro | stable_audio_3 | flux3_klein | none | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_still` | still_motion | kokoro | stable_audio_3 | flux3_klein | none | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_video` | ltx25_high_video | kokoro | stable_audio_3 | flux3_klein | none | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_animatediff` | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | moss_image | ComfyUI-AnimateDiff-Evolved | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_foley` | ltx25_foley_16gb | kokoro | stable_audio_3 | moss_image | none | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_low` | viz_camera | kokoro | stable_audio_3 | moss_image | none | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_mime` | ltx25_mime_16gb | kokoro | stable_audio_3 | moss_image | none | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_still` | still_motion | kokoro | stable_audio_3 | moss_image | none | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_video` | ltx25_high_video | kokoro | stable_audio_3 | moss_image | none | `shipping` | complete; Python <=3.13 |
 
 ## 24 GB NVIDIA  --  1 workflow(s), 0 shipping
 
