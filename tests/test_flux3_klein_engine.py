@@ -26,11 +26,11 @@ _SET = {
 
 @pytest.fixture
 def no_flux3_env(monkeypatch):
-    for var in (FK.MODEL_ENV, FK.CLIP_ENV, FK.VAE_ENV):
+    for var in (FK.MODEL_ENV, FK.CLIP_ENV, FK.VAE_ENV, "OTR_FLUX3_REFERENCE"):
         monkeypatch.delenv(var, raising=False)
 
 
-def test_registered_opt_in_and_flagged_non_commercial_clean():
+def test_registered_opt_in_and_flagged_non_commercial_clean(no_flux3_env):
     eng = ireg.get_engine("flux3_klein")
     assert "flux3_klein" in ireg.all_engine_names()
     assert tuple(eng.default_roles) == ()          # never automatic
