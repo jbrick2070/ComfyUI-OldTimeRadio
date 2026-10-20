@@ -217,6 +217,9 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         (its portrait is a cat's face in a period robe -- the stage-realism style's costume look);
         Jeffrey and MagnoliaRex hold everywhere, and the man beside MagnoliaRex is now Jeffrey in
         all six of her stills (the script-partner co-references, 2b30170e, proven live).
+        NOW: the 3-act MagnoliaRex demo RE-RENDERING with the kind fix (started ~08:13 on main
+        f77dca36, same inputs as the 05:18 demo; tmp/rps_live/mystory_magnolia_kind.log; ~4.5 h).
+        The 05:18 demo and its Athens highlight stay as they are until the new one is verified.
         History of the bug: _ensure_gender_anchor puts "adult woman, " in front
         of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug). Two word-list fixes
         (d1414a7d, 9b0ed9ea) both failed Sonnet as BLOCKERs -- people like "Sailor with a parrot" lost
