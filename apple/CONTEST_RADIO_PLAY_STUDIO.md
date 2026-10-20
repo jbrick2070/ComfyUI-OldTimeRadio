@@ -188,9 +188,14 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         reference=none, before this.
       * main c41dbe25 -- CO-REFERENCES: each still also takes the portraits of the other cast members
         its prompt names (up to 3); Klein chains one ReferenceLatent per portrait.
-      * main d1414a7d + 9b0ed9ea -- NON-HUMAN characters keep their body: _ensure_gender_anchor put
-        "adult woman, " in front of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug).
-        Head-noun rule after a Sonnet BLOCKER ("a cat burglar" stays a person).
+      * NON-HUMAN characters (OPEN, TWO STRIKES): _ensure_gender_anchor puts "adult woman, " in front
+        of "an Egyptian-type adult cat" (the cat-woman / cat-as-a-man bug). Two word-list fixes
+        (d1414a7d, 9b0ed9ea) both failed Sonnet as BLOCKERs -- people like "Sailor with a parrot" lost
+        their anchor -- and were REVERTED in main 83375f0f (prompts byte-identical to before; titles-
+        not-first-names and the LOUD co-portrait report kept). Third attempt goes through a panel
+        first (CLAUDE.md): Codex design round running on "the character's kind as DATA" -- writer
+        cast field vs a My Story card choice vs an LLM classification
+        (tmp/rps_live/codex_kind_design.txt).
       * branch e5a18331 + bd4ce4ae + 861a2b5e -- APP CAST CARDS: one card per character (name, voice
         he/she/any, who they are, how they look, optional photo) after Veo-Moovie-Maker's Cast Bank;
         "Load the example" = Jeffrey, MagnoliaRex, Cat with the operator's own Veo descriptions;
