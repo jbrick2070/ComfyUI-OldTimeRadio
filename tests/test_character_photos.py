@@ -331,3 +331,12 @@ def test_klein_chains_one_reference_latent_per_portrait(monkeypatch):
     # Companions never stand in for a missing speaker reference.
     lone = eng._params({"prompt": "x", "reference_images": ["b.png"]})
     assert lone["reference_images"] == [] and lone["reference_image"] == ""
+
+
+def test_a_first_name_finds_a_two_word_cast_name_when_it_is_unique():
+    cast = {"c02": {"name": "Jeffrey Brick"}, "c03": {"name": "Magnolia Rex"},
+            "c04": {"name": "Magnolia Bell"}}
+    assert mbp.co_present_char_ids("Jeffrey waves", cast, "c03") == ["c02"]
+    # Two Magnolias: the bare first name is ambiguous, so neither is guessed.
+    assert mbp.co_present_char_ids("Magnolia waves", cast, "c02") == []
+    assert mbp.co_present_char_ids("Magnolia Rex waves", cast, "c02") == ["c03"]

@@ -216,3 +216,29 @@ def test_castlock_char_casting_uses_the_bank_canonicalizer():
     assert 'str(entry.get("gender") or "").strip().lower()' not in src, (
         "the raw-gender comparison is the defect; it must not survive"
     )
+
+
+# --------------------------------------------------------------------------- #
+# A non-human character keeps its body (live proof 2026-10-20: "adult woman, "
+# in front of "an Egyptian-type adult cat" drew a cat-woman).
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("appearance", [
+    "An Egyptian-type adult cat, slender and long-limbed. Dark gray fur.",
+    "A battered delivery robot with one blinking eye",
+    "An old gray owl. Speaks in riddles.",
+])
+def test_a_non_human_character_gets_no_human_anchor(appearance):
+    for gender in ("female", "male", "other"):
+        char = {"gender": gender, "appearance": appearance}
+        assert _ensure_gender_anchor(appearance, char) == appearance
+
+
+@pytest.mark.parametrize("appearance", [
+    "A tall woman who keeps a gray cat on her shoulder",
+    "A man, 52, who repairs robots",
+    "A slender figure in a long coat. Her cat follows her everywhere.",
+])
+def test_a_person_with_an_animal_is_still_anchored_as_a_person(appearance):
+    out = _ensure_gender_anchor("a figure in the rain", {"gender": "female",
+                                                         "appearance": appearance})
+    assert out.startswith("adult woman, ")
