@@ -591,7 +591,7 @@ def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
         "requirements with kind frame and text naming the separate frame pass. "
         "Explain the house-role exclusion in cast_plan.reason when relevant, "
         "alongside the dramatic cast-count reasoning. Preserve legitimate named "
-        "dramatic people, including someone whose profession is announcer.")
+        "dramatic characters, including someone whose profession is announcer.")
     interp = _call(
         "interpret", bundle, attempt_receipts=attempt_receipts, **source_kwargs,
         prompt=[
