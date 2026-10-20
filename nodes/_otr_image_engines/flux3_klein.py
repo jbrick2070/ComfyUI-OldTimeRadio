@@ -91,6 +91,16 @@ def _reference_enabled() -> bool:
     return str(otr_env.get("OTR_FLUX3_REFERENCE", "0")).strip() == "1"
 
 
+def _stage_reference(wb, src):
+    """Copy a reference into ComfyUI's input dir under a content-addressed name,
+    so two characters never overwrite each other's file there."""
+    import hashlib
+    with open(src, "rb") as fh:
+        digest = hashlib.sha256(fh.read()).hexdigest()[:16]
+    return wb.stage_into_comfy_input(
+        src, "otr_ref_%s%s" % (digest, os.path.splitext(src)[1] or ".png"))
+
+
 def _installed_unets():
     """Installed ``flux3-image-klein*`` diffusion models, ranked int8 > bf16 >
     nvfp4 > other. The BASE (undistilled, 50-step) checkpoints are excluded: this
@@ -240,6 +250,12 @@ class Flux3KleinEngine:
             # reference still renders the plain t2i graph.
             "reference_image": (str(get("reference_image") or "")
                                 if _reference_enabled() else ""),
+            # The other characters in the frame (the dispatcher's co-references),
+            # each one more ReferenceLatent after the speaker's. Read only with
+            # a primary reference: they are its companions, never a substitute.
+            "reference_images": ([str(r) for r in (get("reference_images") or []) if r]
+                                 if _reference_enabled() and get("reference_image")
+                                 else []),
             # Capped under the portrait's native height so the reference adds
             # about 1.5k latent tokens, not 4k.
             "reference_height": _eint("OTR_FLUX3_REFERENCE_HEIGHT", 768),
@@ -267,26 +283,34 @@ class Flux3KleinEngine:
         ref = str(params.get("reference_image") or "")
         if not ref:
             return graph
-        # ImageScale takes all five arguments and run_graph calls it straight
-        # off this dict. width=0 derives the width from the image, keeping the
-        # portrait's aspect so no face is cropped.
-        graph["load_ref"] = {"class": "load_ref", "inputs": {"image": ref}}
-        graph["scale_ref"] = {
-            "class": "scale_ref",
-            "inputs": {"image": W("load_ref", 0), "upscale_method": "lanczos",
-                       "width": 0, "height": int(params["reference_height"]),
-                       "crop": "disabled"}}
-        graph["encode_ref"] = {
-            "class": "encode_ref",
-            "inputs": {"pixels": W("scale_ref", 0), "vae": W("vae", 0)}}
-        graph["ref_pos"] = {
-            "class": "ref_pos",
-            "inputs": {"conditioning": W("pos", 0), "latent": W("encode_ref", 0)}}
-        graph["ref_neg"] = {
-            "class": "ref_neg",
-            "inputs": {"conditioning": W("neg", 0), "latent": W("encode_ref", 0)}}
-        graph["ksampler"]["inputs"]["positive"] = W("ref_pos", 0)
-        graph["ksampler"]["inputs"]["negative"] = W("ref_neg", 0)
+        refs = [ref] + [str(r) for r in params.get("reference_images") or []]
+        pos, neg = W("pos", 0), W("neg", 0)
+        for i, image in enumerate(refs):
+            # The speaker's chain keeps its original node ids; each further
+            # reference gets a numbered copy of the same five nodes, chained so
+            # the conditioning carries every latent (core appends them).
+            sfx = "" if i == 0 else "_%d" % i
+            # ImageScale takes all five arguments and run_graph calls it straight
+            # off this dict. width=0 derives the width from the image, keeping the
+            # portrait's aspect so no face is cropped.
+            graph["load_ref" + sfx] = {"class": "load_ref", "inputs": {"image": image}}
+            graph["scale_ref" + sfx] = {
+                "class": "scale_ref",
+                "inputs": {"image": W("load_ref" + sfx, 0), "upscale_method": "lanczos",
+                           "width": 0, "height": int(params["reference_height"]),
+                           "crop": "disabled"}}
+            graph["encode_ref" + sfx] = {
+                "class": "encode_ref",
+                "inputs": {"pixels": W("scale_ref" + sfx, 0), "vae": W("vae", 0)}}
+            graph["ref_pos" + sfx] = {
+                "class": "ref_pos",
+                "inputs": {"conditioning": pos, "latent": W("encode_ref" + sfx, 0)}}
+            graph["ref_neg" + sfx] = {
+                "class": "ref_neg",
+                "inputs": {"conditioning": neg, "latent": W("encode_ref" + sfx, 0)}}
+            pos, neg = W("ref_pos" + sfx, 0), W("ref_neg" + sfx, 0)
+        graph["ksampler"]["inputs"]["positive"] = pos
+        graph["ksampler"]["inputs"]["negative"] = neg
         return graph
 
     def _build_base_graph(self, params, wire):
@@ -375,15 +399,11 @@ class Flux3KleinEngine:
         classes = getattr(self, "_classes", None) \
             or _wb.resolve_graph_classes(self._node_candidates(params))
         self._classes = classes
-        ref_src = params["reference_image"]
-        if ref_src:
-            # Staged under a content-addressed name so two characters never
-            # overwrite each other's file in ComfyUI's input dir.
-            import hashlib
-            with open(ref_src, "rb") as fh:
-                digest = hashlib.sha256(fh.read()).hexdigest()[:16]
-            params = dict(params, reference_image=_wb.stage_into_comfy_input(
-                ref_src, "otr_ref_%s%s" % (digest, os.path.splitext(ref_src)[1] or ".png")))
+        if params["reference_image"]:
+            params = dict(
+                params, reference_image=_stage_reference(_wb, params["reference_image"]),
+                reference_images=[_stage_reference(_wb, r)
+                                  for r in params["reference_images"]])
             classes = dict(classes, **_wb.resolve_graph_classes(self._REF_CANDIDATES))
         graph = self._build_graph(params, _wb.Wire)
         try:
@@ -396,9 +416,10 @@ class Flux3KleinEngine:
         finally:
             _wb.reclaim_idle_models(reason="flux3_klein post-decode")
         log.info("[OTR.image.flux3_klein] minted still %dx%d seed=%d steps=%d "
-                 "cfg=%.2f shift=%.4f reference=%s", params["width"],
+                 "cfg=%.2f shift=%.4f reference=%s also=%s", params["width"],
                  params["height"], params["seed"], params["steps"], params["cfg"],
-                 params["shift"], params["reference_image"] or "none")
+                 params["shift"], params["reference_image"] or "none",
+                 ",".join(params["reference_images"]) or "none")
         return frames[0]
 
     def teardown(self, prepared) -> None:  # pragma: no cover
