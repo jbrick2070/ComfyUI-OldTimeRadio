@@ -315,7 +315,9 @@ def with_default_story(fields: RawStoryFields,
 
     A no-op unless the selected bank actually reads these fields AND every
     creative one is empty. Returns the SAME object when it changes nothing, so
-    an identity check upstream still means "the listener's own words".
+    an identity check upstream still means "the listener's own words";
+    otherwise returns DEFAULT_STORY itself, author included (a typed author
+    alone is not a story, and the house story is credited to its writer).
     """
     if not would_apply_default_story(fields, policy):
         return fields
