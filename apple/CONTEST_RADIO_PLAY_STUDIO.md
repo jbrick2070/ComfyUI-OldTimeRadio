@@ -332,6 +332,10 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
           (low, still, animatediff, video, ltx25_foley, ltx25_mime, ltx25_audio_in), driver
           C:\Temp\otr_regress_8gb.py (task OTR_regress_8gb), log C:\Temp\otr_regress.log. They all
           use plain flux3_klein, so they prove today's Klein refactor left the 8 GB path unchanged.
+          [x] otr_8gb_low -- SUCCESS 514 s, obs_publish OK (shadow_pouch_..._vcam, an original story).
+          [x] otr_8gb_still -- SUCCESS 931 s, obs_publish OK (afterlife_echoes_..._stmo_fk3i): it rolled
+              My Story, so the new house default ran on 8 GB too (photos matched; plain Klein paints
+              from text, by design).
       WAS: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
         white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
         Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
