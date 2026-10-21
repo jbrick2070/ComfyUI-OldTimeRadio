@@ -17,6 +17,13 @@ draft to paste from; every number is from a logged run on 2026-10-19.
       from Real-ESRGAN on 10-21 ("yes, switch to off"; "I want to be 100% open"): the repo's own
       benchmark measured it the most faithful of the three, at ~37 ms a frame, and Real-ESRGAN was
       running when the machine went down twice. **Tick Open Weights Only.**
+      **10-21, REFERENCE STILLS BACK (operator: "use reference photos ... no VSR"):** My Story runs
+      the open graph's reference twin, `workflows/otr_16gb_foley_open_flux3_ref.json` (main
+      a9244e8a): character stills on FLUX 3 Klein with references (same open weights), announcer and
+      music stills from text, the same ffmpeg 1080p step. The demo episode is rendered on it. Two
+      things to say honestly: the bundled photos are of the author (his consent, his call against the
+      "no real-person likenesses" rule), and they were blended once with a closed image tool before
+      shipping -- a picture INPUT, not a model in the pipeline, which stays all open weights.
 - [ ] **Demo render on that exact workflow** (operator, 10-20: "we need another run with ESRGAN for our
       demo to be precise") -- then cut the under-2-minute video from it.
 - [ ] README: replace "Demo video: to be recorded" with the link.
@@ -58,7 +65,9 @@ converts to an API graph against the server's live /object_info.
 ## Q8. List all generative models used
 - **Gemma 4 12B** (int8, run by ComfyUI itself) -- writes the story, the cast and every line.
 - **FLUX 3 Image Klein** (Black Forest Labs, open weights under the FLUX Kommunity License; int8
-  model, Qwen3-VL-4B encoder, Flux 2 VAE) -- a still for every beat, from text.
+  model, Qwen3-VL-4B encoder, Flux 2 VAE) -- a still for every beat; in Tell my own story each
+  character's still is painted from that character's photos (the same weights, through ComfyUI
+  core's ReferenceLatent).
 - **LTX 2.5** (mix4x8 DiT + w4a8 encoder, 16 GB foley lane) -- films every beat, with its own sound.
 - **Kokoro** -- a voice for every character and the announcer.
 - **Stable Audio 3** -- the theme music.
@@ -68,11 +77,10 @@ converts to an API graph against the server's live /object_info.
 - comfy-api-proxy (Comfy API v2 bridge) and a standard-library Python web app (no build step).
 - Cast lock (each character keeps one face and one voice) and shot lock (each beat's camera,
   expression and motion planned before filming).
-- Reference stills (an optional workflow, `otr_16gb_foley_flux3_ref`, not the submitted one): a
-  portrait per character, and every still conditioned on the portraits of
-  everyone in the frame (the speaker, the characters the shot names, the person spoken to).
-- Cast cards: one card per character in Tell my own story (a photo on a card is used only by the
-  reference workflow).
+- Reference stills (`otr_16gb_foley_open_flux3_ref`, what Tell my own story runs): a portrait
+  per character, and every still conditioned on the portraits of everyone in the frame (the
+  speaker, the characters the shot names, the person spoken to).
+- Cast cards: one card per character in Tell my own story, each with up to three photos.
 - A progress bar that learns each stage's time on the user's own machine and follows the video
   node's own "frames rendered" bar: within 4 points of the wall clock on a 68-minute episode.
 - Captions burned in (SDH), ffmpeg mux, every weight fetched tokenless from public repos.

@@ -329,8 +329,15 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         unsharp, no model), the most faithful of the three in apple/UPSCALERS.md. Real-ESRGAN was
         running both times the machine went down. The tiled/fp16 ESRGAN fix is shelved on
         wip/esrgan-tiled-fp16 (Codex NEEDS CHANGES), post-contest. Sonnet QA on b0f9a6e4: HOLDS.
-        Stills stay FLUX 3 Klein FROM TEXT -- no reference photos (contest rule: no real-person
-        likenesses in the generated footage).
+      REFERENCE STILLS BACK, STILL OPEN (operator 10-21: "use reference photos. Make an open-weights
+        reference twin (FLUX 3 ref with the ffmpeg 1080p step, no VSR) and render the demo on it"):
+        main a9244e8a adds workflows/otr_16gb_foley_open_flux3_ref.json -- otr_16gb_foley_open with
+        character stills on flux3_klein_ref; diff is that one VideoDirector widget + validator
+        stamps. The app's reference_twin() picks it for My Story by itself. He chose this knowing
+        the "no real-person likenesses" rule (the photos are his). Scoped suite 2454 passed,
+        build_variants --check 28 variants 0 failures, app tests 126 passed.
+      NOW: THE DEMO RENDER on the twin -- 3 acts, blank My Story, plain boot, log
+        tmp/rps_live/demo_open_ref_3act.log.
       [x] MERGED INTO MAIN 6364c3df (operator: "merge the contest branch into main now so the code
         link does not move"): https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio
         resolves. No node code, no pyproject.toml, contest/ excluded from the published pack.

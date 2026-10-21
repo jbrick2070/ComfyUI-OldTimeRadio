@@ -535,9 +535,16 @@ def test_a_my_story_run_uses_the_reference_twin_and_nothing_else_does(settings, 
 
 
 def test_the_contest_default_is_the_open_weights_foley_graph():
-    """Operator, 2026-10-20: "we skip VSR, we stay open weight" -- the default
-    has no reference twin, so My Story runs it too (no reference pictures)."""
+    """Operator, 2026-10-20: "we skip VSR, we stay open weight"; 2026-10-21:
+    "use reference photos ... no VSR" -- the open graph ships an open reference
+    twin, so My Story paints its characters from their pictures."""
+    import json
     from radio_play_studio.config import WORKFLOW_NAME, _checkout_workflow, reference_twin
     assert WORKFLOW_NAME == "otr_16gb_foley_open.json"
-    assert reference_twin(_checkout_workflow()).name == "otr_16gb_foley_open_flux3_ref.json"
-    assert not reference_twin(_checkout_workflow()).exists()
+    twin = reference_twin(_checkout_workflow())
+    assert twin.name == "otr_16gb_foley_open_flux3_ref.json"
+    assert twin.is_file()
+    nodes = json.loads(twin.read_text(encoding="utf-8"))["nodes"]
+    widgets = {n["type"]: n.get("widgets_values") for n in nodes}
+    assert widgets["OTR_SilentComposite"][4:6] == ["off", "cpu"]      # no RTX VSR
+    assert "flux3_klein_ref" in widgets["OTR_VideoDirector"]

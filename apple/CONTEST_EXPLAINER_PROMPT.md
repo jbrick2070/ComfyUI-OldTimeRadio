@@ -69,8 +69,9 @@ What the user does (this is the "in action" part):
    own words (names, events, ending) by a source-correction pass.
 2. **Cast lock and shot lock**: each character keeps one voice and one look for the whole play;
    each beat's camera, expression and motion are planned before filming.
-3. **Stills -- FLUX 3 Klein** (Black Forest Labs, open weights): a picture for every beat, painted
-   from the written description of the characters in it.
+3. **Stills -- FLUX 3 Klein** (Black Forest Labs, open weights): a picture for every beat. In
+   "Tell my own story" each character's still is painted from that character's photos (the same
+   open weights, through ComfyUI's reference conditioning), so faces hold from beat to beat.
 4. **Voices -- Kokoro**: a distinct voice for every character and the announcer.
 5. **Music -- Stable Audio 3**: the theme and the act-break music.
 6. **Video -- LTX 2.5** (the 16 GB "foley" lane): films every beat from its still, **generating
@@ -103,7 +104,8 @@ matter most to the story (Gemma writes, FLUX paints, LTX films with sound, Kokor
 - **Screen recording of the app**: the two cards, the cast cards filling via "Load the example",
   the progress bar with minutes left, a reload that keeps the run.
 - **The demo episode**: "Tell my own story" with nothing typed -- the built-in story, three acts,
-  rendered on the exact submitted workflow (`otr_16gb_foley_open`). Story: Jeffrey, a shy former
+  rendered on the open reference workflow My Story runs (`otr_16gb_foley_open_flux3_ref`), with
+  the built-in story's own photos of its two leads. Story: Jeffrey, a shy former
   VJ preserved as a mind in a virtual afterlife in 2095, wins a day with MagnoliaRex, an electronic
   music artist; the day never ends -- Athens festival, a world tour, a talking cat in Cairo with a
   clue, and finally a frozen, empty Seoul as the machines that keep them alive fail. She says "I
@@ -115,9 +117,8 @@ matter most to the story (Gemma writes, FLUX paints, LTX films with sound, Kokor
 - **End card**: the repo link https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio
   and #OpenSourceHiggsfield.
 
-Do NOT use or describe: any older episode made with a different upscaler or still model; reference
-photos of real people (the submitted workflow paints faces from text); cloud services; anything
-about cost or API keys.
+Do NOT use or describe: any older episode made with a different upscaler or still model; cloud
+services; anything about cost or API keys.
 
 ## 8. Tone and style
 
@@ -142,4 +143,4 @@ about cost or API keys.
 - All ten names from section 6 appear.
 - "Whole story, not a clip" is said; "open weights" and "on your own GPU / no cloud" are said.
 - No number appears that is not in this brief.
-- Nothing claims photos or reference faces in the demo.
+- Photos are described only as the built-in story's own pictures of its characters.
