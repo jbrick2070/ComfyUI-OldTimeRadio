@@ -313,6 +313,28 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         (validator stamp OK, widget drift 0); the house story ran; 16 character stills painted
         from references, 9 announcer/music cards without (by design). Video rendering
         (tmp/rps_live/mystory_twin_1act.log, server_plain.log).
+      [x] TWIN VERIFIED 22:07 -- otr_16gb_foley_flux3_ref on a plain boot: RESULT succeeded,
+        obs_publish OK, 2:34:32 render, 3:00 episode, sha a66c37ff, copies byte-identical, timing
+        saved (otr_16gb_foley_flux3_ref.acts-1.5ab87708.json).
+      CONTEST STACK DECIDED -- FULL OPEN WEIGHTS (operator 10-20: "we skip VSR, we stay open
+        weight"; "flux 3 and esrgan"; "we skip the ref images"). main 4c43ea10 adds
+        workflows/otr_16gb_foley_open.json = otr_16gb_foley with FLUX 3 Klein stills from text for
+        every role and the open Real-ESRGAN x2 upscale (spandrel_esrgan) instead of NVIDIA RTX VSR;
+        diff from foley is exactly those four widgets + validator stamps. The app defaults to it
+        (f3a20a1a); it has no reference twin, so My Story runs it too. The reference workflow
+        (otr_16gb_foley_flux3_ref) still ships as an option, outside the contest. Submission draft
+        ticks Open Weights Only.
+      [x] MERGED INTO MAIN 6364c3df (operator: "merge the contest branch into main now so the code
+        link does not move"): https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio
+        resolves. No node code, no pyproject.toml, contest/ excluded from the published pack.
+      NOW: THE DEMO RENDER on that exact workflow (operator: "we need another run with ESRGAN for
+        our demo to be precise"; "3 acts, same as the approved demo"): started 22:33, blank My Story
+        (his default story), --acts 3, tmp/rps_live/demo_open_3act.log, validator stamp OK
+        (profile otr_16gb_foley_open, drift 0). ~5 h. Then cut the under-2-minute video from it.
+        Sonnet QA on 4c43ea10 + the app switch: diff holds, card holds; its one finding -- My Story
+        no longer uses reference pictures on the default -- is the operator's decision, so the fix
+        is wording: README and draft Q9 now call references an optional workflow. Real-ESRGAN
+        rehearsed on CPU with a 1664x960 foley frame: engine, output check and 1920x1080 fit OK.
       4060 (MRKT) -- ONE INSTALL, ON MAIN, REGRESSING (operator 10-20: "we will still need to regress
         other workflows, the 8gb machine is ready"; "push the latest for sure"; "you are free to
         clean it up so there's only one").
