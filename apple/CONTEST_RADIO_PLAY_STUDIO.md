@@ -298,6 +298,9 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         Brick'", "house My Story: the author's shipped photos of Jeffrey, MagnoliaRex", character
         stills painted from references. The new co-reference log shows the WRITER names the Cat
         in its scene prompts (so the Cat-in-Athens is the writer's, not a stray word).
+        STILLS MEASURED 18:57: 22 stills, nothing typed -- Jeffrey (mime) and MagnoliaRex (white-
+        silver) drawn from the SHIPPED photos and steady in every character frame, the Cat steady
+        too; only the announcer (no reference) is a stranger. Sheet sent. Video still rendering.
       WAS: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
         white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
         Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
