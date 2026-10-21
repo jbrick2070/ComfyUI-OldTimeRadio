@@ -307,6 +307,11 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         fit one act. It ran on otr_16gb_foley with the boot switch (it started before the twin
         shipped); the twin otr_16gb_foley_flux3_ref is what My Story uses from now on. Highlight:
         output/otr/episodes/demo_cuts/default_story_1act_highlight.mp4 (sent).
+      TWIN PROOF (19:32, PLAIN boot -- no OTR_FLUX3_REFERENCE, no pinned seeds): the app, given only
+        --bank my_story --acts 1, picked workflows/otr_16gb_foley_flux3_ref.json by itself
+        (validator stamp OK, widget drift 0); the house story ran; 16 character stills painted
+        from references, 9 announcer/music cards without (by design). Video rendering
+        (tmp/rps_live/mystory_twin_1act.log, server_plain.log).
       WAS: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
         white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
         Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
