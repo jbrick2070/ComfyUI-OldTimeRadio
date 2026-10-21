@@ -338,7 +338,7 @@ def still_pool(host=None) -> "tuple[tuple[str, ...], dict]":
     eligible, left_out = [], {}
     for name in ireg.all_engine_names():
         engine = ireg.get_engine(name)
-        if is_cloud_engine(engine):
+        if is_cloud_engine(engine) or not getattr(engine, "rollable", True):
             continue
         reason = reason_for(name, engine)
         if reason:
@@ -505,7 +505,10 @@ def video_roll_choices() -> "tuple[str, ...]":
 
 
 def still_roll_choices() -> "tuple[str, ...]":
-    """The image models the checklist offers: every registered local one."""
+    """The image models the checklist offers: every registered local one that
+    a random draw may land on. An engine that only makes sense when chosen on
+    purpose (flux3_klein_ref, for a story with reference pictures) declares
+    ``rollable = False`` and is picked from its dropdown instead."""
     try:
         from . import _otr_image_engines  # noqa: F401 -- registers built-ins
         from ._otr_image_engines import registry as ireg
@@ -513,7 +516,8 @@ def still_roll_choices() -> "tuple[str, ...]":
         import _otr_image_engines  # type: ignore  # noqa: F401
         from _otr_image_engines import registry as ireg  # type: ignore
     return tuple(n for n in ireg.all_engine_names()
-                 if not is_cloud_engine(ireg.get_engine(n)))
+                 if not is_cloud_engine(ireg.get_engine(n))
+                 and getattr(ireg.get_engine(n), "rollable", True))
 
 
 def _ticked(inputs, pool_name, where) -> "tuple[str, ...]":

@@ -1999,7 +1999,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 report.append(
                     f"{oid}: photo {identity_photo!r} NOT USED -- still engine "
                     f"{engine_id!r} cannot take a reference image; pick "
-                    f"flux3_klein for the character stills (LOUD)")
+                    f"flux3_klein_ref for the character stills (LOUD)")
                 log.warning("[OTR_ImageGenDispatcher] %s: engine %r takes no "
                             "reference; photo %r unused", oid, engine_id,
                             identity_photo)

@@ -168,14 +168,19 @@ def test_no_shipping_image_engine_advertises_unproven_reference_conditioning(mon
     for that semantic path. Z-Image's matched A/B reproduced square-grid
     corruption, so every shipping image adapter is reference-OFF by default
     (flux3_klein's path is opt-in via OTR_FLUX3_REFERENCE, cleared here).
+
+    The ONE exception is flux3_klein_ref, and it is proven, not assumed: the
+    3-act My Story demo of 2026-10-20 (both leads from reference pictures,
+    5:48, sha f5524300, obs_publish OK) held both faces in every act.
     """
     monkeypatch.delenv("OTR_FLUX3_REFERENCE", raising=False)
     from nodes._otr_image_engines import registry as ireg
 
+    proven = {"flux3_klein_ref"}
     for name in ireg.all_engine_names():
         eng = ireg.get_engine(name)
         declared = bool(getattr(eng, "accepts_reference_image", False))
-        assert declared is False, name
+        assert declared is (name in proven), name
 
     zimage = ireg.get_engine("z_image_turbo")
     assert zimage.engine_version == "2", "old gridded cache entries must miss"

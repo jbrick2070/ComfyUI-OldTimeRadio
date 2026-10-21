@@ -1417,7 +1417,7 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
             return Lane("z_image_int8" if low_vram else "z_image", False)
         if engine == "sd15":
             return Lane("sd15", False)
-        if engine == "flux3_klein":
+        if engine in ("flux3_klein", "flux3_klein_ref"):   # one set of files
             return Lane("flux3_klein", False)
         if engine == "moss_image":
             return Lane("moss_image", False)

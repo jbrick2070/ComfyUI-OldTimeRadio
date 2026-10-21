@@ -129,6 +129,10 @@ def card_for_profile(profile: dict) -> Card:
     else:
         raise ValueError("%s: vendor %r has no gallery words in "
                          "scripts/gallery_thumbs.card_for_profile" % (pid, vendor))
+    if (profile.get("role_overrides") or {}).get("character_image") == "flux3_klein_ref":
+        # The faces come from reference pictures: the one thing that tells this
+        # card apart from the same lane's plain graph.
+        extra = ("FLUX 3 REF, " + extra) if extra else "FLUX 3 REF"
     return Card(brand, tier, lane, extra, vendor)
 
 

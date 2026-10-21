@@ -86,6 +86,13 @@ def _snap(value: int) -> int:
     return max(_CANVAS_FLOOR, int(round(v / _CANVAS_MULTIPLE)) * _CANVAS_MULTIPLE)
 
 
+#: At most this many reference pictures a still: the speaker's portrait and two
+#: more. Measured on an RTX 5080 Laptop 16 GB by the 3-act My Story demo of
+#: 2026-10-20 (both leads from reference pictures, three a still at most); a
+#: fourth is unmeasured, so it is not sent (Codex r1 on flux3_klein_ref).
+MAX_REFERENCES = 3
+
+
 def _reference_enabled() -> bool:
     """True when the operator switched the portrait-reference path on."""
     return str(otr_env.get("OTR_FLUX3_REFERENCE", "0")).strip() == "1"
@@ -188,10 +195,14 @@ class Flux3KleinEngine:
     required_inputs = ("text_prompt",)
     engine_version = "1"
 
+    def _references_on(self) -> bool:
+        """Whether this engine paints from portrait references: the operator's
+        switch, read per call so it needs no re-registration."""
+        return _reference_enabled()
+
     @property
     def accepts_reference_image(self) -> bool:
-        """Read per call so the switch needs no re-registration."""
-        return _reference_enabled()
+        return self._references_on()
 
     #: Resolved SEPARATELY and merged only when a reference is present, so the
     #: base graph and its cached class map stay exactly the nine-node t2i graph.
@@ -249,12 +260,13 @@ class Flux3KleinEngine:
             # capability read: with the switch off, a request that carries a
             # reference still renders the plain t2i graph.
             "reference_image": (str(get("reference_image") or "")
-                                if _reference_enabled() else ""),
+                                if self._references_on() else ""),
             # The other characters in the frame (the dispatcher's co-references),
             # each one more ReferenceLatent after the speaker's. Read only with
             # a primary reference: they are its companions, never a substitute.
             "reference_images": ([str(r) for r in (get("reference_images") or []) if r]
-                                 if _reference_enabled() and get("reference_image")
+                                 [:MAX_REFERENCES - 1]
+                                 if self._references_on() and get("reference_image")
                                  else []),
             # Capped under the portrait's native height so the reference adds
             # about 1.5k latent tokens, not 4k.
@@ -426,4 +438,27 @@ class Flux3KleinEngine:
         return None
 
 
-__all__ = ["Flux3KleinEngine", "MODEL_ENV", "CLIP_ENV", "VAE_ENV"]
+@register
+class Flux3KleinReferenceEngine(Flux3KleinEngine):
+    """FLUX 3 Klein with portrait references ALWAYS on -- a stills choice, not
+    an environment switch (operator, 2026-10-20: "use flux 3 ... we want ref
+    image for my story as an option for this contest").
+
+    The same model files, recipe and graph as flux3_klein; the one difference
+    is that every character still is painted from that character's portrait
+    (and the photos a person gave), so faces hold from beat to beat. Picking it
+    is the option; plain flux3_klein keeps its own behaviour on every graph
+    that ships it (the 8 GB and 24 GB lanes), so nothing changes for them.
+    """
+
+    name = "flux3_klein_ref"
+    #: Chosen on purpose from a dropdown, never by a random roll: references
+    #: only mean something for a story whose characters have pictures.
+    rollable = False
+
+    def _references_on(self) -> bool:
+        return True
+
+
+__all__ = ["Flux3KleinEngine", "Flux3KleinReferenceEngine", "MODEL_ENV", "CLIP_ENV",
+           "VAE_ENV"]

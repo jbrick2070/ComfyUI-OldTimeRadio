@@ -68,6 +68,35 @@ def test_a_fresh_install_fetches_the_int8_set(no_flux3_env):
     assert VA.planned_downloads({"flux3_klein"}) == _SET
 
 
+# --------------------------------------------------------------------------- #
+# flux3_klein_ref: the same Klein with references always on, as a stills choice
+# (operator, 2026-10-20: "we want ref image for my story as an option")
+# --------------------------------------------------------------------------- #
+def test_the_reference_choice_paints_from_the_portrait_without_any_switch(no_flux3_env):
+    ref = ireg.get_engine("flux3_klein_ref")
+    plain = ireg.get_engine("flux3_klein")
+    assert "flux3_klein_ref" in ireg.all_engine_names()
+    assert ref.accepts_reference_image is True
+    assert plain.accepts_reference_image is False     # the shipped lanes are unchanged
+    assert tuple(ref.default_roles) == () and ref.commercial_clean is False
+    request = {"prompt": "a fox", "seed": 7, "reference_image": "C:/p/c02.png",
+               "reference_images": ["C:/p/c03.png"]}
+    p = ref._params(request)
+    assert p["reference_image"] == "C:/p/c02.png"
+    assert p["reference_images"] == ["C:/p/c03.png"]
+    assert plain._params(request)["reference_image"] == ""
+    # Everything but the reference is Klein's own recipe, byte for byte.
+    same = {k: v for k, v in p.items() if not k.startswith("reference_image")}
+    assert same == {k: v for k, v in plain._params(request).items()
+                    if not k.startswith("reference_image")}
+
+
+def test_the_reference_choice_needs_no_new_download(no_flux3_env):
+    assert VA.planned_downloads({"flux3_klein_ref"}) == _SET
+    assert VA.planned_downloads({"flux3_klein", "flux3_klein_ref"}) == _SET
+    assert ireg.CAPABILITIES["flux3_klein_ref"] == ireg.CAPABILITIES["flux3_klein"]
+
+
 def test_every_fetched_file_is_pinned_and_not_gated_repo():
     for key in _SET:
         spec = VA.MANIFEST[key]
@@ -178,3 +207,29 @@ def test_base_checkpoints_are_never_auto_picked(monkeypatch):
     monkeypatch.setattr("folder_paths.get_filename_list", lambda c: names,
                         raising=False)
     assert FK._installed_unets() == ["flux3-image-klein-bf16.safetensors"]
+
+
+def test_a_random_roll_never_lands_on_the_reference_choice():
+    """It is picked on purpose from its dropdown (a story with pictures),
+    never drawn by a roll; plain Klein stays in the draw."""
+    from nodes import _otr_lane_rolls as L
+    choices = L.still_roll_choices()
+    assert "flux3_klein_ref" not in choices
+    assert "flux3_klein" in choices
+
+
+def test_an_empty_checklist_draw_never_lands_on_the_reference_choice():
+    """agy r1: still_pool (the draw an empty checklist uses) honours rollable."""
+    from nodes import _otr_lane_rolls as L
+    import inspect
+    assert 'not getattr(engine, "rollable", True)' in inspect.getsource(L.still_pool)
+
+
+def test_at_most_three_references_a_still(no_flux3_env):
+    """Codex r1: the approved 16 GB demo measured three; a fourth is not sent."""
+    ref = ireg.get_engine("flux3_klein_ref")
+    p = ref._params({"prompt": "a fox", "reference_image": "a.png",
+                     "reference_images": ["b.png", "c.png", "d.png", "e.png"]})
+    assert FK.MAX_REFERENCES == 3
+    assert [p["reference_image"]] + p["reference_images"] == ["a.png", "b.png", "c.png"]
+
