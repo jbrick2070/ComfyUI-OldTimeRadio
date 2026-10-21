@@ -359,6 +359,16 @@ class SpandrelEsrgan:
             self._descriptor.eval()
         except Exception:  # noqa: BLE001
             pass
+        # Half precision on CUDA where the architecture supports it: measured
+        # 2026-10-21 on an RTX 5080 Laptop, 1.30 -> 0.64 s a 1664x960 frame, at
+        # most 0.0013 (a third of one 8-bit level) from fp32.
+        self._half = False
+        if str(device).startswith("cuda") and getattr(self._descriptor, "supports_half", False):
+            try:
+                self._descriptor.model.half()
+                self._half = True
+            except Exception:  # noqa: BLE001 -- fp32 is always correct
+                self._half = False
         self.device = device
 
     def unload(self) -> None:
@@ -387,6 +397,37 @@ class SpandrelEsrgan:
     # -----------------------------------------------------------------
     # Inference
     # -----------------------------------------------------------------
+    #: Tile edge and overlap, ComfyUI core's own (comfy_extras/nodes_upscale_model
+    #: ImageUpscaleWithModel). A whole 1664x960 frame in one pass built a
+    #: 3328x1920 activation stack of several GB per frame: on 2026-10-21 that ran
+    #: at ~0.5 frame/s with the GPU ~12% busy, and the machine went down twice
+    #: under it (CUDA "unknown error", then a HYPERVISOR_ERROR bugcheck).
+    TILE = 512
+    TILE_OVERLAP = 32
+    MIN_TILE = 128
+
+    def _tiled(self, one):
+        """One BCHW frame through the model in overlapping tiles, exactly as
+        core's upscale node does; halves the tile on an out-of-memory error."""
+        import torch
+        try:
+            import comfy.utils as cu
+        except ImportError:          # outside ComfyUI (tests): untiled, as before
+            return self._descriptor(one)
+        tile = self.TILE
+        while True:
+            try:
+                return cu.tiled_scale(one, lambda a: self._descriptor(a), tile_x=tile,
+                                      tile_y=tile, overlap=self.TILE_OVERLAP,
+                                      upscale_amount=self.intrinsic_scale,
+                                      output_device=one.device)
+            except torch.OutOfMemoryError:   # only memory is retried, smaller
+                tile //= 2
+                if tile < self.MIN_TILE:
+                    raise
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+
     def upscale_frames(self, frames):
         """Upscale ``frames`` (BHWC float32 [0,1]) by ``intrinsic_scale``.
 
@@ -400,11 +441,12 @@ class SpandrelEsrgan:
         with torch.inference_mode():
             # BHWC -> BCHW for spandrel's (1,C,H,W) contract
             bchw = frames.permute(0, 3, 1, 2).contiguous()
+            if getattr(self, "_half", False):
+                bchw = bchw.half()
             outs: list = []
             for i in range(bchw.shape[0]):
                 one = bchw[i:i + 1]  # (1, C, H, W)
-                out_one = self._descriptor(one)  # spandrel enforces this shape
-                outs.append(out_one)
+                outs.append(self._tiled(one).float())
             out_bchw = torch.cat(outs, dim=0)
             # BCHW -> BHWC. .contiguous() so downstream .numpy() doesn't crash
             # on stride mismatch (Antigravity r4 MF-2).
