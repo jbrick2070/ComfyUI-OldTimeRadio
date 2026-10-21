@@ -42,9 +42,16 @@ a reference audio file per voice.
 1. **Built-in voices.** It ships many named voices or speaker embeddings. No reference audio file
    is needed to get a voice. Prompted voice design from a text description ("a gravelly old sea
    captain") counts as built-in if it is deterministic per seed.
-2. **Open weights** that can be downloaded without a login, under a licence that allows
-   redistribution in an open-source node pack. Say the exact licence, and whether commercial use is
-   allowed.
+2. **Open weights, auto-downloaded, never gated -- and still multilingual.**
+   - **Self-fetching:** my pack downloads every model on first use, with no user step. So the
+     weights for ALL its languages and voices must be fetchable by a script from a public repository
+     with no login, no token, no "accept the terms" click, and no gated Hugging Face repo.
+   - **Gated means disqualified:** a model whose multilingual weights sit behind a gate, a
+     sign-up or a manual download fails this rule, even if its English model is open.
+   - **What to report:** say exactly where each language's weights live, their total download size,
+     and whether a pinned, hash-checked fetch is possible.
+   - **Licence:** it must allow redistribution in an open-source node pack. Say the exact licence,
+     and whether commercial use is allowed.
 3. **Fast on all three targets.** Report real-time factor or seconds per second of audio on:
    - an NVIDIA consumer GPU;
    - an Apple Silicon Mac (MPS, MLX, Core ML or ANE);
