@@ -20,7 +20,7 @@ LINES = {
         "Gemma 4 writes the story.",
         "Kokoro gives each character a voice.",
         "Stable Audio 3 scores it.",
-        "Flux 3 Klein paints every beat.",
+        "Flux 3 Klein paints every beat, each face from that character's photos.",
         "L.T.X. 2.5 films every beat, with its own sound.",
         "And F.F.mpeg takes it to 1080p, with no model at all.",
     ],

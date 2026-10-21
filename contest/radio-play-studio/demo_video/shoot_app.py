@@ -64,13 +64,8 @@ try:
     time.sleep(0.5)
     js("[...document.querySelectorAll('button')].find(b=>/Load the example/.test(b.textContent)).click()")
     time.sleep(2)                             # thumbnails load
-    # The submitted workflow paints faces from the written look, never from a
-    # photo, so the demo shows the cards without photos: removed with the
-    # page's own remove buttons, one at a time (each click redraws the cards).
-    for _ in range(12):
-        if not js("(() => { const x = document.querySelector('.thumb button'); if (!x) return false; x.click(); return true; })()"):
-            break
-        time.sleep(0.3)
+    # The cards keep the example's photos: My Story runs the open reference
+    # twin, which paints each character's stills from them.
     js("document.querySelector('.cast, [class*=cast]') && document.querySelector('.cast, [class*=cast]').scrollIntoView({block:'start'})")
     time.sleep(0.5)
     shot("02_cast_cards")

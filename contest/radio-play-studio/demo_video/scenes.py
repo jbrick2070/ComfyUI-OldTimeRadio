@@ -23,7 +23,7 @@ import bpy
 
 HERE = Path(__file__).resolve().parent
 REPO = Path(r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio")
-WORKFLOW = REPO / "workflows" / "otr_16gb_foley_open.json"
+WORKFLOW = REPO / "workflows" / "otr_16gb_foley_open_flux3_ref.json"
 FPS = 30
 ORANGE = (0.910, 0.392, 0.118)
 LIME = (0.894, 1.0, 0.227)
