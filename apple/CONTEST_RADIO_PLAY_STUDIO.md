@@ -338,6 +338,24 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         contest/radio-play-studio/demo_video/. CPU test frames OK. Full EEVEE render is queued to
         start the moment the demo render ends (never two GPU jobs); then the live progress-bar shot,
         the excerpt, and the ffmpeg cut to output/otr/episodes/demo_cuts/radio_play_studio_demo.mp4.
+      !! DEMO RENDER LOST 10-21 ~07:45 -- GPU RESET (operator: "I think I had to reset my GPU"):
+        server_plain.log ends "comfy-aimdo WDDM VRAM query failed" -> "CUDA error: unknown error" ->
+        "Fatal Python error: Aborted" at upscale seg_0034 of ~60 (video stage was complete). Not a
+        pack bug. Operator is installing new NVIDIA drivers and rebooting.
+      RESUME AFTER THE REBOOT, in this order (one GPU job at a time):
+        1. Boot ComfyUI plain: powershell -File tmp/rps_live/restart_plain.ps1 (port 8000).
+        2. Profile the upscaler (minutes): python tmp/rps_live/profile_esrgan.py
+           <a clips/*character_video*.mp4 of signal_lost_the_last_circuit_20261020_224235> 48
+           -> tmp/rps_live/profile_esrgan.log. If fp16 or batching is a clean win (same pixels
+           within a tight PSNR, lower time), fix eng_spandrel_esrgan on main FIRST (tests, push,
+           Sonnet QA) so the rerun's composite takes minutes, not hours.
+        3. Rerun the demo: from contest/radio-play-studio,
+           python -m radio_play_studio run --comfyui http://127.0.0.1:8000 --bank my_story --acts 3
+           (default workflow otr_16gb_foley_open) -> tmp/rps_live/demo_open_3act.log.
+        4. Then the motion graphics: output/otr/episodes/demo_cuts/build/ (scenes.py per scene,
+           blender -b --factory-startup --python scenes.py -- <type|title|cards|nodes|ring|end>),
+           the live progress-bar shot (shoot_app.py progress, during a run), the Seoul excerpt,
+           Kokoro narration (narration/*.wav), and the ffmpeg cut.
       [ ] REAL-ESRGAN IS THE BOTTLENECK OF THE CONTEST WORKFLOW (measured 10-21, this demo): the video
         stage ended ~04:15 (56 beats); the composite then upscales at ~0.5 frames/s (seg_0003: 183
         frames in 372 s; seg_0004: 249 in 493 s) with the GPU ~12% busy -- about 6-7 h for a 3-act
