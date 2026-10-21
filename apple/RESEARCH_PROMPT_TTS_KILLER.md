@@ -59,7 +59,17 @@ a reference audio file per voice.
    Say whether ONNX, MLX or GGUF builds exist, and who maintains them.
 4. **Multilingual, with accents.** Which languages, how good each one is (native-speaker or MOS
    evidence), and whether one voice can speak several languages or accents.
-5. **Small enough:** under about 1B parameters preferred, and say the VRAM or RAM it needs.
+5. **Fits the cards: two tiers.**
+   - **8 GB tier:** the everyday model must run in under 8 GB of VRAM on an NVIDIA card (and in
+     16 GB of unified memory on a Mac). It shares the machine with other stages, so a few GB is
+     better.
+   - **16 GB tier (optional):** a larger, higher-quality model that runs in under 16 GB of VRAM is
+     welcome as a premium lane, if it is clearly better.
+   - **What to report for each model:** peak VRAM and RAM at a realistic batch size, the precision
+     it was measured at (fp16, int8, ...), and which tier it fits. Under about 1B parameters is
+     preferred for the 8 GB tier.
+   - **For the train-our-own plan:** design for both tiers: a small model for 8 GB, and optionally a
+     bigger one for 16 GB.
 6. **Stable over long text:** no drift, mumbling or hallucinated words over a page of dialogue.
 
 Nice to have:
