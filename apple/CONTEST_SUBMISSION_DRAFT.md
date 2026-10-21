@@ -53,15 +53,16 @@ converts to an API graph against the server's live /object_info.
 
 ## Q8. List all generative models used
 - **Gemma 4 12B** (int8, run by ComfyUI itself) -- writes the story, the cast and every line.
-- **MOSS-Image SFT** (OpenMOSS, Apache-2.0; int8 model, Qwen3.5-9B w4a8 text encoder, small
-  Flux 2 VAE) -- a still for every beat.
+- **FLUX 3 Image Klein** (Black Forest Labs, FLUX Kommunity License; int8 model, Qwen3-VL-4B
+  encoder, Flux 2 VAE) -- every still. Character stills are painted from each character's
+  reference portrait (reference latents), so every face holds from shot to shot; a person's own
+  photo can be the reference for a character's portrait (workflow `otr_16gb_foley_flux3_ref`).
 - **LTX 2.5** (mix4x8 DiT + w4a8 encoder, 16 GB foley lane) -- films every beat, with its own sound.
 - **Kokoro** -- a voice for every character and the announcer.
 - **Stable Audio 3** -- the theme music.
 - Upscale: **Real-ESRGAN** if switched (see blockers); today's default is NVIDIA RTX VSR.
-- **FLUX 3 Image Klein** (Black Forest Labs, FLUX Kommunity License) -- the My Story demo's stills,
-  each drawn from the portraits of the characters in the frame (reference latents), so every face
-  holds from shot to shot; a person's own photo can be the reference for a character's portrait.
+- (The plain `otr_16gb_foley` workflow paints from text with **MOSS-Image SFT**, Apache-2.0; the
+  submission uses the reference workflow above.)
 
 ## Q9. Other tools or techniques used
 - comfy-api-proxy (Comfy API v2 bridge) and a standard-library Python web app (no build step).
@@ -82,9 +83,12 @@ converts to an API graph against the server's live /object_info.
 - (Best Overall: every entry is considered automatically.)
 
 ## Q11. Is your stack fully open?
-Yes for the generative models, the app (MIT) and the node pack (MIT): open weights only, no partner
-nodes, no closed APIs, no Comfy Cloud calls. **Except** the default upscaler (NVIDIA RTX VSR, a
-local closed SDK) -- answer "yes" only after switching it to Real-ESRGAN or off.
+**Operator decision 2026-10-20: (a) keep FLUX 3 Klein with references and say so plainly.**
+Open weights only: every model runs locally from public weights, no partner nodes, no closed APIs,
+no Comfy Cloud calls; the app and the node pack are MIT. One honest caveat: FLUX 3 Image Klein's
+weights are open but under the FLUX Kommunity License (free for non-commercial use; commercial use
+only under US$5M a year), not an open-source licence -- it is what keeps every face consistent.
+The upscaler must also be open for this answer (see blockers: Real-ESRGAN or off, not RTX VSR).
 
 ## Q12. Agreements -- **operator.**
 
