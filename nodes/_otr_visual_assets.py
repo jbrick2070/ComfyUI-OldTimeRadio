@@ -375,7 +375,7 @@ _MINIMAX_H3_WEIGHT_ENGINES = frozenset({
 _HUMO_WEIGHT_ENGINES = frozenset({"humo", "humo_14B_169", "humo_1.7B", "humo_1.7B_169"})
 _COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image",
                       "ideogram4_local", "flux_gen1", "flux3_klein",
-                      "moss_image"}
+                      "flux3_klein_ref", "moss_image"}
                      | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES
                      | _ANIMATEDIFF_WEIGHT_ENGINES | _MINIMAX_H3_WEIGHT_ENGINES
                      | _HUMO_WEIGHT_ENGINES)
@@ -862,7 +862,7 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
             raise VisualAssetError("flux_gen1 adapter resolution is unavailable")
         add("checkpoints", flux._flux_params({})["ckpt_name"],
             explicit=str(env.get("OTR_FLUX_CKPT") or ""))
-    if "flux3_klein" in engines:
+    if set(engines) & {"flux3_klein", "flux3_klein_ref"}:   # one set of files
         # ASK THE ADAPTER: `_resolve_unet_name` is what assert_usable and the
         # loader share. The encoder and the VAE follow the env-or-default
         # basename rule; the Flux 2 VAE token is the Ideogram 4 row's.
@@ -1397,7 +1397,7 @@ def _load_adapters(engines):
     if "ideogram4_local" in engines:
         from ._otr_image_engines import ideogram4_local
         adapters["ideogram"] = ideogram4_local
-    if "flux3_klein" in engines:
+    if set(engines) & {"flux3_klein", "flux3_klein_ref"}:
         from ._otr_image_engines import flux3_klein
         adapters["flux3"] = flux3_klein
     if "moss_image" in engines:

@@ -2372,7 +2372,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 warnings.append(
                     f"character_photos: {cid}'s photo(s) {_identity_photos[cid]!r} are NOT "
                     "USED -- this lane mints no portrait and its still engine takes no "
-                    "reference image; pick flux3_klein for the character stills")
+                    "reference image; pick flux3_klein_ref for the character stills")
             continue
         _pw, _ph = still_dims_for_aspect(
             _role_aspects.get(_role, "portrait"), PORTRAIT_W, PORTRAIT_H)

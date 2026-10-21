@@ -384,6 +384,7 @@ ENGINE_COVERAGE = {
     # flux3_klein (2026-10-18): LOCAL weights fetched from a pinned mirror; no
     # provider slug to collect.
     "flux3_klein": "local",
+    "flux3_klein_ref": "local",
     # moss_image (2026-10-19): LOCAL weights fetched from Comfy-Org's pinned,
     # ungated repackage; no provider slug to collect.
     "moss_image": "local",

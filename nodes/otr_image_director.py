@@ -235,7 +235,7 @@ class OTRImageDirector:
                         "portrait is painted FROM the photo, in the episode's "
                         "style, and every still of them follows the portrait. "
                         "Needs a still engine that takes a reference image "
-                        "(flux3_klein); with any other the photo is reported "
+                        "(flux3_klein_ref); with any other the photo is reported "
                         "and not used. A name that matches no one in the cast "
                         "is reported too."
                     ),

@@ -187,6 +187,7 @@ IMAGE_GEN = {
     "cloud_seedream_2": "csd2",
 
     "flux3_klein": "fk3i",
+    "flux3_klein_ref": "fk3r",
     "flux_gen1": "flg1",
     "google_image": "gimg",
     "ideo": "ideo",

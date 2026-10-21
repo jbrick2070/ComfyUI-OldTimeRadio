@@ -8,6 +8,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 - [otr_16gb_animatediff](#otr_16gb_animatediff)
 - [otr_16gb_foley](#otr_16gb_foley)
+- [otr_16gb_foley_flux3_ref](#otr_16gb_foley_flux3_ref)
 - [otr_16gb_low](#otr_16gb_low)
 - [otr_16gb_mime](#otr_16gb_mime)
 - [otr_16gb_still](#otr_16gb_still)
@@ -81,6 +82,50 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
 - master_hash: `5f55710f6b7aabc469762543f6478043e1288e10af311030d89a4af20e470cc8`
+
+### ComfyUI launch
+
+- args: `(none)`
+- sage_attention: False
+
+### Environment
+
+- Windows hosts: set `PYTHONUTF8=1` (cp1252 consoles crash the prestartup banner otherwise).
+- Models root override: `OTR_COMFYUI_MODELS_ROOT` (the `C:\ComfyUI-Models` default in _otr_hf_env/_otr_models_root is a Windows-only convenience).
+
+### Music (per bank; only My Story takes its own)
+
+- `media_archive`: small-group jazz quartet, relaxed swing (fixed)
+- `original`: salsa conjunto at 100 BPM, clave-driven (fixed)
+- `public_domain`: Chicago house at 122 BPM, soulful and steady (fixed)
+- `scifi_news_pro`: Detroit techno at 128 BPM, hypnotic machine funk (fixed)
+- `shakespeare`: chosen by the source's year; its own default is Elizabethan consort music
+- `my_story`: the `music_style` widget on `OTR_StableAudioTheme` (blank = the house radio orchestra). Every other bank keeps its genre whatever is typed.
+
+### Required key NAMES (values are NEVER stored here)
+
+- (none)
+
+### Install pointers
+
+- torch cu128+ build (the nv baseline is 2.10/cu130)
+- ffmpeg on PATH (mac: ensure libx264 + aac encoders are in the build).
+
+### Preflight models
+
+- LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors
+- gemma4-12b-ltx25-comfy-w4a8.safetensors
+- ltx-2.5-video-vae-bf16.safetensors
+- ltx-2.5-audio-vae-bf16.safetensors
+- ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors
+
+## otr_16gb_foley_flux3_ref
+
+- file: `workflows/otr_16gb_foley_flux3_ref.json`
+- workflow: `otr_16gb_foley_flux3_ref` (16 GB NVIDIA -- the foley lane with every character still painted from that character's reference picture, so faces hold from beat to beat: FLUX 3 Klein with references (flux3_klein_ref) for character stills, plain FLUX 3 Klein for the announcer and music stills. Built for My Story with your own photos (the built-in story ships its author's), and it keeps a generated portrait's face on any story. Same lane as otr_16gb_foley (ltx25_foley_16gb), Kokoro voices, Stable Audio 3, Writer Gemma 4 12B. MEASURED on an RTX 5080 Laptop 2026-10-20: the 3-act My Story demo, both leads from reference pictures, 5:48 in 5 h 15 min.)
+- status: shipping
+- platform/backend/vendor: any/cuda/nvidia
+- master_hash: `140240fd8d24ba338bcf2f3c52007b370cc51c74ed87093949f47f1d50b244c7`
 
 ### ComfyUI launch
 
