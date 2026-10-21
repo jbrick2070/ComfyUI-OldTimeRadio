@@ -504,3 +504,12 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
 - Shared pack code changes must show the 4060 path is unchanged (CLAUDE.md section 0B).
 - Never two renders at once on the 5080. Before starting one, check `:8000/queue` is empty.
 - Report: commit hashes, RESULT + obs_publish OK + file path, render time, what the app got wrong.
+
+## After the contest (ideas, not commitments)
+
+- Voices: KEEP KOKORO (operator 2026-10-21, after the Gemini TTS survey
+  apple/RESEARCH_PROMPT_TTS_KILLER.md). Worth a measured bake-off later on our own hardware
+  (4060, 5080, CPU, Mac; one scene in all 8 languages; his ear decides): Supertonic 3 (MIT, ~99M,
+  ONNX, ungated, very fast, but only 10 shared voices and an archived repo) and Qwen3-TTS 0.6B/1.7B
+  (Apache-2.0, ungated, Voice Design from a text description -- a fit for casting from the writer's
+  notes -- but slow on CPU, no Hindi). Every number in the survey is unverified until we measure.
