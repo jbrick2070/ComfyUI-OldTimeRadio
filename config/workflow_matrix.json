@@ -362,6 +362,47 @@
       }
     },
     {
+      "id": "otr_16gb_foley_open_flux3_ref",
+      "display_name": "16 GB NVIDIA -- the open-weights foley lane with every character still painted from that character's reference picture: FLUX 3 Klein with references (flux3_klein_ref) for character stills, plain FLUX 3 Klein for the announcer and music stills, ltx25_foley_16gb video, Kokoro voices, Stable Audio 3, Writer Gemma 4 12B, and the 1080p step done by ffmpeg (Lanczos + unsharp, no model) instead of NVIDIA RTX Video Super Resolution, a closed SDK. The reference twin of otr_16gb_foley_open, so Radio Play Studio's My Story runs it (operator 2026-10-21: \"use reference photos ... no VSR\").",
+      "device_backend": "cuda",
+      "gpu_vendor": "nvidia",
+      "allow_sidecars": true,
+      "ships": true,
+      "deltas": {
+        "audio.voice_device": "cuda",
+        "features.act_count": "3",
+        "features.num_characters": 3,
+        "llm.creative_model": "comfy_native:gemma4-12b-int8-convrot",
+        "llm.device": "cuda",
+        "llm.quant_policy": "bnb_nf4",
+        "llm.technical_model": "comfy_native:gemma4-12b-int8-convrot",
+        "llm.vram_ceiling_gb": 14.5,
+        "role_overrides.announcer_image": "flux3_klein",
+        "role_overrides.announcer_visual": "ltx25_foley_16gb",
+        "role_overrides.character_image": "flux3_klein_ref",
+        "role_overrides.character_visual": "ltx25_foley_16gb",
+        "role_overrides.music_image": "flux3_klein",
+        "role_overrides.music_visual": "ltx25_foley_16gb",
+        "slot_overrides.announcer_voice_engine": "kokoro",
+        "slot_overrides.char_voice_engine": "kokoro",
+        "slot_overrides.music_engine": "stable_audio_3",
+        "video.device_policy": "cuda",
+        "video.dtype_policy": "fp8_ok"
+      },
+      "launch": {
+        "boot_contract": "default"
+      },
+      "preflight": {
+        "required_models": [
+          "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors",
+          "gemma4-12b-ltx25-comfy-w4a8.safetensors",
+          "ltx-2.5-video-vae-bf16.safetensors",
+          "ltx-2.5-audio-vae-bf16.safetensors",
+          "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+        ]
+      }
+    },
+    {
       "id": "otr_16gb_foley_flux3_ref",
       "display_name": "16 GB NVIDIA -- the foley lane with every character still painted from that character's reference picture, so faces hold from beat to beat: FLUX 3 Klein with references (flux3_klein_ref) for character stills, plain FLUX 3 Klein for the announcer and music stills. Built for My Story with your own photos (the built-in story ships its author's), and it keeps a generated portrait's face on any story. Same lane as otr_16gb_foley (ltx25_foley_16gb), Kokoro voices, Stable Audio 3, Writer Gemma 4 12B. MEASURED on an RTX 5080 Laptop 2026-10-20: the 3-act My Story demo, both leads from reference pictures, 5:48 in 5 h 15 min.",
       "device_backend": "cuda",
