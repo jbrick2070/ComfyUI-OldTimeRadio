@@ -338,6 +338,16 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         contest/radio-play-studio/demo_video/. CPU test frames OK. Full EEVEE render is queued to
         start the moment the demo render ends (never two GPU jobs); then the live progress-bar shot,
         the excerpt, and the ffmpeg cut to output/otr/episodes/demo_cuts/radio_play_studio_demo.mp4.
+      [ ] REAL-ESRGAN IS THE BOTTLENECK OF THE CONTEST WORKFLOW (measured 10-21, this demo): the video
+        stage ended ~04:15 (56 beats); the composite then upscales at ~0.5 frames/s (seg_0003: 183
+        frames in 372 s; seg_0004: 249 in 493 s) with the GPU ~12% busy -- about 6-7 h for a 3-act
+        episode, publish ~11:00-11:30. Read of the code: spandrel runs fp32, one frame per call
+        (eng_spandrel_esrgan.upscale_frames), x2 to 3328x1920 then a GPU bicubic fit to 1920x1080
+        (_pipeline._fit_and_pad_bhwc) and a host copy per frame. GPU is not saturated, so the model
+        is not the limit. NEXT, once the GPU is free: profile one segment (decode / to-device / model
+        / fit / host copy / encode), then fix the root -- candidates: half precision where spandrel
+        reports supports_half, batching frames through the module, overlapping decode/encode with
+        compute -- same pixels out (A/B by PSNR on a held segment), Codex + Sonnet QA.
         Sonnet QA on 4c43ea10 + the app switch: diff holds, card holds; its one finding -- My Story
         no longer uses reference pictures on the default -- is the operator's decision, so the fix
         is wording: README and draft Q9 now call references an optional workflow. Real-ESRGAN
