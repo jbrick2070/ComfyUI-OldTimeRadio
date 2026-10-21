@@ -16,8 +16,10 @@ Do not guess numbers.
 
 Old-Time Radio is a ComfyUI custom node pack that writes, casts, voices, scores and films whole
 radio plays on the user's own machine. Every character needs a distinct, consistent voice, in the
-episode's language, across a 5-15 minute play. It must run on three kinds of machine: Windows with
-an NVIDIA GPU (8-16 GB), Apple Silicon Macs (M-series, 16 GB unified memory), and CPU-only boxes.
+episode's language, across a 5-15 minute play. It must run on four kinds of machine: Windows with
+an NVIDIA GPU (8-16 GB), Windows or Linux with an AMD Radeon GPU, Apple Silicon Macs (M-series,
+16 GB unified memory), and CPU-only boxes -- and it must be ONE model, the same weights and the same
+voices on every one of them, not a different engine per platform.
 
 ## What I use now (the baseline to beat)
 
@@ -52,11 +54,14 @@ a reference audio file per voice.
      and whether a pinned, hash-checked fetch is possible.
    - **Licence:** it must allow redistribution in an open-source node pack. Say the exact licence,
      and whether commercial use is allowed.
-3. **Fast on all three targets.** Report real-time factor or seconds per second of audio on:
+3. **Fast on all four targets, from one model.** Report real-time factor or seconds per second of
+   audio on:
    - an NVIDIA consumer GPU;
+   - an AMD Radeon GPU (ROCm, DirectML or ONNX Runtime);
    - an Apple Silicon Mac (MPS, MLX, Core ML or ANE);
    - a CPU.
-   Say whether ONNX, MLX or GGUF builds exist, and who maintains them.
+   Say whether ONNX, MLX or GGUF builds exist, and who maintains them. A model that needs a
+   different engine or a different voice set per platform does not meet this.
 4. **Multilingual, with accents.** Which languages, how good each one is (native-speaker or MOS
    evidence), and whether one voice can speak several languages or accents.
 5. **Fits the cards: two tiers.**
