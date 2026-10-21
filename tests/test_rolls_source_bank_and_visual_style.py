@@ -158,7 +158,7 @@ def test_the_creator_bank_rolls_as_an_equal_peer():
 
     The old reasoning -- an unattended run would "draw a bank with no story to
     tell and die at admission" -- was answered by giving it a story to tell:
-    `_otr_story_input.DEFAULT_IDEA` is the floor a blank run writes.
+    `_otr_story_input.DEFAULT_STORY` is the floor a blank run writes.
 
     What has NOT changed, and is asserted below: the "+ Add Your Own" signpost
     stays out of the pool, because it is refused by the OTHER filter

@@ -320,14 +320,22 @@ def test_no_name_gives_a_neutral_line_and_never_invents_one(blank):
 
 def test_the_operators_name_is_never_a_default_anywhere():
     """Operator directive 2026-09-10: the announcer must not credit him by
-    default. Nothing in this module may carry a real person's name."""
+    default. Narrowed 2026-10-20 ("make my story the default"): his name may
+    live ONLY in his own house story and its photos -- the one story that is
+    his -- and a typed story with no author is never credited to anyone."""
     import inspect
 
     source = inspect.getsource(SI)
+    start = source.index("#: THE STANDING STORY")
+    end = source.index("def with_default_story(")
+    outside = source[:start] + source[end:]
     for forbidden in ("Jeffrey", "Brick", "jbrick"):
-        assert forbidden not in source, (
-            "%r appears in the input module; no name may be a default"
-            % forbidden)
+        assert forbidden not in outside, (
+            "%r appears in the input module outside the house story; no name "
+            "may be a default" % forbidden)
+    policy = SI.StoryInputPolicy(mode=SI.INPUT_MODE_USER_FIELDS, bank_id="my_story")
+    typed = SI.with_default_story(SI.capture_raw(idea="a lighthouse keeper"), policy)
+    assert typed.author == ""
 
 
 def test_the_name_is_surrounded_but_not_reworded():
@@ -353,7 +361,7 @@ def test_resolver_preserves_user_fields_and_the_unclamped_request(monkeypatch):
     assert meta["house_source"] is False
 
 
-def test_blank_my_story_stamps_house_source_and_floors_the_idea(monkeypatch, caplog):
+def test_blank_my_story_stamps_house_source_and_floors_the_story(monkeypatch, caplog):
     from nodes import _otr_writer_inputs as WI, _otr_source_snapshot as SNAP
     def forbidden(*a, **kw):
         pytest.fail("My Story attempted to load a source snapshot")
@@ -366,28 +374,53 @@ def test_blank_my_story_stamps_house_source_and_floors_the_idea(monkeypatch, cap
             story_author="", num_characters=2, act_count="1")
     meta = result["source_meta"]
     assert meta["house_source"] is True
-    assert meta["story_input"]["fields"]["idea"] == SI.DEFAULT_IDEA
+    fields = meta["story_input"]["fields"]
+    assert fields["idea"] == ""
+    assert fields["characters"] == SI.DEFAULT_STORY.characters
+    assert fields["plot"] == SI.DEFAULT_STORY.plot
+    assert fields["setting"] == SI.DEFAULT_STORY.setting
+    assert meta["story_author"] == "Jeffrey A. Brick"
+    assert result["source_rights"]["license_label"] == (
+        "the author's own story, shipped with his permission")
     assert result["seed_source"] == "my_story_fields"
-    assert "house DEFAULT_IDEA" in caplog.text
-    assert "1 creative field(s)" not in caplog.text
+    assert "house DEFAULT_STORY" in caplog.text
+    assert "creative field(s)" not in caplog.text
 
 
-def test_house_idea_lets_whiskers_speak():
-    """A 1-act with three speakers cannot floor a mute statue cat.
+def test_the_house_story_is_the_authors_jeffrey_and_magnoliarex():
+    """Operator, 2026-10-20: "make my story the default" -- the three boxes of
+    the approved 3-act demo, with every cast member a speaker (a talking cat,
+    so a 1-act cannot floor a mute one: live 2026-09-15)."""
+    story = SI.DEFAULT_STORY
+    assert story.idea == ""
+    for name in ("Jeffrey (he):", "MagnoliaRex (she):", "Cat:"):
+        assert name in story.characters
+    assert "a talking cat" in story.characters.lower()
+    assert "Bon voyage, Jeffrey!" in story.plot
+    assert story.author == "Jeffrey A. Brick"
 
-    Live 2026-09-15: my_story_act_1 refused because Whiskers had no
-    lines, then ledger_clean spent Credits rewriting statue talk.
-    """
-    idea = SI.DEFAULT_IDEA.lower()
-    assert "never says a word" not in idea
-    assert "toy cat statue" not in idea
-    assert "statues cannot move" not in idea
-    assert "whiskers talks" in idea
-    assert "he says the extra bowl is his" in idea
+
+def test_the_house_plot_names_no_act_numbers():
+    """Codex r1 on the default-story design: a one-act roll must not be handed
+    three labelled acts to cram into one. The writer splits the arc itself."""
+    import re
+    assert not re.search(r"\bact\s*\d", SI.DEFAULT_STORY.plot, re.IGNORECASE)
+
+
+def test_the_house_story_photos_ship_in_the_pack():
+    from nodes._otr_shared import character_photos as cp
+    for name, files in SI.DEFAULT_STORY_PHOTOS.items():
+        assert name + " (" in SI.DEFAULT_STORY.characters
+        assert 1 <= len(files) <= cp.PHOTOS_PER_CHARACTER
+        for ref in files:
+            assert ref.endswith(" [bundled]")
+            assert cp.resolve_photo(ref), ref
 
 
 def test_author_only_is_still_a_house_source(monkeypatch):
-    """A name is attribution, not a story. Rewrite fidelity has nothing to keep."""
+    """A name is attribution, not a story -- and the house story stays credited
+    to the person who wrote it (Codex r1: a typed author would otherwise put
+    another name on his book)."""
     from nodes import _otr_writer_inputs as WI, _otr_source_snapshot as SNAP
     def forbidden(*a, **kw):
         pytest.fail("My Story attempted to load a source snapshot")
@@ -398,7 +431,7 @@ def test_author_only_is_still_a_house_source(monkeypatch):
         story_characters="", story_plot="", story_setting="",
         story_author="A. Listener", num_characters=2, act_count="1")
     assert result["source_meta"]["house_source"] is True
-    assert result["source_meta"]["story_author"] == "A. Listener"
+    assert result["source_meta"]["story_author"] == "Jeffrey A. Brick"
 
 
 @pytest.mark.parametrize("kwargs", [
@@ -421,8 +454,8 @@ def test_any_single_creative_widget_stamps_typed_not_house(monkeypatch, kwargs):
 def test_resolver_stamps_house_source_from_raw_fields_before_the_floor():
     from nodes import _otr_writer_inputs as WI
     src = inspect.getsource(WI._resolve_inputs)
-    stamp = src.find("_house_source = _otr_story_input.would_apply_default_idea")
-    floor = src.find("_raw_fields = _otr_story_input.with_default_idea")
+    stamp = src.find("_house_source = _otr_story_input.would_apply_default_story")
+    floor = src.find("_raw_fields = _otr_story_input.with_default_story")
     assert stamp != -1 and floor != -1 and stamp < floor
 
 

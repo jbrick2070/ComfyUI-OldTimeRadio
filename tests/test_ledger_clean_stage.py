@@ -931,9 +931,9 @@ def test_the_receipt_lands_on_meta_even_when_nothing_fired():
     assert ledger["meta"]["ledger_clean"]["judge"] == "model"
 
 
-def test_house_source_skips_spoken_source_rewrite_and_still_judges():
-    """A blank My Story still gets the clean-stage judge; it does not spend
-    a source-rewrite slot defending DEFAULT_IDEA from itself."""
+def test_the_house_story_gets_the_spoken_source_rewrite_and_the_judge():
+    """A blank My Story tells the author's own story (DEFAULT_STORY), held to
+    its source like typed fields (operator, 2026-10-20) -- and still judged."""
     original = "The lamp has not turned since Tuesday."
     ledger = _ledger(original, bank="my_story")
     ledger["meta"]["my_story"] = {"house_source": True, "source_rewrites": []}
@@ -944,9 +944,7 @@ def test_house_source_skips_spoken_source_rewrite_and_still_judges():
     }
     slot = _Slot()
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="my_story")
-    assert receipt["source_rewrite"] is None
-    assert slot.repair_calls == 0
-    assert ledger["lines"][1]["text"] == original
+    assert receipt["source_rewrite"] is not None
     assert slot.judge_calls >= 1
 
 

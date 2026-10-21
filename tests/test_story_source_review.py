@@ -271,14 +271,15 @@ def _edit(**overrides):
     return edit
 
 
-def test_house_source_skips_spoken_rewrite_and_leaves_line_text_owned():
+def test_the_house_story_is_held_to_its_source_like_typed_fields():
+    """The blank-run story is the author's own book (operator, 2026-10-20):
+    house_source records where it came from and no longer skips fidelity."""
     data = _ledger()
     data["meta"]["my_story"]["house_source"] = True
-    before = copy.deepcopy(data["lines"])
     slot = Slot({"edits": [_edit()]})
-    assert source.rewrite_spoken_from_source(data, slot_fn=slot) is None
-    assert slot.calls == []
-    assert data["lines"] == before
+    receipt = source.rewrite_spoken_from_source(data, slot_fn=slot)
+    assert len(slot.calls) == 1 and receipt["applied"]
+    assert data["lines"][0]["text"] == "  Keep this. Mother lives.  Keep that!"
 
 
 def test_spoken_correction_is_applied_without_changing_surrounding_bytes_ids_or_order():

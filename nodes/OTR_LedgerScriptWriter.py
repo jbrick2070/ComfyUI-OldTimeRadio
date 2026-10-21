@@ -3327,7 +3327,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # claims the two checks agree "by construction". They did not.
         # Applying it here makes that comment true and makes the two sites
         # build the same fields, which is what keeps their digests equal.
-        _story_raw = _otr_story_input.with_default_idea(
+        _story_raw = _otr_story_input.with_default_story(
             _story_raw, _policy_early)
         _otr_story_input.check_selection(
             _story_raw,
@@ -3481,12 +3481,12 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 == _otr_story_input.INPUT_MODE_USER_FIELDS):
             # THE FLOOR, applied before the judgement and before the bundle.
             # A roll can now land on this bank (2026-09-13), and a blind run
-            # types nothing -- DEFAULT_IDEA is what it writes instead of
+            # types nothing -- DEFAULT_STORY is what it writes instead of
             # refusing. Rebinding `_story_raw` here rather than at the capture
             # keeps the pre-roll evidence intact for every other bank, and
             # keeps this digest identical to the validator's, which applies
             # the same floor to the same fields.
-            _story_raw = _otr_story_input.with_default_idea(
+            _story_raw = _otr_story_input.with_default_story(
                 _story_raw,
                 _otr_story_input.StoryInputPolicy(
                     mode=_otr_story_input.INPUT_MODE_USER_FIELDS,

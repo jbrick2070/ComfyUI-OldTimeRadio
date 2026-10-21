@@ -226,7 +226,7 @@ def normalize(fields: RawStoryFields) -> RawStoryFields:
     )
 
 
-#: THE STANDING PREMISE, and the reason `my_story` may sit in the roll pool at
+#: THE STANDING STORY, and the reason `my_story` may sit in the roll pool at
 #: all (operator decision 2026-09-13).
 #:
 #: A roll landing here with nothing typed would otherwise "fail at admission
@@ -235,42 +235,99 @@ def normalize(fields: RawStoryFields) -> RawStoryFields:
 #: blank therefore falls back to THIS, so the bank can be drawn like any other
 #: and still have something to write from.
 #:
+#: WHOSE STORY (operator, 2026-10-20: "make my story the default"): Jeffrey A.
+#: Brick's own published story of Jeffrey and MagnoliaRex, which he owns and
+#: chose to ship. It fills the three boxes a listener would -- characters, plot,
+#: setting -- exactly as the approved 3-act demo of 2026-10-20 typed them, so a
+#: blank run is that demo's input. The plot names no act numbers: the writer
+#: splits beginning, middle and end into however many acts were selected, and a
+#: one-act run is not handed three labelled acts to cram into one.
+#:
 #: IT LIVES IN CODE, NOT IN A WIDGET VALUE, on purpose. Shipped graphs keep
 #: the Story widgets empty (see tests/test_no_shipped_graph_carries_a_premise.py);
-#: a standing premise in the widget would also silently seed every fetcher
+#: a standing story in the widget would also silently seed every fetcher
 #: bank. A fresh node, a cleared field, or a rolled My Story pick still has
 #: something to write from because the floor lives here.
 #:
-#: Applied at EVERY admission point through `with_default_idea`, never at just
-#: one: the validator and the writer each build a bundle from these fields, and
-#: a digest that disagreed between them would break the draft identity.
+#: Applied at EVERY admission point through `with_default_story`, never at
+#: just one: the validator and the writer each build a bundle from these
+#: fields, and a digest that disagreed between them would break the draft
+#: identity.
 #:
-#: Anything the listener types overrides it completely. This is a floor, not a
-#: default anyone has to delete.
-DEFAULT_IDEA = (
-    "In a sunlit toy playground -- a hand-high slide, a white picket fence, a painted blue sky -- two small orange toy boots named Stomp and Tiptoe are playing with a toy tennis ball, while Whiskers, a little toy cat, sits by the fence with his painted eyes almost shut. Stomp, the left boot, is loud, quick and brave; he talks in short bursts and wants to kick everything first. Tiptoe, the right boot, is careful and sharp-eyed; she counts to three before anything and asks the question Stomp skipped. Whiskers talks when he wants to, usually last, in a small dry voice. They do everything on a count of three because it is the only way they ever agree. Then a strange glow rises, rainbow smoke swallows the playground, and when it clears three sealed plastic boxes -- red, green and blue -- float down and settle on the grass. Tiptoe swears the smoke came up from right around Whiskers and that his head is turned differently now; Stomp says cats cannot make smoke, and neither of them quite believes it. They argue about whether to open the boxes at all and who has to touch one first, settle on red, together, and the lid pops with a hiss that sends them both diving behind the slide -- it is only a small toy hairdryer, sparkling faintly, which whirs once by itself and stops. The blue box holds a giant striped candy bar bigger than both of them. The green box is warm and humming, and Stomp, brave all day, will not touch it, so Tiptoe, scared all day, finds she is not, and opens it: a shimmering rainbow candy, the most magical of the three. Thrilled, they carry everything to a toy kitchen where the play stove has a painted flame and no heat, so the hairdryer's warm breath melts the white chocolate squares Stomp breaks off while Tiptoe sorts the candy pieces by color into little bowls. Somewhere in the work they stop counting: they squabble once more over who gets the rainbow candy, then drop it into the melted chocolate so it belongs to everyone, and find they have set out one bowl more than there are boots. Whiskers has been watching. He says the extra bowl is his. Together, and without counting, they carry it to him, while a thin curl of rainbow smoke is rising behind the fence. They decide not to ask."
+#: Anything the listener types in a creative field overrides it completely. A
+#: typed AUTHOR does not: an author alone is not a story, and the floor is
+#: always credited to the person who wrote it.
+DEFAULT_STORY = RawStoryFields(
+    characters=(
+        "Jeffrey (he): A former VJ who died of lung cancer in 2061 and lives on as a "
+        "preserved mind in a government-run virtual afterlife; shy, devoted, makes live "
+        "video art. Looks: A lean man in his fifties with a long, narrow face, a long "
+        "straight nose, deep-set eyes, prominent ears and light stubble; white mime face "
+        "paint with small pink-red marks on the cheeks; a plain black long-sleeve shirt.\n"
+        "MagnoliaRex (she): An electronic music artist preserved in the same program in "
+        "2095; cool, guarded, science-literate, secretly tender. Looks: An ageless adult "
+        "woman with a warm medium-brown complexion, almond-shaped smoky eyes, full lips, a "
+        "softly angular jaw and a small knowing smile. Long, wavy honey-brown hair with "
+        "pastel pink and teal streaks and fine curtain bangs. A high-collared magnolia-white "
+        "gown with silver embroidery and glowing silver wire-and-organza petal shoulders; "
+        "no gold. Cool, composed, iconic.\n"
+        "Cat: A talking cat in Cairo who gives Jeffrey a clue. Looks: An Egyptian-type adult "
+        "cat, slender and long-limbed. Very short, smooth, dark gray to charcoal fur, a "
+        "wedge-shaped head, large almond-shaped eyes, large upright ears, a long tapered "
+        "tail. Elegant, alert, intelligent."
+    ),
+    plot=(
+        "Jeffrey wins MagnoliaRex's contest prize, a day with a fan, at a UN festival in "
+        "Athens celebrating the cure for cancer, and the day never ends. She warns, 'We "
+        "won't be like this forever.' Then comes a 207-concert charity world tour and a "
+        "Valentine's riddle chase from the space station to Cairo, where a talking cat gives "
+        "Jeffrey a clue, to Zurich and to alien sculptors on a far planet; meanwhile in the "
+        "real world, climate collapse is breaking the machines that keep the preserved minds "
+        "alive. At the end, a self-flying copper plane takes them to a frozen, empty Seoul "
+        "with ten days left. A meteor has wrecked the generator that keeps them running, and "
+        "their satellite lasers go astray. She says 'I love you,' then plays him a duet she "
+        "secretly made from his recorded voice. At 11:59 p.m. on January 25: 'Bon voyage, "
+        "Jeffrey! Have a wonderful time!'"
+    ),
+    setting=(
+        "A virtual afterlife in the year 2095, where minds borrow robots and drones; Athens, "
+        "festival grounds, a world tour, a frozen, empty Seoul in January."
+    ),
+    author="Jeffrey A. Brick",
 )
 
+#: His reference pictures of the two leads, shipped in the pack with his
+#: consent (operator, 2026-10-20: "my photos can be public and ship with it").
+#: They are ordinary "Name = file" photo entries on the bundled root, so a
+#: listener can use them by hand too; the image side applies them only when
+#: this floor wrote the story and no photos were given.
+DEFAULT_STORY_PHOTOS = {
+    "Jeffrey": ["jeffrey_1.jpg [bundled]", "jeffrey_2.jpg [bundled]",
+                "jeffrey_3.jpg [bundled]"],
+    "MagnoliaRex": ["magnoliarex_1.jpg [bundled]", "magnoliarex_2.jpg [bundled]",
+                    "magnoliarex_3.jpg [bundled]"],
+}
 
-def with_default_idea(fields: RawStoryFields,
-                      policy: "StoryInputPolicy") -> RawStoryFields:
-    """`fields`, with :data:`DEFAULT_IDEA` supplied when there is nothing else.
+
+def with_default_story(fields: RawStoryFields,
+                       policy: "StoryInputPolicy") -> RawStoryFields:
+    """`fields`, with :data:`DEFAULT_STORY` supplied when there is nothing else.
 
     A no-op unless the selected bank actually reads these fields AND every
     creative one is empty. Returns the SAME object when it changes nothing, so
     an identity check upstream still means "the listener's own words".
     """
-    if not policy.is_user_fields or creative_input_present(fields):
+    if not would_apply_default_story(fields, policy):
         return fields
-    return replace(fields, idea=DEFAULT_IDEA)
+    return DEFAULT_STORY
 
 
-def would_apply_default_idea(fields: RawStoryFields,
-                             policy: "StoryInputPolicy") -> bool:
-    """True when :func:`with_default_idea` would write :data:`DEFAULT_IDEA`.
+def would_apply_default_story(fields: RawStoryFields,
+                              policy: "StoryInputPolicy") -> bool:
+    """True when :func:`with_default_story` would write :data:`DEFAULT_STORY`.
 
     Call BEFORE flooring. After the floor, ``creative_input_present`` is True
-    because the idea is filled, and the identity signal is gone.
+    because the story is filled, and the identity signal is gone.
     """
     return bool(policy.is_user_fields) and not creative_input_present(fields)
 
@@ -690,7 +747,7 @@ def check_queued_prompt(
         # The floor goes on BEFORE the judgement and before the bundle below,
         # so this path and the writer's own admission build byte-identical
         # fields -- and therefore the same digest -- for one submission.
-        fields = with_default_idea(fields, policy)
+        fields = with_default_story(fields, policy)
         source_ref = writer.literal("source_ref", "")
         replay_from = writer.literal("replay_from", "")
         check_selection(
@@ -889,9 +946,10 @@ __all__ = [
     "StoryRequest",
     "attribution_receipt",
     "attribution_sentence",
-    "DEFAULT_IDEA",
-    "with_default_idea",
-    "would_apply_default_idea",
+    "DEFAULT_STORY",
+    "DEFAULT_STORY_PHOTOS",
+    "with_default_story",
+    "would_apply_default_story",
     "build_bundle",
     "capture_raw",
     "check_selection",

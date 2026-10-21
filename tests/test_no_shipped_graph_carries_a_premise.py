@@ -9,7 +9,7 @@ the archive manifest and the Folger fetch entirely.
 A standing premise was written into the canonical's widget so a blank My Story
 pick had something to perform. It did -- and it also silently seeded four of
 the six banks with that same story, with no error and no refusal. The floor in
-`_otr_story_input.DEFAULT_IDEA` already covers the blank-My-Story case for
+`_otr_story_input.DEFAULT_STORY` already covers the blank-My-Story case for
 every graph including a fresh node, which is exactly why the widget never
 needed to carry it.
 
@@ -53,7 +53,7 @@ def test_no_shipped_graph_carries_a_premise(path):
         "OVERRIDE for every bank with a fetcher -- scifi_news_pro, "
         "media_archive, public_domain and shakespeare would all be seeded "
         "from it instead of fetching, silently. The standing premise belongs "
-        "in _otr_story_input.DEFAULT_IDEA, which already covers a blank My "
+        "in _otr_story_input.DEFAULT_STORY, which already covers a blank My "
         "Story run." % (path.name, len(value)))
 
 
@@ -86,12 +86,12 @@ def test_the_floor_still_covers_what_the_widget_was_doing():
     row = rt.find_bank("my_story")
     policy = si.StoryInputPolicy(
         mode=rt.story_input_mode(row), bank_id="my_story")
-    floored = si.with_default_idea(blank, policy)
+    floored = si.with_default_story(blank, policy)
     si.check_selection(floored, policy)            # must not raise
-    assert floored.idea == si.DEFAULT_IDEA
+    assert floored == si.DEFAULT_STORY
 
     # ...and a fetcher bank is NOT floored, so its fetch still runs.
     news = rt.find_bank("scifi_news_pro")
     news_policy = si.StoryInputPolicy(
         mode=rt.story_input_mode(news), bank_id="scifi_news_pro")
-    assert si.with_default_idea(blank, news_policy) is blank
+    assert si.with_default_story(blank, news_policy) is blank

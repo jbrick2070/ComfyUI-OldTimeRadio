@@ -333,10 +333,10 @@ def _resolve_inputs(
         # rolled My Story run types nothing and must still have a source. A
         # direct caller that supplied real fields is untouched.
         # Stamp BEFORE flooring -- after it, creative_input_present is True
-        # and the identity check with_default_idea documents cannot fire.
-        _house_source = _otr_story_input.would_apply_default_idea(
+        # and the identity check with_default_story documents cannot fire.
+        _house_source = _otr_story_input.would_apply_default_story(
             _raw_fields, _policy)
-        _raw_fields = _otr_story_input.with_default_idea(_raw_fields, _policy)
+        _raw_fields = _otr_story_input.with_default_story(_raw_fields, _policy)
         # Defensive: run() already refused these. A DIRECT call to this
         # function (a test, a script) gets the same refusal rather than a
         # half-built payload.
@@ -374,10 +374,14 @@ def _resolve_inputs(
             "story_author": _bundle.normalized.author,
             "house_source": _house_source,
         }
-        source_rights = {"license_label": "listener original idea"}
+        # The floor is not the listener's idea: it is the author's own story,
+        # shipped with his permission (operator, 2026-10-20).
+        source_rights = {"license_label": (
+            "the author's own story, shipped with his permission" if _house_source
+            else "listener original idea")}
         log.info(
             "[OTR_LedgerScriptWriter] my_story: %s, draft %s%s",
-            ("house DEFAULT_IDEA" if _house_source else "%d creative field(s)" % (
+            ("house DEFAULT_STORY" if _house_source else "%d creative field(s)" % (
                 sum(1 for f in _otr_story_input.CREATIVE_FIELDS
                     if getattr(_bundle.normalized, f)))),
             _bundle.digest[:12],

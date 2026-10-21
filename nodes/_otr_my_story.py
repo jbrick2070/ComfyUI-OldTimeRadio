@@ -1450,8 +1450,8 @@ def run_my_story_episode(
         },
         "notes": (
             [
-                "House DEFAULT_IDEA is the source; no creative fields were typed.",
-                "Source-rewrite fidelity is skipped -- there is no listener to contradict.",
+                "House DEFAULT_STORY is the source; no creative fields were typed.",
+                "It is the author's own story, so source-rewrite fidelity holds it like typed fields.",
                 "Selected acts bind treatment acceptance; character count is flexible guidance.",
             ] if house_source else [
                 "The person's own typed fields are the sole source.",
@@ -1470,10 +1470,11 @@ def run_my_story_episode(
         _require_ledger_save(led, what)
 
     def source_kwargs(model_id):
-        kwargs = {"slot_scheduler": slot_scheduler, "configured_model_id": model_id}
-        if not house_source:
-            kwargs["source_rewrite_receipts"] = story["source_rewrites"]
-        return kwargs
+        # Every My Story source is held to its own words, the house story
+        # included: it is the author's book, and the approved 2026-10-20 demo
+        # of it ran with these rewrites on.
+        return {"slot_scheduler": slot_scheduler, "configured_model_id": model_id,
+                "source_rewrite_receipts": story["source_rewrites"]}
 
     # The cameo knob belongs to the house, and this cast belongs to the
     # person who described it. Recorded rather than silently ignored.
