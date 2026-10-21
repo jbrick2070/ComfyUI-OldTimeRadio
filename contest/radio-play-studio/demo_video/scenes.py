@@ -386,7 +386,7 @@ def scene_nodes():
                       loc=(0, 0, -0.06))
         plate.parent = tag
         pop(tag, at)
-        for ob in [tag] + (_fly(fly, x, y, at, stills, video, i) or []):
+        for ob in [tag] + (_fly(fly, x, y, at, end, stills, video, i) or []):
             held = tuple(ob.scale)
             key(ob, "scale", end - 4, held)
             key(ob, "scale", end + 4, (0.0, 0.0, 0.0))
@@ -394,7 +394,7 @@ def scene_nodes():
     return sc
 
 
-def _fly(kind, x, y, at, stills, video, i):
+def _fly(kind, x, y, at, end, stills, video, i):
     """What comes out of a node: a script page, sound bars, stills, the clip.
     Returns the objects made, so the stop can clear them when its line ends."""
     made = []
@@ -416,7 +416,7 @@ def _fly(kind, x, y, at, stills, video, i):
         for k in range(16):
             b = box(0.12, 0.12, 1.0, mat(f"bar{i}{k}", LIME, emit=3.0),
                     loc=(x - 0.9 + k * 0.13, y + 0.5, 0.8))
-            for s in range(0, 120, 6):
+            for s in range(0, max(6, end - 4 - at), 6):     # stop before the clear
                 hgt = 0.2 + rnd.random() * 1.0
                 key(b, "scale", at + s, (0.12, 0.12, hgt if s else 0.01))
             made.append(b)
@@ -425,7 +425,8 @@ def _fly(kind, x, y, at, stills, video, i):
             m, _ = image_mat(f"still{k}", s)
             p = plane(1.92, 1.08, m, loc=(x, y, 0.2), rot=(math.radians(70), 0, 0))
             key(p, "location", at + k * 8, (x, y, 0.2))
-            key(p, "location", at + k * 8 + 20, (x - 2.2 + k * 2.2, y - 0.6, 2.2 + k * 0.15))
+            # Forward and low, so the stills sit under the model's name, not over it.
+            key(p, "location", at + k * 8 + 20, (x - 2.2 + k * 2.2, y - 2.0, 0.9 + k * 0.1))
             key(p, "rotation_euler", at + k * 8 + 20, (math.radians(72), math.radians(-12 + k * 12), 0))
             pop(p, at + k * 8, final=(1.92, 1.08, 1))
             made.append(p)
