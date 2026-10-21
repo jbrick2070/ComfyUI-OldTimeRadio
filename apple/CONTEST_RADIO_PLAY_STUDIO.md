@@ -274,7 +274,8 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         (given photos win; a typed story never gets his). App (this branch): "Load the example"
         fills the new text and both leads' three photos, thumbnails from a confined
         /bundled-photos/ route. Codex contrarian on the design: BROKEN first, every point folded
-        in. Scoped suite 5533 passed; app 124 passed. Sonnet QA: see below.
+        in. Scoped suite 5533 passed; app 124 passed. Sonnet QA HOLDS (no blocker; its docstring
+        nit fixed on main).
         STILL OPEN (his call): his photos only shape the pictures where the still engine takes
         references -- FLUX 3 Klein with OTR_FLUX3_REFERENCE=1. The shipped 16 GB graphs paint
         from text (MOSS), so out of the box the photos are matched and unused. Options: a
