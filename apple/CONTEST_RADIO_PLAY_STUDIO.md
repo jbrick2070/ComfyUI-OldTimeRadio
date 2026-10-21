@@ -312,6 +312,26 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         (validator stamp OK, widget drift 0); the house story ran; 16 character stills painted
         from references, 9 announcer/music cards without (by design). Video rendering
         (tmp/rps_live/mystory_twin_1act.log, server_plain.log).
+      4060 (MRKT) -- ONE INSTALL, ON MAIN, REGRESSING (operator 10-20: "we will still need to regress
+        other workflows, the 8gb machine is ready"; "push the latest for sure"; "you are free to
+        clean it up so there's only one").
+        * Kept: Comfy Desktop (C:\Users\jeffr\AppData\Local\Comfy-Desktop\ComfyUI-Installs\ComfyUI,
+          core 0.41.3) with OTR as a git checkout of main d1b3586d (was registry 2.3.28); models in
+          Comfy-Desktop\ComfyUI-Shared\models, which OTR_COMFYUI_MODELS_ROOT now points at.
+        * Removed after moving every model file not already in that store (17 files, 158.7 GB:
+          MiniMax H3 ref2va/fl2va, LTX 2.5 int8/nvfp4, Ideogram 4, HuMo, FLUX.1-dev, AnimateDiff):
+          C:\OTR-Human-2.3.10 (portable 2.3.11, core 0.37), C:\OTRCold (registry 2.3.22),
+          C:\OTR-CleanRoom, D:\OTR-ColdDrill-aside-20261008 (658 GB of nested drills), and the
+          10-13/10-18 QA installs under D:\otr-4060-testing; 51 stale scheduled tasks. Free: C 285 GB,
+          D 904 GB. Kept D:\otr-4060-testing\ComfyUI-OldTimeRadio (the 4060 window's checkout,
+          clean, fast-forwarded to main) and its reports.
+        * Boot: C:\Temp\otr_one_server.cmd (task OTR_one_server, port 8188; Desktop's own
+          model-paths yaml + C:\Temp\otr_one_paths.yaml for the wrapper packs and AnimateDiff).
+          ComfyUI-GGUF fails to import there -- irrelevant (GGUF is out).
+        * RUNNING 20:27: all seven shipped 8 GB graphs, 1 act each, one at a time, fastest first
+          (low, still, animatediff, video, ltx25_foley, ltx25_mime, ltx25_audio_in), driver
+          C:\Temp\otr_regress_8gb.py (task OTR_regress_8gb), log C:\Temp\otr_regress.log. They all
+          use plain flux3_klein, so they prove today's Klein refactor left the 8 GB path unchanged.
       WAS: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
         white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
         Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
