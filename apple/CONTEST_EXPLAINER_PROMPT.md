@@ -75,7 +75,7 @@ What the user does (this is the "in action" part):
 5. **Music -- Stable Audio 3**: the theme and the act-break music.
 6. **Video -- LTX 2.5** (the 16 GB "foley" lane): films every beat from its still, **generating
    its own sound effects** that are mixed under the voices.
-7. **Upscale -- Real-ESRGAN x2** (open weights): to 1080p. (It replaced NVIDIA's closed RTX Video
+7. **Upscale -- ffmpeg** (Lanczos + unsharp, no model): to 1080p. (It replaced NVIDIA's closed RTX Video
    Super Resolution so the whole stack is open weights.)
 8. **Finish**: captions burned in, everything muxed with ffmpeg, published as one MP4.
 
@@ -93,7 +93,7 @@ and comfy-api-proxy 0.1.6. The workflow file is `otr_16gb_foley_open.json` (ship
 
 ## 6. Every name that MUST appear (spoken or on screen)
 
-Gemma 4 12B; FLUX 3 Klein; LTX 2.5; Kokoro; Stable Audio 3; Real-ESRGAN; ComfyUI; the
+Gemma 4 12B; FLUX 3 Klein; LTX 2.5; Kokoro; Stable Audio 3; ffmpeg; ComfyUI; the
 Old-Time Radio node pack; Comfy SDK; comfy-api-proxy. (Also allowed on an end card: ffmpeg.)
 A compact way: one on-screen "stack" card listing all ten while the narration names the four that
 matter most to the story (Gemma writes, FLUX paints, LTX films with sound, Kokoro speaks).

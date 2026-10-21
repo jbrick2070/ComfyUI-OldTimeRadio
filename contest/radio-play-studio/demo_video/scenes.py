@@ -359,7 +359,7 @@ def scene_nodes():
     # (node id, model label, sentence index, what flies out)
     stops = [(1, "GEMMA 4 12B", 1, "page"), (81, "KOKORO", 2, "bars"),
              (83, "STABLE AUDIO 3", 3, "bars"), (91, "FLUX 3 KLEIN", 4, "stills"),
-             (92, "LTX 2.5", 5, "video"), (84, "REAL-ESRGAN", 6, "frame")]
+             (92, "LTX 2.5", 5, "video"), (84, "1080P \u00b7 FFMPEG", 6, "frame")]
     key(cam, "location", 1, (mid[0], mid[1] - 16, 26))
     key(tgt, "location", 1, (mid[0], mid[1], 0))
     key(cam, "location", f(starts[1]) - 40, (mid[0] - 4, mid[1] - 14, 20))
@@ -465,7 +465,7 @@ def scene_ring():
                 loc=(0, 2.6, 0.5))
     pop(head, third + 10)
     models = ["GEMMA 4 12B", "FLUX 3 KLEIN", "LTX 2.5", "KOKORO", "STABLE AUDIO 3"]
-    tools = ["REAL-ESRGAN", "COMFYUI", "OLD-TIME RADIO PACK", "COMFY SDK", "COMFY-API-PROXY"]
+    tools = ["FFMPEG", "COMFYUI", "OLD-TIME RADIO PACK", "COMFY SDK", "COMFY-API-PROXY"]
     for col, (names, m, x0) in enumerate(((models, lime, -2.9), (tools, white, 2.9))):
         for k, n in enumerate(names):
             t = text(n, size=0.58, extrude=0.05, material=m, loc=(x0, 1.15 - k * 0.8, 0.2))

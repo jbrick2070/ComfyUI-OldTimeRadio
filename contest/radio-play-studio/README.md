@@ -96,7 +96,7 @@ one is tuned for: for example `workflows/otr_8gb_ltx25_foley.json` on an 8 GB ca
 `workflows/otr_16gb_video.json` for silent LTX video on 16 GB, `workflows/otr_16gb_still.json`
 for a still with motion (minutes, not an hour), or `workflows/otr_app.json` for the pack's
 any-machine graph. The default is `otr_16gb_foley_open.json`: the 16 GB foley lane with every
-model open weights (FLUX 3 Klein stills, the open Real-ESRGAN upscale). `otr_16gb_foley.json` is the
+model open weights (FLUX 3 Klein stills; the 1080p step is ffmpeg, no model). `otr_16gb_foley.json` is the
 same lane with NVIDIA RTX Video Super Resolution, a closed SDK.
 
 ## Tell your own story

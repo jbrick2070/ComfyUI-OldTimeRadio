@@ -22,7 +22,7 @@ LINES = {
         "Stable Audio 3 scores it.",
         "Flux 3 Klein paints every beat.",
         "L.T.X. 2.5 films every beat, with its own sound.",
-        "And Real E.S.R.GAN takes it to 1080p.",
+        "And F.F.mpeg takes it to 1080p, with no model at all.",
     ],
     "s6": "Other tools make clips. This makes a whole story: beginning, middle, and end, "
           "every character keeping one voice and one look. All open weights, all on one laptop.",

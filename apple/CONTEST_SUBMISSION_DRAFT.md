@@ -13,8 +13,11 @@ draft to paste from; every number is from a logged run on 2026-10-19.
 - [x] **Open weights -- DECIDED (operator 2026-10-20: "we skip VSR, we stay open weight";
       "flux 3 and esrgan"; "we skip the ref images").** The submission runs
       `workflows/otr_16gb_foley_open.json` (main 4c43ea10): FLUX 3 Klein stills from text, the open
-      Real-ESRGAN x2 upscale instead of NVIDIA RTX VSR. **Tick Open Weights Only.**
-- [ ] **Demo render on that exact workflow** (operator: "we need another run with ESRGAN for our
+      1080p step done by ffmpeg (Lanczos + unsharp, no model) instead of NVIDIA RTX VSR -- switched
+      from Real-ESRGAN on 10-21 ("yes, switch to off"; "I want to be 100% open"): the repo's own
+      benchmark measured it the most faithful of the three, at ~37 ms a frame, and Real-ESRGAN was
+      running when the machine went down twice. **Tick Open Weights Only.**
+- [ ] **Demo render on that exact workflow** (operator, 10-20: "we need another run with ESRGAN for our
       demo to be precise") -- then cut the under-2-minute video from it.
 - [ ] README: replace "Demo video: to be recorded" with the link.
 
@@ -59,7 +62,7 @@ converts to an API graph against the server's live /object_info.
 - **LTX 2.5** (mix4x8 DiT + w4a8 encoder, 16 GB foley lane) -- films every beat, with its own sound.
 - **Kokoro** -- a voice for every character and the announcer.
 - **Stable Audio 3** -- the theme music.
-- **Real-ESRGAN x2** (open weights, via spandrel) -- the 1080p upscale.
+- No upscale model: **ffmpeg** scales to 1080p (Lanczos + unsharp).
 
 ## Q9. Other tools or techniques used
 - comfy-api-proxy (Comfy API v2 bridge) and a standard-library Python web app (no build step).
@@ -83,9 +86,10 @@ converts to an API graph against the server's live /object_info.
 
 ## Q11. Is your stack fully open?
 Yes -- open weights only (operator 2026-10-20: "we stay open weight"). Every model runs locally
-from public weights: Gemma 4 12B, FLUX 3 Klein, LTX 2.5, Kokoro, Stable Audio 3 and Real-ESRGAN.
+from public weights: Gemma 4 12B, FLUX 3 Klein, LTX 2.5, Kokoro and Stable Audio 3; the 1080p step
+is ffmpeg, no model.
 No partner nodes, no closed APIs, no Comfy Cloud calls, no closed upscaler (RTX VSR is swapped for
-Real-ESRGAN). The app and the node pack are MIT. Licence note for honesty: FLUX 3 Klein's open
+ffmpeg's Lanczos scaler). The app and the node pack are MIT. Licence note for honesty: FLUX 3 Klein's open
 weights come under the FLUX Kommunity License (non-commercial above US$5M a year).
 
 ## Q12. Agreements -- **operator.**
