@@ -300,7 +300,13 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         in its scene prompts (so the Cat-in-Athens is the writer's, not a stray word).
         STILLS MEASURED 18:57: 22 stills, nothing typed -- Jeffrey (mime) and MagnoliaRex (white-
         silver) drawn from the SHIPPED photos and steady in every character frame, the Cat steady
-        too; only the announcer (no reference) is a stranger. Sheet sent. Video still rendering.
+        too; only the announcer (no reference) is a stranger. Sheet sent.
+      [x] VERIFIED 19:31 -- the blank 1-act default-story run: RESULT succeeded, obs_publish OK,
+        2:02:57 render, 2:26 episode at 1920x1080, sha 2796acb3, app + obs copies byte-identical,
+        timing saved (episodes/timing/otr_16gb_foley.acts-1.5ab87708.json). The act-neutral plot
+        fit one act. It ran on otr_16gb_foley with the boot switch (it started before the twin
+        shipped); the twin otr_16gb_foley_flux3_ref is what My Story uses from now on. Highlight:
+        output/otr/episodes/demo_cuts/default_story_1act_highlight.mp4 (sent).
       WAS: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
         white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
         Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
