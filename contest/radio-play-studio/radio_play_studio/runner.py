@@ -15,8 +15,9 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
-from .config import Settings, validate_url
-from .form import EPISODE_NODE_TYPE, WRITER, apply_choices, describe_form, locate_nodes
+from .config import REFERENCE_TWIN_SUFFIX, Settings, reference_twin, validate_url
+from .form import (EPISODE_NODE_TYPE, MY_STORY_BANK, WRITER, apply_choices, describe_form,
+                   locate_nodes)
 from .graph import fetch_object_info, load_workflow, workflow_to_api_prompt
 
 VIDEO_SUFFIXES = (".mp4", ".webm", ".mov", ".mkv")
@@ -146,10 +147,21 @@ class Studio:
         graph = workflow_to_api_prompt(workflow, schemas)
         return describe_form(schemas, graph, locate_nodes(workflow))
 
+    def workflow_for(self, choices: dict) -> Path:
+        """The workflow these choices run: a My Story run uses the workflow's
+        reference twin when one ships beside it, so its characters are painted
+        from their pictures; anything else runs the workflow as named."""
+        named = Path(self.settings.workflow_path)
+        if str((choices or {}).get("bank") or "") == MY_STORY_BANK:
+            twin = reference_twin(named)
+            if twin.is_file() and not named.stem.endswith(REFERENCE_TWIN_SUFFIX):
+                return twin
+        return named
+
     def build_graph(self, choices: dict) -> tuple[dict, dict]:
         """`(api_graph, node_ids)` for these choices, from the workflow on disk
         and the server's live node definitions."""
-        workflow = load_workflow(self.settings.workflow_path)
+        workflow = load_workflow(self.workflow_for(choices))
         schemas = self._fetch(self.settings.comfyui_url)
         graph = workflow_to_api_prompt(workflow, schemas)
         node_ids = locate_nodes(workflow)
@@ -164,7 +176,7 @@ class Studio:
         try:
             graph, node_ids = self.build_graph(choices)
             acts = graph.get(node_ids.get(WRITER, ""), {}).get("inputs", {}).get("act_count", "default")
-            timing_file = timing_path(self.settings.out_dir, self.settings.workflow_path, acts, graph)
+            timing_file = timing_path(self.settings.out_dir, self.workflow_for(choices), acts, graph)
             clock = ProgressClock(load_timing(timing_file), now=self._now)
             client = self._client_factory(self.settings.api_url)
             job = client.submit(client.workflows.from_json(graph))

@@ -518,3 +518,23 @@ def test_a_node_whose_bar_resets_never_moves_the_episode_back():
     t.t = 10
     clock.bar("91", 1, 100)                  # reset: distrusted, time says 10%
     assert clock.share() == pytest.approx(high)
+
+
+def test_a_my_story_run_uses_the_reference_twin_and_nothing_else_does(settings, schemas):
+    """Operator, 2026-10-20: the 16 GB foley graph with FLUX 3 Klein reference
+    stills is for My Story; every other story keeps the workflow as named."""
+    from radio_play_studio.runner import Studio
+    studio = Studio(settings, client_factory=lambda url: None, fetch=lambda url: schemas)
+    named = settings.workflow_path
+    assert studio.workflow_for({"bank": "my_story"}) == named        # no twin yet
+    twin = named.with_name(named.stem + "_flux3_ref.json")
+    twin.write_text(named.read_text(encoding="utf-8"), encoding="utf-8")
+    assert studio.workflow_for({"bank": "my_story"}) == twin
+    assert studio.workflow_for({"bank": "shakespeare"}) == named
+    assert studio.workflow_for({}) == named
+
+
+def test_the_shipped_foley_graph_has_its_reference_twin():
+    from radio_play_studio.config import _checkout_workflow, reference_twin
+    twin = reference_twin(_checkout_workflow())
+    assert twin.name == "otr_16gb_foley_flux3_ref.json"

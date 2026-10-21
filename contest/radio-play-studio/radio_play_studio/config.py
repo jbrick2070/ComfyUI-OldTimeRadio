@@ -18,6 +18,18 @@ DEFAULT_API_URL = "http://127.0.0.1:8189"
 #: NVIDIA lane where LTX 2.5 films each beat with its own sound under the voices.
 #: Any other shipped graph runs with --workflow.
 WORKFLOW_NAME = "otr_16gb_foley.json"
+#: A workflow's reference twin sits beside it: the same graph with every
+#: character still painted from that character's reference picture
+#: (flux3_klein_ref). My Story runs use it when it exists -- the one story whose
+#: characters have pictures (operator, 2026-10-20: "16gb foley flux3 ref in my
+#: story"); every other story keeps the workflow as named.
+REFERENCE_TWIN_SUFFIX = "_flux3_ref"
+
+
+def reference_twin(workflow_path: Path) -> Path:
+    """``workflows/x.json`` -> ``workflows/x_flux3_ref.json`` (it may not exist)."""
+    path = Path(workflow_path)
+    return path.with_name(path.stem + REFERENCE_TWIN_SUFFIX + path.suffix)
 PACK_DIR_NAME = "ComfyUI-OldTimeRadio"
 
 

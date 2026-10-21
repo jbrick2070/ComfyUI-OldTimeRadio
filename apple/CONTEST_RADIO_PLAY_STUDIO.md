@@ -276,11 +276,27 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         /bundled-photos/ route. Codex contrarian on the design: BROKEN first, every point folded
         in. Scoped suite 5533 passed; app 124 passed. Sonnet QA HOLDS (no blocker; its docstring
         nit fixed on main).
-        STILL OPEN (his call): his photos only shape the pictures where the still engine takes
-        references -- FLUX 3 Klein with OTR_FLUX3_REFERENCE=1. The shipped 16 GB graphs paint
-        from text (MOSS), so out of the box the photos are matched and unused. Options: a
-        "flux3_klein with references" stills choice, or flip Klein's default (needs a 4060
-        measurement).
+      [x] REFERENCE STILLS AS A SHIPPED CHOICE (operator 10-20: "use flux 3 ... we want ref image for
+        my story as an option for this contest"; "it's our 16gb foley flux3 ref in my story json";
+        "same basic json but these new dropdowns selected by default"; "leave the prior 16gb foley
+        with no ref"; must not touch the non-reference lanes). MOSS cannot take references (core
+        has no path; ostris's MOSS edit node needs an edit LoRA nobody has published -- only a
+        1-of-6 proof of concept). main d1b3586d:
+        * flux3_klein_ref -- FLUX 3 Klein with references always on (same files and recipe;
+          at most 3 references a still, the measured count; never drawn by a roll).
+        * workflows/otr_16gb_foley_flux3_ref.json -- foley with character stills on
+          flux3_klein_ref, announcer/music on flux3_klein; diff from foley = those 3 dropdowns.
+          otr_16gb_foley unchanged; every graph lists the new engine and keeps its own pick.
+        * App (this branch): a My Story run uses the workflow's "_flux3_ref" twin when it ships
+          beside it; every other story runs the workflow as named.
+        Strategy readers before code: Codex + agy Gemini 4 Argon (both NEEDS CHANGES, all folded;
+        pinning source_bank=my_story declined -- unmanaged by design, the app selects it).
+        Full suite 18011 passed; app 126 passed. Sonnet QA: see below.
+      LIVE NOW: blank 1-act My Story on the new code (started 17:28, references on via the boot
+        switch; tmp/rps_live/mystory_default_1act.log): "house DEFAULT_STORY ... by 'Jeffrey A.
+        Brick'", "house My Story: the author's shipped photos of Jeffrey, MagnoliaRex", character
+        stills painted from references. The new co-reference log shows the WRITER names the Cat
+        in its scene prompts (so the Cat-in-Athens is the writer's, not a stray word).
       WAS: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
         white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
         Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
