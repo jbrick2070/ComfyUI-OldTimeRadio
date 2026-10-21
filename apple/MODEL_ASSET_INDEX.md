@@ -92,10 +92,10 @@ Anything not listed there is a manual install -- see its row below.
 | `google_lyria` | nothing on disk | - | 1 profile(s) |
 | `google_tts` | nothing on disk | - | 1 profile(s) |
 | `indextts2` | **a SEPARATE project + its own venv** | manual, see below | - |
-| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 20 profile(s) |
+| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 21 profile(s) |
 | `musicgen` | `facebook/musicgen-small` | auto (HF cache) | - |
 | `stable_audio` | `stabilityai/stable-audio-open-1.0` | auto (HF cache) **(HF_TOKEN)** | - |
-| `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 20 profile(s) |
+| `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 21 profile(s) |
 
 ## Image engines (every shipped workflow picks one)
 
