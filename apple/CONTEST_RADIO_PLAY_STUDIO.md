@@ -291,7 +291,8 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
           beside it; every other story runs the workflow as named.
         Strategy readers before code: Codex + agy Gemini 4 Argon (both NEEDS CHANGES, all folded;
         pinning source_bank=my_story declined -- unmanaged by design, the app selects it).
-        Full suite 18011 passed; app 126 passed. Sonnet QA: see below.
+        Full suite 18011 passed; app 126 passed. Sonnet QA HOLDS (minors only: the twin's first run
+        has no ETA history; a ComfyUI started before d1b3586d rejects the twin until restarted).
       LIVE NOW: blank 1-act My Story on the new code (started 17:28, references on via the boot
         switch; tmp/rps_live/mystory_default_1act.log): "house DEFAULT_STORY ... by 'Jeffrey A.
         Brick'", "house My Story: the author's shipped photos of Jeffrey, MagnoliaRex", character
