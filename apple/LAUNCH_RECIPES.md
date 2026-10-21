@@ -167,10 +167,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_16gb_foley_open
 
 - file: `workflows/otr_16gb_foley_open.json`
-- workflow: `otr_16gb_foley_open` (16 GB NVIDIA -- the foley lane with every model open weights: ltx25_foley_16gb video, FLUX 3 Klein stills from text (no reference pictures), Kokoro voices, Stable Audio 3, Writer Gemma 4 12B, and the open Real-ESRGAN x2 upscale (spandrel_esrgan) instead of NVIDIA RTX Video Super Resolution, a closed SDK. Radio Play Studio's contest default (operator 2026-10-20: "we skip VSR, we stay open weight"; "flux 3 and esrgan").)
+- workflow: `otr_16gb_foley_open` (16 GB NVIDIA -- the foley lane with every model open weights: ltx25_foley_16gb video, FLUX 3 Klein stills from text (no reference pictures), Kokoro voices, Stable Audio 3, Writer Gemma 4 12B, and the 1080p step done by ffmpeg (Lanczos + unsharp, no model) instead of NVIDIA RTX Video Super Resolution, a closed SDK -- the most faithful of the three upscalers measured in apple/UPSCALERS.md. Radio Play Studio's contest default (operator 2026-10-21: "yes, switch to off").)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `542f48b8e7ef6bd517d3c735ac966ac9acbe61a255c71092fadb9fbb65b337b6`
+- master_hash: `ed2e57cc958639e208e98d8778690391b376d4588873bfacf9055e2f32edd395`
 
 ### ComfyUI launch
 
