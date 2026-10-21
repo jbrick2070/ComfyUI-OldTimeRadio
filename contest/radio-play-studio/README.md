@@ -130,13 +130,12 @@ language, acts, cast size, visual style and still model as usual and press **Mak
 
 ### Same faces in every shot
 
-The default workflow keeps every model open weights, and its stills paint each character from
-the written description on their cast card (plus a portrait-derived seed), so describe looks in
-fixed terms. For faces drawn **from** pictures, run the pack's reference workflow instead,
-`--workflow workflows/otr_16gb_foley_flux3_ref.json`: every character gets a portrait (or the
-photos on their card) and each still is painted from the portraits of everyone in the frame, so a
-face does not change from beat to beat. Its still model, FLUX 3 Klein, is open weights under the
-FLUX Kommunity License. On the default workflow a card's photo is reported as unused.
+Every model stays open weights. **Tell my own story** runs the default workflow's reference twin,
+`workflows/otr_16gb_foley_open_flux3_ref.json`, by itself: every character gets a portrait (or
+the photos on their card) and each still is painted from the portraits of everyone in the frame,
+so a face does not change from beat to beat. The other stories run `otr_16gb_foley_open.json`,
+which paints each character from the written description on their cast card, so describe looks
+in fixed terms. The still model, FLUX 3 Klein, is open weights under the FLUX Kommunity License.
 
 From the command line, the same boxes are flags. A card is one line of `--my-characters`, and a
 photo is a `Name = file` line naming a picture in ComfyUI's input folder:
