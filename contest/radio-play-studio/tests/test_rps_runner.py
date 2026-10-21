@@ -534,7 +534,10 @@ def test_a_my_story_run_uses_the_reference_twin_and_nothing_else_does(settings, 
     assert studio.workflow_for({}) == named
 
 
-def test_the_shipped_foley_graph_has_its_reference_twin():
-    from radio_play_studio.config import _checkout_workflow, reference_twin
-    twin = reference_twin(_checkout_workflow())
-    assert twin.name == "otr_16gb_foley_flux3_ref.json"
+def test_the_contest_default_is_the_open_weights_foley_graph():
+    """Operator, 2026-10-20: "we skip VSR, we stay open weight" -- the default
+    has no reference twin, so My Story runs it too (no reference pictures)."""
+    from radio_play_studio.config import WORKFLOW_NAME, _checkout_workflow, reference_twin
+    assert WORKFLOW_NAME == "otr_16gb_foley_open.json"
+    assert reference_twin(_checkout_workflow()).name == "otr_16gb_foley_open_flux3_ref.json"
+    assert not reference_twin(_checkout_workflow()).exists()

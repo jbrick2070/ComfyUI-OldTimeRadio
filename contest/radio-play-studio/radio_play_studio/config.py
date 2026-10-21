@@ -14,10 +14,12 @@ from urllib.parse import urlsplit
 
 DEFAULT_COMFYUI_URL = "http://127.0.0.1:8188"
 DEFAULT_API_URL = "http://127.0.0.1:8189"
-#: The contest default (operator, 2026-10-19: "i like foley better"): the 16 GB
-#: NVIDIA lane where LTX 2.5 films each beat with its own sound under the voices.
-#: Any other shipped graph runs with --workflow.
-WORKFLOW_NAME = "otr_16gb_foley.json"
+#: The contest default: the 16 GB NVIDIA foley lane, where LTX 2.5 films each beat
+#: with its own sound under the voices (operator, 2026-10-19: "i like foley
+#: better"), in its all-open-weights form -- FLUX 3 Klein stills and the open
+#: Real-ESRGAN upscale instead of NVIDIA RTX VSR (operator, 2026-10-20: "we skip
+#: VSR, we stay open weight"). Any other shipped graph runs with --workflow.
+WORKFLOW_NAME = "otr_16gb_foley_open.json"
 #: A workflow's reference twin sits beside it: the same graph with every
 #: character still painted from that character's reference picture
 #: (flux3_klein_ref). My Story runs use it when it exists -- the one story whose

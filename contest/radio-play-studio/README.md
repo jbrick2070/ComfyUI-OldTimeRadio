@@ -59,10 +59,10 @@ Tell the app where the pack is, by any one of:
 ```
 set OTR_PACK_DIR=C:\path\to\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio     (or export on macOS/Linux)
 set COMFYUI_DIR=C:\path\to\ComfyUI
-python -m radio_play_studio ... --workflow C:\path\to\otr_16gb_foley.json
+python -m radio_play_studio ... --workflow C:\path\to\otr_16gb_foley_open.json
 ```
 
-(Run from a checkout of the pack and it finds `workflows/otr_16gb_foley.json` itself.)
+(Run from a checkout of the pack and it finds `workflows/otr_16gb_foley_open.json` itself.)
 
 ## Run
 
@@ -95,7 +95,9 @@ python -m radio_play_studio export-graph graph_api.json     # the exact graph th
 one is tuned for: for example `workflows/otr_8gb_ltx25_foley.json` on an 8 GB card,
 `workflows/otr_16gb_video.json` for silent LTX video on 16 GB, `workflows/otr_16gb_still.json`
 for a still with motion (minutes, not an hour), or `workflows/otr_app.json` for the pack's
-any-machine graph. The default is `otr_16gb_foley.json`.
+any-machine graph. The default is `otr_16gb_foley_open.json`: the 16 GB foley lane with every
+model open weights (FLUX 3 Klein stills, the open Real-ESRGAN upscale). `otr_16gb_foley.json` is the
+same lane with NVIDIA RTX Video Super Resolution, a closed SDK.
 
 ## Tell your own story
 

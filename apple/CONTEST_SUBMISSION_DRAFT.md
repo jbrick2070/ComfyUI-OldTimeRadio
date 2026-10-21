@@ -10,9 +10,12 @@ draft to paste from; every number is from a logged run on 2026-10-19.
 - [ ] **Social post** tagging #OpenSourceHiggsfield (X, IG, Reddit, TikTok...) -- the operator posts.
 - [x] **Code link that will not move:** operator 2026-10-20, "merge the contest branch into main
       now so the code link does not move" -- the app is on `main`.
-- [x] **Upscaler decision -- KEEP RTX VSR (operator 2026-10-20).** NVIDIA RTX Video Super
-      Resolution is a closed NVIDIA SDK that runs locally, so **do not tick Open Weights Only**;
-      Q11 says so plainly.
+- [x] **Open weights -- DECIDED (operator 2026-10-20: "we skip VSR, we stay open weight";
+      "flux 3 and esrgan"; "we skip the ref images").** The submission runs
+      `workflows/otr_16gb_foley_open.json` (main 4c43ea10): FLUX 3 Klein stills from text, the open
+      Real-ESRGAN x2 upscale instead of NVIDIA RTX VSR. **Tick Open Weights Only.**
+- [ ] **Demo render on that exact workflow** (operator: "we need another run with ESRGAN for our
+      demo to be precise") -- then cut the under-2-minute video from it.
 - [ ] README: replace "Demo video: to be recorded" with the link.
 
 ## Q1. Tell us about yourself (required)
@@ -51,16 +54,12 @@ converts to an API graph against the server's live /object_info.
 
 ## Q8. List all generative models used
 - **Gemma 4 12B** (int8, run by ComfyUI itself) -- writes the story, the cast and every line.
-- **FLUX 3 Image Klein** (Black Forest Labs, FLUX Kommunity License; int8 model, Qwen3-VL-4B
-  encoder, Flux 2 VAE) -- every still. Character stills are painted from each character's
-  reference portrait (reference latents), so every face holds from shot to shot; a person's own
-  photo can be the reference for a character's portrait (workflow `otr_16gb_foley_flux3_ref`).
+- **FLUX 3 Image Klein** (Black Forest Labs, open weights under the FLUX Kommunity License; int8
+  model, Qwen3-VL-4B encoder, Flux 2 VAE) -- a still for every beat, from text.
 - **LTX 2.5** (mix4x8 DiT + w4a8 encoder, 16 GB foley lane) -- films every beat, with its own sound.
 - **Kokoro** -- a voice for every character and the announcer.
 - **Stable Audio 3** -- the theme music.
-- Upscale: **NVIDIA RTX Video Super Resolution** (local; a closed NVIDIA SDK, not open weights).
-- (The plain `otr_16gb_foley` workflow paints from text with **MOSS-Image SFT**, Apache-2.0; the
-  submission uses the reference workflow above.)
+- **Real-ESRGAN x2** (open weights, via spandrel) -- the 1080p upscale.
 
 ## Q9. Other tools or techniques used
 - comfy-api-proxy (Comfy API v2 bridge) and a standard-library Python web app (no build step).
@@ -76,18 +75,16 @@ converts to an API graph against the server's live /object_info.
 ## Q10. Which category or categories does your submission best fit?
 - **Most Innovative** -- nobody else's entry makes a whole story: one press yields a written,
   cast-locked, shot-locked radio drama with voices, music and foley.
-- (Not Open Weights Only: the upscaler is NVIDIA RTX VSR, a closed SDK -- operator's call.)
+- **Open Weights Only** -- every model is open weights (workflow `otr_16gb_foley_open`).
 - **LTX bonus** -- LTX 2.5 is the core video model (every beat is filmed by it).
 - (Best Overall: every entry is considered automatically.)
 
 ## Q11. Is your stack fully open?
-**Operator decision 2026-10-20: (a) keep FLUX 3 Klein with references and say so plainly.**
-Open weights only: every model runs locally from public weights, no partner nodes, no closed APIs,
-no Comfy Cloud calls; the app and the node pack are MIT. One honest caveat: FLUX 3 Image Klein's
-weights are open but under the FLUX Kommunity License (free for non-commercial use; commercial use
-only under US$5M a year), not an open-source licence -- it is what keeps every face consistent.
-The one closed piece is the upscaler: NVIDIA RTX Video Super Resolution, a local NVIDIA SDK
-(operator kept it for picture quality), so we do not enter Open Weights Only.
+Yes -- open weights only (operator 2026-10-20: "we stay open weight"). Every model runs locally
+from public weights: Gemma 4 12B, FLUX 3 Klein, LTX 2.5, Kokoro, Stable Audio 3 and Real-ESRGAN.
+No partner nodes, no closed APIs, no Comfy Cloud calls, no closed upscaler (RTX VSR is swapped for
+Real-ESRGAN). The app and the node pack are MIT. Licence note for honesty: FLUX 3 Klein's open
+weights come under the FLUX Kommunity License (non-commercial above US$5M a year).
 
 ## Q12. Agreements -- **operator.**
 
