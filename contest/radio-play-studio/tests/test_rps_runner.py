@@ -1,0 +1,543 @@
+"""Driving a run through the SDK, with the SDK and the server faked."""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import pytest
+
+from radio_play_studio.graph import ServerUnreachable
+from radio_play_studio.runner import (
+    EpisodeMissing, ProgressClock, Studio, describe_failure, is_transient, load_timing, make_client,
+    normalize_event, pick_episode_output, save_timing, settle, timing_path,
+)
+
+
+# Named like the SDK's event classes: the app matches on the class name.
+class Progress:
+    def __init__(self, value, message=None):
+        self.value, self.message = value, message
+
+
+class StatusChange:
+    def __init__(self, status):
+        self.status = status
+
+
+class Preview:
+    pass
+
+
+class FakeOutput:
+    def __init__(self, name, payload=b"video-bytes"):
+        self.name, self._payload = name, payload
+
+    def to_file(self, path):
+        with open(path, "wb") as handle:
+            handle.write(self._payload)
+
+
+class OutputReady:
+    def __init__(self, output):
+        self.output = output
+
+
+class FakeJob:
+    def __init__(self, events, outputs, fail=None):
+        self._events, self.outputs, self._fail = events, outputs, fail
+        self.seen_result = False
+
+    def events(self):
+        yield from self._events
+
+    def wait(self, timeout=None):
+        return self
+
+    def result(self):
+        if self._fail:
+            raise self._fail
+        self.seen_result = True
+        return self
+
+    def get_outputs(self, node_id):
+        assert self.seen_result, "outputs are only read after the job is confirmed finished"
+        return [o for o in self.outputs if getattr(o, "node_id", node_id) == node_id]
+
+
+class FakeClient:
+    def __init__(self, job):
+        self._job, self.submitted = job, None
+        self.workflows = self
+
+    def from_json(self, graph):
+        self.submitted = graph
+        return graph
+
+    def submit(self, workflow):
+        return self._job
+
+
+def _studio(settings, schemas, job):
+    client = FakeClient(job)
+    studio = Studio(settings, client_factory=lambda url: client, fetch=lambda url: schemas)
+    return studio, client
+
+
+def _good_job():
+    video = FakeOutput("otr_episode.mp4")
+    video.node_id = "9"
+    poster = FakeOutput("poster.png")
+    poster.node_id = "9"
+    return FakeJob([StatusChange("running"), Progress(0.5, "writing"), Preview(), OutputReady(poster)],
+                   [poster, video])
+
+
+def test_normalize_event_keeps_what_the_page_shows():
+    assert normalize_event(Progress(0.25, "casting")) == {"type": "progress", "value": 0.25, "message": "casting"}
+    assert normalize_event(Progress(0.5)) == {"type": "progress", "value": 0.5, "message": ""}
+    assert normalize_event(StatusChange("running")) == {"type": "status", "status": "running"}
+    assert normalize_event(OutputReady(FakeOutput("a.png"))) == {"type": "output", "name": "a.png"}
+    assert normalize_event(Preview()) is None
+
+
+def test_one_stage_steps_never_read_as_the_episode_share():
+    # The shapes comfy-api-proxy 0.1.6 sends: ComfyUI's per-node `progress`
+    # (nodes_total=0) and the graph-wide `progress_state`.
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    sampler = RealProgress(value=1.0, nodes_done=0, nodes_total=0, current_node="7", step=16, steps=16)
+    assert normalize_event(sampler) == {"type": "step", "value": 1.0, "step": 16, "steps": 16}
+
+    # progress_state counts only STARTED nodes, so one finished node is 1 of 1
+    # (value 1.0) from the proxy; out of a 22-node graph it is 1 of 22.
+    first = RealProgress(value=1.0, nodes_done=1, nodes_total=1, current_node=None)
+    assert normalize_event(first, 22) == {"type": "progress", "value": 1 / 22, "message": "",
+                                          "nodes_done": 1, "nodes_total": 22}
+    # A running node adds its own share of one node's width.
+    mid = RealProgress(value=0.59, nodes_done=1, nodes_total=2, current_node="7", step=4, steps=16)
+    assert normalize_event(mid, 20)["value"] == pytest.approx((1 + 0.25) / 20)
+    # Without the graph size there is nothing better than the proxy's own number.
+    assert normalize_event(first)["value"] == 1.0
+
+
+def test_normalize_event_reads_the_real_sdk_classes():
+    sdk = pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import OutputReady as RealOutput, Progress as RealProgress, StatusChange as RealStatus
+    assert normalize_event(RealProgress(value=0.4, message=None)) == {"type": "progress", "value": 0.4, "message": ""}
+    assert normalize_event(RealStatus(status="succeeded")) == {"type": "status", "status": "succeeded"}
+    assert normalize_event(RealOutput(output=FakeOutput("e.mp4")))["name"] == "e.mp4"
+    assert sdk is not None
+
+
+def test_a_run_streams_events_then_saves_the_video(settings, schemas):
+    studio, client = _studio(settings, schemas, _good_job())
+    events = list(studio.stream({"bank": "shakespeare"}))
+    kinds = [e["type"] for e in events]
+    assert kinds == ["submitted", "status", "progress", "output", "done"]
+    done = events[-1]
+    saved = settings.out_dir / done["run"] / done["file"]
+    assert done["file"] == "otr_episode.mp4" and saved.read_bytes() == b"video-bytes"
+    assert client.submitted["7"]["inputs"]["source_bank"] == "shakespeare"
+
+
+def test_the_client_is_made_for_the_local_bridge(settings, schemas):
+    seen = []
+    client = FakeClient(_good_job())
+    studio = Studio(settings, client_factory=lambda url: seen.append(url) or client, fetch=lambda url: schemas)
+    list(studio.stream({}))
+    assert seen == ["http://bridge.invalid"]
+
+
+def test_make_client_never_leaves_the_sdk_on_comfy_cloud(monkeypatch):
+    pytest.importorskip("comfy_sdk")
+    monkeypatch.delenv("COMFY_BASE_URL", raising=False)
+    monkeypatch.delenv("COMFY_API_KEY", raising=False)
+    make_client("http://127.0.0.1:8189")
+    assert os.environ["COMFY_BASE_URL"] == "http://127.0.0.1:8189"
+
+
+def test_a_failed_job_ends_the_stream_with_an_error(settings, schemas):
+    class JobFailed(Exception):
+        error = {"node": "OTR_Foo"}
+    job = FakeJob([StatusChange("running")], [], fail=JobFailed("job x ended failed"))
+    studio, _ = _studio(settings, schemas, job)
+    events = list(studio.stream({}))
+    assert events[-1]["type"] == "error" and "OTR_Foo" in events[-1]["message"]
+    assert not any(e["type"] == "done" for e in events)
+
+
+def test_a_finished_job_with_no_video_is_not_a_finished_episode(settings, schemas):
+    poster = FakeOutput("poster.png")
+    poster.node_id = "9"
+    studio, _ = _studio(settings, schemas, FakeJob([], [poster]))
+    last = list(studio.stream({}))[-1]
+    assert last["type"] == "error" and "no video" in last["message"]
+
+
+def test_an_empty_file_is_not_a_saved_episode(settings, schemas):
+    video = FakeOutput("otr_episode.mp4", payload=b"")
+    video.node_id = "9"
+    studio, _ = _studio(settings, schemas, FakeJob([], [video]))
+    last = list(studio.stream({}))[-1]
+    assert last["type"] == "error" and "was not saved" in last["message"]
+
+
+def test_bad_choices_end_the_stream_before_anything_is_submitted(settings, schemas):
+    studio, client = _studio(settings, schemas, _good_job())
+    last = list(studio.stream({"bank": "not a bank"}))[-1]
+    assert last["type"] == "error" and client.submitted is None
+
+
+def test_pick_episode_output_takes_only_the_mux_nodes_video():
+    mux_video = FakeOutput("a.mp4")
+    mux_video.node_id = "9"
+    silent_cut = FakeOutput("silent_cut.mp4")
+    silent_cut.node_id = "4"
+
+    class Job:
+        outputs = [silent_cut, mux_video]
+        def get_outputs(self, node_id):
+            return [o for o in self.outputs if o.node_id == node_id]
+    assert pick_episode_output(Job(), "9") is mux_video
+    with pytest.raises(EpisodeMissing, match="OTR_OBS_DIR"):
+        pick_episode_output(Job(), "55")
+
+
+def test_the_silent_cut_is_never_reported_as_the_episode(settings, schemas):
+    """Seen against the real SDK: with the published file outside ComfyUI's
+    output folder the mux node offers no video, and the silent cut's mp4 was
+    the only one left."""
+    silent_cut = FakeOutput("silent_cut.mp4")
+    silent_cut.node_id = "4"
+    poster = FakeOutput("poster.png")
+    poster.node_id = "9"
+    studio, _ = _studio(settings, schemas, FakeJob([], [silent_cut, poster]))
+    events = list(studio.stream({}))
+    assert events[-1]["type"] == "error" and not any(e["type"] == "done" for e in events)
+    assert not settings.out_dir.exists() or not any(settings.out_dir.rglob("silent_cut.mp4"))
+
+
+class Flaky(Exception):
+    def __init__(self, status):
+        super().__init__(f"HTTP {status}")
+        self.http_status = status
+
+
+class PollingJob(FakeJob):
+    """A job whose first polls fail the way a restarting bridge does."""
+    def __init__(self, failures, still_running=0, **kw):
+        super().__init__([], [], **kw)
+        self._failures, self._running = list(failures), still_running
+
+    def wait(self, timeout=None):
+        if self._failures:
+            raise self._failures.pop(0)
+        if self._running:
+            self._running -= 1
+            raise TimeoutError("not terminal yet")
+        return self
+
+
+def test_settle_rides_out_a_restarting_bridge_and_a_long_render():
+    pauses = []
+    job = PollingJob([Flaky(503), ConnectionError("reset"), Flaky(429)], still_running=3)
+    assert settle(job, sleep=pauses.append) is job
+    assert pauses == [2.0, 4.0, 8.0] and job.seen_result
+
+
+def test_settle_gives_up_on_a_bridge_that_stays_down():
+    job = PollingJob([Flaky(503)] * 50)
+    with pytest.raises(Flaky):
+        settle(job, sleep=lambda s: None)
+
+
+def test_settle_does_not_retry_a_verdict():
+    class JobFailed(Exception):
+        error = "node died"
+    job = PollingJob([], fail=JobFailed("failed"))
+    with pytest.raises(JobFailed):
+        settle(job, sleep=lambda s: pytest.fail("a failed job must not be retried"))
+    with pytest.raises(Flaky):                       # a 404 is the job being gone, not a blip
+        settle(PollingJob([Flaky(404)]), sleep=lambda s: None)
+
+
+def test_is_transient_reads_status_and_connection_errors():
+    assert is_transient(Flaky(502)) and is_transient(Flaky(429)) and is_transient(ConnectionResetError())
+    assert not is_transient(Flaky(404)) and not is_transient(ValueError("x"))
+
+
+def test_a_lost_event_stream_does_not_stop_a_healthy_run(settings, schemas):
+    class DeadStream(FakeJob):
+        def events(self):
+            raise Flaky(503)
+            yield  # pragma: no cover - makes this a generator
+    video = FakeOutput("otr_episode.mp4")
+    video.node_id = "9"
+    studio, _ = _studio(settings, schemas, DeadStream([], [video]))
+    events = list(studio.stream({}))
+    assert [e["type"] for e in events] == ["submitted", "note", "done"]
+
+
+def test_make_client_refuses_a_blank_bridge_address(monkeypatch):
+    monkeypatch.setenv("COMFY_BASE_URL", "http://127.0.0.1:8189")
+    for bad in ("", " ", "/", "cloud.comfy.org", "ftp://host"):
+        with pytest.raises(ValueError):
+            make_client(bad)
+    assert os.environ["COMFY_BASE_URL"] == "http://127.0.0.1:8189"
+
+
+def test_options_come_from_the_live_server(settings, schemas):
+    studio, _ = _studio(settings, schemas, _good_job())
+    assert {r["key"] for r in studio.options()} >= {"bank", "acts", "cast_size"}
+
+
+def test_an_unreachable_server_surfaces_as_such(settings):
+    def down(url):
+        raise ServerUnreachable("no ComfyUI")
+    studio = Studio(settings, fetch=down)
+    with pytest.raises(ServerUnreachable):
+        studio.options()
+    assert list(studio.stream({}))[-1] == {"type": "error", "message": "ServerUnreachable: no ComfyUI"}
+
+
+def test_describe_failure_includes_node_detail_when_the_sdk_gives_it():
+    class E(Exception):
+        error = "boom"
+    assert describe_failure(E("failed")) == "E: failed (boom)"
+    assert describe_failure(ValueError("x")) == "ValueError: x"
+
+
+class FakeClock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+
+def test_the_clock_has_nothing_to_say_without_a_history():
+    clock = ProgressClock({}, now=FakeClock())
+    assert not clock.calibrated
+
+
+def test_the_clock_weights_each_node_by_its_last_run_seconds():
+    # Last run: writer 600 s, video 3000 s, mux 400 s (4000 s in all).
+    t = FakeClock()
+    clock = ProgressClock({"1": 600, "92": 3000, "85": 400}, now=t)
+    clock.observe("1")
+    t.t = 300
+    assert clock.share() == pytest.approx(300 / 4000)
+    t.t = 600
+    clock.observe("92")              # writer finished: its full 600 s counts
+    t.t = 600 + 1500
+    assert clock.share() == pytest.approx((600 + 1500) / 4000)
+    assert clock.seconds_left() == pytest.approx(4000 - 2100)
+    t.t = 600 + 9000                 # far slower than last time: held under the node's share
+    assert clock.share() == pytest.approx((600 + 0.95 * 3000) / 4000)
+    clock.observe(None)
+    assert clock.timings() == {"1": 600, "92": 9000}
+
+
+def test_a_good_run_saves_its_times_and_the_next_run_reads_the_clock(settings, schemas):
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+
+    class Ticking:
+        t = 0.0
+
+        def __call__(self):
+            self.t += 10.0
+            return self.t
+
+    def job():
+        j = _good_job()
+        j._events = [RealProgress(value=0.5, nodes_done=1, nodes_total=2, current_node="2"),
+                     RealProgress(value=1.0, nodes_done=2, nodes_total=2, current_node=None)] + list(j._events)
+        return j
+
+    first = list(Studio(settings, client_factory=lambda url: FakeClient(job()),
+                        fetch=lambda url: schemas, now=Ticking()).stream({}))
+    assert first[-1]["type"] == "done"
+    assert "minutes_left" not in [e for e in first if e["type"] == "progress"][0]
+    saved = next((settings.out_dir / "timing").glob("*.acts-1.*.json"))   # the fixture's act_count
+    assert load_timing(saved).get("2", 0) > 0
+
+    second = list(Studio(settings, client_factory=lambda url: FakeClient(job()),
+                         fetch=lambda url: schemas, now=Ticking()).stream({}))
+    calibrated = [e for e in second if e["type"] == "progress"]
+    assert calibrated and all("minutes_left" in e and 0.0 <= e["value"] <= 0.99 for e in calibrated)
+
+
+def test_a_failed_run_saves_no_times(settings, schemas):
+    studio, _ = _studio(settings, schemas, FakeJob([StatusChange("running")], [], fail=RuntimeError("boom")))
+    assert list(studio.stream({}))[-1]["type"] == "error"
+    assert not (settings.out_dir / "timing").exists()
+
+
+def test_a_lost_stream_saves_no_times(settings, schemas):
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+
+    class Dropping(FakeJob):
+        def events(self):
+            yield RealProgress(value=0.1, nodes_done=0, nodes_total=1, current_node="1")
+            raise ConnectionError("stream dropped")
+
+    good = _good_job()
+    job = Dropping(list(good._events), good.outputs)
+    studio, _ = _studio(settings, schemas, job)
+    events = list(studio.stream({}))
+    assert events[-1]["type"] == "done"
+    assert not (settings.out_dir / "timing").exists()
+
+
+def test_saved_times_keep_nodes_this_run_served_from_cache(tmp_path):
+    path = tmp_path / "timing" / "w.acts-1.json"
+    save_timing(path, {"1": 600.0, "92": 3000.0})
+    save_timing(path, {"92": 2800.0})          # node 1 came from ComfyUI's cache
+    # Node 1 keeps its time; node 92 moves halfway to this run's (a running average).
+    assert load_timing(path) == {"1": 600.0, "92": 2900.0}
+    assert list(path.parent.iterdir()) == [path]   # no side file left behind
+
+
+def test_a_step_frame_without_a_node_does_not_end_the_running_node(settings, schemas):
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    graph, _ = Studio(settings, fetch=lambda url: schemas).build_graph({})
+    save_timing(timing_path(settings.out_dir, settings.workflow_path, "1", graph), {"1": 100.0, "2": 100.0})
+    good = _good_job()
+    good._events = [RealProgress(value=0.0, nodes_done=0, nodes_total=1, current_node="1"),
+                    RealProgress(value=0.5, nodes_done=0, nodes_total=0, current_node=None, step=1, steps=2)]
+    studio = Studio(settings, client_factory=lambda url: FakeClient(good), fetch=lambda url: schemas,
+                    now=FakeClock())          # time stands still
+    shares = [e["value"] for e in studio.stream({}) if e["type"] == "progress"]
+    # Had the node-less frame closed node 1, its full 100 s would count: 0.5.
+    assert shares == [0.0, 0.0]
+
+
+def test_a_reconnected_stream_saves_no_times(settings, schemas):
+    good = _good_job()
+    good._events = [StatusChange("running"), Progress(0.5), StatusChange("running")] + list(good._events[1:])
+    studio, _ = _studio(settings, schemas, good)
+    assert list(studio.stream({}))[-1]["type"] == "done"
+    assert not (settings.out_dir / "timing").exists()
+
+
+def test_a_renumbered_graph_does_not_read_old_times(tmp_path):
+    a = {"1": {"class_type": "W"}, "92": {"class_type": "V"}}
+    b = {"1": {"class_type": "W"}, "93": {"class_type": "V"}}
+    assert timing_path(tmp_path, Path("w.json"), 1, a) != timing_path(tmp_path, Path("w.json"), 1, b)
+    assert timing_path(tmp_path, Path("w.json"), 1, a) == timing_path(tmp_path, Path("w.json"), 1, dict(a))
+
+
+def test_a_starved_stream_saves_no_times(settings, schemas):
+    # A second listener on the same ComfyUI client id takes the job's messages:
+    # this stream then sees the first node or two and then nothing until the end.
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    good = _good_job()
+    graph, _ = Studio(settings, fetch=lambda url: schemas).build_graph({})
+    starved = [RealProgress(value=0.0, nodes_done=0, nodes_total=1, current_node="1")]
+    good._events = starved + list(good._events)
+    studio, _ = _studio(settings, schemas, good)
+    assert len(graph) >= 2
+    assert list(studio.stream({}))[-1]["type"] == "done"
+    assert not (settings.out_dir / "timing").exists()
+
+
+def test_a_stream_starved_late_mid_node_saves_no_times(settings, schemas):
+    # Half the graph finished, then the stream went quiet while a node was still
+    # running: the last graph-wide frame never says "all started nodes done".
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    good = _good_job()
+    graph, _ = Studio(settings, fetch=lambda url: schemas).build_graph({})
+    late = [RealProgress(value=0.9, nodes_done=len(graph), nodes_total=len(graph) + 1, current_node="9")]
+    good._events = late + list(good._events)
+    studio, _ = _studio(settings, schemas, good)
+    assert list(studio.stream({}))[-1]["type"] == "done"
+    assert not (settings.out_dir / "timing").exists()
+
+
+def test_a_node_that_draws_its_own_forward_bar_moves_the_episode_by_it():
+    # Video (92) draws render frames done of the episode since ec55add4.
+    t = FakeClock()
+    clock = ProgressClock({"1": 100.0, "92": 900.0}, now=t)
+    clock.observe("1")
+    t.t = 100
+    clock.observe("92")
+    clock.bar("92", 0, 1)                   # ComfyUI's start frame: ignored
+    clock.bar("92", 291, 2910)
+    assert clock.fraction() == pytest.approx(0.1)
+    assert clock.share() == pytest.approx((100 + 0.1 * 900) / 1000)
+    t.t = 100 + 120                          # a tenth done after two minutes
+    assert clock.seconds_left() == pytest.approx(120 * 0.9 / 0.1)
+
+
+def test_a_bar_that_resets_is_never_trusted_again():
+    t = FakeClock()
+    clock = ProgressClock({"91": 100.0}, now=t)
+    clock.observe("91")
+    clock.bar("91", 7, 8)
+    clock.bar("91", 1, 8)                    # the next picture's sampler starts over
+    clock.bar("91", 8, 8)
+    assert clock.fraction() is None
+    t.t = 30
+    assert clock.share() == pytest.approx(30 / 100)
+
+
+def test_early_in_a_node_the_saved_time_says_how_long_is_left():
+    t = FakeClock()
+    clock = ProgressClock({"92": 900.0}, now=t)
+    clock.observe("92")
+    clock.bar("92", 10, 1000)                # 1% in: too early to trust its pace
+    t.t = 40
+    assert clock.seconds_left() == pytest.approx(900 - 40)
+
+
+def test_the_stream_reads_the_running_nodes_own_bar(settings, schemas):
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    graph, _ = Studio(settings, fetch=lambda url: schemas).build_graph({})
+    save_timing(timing_path(settings.out_dir, settings.workflow_path, "1", graph), {"9": 1000.0})
+    good = _good_job()
+    good._events = [RealProgress(value=0.0, nodes_done=0, nodes_total=1, current_node="9", step=0, steps=1),
+                    RealProgress(value=0.5, nodes_done=0, nodes_total=0, current_node="9", step=500, steps=1000)]
+    studio = Studio(settings, client_factory=lambda url: FakeClient(good), fetch=lambda url: schemas,
+                    now=FakeClock())          # time stands still: only the bar can move the share
+    shares = [e["value"] for e in studio.stream({}) if e["type"] == "progress"]
+    assert shares[-1] == pytest.approx(0.5)
+
+
+def test_a_node_whose_bar_resets_never_moves_the_episode_back():
+    t = FakeClock()
+    clock = ProgressClock({"91": 100.0}, now=t)
+    clock.observe("91")
+    clock.bar("91", 80, 100)
+    high = clock.share()
+    t.t = 10
+    clock.bar("91", 1, 100)                  # reset: distrusted, time says 10%
+    assert clock.share() == pytest.approx(high)
+
+
+def test_a_my_story_run_uses_the_reference_twin_and_nothing_else_does(settings, schemas):
+    """Operator, 2026-10-20: the 16 GB foley graph with FLUX 3 Klein reference
+    stills is for My Story; every other story keeps the workflow as named."""
+    from radio_play_studio.runner import Studio
+    studio = Studio(settings, client_factory=lambda url: None, fetch=lambda url: schemas)
+    named = settings.workflow_path
+    assert studio.workflow_for({"bank": "my_story"}) == named        # no twin yet
+    twin = named.with_name(named.stem + "_flux3_ref.json")
+    twin.write_text(named.read_text(encoding="utf-8"), encoding="utf-8")
+    assert studio.workflow_for({"bank": "my_story"}) == twin
+    assert studio.workflow_for({"bank": "shakespeare"}) == named
+    assert studio.workflow_for({}) == named
+
+
+def test_the_contest_default_is_the_open_weights_foley_graph():
+    """Operator, 2026-10-20: "we skip VSR, we stay open weight" -- the default
+    has no reference twin, so My Story runs it too (no reference pictures)."""
+    from radio_play_studio.config import WORKFLOW_NAME, _checkout_workflow, reference_twin
+    assert WORKFLOW_NAME == "otr_16gb_foley_open.json"
+    assert reference_twin(_checkout_workflow()).name == "otr_16gb_foley_open_flux3_ref.json"
+    assert not reference_twin(_checkout_workflow()).exists()

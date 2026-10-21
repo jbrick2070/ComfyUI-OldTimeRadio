@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Play Studio</title>
+<style>
+  :root {
+    --bg: #f4efe6; --panel: #fffdf8; --ink: #2a2118; --muted: #6f6254;
+    --line: #d9ccb8; --accent: #b4491f; --accent-ink: #fff8f0; --ok: #2f6b3a; --bad: #a3261a;
+    --bar: #e5d9c5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17130f; --panel: #211b15; --ink: #f0e6d6; --muted: #a89a86;
+      --line: #3a3026; --accent: #e0703f; --accent-ink: #1a1007; --ok: #7ec28a; --bad: #f08a7e;
+      --bar: #3a3026;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 Georgia, "Times New Roman", serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 2rem; margin: 0 0 4px; letter-spacing: .02em; }
+  .tag { color: var(--muted); margin: 0 0 24px; }
+  fieldset { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+             padding: 16px; margin: 0 0 16px; }
+  legend { padding: 0 8px; font-weight: bold; }
+  label { display: block; margin: 12px 0 4px; font-weight: bold; }
+  .help { color: var(--muted); font-size: .875rem; margin: 2px 0 0; }
+  select, input, textarea { width: 100%; padding: 8px 10px; font: inherit; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+  textarea { min-height: 72px; resize: vertical; }
+  button { font: inherit; font-weight: bold; padding: 12px 22px; border: 0; border-radius: 8px;
+           background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #bar { height: 10px; background: var(--bar); border-radius: 5px; overflow: hidden; margin: 12px 0 6px; }
+  #fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  #status { color: var(--muted); min-height: 1.5em; }
+  #error { color: var(--bad); white-space: pre-wrap; }
+  #notice { color: var(--bad); }
+  video { width: 100%; border-radius: 8px; background: #000; margin-top: 12px; }
+  .done a { color: var(--ok); }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 16px; }
+  @media (max-width: 560px) { .modes { grid-template-columns: 1fr; } }
+  .mode { display: block; margin: 0; padding: 14px 16px; border: 2px solid var(--line);
+          border-radius: 10px; background: var(--panel); cursor: pointer; font-weight: normal; }
+  .mode strong { display: block; font-size: 1.1rem; }
+  .mode span { color: var(--muted); font-size: .875rem; }
+  .mode input { width: auto; margin: 0 6px 0 0; }
+  .mode:has(input:checked) { border-color: var(--accent); }
+  [hidden] { display: none !important; }
+  .cast { display: grid; gap: 12px; margin-top: 8px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg);
+          display: grid; grid-template-columns: 96px 1fr; gap: 12px; }
+  @media (max-width: 560px) { .card, .card .who { grid-template-columns: 1fr; } }
+  .face { width: 96px; height: 96px; border-radius: 8px; border: 1px dashed var(--line);
+          display: flex; align-items: center; justify-content: center; overflow: hidden;
+          color: var(--muted); font-size: 2rem; background: var(--panel); }
+  .face img { width: 100%; height: 100%; object-fit: cover; }
+  .thumbs { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .thumb { position: relative; width: 48px; height: 48px; border-radius: 6px; overflow: hidden;
+           border: 1px solid var(--line); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .thumb button { position: absolute; top: 0; right: 0; padding: 0 5px; font-size: .75rem;
+                  border-radius: 0 0 0 6px; }
+  .card .who { display: grid; grid-template-columns: 1fr 120px; gap: 8px; }
+  .card label { margin: 6px 0 2px; font-size: .875rem; }
+  .card textarea { min-height: 56px; }
+  .card .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .small { padding: 6px 12px; font-size: .875rem; }
+  .quiet { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .castbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Radio Play Studio</h1>
+  <p class="tag">Press the button. Your own ComfyUI writes, casts, performs and films a radio play.</p>
+
+  <p id="notice" hidden></p>
+  <form id="form"></form>
+  <button id="go" type="submit" form="form" disabled>Make the episode</button>
+
+  <section id="run" hidden aria-live="polite">
+    <div id="bar"><div id="fill"></div></div>
+    <p id="status"></p>
+    <p id="error" hidden></p>
+    <div id="result" class="done" hidden></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const form = $("form"), go = $("go");
+let fields = [];
+let running = false;   // an episode is being made: Make stays off
+
+function control(f) {
+  let el;
+  if (f.kind === "choice") {
+    el = document.createElement("select");
+    for (const c of f.choices) {
+      const o = document.createElement("option");
+      o.value = o.textContent = String(c);
+      el.appendChild(o);
+    }
+    if (f.default != null) el.value = String(f.default);
+  } else if (f.kind === "int" || f.kind === "float") {
+    el = document.createElement("input");
+    el.type = "number";
+    if (f.min != null) el.min = f.min;
+    if (f.max != null) el.max = f.max;
+    el.step = f.kind === "int" ? 1 : "any";
+    if (f.default != null) el.value = f.default;
+  } else if (f.multiline) {
+    el = document.createElement("textarea");
+    el.value = f.default || "";
+  } else {
+    el = document.createElement("input");
+    el.type = "text";
+    el.value = f.default || "";
+  }
+  if (f.kind === "text" && f.placeholder) el.placeholder = f.placeholder;   // the pack's own example
+  el.id = "f_" + f.key;
+  return el;
+}
+
+// The bank that reads the four My Story boxes (the pack's own name for it).
+const MY_STORY_BANK = "my_story", MY_STORY_GROUP = "My story";
+let lastBank = null;
+
+function build(list) {
+  fields = list;
+  form.textContent = "";
+  const boxes = {};
+  for (const f of list) {
+    if (!boxes[f.group]) {
+      const box = document.createElement("fieldset");
+      box.id = "group_" + f.group.replace(/\W+/g, "_");
+      const lg = document.createElement("legend");
+      lg.textContent = f.group;
+      box.appendChild(lg);
+      boxes[f.group] = box;
+    }
+    const row = document.createElement("div");
+    row.id = "row_" + f.key;
+    const label = document.createElement("label");
+    label.htmlFor = "f_" + f.key;
+    label.textContent = f.label;
+    const help = document.createElement("p");
+    help.className = "help";
+    help.textContent = f.help;
+    row.append(label, control(f), help);
+    boxes[f.group].appendChild(row);
+    // The characters box is written by the cast cards, and the photos box with it.
+    if (f.key === "my_characters") boxes[f.group].appendChild(castEditor());
+    if (f.key === "my_characters" || f.key === "my_photos") row.hidden = true;
+  }
+  const bank = list.find((f) => f.key === "bank");
+  const ownStory = boxes[MY_STORY_GROUP] && bank && bank.choices.includes(MY_STORY_BANK);
+  if (ownStory) form.appendChild(modeSwitch());
+  if (ownStory) form.appendChild(boxes[MY_STORY_GROUP]);
+  for (const [name, box] of Object.entries(boxes)) if (!(ownStory && name === MY_STORY_GROUP)) form.appendChild(box);
+  if (ownStory) {
+    $("f_bank").addEventListener("change", () => setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic"));
+    setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic");
+  }
+  go.disabled = running;
+}
+
+// -- The cast cards: one per character, each with an optional photo ---------
+// They write the "Who is in it" text the pack's writer reads, one line per
+// character, and the "Name = file" photo lines. A photo is the reference the
+// character's portrait is painted from, and every still of them follows it.
+let cast = [];
+// The pack voices and draws every character as a man or a woman, so the card
+// offers exactly that, or leaves it to the writer.
+const VOICES = [["", "voice: any"], ["he", "he"], ["she", "she"]];
+
+// The example: the author's own story and characters (Jeffrey A. Brick,
+// "Mime Lung Music Festival", Part 2) -- the pack's built-in My Story, the
+// same words and the same shipped photos a blank My Story run uses.
+function bundled(names) {
+  return names.map((n) => ({file: n + " [bundled]", thumb: "/bundled-photos/" + n}));
+}
+const EXAMPLE = {
+  cast: [
+    {name: "Jeffrey", pronoun: "he",
+     who: "A former VJ who died of lung cancer in 2061 and lives on as a preserved mind in a government-run virtual afterlife; shy, devoted, makes live video art.",
+     look: "A lean man in his fifties with a long, narrow face, a long straight nose, deep-set eyes, prominent ears and light stubble; white mime face paint with small pink-red marks on the cheeks; a plain black long-sleeve shirt.",
+     photos: bundled(["jeffrey_1.jpg", "jeffrey_2.jpg", "jeffrey_3.jpg"])},
+    {name: "MagnoliaRex", pronoun: "she",
+     who: "An electronic music artist preserved in the same program in 2095; cool, guarded, science-literate, secretly tender.",
+     look: "An ageless adult woman with a warm medium-brown complexion, almond-shaped smoky eyes, full lips, a softly angular jaw and a small knowing smile. Long, wavy honey-brown hair with pastel pink and teal streaks and fine curtain bangs. A high-collared magnolia-white gown with silver embroidery and glowing silver wire-and-organza petal shoulders; no gold. Cool, composed, iconic.",
+     photos: bundled(["magnoliarex_1.jpg", "magnoliarex_2.jpg", "magnoliarex_3.jpg"])},
+    {name: "Cat", pronoun: "",
+     who: "A talking cat in Cairo who gives Jeffrey a clue.",
+     look: "An Egyptian-type adult cat, slender and long-limbed. Very short, smooth, dark gray to charcoal fur, a wedge-shaped head, large almond-shaped eyes, large upright ears, a long tapered tail. Elegant, alert, intelligent."},
+  ],
+  my_plot: "Jeffrey wins MagnoliaRex's contest prize, a day with a fan, at a UN festival in Athens celebrating the cure for cancer, and the day never ends. She warns, 'We won't be like this forever.' Then comes a 207-concert charity world tour and a Valentine's riddle chase from the space station to Cairo, where a talking cat gives Jeffrey a clue, to Zurich and to alien sculptors on a far planet; meanwhile in the real world, climate collapse is breaking the machines that keep the preserved minds alive. At the end, a self-flying copper plane takes them to a frozen, empty Seoul with ten days left. A meteor has wrecked the generator that keeps them running, and their satellite lasers go astray. She says 'I love you,' then plays him a duet she secretly made from his recorded voice. At 11:59 p.m. on January 25: 'Bon voyage, Jeffrey! Have a wonderful time!'",
+  my_setting: "A virtual afterlife in the year 2095, where minds borrow robots and drones; Athens, festival grounds, a world tour, a frozen, empty Seoul in January.",
+  my_author: "Jeffrey A. Brick",
+};
+
+function castLines() {
+  const people = cast.filter((c) => c.name.trim());
+  const text = people.map((c) => {
+    const name = c.name.trim() + (c.pronoun ? " (" + c.pronoun + ")" : "");
+    const who = c.who.trim(), look = c.look.trim();
+    return name + (who ? ": " + who : "") + (look ? (who ? " " : ": ") + "Looks: " + look : "");
+  }).join("\n");
+  // Several photos of one face make one portrait (up to PHOTOS_PER_CHARACTER).
+  const photos = people.filter((c) => c.photos.length)
+    .map((c) => c.name.trim().replace(/=/g, " ") + " = " +
+         c.photos.map((ph) => ph.file).join(", ")).join("\n");
+  return {text, photos};
+}
+
+function syncCast() {
+  const {text, photos} = castLines();
+  if ($("f_my_characters")) $("f_my_characters").value = text;
+  if ($("f_my_photos")) $("f_my_photos").value = photos;
+}
+
+function castEditor() {
+  const wrap = document.createElement("div");
+  wrap.id = "cast_editor";
+  const label = document.createElement("label");
+  label.textContent = "Who is in it";
+  const help = document.createElement("p");
+  help.className = "help";
+  help.textContent = "One card per character. Say how they look in fixed terms (age, build, face, " +
+    "hair, clothes) so they look the same in every shot, and add up to three photos of them if " +
+    "you like: their " +
+    "portrait is painted from it, in the episode's style, and every still follows that portrait. " +
+    "Photos need the flux3_klein still pictures. Leave the cards empty and the cast is invented for you.";
+  const list = document.createElement("div");
+  list.className = "cast"; list.id = "cast_list";
+  const bar = document.createElement("div");
+  bar.className = "castbar";
+  const add = document.createElement("button");
+  add.type = "button"; add.className = "small"; add.textContent = "Add a character";
+  add.addEventListener("click", () => { cast.push(blankCard()); drawCast(); });
+  const example = document.createElement("button");
+  example.type = "button"; example.className = "small quiet"; example.id = "load_example";
+  example.textContent = "Load the example (Jeffrey and MagnoliaRex)";
+  example.addEventListener("click", loadExample);
+  bar.append(add, example);
+  wrap.append(label, help, list, bar);
+  return wrap;
+}
+
+// The pack takes up to three photos of one character (one face, an amalgamation).
+const PHOTOS_PER_CHARACTER = 3;
+
+function blankCard() { return {name: "", pronoun: "", who: "", look: "", photos: []}; }
+
+function drawCast() {
+  const list = $("cast_list");
+  if (!list) return;
+  list.textContent = "";
+  cast.forEach((c, i) => list.appendChild(castCard(c, i)));
+  syncCast();
+}
+
+function labelled(text, el) {
+  const l = document.createElement("label");
+  l.textContent = text;
+  const box = document.createElement("div");
+  box.append(l, el);
+  return box;
+}
+
+function castCard(c, i) {
+  const el = document.createElement("div");
+  el.className = "card";
+  const face = document.createElement("div");
+  face.className = "face";
+  if (c.photos.length) {
+    const img = document.createElement("img");
+    img.src = c.photos[0].thumb; img.alt = c.name;
+    face.appendChild(img);
+  } else {
+    face.textContent = (c.name.trim()[0] || "?").toUpperCase();
+  }
+  const body = document.createElement("div");
+
+  const name = document.createElement("input");
+  name.type = "text"; name.value = c.name; name.placeholder = "Name";
+  name.addEventListener("input", () => { c.name = name.value; syncCast(); });
+  const voice = document.createElement("select");
+  for (const [value, text] of VOICES) {
+    const o = document.createElement("option");
+    o.value = value; o.textContent = text;
+    voice.appendChild(o);
+  }
+  voice.value = c.pronoun;
+  voice.addEventListener("change", () => { c.pronoun = voice.value; syncCast(); });
+  const top = document.createElement("div");
+  top.className = "who";
+  top.append(labelled("Name", name), labelled("Voice", voice));
+
+  const who = document.createElement("textarea");
+  who.value = c.who; who.placeholder = "Who they are: their part in the story, what they are like.";
+  who.addEventListener("input", () => { c.who = who.value; syncCast(); });
+  const look = document.createElement("textarea");
+  look.value = c.look;
+  look.placeholder = "How they look, in fixed terms: age, build, face, hair, the clothes they always wear.";
+  look.addEventListener("input", () => { c.look = look.value; syncCast(); });
+
+  const tools = document.createElement("div");
+  tools.className = "tools";
+  const pick = document.createElement("input");
+  pick.type = "file"; pick.accept = "image/png,image/jpeg,image/webp"; pick.hidden = true;
+  const photo = document.createElement("button");
+  photo.type = "button"; photo.className = "small quiet";
+  photo.textContent = c.photos.length ? "Add another photo" : "Add a photo";
+  photo.disabled = c.photos.length >= PHOTOS_PER_CHARACTER;
+  photo.title = "Up to " + PHOTOS_PER_CHARACTER + " photos of the same face";
+  photo.addEventListener("click", () => pick.click());
+  const state = document.createElement("span");
+  state.className = "help";
+  pick.addEventListener("change", () => addPhoto(c, pick.files[0], state));
+  tools.append(photo, pick, state);
+  const thumbs = document.createElement("div");
+  thumbs.className = "thumbs";
+  c.photos.forEach((ph, k) => {
+    const t = document.createElement("div");
+    t.className = "thumb";
+    const img = document.createElement("img");
+    img.src = ph.thumb; img.alt = c.name + " photo " + (k + 1);
+    const x = document.createElement("button");
+    x.type = "button"; x.className = "quiet"; x.textContent = "x";
+    x.title = "Remove this photo";
+    x.addEventListener("click", () => { c.photos.splice(k, 1); drawCast(); });
+    t.append(img, x);
+    thumbs.appendChild(t);
+  });
+  const remove = document.createElement("button");
+  remove.type = "button"; remove.className = "small quiet"; remove.textContent = "Remove character";
+  remove.addEventListener("click", () => { cast.splice(i, 1); drawCast(); });
+  tools.appendChild(remove);
+
+  body.append(top, labelled("Who they are", who), labelled("How they look", look), tools, thumbs);
+  el.append(face, body);
+  return el;
+}
+
+function addPhoto(c, file, state) {
+  if (!file) return;
+  if (!$("f_my_photos")) {
+    state.textContent = "This ComfyUI's Old-Time Radio pack is too old for photos; update it.";
+    return;
+  }
+  state.textContent = "Sending the photo to your ComfyUI...";
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const res = await fetch("/api/photos", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({data: reader.result}),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || res.statusText);
+      // Two uploads started before either returned must not pass the cap.
+      if (c.photos.length < PHOTOS_PER_CHARACTER
+          && !c.photos.some((ph) => ph.file === body.file)) {
+        c.photos.push({file: body.file, thumb: reader.result});
+      }
+      drawCast();
+    } catch (err) {
+      state.textContent = "Photo not added: " + err.message;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadExample() {
+  // Each card gets its own copy of the photo list, so removing one from a
+  // card never changes the example itself.
+  cast = EXAMPLE.cast.map((c) => Object.assign(blankCard(), c,
+                                               {photos: (c.photos || []).slice()}));
+  for (const key of ["my_plot", "my_setting", "my_author"]) {
+    if ($("f_" + key)) $("f_" + key).value = EXAMPLE[key];
+  }
+  drawCast();
+}
+
+function modeSwitch() {
+  const wrap = document.createElement("div");
+  wrap.className = "modes";
+  wrap.setAttribute("role", "radiogroup");
+  wrap.setAttribute("aria-label", "What story?");
+  for (const [mode, title, text] of [
+    ["classic", "A classic, or surprise me", "Adapt Shakespeare or a public-domain story, or roll the dice."],
+    ["own", "Tell my own story", "Write who is in it, what happens and where. The rest is filled in for you."],
+  ]) {
+    const card = document.createElement("label");
+    card.className = "mode";
+    const radio = document.createElement("input");
+    radio.type = "radio"; radio.name = "mode"; radio.value = mode; radio.id = "mode_" + mode;
+    radio.addEventListener("change", () => setMode(mode));
+    const strong = document.createElement("strong");
+    strong.append(radio, title);
+    const span = document.createElement("span");
+    span.textContent = text;
+    card.append(strong, span);
+    wrap.appendChild(card);
+  }
+  return wrap;
+}
+
+function setMode(mode) {
+  const own = mode === "own", bank = $("f_bank");
+  $("mode_" + mode).checked = true;
+  if (own && bank.value !== MY_STORY_BANK) { lastBank = bank.value; bank.value = MY_STORY_BANK; }
+  if (!own && bank.value === MY_STORY_BANK) bank.value = lastBank || bank.options[0].value;
+  $("group_" + MY_STORY_GROUP.replace(/\W+/g, "_")).hidden = !own;
+  for (const key of ["bank", "source_ref"]) if ($("row_" + key)) $("row_" + key).hidden = own;
+}
+
+function collect() {
+  if ($("cast_list")) syncCast();   // the cards are the truth for both boxes
+  const out = {};
+  const bank = $("f_bank") ? $("f_bank").value : null;
+  for (const f of fields) {
+    // The My Story boxes travel only with my_story: the pack stops a run whose
+    // hand-picked bank is another one while they hold text, and text left in
+    // the hidden boxes must not ride along with a roll the person meant as
+    // "surprise me".
+    if (f.group === MY_STORY_GROUP && bank !== MY_STORY_BANK) continue;
+    // ...and my_story has no classic to adapt: the pack stops a run that names
+    // one (_otr_story_input.py), so it is sent empty, over any saved value.
+    if (f.key === "source_ref" && bank === MY_STORY_BANK) { out[f.key] = ""; continue; }
+    const el = $("f_" + f.key);
+    if (f.kind === "text" && el.value === "" ) continue;   // blank = the workflow's own value
+    out[f.key] = (f.kind === "int" || f.kind === "float") ? Number(el.value) : el.value;
+  }
+  return out;
+}
+
+async function loadOptions() {
+  // A ComfyUI that is busy rendering takes about 40 s to list its nodes.
+  $("notice").textContent = "Asking your ComfyUI what it can make... (slower while it is rendering)";
+  $("notice").hidden = false;
+  try {
+    const res = await fetch("/api/options");
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    build(body.fields);
+    $("notice").hidden = true;
+  } catch (err) {
+    $("notice").textContent = "Cannot reach your ComfyUI: " + err.message +
+      "  Start ComfyUI, then reload. (python -m radio_play_studio doctor says what is missing.)";
+    $("notice").hidden = false;
+  }
+}
+
+function watch(id) {
+  const es = new EventSource("/api/episodes/" + id + "/events");
+  let finished = false, high = 0;   // the bar only moves forward
+  es.onerror = () => {
+    if (finished || es.readyState !== EventSource.CLOSED) return;   // otherwise the browser is reconnecting
+    es.close();
+    $("error").textContent = "Lost the connection to the app. Reload to pick the episode back up; if the app was restarted it is no longer tracked here, but it may still be rendering on your ComfyUI, and its episode lands in otr/obs.";
+    $("error").hidden = false;
+    $("status").textContent = "Disconnected.";
+    running = false; go.disabled = false;
+  };
+  es.onmessage = (m) => {
+    const ev = JSON.parse(m.data);
+    if (ev.type === "progress") {
+      high = Math.max(high, Math.round(ev.value * 100));
+      $("fill").style.width = high + "%";
+      // minutes_left comes from this machine's last run of the same workflow
+      const parts = ev.minutes_left != null ? ", about " + ev.minutes_left + " min left"
+        : ev.nodes_total ? " (" + ev.nodes_done + " of " + ev.nodes_total + " stages)" : "";
+      $("status").textContent = high + "%" + parts + (ev.message ? " " + ev.message : "");
+    } else if (ev.type === "step") {
+      // one stage's own steps; the bar is the whole episode, so it stays put
+      const stage = ev.steps ? "this stage: step " + ev.step + " of " + ev.steps : "";
+      $("status").textContent = high + "%" + (stage ? ", " + stage : "");
+    } else if (ev.type === "submitted") {
+      $("status").textContent = "Queued on your ComfyUI. A full episode takes a while; the bar moves in steps.";
+    } else if (ev.type === "status") {
+      $("status").textContent = "Status: " + ev.status;
+    } else if (ev.type === "done") {
+      finished = true;
+      es.close();
+      $("fill").style.width = "100%";
+      $("status").textContent = "Finished.";
+      const url = "/episodes/" + ev.run + "/" + encodeURIComponent(ev.file);
+      const v = document.createElement("video");
+      v.controls = true; v.src = url;
+      const a = document.createElement("a");
+      a.href = url; a.download = ev.file; a.textContent = "Download " + ev.file;
+      $("result").textContent = "";
+      $("result").append(v, a);
+      $("result").hidden = false;
+      running = false; go.disabled = false;
+    } else if (ev.type === "error") {
+      finished = true;
+      es.close();
+      $("error").textContent = ev.message;
+      $("error").hidden = false;
+      $("status").textContent = "The run stopped.";
+      running = false; go.disabled = false;
+    }
+  };
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  go.disabled = true;
+  $("run").hidden = false; $("error").hidden = true; $("result").hidden = true;
+  $("fill").style.width = "0"; $("status").textContent = "Checking your choices...";
+  try {
+    const res = await fetch("/api/episodes", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({choices: collect()}),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    history.replaceState(null, "", "#run=" + body.id);   // a reload picks it back up
+    running = true;
+    watch(body.id);
+  } catch (err) {
+    $("error").textContent = err.message; $("error").hidden = false;
+    $("status").textContent = "Not started."; go.disabled = false;
+  }
+});
+
+// A reload, or a second tab, finds the episode being made and shows it from the
+// start: the app keeps every event of a run and replays them to a new page.
+async function resume() {
+  const wanted = (location.hash.match(/^#run=([0-9a-f]{12})$/) || [])[1];
+  let list = [];
+  try {
+    list = (await (await fetch("/api/episodes")).json()).episodes || [];
+  } catch (err) { return; }
+  const run = list.find((r) => r.id === wanted) || list.find((r) => !r.finished);
+  if (!run) {
+    if (wanted) {
+      $("run").hidden = false;
+      $("error").textContent = "That episode is not tracked any more (the app was restarted). " +
+        "If it was still rendering, it lands in your ComfyUI output folder under otr/obs.";
+      $("error").hidden = false;
+      history.replaceState(null, "", location.pathname);
+    }
+    return;
+  }
+  history.replaceState(null, "", "#run=" + run.id);
+  $("run").hidden = false; $("error").hidden = true; $("result").hidden = true;
+  $("status").textContent = run.finished ? "" : "Picking the episode back up...";
+  running = !run.finished;
+  go.disabled = running || !fields.length;
+  watch(run.id);
+}
+
+// The page tells the app it is open; once every page has been closed for a
+// minute and nothing is being made, the app asks ComfyUI to free the GPU.
+const PAGE_ID = Math.random().toString(16).slice(2, 14);
+function presence(closing) {
+  try {
+    fetch("/api/presence", {
+      method: "POST", headers: {"Content-Type": "application/json"}, keepalive: true,
+      body: JSON.stringify({page: PAGE_ID, closing: !!closing}),
+    }).catch(() => {});
+  } catch (err) { /* the app is gone; nothing to tell */ }
+}
+presence(false);
+setInterval(() => presence(false), 20000);
+addEventListener("pagehide", () => presence(true));
+
+resume();
+loadOptions();
+</script>
+</body>
+</html>
