@@ -336,8 +336,14 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         stamps. The app's reference_twin() picks it for My Story by itself. He chose this knowing
         the "no real-person likenesses" rule (the photos are his). Scoped suite 2454 passed,
         build_variants --check 28 variants 0 failures, app tests 126 passed.
-      NOW: THE DEMO RENDER on the twin -- 3 acts, blank My Story, plain boot, log
-        tmp/rps_live/demo_open_ref_3act.log.
+      [x] DEMO VERIFIED 14:36 (10-21) -- the twin, 3 acts, blank My Story (built-in story + its
+        bundled photos), plain boot, new NVIDIA driver: RESULT succeeded, obs_publish OK, Prompt
+        executed in 5:25:57, episode 6:17 at 1920x1080,
+        seoul_duet_20261021_091839__vstb__n16f__fk3r__koko__myst__cg412__sa3_final.mp4 (sha
+        4f6a9a92), episodes/4a38607f7f0d copy byte-identical, timing saved
+        (otr_16gb_foley_open_flux3_ref.acts-3.5ab87708.json). No crash on the new driver. Stills
+        ~33 min (vs ~10 from text), filming ~4.6 h for 64 beats; the ffmpeg 1080p step took minutes.
+      NEXT: the demo video from this episode (Blender scenes, Seoul excerpt, ffmpeg cut).
       [x] MERGED INTO MAIN 6364c3df (operator: "merge the contest branch into main now so the code
         link does not move"): https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio
         resolves. No node code, no pyproject.toml, contest/ excluded from the published pack.
