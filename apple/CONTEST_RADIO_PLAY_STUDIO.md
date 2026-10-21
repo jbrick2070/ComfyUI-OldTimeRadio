@@ -331,6 +331,13 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         our demo to be precise"; "3 acts, same as the approved demo"): started 22:33, blank My Story
         (his default story), --acts 3, tmp/rps_live/demo_open_3act.log, validator stamp OK
         (profile otr_16gb_foley_open, drift 0). ~5 h. Then cut the under-2-minute video from it.
+      DEMO VIDEO BUILD (operator: "make a video in the same style as their intro video ... 3D intro
+        into walking through the nodes and videos appear"): storyboard apple/CONTEST_DEMO_STORYBOARD.md
+        (agy Gemini 4 Argon reviewed: pacing, honest app shot, LTX hero beat, a flat name grid -- all
+        folded); Blender 5.2 scenes, Kokoro narration (146 words) and headless-Chrome app shots in
+        contest/radio-play-studio/demo_video/. CPU test frames OK. Full EEVEE render is queued to
+        start the moment the demo render ends (never two GPU jobs); then the live progress-bar shot,
+        the excerpt, and the ffmpeg cut to output/otr/episodes/demo_cuts/radio_play_studio_demo.mp4.
         Sonnet QA on 4c43ea10 + the app switch: diff holds, card holds; its one finding -- My Story
         no longer uses reference pictures on the default -- is the operator's decision, so the fix
         is wording: README and draft Q9 now call references an optional workflow. Real-ESRGAN
@@ -362,6 +369,8 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
           [x] otr_8gb_animatediff -- SUCCESS 2825 s, obs_publish OK (last_duet_..._adhv, My Story).
           [x] otr_8gb_video -- SUCCESS 624 s, obs_publish OK (wrestling_system_..._lx8g_fk3i).
           [x] otr_8gb_ltx25_foley -- SUCCESS 3611 s (published, see obs on the 4060).
+          [x] otr_8gb_ltx25_mime -- SUCCESS 3031 s. All 8 GB graphs upscale with RTX VSR, so VSR is
+              proven on the 4060 too. otr_8gb_ltx25_audio_in running (the last leg).
       WAS: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
         white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
         Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
