@@ -361,6 +361,7 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
               from text, by design).
           [x] otr_8gb_animatediff -- SUCCESS 2825 s, obs_publish OK (last_duet_..._adhv, My Story).
           [x] otr_8gb_video -- SUCCESS 624 s, obs_publish OK (wrestling_system_..._lx8g_fk3i).
+          [x] otr_8gb_ltx25_foley -- SUCCESS 3611 s (published, see obs on the 4060).
       WAS: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
         white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
         Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
