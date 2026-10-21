@@ -180,20 +180,26 @@ let cast = [];
 const VOICES = [["", "voice: any"], ["he", "he"], ["she", "she"]];
 
 // The example: the author's own story and characters (Jeffrey A. Brick,
-// "Mime Lung Music Festival", Part 2) -- the cast of Veo-Moovie-Maker's sample.
+// "Mime Lung Music Festival", Part 2) -- the pack's built-in My Story, the
+// same words and the same shipped photos a blank My Story run uses.
+function bundled(names) {
+  return names.map((n) => ({file: n + " [bundled]", thumb: "/bundled-photos/" + n}));
+}
 const EXAMPLE = {
   cast: [
     {name: "Jeffrey", pronoun: "he",
      who: "A former VJ who died of lung cancer in 2061 and lives on as a preserved mind in a government-run virtual afterlife; shy, devoted, makes live video art.",
-     look: "52 years old, 5 foot 7, about 192 pounds, chubby and stocky. Clean-shaven, short to medium-length hair that is slightly unkempt, a round face with gentle features. Loose, comfortable casual clothes in pinks, soft pastels, muted reds and light blues. Approachable, peaceful, slightly disheveled."},
+     look: "A lean man in his fifties with a long, narrow face, a long straight nose, deep-set eyes, prominent ears and light stubble; white mime face paint with small pink-red marks on the cheeks; a plain black long-sleeve shirt.",
+     photos: bundled(["jeffrey_1.jpg", "jeffrey_2.jpg", "jeffrey_3.jpg"])},
     {name: "MagnoliaRex", pronoun: "she",
      who: "An electronic music artist preserved in the same program in 2095; cool, guarded, science-literate, secretly tender.",
-     look: "An ageless adult woman, tall, slim and elegant. Symmetrical features, high cheekbones, a defined jawline. Long, dark, voluminous hair with subtle asymmetry and faint star-like speckling. Eclectic pop clothing with layered textures in violet, black, metallic gold and electric accents. Confident, iconic, composed."},
+     look: "An ageless adult woman with a warm medium-brown complexion, almond-shaped smoky eyes, full lips, a softly angular jaw and a small knowing smile. Long, wavy honey-brown hair with pastel pink and teal streaks and fine curtain bangs. A high-collared magnolia-white gown with silver embroidery and glowing silver wire-and-organza petal shoulders; no gold. Cool, composed, iconic.",
+     photos: bundled(["magnoliarex_1.jpg", "magnoliarex_2.jpg", "magnoliarex_3.jpg"])},
     {name: "Cat", pronoun: "",
      who: "A talking cat in Cairo who gives Jeffrey a clue.",
      look: "An Egyptian-type adult cat, slender and long-limbed. Very short, smooth, dark gray to charcoal fur, a wedge-shaped head, large almond-shaped eyes, large upright ears, a long tapered tail. Elegant, alert, intelligent."},
   ],
-  my_plot: "Act 1: Jeffrey wins MagnoliaRex's contest prize, a day with a fan, at a UN festival in Athens celebrating the cure for cancer, and the day never ends. She warns, 'We won't be like this forever.' Act 2: a 207-concert charity world tour, a Valentine's riddle chase from the space station to Cairo to Zurich, alien sculptors on a far planet; meanwhile in the real world, climate collapse is breaking the machines that keep the preserved minds alive. Act 3: a self-flying copper plane takes them to a frozen, empty Seoul with ten days left. A meteor has wrecked the generator that keeps them running, and their satellite lasers go astray. She says 'I love you,' then plays him a duet she secretly made from his recorded voice. At 11:59 p.m. on January 25: 'Bon voyage, Jeffrey! Have a wonderful time!'",
+  my_plot: "Jeffrey wins MagnoliaRex's contest prize, a day with a fan, at a UN festival in Athens celebrating the cure for cancer, and the day never ends. She warns, 'We won't be like this forever.' Then comes a 207-concert charity world tour and a Valentine's riddle chase from the space station to Cairo, where a talking cat gives Jeffrey a clue, to Zurich and to alien sculptors on a far planet; meanwhile in the real world, climate collapse is breaking the machines that keep the preserved minds alive. At the end, a self-flying copper plane takes them to a frozen, empty Seoul with ten days left. A meteor has wrecked the generator that keeps them running, and their satellite lasers go astray. She says 'I love you,' then plays him a duet she secretly made from his recorded voice. At 11:59 p.m. on January 25: 'Bon voyage, Jeffrey! Have a wonderful time!'",
   my_setting: "A virtual afterlife in the year 2095, where minds borrow robots and drones; Athens, festival grounds, a world tour, a frozen, empty Seoul in January.",
   my_author: "Jeffrey A. Brick",
 };
@@ -372,7 +378,10 @@ function addPhoto(c, file, state) {
 }
 
 function loadExample() {
-  cast = EXAMPLE.cast.map((c) => Object.assign(blankCard(), c));
+  // Each card gets its own copy of the photo list, so removing one from a
+  // card never changes the example itself.
+  cast = EXAMPLE.cast.map((c) => Object.assign(blankCard(), c,
+                                               {photos: (c.photos || []).slice()}));
   for (const key of ["my_plot", "my_setting", "my_author"]) {
     if ($("f_" + key)) $("f_" + key).value = EXAMPLE[key];
   }

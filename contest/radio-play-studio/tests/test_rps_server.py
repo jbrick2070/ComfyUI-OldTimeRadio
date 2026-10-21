@@ -112,6 +112,31 @@ def test_files_outside_the_episode_folder_are_not_served(app, tmp_path):
         assert status == 404 and b"nope" not in body
 
 
+def test_the_shipped_example_photos_are_served_and_nothing_else(app, tmp_path, monkeypatch):
+    """The example's cast cards show the author's photos that ship in the pack;
+    the route serves those plain .jpg names from that one folder only."""
+    from radio_play_studio import server
+    port, _ = app
+    photos = tmp_path / "photos"
+    photos.mkdir()
+    (photos / "jeffrey_1.jpg").write_bytes(b"\xff\xd8\xff jpeg")
+    (tmp_path / "secret.jpg").write_bytes(b"nope")
+    monkeypatch.setattr(server, "BUNDLED_PHOTO_DIR", photos)
+    status, headers, body = _request(port, "GET", "/bundled-photos/jeffrey_1.jpg")
+    assert status == 200 and body.startswith(b"\xff\xd8\xff")
+    for path in ("/bundled-photos/../secret.jpg", "/bundled-photos/%2e%2e/secret.jpg",
+                 "/bundled-photos/missing.jpg", "/bundled-photos/Jeffrey_1.JPG",
+                 "/bundled-photos/x.png"):
+        status, _, body = _request(port, "GET", path)
+        assert status == 404 and b"nope" not in body, path
+
+
+def test_the_bundled_photo_folder_is_the_packs():
+    from radio_play_studio import server
+    assert server.BUNDLED_PHOTO_DIR.parts[-4:] == ("nodes", "story_packs", "my_story", "photos")
+    assert (server.BUNDLED_PHOTO_DIR.parents[3] / "__init__.py").is_file()
+
+
 def test_an_unknown_episode_is_a_404(app):
     port, _ = app
     status, _, _ = _request(port, "GET", "/api/episodes/000000000000/events")

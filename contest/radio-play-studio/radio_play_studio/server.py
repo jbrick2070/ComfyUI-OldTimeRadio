@@ -24,6 +24,11 @@ from .photos import MAX_PHOTO_BYTES, PhotoError, upload_photo
 from .runner import Studio
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+#: The author's photos that ship in the pack for its built-in My Story (the
+#: example's cast cards show them). The pack reads them by " [bundled]" names.
+BUNDLED_PHOTO_DIR = (Path(__file__).resolve().parents[3]
+                     / "nodes" / "story_packs" / "my_story" / "photos")
+_BUNDLED_NAME = re.compile(r"[a-z0-9_]{1,64}\.jpg")
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "[::1]"})
 HEARTBEAT_S = 15.0
 #: A page says it is open this often; with none heard for GPU_IDLE_S, and no
@@ -206,6 +211,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._events(match.group(1))
         if path.startswith("/episodes/"):
             return self._episode_file(path[len("/episodes/"):])
+        if path.startswith("/bundled-photos/"):
+            name = path[len("/bundled-photos/"):]
+            if _BUNDLED_NAME.fullmatch(name):
+                return self._send_file(BUNDLED_PHOTO_DIR / name, "image/jpeg")
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
     def _post(self) -> None:

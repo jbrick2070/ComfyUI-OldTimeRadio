@@ -261,7 +261,25 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         saved (episodes/timing/otr_16gb_foley.acts-3.5ab87708.json; video 15,766 s of 18,558 s).
         Faces hold in motion as in the stills. Highlight: output/otr/episodes/demo_cuts/
         magnolia_both_refs_seoul.mp4 (238-298 s, the Seoul ending; sent). Supersedes the 05:18
-        demo. NEXT: his true story as My Story's built-in default with his photos bundled.
+        demo.
+      [x] HIS STORY IS MY STORY'S BUILT-IN DEFAULT (operator 10-20: "Yes, make my story the default").
+        main 20f8c34b: a blank My Story run (blank node, cleared field, rolled pick) writes
+        DEFAULT_STORY -- his Jeffrey/MagnoliaRex/Cat cast, plot and setting, the demo's exact
+        words, the plot without act numbers so a 1-act roll is not handed three labelled acts --
+        credited to Jeffrey A. Brick even when only an author is typed; held to its source like
+        typed fields (house_source no longer switches fidelity off); licence label "the author's
+        own story, shipped with his permission". His six photos ship at
+        nodes/story_packs/my_story/photos (0.9 MB, 768 px); "name.jpg [bundled]" resolves there,
+        confined like input/output/temp; the house story uses them when no photos are given
+        (given photos win; a typed story never gets his). App (this branch): "Load the example"
+        fills the new text and both leads' three photos, thumbnails from a confined
+        /bundled-photos/ route. Codex contrarian on the design: BROKEN first, every point folded
+        in. Scoped suite 5533 passed; app 124 passed. Sonnet QA: see below.
+        STILL OPEN (his call): his photos only shape the pictures where the still engine takes
+        references -- FLUX 3 Klein with OTR_FLUX3_REFERENCE=1. The shipped 16 GB graphs paint
+        from text (MOSS), so out of the box the photos are matched and unused. Options: a
+        "flux3_klein with references" stills choice, or flip Klein's default (needs a 4060
+        measurement).
       WAS: the 3-act demo RENDERING with BOTH leads' references -- Jeffrey's three photos and the
         white-silver MagnoliaRex set (started 10:42 on main 45b58a73, ComfyUI restarted with the
         Character Photo node; tmp/rps_live/mystory_magnolia_both.log; launcher scratchpad
