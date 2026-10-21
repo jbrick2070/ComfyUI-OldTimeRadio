@@ -27,8 +27,8 @@ Why it is innovative (say it in shots 1, 5 and 7; the line is the point):
 - "Tell my own story" turns a person's own writing into a produced radio play.
 
 Model and tool names to say or show (all of them, per the rules): Gemma 4 12B; MOSS-Image;
-Kokoro; Stable Audio 3; LTX 2.5; the upscaler actually used in the demo episodes (RTX VSR on the
-Midsummer episode -- or Real-ESRGAN if the operator switches it before re-rendering); Comfy SDK;
+Kokoro; Stable Audio 3; LTX 2.5; ffmpeg (the 1080p step on the submitted graph, no model --
+10-21; RTX VSR and Real-ESRGAN are both out of the contest graph); Comfy SDK;
 comfy-api-proxy; ComfyUI; the Old-Time Radio node pack.
 
 Note: both demo episodes were rendered with FLUX 3 Klein stills -- Midsummer before the MOSS

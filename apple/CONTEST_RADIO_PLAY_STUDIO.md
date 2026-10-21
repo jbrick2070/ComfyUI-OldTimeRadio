@@ -324,6 +324,13 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         (f3a20a1a); it has no reference twin, so My Story runs it too. The reference workflow
         (otr_16gb_foley_flux3_ref) still ships as an option, outside the contest. Submission draft
         ticks Open Weights Only.
+      SUPERSEDED 10-21 (operator: "yes, switch to off"; "I want to be 100% open"): main b0f9a6e4
+        drops Real-ESRGAN from otr_16gb_foley_open -- the 1080p step is now "off" (ffmpeg Lanczos +
+        unsharp, no model), the most faithful of the three in apple/UPSCALERS.md. Real-ESRGAN was
+        running both times the machine went down. The tiled/fp16 ESRGAN fix is shelved on
+        wip/esrgan-tiled-fp16 (Codex NEEDS CHANGES), post-contest. Sonnet QA on b0f9a6e4: HOLDS.
+        Stills stay FLUX 3 Klein FROM TEXT -- no reference photos (contest rule: no real-person
+        likenesses in the generated footage).
       [x] MERGED INTO MAIN 6364c3df (operator: "merge the contest branch into main now so the code
         link does not move"): https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio
         resolves. No node code, no pyproject.toml, contest/ excluded from the published pack.
@@ -356,7 +363,7 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
            blender -b --factory-startup --python scenes.py -- <type|title|cards|nodes|ring|end>),
            the live progress-bar shot (shoot_app.py progress, during a run), the Seoul excerpt,
            Kokoro narration (narration/*.wav), and the ffmpeg cut.
-      [ ] REAL-ESRGAN IS THE BOTTLENECK OF THE CONTEST WORKFLOW (measured 10-21, this demo): the video
+      [-] (MOOT 10-21, Real-ESRGAN left the contest graph) REAL-ESRGAN WAS THE BOTTLENECK (measured 10-21): the video
         stage ended ~04:15 (56 beats); the composite then upscales at ~0.5 frames/s (seg_0003: 183
         frames in 372 s; seg_0004: 249 in 493 s) with the GPU ~12% busy -- about 6-7 h for a 3-act
         episode, publish ~11:00-11:30. Read of the code: spandrel runs fp32, one frame per call
