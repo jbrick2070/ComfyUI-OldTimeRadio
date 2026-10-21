@@ -17,7 +17,8 @@ branch, then do the first unchecked step. Update this file in the same commit as
 ## Where things are
 
 - **Branch:** `claude/sharp-heisenberg-no3hzt` (draft PR #8, jbrick2070/ComfyUI-OldTimeRadio).
-  Push here. Never merge to `main` until the operator says so.
+  Push here. MERGED INTO MAIN 2026-10-20 (operator: "merge the contest branch into main now so
+  the code link does not move"); keep pushing app work here and merge again when it is green.
 - **Pack fixes** (anything under `nodes/`) go to `main` first, then `git merge main` into the branch.
 - **Never edit `pyproject.toml`** (it auto-publishes). Never tag or release.
 - **App:** `contest/radio-play-studio/`. Its venv is `C:\Users\jeffr\Documents\ComfyUI\.venv-rps`
