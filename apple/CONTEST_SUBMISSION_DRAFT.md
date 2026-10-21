@@ -65,9 +65,11 @@ converts to an API graph against the server's live /object_info.
 - comfy-api-proxy (Comfy API v2 bridge) and a standard-library Python web app (no build step).
 - Cast lock (each character keeps one face and one voice) and shot lock (each beat's camera,
   expression and motion planned before filming).
-- Reference stills: a portrait per character, and every still conditioned on the portraits of
+- Reference stills (an optional workflow, `otr_16gb_foley_flux3_ref`, not the submitted one): a
+  portrait per character, and every still conditioned on the portraits of
   everyone in the frame (the speaker, the characters the shot names, the person spoken to).
-- Cast cards: one card per character in Tell my own story, with an optional photo.
+- Cast cards: one card per character in Tell my own story (a photo on a card is used only by the
+  reference workflow).
 - A progress bar that learns each stage's time on the user's own machine and follows the video
   node's own "frames rendered" bar: within 4 points of the wall clock on a 68-minute episode.
 - Captions burned in (SDH), ffmpeg mux, every weight fetched tokenless from public repos.

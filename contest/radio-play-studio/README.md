@@ -130,12 +130,13 @@ language, acts, cast size, visual style and still model as usual and press **Mak
 
 ### Same faces in every shot
 
-Every character gets a portrait, and each still is drawn **from** the portraits of everyone in
-the frame -- the speaker and the others the shot names -- so a face does not change from beat to
-beat. This needs a still model that takes reference images: pick **flux3_klein** under Still
-pictures and start ComfyUI with `OTR_FLUX3_REFERENCE=1` (off by default while it is measured on
-every card). With another still model, the cast cards still work and a photo is reported as
-unused; the faces then rest on the written description alone.
+The default workflow keeps every model open weights, and its stills paint each character from
+the written description on their cast card (plus a portrait-derived seed), so describe looks in
+fixed terms. For faces drawn **from** pictures, run the pack's reference workflow instead,
+`--workflow workflows/otr_16gb_foley_flux3_ref.json`: every character gets a portrait (or the
+photos on their card) and each still is painted from the portraits of everyone in the frame, so a
+face does not change from beat to beat. Its still model, FLUX 3 Klein, is open weights under the
+FLUX Kommunity License. On the default workflow a card's photo is reported as unused.
 
 From the command line, the same boxes are flags. A card is one line of `--my-characters`, and a
 photo is a `Name = file` line naming a picture in ComfyUI's input folder:

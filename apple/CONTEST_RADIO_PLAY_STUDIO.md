@@ -331,6 +331,10 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         our demo to be precise"; "3 acts, same as the approved demo"): started 22:33, blank My Story
         (his default story), --acts 3, tmp/rps_live/demo_open_3act.log, validator stamp OK
         (profile otr_16gb_foley_open, drift 0). ~5 h. Then cut the under-2-minute video from it.
+        Sonnet QA on 4c43ea10 + the app switch: diff holds, card holds; its one finding -- My Story
+        no longer uses reference pictures on the default -- is the operator's decision, so the fix
+        is wording: README and draft Q9 now call references an optional workflow. Real-ESRGAN
+        rehearsed on CPU with a 1664x960 foley frame: engine, output check and 1920x1080 fit OK.
       4060 (MRKT) -- ONE INSTALL, ON MAIN, REGRESSING (operator 10-20: "we will still need to regress
         other workflows, the 8gb machine is ready"; "push the latest for sure"; "you are free to
         clean it up so there's only one").
