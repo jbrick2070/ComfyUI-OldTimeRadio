@@ -90,6 +90,11 @@ def test_nvidia_workflows_upscale_with_rtx_vsr_and_the_rest_stay_off():
     nvidia = {"otr_%s.json" % r["id"].replace("otr_", "", 1)
               for r in matrix["rows"] if r.get("gpu_vendor") == "nvidia"}
     assert len(nvidia) >= 10, nvidia
+    # The one NVIDIA graph that stays all open weights (operator, 2026-10-20:
+    # "we skip VSR, we stay open weight"; 2026-10-21: "yes, switch to off"): no
+    # closed SDK -- ffmpeg Lanczos + unsharp, the canonical default.
+    open_weights = {"otr_16gb_foley_open.json"}
+    assert open_weights <= nvidia
     seen = set()
     for path in sorted((REPO_ROOT / "workflows").glob("*.json")):
         wf = json.loads(path.read_text(encoding="utf-8"))
@@ -97,7 +102,10 @@ def test_nvidia_workflows_upscale_with_rtx_vsr_and_the_rest_stay_off():
             if node.get("type") != "OTR_SilentComposite":
                 continue
             values = node.get("widgets_values", [])
-            if path.name in nvidia:
+            if path.name in open_weights:
+                seen.add(path.name)
+                assert values[4:6] == ["off", "cpu"], path.name
+            elif path.name in nvidia:
                 seen.add(path.name)
                 assert values[4:6] == ["rtx_vsr", "cuda"], path.name
             else:

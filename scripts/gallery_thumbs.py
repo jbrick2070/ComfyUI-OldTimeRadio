@@ -129,8 +129,10 @@ def card_for_profile(profile: dict) -> Card:
     else:
         raise ValueError("%s: vendor %r has no gallery words in "
                          "scripts/gallery_thumbs.card_for_profile" % (pid, vendor))
-    if str((profile.get("upscale_stage") or {}).get("engine") or "") == "spandrel_esrgan":
-        # The open upscaler is what makes the whole graph open weights.
+    if vendor == "nvidia" and str((profile.get("upscale_stage") or {}).get("engine")
+                                  or "") != "rtx_vsr":
+        # An NVIDIA graph without RTX VSR, a closed SDK, is all open weights:
+        # the one thing that tells it apart from the same lane's plain graph.
         extra = ("OPEN WEIGHTS, " + extra) if extra else "OPEN WEIGHTS"
     if (profile.get("role_overrides") or {}).get("character_image") == "flux3_klein_ref":
         # The faces come from reference pictures: the one thing that tells this

@@ -322,7 +322,7 @@
     },
     {
       "id": "otr_16gb_foley_open",
-      "display_name": "16 GB NVIDIA -- the foley lane with every model open weights: ltx25_foley_16gb video, FLUX 3 Klein stills from text (no reference pictures), Kokoro voices, Stable Audio 3, Writer Gemma 4 12B, and the open Real-ESRGAN x2 upscale (spandrel_esrgan) instead of NVIDIA RTX Video Super Resolution, a closed SDK. Radio Play Studio's contest default (operator 2026-10-20: \"we skip VSR, we stay open weight\"; \"flux 3 and esrgan\").",
+      "display_name": "16 GB NVIDIA -- the foley lane with every model open weights: ltx25_foley_16gb video, FLUX 3 Klein stills from text (no reference pictures), Kokoro voices, Stable Audio 3, Writer Gemma 4 12B, and the 1080p step done by ffmpeg (Lanczos + unsharp, no model) instead of NVIDIA RTX Video Super Resolution, a closed SDK -- the most faithful of the three upscalers measured in apple/UPSCALERS.md. Radio Play Studio's contest default (operator 2026-10-21: \"yes, switch to off\").",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "allow_sidecars": true,
@@ -345,8 +345,6 @@
         "slot_overrides.announcer_voice_engine": "kokoro",
         "slot_overrides.char_voice_engine": "kokoro",
         "slot_overrides.music_engine": "stable_audio_3",
-        "upscale_stage.device": "cuda",
-        "upscale_stage.engine": "spandrel_esrgan",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
       },
