@@ -339,7 +339,7 @@ def eligible_bank_ids() -> "tuple[str, ...]":
 
     my_story is NOT excluded by this field (operator, 2026-09-13), although
     its story is the person's own typed fields: a blank automatic run still
-    has something to write, because `_otr_story_input.DEFAULT_IDEA` is the
+    has something to write, because `_otr_story_input.DEFAULT_STORY` is the
     floor a blank My Story run writes. Do not "fix" this back.
     """
     banks = _ROUTING._ensure_loaded().banks

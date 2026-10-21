@@ -48,7 +48,7 @@ def test_literal_admission_persists_before_assets_with_real_prompt_identity(gate
 
 # {"custom_premise": " "} and {"custom_premise": "", "story_author": [...]}
 # lived here until 2026-09-13. A My Story submission with nothing creative in
-# it is no longer refused -- it writes `SI.DEFAULT_IDEA`, which is what lets
+# it is no longer refused -- it writes `SI.DEFAULT_STORY`, which is what lets
 # the bank sit in the roll pool at all. See the floor test below. Every row
 # that is still genuinely unrunnable stays exactly where it was.
 @pytest.mark.parametrize("values", [
@@ -119,7 +119,7 @@ def test_unrelated_writers_are_ignored_and_all_dependent_writers_checked(gate):
 @pytest.mark.parametrize("blank", ["", " ", "\n  "])
 def test_a_blank_my_story_submission_writes_the_standing_premise(gate, blank):
     """THE FLOOR (2026-09-13). Nothing typed is no longer a refusal: the run
-    proceeds and the persisted draft carries `SI.DEFAULT_IDEA`, which is the
+    proceeds and the persisted draft carries `SI.DEFAULT_STORY`, which is the
     whole reason my_story may be drawn by a blank automatic roll.
     """
     run, downloads = gate
@@ -128,7 +128,7 @@ def test_a_blank_my_story_submission_writes_the_standing_premise(gate, blank):
     files = list(DR.drafts_root().glob("*/input.json"))
     assert len(files) == 1
     saved = json.loads(files[0].read_text(encoding="utf-8"))
-    assert saved["fields"]["idea"] == SI.DEFAULT_IDEA
+    assert saved["fields"]["characters"] == SI.DEFAULT_STORY.characters
 
 
 def test_the_writers_own_preroll_check_floors_too_not_just_the_validator():
@@ -156,9 +156,9 @@ def test_the_writers_own_preroll_check_floors_too_not_just_the_validator():
         mode=RT.story_input_mode(row),
         bank_id=getattr(row, "source_bank_id", "") or "my_story",
     )
-    floored = SI.with_default_idea(raw, policy)
+    floored = SI.with_default_story(raw, policy)
     SI.check_selection(floored, policy)          # must not raise
-    assert floored.idea == SI.DEFAULT_IDEA
+    assert floored == SI.DEFAULT_STORY
 
     # ...and the roll sentinel is still NOT a user-fields bank here, so the
     # floor must leave it exactly alone (same object, not merely equal).
@@ -167,11 +167,11 @@ def test_the_writers_own_preroll_check_floors_too_not_just_the_validator():
         mode=RT.story_input_mode(sentinel_row),
         bank_id="roll (any eligible bank)",
     )
-    assert SI.with_default_idea(raw, sentinel_policy) is raw
-    assert SI.would_apply_default_idea(raw, policy) is True
-    assert SI.would_apply_default_idea(raw, sentinel_policy) is False
+    assert SI.with_default_story(raw, sentinel_policy) is raw
+    assert SI.would_apply_default_story(raw, policy) is True
+    assert SI.would_apply_default_story(raw, sentinel_policy) is False
     typed = SI.capture_raw(idea="a story about my mother")
-    assert SI.would_apply_default_idea(typed, policy) is False
+    assert SI.would_apply_default_story(typed, policy) is False
 
 
 def test_a_typed_my_story_submission_is_never_overwritten_by_the_floor(gate):

@@ -15,6 +15,7 @@ Pure CPU: no ComfyUI runtime, no GPU, no image model.
 from __future__ import annotations
 
 import json
+import os
 
 import numpy as np
 import pytest
@@ -151,6 +152,50 @@ def test_photos_match_the_cast_through_the_policy():
     assert got == {"c02": ["a.png"]}
     assert any("Zed" in w for w in warnings)
     assert mbp._identity_photos_from_policy("{}", [], []) == {}
+
+
+# --------------------------------------------------------------------------- #
+# The house My Story brings the author's shipped photos (operator, 2026-10-20)
+# --------------------------------------------------------------------------- #
+_HOUSE_CAST = [{"char_id": "c02", "name": "Jeffrey"}, {"char_id": "c03", "name": "MagnoliaRex"},
+               {"char_id": "c04", "name": "Cat"}]
+
+
+def test_the_house_story_uses_the_shipped_photos_when_none_are_given():
+    from nodes import _otr_story_input as SI
+    meta = {"my_story": {"house_source": True}}
+    got = mbp._identity_photos_from_policy("{}", _HOUSE_CAST, [], meta=meta)
+    assert got == {"c02": SI.DEFAULT_STORY_PHOTOS["Jeffrey"],
+                   "c03": SI.DEFAULT_STORY_PHOTOS["MagnoliaRex"]}
+    assert all(cp.resolve_photo(ref) for refs in got.values() for ref in refs)
+
+
+def test_given_photos_win_and_a_typed_story_never_gets_his():
+    given = json.dumps({"character_photos": {"Jeffrey": "mine.png"}})
+    house = {"my_story": {"house_source": True}}
+    assert mbp._identity_photos_from_policy(given, _HOUSE_CAST, [], meta=house) == {
+        "c02": ["mine.png"]}
+    typed = {"my_story": {"house_source": False}}
+    assert mbp._identity_photos_from_policy("{}", _HOUSE_CAST, [], meta=typed) == {}
+    assert mbp._identity_photos_from_policy("{}", _HOUSE_CAST, []) == {}
+
+
+def test_the_ledger_meta_reaches_the_photo_lookup():
+    import inspect
+    assert "image_policy_json, cast, warnings, meta=meta)" in inspect.getsource(mbp)
+
+
+def test_a_bundled_name_stays_inside_the_pack_photo_folder():
+    assert cp.resolve_photo("jeffrey_1.jpg [bundled]").startswith(
+        os.path.realpath(cp.BUNDLED_PHOTO_DIR))
+    # Without the annotation the same name means the input folder, never the pack.
+    assert not cp.resolve_photo("jeffrey_1.jpg").startswith(
+        os.path.realpath(cp.BUNDLED_PHOTO_DIR))
+    for bad in ("../my_story.json [bundled]", "missing.jpg [bundled]",
+                "../../__init__.py [bundled]"):
+        assert cp.resolve_photo(bad) == "", bad
+    photos, problems = cp.parse_photo_lines("Jeffrey = jeffrey_1.jpg [bundled]")
+    assert photos == {"Jeffrey": ["jeffrey_1.jpg [bundled]"]} and not problems
 
 
 # --------------------------------------------------------------------------- #

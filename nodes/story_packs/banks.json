@@ -209,7 +209,7 @@
       },
       "required_seams": [],
       "runnable": true,
-      "guide_ref": "Type your idea in Story input, optionally add characters, plot, setting and who the story is by, pick a look, and run. OPERATOR DECISION 2026-09-13, superseding the 09-10 build: an automatic roll can land here on equal footing with every other shipped bank -- a run that types nothing writes the standing DEFAULT_IDEA premise in _otr_story_input.py instead of refusing. See apple/EXTENDING.md."
+      "guide_ref": "Type your idea in Story input, optionally add characters, plot, setting and who the story is by, pick a look, and run. OPERATOR DECISION 2026-09-13, superseding the 09-10 build: an automatic roll can land here on equal footing with every other shipped bank -- a run that types nothing writes the standing DEFAULT_STORY in _otr_story_input.py -- the author's own story of Jeffrey and MagnoliaRex -- instead of refusing. See apple/EXTENDING.md."
     },
     {
       "source_bank_id": "custom_source_bank",

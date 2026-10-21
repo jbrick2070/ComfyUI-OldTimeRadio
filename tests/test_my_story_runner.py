@@ -147,8 +147,8 @@ def _run(slots, *, author="A. Listener", act_count=1, num_characters=2,
     if house_source:
         policy = SI.StoryInputPolicy(
             mode=SI.INPUT_MODE_USER_FIELDS, bank_id="my_story")
-        assert SI.would_apply_default_idea(fields, policy)
-        fields = SI.with_default_idea(fields, policy)
+        assert SI.would_apply_default_story(fields, policy)
+        fields = SI.with_default_story(fields, policy)
     bundle = SI.build_bundle(
         fields,
         SI.StoryRequest(num_characters=raw_requested, act_count=str(act_count),
@@ -208,18 +208,19 @@ def test_one_call_per_act():
     assert len(slots.calls) == 12, slots.calls  # six author calls, six combined corrections
 
 
-def test_house_source_skips_every_source_rewrite_and_still_fills_the_ledger():
-    """A blank roll invents from DEFAULT_IDEA; there is no listener to contradict."""
+def test_the_house_story_keeps_every_source_rewrite_and_fills_the_ledger():
+    """A blank roll tells the author's own story (DEFAULT_STORY), and it is
+    held to its source exactly like typed fields (operator, 2026-10-20: the
+    approved demo of it ran with the rewrites on)."""
     slots = Slots()
     led, _ = _run(slots, idea="", characters="", author="", house_source=True)
     story = led.data["meta"]["my_story"]
     assert story["house_source"] is True
-    assert story["source_rewrites"] == []
     assert led.data["meta"]["source_meta"]["house_source"] is True
-    assert all("Check and rewrite" not in prompt[0]["content"]
-               for prompt in slots.prompts)
-    assert len(slots.calls) == 4, slots.calls  # interpret, treatment, act, frame
-    assert story["notes"][0].startswith("House DEFAULT_IDEA")
+    assert story["source_rewrites"]
+    assert any("Check and rewrite" in prompt[0]["content"] for prompt in slots.prompts)
+    assert len(slots.calls) == 8, slots.calls  # four author calls, four corrections
+    assert story["notes"][0].startswith("House DEFAULT_STORY")
     assert "no creative fields were typed" in story["notes"][0]
     assert led.data["lines"]
     assert led.data["cast"]
@@ -1724,7 +1725,7 @@ def _interpretation_without(*keys, plan_keys=()):
     return data
 
 
-@pytest.mark.parametrize("house_source", [True, False], ids=["no_rewrite", "source_rewrite"])
+@pytest.mark.parametrize("house_source", [True, False], ids=["house_story", "typed_story"])
 def test_an_omitted_cast_plan_is_recorded_as_default_not_as_planned(house_source):
     """CastPlan defaults planned to 2. When the interpretation omits cast_plan,
     that 2 is a schema default, not a decision -- and the source rewrite

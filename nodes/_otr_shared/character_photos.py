@@ -28,12 +28,22 @@ PHOTOS_PER_CHARACTER = 3
 
 #: A picture as ComfyUI's own picker names it: a path relative to the input
 #: folder (a paste lands in "pasted/"), optionally annotated " [input]",
-#: " [output]" or " [temp]" the way core's folder_paths reads it. Never an
-#: absolute path, a backslash or a ".." segment; resolve_photo confines it.
+#: " [output]" or " [temp]" the way core's folder_paths reads it -- or
+#: " [bundled]" for a picture shipped inside this pack (BUNDLED_PHOTO_DIR).
+#: Never an absolute path, a backslash or a ".." segment; resolve_photo
+#: confines it to its root.
 SAFE_PHOTO_NAME = re.compile(
-    r"^(?![/.])[A-Za-z0-9_ ./()-]{1,190}\.(png|jpg|jpeg|webp)( \[(input|output|temp)\])?$",
+    r"^(?![/.])[A-Za-z0-9_ ./()-]{1,190}\.(png|jpg|jpeg|webp)"
+    r"( \[(input|output|temp|bundled)\])?$",
     re.IGNORECASE)
-_ANNOTATION = re.compile(r"^(?P<path>.+?) \[(?P<root>input|output|temp)\]$")
+_ANNOTATION = re.compile(r"^(?P<path>.+?) \[(?P<root>input|output|temp|bundled)\]$")
+
+#: Pictures that ship inside the pack: the author's reference photos for the
+#: built-in My Story default (operator, 2026-10-20). Read-only, and reachable
+#: only by a " [bundled]" name confined to this folder.
+BUNDLED_PHOTO_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "story_packs", "my_story", "photos")
 
 
 def name_key(name: str) -> str:
@@ -132,7 +142,9 @@ def input_dir() -> str:
 
 
 def _root_dir(kind: str) -> str:
-    """ComfyUI's input, output or temp folder."""
+    """ComfyUI's input, output or temp folder, or the pack's bundled pictures."""
+    if kind == "bundled":
+        return BUNDLED_PHOTO_DIR
     try:
         import folder_paths  # type: ignore
         return {"output": folder_paths.get_output_directory,
@@ -147,7 +159,8 @@ def resolve_photo(filename: str, base: "str | None" = None) -> str:
     """The absolute path of a photo, or "" when the name is unsafe, escapes
     its folder, or names no file. Accepts what ComfyUI's picker writes --
     "a.png", "pasted/a.png", "a.png [output]" -- and confines the result to
-    that root (``base`` stands in for the input folder in tests)."""
+    that root (``base`` stands in for the input folder in tests). " [bundled]"
+    names a picture shipped in the pack (BUNDLED_PHOTO_DIR)."""
     name = str(filename or "")
     if not SAFE_PHOTO_NAME.match(name) or ".." in name.replace("\\", "/").split("/"):
         return ""
@@ -215,6 +228,7 @@ def photo_hash(path: str) -> str:
     return digest.hexdigest()
 
 
-__all__ = ["SAFE_PHOTO_NAME", "PHOTOS_PER_CHARACTER", "name_key", "parse_photo_lines",
+__all__ = ["SAFE_PHOTO_NAME", "PHOTOS_PER_CHARACTER", "BUNDLED_PHOTO_DIR", "name_key",
+           "parse_photo_lines",
            "photo_list", "match_cast", "add_photo", "merge_photos", "photos_fingerprint",
            "input_dir", "resolve_photo", "photo_hash"]

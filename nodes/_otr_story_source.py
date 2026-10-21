@@ -68,18 +68,16 @@ def raw_fields_from_ledger(ledger_data) -> dict | None:
 
 
 def fidelity_wanted(meta) -> bool:
-    """True when my_story has a listener's own words to stay faithful to.
+    """True when the ledger is a My Story episode, whose source it must keep.
 
-    A blank roll floors DEFAULT_IDEA and stamps house_source. That constant
-    is house-authored; rewriting against it defends our own text from ourselves.
-    Typed fields keep the full apparatus.
+    Typed fields and the house DEFAULT_STORY alike: the floor is the author's
+    own book (operator, 2026-10-20), so a blank roll is held to it exactly as
+    a typed run is held to the listener's words. house_source still records
+    which one it was; it no longer switches fidelity off.
     """
     if not isinstance(meta, dict):
         return False
-    story = meta.get("my_story")
-    if not isinstance(story, dict):
-        return False
-    return not bool(story.get("house_source"))
+    return isinstance(meta.get("my_story"), dict)
 
 
 def _complete_repair(*, original_prompt, failed_output, error):

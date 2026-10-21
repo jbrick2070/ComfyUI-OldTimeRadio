@@ -874,21 +874,35 @@ def beat_partner_char_ids(lines, cast_by_id):
     return out
 
 
-def _identity_photos_from_policy(policy_json, cast, warnings):
+def _identity_photos_from_policy(policy_json, cast, warnings, meta=None):
     """``{char_id: photo file}`` for the image policy's character photos.
 
     The ONE place a photo's name is matched to the cast (OTR_ImageDirector
     only parses the lines): by the folded name, to exactly one cast member.
     A name no one has, or two share, is a warning and the photo is unused --
     never a guess. A missing or malformed policy means no photos.
+
+    The house My Story (``meta["my_story"]["house_source"]``: nothing was
+    typed, so the writer told the author's own story) brings the author's
+    shipped pictures of its two leads when the policy names none. Given
+    photos always win, and a typed story never gets his.
     """
     try:
         pol = json.loads(policy_json or "{}")
     except (ValueError, TypeError):
-        return {}
+        pol = {}
     photos = pol.get("character_photos") if isinstance(pol, dict) else None
     if not isinstance(photos, dict) or not photos:
-        return {}
+        story = (meta or {}).get("my_story") if isinstance(meta, dict) else None
+        if not (isinstance(story, dict) and story.get("house_source")):
+            return {}
+        try:
+            from ._otr_story_input import DEFAULT_STORY_PHOTOS  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_story_input import DEFAULT_STORY_PHOTOS  # type: ignore
+        photos = {name: list(files) for name, files in DEFAULT_STORY_PHOTOS.items()}
+        log.info("[OTR_MetaBrief] house My Story: the author's shipped photos of %s",
+                 ", ".join(sorted(photos)))
     try:
         from ._otr_shared import character_photos as _photos  # type: ignore
     except ImportError:  # pragma: no cover -- flat test imports
@@ -2842,7 +2856,7 @@ class OTRMetaBriefImagePromptGen:
             source_model_id=source_model_id,
             source_binding_model_id=source_binding_model_id,
             identity_photos=_identity_photos_from_policy(
-                image_policy_json, cast, warnings),
+                image_policy_json, cast, warnings, meta=meta),
         )  # aspects + mesh-fodder + still_word + identity roles + video_models ride in image_policy_json
         warnings.extend(warn2)
 

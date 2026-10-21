@@ -19,7 +19,7 @@ def bank_row():
 def test_listener_bank_resolves_and_rolls_like_any_other():
     """OPERATOR DECISION 2026-09-13: my_story is roll-eligible on equal footing
     with every other shipped bank. It was excluded at birth because a blank
-    automatic run had nothing to write from; `_otr_story_input.DEFAULT_IDEA` is
+    automatic run had nothing to write from; `_otr_story_input.DEFAULT_STORY` is
     now that floor, so the exclusion no longer has a reason."""
     bank = RT.require_runnable_bank("my_story")
     assert RT.story_input_mode(bank) == "user_fields_v1"

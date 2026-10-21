@@ -21,7 +21,7 @@ LIVE_BANKS = (
     "shakespeare",
     # The creator bank. Added 2026-09-10 as manual-only; since 2026-09-13 it
     # rolls like every other row here, because a blank run now writes
-    # `_otr_story_input.DEFAULT_IDEA` instead of having nothing to write from.
+    # `_otr_story_input.DEFAULT_STORY` instead of having nothing to write from.
     # See test_rolls_*.
     "my_story",
 )

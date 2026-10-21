@@ -290,9 +290,9 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
     # NO GUARD AGAINST `story_input_mode=user_fields_v1` WITH `auto_select`
     # TRUE (operator decision 2026-09-13: "the roll needs to work"). A roll
     # landing on a bank whose source is the person's typed fields works,
-    # because `_otr_story_input` carries a DEFAULT_IDEA floor applied at every
+    # because `_otr_story_input` carries a DEFAULT_STORY floor applied at every
     # admission point: a user-fields bank with nothing typed into it writes the
-    # standing premise instead of refusing. Forbidding the combination would
+    # standing story instead of refusing. Forbidding the combination would
     # only stop the operator from putting the bank in the pool on purpose. If
     # that floor is ever removed, the guard (refuse that combination: "would
     # fail at admission every time") COMES BACK in the same change.
