@@ -533,12 +533,23 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
 
 ## Phase 3 -- demo and submission (Oct 26-29)
 
-- [ ] Record the demo: the app (both cards: a classic, and Tell my own story), the progress bar
-      with minutes left, then the finished episode.
-- [ ] Name every model and tool in the video: writer Gemma 4 12B (comfy_native int8); FLUX 3 Klein
-      stills; LTX 2.5 foley (mix4x8 DiT) video; Kokoro voices; Stable Audio 3 music; the upscaler
-      the workflow uses; comfy-sdk 0.5.0; comfy-api-proxy 0.1.6; ComfyUI 0.42.1; the OTR pack.
-- [ ] Why it is new: one press yields a cast-locked, shot-locked radio play on local open weights.
+- [x] DRAFT DEMO VIDEO (10-21 22:45): output/otr/episodes/demo_cuts/radio_play_studio_demo.mp4,
+      1:53, phone copy beside it. Black/purple, yellow and aquamarine palette (operator: "orange
+      isn't good"), Montserrat, lit letters; app shots (cards, cast with photos, live progress bar);
+      the unedited 35 s Seoul ending of the reference-stills demo; the 3D node walk naming every
+      model and tool (Gemma 4 12B, FLUX 3 Klein, LTX 2.5, Kokoro, Stable Audio 3, ffmpeg, ComfyUI,
+      the OTR pack, Comfy SDK, comfy-api-proxy); "whole story, not a clip" + open weights card.
+      Scripts: contest/radio-play-studio/demo_video/ (scenes.py, narrate.py, shoot_app.py, cut.py).
+      WAITING ON: the operator's watch-through with sound.
+- [x] RANGE REEL (10-21 night, operator: "take the best of the videos and make a conglomerate
+      showing range of languages 1,2,3,4 and story types 1,2,3 and something else 1,2 ... classic 3D
+      bold blocky lettering"; "showing my great taste in literature, Shakespeare, openness to
+      languages, but yeah some good dramatic moments too"): demo_cuts/radio_play_studio_range.mp4,
+      Languages 1-5 (English Twelfth Night, Spanish Much Ado, French film archive, Hindi Hamlet,
+      Japanese sci-fi news), Stories 1-3 (Shakespeare, his own story, sci-fi from the news), Looks 1-5
+      (Flatland engraving "I am falling" vs video art "I am rising", recursive fractal, cartoon My
+      Story, the 4060's AnimateDiff GUSTO). Builder: demo_video/build_reel.py + reel_cards.py.
+      Mandarin (Languages 6) waits for the RunPod redo with fonts.
 - [ ] README final pass (`contest/radio-play-studio/README.md`).
 - [ ] Submit through the Typeform. **The operator submits** (it is his entry and his account).
 
