@@ -16,9 +16,13 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 
 from .config import REFERENCE_TWIN_SUFFIX, Settings, reference_twin, validate_url
-from .form import (EPISODE_NODE_TYPE, MY_STORY_BANK, WRITER, apply_choices, describe_form,
-                   locate_nodes)
+from .form import (EPISODE_NODE_TYPE, FIELDS_BY_KEY, MY_STORY_BANK, WRITER, apply_choices,
+                   describe_form, locate_nodes)
 from .graph import fetch_object_info, load_workflow, workflow_to_api_prompt
+
+#: The still-engine dropdown the Still pictures field sets for the characters.
+DIRECTOR = FIELDS_BY_KEY["stills"].node_type
+STILLS_INPUT = FIELDS_BY_KEY["stills"].input
 
 VIDEO_SUFFIXES = (".mp4", ".webm", ".mov", ".mkv")
 
@@ -161,11 +165,21 @@ class Studio:
     def build_graph(self, choices: dict) -> tuple[dict, dict]:
         """`(api_graph, node_ids)` for these choices, from the workflow on disk
         and the server's live node definitions."""
-        workflow = load_workflow(self.workflow_for(choices))
+        path = self.workflow_for(choices)
+        workflow = load_workflow(path)
         schemas = self._fetch(self.settings.comfyui_url)
         graph = workflow_to_api_prompt(workflow, schemas)
         node_ids = locate_nodes(workflow)
+        director = graph.get(node_ids.get(DIRECTOR, ""), {}).get("inputs", {})
+        twin_character = (director.get(STILLS_INPUT)
+                          if path != Path(self.settings.workflow_path) else None)
         apply_choices(graph, schemas, node_ids, copy.deepcopy(choices))
+        # The page's Still pictures box shows the base model (flux3_klein), so a
+        # My Story run sends it back; on the reference twin that means the same
+        # model WITH references for the characters, never a silent loss of them.
+        chosen = str((choices or {}).get("stills") or "")
+        if isinstance(twin_character, str) and chosen and twin_character == chosen + "_ref":
+            director[STILLS_INPUT] = twin_character
         return graph, node_ids
 
     def stream(self, choices: dict) -> Iterator[dict]:

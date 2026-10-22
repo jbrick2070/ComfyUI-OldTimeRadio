@@ -548,3 +548,33 @@ def test_the_contest_default_is_the_open_weights_foley_graph():
     widgets = {n["type"]: n.get("widgets_values") for n in nodes}
     assert widgets["OTR_SilentComposite"][4:6] == ["off", "cpu"]      # no RTX VSR
     assert "flux3_klein_ref" in widgets["OTR_VideoDirector"]
+
+
+def test_the_still_box_keeps_the_twins_reference_stills(settings, schemas):
+    """The page's Still pictures box shows flux3_klein, so a My Story run sends it
+    back; on the reference twin the characters keep flux3_klein_ref (the GUSTO
+    run, 2026-10-21, would otherwise have lost them silently). Another pick wins,
+    and a story that runs the workflow as named takes the pick as it is."""
+    import json as _json
+    from radio_play_studio.runner import Studio
+    schemas["OTR_VideoDirector"]["input"]["required"]["character_image_model"][0].append(
+        "flux3_klein_ref")
+    named = settings.workflow_path
+    twin_graph = _json.loads(named.read_text(encoding="utf-8"))
+    for node in twin_graph["nodes"]:
+        if node["type"] == "OTR_VideoDirector":
+            node["widgets_values"] = ["flux3_klein", "flux3_klein_ref", "flux3_klein"]
+    named.with_name(named.stem + "_flux3_ref.json").write_text(
+        _json.dumps(twin_graph), encoding="utf-8")
+    studio = Studio(settings, client_factory=lambda url: None, fetch=lambda url: schemas)
+
+    def director(choices):
+        graph, ids = studio.build_graph(choices)
+        return graph[ids["OTR_VideoDirector"]]["inputs"]
+
+    kept = director({"bank": "my_story", "stills": "flux3_klein"})
+    assert kept["character_image_model"] == "flux3_klein_ref"
+    assert kept["announcer_image_model"] == kept["music_image_model"] == "flux3_klein"
+    assert director({"bank": "my_story", "stills": "moss_image"})["character_image_model"] == "moss_image"
+    assert director({"bank": "my_story"})["character_image_model"] == "flux3_klein_ref"
+    assert director({"bank": "shakespeare", "stills": "flux3_klein"})["character_image_model"] == "flux3_klein"
