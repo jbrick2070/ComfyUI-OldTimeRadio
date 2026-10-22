@@ -36,6 +36,7 @@ SECTIONS = [
         ("2", "VIDEO ART", "FLATLAND", "three_dimensions_20261021_150516", 79.0),
         ("3", "RECURSIVE FRACTAL", "THE ECHO OF THE DRAGON", "dragon_echo_20261009_014109", 43.0),
         ("4", "CARTOON", "THE LAST DUET", "final_duet_20261022_034335", 94.5),
+        ("5", "ANIMATEDIFF ON 8 GB", "GUSTO: SIDE B", "side_b_20261021_215830", 103.5),
     ]),
 ]
 EXTRA = WORK / "extra_clips.json"   # late episodes (Mandarin, Japanese) land here
