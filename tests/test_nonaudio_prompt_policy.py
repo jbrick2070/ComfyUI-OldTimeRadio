@@ -594,12 +594,57 @@ def test_no_joint_av_prompt_may_ask_for_a_CATEGORY(engine, banned):
     ("she pushes the heavy door open", "a door latch clacking"),
     ("rain hammering the window", "rain drumming"),
     ("papers scattered across the desk", "papers rustling"),
-    ("boots on the metal deck", "a hard metal clang"),
+    ("boots on the metal deck", "metal creaking and ringing faintly"),
     ("he lifts the telephone", "a receiver clattering onto its cradle"),
 ])
 def test_the_named_sounds_come_from_the_action_itself(core, expected_sound):
     assert expected_sound in ltx25.finish_joint_av_positive(
         "ltx25_foley_16gb", core)
+
+
+_IMPACT_WORDS = ("thud", "clang", "slam", "bang", "knock", "thump")
+
+
+@pytest.mark.parametrize("core", [
+    "the ledger lies open beside her",
+    "she leans on the iron rail",
+    "a crate stands in the corner",
+])
+def test_a_noun_alone_never_names_an_impact(core):
+    """2026-10-22: a noun with no verb is something handled or present, and a
+    clang, a thump or a lid thudding under it is how every beat came to sound
+    like a hit. A real blow is the impact row's job."""
+    for sound in ltx25.named_sounds_for(core):
+        assert not any(w in sound for w in _IMPACT_WORDS), (core, sound)
+
+
+def test_a_real_blow_still_names_the_impact():
+    assert "a loud heavy wooden thud echoing" in ltx25.named_sounds_for(
+        "he slams his fist on the table")
+
+
+@pytest.mark.parametrize("core,expected_sound", [
+    ("her boots crunch across the gravel", "gravel crunching underfoot"),
+    ("he trudges through deep snow", "snow crunching underfoot"),
+    ("she splashes through the puddle", "feet splashing through water"),
+    ("he pushes through the undergrowth", "leaves and branches rustling"),
+    ("she whirls toward the door", "a fast whoosh of air"),
+    ("he brushes his fingertips along the wall",
+     "fingertips brushing a rough surface"),
+])
+def test_movement_through_the_world_has_a_sound(core, expected_sound):
+    assert expected_sound in ltx25.named_sounds_for(core)
+
+
+@pytest.mark.parametrize("core,wrong_sound", [
+    ("a chill runs down her spine", "a fast whoosh of air"),
+    ("he eats a sandwich", "gravel crunching underfoot"),
+    ("her thoughts are muddled", "feet splashing through water"),
+    ("she peers through frosted glass", "snow crunching underfoot"),
+    ("she brushes his hand away", "leaves and branches rustling"),
+])
+def test_the_new_cues_do_not_fire_on_lookalike_words(core, wrong_sound):
+    assert wrong_sound not in ltx25.named_sounds_for(core)
 
 
 def test_an_action_with_no_cue_still_NAMES_sounds():

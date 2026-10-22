@@ -1273,6 +1273,17 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
     # beat_intent/traits off the beat row (stamped by `extract_beats` from
     # the frozen line), all as INPUT-ONLY context: the response schema, the
     # quote filter, and every ban below are unaffected by it.
+    #
+    # NO CONTACT MANDATE (2026-10-22, operator: "it seems they are always
+    # banging something on a desk ... the foley should be more expressive").
+    # This used to require that every beat "makes REAL CONTACT with an
+    # object", with a chart slapped onto the wooden desk as the worked
+    # example. The foley lanes decode their sound from these words, so every
+    # beat staged a hand hitting a prop: an AudioSet tagger on the 3-act
+    # demo's 189 foley stems put 56 in an impact class (door, slam, knock,
+    # bang) in its top two. The ask is now for the sound of the moment and
+    # the place -- ground, air, what is handled -- with a blow kept for a
+    # line that is one. The examples are words `_SOUND_LEXICON` maps.
     logline = str(((meta or {}).get("produced_story") or {})
                   .get("logline") or "").strip()
     key_objects = [str(o).strip() for o in (meta or {}).get("key_objects")
@@ -1289,12 +1300,17 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
         "physical actions, what the body actually DOES, the motion vector, "
         "not a pose. SCALE THE MOVEMENT TO THE LINE: a calm line earns small "
         "motion; an urgent, angry or frightened line earns real movement "
-        "(rises, strides, wheels around, slams, recoils, grabs, points), and "
-        "at least one of its actions makes REAL CONTACT with an object the "
-        "setting or the listed objects support -- name the concrete verbs, "
-        "objects and materials (a brass dial rolled down, a ledger snapped "
-        "shut, a chart slapped onto the wooden desk), because the shot's "
-        "sound is derived from exactly those words. Do not cap yourself at "
+        "(rises, strides, wheels around, recoils, lunges, points). The shot's "
+        "sound is derived from your words, so make the action SOUND like this "
+        "moment and this place, and vary it from beat to beat: what the body "
+        "moves through or stands on (boots crunching on gravel, a coat "
+        "snapping in the wind, feet splashing through a puddle, pushing "
+        "through branches), what it handles (a ledger's pages riffled, a "
+        "brass dial turned, a curtain pulled aside), or what it strikes -- "
+        "a blow only when the line is a blow. Those are kinds of sound, not "
+        "words to reuse: take the ground, the air and the objects from THIS "
+        "setting. Name the concrete verbs, objects and materials. Do not cap "
+        "yourself at "
         "fidgets. Then ONE camera movement, and it must be STRATEGIC: the move "
         "has to earn its place in THIS beat -- push in as a realisation lands, "
         "pull back as someone is left alone, tilt or crane to reveal the thing "

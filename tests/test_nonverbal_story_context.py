@@ -130,3 +130,32 @@ def test_a_sparse_beat_acquires_no_null_context_keys():
     assert "traits" not in row
     assert "Story (private context)" not in prompt
     assert "Objects on hand" not in prompt
+
+
+def test_the_director_no_longer_mandates_hitting_a_prop():
+    """2026-10-22 (operator: "always banging something on a desk"). The foley
+    lanes decode their sound from the director's words, and the old ask made
+    every beat touch an object, worked example a chart slapped onto a desk."""
+    ledger = _ledger()
+    prompt = sl._build_nonverbal_batch_prompt(
+        sl.extract_beats(ledger), _meta(), ledger, "a station")
+    assert "REAL CONTACT" not in prompt
+    assert "wooden desk" not in prompt
+    assert "slams" not in prompt
+    assert "a blow only when the line is a blow" in prompt
+    assert "take the ground, the air and the objects from THIS" in prompt
+
+
+def test_the_directors_sound_examples_are_words_the_lexicon_maps():
+    """An example the lexicon cannot hear would teach the director to write
+    sounds that never reach the prompt."""
+    from nodes._otr_video_engines import eng_ltx25 as ltx25
+    for example, sound in (
+            ("boots crunching on gravel", "gravel crunching underfoot"),
+            ("a coat snapping in the wind", "wind moaning"),
+            ("feet splashing through a puddle", "feet splashing through water"),
+            ("pushing through branches", "leaves and branches rustling"),
+            ("a ledger's pages riffled", "pages riffling"),
+            ("a brass dial turned", "close dial ticks and clicks"),
+            ("a curtain pulled aside", "cloth shifting")):
+        assert any(sound in s for s in ltx25.named_sounds_for(example)), example

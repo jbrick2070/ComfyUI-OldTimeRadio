@@ -2347,8 +2347,13 @@ _SOUND_LEXICON = (
     (("radio", "static", "transmit", "signal", "receiver", "dispatch"),
      "a strong burst of radio static"),
     (("glass", "bottle", "window", "mirror", "jar"), "glass clinking"),
+    # NOUN-ONLY ROWS NAME HANDLING, NOT HITTING (operator 2026-10-22: "always
+    # banging something on a desk ... the foley should be more expressive").
+    # These three rows fire on a noun with no verb, so a ledger lying open or a
+    # rail someone leans on was asking for a clang, a thump or a lid slam. A
+    # real blow is the impact row's job, and it sits first.
     (("metal", "steel", "iron", "pipe", "chain", "rail"),
-     "a hard metal clang and a bright latch snap"),
+     "metal creaking and ringing faintly"),
     (("rain", "storm", "downpour"), "rain drumming steadily"),
     (("wind", "gale", "draft"), "wind moaning"),
     (("fire", "flame", "burn", "match", "lantern"), "fire crackling"),
@@ -2361,8 +2366,8 @@ _SOUND_LEXICON = (
     # a ticking clock in an empty landscape. "clock" and "tick" carry it.
     (("clock", "tick"), "a clock ticking"),
     (("book", "ledger", "volume"),
-     "a deep book thump and a stiff cover creak"),
-    (("box", "crate", "lid", "case", "trunk"), "a wooden lid thudding"),
+     "pages riffling and a stiff cover creaking"),
+    (("box", "crate", "lid", "case", "trunk"), "a wooden lid creaking"),
     # NO WEAPON CUE, AND THAT IS DELIBERATE (r3 finding, 2026-08-28). The
     # banana route -- "transform every weapon noun", `_otr_banana_route.apply`
     # -- runs AFTER this tail is composed, on a PINNED ordering. Proven live:
@@ -2386,6 +2391,22 @@ _SOUND_LEXICON = (
     # matches "drag" -- motion text from the nonverbal director describes
     # physical actions, where that word does not occur.
     (("drag", "scrape", "shove", "slide"), "wood scraping across the floor"),
+    # MOVEMENT THROUGH THE WORLD, not only contact with it (2026-10-22). The
+    # director now asks for what the body moves through and stands on, and
+    # these rows give those words a sound. Leading-boundary audit: "spin" is
+    # NOT a cue (it matches "spine"), nor "duck" (the bird) nor "sand"
+    # ("sandal", "sandwich"), "mud" ("muddled") or "frost" ("frosted glass");
+    # "brush" belongs to the fingertips row as "brushes" and is kept out of
+    # the leaves row, where "she brushes his hand" would rustle leaves.
+    (("gravel", "pebble", "rubble", "cobble"), "gravel crunching underfoot"),
+    (("snow",), "snow crunching underfoot"),
+    (("puddle", "muddy", "splash", "wade"), "feet splashing through water"),
+    (("leaf", "leaves", "branch", "undergrowth", "grass"),
+     "leaves and branches rustling"),
+    (("whirl", "twirl", "pivot", "lunge", "leap", "swing", "flings"),
+     "a fast whoosh of air"),
+    (("brushes", "strokes", "graze", "trace", "fingertip", "caress"),
+     "fingertips brushing a rough surface"),
     (("coat", "cloth", "sleeve", "fabric", "curtain"), "cloth shifting"),
     (("step", "walk", "pace", "stride", "foot", "boot", "run"),
      "footsteps landing on the floor"),
