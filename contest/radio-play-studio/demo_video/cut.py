@@ -16,7 +16,7 @@ WORK = HERE / "cut_parts"
 WORK.mkdir(exist_ok=True)
 EXCERPT = next((HERE / "footage" / "excerpt").glob("*.mp4"))
 TAG = "UNEDITED OUTPUT \u00b7 3-ACT EPISODE \u00b7 RTX 5080 LAPTOP 16 GB"
-LIME = (228, 255, 58, 255)
+YELLOW = (255, 217, 31, 255)
 
 # (scene, narration line, seconds into the scene the voice starts)
 PLAN = [("type", None, 0), ("title", "s2", 0.3), ("cards", "s3", 0.35),
@@ -52,8 +52,8 @@ def tag_png():
     img = Image.new("RGBA", (1920, 1080), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     w = d.textlength(TAG, font=font)
-    d.rounded_rectangle((36, 30, 36 + w + 36, 84), radius=10, fill=(33, 25, 39, 210))
-    d.text((54, 38), TAG, font=font, fill=LIME)
+    d.rounded_rectangle((36, 30, 36 + w + 36, 84), radius=10, fill=(26, 13, 46, 215))
+    d.text((54, 38), TAG, font=font, fill=YELLOW)
     path = WORK / "tag.png"
     img.save(path)
     return path

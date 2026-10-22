@@ -7,10 +7,10 @@ Scenes: type, title, cards, nodes, ring, end. Output: renders/<scene>/####.png a
 1920x1080, 30 fps. --test renders 3 frames at 480x270 on the CPU (Cycles) so the
 GPU stays free for an episode render; a full render uses EEVEE on the GPU.
 
-Style after Comfy's launch video for the challenge: typewriter code on black,
-hot orange backdrops, lime heavy condensed all-caps type, app UI on dark purple
-panels, 3D rotating type. Fonts are Windows system fonts (Impact, Consolas,
-Bahnschrift); no Comfy logo or font is used.
+Motion after Comfy's launch video for the challenge (typewriter code, 3D rotating
+type, app UI on panels), in the operator's own palette: black and purple backdrops,
+yellow headlines, aquamarine secondary type. Fonts are Windows system fonts
+(Montserrat Bold, Consolas, Bahnschrift); no Comfy logo or font is used.
 """
 import json
 import math
@@ -25,12 +25,13 @@ HERE = Path(__file__).resolve().parent
 REPO = Path(r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio")
 WORKFLOW = REPO / "workflows" / "otr_16gb_foley_open_flux3_ref.json"
 FPS = 30
-ORANGE = (0.910, 0.392, 0.118)
-LIME = (0.894, 1.0, 0.227)
-PURPLE = (0.129, 0.098, 0.153)
-PANEL = (0.180, 0.137, 0.251)
-WHITE = (1.0, 1.0, 1.0)
-FONT_HEAVY = r"C:\Windows\Fonts\impact.ttf"
+# Palette (operator 10-21): "purple and aquamarine and black and yellow"; no orange.
+NIGHT = (0.035, 0.020, 0.060)     # black with a purple cast
+YELLOW = (1.0, 0.850, 0.120)      # headlines, card edges, sound bars
+AQUA = (0.300, 1.0, 0.800)        # secondary type, links
+PURPLE = (0.100, 0.050, 0.180)    # the app and node scenes' backdrop
+PANEL = (0.220, 0.120, 0.360)
+FONT_HEAVY = r"C:\Windows\Fonts\Montserrat-Bold.ttf"    # Impact read as blocky
 FONT_MONO = r"C:\Windows\Fonts\consola.ttf"
 FONT_UI = r"C:\Windows\Fonts\bahnschrift.ttf"
 
@@ -220,33 +221,30 @@ def scene_type():
     """1 -- black, a typewriter command line, a blinking cursor."""
     sc = reset(3.0, (0, 0, 0))
     camera((0, 0, 10), (0, 0, 0), lens=50)
-    t = text("", size=0.42, font=FONT_MONO, material=mat("lime", LIME, emit=3.0),
+    t = text("", size=0.42, font=FONT_MONO, material=mat("yellow", YELLOW, emit=3.0),
              align="LEFT", loc=(-3.6, 0.0, 0))
     typewriter(t, "> radio_play_studio --one-press", start=4, cps=24)
     return sc
 
 
 def scene_title():
-    """2 -- orange; RADIO PLAY STUDIO rotates in, extruded; the promise types on."""
-    sc = reset(max(7.5, CUES["lengths"]["s2"] + 0.4), ORANGE)
+    """2 -- RADIO PLAY STUDIO rotates in, lightly extruded; the promise types on."""
+    sc = reset(max(7.5, CUES["lengths"]["s2"] + 0.4), NIGHT)
     camera((0, -0.6, 11), (0, 0, 0), lens=45)
     lights(3.5)
     rake = bpy.data.objects.new("rake", bpy.data.lights.new("rake", "SUN"))
     rake.data.energy = 6.0
     rake.rotation_euler = (math.radians(15), math.radians(-75), 0)
     bpy.context.collection.objects.link(rake)
-    lime = mat("lime", LIME, emit=0.12, rough=0.35)
-    shadow = mat("shadow", (0.55, 0.20, 0.05), rough=0.9)
-    title = text("RADIO PLAY STUDIO", size=1.45, extrude=0.18, bevel=0.03, material=lime,
+    yellow = mat("yellow", YELLOW, emit=0.9, rough=0.35)    # lit on every face, never a dark side
+    title = text("RADIO PLAY STUDIO", size=0.85, extrude=0.06, bevel=0.03, material=yellow,
                  loc=(0, 0.55, 0), name="title")
-    back = text("RADIO PLAY STUDIO", size=1.45, extrude=0.02, material=shadow,
-                loc=(0.08, 0.47, -0.6), name="title_shadow")
-    for ob in (title, back):
+    for ob in (title,):
         key(ob, "rotation_euler", 1, (0, math.radians(-100), 0))
         key(ob, "rotation_euler", 22, (0, math.radians(9), 0))
         key(ob, "rotation_euler", 34, (0, 0, 0))
         key(ob, "rotation_euler", sc.frame_end, (math.radians(4), math.radians(-14), 0))
-    sub = text("", size=0.5, font=FONT_HEAVY, material=mat("white", WHITE, emit=1.5),
+    sub = text("", size=0.5, font=FONT_HEAVY, material=mat("aqua", AQUA, emit=1.5),
                loc=(0, -1.05, 0.2))
     typewriter(sub, "ONE PRESS. A WHOLE STORY.", start=40, cps=26, cursor="")
     return sc
@@ -262,7 +260,7 @@ def scene_cards():
     calls = {"01_cards": "PICK A STORY", "02_cast_cards": "YOUR OWN CAST",
              "03_progress": "LEARNS YOUR GPU"}
     span = sc.frame_end / max(1, len(shots))
-    lime = mat("lime", LIME, emit=2.5)
+    yellow = mat("yellow", YELLOW, emit=2.5)
     for i, shot in enumerate(shots):
         m, _ = image_mat(f"shot{i}", shot, emit=1.0)
         f0 = int(i * span) + 1
@@ -276,9 +274,16 @@ def scene_cards():
         key(p, "location", f1 - 10, (side * -1.6, 0.2, 0.4))
         key(p, "rotation_euler", f1 - 10, (math.radians(4), math.radians(side * 8), 0))
         key(p, "location", f1, (side * -16, 0.2, -2))
-        word = text(calls.get(shot.stem, "RADIO PLAY STUDIO"), size=0.95, extrude=0.12,
-                    material=lime, loc=(side * 3.0, -3.0, 2.6))
+        call = calls.get(shot.stem, "RADIO PLAY STUDIO")
+        word = text(call, size=0.55, extrude=0.04, material=yellow,
+                    loc=(side * 2.4, -1.9, 3.0))
         word.rotation_euler = (math.radians(12), 0, math.radians(side * 3))
+        # A dark plate behind the call, so it reads over the screenshot.
+        plate = plane(len(call) * 0.42 + 0.6, 0.9, mat(f"call_plate{i}", PANEL, emit=0.2),
+                      loc=(0, 0, -0.06))
+        plate.parent = word
+        for ob in (word, plate):
+            ob.visible_shadow = False         # no wedge of shadow across the screenshot
         pop(word, f0 + 20)
         key(word, "scale", f1 - 6, (1, 1, 1))
         key(word, "scale", f1, (0, 0, 0))
@@ -289,8 +294,8 @@ def node_cards(px=1 / 230.0):
     """The real workflow, laid out as 3D cards; returns {node id: (x, y, w, h)}."""
     g = json.loads(WORKFLOW.read_text(encoding="utf-8"))
     card_m = mat("card", PANEL, emit=0.15, rough=0.7)
-    edge_m = mat("edge", LIME, emit=4.0)
-    label_m = mat("label", WHITE, emit=1.2)
+    edge_m = mat("edge", YELLOW, emit=4.0)
+    label_m = mat("label", AQUA, emit=1.2)
     where = {}
     for n in g["nodes"]:
         if n["type"] in ("Note", "MarkdownNote"):
@@ -307,7 +312,7 @@ def node_cards(px=1 / 230.0):
         text(title.upper(), size=0.28, font=FONT_UI, material=label_m, align="LEFT",
              loc=(x - w / 2 + 0.15, y + h / 2 - 0.3, 0.1))
         where[n["id"]] = (x, y, w, h)
-    link_m = mat("link", LIME, emit=2.5)
+    link_m = mat("link", AQUA, emit=2.5)
     order = []
     for _lid, src, _ss, dst, _ds, _typ in g["links"]:
         if src not in where or dst not in where:
@@ -342,7 +347,7 @@ def scene_nodes():
     seconds = lead + CUES["lengths"]["s5"] + 1.5
     sc = reset(seconds, PURPLE)
     lights(2.5)
-    floor = plane(200, 200, mat("floor", (0.09, 0.07, 0.11), rough=0.9), loc=(10, -6, -0.2))
+    floor = plane(200, 200, mat("floor", (0.05, 0.025, 0.09), rough=0.9), loc=(10, -6, -0.2))
     where, links = node_cards()
     # Links draw themselves in, left to right, over the opening overview.
     for x, cu in sorted(links, key=lambda t: t[0]):
@@ -364,7 +369,7 @@ def scene_nodes():
     key(tgt, "location", 1, (mid[0], mid[1], 0))
     key(cam, "location", f(starts[1]) - 40, (mid[0] - 4, mid[1] - 14, 20))
     key(tgt, "location", f(starts[1]) - 40, (mid[0] - 4, mid[1], 0))
-    lime = mat("lime", LIME, emit=1.0, rough=0.35)
+    yellow = mat("yellow", YELLOW, emit=1.0, rough=0.35)
     stills = sorted(HERE.joinpath("footage", "stills").glob("*.png"))[:6]
     video = next(iter(sorted(HERE.joinpath("footage").glob("*.mp4"))), None)
     for i, (nid, label, sent, fly) in enumerate(stops):
@@ -380,9 +385,9 @@ def scene_nodes():
         end = f(starts[sent + 1]) - 8 if sent + 1 < len(starts) else sc.frame_end - 10
         key(cam, "location", end, (x + 0.5, y - 9.0, 8.0))
         key(tgt, "location", end, (x + 2.0, y, 0.8))
-        tag = text(label, size=0.8, extrude=0.1, material=lime,
+        tag = text(label, size=0.7, extrude=0.04, material=yellow,
                    loc=(x, y + h / 2 + 0.9, 1.4), rot=(math.radians(70), 0, 0))
-        plate = plane(len(label) * 0.5 + 0.8, 1.15, mat(f"plate{i}", (0.06, 0.04, 0.08)),
+        plate = plane(len(label) * 0.6 + 0.8, 1.15, mat(f"plate{i}", (0.06, 0.04, 0.08)),
                       loc=(0, 0, -0.06))
         plate.parent = tag
         pop(tag, at)
@@ -414,7 +419,7 @@ def _fly(kind, x, y, at, end, stills, video, i):
     elif kind == "bars":
         rnd = random.Random(i)
         for k in range(16):
-            b = box(0.12, 0.12, 1.0, mat(f"bar{i}{k}", LIME, emit=3.0),
+            b = box(0.12, 0.12, 1.0, mat(f"bar{i}{k}", YELLOW, emit=3.0),
                     loc=(x - 0.9 + k * 0.13, y + 0.5, 0.8))
             for s in range(0, max(6, end - 4 - at), 6):     # stop before the clear
                 hgt = 0.2 + rnd.random() * 1.0
@@ -448,13 +453,13 @@ def _fly(kind, x, y, at, end, stills, video, i):
 def scene_ring():
     """6 -- the claim, then every open model and tool on a turning 3D ring."""
     seconds = max(13.0, CUES["lengths"]["s6"] + 1.8)
-    sc = reset(seconds, ORANGE)
+    sc = reset(seconds, NIGHT)
     camera((0, -2.0, 13), (0, 0, 0), lens=40)
     lights(3.5)
-    lime = mat("lime", LIME, emit=0.6, rough=0.35)
-    white = mat("white", WHITE, emit=1.2)
-    a = text("OTHER TOOLS MAKE CLIPS", size=0.9, extrude=0.15, material=white, loc=(0, 1.0, 0))
-    b = text("THIS MAKES A WHOLE STORY", size=1.15, extrude=0.25, bevel=0.02, material=lime,
+    yellow = mat("yellow", YELLOW, emit=0.9, rough=0.35)
+    aqua = mat("aqua", AQUA, emit=1.2)
+    a = text("OTHER TOOLS MAKE CLIPS", size=0.6, extrude=0.05, material=aqua, loc=(0, 1.0, 0))
+    b = text("THIS MAKES A WHOLE STORY", size=0.68, extrude=0.06, bevel=0.02, material=yellow,
              loc=(0, -0.4, 0))
     pop(a, 5)
     pop(b, 50)
@@ -462,34 +467,34 @@ def scene_ring():
     for ob in (a, b):
         key(ob, "location", third - 1, tuple(ob.location))
         key(ob, "location", third + 12, (ob.location.x, ob.location.y + 9, ob.location.z))
-    head = text("OPEN WEIGHTS ONLY", size=1.0, extrude=0.2, bevel=0.02, material=lime,
+    head = text("OPEN WEIGHTS ONLY", size=0.9, extrude=0.06, bevel=0.02, material=yellow,
                 loc=(0, 2.6, 0.5))
     pop(head, third + 10)
     models = ["GEMMA 4 12B", "FLUX 3 KLEIN", "LTX 2.5", "KOKORO", "STABLE AUDIO 3"]
     tools = ["FFMPEG", "COMFYUI", "OLD-TIME RADIO PACK", "COMFY SDK", "COMFY-API-PROXY"]
-    for col, (names, m, x0) in enumerate(((models, lime, -2.9), (tools, white, 2.9))):
+    for col, (names, m, x0) in enumerate(((models, yellow, -2.9), (tools, aqua, 2.9))):
         for k, n in enumerate(names):
-            t = text(n, size=0.58, extrude=0.05, material=m, loc=(x0, 1.15 - k * 0.8, 0.2))
+            t = text(n, size=0.5, extrude=0.03, material=m, loc=(x0, 1.15 - k * 0.8, 0.2))
             pop(t, third + 16 + col * 4 + k * 3)
     return sc
 
 
 def scene_end():
     """7 -- the title settles; link, hashtag, byline."""
-    sc = reset(7.0, ORANGE)
+    sc = reset(7.0, NIGHT)
     camera((0, -0.4, 11), (0, 0, 0), lens=45)
     lights(3.5)
-    lime = mat("lime", LIME, emit=0.6, rough=0.35)
-    white = mat("white", WHITE, emit=1.3)
-    t = text("RADIO PLAY STUDIO", size=1.3, extrude=0.25, bevel=0.03, material=lime,
+    yellow = mat("yellow", YELLOW, emit=0.9, rough=0.35)
+    aqua = mat("aqua", AQUA, emit=1.3)
+    t = text("RADIO PLAY STUDIO", size=0.8, extrude=0.06, bevel=0.03, material=yellow,
              loc=(0, 1.0, 0))
     key(t, "rotation_euler", 1, (0, math.radians(30), 0))
     key(t, "rotation_euler", 30, (0, 0, 0))
     text("github.com/jbrick2070/ComfyUI-OldTimeRadio", size=0.36, font=FONT_UI,
-         material=white, loc=(0, -0.35, 0.1))
-    h = text("#OPENSOURCEHIGGSFIELD", size=0.62, extrude=0.08, material=white, loc=(0, -1.2, 0.1))
+         material=aqua, loc=(0, -0.35, 0.1))
+    h = text("#OPENSOURCEHIGGSFIELD", size=0.55, extrude=0.03, material=aqua, loc=(0, -1.2, 0.1))
     pop(h, 24)
-    by = text("BY JEFFREY A. BRICK", size=0.42, material=white, loc=(0, -2.05, 0.1))
+    by = text("BY JEFFREY A. BRICK", size=0.42, material=aqua, loc=(0, -2.05, 0.1))
     pop(by, 40)
     return sc
 
