@@ -7,7 +7,7 @@ draft to paste from; every number is from a logged run on 2026-10-19.
 ## Before submitting (blockers)
 
 - [x] **Demo video under 2 minutes** (the form says so): https://youtu.be/UeQQeVMaMVs (1:53, posted 10-22).
-- [ ] **Social post** tagging #OpenSourceHiggsfield (X, IG, Reddit, TikTok...) -- the operator posts.
+- [x] **Social post** tagging #OpenSourceHiggsfield: https://www.instagram.com/reel/DezJQFfOLT3/ (Instagram reel, 10-22).
 - [x] **Code link that will not move:** operator 2026-10-20, "merge the contest branch into main
       now so the code link does not move" -- the app is on `main`.
 - [x] **Open weights -- DECIDED (operator 2026-10-20: "we skip VSR, we stay open weight";
@@ -54,7 +54,7 @@ Radio Play Studio
   wants one, the 5-minute stills workflow (`--workflow workflows/otr_16gb_still.json`) behind a
   password and a tunnel is the only realistic shape -- the app is loopback-only today and would need
   a login added first. Recommended: leave blank.
-- **Social post link:** -- after posting.
+- **Social post link:** https://www.instagram.com/reel/DezJQFfOLT3/
 
 ## Q7. Which parts of ComfyUI did you use?
 Comfy SDK (comfy-sdk 0.5.0) driving a self-hosted ComfyUI through comfy-api-proxy (the Comfy API
