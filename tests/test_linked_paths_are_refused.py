@@ -134,3 +134,39 @@ def test_staging_refuses_a_name_with_a_folder_in_it(tmp_path, monkeypatch):
     with pytest.raises(WB.GraphExecutionError):
         WB.stage_into_comfy_input(str(src), "..\\escape.png")
     assert WB.stage_into_comfy_input(str(src), "ok.png") == "ok.png"
+
+
+def test_a_bundled_my_story_photo_still_stages_as_a_reference(tmp_path, monkeypatch):
+    """Sonnet QA 2026-10-22: the reference read's confinement first refused the
+    pack's own bundled photos, which the built-in My Story reads in place --
+    every built-in My Story still would have failed."""
+    from nodes._otr_image_engines import flux3_klein as F3
+    from nodes._otr_shared.character_photos import BUNDLED_PHOTO_DIR
+    photo = os.path.join(BUNDLED_PHOTO_DIR, "jeffrey_1.jpg")
+    assert os.path.isfile(photo)
+    staged = {}
+
+    class _Bridge:
+        @staticmethod
+        def stage_into_comfy_input(src, name):
+            staged["src"], staged["name"] = src, name
+            return name
+
+    name = F3._stage_reference(_Bridge, photo)
+    assert name.startswith("otr_ref_") and name.endswith(".jpg")
+    assert os.path.samefile(staged["src"], photo)
+
+
+def test_a_reference_outside_every_root_is_refused(allowed):
+    from nodes._otr_image_engines import flux3_klein as F3
+    _root, outside = allowed
+    stray = outside / "stray.png"
+    stray.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    class _Bridge:
+        @staticmethod
+        def stage_into_comfy_input(src, name):
+            raise AssertionError("must not stage")
+
+    with pytest.raises(Exception):
+        F3._stage_reference(_Bridge, str(stray))
