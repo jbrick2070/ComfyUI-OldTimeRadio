@@ -154,7 +154,7 @@ def test_the_directors_sound_examples_are_words_the_lexicon_maps():
             ("boots crunching on gravel", "gravel crunching underfoot"),
             ("a coat snapping in the wind", "wind moaning"),
             ("feet splashing through a puddle", "feet splashing through water"),
-            ("pushing through branches", "leaves and branches rustling"),
+            ("pushing through the undergrowth", "leaves and branches rustling"),
             ("a ledger's pages riffled", "pages riffling"),
             ("a brass dial turned", "close dial ticks and clicks"),
             ("a curtain pulled aside", "cloth shifting")):

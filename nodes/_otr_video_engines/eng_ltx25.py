@@ -2329,6 +2329,32 @@ _SOUND_LEXICON = (
     # body actions, not interior states.
     (("slam", "pound", "punch", "bang", "smack", "fist"),
      "a loud heavy wooden thud echoing"),
+    # MOVEMENT THROUGH THE WORLD, not only contact with it (2026-10-22). The
+    # director now asks for what the body moves through and stands on, and
+    # these rows give those words a sound. They sit RIGHT AFTER THE IMPACT
+    # ROW because priority is lexicon order and only three sounds are named:
+    # at the bottom they lost to any handled object on the same beat (Sonnet
+    # QA: "walks through snow, grabs the ledger, turns the dial, opens the
+    # box" named dial, ledger and box and never the snow).
+    # Leading-boundary audit -- each of these is NOT a cue, and why:
+    # "spin" (spine), "duck" (the bird), "sand" (sandal, sandwich), "mud"
+    # (muddled), "frost" (frosted glass), "leaf"/"leaves" (leaflet, and
+    # "she leaves the office" -- the verb is the commoner use), "branch"
+    # (branch office, branching), "cobble" (cobbler), "graze" (a bullet
+    # grazed him, cattle grazing), "trace" (traces a line on the map),
+    # "strokes" (brush strokes). "brush" alone stays out too: "brushes"
+    # is the fingertips row, and "she brushes his hand" must not rustle
+    # leaves.
+    (("gravel", "pebble", "rubble", "cobblestone"),
+     "gravel crunching underfoot"),
+    (("snow",), "snow crunching underfoot"),
+    (("puddle", "muddy", "splash", "wade"), "feet splashing through water"),
+    (("undergrowth", "foliage", "bushes", "thicket", "grass"),
+     "leaves and branches rustling"),
+    (("whirl", "twirl", "pivot", "lunge", "leap", "swing", "flings"),
+     "a fast whoosh of air"),
+    (("brushes", "fingertip", "caress"),
+     "fingertips brushing a rough surface"),
     (("door", "hatch", "gate"), "a door latch clacking and hinges creaking"),
     (("typewriter", "typing", "keyboard"), "typewriter keys striking"),
     (("switch", "lever", "console", "panel", "control"),
@@ -2391,22 +2417,6 @@ _SOUND_LEXICON = (
     # matches "drag" -- motion text from the nonverbal director describes
     # physical actions, where that word does not occur.
     (("drag", "scrape", "shove", "slide"), "wood scraping across the floor"),
-    # MOVEMENT THROUGH THE WORLD, not only contact with it (2026-10-22). The
-    # director now asks for what the body moves through and stands on, and
-    # these rows give those words a sound. Leading-boundary audit: "spin" is
-    # NOT a cue (it matches "spine"), nor "duck" (the bird) nor "sand"
-    # ("sandal", "sandwich"), "mud" ("muddled") or "frost" ("frosted glass");
-    # "brush" belongs to the fingertips row as "brushes" and is kept out of
-    # the leaves row, where "she brushes his hand" would rustle leaves.
-    (("gravel", "pebble", "rubble", "cobble"), "gravel crunching underfoot"),
-    (("snow",), "snow crunching underfoot"),
-    (("puddle", "muddy", "splash", "wade"), "feet splashing through water"),
-    (("leaf", "leaves", "branch", "undergrowth", "grass"),
-     "leaves and branches rustling"),
-    (("whirl", "twirl", "pivot", "lunge", "leap", "swing", "flings"),
-     "a fast whoosh of air"),
-    (("brushes", "strokes", "graze", "trace", "fingertip", "caress"),
-     "fingertips brushing a rough surface"),
     (("coat", "cloth", "sleeve", "fabric", "curtain"), "cloth shifting"),
     (("step", "walk", "pace", "stride", "foot", "boot", "run"),
      "footsteps landing on the floor"),

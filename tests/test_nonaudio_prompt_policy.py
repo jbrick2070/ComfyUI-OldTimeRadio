@@ -628,6 +628,10 @@ def test_a_real_blow_still_names_the_impact():
     ("he trudges through deep snow", "snow crunching underfoot"),
     ("she splashes through the puddle", "feet splashing through water"),
     ("he pushes through the undergrowth", "leaves and branches rustling"),
+    ("walks through snow, grabs the ledger, turns the dial, opens the box",
+     "snow crunching underfoot"),
+    ("boots crunching on gravel past the door and the window",
+     "gravel crunching underfoot"),
     ("she whirls toward the door", "a fast whoosh of air"),
     ("he brushes his fingertips along the wall",
      "fingertips brushing a rough surface"),
@@ -642,6 +646,11 @@ def test_movement_through_the_world_has_a_sound(core, expected_sound):
     ("her thoughts are muddled", "feet splashing through water"),
     ("she peers through frosted glass", "snow crunching underfoot"),
     ("she brushes his hand away", "leaves and branches rustling"),
+    ("she leaves the office and closes the door", "leaves and branches rustling"),
+    ("the cobbler mends a shoe", "gravel crunching underfoot"),
+    ("a bullet grazed his arm", "fingertips brushing a rough surface"),
+    ("she traces a line on the map", "fingertips brushing a rough surface"),
+    ("he takes a leaflet", "leaves and branches rustling"),
 ])
 def test_the_new_cues_do_not_fire_on_lookalike_words(core, wrong_sound):
     assert wrong_sound not in ltx25.named_sounds_for(core)

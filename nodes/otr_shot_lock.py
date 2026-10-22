@@ -1305,7 +1305,7 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
         "moment and this place, and vary it from beat to beat: what the body "
         "moves through or stands on (boots crunching on gravel, a coat "
         "snapping in the wind, feet splashing through a puddle, pushing "
-        "through branches), what it handles (a ledger's pages riffled, a "
+        "through undergrowth), what it handles (a ledger's pages riffled, a "
         "brass dial turned, a curtain pulled aside), or what it strikes -- "
         "a blow only when the line is a blow. Those are kinds of sound, not "
         "words to reuse: take the ground, the air and the objects from THIS "
