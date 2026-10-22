@@ -24,6 +24,7 @@ SECTIONS = [
         ("2", "ESPAÑOL", "MUCH ADO ABOUT NOTHING", "balthasar_song_es_20261022_033941", 26.5),
         ("3", "FRANÇAIS", "THE FILM ARCHIVE", "red_emotion_fr_20261022_034355", 27.5),
         ("4", "HINDI", "HAMLET", "mist_fear_hi_20261022_034113", 19.5),
+        ("5", "JAPANESE", "SIGNAL LOST", "lost_signal_ja_20261022_034530", 55.5),
     ]),
     ("STORIES", [
         ("1", "SHAKESPEARE", "TWELFTH NIGHT", "bird_bolts_20261022_034014", 51.5),
@@ -34,6 +35,7 @@ SECTIONS = [
         ("1", "STORYBOOK ENGRAVING", "FLATLAND", "three_dimensions_20261021_171919", 227.0),
         ("2", "VIDEO ART", "FLATLAND", "three_dimensions_20261021_150516", 79.0),
         ("3", "RECURSIVE FRACTAL", "THE ECHO OF THE DRAGON", "dragon_echo_20261009_014109", 43.0),
+        ("4", "CARTOON", "THE LAST DUET", "final_duet_20261022_034335", 94.5),
     ]),
 ]
 EXTRA = WORK / "extra_clips.json"   # late episodes (Mandarin, Japanese) land here
