@@ -35,9 +35,10 @@ SECTIONS = [
     ("LOOKS", [
         ("1", "STORYBOOK ENGRAVING", "FLATLAND", "three_dimensions_20261021_171919", 227.0),
         ("2", "VIDEO ART", "FLATLAND", "three_dimensions_20261021_150516", 79.0),
-        ("3", "RECURSIVE FRACTAL", "THE ECHO OF THE DRAGON", "dragon_echo_20261009_014109", 43.0),
-        ("4", "CARTOON", "THE LAST DUET", "final_duet_20261022_034335", 94.5),
-        ("5", "ANIMATEDIFF ON 8 GB", "GUSTO: SIDE B", "side_b_20261021_215830", 103.5),
+        ("3", "ARCHIVAL DOCUMENTARY", "FLATLAND", "three_dimensions_20261022_034357", 89.5),
+        ("4", "RECURSIVE FRACTAL", "THE ECHO OF THE DRAGON", "dragon_echo_20261009_014109", 43.0),
+        ("5", "CARTOON", "THE LAST DUET", "final_duet_20261022_034335", 94.5),
+        ("6", "ANIMATEDIFF ON 8 GB", "GUSTO: SIDE B", "side_b_20261021_215830", 103.5),
     ]),
 ]
 EXTRA = WORK / "extra_clips.json"   # late episodes (Mandarin, Japanese) land here
