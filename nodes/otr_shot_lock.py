@@ -1129,6 +1129,98 @@ DIRECTIVE_TOKEN_CEILING = 2400         # escalation stop: past this the prompt i
 # taxonomy and also works for an injected `llm_fn`.
 
 
+#: THE DIRECTOR WRITES THE FOLEY (2026-10-22, operator: "have them write
+#: foley prompts for a variety of non-verbal sound effects that may
+#: co-occur"). On a lane that decodes its audio from the prompt, the
+#: nonverbal director also answers a ``sound`` key: up to three sounds the
+#: moment makes at once. The deterministic `_SOUND_LEXICON` in eng_ltx25 stays
+#: as the fallback for every beat this key does not fill.
+_SOUND_KEY = "sound"
+_SOUND_MAX_ITEMS = 3
+_SOUND_MAX_WORDS = 24
+
+#: A JOINT-AV LATENT SPEAKS WHAT IT READS ("Queen of the Fairies",
+#: 2026-08-28), so a director sound that names a voice, a song or music is
+#: dropped whole, never trimmed. WHOLE WORDS WITH THEIR ENDINGS, not bare
+#: stems: a stem pass drops "crystal" (cry), "a single bell" (sing),
+#: "cockpit" (cock) and "human" (hum), and every false drop costs a beat its
+#: written sound.
+_SOUND_VOCAL_WORDS = (
+    r"voic(?:e|es|ed|ing)", r"speak(?:s|ing)?", r"speech(?:es)?",
+    r"spoken?", r"talk(?:s|ing|ed)?", r"words?", r"whisper(?:s|ing|ed)?",
+    r"murmur(?:s|ing|ed)?", r"mutter(?:s|ing|ed)?", r"sing(?:s|ing|er)?",
+    r"sang", r"sung", r"songs?", r"hum(?:s|ming|med)?", r"chant(?:s|ing)?",
+    r"choirs?", r"music(?:al)?", r"melod(?:y|ies|ic)", r"tunes?",
+    r"breath(?:s|ing|e|es|ed)?", r"gasp(?:s|ing|ed)?", r"sigh(?:s|ing|ed)?",
+    r"pant(?:s|ing|ed)?", r"moan(?:s|ing|ed)?", r"groan(?:s|ing|ed)?",
+    r"grunt(?:s|ing|ed)?", r"scream(?:s|ing|ed)?", r"shout(?:s|ing|ed)?",
+    r"yell(?:s|ing|ed)?", r"cr(?:y|ies|ying|ied)", r"sob(?:s|bing|bed)?",
+    r"laugh(?:s|ing|ed|ter)?", r"giggl(?:e|es|ing|ed)", r"chuckl(?:e|es|ing|ed)",
+    r"call(?:s|ing|ed)?", r"say(?:s|ing)?", r"said", r"nam(?:e|es|ed)",
+)
+#: The banana route rewrites weapon nouns in the PICTURE after compose, so a
+#: sound like "a hammer clicking back" would score a revolver the screen no
+#: longer shows. The lexicon has no weapon row for the same reason.
+_SOUND_WEAPON_WORDS = (
+    r"guns?", r"gunfire", r"gunshots?", r"pistols?", r"revolvers?",
+    r"rifles?", r"shotguns?", r"muskets?", r"triggers?", r"bullets?",
+    r"cartridges?", r"holsters?", r"firearms?", r"hammer (?:click|cock)\w*",
+)
+_SOUND_BANNED = re.compile(
+    r"\b(?:" + "|".join(_SOUND_VOCAL_WORDS + _SOUND_WEAPON_WORDS) + r")\b",
+    re.IGNORECASE)
+
+
+def _clean_director_sound(value: str, cast_names=()) -> tuple:
+    """Vet one director ``sound`` answer. Returns ``(sound, reason)``.
+
+    ``sound`` is the cleaned comma list, or "" with ``reason`` saying why it
+    was dropped. Dropped whole, never trimmed: a half-kept answer is a sound
+    the director did not write. Pure.
+    """
+    text = " ".join(str(value or "").split()).strip(" ,.;:")
+    if not text:
+        return "", ""
+    items = [i.strip(" .;:") for i in text.split(",") if i.strip(" .;:")]
+    if not items:
+        return "", ""
+    if len(items) > _SOUND_MAX_ITEMS or len(text.split()) > _SOUND_MAX_WORDS:
+        return "", "longer than %d sounds / %d words" % (
+            _SOUND_MAX_ITEMS, _SOUND_MAX_WORDS)
+    hit = _SOUND_BANNED.search(text)
+    if hit:
+        return "", "names a voice, music or weapon (%r)" % hit.group(0)
+    # A capital letter inside an item is a proper noun -- a name or a title,
+    # the exact text this lane has been caught speaking aloud.
+    for item in items:
+        if any(w[:1].isupper() for w in item.split()[1:]):
+            return "", "names a proper noun (%r)" % item
+    low = text.lower()
+    for name in cast_names or ():
+        nm = str(name or "").strip().lower()
+        if len(nm) >= 3 and re.search(r"\b" + re.escape(nm) + r"\b", low):
+            return "", "names a cast member"
+    return ", ".join(i[:1].lower() + i[1:] for i in items), ""
+
+
+def _lane_decodes_audio(engine_id) -> bool:
+    """True when ``engine_id`` builds its sound from the composed prompt.
+
+    The LOCAL foley and mime lanes only: they are the ones whose composer
+    seats a director sound. The cloud foley lane keeps the lexicon tail.
+    Fail-soft False, so a missing engine module asks for nothing new.
+    """
+    try:
+        try:
+            from ._otr_video_engines.eng_ltx25 import _JOINT_AV_ENGINES
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_video_engines.eng_ltx25 import _JOINT_AV_ENGINES
+    except Exception:  # noqa: BLE001
+        return False
+    eid = str(engine_id or "")
+    return eid in _JOINT_AV_ENGINES and not eid.startswith("cloud_")
+
+
 def _directive_token_budget(beat_count: int) -> int:
     """Reply budget for a derivation batch of ``beat_count`` beats.
 
@@ -1195,6 +1287,8 @@ def _parse_directives(raw: str, expected_ids: list) -> dict:
             # passed through the consistency gate (a hallucinated text_prompt
             # that drops the cast/setting falls back to the template).
             parsed["text_prompt"] = str(row.get("text_prompt") or "").strip()
+            # Optional, and only ever asked of a lane that decodes audio.
+            parsed[_SOUND_KEY] = str(row.get(_SOUND_KEY) or "").strip()
             out[bid] = parsed
     return out
 
@@ -1252,7 +1346,7 @@ def _build_batch_prompt(batch: list, meta: dict, ledger: dict, setting: str) -> 
 
 
 def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
-                                  setting: str) -> str:
+                                  setting: str, ask_sound: bool = False) -> str:
     """The batch derivation prompt for a lane that CANNOT speak.
 
     The literal line is still handed to the model, and that is deliberate: it
@@ -1318,7 +1412,10 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
         "it moves toward or away from. A shot size or an angle on its own is a "
         "photograph, not a movement, so never answer with framing alone, and "
         "never repeat the same move twice in this batch. Reply ONLY with a "
-        'JSON list of objects {"beat_id","expression","motion","camera"}.',
+        + ('JSON list of objects '
+           '{"beat_id","expression","motion","camera","sound"}.'
+           if ask_sound else
+           'JSON list of objects {"beat_id","expression","motion","camera"}.'),
         # Same finisher contract as the spoken path: the era/style tails are
         # APPENDED later and must not be duplicated here.
         "Do not include film-stock, film-grain, or lighting-style terms; "
@@ -1331,6 +1428,15 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
         "scenery or props without the character.",
         f"Setting: {setting}",
     ]
+    if ask_sound:
+        lines.append(
+            "sound: the sounds this moment makes AT ONCE, as a short comma "
+            "list of up to three, each with its texture and how loud it is "
+            "(gravel crunching hard underfoot, a coat snapping in the wind, a "
+            "far-off crowd swelling). Only sounds the motion and this place "
+            "would really make; vary them from beat to beat. Never a voice, "
+            "breath, words, singing, music, a name or a weapon -- the shot "
+            "has no dialogue and its score is added separately.")
     if logline:
         lines.append("Story (private context): %s" % logline[:240])
     if key_objects:
@@ -1437,10 +1543,15 @@ def derive_creative_directives(
     # "strip the dialogue" would silently change every one of them. Production
     # always passes one (``lock()`` calls this with ``video_policy=policy``).
     preserves_dialogue_for_role = {}
+    decodes_audio_for_role = {}
     if video_policy is not None:
         for _role in sorted({b["role"] for b in char_beats}):
+            _engine = _policy_engine_for_role(video_policy, _role)
             preserves_dialogue_for_role[_role] = _lane_preserves_dialogue(
-                _policy_engine_for_role(video_policy, _role), _role)
+                _engine, _role)
+            decodes_audio_for_role[_role] = _lane_decodes_audio(_engine)
+    cast_names = [str(c.get("name") or "") for c in (ledger.get("cast") or [])
+                  if isinstance(c, dict)]
 
     # The budget is sized to the REQUEST, not to a constant: this pass asks for
     # one JSON row per beat, so the reply grows with the batch (PBUG-20260903-07).
@@ -1475,7 +1586,9 @@ def derive_creative_directives(
             prompt = (_build_batch_prompt(batch, meta, ledger, setting)
                       if batch_preserves_dialogue
                       else _build_nonverbal_batch_prompt(
-                          batch, meta, ledger, setting))
+                          batch, meta, ledger, setting,
+                          ask_sound=decodes_audio_for_role.get(
+                              batch[0]["role"], False)))
             attempt_fn = llm_fn
             budget = directive_budget
             for attempt in range(max_reseed + 1):
@@ -1577,6 +1690,24 @@ def derive_creative_directives(
                     # spoken path.
                     source = "template"
                 d = dict(kept)
+                # The director's sound gets the same quote backstop as the
+                # acting leaves, then the vocal/weapon/name guard.
+                sound = ""
+                if decodes_audio_for_role.get(b["role"], False):
+                    raw_sound = str((directives.get(b["beat_id"]) or {})
+                                    .get(_SOUND_KEY) or "").strip()
+                    if raw_sound and any(_repeats_the_line(raw_sound, run)
+                                         for run in context_runs if run):
+                        reason = "quotes the shown private context"
+                    else:
+                        sound, reason = _clean_director_sound(
+                            raw_sound, cast_names)
+                    if reason:
+                        warnings.append(
+                            "beat %s: director sound dropped (%s); the "
+                            "lexicon names this beat's sounds instead"
+                            % (b["beat_id"], reason))
+                d[_SOUND_KEY] = sound
                 text_prompt = ", ".join(p for p in (
                     appearance, setting,
                     kept["expression"] or _NONVERBAL_FALLBACKS["expression"],
@@ -1638,6 +1769,7 @@ def derive_creative_directives(
                 "expression": d.get("expression", ""),
                 "motion": d.get("motion", ""),
                 "camera": d.get("camera", ""),
+                "sound": d.get(_SOUND_KEY, ""),
                 "text_prompt": text_prompt,
                 "source": source,
                 "request_hash": _content_hash(

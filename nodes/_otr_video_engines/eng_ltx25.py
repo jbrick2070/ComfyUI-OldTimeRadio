@@ -2762,7 +2762,17 @@ def _ltx25_joint_av_core(inputs):
             parts.append(value)
     if not parts:
         return ""
-    parts.extend(named_sounds_for(", ".join(parts)))
+    # THE DIRECTOR'S OWN FOLEY WINS when it wrote one (2026-10-22, operator:
+    # "have them write foley prompts for a variety of non-verbal sound
+    # effects that may co-occur"). ShotLock vetted it -- at most three
+    # sounds, no voice, music, name or weapon -- so it is seated as written,
+    # in the lexicon's slot. Every beat it did not fill, and every older
+    # ledger, still gets the lexicon.
+    director_sound = str(inputs.get("sound") or "").strip().strip(",")
+    if director_sound:
+        parts.append(director_sound)
+    else:
+        parts.extend(named_sounds_for(", ".join(parts)))
     parts.append(_SOUND_FRAME)
     camera = str(inputs.get("camera") or "").strip().strip(",")
     if camera:

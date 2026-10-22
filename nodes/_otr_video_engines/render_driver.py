@@ -3298,6 +3298,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "expression": str(creative.get("expression") or ""),
                 "motion": str(creative.get("motion") or ""),
                 "camera": str(creative.get("camera") or ""),
+                # The director's own foley (2026-10-22), vetted at ShotLock;
+                # "" on every older ledger, which keeps the lexicon.
+                "sound": str(creative.get("sound") or ""),
                 "text_prompt": str(creative.get("text_prompt") or ""),
                 "dialogue": (str(_lane_line.get("text") or "")
                              if _keeps else ""),
@@ -3714,7 +3717,18 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # cue re-scan would match the phrases' own words.
         _jav_ok = joint_av_prompt_is_finished(_jav_after)
         _jav_obs["joint_av_prompt"] = "finished" if _jav_ok else "UNFINISHED"
-        _jav_obs["joint_av_sounds"] = sounds_named_in(_jav_after)
+        # WHO NAMED THE SOUNDS. "director" only when the director's vetted
+        # sound actually reached the finished string -- a non-empty
+        # creative.sound alone proves nothing (the cloud foley lane has no
+        # composer and keeps the lexicon tail).
+        _jav_director = str(creative.get("sound") or "").strip()
+        if _jav_director and _jav_director in _jav_after:
+            _jav_obs["joint_av_sound_source"] = "director"
+            _jav_obs["joint_av_sounds"] = [
+                i.strip() for i in _jav_director.split(",") if i.strip()]
+        else:
+            _jav_obs["joint_av_sound_source"] = "lexicon"
+            _jav_obs["joint_av_sounds"] = sounds_named_in(_jav_after)
         if not _jav_ok:
             _LOG.warning(
                 "[OTR.render_driver] JOINT-AV: %s beat %s did NOT end with the "
@@ -4866,7 +4880,7 @@ _TRACE_OBS_KEYS = (
     "positive_clip_tokens", "positive_clip_windows",
     "negative_clip_tokens", "negative_clip_windows",
     "clip_window_max", "clip_counter",
-    "joint_av_prompt", "joint_av_sounds",
+    "joint_av_prompt", "joint_av_sounds", "joint_av_sound_source",
     "joint_av_identity_leak",
 )
 
@@ -5681,6 +5695,7 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                             # `joint_av_identity_leak` is only present when a leak
                             # was detected; absent stays absent, never invented.
                             "joint_av_prompt", "joint_av_sounds",
+                            "joint_av_sound_source",
                             "joint_av_identity_leak"):
                     if key in obs:
                         row[key] = obs[key]
