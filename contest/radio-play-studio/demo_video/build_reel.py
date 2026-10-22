@@ -17,7 +17,8 @@ WORK = OUT_DIR / "reel"
 BLENDER = r"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
 CLIP_S = 6.0
 
-# (section, [(number, badge line, sub line, episode name stem, start seconds)])
+# (section, [(number, badge line, sub line, episode name stem, start seconds)]);
+# the number orders the list and is not drawn (operator: the 1, 2, 3 clutter).
 SECTIONS = [
     ("LANGUAGES", [
         ("1", "ENGLISH", "TWELFTH NIGHT", "bird_bolts_20261022_034014", 30.0),
@@ -38,7 +39,12 @@ SECTIONS = [
         ("3", "ARCHIVAL DOCUMENTARY", "FLATLAND", "three_dimensions_20261022_034357", 89.5),
         ("4", "RECURSIVE FRACTAL", "THE ECHO OF THE DRAGON", "dragon_echo_20261009_014109", 43.0),
         ("5", "CARTOON", "THE LAST DUET", "final_duet_20261022_034335", 94.5),
-        ("6", "ANIMATEDIFF ON 8 GB", "GUSTO: SIDE B", "side_b_20261021_215830", 103.5),
+    ]),
+    # Operator 10-22: "it just needs some GUSTO" -- his own script, closing the reel.
+    ("YOUR STORY", [
+        ("1", "GUSTO: SIDE B", "WRITTEN BY JEFFREY A. BRICK", "side_b_20261021_215830", 103.5),
+        ("2", "ROOK TAKES THE QUEUE", "IMPROVISATION IS UNDEFINED", "side_b_20261022_002847", 125.5),
+        ("3", "ERROR OR PERFORMANCE?", "KEEP THE PERFORMANCE", "side_b_20261022_002847", 182.5),
     ]),
 ]
 EXTRA = WORK / "extra_clips.json"   # late episodes (Mandarin, Japanese) land here
@@ -97,7 +103,7 @@ def main():
         for c_i, (num, line, sub, stem, start) in enumerate(clips, 1):
             badge = WORK / "cards" / f"badge_{s_i}_{c_i}"
             if not badge.is_dir():
-                blender("badge", num, line, sub, str(badge))
+                blender("badge", line, sub, str(badge))
             part = WORK / f"{s_i:02d}_{c_i:02d}_clip.mp4"
             clip_part(episode(stem), start, badge, part)
             parts.append(part)

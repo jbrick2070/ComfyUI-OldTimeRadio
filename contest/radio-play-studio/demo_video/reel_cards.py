@@ -2,13 +2,13 @@
 
 Run headless, one card per call:
   blender -b --factory-startup --python reel_cards.py -- section "LANGUAGES" OUT_DIR
-  blender -b --factory-startup --python reel_cards.py -- badge 1 "ENGLISH" "TWELFTH NIGHT" OUT_DIR
+  blender -b --factory-startup --python reel_cards.py -- badge "ENGLISH" "TWELFTH NIGHT" OUT_DIR
   blender -b --factory-startup --python reel_cards.py -- open OUT_DIR
   blender -b --factory-startup --python reel_cards.py -- end OUT_DIR
 
 ``section`` and ``end`` render opaque 1920x1080 frames on black and purple.
-``badge`` renders a transparent overlay (PNG with alpha) that slams a big number
-and a label in over the top-left of an episode clip, holds, and drops away.
+``badge`` renders a transparent overlay (PNG with alpha) that slams a name and a
+title in over the top-left of an episode clip, holds, and drops away.
 Impact, extruded and bevelled, lit on every face (operator 2026-10-21: the
 "black rendered 3D letters" were hard to read), in the reel palette: yellow
 type, aquamarine labels, purple plates.
@@ -142,25 +142,24 @@ if MODE == "section":
     key(bar, "scale", 22, (5.5, 0.07, 1))
     render(sc, out_dir)
 elif MODE == "badge":
-    num, label, sub, out_dir = argv[1], argv[2], argv[3], argv[4]
+    # No number (operator 10-22: "I don't like the 1, 2, 3 ... it clutters
+    # space"): the name in blocky 3D, the title flat beneath it.
+    label, sub, out_dir = argv[1], argv[2], argv[3]
     sc = reset(3.0, transparent=True)
     camera()
     # The frame at the badge's depth is about 9.4 x 5.3 units, so this is the
     # top-left corner with a margin.
-    x, y = -3.95, 2.0
-    n = text(num, 1.35, mat("y", YELLOW, 0.45), extrude=0.18, loc=(x, y - 0.05, 0.2))
-    slam(n, 1, settle=7)
-    t = text(label, 0.5, mat("y2", YELLOW, 1.0), extrude=0.0, bevel=0.0,
-             loc=(x + 0.62, y + 0.14, 0.2), align="LEFT")
+    x, y = -4.15, 2.0
+    t = text(label, 0.62, mat("y2", YELLOW, 0.5), extrude=0.06, loc=(x, y + 0.14, 0.2), align="LEFT")
+    slam(t, 1, settle=7, from_rot=(math.radians(-80), 0, 0), rest=(math.radians(10), 0, 0))
     s = text(sub, 0.3, mat("a", AQUA, 1.3), extrude=0.0, bevel=0.0,          # flat: crisp when small
-             loc=(x + 0.63, y - 0.33, 0.2), align="LEFT")
-    for k, ob in enumerate((t, s)):
-        slam(ob, 5 + k * 3, settle=7, from_rot=(math.radians(-80), 0, 0), rest=(0, 0, 0))
-    width = max(len(label) * 0.26, len(sub) * 0.125) + 1.35
-    back = plane(width, 1.05, mat("p", PLATE, 0.6), loc=(x - 0.45 + width / 2, y - 0.05, 0.0))
-    key(back, "scale", 1, (0.0, 1.05, 1))
-    key(back, "scale", 6, (width, 1.05, 1))
-    for ob in (n, t, s, back):                 # drop away at the end
+             loc=(x + 0.02, y - 0.38, 0.2), align="LEFT")
+    slam(s, 6, settle=7, from_rot=(math.radians(-80), 0, 0), rest=(0, 0, 0))
+    width = max(len(label) * 0.33, len(sub) * 0.125) + 0.5
+    back = plane(width, 1.1, mat("p", PLATE, 0.6), loc=(x - 0.25 + width / 2, y - 0.08, 0.0))
+    key(back, "scale", 1, (0.0, 1.1, 1))
+    key(back, "scale", 6, (width, 1.1, 1))
+    for ob in (t, s, back):                    # drop away at the end
         held = tuple(ob.scale)
         key(ob, "scale", sc.frame_end - 7, held)
         key(ob, "scale", sc.frame_end, (0.0,) * 3)
