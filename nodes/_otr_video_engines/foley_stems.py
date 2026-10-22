@@ -79,21 +79,27 @@ def _soften_join(prev, arr, start, step, duck_samples, np):
     """Smooth one chained join in place on ``prev`` and return the new piece.
 
     1. A one-frame equal-power CROSSFADE: a chained successor's frame 0 is the
-       predecessor's last frame (that is why ``drop_head`` is 1), so the
-       dropped frame's audio and ``prev``'s last frame cover the same instant
-       and can be blended exactly -- no length changes.
+       predecessor's last frame in the PICTURE (that is why ``drop_head`` is
+       1), so the dropped frame's audio and ``prev``'s last frame cover the
+       same instant. They are two independent generations, not one signal,
+       so this is a blend of the two over that frame -- no length changes.
     2. An ATTACK DUCK on the new piece: a raised-cosine gain from
        ``FOLEY_JOIN_DUCK_FLOOR`` to unity over ``duck_samples``, which takes
        the edge off a segment that opens on a crash without muting it.
+    The successor's side of the crossfade is held at the duck's starting
+    gain, so the blend hands over to the duck with no step (Sonnet QA
+    2026-10-22: a crossfade ending at unity into a duck starting at 0.25 put
+    a 0.75x gain jump -- a click -- at every join).
     """
     piece = arr[:, start:].astype(np.float64)
+    n = min(int(duck_samples), piece.shape[-1])
+    floor = FOLEY_JOIN_DUCK_FLOOR if n > 0 else 1.0
     if start >= step and prev.shape[-1] >= step:
         t = np.linspace(0.0, np.pi / 2.0, step)
         fade_out, fade_in = np.cos(t), np.sin(t)
         head = arr[:, start - step:start].astype(np.float64)
         tail = prev[:, -step:].astype(np.float64)
-        prev[:, -step:] = tail * fade_out + head * fade_in
-    n = min(int(duck_samples), piece.shape[-1])
+        prev[:, -step:] = tail * fade_out + head * fade_in * floor
     if n > 0:
         ramp = FOLEY_JOIN_DUCK_FLOOR + (1.0 - FOLEY_JOIN_DUCK_FLOOR) * (
             0.5 - 0.5 * np.cos(np.linspace(0.0, np.pi, n)))
@@ -637,6 +643,8 @@ def assemble_beat_foley_segments(segments, out_path, *, expect_frames, fps):
     return {
         "foley_path": str(out_path),
         "foley_sha256": sha256_of_file(out_path),
+        # 0 = the shipped hard cut; any other value changed these bytes.
+        "foley_join_soften_ms": int(soften_ms),
         "foley_samples": int(n_samples),
         "foley_sample_rate": int(rate),
         "foley_channels": int(n_channels),

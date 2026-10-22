@@ -67,3 +67,25 @@ def test_on_keeps_the_length_and_takes_the_edge_off_the_join(
 def test_the_knob_never_raises(monkeypatch, raw, expected):
     monkeypatch.setenv(fs.FOLEY_JOIN_SOFTEN_ENV, raw)
     assert fs.foley_join_soften_ms() == expected
+
+
+def test_a_sustained_tone_passes_the_join_without_a_step(tmp_path, monkeypatch):
+    """Sonnet QA 2026-10-22: a crossfade ending at unity into a duck starting
+    at 0.25 put a 0.75x gain jump -- a click -- at every join."""
+    monkeypatch.setenv(fs.FOLEY_JOIN_SOFTEN_ENV, "300")
+    n = 97 * STEP
+    tone = (0.5 * np.sin(2 * np.pi * 220 * np.arange(n) / RATE)).astype(np.float32)
+    paths = []
+    for name in ("t1.wav", "t2.wav"):
+        p = tmp_path / name
+        fs.write_pcm16_wav(str(p), np.vstack([tone, tone]), RATE)
+        paths.append(str(p))
+    out = tmp_path / "beat.wav"
+    receipt = fs.assemble_beat_foley_segments(
+        [(paths[0], 0, 97), (paths[1], 1, 60)], str(out), expect_frames=157, fps=FPS)
+    y = fs.read_pcm16_wav(str(out))[0][0]
+    join = 97 * STEP
+    jump = np.abs(np.diff(y[join - STEP - 4:join + 4])).max()
+    natural = np.abs(np.diff(tone)).max()
+    assert jump < 1.5 * natural
+    assert receipt["foley_join_soften_ms"] == 300
