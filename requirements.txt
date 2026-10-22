@@ -167,9 +167,10 @@ unidic-lite>=1.0.8
 # these six. They were an install-by-hand extra until the 4060 cold drill: a
 # fresh portable install refused Japanese and Mandarin at Run, and a language
 # roll quietly chose from six languages instead of the eight the dropdown
-# lists. The marker is kokoro-onnx's, so only the interpreter that uses the
-# copy carries them; on 3.12 and earlier the torch kokoro needs misaki[ja] /
-# misaki[zh] instead (apple/MULTILINGUAL.md). fugashi ships wheels for
+# lists. The marker is still kokoro-onnx's: since 2026-10-21 the torch kokoro
+# (3.12 and earlier) reads with the copy too, and widening the marker waits for
+# the next release (it must change with pyproject.toml); until then those boxes
+# install the six by hand, never misaki[ja] (PBUG-20261021-01). fugashi ships wheels for
 # Windows, Linux (x86_64, aarch64) and macOS on 3.13; the other five are pure
 # Python (jieba and unidic-lite as sdists). Proven installing on Windows (the
 # 4060 portable) and Linux (.github/workflows/linux_install_check.yml).

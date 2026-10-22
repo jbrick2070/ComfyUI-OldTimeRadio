@@ -534,6 +534,8 @@ def test_the_pack_copy_answers_on_both_backends(monkeypatch):
     pack's copy too (`OwnG2PPipeline`), so the copy is the answer with or
     without the torch package, and whatever OTR_KOKORO_BACKEND says."""
     import importlib.util as util
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+    monkeypatch.setattr(kb, "kokoro_has_pipeline_api", lambda: True)
     for torch_present in (True, False):
         monkeypatch.setattr(
             util, "find_spec",
@@ -567,3 +569,16 @@ def test_installed_but_not_starting_says_reinstall_not_install(monkeypatch):
     with pytest.raises(el.EpisodeLanguageError, match="needs the libraries under"):
         el.assert_readiness_extras(el.row_by_label("Japanese"))
 
+
+
+def test_an_older_torch_kokoro_does_not_count_the_copy(monkeypatch):
+    """Sonnet QA of 6c4f8422: on kokoro 0.7 the torch backend still reads with
+    misaki, so the copy must not pass the gate there."""
+    import importlib.util as util
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+    monkeypatch.setenv("OTR_KOKORO_BACKEND", "auto")
+    monkeypatch.setattr(util, "find_spec", lambda name: object() if name == "kokoro" else None)
+    monkeypatch.setattr(kb, "kokoro_has_pipeline_api", lambda: False)
+    assert el._pack_copy_lang("ja") is None
+    monkeypatch.setenv("OTR_KOKORO_BACKEND", "onnx")
+    assert el._pack_copy_lang("ja") == "j"

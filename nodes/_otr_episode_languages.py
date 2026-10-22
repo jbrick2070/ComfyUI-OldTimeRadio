@@ -608,12 +608,28 @@ def _kokoro_backends():
 
 
 def _pack_copy_lang(sub: str):
-    """The lang_code of the pack's copy of misaki's ``sub`` phonemizer, or None
-    when there is no copy. Both Kokoro backends read Japanese and Mandarin with
-    the copy when it builds (the torch one since 2026-10-21,
-    ``_kokoro_backends.OwnG2PPipeline``), so it satisfies the extra on either;
-    the torch backend still takes misaki itself when only that works."""
-    return _MISAKI_EXTRA_LANG.get(str(sub or "").strip())
+    """The lang_code of the pack's copy of misaki's ``sub`` phonemizer when THIS
+    box reads with it, or None. ONNX always does; the torch backend does since
+    2026-10-21 (``_kokoro_backends.OwnG2PPipeline``) on kokoro 0.9 or later. On an
+    older torch kokoro only misaki itself satisfies the extra (Sonnet QA of
+    6c4f8422: the copy must not pass a gate the voice node will not use)."""
+    code = _MISAKI_EXTRA_LANG.get(str(sub or "").strip())
+    if code is None:
+        return None
+    try:
+        from ._otr_shared import env as _otr_env
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import env as _otr_env  # type: ignore
+    if str(_otr_env.get("OTR_KOKORO_BACKEND", "") or "").strip().lower() == "onnx":
+        return code
+    import importlib.util
+    try:
+        torch_kokoro = importlib.util.find_spec("kokoro") is not None
+    except (ImportError, ValueError):
+        torch_kokoro = False
+    if not torch_kokoro or _kokoro_backends().kokoro_has_pipeline_api():
+        return code
+    return None
 
 
 def assert_readiness_extras(row: LanguageRow) -> None:
