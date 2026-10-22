@@ -11,10 +11,14 @@ output does not change.
 
 * Noto Sans SC (``cjk``): Simplified Chinese, and Japanese kana; on a fontless
   box a Japanese line draws some kanji in their Chinese forms -- read, not boxed.
-* Noto Sans Devanagari (``devanagari``): Hindi.
+* OTR Noto Devanagari Latin (``devanagari``): Hindi. Noto Sans Devanagari has
+  no Latin letters, so a credits line mixing a Hindi heading with names and
+  model ids boxed its Latin half (RunPod, 2026-10-21); this is that font merged
+  with Noto Sans and renamed. For the same reason it is tried BEFORE a Linux
+  system Devanagari face (``otr_credits_roll._credits_script_font_paths``).
 
-Both are the Noto Project's fonts, unmodified, under the SIL Open Font License
-1.1 (``nodes/fonts/OFL-NotoSans*.txt``). Pure lookup: nothing is fetched.
+All are the Noto Project's fonts under the SIL Open Font License 1.1
+(``nodes/fonts/OFL-*.txt``). Pure lookup: nothing is fetched.
 UTF-8 no BOM, ASCII-only source.
 """
 from __future__ import annotations
@@ -30,7 +34,7 @@ FONTS_DIR = Path(__file__).resolve().parent / "fonts"
 #: captions.font_policy -> (file in nodes/fonts, the font's family name).
 BUNDLED = {
     "cjk": ("NotoSansSC-Regular.otf", "Noto Sans SC"),
-    "devanagari": ("NotoSansDevanagari-Regular.ttf", "Noto Sans Devanagari"),
+    "devanagari": ("OTRNotoDevanagariLatin-Regular.ttf", "OTR Noto Devanagari Latin"),
 }
 
 #: The install line that gives a Linux box its own face for a script.

@@ -718,7 +718,15 @@ def _credits_script_font_paths(fd: str, policy: str) -> list:
     except ImportError:  # pragma: no cover -- flat/standalone load
         import _otr_script_fonts as _SF  # type: ignore
     shipped = _SF.bundled_path(policy)
-    return os_faces + ([shipped] if shipped else [])
+    if not shipped:
+        return os_faces
+    if policy == "devanagari":
+        # Linux's Devanagari faces carry no Latin letters, and these walks draw
+        # a whole line in one face: the shipped merge goes ahead of them, still
+        # behind Windows' Nirmala UI and macOS's Sangam, which have Latin.
+        linux = [path for path in os_faces if path.startswith("/usr/")]
+        return [path for path in os_faces if path not in linux] + [shipped] + linux
+    return os_faces + [shipped]
 
 
 def _os_script_font_paths(fd: str, policy: str) -> list:

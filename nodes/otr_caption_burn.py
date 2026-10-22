@@ -240,8 +240,14 @@ def _shipped_fonts_option(ass_path: str) -> str:
     target.mkdir(exist_ok=True)
     for policy in policies:
         source = _SF.bundled_path(policy)
-        if source and not (target / Path(source).name).is_file():
-            shutil.copyfile(source, target / Path(source).name)
+        final = target / Path(source).name if source else None
+        if final is None or (final.is_file() and final.stat().st_size == Path(source).stat().st_size):
+            continue
+        # Copy to a temporary name and rename, so an interrupted copy never
+        # leaves a truncated face that a later burn would trust.
+        partial = final.with_name(final.name + ".part")
+        shutil.copyfile(source, partial)
+        os.replace(partial, final)
     return f":fontsdir={SHIPPED_FONTS_DIRNAME}"
 
 

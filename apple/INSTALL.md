@@ -108,7 +108,8 @@ container that carried eight DejaVu fonts and zero CJK coverage.** Hindi needs a
 Devanagari font the same way -- `apt install fonts-noto-core`. Seen again on a
 RunPod pod 2026-10-21 (a Mandarin episode, every caption and credit boxed);
 `scripts/otr_pod_provision.sh` now installs both, and since the same day the pack
-ships Noto Sans SC and Noto Sans Devanagari (`nodes/fonts`) and falls back to them
+ships Noto Sans SC and a Noto Devanagari face merged with Noto Sans's Latin
+(`nodes/fonts`; plain Noto Sans Devanagari has no Latin letters) and falls back to them
 when a machine has no face of its own, so a bare box draws the script instead of
 boxes. The OS packages are still better for Japanese, whose kanji the SC face
 draws in Chinese forms.

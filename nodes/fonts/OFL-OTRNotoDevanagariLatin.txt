@@ -1,3 +1,19 @@
+OTR Noto Devanagari Latin (OTRNotoDevanagariLatin-Regular.ttf) is a merge, made
+2026-10-21 with fontTools, of two unmodified Noto Project fonts:
+
+  * Noto Sans Regular (Latin) -- notofonts/notofonts.github.io at 957448b6,
+    fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf
+  * Noto Sans Devanagari Regular -- notofonts/notofonts.github.io at 957448b6,
+    fonts/NotoSansDevanagari/hinted/ttf/NotoSansDevanagari-Regular.ttf
+
+Noto Sans Devanagari carries no Latin letters, so a credits line that mixes a
+Hindi heading with names, model ids and dates drew the Latin half as empty
+boxes. The merge is renamed, as the licence asks of a modified version.
+
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic,
+https://github.com/notofonts/devanagari). Licensed under the SIL Open Font License,
+Version 1.1, reproduced below.
+
 Copyright 2022 The Noto Project Authors (https://github.com/notofonts/devanagari)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

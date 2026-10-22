@@ -74,6 +74,9 @@ PARTIAL_DELETE_EXTENSIONS = frozenset({
     ".wav", ".flac", ".mp3", ".m4a",
     ".png", ".jpg", ".jpeg", ".webp", ".gif", ".exr",
     ".npy",
+    # The caption burn's copies of the pack's shipped faces (otr_fonts/,
+    # otr_caption_burn._shipped_fonts_option); the originals live in nodes/fonts.
+    ".otf", ".ttf",
 })
 
 TOOLTIP = (
