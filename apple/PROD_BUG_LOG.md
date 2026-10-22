@@ -17379,3 +17379,19 @@ not promote it to the Bug Bible on this evidence alone.
   then a 3.10-3.12 box installs `fugashi jaconv` (Japanese) or `jieba pypinyin
   cn2an ordered-set` (Mandarin) by hand, as the docs and the refusal say.
 - status: FIXED in code; live proof is the next Japanese leg on a <=3.12 box.
+
+## PBUG-20261022-01 -- ShotLock threw away a partial director reply when the last reseed came back empty
+- evidence: 5080, 2026-10-22 08:53, Radio Play Studio 1-act My Story on
+  `otr_16gb_foley_open_flux3_ref` (server log tmp/rps_live/server_foley_director.log,
+  episode signal_lost_the_last_circuit_20261022_085831). The 15-beat director
+  batch logged "malformed derivation ... (14 of 15 beats parsed)" on both
+  reseeds, then every one of the 15 beats took the deterministic acting
+  fallbacks (`template_after_llm_miss`); the 3-beat batch after it was fine.
+- cause: `derive_creative_directives` assigned `directives = _parse_directives(...)`
+  on every attempt, so the LAST attempt won. The final reseed parsed nothing and
+  replaced two attempts that had 14 good rows each. Made likely that day by the
+  new director `sound` key (a longer row), but the loss is the loop's.
+- fix: every attempt adds and none replaces -- a beat keeps the first row that
+  carries acting, and a reseed only fills beats still missing. Pinned in
+  tests/test_director_foley.py.
+- status: FIXED in code; live proof is the next 16 GB foley leg.

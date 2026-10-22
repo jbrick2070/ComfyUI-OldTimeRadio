@@ -1618,7 +1618,17 @@ def derive_creative_directives(
                 except Exception as exc:  # noqa: BLE001
                     warnings.append(f"derivation llm_fn raised ({exc}); reseed {attempt}")
                     raw = ""
-                directives = _parse_directives(raw, expected)
+                # EVERY ATTEMPT ADDS, NONE REPLACES (2026-10-22). This was
+                # `directives = _parse_directives(...)`, so the LAST attempt
+                # won: live, two reseeds each parsed 14 of 15 beats and the
+                # final one parsed none, and all 15 beats fell to the stock
+                # acting fallbacks -- 14 good rows thrown away for one
+                # missing. A beat keeps the first row that carries acting;
+                # a reseed only fills what is still missing.
+                for bid, row in _parse_directives(raw, expected).items():
+                    if not any(directives.get(bid, {}).get(k)
+                               for k in _DIRECTIVE_KEYS):
+                        directives[bid] = row
                 # Break only on FULL batch coverage -- a partial reply (e.g. 14
                 # of 15 beats) must spend its remaining reseed budget before
                 # the missing beats drop to the deterministic collapse guard.

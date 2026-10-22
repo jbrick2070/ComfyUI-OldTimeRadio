@@ -216,3 +216,34 @@ def test_the_reply_budget_makes_room_for_the_sound_key():
         sl._directive_token_budget(15)
     assert sl._directive_token_budget(15, with_sound=True) <= \
         sl.DIRECTIVE_TOKEN_CEILING
+
+
+def test_a_partial_reply_is_kept_when_a_later_reseed_comes_back_empty():
+    """Live 2026-10-22: two reseeds each parsed 14 of 15 beats, the last
+    parsed none, and the LAST attempt used to win -- all 15 beats fell to
+    the stock acting fallbacks. Every attempt now adds; none replaces."""
+    led = {
+        "meta": {}, "cast": [{"char_id": "c01", "name": "Vera",
+                              "appearance": "a radio operator"}],
+        "lines": [{"line_id": "b%d" % i, "char_id": "c01", "speaker": "VERA",
+                   "speaker_role": "character", "text": "Line %d." % i,
+                   "dur_s": 2.0, "shot_id": "shot_001"} for i in (1, 2, 3)],
+    }
+    beats = sl.extract_beats(led)
+    ids = [b["beat_id"] for b in beats]
+    replies = iter([
+        json.dumps([{"beat_id": ids[0], "expression": "wary",
+                     "motion": "she backs toward the hatch",
+                     "camera": "push in"},
+                    {"beat_id": ids[1], "expression": "set",
+                     "motion": "he strides across the deck",
+                     "camera": "track"}]),
+        "",
+        "",
+    ])
+    creative, warnings = sl.derive_creative_directives(
+        beats, led["meta"], led, llm_fn=lambda _p: next(replies),
+        video_policy=_policy("ltx25_foley_16gb"))
+    assert creative[ids[0]]["source"] == "llm"
+    assert creative[ids[1]]["source"] == "llm"
+    assert creative[ids[2]]["source"] == "template_after_llm_miss"
