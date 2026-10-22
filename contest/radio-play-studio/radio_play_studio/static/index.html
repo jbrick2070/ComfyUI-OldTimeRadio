@@ -166,14 +166,21 @@ async function fetchStrings(code) {
   return res.json();
 }
 let langRequest = 0;
-async function setLang(code) {
+// Only a language the person picks is remembered. Detection (saved choice or
+// browser language) never writes, so a missing file on one load, or a browser
+// language that maps differently in a later build, cannot overwrite a choice.
+// Earlier builds wrote "rps_lang" on every detection, so that key is ignored.
+const LANG_KEY = "rps_lang_picked";
+async function setLang(code, picked) {
   const mine = ++langRequest;
   let strings;
   try { strings = code === "en" ? {} : await fetchStrings(code); }
   catch (err) { $("lang").value = lang; return; }   // keep the language we have, and the saved choice
   if (mine !== langRequest) return;                  // a later pick already won
   STR = strings; lang = code;
-  try { localStorage.setItem("rps_lang", lang); } catch (err) { /* private window: not remembered */ }
+  if (picked) {
+    try { localStorage.setItem(LANG_KEY, lang); } catch (err) { /* private window: not remembered */ }
+  }
   $("lang").value = lang;
   paintAll();
 }
@@ -181,7 +188,9 @@ async function setLang(code) {
 // serves it, or null. Chinese is split by script: Traditional for Hant, Taiwan,
 // Hong Kong and Macau; Simplified for everything else.
 function matchLang(tag, has) {
-  const parts = String(tag).toLowerCase().split("-");
+  let parts = String(tag).toLowerCase().split("-");
+  const ext = parts.findIndex((p, i) => i > 0 && p.length === 1);
+  if (ext > 0) parts = parts.slice(0, ext);
   if (parts[0] === "zh") {
     const traditional = !parts.includes("hans") &&
       (parts.includes("hant") || parts.some((p) => p === "tw" || p === "hk" || p === "mo"));
@@ -203,12 +212,12 @@ async function initLang() {
     o.value = l.code; o.textContent = l.name;
     sel.appendChild(o);
   }
-  sel.addEventListener("change", () => setLang(sel.value));
+  sel.addEventListener("change", () => setLang(sel.value, true));
   let saved = null;
-  try { saved = localStorage.getItem("rps_lang"); } catch (err) { /* private window */ }
+  try { saved = localStorage.getItem(LANG_KEY); } catch (err) { /* private window */ }
   const has = (c) => langs.some((l) => l.code === c);
   const asked = (navigator.languages || [navigator.language || "en"]).map((l) => matchLang(l, has));
-  await setLang(has(saved) ? saved : (asked.find(Boolean) || "en"));
+  await setLang(has(saved) ? saved : (asked.find(Boolean) || "en"), false);
 }
 
 function control(f) {

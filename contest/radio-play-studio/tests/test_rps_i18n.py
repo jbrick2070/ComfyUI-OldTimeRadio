@@ -1,4 +1,4 @@
-"""The page in eight languages: every language file says what English says,
+"""The page in nine languages: every language file says what English says,
 English is the form's own words, and the app hands the files out."""
 from __future__ import annotations
 
@@ -73,7 +73,8 @@ def _match_lang_in_node(cases, offered):
     """Run the page's own matchLang() under node, so the test cannot drift from the page."""
     import shutil
     import subprocess
-    node = shutil.which("node")
+    node = next((found for found in (shutil.which(c) for c in
+                 ("node", r"C:\Program Files\nodejs\node.exe")) if found), None)
     if not node:
         pytest.skip("node is not installed")
     page = PAGE.read_text(encoding="utf-8")
@@ -88,17 +89,42 @@ def test_a_browser_language_finds_its_file_by_script_and_region():
     offered = CODES
     cases = ["en-US", "es-MX", "pt-BR", "ja-JP", "hi-IN", "fr-CA", "de-DE", "ko", "xx",
              "zh", "zh-CN", "zh-SG", "zh-Hans", "zh-Hans-CN", "zh-Hans-TW",
-             "zh-TW", "zh-HK", "zh-MO", "zh-Hant", "zh-Hant-TW", "zh-Hant-CN", "ZH-tw"]
+             "zh-TW", "zh-HK", "zh-MO", "zh-Hant", "zh-Hant-TW", "zh-Hant-CN", "ZH-tw",
+             "zh-CN-x-tw", "zh-x-hk", "zh-u-rg-twzzzz", "ja-u-ca-japanese"]
     assert _match_lang_in_node(cases, offered) == [
         "en", "es", "pt", "ja", "hi", "fr", None, None, None,
         "zh", "zh", "zh", "zh", "zh", "zh",
-        "zh-hant", "zh-hant", "zh-hant", "zh-hant", "zh-hant", "zh-hant", "zh-hant"]
+        "zh-hant", "zh-hant", "zh-hant", "zh-hant", "zh-hant", "zh-hant", "zh-hant",
+        "zh", "zh", "zh", "ja"]
 
 
 def test_traditional_chinese_falls_back_to_simplified_when_it_is_not_offered():
     offered = [c for c in CODES if c != "zh-hant"]
     assert _match_lang_in_node(["zh-TW", "zh-Hant", "zh-CN"], offered) == ["zh", "zh", "zh"]
     assert _match_lang_in_node(["zh-TW"], ["en", "es"]) == [None]
+
+
+def _function(page, name):
+    return re.search(r"async function " + name + r"\(.*?\n\}\n", page, re.S).group(0)
+
+
+def test_the_page_detects_through_matchlang():
+    """matchLang is only the fix if initLang calls it; without this the old
+    primary-subtag split could come back with every other test green."""
+    body = _function(PAGE.read_text(encoding="utf-8"), "initLang")
+    assert ".map((l) => matchLang(l, has))" in body
+    assert 'split("-")[0]' not in body
+
+
+def test_only_a_pick_is_remembered():
+    """Detection never writes the saved choice; a pick from the picker does."""
+    page = PAGE.read_text(encoding="utf-8")
+    set_lang, init_lang = _function(page, "setLang"), _function(page, "initLang")
+    assert "if (picked) {" in set_lang and set_lang.count("localStorage.setItem") == 1
+    assert set_lang.index("if (picked) {") < set_lang.index("localStorage.setItem")
+    assert 'sel.addEventListener("change", () => setLang(sel.value, true));' in init_lang
+    assert init_lang.rstrip().endswith('|| "en"), false);\n}')
+    assert 'Item("rps_lang")' not in page and 'Item("rps_lang",' not in page   # the key earlier builds wrote on every detection
 
 
 def test_a_missing_string_never_shows_its_key():
@@ -146,8 +172,9 @@ def test_a_language_with_a_script_is_served(app):  # noqa: F811
     assert status == 200 and json.loads(body.decode("utf-8"))["_name"] == "繁體中文"
 
 
-@pytest.mark.parametrize("path", ["/i18n/xx.json", "/i18n/EN.json", "/i18n/../server.py",
-                                  "/i18n/%2e%2e/server.py", "/i18n/en.json.bak", "/i18n/",
+@pytest.mark.parametrize("path", ["/i18n/xx.json", "/i18n/EN.json", "/i18n/../index.html",
+                                  "/i18n/%2e%2e/index.html", "/i18n/../../server.py",
+                                  "/i18n/..%2f..%2fserver.py", "/i18n/en.json.bak", "/i18n/",
                                   "/i18n/zh-Hant.json", "/i18n/zh-hant-tw.json", "/i18n/zh-.json"])
 def test_anything_else_under_i18n_is_a_404(app, path):  # noqa: F811
     port, _ = app
@@ -165,4 +192,21 @@ def test_a_file_without_a_name_is_not_offered(tmp_path, monkeypatch):
     (tmp_path / "yy.json").write_text("not json", encoding="utf-8")
     (tmp_path / "zz.json").write_text('["a list, not an object"]', encoding="utf-8")
     monkeypatch.setattr(rps_server, "I18N_DIR", tmp_path)
+    assert available_languages() == [{"code": "en", "name": "English"}]
+
+
+BAD_NAMES = ["zh-hant-tw.json", "a.json", "abcd.json", "zh-han.json", "en_us.json", "en.json.bak",
+             "zh-hant5.json", "-en.json"]
+
+
+@pytest.mark.parametrize("name", BAD_NAMES)
+def test_a_file_that_exists_under_a_bad_name_is_never_served(app, tmp_path, monkeypatch, name):  # noqa: F811
+    """The traversal cases above prove the guard keeps the page's own files
+    private; this proves the name pattern itself, with the file really there."""
+    port, _ = app
+    (tmp_path / "en.json").write_text('{"_name": "English"}', encoding="utf-8")
+    (tmp_path / name).write_text('{"_name": "Planted"}', encoding="utf-8")
+    monkeypatch.setattr(rps_server, "I18N_DIR", tmp_path)
+    status, _, body = _request(port, "GET", "/i18n/" + name)
+    assert status == 404 and b"Planted" not in body
     assert available_languages() == [{"code": "en", "name": "English"}]

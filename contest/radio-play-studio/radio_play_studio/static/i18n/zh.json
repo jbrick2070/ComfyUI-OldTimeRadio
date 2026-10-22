@@ -10,7 +10,7 @@
  "field.bank.label": "故事来源",
  "field.bank.help": "故事从哪里来。选择莎士比亚或公有领域来改编经典，选择我的故事来使用下方你自己填写的内容，或选择给我个惊喜让系统随机决定。",
  "field.source_ref.label": "要改编的作品",
- "field.source_ref.help": "可选。填写要改编的经典名称（需要指定来源，不能选随机）。",
+ "field.source_ref.help": "可选。填写要改编的经典名称（需要指定来源，不能选“给我个惊喜”）。",
  "field.language.label": "语言",
  "field.language.help": "广播剧的语言。",
  "field.acts.label": "幕数",

@@ -171,8 +171,9 @@ remembered. The story bank and episode language dropdowns show translated names,
 to the pack stay its own. Model and style names, the pack's own examples, and error text from ComfyUI stay
 as they are.
 
-Each language is one file, `radio_play_studio/static/i18n/<code>.json` (`es`, or a code and script like
-`zh-hant`), and adding a file adds a language.
+Each language is one file, `radio_play_studio/static/i18n/<code>.json` (`es`; Chinese also carries its script,
+`zh-hant`), and adding a file adds a language. A browser picks a file by its primary language subtag, and by
+script or region only for Chinese.
 English (`en.json`) is the fallback and carries the form's own words from `form.py`. The other eight are
 machine translations that no native speaker has reviewed yet, so corrections are welcome.
 `tests/test_rps_i18n.py` checks that every file has every key with the same `{placeholders}`.
