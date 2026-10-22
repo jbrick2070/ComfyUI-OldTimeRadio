@@ -550,7 +550,9 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       (Flatland engraving "I am falling" vs video art "I am rising", recursive fractal, cartoon My
       Story, the 4060's AnimateDiff GUSTO). Builder: demo_video/build_reel.py + reel_cards.py.
       Mandarin (Languages 6) waits for the RunPod redo with fonts.
-- [ ] README final pass (`contest/radio-play-studio/README.md`).
+- [~] README final pass (`contest/radio-play-studio/README.md`), 10-22 00:30: still model is FLUX 3
+      Klein (it said MOSS-Image), My Story reference stills, the ffmpeg 1080p row, licence note.
+      Left: the demo video link once the operator posts it.
 - [ ] Submit through the Typeform. **The operator submits** (it is his entry and his account).
 
 ## Rules for any session here
