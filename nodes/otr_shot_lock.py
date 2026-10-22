@@ -1141,15 +1141,19 @@ _SOUND_MAX_WORDS = 24
 
 #: A JOINT-AV LATENT SPEAKS WHAT IT READS ("Queen of the Fairies",
 #: 2026-08-28), so a director sound that names a voice, a song or music is
-#: dropped whole, never trimmed. WHOLE WORDS WITH THEIR ENDINGS, not bare
+#: dropped whole, never trimmed. A CROWD THAT CHEERS OR CHATTERS IS VOICES
+#: too, and comes out as babble. "hum" is NOT banned: an engine or a light
+#: hums, and the lexicon itself asks for "a steady mechanical hum".
+#: WHOLE WORDS WITH THEIR ENDINGS, not bare
 #: stems: a stem pass drops "crystal" (cry), "a single bell" (sing),
 #: "cockpit" (cock) and "human" (hum), and every false drop costs a beat its
 #: written sound.
 _SOUND_VOCAL_WORDS = (
     r"voic(?:e|es|ed|ing)", r"speak(?:s|ing)?", r"speech(?:es)?",
     r"spoken?", r"talk(?:s|ing|ed)?", r"words?", r"whisper(?:s|ing|ed)?",
-    r"murmur(?:s|ing|ed)?", r"mutter(?:s|ing|ed)?", r"sing(?:s|ing|er)?",
-    r"sang", r"sung", r"songs?", r"hum(?:s|ming|med)?", r"chant(?:s|ing)?",
+    r"murmur(?:s|ing|ed)?", r"mutter(?:s|ing|ed)?", r"chatter(?:s|ing|ed)?",
+    r"babbl(?:e|es|ing|ed)", r"cheer(?:s|ing|ed)?", r"sing(?:s|ing|er)?",
+    r"sang", r"sung", r"songs?", r"chant(?:s|ing)?",
     r"choirs?", r"music(?:al)?", r"melod(?:y|ies|ic)", r"tunes?",
     r"breath(?:s|ing|e|es|ed)?", r"gasp(?:s|ing|ed)?", r"sigh(?:s|ing|ed)?",
     r"pant(?:s|ing|ed)?", r"moan(?:s|ing|ed)?", r"groan(?:s|ing|ed)?",
@@ -1178,10 +1182,13 @@ def _clean_director_sound(value: str, cast_names=()) -> tuple:
     was dropped. Dropped whole, never trimmed: a half-kept answer is a sound
     the director did not write. Pure.
     """
-    text = " ".join(str(value or "").split()).strip(" ,.;:")
+    text = " ".join(str(value or "").split())
+    text = re.sub(r"[\[\]\"\u201c\u201d]", "", text).strip(" ,.;:'")
     if not text:
         return "", ""
-    items = [i.strip(" .;:") for i in text.split(",") if i.strip(" .;:")]
+    # ";" and "." separate sounds as surely as "," does, so the cap counts
+    # them all; the cleaned answer is rejoined with commas.
+    items = [i.strip(" '") for i in re.split(r"[,;.]", text) if i.strip(" '")]
     if not items:
         return "", ""
     if len(items) > _SOUND_MAX_ITEMS or len(text.split()) > _SOUND_MAX_WORDS:
@@ -1195,7 +1202,7 @@ def _clean_director_sound(value: str, cast_names=()) -> tuple:
     for item in items:
         if any(w[:1].isupper() for w in item.split()[1:]):
             return "", "names a proper noun (%r)" % item
-    low = text.lower()
+    low = ", ".join(items).lower()
     for name in cast_names or ():
         nm = str(name or "").strip().lower()
         if len(nm) >= 3 and re.search(r"\b" + re.escape(nm) + r"\b", low):
@@ -1221,7 +1228,11 @@ def _lane_decodes_audio(engine_id) -> bool:
     return eid in _JOINT_AV_ENGINES and not eid.startswith("cloud_")
 
 
-def _directive_token_budget(beat_count: int) -> int:
+#: What a ``sound`` answer adds to a row: up to 24 words, ~35 tokens.
+DIRECTIVE_SOUND_TOKENS_PER_BEAT = 35
+
+
+def _directive_token_budget(beat_count: int, with_sound: bool = False) -> int:
     """Reply budget for a derivation batch of ``beat_count`` beats.
 
     Sized to the ACTUAL request. Over-granting is free -- generation stops at
@@ -1229,7 +1240,9 @@ def _directive_token_budget(beat_count: int) -> int:
     the whole batch, so this errs high on purpose.
     """
     beats = max(1, int(beat_count or 1))
-    want = beats * DIRECTIVE_TOKENS_PER_BEAT + DIRECTIVE_TOKEN_OVERHEAD
+    per_beat = DIRECTIVE_TOKENS_PER_BEAT + (
+        DIRECTIVE_SOUND_TOKENS_PER_BEAT if with_sound else 0)
+    want = beats * per_beat + DIRECTIVE_TOKEN_OVERHEAD
     return max(WRITER_REPLY_TOKENS_DEFAULT, min(want, DIRECTIVE_TOKEN_CEILING))
 
 
@@ -1288,7 +1301,13 @@ def _parse_directives(raw: str, expected_ids: list) -> dict:
             # that drops the cast/setting falls back to the template).
             parsed["text_prompt"] = str(row.get("text_prompt") or "").strip()
             # Optional, and only ever asked of a lane that decodes audio.
-            parsed[_SOUND_KEY] = str(row.get(_SOUND_KEY) or "").strip()
+            # A model asked for a "comma list" may answer a JSON array;
+            # str() of that is "['a', 'b']", brackets and quotes and all,
+            # straight into an audio prompt (Sonnet QA 2026-10-22).
+            raw_sound = row.get(_SOUND_KEY) or ""
+            if isinstance(raw_sound, (list, tuple)):
+                raw_sound = ", ".join(str(x) for x in raw_sound if x)
+            parsed[_SOUND_KEY] = str(raw_sound).strip()
             out[bid] = parsed
     return out
 
@@ -1432,10 +1451,11 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
         lines.append(
             "sound: the sounds this moment makes AT ONCE, as a short comma "
             "list of up to three, each with its texture and how loud it is "
-            "(gravel crunching hard underfoot, a coat snapping in the wind, a "
-            "far-off crowd swelling). Only sounds the motion and this place "
+            "(gravel crunching hard underfoot, a coat snapping in the wind, "
+            "rain drumming on a tin roof). Only sounds the motion and this place "
             "would really make; vary them from beat to beat. Never a voice, "
-            "breath, words, singing, music, a name or a weapon -- the shot "
+            "breath, words, singing, a cheering or chattering crowd, music, a "
+            "name or a weapon -- the shot "
             "has no dialogue and its score is added separately.")
     if logline:
         lines.append("Story (private context): %s" % logline[:240])
@@ -1557,7 +1577,8 @@ def derive_creative_directives(
     # one JSON row per beat, so the reply grows with the batch (PBUG-20260903-07).
     # Keep the raw generator too -- a truncated reply is recoverable by re-binding
     # a bigger budget, and that must not cost a model re-resolution.
-    directive_budget = _directive_token_budget(batch_size)
+    directive_budget = _directive_token_budget(
+        batch_size, with_sound=any(decodes_audio_for_role.values()))
     writer_gen = None
     if llm_fn is None:
         writer_gen, writer_model_id = _resolve_writer_llm_binding(meta, warnings)

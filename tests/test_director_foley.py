@@ -177,3 +177,42 @@ def test_the_render_driver_hands_the_sound_to_the_composer_and_receipts_it():
     assert '"sound": str(creative.get("sound") or "")' in inspect.getsource(
         render_driver)
     assert '"joint_av_sound_source"' in src
+
+
+# --------------------------------------------------------------------------- #
+# Sonnet QA 2026-10-22
+# --------------------------------------------------------------------------- #
+
+def test_a_json_list_answer_is_joined_not_printed_as_a_python_list():
+    c, _w, _ = _derive("ltx25_foley_16gb",
+                       ["gravel crunching", "wind howling"])
+    assert c["sound"] == "gravel crunching, wind howling"
+
+
+def test_quotes_and_brackets_never_reach_the_prompt():
+    kept, _ = sl._clean_director_sound('"gravel crunching", "wind howling"')
+    assert kept == "gravel crunching, wind howling"
+
+
+def test_the_three_sound_cap_counts_every_separator():
+    kept, reason = sl._clean_director_sound(
+        "gravel crunching. wind howling; a door creaking, a clock ticking")
+    assert kept == "" and reason
+
+
+@pytest.mark.parametrize("sound", ["a cheering crowd", "crowd chatter",
+                                   "voices babbling in the hall"])
+def test_a_crowd_that_would_come_out_as_babble_is_dropped(sound):
+    assert sl._clean_director_sound(sound)[0] == ""
+
+
+def test_an_engine_may_hum():
+    kept, reason = sl._clean_director_sound("an engine humming low")
+    assert kept == "an engine humming low" and reason == ""
+
+
+def test_the_reply_budget_makes_room_for_the_sound_key():
+    assert sl._directive_token_budget(15, with_sound=True) > \
+        sl._directive_token_budget(15)
+    assert sl._directive_token_budget(15, with_sound=True) <= \
+        sl.DIRECTIVE_TOKEN_CEILING
