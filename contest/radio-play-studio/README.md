@@ -9,7 +9,7 @@ keeps the same face and voice from shot to shot, and every shot is filmed with L
 card, with voices, music and foley mixed under the picture. Open weights only, nothing to pay
 per episode; the app is MIT licensed, and each model keeps its own license (see License).
 
-> **Demo video:** to be recorded before submission.
+> **Demo video (1:53):** https://youtu.be/UeQQeVMaMVs
 
 ```
 browser  ->  Radio Play Studio  ->  Comfy SDK  ->  comfy-api-proxy  ->  your ComfyUI + Old-Time Radio pack

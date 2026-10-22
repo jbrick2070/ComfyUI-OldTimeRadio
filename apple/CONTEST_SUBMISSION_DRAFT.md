@@ -6,7 +6,7 @@ draft to paste from; every number is from a logged run on 2026-10-19.
 
 ## Before submitting (blockers)
 
-- [ ] **Demo video under 2 minutes** (the form says so), posted somewhere linkable.
+- [x] **Demo video under 2 minutes** (the form says so): https://youtu.be/UeQQeVMaMVs (1:53, posted 10-22).
 - [ ] **Social post** tagging #OpenSourceHiggsfield (X, IG, Reddit, TikTok...) -- the operator posts.
 - [x] **Code link that will not move:** operator 2026-10-20, "merge the contest branch into main
       now so the code link does not move" -- the app is on `main`.
@@ -26,7 +26,7 @@ draft to paste from; every number is from a logged run on 2026-10-19.
       shipping -- a picture INPUT, not a model in the pipeline, which stays all open weights.
 - [ ] **Demo render on that exact workflow** (operator, 10-20: "we need another run with ESRGAN for our
       demo to be precise") -- then cut the under-2-minute video from it.
-- [ ] README: replace "Demo video: to be recorded" with the link.
+- [x] README: the demo video link is in (10-22).
 
 ## Q1. Tell us about yourself (required)
 Name / Comfy app email / Country -- **operator.**
@@ -48,7 +48,7 @@ Radio Play Studio
 ## Q6. Submission links
 - **GitHub repo URL:** https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio
   Public, MIT (`LICENSE` in the folder and at the repo root), setup in the README.
-- **Demo video URL:** -- after recording (under 2 min).
+- **Demo video URL:** https://youtu.be/UeQQeVMaMVs
 - **Live link to try it (optional):** **operator's call.** An episode is about an hour of GPU on a
   16 GB card and judges expect 5-10 runs, so a live link is not practical on the home box. If he
   wants one, the 5-minute stills workflow (`--workflow workflows/otr_16gb_still.json`) behind a
