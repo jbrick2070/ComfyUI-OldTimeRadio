@@ -225,6 +225,13 @@ if command -v apt-get >/dev/null 2>&1; then
   apt-get update -qq >/dev/null 2>&1 \
     && apt-get install -y -qq libcairo2-dev pkg-config >/dev/null 2>&1 \
     || fail "system dependencies libcairo2-dev/pkg-config failed"
+  # Script fonts for the non-Latin rows. Linux images ship none, so a Mandarin,
+  # Japanese or Hindi episode burned every caption, title and credit as empty
+  # boxes (RunPod 2026-10-21). The pack's walks name exactly these files:
+  # NotoSansCJK-Regular.ttc and NotoSansDevanagari-Regular.ttf.
+  apt-get install -y -qq fonts-noto-cjk fonts-noto-core >/dev/null 2>&1 \
+    && fc-cache -f >/dev/null 2>&1 \
+    || fail "CJK/Devanagari fonts (fonts-noto-cjk, fonts-noto-core) failed to install"
 fi
 
 # ffmpeg MUST BE ABLE TO WRITE PCM AUDIO INTO AN MP4, which FFmpeg gained in
