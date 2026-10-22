@@ -177,6 +177,18 @@ async function setLang(code) {
   $("lang").value = lang;
   paintAll();
 }
+// A browser language tag ("zh-TW", "ja-JP", "pt-BR") -> the language file that
+// serves it, or null. Chinese is split by script: Traditional for Hant, Taiwan,
+// Hong Kong and Macau; Simplified for everything else.
+function matchLang(tag, has) {
+  const parts = String(tag).toLowerCase().split("-");
+  if (parts[0] === "zh") {
+    const traditional = !parts.includes("hans") &&
+      (parts.includes("hant") || parts.some((p) => p === "tw" || p === "hk" || p === "mo"));
+    return traditional && has("zh-hant") ? "zh-hant" : (has("zh") ? "zh" : null);
+  }
+  return has(parts[0]) ? parts[0] : null;
+}
 // The page speaks the language the person chose last time, else the browser's,
 // else English. The list comes from the app: one file per language.
 async function initLang() {
@@ -195,8 +207,8 @@ async function initLang() {
   let saved = null;
   try { saved = localStorage.getItem("rps_lang"); } catch (err) { /* private window */ }
   const has = (c) => langs.some((l) => l.code === c);
-  const asked = (navigator.languages || [navigator.language || "en"]).map((l) => String(l).toLowerCase().split("-")[0]);
-  await setLang(has(saved) ? saved : (asked.find(has) || "en"));
+  const asked = (navigator.languages || [navigator.language || "en"]).map((l) => matchLang(l, has));
+  await setLang(has(saved) ? saved : (asked.find(Boolean) || "en"));
 }
 
 function control(f) {

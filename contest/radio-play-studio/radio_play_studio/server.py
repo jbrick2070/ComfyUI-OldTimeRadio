@@ -25,9 +25,10 @@ from .runner import Studio
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 #: One JSON file per language the page can speak: `{"_name": "Espanol", "key": "text", ...}`.
+#: The name is a language code (`es`) or a code and script (`zh-hant`), all lower case.
 #: Adding a file adds a language; the page reads the list from `/api/languages`.
 I18N_DIR = STATIC_DIR / "i18n"
-_I18N_FILE = re.compile(r"([a-z]{2,3})\.json")
+_I18N_FILE = re.compile(r"([a-z]{2,3}(?:-[a-z]{4})?)\.json")
 #: The author's photos that ship in the pack for its built-in My Story (the
 #: example's cast cards show them). The pack reads them by " [bundled]" names.
 BUNDLED_PHOTO_DIR = (Path(__file__).resolve().parents[3]

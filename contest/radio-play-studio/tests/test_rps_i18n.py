@@ -31,8 +31,10 @@ def _slug(text):
 EN = _load("en")
 
 
-def test_the_page_speaks_the_languages_the_pack_writes_episodes_in():
-    assert CODES == sorted(["en", "es", "pt", "it", "fr", "hi", "ja", "zh"])
+def test_the_page_speaks_the_languages_the_pack_writes_episodes_in_plus_traditional_chinese():
+    """The pack writes episodes in eight languages; Mandarin has two page files
+    because a Traditional-script reader should not be handed Simplified."""
+    assert CODES == sorted(["en", "es", "pt", "it", "fr", "hi", "ja", "zh", "zh-hant"])
 
 
 @pytest.mark.parametrize("code", CODES)
@@ -65,6 +67,38 @@ def test_every_key_the_page_names_is_in_english():
     used = set(re.findall(r'"([a-z_]+(?:\.[a-z0-9_]+)+)"', page))
     assert used, "the page names no keys at all"
     assert sorted(k for k in used if k not in EN) == []
+
+
+def _match_lang_in_node(cases, offered):
+    """Run the page's own matchLang() under node, so the test cannot drift from the page."""
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    page = PAGE.read_text(encoding="utf-8")
+    src = re.search(r"function matchLang\(tag, has\) \{.*?\n\}\n", page, re.S).group(0)
+    script = (src + "const offered = " + json.dumps(offered) + "; const has = (c) => offered.includes(c);"
+              "console.log(JSON.stringify(" + json.dumps(cases) + ".map((t) => matchLang(t, has))));")
+    done = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=30, check=True)
+    return json.loads(done.stdout)
+
+
+def test_a_browser_language_finds_its_file_by_script_and_region():
+    offered = CODES
+    cases = ["en-US", "es-MX", "pt-BR", "ja-JP", "hi-IN", "fr-CA", "de-DE", "ko", "xx",
+             "zh", "zh-CN", "zh-SG", "zh-Hans", "zh-Hans-CN", "zh-Hans-TW",
+             "zh-TW", "zh-HK", "zh-MO", "zh-Hant", "zh-Hant-TW", "zh-Hant-CN", "ZH-tw"]
+    assert _match_lang_in_node(cases, offered) == [
+        "en", "es", "pt", "ja", "hi", "fr", None, None, None,
+        "zh", "zh", "zh", "zh", "zh", "zh",
+        "zh-hant", "zh-hant", "zh-hant", "zh-hant", "zh-hant", "zh-hant", "zh-hant"]
+
+
+def test_traditional_chinese_falls_back_to_simplified_when_it_is_not_offered():
+    offered = [c for c in CODES if c != "zh-hant"]
+    assert _match_lang_in_node(["zh-TW", "zh-Hant", "zh-CN"], offered) == ["zh", "zh", "zh"]
+    assert _match_lang_in_node(["zh-TW"], ["en", "es"]) == [None]
 
 
 def test_a_missing_string_never_shows_its_key():
@@ -106,8 +140,15 @@ def test_a_language_file_is_served_as_utf8_json(app):  # noqa: F811
     assert json.loads(body.decode("utf-8")) == _load("ja")
 
 
+def test_a_language_with_a_script_is_served(app):  # noqa: F811
+    port, _ = app
+    status, _, body = _request(port, "GET", "/i18n/zh-hant.json")
+    assert status == 200 and json.loads(body.decode("utf-8"))["_name"] == "繁體中文"
+
+
 @pytest.mark.parametrize("path", ["/i18n/xx.json", "/i18n/EN.json", "/i18n/../server.py",
-                                  "/i18n/%2e%2e/server.py", "/i18n/en.json.bak", "/i18n/"])
+                                  "/i18n/%2e%2e/server.py", "/i18n/en.json.bak", "/i18n/",
+                                  "/i18n/zh-Hant.json", "/i18n/zh-hant-tw.json", "/i18n/zh-.json"])
 def test_anything_else_under_i18n_is_a_404(app, path):  # noqa: F811
     port, _ = app
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
