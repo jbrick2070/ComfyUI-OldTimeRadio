@@ -344,6 +344,18 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         (otr_16gb_foley_open_flux3_ref.acts-3.5ab87708.json). No crash on the new driver. Stills
         ~33 min (vs ~10 from text), filming ~4.6 h for 64 beats; the ffmpeg 1080p step took minutes.
       NEXT: the demo video from this episode (Blender scenes, Seoul excerpt, ffmpeg cut).
+      [x] FLATLAND 1-ACT (10-21 17:11) -- My Story with Abbott's Flatland (public domain, 1884) as
+        plot/characters/setting, rolled video_art: RESULT succeeded, obs_publish OK, 2:09:59, 2:53
+        at 1920x1080, three_dimensions_20261021_150516__vart__...final.mp4 (sha 9ea1d189), app copy
+        byte-identical, timing saved (open_flux3_ref.acts-1). No digital glitch: the glitch seen on
+        My Story is that story's own digital setting, not a style leak (0 hits of the video_art /
+        recur_frac pack words in the demo run's prompts; "digital" 176, "glitch" 24, all story text).
+      STYLE SWEEP, 3 ACTS EACH (operator 10-21: "run the 3 acts, my story and flatland, a few runs
+        for a few days and see what we get"; "not a fan of origami"): Flatland on
+        storybook_engraving (started 17:13), then tmp/rps_live/style_queue.py (detached, log
+        style_queue.log) runs one at a time: My Story anime, Flatland archival_documentary, My Story
+        sci_fi_radio, Flatland shakespeare_stage_realism, My Story cartoon, Flatland recur_frac,
+        My Story video_art, Flatland visual_storybased. Styles are set, not rolled.
       [x] MERGED INTO MAIN 6364c3df (operator: "merge the contest branch into main now so the code
         link does not move"): https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio
         resolves. No node code, no pyproject.toml, contest/ excluded from the published pack.
