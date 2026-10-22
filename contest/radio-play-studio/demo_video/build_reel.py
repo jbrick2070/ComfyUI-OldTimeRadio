@@ -39,12 +39,14 @@ SECTIONS = [
         ("3", "ARCHIVAL DOCUMENTARY", "FLATLAND", "three_dimensions_20261022_034357", 89.5),
         ("4", "RECURSIVE FRACTAL", "THE ECHO OF THE DRAGON", "dragon_echo_20261009_014109", 43.0),
         ("5", "CARTOON", "THE LAST DUET", "final_duet_20261022_034335", 94.5),
+        ("6", "ANIMATEDIFF ON 8 GB", "GUSTO: SIDE B", "side_b_20261021_215830", 103.5),
     ]),
     # Operator 10-22: "it just needs some GUSTO" -- his own script, closing the reel.
     ("YOUR STORY", [
-        ("1", "GUSTO: SIDE B", "WRITTEN BY JEFFREY A. BRICK", "side_b_20261021_215830", 103.5),
-        ("2", "ROOK TAKES THE QUEUE", "IMPROVISATION IS UNDEFINED", "side_b_20261022_002847", 125.5),
-        ("3", "ERROR OR PERFORMANCE?", "KEEP THE PERFORMANCE", "side_b_20261022_002847", 182.5),
+        ("1", "GUSTO: SIDE B", "WRITTEN BY JEFFREY A. BRICK", "side_b_20261022_045001", 76.5),
+        ("2", "NINA CALDER", "LEAVE THE SILENCE WHERE I PUT IT", "side_b_20261022_045001", 97.5),
+        ("3", "ACT ONE ENDS", "THE NEXT SELECTION BELONGS TO ROOK", "side_b_20261022_045001", 139.5),
+        ("4", "KEEP THE PERFORMANCE", "ELI MERCER", "side_b_20261022_045001", 247.0),
     ]),
 ]
 EXTRA = WORK / "extra_clips.json"   # late episodes (Mandarin, Japanese) land here

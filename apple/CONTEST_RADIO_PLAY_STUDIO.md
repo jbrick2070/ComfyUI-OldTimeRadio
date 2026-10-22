@@ -549,7 +549,11 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       Japanese sci-fi news), Stories 1-3 (Shakespeare, his own story, sci-fi from the news), Looks 1-5
       (Flatland engraving "I am falling" vs video art "I am rising", recursive fractal, cartoon My
       Story, the 4060's AnimateDiff GUSTO). Builder: demo_video/build_reel.py + reel_cards.py.
-      Mandarin (Languages 6) waits for the RunPod redo with fonts.
+      10-22 update: Languages 6 (Mandarin Kipling, clean CJK), Looks 6 (Flatland archival), no
+      numbers on the badges ("it clutters space"), a 100% open weights card, and a closing YOUR
+      STORY section of four GUSTO beats from the 16 GB pod render (side_b_20261022_045001):
+      turntables, Nina's "leave the silence", "the next selection belongs to Rook", "keep the
+      performance". 2:12, 25 parts.
 - [~] README final pass (`contest/radio-play-studio/README.md`), 10-22 00:30: still model is FLUX 3
       Klein (it said MOSS-Image), My Story reference stills, the ffmpeg 1080p row, licence note.
       Left: the demo video link once the operator posts it.
