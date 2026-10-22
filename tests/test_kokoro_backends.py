@@ -733,7 +733,7 @@ def test_a_cjk_row_moves_to_torch_when_its_libraries_are_not_in(monkeypatch, tmp
     loaded = []
 
     class _Torch:
-        def __init__(self, device, lang_code="b"):
+        def __init__(self, device, lang_code="b", voices_dir=None):
             loaded.append(lang_code)
 
         def load(self):
@@ -1051,3 +1051,106 @@ def test_a_failure_reason_keeps_the_line_that_names_the_cause():
 
     assert kb._failure_reason(_Unprintable()) == "_Unprintable"
     assert kb._failure_reason(OSError()) == "OSError"
+
+
+# --------------------------------------------------------------------------- #
+# the torch backend reads Japanese and Mandarin with the pack's copy (2026-10-21)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("text", [
+    "", "short.", "no sentence end at all " * 30,
+    "One. Two! Three? " * 40, "a" * 1000, "Mixed. " + "x" * 450 + ". End.",
+])
+def test_the_chunking_is_kpipelines_own(text):
+    pipeline = pytest.importorskip("kokoro.pipeline")
+    source = inspect.getsource(pipeline.KPipeline.__call__)
+    assert "chunk_size = %d" % kb.KPIPELINE_CHUNK_CHARS in source
+    assert "> %d" % kb.KPIPELINE_MAX_PHONEMES in source
+    # Run kokoro's own chunking loop, lifted from its source, on the same text.
+    import re as _re
+    graphemes, chunk_size = text, kb.KPIPELINE_CHUNK_CHARS
+    chunks, sentences, current_chunk = [], _re.split(r"([.!?]+)", graphemes), ""
+    for i in range(0, len(sentences), 2):
+        sentence = sentences[i]
+        if i + 1 < len(sentences):
+            sentence += sentences[i + 1]
+        if len(current_chunk) + len(sentence) <= chunk_size:
+            current_chunk += sentence
+        else:
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            current_chunk = sentence
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+    if not chunks:
+        chunks = [graphemes[i:i + chunk_size] for i in range(0, len(graphemes), chunk_size)]
+    assert kb.kpipeline_chunks(text) == chunks
+
+
+def test_the_torch_backend_takes_the_pack_copy_for_japanese(monkeypatch, tmp_path):
+    made = []
+
+    class _Own:
+        def __init__(self, lang_code, device, voices_dir):
+            made.append((lang_code, device, voices_dir))
+
+    monkeypatch.setattr(kb, "OwnG2PPipeline", _Own)
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: True)
+    monkeypatch.setattr(kb, "kokoro_has_pipeline_api", lambda: True)
+    backend = kb.TorchKokoroBackend("cpu", lang_code="j", voices_dir=str(tmp_path))
+    backend.load()
+    assert made == [("j", "cpu", str(tmp_path))]
+
+
+@pytest.mark.parametrize("ready, api, voices", [
+    (False, True, True), (True, False, True), (True, True, False)])
+def test_the_torch_backend_keeps_kpipeline_when_the_copy_cannot_serve(
+        monkeypatch, tmp_path, ready, api, voices):
+    built = []
+    fake = types.ModuleType("kokoro")
+
+    class _KPipeline:
+        def __init__(self, **kwargs):
+            built.append(kwargs["lang_code"])
+
+    fake.KPipeline = _KPipeline
+    monkeypatch.setitem(sys.modules, "kokoro", fake)
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: ready)
+    monkeypatch.setattr(kb, "kokoro_has_pipeline_api", lambda: api)
+    backend = kb.TorchKokoroBackend("cpu", lang_code="z",
+                                    voices_dir=str(tmp_path) if voices else None)
+    backend.load()
+    assert built == ["z"]
+
+
+def test_the_engine_hands_the_torch_backend_its_voices_folder():
+    source = inspect.getsource(eng_kokoro.KokoroEngine.load)
+    assert "voices_dir=_kokoro_voices_dir()" in source
+
+
+@pytest.mark.parametrize("lang, voice, line", [
+    ("j", "jf_alpha", "海の水は塩辛い。\n第二の行です。"),
+    ("z", "zf_xiaobei", "一路顺风。\n第二行。"),
+])
+def test_the_pack_copy_path_is_byte_identical_to_kpipeline(lang, voice, line):
+    """Measured on the 5080 2026-10-21; runs wherever the torch kokoro, misaki's
+    own phonemizers and the cached model and voice are all present."""
+    torch = pytest.importorskip("torch")
+    kokoro = pytest.importorskip("kokoro")
+    if not kb.kokoro_has_pipeline_api() or not kb.own_g2p_ready(lang):
+        pytest.skip("needs kokoro 0.9 and the pack copy's libraries")
+    voices_dir = eng_kokoro._kokoro_voices_dir()
+    if not os.path.exists(os.path.join(voices_dir, "%s.pt" % voice)):
+        pytest.skip("voice file not on this box")
+    try:
+        ours = kb.OwnG2PPipeline(lang, "cpu", voices_dir)
+        theirs = kokoro.KPipeline(lang_code=lang, repo_id=kb.KOKORO_REPO_ID,
+                                  model=ours.model, device="cpu")
+    except Exception as exc:  # noqa: BLE001 -- no cached model or misaki extra here
+        pytest.skip("kokoro model or misaki[%s] unavailable: %s" % (lang, exc))
+    torch.manual_seed(0)
+    a = [r.output.audio.numpy() for r in theirs(line, voice=voice, speed=1.0)]
+    torch.manual_seed(0)
+    b = [audio.numpy() for _, _, audio in ours(line, voice=voice, speed=1.0)]
+    assert len(a) == len(b) == 2
+    for x, y in zip(a, b):
+        assert np.array_equal(x, y)

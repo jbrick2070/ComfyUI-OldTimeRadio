@@ -129,9 +129,13 @@ itself does not, so the pack carries that code
 has no 3.13 wheel (after NFKC it is a three-character table, measured), and
 pins the unidic-lite dictionary. Python 3.14 has no packaged Kokoro path.
 Japanese and Mandarin additionally require their readiness extra, checked
-only when that language is selected and never an English-install tax:
-`misaki[ja]` / `misaki[zh]` on 3.10 - 3.12, and on 3.13 the libraries under
-the pack's copy.
+only when that language is selected and never an English-install tax: the
+libraries under the pack's copy, on every Python. Since 2026-10-21 the torch
+Kokoro (3.10 - 3.12) reads those two languages with the same copy
+(`OwnG2PPipeline`, byte-identical audio to kokoro's own pipeline, measured), so
+`misaki[ja]` / `misaki[zh]` are no longer needed -- and `misaki[ja]` should not be
+installed: it pulls `unidic`, an empty dictionary downloader that fugashi
+prefers over unidic-lite (PBUG-20260918-06).
 
 Where the two backends differ, the ONNX one errs toward speaking. Ordinary
 lines match the torch output (Sonnet QA, 2026-09-28: same duration to the
@@ -142,21 +146,20 @@ model has no sound for can pick a neighbouring style row; and a line with
 nothing speakable in it is a quarter second of silence on both.
 
 On Python 3.13 the libraries both rows need install with the pack's
-requirements, so nothing is added by hand. On 3.10 - 3.12 install one with
-ComfyUI's own Python before selecting that row, and on 3.13 use the lines
-below only to repair an install that lost them:
+requirements. On 3.10 - 3.12 the requirements still declare them for 3.13 only
+(widening that marker means editing `pyproject.toml`, which publishes a release,
+so it waits for the next version bump); until then install the one you need by
+hand with ComfyUI's own Python. On 3.13 the same lines repair an install that
+lost them:
 
 ```text
-<ComfyUI Python> -m pip install "misaki[ja]"                       # Japanese on Python 3.10 - 3.12
-<ComfyUI Python> -m pip install "misaki[zh]"                       # Mandarin on Python 3.10 - 3.12
-<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set     # Mandarin on Python 3.13 (repair)
-<ComfyUI Python> -m pip install fugashi jaconv unidic-lite        # Japanese on Python 3.13 (repair)
+<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set     # Mandarin
+<ComfyUI Python> -m pip install fugashi jaconv unidic-lite        # Japanese
 ```
 
-Use only the line for the language you need. One edge: on 3.10 - 3.12 with
-`OTR_KOKORO_BACKEND=onnx` forced, Kokoro uses the pack's copy and needs the
-3.13 lines, which the requirements do not install there; the refusal names
-them.
+A box that already has `misaki[ja]` (and its `unidic`) from an older install
+needs nothing removed: the pack's copy reads unidic-lite whatever else is
+installed, and the torch Kokoro takes the copy whenever it builds.
 
 ---
 

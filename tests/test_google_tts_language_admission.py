@@ -89,5 +89,5 @@ def test_castlock_asks_for_kokoros_phonemizers_only_when_kokoro_speaks(monkeypat
     meta = {"episode_language": "ja"}
     assert cast_lock._require_language_engines(meta, "google_tts", "google_tts") == "ja"
     for engines in (("kokoro", "google_tts"), ("google_tts", "kokoro"), ("auto", "google_tts")):
-        with pytest.raises(eplang.EpisodeLanguageError, match="misaki"):
+        with pytest.raises(eplang.EpisodeLanguageError, match="Japanese phonemizer"):
             cast_lock._require_language_engines(meta, *engines)

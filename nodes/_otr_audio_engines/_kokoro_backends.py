@@ -652,12 +652,131 @@ def _nothing_voiced(text: str, lang_code: str, backend: str):
         % (backend, lang_code, line[:120]))
 
 
+KOKORO_REPO_ID = "hexgrad/Kokoro-82M"
+
+#: The kokoro release whose pipeline ``OwnG2PPipeline`` repeats; an older one
+#: (requirements allow 0.7.16) builds KModel differently, so it keeps KPipeline.
+KPIPELINE_API = (0, 9)
+
+#: kokoro 0.9.4 ``KPipeline``: a non-English segment is cut into chunks of about
+#: this many characters at sentence ends, and a chunk's phonemes are cut to the
+#: model's limit.
+KPIPELINE_CHUNK_CHARS = 400
+KPIPELINE_MAX_PHONEMES = 510
+_SENTENCE_SPLIT = re.compile(r"([.!?]+)")
+
+
+def kpipeline_chunks(graphemes: str) -> list:
+    """kokoro 0.9.4 ``KPipeline.__call__``'s non-English chunking, repeated:
+    sentences joined up to ``KPIPELINE_CHUNK_CHARS``, and plain slices when no
+    chunk came out."""
+    sentences = _SENTENCE_SPLIT.split(graphemes)
+    chunks, current = [], ""
+    for i in range(0, len(sentences), 2):
+        sentence = sentences[i]
+        if i + 1 < len(sentences):
+            sentence += sentences[i + 1]
+        if len(current) + len(sentence) <= KPIPELINE_CHUNK_CHARS:
+            current += sentence
+        else:
+            if current:
+                chunks.append(current.strip())
+            current = sentence
+    if current:
+        chunks.append(current.strip())
+    if not chunks:
+        chunks = [graphemes[i:i + KPIPELINE_CHUNK_CHARS]
+                  for i in range(0, len(graphemes), KPIPELINE_CHUNK_CHARS)]
+    return chunks
+
+
+def kokoro_has_pipeline_api() -> bool:
+    """True when the installed kokoro is at least ``KPIPELINE_API``. A metadata
+    read only; nothing is imported."""
+    from importlib import metadata
+
+    try:
+        parts = metadata.version("kokoro").split(".")[:2]
+        return tuple(int(re.match(r"\d+", part).group()) for part in parts) >= KPIPELINE_API
+    except (metadata.PackageNotFoundError, AttributeError, ValueError):
+        return False
+
+
+class OwnG2PPipeline:
+    """kokoro's ``KPipeline`` for Japanese and Mandarin, with the phonemes from
+    the pack's copy of misaki (``OWN_G2P``) instead of the installed misaki.
+
+    It keeps KPipeline's call shape -- ``pipeline(text, voice=, speed=,
+    split_pattern=)`` yielding ``(graphemes, phonemes, audio)`` -- and repeats its
+    non-English branch of kokoro 0.9 (``KPIPELINE_API``): split, chunk,
+    phonemize, cut to 510, infer with the voice pack row for the phoneme count.
+    A voice is the local ``<voices_dir>/<id>.pt`` the engine has already checked
+    -- the same bytes as the hub copy KPipeline reads, and nothing here networks
+    (C-7). Measured 2026-10-21 against KPipeline('j') and KPipeline('z') on the
+    5080 (kokoro 0.9.4, CPU): the same phonemes and byte-identical audio on every
+    line tried. One difference by design: the copy always reads unidic-lite, so a
+    box with the full UniDic downloaded phonemizes Japanese as the ONNX backend
+    does, not as misaki would there.
+    """
+
+    def __init__(self, lang_code: str, device: str, voices_dir: str):
+        import inspect
+
+        from kokoro import KModel
+
+        self.lang_code = lang_code
+        kwargs = {}
+        try:
+            if "repo_id" in inspect.signature(KModel.__init__).parameters:
+                kwargs["repo_id"] = KOKORO_REPO_ID
+        except (TypeError, ValueError):
+            kwargs["repo_id"] = KOKORO_REPO_ID
+        if device == "cuda":
+            import torch
+
+            if not torch.cuda.is_available():
+                # KPipeline's own refusal: never a silent move to the CPU.
+                raise RuntimeError("CUDA requested but not available")
+        self.model = KModel(**kwargs).to(device).eval()
+        self._g2p = OWN_G2P[lang_code]()
+        self._voices_dir = voices_dir
+        self._voices = {}
+
+    def _voice_pack(self, voice: str):
+        import torch
+
+        if voice not in self._voices:
+            path = os.path.join(self._voices_dir, "%s.pt" % voice)
+            self._voices[voice] = torch.load(path, weights_only=True)
+        return self._voices[voice]
+
+    def __call__(self, text: str, voice: str, speed: float = 1, split_pattern=r"\n+"):
+        pack = self._voice_pack(voice).to(self.model.device)
+        segments = re.split(split_pattern, text.strip()) if split_pattern else [text]
+        for graphemes in segments:
+            if not graphemes.strip():
+                continue
+            for chunk in kpipeline_chunks(graphemes):
+                if not chunk.strip():
+                    continue
+                phonemes = self._g2p(chunk)
+                if not phonemes:
+                    continue
+                if len(phonemes) > KPIPELINE_MAX_PHONEMES:
+                    log.warning("[kokoro] truncating %d phonemes to %d", len(phonemes),
+                                KPIPELINE_MAX_PHONEMES)
+                    phonemes = phonemes[:KPIPELINE_MAX_PHONEMES]
+                output = self.model(phonemes, pack[len(phonemes) - 1], speed, return_output=True)
+                yield chunk, phonemes, output.audio
+
+
 class TorchKokoroBackend:
     """The pre-2026-09-02 synthesis path, moved verbatim.
 
     ``load`` builds ``KPipeline`` with the episode's lang_code (British ``b``
     on English; ``e``/``p``/``i``/``f``/``h``/``j``/``z`` on the other admitted
-    rows). Cache identity is ``(lang_code, device)`` -- a language change
+    rows), except Japanese and Mandarin when the pack's copy of misaki is ready
+    there: those get ``OwnG2PPipeline``, which never imports misaki. Cache identity is ``(lang_code, device)`` -- a language change
     rebuilds. The EXPLICIT device comes from the CastLock ledger stamp (S4 -- a
     device the host cannot provide fails LOUD in KPipeline, never a silent
     downgrade). ``repo_id`` only when this kokoro build accepts it (0.7.x does
@@ -669,15 +788,25 @@ class TorchKokoroBackend:
 
     name = "torch"
 
-    def __init__(self, device: str, lang_code: str = "b"):
+    def __init__(self, device: str, lang_code: str = "b", voices_dir: "str | None" = None):
         self.device = device
         self.lang_code = str(lang_code or "b").strip() or "b"
+        self.voices_dir = voices_dir
         self._pipeline = None
 
     def load(self) -> None:
         if self._pipeline is not None:
             return
         import inspect
+
+        if (self.lang_code in OWN_G2P and self.voices_dir
+                and kokoro_has_pipeline_api() and own_g2p_ready(self.lang_code)):
+            # Japanese and Mandarin read with the pack's copy of misaki, as on
+            # ONNX: misaki[ja] is then never needed, and its empty `unidic`
+            # cannot shadow the dictionary (PBUG-20260918-06, live again on a
+            # fresh Python 3.12 pod 2026-10-21). Byte-identical to KPipeline.
+            self._pipeline = OwnG2PPipeline(self.lang_code, self.device, self.voices_dir)
+            return
 
         from kokoro import KPipeline
 

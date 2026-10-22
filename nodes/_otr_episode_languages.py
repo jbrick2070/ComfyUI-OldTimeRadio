@@ -540,10 +540,12 @@ def readiness_extra_ok(token: str) -> bool:
         sub = extra[7:-1].strip()
         if not sub:
             return False
-        if _misaki_g2p_failure(sub) is None:
-            return True
+        # The pack's copy first: both backends prefer it, and a box whose misaki
+        # is poisoned (an empty `unidic`) is then never rebuilt on every queue.
         code = _pack_copy_lang(sub)
-        return code is not None and _kokoro_backends().own_g2p_ready(code)
+        if code is not None and _kokoro_backends().own_g2p_ready(code):
+            return True
+        return _misaki_g2p_failure(sub) is None
     return False
 
 
@@ -606,27 +608,12 @@ def _kokoro_backends():
 
 
 def _pack_copy_lang(sub: str):
-    """The lang_code of the pack's copy of misaki's ``sub`` phonemizer when THIS
-    box uses it: Kokoro runs through ONNX, because the torch kokoro package is
-    absent or ``OTR_KOKORO_BACKEND=onnx`` forces it. Otherwise the torch pipeline
-    imports misaki itself, and only misaki satisfies the extra. None when there
-    is no copy or it is not used."""
-    code = _MISAKI_EXTRA_LANG.get(str(sub or "").strip())
-    if code is None:
-        return None
-    try:
-        from ._otr_shared import env as _otr_env
-    except ImportError:  # pragma: no cover -- flat test imports
-        from _otr_shared import env as _otr_env  # type: ignore
-    if str(_otr_env.get("OTR_KOKORO_BACKEND", "") or "").strip().lower() == "onnx":
-        return code
-    import importlib.util
-    try:
-        if importlib.util.find_spec("kokoro") is not None:
-            return None
-    except (ImportError, ValueError):
-        pass
-    return code
+    """The lang_code of the pack's copy of misaki's ``sub`` phonemizer, or None
+    when there is no copy. Both Kokoro backends read Japanese and Mandarin with
+    the copy when it builds (the torch one since 2026-10-21,
+    ``_kokoro_backends.OwnG2PPipeline``), so it satisfies the extra on either;
+    the torch backend still takes misaki itself when only that works."""
+    return _MISAKI_EXTRA_LANG.get(str(sub or "").strip())
 
 
 def assert_readiness_extras(row: LanguageRow) -> None:
@@ -640,9 +627,9 @@ def assert_readiness_extras(row: LanguageRow) -> None:
                 if kb.own_g2p_missing(code):
                     raise EpisodeLanguageError(
                         "language %s needs the libraries under Kokoro's %s phonemizer "
-                        "on this box (misaki itself does not install on this Python; "
-                        "the pack carries its code). Install them outside the render "
-                        "with this ComfyUI Python: python -m %s"
+                        "on this box (the pack carries the phonemizer's code; misaki "
+                        "itself is not needed). Install them outside the render with "
+                        "this ComfyUI Python: python -m %s"
                         % (row.label, row.label, hint))
                 # Installed, and still not working: a second pip install does
                 # nothing, so say what failed and how to reinstall.
@@ -652,26 +639,6 @@ def assert_readiness_extras(row: LanguageRow) -> None:
                     "ComfyUI Python: python -m %s --force-reinstall -- or, if that "
                     "error names a file inside this pack, reinstall the pack."
                     % (row.label, row.label, kb.own_g2p_error(code), hint))
-            sub = extra[7:-1] if extra.startswith("misaki[") else ""
-            # This look only chooses the advice. The DECISION is
-            # readiness_extra_ok's -- the seam callers and tests drive -- so a
-            # second look that happens to build (a transient first failure)
-            # still refuses, with the plain install line below.
-            failure = _misaki_g2p_failure(sub) if sub else None
-            if failure is not None and failure[0] == "build":
-                # misaki imports and its phonemizer will not start: a plain
-                # install changes nothing. The empty-MeCab-dictionary trap gets
-                # the fix the voice node would have given (PBUG-20260918-06);
-                # anything else is named as it is.
-                kb = _kokoro_backends()
-                exc = failure[1]
-                reworded = kb._mecab_dictionary_error(exc, _MISAKI_EXTRA_LANG.get(sub, ""))
-                if reworded is not exc:
-                    raise EpisodeLanguageError("language %s: %s" % (row.label, reworded))
-                raise EpisodeLanguageError(
-                    "language %s: readiness extra %s imports on this box but its "
-                    "phonemizer does not start (%s)."
-                    % (row.label, extra, kb._failure_reason(exc)))
             raise EpisodeLanguageError(
                 "language %s needs readiness extra %s on this box "
                 "(CastLock extra, never an English-install tax). Install it "

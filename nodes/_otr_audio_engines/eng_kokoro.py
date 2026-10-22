@@ -292,7 +292,8 @@ class KokoroEngine:
             self._backend_key = None
 
         if name == "torch":
-            backend = _kb.TorchKokoroBackend(device, lang_code=lang)
+            backend = _kb.TorchKokoroBackend(device, lang_code=lang,
+                                             voices_dir=_kokoro_voices_dir())
             backend.load()          # KPipeline errors stay as they were (S4: loud)
             log.info("[OTR.kokoro] backend=torch device=%s lang=%s", device, lang)
         else:

@@ -597,7 +597,7 @@ def test_a_missing_readiness_extra_is_a_gap(monkeypatch):
     monkeypatch.setattr(eng_kokoro, "_spec_present", lambda name: True)
     monkeypatch.setattr(langs, "readiness_extra_ok", lambda token: False)
     gap = L.language_voice_gap(langs.row_by_iso("ja"), ("kokoro", "kokoro"))
-    assert "misaki[ja]" in gap
+    assert "Japanese phonemizer" in gap
 
 
 def test_the_voice_pool_leaves_out_kokoro_where_it_cannot_speak(monkeypatch):
@@ -715,7 +715,7 @@ def test_the_readiness_extras_are_kokoros_alone(monkeypatch):
     monkeypatch.setattr(eng_kokoro, "_spec_present", lambda name: True)
     japanese = langs.row_by_iso("ja")
     assert L.language_voice_gap(japanese, ("google_tts", "google_tts")) is None
-    assert "misaki[ja]" in L.language_voice_gap(japanese, ("kokoro", "google_tts"))
+    assert "Japanese phonemizer" in L.language_voice_gap(japanese, ("kokoro", "google_tts"))
 
 
 def test_a_refused_pick_names_the_voice_that_would_speak_it(monkeypatch):

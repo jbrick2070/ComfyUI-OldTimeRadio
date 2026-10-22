@@ -56,7 +56,11 @@ The Python version decides the voice backend, and this is not a preference:
 
 * **3.10, 3.11, 3.12** -> the torch `kokoro` package and every admitted
   language (`requirements.txt` pins it to
-  `python_version < "3.13"`).
+  `python_version < "3.13"`). Japanese and Mandarin read with the pack's own
+  phonemizer copy: install its libraries by hand
+  (`<ComfyUI Python> -m pip install fugashi jaconv unidic-lite` for Japanese,
+  `<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set` for
+  Mandarin), and do NOT install `misaki[ja]` (its empty `unidic` breaks MeCab).
 * **3.13** (what Desktop and the portable build ship) -> `kokoro-onnx`, on the
   CPU, about six times faster than realtime. It speaks every language; the
   Mandarin and Japanese libraries install with the pack's requirements (the

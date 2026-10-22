@@ -338,9 +338,11 @@ def test_readiness_extras_are_not_an_english_install_tax(label, extras):
 def test_readiness_extra_imports_transitive_contract(
         monkeypatch, label, extra, module_name, dependency):
     """A discoverable adapter is not usable when a transitive import is absent.
-    The torch path: with the torch kokoro package installed only misaki
-    satisfies the extra, so the pack's own copy is never consulted."""
-    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
+    With the pack's copy unavailable too, the extra is refused, and the advice
+    is the copy's libraries -- never misaki[ja], whose `unidic` is the trap."""
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: False)
+    monkeypatch.setattr(kb, "own_g2p_missing", lambda code: [dependency])
     calls = []
 
     def _missing_dependency(requested_module):
@@ -350,15 +352,17 @@ def test_readiness_extra_imports_transitive_contract(
     monkeypatch.setattr(importlib, "import_module", _missing_dependency)
     assert el.readiness_extra_ok(extra) is False
     assert calls == [module_name]
-    with pytest.raises(el.EpisodeLanguageError, match=r"misaki\["):
+    with pytest.raises(el.EpisodeLanguageError, match="needs the libraries under"):
         el.assert_readiness_extras(el.row_by_label(label))
 
 
 def test_readiness_extra_accepts_a_fully_importable_adapter(monkeypatch):
-    """The torch path imports misaki's adapter AND builds its phonemizer the
-    way KPipeline does (Mandarin on the legacy route Kokoro-82M uses)."""
+    """With the pack's copy unavailable, misaki's own adapter still meets the
+    extra: imported AND its phonemizer built the way KPipeline does (Mandarin on
+    the legacy route Kokoro-82M uses)."""
     import types
-    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)   # the torch path
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: False)
     calls, built = [], []
 
     def _available(module_name):
@@ -370,33 +374,35 @@ def test_readiness_extra_accepts_a_fully_importable_adapter(monkeypatch):
     assert calls == ["misaki.zh"] and built == [None]
 
 
-def test_the_torch_path_refuses_a_phonemizer_that_will_not_build(monkeypatch):
-    """Composer QA of 1a57dc91: the torch path only imported misaki, so a MeCab
-    dictionary that would not open passed the queue and died at the voice
-    node. It now refuses at the queue -- and with the fix the voice node gives
-    for the empty-dictionary trap, not a reinstall (Sonnet QA of c7136448)."""
+def test_a_poisoned_misaki_is_passed_over_for_the_pack_copy(monkeypatch):
+    """PBUG-20260918-06, live again on a fresh Python 3.12 pod 2026-10-21:
+    misaki[ja]'s empty `unidic` stops misaki's own phonemizer from building.
+    The pack's copy reads unidic-lite whatever else is installed, so the extra
+    is met by the copy, and misaki is never even built on that queue."""
     import types
-    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
+    from nodes._otr_audio_engines import _kokoro_backends as kb
     monkeypatch.setattr(el, "_MISAKI_BUILT", {})
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: code == "j")
+    built = []
 
     def _broken_dictionary():
+        built.append(1)
         raise RuntimeError("Failed initializing MeCab. no such file: /dic/mecabrc")
 
     module = types.SimpleNamespace(JAG2P=_broken_dictionary)
     monkeypatch.setattr(importlib, "import_module", lambda name: module)
-    assert el.readiness_extra_ok("misaki[ja]") is False
-    with pytest.raises(el.EpisodeLanguageError) as exc:
-        el.assert_readiness_extras(el.row_by_label("Japanese"))
-    text = str(exc.value)
-    assert "pip uninstall -y unidic" in text and "pip install unidic-lite" in text
-    assert "no such file: /dic/mecabrc" in text and "--force-reinstall" not in text
+    assert el.readiness_extra_ok("misaki[ja]") is True
+    el.assert_readiness_extras(el.row_by_label("Japanese"))
+    assert built == []
 
 
-def test_a_torch_box_missing_a_library_is_told_to_install_it(monkeypatch):
-    """misaki itself is on every torch box (kokoro needs misaki[en]); a missing
-    [ja] library is an import failure and gets the plain install line."""
-    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
+def test_a_box_missing_the_copys_libraries_is_told_to_install_them(monkeypatch):
+    """Neither phonemizer works: the advice is the copy's libraries, which work
+    on every Python, and never misaki[ja]."""
+    from nodes._otr_audio_engines import _kokoro_backends as kb
     monkeypatch.setattr(el, "_MISAKI_BUILT", {})
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: False)
+    monkeypatch.setattr(kb, "own_g2p_missing", lambda code: ["fugashi"])
 
     def _no_pyopenjtalk(name):
         raise ModuleNotFoundError("No module named 'pyopenjtalk'")
@@ -405,24 +411,8 @@ def test_a_torch_box_missing_a_library_is_told_to_install_it(monkeypatch):
     with pytest.raises(el.EpisodeLanguageError) as exc:
         el.assert_readiness_extras(el.row_by_label("Japanese"))
     text = str(exc.value)
-    assert "python -m pip install 'misaki[ja]'" in text
-    assert "force-reinstall" not in text and "does not start" not in text
-
-
-def test_any_other_build_failure_is_named_as_it_is(monkeypatch):
-    import types
-    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
-    monkeypatch.setattr(el, "_MISAKI_BUILT", {})
-
-    def _odd():
-        raise ValueError("jieba dictionary is unreadable")
-
-    module = types.SimpleNamespace(ZHG2P=lambda version: _odd())
-    monkeypatch.setattr(importlib, "import_module", lambda name: module)
-    with pytest.raises(el.EpisodeLanguageError) as exc:
-        el.assert_readiness_extras(el.row_by_label("Mandarin"))
-    assert "imports on this box but its phonemizer does not start" in str(exc.value)
-    assert "ValueError: jieba dictionary is unreadable" in str(exc.value)
+    assert "pip install fugashi jaconv unidic-lite" in text
+    assert "misaki[ja]" not in text and "force-reinstall" not in text
 
 
 def test_a_phonemizer_that_built_is_not_rebuilt_on_every_queue(monkeypatch):
@@ -430,7 +420,8 @@ def test_a_phonemizer_that_built_is_not_rebuilt_on_every_queue(monkeypatch):
     and readiness runs on every queued prompt. A success is kept for the
     process; a different module (a reinstall) is built again."""
     import types
-    monkeypatch.setattr(el, "_pack_copy_lang", lambda sub: None)
+    from nodes._otr_audio_engines import _kokoro_backends as kb
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: False)
     monkeypatch.setattr(el, "_MISAKI_BUILT", {})
     built = []
     module = types.SimpleNamespace(JAG2P=lambda: built.append(1))
@@ -538,26 +529,20 @@ def test_without_torch_kokoro_the_mandarin_extra_is_the_pack_copy(monkeypatch):
         el.assert_readiness_extras(el.row_by_label("Japanese"))
 
 
-def test_with_torch_kokoro_installed_the_copy_is_never_the_answer(monkeypatch):
+def test_the_pack_copy_answers_on_both_backends(monkeypatch):
+    """Since 2026-10-21 the torch Kokoro reads Japanese and Mandarin with the
+    pack's copy too (`OwnG2PPipeline`), so the copy is the answer with or
+    without the torch package, and whatever OTR_KOKORO_BACKEND says."""
     import importlib.util as util
-    monkeypatch.setattr(util, "find_spec", lambda name: object() if name == "kokoro" else None)
-    assert el._pack_copy_lang("zh") is None
-    monkeypatch.setattr(util, "find_spec", lambda name: None)
-    assert el._pack_copy_lang("zh") == "z"
-    assert el._pack_copy_lang("ja") == "j"
-    assert el._pack_copy_lang("ko") is None
-
-
-def test_a_forced_onnx_backend_uses_the_pack_copy_even_beside_torch(monkeypatch):
-    """OTR_KOKORO_BACKEND=onnx on a box with the torch package: load() voices
-    Mandarin through the pack's copy, so the readiness extra must accept it
-    there too (Sonnet QA of 503b2661: the gate refused what load() would say)."""
-    import importlib.util as util
-    monkeypatch.setattr(util, "find_spec", lambda name: object() if name == "kokoro" else None)
-    monkeypatch.setenv("OTR_KOKORO_BACKEND", "onnx")
-    assert el._pack_copy_lang("zh") == "z"
-    monkeypatch.setenv("OTR_KOKORO_BACKEND", "auto")
-    assert el._pack_copy_lang("zh") is None
+    for torch_present in (True, False):
+        monkeypatch.setattr(
+            util, "find_spec",
+            lambda name, present=torch_present: object() if present and name == "kokoro" else None)
+        for backend in ("auto", "onnx", "torch"):
+            monkeypatch.setenv("OTR_KOKORO_BACKEND", backend)
+            assert el._pack_copy_lang("zh") == "z"
+            assert el._pack_copy_lang("ja") == "j"
+            assert el._pack_copy_lang("ko") is None
 
 
 def test_installed_but_not_starting_says_reinstall_not_install(monkeypatch):

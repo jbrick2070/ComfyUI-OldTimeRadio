@@ -17355,3 +17355,27 @@ not promote it to the Bug Bible on this evidence alone.
   quote after a colon stays a syntax miss. `_origin_of` maps the dropped quote
   so errors still point at the text as written.
 - status: FIXED in code; live proof is the next 16 GB leg.
+
+## PBUG-20261021-01 -- PBUG-20260918-06 again: a fresh Python 3.12 pod could not speak Japanese
+- evidence: RunPod 1-act sweep 2026-10-21, `scifi_news_pro`, Japanese, anime,
+  `otr_16gb_foley_open.json`, a fresh pod on Python 3.12 with the torch kokoro.
+  The run died within a minute at the voice: fugashi opened `unidic`'s empty
+  dictionary. The pod had `misaki[ja]` installed by hand, as apple/MULTILINGUAL.md
+  and apple/AGENT_INSTALL.md told every 3.10-3.12 box to do.
+- cause: on Python 3.12 and earlier the torch KPipeline('j') imports misaki's own
+  Japanese reader, which only works after `misaki[ja]`, and `misaki[ja]` pulls
+  `unidic` -- the trap the 09-18 fix named but could only advise around. The
+  pack's own copy (pinned to unidic-lite) served only the ONNX backend.
+- fix: the torch backend reads Japanese and Mandarin with the pack's copy too
+  (`_kokoro_backends.OwnG2PPipeline`: KPipeline's non-English chunking, the
+  copy's phonemes, KModel, the local voice file), whenever the copy builds and
+  kokoro is 0.9 or later. Measured byte-identical audio to KPipeline('j') and
+  KPipeline('z') on the 5080 (pinned in tests/test_kokoro_backends.py).
+  Readiness tries the copy first; the advice is the copy's libraries, never
+  misaki[ja]. The docs stop telling anyone to install misaki[ja].
+- not yet: requirements.txt and pyproject.toml still declare the copy's six
+  libraries for Python 3.13 only. Widening the marker means editing
+  pyproject.toml, which publishes, so it rides the next version bump; until
+  then a 3.10-3.12 box installs `fugashi jaconv` (Japanese) or `jieba pypinyin
+  cn2an ordered-set` (Mandarin) by hand, as the docs and the refusal say.
+- status: FIXED in code; live proof is the next Japanese leg on a <=3.12 box.
