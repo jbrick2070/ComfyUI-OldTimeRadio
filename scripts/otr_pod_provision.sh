@@ -6,7 +6,9 @@
 # Safe reruns verify exact state. Existing drift is named and left untouched.
 set -uo pipefail
 
-CORE_PIN_DEFAULT="169fcf35a2fc163fec31338b816503ddac0d3fcf"
+# ComfyUI v0.42.1, the 5080's own core (2026-10-21). 169fcf35 had no CLIPLoader
+# "flux3" type, so every FLUX 3 Klein still died on a fresh pod.
+CORE_PIN_DEFAULT="63be2f9b82ad0dac88a7ceaa28a9cf3154125a18"
 OTR_REPO_URL="https://github.com/jbrick2070/ComfyUI-OldTimeRadio.git"
 COMFY_TORCH_CU128="2.10.0+cu128"
 COMFY_TORCHVISION_CU128="0.25.0+cu128"
@@ -272,6 +274,14 @@ fi
 # before. Do not "simplify" by deleting this line and un-marking requirements.
 "$COMFY_PY" -m pip install -q "pycairo>=1.24" \
   || fail "pycairo install failed (libcairo2-dev present but the build did not succeed)"
+
+# Kokoro's Japanese and Mandarin readers (the pack's copy of misaki's code)
+# need these on every Python; requirements.txt still declares them for 3.13
+# only until the next release widens the marker (PBUG-20261021-01). Never
+# `misaki[ja]`: it pulls `unidic`, an empty dictionary that MeCab then prefers.
+"$COMFY_PY" -m pip install -q "fugashi>=1.5" "jaconv>=0.4" "unidic-lite>=1.0.8" \
+  "jieba>=0.42" "pypinyin>=0.50" "cn2an>=0.5.22" "ordered-set>=4.1" \
+  || fail "Kokoro's Japanese/Mandarin reader libraries failed to install"
 
 # Recover template-scoped model/token settings; SSH does not inherit pid 1's
 # environment on common RunPod images. Secrets are never printed.
