@@ -165,21 +165,19 @@ class Studio:
     def build_graph(self, choices: dict) -> tuple[dict, dict]:
         """`(api_graph, node_ids)` for these choices, from the workflow on disk
         and the server's live node definitions."""
-        path = self.workflow_for(choices)
-        workflow = load_workflow(path)
+        workflow = load_workflow(self.workflow_for(choices))
         schemas = self._fetch(self.settings.comfyui_url)
         graph = workflow_to_api_prompt(workflow, schemas)
         node_ids = locate_nodes(workflow)
         director = graph.get(node_ids.get(DIRECTOR, ""), {}).get("inputs", {})
-        twin_character = (director.get(STILLS_INPUT)
-                          if path != Path(self.settings.workflow_path) else None)
+        saved_character = director.get(STILLS_INPUT)
         apply_choices(graph, schemas, node_ids, copy.deepcopy(choices))
         # The page's Still pictures box shows the base model (flux3_klein), so a
-        # My Story run sends it back; on the reference twin that means the same
-        # model WITH references for the characters, never a silent loss of them.
+        # run sends it back; on a graph whose characters use that model WITH
+        # references (the My Story twin), they keep them -- never a silent loss.
         chosen = str((choices or {}).get("stills") or "")
-        if isinstance(twin_character, str) and chosen and twin_character == chosen + "_ref":
-            director[STILLS_INPUT] = twin_character
+        if isinstance(saved_character, str) and chosen and saved_character == chosen + "_ref":
+            director[STILLS_INPUT] = saved_character
         return graph, node_ids
 
     def stream(self, choices: dict) -> Iterator[dict]:

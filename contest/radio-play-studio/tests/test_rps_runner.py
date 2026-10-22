@@ -578,3 +578,19 @@ def test_the_still_box_keeps_the_twins_reference_stills(settings, schemas):
     assert director({"bank": "my_story", "stills": "moss_image"})["character_image_model"] == "moss_image"
     assert director({"bank": "my_story"})["character_image_model"] == "flux3_klein_ref"
     assert director({"bank": "shakespeare", "stills": "flux3_klein"})["character_image_model"] == "flux3_klein"
+
+
+def test_a_reference_graph_named_directly_keeps_its_reference_stills(settings, schemas):
+    """Sonnet QA of a27b502c: --workflow naming the _flux3_ref graph itself."""
+    import json as _json
+    from radio_play_studio.runner import Studio
+    schemas["OTR_VideoDirector"]["input"]["required"]["character_image_model"][0].append(
+        "flux3_klein_ref")
+    graph = _json.loads(settings.workflow_path.read_text(encoding="utf-8"))
+    for node in graph["nodes"]:
+        if node["type"] == "OTR_VideoDirector":
+            node["widgets_values"] = ["flux3_klein", "flux3_klein_ref", "flux3_klein"]
+    settings.workflow_path.write_text(_json.dumps(graph), encoding="utf-8")
+    studio = Studio(settings, client_factory=lambda url: None, fetch=lambda url: schemas)
+    built, ids = studio.build_graph({"bank": "shakespeare", "stills": "flux3_klein"})
+    assert built[ids["OTR_VideoDirector"]]["inputs"]["character_image_model"] == "flux3_klein_ref"
