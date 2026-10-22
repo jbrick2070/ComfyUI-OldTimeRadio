@@ -276,7 +276,7 @@ def scene_cards():
         key(p, "location", f1, (side * -16, 0.2, -2))
         call = calls.get(shot.stem, "RADIO PLAY STUDIO")
         word = text(call, size=0.55, extrude=0.04, material=yellow,
-                    loc=(side * 2.4, -1.9, 3.0))
+                    loc=(side * 1.0, -1.9, 3.0))
         word.rotation_euler = (math.radians(12), 0, math.radians(side * 3))
         # A dark plate behind the call, so it reads over the screenshot.
         plate = plane(len(call) * 0.42 + 0.6, 0.9, mat(f"call_plate{i}", PANEL, emit=0.2),
