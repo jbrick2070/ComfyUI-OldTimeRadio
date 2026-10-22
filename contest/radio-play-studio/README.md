@@ -40,7 +40,8 @@ episode. The app makes no Comfy Router or Comfy Cloud calls and holds no API key
 
 - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) v0.42.0 or newer running on your machine
   (FLUX 3 Klein's text encoder needs a recent core), with the **Old-Time Radio** pack installed
-  (ComfyUI Manager: `comfyui-old-time-radio`, or clone it into `custom_nodes/`). One node pack;
+  (`git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio` into `custom_nodes/`; the app is
+  built and tested against `main`, and the registry listing `comfyui-old-time-radio` can lag it). One node pack;
   every model downloads itself from public, ungated repos with no Hugging Face token -- the
   writer and still models at pinned revisions, the rest checked against their published SHA-256.
 - By default, an NVIDIA card with 16 GB. Other cards run one of the pack's other workflows (see

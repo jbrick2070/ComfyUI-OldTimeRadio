@@ -62,7 +62,7 @@ Radio Play Studio
 ## Q7. Which parts of ComfyUI did you use?
 Comfy SDK (comfy-sdk 0.5.0) driving a self-hosted ComfyUI through comfy-api-proxy (the Comfy API
 v2); ComfyUI core 0.42.1 with its native MOSS-Image, LTX 2.5 and Gemma 4 support; a custom node
-pack on the Comfy registry (comfyui-old-time-radio, 22 nodes) whose shipped workflow the app
+pack on the Comfy registry (comfyui-old-time-radio, 23 nodes) whose shipped workflow the app
 converts to an API graph against the server's live /object_info.
 
 ## Q8. List all generative models used
