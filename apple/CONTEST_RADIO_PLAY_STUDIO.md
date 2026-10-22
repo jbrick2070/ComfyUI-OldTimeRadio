@@ -182,7 +182,7 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
       only + A/B (~half a day; Klein faces again); (2) keep MOSS and sharpen the weak character's
       locked appearance text (a correctness fix per CLAUDE.md). Default until he answers: judge the
       finished video first; build nothing.
-- [ ] **REFERENCE STILLS FOR EVERY LANE (operator, 2026-10-19 23:50 -- his main point).** "All
+- [x] **REFERENCE STILLS FOR EVERY LANE (operator, 2026-10-19 23:50 -- his main point).** "All
       lanes should generate ref images for char stills so we have consistency." Not a one-off for
       the demo: "we can use the photos if we give an architecture for other people to use their own
       photos too ... it's not a sleight-of-hand hack."
@@ -343,7 +343,11 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         4f6a9a92), episodes/4a38607f7f0d copy byte-identical, timing saved
         (otr_16gb_foley_open_flux3_ref.acts-3.5ab87708.json). No crash on the new driver. Stills
         ~33 min (vs ~10 from text), filming ~4.6 h for 64 beats; the ffmpeg 1080p step took minutes.
-      NEXT: the demo video from this episode (Blender scenes, Seoul excerpt, ffmpeg cut).
+      CLOSED 10-22 (check-in): built, shipped and proven. Portraits on every reference-capable
+        lane, co-references, the general own-photo path (Name = a.png, b.png in the cast card),
+        the shipped flux3_klein_ref choice, the open-weights twin the app picks for My Story,
+        and the 3-act MagnoliaRex demo re-rendered on it (seoul_duet_20261021_091839, above).
+        The demo video and range reel are cut from it. No re-render is owed.
       [x] FLATLAND 1-ACT (10-21 17:11) -- My Story with Abbott's Flatland (public domain, 1884) as
         plot/characters/setting, rolled video_art: RESULT succeeded, obs_publish OK, 2:09:59, 2:53
         at 1920x1080, three_dimensions_20261021_150516__vart__...final.mp4 (sha 9ea1d189), app copy
