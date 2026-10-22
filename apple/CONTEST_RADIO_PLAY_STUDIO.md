@@ -356,6 +356,10 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         style_queue.log) runs one at a time: My Story anime, Flatland archival_documentary, My Story
         sci_fi_radio, Flatland shakespeare_stage_realism, My Story cartoon, Flatland recur_frac,
         My Story video_art, Flatland visual_storybased. Styles are set, not rolled.
+      [x] FLATLAND 3-ACT, storybook_engraving (10-21 22:27, laptop): RESULT succeeded, obs_publish
+        OK, 5:14:05, 6:49 at 1920x1080,
+        three_dimensions_20261021_171919__sbke__n16f__fk3r__koko__myst__cg412__sa3_final.mp4 (sha
+        7ad47109), app copy byte-identical, timing saved (open_flux3_ref.acts-3).
         MOVED TO RUNPOD (operator 10-21: "spin up a volume and the runpod, I give approval"; "you
         can run my story jeffrey and magnolia on runpod too in parallel"): all eight style runs
         (Flatland archival_documentary / shakespeare_stage_realism / recur_frac / visual_storybased;
