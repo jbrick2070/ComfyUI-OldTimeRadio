@@ -104,17 +104,20 @@ def _stage_reference(wb, src):
     import hashlib
     try:
         from .._otr_paths import confine_to_read_roots, read_roots
-        from .._otr_shared.character_photos import BUNDLED_PHOTO_DIR
+        from .._otr_shared.character_photos import _root_dir
     except ImportError:  # pragma: no cover -- flat test imports
         from _otr_paths import confine_to_read_roots, read_roots  # type: ignore
-        from _otr_shared.character_photos import BUNDLED_PHOTO_DIR  # type: ignore
+        from _otr_shared.character_photos import _root_dir  # type: ignore
     # Proven inside the approved folders, resolved, before a byte is read
     # (registry policy review, 2026-10-22); this is the one seat that opens the
-    # file. The pack's own bundled photos are a root here: the built-in My
-    # Story names them ("jeffrey_1.jpg [bundled]") and they are read in place,
-    # so without it every built-in My Story still would refuse (Sonnet QA).
+    # file. The roots are the read roots plus EVERY folder the photo picker
+    # itself allows -- ComfyUI's input, output and temp, and the pack's bundled
+    # pictures -- one list, owned by character_photos, so a photo the picker
+    # accepts is never refused here (Sonnet QA: "jeffrey_1.jpg [bundled]" and
+    # "x.png [output]" both are read in place, not copied into input first).
+    picker_roots = [_root_dir(kind) for kind in ("input", "output", "temp", "bundled")]
     src = confine_to_read_roots(src, "reference image",
-                                roots=read_roots() + [BUNDLED_PHOTO_DIR])
+                                roots=read_roots() + picker_roots)
     with open(src, "rb") as fh:
         digest = hashlib.sha256(fh.read()).hexdigest()[:16]
     return wb.stage_into_comfy_input(

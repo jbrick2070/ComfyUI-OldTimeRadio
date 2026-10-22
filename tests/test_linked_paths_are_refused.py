@@ -170,3 +170,24 @@ def test_a_reference_outside_every_root_is_refused(allowed):
 
     with pytest.raises(Exception):
         F3._stage_reference(_Bridge, str(stray))
+
+
+def test_a_photo_picked_from_the_output_folder_still_stages(tmp_path, monkeypatch, allowed):
+    """Sonnet QA 2026-10-22: "x.png [output]" resolves into ComfyUI's output
+    folder, which is not a read root; the picker allows it, so staging must."""
+    from nodes._otr_image_engines import flux3_klein as F3
+    from nodes._otr_shared import character_photos as CP
+    out = tmp_path / "comfy_output"
+    out.mkdir()
+    photo = out / "x.png"
+    photo.write_bytes(b"\x89PNG\r\n\x1a\nphoto")
+    real_root = CP._root_dir
+    monkeypatch.setattr(CP, "_root_dir",
+                        lambda kind: str(out) if kind == "output" else real_root(kind))
+
+    class _Bridge:
+        @staticmethod
+        def stage_into_comfy_input(src, name):
+            return name
+
+    assert F3._stage_reference(_Bridge, str(photo)).startswith("otr_ref_")
