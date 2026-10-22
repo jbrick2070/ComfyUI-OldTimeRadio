@@ -561,7 +561,8 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
 - [x] README final pass (`contest/radio-play-studio/README.md`), 10-22 00:30: still model is FLUX 3
       Klein (it said MOSS-Image), My Story reference stills, the ffmpeg 1080p row, licence note.
       10-22: demo video link in (https://youtu.be/UeQQeVMaMVs, 1:53).
-- [ ] Submit through the Typeform. **The operator submits** (it is his entry and his account).
+- [x] SUBMITTED 2026-10-22 through the Typeform (Claude filled Q1-Q10 at his word; he ticked the
+      agreements and pressed Submit; the form showed its thank-you page). Answers: CONTEST_SUBMISSION_DRAFT.md.
 
 ## Rules for any session here
 
