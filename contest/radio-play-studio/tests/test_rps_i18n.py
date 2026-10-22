@@ -67,6 +67,21 @@ def test_every_key_the_page_names_is_in_english():
     assert sorted(k for k in used if k not in EN) == []
 
 
+def test_a_missing_string_never_shows_its_key():
+    """With no strings loaded at all (en.json unreachable), an element keeps the
+    English it was created with: t() returns null, and paint() leaves it alone."""
+    page = PAGE.read_text(encoding="utf-8")
+    assert "if (s == null) return null;" in page
+    assert 'if (fallback == null) fallback = attr ? el.getAttribute(attr) : el.textContent;' in page
+
+
+def test_a_failed_language_fetch_keeps_the_language_and_the_saved_choice():
+    page = PAGE.read_text(encoding="utf-8")
+    body = page[page.index("async function setLang"):page.index("async function initLang")]
+    assert 'catch (err) { $("lang").value = lang; return; }' in body
+    assert body.index("localStorage.setItem") > body.index("if (mine !== langRequest) return;")
+
+
 def test_the_slug_matches_the_page():
     """The page builds choice keys with this exact expression; a drift would
     quietly show every translated choice under its raw name."""
@@ -107,5 +122,6 @@ def test_a_file_without_a_name_is_not_offered(tmp_path, monkeypatch):
     (tmp_path / "en.json").write_text('{"_name": "English"}', encoding="utf-8")
     (tmp_path / "xx.json").write_text('{"a": "b"}', encoding="utf-8")
     (tmp_path / "yy.json").write_text("not json", encoding="utf-8")
+    (tmp_path / "zz.json").write_text('["a list, not an object"]', encoding="utf-8")
     monkeypatch.setattr(rps_server, "I18N_DIR", tmp_path)
     assert available_languages() == [{"code": "en", "name": "English"}]

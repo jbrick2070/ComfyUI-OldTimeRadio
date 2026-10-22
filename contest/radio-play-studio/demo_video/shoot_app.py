@@ -62,7 +62,7 @@ try:
     shot("01_cards")
     js("document.getElementById('mode_own').click()")
     time.sleep(0.5)
-    js("[...document.querySelectorAll('button')].find(b=>/Load the example/.test(b.textContent)).click()")
+    js("document.getElementById('load_example').click()")
     time.sleep(2)                             # thumbnails load
     # The cards keep the example's photos: My Story runs the open reference
     # twin, which paints each character's stills from them.

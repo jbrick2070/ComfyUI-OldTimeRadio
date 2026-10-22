@@ -89,5 +89,6 @@
  "progress.step": "{pct}%, esta etapa: passo {step} de {steps}",
  "result.download": "Baixar {file}",
  "error.lost": "A conexão com o aplicativo foi perdida. Recarregue para retomar o episódio; se o aplicativo foi reiniciado, ele não é mais acompanhado aqui, mas pode ainda estar renderizando no seu ComfyUI, e o episódio cai em otr/obs.",
- "error.untracked": "Esse episódio não é mais acompanhado (o aplicativo foi reiniciado). Se ainda estava renderizando, ele cai na pasta de saída do seu ComfyUI, em otr/obs."
+ "error.untracked": "Esse episódio não é mais acompanhado (o aplicativo foi reiniciado). Se ainda estava renderizando, ele cai na pasta de saída do seu ComfyUI, em otr/obs.",
+ "choice.style.roll_any_style": "Surpreenda-me (qualquer estilo)"
 }

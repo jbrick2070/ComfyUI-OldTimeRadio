@@ -89,5 +89,6 @@
  "progress.step": "{pct}%，当前阶段：第 {step} 步，共 {steps} 步",
  "result.download": "下载 {file}",
  "error.lost": "与应用的连接已断开。刷新页面可继续这一集；如果应用被重启过，这里将不再跟踪它，但它可能仍在你的 ComfyUI 上渲染，完成后的这一集会出现在 otr/obs 中。",
- "error.untracked": "这一集已不再被跟踪（应用被重启过）。如果它当时仍在渲染，完成后会出现在你的 ComfyUI 输出文件夹的 otr/obs 中。"
+ "error.untracked": "这一集已不再被跟踪（应用被重启过）。如果它当时仍在渲染，完成后会出现在你的 ComfyUI 输出文件夹的 otr/obs 中。",
+ "choice.style.roll_any_style": "给我个惊喜（任意风格）"
 }

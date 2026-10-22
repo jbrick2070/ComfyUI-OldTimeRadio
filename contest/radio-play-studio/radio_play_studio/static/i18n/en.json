@@ -89,5 +89,6 @@
  "progress.step": "{pct}%, this stage: step {step} of {steps}",
  "result.download": "Download {file}",
  "error.lost": "Lost the connection to the app. Reload to pick the episode back up; if the app was restarted it is no longer tracked here, but it may still be rendering on your ComfyUI, and its episode lands in otr/obs.",
- "error.untracked": "That episode is not tracked any more (the app was restarted). If it was still rendering, it lands in your ComfyUI output folder under otr/obs."
+ "error.untracked": "That episode is not tracked any more (the app was restarted). If it was still rendering, it lands in your ComfyUI output folder under otr/obs.",
+ "choice.style.roll_any_style": "roll (any style)"
 }

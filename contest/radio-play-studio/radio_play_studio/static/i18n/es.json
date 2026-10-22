@@ -89,5 +89,6 @@
  "progress.step": "{pct}%, esta etapa: paso {step} de {steps}",
  "result.download": "Descargar {file}",
  "error.lost": "Se perdió la conexión con la aplicación. Recarga para retomar el episodio; si la aplicación se reinició, ya no se sigue aquí, pero puede que siga renderizando en tu ComfyUI y su episodio llegará a otr/obs.",
- "error.untracked": "Ese episodio ya no se sigue (la aplicación se reinició). Si aún se estaba renderizando, llegará a la carpeta de salida de tu ComfyUI, en otr/obs."
+ "error.untracked": "Ese episodio ya no se sigue (la aplicación se reinició). Si aún se estaba renderizando, llegará a la carpeta de salida de tu ComfyUI, en otr/obs.",
+ "choice.style.roll_any_style": "Sorpréndeme (cualquier estilo)"
 }

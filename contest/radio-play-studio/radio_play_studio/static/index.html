@@ -64,7 +64,7 @@
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
   .thumb button { position: absolute; top: 0; right: 0; padding: 0 5px; font-size: .75rem;
                   border-radius: 0 0 0 6px; }
-  .card .who { display: grid; grid-template-columns: 1fr 120px; gap: 8px; }
+  .card .who { display: grid; grid-template-columns: 1fr 150px; gap: 8px; }
   .card label { margin: 6px 0 2px; font-size: .875rem; }
   .card textarea { min-height: 56px; }
   .card .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
@@ -110,30 +110,36 @@ let running = false;   // an episode is being made: Make stays off
 let EN = {}, STR = {}, lang = "en";
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 // Dropdowns whose shown names are translated; the value that is sent stays the pack's own.
-const CHOICE_LABELS = new Set(["bank", "language"]);
+const CHOICE_LABELS = new Set(["bank", "language", "style", "stills"]);
 const ATTRS = ["placeholder", "title", "aria-label", "alt"];
 
 function t(key, vars, fallback) {
-  let s = STR[key] ?? EN[key] ?? fallback ?? key;
+  let s = STR[key] ?? EN[key] ?? fallback;
+  if (s == null) return null;   // nobody has this string: the caller keeps what it had
   if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
   return s;
 }
 function paint(el) {
   const vars = el._vars || null;
   const k = el.getAttribute("data-i18n");
-  if (k) el.textContent = t(k, vars, el.getAttribute("data-fb"));
+  if (k) { const s = t(k, vars, el.getAttribute("data-fb")); if (s != null) el.textContent = s; }
   for (const a of ATTRS) {
     const ak = el.getAttribute("data-i18n-" + a);
-    if (ak) el.setAttribute(a, t(ak, vars, el.getAttribute("data-fb-" + a)));
+    if (!ak) continue;
+    const s = t(ak, vars, el.getAttribute("data-fb-" + a));
+    if (s != null) el.setAttribute(a, s);
   }
-  if (el._msg) el.textContent = t(el._msg.key, el._msg.vars);
+  if (el._msg) { const s = t(el._msg.key, el._msg.vars); if (s != null) el.textContent = s; }
 }
 // Show `key` on an element (its text, or the attribute `attr`) and remember it, so
 // a change of language redraws it in place and nothing the person typed is lost.
 function tx(el, key, fallback, attr, vars) {
   const suffix = attr ? "-" + attr : "";
   el.setAttribute("data-i18n" + suffix, key);
-  if (fallback != null) el.setAttribute("data-fb" + suffix, fallback);
+  // The English the element was created with is its fallback, so a page whose
+  // strings never loaded still reads in English rather than showing keys.
+  if (fallback == null) fallback = attr ? el.getAttribute(attr) : el.textContent;
+  if (fallback) el.setAttribute("data-fb" + suffix, fallback);
   if (vars) el._vars = vars;
   paint(el);
   return el;
@@ -159,9 +165,14 @@ async function fetchStrings(code) {
   if (!res.ok) throw new Error(code + ": " + res.status);
   return res.json();
 }
+let langRequest = 0;
 async function setLang(code) {
-  try { STR = code === "en" ? {} : await fetchStrings(code); lang = code; }
-  catch (err) { STR = {}; lang = "en"; }
+  const mine = ++langRequest;
+  let strings;
+  try { strings = code === "en" ? {} : await fetchStrings(code); }
+  catch (err) { $("lang").value = lang; return; }   // keep the language we have, and the saved choice
+  if (mine !== langRequest) return;                  // a later pick already won
+  STR = strings; lang = code;
   try { localStorage.setItem("rps_lang", lang); } catch (err) { /* private window: not remembered */ }
   $("lang").value = lang;
   paintAll();
@@ -173,7 +184,7 @@ async function initLang() {
   try {
     EN = await fetchStrings("en");
     langs = (await (await fetch("/api/languages")).json()).languages || langs;
-  } catch (err) { /* no strings: the page keeps the English it was written in */ }
+  } catch (err) { /* no strings: every element keeps the English it was created with */ }
   const sel = $("lang");
   for (const l of langs) {
     const o = document.createElement("option");
@@ -323,7 +334,11 @@ function castEditor() {
   tx(label, "cast.label", "Who is in it");
   const help = document.createElement("p");
   help.className = "help";
-  tx(help, "cast.help");
+  tx(help, "cast.help", "One card per character. Say how they look in fixed terms (age, build, face, " +
+    "hair, clothes) so they look the same in every shot, and add up to three photos of them if " +
+    "you like: their portrait is painted from it, in the episode's style, and every still follows " +
+    "that portrait. Photos need the flux3_klein still pictures. Leave the cards empty and the cast " +
+    "is invented for you.");
   const list = document.createElement("div");
   list.className = "cast"; list.id = "cast_list";
   const bar = document.createElement("div");

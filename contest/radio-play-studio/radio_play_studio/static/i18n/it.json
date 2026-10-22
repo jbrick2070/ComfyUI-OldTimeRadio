@@ -89,5 +89,6 @@
  "progress.step": "{pct}%, questa fase: passo {step} di {steps}",
  "result.download": "Scarica {file}",
  "error.lost": "Connessione all'app persa. Ricarica per riprendere l'episodio; se l'app è stata riavviata non viene più seguito qui, ma potrebbe essere ancora in elaborazione sul tuo ComfyUI e l'episodio finirà in otr/obs.",
- "error.untracked": "Quell'episodio non è più seguito (l'app è stata riavviata). Se era ancora in elaborazione, finirà nella cartella di output di ComfyUI, in otr/obs."
+ "error.untracked": "Quell'episodio non è più seguito (l'app è stata riavviata). Se era ancora in elaborazione, finirà nella cartella di output di ComfyUI, in otr/obs.",
+ "choice.style.roll_any_style": "Sorprendimi (qualsiasi stile)"
 }

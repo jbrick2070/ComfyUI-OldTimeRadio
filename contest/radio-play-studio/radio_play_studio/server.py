@@ -53,9 +53,10 @@ def available_languages() -> list:
         if not _I18N_FILE.fullmatch(path.name):
             continue
         try:
-            name = json.loads(path.read_text(encoding="utf-8")).get("_name")
+            data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
+        name = data.get("_name") if isinstance(data, dict) else None
         if isinstance(name, str) and name:
             found.append({"code": path.stem, "name": name})
     found.sort(key=lambda lang: (lang["code"] != "en", lang["code"]))
