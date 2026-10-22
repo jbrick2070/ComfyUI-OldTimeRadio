@@ -31,7 +31,6 @@ import hashlib
 import logging
 import os
 import wave
-from os import environ
 
 _LOG = logging.getLogger("OTR.foley")
 
@@ -71,7 +70,11 @@ def foley_join_soften_ms() -> int:
     """The duck length from the environment; 0 (hard cut, as shipped) when
     unset or unreadable. Never raises."""
     try:
-        return max(0, int(str(environ.get(FOLEY_JOIN_SOFTEN_ENV) or "0").strip()))
+        try:
+            from .._otr_shared import env as otr_env
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared import env as otr_env  # type: ignore
+        return max(0, int(str(otr_env.get(FOLEY_JOIN_SOFTEN_ENV) or "0").strip()))
     except ValueError:
         return 0
 
