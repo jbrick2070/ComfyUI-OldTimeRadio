@@ -702,6 +702,10 @@ def kokoro_has_pipeline_api() -> bool:
         return False
 
 
+#: A Kokoro voice id is a bare file stem (af_heart, jf_alpha), never a path.
+_VOICE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
 class OwnG2PPipeline:
     """kokoro's ``KPipeline`` for Japanese and Mandarin, with the phonemes from
     the pack's copy of misaki (``OWN_G2P``) instead of the installed misaki.
@@ -746,7 +750,20 @@ class OwnG2PPipeline:
         import torch
 
         if voice not in self._voices:
-            path = os.path.join(self._voices_dir, "%s.pt" % voice)
+            # The voice id arrives from a cast row a workflow can supply, so it
+            # must be a bare name, and the file it names must RESOLVE inside the
+            # approved voice roots -- a symlinked .pt or a junctioned voices
+            # folder is refused, not read (registry policy review, 2026-10-22).
+            if not _VOICE_NAME.fullmatch(str(voice or "")):
+                raise ValueError("kokoro voice id %r is not a bare voice name" % (voice,))
+            try:
+                from .._otr_paths import confine_to_read_roots, voice_read_roots
+            except ImportError:  # pragma: no cover -- flat test imports
+                from _otr_paths import confine_to_read_roots, voice_read_roots  # type: ignore
+            path = confine_to_read_roots(
+                os.path.join(self._voices_dir, "%s.pt" % voice), "kokoro voice",
+                roots=voice_read_roots() + [os.path.normpath(
+                    os.path.join(self._voices_dir, "..", "..", ".."))])
             self._voices[voice] = torch.load(path, weights_only=True)
         return self._voices[voice]
 

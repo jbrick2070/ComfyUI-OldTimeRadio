@@ -102,6 +102,14 @@ def _stage_reference(wb, src):
     """Copy a reference into ComfyUI's input dir under a content-addressed name,
     so two characters never overwrite each other's file there."""
     import hashlib
+    try:
+        from .._otr_paths import confine_to_read_roots
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_paths import confine_to_read_roots  # type: ignore
+    # Proven inside the approved folders, resolved, before a byte is read
+    # (registry policy review, 2026-10-22); every caller already confines, and
+    # this is the one seat that opens the file.
+    src = confine_to_read_roots(src, "reference image")
     with open(src, "rb") as fh:
         digest = hashlib.sha256(fh.read()).hexdigest()[:16]
     return wb.stage_into_comfy_input(

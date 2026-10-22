@@ -230,22 +230,36 @@ def _shipped_fonts_option(ass_path: str) -> str:
     reason the .ass itself goes by basename (``_ass_filter_arg``)."""
     try:
         from . import _otr_script_fonts as _SF
+        from ._otr_paths import confine_to_output_tree
     except ImportError:  # pragma: no cover -- flat (sys.path) test import
         import _otr_script_fonts as _SF  # type: ignore
-    text = Path(ass_path).read_text(encoding="utf-8", errors="replace")
+        from _otr_paths import confine_to_output_tree  # type: ignore
+    # EVERY PATH THIS TOUCHES IS PROVEN INSIDE THE OUTPUT TREE FIRST (registry
+    # policy review, 2026-10-22): the .ass sits beside a workflow-named output,
+    # so a junction at `otr_fonts` or a symlink at a `.part` name would
+    # otherwise carry the copy, the rename and libass's fontsdir off the tree.
+    # Each is checked resolved, immediately before its own operation.
+    ass = confine_to_output_tree(ass_path, "caption .ass")
+    text = Path(ass).read_text(encoding="utf-8", errors="replace")
     policies = _SF.families_in(text)
     if not policies:
         return ""
-    target = Path(ass_path).parent / SHIPPED_FONTS_DIRNAME
+    target = Path(confine_to_output_tree(
+        str(Path(ass).parent / SHIPPED_FONTS_DIRNAME), "caption fonts folder"))
     target.mkdir(exist_ok=True)
+    target = Path(confine_to_output_tree(str(target), "caption fonts folder"))
     for policy in policies:
         source = _SF.bundled_path(policy)
-        final = target / Path(source).name if source else None
-        if final is None or (final.is_file() and final.stat().st_size == Path(source).stat().st_size):
+        if not source:
+            continue
+        final = Path(confine_to_output_tree(
+            str(target / Path(source).name), "caption font"))
+        if final.is_file() and final.stat().st_size == Path(source).stat().st_size:
             continue
         # Copy to a temporary name and rename, so an interrupted copy never
         # leaves a truncated face that a later burn would trust.
-        partial = final.with_name(final.name + ".part")
+        partial = Path(confine_to_output_tree(
+            str(final.with_name(final.name + ".part")), "caption font"))
         shutil.copyfile(source, partial)
         os.replace(partial, final)
     return f":fontsdir={SHIPPED_FONTS_DIRNAME}"

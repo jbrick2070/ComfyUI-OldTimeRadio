@@ -99,7 +99,22 @@ def _kokoro_voice_path(voice_id: str) -> str:
     name = str(voice_id or "")
     if not _KOKORO_VOICE_ID.fullmatch(name):
         name = "_refused_voice_id_"
-    return os.path.join(_kokoro_model_dir(), "voices", f"{name}.pt")
+    path = os.path.join(_kokoro_model_dir(), "voices", f"{name}.pt")
+    # A name that resolves OUTSIDE the voice roots (a symlinked .pt, a
+    # junctioned voices folder) maps to the refused name too, so the existence
+    # check never stats outside them (registry policy review, 2026-10-22).
+    try:
+        from .._otr_paths import confined_or_empty, voice_read_roots
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_paths import confined_or_empty, voice_read_roots  # type: ignore
+    # The configured models folder (TTS/KokoroTTS's grandparent) is a root
+    # too: it is pack configuration, never a workflow value, and outside a
+    # ComfyUI process it is the only place the voices can be.
+    roots = voice_read_roots() + [os.path.normpath(
+        os.path.join(_kokoro_model_dir(), "..", ".."))]
+    if os.path.lexists(path) and not confined_or_empty(path, roots=roots):
+        return os.path.join(_kokoro_model_dir(), "voices", "_refused_voice_id_.pt")
+    return path
 
 
 def _kokoro_voices_dir() -> str:

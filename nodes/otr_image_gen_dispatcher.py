@@ -626,7 +626,12 @@ def _portrait_png(portrait_row, portrait_hash, output_dir) -> str:
                                   or (portrait_row or {}).get("path") or ""))
     if not cand or not os.path.isfile(cand):
         try:
-            cand = str(_pl.portrait_path_for_hash(portrait_hash, output_dir) or "")
+            # The pool fallback is confined too: the hash is ledger data, and a
+            # linked cache file or folder must read as absent, never as bytes
+            # from outside the approved folders (registry policy review,
+            # 2026-10-22).
+            cand = _confined_or_empty(
+                str(_pl.portrait_path_for_hash(portrait_hash, output_dir) or ""))
         except Exception:  # noqa: BLE001 -- resolver is best-effort
             cand = ""
     return cand if cand and os.path.isfile(cand) else ""

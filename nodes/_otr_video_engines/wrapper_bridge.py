@@ -1300,7 +1300,21 @@ def stage_into_comfy_input(src_path, dst_name=None):
     dst_dir = comfy_input_dir()
     os.makedirs(dst_dir, exist_ok=True)
     name = dst_name or os.path.basename(src_path)
-    shutil.copy2(src_path, os.path.join(dst_dir, name))
+    if os.path.basename(name) != name or name in ("", ".", ".."):
+        raise GraphExecutionError("staged name %r is not a bare file name" % name)
+    # THE DESTINATION IS PROVEN INSIDE THE INPUT DIR, RESOLVED, before the copy
+    # (registry policy review, 2026-10-22): a symlink planted at a predictable
+    # staged name would otherwise carry this overwrite anywhere on the box.
+    try:
+        from .._otr_paths import confine_to_output_tree
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_paths import confine_to_output_tree  # type: ignore
+    try:
+        dst = confine_to_output_tree(os.path.join(dst_dir, name), "staged input",
+                                     roots=[dst_dir])
+    except Exception as exc:  # noqa: BLE001 -- one named failure for callers
+        raise GraphExecutionError("refusing to stage %r: %s" % (name, exc)) from exc
+    shutil.copy2(src_path, dst)
     return name
 
 
