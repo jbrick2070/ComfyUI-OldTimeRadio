@@ -53,6 +53,52 @@ _LOG = logging.getLogger("OTR.foley")
 #: whether or not a stem exists for a given beat, so a beat with no foley does
 #: not get louder than its neighbours.
 FOLEY_GAIN = 0.50
+
+#: SOFT SEGMENT JOINS (2026-10-22, operator: "this repetitive cymbal crash").
+#: Each chained segment's audio is generated on its own, and a quarter of all
+#: segments open on their loudest moment (measured on the 3-act demo's 105
+#: segment stems: 25% peak in their first 0.3 s, against ~8% by chance), so a
+#: hard-cut join lands a fresh crash every ~3.84 s of a long beat. Off (0) by
+#: default until his ear has compared it; ``OTR_FOLEY_JOIN_SOFTEN_MS`` sets the
+#: duck length in milliseconds for an A/B arm.
+FOLEY_JOIN_SOFTEN_ENV = "OTR_FOLEY_JOIN_SOFTEN_MS"
+#: Where the duck starts: -12 dB, rising to unity over the duck length.
+FOLEY_JOIN_DUCK_FLOOR = 0.25
+
+
+def foley_join_soften_ms() -> int:
+    """The duck length from the environment; 0 (hard cut, as shipped) when
+    unset or unreadable. Never raises."""
+    try:
+        return max(0, int(str(os.environ.get(FOLEY_JOIN_SOFTEN_ENV) or "0").strip()))
+    except ValueError:
+        return 0
+
+
+def _soften_join(prev, arr, start, step, duck_samples, np):
+    """Smooth one chained join in place on ``prev`` and return the new piece.
+
+    1. A one-frame equal-power CROSSFADE: a chained successor's frame 0 is the
+       predecessor's last frame (that is why ``drop_head`` is 1), so the
+       dropped frame's audio and ``prev``'s last frame cover the same instant
+       and can be blended exactly -- no length changes.
+    2. An ATTACK DUCK on the new piece: a raised-cosine gain from
+       ``FOLEY_JOIN_DUCK_FLOOR`` to unity over ``duck_samples``, which takes
+       the edge off a segment that opens on a crash without muting it.
+    """
+    piece = arr[:, start:].astype(np.float64)
+    if start >= step and prev.shape[-1] >= step:
+        t = np.linspace(0.0, np.pi / 2.0, step)
+        fade_out, fade_in = np.cos(t), np.sin(t)
+        head = arr[:, start - step:start].astype(np.float64)
+        tail = prev[:, -step:].astype(np.float64)
+        prev[:, -step:] = tail * fade_out + head * fade_in
+    n = min(int(duck_samples), piece.shape[-1])
+    if n > 0:
+        ramp = FOLEY_JOIN_DUCK_FLOOR + (1.0 - FOLEY_JOIN_DUCK_FLOOR) * (
+            0.5 - 0.5 * np.cos(np.linspace(0.0, np.pi, n)))
+        piece[:, :n] *= ramp
+    return piece
 MASTER_GAIN_UNDER_FOLEY = 0.50
 
 #: The receipt keys a foley row carries. ONE tuple, consumed by the adapter, the
@@ -512,6 +558,7 @@ def assemble_beat_foley_segments(segments, out_path, *, expect_frames, fps):
     rows = [(str(path), int(drop), int(keep)) for path, drop, keep in segments]
     if not rows:
         raise FoleyStemError("beat foley assembly was handed NO segments")
+    soften_ms = foley_join_soften_ms()
 
     pieces = []
     rate = None
@@ -547,10 +594,21 @@ def assemble_beat_foley_segments(segments, out_path, *, expect_frames, fps):
                 "than the picture it belongs to"
                 % (path, int(arr.shape[-1]), drop_head,
                    drop_head + keep_frames, stop))
-        pieces.append(arr[:, start:stop])
+        if soften_ms and pieces:
+            # Every join after the first segment; the beat's own opening is
+            # its picture's opening and is left alone.
+            prev = pieces[-1].astype(np.float64)
+            piece = _soften_join(prev, arr[:, :stop], start, step,
+                                 rate * soften_ms // 1000, np)
+            pieces[-1] = prev
+            pieces.append(piece)
+        else:
+            pieces.append(arr[:, start:stop])
 
     assembled = (pieces[0] if len(pieces) == 1
                  else np.concatenate(pieces, axis=-1))
+    if soften_ms and len(pieces) > 1:
+        assembled = assembled.astype(np.float32)
     step = samples_per_frame(rate, fps)
     want = int(expect_frames) * step
     if int(assembled.shape[-1]) != want:
