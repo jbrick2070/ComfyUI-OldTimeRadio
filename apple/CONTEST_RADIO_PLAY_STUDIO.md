@@ -356,6 +356,15 @@ Story and music are FROZEN (CLAUDE.md 2026-08-04, 2026-09-17). Do not chase pros
         style_queue.log) runs one at a time: My Story anime, Flatland archival_documentary, My Story
         sci_fi_radio, Flatland shakespeare_stage_realism, My Story cartoon, Flatland recur_frac,
         My Story video_art, Flatland visual_storybased. Styles are set, not rolled.
+        MOVED TO RUNPOD (operator 10-21: "spin up a volume and the runpod, I give approval"; "you
+        can run my story jeffrey and magnolia on runpod too in parallel"): all eight style runs
+        (Flatland archival_documentary / shakespeare_stage_realism / recur_frac / visual_storybased;
+        My Story anime / sci_fi_radio / cartoon / video_art) run on pods in parallel from one
+        network volume, driven by the session "RunPod: Flatland 3-act style sweep in parallel";
+        episodes come back to otr/obs and every pod is stopped after. The laptop queue is stopped;
+        the laptop finishes Flatland storybook_engraving, then re-renders the demo video's scenes
+        in the new palette (black/purple, yellow, aquamarine; operator: "orange isn't good") and
+        re-cuts it (tmp/rps_live/after_flatland3_demo.sh).
       [x] MERGED INTO MAIN 6364c3df (operator: "merge the contest branch into main now so the code
         link does not move"): https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio
         resolves. No node code, no pyproject.toml, contest/ excluded from the published pack.
