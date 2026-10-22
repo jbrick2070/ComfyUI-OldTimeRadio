@@ -102,6 +102,12 @@ def main():
             clip_part(episode(stem), start, badge, part)
             parts.append(part)
             print(part.name, stem, start)
+    opened = WORK / "cards" / "open"
+    if not opened.is_dir():
+        blender("open", str(opened))
+    part = WORK / "98_open.mp4"
+    card_part(opened, part)
+    parts.append(part)
     end = WORK / "cards" / "end"
     if not end.is_dir():
         blender("end", str(end))

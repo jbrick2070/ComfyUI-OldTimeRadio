@@ -3,6 +3,7 @@
 Run headless, one card per call:
   blender -b --factory-startup --python reel_cards.py -- section "LANGUAGES" OUT_DIR
   blender -b --factory-startup --python reel_cards.py -- badge 1 "ENGLISH" "TWELFTH NIGHT" OUT_DIR
+  blender -b --factory-startup --python reel_cards.py -- open OUT_DIR
   blender -b --factory-startup --python reel_cards.py -- end OUT_DIR
 
 ``section`` and ``end`` render opaque 1920x1080 frames on black and purple.
@@ -163,6 +164,23 @@ elif MODE == "badge":
         held = tuple(ob.scale)
         key(ob, "scale", sc.frame_end - 7, held)
         key(ob, "scale", sc.frame_end, (0.0,) * 3)
+    render(sc, out_dir)
+elif MODE == "open":
+    out_dir = argv[1]
+    sc = reset(5.5)
+    camera()
+    head = text("100% OPEN WEIGHTS", 1.05, mat("y", YELLOW, 0.45), extrude=0.22, loc=(0, 1.85, 0))
+    slam(head, 2)
+    models = ["GEMMA 4 12B", "FLUX 3 KLEIN", "LTX 2.5", "KOKORO", "STABLE AUDIO 3"]
+    for k, name in enumerate(models):
+        col, row = k % 3, k // 3
+        x = (col - 1) * 3.2 if row == 0 else (col - 0.5) * 3.2
+        t = text(name, 0.58, mat("y%d" % k, YELLOW, 0.5), extrude=0.06,
+                 loc=(x, 0.45 - row * 0.85, 0))
+        slam(t, 20 + k * 6, settle=8)
+    tail = text("ON YOUR OWN GPU.  NO CLOUD.  NOTHING TO PAY PER EPISODE.", 0.3,
+                mat("a", AQUA, 1.3), extrude=0.0, bevel=0.0, loc=(0, -1.55, 0))
+    slam(tail, 60, from_rot=(math.radians(-80), 0, 0), rest=(0, 0, 0))
     render(sc, out_dir)
 elif MODE == "end":
     out_dir = argv[1]
