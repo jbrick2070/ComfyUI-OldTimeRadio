@@ -706,9 +706,23 @@ def _use_credits_font_policy(layout) -> str:
 
 
 def _credits_script_font_paths(fd: str, policy: str) -> list:
-    """OS faces that can actually paint the row's script. Tried BEFORE
-    the English monospace list so Hindi / CJK titles do not tofu, and
-    AFTER ``OTR_CREDITS_FONT`` so the operator override still wins."""
+    """Faces that can actually paint the row's script: the OS's own, then the
+    one the pack ships (``_otr_script_fonts``) for a box that has none -- a
+    Linux image carries no CJK or Devanagari face (RunPod 2026-10-21: every
+    Mandarin caption and credit boxed). Tried BEFORE the English monospace
+    list so Hindi / CJK titles do not tofu, and AFTER ``OTR_CREDITS_FONT`` so
+    the operator override still wins."""
+    os_faces = _os_script_font_paths(fd, policy)
+    try:
+        from . import _otr_script_fonts as _SF
+    except ImportError:  # pragma: no cover -- flat/standalone load
+        import _otr_script_fonts as _SF  # type: ignore
+    shipped = _SF.bundled_path(policy)
+    return os_faces + ([shipped] if shipped else [])
+
+
+def _os_script_font_paths(fd: str, policy: str) -> list:
+    """The operating systems' own faces for the row's script, in order."""
     if policy == "devanagari":
         return [
             # Windows 10/11 ship Nirmala UI as a COLLECTION (Nirmala.ttc,

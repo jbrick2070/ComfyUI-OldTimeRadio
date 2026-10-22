@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -216,6 +217,34 @@ def _captioned_name(in_dir: str, stem: str) -> str:
     return compact_artifact(in_dir, stem, "_captioned", ".mp4")
 
 
+#: Folder beside the .ass that holds copies of the pack's shipped faces, named
+#: plainly so it reaches the filtergraph as a bare relative path.
+SHIPPED_FONTS_DIRNAME = "otr_fonts"
+
+
+def _shipped_fonts_option(ass_path: str) -> str:
+    """``:fontsdir=otr_fonts`` when the .ass names a face the pack ships, after
+    copying those files beside it; ``""`` otherwise (every Windows and macOS
+    burn, byte-identical). A copy beside the subtitle file keeps the drive
+    letter and backslashes of an absolute path out of the filtergraph, the same
+    reason the .ass itself goes by basename (``_ass_filter_arg``)."""
+    try:
+        from . import _otr_script_fonts as _SF
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        import _otr_script_fonts as _SF  # type: ignore
+    text = Path(ass_path).read_text(encoding="utf-8", errors="replace")
+    policies = _SF.families_in(text)
+    if not policies:
+        return ""
+    target = Path(ass_path).parent / SHIPPED_FONTS_DIRNAME
+    target.mkdir(exist_ok=True)
+    for policy in policies:
+        source = _SF.bundled_path(policy)
+        if source and not (target / Path(source).name).is_file():
+            shutil.copyfile(source, target / Path(source).name)
+    return f":fontsdir={SHIPPED_FONTS_DIRNAME}"
+
+
 def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
     """(basename, cwd) for the ffmpeg ``ass=`` filter -- reference the subtitle
     file by BASENAME with ffmpeg's cwd set to its folder, so a Windows
@@ -390,11 +419,12 @@ def burn_captions_on_video(video_path: str, ledger_path: str, out_path: str, *,
     if not ass_path:
         raise ValueError(f"OTR_CaptionBurn: no captions ({report})")
     ass_name, ass_cwd = _ass_filter_arg(ass_path)
+    fonts_opt = _shipped_fonts_option(ass_path)
     cmd = [
         fb, "-y", "-loglevel", "error",
         "-i", os.path.abspath(video_path),
         "-an",                                   # silent in, silent out (V-1)
-        "-vf", f"ass={ass_name},fps={max(1, int(fps))}",
+        "-vf", f"ass={ass_name}{fonts_opt},fps={max(1, int(fps))}",
         *cfr_flags(fb),
         "-pix_fmt", "yuv420p",
         "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",

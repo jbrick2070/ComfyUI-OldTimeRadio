@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -449,6 +450,29 @@ TITLE_STYLE_NAME = "TITLE"
 # to move, not `core vs outline`, which was already passing.
 TITLE_OUTLINE_W = 6
 TITLE_SHADOW = 2
+def _shipped_family_if_no_os_face(policy: str) -> "str | None":
+    """The family of the face the pack ships for ``policy`` when this machine
+    has no face of its own for the script (a bare Linux image), else None --
+    Windows and macOS keep naming their own face, byte-identical. The burn
+    hands libass the shipped file (``otr_caption_burn``)."""
+    try:
+        from . import _otr_script_fonts as _SF
+        from .otr_credits_roll import _os_script_font_paths
+    except ImportError:  # pragma: no cover -- flat load
+        import _otr_script_fonts as _SF  # type: ignore
+        from otr_credits_roll import _os_script_font_paths  # type: ignore
+    if _SF.bundled_family(policy) is None:
+        return None
+    fd = os.path.join(otr_env.get("WINDIR", r"C:\Windows"), "Fonts")
+    if _SF.os_face(policy, _os_script_font_paths(fd, policy)):
+        return None
+    if _SF.bundled_path(policy) is None:
+        return None
+    log.info("[captions] no %s face on this machine; using the pack's %s",
+             policy, _SF.bundled_family(policy))
+    return _SF.bundled_family(policy)
+
+
 def _title_style_line(font_name: str | None = None) -> str:
     """The hero title card's ASS style row. A FUNCTION rather than a module
     constant, because the face is resolved per platform (and per
@@ -656,6 +680,9 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
             elif font_policy == "cjk":
                 st["font"] = "Microsoft YaHei"
                 title_font = "Microsoft YaHei"
+            shipped = _shipped_family_if_no_os_face(font_policy)
+            if shipped:
+                st["font"] = title_font = shipped
         except Exception:
             wrap_policy = "word_split"
             title_font = None
