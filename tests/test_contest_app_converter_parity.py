@@ -85,3 +85,20 @@ def test_a_representative_choice_lands_on_the_real_writer(schemas):
     rps_form.apply_choices(graph, schemas, node_ids, choices)
     inputs = graph[node_ids[rps_form.WRITER]]["inputs"]
     assert inputs["source_bank"] == "my_story" and inputs["story_plot"] == "A quiet lighthouse."
+
+
+def test_every_bank_and_language_the_real_writer_offers_has_a_name_on_the_page(schemas):
+    """The page shows the story bank and language dropdowns under translated
+    names (contest/radio-play-studio/radio_play_studio/static/i18n). A bank or a
+    language the pack adds without a name there would show untranslated."""
+    import re
+    workflow = _workflow(APP)
+    _complete(workflow, schemas)
+    graph = rps_graph.workflow_to_api_prompt(workflow, schemas)
+    rows = {r["key"]: r for r in rps_form.describe_form(schemas, graph, rps_form.locate_nodes(workflow))}
+    en_path = REPO / "contest" / "radio-play-studio" / "radio_play_studio" / "static" / "i18n" / "en.json"
+    en = json.loads(en_path.read_text(encoding="utf-8"))
+    slug = lambda text: re.sub(r"[^a-z0-9]+", "_", str(text).lower()).strip("_")  # noqa: E731
+    missing = [f"choice.{key}.{slug(c)}" for key in ("bank", "language") for c in rows[key]["choices"]
+               if f"choice.{key}.{slug(c)}" not in en]
+    assert missing == []

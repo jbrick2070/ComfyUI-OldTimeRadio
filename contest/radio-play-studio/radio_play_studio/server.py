@@ -24,6 +24,10 @@ from .photos import MAX_PHOTO_BYTES, PhotoError, upload_photo
 from .runner import Studio
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+#: One JSON file per language the page can speak: `{"_name": "Espanol", "key": "text", ...}`.
+#: Adding a file adds a language; the page reads the list from `/api/languages`.
+I18N_DIR = STATIC_DIR / "i18n"
+_I18N_FILE = re.compile(r"([a-z]{2,3})\.json")
 #: The author's photos that ship in the pack for its built-in My Story (the
 #: example's cast cards show them). The pack reads them by " [bundled]" names.
 BUNDLED_PHOTO_DIR = (Path(__file__).resolve().parents[3]
@@ -38,6 +42,24 @@ PRESENCE_S = 20.0
 #: window is well above that: a background tab still counts as open.
 GPU_IDLE_S = 150.0
 _RANGE = re.compile(r"^bytes=(\d*)-(\d*)$")
+
+
+def available_languages() -> list:
+    """`[{"code", "name"}]` for each language file, English first. A file with no
+    `_name` (or that does not parse) is not offered: the page would have nothing
+    to call it."""
+    found = []
+    for path in sorted(I18N_DIR.glob("*.json")):
+        if not _I18N_FILE.fullmatch(path.name):
+            continue
+        try:
+            name = json.loads(path.read_text(encoding="utf-8")).get("_name")
+        except (OSError, ValueError):
+            continue
+        if isinstance(name, str) and name:
+            found.append({"code": path.stem, "name": name})
+    found.sort(key=lambda lang: (lang["code"] != "en", lang["code"]))
+    return found
 
 
 class Run:
@@ -204,6 +226,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_file(STATIC_DIR / "index.html", "text/html; charset=utf-8")
         if path == "/api/options":
             return self._options()
+        if path == "/api/languages":
+            return self._send_json(HTTPStatus.OK, {"languages": available_languages()})
+        if path.startswith("/i18n/"):
+            name = path[len("/i18n/"):]
+            if _I18N_FILE.fullmatch(name):
+                return self._send_file(I18N_DIR / name, "application/json; charset=utf-8")
         if path == "/api/episodes":
             return self._send_json(HTTPStatus.OK, {"episodes": self.runs.listing()})
         match = re.fullmatch(r"/api/episodes/([0-9a-f]{12})/events", path)

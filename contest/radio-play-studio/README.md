@@ -161,6 +161,20 @@ Story bank, the classic to adapt, language, acts, cast size, visual style, the s
 Every dropdown is read live from your ComfyUI, so it offers exactly what your installed pack has.
 Everything else (voices, music, the video lane) keeps the workflow's own setting.
 
+## The page speaks eight languages
+
+English, Español, Português, Italiano, Français, हिन्दी, 日本語 and 简体中文: the same eight languages the
+pack writes episodes in. The page opens in your browser's language (English if it is none of these) and
+the picker at the top right switches it at once, without losing anything you have typed; the choice is
+remembered. The story bank and episode language dropdowns show translated names, while the values sent
+to the pack stay its own. Model and style names, the pack's own examples, and error text from ComfyUI stay
+as they are.
+
+Each language is one file, `radio_play_studio/static/i18n/<code>.json`, and adding a file adds a language.
+English (`en.json`) is the fallback and carries the form's own words from `form.py`. The other seven are
+machine translations that no native speaker has reviewed yet, so corrections are welcome.
+`tests/test_rps_i18n.py` checks that every file has every key with the same `{placeholders}`.
+
 ## Measured timings (RTX 5080 Laptop, 16 GB, ComfyUI 0.42.1, through the SDK and proxy)
 
 | Job | Time |
