@@ -32,8 +32,18 @@ def _oracle():
     return module
 
 
+#: The one place the shipped set may carry findings, and why. Operator,
+#: 2026-10-22: Radio Play Studio ships in the zip to measure the registry's real
+#: verdict, knowing the replica predicts a Flag for its environment reads and its
+#: HTTP calls to the local ComfyUI. Those calls are what the app does, so they are
+#: not respelled. If the registry Flags the version, restore `contest/` in
+#: .comfyignore and delete this; if it goes Active, the replica over-reports these
+#: rules for this code. The rest of the pack is held to zero, as before.
+SHIPPED_APP = "contest/radio-play-studio/radio_play_studio/"
+
+
 def test_the_packed_set_has_no_scan_findings():
-    findings = _oracle().scan()
+    findings = [f for f in _oracle().scan() if not f["file"].startswith(SHIPPED_APP)]
     assert findings == [], (
         "the registry scan replica finds %d line(s) that would Flag the next "
         "version:\n%s\nRespell the line, or add an internal document to "
@@ -50,3 +60,12 @@ def test_the_replica_still_sees_the_packed_set():
         "the replica sees only %d shipped files; it would pass by scanning "
         "almost nothing" % len(shipped))
     assert "nodes/otr_master_audio_mux.py" in shipped
+
+
+def test_the_app_experiment_is_the_only_exception():
+    """The exception covers the app package and nothing else, and only while the
+    app actually ships; once contest/ is ignored again it must find nothing there."""
+    findings = _oracle().scan()
+    app = [f for f in findings if f["file"].startswith(SHIPPED_APP)]
+    assert all(f["rule"] in {"$env_read/mod", "$http2", "$socket2"} for f in app), app
+    assert len(app) <= 10, "the app grew new scan findings; respell nothing, decide first"

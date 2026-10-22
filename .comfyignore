@@ -330,6 +330,10 @@ scripts/_tmp_*
 config/experiments/
 apple/FRESH_INSTALL_4060_2026-09-25.md
 
-# 2026-10-19: the contest app (Radio Play Studio) is a separate program that
-# drives this pack through the Comfy SDK. It is not pack code and never ships in it.
-contest/
+# 2026-10-22 (operator): Radio Play Studio ships inside the pack zip as an experiment --
+# the scan replica predicts a Flag for its environment reads and its HTTP calls to the
+# local ComfyUI. If the registry Flags the version, put back the single line
+# `contest/` here. Its tests and the demo reel tools never ship.
+contest/radio-play-studio/tests/
+contest/radio-play-studio/demo_video/
+contest/radio-play-studio/.gitignore
