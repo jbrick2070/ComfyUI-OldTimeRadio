@@ -1,7 +1,10 @@
 # Open Source Higgsfield -- submission form, draft answers
 
 Form: https://form.typeform.com/to/V1dSQrkS (12 questions, read 2026-10-19; nothing was entered).
-**The operator fills and submits it.** Personal fields are left for him. Everything below is a
+**10-22: Claude filled Q1-Q10 in the browser pane at the operator's word (Q2 handles left blank,
+Q3 = builds custom nodes, Q6 parts = Comfy API + Comfy SDK, live link blank, the judges' blurb
+folded into Q8 since the live form has no separate field). The operator ticks the four
+agreements (Q11) and presses Submit.** Personal fields are left for him. Everything below is a
 draft to paste from; every number is from a logged run on 2026-10-19.
 
 ## Before submitting (blockers)
@@ -90,6 +93,8 @@ converts to an API graph against the server's live /object_info.
   cast-locked, shot-locked radio drama with voices, music and foley.
 - **Open Weights Only** -- every model is open weights (workflow `otr_16gb_foley_open`).
 - **LTX bonus** -- LTX 2.5 is the core video model (every beat is filmed by it).
+- **Built with FLUX 3 bonus** -- FLUX 3 Klein paints every still (a category the live form lists;
+  ticked 10-22).
 - (Best Overall: every entry is considered automatically.)
 
 ## Q11. Is your stack fully open?
