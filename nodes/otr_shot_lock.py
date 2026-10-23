@@ -1495,6 +1495,53 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
     return "\n".join(lines)
 
 
+def _join_directive_leaves(appearance: str, setting: str, line_text: str,
+                           leaves: dict, *, nonverbal: bool) -> str:
+    """The two DETERMINISTIC compositions of a beat's visual prompt.
+
+    ONE place, used by :func:`derive_creative_directives` for its composed
+    paths and by the Scene Producer's action overlay
+    (:func:`apply_action_edits`), so an edited action is composed by exactly
+    the rule that composed the original.
+
+    ``nonverbal`` means the VIDEO MODEL is not given the spoken line
+    (``_lane_preserves_dialogue`` is False) -- not that the episode is silent.
+    Foley lanes mix the clip's own generated sound with the TTS voices; mime
+    lanes let the clip's own sound carry the beat and do not mux the TTS. On
+    those lanes the prompt falls back to the acting defaults and never carries
+    the line; on a lane that keeps dialogue it leads with the line.
+    """
+    if nonverbal:
+        parts = (appearance, setting,
+                 leaves.get("expression") or _NONVERBAL_FALLBACKS["expression"],
+                 leaves.get("motion") or _NONVERBAL_FALLBACKS["motion"],
+                 leaves.get("camera") or _NONVERBAL_FALLBACKS["camera"])
+    else:
+        parts = (appearance, setting, line_text,
+                 leaves.get("expression"), leaves.get("motion"), leaves.get("camera"))
+    return ", ".join(p for p in parts if p)
+
+
+def _finish_beat_prompt(meta: dict, appearance: str, text_prompt: str, *,
+                        nonverbal: bool) -> str:
+    """The subject anchor (spoken lanes only: its first clause is "speaking to
+    camera") and the era and film tails. Fail-soft on the tails, as before."""
+    if not nonverbal:
+        text_prompt = f"{_subject_anchor(appearance)}, {text_prompt}"
+    # FINISH the prompt (gap-audit F3, 2026-06-10): era tail (brief
+    # atmosphere/palette/lighting) + the film style tail. MUST run before
+    # prompt_hash so the stored hash matches the rendered prompt. Fail-soft.
+    try:
+        try:
+            from ._otr_story_brief_helpers import finish_visual_prompt  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_story_brief_helpers import finish_visual_prompt  # type: ignore
+        text_prompt = finish_visual_prompt(meta, text_prompt)
+    except Exception:  # noqa: BLE001
+        pass
+    return text_prompt
+
+
 def derive_creative_directives(
     beats: list,
     meta: dict,
@@ -1739,22 +1786,14 @@ def derive_creative_directives(
                             "lexicon names this beat's sounds instead"
                             % (b["beat_id"], reason))
                 d[_SOUND_KEY] = sound
-                text_prompt = ", ".join(p for p in (
-                    appearance, setting,
-                    kept["expression"] or _NONVERBAL_FALLBACKS["expression"],
-                    kept["motion"] or _NONVERBAL_FALLBACKS["motion"],
-                    kept["camera"] or _NONVERBAL_FALLBACKS["camera"],
-                ) if p)
+                text_prompt = _join_directive_leaves(appearance, setting, "", kept,
+                                                     nonverbal=True)
             elif llm_text:
                 text_prompt = llm_text
                 source = "llm"
             elif has_directives:
-                text_prompt = ", ".join(
-                    p for p in (
-                        appearance, setting, b["text"],
-                        d.get("expression"), d.get("motion"), d.get("camera"),
-                    ) if p
-                )
+                text_prompt = _join_directive_leaves(appearance, setting, b["text"], d,
+                                                     nonverbal=False)
                 source = "llm"
             elif llm_fn is not None:
                 text_prompt = _deterministic_template(
@@ -1779,23 +1818,10 @@ def derive_creative_directives(
             # ...on the SPOKEN paths only. The anchor's first clause is
             # "face visible, speaking to camera", which is a speaking
             # instruction; a silent lane composed its own subject above and
-            # must not be handed one.
-            if not nonverbal:
-                text_prompt = f"{_subject_anchor(appearance)}, {text_prompt}"
-            # FINISH the prompt (gap-audit F3, 2026-06-10): era tail (brief
-            # atmosphere/palette/lighting) + the film style tail. MUST run
-            # before prompt_hash so the stored hash matches the rendered
-            # prompt. Fail-soft.
-            try:
-                try:
-                    from ._otr_story_brief_helpers import (  # type: ignore
-                        finish_visual_prompt)
-                except ImportError:  # pragma: no cover -- flat test imports
-                    from _otr_story_brief_helpers import (  # type: ignore
-                        finish_visual_prompt)
-                text_prompt = finish_visual_prompt(meta, text_prompt)
-            except Exception:  # noqa: BLE001
-                pass
+            # must not be handed one. The era and film tails follow
+            # (`_finish_beat_prompt`), before prompt_hash.
+            text_prompt = _finish_beat_prompt(meta, appearance, text_prompt,
+                                              nonverbal=nonverbal)
             creative[b["beat_id"]] = {
                 "expression": d.get("expression", ""),
                 "motion": d.get("motion", ""),
@@ -2383,6 +2409,81 @@ def _apply_replay_engine_override(planned: dict, override: str, policy: dict) ->
     if leftover:
         raise ValueError("OTR_ShotLock: replay engine override left shots on the "
                          "source engine: %r" % leftover[:5])
+
+
+def action_is_editable(shot: dict) -> bool:
+    """Whether a planned shot has an action a person can edit: a character
+    beat whose ``creative`` carries a ``motion`` leaf. Bookends and music have
+    no ``creative``; a Ghost shot composes from its own finalized prompt
+    (``ghost_prompt``), so editing ``motion`` there would change nothing."""
+    creative = shot.get("creative") if isinstance(shot, dict) else None
+    return (isinstance(creative, dict) and "motion" in creative
+            and not shot.get("ghost_prompt"))
+
+
+def apply_action_edits(planned: dict, ledger: dict, meta: dict, cards: dict) -> list:
+    """THE SCENE PRODUCER'S ACTION OVERLAY: apply each card's edited action
+    (``motion_text``) to the frozen plan, in place, and return the shot ids it
+    changed.
+
+    For an edited card only, the action replaces ``creative["motion"]`` and the
+    shot's ``text_prompt`` is recomposed by the SAME deterministic rule that
+    composed it (:func:`_join_directive_leaves`, :func:`_finish_beat_prompt`),
+    from the frozen appearance, setting, expression and camera -- and the
+    spoken line only on a lane that keeps dialogue. Both matter: the LTX and
+    HuMo lane formatters compose again from the structured leaves, so changing
+    ``text_prompt`` alone would not reach the render. No LLM runs and no other
+    leaf is rewritten. An action equal to the frozen one recomposes nothing.
+
+    Refused, before anything changes: a card for a shot the plan does not
+    have, and an action on a shot with nothing to edit
+    (:func:`action_is_editable`).
+    """
+    shots = {s.get("shot_id"): s for s in (planned.get("shots") or [])
+             if isinstance(s, dict)}
+    wanted = {sid: body["motion_text"] for sid, body in (cards or {}).items()
+              if "motion_text" in body}
+    unknown = sorted(sid for sid in wanted if sid not in shots)
+    if unknown:
+        raise ValueError("OTR_ShotLock: Scene Producer direction names shot(s) this plan "
+                         "does not have: %s" % ", ".join(unknown[:5]))
+    not_editable = sorted(sid for sid in wanted if not action_is_editable(shots[sid]))
+    if not_editable:
+        raise ValueError("OTR_ShotLock: Scene Producer direction edits the action of "
+                         "shot(s) that have none to edit: %s" % ", ".join(not_editable[:5]))
+    # A character beat's id IS its line's line_id and its text the line's
+    # stripped text (`extract_beats`); read them directly rather than re-run
+    # the planner's role validation over a frozen ledger.
+    lines = {str(ln.get("line_id")): str(ln.get("text") or "").strip()
+             for ln in (ledger.get("lines") or [])
+             if isinstance(ln, dict) and ln.get("line_id")}
+    setting = _read_setting(meta)
+    changed = []
+    for sid in sorted(wanted):
+        shot = shots[sid]
+        creative = shot["creative"]
+        action = str(wanted[sid]).strip()
+        if action == str(creative.get("motion") or "").strip():
+            continue
+        nonverbal = not _lane_preserves_dialogue(shot.get("engine_id"), shot.get("role"))
+        appearance = _appearance_for_char(ledger, str(shot.get("char_id") or ""))
+        beat_id = (shot.get("source_line_ids") or [""])[0]
+        line = "" if nonverbal else lines.get(beat_id, "")
+        leaves = {"expression": creative.get("expression", ""), "motion": action,
+                  "camera": creative.get("camera", "")}
+        text_prompt = _finish_beat_prompt(
+            meta, appearance,
+            _join_directive_leaves(appearance, setting, line, leaves, nonverbal=nonverbal),
+            nonverbal=nonverbal)
+        creative["motion"] = action
+        creative["text_prompt"] = text_prompt
+        creative["prompt_hash"] = _content_hash(text_prompt)
+        creative["edited_by"] = "scene_producer"
+        cache_keys = shot.get("cache_keys")
+        if isinstance(cache_keys, dict):
+            cache_keys["prompt_hash"] = creative["prompt_hash"]
+        changed.append(sid)
+    return changed
 
 
 def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
@@ -3643,6 +3744,14 @@ class OTRShotLock:
                 _apply_replay_engine_override(planned, _override, policy)
                 log.warning("[OTR_ShotLock] REPLAY: engine override -> %r on every "
                             "shot, role and execution group", _override)
+            # THE SCENE PRODUCER'S ACTION EDITS: after the engine override (the
+            # lane decides whether a recomposed prompt keeps the line) and
+            # before the durable stamp, so the edited plan is the one frozen.
+            if direction is not None and direction["cards"]:
+                _edited = apply_action_edits(planned, led, meta, direction["cards"])
+                if _edited:
+                    log.warning("[OTR_ShotLock] Scene Producer: recomposed %d edited "
+                                "action(s): %s", len(_edited), ", ".join(_edited[:8]))
             _stamp_durable(sections={"video": planned},
                            meta_updates={"video_revision": revision,
                                          "replay_engine_override": _override},

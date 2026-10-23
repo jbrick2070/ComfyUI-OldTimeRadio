@@ -286,8 +286,14 @@ def test_the_validator_admits_a_plain_direction_and_refuses_what_is_not_built(pr
     assert admit(_prompt(_raw())) is None
     with pytest.raises(ValueError, match="direction refused -- .*version must be 1"):
         admit(_prompt(_raw(version=7)))
-    with pytest.raises(ValueError, match="card edits are not available in this build yet"):
+    with pytest.raises(ValueError, match="first run has no cards yet"):
         admit(_prompt(_raw(cards={"shot_b001": {"picture_text": "a desk"}})))
+    later = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
+                                    cards={"shot_b001": {"picture_text": "a desk"}}))
+    assert "picture edits are not available" in PD.not_yet_supported(later)
+    action_only = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
+                                          cards={"shot_b001": {"motion_text": "leans in"}}))
+    assert PD.not_yet_supported(action_only) is None
     publish = PD.parse_direction(_raw(stage="publish", out=_DROP, source="a" * 64))
     assert "Publish is not available" in PD.not_yet_supported(publish)
 
@@ -306,7 +312,8 @@ def test_shot_lock_carries_the_widget_as_an_advanced_input():
 def test_shot_lock_refuses_what_this_build_cannot_honour_before_any_work():
     from nodes.otr_shot_lock import OTRShotLock
     with pytest.raises(ValueError, match="takes are not available in this build yet"):
-        OTRShotLock().lock("{}", direction_json=_raw(takes={"clips": {"shot_b001": 1}}))
+        OTRShotLock().lock("{}", direction_json=_raw(out="02-stills", source="a" * 64,
+                                                     takes={"clips": {"shot_b001": 1}}))
 
 
 def test_every_shipped_graph_saves_the_widget_blank():

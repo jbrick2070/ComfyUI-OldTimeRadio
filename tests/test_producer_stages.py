@@ -117,8 +117,8 @@ def test_a_first_run_direction_cannot_reach_a_replay(replay_json):
 
 def test_what_this_build_cannot_honour_is_refused_before_any_work():
     from nodes.otr_shot_lock import OTRShotLock
-    edits = _direction(cards={"shot_b001": {"motion_text": "leans in"}})
-    with pytest.raises(ValueError, match="card edits are not available in this build yet"):
+    edits = _direction(cards={"shot_b001": {"picture_text": "a lamp-lit desk"}})
+    with pytest.raises(ValueError, match="picture edits are not available in this build yet"):
         OTRShotLock().lock("{}", direction_json=edits)
     publish = _direction(stage="publish", out=None)
     with pytest.raises(ValueError, match="Publish is not available in this build yet"):
@@ -217,3 +217,76 @@ def test_the_blocker_is_comfyuis_own_and_silent():
     from comfy_execution.graph_utils import ExecutionBlocker
     blocked = PD.execution_blocker()
     assert isinstance(blocked, ExecutionBlocker) and blocked.message is None
+
+
+# --------------------------------------------------------------------------- #
+# chunk 2b: an edited action reaches the render
+# --------------------------------------------------------------------------- #
+
+ACTION = "slams the desk drawer shut"
+
+
+def _character_shot(replay_json, engine):
+    """The replay episode with its one shot made an ordinary character beat."""
+    data = json.loads(replay_json)
+    shot = data["video"]["shots"][0]
+    shot.pop("ghost_prompt", None)
+    shot.update({"engine_id": engine, "role": "character_video", "char_id": "c02",
+                 "source_line_ids": ["b001"],
+                 "creative": {"expression": "worried", "motion": "stands still",
+                              "camera": "slow push in", "text_prompt": "frozen prompt",
+                              "prompt_hash": "frozen"},
+                 "cache_keys": {"prompt_hash": "frozen", "request_hash": "r"}})
+    return data
+
+
+@pytest.mark.parametrize("engine, keeps_line", [("ltx25_foley_16gb", False),
+                                                ("humo_1.7B_169", True)])
+def test_an_edited_action_reaches_the_lane_request(replay_json, engine, keeps_line):
+    from nodes.otr_shot_lock import OTRShotLock
+    from nodes._otr_video_engines import render_driver as RD
+    data = _character_shot(replay_json, engine)
+    direction = _direction(cards={"shot_b001": {"motion_text": ACTION}})
+    patched, *_ = OTRShotLock().lock(json.dumps(data), video_policy_json=POLICY,
+                                     direction_json=direction)
+    ledger = json.loads(patched)
+    shot = ledger["video"]["shots"][0]
+    creative = shot["creative"]
+    assert creative["motion"] == ACTION and ACTION in creative["text_prompt"]
+    assert ("sequence is initiated" in creative["text_prompt"]) is keeps_line
+    assert creative["prompt_hash"] != "frozen"
+    assert shot["cache_keys"]["prompt_hash"] == creative["prompt_hash"]
+    request = RD.build_request_from_shot(shot, ledger, phase="render")
+    text = request.get("text_prompt") if isinstance(request, dict) else request.text_prompt
+    assert ACTION in text
+    # ...and the edited plan is the one stamped durably, so a freeze carries it.
+    assert PL.peek_ledger().data["video"]["shots"][0]["creative"]["motion"] == ACTION
+
+
+def test_an_unchanged_action_recomposes_nothing(replay_json):
+    from nodes import otr_shot_lock as SL
+    data = _character_shot(replay_json, "ltx25_foley_16gb")
+    before = json.dumps(data["video"], sort_keys=True)
+    assert SL.apply_action_edits(data["video"], data, data["meta"],
+                                 {"shot_b001": {"motion_text": " stands still "}}) == []
+    assert json.dumps(data["video"], sort_keys=True) == before
+
+
+def test_an_action_on_an_unknown_or_uneditable_shot_is_refused(replay_json):
+    from nodes import otr_shot_lock as SL
+    data = _character_shot(replay_json, "ltx25_foley_16gb")
+    with pytest.raises(ValueError, match="does not have: shot_zzz"):
+        SL.apply_action_edits(data["video"], data, data["meta"],
+                              {"shot_zzz": {"motion_text": ACTION}})
+    ghost = json.loads(replay_json)          # the replay episode's own Ghost shot
+    with pytest.raises(ValueError, match="have none to edit: shot_b001"):
+        SL.apply_action_edits(ghost["video"], ghost, ghost["meta"],
+                              {"shot_b001": {"motion_text": ACTION}})
+
+
+def test_a_first_run_carries_no_edits():
+    first = {k: v for k, v in DIRECTION.items() if k != "source"}
+    first.update(stage="stills", out="01-stills",
+                 cards={"shot_b001": {"motion_text": ACTION}})
+    with pytest.raises(PD.DirectionError, match="first run has no cards yet"):
+        PD.parse_direction(json.dumps(first))

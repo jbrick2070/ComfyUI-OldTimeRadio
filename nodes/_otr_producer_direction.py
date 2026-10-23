@@ -244,6 +244,12 @@ def parse_direction(raw: Any) -> Optional[Dict[str, Any]]:
             raise DirectionError("kept.%s lists an id twice" % group)
         kept[group] = seen
 
+    if source is None and (scenes or cards or any(takes.values())
+                           or any(kept.values())):
+        # The first run writes the episode the cards are made from, so there
+        # is nothing to edit, re-take or keep yet.
+        raise DirectionError("a project's first run has no cards yet, so it carries "
+                             "no edits, takes or keeps")
     return {"version": DIRECTION_VERSION, "project_id": project_id,
             "attempt_id": attempt_id, "stage": stage, "out": out, "source": source,
             "scenes": scenes, "cards": cards, "takes": takes, "kept": kept}
@@ -440,21 +446,23 @@ def not_yet_supported(direction: Dict[str, Any]) -> Optional[str]:
     silently ignored: an edit that does nothing would look like a broken edit.
 
     Each arrives with the build step that makes it real (plan, Build order):
-    Publish needs clip reuse, or it would film every shot again; card and
-    scene edits, takes and keeps need the overlay and the repaint.
+    Publish needs clip reuse, or it would film every shot again; picture edits,
+    scene notes, takes and keeps need the repaint. ACTION edits
+    (``motion_text``) are real: Shot Lock recomposes them on replay.
     """
     if direction["stage"] == "publish":
         return ("Publish is not available in this build yet: without clip reuse it "
                 "would film every shot again")
     asked = [label for label, present in (
         ("scene notes", bool(direction["scenes"])),
-        ("card edits", bool(direction["cards"])),
+        ("picture edits", any("picture_text" in body
+                              for body in direction["cards"].values())),
         ("takes", any(direction["takes"].values())),
         ("kept cards", any(direction["kept"].values())),
     ) if present]
     if asked:
         return ("%s are not available in this build yet; this build runs the stills "
-                "and video stages without edits" % ", ".join(asked))
+                "and video stages with action edits only" % ", ".join(asked))
     return None
 
 
