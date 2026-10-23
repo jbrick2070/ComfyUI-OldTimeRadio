@@ -47,15 +47,15 @@ An optional shot editor for Radio Play Studio, built and proven first on the My 
 | Video | Replay of the latest bundle | Batch #92: freeze, block |
 | Publish | Replay of the latest Video bundle | Mux #85, unchanged; no freeze |
 
-**Direction JSON**, versioned: `project_id`, `stage`, `out` (the bundle this run writes), `source` (previous bundle's manifest digest; absent on the first run), scene text, per-card picture text and motion text, take numbers per portrait, still and clip, and kept ids. No selection in V1: each stage acts on everything changed.
+**Direction JSON**, versioned: `project_id`, `stage`, `out` (the bundle this run writes), `source` (previous bundle's manifest digest; absent on the first run), scene notes keyed by scene id, per-card picture text and motion text keyed by shot id, take numbers per character, still and clip, and kept ids. No selection in V1: each stage acts on everything changed. Takes are sent in full on every run; Studio's project file is their source of truth.
 
-**The stage lives only on the wire.** Shot Lock sets it on the ledger it passes downstream, as a runtime key, on every run, and clears it when the widget is blank. The durable save and the freeze strip it. A blank-widget replay of a producer bundle therefore reaches the mux.
+**The direction lives only on the wire.** Shot Lock puts the parsed direction, stage included, on the ledger it passes downstream as one runtime key, on every run, and clears it when the widget is blank. Node 89, the dispatcher and Batch read it from their wire input. The durable save and the freeze strip it. A blank-widget replay of a producer bundle therefore reaches the mux.
 
-**Validation is in the Workflow Validator.** `VALIDATE_INPUTS` cannot refuse a prompt: core drops only the outputs that depend on the failing node and still runs the writer. Node 63's resolver checks shape and version, refuses a linked or non-literal direction, confines `project_id` and `out` to short safe names, refuses an `out` that exists, and matches `source` against the bundle in `replay_from`. These checks run before both `_queue_time_readiness_gates` calls, which otherwise roll lanes, preflight clouds and fetch assets. A raise there halts the prompt before any asset loads. Execution is sequential, so a duplicate queued behind its twin fails at node 63 once the first has frozen `out`.
+**Validation is in the Workflow Validator.** `VALIDATE_INPUTS` cannot refuse a prompt: core drops only the outputs that depend on the failing node and still runs the writer. A blank or whitespace direction passes with no checks at all. Otherwise node 63's resolver checks shape and version, refuses a linked or non-literal direction, confines `project_id` and `out` to short safe names, refuses an `out` that exists, and matches `source` against the bundle in `replay_from`. These checks run before both `_queue_time_readiness_gates` calls, which otherwise roll lanes, preflight clouds and fetch assets. A raise there halts the prompt before any asset loads. Execution is sequential, so a duplicate queued behind its twin fails at node 63 once the first has frozen `out`.
 
 ## Stages
 
-**Stills.** On replay Shot Lock writes card motion text and clip takes onto the shot rows. On the first run the dispatcher stores the image prompt payload it received, before its own merge, as `images.producer_prompt_payload`. It must be added inside the dispatcher's own rebuild of the images section, which replaces the whole section with six named keys. On replay the image prompt node rebuilds from that payload. A card edit replaces only that object's prompt text, with the scene text appended; identity, co-references and every other field are kept, and no template or LLM runs. The dispatcher, in producer mode, runs its cached path instead of verify-only and mints only misses, portraits first.
+**Stills.** On replay Shot Lock writes card motion text into each shot row's free-form `creative` dict; takes are never written onto rows, because `ShotRow` forbids extra fields. On the first run the dispatcher stores the image prompt payload it received, before its own merge, as `images.producer_prompt_payload`. It must be added inside the dispatcher's own rebuild of the images section, which replaces the whole section with six named keys. On replay the image prompt node rebuilds from that payload. A card edit replaces only that object's prompt text, with the scene text appended; identity, co-references and every other field are kept, and no template or LLM runs. The dispatcher, in producer mode, runs its cached path instead of verify-only and mints only misses, portraits first.
 
 Take numbers above zero enter every seed branch: bookend, fixed mode, scene character and portrait. A character's take enters the identity seed of every scene still of that character, whether or not the lane mints a portrait. Studio's My Story graphs mint none without photos: scene stills take their identity from a hashed identity prompt. Take 0 is today's seed exactly. Kept objects keep their row whatever their key. Rows are one per object, newest wins, and the render driver's portrait indexes become newest-wins. Paint again raises the still's take; Film again raises only the clip's take and keeps the still. Node 12 renames the workspace on every run; Shot Lock already adopts the renamed id and rebases every path before the dispatcher, which prefers that wired id, so minting on replay writes into the right folder with no change.
 
@@ -65,7 +65,7 @@ Take numbers above zero enter every seed branch: bookend, fixed mode, scene char
 
 **Freezer.** It moves to a helper in `nodes/` with relative imports. It raises `ReplayBundleError`, never `SystemExit`, which would kill ComfyUI's prompt worker, and takes an explicit destination. The CLI becomes a thin wrapper. It carries every member present: ledger, master, canon, stills, portraits, clips and `audio/foley`. Bundles live at `otr/episodes/_replay/p/<project>/<nn>-<stage>`, short for Windows path limits. Nothing is deleted automatically in V1: each stage run adds one bundle and one workspace, and the operator removes old ones by hand.
 
-**Readiness.** One pure resolver, called by node 63, `_otr_visual_assets` and the two cloud preflights. It finds Shot Lock through all links and rejects an ambiguous graph. A Stills replay needs image-engine assets, a Video replay clip assets, Publish none, and no replay needs writer assets.
+**Readiness.** One pure resolver, called by node 63, `_otr_visual_assets` and the two cloud preflights. It finds Shot Lock by class type in the queued prompt, since the gate-in walker never reaches it, and refuses a graph with more than one. A Stills replay needs image-engine assets, a Video replay clip assets, Publish none, and no replay needs writer assets.
 
 **Known cost.** Node 12's CRT base video renders and renames on every stage, measured at about 53 frames a second, a few minutes for a typical episode. V1 accepts it.
 
@@ -75,13 +75,26 @@ The approved design is `mockup.html`.
 
 - **Entry.** A quiet second button, "Direct the shots first", sits beside "Make the episode" on the My Story path. The form stays first and folds to one line once a project exists; the board takes the run section.
 - **Runs.** Every run submits the shipped graph through the existing busy guard. The first takes the user's My Story choices, and the project records which workflow it used: the reference twin when photos were given. Later runs reuse that recorded workflow and the first run's recorded form choices, because `runner.workflow_for` picks the twin only when the bank is my_story and the image engines come from the video director's widgets. Node 63 refuses a replay whose image engines differ from the bundle's. They set `replay_from` to the previous bundle, Source to `roll (any eligible bank)`, and `source_ref` and every My Story box to empty, which the writer's replay check allows. A small internal patcher writes those values and `direction_json` by node type; the form's `apply_choices` rejects unknown fields and stays unchanged.
-- **Results.** A succeeded job ends a stage; only Publish picks the mux output. Studio's server reads `cards.json` and media from the bundle through ComfyUI's `/view`, copies them by sha into `out_dir/projects/<project_id>/`, and serves them itself, so the page never calls ComfyUI and pruned bundles never blank it. `cards.json` is a small versioned view the freeze writes: shots grouped by scene, each with its still or clip, takes and state.
+- **Routes.** Studio's own server gains two routes, one to read the project and one to start a stage run, behind the same busy guard. ComfyUI gains none.
+- **Results.** A succeeded job ends a stage. Only Publish picks the mux output; `runner.stream` today always does, and would raise `EpisodeMissing` on every other stage. Studio's server reads `cards.json` and media from the bundle through ComfyUI's `/view`, copies them by sha into `out_dir/projects/<project_id>/`, and serves them through its existing `/episodes/` file route. The page never calls ComfyUI, and a deleted bundle never blanks it.
+- **`cards.json`.** The freeze writes this small versioned view, the one contract between nodes and page:
+
+  ```json
+  {"version": 1, "project_id": "", "stage": "", "bundle": "",
+   "cast":   [{"char_id": "", "name": "", "picture": "", "take": 0}],
+   "scenes": [{"scene_id": "", "note": "",
+               "shots": [{"shot_id": "", "char_id": "", "line": "", "start_s": 0.0, "dur_s": 0.0,
+                          "picture_text": "", "motion_text": "", "still": "", "clip": null,
+                          "still_take": 0, "clip_take": 0, "state": ""}]}]}
+  ```
+
+  Media fields are bundle-relative paths. `state` is one of painted, filmed, changed, failed or kept.
 - **Page.**
   - **Cast:** one picture per character with Paint again; it repaints that character's shots unless kept. The picture is the portrait when the lane mints one, otherwise the character's first scene still.
   - **Scenes:** collapsed, opening when one holds a changed or failed card.
   - **Card row:** thumb, who, the spoken line, Picture and Motion text, Paint again, Film again, Keep. Paint again repaints the still; Film again keeps the still and films a new take.
   - **Buttons:** Paint the stills (N changed), Film the shots (N to film), Publish the episode, each with a one-line reason when disabled.
-- **Progress.** In producer mode the dispatcher and Batch each drive one node-level bar over their items, and the page marks the k-th card of the work order.
+- **Progress.** In producer mode the dispatcher and Batch each drive one node-level bar whose steps are their items. Studio passes that node's step and step count to the page unchanged, and the page marks the k-th card of the work order.
 - **Project file.** One atomic file holds the draft direction, the bundle names in order, and the pending `out` with its job id. After a restart, `client.jobs.get` re-attaches a running job; a succeeded job with `cards.json` finishes the stage; a failed or unknown job with no `out` offers the run again.
 - **Languages.** New strings go into every language file (the parity test enforces it).
 - **README.** The README gains a Producer section only after the proof passes. When it mentions the feature relative to contest judging is the operator's call.
