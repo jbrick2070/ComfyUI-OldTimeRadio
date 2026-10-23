@@ -624,6 +624,24 @@ def test_resolve_inputs_uses_selected_link_not_differing_request(monkeypatch):
         "https://requested.example/feed")
 
 
+def test_a_lane_that_ignores_the_request_selects_no_source_ref():
+    """The original lane has no source to resolve: a source_ref typed on it
+    is a request nothing used, so the ledger's source_ref is empty and the
+    request is kept as requested_source_ref. Until 2026-10-23 the ignored
+    value was stamped as the selected ref (Codex QA on 05e51de4)."""
+    import nodes.OTR_LedgerScriptWriter as writer
+
+    out = writer._resolve_inputs(
+        custom_premise="",
+        source_bank="original",
+        source_ref="folger-macbeth:act1-scene3-witches",
+    )
+
+    assert out["source_ref"] == ""
+    assert out["source_meta"]["requested_source_ref"] == (
+        "folger-macbeth:act1-scene3-witches")
+
+
 def test_writer_stamps_source_sidecars_into_meta():
     tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
     run_fn = next(

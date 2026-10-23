@@ -114,11 +114,17 @@ def test_source_ref_is_real_run_parameter_and_resolved_value():
     resolved = _resolve_inputs(custom_premise="seed")
     assert resolved["source_ref"] == ""
 
+    # The request reaches the resolver and is kept for forensics; it is not
+    # the SELECTED ref unless a fetcher resolved it (here nothing did), and
+    # since 2026-10-23 an ignored request is no longer stamped as selected
+    # (Codex QA on 05e51de4).
     resolved2 = _resolve_inputs(
         custom_premise="seed",
         source_ref="https://example.invalid/source.txt",
     )
-    assert resolved2["source_ref"] == "https://example.invalid/source.txt"
+    assert resolved2["source_ref"] == ""
+    assert resolved2["source_meta"]["requested_source_ref"] == (
+        "https://example.invalid/source.txt")
 
 
 def test_source_ref_on_both_headless_whitelists():

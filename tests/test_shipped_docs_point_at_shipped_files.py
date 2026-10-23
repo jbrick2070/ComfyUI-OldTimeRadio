@@ -27,6 +27,8 @@ GITHUB_BLOB = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/"
 GITHUB_BLOB_ANY = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
 _REF = re.compile(r"(?<![/\w])apple/((?:[A-Za-z0-9_.\-]+/)*[A-Za-z0-9_.\-]+\.(?:md|yaml|json|txt))")
 _BARE = re.compile(r"(?<![/\w])([A-Za-z0-9_\-]+(?:--[A-Za-z0-9_.\-]+)?\.(?:md|yaml|json|txt))\b")
+#: Any URL: read for its GitHub file link, then kept out of the path scan.
+_URL = re.compile(r"https?://\S+")
 #: A file link on GitHub: on main, or a permalink to a commit.
 _BLOB = re.compile(re.escape(GITHUB_BLOB_ANY) + r"(main|[0-9a-f]{7,40})/([^\s)\]<>\"'#?]+)")
 
@@ -77,21 +79,33 @@ def _apple_names() -> set:
     return {rel.rsplit("/", 1)[-1] for rel in _tracked("apple/")}
 
 
+def _local_spelling(line: str, tracked_all: set) -> str:
+    """The line with every path spelled as git spells it and no URL left in
+    it. A Windows spelling names the same file (Codex QA, 2026-10-23); so do
+    a dot-slash or dot-backslash prefix, and a markdown-escaped underscore
+    (a backslash before the underscore) is the underscore (Sonnet QA, same
+    day) -- unless reading that backslash as a separator names a file git
+    holds (apple/_PRIVATE.md spelt the Windows way). A URL's query string is
+    not a local path (Codex QA on 05e51de4)."""
+    line = _URL.sub(" ", line)
+    separators = re.sub(r"(?<![\w/])\./", "", line.replace("\\", "/"))
+    if "\\_" in line and any(f"apple/{m}" in tracked_all for m in _REF.findall(separators)):
+        return separators
+    line = line.replace("\\_", "_").replace("\\", "/")
+    return re.sub(r"(?<![\w/])\./", "", line)
+
+
 def _problems(text: str, patterns: list, names: set, tracked_all: set) -> list:
     problems = []
-    # A Windows spelling of a path names the same file (Codex QA, 2026-10-23);
-    # so do `./apple/X.md`, `.\apple\X.md` and a markdown-escaped underscore
-    # (Sonnet QA, same day).
-    text = text.replace("\\_", "_").replace("\\", "/")
-    text = re.sub(r"(?<![\w/])\./", "", text)
-    for line in text.splitlines():
+    for raw in text.splitlines():
         # Every file this line links on GitHub, bare URL or markdown link alike.
         linked = set()
-        for ref, target in _BLOB.findall(line):
+        for ref, target in _BLOB.findall(raw):
             target = target.rstrip(".,;:")       # a bare URL at the end of a sentence
             if not _held_in_git(ref, target, tracked_all):
                 problems.append(f"GitHub link to {target} at {ref}, which git does not hold")
             linked.add(target)
+        line = _local_spelling(raw, tracked_all)
         # A reference is exempt only when THIS line links that same file.
         for rel in {f"apple/{m}" for m in _REF.findall(line)}:
             if rel in linked:
@@ -145,6 +159,13 @@ def test_the_rule_catches_what_it_must_and_nothing_else():
     # ...and the escaped spelling names the real file, not `apple/X/_Y.md`.
     assert _problems("see apple/IDEOGRAM4\\_LICENSE\\_ATTESTATION.md", patterns, names, tracked) == [
         "apple/IDEOGRAM4_LICENSE_ATTESTATION.md is excluded by .comfyignore"]
+    # A URL's query string is not a local path, and `\_` is a separator when
+    # that reading names a file git holds (Codex QA on 05e51de4).
+    assert _problems("see https://example.test/?path=./apple/schema/anime.json",
+                     patterns, names, tracked) == []
+    assert _problems("See .\\apple\\_PRIVATE.md", patterns + ["apple/_PRIVATE.md"],
+                     names | {"_PRIVATE.md"}, tracked | {"apple/_PRIVATE.md"}) == [
+        "apple/_PRIVATE.md is excluded by .comfyignore"]
     # A permalink to a commit is held against that commit's tree: this file at
     # the repository's first commit on main does not exist there. A shallow
     # clone's oldest commit is its cut, which may hold this file, so the

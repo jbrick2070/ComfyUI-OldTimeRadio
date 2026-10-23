@@ -543,16 +543,17 @@ def _resolve_inputs(
     source_meta = dict(source_meta or {})
     news_seed_receipt = source_meta.pop("_news_seed_receipt", {})
 
-    # Source identity is selected-source truth, not merely the requested
-    # widget value. RSS lanes ignore/leave that widget blank and choose a real
-    # item at fetch time; manifest lanes already return the resolved ref in
-    # their sidecar. Preserve a differing operator request separately for
-    # forensics, then expose the selected ref as the canonical ledger field.
+    # Source identity is selected-source truth, not the requested widget
+    # value. RSS lanes ignore that widget and choose a real item at fetch
+    # time; manifest lanes return the resolved ref in their sidecar; the
+    # original lane has no source and selects nothing. A differing request
+    # is kept separately for forensics and is NEVER the selected ref: until
+    # 2026-10-23 a lane that ignored the widget stamped the ignored value as
+    # the ledger's source_ref (Codex QA on 05e51de4).
     _requested_source_ref = str(source_ref or "").strip()
     _selected_source_ref = str(
         (source_meta or {}).get("source_ref")
         or (news_article or {}).get("link")
-        or _requested_source_ref
         or ""
     ).strip()
     if _requested_source_ref and _requested_source_ref != _selected_source_ref:

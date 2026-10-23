@@ -11,8 +11,8 @@
 **Narration word count:** ~715
 
 **v2 changes from v1:**
-- Scenes 05, 07, 08 and 11 quote the help lines as the form says them after the 2026-10-23 QA fold (05e51de4): Source "Blank, or an id + a named bank"; Visual style "Visualizer frames ignore it"; the still rows "Not every video lane uses it"; the voice rows "kokoro: ja/zh may need extras"; the checklists "… roll only; none = all".
-- Narration follows: an id needs a named bank; the credits still name the style; some lanes take no still without saying so; Japanese and Mandarin may need two libraries; an empty checklist is all.
+- Scenes 05, 07, 08 and 11 quote the help lines as the form says them after the 2026-10-23 QA fold (05e51de4): Source "shakespeare/public_domain only"; Visual style "Visualizer frames ignore it"; the still rows "Not every video lane uses it"; the voice rows "kokoro: ja/zh may need extras"; the checklists "… roll only; none = all".
+- Narration follows: only the two adapt banks read an id; the credits still name the style; some lanes take no still without saying so; Japanese and Mandarin may need two libraries; an empty checklist is all.
 - End card: BANKS.md is the guide to the banks; it does not list source ids.
 
 Facts in this script come from three places only: the pack's README, `config/app_mode.json` (the form's labels and help lines), and the form as it renders in ComfyUI. Every row name and help line below is quoted as the form draws it.
@@ -75,9 +75,9 @@ Dry narration over silence. One cue: a tuning dial — a dry, dead-air crackle w
 
 ## SCENE 05 — STORY BANK AND STYLE
 
-**VISUAL:** Three rows. STORY BANK, "Pick my_story to tell yours", with its dropdown drawn as a wireframe list fanning out: original, scifi_news_pro, media_archive, shakespeare, public_domain, my_story, and a top entry "roll (any eligible bank)" in solid magenta. SOURCE TO ADAPT, "Blank, or an id + a named bank". VISUAL STYLE, "Visualizer frames ignore it", with its own "roll (any style)" entry lit.
+**VISUAL:** Three rows. STORY BANK, "Pick my_story to tell yours", with its dropdown drawn as a wireframe list fanning out: original, scifi_news_pro, media_archive, shakespeare, public_domain, my_story, and a top entry "roll (any eligible bank)" in solid magenta. SOURCE TO ADAPT, "shakespeare/public_domain only". VISUAL STYLE, "Visualizer frames ignore it", with its own "roll (any style)" entry lit.
 
-**NARRATION:** Story bank decides what kind of show it is. Leave it on roll and the pack picks one: an original drama, science fiction from tonight's science news, a story from the media archives, a scene of Shakespeare, a public-domain classic. Pick my story to tell your own. Source to adapt stays blank unless you have a source id, and an id needs a bank picked by name, not rolled. Visual style restyles the pictures — but note the help line: the visualizer lanes the form ships with ignore it in their frames. The credits still name it.
+**NARRATION:** Story bank decides what kind of show it is. Leave it on roll and the pack picks one: an original drama, science fiction from tonight's science news, a story from the media archives, a scene of Shakespeare, a public-domain classic. Pick my story to tell your own. Source to adapt stays blank unless you have a source id; only the Shakespeare and public-domain banks read one. Visual style restyles the pictures — but note the help line: the visualizer lanes the form ships with ignore it in their frames. The credits still name it.
 
 **ON-SCREEN TEXT:** STORY BANK · roll · my_story · SOURCE TO ADAPT · VISUAL STYLE
 
