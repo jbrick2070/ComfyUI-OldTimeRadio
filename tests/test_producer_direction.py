@@ -624,7 +624,11 @@ def test_a_producer_freeze_records_its_identity_and_the_stills_engines(tmp_path,
     producer = PL.load_replay_manifest(str(bundle))[PD.MANIFEST_PRODUCER_KEY]
     assert producer == {"version": 1, "project_id": PID, "attempt_id": FIRST["attempt_id"],
                         "stage": "stills", "out": "01-stills", "source": None,
-                        "image_engines": ENGINES}
+                        "image_engines": ENGINES,
+                        # chunk 3b: what a replay of it renders with (the
+                        # fixture's histogram is empty; its one shot's lane)
+                        "image_engines_used": [],
+                        "video_engines": ["animatediff15_v3_haunted_video"]}
 
 
 def test_an_ordinary_freeze_writes_no_producer_section_and_an_unstamped_one_is_refused(
@@ -681,3 +685,90 @@ def test_the_stamp_reads_the_policy_the_dispatcher_paints_with():
     assert PD.policy_image_engines(policy) == {
         "announcer_image_model": "z_image_turbo", "music_image_model": "",
         "character_image_model": "flux_gen1"}
+
+
+# --------------------------------------------------------------------------- #
+# chunk 3b: readiness -- what a producer replay must have ready
+# --------------------------------------------------------------------------- #
+
+USED = {"announcer_visual": {"cloud_flux_pro": 2}, "character_video": {"z_image_turbo": 9}}
+
+
+def _bundle_painted_with(tmp_path, monkeypatch, by_role):
+    """A producer 01-stills bundle whose stills the dispatcher's histogram says
+    were painted with ``by_role``."""
+    monkeypatch.setattr(PL, "_default_out_dir",
+                        lambda ep=None: str(tmp_path / "episodes" / (ep or "pending") / "audio"))
+    spec = importlib.util.spec_from_file_location(
+        "otr_test_canonical_replay_for_readiness",
+        pathlib.Path(__file__).with_name("test_canonical_replay.py"))
+    tcr = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tcr)
+    ep, _ledger = tcr._make_episode(tmp_path / "source_episodes")
+    led_path = next((ep / "audio").glob("*_ledger.json"))
+    led = json.loads(led_path.read_text(encoding="utf-8"))
+    led["meta"]["image_engines"] = {"by_role": by_role, "image_revision": 1}
+    led_path.write_text(json.dumps(led), encoding="utf-8")
+    return _producer_freeze(ep, PD.bundle_path(PID, "01-stills"))
+
+
+def _gated(prompt):
+    """The prompt with its writer gated by node 63, as the canonical graph is."""
+    prompt["1"]["inputs"]["gate_in"] = ["63", 0]
+    prompt["87"]["inputs"]["gate_in"] = ["63", 0]
+    return prompt
+
+
+def test_the_resolver_names_what_each_producer_replay_renders(producer_root, tmp_path,
+                                                             monkeypatch):
+    bundle = _bundle_painted_with(tmp_path, monkeypatch, USED)
+    producer = PL.load_replay_manifest(str(bundle))[PD.MANIFEST_PRODUCER_KEY]
+    assert producer["image_engines_used"] == ["cloud_flux_pro", "z_image_turbo"]
+    assert PD.producer_replay_needs(_continue(bundle, "02-stills")) == {
+        "stage": "stills", "image_engines": ["cloud_flux_pro", "z_image_turbo"],
+        "video_engines": []}
+    assert PD.producer_replay_needs(_continue(bundle, "02-video")) == {
+        "stage": "video", "image_engines": [],
+        "video_engines": ["animatediff15_v3_haunted_video"]}
+    publish = _prompt(_raw(stage="publish", out=None, source=PD.manifest_digest(str(bundle))),
+                      replay_from=str(bundle))
+    assert PD.producer_replay_needs(publish) == {
+        "stage": "publish", "image_engines": [], "video_engines": []}
+
+
+def test_the_resolver_leaves_every_other_prompt_alone(producer_root):
+    assert PD.producer_replay_needs(_prompt("")) is None, "a blank widget"
+    assert PD.producer_replay_needs(_prompt(_raw())) is None, "a project's first run is live"
+    assert PD.producer_replay_needs({"1": {"class_type": "OTR_LedgerScriptWriter"}}) is None
+
+
+def test_a_video_replay_plans_its_frozen_lanes_not_the_live_dropdowns(producer_root, tmp_path,
+                                                                    monkeypatch):
+    from nodes import _otr_visual_assets as VA
+    bundle = _bundle_painted_with(tmp_path, monkeypatch, USED)
+
+    def no_live_resolver(*_a, **_k):
+        raise AssertionError("a producer replay never reads the live dropdowns")
+
+    plan = VA.plan_prompt(_gated(_continue(bundle, "02-video")), "63",
+                          resolve_video=no_live_resolver, freeze_video=no_live_resolver)
+    assert plan["replay"] and plan["engines"] == {"animatediff15_v3_haunted_video"}
+    plan = VA.plan_prompt(_gated(_continue(bundle, "02-stills")), "63",
+                          resolve_video=no_live_resolver, freeze_video=no_live_resolver)
+    assert plan["engines"] == {"cloud_flux_pro", "z_image_turbo"}
+
+
+def test_the_cloud_gates_check_and_price_what_the_replay_renders(producer_root, tmp_path,
+                                                               monkeypatch):
+    from nodes._otr_shared import cloud_balance_preflight as CBP
+    from nodes._otr_shared import cloud_slug_preflight as CSP
+    bundle = _bundle_painted_with(tmp_path, monkeypatch, USED)
+    stills = _gated(_continue(bundle, "02-stills"))
+    looked_up = []
+    CSP.collect_findings(stills, "63", resolve_engine=lambda eid: looked_up.append(eid),
+                         walk_fn=lambda prompt, uid: list(prompt.values()))
+    assert sorted(looked_up) == ["cloud_flux_pro", "z_image_turbo"]
+    lines = CBP.estimate_lines(stills, "63", resolve_engine=lambda eid: None,
+                               unit_usd_fn=lambda label, eng: 0.5,
+                               walk_fn=lambda prompt, uid: list(prompt.values()))
+    assert [line.label for line in lines] == ["cloud_flux_pro"], "the paid image engine only"

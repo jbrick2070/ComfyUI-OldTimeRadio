@@ -598,6 +598,22 @@ def _posted_writer_slug(handle, inputs):
     return "", "unknown writer handle %r" % handle
 
 
+def producer_replay_needs(prompt):
+    """The Scene Producer readiness resolver's answer for ``prompt``
+    (``_otr_producer_direction.producer_replay_needs``): what a producer
+    replay renders with, or None for every other prompt. Imported lazily, and
+    None where the pack's modules cannot load, so this module's own imports
+    stay what they are. The balance preflight reads the same answer."""
+    try:
+        from .. import _otr_producer_direction as _pd
+    except ImportError:
+        try:
+            import _otr_producer_direction as _pd  # type: ignore
+        except ImportError:
+            return None
+    return _pd.producer_replay_needs(prompt)
+
+
 def director_engine_picks(inputs) -> tuple:
     """(video_engine_ids, image_engine_ids) one ``OTR_VideoDirector`` will run.
 
@@ -775,14 +791,20 @@ def collect_findings(
     # A REPLAY re-renders video only. The image dispatcher re-stamps the
     # frozen stills, the theme passes the frozen master through and CastLock
     # the frozen cast, with no model call -- so on a replay only the video
-    # engines are checked (the writer is skipped below).
+    # engines are checked (the writer is skipped below). A SCENE PRODUCER
+    # replay is checked against exactly what it renders: a stills repaint's
+    # image engines, a video run's frozen lanes, nothing for Publish.
     engine_ids = []
-    directors = [n for n in scoped if n.get("class_type") == _DIRECTOR]
-    for node in directors:
-        videos, images = director_engine_picks(node.get("inputs") or {})
-        engine_ids.extend(videos)
-        if not replay:
-            engine_ids.extend(images)
+    needs = producer_replay_needs(prompt) if replay else None
+    if needs is not None:
+        engine_ids.extend(needs["image_engines"] + needs["video_engines"])
+    else:
+        directors = [n for n in scoped if n.get("class_type") == _DIRECTOR]
+        for node in directors:
+            videos, images = director_engine_picks(node.get("inputs") or {})
+            engine_ids.extend(videos)
+            if not replay:
+                engine_ids.extend(images)
 
     for node in scoped:
         ctype = node.get("class_type")

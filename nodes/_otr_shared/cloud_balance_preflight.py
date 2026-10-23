@@ -533,12 +533,19 @@ def estimate_lines(
     image_roles = []
     # A REPLAY prices video only: the dispatcher re-stamps the frozen stills,
     # the theme and CastLock pass the frozen audio through (no model call), and
-    # the writer is skipped below.
-    for node in [n for n in scoped if n.get("class_type") == _DIRECTOR]:
-        videos, images = csp.director_engine_picks(node.get("inputs") or {})
-        video_ids.extend(videos)
-        if not replay:
-            image_roles.extend(images)
+    # the writer is skipped below. A SCENE PRODUCER replay prices exactly what
+    # it renders: a stills repaint's image engines (fresh_cap each, as a live
+    # run prices a role), a video run's frozen lanes, nothing for Publish.
+    needs = csp.producer_replay_needs(prompt) if replay else None
+    if needs is not None:
+        video_ids.extend(needs["video_engines"])
+        image_roles.extend(needs["image_engines"])
+    else:
+        for node in [n for n in scoped if n.get("class_type") == _DIRECTOR]:
+            videos, images = csp.director_engine_picks(node.get("inputs") or {})
+            video_ids.extend(videos)
+            if not replay:
+                image_roles.extend(images)
 
     def add(label, count, note):
         wallet = wallet_for_engine(label)

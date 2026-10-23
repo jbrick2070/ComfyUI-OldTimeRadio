@@ -281,7 +281,19 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
                 "a producer freeze needs the image engines its stills were painted "
                 "with, and ledger %s records none (meta %s)" % (ledger_path.name,
                                                                 META_IMAGE_ENGINES))
-        producer_section = dict(producer, image_engines=dict(engines))
+        # WHAT A REPLAY OF THIS BUNDLE MUST HAVE READY (chunk 3b): the image
+        # engines its stills were actually painted with, per the dispatcher's
+        # own per-role histogram -- not every slot, since a slot whose role
+        # mints no still needs no weights -- and the video lanes its frozen plan
+        # renders, which a replay keeps whatever the live dropdowns say.
+        by_role = ((meta.get("image_engines") or {}).get("by_role")
+                   if isinstance(meta.get("image_engines"), dict) else None)
+        used = sorted({str(engine) for counts in (by_role or {}).values()
+                       if isinstance(counts, dict) for engine in counts if engine})
+        lanes = sorted({str(shot.get("engine_id")) for shot in (video.get("shots") or [])
+                        if isinstance(shot, dict) and shot.get("engine_id")})
+        producer_section = dict(producer, image_engines=dict(engines),
+                                image_engines_used=used, video_engines=lanes)
 
     if dest is not None:
         final = pathlib.Path(dest)

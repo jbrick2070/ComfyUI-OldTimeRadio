@@ -582,6 +582,21 @@ def walk_gate_consumers(prompt, unique_id):
     return scoped
 
 
+def _producer_replay_needs(prompt):
+    """The Scene Producer readiness resolver's answer for ``prompt``
+    (``_otr_producer_direction.producer_replay_needs``), or None for every
+    other prompt. Imported lazily, and None where the pack's modules cannot
+    load: this module also loads standalone by file path."""
+    try:
+        from . import _otr_producer_direction as _pd
+    except ImportError:
+        try:
+            import _otr_producer_direction as _pd  # type: ignore
+        except ImportError:
+            return None
+    return _pd.producer_replay_needs(prompt)
+
+
 def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
                 consumes_still=None, role_video_slots=None):
     """Inspect only this validator's direct gate consumers in the LIVE prompt.
@@ -605,6 +620,19 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
             raise VisualAssetError("visual asset preflight refuses mixed replay/live writers "
                                    "behind one validator; frozen and live selections differ")
         result["replay"] = True
+        # A SCENE PRODUCER replay renders something, so it plans exactly that:
+        # a stills repaint the image engines its bundle's stills were painted
+        # with, a video run its frozen plan's lanes (never the live dropdowns),
+        # Publish nothing -- and no replay plans writer weights.
+        needs = _producer_replay_needs(prompt)
+        if needs is not None and (needs["image_engines"] or needs["video_engines"]):
+            result["engines"].update(needs["image_engines"] + needs["video_engines"])
+            result["skipped"].append("Scene Producer %s replay plans only the engines it "
+                                     "renders with" % needs["stage"])
+            for engine in sorted(result["engines"] - _COVERED):
+                result["skipped"].append("%s: automatic visual-weight coverage unavailable; "
+                                         "existing adapter checks remain" % engine)
+            return result
         result["skipped"].append("replay uses frozen bundle assets, not live dropdowns")
         return result
     # THE WRITER'S OWN WEIGHTS (plan row 0n). Both slots are read: either may

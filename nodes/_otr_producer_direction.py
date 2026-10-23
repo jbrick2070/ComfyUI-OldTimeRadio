@@ -128,7 +128,8 @@ __all__ = [
     "IMAGE_SLOTS", "META_IMAGE_ENGINES", "MANIFEST_PRODUCER_KEY",
     "policy_image_engines", "prompt_image_engines", "manifest_producer_fields",
     "PAYLOAD_KEY", "RAW_TEXTS_KEY", "TAKES_KEY", "object_shot_id", "initial_raw_texts",
-    "merged_raw_texts", "compose_picture", "painted_takes",
+    "merged_raw_texts", "compose_picture", "painted_takes", "SUPERSEDED_KEY",
+    "producer_replay_needs",
 ]
 
 
@@ -712,6 +713,62 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
                     "writes %02d-%s" % (direction["out"], project_id, latest, following,
                                         direction["stage"]))
     return {"direction": direction, "replay_from": replay_from, "manifest": manifest}
+
+
+# --------------------------------------------------------------------------- #
+# readiness: what a producer replay must have ready
+# --------------------------------------------------------------------------- #
+
+def producer_replay_needs(prompt: Any) -> Optional[Dict[str, Any]]:
+    """What a queued Scene Producer REPLAY renders with, for node 63's three
+    readiness gates -- the cloud-slug check, the wallet estimate and the weight
+    downloads -- or ``None`` when the prompt is not one: no Shot Lock, a blank
+    direction, or a project's first run, which plans as the ordinary live run
+    it is.
+
+    An ordinary replay renders video only, so those gates read the video
+    director's picks on a replay. A producer replay is narrower and more exact:
+
+    * a STILLS replay paints, with the image engines its bundle's stills were
+      actually painted with, and renders no video;
+    * a VIDEO replay films its frozen plan's lanes, whatever the live
+      dropdowns say;
+    * PUBLISH renders nothing.
+
+    Both lists come from the bundle manifest's producer section, which node 63's
+    admission has verified file by file before any gate runs. No writer, voice
+    or music engine is needed by any replay.
+    """
+    if not isinstance(prompt, dict):
+        return None
+    locks = _nodes_of(prompt, SHOT_LOCK_CLASS)
+    raws = [(nid, (node.get("inputs") or {}).get(WIDGET_NAME)) for nid, node in locks]
+    if all(is_blank(raw) for _nid, raw in raws):
+        return None
+    if len(locks) != 1 or isinstance(raws[0][1], list):
+        raise DirectionError("a Scene Producer run needs exactly one %s with a typed "
+                             "direction" % SHOT_LOCK_CLASS)
+    direction = parse_direction(raws[0][1])
+    if direction["source"] is None:
+        return None
+    writers = _nodes_of(prompt, WRITER_CLASS)
+    replay_from = (writers[0][1].get("inputs") or {}).get("replay_from", "") if writers else ""
+    try:
+        bundle = confine_to_read_roots(str(replay_from or "").strip(), "replay_from")
+        with open(os.path.join(bundle, MANIFEST_NAME), "r", encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except (OtrPathContractError, OSError, ValueError) as exc:
+        raise DirectionError("the bundle in replay_from cannot be read: %s" % exc) from None
+    producer = manifest.get(MANIFEST_PRODUCER_KEY) if isinstance(manifest, dict) else None
+    producer = producer if isinstance(producer, dict) else {}
+    stage = direction["stage"]
+    return {
+        "stage": stage,
+        "image_engines": (sorted(str(e) for e in producer.get("image_engines_used") or [])
+                          if stage == "stills" else []),
+        "video_engines": (sorted(str(e) for e in producer.get("video_engines") or [])
+                          if stage == "video" else []),
+    }
 
 
 # --------------------------------------------------------------------------- #
