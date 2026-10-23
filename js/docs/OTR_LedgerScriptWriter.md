@@ -162,11 +162,11 @@ OpenRouter model slug bound to the 'openrouter:slot-a' handle (the creative slot
 
 OpenRouter model slug bound to the 'openrouter:slot-b' handle (the technical slot). Passive: only used when technical_model is set to 'openrouter:slot-b'. Choices are the curated '~family-latest' aliases plus your favourites from the cached catalog; shows '(enable OpenRouter)' until remote is enabled. OTR_OPENROUTER_SLOT_B_REQUIRE_JSON=1 limits the CACHED CATALOG rows to structured-output models; the curated aliases are policy, not catalog discovery, so they are still offered -- check the family before binding one here. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/openrouter-setup.md.
 
-**Cloud writer - Comfy A** (`comfy_slot_a_model`) -- a choice from the dropdown.
+**Cloud writer - Comfy Credits A** (`comfy_slot_a_model`) -- a choice from the dropdown.
 
 Comfy Credits model slug bound to the 'comfy:slot-a' handle (the creative slot). Passive: only used when creative_writing_model is set to 'comfy:slot-a'. Choices are the pinned ComfyUI partner-node catalog (Sonnet 5, Luna and Sol are always listed so a saved cloud graph loads). The enable-sentinel remains choices[0]. Credit-billed at generate() when a Comfy API key is present. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/comfy-credits-setup.md.
 
-**Cloud writer - Comfy B** (`comfy_slot_b_model`) -- a choice from the dropdown.
+**Cloud writer - Comfy Credits B** (`comfy_slot_b_model`) -- a choice from the dropdown.
 
 Comfy Credits model slug bound to the 'comfy:slot-b' handle (the technical slot). Passive: only used when technical_model is set to 'comfy:slot-b'. Choices are the pinned ComfyUI partner-node catalog (Sonnet 5, Luna and Sol are always listed so a saved cloud graph loads). The enable-sentinel remains choices[0]. Credit-billed at generate() when a Comfy API key is present. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/comfy-credits-setup.md.
 

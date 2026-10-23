@@ -41,7 +41,7 @@ Optional ordering signal (wire an upstream done).
 
 Device for local voice and music engines. 'default' asks ComfyUI what this machine has and RECORDS what it chose; an explicit device is never second-guessed and still fails loud if it is not there.
 
-**Randomize audio (non-cloud)** (`roll_audio_engines`) -- on or off; starts as off.
+**Randomize audio (16 GB+)** (`roll_audio_engines`) -- on or off; starts as off.
 
 Yes: one local voice engine, drawn at random, voices the whole cast and the announcer, and one local music engine, drawn at random, scores the theme. Cloud engines are never drawn, nor one this machine cannot run or this episode's language does not allow. With preserve_ledger the writer's voices are kept, so only the music is drawn. Suggested for 16 GB cards and up.
 

@@ -26,7 +26,8 @@ lane", because a roll will usually land somewhere else.
 
 One more entry, **+ Add Your Own** `custom_source_bank`, is a signpost rather
 than a bank. It is deliberately not runnable and never comes up on a roll;
-selecting it does nothing. It is there to tell you the door exists --
+selecting it stops the run with a message that says so. It is there to tell
+you the door exists --
 [apple/EXTENDING.md](EXTENDING.md) is how you walk through it.
 
 ### Language compatibility

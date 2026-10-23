@@ -23,15 +23,15 @@ Video model for MUSIC beats (role B).
 
 Video model for CHARACTER beats (face + audio, role C). Uses the saved dropdown value; profiles only retarget this when explicitly applied.
 
-**Announcer - still** (`announcer_image_model`) -- a choice from the dropdown.
+**Announcer - still image** (`announcer_image_model`) -- a choice from the dropdown.
 
 The still the announcer's video is built from. Nothing downloads while this role's video lane is procedural; z_image_turbo is about 19 GB the first time a lane actually needs it.
 
-**Music - still** (`music_image_model`) -- a choice from the dropdown.
+**Music - still image** (`music_image_model`) -- a choice from the dropdown.
 
 The still music beats are built from. Nothing downloads while this role's video lane is procedural; z_image_turbo is about 19 GB the first time a lane actually needs it.
 
-**Characters - still** (`character_image_model`) -- a choice from the dropdown.
+**Characters - still image** (`character_image_model`) -- a choice from the dropdown.
 
 The still character beats are built from -- the shots that carry a face. Nothing downloads while this role's video lane is procedural; z_image_turbo is about 19 GB the first time a lane actually needs it.
 
@@ -69,11 +69,11 @@ Recorded on the episode receipt only. No video engine currently reads it to choo
 
 Absolute per-clip RENDER-length ceiling in frames for local video engines (0 = unpinned = the engine's own maximum). Beat LENGTH is never changed by it -- this caps what an engine renders, never what the episode plays. TWO LANES CONSUME IT DIFFERENTLY. ltx_8gb takes it as a COVERAGE-PLANNING cap: the beat is partitioned into real clips of at most this many frames and chained, so the ceiling decides how many clips cover the beat. The 8GB Wan tier takes it as an adapter-side NATIVE cap: it pins 17, renders 17 real frames, and ping-pong-extends them to the beat's audio length rather than requesting the whole 177-frame span and dying in the VRAM cost model. A value at or above an engine's own maximum has no effect on that engine.
 
-**Randomize video (non-cloud)** (`roll_video_lanes`) -- on or off; starts as off.
+**Randomize video (16 GB+)** (`roll_video_lanes`) -- on or off; starts as off.
 
 Yes: one local video lane, drawn at random, renders the whole episode, in place of all three video pickers. Cloud lanes are never drawn, nor a lane this machine cannot run. A lane it draws downloads its models the first time, as if picked by hand. Suggested for 16 GB cards and up.
 
-**Randomize stills (non-cloud)** (`roll_still_models`) -- on or off; starts as off.
+**Randomize stills (16 GB+)** (`roll_still_models`) -- on or off; starts as off.
 
 Yes: one local image model, drawn at random, makes every still in the episode, in place of all three still pickers. Cloud models are never drawn. Nothing is drawn when no video lane in the episode uses a still. Suggested for 16 GB cards and up.
 
