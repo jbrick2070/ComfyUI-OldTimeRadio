@@ -9,7 +9,9 @@ same still and audio bytes at its own paths, as a replay workspace does.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
+import re
 import shutil
 import sys
 
@@ -39,7 +41,7 @@ def producer_root(tmp_path, monkeypatch):
 class _Camera:
     """A stand-in video engine. ``broken`` names shots it fails on, and
     ``timeouts`` shots whose provider times out -- a cloud floor on a cloud
-    lane."""
+    lane. ``peak_mb``, when set, is the VRAM peak each render reports."""
     family = "abstract"
     roles = ("retired_role_b",)
     default_roles = ()
@@ -54,6 +56,7 @@ class _Camera:
         self.filmed = []
         self.broken = set()
         self.timeouts = set()
+        self.peak_mb = None
 
     def load(self):
         pass
@@ -81,8 +84,11 @@ class _Camera:
         return {"path": str(path)}
 
     def canonicalize(self, raw, request, profile=None):
-        return {"clip_id": request["shot_id"], "engine_id": self.name,
+        clip = {"clip_id": request["shot_id"], "engine_id": self.name,
                 "family": self.family, "frame_count": 25, "fps": 25, "path": raw["path"]}
+        if self.peak_mb is not None:
+            clip["vram_peak_mb"] = self.peak_mb
+        return clip
 
     def teardown(self, prepared):
         pass
@@ -261,6 +267,37 @@ def test_a_bundle_record_names_only_episode_files(producer_root, cameras, tmp_pa
     assert filmed == [] and producer.reused["shot_b001"] == "store"
 
 
+def test_a_bundle_record_that_names_a_path_in_its_clip_is_not_used(producer_root, cameras,
+                                                                   tmp_path):
+    # A path in the clip body would be handed on unverified: the mux reads a
+    # foley_path without checking it against anything.
+    camera = cameras()
+    ep_a, ledger, build = _workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger, build))
+    forged = json.loads(json.dumps(_map(first)))
+    forged["shot_b001"]["clip"]["foley_path"] = str(tmp_path / "a stem nobody listed.wav")
+    again, filmed, producer = _film(camera, _replayed(tmp_path, ep_a, "ep_c"),
+                                    bundle_map=forged)
+    assert filmed == [] and producer.reused["shot_b001"] == "store"
+    assert "foley_path" not in again["clips"]["shot_b001"]
+
+
+def test_a_reused_shot_reports_the_peak_it_was_filmed_at_and_says_it_was_reused(
+        producer_root, cameras, tmp_path):
+    camera = cameras()
+    camera.peak_mb = 321
+    first, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a"))
+    assert first["vram_peak_mb"] == 321
+    again, filmed, _producer = _film(camera, _workspace(tmp_path, "ep_b"))
+    assert filmed == [] and again["vram_peak_mb"] == 321, "the credits name what it took"
+    assert [r.get("reused_from") for r in again["receipts"]] == ["store"] * len(PROMPTS)
+    assert not [r for r in first["receipts"] if "reused_from" in r]
+    assert all(r["actual_request_sha"] == f["actual_request_sha"]
+               for r, f in zip(again["receipts"], first["receipts"]))
+    assert not [r for r in _map(again).values() if "reused_from" in r["clip"]["receipt"]], \
+        "the record rides on as it was filmed"
+
+
 def test_the_cloud_fan_out_reuses_and_commits_on_its_workers(producer_root, cameras, tmp_path):
     camera = cameras("cloud_stub_camera")
     first, filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a",
@@ -325,6 +362,42 @@ def test_the_key_sees_what_files_hold_never_where_they_are(tmp_path):
                           engine={}, render_policy={}, settings={})
 
 
+def test_the_key_sees_every_engine_setting_in_the_environment(monkeypatch):
+    shot = {"shot_id": "shot_b001", "engine_id": "stub_camera"}
+    request = {"shot_id": "shot_b001", "text_prompt": "a desk"}
+
+    def key():
+        return rd._producer_clip_key(shot, [request], {})
+
+    same = key()
+    monkeypatch.setenv("OTR_HUMO_CFG", "7.0")
+    assert key() != same, "a sampler setting an engine reads at render time"
+    monkeypatch.delenv("OTR_HUMO_CFG")
+    assert key() == same
+    for name, value in (("OTR_SNAPSHOT_HASH", "f" * 64), ("OTR_ACTIVE_PROFILE", "otr_16gb"),
+                        ("OTR_OUTPUT_DIR", "D:/elsewhere"), ("OTR_ENABLE_STYLE_GRAMMAR", "1"),
+                        ("OTR_GOOGLE_API_KEY", "a rotated key"),
+                        ("OTR_CLOUD_VIDEO_TIMEOUT_S", "900"), ("OTR_CLOUD_FANOUT", "4"),
+                        ("OTR_CLOUD_VIDEO_EST_USD", "0.5"), ("OTR_LTX25_ENCODER_CACHE", "0"),
+                        ("HF_HOME", "D:/hf")):
+        monkeypatch.setenv(name, value)
+        assert key() == same, name
+
+
+def test_every_setting_the_pack_writes_while_a_prompt_runs_stays_out_of_the_key():
+    # A setting a node writes per prompt can differ between two runs of one
+    # project; in the key it would film every shot again on every run. A new
+    # one fails here until someone decides which it is: one that cannot change
+    # a clip joins _ENV_NOT_CAUSAL, and one that can stays in the key and is
+    # named in this test as the exception it is.
+    pinned = set()
+    for source in (_REPO / "nodes").rglob("*.py"):
+        pinned.update(re.findall(r"otr_env\.(?:pin|setdefault)\(\s*[\"'](OTR_[A-Z0-9_]+)",
+                                 source.read_text(encoding="utf-8")))
+    assert pinned, "the scan found the pins"
+    assert pinned <= PC._ENV_NOT_CAUSAL, sorted(pinned - PC._ENV_NOT_CAUSAL)
+
+
 # --------------------------------------------------------------------------- #
 # the store
 # --------------------------------------------------------------------------- #
@@ -349,6 +422,35 @@ def test_a_store_entry_is_whole_or_absent(tmp_path):
     assert record["files"]["clip"]["name"] == "shot_b001_role_engine.mp4"
     second = PC.commit(store, key, BODY, {"clip": str(_clip_file(tmp_path, b"other bytes"))})
     assert second == record, "a committed entry is never changed"
+
+
+def test_a_file_replaced_in_place_never_passes_as_the_one_it_replaced(tmp_path):
+    store, key = tmp_path / "store", "be" * 32
+    PC.commit(store, key, BODY, {"clip": str(_clip_file(tmp_path))})
+    assert PC.lookup(store, key) is not None
+    stored = store / key / "clip.mp4"
+    before = stored.stat()
+    stored.write_bytes(b"CLIP BYTES")                  # the same length, other bytes
+    os.utime(str(stored), ns=(before.st_atime_ns, before.st_mtime_ns))
+    with pytest.raises(PC.ClipStoreError, match="not the file its record names"):
+        PC.lookup(store, key)
+
+
+def test_a_record_keeps_files_never_paths(tmp_path):
+    store, key = tmp_path / "store", "ad" * 32
+    with pytest.raises(PC.ClipStoreError, match="names a path in its clip"):
+        PC.commit(store, key, dict(BODY, clip={"frame_count": 25, "path": "x.mp4"}),
+                  {"clip": str(_clip_file(tmp_path))})
+    PC.commit(store, key, BODY, {"clip": str(_clip_file(tmp_path))})
+    written = store / key / PC.RECORD_NAME
+    record = json.loads(written.read_text(encoding="utf-8"))
+    for clip, refusal in (({"frame_count": 25, "foley_path": str(tmp_path / "stem.wav")},
+                           "names a path in its clip"),
+                          ({"frame_count": 25, "foley_sha256": "0" * 64},
+                           "a foley receipt for a stem it does not list")):
+        written.write_text(json.dumps(dict(record, clip=clip)), encoding="utf-8")
+        with pytest.raises(PC.ClipStoreError, match=refusal):
+            PC.lookup(store, key)
 
 
 def test_a_tampered_entry_is_refused(tmp_path):

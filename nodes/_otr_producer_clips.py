@@ -20,16 +20,23 @@ the folder renamed into place: an entry named for its key is whole or absent.
 A committed entry is never changed; one that fails verification is moved
 aside, not overwritten.
 
-WHAT THE KEY DOES NOT SEE, honestly: an engine setting read from the
-environment at render time other than those the render driver hands
-:func:`clip_reuse_key`, and a model file an engine does not declare
-(``model_artifacts``). Swapping either under the same engine id and version
-calls for a new project.
+THE ENVIRONMENT IS IN THE KEY. Engines read their sampler settings -- steps,
+guidance, a negative prompt -- from ``OTR_`` settings at render time, outside
+the request, so every one of them enters the key (:func:`causal_env`) except
+those that cannot change a clip: the ones the pack itself writes while a
+prompt runs, credentials, and settings that only say where files live, how
+long to wait, how many calls run at once or what a call is expected to cost.
+
+WHAT THE KEY DOES NOT SEE, honestly: a setting outside the pack's ``OTR_``
+names, and a model file an engine does not declare (``model_artifacts``).
+Swapping either under the same engine id and version calls for a new
+project.
 
 Standard library only. UTF-8, no BOM.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -43,14 +50,16 @@ from typing import Any, Dict, Iterable, Optional
 
 try:
     from . import _otr_producer_direction as _PD
+    from ._otr_shared import env as otr_env
 except ImportError:  # pragma: no cover -- flat (sys.path) load
     import _otr_producer_direction as _PD  # type: ignore
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR.producer_clips")
 
 #: Bumped whenever what the key hashes changes, so a store entry is never found
 #: by a key that has come to mean something else.
-CLIP_KEY_VERSION = 1
+CLIP_KEY_VERSION = 2
 RECORD_VERSION = 1
 RECORD_NAME = "record.json"
 #: The video section's map from shot id to the record of the clip this
@@ -71,12 +80,26 @@ _PATH_FIELDS = {"clip": "path", "foley": "foley_path"}
 #: Request fields that never reach the pixels: the request's own name, the
 #: trace stamps, and the folder an engine writes its plate into.
 _NOT_CAUSAL = frozenset({"request_id", "observability", "plate_path"})
+#: ``OTR_`` settings that never change a clip's bytes. The pack writes the
+#: first four itself while a prompt runs -- the workflow validator's two
+#: exports, the output folder, the writer's style-grammar switch -- so they can
+#: differ between two runs of one project; the last two say where credentials
+#: are kept, and rotating a key must not film a project again.
+_ENV_NOT_CAUSAL = frozenset({
+    "OTR_ACTIVE_PROFILE", "OTR_SNAPSHOT_HASH", "OTR_OUTPUT_DIR", "OTR_ENABLE_STYLE_GRAMMAR",
+    "OTR_ALLOW_KEY_FILES", "OTR_API_KEY_PACK_ROOT"})
+#: Endings of ``OTR_`` settings that never change a clip's bytes: a credential,
+#: a place files live, how long to wait, how many calls run at once, and what a
+#: call is expected to cost.
+_ENV_NOT_CAUSAL_ENDINGS = ("_API_KEY", "_KEY_FILE", "_DIR", "_ROOT", "_ROOTS", "_PATH",
+                           "_TMP", "_CACHE", "_TIMEOUT", "_TIMEOUT_S", "_FANOUT",
+                           "_EST_USD", "_EST_USD_PER_S", "_PORT")
 _KEY_RE = re.compile(r"^[0-9a-f]{64}$")
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$")
 
 __all__ = ["CLIP_KEY_VERSION", "FLOOR_KEY", "MAP_KEY", "ClipStoreError", "ProducerClips",
-           "clip_reuse_key", "commit", "file_sha256", "lookup", "request_projection",
-           "store_dir"]
+           "causal_env", "clip_reuse_key", "commit", "file_sha256", "lookup",
+           "request_projection", "store_dir"]
 
 
 class ClipStoreError(RuntimeError):
@@ -87,22 +110,11 @@ class ClipStoreError(RuntimeError):
 # the key
 # --------------------------------------------------------------------------- #
 
-_DIGESTS: Dict[tuple, str] = {}
-_DIGEST_LOCK = threading.Lock()
-
-
 def file_sha256(path: Any) -> Optional[str]:
-    """The sha256 of a file, computed once per process for each path, size and
-    modification time, or None when it cannot be read."""
-    try:
-        st = os.stat(str(path))
-    except OSError:
-        return None
-    memo = (os.path.abspath(str(path)), st.st_size, st.st_mtime_ns)
-    with _DIGEST_LOCK:
-        hit = _DIGESTS.get(memo)
-    if hit:
-        return hit
+    """The sha256 of a file's bytes, read in full on every call, or None when it
+    cannot be read. Never remembered: a file replaced in place by another of
+    the same size, its modification time put back, must not pass as the file
+    it replaced."""
     digest = hashlib.sha256()
     try:
         with open(str(path), "rb") as fh:
@@ -110,10 +122,21 @@ def file_sha256(path: Any) -> Optional[str]:
                 digest.update(chunk)
     except OSError:
         return None
-    value = digest.hexdigest()
-    with _DIGEST_LOCK:
-        _DIGESTS[memo] = value
-    return value
+    return digest.hexdigest()
+
+
+def causal_env() -> Dict[str, str]:
+    """The pack's ``OTR_`` settings in the environment, as the key hashes them.
+
+    Engines read their own at render time, outside the request -- HuMo its
+    steps, guidance and negative prompt, LTX its sampler and schedule -- so all
+    of them enter the key, and a setting added tomorrow is in it the day it
+    lands. Left out: the names in :data:`_ENV_NOT_CAUSAL` and those ending as
+    :data:`_ENV_NOT_CAUSAL_ENDINGS` lists, none of which changes what a clip
+    shows."""
+    return {name: value for name, value in sorted(otr_env.snapshot().items())
+            if name.startswith("OTR_") and name not in _ENV_NOT_CAUSAL
+            and not name.endswith(_ENV_NOT_CAUSAL_ENDINGS)}
 
 
 def _as_file(value: Any) -> Any:
@@ -204,6 +227,14 @@ def _check_record(record: Any, where: str) -> Dict[str, Any]:
     if not isinstance(files, dict) or "clip" not in files:
         raise ClipStoreError("%s lists no clip file" % where)
     _check_files(files, where)
+    if set(record["clip"]) & set(_PATH_FIELDS.values()):
+        raise ClipStoreError("%s names a path in its clip: a record keeps files, not paths"
+                             % where)
+    # The mux finds a beat's foley bed by its stem: a receipt for a stem the
+    # record does not list would drop the bed without a word.
+    foley_sha = record["clip"].get("foley_sha256")
+    if foley_sha and (files.get("foley") or {}).get("sha256") != foley_sha:
+        raise ClipStoreError("%s carries a foley receipt for a stem it does not list" % where)
     return record
 
 
@@ -214,8 +245,12 @@ def _check_floor(record: Any, where: str) -> Dict[str, Any]:
         raise ClipStoreError("%s is not a version-%d floor" % (where, RECORD_VERSION))
     if not isinstance(record.get("marks"), dict) or not isinstance(record.get("files"), dict):
         raise ClipStoreError("%s carries no floor marks" % where)
-    if record["files"] and not isinstance(record.get("clip"), dict):
+    clip = record.get("clip")
+    if record["files"] and not isinstance(clip, dict):
         raise ClipStoreError("%s lists a file but no clip" % where)
+    if isinstance(clip, dict) and set(clip) & set(_PATH_FIELDS.values()):
+        raise ClipStoreError("%s names a path in its clip: a floor keeps files, not paths"
+                             % where)
     _check_files(record["files"], where)
     return record
 
@@ -421,7 +456,7 @@ class ProducerClips:
             paths = self._bundle_paths(floor["files"])
         except ClipStoreError as exc:
             raise ClipStoreError("card %s keeps its floor, but %s" % (shot_id, exc)) from None
-        clip = dict(floor.get("clip") or {})
+        clip = copy.deepcopy(floor["clip"]) if isinstance(floor.get("clip"), dict) else {}
         for role, path in paths.items():
             clip[_PATH_FIELDS[role]] = str(path)
         with self._lock:
@@ -468,7 +503,9 @@ class ProducerClips:
 
     def _take(self, shot_id: str, record: Dict[str, Any], paths: Dict[str, Path],
               source: str) -> Dict[str, Any]:
-        clip = dict(record["clip"])
+        # A copy all the way down: the run marks the receipts on the clip it
+        # hands back, and the record rides on into the next bundle as filmed.
+        clip = copy.deepcopy(record["clip"])
         for role, path in paths.items():
             clip[_PATH_FIELDS[role]] = str(path)
         with self._lock:

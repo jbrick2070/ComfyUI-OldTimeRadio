@@ -4402,8 +4402,10 @@ def _producer_clip_key(shot, requests, profile):
     """A shot's causal clip key (``_otr_producer_clips.clip_reuse_key``): its
     requests as built, its coverage plan, its engine as registered -- id,
     versions, recipe and any model files it declares -- the episode's render
-    policy, and the environment settings that change a clip's bytes outside
-    the request (the fear cape on chained beats, the foley join duck)."""
+    policy, the settings this driver applies outside the request (the fear
+    cape on chained beats, the foley join duck) as it resolves them, and every
+    pack setting in the environment an engine may read at render time
+    (``_otr_producer_clips.causal_env``)."""
     try:
         from . import foley_stems as _foley  # type: ignore
         from . import wrapper_bridge as _wb2  # type: ignore
@@ -4432,10 +4434,12 @@ def _producer_clip_key(shot, requests, profile):
                                               or ""),
                 "recipe": str(recipe) if recipe is not None else None,
                 "model_artifacts": artifacts}
+    clips_module = _producer_clips_module()
     settings = {"fear_cape": bool(_wb2.fear_cape_enabled()),
                 "fear_cape_min_segments": int(_wb2.fear_cape_min_segments()),
-                "foley_join_soften_ms": int(_foley.foley_join_soften_ms())}
-    return _producer_clips_module().clip_reuse_key(
+                "foley_join_soften_ms": int(_foley.foley_join_soften_ms()),
+                "env": clips_module.causal_env()}
+    return clips_module.clip_reuse_key(
         shot_id=str(shot.get("shot_id") or ""), requests=requests,
         coverage_plan=shot.get("coverage_plan"), engine=identity,
         render_policy=dict(profile or {}), settings=settings)
@@ -4445,18 +4449,41 @@ def _reuse_filmed_clip(reuse, shot, requests, profile):
     """The clip a Scene Producer run already filmed for this shot under its
     causal key, as :func:`render_shot` returns one -- or None, and the shot
     renders. Called once the shot's requests are built, before any weights
-    load or any provider is called."""
+    load or any provider is called.
+
+    Its VRAM peak is the one measured when it was filmed, so the credits name
+    what the episode took even when a run films nothing; its receipts say
+    where it came from (:func:`_mark_reused_receipts`)."""
     sid = str(shot.get("shot_id") or "")
     key = _producer_clip_key(shot, requests, profile)
     found = reuse.find(sid, key)
     if found is None:
         return None
+    source = reuse.reused.get(sid, "?")
     _LOG.warning("[OTR video] REUSED shot %s: filmed before under key %s, taken from "
-                 "the %s, not rendered", sid, key[:12], reuse.reused.get(sid, "?"))
+                 "the %s, not rendered", sid, key[:12], source)
+    clip = found["clip"]
+    _mark_reused_receipts(clip, source)
+    peak = clip.get("vram_peak_mb")
+    used = (int(peak) if isinstance(peak, (int, float)) and not isinstance(peak, bool)
+            and math.isfinite(peak) else None)
     # A kept FLOOR stays visibly a floor: it carries back the marks it fell
     # with, and nothing else a replayed row might have.
     out_shot = dict(_rendered_shot(shot), **found.get("marks", {}))
-    return found["clip"], out_shot, list(found["attempts"]), None
+    return clip, out_shot, list(found["attempts"]), used
+
+
+def _mark_reused_receipts(clip, source):
+    """Mark each receipt a reused clip carries -- its own, and each segment's
+    -- with where it came from: the run's render trace lists them, and must
+    never claim a render this run did not do. Outside the causal fields, so
+    every receipt still recomputes its ``actual_request_sha``."""
+    rows = [clip.get("receipt")] + list(clip.get("receipts") or ())
+    rows += [seg.get("receipt") for seg in clip.get("segments") or ()
+             if isinstance(seg, dict)]
+    for row in rows:
+        if isinstance(row, dict):
+            row["reused_from"] = source
 
 
 def _producer_floor(producer, row, clip):
