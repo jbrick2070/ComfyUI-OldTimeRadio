@@ -282,27 +282,34 @@ def _capped(text: str) -> str:
 
 
 def key_body_diff(old: Any, new: Any, limit: int = 40) -> list:
-    """The dotted paths at which two causal bodies differ, at most ``limit``
-    of them. Iterative and bounded: a deep or wide body never raises and
-    never walks past the limit (Codex QA on daa7adce). Scalars compare as
-    their JSON text, so an unchanged NaN is unchanged."""
+    """The dotted paths at which two causal bodies differ, in ascending order
+    of path, at most ``limit`` of them. Iterative and bounded: a deep or wide
+    body never raises and never walks past the limit (Codex QA on daa7adce).
+    Scalars compare as their JSON text, so an unchanged NaN is unchanged."""
     out: list = []
-    work = [(old, new, "")]
+    work: list = [("diff", old, new, "")]
     while work and len(out) < limit:
-        a, b, at = work.pop()
+        item = work.pop()
+        if item[0] == "emit":
+            out.append(item[1])
+            continue
+        _kind, a, b, at = item
         if isinstance(a, dict) and isinstance(b, dict):
-            for name in sorted(set(a) | set(b), reverse=True):
+            steps: list = []
+            for name in sorted(set(a) | set(b)):
                 here = "%s.%s" % (at, name) if at else str(name)
                 if name not in a or name not in b:
-                    if len(out) < limit:
-                        out.append(here + (" (new)" if name not in a else " (gone)"))
+                    steps.append(("emit", here + (" (new)" if name not in a else " (gone)")))
                 else:
-                    work.append((a[name], b[name], here))
+                    steps.append(("diff", a[name], b[name], here))
+            work.extend(reversed(steps))
         elif isinstance(a, list) and isinstance(b, list):
+            steps = []
             if len(a) != len(b):
-                out.append("%s (%d -> %d items)" % (at, len(a), len(b)))
-            for i in range(min(len(a), len(b)) - 1, -1, -1):
-                work.append((a[i], b[i], "%s[%d]" % (at, i)))
+                steps.append(("emit", "%s (%d -> %d items)" % (at, len(a), len(b))))
+            for i in range(min(len(a), len(b))):
+                steps.append(("diff", a[i], b[i], "%s[%d]" % (at, i)))
+            work.extend(reversed(steps))
         elif _scalar_text(a) != _scalar_text(b):
             out.append("%s (%s -> %s)" % (at, _short(a), _short(b)))
     return out[:limit]
@@ -643,9 +650,10 @@ class ProducerClips:
         old = previous.get("key_body")
         if isinstance(old, dict):
             moved = key_body_diff(old, body)
+            count = "%d+" % len(moved) if len(moved) >= 40 else str(len(moved))
             log.warning("[OTR.producer_clips] shot %s NOT reused: filmed before under key "
-                        "%s; this run's key %s differs in %d place(s): %s",
-                        shot_id, str(previous.get("key", ""))[:12], key[:12], len(moved),
+                        "%s; this run's key %s differs in %s place(s): %s",
+                        shot_id, str(previous.get("key", ""))[:12], key[:12], count,
                         "; ".join(moved) or "nothing the body shows (a non-JSON value?)")
             return
         text = json.dumps(body, sort_keys=True, ensure_ascii=True, default=str)

@@ -311,6 +311,56 @@ def test_the_key_and_body_come_from_one_projection_and_the_body_is_bounded():
     assert len(json.dumps(body)) < 1500
 
 
+def test_the_key_is_a_literal_hash_so_a_change_to_it_cannot_slip_by():
+    """The key is the sha256 of the raw body, sorted, compact, ASCII. A change
+    to that re-films every cached shot in every store, so it is pinned to a
+    literal, never to clip_reuse_key itself (Sonnet QA on 0484aeae)."""
+    kw = dict(shot_id="shot_x", requests=[{"text_prompt": "a lamp", "frames": (1, 2),
+                                           "request_id": "r"}],
+              coverage_plan={"join": "chain"}, engine={"engine_id": "stub"},
+              render_policy={"device": "cuda"}, settings={"env": {"OTR_A": "1"}})
+    assert PC.CLIP_KEY_VERSION == 2
+    assert PC.clip_reuse_key(**kw) == "dbed724009153650a9a08e792518ce04d208e23a50ef7da9c7d5580145fdef57"
+    assert PC.clip_key_and_body(**kw)[0] == "dbed724009153650a9a08e792518ce04d208e23a50ef7da9c7d5580145fdef57"
+
+
+def test_a_string_is_kept_at_the_cap_and_hashed_one_past_it():
+    kept, hashed = "x" * PC.BODY_STRING_CAP, "x" * (PC.BODY_STRING_CAP + 1)
+    body = PC.clip_key_and_body(shot_id="s", requests=[{"a": kept, "b": hashed}],
+                                coverage_plan=None, engine={}, render_policy={},
+                                settings={})[1]
+    assert body["requests"][0]["a"] == kept
+    assert body["requests"][0]["b"].startswith("sha256:") and "(1001 chars)" in body["requests"][0]["b"]
+
+
+def test_the_diff_limit_holds_on_every_branch_and_lists_in_ascending_order():
+    changed = {"k%03d" % i: i for i in range(1000)}
+    assert len(PC.key_body_diff(changed, {k: v + 1 for k, v in changed.items()})) == 40
+    assert len(PC.key_body_diff({"l": list(range(1000))}, {"l": list(range(1, 1001))})) == 40
+    assert PC.key_body_diff({"b": 1, "z": 1}, {"a": 0, "b": 2, "c": 0}) == [
+        "a (new)", "b (1 -> 2)", "c (new)", "z (gone)"]
+    assert PC.key_body_diff({}, changed)[:2] == ["k000 (new)", "k001 (new)"]
+
+
+def test_a_failing_explanation_never_fails_the_run(producer_root, cameras, tmp_path,
+                                                    monkeypatch, caplog):
+    import logging
+    camera = cameras()
+    first, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a"))
+
+    def broken(*_args, **_kw):
+        raise RuntimeError("diff exploded")
+
+    monkeypatch.setattr(PC, "key_body_diff", broken)
+    with caplog.at_level(logging.WARNING, logger=PC.log.name):
+        _again, filmed, _producer = _film(camera, _workspace(
+            tmp_path, "ep_b", prompts={"shot_b002": "a window lashed by a storm"}),
+            bundle_map=_map(first))
+    assert filmed == ["shot_b002"]
+    assert any("the explanation failed (RuntimeError: diff exploded)" in r.getMessage()
+               for r in caplog.records)
+
+
 def test_the_body_diff_is_bounded_iterative_and_nan_safe():
     wide = {"k%d" % i: i for i in range(1000)}
     assert len(PC.key_body_diff({}, wide)) == 40
