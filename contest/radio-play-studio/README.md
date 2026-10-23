@@ -41,7 +41,9 @@ episode. The app makes no Comfy Router or Comfy Cloud calls and holds no API key
 - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) v0.42.0 or newer running on your machine
   (FLUX 3 Klein's text encoder needs a recent core), with the **Old-Time Radio** pack installed
   (`git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio` into `custom_nodes/`; the app is
-  built and tested against `main`, and the registry listing `comfyui-old-time-radio` can lag it). One node pack;
+  built and tested against `main`. The pack carries this app from 2.3.37 on, so a ComfyUI Manager
+  install of `comfyui-old-time-radio` has it once the registry serves 2.3.37 or newer; the registry
+  can serve an older version, and a clone is the sure path). One node pack;
   every model downloads itself from public, ungated repos with no Hugging Face token -- the
   writer and still models at pinned revisions, the rest checked against their published SHA-256.
 - By default, an NVIDIA card with 16 GB. Other cards run one of the pack's other workflows (see
@@ -64,7 +66,10 @@ set COMFYUI_DIR=C:\path\to\ComfyUI
 python -m radio_play_studio ... --workflow C:\path\to\otr_16gb_foley_open.json
 ```
 
-(Run from a checkout of the pack and it finds `workflows/otr_16gb_foley_open.json` itself.)
+(Run from inside the pack, a clone or a Manager install, and it finds
+`workflows/otr_16gb_foley_open.json` itself. `COMFYUI_DIR` looks for the pack under either folder
+name: `custom_nodes/ComfyUI-OldTimeRadio` for a clone, `custom_nodes/comfyui-old-time-radio` for a
+Manager install.)
 
 ## Run
 

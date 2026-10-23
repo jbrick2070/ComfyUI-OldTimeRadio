@@ -32,7 +32,9 @@ def reference_twin(workflow_path: Path) -> Path:
     """``workflows/x.json`` -> ``workflows/x_flux3_ref.json`` (it may not exist)."""
     path = Path(workflow_path)
     return path.with_name(path.stem + REFERENCE_TWIN_SUFFIX + path.suffix)
-PACK_DIR_NAME = "ComfyUI-OldTimeRadio"
+#: The pack's folder under custom_nodes/: a git clone takes the repository's name,
+#: a registry install (ComfyUI Manager, comfy-cli) takes the node id.
+PACK_DIR_NAMES = ("ComfyUI-OldTimeRadio", "comfyui-old-time-radio")
 
 
 class WorkflowNotFound(FileNotFoundError):
@@ -75,8 +77,9 @@ def _configured_workflow_sources() -> list:
         sources.append(("OTR_PACK_DIR", Path(pack_dir).expanduser() / "workflows" / WORKFLOW_NAME))
     comfy_dir = os.environ.get("COMFYUI_DIR", "").strip()
     if comfy_dir:
-        sources.append(("COMFYUI_DIR", Path(comfy_dir).expanduser() / "custom_nodes" / PACK_DIR_NAME
-                        / "workflows" / WORKFLOW_NAME))
+        candidates = [Path(comfy_dir).expanduser() / "custom_nodes" / name / "workflows" / WORKFLOW_NAME
+                      for name in PACK_DIR_NAMES]
+        sources.append(("COMFYUI_DIR", next((p for p in candidates if p.is_file()), candidates[0])))
     return sources
 
 
@@ -101,7 +104,7 @@ def find_workflow(explicit: str | None = None) -> Path:
     raise WorkflowNotFound(
         "could not find %s. Set OTR_PACK_DIR to the Old-Time Radio pack folder "
         "(custom_nodes/%s), or COMFYUI_DIR to your ComfyUI folder, or pass --workflow."
-        % (WORKFLOW_NAME, PACK_DIR_NAME)
+        % (WORKFLOW_NAME, " or custom_nodes/".join(PACK_DIR_NAMES))
     )
 
 

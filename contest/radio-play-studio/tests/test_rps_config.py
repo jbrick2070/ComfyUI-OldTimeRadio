@@ -43,6 +43,16 @@ def test_a_workflow_named_by_the_person_must_exist(monkeypatch, tmp_path):
         monkeypatch.delenv(var)
 
 
+@pytest.mark.parametrize("folder", ["ComfyUI-OldTimeRadio", "comfyui-old-time-radio"])
+def test_comfyui_dir_finds_a_git_clone_and_a_registry_install(monkeypatch, tmp_path, folder):
+    """A registry install lands in custom_nodes/<node id>, a git clone under the repository's name."""
+    target = tmp_path / "custom_nodes" / folder / "workflows" / config.WORKFLOW_NAME
+    target.parent.mkdir(parents=True)
+    target.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("COMFYUI_DIR", str(tmp_path))
+    assert find_workflow() == target
+
+
 def test_a_configured_pack_dir_wins_over_the_checkout(monkeypatch, tmp_path):
     (tmp_path / "workflows").mkdir()
     target = tmp_path / "workflows" / config.WORKFLOW_NAME

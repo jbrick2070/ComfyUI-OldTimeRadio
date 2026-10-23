@@ -69,3 +69,14 @@ def test_the_app_experiment_is_the_only_exception():
     app = [f for f in findings if f["file"].startswith(SHIPPED_APP)]
     assert all(f["rule"] in {"$env_read/mod", "$http2", "$socket2"} for f in app), app
     assert len(app) <= 10, "the app grew new scan findings; respell nothing, decide first"
+
+
+def test_only_the_app_itself_ships_from_contest():
+    """.comfyignore keeps contest/ out by listing what not to ship, so a new folder
+    or a media file added beside the app would ship without anyone deciding it."""
+    app_dir = "contest/radio-play-studio/"
+    top = {app_dir + name for name in ("LICENSE", "README.md", "requirements.txt")}
+    extra = sorted(p for p in _oracle()._shipped_files(False) if p.startswith("contest/")
+                   and p not in top
+                   and not (p.startswith(SHIPPED_APP) and Path(p).suffix in {".py", ".html", ".json"}))
+    assert extra == [], "these would ship from contest/; decide, then list them here or ignore them"
