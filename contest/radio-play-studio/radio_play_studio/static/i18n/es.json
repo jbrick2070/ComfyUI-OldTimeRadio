@@ -106,6 +106,7 @@
  "stage.publish_ready": "listo para publicar",
  "stage.publish_done": "publicado",
  "board.cast": "Reparto",
+ "board.rail": "Etapas y reparto",
  "board.cast_help": "Un retrato nuevo vuelve a pintar todas las tomas de ese personaje, salvo las conservadas, así que prueba primero con las tomas.",
  "board.paint_again": "Pintar de nuevo",
  "badge.repaint": "Por pintar de nuevo",

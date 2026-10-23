@@ -106,6 +106,7 @@
  "stage.publish_ready": "ready to publish",
  "stage.publish_done": "published",
  "board.cast": "Cast",
+ "board.rail": "Stages and cast",
  "board.cast_help": "A new portrait repaints every shot that character is in, except the kept ones, so try the shots first.",
  "board.paint_again": "Paint again",
  "badge.repaint": "To paint again",

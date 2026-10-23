@@ -106,6 +106,7 @@
  "stage.publish_ready": "可以發布",
  "stage.publish_done": "已發布",
  "board.cast": "角色",
+ "board.rail": "階段與角色",
  "board.cast_help": "新的肖像會重畫該角色出現的每個鏡頭（保留的除外），所以先試鏡頭。",
  "board.paint_again": "重畫",
  "badge.repaint": "待重畫",

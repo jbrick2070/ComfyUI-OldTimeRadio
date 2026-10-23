@@ -106,6 +106,7 @@
  "stage.publish_ready": "公開できます",
  "stage.publish_done": "公開済み",
  "board.cast": "キャスト",
+ "board.rail": "工程とキャスト",
  "board.cast_help": "新しい肖像を描くと、そのキャラクターが出るショットをすべて描き直します(残したものを除く)。先にショットを試してください。",
  "board.paint_again": "描き直す",
  "badge.repaint": "描き直し待ち",

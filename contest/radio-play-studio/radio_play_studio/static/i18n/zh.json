@@ -106,6 +106,7 @@
  "stage.publish_ready": "可以发布",
  "stage.publish_done": "已发布",
  "board.cast": "角色",
+ "board.rail": "阶段与角色",
  "board.cast_help": "新的肖像会重画该角色出现的每个镜头（保留的除外），所以先试镜头。",
  "board.paint_again": "重画",
  "badge.repaint": "待重画",

@@ -106,6 +106,7 @@
  "stage.publish_ready": "प्रकाशन के लिए तैयार",
  "stage.publish_done": "प्रकाशित",
  "board.cast": "पात्र",
+ "board.rail": "चरण और पात्र",
  "board.cast_help": "नया चित्र उस पात्र के हर शॉट को फिर से बनाता है, रखे गए शॉट्स को छोड़कर, इसलिए पहले शॉट्स आज़माइए।",
  "board.paint_again": "फिर से बनाइए",
  "badge.repaint": "फिर से बनाना है",

@@ -106,6 +106,7 @@
  "stage.publish_ready": "prêt à publier",
  "stage.publish_done": "publié",
  "board.cast": "Distribution",
+ "board.rail": "Étapes et distribution",
  "board.cast_help": "Un nouveau portrait repeint tous les plans de ce personnage, sauf ceux gardés : essayez donc d'abord les plans.",
  "board.paint_again": "Repeindre",
  "badge.repaint": "À repeindre",

@@ -11,7 +11,7 @@
   :root {
     color-scheme: light dark;
     --bg: #f4efe6; --panel: #fffdf8; --strip: #ece4d6; --ink: #2a2118; --muted: #6f6254;
-    --line: #d9ccb8; --field-line: #9a8a72; --accent: #b4491f; --accent-ink: #fff8f0;
+    --line: #d9ccb8; --field-line: #948470; --accent: #b4491f; --accent-ink: #fff8f0;
     --ok: #2f6b3a; --bad: #a3261a; --bar: #e5d9c5; --kept: #70644f;
     --lamp: #8a5200; --lamp-glow: transparent; --focus: #8a5200;
     --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Noto Serif", serif;
@@ -38,7 +38,7 @@
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
   /* ---- masthead ---- */
-  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 6px; letter-spacing: .01em; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 6px; }
   .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .tag { color: var(--muted); margin: 0 0 24px; max-width: 40rem; }
   #lang { width: auto; max-width: 12rem; min-height: 44px; padding: 6px 10px; font: .9rem var(--sans); }
@@ -109,15 +109,15 @@
   #run { max-width: 760px; margin-top: 18px; }
   #bar, .bar { height: 8px; background: var(--bar); border-radius: 4px; overflow: hidden; margin: 12px 0 6px; }
   #fill, .fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
-  #status { color: var(--muted); min-height: 1.5em; font-family: var(--sans); }
+  #status { color: var(--muted); min-height: 1.5em; font-family: var(--sans); font-variant-numeric: tabular-nums; }
   /* While the episode is being made, its lamp is lit beside the status line. */
-  #run:has(#result[hidden]):has(#error[hidden]) #status::before {
+  #run:has(#result[hidden]):has(#error[hidden]) #status:not(:empty)::before {
     content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 10px; vertical-align: -1px;
     border-radius: 50%; background: var(--lamp); box-shadow: 0 0 10px 2px var(--lamp-glow);
   }
 
   /* ---- the board: the folded form, then a rail and the stage floor ---- */
-  .summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  .summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; max-width: 760px;
              border: 1px solid var(--line); background: var(--panel); border-radius: 12px;
              padding: 12px 16px; margin: 0 0 18px; }
   .summary strong { font: 600 1.1rem var(--serif); }
@@ -149,8 +149,9 @@
   .stage span { color: var(--muted); font: .82rem/1.35 var(--mono); font-variant-numeric: tabular-nums;
                 overflow-wrap: anywhere; }
   .stage.done::before { content: "\2713"; background: var(--accent); border-color: var(--accent); }
-  .stage.on::before { content: ""; background: var(--lamp); border-color: var(--lamp);
-                      box-shadow: 0 0 0 3px var(--panel), 0 0 16px 4px var(--lamp-glow); }
+  .stage.on::before { content: ""; border-color: var(--lamp);
+                      background: radial-gradient(circle, var(--lamp) 0 42%, transparent 46%);
+                      box-shadow: 0 0 16px 4px var(--lamp-glow); }
   @media (prefers-reduced-motion: no-preference) {
     .stage.on::before { animation: lamp 2.4s ease-in-out infinite; }
     /* A held run is lit but steady: nothing is moving until it is looked at again. */
@@ -161,7 +162,8 @@
     .stage { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
     .stage::before { grid-row: auto; justify-self: start; }
   }
-  #pstatus { color: var(--muted); min-height: 1.5em; margin: 10px 0 0; font-family: var(--sans); font-size: .9rem; }
+  #pstatus { color: var(--muted); min-height: 1.5em; margin: 10px 0 0; font-family: var(--sans); font-size: .9rem;
+             font-variant-numeric: tabular-nums; }
   .rail .bar { margin: 14px 0 4px; }
 
   /* The cast: square portraits in a mat. */
@@ -191,7 +193,7 @@
   details[open].scene > summary::before { content: "\25BE"; }
   details.scene > summary b { font: 600 1.1rem var(--serif); }
   details.scene > summary .count { color: var(--muted); font: .85rem var(--mono); font-variant-numeric: tabular-nums; }
-  .flag { font: 600 .78rem var(--sans); padding: 2px 9px; border-radius: 10px; border: 1px solid var(--line);
+  .flag { font: 600 .78rem var(--sans); font-variant-numeric: tabular-nums; padding: 2px 9px; border-radius: 10px; border: 1px solid var(--line);
           color: var(--muted); background: var(--panel); }
   .flag.changed { border-color: var(--accent); color: var(--accent); }
   .flag.failed { border-color: var(--bad); color: var(--bad); }
@@ -205,6 +207,7 @@
   /* A shot card: the still, the script, the three presses. Layout follows the card's own width. */
   .shot { border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; padding: 12px;
           background: var(--bg); display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .shot > .tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   @container (min-width: 480px) {
     .shot { grid-template-columns: 176px minmax(0, 1fr); }
     .shot > .tools { grid-column: 2; }
@@ -240,9 +243,9 @@
   .shot label { margin: 8px 0 3px; font-size: .85rem; }
   .shot textarea { min-height: 52px; font: .95rem/1.45 var(--sans); }
   .shot textarea.dirty { border-color: var(--accent); }
-  .shot > .tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .why { color: var(--ink); font: .92rem var(--serif); margin: 8px 0 0; padding-left: 10px;
-         border-left: 3px solid var(--bad); }
+         border-left: 3px solid var(--field-line); }
+  .shot.failed .why { border-left-color: var(--bad); }
 
   /* The console: the presses and why one is off, stuck to the bottom of the window. */
   .actions { position: sticky; bottom: 0; z-index: 2; background: var(--panel); margin-top: 16px;
@@ -254,7 +257,8 @@
   /* The press that can be made now is the one that looks like a press. */
   .actions #b_stills:enabled, .actions #b_video:enabled, .actions #b_publish:enabled {
     background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  .actions .hint, .actions .error, .actions .help { font: .875rem/1.4 var(--sans); flex-basis: 100%; }
+  .actions .hint, .actions .error { font: .875rem/1.4 var(--sans); flex-basis: 100%; }
+  .actions .help { font: .8rem/1.4 var(--sans); }
   .actions .hint { color: var(--muted); }
   #saved.error { color: var(--bad); }
   @media (max-height: 520px) { .actions { position: static; } }
@@ -267,14 +271,16 @@
     .actions { padding: 10px 12px; gap: 8px; border-radius: 10px 10px 0 0; }
     .actions button { flex: 1 1 auto; padding: 8px 12px; font-size: .95rem; }
     /* Only the press that can be made now; the line beside it says why the others are off. */
-    .actions #b_stills:disabled, .actions #b_video:disabled, .actions #b_publish:disabled { display: none; }
+    .actions:has(#b_stills:enabled, #b_video:enabled, #b_publish:enabled) #b_stills:disabled,
+    .actions:has(#b_stills:enabled, #b_video:enabled, #b_publish:enabled) #b_video:disabled,
+    .actions:has(#b_stills:enabled, #b_video:enabled, #b_publish:enabled) #b_publish:disabled { display: none; }
     .actions .hint { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   }
   @media (forced-colors: active) {
     .stage::before { border: 2px solid CanvasText; }
     .stage.done::before { background: CanvasText; color: Canvas; }
     .stage.on::before { background: Highlight; border-color: Highlight; }
-    #run:has(#result[hidden]):has(#error[hidden]) #status::before { background: Highlight; }
+    #run:has(#result[hidden]):has(#error[hidden]) #status:not(:empty)::before { background: Highlight; }
   }
 </style>
 </head>
@@ -313,7 +319,7 @@
        a direct child of #board, so it sticks to the bottom of the window across the board. -->
   <section id="board" hidden>
     <div class="board-grid">
-      <div class="rail">
+      <div class="rail" tabindex="0" data-i18n-aria-label="board.rail" data-fb-aria-label="Stages and cast">
         <div class="panel">
           <div class="stages">
             <!-- showStage() writes each stage's FIRST span; the lamp is the cell's ::before. -->
@@ -345,7 +351,7 @@
       <span class="hint" id="hint" role="status"></span>
       <!-- In the sticky bar, beside the buttons that raise it: never scrolled out of sight. -->
       <span class="error" id="perror" role="alert" hidden></span>
-      <span class="help" id="saved"></span>
+      <span class="help" id="saved" role="status"></span>
     </div>
   </section>
 </main>
@@ -946,6 +952,7 @@ const STAGE_TEXT = {
 // A look at a pending run names the stage it belongs to; any other is read as Stills.
 const stageText = (name) => STAGE_TEXT[name] || STAGE_TEXT.stills;
 let cardEls = {}, sceneEls = {}, personEls = {};
+let drawnFor = null;   // the project the board was last drawn for
 
 function folded(on) {
   $("form").hidden = $("gobar").hidden = on;
@@ -1120,8 +1127,11 @@ function counts() {
 
 function drawBoard() {
   summaryLine();
-  // The scenes the person had open stay open when the board is drawn again.
-  const wasOpen = new Set(Object.values(sceneEls).filter((s) => s.el.open).map((s) => s.scene.scene_id));
+  // The scenes the person had open stay open when the board is drawn again -- for
+  // the same project only: every project names its scenes "" and "s01".
+  const same = drawnFor === project.project_id;
+  const wasOpen = new Set(same ? Object.values(sceneEls).filter((s) => s.el.open).map((s) => s.scene.scene_id) : []);
+  drawnFor = project.project_id;
   cardEls = {}; sceneEls = {}; personEls = {};
   const view = shown();
   const row = $("castrow");

@@ -106,6 +106,7 @@
  "stage.publish_ready": "pronto para publicar",
  "stage.publish_done": "publicado",
  "board.cast": "Elenco",
+ "board.rail": "Etapas e elenco",
  "board.cast_help": "Um novo retrato repinta todas as tomadas desse personagem, exceto as mantidas, então experimente as tomadas primeiro.",
  "board.paint_again": "Pintar de novo",
  "badge.repaint": "A pintar de novo",

@@ -12,18 +12,22 @@ from html.parser import HTMLParser
 
 import pytest
 
+from radio_play_studio.form import FIELDS
 from radio_play_studio.server import I18N_DIR
 
 PAGE = I18N_DIR.parent / "index.html"
 TEXT = PAGE.read_text(encoding="utf-8")
 SCRIPT = TEXT[TEXT.index("<script>"):]
+#: The script with its comments taken out, so a contract cannot be met by a comment.
+CODE = "\n".join(line.split("//", 1)[0] for line in SCRIPT.splitlines())
 CODES = sorted(p.stem for p in I18N_DIR.glob("*.json"))
 
 
 class _Tree(HTMLParser):
     """Every element of the static markup: tag, id, class, parent index."""
 
-    VOID = {"meta", "link", "br", "img", "input", "hr", "source"}
+    VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
+            "source", "track", "wbr"}
 
     def __init__(self):
         super().__init__()
@@ -32,10 +36,14 @@ class _Tree(HTMLParser):
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
         node = {"tag": tag, "id": a.get("id"), "class": (a.get("class") or "").split(),
-                "attrs": a, "parent": self._stack[-1] if self._stack else None}
+                "attrs": a, "parent": self._stack[-1] if self._stack else None, "text": ""}
         self.nodes.append(node)
         if tag not in self.VOID:
             self._stack.append(len(self.nodes) - 1)
+
+    def handle_data(self, data):
+        if self._stack and data.strip():
+            self.nodes[self._stack[-1]]["text"] += data.strip()
 
     def handle_endtag(self, tag):
         if tag in self.VOID:
@@ -67,6 +75,12 @@ def _ancestors(index):
     return out
 
 
+def test_the_page_puts_nothing_in_a_template():
+    """A <template>'s content is not part of the live page; the ancestry checks
+    below would read it as if it were."""
+    assert all(n["tag"] != "template" for n in NODES)
+
+
 def test_every_static_id_is_unique():
     ids = [n["id"] for n in NODES if n["id"]]
     assert len(ids) == len(set(ids)), sorted({i for i in ids if ids.count(i) > 1})
@@ -75,10 +89,11 @@ def test_every_static_id_is_unique():
 def test_every_id_the_script_reads_by_name_exists():
     """A literal $("id") in the script is in the static markup, or the script
     makes it (an id assigned in the script itself)."""
-    read = set(re.findall(r'\$\("([a-z_0-9]+)"\)', SCRIPT))
-    made = set(re.findall(r'\.id = "([a-z_0-9]+)"', SCRIPT))
-    prefixed = ("f_", "mode_", "row_", "group_", "note_", "stage_")
-    missing = sorted(i for i in read - set(BY_ID) - made if not i.startswith(prefixed))
+    read = set(re.findall(r'\$\("([a-z_0-9]+)"\)', CODE))
+    made = set(re.findall(r'\.id = "([a-z_0-9]+)"', CODE))
+    # Ids the script makes from parts: a field's control is "f_" + its key.
+    made |= {"f_" + f.key for f in FIELDS} | {"mode_classic", "mode_own"}
+    missing = sorted(read - set(BY_ID) - made)
     assert missing == []
     for name in ("stills", "video", "publish"):
         assert "stage_" + name in BY_ID
@@ -119,8 +134,10 @@ def test_the_console_is_the_last_child_of_the_board_and_never_in_its_grid():
 def test_the_board_is_not_one_live_region():
     """refreshBoard() rewrites every badge on each keystroke; the announcements
     come from the status lines and the error alone."""
-    assert "aria-live" not in NODES[BY_ID["board"]]["attrs"]
+    board = NODES[BY_ID["board"]]["attrs"]
+    assert "aria-live" not in board and board.get("role") not in ("status", "alert", "log")
     assert NODES[BY_ID["pstatus"]]["attrs"].get("role") == "status"
+    assert NODES[BY_ID["saved"]]["attrs"].get("role") == "status"
     assert NODES[BY_ID["hint"]]["attrs"].get("role") == "status"
     assert NODES[BY_ID["perror"]]["attrs"].get("role") == "alert"
 
@@ -130,12 +147,23 @@ def test_script_owned_containers_hold_no_static_children():
     put inside one would vanish on the first draw."""
     for owner in ("form", "result", "published", "projects", "summary_text", "castrow", "scenes", "hint"):
         assert _children(BY_ID[owner]) == [], owner
+        assert NODES[BY_ID[owner]]["text"] == "", owner
 
 
 def test_the_shot_card_puts_its_presses_beside_the_still_and_the_script():
     """The presses are the card's third child, so a wide card can give them a column."""
-    assert "el.append(still, body, tools);" in SCRIPT
-    assert "body.append(why, tools)" not in SCRIPT
+    assert "el.append(still, body, tools);" in CODE
+    assert "body.append(why, tools)" not in CODE
+
+
+def test_the_rail_is_reachable_by_keyboard_and_named_in_every_language():
+    """The rail scrolls on its own on a short window: it takes focus, and its
+    name comes from the language files."""
+    rail = next(n for n in NODES if "rail" in n["class"])
+    assert rail["attrs"].get("tabindex") == "0"
+    key = rail["attrs"].get("data-i18n-aria-label")
+    for code in CODES:
+        assert json.loads((I18N_DIR / f"{code}.json").read_text(encoding="utf-8")).get(key), code
 
 
 @pytest.mark.parametrize("code", CODES)
