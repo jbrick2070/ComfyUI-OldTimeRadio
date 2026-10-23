@@ -35,8 +35,10 @@ time carries the cold start; compare it across rounds with that in mind.
 | `otr_16gb_low` | 353 | 119.6 | 3.0 |
 | `otr_16gb_still` | 1,543 | 181.7 | 8.5 |
 | `otr_16gb_video` | 8,849 | 173.2 | 51.1 |
-| `otr_16gb_foley` | running when the round was paused | | |
+| `otr_16gb_foley` | 12,090 | 186.2 | 64.9 |
 
-Paused by the operator after `otr_16gb_foley`; not run this round: `otr_16gb_foley_open`,
+`otr_16gb_foley` finished after the harness was stopped; its time is submit (12:27:13) to
+published (15:48:43), read from ComfyUI's history and the file. Paused by the operator after
+it; not run this round: `otr_16gb_foley_open`,
 `otr_16gb_mime`, `otr_16gb_animatediff`, `otr_16gb_foley_flux3_ref`,
 `otr_16gb_foley_open_flux3_ref`.
