@@ -214,7 +214,8 @@ def test_a_file_that_exists_under_a_bad_name_is_never_served(app, tmp_path, monk
 
 def test_every_choice_a_translated_dropdown_offers_has_its_words(schemas):
     """The page builds these keys from the choice itself, so the literal-key
-    test above cannot see them (Codex QA, 2026-10-23: the still models had none)."""
+    test above cannot see them (Codex QA, 2026-10-23: the still models had none).
+    A visual style keeps the pack's own name: only its roll entry is worded."""
     from radio_play_studio.form import describe_form
     rows = {r["key"]: r for r in describe_form(schemas)}
     missing = [f"choice.{key}.{_slug(c)}" for key in ("bank", "language", "stills")

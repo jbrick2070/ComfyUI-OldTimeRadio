@@ -328,6 +328,21 @@ def test_a_replay_carries_only_what_differs_from_the_bundle_shown():
         producer.build_direction(project, "stills")
 
 
+def test_an_edit_of_spaces_alone_is_no_edit_as_node_63_reads_it():
+    # Codex QA, 2026-10-23: node 63 composes the stripped texts, so padding a
+    # text with spaces paints the same pixels; Studio must not hold Video for it.
+    project = _shown()
+    project["draft"]["cards"] = {"shot_b001": {"picture_text": "  " + TEXTS["shot_b001"] + "\n",
+                                               "motion_text": " turns to the door "}}
+    project["draft"]["scenes"] = {"scene_1": {"note": "rain  "}}
+    assert producer.unpainted(project) == []
+    direction = producer.build_direction(project, "video")
+    assert (direction["cards"], direction["scenes"]) == ({}, {})
+    project["draft"]["cards"]["shot_b001"]["picture_text"] = "\x85\x1c"   # blank to Python
+    with pytest.raises(producer.ProjectError, match="shot_b001 has no picture text"):
+        producer.build_direction(project, "stills")
+
+
 def test_a_new_portrait_waits_for_a_stills_run_whether_or_not_a_still_names_it():
     # Codex QA, 2026-10-23: no card's still names c1, so only the portrait
     # shows the take; node 63 refuses Video until a Stills run paints it.

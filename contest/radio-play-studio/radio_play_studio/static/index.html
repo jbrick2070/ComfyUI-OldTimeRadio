@@ -773,7 +773,9 @@ function showVideo(box, run, file) {
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  go.disabled = $("direct").disabled = true;
+  // Busy from the press: a board opened while the request is on its way
+  // must not turn anything back on (Sonnet QA, 2026-10-23).
+  running = true; buttons(); refreshBoard();
   $("run").hidden = false; $("error").hidden = true; $("result").hidden = true;
   $("fill").style.width = "0"; say($("status"), "status.checking");
   try {
@@ -784,11 +786,11 @@ form.addEventListener("submit", async (e) => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
     history.replaceState(null, "", "#run=" + body.id);   // a reload picks it back up
-    running = true;
     watch(body.id);
   } catch (err) {
     plain($("error"), err.message); $("error").hidden = false;
-    say($("status"), "status.not_started"); buttons();
+    say($("status"), "status.not_started");
+    running = false; buttons(); refreshBoard();
   }
 });
 
@@ -854,14 +856,17 @@ async function reloadProject() {
       draft = JSON.parse(JSON.stringify(project.draft));
     }
     drawBoard();
-  } catch (err) { plain($("perror"), err.message); $("perror").hidden = false; }
+  } catch (err) { plain($("perror"), err.message); $("perror").hidden = false; refreshBoard(); }
 }
 
 // Unsaved edits are saved before the board closes. One that cannot be saved
 // keeps it open, with the reason beside the buttons (Codex QA, 2026-10-23:
 // an edit typed just before the press was dropped).
 async function closeProject() {
-  if (project && !(await saveDraft())) return;
+  // Until every edit is held: one typed while a save was on its way is saved too.
+  while (project && edits !== savedEdits) {
+    if (!(await saveDraft())) return;
+  }
   clearTimeout(saveTimer); saveTimer = null;
   edits = savedEdits = 0;
   project = draft = null;
@@ -912,16 +917,24 @@ function eachCard(fn) {
   shown().scenes.forEach((scene) => (scene.shots || []).forEach((card) => fn(card, scene)));
 }
 const has = (list, id) => (list || []).includes(id);
+// A text as the app and node 63 read it: stripped of what Python's str.strip()
+// strips -- not JavaScript's trim(), which strips U+FEFF and keeps U+0085 and
+// U+001C-U+001F (Sonnet QA, 2026-10-23) -- so an edit of spaces alone is no edit.
+const PY_SPACE = "[\\t\\n\\v\\f\\r \\x1c-\\x1f\\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]";
+const PY_STRIP = new RegExp("^" + PY_SPACE + "+|" + PY_SPACE + "+$", "g");
+const stripped = (s) => String(s == null ? "" : s).replace(PY_STRIP, "");
 
 // What one card needs, read from the draft against the view.
 function assess(card, scene) {
   const sid = card.shot_id, d = draft.cards[sid] || {};
   const keptStill = has(draft.kept.stills, sid), keptClip = has(draft.kept.clips, sid);
-  const pictureEdit = card.picture_editable && d.picture_text != null && d.picture_text !== card.picture_text;
+  const pictureEdit = !!card.picture_editable && d.picture_text != null
+    && stripped(d.picture_text) !== stripped(card.picture_text);
   // Studio refuses a still with no words, so the page never offers to paint one.
-  const blank = !!pictureEdit && !String(d.picture_text).trim();
+  const blank = pictureEdit && !stripped(d.picture_text);
   const noteEdit = scene.note_editable && draft.scenes[scene.scene_id] != null
-    && draft.scenes[scene.scene_id].note !== (scene.note || "");
+    && draft.scenes[scene.scene_id].note != null
+    && stripped(draft.scenes[scene.scene_id].note) !== stripped(scene.note);
   const stillTake = (draft.takes.stills[sid] || 0) !== (card.still_take || 0);
   const charTake = !!card.still_char_id &&
     (draft.takes.characters[card.still_char_id] || 0) !== (card.still_char_take || 0);
@@ -931,7 +944,8 @@ function assess(card, scene) {
   // painted again, or the card keeps the clip it has -- a kept still does not
   // stand in for it, as node 63 reads it too.
   const stillFailed = card.still_state === "failed" && !keptClip && !stillDirty;
-  const motionEdit = card.motion_editable && d.motion_text != null && d.motion_text !== card.motion_text;
+  const motionEdit = !!card.motion_editable && d.motion_text != null
+    && stripped(d.motion_text) !== stripped(card.motion_text);
   const clipTake = (draft.takes.clips[sid] || 0) !== (card.clip_take || 0);
   const filmed = !!card.clip && card.clip_state !== "failed";
   const stale = filmed && !!card.clip_still && card.clip_still !== card.still;
@@ -1338,8 +1352,13 @@ async function startStage(stageName) {
   if (stageBusy || !project) return;
   const pid = project.project_id;
   $("perror").hidden = true;
-  if (!(await saveDraft())) return;   // the stage carries the draft as saved
+  // Busy from the press, so a second click while the draft saves sends nothing
+  // (Sonnet QA, 2026-10-23).
   stageBusy = true; watching = stageName; stagePid = pid; refreshBoard(); buttons();
+  if (!(await saveDraft())) {         // the stage carries the draft as saved
+    stageBusy = false; watching = stagePid = null; refreshBoard(); buttons();
+    return;
+  }
   try {
     const res = await fetch("/api/projects/" + pid + "/stages", {
       method: "POST", headers: {"Content-Type": "application/json"},
@@ -1450,8 +1469,11 @@ $("direct").addEventListener("click", async () => {
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
-    await openProject(body.project_id);
+    // The Stills run is the app's now: follow it first, so a board that
+    // fails to open never turns the buttons back on while it runs.
     watchStage(body.id, "stills", body.project_id);
+    try { await openProject(body.project_id); }
+    catch (err) { say($("notice"), "pstatus.missing", {error: err.message}); $("notice").hidden = false; }
   } catch (err) {
     $("run").hidden = false; plain($("error"), err.message); $("error").hidden = false;
     say($("status"), "status.not_started");

@@ -393,6 +393,8 @@ def test_the_key_sees_every_engine_setting_in_the_environment(monkeypatch):
                         ("OTR_HF_TOKEN_FILE", "D:/token"), ("OTR_RUNTIME_SECRETS_FILE", "D:/s"),
                         ("OTR_VIDEO_BUDGET_MARGIN", "0.2"), ("OTR_VIDEO_COST_PER_FRAME_MB", "9"),
                         ("OTR_UNIFIED_MEMORY_HEADROOM_MB", "512"), ("OTR_TMP", "D:/tmp"),
+                        # A health check that raises after the render changes no pixel.
+                        ("OTR_LTX_OPEN_STRICT", "1"),
                         ("HF_HOME", "D:/hf")):
         monkeypatch.setenv(name, value)
         assert key() == same, name
@@ -477,11 +479,14 @@ def test_a_record_of_the_wrong_shape_is_passed_over_never_a_crash(producer_root,
     forged = json.loads(json.dumps(_map(first)))
     forged["shot_b001"]["clip"]["receipts"] = 5                # not a list
     forged["shot_b002"]["clip"]["vram_peak_mb"] = 10 ** 400     # no float holds it
+    forged["shot_b003"]["clip"]["frame_count"] = "not-a-number"
     again, filmed, producer = _film(camera, _replayed(tmp_path, ep_a, "ep_c"),
                                     bundle_map=forged)
     assert filmed == []
     assert producer.reused["shot_b001"] == "store", "the bad record is passed over"
     assert producer.reused["shot_b002"] == "bundle" and again["vram_peak_mb"] is None
+    assert producer.reused["shot_b003"] == "store", "a number that is not one is passed over"
+    rd.build_clip_manifest(again, episode_id="ep_c")
 
 
 def test_a_stored_clip_copied_in_waits_out_a_held_file(producer_root, cameras, tmp_path,
@@ -508,12 +513,12 @@ def test_a_stored_clip_copied_in_waits_out_a_held_file(producer_root, cameras, t
 def test_a_copy_in_that_fails_half_way_leaves_nothing_under_the_clips_name(
         producer_root, cameras, tmp_path, monkeypatch):
     camera = cameras()
-    real_move, real_copy = shutil.move, shutil.copyfile
+    real_replace, real_copy = os.replace, shutil.copyfile
 
-    def held(src, dst, *args, **kwargs):
-        if "shot_b002" in str(src):
+    def held(src, dst):
+        if "shot_b002" in str(src) and not str(src).endswith(".part"):
             raise PermissionError(13, "the file is held", str(src))
-        return real_move(src, dst, *args, **kwargs)
+        return real_replace(src, dst)
 
     def breaks(src, dst, *args, **kwargs):
         if "shot_b002" in str(src) and str(dst).endswith(".part"):
@@ -521,12 +526,34 @@ def test_a_copy_in_that_fails_half_way_leaves_nothing_under_the_clips_name(
             raise OSError("the disk filled up")
         return real_copy(src, dst, *args, **kwargs)
 
-    monkeypatch.setattr(shutil, "move", held)
+    monkeypatch.setattr(PC.os, "replace", held)
+    monkeypatch.setattr(PC.time, "sleep", lambda seconds: None)
     monkeypatch.setattr(shutil, "copyfile", breaks)
     ep, ledger, build = workspace = _workspace(tmp_path, "ep_a")
     result, filmed, _producer = _film(camera, workspace)
     assert filmed == sorted(PROMPTS) and "shot_b002" not in _map(result), "not committed"
     assert not [p.name for p in (ep / "clips").iterdir() if "shot_b002" in p.name]
+
+
+def test_a_clip_brought_into_the_episode_waits_out_a_held_file(producer_root, cameras,
+                                                                tmp_path, monkeypatch):
+    # Codex QA, 2026-10-23: the copy-in renamed once, with no wait.
+    camera = cameras()
+    real_replace = os.replace
+    refused = []
+
+    def held_once(src, dst):
+        if "shot_b001" in str(src) and not refused:
+            refused.append(src)
+            raise PermissionError(13, "the file is held", str(src))
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(PC.os, "replace", held_once)
+    monkeypatch.setattr(PC.time, "sleep", lambda seconds: None)
+    ep, ledger, build = workspace = _workspace(tmp_path, "ep_a")
+    result, filmed, _producer = _film(camera, workspace)
+    assert refused and filmed == sorted(PROMPTS) and "shot_b001" in _map(result)
+    assert not [p.name for p in (ep / "clips").iterdir() if p.name.endswith(".part")]
 
 
 def test_a_record_keeps_files_never_paths(tmp_path):

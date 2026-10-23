@@ -4523,30 +4523,38 @@ def _mark_reused_receipts(clip, source):
 def _bring_clip_into(clip, dest, name):
     """Move a producer run's clip into the episode folder ``dest`` as ``name``,
     so the record or floor payload made from it names a file the episode
-    holds. When the move fails -- on Windows a scanner can hold a file it has
-    just seen appear -- the clip is copied in instead, since a copy reads where
-    a rename cannot. Raises when neither can be done."""
+    holds. A rename where one can be done; else -- another volume, or a file
+    a scanner will not let go of -- a copy beside the target, renamed into
+    place. Both renames wait out a scanner holding the file (the clip store's
+    _replace_held), and nothing is ever left under the clip's name unless it
+    is whole (Codex QA, 2026-10-23: a cross-volume move failing half-way left
+    a truncated file there). A directory clip, or one already in ``dest``,
+    is left as it is. Raises when neither can be done."""
     import shutil
+    if str(clip.get("type") or "video") == "directory":
+        return
     os.makedirs(dest, exist_ok=True)
-    _persist_one_clip(clip, dest, name)
     src = str(clip.get("path") or "")
-    if (src and os.path.isfile(src)
-            and os.path.dirname(os.path.abspath(src)) != os.path.abspath(dest)):
-        # Copied beside the target and renamed into place, so a copy that
-        # fails half-way leaves nothing under the clip's name.
-        target = os.path.join(dest, name)
+    if not (src and os.path.isfile(src)) or (
+            os.path.dirname(os.path.abspath(src)) == os.path.abspath(dest)):
+        return
+    target = os.path.join(dest, name)
+    replace_held = _producer_clips_module()._replace_held
+    try:
+        replace_held(src, target)
+    except OSError:
         handle, part = tempfile.mkstemp(prefix="." + name + ".", suffix=".part", dir=dest)
         os.close(handle)
         try:
             shutil.copyfile(src, part)
-            os.replace(part, target)
+            replace_held(part, target)
         except BaseException:
             try:
                 os.remove(part)
             except OSError:
                 pass
             raise
-        clip["path"] = target
+    clip["path"] = target
 
 
 def _producer_floor(producer, row, clip):

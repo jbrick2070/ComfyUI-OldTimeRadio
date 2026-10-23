@@ -42,6 +42,7 @@ import copy
 import hashlib
 import json
 import logging
+import math
 import os
 import re
 import shutil
@@ -100,7 +101,7 @@ _ENV_NOT_CAUSAL_RE = re.compile(
     r"(_API_KEY|_KEY_FILES?|_TOKEN_FILE|_SECRETS_FILE|_API_BASE|_URL|_HOST|_PORT"
     r"|_TIMEOUT|_TIMEOUT_S|_RETRIES|_FANOUT|_WORKERS"
     r"|_BUDGET_USD|_BUDGET_MARGIN|_EST_USD|_EST_USD_PER_S|_HEADROOM_MB"
-    r"|_CACHE|_CACHE_DIR|_TMP|_LOG_PATH|_STDERR_DIR|_MAX_AGE_S)$"
+    r"|_CACHE|_CACHE_DIR|_TMP|_LOG_PATH|_STDERR_DIR|_MAX_AGE_S|_STRICT)$"
     r"|_MAX_CONCURRENCY|_COST_|_SWEEP_")
 _KEY_RE = re.compile(r"^[0-9a-f]{64}$")
 #: How long a commit waits, in turn, before it renames a held staging folder
@@ -270,16 +271,31 @@ def _check_floor(record: Any, where: str) -> Dict[str, Any]:
     return record
 
 
+#: A clip body's numbers, read as numbers wherever the clip is used.
+_CLIP_NUMBERS = ("frame_count", "target_frame_count", "fps", "width", "height",
+                 "duration_s", "vram_peak_mb")
+
+
+def _is_number(value: Any) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return not isinstance(value, float) or math.isfinite(value)
+
+
 def _check_clip_shape(clip: Dict[str, Any], where: str) -> None:
     """A clip body's receipts and segments, of the shapes a render gives
-    them, or a refusal -- so a corrupt record is passed over for the store,
-    never a crash of the run that reads it."""
+    them, and its numbers numbers, or a refusal -- so a corrupt record is
+    passed over for the store, never a crash of the run that reads it."""
     if ((clip.get("receipt") is not None and not isinstance(clip.get("receipt"), dict))
             or (clip.get("receipts") is not None and not isinstance(clip.get("receipts"), list))
             or (clip.get("segments") is not None
                 and not isinstance(clip.get("segments"), list))):
         raise ClipStoreError("%s carries a clip whose receipts or segments are not "
                              "receipts or segments" % where)
+    bad = [k for k in _CLIP_NUMBERS if clip.get(k) is not None and not _is_number(clip[k])]
+    if bad:
+        raise ClipStoreError("%s carries a clip whose %s is not a number"
+                             % (where, ", ".join(bad)))
 
 
 def _check_files(files: Dict[str, Any], where: str) -> None:

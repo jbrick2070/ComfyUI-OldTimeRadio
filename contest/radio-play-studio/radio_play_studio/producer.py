@@ -287,6 +287,12 @@ def bundle_subfolder(project_id: str, out: str) -> str:
     return f"{REPLAY_ROOT}/{project_id}/{out}"
 
 
+def _text(value: Any) -> str:
+    """A text as node 63 reads it: the painter sees it stripped, so an edit
+    of spaces alone is no edit (compose_picture, still_input_digest)."""
+    return str(value or "").strip()
+
+
 def unpainted(project: dict) -> list:
     """The cards whose still the draft asks to paint and no Stills run has
     painted yet: a new picture text or still take, or -- unless the still is
@@ -300,7 +306,7 @@ def unpainted(project: dict) -> list:
     for scene in view.get("scenes", []):
         note = draft["scenes"].get(scene["scene_id"]) or {}
         note_changed = (bool(scene.get("note_editable")) and "note" in note
-                        and note["note"] != scene.get("note", ""))
+                        and _text(note["note"]) != _text(scene.get("note")))
         for card in scene["shots"]:
             if not card.get("picture_editable"):
                 continue
@@ -308,7 +314,8 @@ def unpainted(project: dict) -> list:
             char = card.get("still_char_id") or ""
             char_changed = bool(char) and (draft["takes"]["characters"].get(char, 0)
                                            != card.get("still_char_take", 0))
-            if (("picture_text" in body and body["picture_text"] != card.get("picture_text", ""))
+            if (("picture_text" in body
+                 and _text(body["picture_text"]) != _text(card.get("picture_text")))
                     or draft["takes"]["stills"].get(sid, 0) != card.get("still_take", 0)
                     or (sid not in kept and (note_changed or char_changed))):
                 waiting.append(sid)
@@ -364,19 +371,20 @@ def build_direction(project: dict, stage: str) -> dict:
             continue
         edit = {}
         if ("picture_text" in body and card.get("picture_editable")
-                and body["picture_text"] != card.get("picture_text", "")):
+                and _text(body["picture_text"]) != _text(card.get("picture_text"))):
             if not body["picture_text"].strip():
                 raise ProjectError(f"card {shot_id} has no picture text; a still needs "
                                    "a description")
             edit["picture_text"] = body["picture_text"]
         if ("motion_text" in body and card.get("motion_editable")
-                and body["motion_text"] != card.get("motion_text", "")):
+                and _text(body["motion_text"]) != _text(card.get("motion_text"))):
             edit["motion_text"] = body["motion_text"]
         if edit:
             cards[shot_id] = edit
     scenes = {scene_id: {"note": body["note"]}
               for scene_id, body in draft["scenes"].items()
-              if scene_id in notes and "note" in body and body["note"] != notes[scene_id]}
+              if scene_id in notes and "note" in body
+              and _text(body["note"]) != _text(notes[scene_id])}
     direction.update(cards=cards, scenes=scenes, takes=copy.deepcopy(draft["takes"]),
                      kept=copy.deepcopy(draft["kept"]))
     return direction
