@@ -2755,6 +2755,52 @@ def _resolve_writer_llm(meta, warnings):
         return None
 
 
+def rebuild_producer_payload(ledger: dict, direction: dict) -> tuple:
+    """A SCENE PRODUCER STILLS REPLAY rebuilds the payload it hands the
+    dispatcher (planning/scene-producer/PLAN.md, "Stills").
+
+    It starts from the payload the first stills run was handed
+    (``images.producer_prompt_payload``) and composes each card's still prompt
+    afresh from its raw picture text and its scene's note
+    (``_otr_producer_direction.merged_raw_texts`` and ``compose_picture``),
+    replacing the prompt completely -- a note is never appended to an already
+    composed prompt, so replacing or clearing one leaves nothing behind.
+    Identity, co-references and every other field are kept; no template or LLM
+    runs. A scene is the one the still's beat belongs to.
+
+    A prompt that comes out unchanged keeps its saved hash, so the dispatcher
+    finds it in its cache and paints nothing; a changed one is hashed exactly as
+    this node hashes every prompt, so the dispatcher paints that still again.
+
+    Returns ``(payload, changed_shot_ids)``.
+    """
+    from . import _otr_producer_direction as _PD
+    images = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
+    stored = images.get(_PD.PAYLOAD_KEY)
+    if not isinstance(stored, dict) or not isinstance(stored.get("objects"), list):
+        raise ValueError(
+            "OTR_MetaBriefImagePromptGen: this Scene Producer replay's bundle carries no "
+            "saved prompt payload (images.%s); only a producer stills run's bundle can "
+            "be painted again" % _PD.PAYLOAD_KEY)
+    raw = _PD.merged_raw_texts(images.get(_PD.RAW_TEXTS_KEY), direction)
+    scene_of_beat = {str(b.get("beat_id")): str(b.get("scene_id") or "")
+                     for b in (ledger.get("beats") or []) if isinstance(b, dict)}
+    payload = json.loads(json.dumps(stored))          # a deep, JSON-clean copy
+    changed = []
+    for obj in payload["objects"]:
+        shot = _PD.object_shot_id(obj)
+        if shot is None:
+            continue
+        picture = raw["cards"].get(shot, obj.get("prompt"))
+        note = raw["scenes"].get(scene_of_beat.get(str(obj.get("beat_id") or ""), ""), "")
+        prompt = _PD.compose_picture(picture, note)
+        if prompt != str(obj.get("prompt") or ""):
+            obj["prompt"] = prompt
+            obj["prompt_hash"] = _content_hash(prompt)
+            changed.append(shot)
+    return payload, sorted(set(changed))
+
+
 class OTRMetaBriefImagePromptGen:
     """Registered as ``OTR_MetaBriefImagePromptGen``. Brief -> per-character image prompts."""
 
@@ -2815,6 +2861,21 @@ class OTRMetaBriefImagePromptGen:
             # AttributeError: a non-dict wire (the legacy parser LIST) is not a replay
             _rmeta = {}
         if _rmeta and _replay_descriptor(_rmeta):
+            # A SCENE PRODUCER STILLS REPLAY paints, so it gets a payload: the
+            # saved one, rebuilt from its raw texts. Every other replay passes
+            # through, exactly as before.
+            from . import _otr_producer_direction as _PD
+            _wire = json.loads(script_json or "{}")
+            _direction = _PD.runtime_direction(_wire)
+            if _direction is not None and _direction["stage"] == "stills":
+                payload, changed = rebuild_producer_payload(_wire, _direction)
+                report = ("producer stills replay: %d object(s) rebuilt from the saved "
+                          "payload, no LLM; %d picture(s) changed%s"
+                          % (len(payload["objects"]), len(changed),
+                             (": " + ", ".join(changed[:8])) if changed else ""))
+                log.warning("[OTR_MetaBriefImagePromptGen] %s", report)
+                return (json.dumps(payload, ensure_ascii=True, separators=(",", ":")),
+                        report)
             log.warning("[OTR_MetaBriefImagePromptGen] REPLAY: pass-through, no LLM")
             return (json.dumps({"replay": True, "objects": []}), "replay: pass-through")
         try:

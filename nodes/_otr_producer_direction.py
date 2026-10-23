@@ -127,6 +127,8 @@ __all__ = [
     "bundle_path", "manifest_digest", "admit_prompt_direction",
     "IMAGE_SLOTS", "META_IMAGE_ENGINES", "MANIFEST_PRODUCER_KEY",
     "policy_image_engines", "prompt_image_engines", "manifest_producer_fields",
+    "PAYLOAD_KEY", "RAW_TEXTS_KEY", "TAKES_KEY", "object_shot_id", "initial_raw_texts",
+    "merged_raw_texts", "compose_picture", "painted_takes",
 ]
 
 
@@ -288,6 +290,11 @@ def parse_direction(raw: Any) -> Optional[Dict[str, Any]]:
         _refuse_unknown(body, _CARD_KEYS, "card %s" % shot)
         cards[shot] = {key: _text(body[key], MAX_CARD_TEXT_CHARS, "card %s %s" % (shot, key))
                        for key in sorted(_CARD_KEYS) if key in body}
+        if "picture_text" in cards[shot] and not cards[shot]["picture_text"].strip():
+            # An empty ACTION is a valid edit (the shot simply has none); an
+            # empty picture would hand the image model nothing to draw.
+            raise DirectionError("card %s picture_text is empty; a still needs a "
+                                 "description" % shot)
 
     takes_in = _require_dict(data.get("takes", {}), "takes")
     _refuse_unknown(takes_in, frozenset(_TAKE_GROUPS), "takes")
@@ -511,6 +518,81 @@ def _check_image_engines(prompt: dict, manifest: dict, bundle_name: str) -> None
             "the video director's image engines differ from bundle %s's: %s; a producer "
             "run keeps the engines its stills were painted with" % (bundle_name,
                                                                    "; ".join(differ)))
+
+
+# --------------------------------------------------------------------------- #
+# what a producer stills run paints from: raw texts, takes, keeps
+# --------------------------------------------------------------------------- #
+
+#: Kept on the ledger's images section by a producer stills run: the payload
+#: node 89 handed the first one, the raw texts every later one composes from,
+#: and the takes it painted with.
+PAYLOAD_KEY = "producer_prompt_payload"
+RAW_TEXTS_KEY = "producer_raw_texts"
+TAKES_KEY = "producer_takes"
+#: The earlier stills of each object, kept beside the one current row per
+#: object so an undone edit is a cache hit on the still it restores.
+SUPERSEDED_KEY = "producer_superseded"
+
+
+def object_shot_id(obj: Any) -> Optional[str]:
+    """The card a still object answers to: the shot of the beat whose own
+    scene still it is (``still_<beat>`` -> ``shot_<beat>``, as Shot Lock names
+    shots), or None. Portraits have no card; a 3D lane's mesh and plate objects
+    and the dispatcher's jump-segment clones are not the card's picture."""
+    if not isinstance(obj, dict):
+        return None
+    beat = str(obj.get("beat_id") or "")
+    if not beat or str(obj.get("object_id") or "") != "still_%s" % beat:
+        return None
+    return "shot_%s" % beat
+
+
+def initial_raw_texts(payload: Any) -> Dict[str, Dict[str, str]]:
+    """The raw picture text of every card in a first payload -- the text node
+    89 wrote for its still -- and no scene notes yet."""
+    cards: Dict[str, str] = {}
+    objects = (payload or {}).get("objects") if isinstance(payload, dict) else None
+    for obj in objects or []:
+        shot = object_shot_id(obj)
+        if shot and shot not in cards:
+            cards[shot] = str(obj.get("prompt") or "")
+    return {"cards": cards, "scenes": {}}
+
+
+def merged_raw_texts(previous: Any, direction: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+    """The raw texts a run paints from: the previous bundle's, with each picture
+    text and scene note the direction names put in its place. What the
+    direction leaves out keeps its previous text; an empty note it sends clears
+    the old one."""
+    prev = previous if isinstance(previous, dict) else {}
+    cards = {str(k): str(v) for k, v in dict(prev.get("cards") or {}).items()}
+    scenes = {str(k): str(v) for k, v in dict(prev.get("scenes") or {}).items()}
+    for shot, body in (direction.get("cards") or {}).items():
+        if "picture_text" in body:
+            cards[shot] = body["picture_text"]
+    for scene, body in (direction.get("scenes") or {}).items():
+        scenes[scene] = body.get("note", "")
+    return {"cards": cards, "scenes": scenes}
+
+
+def compose_picture(picture_text: Any, note: Any) -> str:
+    """A still's effective prompt: its picture text, then its scene's note.
+    Composed afresh from the two raw texts on every run, so a replaced or
+    cleared note never leaves its old words behind."""
+    picture = str(picture_text or "").strip()
+    note = str(note or "").strip()
+    if picture and note:
+        return "%s, %s" % (picture, note)
+    return picture or note
+
+
+def painted_takes(direction: Dict[str, Any]) -> Dict[str, Dict[str, int]]:
+    """The still takes a stills run paints with (characters and stills; clip
+    takes belong to the video stage), as the ledger keeps them."""
+    takes = direction.get("takes") or {}
+    return {"characters": dict(takes.get("characters") or {}),
+            "stills": dict(takes.get("stills") or {})}
 
 
 # --------------------------------------------------------------------------- #

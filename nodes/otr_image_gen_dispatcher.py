@@ -1544,6 +1544,41 @@ def _flush_pending_cloud_stills(pending, ctx):
             packed["laplacian"], ctx)
 
 
+def _kept_row(images, oid):
+    """The newest row for ``oid`` whose still is on disk, for a KEPT card: its
+    verified bytes are reused as they are. Keep never vouches for a missing
+    file -- the newest row with no file on disk means there is nothing to keep."""
+    for row in reversed(images):
+        if isinstance(row, dict) and str(row.get("object_id") or "") == oid:
+            path = _confined_or_empty(str(row.get("path") or ""))
+            if path and os.path.isfile(path) and os.path.getsize(path) > 0:
+                return row
+            return None
+    return None
+
+
+def _one_row_per_object(images):
+    """A Scene Producer run keeps ONE row per object, the newest replacing the
+    older ones, so the render driver's first-row-wins index needs no change.
+
+    Returns ``(rows, superseded)``. The superseded rows are not thrown away:
+    the cache index still names their stills, and a picture edit that is undone
+    -- a note cleared, a text restored -- is a cache hit on exactly those rows,
+    so the run keeps them beside the images for the cache to find."""
+    newest = {}
+    for index, row in enumerate(images):
+        if isinstance(row, dict) and row.get("object_id"):
+            newest[str(row["object_id"])] = index
+    keep = set(newest.values())
+    rows, superseded = [], []
+    for index, row in enumerate(images):
+        if isinstance(row, dict) and row.get("object_id") and index not in keep:
+            superseded.append(row)
+        else:
+            rows.append(row)
+    return rows, superseded
+
+
 def _draws_partner_heartbeat(engine_id) -> bool:
     """True when this image engine renders through a Comfy partner node, whose
     wait loop redraws the executing node's bar with its own heartbeat
@@ -1632,13 +1667,26 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     warnings: list = []
     report: list = []
     # THE SCENE PRODUCER'S PAYLOAD (plan, "Stills"). On a producer run the
-    # payload node 89 handed this node is kept as it arrived, BEFORE this node's
-    # own merge adds jump stills, as ``images.producer_prompt_payload``, so a
-    # replay can rebuild from it and edited picture text carries into the next
-    # bundle. On every other run nothing is kept and nothing changes.
+    # payload node 89 handed the FIRST stills run is kept as it arrived, BEFORE
+    # this node's own merge adds jump stills, as ``images.producer_prompt_payload``,
+    # and every later stills run keeps that same one: node 89 rebuilds each
+    # run's prompts from it and from the raw texts kept beside it, which this
+    # run updates with the direction's edits. On every other run nothing is
+    # kept and nothing changes.
     from . import _otr_producer_direction as _PD
     _producer = _PD.runtime_direction(ledger)
-    _producer_payload = copy.deepcopy(image_prompts) if _producer is not None else None
+    _producer_payload = _raw_texts = None
+    _kept_stills: set = set()
+    if _producer is not None:
+        _arrived = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
+        _saved = _arrived.get(_PD.PAYLOAD_KEY)
+        if isinstance(_saved, dict):                  # a stills REPLAY
+            _producer_payload = copy.deepcopy(_saved)
+            _raw_texts = _PD.merged_raw_texts(_arrived.get(_PD.RAW_TEXTS_KEY), _producer)
+        else:                                         # the project's first stills run
+            _producer_payload = copy.deepcopy(image_prompts)
+            _raw_texts = _PD.initial_raw_texts(image_prompts)
+        _kept_stills = set(_producer["kept"]["stills"])
     objects = (image_prompts or {}).get("objects") or []
     required_scene_targets = (image_prompts or {}).get(
         "required_scene_targets")
@@ -1717,6 +1765,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     images_section = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
     cache_index = dict(images_section.get("cache_index") or {})
     images = list(images_section.get("images") or [])
+    # A producer run's earlier stills of each object (``_one_row_per_object``):
+    # empty on every other run.
+    _superseded = (list(images_section.get(_PD.SUPERSEDED_KEY) or [])
+                   if _producer is not None else [])
     ep_rows: list = []
 
     rev = int(images_section.get("image_revision") or 0) + 1
@@ -1843,6 +1895,22 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         role = str(obj.get("role") or "character_video")
         char_id = str(obj.get("char_id") or "")
         beat_id = str(obj.get("beat_id") or "")
+        # A KEPT CARD keeps the still it has (plan, "Stills"): its verified row
+        # is carried as it is, whatever bulk scene or character edit has changed
+        # its prompt since. Every picture of the card's beat is kept with it.
+        if (_kept_stills and beat_id and kind != "portrait"
+                and "shot_%s" % beat_id in _kept_stills):
+            _kept = _kept_row(images, oid)
+            if _kept is None:
+                raise ImageRenderError(
+                    "Scene Producer keeps the still of card shot_%s, but %s has no "
+                    "verified still on disk to keep" % (beat_id, oid))
+            _kept = dict(_kept, provenance={"source": "kept"})
+            images.append(_kept)
+            ep_rows.append(_kept)
+            reused += 1
+            report.append(f"{oid}: kept -> {os.path.basename(str(_kept.get('path') or ''))}")
+            continue
         # Composition provenance -- the banana quote-shield discriminator below.
         source = str(obj.get("source") or "")
         # RADIO FACE LOGIC (2026-07-04): the announcer portrait's chosen radio-host
@@ -2198,7 +2266,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             hit_id = cache_index[key]
             src = ""
             ref_row = None
-            for im in images:
+            for im in images + _superseded:
                 if isinstance(im, dict) and im.get("image_id") == hit_id:
                     ref_row = im
                     src = str(im.get("pool_path") or im.get("path") or "")
@@ -2592,6 +2660,11 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             err.missing_targets = missing_targets
             raise err
 
+    if _producer is not None:
+        images, _newly_superseded = _one_row_per_object(images)
+        _known = {str(r.get("image_id")) for r in _superseded if isinstance(r, dict)}
+        _superseded.extend(r for r in _newly_superseded
+                           if str(r.get("image_id")) not in _known)
     ledger["images"] = {
         "image_revision": rev,
         "episode_id": ep,
@@ -2602,8 +2675,11 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     }
     if required_scene_targets:
         ledger["images"]["required_scene_targets"] = required_target_receipt
-    if _producer_payload is not None:
-        ledger["images"]["producer_prompt_payload"] = _producer_payload
+    if _producer is not None:
+        ledger["images"][_PD.PAYLOAD_KEY] = _producer_payload
+        ledger["images"][_PD.RAW_TEXTS_KEY] = _raw_texts
+        ledger["images"][_PD.TAKES_KEY] = _PD.painted_takes(_producer)
+        ledger["images"][_PD.SUPERSEDED_KEY] = _superseded
     # Credits: stamp the per-role image-engine histogram into meta (which DOES
     # persist to the on-disk ledger the credits dossier reads) so the dossier
     # shows the image model used for each slot. Additive; never overwrites.
@@ -2846,10 +2922,19 @@ class OTRImageGenDispatcher:
         direction = _PD.runtime_direction(led)
         # CANONICAL REPLAY (campaign item 0): the imported ``images`` rows are
         # verified on disk and re-stamped as they are; gen_fn is never called.
+        # The one replay that PAINTS is a Scene Producer stills stage: it runs
+        # the cached path below on node 89's rebuilt payload, so only what
+        # changed is minted (plan, "Only the Stills stage paints").
         from .production_ledger import replay_descriptor as _replay_descriptor
-        if _replay_descriptor((led.get("meta") or {})):
+        _replay = bool(_replay_descriptor((led.get("meta") or {})))
+        _paints = direction is not None and direction["stage"] == "stills"
+        if _replay and not _paints:
             led, image_done, report = verify_replay_images(led)
         else:
+            if _replay:
+                # The wire snapshot can predate rename_episode; the same rebase
+                # the verify path runs, before any imported row is read.
+                led = _replay_rebase_to_live_episode(led)
             # The in-graph node mints REAL portraits via the request's image
             # engine (in-process Flux gen-1) under the AS-3 GPU-residency lease.
             # On a box without the GPU / wrapper nodes / checkpoint the render
