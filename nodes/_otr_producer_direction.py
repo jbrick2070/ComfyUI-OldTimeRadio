@@ -28,11 +28,19 @@ unauthenticated ``/prompt``. Every name that becomes part of a path is matched
 against a strict pattern here, and every path is confined to the producer's own
 folder, before anything touches the disk.
 
+THE IMAGE-ENGINE STAMP (chunk 3). A producer stills run records the per-slot
+image engines it painted with on the durable ledger (meta
+``producer_image_engines``); every producer freeze copies them into the bundle
+manifest's ``producer`` section, so a video bundle still names the engines its
+stills came from. A later run must resolve the same engines from its own video
+director, or :func:`admit_prompt_direction` refuses it: a repaint with another
+engine would mix two looks in one episode.
+
 WHAT IS NOT HERE YET, and which build step adds it beside its caller (a check
-with nothing to compare against is the defect the repo's own rules forbid): the
-image-engine stamp and its check, ``cards.json`` and the unpainted-edit check
-(chunk 3, with the repaint they protect), the clip store path (chunk 4). Until
-then :func:`not_yet_supported` refuses what a direction cannot get yet.
+with nothing to compare against is the defect the repo's own rules forbid):
+``cards.json`` and the unpainted-edit check (chunk 3, with the repaint they
+protect), the clip store path (chunk 4). Until then :func:`not_yet_supported`
+refuses what a direction cannot get yet.
 
 UTF-8, no BOM. Standard library only.
 """
@@ -57,6 +65,17 @@ STAGES = ("stills", "video", "publish")
 WIDGET_NAME = "direction_json"
 SHOT_LOCK_CLASS = "OTR_ShotLock"
 WRITER_CLASS = "OTR_LedgerScriptWriter"
+DIRECTOR_CLASS = "OTR_VideoDirector"
+#: The three image slots the video director resolves, in its policy's order.
+IMAGE_SLOTS = ("announcer_image_model", "music_image_model", "character_image_model")
+#: What the image director puts in a slot the video director left empty
+#: (``otr_image_director.direct``).
+DEFAULT_IMAGE_ENGINE = "flux_gen1"
+#: The durable-ledger meta key a producer stills run writes its engines to.
+META_IMAGE_ENGINES = "producer_image_engines"
+#: The bundle manifest's producer section, and its version.
+MANIFEST_PRODUCER_KEY = "producer"
+MANIFEST_PRODUCER_VERSION = 1
 MANIFEST_NAME = "manifest.json"
 
 #: EVERY NAME IS CHECKED WITH ``fullmatch`` (Codex QA, 2026-10-22): ``$`` under
@@ -106,6 +125,8 @@ __all__ = [
     "project_bundle", "not_yet_supported", "RUNTIME_KEY", "attach_runtime",
     "runtime_direction", "freeze_stage", "execution_blocker",
     "bundle_path", "manifest_digest", "admit_prompt_direction",
+    "IMAGE_SLOTS", "META_IMAGE_ENGINES", "MANIFEST_PRODUCER_KEY",
+    "policy_image_engines", "prompt_image_engines", "manifest_producer_fields",
 ]
 
 
@@ -419,6 +440,80 @@ def manifest_digest(bundle_dir: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# the image-engine stamp and its check
+# --------------------------------------------------------------------------- #
+
+def policy_image_engines(image_policy: Any) -> Dict[str, str]:
+    """The per-slot engine ids an image policy (the image director's output,
+    which the dispatcher paints with) names: what a producer stills run
+    stamps. A slot entry is ``{"engine_id": ...}`` or a bare id."""
+    models = (image_policy or {}).get("image_models") if isinstance(image_policy, dict) else None
+    models = models if isinstance(models, dict) else {}
+    out = {}
+    for slot in IMAGE_SLOTS:
+        entry = models.get(slot)
+        out[slot] = str((entry.get("engine_id") if isinstance(entry, dict) else entry) or "")
+    return out
+
+
+def prompt_image_engines(prompt: dict) -> Dict[str, str]:
+    """The per-slot image engines a queued prompt will paint with: the video
+    director's three picks, resolved exactly as it resolves them
+    (``OTRVideoDirector._image_picks``: a "+ Add Custom" pick takes its
+    ``custom_models_json`` entry), then given the image director's default for
+    an empty slot. A producer run types these, like its direction; a pick
+    wired from another node cannot be checked, so it is refused."""
+    directors = _nodes_of(prompt, DIRECTOR_CLASS)
+    if len(directors) != 1:
+        raise DirectionError("a Scene Producer run needs exactly one %s in the graph, "
+                             "found %d" % (DIRECTOR_CLASS, len(directors)))
+    node_id, node = directors[0]
+    inputs = node.get("inputs") or {}
+    for name in IMAGE_SLOTS + ("custom_models_json",):
+        if isinstance(inputs.get(name), list):
+            raise DirectionError("%s node %s takes %s from another node; a producer run "
+                                 "must type it" % (DIRECTOR_CLASS, node_id, name))
+    try:
+        from .otr_video_director import OTRVideoDirector
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from otr_video_director import OTRVideoDirector  # type: ignore
+    picked = OTRVideoDirector._image_picks(
+        inputs.get("custom_models_json", ""),
+        {slot: inputs.get(slot, "") for slot in IMAGE_SLOTS})
+    return {slot: (picked[slot].strip() if isinstance(picked.get(slot), str)
+                   and picked[slot].strip() else DEFAULT_IMAGE_ENGINE)
+            for slot in IMAGE_SLOTS}
+
+
+def manifest_producer_fields(direction: Dict[str, Any]) -> Dict[str, Any]:
+    """The direction's identity as a producer freeze records it in the bundle
+    manifest. The freezer adds the image-engine stamp from the ledger."""
+    return {"version": MANIFEST_PRODUCER_VERSION, "project_id": direction["project_id"],
+            "attempt_id": direction["attempt_id"], "stage": direction["stage"],
+            "out": direction["out"], "source": direction["source"]}
+
+
+def _check_image_engines(prompt: dict, manifest: dict, bundle_name: str) -> None:
+    """A later run paints, or replays stills painted, with the bundle's own
+    engines -- refused otherwise, before any model loads."""
+    producer = manifest.get(MANIFEST_PRODUCER_KEY)
+    stamped = producer.get("image_engines") if isinstance(producer, dict) else None
+    if (not isinstance(stamped, dict) or set(stamped) != set(IMAGE_SLOTS)
+            or not all(isinstance(v, str) for v in stamped.values())):
+        raise DirectionError(
+            "bundle %s carries no image-engine stamp, so a producer run cannot continue "
+            "it; it was not frozen by a producer stills run" % bundle_name)
+    queued = prompt_image_engines(prompt)
+    differ = ["%s %s (the bundle used %s)" % (slot, _shown(queued[slot]), _shown(stamped[slot]))
+              for slot in IMAGE_SLOTS if queued[slot] != stamped[slot]]
+    if differ:
+        raise DirectionError(
+            "the video director's image engines differ from bundle %s's: %s; a producer "
+            "run keeps the engines its stills were painted with" % (bundle_name,
+                                                                   "; ".join(differ)))
+
+
+# --------------------------------------------------------------------------- #
 # the queue-time admission the Workflow Validator runs
 # --------------------------------------------------------------------------- #
 
@@ -521,6 +616,7 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
                 "replay_from %s is not the bundle this direction continues (its manifest "
                 "is %s, the direction names %s)" % (_shown(replay_from), digest[:12],
                                                     direction["source"][:12]))
+        _check_image_engines(prompt, manifest, bundle.name)
         if direction["out"] is not None:
             # Bundles are numbered in the order they were made, one apart, so
             # "latest" is always the highest number and no number is skipped.
@@ -614,7 +710,8 @@ def freeze_stage(direction: Dict[str, Any], episode_id: str, *,
     ep_dir = Path(otr_audio_dir(str(episode_id or ""))).parent
     dest = bundle_path(direction["project_id"], direction["out"])
     return freeze(ep_dir, None, dest=dest, source_commit="unknown",
-                  include_render_outputs=include_render_outputs)
+                  include_render_outputs=include_render_outputs,
+                  producer=manifest_producer_fields(direction))
 
 
 def execution_blocker() -> Any:

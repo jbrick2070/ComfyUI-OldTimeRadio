@@ -165,6 +165,71 @@ def test_a_video_stage_passes_the_direction_on_to_batch(monkeypatch, recorded):
     assert done == "image_done:ok" and calls == []
 
 
+def _dispatch_one_portrait(tmp_path, ledger):
+    """One portrait through the real dispatch_images on a local stand-in."""
+    import types
+
+    import numpy as np
+
+    from nodes import otr_image_gen_dispatcher as D
+    from nodes._otr_image_engines import registry as ireg
+    from nodes._otr_shared import role_compat as rc
+
+    saved = dict(ireg._IMAGE_REGISTRY._registry)
+    ireg._IMAGE_REGISTRY._registry.clear()
+    ireg.register(types.SimpleNamespace(
+        name="flux_gen1", roles=rc.ROLES, default_roles=rc.ROLES, commercial_clean=True,
+        requires_flag=None, required_inputs=("text_prompt",), engine_version="1"))
+    policy = {"policy_version": 2,
+              "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": {"announcer_video_model": {"engine_id": "viz_mxc_cpu"},
+                               "music_video_model": {"engine_id": "viz_mxc_mandala"},
+                               "character_video_model": {"engine_id": "still_motion"}},
+              "seed": {"request_seed": 0}}
+    payload = {"version": 1, "objects": [
+        {"object_id": "c1", "kind": "portrait", "role": "character_video", "char_id": "c1",
+         "w": 832, "h": 1216, "prompt": "a radio actor", "prompt_hash": "ph_c1",
+         "source": "llm"}]}
+    try:
+        led, _done, _report, _warn = D.dispatch_images(
+            ledger, policy, payload, gen_fn=lambda _r: np.full((8, 8, 3), 9, dtype=np.uint8),
+            output_dir=str(tmp_path), lockdir=tmp_path / "lease.lockdir")
+    finally:
+        ireg._IMAGE_REGISTRY._registry.clear()
+        ireg._IMAGE_REGISTRY._registry.update(saved)
+    return led, payload
+
+
+def test_a_producer_stills_run_keeps_its_payload_and_stamps_its_engines(tmp_path):
+    ledger = {"episode_id": "ep_payload", "cast": [{"char_id": "c1"}],
+              PD.RUNTIME_KEY: PD.parse_direction(_direction(stage="stills", out="01-stills",
+                                                            source=None))}
+    led, payload = _dispatch_one_portrait(tmp_path, ledger)
+    kept = led["images"]["producer_prompt_payload"]
+    assert kept == payload and kept is not payload, "a copy of what node 89 handed over"
+    assert led["meta"][PD.META_IMAGE_ENGINES] == {
+        "announcer_image_model": "", "music_image_model": "",
+        "character_image_model": "flux_gen1"}
+
+
+def test_a_stage_end_freezes_with_the_directions_identity(monkeypatch):
+    from nodes import _otr_replay_freezer as RF
+    seen = {}
+    monkeypatch.setattr(RF, "freeze",
+                        lambda ep_dir, out_root, **kw: seen.update(kw) or pathlib.Path("b"))
+    direction = PD.parse_direction(_direction())
+    PD.freeze_stage(direction, "signal_lost_ep_1", include_render_outputs=True)
+    assert seen["producer"] == PD.manifest_producer_fields(direction)
+    assert seen["include_render_outputs"] is True and seen["source_commit"] == "unknown"
+
+
+def test_an_ordinary_dispatch_keeps_no_payload_and_no_stamp(tmp_path):
+    led, _payload = _dispatch_one_portrait(
+        tmp_path, {"episode_id": "ep_plain", "cast": [{"char_id": "c1"}]})
+    assert "producer_prompt_payload" not in led["images"]
+    assert PD.META_IMAGE_ENGINES not in led["meta"]
+
+
 def test_an_ordinary_dispatch_is_unchanged(monkeypatch, recorded):
     calls, _sentinel = recorded
     quiets = []

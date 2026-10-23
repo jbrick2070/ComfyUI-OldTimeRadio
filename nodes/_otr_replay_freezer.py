@@ -41,11 +41,14 @@ try:
         REPLAY_MANIFEST_NAME, REPLAY_MANIFEST_SCHEMA, ReplayBundleError,
         load_replay_manifest,
     )
+    from ._otr_producer_direction import MANIFEST_PRODUCER_KEY, META_IMAGE_ENGINES
 except ImportError:  # pragma: no cover -- flat (sys.path) load
     from production_ledger import (  # type: ignore
         REPLAY_MANIFEST_NAME, REPLAY_MANIFEST_SCHEMA, ReplayBundleError,
         load_replay_manifest,
     )
+    from _otr_producer_direction import (  # type: ignore
+        MANIFEST_PRODUCER_KEY, META_IMAGE_ENGINES)
 
 log = logging.getLogger("OTR.replay_freezer")
 
@@ -232,7 +235,8 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
            allow_no_plan: bool = False,
            dest: Optional[PathLike] = None,
            source_commit: str = "",
-           include_render_outputs: bool = False) -> pathlib.Path:
+           include_render_outputs: bool = False,
+           producer: Optional[dict] = None) -> pathlib.Path:
     """Freeze ``ep_dir`` into an immutable bundle and return its directory.
 
     The bundle lands at ``out_root/<episode_id>`` unless ``dest`` names the
@@ -241,6 +245,12 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
     ``out_root``. ``source_commit`` is recorded as given (an empty string when
     unknown) -- this function never asks git. Clips and foley stems are frozen
     only with ``include_render_outputs=True``.
+
+    ``producer`` is given only by a Scene Producer stage end: the direction's
+    identity, recorded as the manifest's ``producer`` section together with
+    the image engines the episode's stills were painted with, read from the
+    ledger. A producer freeze of a ledger with no engine stamp is refused. An
+    ordinary freeze writes no producer section.
 
     The episode path is made absolute first: the manifest records it as
     ``source_episode_root``, and a replay rebases its image paths from it, which
@@ -262,6 +272,16 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
         log.warning("[replay freeze] allow_no_plan: %s", msg)
     master = find_master(ep_dir, ledger)
     episode_id = str(ledger.get("episode_id") or ep_dir.name)
+    producer_section = None
+    if producer is not None:
+        meta = ledger.get("meta") if isinstance(ledger.get("meta"), dict) else {}
+        engines = meta.get(META_IMAGE_ENGINES)
+        if not isinstance(engines, dict) or not engines:
+            raise ReplayBundleError(
+                "a producer freeze needs the image engines its stills were painted "
+                "with, and ledger %s records none (meta %s)" % (ledger_path.name,
+                                                                META_IMAGE_ENGINES))
+        producer_section = dict(producer, image_engines=dict(engines))
 
     if dest is not None:
         final = pathlib.Path(dest)
@@ -327,6 +347,8 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
             "planned_shots": len(video.get("shots") or []),
             "files": files,
         }
+        if producer_section is not None:
+            manifest[MANIFEST_PRODUCER_KEY] = producer_section
         (tmp / REPLAY_MANIFEST_NAME).write_text(
             json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return final

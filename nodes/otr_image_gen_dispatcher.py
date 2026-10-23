@@ -30,6 +30,7 @@ Cold-import clean: torch / PIL / numpy are never imported at module scope.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -1587,6 +1588,14 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     }
     warnings: list = []
     report: list = []
+    # THE SCENE PRODUCER'S PAYLOAD (plan, "Stills"). On a producer run the
+    # payload node 89 handed this node is kept as it arrived, BEFORE this node's
+    # own merge adds jump stills, as ``images.producer_prompt_payload``, so a
+    # replay can rebuild from it and edited picture text carries into the next
+    # bundle. On every other run nothing is kept and nothing changes.
+    from . import _otr_producer_direction as _PD
+    _producer = _PD.runtime_direction(ledger)
+    _producer_payload = copy.deepcopy(image_prompts) if _producer is not None else None
     objects = (image_prompts or {}).get("objects") or []
     required_scene_targets = (image_prompts or {}).get(
         "required_scene_targets")
@@ -2548,6 +2557,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     }
     if required_scene_targets:
         ledger["images"]["required_scene_targets"] = required_target_receipt
+    if _producer_payload is not None:
+        ledger["images"]["producer_prompt_payload"] = _producer_payload
     # Credits: stamp the per-role image-engine histogram into meta (which DOES
     # persist to the on-disk ledger the credits dossier reads) so the dossier
     # shows the image model used for each slot. Additive; never overwrites.
@@ -2556,6 +2567,13 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         _ie_meta = {}
         ledger["meta"] = _ie_meta
     _ie_meta["image_engines"] = {"by_role": img_hist, "image_revision": rev}
+    _meta_updates = {"image_engines": _ie_meta["image_engines"]}
+    if _producer is not None:
+        # THE IMAGE-ENGINE STAMP: the engines this policy paints every slot
+        # with, which every producer freeze copies into its manifest and a
+        # later run must match (``_otr_producer_direction``).
+        _ie_meta[_PD.META_IMAGE_ENGINES] = _PD.policy_image_engines(image_policy)
+        _meta_updates[_PD.META_IMAGE_ENGINES] = _ie_meta[_PD.META_IMAGE_ENGINES]
     # S2 durable persistence (credits enrichment 2026-07-03): ``ledger`` here
     # is the LOCAL wire-parsed dict -- the stamp above was wire-only, so the
     # image-engine receipts died with the wire. Copy the images section + the
@@ -2591,7 +2609,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     from .production_ledger import stamp_durable
     stamp_durable(
         sections={"images": ledger["images"], "visual": ledger["visual"]},
-        meta_updates={"image_engines": _ie_meta["image_engines"]},
+        meta_updates=_meta_updates,
         source="image_dispatcher",
     )
     # stills_manifest.json beside the episode stills (ST-3/W3): the durable

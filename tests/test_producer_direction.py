@@ -188,15 +188,39 @@ def test_the_manifest_digest_is_the_sha256_of_its_bytes(tmp_path):
 # the queue-time admission
 # --------------------------------------------------------------------------- #
 
-def _prompt(direction, replay_from=""):
+#: The image engines every test bundle is stamped with, and every test graph's
+#: video director picks.
+ENGINES = {"announcer_image_model": "z_image_turbo", "music_image_model": "z_image_turbo",
+           "character_image_model": "z_image_turbo"}
+
+
+def _prompt(direction, replay_from="", picks=None):
+    director = dict(picks if picks is not None else ENGINES, custom_models_json="{}")
     return {"63": {"class_type": "OTR_WorkflowValidator", "inputs": {}},
             "1": {"class_type": "OTR_LedgerScriptWriter",
                   "inputs": {"source_bank": "my_story", "replay_from": replay_from}},
+            "87": {"class_type": "OTR_VideoDirector", "inputs": director},
             "90": {"class_type": "OTR_ShotLock",
                    "inputs": {"script_json": ["62", 1], "direction_json": direction}}}
 
 
-def _frozen_bundle(tmp_path, monkeypatch, dest):
+def _stamp_engines(ep, engines=None):
+    """Give a fixture episode's ledger the stamp a producer stills run writes."""
+    led_path = next((pathlib.Path(ep) / "audio").glob("*_ledger.json"))
+    led = json.loads(led_path.read_text(encoding="utf-8"))
+    led.setdefault("meta", {})[PD.META_IMAGE_ENGINES] = dict(engines or ENGINES)
+    led_path.write_text(json.dumps(led), encoding="utf-8")
+
+
+def _producer_freeze(ep, dest, *, stamp=True):
+    """A producer freeze of ``ep`` into ``dest``, as a stage end makes one."""
+    if stamp:
+        _stamp_engines(ep)
+    return RF.freeze(ep, None, dest=dest,
+                     producer=PD.manifest_producer_fields(PD.parse_direction(_raw())))
+
+
+def _frozen_bundle(tmp_path, monkeypatch, dest, *, producer=True):
     monkeypatch.setattr(PL, "_default_out_dir",
                         lambda ep=None: str(tmp_path / "episodes" / (ep or "pending") / "audio"))
     spec = importlib.util.spec_from_file_location(
@@ -205,7 +229,9 @@ def _frozen_bundle(tmp_path, monkeypatch, dest):
     tcr = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(tcr)
     ep, _ledger = tcr._make_episode(tmp_path / "source_episodes")
-    return RF.freeze(ep, None, dest=dest)
+    if not producer:
+        return RF.freeze(ep, None, dest=dest)
+    return _producer_freeze(ep, dest)
 
 
 def test_the_first_stills_run_is_admitted(producer_root):
@@ -451,7 +477,7 @@ def test_a_later_run_continues_the_latest_bundle_into_the_next_number(producer_r
                                                                      monkeypatch):
     first = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path(PID, "01-stills"))
     ep = pathlib.Path(PL.load_replay_manifest(str(first))["source_episode_root"])
-    second = RF.freeze(ep, None, dest=PD.bundle_path(PID, "02-stills"))
+    second = _producer_freeze(ep, PD.bundle_path(PID, "02-stills"))
     with pytest.raises(PD.DirectionError, match="latest bundle is 02-stills"):
         PD.admit_prompt_direction(_continue(first, "03-video"))
     with pytest.raises(PD.DirectionError, match="does not follow .* this run writes 03-video"):
@@ -587,3 +613,71 @@ def test_an_empty_direction_option_is_refused_not_ignored(tmp_path):
     with pytest.raises(SystemExit, match="direction-json missing"):
         canonical.main(["--offline-schemas", "--dry-run", "--direction-json", "",
                         "--dump-prompt", str(tmp_path / "prompt.json")])
+
+
+# --------------------------------------------------------------------------- #
+# chunk 3a: the image-engine stamp and its check
+# --------------------------------------------------------------------------- #
+
+def test_a_producer_freeze_records_its_identity_and_the_stills_engines(tmp_path, monkeypatch):
+    bundle = _frozen_bundle(tmp_path, monkeypatch, tmp_path / "b" / "01-stills")
+    producer = PL.load_replay_manifest(str(bundle))[PD.MANIFEST_PRODUCER_KEY]
+    assert producer == {"version": 1, "project_id": PID, "attempt_id": FIRST["attempt_id"],
+                        "stage": "stills", "out": "01-stills", "source": None,
+                        "image_engines": ENGINES}
+
+
+def test_an_ordinary_freeze_writes_no_producer_section_and_an_unstamped_one_is_refused(
+        tmp_path, monkeypatch):
+    plain = _frozen_bundle(tmp_path, monkeypatch, tmp_path / "plain" / "ep", producer=False)
+    assert PD.MANIFEST_PRODUCER_KEY not in PL.load_replay_manifest(str(plain))
+    ep = pathlib.Path(PL.load_replay_manifest(str(plain))["source_episode_root"])
+    with pytest.raises(PL.ReplayBundleError, match="records none"):
+        _producer_freeze(ep, tmp_path / "unstamped" / "01-stills", stamp=False)
+    assert not (tmp_path / "unstamped").exists()
+
+
+def test_a_later_run_must_paint_with_the_bundles_engines(producer_root, tmp_path, monkeypatch):
+    bundle = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path(PID, "01-stills"))
+    assert PD.admit_prompt_direction(_continue(bundle, "02-stills"))["manifest"]
+    swapped = _continue(bundle, "02-stills")
+    swapped["87"]["inputs"]["character_image_model"] = "flux_gen1"
+    with pytest.raises(PD.DirectionError,
+                       match="character_image_model 'flux_gen1' \\(the bundle used 'z_image_turbo'\\)"):
+        PD.admit_prompt_direction(swapped)
+    wired = _continue(bundle, "02-stills")
+    wired["87"]["inputs"]["music_image_model"] = ["300", 0]
+    with pytest.raises(PD.DirectionError, match="takes music_image_model from another node"):
+        PD.admit_prompt_direction(wired)
+    headless = _continue(bundle, "02-stills")
+    del headless["87"]
+    with pytest.raises(PD.DirectionError, match="exactly one OTR_VideoDirector"):
+        PD.admit_prompt_direction(headless)
+
+
+def test_a_bundle_without_the_stamp_cannot_be_continued(producer_root, tmp_path, monkeypatch):
+    bundle = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path(PID, "01-stills"),
+                            producer=False)
+    with pytest.raises(PD.DirectionError, match="carries no image-engine stamp"):
+        PD.admit_prompt_direction(_continue(bundle, "02-stills"))
+
+
+def test_the_check_resolves_picks_as_the_two_directors_do():
+    # An empty pick takes the image director's default; a custom sentinel takes
+    # its custom_models_json entry, exactly as the video director resolves it.
+    prompt = _prompt(_raw(), picks={"announcer_image_model": "",
+                                    "music_image_model": " z_image_turbo ",
+                                    "character_image_model": "+ Add Custom Model"})
+    prompt["87"]["inputs"]["custom_models_json"] = json.dumps(
+        {"character_image_model": "my_house_engine"})
+    assert PD.prompt_image_engines(prompt) == {
+        "announcer_image_model": "flux_gen1", "music_image_model": "z_image_turbo",
+        "character_image_model": "my_house_engine"}
+
+
+def test_the_stamp_reads_the_policy_the_dispatcher_paints_with():
+    policy = {"image_models": {"announcer_image_model": {"engine_id": "z_image_turbo"},
+                               "character_image_model": "flux_gen1"}}
+    assert PD.policy_image_engines(policy) == {
+        "announcer_image_model": "z_image_turbo", "music_image_model": "",
+        "character_image_model": "flux_gen1"}
