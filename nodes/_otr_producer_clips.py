@@ -223,6 +223,8 @@ def _key_body(*, shot_id, requests, coverage_plan, engine, render_policy, settin
 BODY_STRING_CAP = 1000
 #: A body logged whole (a miss against a record that kept none) stops here.
 LOGGED_BODY_CAP = 16000
+#: How many moved paths a miss line shows.
+DIFF_SHOWN = 40
 
 
 def clip_key_and_body(*, shot_id: str, requests: Iterable[Any], coverage_plan: Any,
@@ -282,9 +284,11 @@ def _capped(text: str) -> str:
 
 
 def key_body_diff(old: Any, new: Any, limit: int = 40) -> list:
-    """The dotted paths at which two causal bodies differ, in ascending order
-    of path, at most ``limit`` of them. Iterative and bounded: a deep or wide
-    body never raises and never walks past the limit (Codex QA on daa7adce).
+    """The dotted paths at which two causal bodies differ, in tree order with
+    siblings ascending (a child's paths come before the next sibling's, so
+    ``a[0]`` precedes ``a0``), at most ``limit`` of them. Iterative: a deep
+    body never raises, and the output never passes the limit; the walk still
+    visits every key of a wide body (Codex QA on daa7adce and b28f5f76).
     Scalars compare as their JSON text, so an unchanged NaN is unchanged."""
     out: list = []
     work: list = [("diff", old, new, "")]
@@ -316,7 +320,12 @@ def key_body_diff(old: Any, new: Any, limit: int = 40) -> list:
 
 
 def _scalar_text(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, ensure_ascii=True, default=str)
+    try:
+        return json.dumps(value, sort_keys=True, ensure_ascii=True, default=str)
+    except (RecursionError, ValueError, TypeError):
+        # A container too deep to print compared against a scalar: name its
+        # shape, never raise (Codex QA on b28f5f76).
+        return "<%s too deep to print>" % type(value).__name__
 
 
 def _short(value: Any, width: int = 48) -> str:
@@ -649,8 +658,10 @@ class ProducerClips:
             return
         old = previous.get("key_body")
         if isinstance(old, dict):
-            moved = key_body_diff(old, body)
-            count = "%d+" % len(moved) if len(moved) >= 40 else str(len(moved))
+            # One past the shown limit tells "exactly 40" from "more than 40".
+            moved = key_body_diff(old, body, limit=DIFF_SHOWN + 1)
+            count = "%d+" % DIFF_SHOWN if len(moved) > DIFF_SHOWN else str(len(moved))
+            moved = moved[:DIFF_SHOWN]
             log.warning("[OTR.producer_clips] shot %s NOT reused: filmed before under key "
                         "%s; this run's key %s differs in %s place(s): %s",
                         shot_id, str(previous.get("key", ""))[:12], key[:12], count,

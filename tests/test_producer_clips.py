@@ -333,32 +333,57 @@ def test_a_string_is_kept_at_the_cap_and_hashed_one_past_it():
     assert body["requests"][0]["b"].startswith("sha256:") and "(1001 chars)" in body["requests"][0]["b"]
 
 
-def test_the_diff_limit_holds_on_every_branch_and_lists_in_ascending_order():
+def test_the_diff_limit_holds_on_every_branch_and_walks_in_tree_order():
     changed = {"k%03d" % i: i for i in range(1000)}
     assert len(PC.key_body_diff(changed, {k: v + 1 for k, v in changed.items()})) == 40
     assert len(PC.key_body_diff({"l": list(range(1000))}, {"l": list(range(1, 1001))})) == 40
     assert PC.key_body_diff({"b": 1, "z": 1}, {"a": 0, "b": 2, "c": 0}) == [
         "a (new)", "b (1 -> 2)", "c (new)", "z (gone)"]
     assert PC.key_body_diff({}, changed)[:2] == ["k000 (new)", "k001 (new)"]
+    # Tree order: a child's paths come before the next sibling's (Codex QA).
+    assert PC.key_body_diff({"a": [0], "a0": 0}, {"a": [1], "a0": 1}) == [
+        "a[0] (0 -> 1)", "a0 (0 -> 1)"]
 
 
-def test_a_failing_explanation_never_fails_the_run(producer_root, cameras, tmp_path,
-                                                    monkeypatch, caplog):
+def test_a_deep_container_against_a_scalar_never_raises():
+    deep: dict = {}
+    node = deep
+    for _ in range(3000):
+        node["d"] = {}
+        node = node["d"]
+    moved = PC.key_body_diff({"x": deep}, {"x": 1})
+    assert len(moved) == 1 and moved[0].startswith("x (<dict too deep to print> -> 1)")
+
+
+def test_a_miss_line_says_40_plus_only_past_forty(producer_root, cameras, tmp_path, caplog):
+    """Exactly forty moved paths are forty; a forty-first makes it 40+. The
+    count is built from the real diff of the two records' bodies, padded
+    with gone keys under settings."""
     import logging
     camera = cameras()
     first, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a"))
-
-    def broken(*_args, **_kw):
-        raise RuntimeError("diff exploded")
-
-    monkeypatch.setattr(PC, "key_body_diff", broken)
-    with caplog.at_level(logging.WARNING, logger=PC.log.name):
-        _again, filmed, _producer = _film(camera, _workspace(
-            tmp_path, "ep_b", prompts={"shot_b002": "a window lashed by a storm"}),
-            bundle_map=_map(first))
-    assert filmed == ["shot_b002"]
-    assert any("the explanation failed (RuntimeError: diff exploded)" in r.getMessage()
-               for r in caplog.records)
+    edit = {"shot_b002": "a window lashed by a storm"}
+    again, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_b", prompts=edit),
+                                      bundle_map=_map(first))
+    old = _map(first)["shot_b002"]["key_body"]
+    new = _map(again)["shot_b002"]["key_body"]
+    base = len(PC.key_body_diff(old, new, limit=1000))
+    assert 0 < base < 40
+    for n in (40, 41):
+        padded = {sid: rec for sid, rec in _map(first).items()}
+        pad = {"OTR_PAD_%03d" % i: "1" for i in range(n - base)}
+        padded["shot_b002"] = dict(padded["shot_b002"], key_body=dict(
+            old, settings=dict(old["settings"], **pad)))
+        caplog.clear()
+        # A fresh edit each time: the store already holds the first edit's clip,
+        # and a store hit is a reuse, not a miss.
+        fresh = {"shot_b002": "a window lashed by a storm, take %d" % n}
+        with caplog.at_level(logging.WARNING, logger=PC.log.name):
+            _film(camera, _workspace(tmp_path, "ep_%d" % n, prompts=fresh), bundle_map=padded)
+        said = [r.getMessage() for r in caplog.records if "shot_b002 NOT reused" in r.getMessage()]
+        assert len(said) == 1, said
+        expected = "differs in 40 place(s)" if n == 40 else "differs in 40+ place(s)"
+        assert expected in said[0], (n, base, said[0][:160])
 
 
 def test_the_body_diff_is_bounded_iterative_and_nan_safe():
