@@ -897,6 +897,10 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
         # delivered, or the payload of the floor it fell to -- a failed card
         # until it is filmed again or kept as it is.
         record = filmed.get(shot_id) if isinstance(filmed.get(shot_id), dict) else None
+        if record is not None and not filed(record):
+            # Filmed only with its clip in this bundle: the bundle is what a
+            # replay of it delivers, and the clip store only a shortcut.
+            record = None
         floor = floored.get(shot_id) if isinstance(floored.get(shot_id), dict) else None
         clip = filed(record) or filed(floor)
         clip_state = ("kept" if shot_id in kept_clips and (record or floor) else

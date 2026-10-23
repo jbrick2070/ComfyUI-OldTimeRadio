@@ -477,6 +477,32 @@ def test_a_commit_waits_out_a_folder_held_for_a_moment(tmp_path, monkeypatch):
     assert [p.name for p in store.iterdir()] == [key], "no staging folder is left behind"
 
 
+def test_the_map_describes_the_episodes_own_files(producer_root, tmp_path):
+    # Another writer's entry already under the key holds other bytes; the map
+    # must still describe the clip this episode holds, or its bundle would not
+    # verify on its own. A record whose foley receipt names another stem is
+    # never kept, with or without the store.
+    producer = PC.ProducerClips(project_id=PID, episode_root=tmp_path / "ep", bundle_map={})
+    key = "fa" * 32
+    PC.commit(PC.store_dir(PID), key, BODY, {"clip": str(_clip_file(tmp_path, b"theirs"))})
+    mine = tmp_path / "ep" / "clips" / "shot_b001_role_engine.mp4"
+    mine.parent.mkdir(parents=True)
+    mine.write_bytes(b"mine")
+    producer._keys["shot_b001"] = key
+    producer.commit("shot_b001", {"path": str(mine), "frame_count": 25}, ["stub_camera"])
+    record = producer.records_for(["shot_b001"])["shot_b001"]
+    assert record["files"]["clip"]["sha256"] == PC.file_sha256(mine)
+    assert PC.lookup(PC.store_dir(PID), key)["files"]["clip"]["sha256"] != \
+        record["files"]["clip"]["sha256"], "the store keeps its own entry"
+    stem = tmp_path / "ep" / "audio" / "foley" / "shot_b002.wav"
+    stem.parent.mkdir(parents=True)
+    stem.write_bytes(b"RIFF a stem")
+    producer._keys["shot_b002"] = "fb" * 32
+    producer.commit("shot_b002", {"path": str(mine), "foley_path": str(stem),
+                                  "foley_sha256": "0" * 64}, [])
+    assert producer.records_for(["shot_b002"]) == {}
+
+
 def test_a_tampered_entry_is_refused(tmp_path):
     store, key = tmp_path / "store", "cd" * 32
     PC.commit(store, key, BODY, {"clip": str(_clip_file(tmp_path))})
@@ -817,6 +843,11 @@ def test_cards_show_each_clip_and_its_state(producer_root, cameras, floors, tmp_
                 for c in g["shots"]}
 
     shown = cards()
+    unfiled = {c["shot_id"]: c for g in PD.build_cards(
+        first["ledger"], PD.manifest_producer_fields(_direction()),
+        [f for f in files if "shot_b001" not in f["path"]])["scenes"] for c in g["shots"]}
+    assert (unfiled["shot_b001"]["clip"], unfiled["shot_b001"]["clip_state"]) == (None, ""), \
+        "filmed only with its clip in the bundle"
     assert shown["shot_b001"]["clip"] == video[PC.MAP_KEY]["shot_b001"]["files"]["clip"]["path"]
     assert (shown["shot_b001"]["clip_state"], shown["shot_b001"]["state"]) == ("filmed", "filmed")
     assert shown["shot_b001"]["clip_input_hash"] == video[PC.MAP_KEY]["shot_b001"]["key"]

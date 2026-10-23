@@ -539,9 +539,12 @@ class ProducerClips:
 
     # -- committing ------------------------------------------------------- #
     def commit(self, shot_id: str, clip: Dict[str, Any], attempts: list) -> None:
-        """Keep a shot this run filmed: its clip, already in the episode's
-        clips folder, and its foley stem go into the store, and the record into
-        this run's map. A store that cannot take it is reported, not fatal: the
+        """Keep a shot this run filmed: its record goes into this run's map,
+        and its clip and foley stem into the store. The record is made from
+        the files as they sit in the episode folder and checked as any record
+        is, so the map describes the episode's own files -- the bundle frozen
+        with them verifies on its own, whatever the store already holds under
+        the key. A store that cannot take the shot is reported, not fatal: the
         clip is in the episode, and the stage's bundle carries it."""
         shot_id = str(shot_id)
         with self._lock:
@@ -558,18 +561,17 @@ class ProducerClips:
              "clip": {k: v for k, v in clip.items() if k not in _PATH_FIELDS.values()}},
             ensure_ascii=True, default=str))
         try:
-            record = commit(self.store, key, body, files)
+            record = _check_record(dict(body, version=RECORD_VERSION, key=key, files={
+                role: _file_entry(Path(path), os.path.basename(path))
+                for role, path in files.items()}), "shot %s's record" % shot_id)
+        except ClipStoreError as exc:
+            log.error("[OTR.producer_clips] shot %s keeps no reuse record: %s", shot_id, exc)
+            return
+        try:
+            commit(self.store, key, body, files)
         except (OSError, ClipStoreError) as exc:
             log.error("[OTR.producer_clips] shot %s was filmed but not committed to the "
                       "store (%s); this stage's bundle still carries it", shot_id, exc)
-            try:
-                record = dict(body, version=RECORD_VERSION, key=key, files={
-                    role: _file_entry(Path(path), os.path.basename(path))
-                    for role, path in files.items()})
-            except ClipStoreError as unread:
-                log.error("[OTR.producer_clips] shot %s keeps no reuse record: %s",
-                          shot_id, unread)
-                return
         with self._lock:
             self._records[shot_id] = self._map_record(record)
 
