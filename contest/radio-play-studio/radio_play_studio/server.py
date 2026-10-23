@@ -47,6 +47,8 @@ PRESENCE_S = 20.0
 #: window is well above that: a background tab still counts as open.
 GPU_IDLE_S = 150.0
 _RANGE = re.compile(r"^bytes=(\d*)-(\d*)$")
+#: The largest body any route takes: a photo's data URL, with room to spare.
+MAX_BODY_BYTES = 32 * 1024 * 1024
 _PROJECT = r"([a-z0-9][a-z0-9-]{3,31})"
 
 
@@ -70,10 +72,14 @@ def available_languages() -> list:
 
 
 class Run:
-    """One episode: its events so far, and whether it has ended."""
+    """One episode, or one Scene Producer stage: its events so far, and
+    whether it has ended."""
 
-    def __init__(self, run_id: str) -> None:
+    def __init__(self, run_id: str, label: dict | None = None) -> None:
         self.id = run_id
+        #: What a stage run makes -- its project and stage -- so a reloaded
+        #: page finds the board it belongs to; empty for an episode.
+        self.label = dict(label or {})
         self.events: list = []
         self.finished = False
         self.started = time.time()
@@ -89,10 +95,13 @@ class Run:
 
 def _body_length(headers) -> int:
     """The request body's declared length. A negative one is refused: reading
-    -1 bytes would block until the client hung up."""
+    -1 bytes would block until the client hung up. So is one past
+    MAX_BODY_BYTES, before a byte of it is read."""
     length = int(headers.get("Content-Length") or 0)
     if length < 0:
         raise ValueError("a negative Content-Length")
+    if length > MAX_BODY_BYTES:
+        raise ValueError(f"a body over {MAX_BODY_BYTES // (1024 * 1024)} MB")
     return length
 
 
@@ -126,7 +135,8 @@ class Runs:
         """One Scene Producer stage of a project, the same way: checked here,
         run on a thread, refused while anything else is being made."""
         return self._launch(lambda: self.studio.prepare_stage(project_id, stage),
-                            self.studio.stream_stage)
+                            self.studio.stream_stage,
+                            {"project_id": project_id, "stage": stage})
 
     def start_project(self, choices: dict) -> tuple:
         """A new Scene Producer project for these choices, with its first
@@ -141,27 +151,33 @@ class Runs:
                                        choices=choices)
         return project, self.start_stage(project["project_id"], "stills")
 
-    def _launch(self, check, events) -> Run:
+    def _launch(self, check, events, label: dict | None = None) -> Run:
         """``check()`` raises for a request that cannot run, before any thread
         starts; ``events(checked)`` then yields the run's events on one."""
         with self._lock:
             if self._busy():
                 raise Busy(_BUSY)
         checked = check()
-        run = Run(uuid.uuid4().hex[:12])
+        run = Run(uuid.uuid4().hex[:12], label)
         with self._lock:
             if self._busy():
                 raise Busy(_BUSY)
             self._runs[run.id] = run
             self._gpu_dirty = True
-        threading.Thread(target=self._drive, args=(run, events, checked), daemon=True).start()
+        try:
+            threading.Thread(target=self._drive, args=(run, events, checked), daemon=True).start()
+        except BaseException:
+            with self._lock:
+                self._runs.pop(run.id, None)
+            raise
         return run
 
     def listing(self) -> list:
-        """Every episode this app has started since it was launched, newest first."""
+        """Every episode and stage this app has started since it was launched,
+        newest first; a stage with its project and stage."""
         with self._lock:
             runs = sorted(self._runs.values(), key=lambda r: r.started, reverse=True)
-        return [{"id": r.id, "finished": r.finished, "started": r.started} for r in runs]
+        return [dict(r.label, id=r.id, finished=r.finished, started=r.started) for r in runs]
 
     # -- the GPU goes back when the last page closes -----------------------
     def page_open(self, page_id: str) -> None:
@@ -185,8 +201,17 @@ class Runs:
             return True
 
     def _drive(self, run: Run, events, checked) -> None:
-        for event in events(checked):
-            run.add(event)
+        """Feed a run its events. A run always ends -- a failure inside it is
+        its last event -- or the GPU guard would stay held for good."""
+        try:
+            for event in events(checked):
+                run.add(event)
+        except Exception as exc:  # noqa: BLE001 - reported on the run, and in the console
+            traceback.print_exc()
+            run.add({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
+        finally:
+            if not run.finished:
+                run.add({"type": "error", "message": "the run stopped without saying why"})
 
     def get(self, run_id: str) -> Run | None:
         with self._lock:
@@ -206,8 +231,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _host_ok(self) -> bool:
         host = (self.headers.get("Host") or "").strip().lower()
-        if host.startswith("["):  # [::1] or [::1]:8765
-            name = host[:host.find("]") + 1]
+        if host.startswith("["):  # [::1] or [::1]:8765, and nothing else after it
+            name, _, rest = host.partition("]")
+            name += "]"
+            if rest and not re.fullmatch(r":\d{1,5}", rest):
+                return False
         else:
             name = host.split(":", 1)[0]
         return name in LOOPBACK_HOSTS

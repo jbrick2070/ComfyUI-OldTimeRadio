@@ -311,8 +311,10 @@ class Studio:
         latest = producer.latest_bundle(project)
         replay_from = producer.bundle_subfolder(project_id, latest["out"]) if latest else ""
         producer.patch_graph(graph, node_ids, direction, replay_from)
-        return {"project_id": project_id, "direction": direction, "graph": graph,
-                "node_ids": node_ids, "revision": project["draft"]["revision"]}
+        # The direction that is SENT is built again when the attempt is saved
+        # (producer.begin_attempt), from the project as it stands then.
+        return {"project_id": project_id, "stage": stage, "graph": graph,
+                "node_ids": node_ids}
 
     def stream_stage(self, plan: dict) -> Iterator[dict]:
         """Run one prepared stage (:meth:`prepare_stage`) and report it as
@@ -329,22 +331,29 @@ class Studio:
         outright, or a job that ended failed with no complete bundle, lets
         the project try again."""
         out_dir = self.settings.out_dir
-        pid, direction = plan["project_id"], plan["direction"]
-        stage, attempt = direction["stage"], direction["attempt_id"]
+        pid, stage = plan["project_id"], plan["stage"]
         base = {"stage": stage, "project_id": pid}
 
         def error(message: str) -> dict:
             return dict(base, type="error", message=message)
 
         try:
-            producer.begin_attempt(out_dir, pid, direction, plan["graph"], plan["node_ids"],
-                                   plan["revision"])
+            direction = producer.begin_attempt(out_dir, pid, stage, plan["graph"],
+                                               plan["node_ids"])
         except Exception as exc:  # noqa: BLE001 - reported, never raised
             yield error(describe_failure(exc))
             return
+        plan = dict(plan, direction=direction)
+        attempt = direction["attempt_id"]
         try:
             client = self._client_factory(self.settings.api_url)
-            job = client.submit(client.workflows.from_json(plan["graph"]))
+            workflow = client.workflows.from_json(plan["graph"])
+        except Exception as exc:  # noqa: BLE001 - nothing was sent
+            producer.abandon_attempt(out_dir, pid, attempt, describe_failure(exc))
+            yield error(describe_failure(exc))
+            return
+        try:
+            job = client.submit(workflow)
         except Exception as exc:  # noqa: BLE001 - decided below
             if submit_was_refused(exc):
                 producer.abandon_attempt(out_dir, pid, attempt, describe_failure(exc))
@@ -415,7 +424,8 @@ class Studio:
         try:
             project = producer.load_project(out_dir, pid)
             view = producer.adopt_bundle(out_dir, project, direction["out"], self._read_output,
-                                         attempt_id=attempt, source=direction.get("source"))
+                                         attempt_id=attempt, source=direction.get("source"),
+                                         stage=stage)
         except producer.BundleMissing as exc:
             if failure is not None:
                 producer.abandon_attempt(out_dir, pid, attempt, describe_failure(failure))

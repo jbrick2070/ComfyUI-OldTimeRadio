@@ -84,6 +84,7 @@ class StageClient:
         self.workflows = self
         self.directions = []
         self.texts = dict(TEXTS)
+        self.filmed = {}            # shot id -> the picture text its clip shows
         self.refuse = None          # an exception submit raises
         self.fail = None            # the job ends with this
         self.freezes = True         # whether the run leaves its bundle
@@ -103,16 +104,19 @@ class StageClient:
         self.directions.append(direction)
         for sid, edit in direction.get("cards", {}).items():
             self.texts[sid] = edit.get("picture_text", self.texts[sid])
+        if direction["stage"] == "video":
+            self.filmed = dict(self.texts)
         if direction["stage"] != "publish" and self.freezes:
-            freeze(self.output, direction, self.texts)
+            freeze(self.output, direction, self.texts, self.filmed)
         outputs = ([FakeOutput("9", "otr_episode.mp4")]
                    if direction["stage"] == "publish" else [])
         return StageJob("job-%d" % len(self.directions), self.events, self.fail, outputs)
 
 
-def freeze(output, direction, texts):
-    """What the pack's freeze leaves for one stage: each still and, for Video,
-    each clip, cards.json, and the manifest listing every one of them."""
+def freeze(output, direction, texts, filmed=None):
+    """What the pack's freeze leaves for one stage: each still, each clip
+    filmed so far (``filmed``: shot id -> the picture its clip shows; a Stills
+    bundle carries them over), cards.json, and the manifest listing them."""
     folder = f"{producer.REPLAY_ROOT}/{direction['project_id']}/{direction['out']}"
     files = []
 
@@ -127,12 +131,13 @@ def freeze(output, direction, texts):
         still = "stills/still_%s.png" % sid[len("shot_"):]
         put(still, b"PNG of " + text.encode())
         clip = None
-        if direction["stage"] == "video":
+        if sid in (filmed or {}):
             clip = "clips/%s.mp4" % sid
-            put(clip, b"MP4 of " + text.encode())
+            put(clip, b"MP4 of " + filmed[sid].encode())
         cards.append({"shot_id": sid, "picture_text": text, "motion_text": "turns to the door",
                       "picture_editable": True, "motion_editable": sid != "shot_b003",
-                      "still": still, "clip": clip, "state": "painted"})
+                      "still": still, "clip": clip, "state": "painted",
+                      "clip_state": "filmed" if clip else ""})
     view = {"version": 1, "project_id": direction["project_id"],
             "attempt_id": direction["attempt_id"], "stage": direction["stage"],
             "bundle": direction["out"], "source": direction.get("source"),
@@ -140,8 +145,11 @@ def freeze(output, direction, texts):
                       "take": 0}],
             "scenes": [{"scene_id": "scene_1", "note": "", "shots": cards}]}
     put("cards.json", json.dumps(view).encode())
-    output[(folder, "manifest.json")] = json.dumps({"schema_version": 1,
-                                                   "files": files}).encode()
+    record = {"version": 1, "project_id": direction["project_id"],
+              "attempt_id": direction["attempt_id"], "stage": direction["stage"],
+              "out": direction["out"], "source": direction.get("source")}
+    output[(folder, "manifest.json")] = json.dumps({"schema_version": 1, "files": files,
+                                                   "producer": record}).encode()
 
 
 def reader(output):
@@ -230,6 +238,8 @@ def test_a_draft_saves_over_the_revision_it_read_and_refuses_a_stale_one(tmp_pat
     {"takes": {"clips": {"shot_b001": -1}}},
     {"kept": {"clips": "shot_b001"}},
     {"kept": {"clips": ["shot b001"]}},
+    {"takes": {"characters": {"con": 0}}},
+    {"kept": {"stills": ["LPT1"]}},
     ["not", "an", "object"],
 ])
 def test_a_draft_the_pack_would_refuse_never_reaches_the_disk(tmp_path, draft):
@@ -274,13 +284,17 @@ def test_a_replay_carries_only_what_differs_from_the_bundle_shown():
         scenes={"scene_1": {"note": "rain"}, "scene_9": {"note": "nowhere"}},
         takes={"characters": {"c01": 1}, "stills": {}, "clips": {"shot_b002": 3}},
         kept={"stills": [], "clips": ["shot_b001"]})
-    direction = producer.build_direction(project, "video")
-    assert (direction["out"], direction["source"]) == ("02-video", "d" * 64)
+    with pytest.raises(producer.ProjectError, match="paint the changed pictures first: shot_b002"):
+        producer.build_direction(project, "video")
+    direction = producer.build_direction(project, "stills")
+    assert (direction["out"], direction["source"]) == ("02-stills", "d" * 64)
     assert direction["cards"] == {"shot_b001": {"motion_text": "sits"},
                                   "shot_b002": {"picture_text": "a window in a storm"}}
     assert direction["scenes"] == {}
     assert direction["takes"]["clips"] == {"shot_b002": 3}, "takes and keeps go in full"
     assert direction["kept"]["clips"] == ["shot_b001"]
+    project["draft"]["scenes"] = {"scene_1": {}}
+    assert producer.build_direction(project, "stills")["scenes"] == {}, "no note, no clear"
     project["draft"]["scenes"] = {"scene_1": {"note": ""}}
     assert producer.build_direction(project, "stills")["scenes"] == {"scene_1": {"note": ""}}
     project["draft"]["cards"] = {"shot_b002": {"picture_text": "  "}}
@@ -331,7 +345,7 @@ def _frozen(tmp_path, **direction):
 def test_a_bundle_is_adopted_only_as_it_was_frozen(tmp_path):
     project, output, direction = _frozen(tmp_path)
     view = producer.adopt_bundle(tmp_path, project, "01-stills", reader(output),
-                                 attempt_id="a" * 32, source=None)
+                                 attempt_id="a" * 32, source=None, stage="stills")
     manifest = output[(f"{producer.REPLAY_ROOT}/{project['project_id']}/01-stills",
                        "manifest.json")]
     assert view["digest"] == hashlib.sha256(manifest).hexdigest()
@@ -341,9 +355,15 @@ def test_a_bundle_is_adopted_only_as_it_was_frozen(tmp_path):
     assert view["cast"][0]["picture"] == card["still"]
     kept = tmp_path / "projects" / project["project_id"] / "media" / f"{sha}.png"
     assert kept.read_bytes() == b"PNG of " + TEXTS["shot_b001"].encode()
-    with pytest.raises(producer.ProjectError, match="not the one this run made"):
-        producer.adopt_bundle(tmp_path, project, "01-stills", reader(output),
-                              attempt_id="b" * 32, source=None)
+    for attempt, stage in (("b" * 32, "stills"), ("a" * 32, "video")):
+        with pytest.raises(producer.ProjectError, match="not the one this run made"):
+            producer.adopt_bundle(tmp_path, project, "01-stills", reader(output),
+                                  attempt_id=attempt, source=None, stage=stage)
+    # A copy kept here is checked as well: one altered on disk is fetched again.
+    kept.write_bytes(b"not the picture")
+    producer.adopt_bundle(tmp_path, project, "01-stills", reader(output),
+                          attempt_id="a" * 32, source=None, stage="stills")
+    assert kept.read_bytes() == b"PNG of " + TEXTS["shot_b001"].encode()
     # A picture copied in once is kept by its hash and never fetched again;
     # one not yet copied is checked against the manifest as it is fetched.
     other, output, _direction = _frozen(tmp_path / "other")
@@ -351,7 +371,15 @@ def test_a_bundle_is_adopted_only_as_it_was_frozen(tmp_path):
     output[(folder, "still_b002.png")] = b"a different picture"
     with pytest.raises(producer.ProjectError, match="not the file its manifest lists"):
         producer.adopt_bundle(tmp_path / "other", other, "01-stills", reader(output),
-                              attempt_id="a" * 32, source=None)
+                              attempt_id="a" * 32, source=None, stage="stills")
+    # The manifest's own producer record must name the run too.
+    folder = f"{producer.REPLAY_ROOT}/{other['project_id']}/01-stills"
+    manifest = json.loads(output[(folder, "manifest.json")])
+    manifest["producer"]["attempt_id"] = "c" * 32
+    output[(folder, "manifest.json")] = json.dumps(manifest).encode()
+    with pytest.raises(producer.ProjectError, match="not the one this run made"):
+        producer.adopt_bundle(tmp_path / "other", other, "01-stills", reader(output),
+                              attempt_id="a" * 32, source=None, stage="stills")
 
 
 def test_a_bundle_cannot_name_media_outside_itself_or_unlisted(tmp_path):
@@ -373,7 +401,7 @@ def test_a_bundle_cannot_name_media_outside_itself_or_unlisted(tmp_path):
         output[(folder, "manifest.json")] = json.dumps(manifest).encode()
         with pytest.raises(producer.ProjectError, match=refusal):
             producer.adopt_bundle(tmp_path, project, "01-stills", reader(output),
-                                  attempt_id="a" * 32, source=None)
+                                  attempt_id="a" * 32, source=None, stage="stills")
 
 
 # --------------------------------------------------------------------------- #
@@ -425,6 +453,23 @@ def test_a_replay_sends_its_edits_and_the_previous_bundle(studio):
         "an edit the bundle now shows is an edit no more"
 
 
+def test_each_clip_is_noted_with_the_still_it_was_filmed_from(studio):
+    # A still painted again after its clip was filmed leaves that clip
+    # showing the old picture: the page must say it needs filming again.
+    pid = _project(studio)["project_id"]
+    _run(studio, pid, "stills")
+    _run(studio, pid, "video")
+    cards = {c["shot_id"]: c for c in _load(studio, pid)["view"]["scenes"][0]["shots"]}
+    assert all(c["clip_still"] == c["still"] for c in cards.values())
+    producer.save_draft(studio.settings.out_dir, pid,
+                        {"cards": {"shot_b002": {"picture_text": "a window in a storm"}}}, 0)
+    _run(studio, pid, "stills")
+    cards = {c["shot_id"]: c for c in _load(studio, pid)["view"]["scenes"][0]["shots"]}
+    assert cards["shot_b002"]["clip"] and cards["shot_b002"]["clip_still"] != \
+        cards["shot_b002"]["still"]
+    assert cards["shot_b001"]["clip_still"] == cards["shot_b001"]["still"]
+
+
 def test_a_draft_saved_while_a_stage_runs_stays_an_edit(studio):
     pid = _project(studio)["project_id"]
     _run(studio, pid, "stills")
@@ -440,6 +485,37 @@ def test_a_draft_saved_while_a_stage_runs_stays_an_edit(studio):
     assert after["draft"]["revision"] == 2
     assert producer.build_direction(after, "stills")["cards"] == {
         "shot_b002": {"picture_text": "a window at dawn"}}
+
+
+def test_a_run_sends_the_project_as_it_stands_when_its_attempt_is_saved(studio):
+    # Prepared, then overtaken: a draft saved and a whole stage run since.
+    # What is sent is built when the attempt is saved, so it carries the
+    # newest draft and the next bundle number, never a stale plan.
+    pid = _project(studio)["project_id"]
+    _run(studio, pid, "stills")
+    stale = studio.prepare_stage(pid, "stills")
+    producer.save_draft(studio.settings.out_dir, pid,
+                        {"cards": {"shot_b002": {"picture_text": "a window in a storm"}}}, 0)
+    _run(studio, pid, "stills")                                   # 02-stills
+    producer.save_draft(studio.settings.out_dir, pid,
+                        {"cards": {"shot_b002": {"picture_text": "a window at dawn"}}}, 1)
+    events = list(studio.stream_stage(stale))
+    assert events[-1]["bundle"] == "03-stills"
+    sent = studio.client.directions[-1]
+    assert sent["source"] == _load(studio, pid)["bundles"][1]["digest"]
+    assert sent["cards"] == {"shot_b002": {"picture_text": "a window at dawn"}}
+
+
+def test_a_client_that_cannot_be_built_sends_nothing_and_frees_the_project(studio):
+    pid = _project(studio)["project_id"]
+
+    def broken(url):
+        raise RuntimeError("the Comfy SDK is not installed")
+
+    studio._client_factory = broken
+    events = _run(studio, pid, "stills")
+    assert events[-1]["type"] == "error" and "not installed" in events[-1]["message"]
+    assert _load(studio, pid)["pending"] is None
 
 
 def test_a_refused_submit_frees_the_project_and_an_unclear_one_holds_it(studio):
@@ -592,6 +668,44 @@ def test_project_routes_refuse_what_cannot_run(app):
     _events(port, started["id"])
     status, body = _call(port, "POST", f"/api/projects/{pid}/stages", {"stage": "stills"})
     assert status == 409 and "in flight" in body["error"]
+
+
+def test_a_run_that_raises_still_ends_and_frees_the_gpu(app, monkeypatch):
+    port, studio = app
+
+    def broken(plan):
+        yield {"type": "submitted"}
+        raise RuntimeError("a bug in the stage")
+
+    monkeypatch.setattr(studio, "stream_stage", broken)
+    pid = _project(studio)["project_id"]
+    status, started = _call(port, "POST", f"/api/projects/{pid}/stages", {"stage": "stills"})
+    assert status == 202
+    last = _events(port, started["id"])[-1]
+    assert last["type"] == "error" and "a bug in the stage" in last["message"]
+    monkeypatch.undo()
+    status, _ = _call(port, "POST", f"/api/projects/{pid}/stages", {"stage": "stills"})
+    assert status == 202, "the guard was released"
+
+
+def test_only_loopback_hosts_and_bounded_bodies_are_answered(app):
+    port, _studio = app
+    for host in ("[::1].evil.example", "[::1]x", "127.0.0.1.evil.example"):
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("GET", "/api/projects", headers={"Host": host})
+        assert conn.getresponse().status == 403, host
+        conn.close()
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("GET", "/api/projects", headers={"Host": "[::1]:8765"})
+    assert conn.getresponse().status == 200
+    conn.close()
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.putrequest("POST", "/api/projects")
+    conn.putheader("Content-Type", "application/json")
+    conn.putheader("Content-Length", str(10 ** 30))
+    conn.endheaders()
+    assert conn.getresponse().status == 400
+    conn.close()
 
 
 def test_a_stage_waits_its_turn_behind_an_episode(app, monkeypatch):

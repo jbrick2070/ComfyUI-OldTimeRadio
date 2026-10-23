@@ -60,6 +60,9 @@ STAGES = ("stills", "video", "publish")
 PROJECT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{3,31}$")
 OUT_RE = re.compile(r"^([0-9]{2})-(stills|video)$")
 ITEM_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+#: Names Windows reserves for devices, which the pack refuses as ids.
+DEVICE_NAMES = frozenset(["con", "prn", "aux", "nul"] + ["com%d" % n for n in range(10)]
+                         + ["lpt%d" % n for n in range(10)])
 MAX_NOTE_CHARS = 2_000
 MAX_CARD_TEXT_CHARS = 4_000
 MAX_TAKE = 9_999
@@ -181,7 +184,8 @@ def list_projects(out_dir: Path) -> list:
 # --------------------------------------------------------------------------- #
 
 def _item_id(value: Any, where: str) -> str:
-    if not isinstance(value, str) or not ITEM_ID_RE.fullmatch(value):
+    if (not isinstance(value, str) or not ITEM_ID_RE.fullmatch(value)
+            or value.lower() in DEVICE_NAMES):
         raise ProjectError(f"{where} names {value!r}, which is not an id")
     return value
 
@@ -282,6 +286,34 @@ def bundle_subfolder(project_id: str, out: str) -> str:
     return f"{REPLAY_ROOT}/{project_id}/{out}"
 
 
+def unpainted(project: dict) -> list:
+    """The cards whose still the draft asks to paint and no Stills run has
+    painted yet: a new picture text or still take, or -- unless the still is
+    kept -- a new scene note or a new take of the character in it. Video and
+    Publish film what is painted, so node 63 refuses them while any is left,
+    and Studio does too, before anything is sent."""
+    view = project.get("view") or {}
+    draft = project["draft"]
+    kept = set(draft["kept"]["stills"])
+    waiting = []
+    for scene in view.get("scenes", []):
+        note = draft["scenes"].get(scene["scene_id"]) or {}
+        note_changed = (bool(scene.get("note_editable")) and "note" in note
+                        and note["note"] != scene.get("note", ""))
+        for card in scene["shots"]:
+            if not card.get("picture_editable"):
+                continue
+            sid, body = card["shot_id"], draft["cards"].get(card["shot_id"], {})
+            char = card.get("still_char_id") or ""
+            char_changed = bool(char) and (draft["takes"]["characters"].get(char, 0)
+                                           != card.get("still_char_take", 0))
+            if (("picture_text" in body and body["picture_text"] != card.get("picture_text", ""))
+                    or draft["takes"]["stills"].get(sid, 0) != card.get("still_take", 0)
+                    or (sid not in kept and (note_changed or char_changed))):
+                waiting.append(sid)
+    return waiting
+
+
 def build_direction(project: dict, stage: str) -> dict:
     """The direction a stage run carries: the project's identity and the
     latest bundle's digest, the draft's edits that differ from what the
@@ -300,6 +332,10 @@ def build_direction(project: dict, stage: str) -> dict:
         return direction
     if stage == "publish" and latest["stage"] != "video":
         raise ProjectError("Publish puts together the shots a Video run filmed: film them first")
+    waiting = unpainted(project) if stage != "stills" else []
+    if waiting:
+        more = f" and {len(waiting) - 5} more" if len(waiting) > 5 else ""
+        raise ProjectError("paint the changed pictures first: " + ", ".join(waiting[:5]) + more)
     direction["source"] = latest["digest"]
     view = project.get("view") or {}
     shown = {card["shot_id"]: card for scene in view.get("scenes", []) for card in scene["shots"]}
@@ -322,9 +358,9 @@ def build_direction(project: dict, stage: str) -> dict:
             edit["motion_text"] = body["motion_text"]
         if edit:
             cards[shot_id] = edit
-    scenes = {scene_id: {"note": body.get("note", "")}
+    scenes = {scene_id: {"note": body["note"]}
               for scene_id, body in draft["scenes"].items()
-              if scene_id in notes and body.get("note", "") != notes[scene_id]}
+              if scene_id in notes and "note" in body and body["note"] != notes[scene_id]}
     direction.update(cards=cards, scenes=scenes, takes=copy.deepcopy(draft["takes"]),
                      kept=copy.deepcopy(draft["kept"]))
     return direction
@@ -360,17 +396,26 @@ def patch_graph(graph: dict, node_ids: dict, direction: dict,
 # one attempt, from before it is sent to its end
 # --------------------------------------------------------------------------- #
 
-def begin_attempt(out_dir: Path, project_id: str, direction: dict, graph: dict,
-                  node_ids: dict, revision: int) -> dict:
-    """Save an attempt as the project's ``pending`` before anything is sent:
-    its id, stage, bundle and source, the draft revision it carries, and --
-    in ``attempts/<attempt_id>.json`` beside the project -- the exact graph
-    it submits. Refused when another attempt is pending."""
-    attempt_id = direction["attempt_id"]
+def begin_attempt(out_dir: Path, project_id: str, stage: str, graph: dict,
+                  node_ids: dict) -> dict:
+    """Save an attempt as the project's ``pending`` before anything is sent,
+    and return its direction. The direction is built here, under the project
+    lock, from the project as it stands -- its latest bundle, its next bundle
+    number, its draft as last saved -- and set on ``graph``, so a draft saved
+    or a stage finished since the run was prepared never sends a stale one,
+    and no bundle number is sent twice. The exact graph is kept in
+    ``attempts/<attempt_id>.json`` beside the project. Refused when another
+    attempt is pending."""
+    made = {}
 
     def change(project: dict) -> None:
         if project["pending"] is not None:
             raise StageInFlight("this project already has a stage in flight")
+        direction = build_direction(project, stage)
+        latest = latest_bundle(project)
+        patch_graph(graph, node_ids, direction,
+                    bundle_subfolder(project_id, latest["out"]) if latest else "")
+        attempt_id = direction["attempt_id"]
         folder = project_dir(out_dir, project_id) / ATTEMPTS_DIR
         folder.mkdir(parents=True, exist_ok=True)
         (folder / f"{attempt_id}.json").write_text(
@@ -378,13 +423,15 @@ def begin_attempt(out_dir: Path, project_id: str, direction: dict, graph: dict,
                        ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
         out = direction.get("out")
         if out:
-            project["last_number"] = max(int(project.get("last_number") or 0), int(out[:2]))
-        project["pending"] = {"attempt_id": attempt_id, "stage": direction["stage"],
-                              "out": out, "source": direction.get("source"),
-                              "revision": int(revision), "started": time.time(),
+            project["last_number"] = int(out[:2])
+        project["pending"] = {"attempt_id": attempt_id, "stage": stage, "out": out,
+                              "source": direction.get("source"),
+                              "revision": project["draft"]["revision"], "started": time.time(),
                               "job_id": None, "state": "submitting", "note": ""}
+        made["direction"] = direction
 
-    return update_project(out_dir, project_id, change)
+    update_project(out_dir, project_id, change)
+    return made["direction"]
 
 
 def _pending_change(attempt_id: str, apply: Callable[[dict], None]) -> Callable[[dict], None]:
@@ -426,12 +473,36 @@ def abandon_attempt(out_dir: Path, project_id: str, attempt_id: str, message: st
     return update_project(out_dir, project_id, _pending_change(attempt_id, apply))
 
 
+def carry_clip_stills(view: dict, previous: Optional[dict], stage: str) -> dict:
+    """Note on each card the still its clip was filmed from (``clip_still``),
+    so the page can tell a clip whose still has been painted again since. A
+    Video bundle films each clip it shows from the still beside it, unless
+    the card kept its clip; a kept clip, and every clip a Stills bundle
+    carries over, keeps the note it had. Media URLs are named by sha256, so
+    equal URLs are equal files."""
+    before = {card["shot_id"]: card for scene in (previous or {}).get("scenes", [])
+              for card in scene["shots"]}
+    for scene in view.get("scenes") or []:
+        for card in scene.get("shots") or []:
+            old = before.get(card["shot_id"]) or {}
+            if not card.get("clip"):
+                card["clip_still"] = None
+            elif stage == "video" and card.get("clip_state") != "kept":
+                card["clip_still"] = card.get("still")
+            else:
+                card["clip_still"] = old.get("clip_still") if old.get("clip") == card["clip"] else None
+    return view
+
+
 def finish_bundle(out_dir: Path, project_id: str, attempt_id: str, view: dict) -> dict:
     """A Stills or Video attempt whose bundle is adopted: the bundle joins the
-    project and its view becomes the one the draft is read against. The draft
-    is left as it is, so an edit made while the stage ran stays an edit."""
+    project and its view becomes the one the draft is read against, each clip
+    noted with the still it was filmed from (:func:`carry_clip_stills`). The
+    draft is left as it is, so an edit made while the stage ran stays an
+    edit."""
     def apply(project: dict) -> None:
         pending = project["pending"]
+        carry_clip_stills(view, project["view"], pending["stage"])
         project["bundles"].append({"out": pending["out"], "stage": pending["stage"],
                                    "digest": view["digest"], "attempt_id": attempt_id,
                                    "source": pending["source"], "finished": time.time()})
@@ -475,14 +546,15 @@ def read_output(comfyui_url: str, subfolder: str, name: str, timeout: float = 12
 
 
 def adopt_bundle(out_dir: Path, project: dict, out: str, read_file: ReadFile,
-                 *, attempt_id: str, source: Optional[str]) -> dict:
+                 *, attempt_id: str, source: Optional[str], stage: str) -> dict:
     """Read a finished stage's bundle and return its page view, its media
     copied into the project. ``read_file(subfolder, name)`` returns a file's
     bytes from ComfyUI's output folder.
 
-    Only the intended bundle is adopted: its cards must name this project,
-    the attempt that made it and the bundle it continued, and every file is
-    checked against the manifest's sha256 before it is kept."""
+    Only the intended bundle is adopted: its manifest's producer record and
+    its cards must both name this project, the attempt and stage that made
+    it and the bundle it continued, and every file is checked against the
+    manifest's sha256 before it is kept -- one already copied in, too."""
     subfolder = bundle_subfolder(project["project_id"], out)
     raw_manifest = read_file(subfolder, "manifest.json")
     try:
@@ -491,6 +563,11 @@ def adopt_bundle(out_dir: Path, project: dict, out: str, read_file: ReadFile,
         raise ProjectError(f"bundle {out}'s manifest cannot be read: {exc}") from None
     if not isinstance(manifest, dict):
         raise ProjectError(f"bundle {out}'s manifest is not an object")
+    made_by = (project["project_id"], attempt_id, stage, out, source)
+    record = manifest.get("producer") if isinstance(manifest.get("producer"), dict) else {}
+    if tuple(record.get(k) for k in ("project_id", "attempt_id", "stage", "out",
+                                     "source")) != made_by:
+        raise ProjectError(f"bundle {out} is not the one this run made")
     listed = {str(row.get("path")): str(row.get("sha256") or "")
               for row in (manifest.get("files") or []) if isinstance(row, dict)}
 
@@ -513,8 +590,8 @@ def adopt_bundle(out_dir: Path, project: dict, out: str, read_file: ReadFile,
         raise ProjectError(f"bundle {out}'s cards cannot be read: {exc}") from None
     if not isinstance(cards, dict) or cards.get("version") != CARDS_VERSION:
         raise ProjectError(f"bundle {out}'s cards are not version {CARDS_VERSION}")
-    if (cards.get("project_id"), cards.get("attempt_id"), cards.get("bundle"),
-            cards.get("source")) != (project["project_id"], attempt_id, out, source):
+    if (cards.get("project_id"), cards.get("attempt_id"), cards.get("stage"),
+            cards.get("bundle"), cards.get("source")) != made_by:
         raise ProjectError(f"bundle {out} is not the one this run made")
 
     media = project_dir(out_dir, project["project_id"]) / MEDIA_DIR
@@ -532,7 +609,8 @@ def adopt_bundle(out_dir: Path, project: dict, out: str, read_file: ReadFile,
             raise ProjectError(f"bundle {out} does not list {rel}")
         name = listed[rel] + suffix
         target = media / name
-        if not target.is_file():
+        if not (target.is_file()
+                and hashlib.sha256(target.read_bytes()).hexdigest() == listed[rel]):
             media.mkdir(parents=True, exist_ok=True)
             side = media / f".{name}.{uuid.uuid4().hex[:8]}.part"
             side.write_bytes(fetch(rel))

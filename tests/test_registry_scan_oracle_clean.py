@@ -72,7 +72,10 @@ def test_the_app_experiment_is_the_only_exception():
     findings = _oracle().scan()
     app = [f for f in findings if f["file"].startswith(SHIPPED_APP)]
     assert all(f["rule"] in {"$env_read/mod", "$http2", "$socket2"} for f in app), app
-    assert len(app) <= 10, "the app grew new scan findings; respell nothing, decide first"
+    # Eleven: the ten the ruling above names, and since 2026-10-22 one more HTTP
+    # call of the same kind -- the Scene Producer reading its bundles through the
+    # local ComfyUI's own /view (radio_play_studio/producer.py, read_output).
+    assert len(app) <= 11, "the app grew new scan findings; respell nothing, decide first"
 
 
 def test_only_the_app_itself_ships_from_contest():
