@@ -2716,25 +2716,52 @@ class OTRImageGenDispatcher:
         led = self._loads(script_json, {})
         policy = self._loads(image_policy_json, {})
         prompts = self._loads(image_prompts_json, {})
+        # THE SCENE PRODUCER'S DIRECTION, as Shot Lock put it on the wire. None
+        # on every ordinary run, and then nothing below changes.
+        from . import _otr_producer_direction as _PD
+        direction = _PD.runtime_direction(led)
         # CANONICAL REPLAY (campaign item 0): the imported ``images`` rows are
         # verified on disk and re-stamped as they are; gen_fn is never called.
         from .production_ledger import replay_descriptor as _replay_descriptor
         if _replay_descriptor((led.get("meta") or {})):
             led, image_done, report = verify_replay_images(led)
-            patched = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
-            return (patched, image_done, report)
-        # The in-graph node mints REAL portraits via the request's image engine
-        # (in-process Flux gen-1) under the AS-3 GPU-residency lease. On a box
-        # without the GPU / wrapper nodes / checkpoint the render fails closed and
-        # the dispatcher degrades that object to the radio floor LOUD (never a
-        # crash). The CPU platform tests bypass this by calling dispatch_images()
-        # directly with an injected gen_fn.
-        led, image_done, report, _warn = dispatch_images(
-            led, policy, prompts, gen_fn=_inprocess_gen_fn,
-            episode_id=str(episode_id or ""),
-        )
+        else:
+            # The in-graph node mints REAL portraits via the request's image
+            # engine (in-process Flux gen-1) under the AS-3 GPU-residency lease.
+            # On a box without the GPU / wrapper nodes / checkpoint the render
+            # fails closed and the dispatcher degrades that object to the radio
+            # floor LOUD (never a crash). The CPU platform tests bypass this by
+            # calling dispatch_images() directly with an injected gen_fn.
+            led, image_done, report, _warn = dispatch_images(
+                led, policy, prompts, gen_fn=_inprocess_gen_fn,
+                episode_id=str(episode_id or ""),
+            )
+        if direction is not None:
+            if direction["stage"] == "stills":
+                return self._finish_stills_stage(led, direction, episode_id, report)
+            # Any later stage: hand the direction on to Batch, whatever the
+            # helpers above did to the ledger dict.
+            _PD.attach_runtime(led, direction)
         patched = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
         return (patched, image_done, report)
+
+    @staticmethod
+    def _finish_stills_stage(led, direction, episode_id, report):
+        """END OF A SCENE PRODUCER STILLS STAGE: freeze this workspace into the
+        bundle the direction names, then stop the graph here. Every node
+        downstream -- the video, composite, captions, credits and mux -- is
+        skipped by ComfyUI's silent blocker, and the prompt still ends as a
+        success. The stills are already stamped durably, so the freeze reads
+        them from disk."""
+        from . import _otr_producer_direction as _PD
+        ep = str(episode_id or led.get("episode_id")
+                 or (led.get("meta") or {}).get("episode_id") or "")
+        bundle = _PD.freeze_stage(direction, ep, include_render_outputs=False)
+        log.warning("[OTR_ImageGenDispatcher] Scene Producer stills stage done: froze "
+                    "episode %s into %s; the graph stops here (%s)", ep, bundle,
+                    str(report or "").splitlines()[0] if report else "no report")
+        blocked = _PD.execution_blocker()
+        return (blocked, blocked, blocked)
 
     @staticmethod
     def _loads(raw, default):

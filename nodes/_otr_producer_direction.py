@@ -27,11 +27,11 @@ unauthenticated ``/prompt``. Every name that becomes part of a path is matched
 against a strict pattern here, and every path is confined to the producer's own
 folder, before anything touches the disk.
 
-WHAT IS NOT HERE YET, and which chunk adds it beside its caller (a check with
-nothing to compare against is the defect the repo's own rules forbid): the
-image-engine stamp and its check (chunk 2, with the producer freeze that writes
-it), ``cards.json`` and the unpainted-edit check (chunk 3), the clip store path
-(chunk 4).
+WHAT IS NOT HERE YET, and which build step adds it beside its caller (a check
+with nothing to compare against is the defect the repo's own rules forbid): the
+image-engine stamp and its check, ``cards.json`` and the unpainted-edit check
+(chunk 3, with the repaint they protect), the clip store path (chunk 4). Until
+then :func:`not_yet_supported` refuses what a direction cannot get yet.
 
 UTF-8, no BOM. Standard library only.
 """
@@ -91,7 +91,8 @@ _KEPT_GROUPS = ("stills", "clips")
 __all__ = [
     "DIRECTION_VERSION", "STAGES", "WIDGET_NAME", "DirectionError", "is_blank",
     "parse_direction", "check_stage_rules", "bundle_root", "project_dir", "FIRST_OUT",
-    "project_bundle",
+    "project_bundle", "not_yet_supported", "RUNTIME_KEY", "attach_runtime",
+    "runtime_direction", "freeze_stage", "execution_blocker",
     "bundle_path", "manifest_digest", "admit_prompt_direction",
 ]
 
@@ -427,3 +428,91 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
                 "or the direction reuses a bundle name" % (direction["out"],
                                                           direction["project_id"]))
     return {"direction": direction, "replay_from": replay_from, "manifest": manifest}
+
+
+# --------------------------------------------------------------------------- #
+# what this build can run
+# --------------------------------------------------------------------------- #
+
+def not_yet_supported(direction: Dict[str, Any]) -> Optional[str]:
+    """What a direction asks for that this build cannot honour yet, in plain
+    words, or ``None``. A direction is refused rather than run with part of it
+    silently ignored: an edit that does nothing would look like a broken edit.
+
+    Each arrives with the build step that makes it real (plan, Build order):
+    Publish needs clip reuse, or it would film every shot again; card and
+    scene edits, takes and keeps need the overlay and the repaint.
+    """
+    if direction["stage"] == "publish":
+        return ("Publish is not available in this build yet: without clip reuse it "
+                "would film every shot again")
+    asked = [label for label, present in (
+        ("scene notes", bool(direction["scenes"])),
+        ("card edits", bool(direction["cards"])),
+        ("takes", any(direction["takes"].values())),
+        ("kept cards", any(direction["kept"].values())),
+    ) if present]
+    if asked:
+        return ("%s are not available in this build yet; this build runs the stills "
+                "and video stages without edits" % ", ".join(asked))
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# the runtime key: the direction on the wire, never on disk
+# --------------------------------------------------------------------------- #
+
+#: Shot Lock puts the parsed direction on the ledger it passes downstream under
+#: this top-level key; the image prompt node, the dispatcher and Batch read it
+#: from their wire input. The durable save copies named sections only, so the
+#: key never reaches disk, and a freeze reads the disk ledger, so no bundle
+#: carries it. A blank widget means no key at all.
+RUNTIME_KEY = "_otr_producer"
+
+
+def attach_runtime(ledger: dict, direction: Optional[Dict[str, Any]]) -> dict:
+    """Put ``direction`` on the wire ledger, or remove any key when it is None."""
+    if direction is None:
+        ledger.pop(RUNTIME_KEY, None)
+    else:
+        ledger[RUNTIME_KEY] = direction
+    return ledger
+
+
+def runtime_direction(ledger: Any) -> Optional[Dict[str, Any]]:
+    """The direction Shot Lock put on this wire ledger, or ``None``."""
+    if not isinstance(ledger, dict):
+        return None
+    direction = ledger.get(RUNTIME_KEY)
+    if (not isinstance(direction, dict) or direction.get("version") != DIRECTION_VERSION
+            or direction.get("stage") not in STAGES):
+        return None
+    return direction
+
+
+def freeze_stage(direction: Dict[str, Any], episode_id: str, *,
+                 include_render_outputs: bool) -> Path:
+    """Freeze the finished stage's workspace into the bundle the direction
+    names. The names are re-validated here (``bundle_path``), because this runs
+    in a node and the wire ledger is only as trustworthy as its sender. The
+    source commit is ``unknown``: inside the server there is no honest way to
+    know it, and a package version is not a commit."""
+    try:
+        from ._otr_paths import otr_audio_dir
+        from ._otr_replay_freezer import freeze
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import otr_audio_dir  # type: ignore
+        from _otr_replay_freezer import freeze  # type: ignore
+    ep_dir = Path(otr_audio_dir(str(episode_id or ""))).parent
+    dest = bundle_path(direction["project_id"], direction["out"])
+    return freeze(ep_dir, None, dest=dest, source_commit="unknown",
+                  include_render_outputs=include_render_outputs)
+
+
+def execution_blocker() -> Any:
+    """ComfyUI's silent blocker: every node downstream of the one returning it
+    is skipped, and the prompt still ends as a success. Always given ``None``;
+    a message would turn the skip into an execution error. Imported lazily so
+    this module loads outside ComfyUI."""
+    from comfy_execution.graph_utils import ExecutionBlocker  # type: ignore
+    return ExecutionBlocker(None)

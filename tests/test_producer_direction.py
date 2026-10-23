@@ -278,15 +278,18 @@ def test_the_validator_asks_before_either_readiness_gate():
     assert ask < src.index("_queue_time_readiness_gates(")
 
 
-def test_the_validator_passes_blank_and_refuses_every_filled_direction_for_now(producer_root):
+def test_the_validator_admits_a_plain_direction_and_refuses_what_is_not_built(producer_root):
     from nodes import _otr_workflow_validator as wv
     admit = wv.WorkflowValidator._admit_producer_direction
     assert admit(_prompt("")) is None
     assert admit({"90": {"class_type": "OTR_ShotLock", "inputs": {}}}) is None
+    assert admit(_prompt(_raw())) is None
     with pytest.raises(ValueError, match="direction refused -- .*version must be 1"):
         admit(_prompt(_raw(version=7)))
-    with pytest.raises(ValueError, match="cannot run Scene Producer stages yet"):
-        admit(_prompt(_raw()))
+    with pytest.raises(ValueError, match="card edits are not available in this build yet"):
+        admit(_prompt(_raw(cards={"shot_b001": {"picture_text": "a desk"}})))
+    publish = PD.parse_direction(_raw(stage="publish", out=_DROP, source="a" * 64))
+    assert "Publish is not available" in PD.not_yet_supported(publish)
 
 
 def test_shot_lock_carries_the_widget_as_an_advanced_input():
@@ -300,10 +303,10 @@ def test_shot_lock_carries_the_widget_as_an_advanced_input():
     assert "socketless" not in opts and "forceInput" not in opts
 
 
-def test_shot_lock_refuses_a_filled_direction_before_any_work():
+def test_shot_lock_refuses_what_this_build_cannot_honour_before_any_work():
     from nodes.otr_shot_lock import OTRShotLock
-    with pytest.raises(ValueError, match="cannot run Scene Producer stages yet"):
-        OTRShotLock().lock("{}", direction_json=_raw())
+    with pytest.raises(ValueError, match="takes are not available in this build yet"):
+        OTRShotLock().lock("{}", direction_json=_raw(takes={"clips": {"shot_b001": 1}}))
 
 
 def test_every_shipped_graph_saves_the_widget_blank():
@@ -382,7 +385,7 @@ def test_an_ordinary_bundle_outside_the_producer_folder_is_refused(producer_root
 def test_shot_lock_and_the_validator_agree_on_what_blank_means(falsy):
     from nodes.otr_shot_lock import OTRShotLock
     assert not PD.is_blank(falsy)
-    with pytest.raises(ValueError, match="cannot run Scene Producer stages yet"):
+    with pytest.raises(ValueError, match="Scene Producer direction refused -- .*literal text"):
         OTRShotLock().lock("{}", direction_json=falsy)
 
 

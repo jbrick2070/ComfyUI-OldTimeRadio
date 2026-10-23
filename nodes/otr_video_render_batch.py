@@ -549,6 +549,13 @@ class OTRVideoRenderBatch:
         # the workflow named.
         master_audio_path = confine_to_read_roots(master_audio_path, "master_audio_path")
         from ._otr_video_engines import render_driver as _rd
+        # THE SCENE PRODUCER'S DIRECTION, as Shot Lock put it on the wire. None
+        # on every ordinary run, and then nothing below changes.
+        from . import _otr_producer_direction as _PD
+        try:
+            direction = _PD.runtime_direction(json.loads(patched_ledger_json or "{}"))
+        except (ValueError, TypeError):
+            direction = None
         report, manifest_payload, name = self._render_episode(
             _rd, patched_ledger_json,
             master_audio_path=str(master_audio_path or ""))
@@ -584,8 +591,31 @@ class OTRVideoRenderBatch:
                 _floored - int(report.get("floor_clip_count") or 0), name)
         else:
             log.warning("[OTR_VideoRenderBatch] ok=%s -> %s", ok, name)
+        if direction is not None and direction["stage"] == "video":
+            return self._finish_video_stage(direction, report, payload)
         return {"ui": {"text": [payload[:6000]]},
                 "result": (payload, manifest_payload)}
+
+    @staticmethod
+    def _finish_video_stage(direction, report, payload):
+        """END OF A SCENE PRODUCER VIDEO STAGE: freeze this workspace, clips and
+        foley stems included, into the bundle the direction names, then stop
+        the graph here. A stage that did not account for every shot is not a
+        bundle anyone should continue, so it fails LOUD and freezes nothing;
+        sanctioned floors are accounted for, and they freeze."""
+        from . import _otr_producer_direction as _PD
+        if not report.get("ok"):
+            raise ValueError(
+                "OTR_VideoRenderBatch: Scene Producer video stage did not account for "
+                "every shot (%s unaccounted%s); no bundle was frozen" % (
+                    report.get("unaccounted_beat_count", "?"),
+                    "; " + str(report["error"]) if report.get("error") else ""))
+        ep = str(report.get("episode_id") or "")
+        bundle = _PD.freeze_stage(direction, ep, include_render_outputs=True)
+        log.warning("[OTR_VideoRenderBatch] Scene Producer video stage done: froze "
+                    "episode %s into %s; the graph stops here", ep, bundle)
+        blocked = _PD.execution_blocker()
+        return {"ui": {"text": [payload[:6000]]}, "result": (blocked, blocked)}
 
     @staticmethod
     def _render_episode(_rd, patched_ledger_json, master_audio_path=""):

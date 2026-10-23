@@ -3522,23 +3522,26 @@ class OTRShotLock:
     # ------------------------------------------------------------------ #
     def lock(self, script_json, audio_done="", video_policy_json="{}",
              gate_in="", direction_json=""):
-        # A FILLED DIRECTION IS REFUSED UNTIL ITS STAGES EXIST (Scene Producer
-        # chunk 1). The Workflow Validator refuses one at queue time; this is
-        # the backstop for a graph without that node, so a direction is never
-        # silently run as an ordinary full episode. Chunk 2 replaces it with
-        # the stage itself. Blank -- every shipped graph -- passes untouched.
-        # "Blank" is the shared module's rule, so this backstop and the
-        # validator can never disagree (a falsy non-text value such as 0 or {}
-        # is a malformed direction, not a blank one).
+        # THE SCENE PRODUCER'S DIRECTION (planning/scene-producer/PLAN.md).
+        # Blank -- every shipped graph -- parses to None and nothing below
+        # changes. A filled one is read with the SAME rules the Workflow
+        # Validator applied at queue time (a graph without that node is caught
+        # here instead), and whatever this build cannot honour yet is refused
+        # rather than silently ignored.
         try:
-            from ._otr_producer_direction import is_blank as _direction_is_blank
+            from . import _otr_producer_direction as _PD
         except ImportError:  # pragma: no cover -- flat imports
-            from _otr_producer_direction import is_blank as _direction_is_blank  # type: ignore
-        if not _direction_is_blank(direction_json):
-            raise ValueError(
-                "OTR_ShotLock: direction_json is filled, but this build cannot run "
-                "Scene Producer stages yet. Clear direction_json to make an ordinary "
-                "episode.")
+            import _otr_producer_direction as _PD  # type: ignore
+        try:
+            direction = _PD.parse_direction(direction_json)
+        except _PD.DirectionError as exc:
+            raise ValueError("OTR_ShotLock: Scene Producer direction refused -- %s"
+                             % exc) from None
+        if direction is not None:
+            _not_yet = _PD.not_yet_supported(direction)
+            if _not_yet:
+                raise ValueError("OTR_ShotLock: Scene Producer direction refused -- %s"
+                                 % _not_yet)
         from . import _otr_ledger_consumers as _OTRLC
         try:
             from .production_ledger import stamp_durable as _stamp_durable
@@ -3559,6 +3562,17 @@ class OTRShotLock:
         if not isinstance(meta, dict):
             meta = {}
             led["meta"] = meta
+        from .production_ledger import replay_descriptor as _replay_descriptor
+        # A first run writes a new episode; every later run replays a bundle.
+        # The writer's replay_from decides which this is, so a direction that
+        # disagrees with it is refused before any planning work.
+        if direction is not None and (direction["source"] is None) == bool(
+                _replay_descriptor(meta)):
+            raise ValueError(
+                "OTR_ShotLock: Scene Producer direction refused -- a %s direction "
+                "reached a %s run" % (
+                    "first-run" if direction["source"] is None else "replay",
+                    "replay" if _replay_descriptor(meta) else "fresh"))
         try:
             policy = json.loads(video_policy_json or "{}")
             if not isinstance(policy, dict):
@@ -3608,7 +3622,6 @@ class OTRShotLock:
         # CANONICAL REPLAY (campaign item 0): the PLANNED section is reused from
         # the imported ledger -- no LLM derivation, no re-plan, no revision bump.
         # The seeds are the same because the request hashes are the same rows.
-        from .production_ledger import replay_descriptor as _replay_descriptor
         if _replay_descriptor(meta):
             planned = led.get("video")
             if not isinstance(planned, dict) or not planned.get("shots"):
@@ -3634,6 +3647,9 @@ class OTRShotLock:
                            meta_updates={"video_revision": revision,
                                          "replay_engine_override": _override},
                            source="OTR_ShotLock:replay")
+            # The direction rides the WIRE only (after the durable stamp, which
+            # copies the video section and never this top-level key).
+            _PD.attach_runtime(led, direction)
             patched = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
             log.warning("[OTR_ShotLock] REPLAY: planned section reused (revision %d, "
                         "%d shot(s)), no LLM", revision, len(planned.get("shots") or []))
@@ -3743,6 +3759,8 @@ class OTRShotLock:
             report.append(f"WARN: {w}")
             log.warning("[OTR_ShotLock] %s", w)
 
+        # The direction rides the WIRE only (see the replay branch above).
+        _PD.attach_runtime(led, direction)
         patched = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
         done = f"shot_lock:done:rev={revision}"
         episode_id = str(led.get("episode_id")
