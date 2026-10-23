@@ -36,11 +36,16 @@ stills came from. A later run must resolve the same engines from its own video
 director, or :func:`admit_prompt_direction` refuses it: a repaint with another
 engine would mix two looks in one episode.
 
+CARDS.JSON AND UNPAINTED EDITS (chunk 3). Every producer freeze writes
+``cards.json``, the page's view of its bundle, and each card still records the
+digest of what it was painted from. A Video or Publish run whose direction asks
+for a still its card does not show -- an edited picture or note, a raised take
+-- is refused (:func:`unpainted_shots`) unless the card is kept.
+
 WHAT IS NOT HERE YET, and which build step adds it beside its caller (a check
-with nothing to compare against is the defect the repo's own rules forbid):
-``cards.json`` and the unpainted-edit check (chunk 3, with the repaint they
-protect), the clip store path (chunk 4). Until then :func:`not_yet_supported`
-refuses what a direction cannot get yet.
+with nothing to compare against is the defect the repo's own rules forbid): the
+clip store and clip reuse (chunk 4), and with them Publish, clip takes and kept
+clips. Until then :func:`not_yet_supported` refuses those.
 
 UTF-8, no BOM. Standard library only.
 """
@@ -129,7 +134,8 @@ __all__ = [
     "policy_image_engines", "prompt_image_engines", "manifest_producer_fields",
     "PAYLOAD_KEY", "RAW_TEXTS_KEY", "TAKES_KEY", "object_shot_id", "initial_raw_texts",
     "merged_raw_texts", "compose_picture", "painted_takes", "SUPERSEDED_KEY",
-    "producer_replay_needs",
+    "producer_replay_needs", "CARDS_NAME", "ROW_INPUT_HASH", "payload_object_hash",
+    "still_input_digest", "card_still_digest", "build_cards", "unpainted_shots",
 ]
 
 
@@ -498,7 +504,25 @@ def manifest_producer_fields(direction: Dict[str, Any]) -> Dict[str, Any]:
     manifest. The freezer adds the image-engine stamp from the ledger."""
     return {"version": MANIFEST_PRODUCER_VERSION, "project_id": direction["project_id"],
             "attempt_id": direction["attempt_id"], "stage": direction["stage"],
-            "out": direction["out"], "source": direction["source"]}
+            "out": direction["out"], "source": direction["source"],
+            "kept": {"stills": list(direction["kept"]["stills"]),
+                     "clips": list(direction["kept"]["clips"])}}
+
+
+def _read_cards(bundle: Path) -> Dict[str, Any]:
+    """The bundle's ``cards.json`` -- a member the manifest lists, so admission
+    has already hashed it -- or a refusal when a producer bundle carries none."""
+    path = os.path.join(str(bundle), CARDS_NAME)
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            cards = json.load(fh)
+    except (OSError, ValueError) as exc:
+        raise DirectionError("bundle %s has no readable %s (%s); it was not frozen by a "
+                             "producer run" % (bundle.name, CARDS_NAME, exc)) from None
+    if not isinstance(cards, dict) or cards.get("version") != CARDS_VERSION:
+        raise DirectionError("bundle %s's %s is not version %d"
+                             % (bundle.name, CARDS_NAME, CARDS_VERSION))
+    return cards
 
 
 def _check_image_engines(prompt: dict, manifest: dict, bundle_name: str) -> None:
@@ -594,6 +618,178 @@ def painted_takes(direction: Dict[str, Any]) -> Dict[str, Dict[str, int]]:
     takes = direction.get("takes") or {}
     return {"characters": dict(takes.get("characters") or {}),
             "stills": dict(takes.get("stills") or {})}
+
+
+# --------------------------------------------------------------------------- #
+# cards.json, and the still-input digest it records per card
+# --------------------------------------------------------------------------- #
+
+CARDS_NAME = "cards.json"
+CARDS_VERSION = 1
+#: Stamped on each card still's ledger row when it is painted; a kept row
+#: carries the digest of the paint it keeps, never of the texts since.
+ROW_INPUT_HASH = "producer_input_hash"
+
+
+def _hash_json(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, ensure_ascii=True, sort_keys=True,
+                                     separators=(",", ":")).encode()).hexdigest()
+
+
+def payload_object_hash(obj: Any) -> str:
+    """What a still is painted from besides its prompt -- identity, references,
+    size, kind: the payload object without ``prompt`` and ``prompt_hash``, which
+    its raw picture text and note stand for instead."""
+    if not isinstance(obj, dict):
+        return ""
+    return _hash_json({k: v for k, v in obj.items() if k not in ("prompt", "prompt_hash")})
+
+
+def still_input_digest(payload_hash: str, picture_text: str, note: str, char_id: str,
+                       identity_take: int, still_take: int, engine_id: str) -> str:
+    """Everything that decides a card still's pixels, as one digest: the payload
+    object, the raw picture text, the scene's note, the character and its take,
+    the still's take and the image engine. A Stills run records it per card;
+    node 63 recomputes it for a Video or Publish run. An ACTION never enters it,
+    so a motion edit never asks for a repaint."""
+    return _hash_json({"v": 1, "payload": str(payload_hash or ""),
+                       "picture": str(picture_text or ""), "note": str(note or ""),
+                       "char": str(char_id or ""), "identity_take": int(identity_take or 0),
+                       "still_take": int(still_take or 0), "engine": str(engine_id or "")})
+
+
+def card_still_digest(obj: Any, engine_id: str, raw_texts: Dict[str, Any],
+                      takes: Dict[str, Any], scene_of_beat: Dict[str, str]) -> str:
+    """The digest of a card still as a run paints it: its payload object, its
+    raw picture text and its scene's note from ``raw_texts``, its OWN
+    character (the still object's, which an announcer beat's still has none
+    of) and that character's take, its own take and its engine. The
+    dispatcher stamps it on the row it paints; node 63 recomputes the same."""
+    shot = object_shot_id(obj)
+    char_id = str(obj.get("char_id") or "")
+    scene = scene_of_beat.get(str(obj.get("beat_id") or ""), "")
+    return still_input_digest(
+        payload_object_hash(obj),
+        (raw_texts.get("cards") or {}).get(shot, obj.get("prompt") or ""),
+        (raw_texts.get("scenes") or {}).get(scene, ""), char_id,
+        int((takes.get("characters") or {}).get(char_id, 0) or 0) if char_id else 0,
+        int((takes.get("stills") or {}).get(shot, 0) or 0), str(engine_id or ""))
+
+
+def _scene_of_beat(ledger: dict) -> Dict[str, str]:
+    return {str(b.get("beat_id")): str(b.get("scene_id") or "")
+            for b in (ledger.get("beats") or []) if isinstance(b, dict)}
+
+
+def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str, Any]:
+    """The small versioned view a producer freeze writes beside the manifest:
+    the one contract between the nodes and Radio Play Studio's page. Media
+    paths are bundle-relative and name only files the manifest lists. Each
+    card's ``still_input_hash`` is the digest recorded on its row when its
+    still was painted, so a kept still keeps the digest of the paint it is."""
+    images = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
+    raw = images.get(RAW_TEXTS_KEY) if isinstance(images.get(RAW_TEXTS_KEY), dict) else {}
+    takes = images.get(TAKES_KEY) if isinstance(images.get(TAKES_KEY), dict) else {}
+    payload = images.get(PAYLOAD_KEY) if isinstance(images.get(PAYLOAD_KEY), dict) else {}
+    objects = {str(o.get("object_id")): o for o in payload.get("objects") or []
+               if isinstance(o, dict)}
+    rows = {str(r.get("object_id")): r for r in images.get("images") or []
+            if isinstance(r, dict) and r.get("object_id")}
+    by_name = {}
+    for entry in files:
+        rel = str(entry.get("path") or "")
+        if rel.startswith(("stills/", "portraits/")):
+            by_name.setdefault(rel.rsplit("/", 1)[-1], rel)
+
+    def media(row):
+        name = os.path.basename(str((row or {}).get("path") or ""))
+        return by_name.get(name, "") if name else ""
+
+    lines = {str(ln.get("line_id")): ln for ln in ledger.get("lines") or []
+             if isinstance(ln, dict)}
+    scene_of = _scene_of_beat(ledger)
+    kept = set((producer.get("kept") or {}).get("stills") or [])
+    characters = takes.get("characters") or {}
+    stills = takes.get("stills") or {}
+    scenes: Dict[str, Dict[str, Any]] = {}
+    for shot in (ledger.get("video") or {}).get("shots") or []:
+        if not isinstance(shot, dict) or not str(shot.get("shot_id") or "").startswith("shot_"):
+            continue
+        shot_id = str(shot["shot_id"])
+        beat = shot_id[len("shot_"):]
+        obj = objects.get("still_%s" % beat)
+        row = rows.get("still_%s" % beat)
+        line = lines.get(beat) or {}
+        creative = shot.get("creative") if isinstance(shot.get("creative"), dict) else {}
+        editable = "motion" in creative and not shot.get("ghost_prompt")
+        scene_id = scene_of.get(beat, "")
+        still = media(row)
+        state = ("kept" if shot_id in kept else
+                 "painted" if still else
+                 "failed" if obj is not None else "")
+        card = {
+            "shot_id": shot_id, "char_id": str(shot.get("char_id") or ""),
+            "line": str(line.get("text") or ""),
+            "start_s": float(line.get("start_s") or shot.get("start_s") or 0.0),
+            "dur_s": float(line.get("dur_s") or shot.get("dur_s") or 0.0),
+            "picture_text": ((raw.get("cards") or {}).get(shot_id, obj.get("prompt") or "")
+                             if obj else ""),
+            "motion_text": str(creative.get("motion") or "") if editable else "",
+            "motion_editable": bool(editable), "picture_editable": obj is not None,
+            "still": still, "clip": None,
+            "still_take": int(stills.get(shot_id, 0) or 0), "clip_take": 0,
+            "still_input_hash": str((row or {}).get(ROW_INPUT_HASH) or ""),
+            "payload_hash": payload_object_hash(obj) if obj else "",
+            "still_char_id": str((obj or {}).get("char_id") or ""),
+            "engine_id": str((row or {}).get("engine_id") or ""),
+            "still_dirty": False, "clip_dirty": False, "state": state,
+        }
+        group = scenes.setdefault(scene_id, {"scene_id": scene_id,
+                                             "note": (raw.get("scenes") or {}).get(scene_id, ""),
+                                             "shots": []})
+        group["shots"].append(card)
+    cast = []
+    for member in ledger.get("cast") or []:
+        if not isinstance(member, dict) or not member.get("char_id"):
+            continue
+        char_id = str(member["char_id"])
+        picture = media(rows.get(char_id)) or next(
+            (card["still"] for group in scenes.values() for card in group["shots"]
+             if card["char_id"] == char_id and card["still"]), "")
+        cast.append({"char_id": char_id, "name": str(member.get("name") or ""),
+                     "picture": picture, "take": int(characters.get(char_id, 0) or 0)})
+    return {"version": CARDS_VERSION, "project_id": producer.get("project_id"),
+            "attempt_id": producer.get("attempt_id"), "stage": producer.get("stage"),
+            "bundle": producer.get("out"), "source": producer.get("source"),
+            "cast": cast, "scenes": list(scenes.values())}
+
+
+def unpainted_shots(cards: Dict[str, Any], direction: Dict[str, Any]) -> list:
+    """The cards whose stills do not show what the direction asks for: an
+    edited picture or note, a raised take -- any change to a still's inputs
+    since it was painted -- unless the card is kept. A Video or Publish run
+    with any is refused: it would film the old stills under the new edits."""
+    kept = set(direction["kept"]["stills"])
+    characters = direction["takes"]["characters"]
+    stills = direction["takes"]["stills"]
+    pending = []
+    for group in cards.get("scenes") or []:
+        scene_note = direction["scenes"].get(group.get("scene_id"), {}).get(
+            "note", group.get("note", ""))
+        for card in group.get("shots") or []:
+            shot_id = card.get("shot_id")
+            if not card.get("still_input_hash") or shot_id in kept:
+                continue
+            picture = direction["cards"].get(shot_id, {}).get("picture_text",
+                                                               card.get("picture_text", ""))
+            char_id = card.get("still_char_id") or ""
+            digest = still_input_digest(
+                card.get("payload_hash", ""), picture, scene_note, char_id,
+                characters.get(char_id, 0) if char_id else 0, stills.get(shot_id, 0),
+                card.get("engine_id", ""))
+            if digest != card["still_input_hash"]:
+                pending.append(shot_id)
+    return pending
 
 
 # --------------------------------------------------------------------------- #
@@ -700,6 +896,16 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
                 "is %s, the direction names %s)" % (_shown(replay_from), digest[:12],
                                                     direction["source"][:12]))
         _check_image_engines(prompt, manifest, bundle.name)
+        if direction["stage"] in ("video", "publish"):
+            # UNPAINTED EDITS (plan, "Validation"): a Video or Publish run films
+            # the stills it has, so an edit the stills do not show yet -- a
+            # picture, a note, a take -- must be painted first, or the card kept.
+            pending = unpainted_shots(_read_cards(bundle), direction)
+            if pending:
+                raise DirectionError(
+                    "%d card(s) carry edits their stills do not show yet: %s; paint the "
+                    "stills first, or keep those cards as they are"
+                    % (len(pending), ", ".join(pending[:8])))
         if direction["out"] is not None:
             # Bundles are numbered in the order they were made, one apart, so
             # "latest" is always the highest number and no number is skipped.
@@ -780,24 +986,24 @@ def not_yet_supported(direction: Dict[str, Any]) -> Optional[str]:
     words, or ``None``. A direction is refused rather than run with part of it
     silently ignored: an edit that does nothing would look like a broken edit.
 
-    Each arrives with the build step that makes it real (plan, Build order):
-    Publish needs clip reuse, or it would film every shot again; picture edits,
-    scene notes, takes and keeps need the repaint. ACTION edits
-    (``motion_text``) are real: Shot Lock recomposes them on replay.
+    Each arrives with the build step that makes it real (plan, Build order).
+    Real now: ACTION edits (Shot Lock recomposes them on replay), and since
+    chunk 3 picture edits, scene notes, character and still takes and kept
+    stills (a stills replay repaints them, and node 63 refuses a Video run
+    that would film stills they have not reached). Still to come with chunk 4's
+    clip reuse: Publish, which would otherwise film every shot again, and clip
+    takes and kept clips, which need the clip store.
     """
     if direction["stage"] == "publish":
         return ("Publish is not available in this build yet: without clip reuse it "
                 "would film every shot again")
     asked = [label for label, present in (
-        ("scene notes", bool(direction["scenes"])),
-        ("picture edits", any("picture_text" in body
-                              for body in direction["cards"].values())),
-        ("takes", any(direction["takes"].values())),
-        ("kept cards", any(direction["kept"].values())),
+        ("clip takes", bool(direction["takes"]["clips"])),
+        ("kept clips", bool(direction["kept"]["clips"])),
     ) if present]
     if asked:
-        return ("%s are not available in this build yet; this build runs the stills "
-                "and video stages with action edits only" % ", ".join(asked))
+        return ("%s are not available in this build yet; they arrive with clip reuse"
+                % ", ".join(asked))
     return None
 
 

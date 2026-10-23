@@ -41,14 +41,15 @@ try:
         REPLAY_MANIFEST_NAME, REPLAY_MANIFEST_SCHEMA, ReplayBundleError,
         load_replay_manifest,
     )
-    from ._otr_producer_direction import MANIFEST_PRODUCER_KEY, META_IMAGE_ENGINES
+    from ._otr_producer_direction import (CARDS_NAME, MANIFEST_PRODUCER_KEY,
+                                          META_IMAGE_ENGINES, build_cards)
 except ImportError:  # pragma: no cover -- flat (sys.path) load
     from production_ledger import (  # type: ignore
         REPLAY_MANIFEST_NAME, REPLAY_MANIFEST_SCHEMA, ReplayBundleError,
         load_replay_manifest,
     )
     from _otr_producer_direction import (  # type: ignore
-        MANIFEST_PRODUCER_KEY, META_IMAGE_ENGINES)
+        CARDS_NAME, MANIFEST_PRODUCER_KEY, META_IMAGE_ENGINES, build_cards)
 
 log = logging.getLogger("OTR.replay_freezer")
 
@@ -360,6 +361,13 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
             "files": files,
         }
         if producer_section is not None:
+            # cards.json, the page's view of this bundle: a member like any
+            # other, listed and hashed, so node 63 reads a verified copy.
+            cards_path = tmp / CARDS_NAME
+            cards_path.write_text(json.dumps(build_cards(ledger, producer_section, files),
+                                             indent=2, ensure_ascii=False), encoding="utf-8")
+            files.append({"path": CARDS_NAME, "bytes": cards_path.stat().st_size,
+                          "sha256": sha256_file(cards_path)})
             manifest[MANIFEST_PRODUCER_KEY] = producer_section
         (tmp / REPLAY_MANIFEST_NAME).write_text(
             json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

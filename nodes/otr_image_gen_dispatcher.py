@@ -2661,6 +2661,24 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             raise err
 
     if _producer is not None:
+        # EACH CARD STILL RECORDS WHAT IT WAS PAINTED FROM (chunk 3e): the
+        # digest node 63 recomputes before a Video run, so an edit the still
+        # does not show yet is refused there. A kept row keeps the digest of
+        # the paint it is, never of the texts written since.
+        _payload_objects = {str(o.get("object_id")): o
+                            for o in (_producer_payload or {}).get("objects") or []
+                            if isinstance(o, dict)}
+        _scene_of_beat = {str(b.get("beat_id")): str(b.get("scene_id") or "")
+                          for b in (ledger.get("beats") or []) if isinstance(b, dict)}
+        _painted = _PD.painted_takes(_producer)
+        for _row in ep_rows:
+            if not isinstance(_row, dict) or (_row.get("provenance") or {}).get("source") == "kept":
+                continue
+            _obj = _payload_objects.get(str(_row.get("object_id") or ""))
+            if _obj is not None and _PD.object_shot_id(_obj):
+                _row[_PD.ROW_INPUT_HASH] = _PD.card_still_digest(
+                    _obj, str(_row.get("engine_id") or ""), _raw_texts, _painted,
+                    _scene_of_beat)
         images, _newly_superseded = _one_row_per_object(images)
         _known = {str(r.get("image_id")) for r in _superseded if isinstance(r, dict)}
         _superseded.extend(r for r in _newly_superseded

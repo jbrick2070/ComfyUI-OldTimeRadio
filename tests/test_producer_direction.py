@@ -331,9 +331,17 @@ def test_the_validator_admits_a_plain_direction_and_refuses_what_is_not_built(pr
         admit(_prompt(_raw(version=7)))
     with pytest.raises(ValueError, match="first run has no cards yet"):
         admit(_prompt(_raw(cards={"shot_b001": {"picture_text": "a desk"}})))
+    # Since chunk 3 picture edits, notes, still and character takes and kept
+    # stills are real; clip takes and kept clips wait for clip reuse.
     later = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
-                                    cards={"shot_b001": {"picture_text": "a desk"}}))
-    assert "picture edits are not available" in PD.not_yet_supported(later)
+                                    cards={"shot_b001": {"picture_text": "a desk"}},
+                                    scenes={"s01": {"note": "at dusk"}},
+                                    takes={"characters": {"c01": 1}, "stills": {"shot_b001": 2}},
+                                    kept={"stills": ["shot_b002"]}))
+    assert PD.not_yet_supported(later) is None
+    clips = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
+                                    takes={"clips": {"shot_b001": 1}}, kept={"clips": ["shot_b002"]}))
+    assert "clip takes, kept clips are not available" in PD.not_yet_supported(clips)
     action_only = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
                                           cards={"shot_b001": {"motion_text": "leans in"}}))
     assert PD.not_yet_supported(action_only) is None
@@ -628,7 +636,9 @@ def test_a_producer_freeze_records_its_identity_and_the_stills_engines(tmp_path,
                         # chunk 3b: what a replay of it renders with (the
                         # fixture's histogram is empty; its one shot's lane)
                         "image_engines_used": [],
-                        "video_engines": ["animatediff15_v3_haunted_video"]}
+                        "video_engines": ["animatediff15_v3_haunted_video"],
+                        # chunk 3e: what the direction kept
+                        "kept": {"stills": [], "clips": []}}
 
 
 def test_an_ordinary_freeze_writes_no_producer_section_and_an_unstamped_one_is_refused(
@@ -772,3 +782,69 @@ def test_the_cloud_gates_check_and_price_what_the_replay_renders(producer_root, 
                                unit_usd_fn=lambda label, eng: 0.5,
                                walk_fn=lambda prompt, uid: list(prompt.values()))
     assert [line.label for line in lines] == ["cloud_flux_pro"], "the paid image engine only"
+
+
+# --------------------------------------------------------------------------- #
+# chunk 3e: cards.json and the unpainted-edit check, through a real freeze
+# --------------------------------------------------------------------------- #
+
+def _bundle_with_a_painted_card(tmp_path, monkeypatch):
+    """A producer 01-stills bundle whose one card still, shot_b001, records
+    the digest of what it was painted from, as the dispatcher stamps it."""
+    monkeypatch.setattr(PL, "_default_out_dir",
+                        lambda ep=None: str(tmp_path / "episodes" / (ep or "pending") / "audio"))
+    spec = importlib.util.spec_from_file_location(
+        "otr_test_canonical_replay_for_cards",
+        pathlib.Path(__file__).with_name("test_canonical_replay.py"))
+    tcr = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tcr)
+    ep, _ledger = tcr._make_episode(tmp_path / "source_episodes")
+    led_path = next((ep / "audio").glob("*_ledger.json"))
+    led = json.loads(led_path.read_text(encoding="utf-8"))
+    obj = {"object_id": "still_b001", "beat_id": "b001", "kind": "scene_beat",
+           "role": "character_video", "prompt": "a lamp-lit desk", "prompt_hash": "h"}
+    raw = {"cards": {"shot_b001": "a lamp-lit desk"}, "scenes": {}}
+    takes = {"characters": {}, "stills": {}}
+    row = led["images"]["images"][0]
+    row["object_id"] = "still_b001"
+    row[PD.ROW_INPUT_HASH] = PD.card_still_digest(obj, "", raw, takes, {})
+    led["images"].update({PD.PAYLOAD_KEY: {"version": 1, "objects": [obj]},
+                          PD.RAW_TEXTS_KEY: raw, PD.TAKES_KEY: takes})
+    led_path.write_text(json.dumps(led), encoding="utf-8")
+    return _producer_freeze(ep, PD.bundle_path(PID, "01-stills"))
+
+
+def test_a_producer_freeze_writes_a_verified_cards_json(producer_root, tmp_path, monkeypatch):
+    bundle = _bundle_with_a_painted_card(tmp_path, monkeypatch)
+    assert PD.CARDS_NAME in {f["path"] for f in PL.load_replay_manifest(str(bundle))["files"]}
+    cards = json.loads((bundle / PD.CARDS_NAME).read_text(encoding="utf-8"))
+    card = cards["scenes"][0]["shots"][0]
+    assert (cards["version"], cards["project_id"], cards["bundle"]) == (1, PID, "01-stills")
+    assert card["shot_id"] == "shot_b001" and card["picture_text"] == "a lamp-lit desk"
+    assert card["still"] == "stills/scene_b001.png" and card["still_input_hash"]
+    plain = _frozen_bundle(tmp_path / "plain", monkeypatch, tmp_path / "plain_b" / "ep",
+                           producer=False)
+    assert not (plain / PD.CARDS_NAME).exists(), "an ordinary freeze writes no cards"
+
+
+def test_node_63_refuses_a_video_run_over_edits_the_stills_do_not_show(producer_root, tmp_path,
+                                                                      monkeypatch):
+    bundle = _bundle_with_a_painted_card(tmp_path, monkeypatch)
+    digest = PD.manifest_digest(str(bundle))
+
+    def video(**changes):
+        return _prompt(_raw(stage="video", out="02-video", source=digest, **changes),
+                       replay_from=str(bundle))
+
+    assert PD.admit_prompt_direction(video())["manifest"], "nothing pending"
+    edit = {"shot_b001": {"picture_text": "a broken desk"}}
+    with pytest.raises(PD.DirectionError,
+                       match="1 card\\(s\\) carry edits their stills do not show yet: shot_b001"):
+        PD.admit_prompt_direction(video(cards=edit))
+    assert PD.admit_prompt_direction(video(cards=edit, kept={"stills": ["shot_b001"]}))
+    with pytest.raises(PD.DirectionError, match="do not show yet: shot_b001"):
+        PD.admit_prompt_direction(video(takes={"stills": {"shot_b001": 1}}))
+    # A stills replay is how the edit gets painted: it is never refused for it.
+    assert PD.admit_prompt_direction(_prompt(
+        _raw(stage="stills", out="02-stills", source=digest, cards=edit),
+        replay_from=str(bundle)))

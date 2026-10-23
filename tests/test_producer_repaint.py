@@ -166,6 +166,74 @@ def test_takes_redraw_a_still_or_a_whole_character(studio):
     assert painted == ["c1"], "the portrait; these scene stills carry no character"
 
 
+SHOTS = {"video": {"shots": [
+    {"shot_id": "shot_b001", "char_id": "c1", "engine_id": "ltx25_foley_16gb",
+     "source_line_ids": ["b001"], "creative": {"motion": "leans in"}},
+    {"shot_id": "shot_b002", "char_id": "c1", "engine_id": "ltx25_foley_16gb",
+     "source_line_ids": ["b002"], "creative": {"motion": "turns away"}},
+    {"shot_id": "shot_b003", "char_id": "", "engine_id": "ltx25_foley_16gb",
+     "source_line_ids": ["b003"]}]},
+    "lines": [{"line_id": "b001", "text": "Who is there?", "start_s": 1.0, "dur_s": 2.0}],
+    "cast": [{"char_id": "c1", "name": "MARA"}]}
+
+
+def _cards(led, direction=None):
+    """The cards a producer freeze of ``led`` would write."""
+    ledger = dict(copy.deepcopy(led), **copy.deepcopy(SHOTS))
+    files = [{"path": "%s/%s" % ("portraits" if row.get("kind") == "portrait" else "stills",
+                                  pathlib.Path(row["path"]).name)}
+             for row in ledger["images"]["images"]]
+    fields = PD.manifest_producer_fields(direction or PD.parse_direction(json.dumps(FIRST)))
+    return PD.build_cards(ledger, fields, files)
+
+
+def _video(**changes):
+    direction = dict(FIRST, stage="video", out="02-video", source="a" * 64)
+    direction.update(changes)
+    return PD.parse_direction(json.dumps(direction))
+
+
+def test_cards_record_what_each_still_was_painted_from(studio):
+    led = _first_run(studio)
+    cards = _cards(led)
+    assert [g["scene_id"] for g in cards["scenes"]] == ["s01", "s02"]
+    first = cards["scenes"][0]["shots"][0]
+    assert first["shot_id"] == "shot_b001" and first["line"] == "Who is there?"
+    assert first["picture_text"] == "a lamp-lit radio desk" and first["motion_text"] == "leans in"
+    assert first["state"] == "painted" and first["still"].startswith("stills/")
+    assert first["still_input_hash"] == led["images"]["images"][1][PD.ROW_INPUT_HASH]
+    assert cards["scenes"][1]["shots"][0]["motion_editable"] is False
+    assert cards["cast"] == [{"char_id": "c1", "name": "MARA", "take": 0,
+                              "picture": cards["cast"][0]["picture"]}]
+    assert cards["cast"][0]["picture"].startswith("portraits/")
+
+
+def test_a_video_run_refuses_edits_its_stills_do_not_show(studio):
+    cards = _cards(_first_run(studio))
+    assert PD.unpainted_shots(cards, _video()) == []
+    assert PD.unpainted_shots(cards, _video(
+        cards={"shot_b001": {"motion_text": "stands up"}})) == [], "an action never repaints"
+    assert PD.unpainted_shots(cards, _video(
+        cards={"shot_b002": {"picture_text": "a broken window"}})) == ["shot_b002"]
+    assert PD.unpainted_shots(cards, _video(
+        scenes={"s01": {"note": "at dusk"}})) == ["shot_b001", "shot_b002"]
+    assert PD.unpainted_shots(cards, _video(takes={"stills": {"shot_b003": 1}})) == ["shot_b003"]
+    assert PD.unpainted_shots(cards, _video(
+        scenes={"s01": {"note": "at dusk"}}, kept={"stills": ["shot_b001", "shot_b002"]})) == []
+
+
+def test_a_kept_still_keeps_the_digest_of_the_paint_it_is(studio):
+    led2, painted, _changed = _again(studio, _first_run(studio),
+                                     scenes={"s01": {"note": "at dusk"}},
+                                     kept={"stills": ["shot_b002"]})
+    assert painted == ["still_b001"]
+    cards = _cards(led2)
+    note = {"s01": {"note": "at dusk"}}
+    assert PD.unpainted_shots(cards, _video(scenes=note, kept={"stills": ["shot_b002"]})) == []
+    # Un-kept, the still is what it was before the note, and that shows.
+    assert PD.unpainted_shots(cards, _video(scenes=note)) == ["shot_b002"]
+
+
 def test_only_a_beats_own_scene_still_answers_to_its_card():
     assert PD.object_shot_id(_still("b001", "x")) == "shot_b001"
     assert PD.object_shot_id(PAYLOAD["objects"][0]) is None, "a portrait has no card"
