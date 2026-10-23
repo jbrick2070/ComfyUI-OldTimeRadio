@@ -273,6 +273,13 @@ class Runs:
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "RadioPlayStudio/0.1"
+    #: Seconds a socket may sit with nothing sent before the connection is
+    #: closed (socketserver applies it to each connection). Without it, a
+    #: client that declares a body and sends only part of it holds a handler
+    #: thread for good (Codex QA, 2026-10-23). It bounds a silence, not a
+    #: request: an upload that keeps moving, or an event stream that writes
+    #: a keep-alive every HEARTBEAT_S, never meets it.
+    timeout = 60
 
     # -- plumbing -----------------------------------------------------------
     @property
@@ -317,6 +324,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             route()
         except ConnectionError:
+            return
+        except TimeoutError:            # the client went quiet mid-request
+            self.close_connection = True
             return
         except Exception:  # noqa: BLE001 - last line of defence for the handler thread
             traceback.print_exc()

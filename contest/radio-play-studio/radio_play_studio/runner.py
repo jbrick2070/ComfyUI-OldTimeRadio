@@ -425,11 +425,13 @@ class Studio:
                 # stays pending instead of being freed to make it again.
                 #
                 # NOT the "expired" seen live on 2026-10-23 (Sonnet QA): that
-                # one was only the bridge's event STREAM, whose closing status
-                # comes from one snapshot taken the moment ComfyUI reports the
-                # run done, and can find it in neither its history nor its
-                # queue. settle()'s own poll came back succeeded, and the
-                # SDK's result() polls again before it ever raises.
+                # one was the bridge's event STREAM, whose closing status comes
+                # from one snapshot taken the moment ComfyUI reports the run
+                # done -- it can read the history before the run is written
+                # there and the queue after the run has left it. The SDK's
+                # result() polls again before it raises, and ComfyUI's history
+                # holds that run as a success. (What settle() itself saw that
+                # night was not logged; the bundle was adopted either way.)
                 yield self._settle_forgotten(plan, str(job.id), error)
                 return
             failure = exc

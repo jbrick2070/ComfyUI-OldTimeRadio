@@ -4570,7 +4570,8 @@ def _bring_clip_into(clip, dest, name):
     except OSError:
         # Beside the target, under a name of its own: the episode folder, not
         # the system temp folder test_engine_tmp_in_tree guards against.
-        part = os.path.join(dest, ".%s.%s.part" % (name, uuid.uuid4().hex[:8]))
+        # All 128 bits: no other writer's .part in this folder can share it.
+        part = os.path.join(dest, ".%s.%s.part" % (name, uuid.uuid4().hex))
         try:
             shutil.copyfile(src, part)
             replace_held(part, target)

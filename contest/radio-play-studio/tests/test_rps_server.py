@@ -8,7 +8,7 @@ import threading
 import pytest
 
 from radio_play_studio.runner import Studio
-from radio_play_studio.server import make_server
+from radio_play_studio.server import Handler, make_server
 
 from test_rps_runner import FakeClient, _good_job  # noqa: E402 - sibling test module
 
@@ -233,3 +233,22 @@ def test_a_negative_content_length_is_refused_not_read_to_the_end():
     assert _body_length({}) == 0
     with pytest.raises(ValueError, match="negative"):
         _body_length({"Content-Length": "-1"})
+
+
+def test_a_client_that_stops_mid_body_does_not_hold_a_handler(app, monkeypatch):
+    # Codex QA, 2026-10-23: a declared body sent only in part blocked the
+    # handler's read for good. The socket timeout closes the connection, and
+    # the app answers the next request.
+    import socket
+    import time
+    monkeypatch.setattr(Handler, "timeout", 1)
+    port, _ = app
+    stalled = socket.create_connection(("127.0.0.1", port), timeout=10)
+    stalled.sendall(b"POST /api/presence HTTP/1.1\r\nHost: 127.0.0.1\r\n"
+                    b"Content-Type: application/json\r\nContent-Length: 100\r\n\r\n{")
+    started = time.monotonic()
+    assert stalled.recv(1024) == b"", "the app closed the quiet connection"
+    assert time.monotonic() - started < 9
+    stalled.close()
+    status, _, _ = _request(port, "GET", "/api/episodes")
+    assert status == 200
