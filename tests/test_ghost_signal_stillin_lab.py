@@ -424,9 +424,9 @@ def test_derive_engine_bundle_is_bundle_to_bundle_and_immutable(tmp_path):
     assert [f["path"] for f in man["files"]] == [f["path"] for f in
                                                  PL.load_replay_manifest(str(src))["files"]]
     assert not (src / PL.REPLAY_MANIFEST_NAME).read_text(encoding="utf-8").count("engine_override")
-    with pytest.raises(SystemExit, match="already exists"):
+    with pytest.raises(PL.ReplayBundleError, match="already exists"):
         fz.derive_engine_bundle(src, LAB)
-    with pytest.raises(SystemExit, match="ORIGINAL"):
+    with pytest.raises(PL.ReplayBundleError, match="ORIGINAL"):
         fz.derive_engine_bundle(derived, HAUNTED)
 
 

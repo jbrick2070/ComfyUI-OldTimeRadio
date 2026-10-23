@@ -121,13 +121,13 @@ def test_freeze_writes_a_verified_manifest_with_relative_paths(frozen):
 
 def test_freeze_refuses_a_ledger_without_the_planned_section(tmp_path, monkeypatch):
     ep, _ = _make_episode(tmp_path / "e", ep_id="noplan_20260902_000000", with_plan=False)
-    with pytest.raises(SystemExit, match="planned video.shots"):
+    with pytest.raises(PL.ReplayBundleError, match="planned video.shots"):
         _freeze(ep, tmp_path / "b")
     assert _freeze(ep, tmp_path / "b2", allow_no_plan=True).is_dir()
 
 
 def test_freeze_is_immutable_and_refuses_an_existing_bundle(frozen):
-    with pytest.raises(SystemExit, match="already exists"):
+    with pytest.raises(PL.ReplayBundleError, match="already exists"):
         _freeze(frozen["ep"], frozen["bundle"].parent)
 
 
@@ -735,13 +735,13 @@ def test_the_freezer_refuses_when_no_master_matches_or_none_is_stamped(tmp_path)
     audio = ep / "audio"
     audio.mkdir(parents=True)
     (audio / "pending_20260926_000000_master.wav").write_bytes(b"RIFF")
-    with pytest.raises(SystemExit, match="matches the ledger"):
+    with pytest.raises(PL.ReplayBundleError, match="matches the ledger"):
         freezer.find_master(ep, {"audio": {"master_audio_sha256": "0" * 64}})
-    with pytest.raises(SystemExit, match="stamps no"):
+    with pytest.raises(PL.ReplayBundleError, match="stamps no"):
         freezer.find_master(ep, {})
     # A master OUTSIDE the episode is never a candidate.
     outside = tmp_path / "elsewhere_master.wav"
     outside.write_bytes(b"RIFF-x")
-    with pytest.raises(SystemExit):
+    with pytest.raises(PL.ReplayBundleError):
         freezer.find_master(ep, dict(_digest_ledger(outside),
                                      final_audio_path=str(outside)))
