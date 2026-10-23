@@ -423,6 +423,25 @@ def _grade_acceptance(ledger, manifest):
     return len(findings)
 
 
+def _producer_clips(direction, ledger, episode_id, _rd):
+    """A Scene Producer Video run's clip reuse (``_otr_producer_clips``): the
+    project's store, this workspace's episode folder, and the reuse map the
+    bundle it replays carries. The folder is resolved by the rule the clip
+    persist uses after the render, so a shot committed mid-render lands where
+    the persist would have put it."""
+    from pathlib import Path
+
+    from . import _otr_producer_clips as _PC
+    from ._otr_paths import otr_clips_dir
+    workspace = _rd.resolve_episode_id_for_clip_persistence(
+        episode_id,
+        freeze_timestamp=str(((ledger.get("meta") or {}).get("freeze_timestamp") or "")))
+    return _PC.ProducerClips(
+        project_id=direction["project_id"],
+        episode_root=Path(str(otr_clips_dir(str(workspace)))).parent,
+        bundle_map=(ledger.get("video") or {}).get(_PC.MAP_KEY))
+
+
 class OTRVideoRenderBatch:
     """Registered as ``OTR_VideoRenderBatch``. Walks the model-agnostic render
     loop in-process (NODE_CLASS_MAPPINGS populated). OUTPUT_NODE so it can be the
@@ -558,7 +577,10 @@ class OTRVideoRenderBatch:
             direction = None
         report, manifest_payload, name = self._render_episode(
             _rd, patched_ledger_json,
-            master_audio_path=str(master_audio_path or ""))
+            master_audio_path=str(master_audio_path or ""),
+            # Passed only when there is one, so every ordinary call -- and any
+            # caller built for the older signature -- is exactly what it was.
+            **({"direction": direction} if direction is not None else {}))
         ok = bool(report.get("ok"))
         payload = json.dumps(report, ensure_ascii=True, default=str)
         # OUTPUT HYGIENE (output-tree contract OH-1, 2026-06-11): the episode
@@ -620,14 +642,19 @@ class OTRVideoRenderBatch:
         return {"ui": {"text": [payload[:6000]]}, "result": (blocked, blocked)}
 
     @staticmethod
-    def _render_episode(_rd, patched_ledger_json, master_audio_path=""):
+    def _render_episode(_rd, patched_ledger_json, master_audio_path="", direction=None):
         """Render one REAL episode from a ShotLock-planned ledger ->
         ``(report, clip_manifest_json, report_name)``. Fail-soft: a bad or empty
         ledger yields an error report + an empty manifest so the graph never
         crashes (the procgen floor still carries the visual elsewhere).
 
         ``master_audio_path``: path to the FROZEN master mix; forwarded to
-        :func:`run_real_episode` for per-beat audio slicing.  Read-only."""
+        :func:`run_real_episode` for per-beat audio slicing.  Read-only.
+
+        ``direction``: a Scene Producer Video run's direction, or None. With
+        one, the render reuses every clip already filmed under its shot's
+        causal key and commits each shot it films the moment it is whole
+        (``_otr_producer_clips``)."""
         try:
             ledger = json.loads(patched_ledger_json or "{}")
         except (ValueError, TypeError) as exc:
@@ -666,8 +693,11 @@ class OTRVideoRenderBatch:
             )
         else:
             _rd.validate_and_repair_still_spine(ledger)
+        producer = (_producer_clips(direction, ledger, episode_id, _rd)
+                    if direction is not None else None)
         ep = _rd.run_real_episode(ledger,
-                                  master_audio_path=str(master_audio_path or ""))
+                                  master_audio_path=str(master_audio_path or ""),
+                                  **({"producer": producer} if producer is not None else {}))
         # CLIP-FILL Piece 4: move each rendered per-beat clip out of the
         # janitor-swept _shared/tmp scratch tier into the durable
         # episodes/<ep>/clips/ workspace BEFORE building the manifest, so the

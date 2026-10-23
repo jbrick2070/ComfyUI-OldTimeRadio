@@ -246,10 +246,14 @@ def test_an_ordinary_dispatch_is_unchanged(monkeypatch, recorded):
 
 def _render(monkeypatch, wire, report):
     from nodes import otr_video_render_batch as B
+    handed = []
     monkeypatch.setattr(B.OTRVideoRenderBatch, "_render_episode",
-                        staticmethod(lambda _rd, ledger_json, master_audio_path="": (
+                        staticmethod(lambda _rd, ledger_json, master_audio_path="",
+                                     direction=None: handed.append(direction) or (
                             report, '{"clips": []}', "node_episode_report.json")))
-    return B.OTRVideoRenderBatch().render(json.dumps(wire), master_audio_path="")
+    out = B.OTRVideoRenderBatch().render(json.dumps(wire), master_audio_path="")
+    assert handed == [wire.get(PD.RUNTIME_KEY)], "the render gets the wire's direction"
+    return out
 
 
 def test_a_video_stage_freezes_clips_then_blocks(monkeypatch, recorded):
@@ -413,6 +417,71 @@ def test_the_stills_freeze_names_the_workspace_the_ledger_settled_on(monkeypatch
     D.OTRImageGenDispatcher._finish_stills_stage(
         {"episode_id": "signal_lost_final_slug"}, direction, "pending_20261022_010101", "")
     assert calls == [("01-stills", "signal_lost_final_slug", False)]
+
+
+def test_a_stills_freeze_after_a_video_one_carries_its_clips(recorded):
+    # Chunk 4a: the video section's reuse map names clip and foley files the
+    # next Video run reuses from this bundle, whether or not the store is there.
+    calls, _sentinel = recorded
+    from nodes import _otr_producer_clips as PC
+    from nodes import otr_image_gen_dispatcher as D
+    direction = PD.parse_direction(_direction(stage="stills", out="03-stills"))
+    led = {"episode_id": "e", "video": {"shots": [], PC.MAP_KEY: {"shot_b001": {}}}}
+    D.OTRImageGenDispatcher._finish_stills_stage(led, direction, "e", "")
+    D.OTRImageGenDispatcher._finish_stills_stage({"episode_id": "e"}, direction, "e", "")
+    assert calls == [("03-stills", "e", True), ("03-stills", "e", False)]
+
+
+def test_batch_hands_a_producer_video_run_its_clip_reuse(monkeypatch):
+    # Chunk 4a: only a producer Video run gets one, built on the project's
+    # store, this workspace's folder and the reuse map the bundle carries.
+    from nodes import _otr_paths
+    from nodes import _otr_producer_clips as PC
+    from nodes import otr_video_render_batch as B
+    seen = []
+
+    class Driver:
+        def resolve_final_shot_engines(self, ledger):
+            return ledger
+
+        def validate_and_repair_still_spine(self, ledger):
+            return None
+
+        def run_real_episode(self, ledger, master_audio_path="", **kwargs):
+            seen.append(kwargs.get("producer"))
+            return {"ledger": ledger, "clips": {}, "trace": [], "vram_peak_mb": None,
+                    "receipts": []}
+
+        def resolve_episode_id_for_clip_persistence(self, episode_id, **_kw):
+            return episode_id
+
+        def persist_episode_clips(self, ep, episode_id):
+            return None
+
+        def build_clip_manifest(self, ep, episode_id=""):
+            return {"clips": [], "n_beats": 0, "clip_count": 0, "engine_histogram": {},
+                    "video_revision": 1, "floor_clip_count": 0}
+
+        def ltx_prompt_diversity_status(self, trace):
+            return {"ok": True}
+
+    for name in ("_stamp_floored_video_shots", "_stamp_render_engines_meta",
+                 "_stamp_render_trace", "_grade_acceptance"):
+        monkeypatch.setattr(B, name, lambda *a, **k: 0)
+    monkeypatch.setattr(B, "_legacy_receipt_bypass_allowed", lambda ledger: True)
+    monkeypatch.setattr(_otr_paths, "otr_clips_dir",
+                        lambda episode_id: pathlib.Path("X:/episodes") / episode_id / "clips")
+    bundle_map = {"shot_b001": {"key": "ab" * 32}}
+    ledger = json.dumps({"episode_id": "ep_7", "video": {
+        "shots": [{"shot_id": "shot_b001"}], PC.MAP_KEY: bundle_map}})
+    B.OTRVideoRenderBatch._render_episode(Driver(), ledger)
+    B.OTRVideoRenderBatch._render_episode(Driver(), ledger,
+                                          direction=PD.parse_direction(_direction()))
+    assert seen[0] is None, "an ordinary run passes no producer at all"
+    producer = seen[1]
+    assert producer.episode_root == pathlib.Path("X:/episodes/ep_7")
+    assert producer.store == PC.store_dir("a1b2c3d4e5f6")
+    assert producer._bundle == bundle_map
 
 
 def test_an_unchanged_action_recomposes_nothing(replay_json):

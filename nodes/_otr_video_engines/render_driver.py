@@ -4341,9 +4341,108 @@ def render_shot(shot, request, *, host_caps=None, profile=None, segment=None):
     return clip, out_shot, [eng], clip_peak
 
 
+# --------------------------------------------------------------------------- #
+# Scene Producer clip reuse (planning/scene-producer/PLAN.md, "Video")
+# --------------------------------------------------------------------------- #
+
+def _producer_clips_module():
+    try:
+        from .. import _otr_producer_clips as _mod  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        import _otr_producer_clips as _mod  # type: ignore
+    return _mod
+
+
+def _producer_clip_key(shot, requests, profile):
+    """A shot's causal clip key (``_otr_producer_clips.clip_reuse_key``): its
+    requests as built, its coverage plan, its engine as registered -- id,
+    versions, recipe and any model files it declares -- the episode's render
+    policy, and the environment settings that change a clip's bytes outside
+    the request (the fear cape on chained beats, the foley join duck)."""
+    try:
+        from . import foley_stems as _foley  # type: ignore
+        from . import wrapper_bridge as _wb2  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        import foley_stems as _foley  # type: ignore
+        import wrapper_bridge as _wb2  # type: ignore
+    engine_id = str(shot.get("engine_id") or "")
+    engine = _vreg.get_engine(engine_id) if _vreg.is_registered(engine_id) else None
+    artifacts = []
+    declared = getattr(engine, "model_artifacts", None)
+    if callable(declared):
+        try:
+            for name, path in declared() or ():
+                try:
+                    st = os.stat(str(path))
+                    artifacts.append([str(name), os.path.basename(str(path)),
+                                      st.st_size, st.st_mtime_ns])
+                except OSError:
+                    artifacts.append([str(name), os.path.basename(str(path)), None, None])
+        except Exception as exc:  # noqa: BLE001 -- an unreadable declaration keys as such
+            artifacts = [["unreadable", type(exc).__name__]]
+    recipe = getattr(engine, "recipe_receipt_id", None)
+    identity = {"engine_id": engine_id,
+                "engine_version": str(getattr(engine, "engine_version", "") or ""),
+                "implementation_version": str(getattr(engine, "implementation_version", "")
+                                              or ""),
+                "recipe": str(recipe) if recipe is not None else None,
+                "model_artifacts": artifacts}
+    settings = {"fear_cape": bool(_wb2.fear_cape_enabled()),
+                "fear_cape_min_segments": int(_wb2.fear_cape_min_segments()),
+                "foley_join_soften_ms": int(_foley.foley_join_soften_ms())}
+    return _producer_clips_module().clip_reuse_key(
+        shot_id=str(shot.get("shot_id") or ""), requests=requests,
+        coverage_plan=shot.get("coverage_plan"), engine=identity,
+        render_policy=dict(profile or {}), settings=settings)
+
+
+def _reuse_filmed_clip(reuse, shot, requests, profile):
+    """The clip a Scene Producer run already filmed for this shot under its
+    causal key, as :func:`render_shot` returns one -- or None, and the shot
+    renders. Called once the shot's requests are built, before any weights
+    load or any provider is called."""
+    sid = str(shot.get("shot_id") or "")
+    key = _producer_clip_key(shot, requests, profile)
+    found = reuse.find(sid, key)
+    if found is None:
+        return None
+    _LOG.warning("[OTR video] REUSED shot %s: filmed before under key %s, taken from "
+                 "the %s, not rendered", sid, key[:12], reuse.reused.get(sid, "?"))
+    return found["clip"], dict(shot), list(found["attempts"]), None
+
+
+def _producer_commit(producer, out_shot, clip, attempts):
+    """A filmed shot, the moment it is whole: its clip and foley stem go into
+    the episode folder, never left to swept scratch, and then into the
+    project's store. A reused shot, a frame-directory clip and a clip with no
+    file have nothing to commit. Never raises: the render is paid for, and a
+    shot the store cannot take is still in the episode."""
+    sid = str(out_shot.get("shot_id") or "")
+    if (sid in producer.reused or not isinstance(clip, dict)
+            or str(clip.get("type") or "video") == "directory"):
+        return
+    try:
+        import shutil
+        os.makedirs(str(producer.clips_dir), exist_ok=True)
+        _persist_one_clip(clip, str(producer.clips_dir),
+                          _persisted_clip_name(sid, *_clip_name_parts(out_shot)))
+        stem = str(clip.get("foley_path") or "")
+        if (stem and os.path.isfile(stem) and os.path.dirname(os.path.abspath(stem))
+                != os.path.abspath(str(producer.foley_dir))):
+            os.makedirs(str(producer.foley_dir), exist_ok=True)
+            kept = os.path.join(str(producer.foley_dir), os.path.basename(stem))
+            shutil.copyfile(stem, kept)
+            clip["foley_path"] = kept
+        if os.path.isfile(str(clip.get("path") or "")):
+            producer.commit(sid, clip, attempts)
+    except Exception as exc:  # noqa: BLE001 -- never lose a paid render to its bookkeeping
+        _LOG.error("[OTR video] shot %s rendered but its reuse record was not kept: "
+                   "%s: %s", sid, type(exc).__name__, exc)
+
+
 def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                          canvas=None, host_caps=None, profile=None,
-                         on_segment_done=None):
+                         on_segment_done=None, reuse=None):
     """Render ONE BEAT -- as one clip, or as its plan's segments assembled.
 
     Multi-clip coverage chunk 6c/6d (2026-07-26). This is the loop the whole
@@ -4371,6 +4470,11 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     segment of a multi-segment beat renders -- the local walk's progress bar.
     This function also runs on cloud fan-out worker threads, which never pass
     it, so nothing thread-bound ever happens in here.
+
+    ``reuse`` (a Scene Producer Video run's ``ProducerClips``, None on every
+    other run): once the beat's requests are built and before any weights
+    load, the clip already filmed under the beat's causal key is returned in
+    place of a render (:func:`_reuse_filmed_clip`).
     """
     try:
         # ``acceptance`` owns the beat frame arithmetic, and it lives THERE
@@ -4414,6 +4518,10 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         # what the plan OWES rather than how many pieces it is in.
         single = request if request is not None else request_builder(
             shot, ledger, canvas=canvas)
+        if reuse is not None:
+            filmed = _reuse_filmed_clip(reuse, shot, [single], profile)
+            if filmed is not None:
+                return filmed
         result = render_shot(shot, single, host_caps=host_caps,
                              profile=profile)
         if on_segment_done is not None:
@@ -4484,6 +4592,13 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         prebuilt.append(
             (segment, request_builder(shot, ledger, canvas=canvas,
                                       segment_index=int(segment.index))))
+    # Keyed HERE, on the requests as built: the CHAIN loop below writes each
+    # successor's terminal frame into its request, and that frame is evidence
+    # of a render, never a cause of one.
+    if reuse is not None:
+        filmed = _reuse_filmed_clip(reuse, shot, [r for _s, r in prebuilt], profile)
+        if filmed is not None:
+            return filmed
 
     admission = _assert_beat_affordable(shot, prebuilt)
 
@@ -5207,12 +5322,17 @@ def _report_cloud_floors(shots):
 
 
 def _execute_cloud_shot(shot, ledger, *, request_builder, assets, frame_count,
-                        canvas, host_caps, profile, prompt_id=None):
+                        canvas, host_caps, profile, prompt_id=None, reuse=None):
     """One provider-side beat. Safe to run beside other cloud beats.
 
     CHAIN segments inside the beat stay serial (they need the prior
     terminal frame). JUMP / single-clip beats are independent of each
     other, which is why the episode can fire them together.
+
+    ``reuse`` (a Scene Producer Video run only): a shot filmed before is taken
+    instead of calling its provider, and a shot that renders is committed on
+    this worker the moment it is whole, so a fan-out that dies keeps every
+    shot already back.
     """
     from .._otr_shared.cloud_media_invoke import bind_prompt_id
 
@@ -5223,7 +5343,9 @@ def _execute_cloud_shot(shot, ledger, *, request_builder, assets, frame_count,
             request = build_request(shot, assets, frame_count, canvas)
         clip, out_shot, attempts, used = render_beat_coverage(
             shot, ledger, request=request, request_builder=request_builder,
-            canvas=canvas, host_caps=host_caps, profile=profile)
+            canvas=canvas, host_caps=host_caps, profile=profile, reuse=reuse)
+        if reuse is not None:
+            _producer_commit(reuse, out_shot, clip, attempts)
         return {
             "shot_id": str(out_shot.get("shot_id") or shot.get("shot_id") or ""),
             "request": request,
@@ -5240,7 +5362,7 @@ def _execute_cloud_shot(shot, ledger, *, request_builder, assets, frame_count,
 
 
 def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
-                request_builder=None):
+                request_builder=None, producer=None):
     """Drive one episode end-to-end on REAL engines (deep-copies the ledger; the
     frozen ``audio`` section is never touched). Returns
     ``{ledger, clips, trace, vram_peak_mb}``.
@@ -5249,7 +5371,13 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
     (``build_request`` with the shared ``assets`` + ``frame_count``). The REAL
     episode path passes ``build_request_from_shot``: ``request_builder(shot,
     ledger, canvas=canvas)`` is called per shot for a per-beat portrait + audio
-    + prompt request (see :func:`run_real_episode`)."""
+    + prompt request (see :func:`run_real_episode`).
+
+    ``producer`` (a Scene Producer Video run's ``ProducerClips``; None on every
+    other run, which then changes in nothing): a shot already filmed under its
+    causal key is taken instead of rendered, a shot that renders is committed
+    the moment it is whole, and the returned video section carries the map of
+    every clip this run delivered (``video.producer_clip_reuse``)."""
     ledger = copy.deepcopy(ledger)
     _log_if_legacy_render_plan_present(ledger)
     section = ledger["video"]
@@ -5443,7 +5571,7 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                     frame_count=frame_count, canvas=canvas,
                     host_caps=_episode_host_caps,
                     profile=_episode_profile,
-                    prompt_id=None)
+                    prompt_id=None, reuse=producer)
 
             outcome = run_cloud_fanout(
                 work_shots,
@@ -5615,7 +5743,8 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                         canvas=canvas,
                         host_caps=_episode_host_caps,
                         profile=_episode_profile,
-                        on_segment_done=_video_progress.part)
+                        on_segment_done=_video_progress.part,
+                        reuse=producer)
                 except Exception as exc:
                     sid = str(shot.get("shot_id") or "")
                     if _cloud_budget_floor_sid(sid, {sid: exc}, ()):
@@ -5644,6 +5773,8 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                 # AS-2 family-change group prune (the family can never change here).
                 clips[out_shot["shot_id"]] = clip
                 new_shots.append(out_shot)
+                if producer is not None:
+                    _producer_commit(producer, out_shot, clip, attempts)
                 row = {"shot_id": out_shot["shot_id"], "attempts": attempts,
                        "final_engine": out_shot["engine_id"]}
                 # Round 5 F2: prompt observability rides the trace (durable in the
@@ -5730,6 +5861,9 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
         for _scoped_id in list(_scoped_engines):
             _end_engine_scope(_scoped_id)
     section["shots"] = new_shots
+    if producer is not None:
+        section[_producer_clips_module().MAP_KEY] = producer.records_for(
+            s.get("shot_id") for s in new_shots if isinstance(s, dict))
     _report_cloud_floors(new_shots)
     ledger["video"] = section
     receipts = []
@@ -5790,7 +5924,7 @@ def _log_if_legacy_render_plan_present(ledger):
 
 
 def run_real_episode(ledger, *, canvas=None,
-                     master_audio_path=""):
+                     master_audio_path="", producer=None):
     """Drive one REAL episode from a ShotLock-planned ledger: per-shot requests
     (character portrait + per-beat voice audio + the M4 prompt) via
     :func:`build_request_from_shot`, NO forced OOM, NO FALLBACKS (a failed
@@ -5810,7 +5944,10 @@ def run_real_episode(ledger, *, canvas=None,
     pending dir gone) by the time this renders -- which silently skipped the
     per-beat slice and starved HuMo (audio_ref=''). Re-resolve to the SAME
     master file under the renamed dir using the same contract the terminal mux
-    uses. Read-only; the audio bytes are never touched."""
+    uses. Read-only; the audio bytes are never touched.
+
+    ``producer``: a Scene Producer Video run's clip reuse, passed through to
+    :func:`run_episode`; None on every other run."""
     # Brief disposition, ONCE per episode run (gap-audit G4 restore): the
     # canonical [story_brief:<id>] line proving the brief reached the scene
     # composer. Fail-soft -- never blocks the render.
@@ -5837,7 +5974,10 @@ def run_real_episode(ledger, *, canvas=None,
     ledger = resolve_final_shot_engines(ledger)
     rb = functools.partial(build_request_from_shot,
                            master_audio_path=master_audio_path)
-    return run_episode(ledger, request_builder=rb, canvas=canvas)
+    # Passed only when there is one, so an ordinary run calls run_episode
+    # exactly as it always has.
+    return run_episode(ledger, request_builder=rb, canvas=canvas,
+                       **({"producer": producer} if producer is not None else {}))
 
 
 def parse_engine_override(spec: str) -> dict:
@@ -6486,37 +6626,59 @@ def persist_episode_clips(result, episode_id):
     shot_meta = {}
     for shot in (((result or {}).get("ledger") or {}).get("video") or {}).get("shots") or []:
         if isinstance(shot, dict) and shot.get("shot_id"):
-            # A floored beat's clip was drawn by its floor engine, not by the
-            # cloud engine the plan named -- the filename says what made it.
-            shot_meta[str(shot["shot_id"])] = (
-                str(shot.get("role") or ""),
-                str(shot.get("floor_render") or shot.get("engine_id") or ""))
-    import shutil
+            shot_meta[str(shot["shot_id"])] = _clip_name_parts(shot)
     moved = 0
     for sid, clip in clips.items():
         if not isinstance(clip, dict):
             continue
         role, eng = shot_meta.get(str(sid), ("", str(clip.get("engine_id") or "")))
-        stem = "_".join(p for p in (str(sid), role, eng) if p) or str(sid)
-        safe_stem = _safe_clip_basename(stem)
-        if str(clip.get("type") or "video") != "directory":
-            src = str(clip.get("path") or "")
-            if src and os.path.isfile(src):
-                dst = os.path.join(dest_dir, safe_stem + ".mp4")
-                if os.path.dirname(os.path.abspath(src)) != os.path.abspath(dest_dir):
-                    try:
-                        if os.path.abspath(src) != os.path.abspath(dst):
-                            shutil.move(src, dst)
-                            clip["path"] = dst
-                            moved += 1
-                    except Exception as exc:  # noqa: BLE001 -- one bad move never aborts
-                        _LOG.warning(
-                            "[OTR video] persist_episode_clips: move FAILED %s -> "
-                            "%s (%s) -- clip stays in tmp", src, dst, exc)
+        if _persist_one_clip(clip, dest_dir, _persisted_clip_name(sid, role, eng)):
+            moved += 1
     if moved:
         _LOG.info("[OTR video] persisted %d clip(s) to episodes/%s/clips/",
                   moved, episode_id)
     return result
+
+
+def _clip_name_parts(shot):
+    """``(role, engine)`` for a shot's durable clip name. A floored beat's clip
+    was drawn by its floor engine, not by the cloud engine the plan named --
+    the filename says what made it."""
+    return (str(shot.get("role") or ""),
+            str(shot.get("floor_render") or shot.get("engine_id") or ""))
+
+
+def _persisted_clip_name(sid, role, engine):
+    """The durable file name of a shot's clip: ``<shot>_<role>_<engine>.mp4``."""
+    stem = "_".join(p for p in (str(sid), role, engine) if p) or str(sid)
+    return _safe_clip_basename(stem) + ".mp4"
+
+
+def _persist_one_clip(clip, dest_dir, name):
+    """Move one clip's file out of scratch into ``dest_dir`` as ``name`` and
+    point ``clip['path']`` at it. Returns True when it moved. A directory clip,
+    a clip with no file, or one already in ``dest_dir`` is left as it is; a
+    failed move is logged and leaves the clip in scratch, never aborting the
+    render."""
+    import shutil
+    if str(clip.get("type") or "video") == "directory":
+        return False
+    src = str(clip.get("path") or "")
+    if not (src and os.path.isfile(src)):
+        return False
+    dst = os.path.join(dest_dir, name)
+    if os.path.dirname(os.path.abspath(src)) == os.path.abspath(dest_dir):
+        return False
+    try:
+        if os.path.abspath(src) != os.path.abspath(dst):
+            shutil.move(src, dst)
+            clip["path"] = dst
+            return True
+    except Exception as exc:  # noqa: BLE001 -- one bad move never aborts
+        _LOG.warning(
+            "[OTR video] persist_episode_clips: move FAILED %s -> "
+            "%s (%s) -- clip stays in tmp", src, dst, exc)
+    return False
 
 
 def _segment_receipt_projection(segments):

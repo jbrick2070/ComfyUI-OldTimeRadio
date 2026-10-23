@@ -46,10 +46,13 @@ is refused (:func:`unpainted_shots`) unless the card is kept, and so is one
 that changes a character's take before it is painted
 (:func:`unpainted_characters`).
 
+CLIP REUSE (chunk 4a) lives beside this module, in ``_otr_producer_clips``: a
+Video run films only the shots whose causal key changed.
+
 WHAT IS NOT HERE YET, and which build step adds it beside its caller (a check
-with nothing to compare against is the defect the repo's own rules forbid): the
-clip store and clip reuse (chunk 4), and with them Publish, clip takes and kept
-clips. Until then :func:`not_yet_supported` refuses those.
+with nothing to compare against is the defect the repo's own rules forbid):
+clip takes and kept clips (chunk 4b), and Publish (chunk 4c). Until then
+:func:`not_yet_supported` refuses those.
 
 UTF-8, no BOM. Standard library only.
 """
@@ -1232,23 +1235,22 @@ def not_yet_supported(direction: Dict[str, Any]) -> Optional[str]:
     silently ignored: an edit that does nothing would look like a broken edit.
 
     Each arrives with the build step that makes it real (plan, Build order).
-    Real now: ACTION edits (Shot Lock recomposes them on replay), and since
-    chunk 3 picture edits, scene notes, character and still takes and kept
-    stills (a stills replay repaints them, and node 63 refuses a Video run
-    that would film stills they have not reached). Still to come with chunk 4's
-    clip reuse: Publish, which would otherwise film every shot again, and clip
-    takes and kept clips, which need the clip store.
+    Real now: ACTION edits (Shot Lock recomposes them on replay); since chunk
+    3 picture edits, scene notes, character and still takes and kept stills (a
+    stills replay repaints them, and node 63 refuses a Video run that would
+    film stills they have not reached); and since chunk 4a clip reuse, so a
+    Video run films only what changed. Still to come: clip takes and kept
+    clips (chunk 4b), and Publish (chunk 4c). Takes are sent in full, so a
+    clip take of 0 -- no take -- asks for nothing and is not refused.
     """
     if direction["stage"] == "publish":
-        return ("Publish is not available in this build yet: without clip reuse it "
-                "would film every shot again")
+        return "Publish is not available in this build yet"
     asked = [label for label, present in (
-        ("clip takes", bool(direction["takes"]["clips"])),
+        ("clip takes", any(direction["takes"]["clips"].values())),
         ("kept clips", bool(direction["kept"]["clips"])),
     ) if present]
     if asked:
-        return ("%s are not available in this build yet; they arrive with clip reuse"
-                % ", ".join(asked))
+        return "%s are not available in this build yet" % ", ".join(asked)
     return None
 
 

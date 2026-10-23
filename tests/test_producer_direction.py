@@ -353,6 +353,10 @@ def test_the_validator_admits_a_plain_direction_and_refuses_what_is_not_built(pr
     clips = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
                                     takes={"clips": {"shot_b001": 1}}, kept={"clips": ["shot_b002"]}))
     assert "clip takes, kept clips are not available" in PD.not_yet_supported(clips)
+    # Takes are sent in full: a clip take of 0 is no take (Codex QA, 2026-10-22).
+    in_full = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
+                                      takes={"clips": {"shot_b001": 0, "shot_b002": 0}}))
+    assert PD.not_yet_supported(in_full) is None
     action_only = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
                                           cards={"shot_b001": {"motion_text": "leans in"}}))
     assert PD.not_yet_supported(action_only) is None
