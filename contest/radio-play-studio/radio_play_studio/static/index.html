@@ -8,13 +8,13 @@
   :root {
     --bg: #f4efe6; --panel: #fffdf8; --ink: #2a2118; --muted: #6f6254;
     --line: #d9ccb8; --accent: #b4491f; --accent-ink: #fff8f0; --ok: #2f6b3a; --bad: #a3261a;
-    --bar: #e5d9c5;
+    --bar: #e5d9c5; --kept: #8a7d6b;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #17130f; --panel: #211b15; --ink: #f0e6d6; --muted: #a89a86;
       --line: #3a3026; --accent: #e0703f; --accent-ink: #1a1007; --ok: #7ec28a; --bad: #f08a7e;
-      --bar: #3a3026;
+      --bar: #3a3026; --kept: #8f826f;
     }
   }
   * { box-sizing: border-box; }
@@ -34,10 +34,10 @@
   button { font: inherit; font-weight: bold; padding: 12px 22px; border: 0; border-radius: 8px;
            background: var(--accent); color: var(--accent-ink); cursor: pointer; }
   button:disabled { opacity: .5; cursor: default; }
-  #bar { height: 10px; background: var(--bar); border-radius: 5px; overflow: hidden; margin: 12px 0 6px; }
-  #fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  #bar, .bar { height: 10px; background: var(--bar); border-radius: 5px; overflow: hidden; margin: 12px 0 6px; }
+  #fill, .fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
   #status { color: var(--muted); min-height: 1.5em; }
-  #error { color: var(--bad); white-space: pre-wrap; }
+  #error, .error { color: var(--bad); white-space: pre-wrap; }
   #notice { color: var(--bad); }
   video { width: 100%; border-radius: 8px; background: #000; margin-top: 12px; }
   .done a { color: var(--ok); }
@@ -70,10 +70,96 @@
   .card .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
   .small { padding: 6px 12px; font-size: .875rem; }
   .quiet { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .quiet[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
   .castbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
   .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   #lang { width: auto; max-width: 11rem; padding: 6px 8px; font-size: .875rem; }
   .mode strong .mt { color: inherit; font-size: inherit; }
+  .gobar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  #direct_help { flex-basis: 100%; }
+  #projects { margin-top: 12px; }
+  #projects a { color: var(--accent); margin-right: 10px; }
+
+  /* The Scene Producer: the form folded to one line, and the board */
+  .summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+             border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+             padding: 12px 16px; margin: 0 0 16px; }
+  .summary strong { font-size: 1.05rem; }
+  .summary span { color: var(--muted); }
+  .summary .quiet { margin-left: auto; }
+  .stages { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 0 0 8px; }
+  .stage { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
+  .stage b { display: block; }
+  .stage span { color: var(--muted); font-size: .875rem; }
+  .stage.on { border-color: var(--accent); }
+  .stage.done b::after { content: " \2713"; color: var(--ok); }
+  #pstatus { color: var(--muted); min-height: 1.5em; margin: 0 0 16px; }
+  .castrow { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+  .person { width: 128px; text-align: center; }
+  .person .face { width: 128px; height: 128px; border-style: solid; }
+  .person b { display: block; margin: 6px 0 2px; }
+  details.scene { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+                  margin: 0 0 12px; }
+  details.scene > summary { list-style: none; cursor: pointer; padding: 12px 16px; display: flex;
+                            align-items: center; gap: 10px; flex-wrap: wrap; }
+  details.scene > summary::-webkit-details-marker { display: none; }
+  details.scene > summary::before { content: "\25B8"; color: var(--muted); }
+  details[open].scene > summary::before { content: "\25BE"; }
+  details.scene > summary b { font-size: 1.05rem; }
+  details.scene > summary .count { color: var(--muted); font-size: .875rem; }
+  .flag { font-size: .8rem; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line);
+          color: var(--muted); }
+  .flag.changed { border-color: var(--accent); color: var(--accent); }
+  .flag.failed { border-color: var(--bad); color: var(--bad); }
+  .scenebody { padding: 0 16px 16px; }
+  .scenenote { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center;
+               margin: 4px 0 12px; }
+  .scenenote label { margin: 0; font-size: .875rem; }
+  .scenenote input { padding: 6px 10px; font-size: .95rem; }
+  .shots { display: grid; gap: 10px; }
+  .shot { border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; padding: 12px;
+          background: var(--bg); display: grid; grid-template-columns: 176px 1fr; gap: 12px; }
+  .shot.changed { border-left-color: var(--accent); }
+  .shot.failed { border-left-color: var(--bad); border-color: var(--bad); }
+  .shot.kept { border-left-color: var(--kept); }
+  .still { position: relative; width: 176px; height: 99px; border-radius: 6px; overflow: hidden;
+           border: 1px solid var(--line); background: var(--panel); }
+  .still img, .still video { width: 100%; height: 100%; object-fit: cover; margin: 0; border-radius: 0; }
+  .still .kind { position: absolute; left: 6px; bottom: 4px; font-size: .7rem; color: #fff;
+                 background: rgba(0,0,0,.45); padding: 0 6px; border-radius: 8px; }
+  .still .play { position: absolute; right: 6px; bottom: 4px; width: 26px; height: 26px; padding: 0;
+                 border-radius: 13px; background: rgba(0,0,0,.55); color: #fff; font-size: .75rem; }
+  .shot.failed .still img { filter: grayscale(1) brightness(.6); }
+  .badge { display: inline-block; font-size: .8rem; padding: 1px 8px; border-radius: 10px;
+           border: 1px solid var(--line); color: var(--muted); margin-left: 6px; vertical-align: middle; }
+  .badge.changed { border-color: var(--accent); color: var(--accent); }
+  .badge.failed { border-color: var(--bad); color: var(--bad); }
+  .badge.kept { border-color: var(--kept); color: var(--kept); }
+  .badge.filmed { border-color: var(--ok); color: var(--ok); }
+  .shot .who { font-weight: bold; }
+  .shot .when { color: var(--muted); font-size: .875rem; }
+  .shot .line { font-style: italic; color: var(--muted); margin: 2px 0 6px; }
+  .shot label { margin: 6px 0 2px; font-size: .875rem; }
+  .shot textarea { min-height: 48px; font-size: .95rem; }
+  .shot textarea.dirty { border-color: var(--accent); }
+  .shot .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .why { color: var(--bad); font-size: .875rem; margin: 4px 0 0; }
+  .actions { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0 8px;
+             border-top: 1px solid var(--line); display: flex; gap: 10px; flex-wrap: wrap;
+             align-items: center; margin-top: 8px; }
+  .actions button { padding: 10px 16px; }
+  .actions .hint, .actions .error { font-size: .875rem; flex-basis: 100%; }
+  .actions .hint { color: var(--muted); }
+  @media (max-width: 560px) {
+    .shot { grid-template-columns: 1fr; }
+    .still { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+    .stages { gap: 6px; }
+    .stage { padding: 6px 8px; } .stage b { font-size: .95rem; } .stage span { font-size: .78rem; }
+    .summary .quiet { margin-left: 0; }
+    .actions { padding: 8px 0 6px; gap: 6px; }
+    .actions button { padding: 8px 12px; font-size: .9rem; flex: 1 1 auto; }
+    .actions .hint { font-size: .8rem; line-height: 1.3; }
+  }
 </style>
 </head>
 <body>
@@ -86,13 +172,50 @@
 
   <p id="notice" hidden></p>
   <form id="form"></form>
-  <button id="go" type="submit" form="form" disabled data-i18n="go.make">Make the episode</button>
+  <div class="gobar" id="gobar">
+    <button id="go" type="submit" form="form" disabled data-i18n="go.make">Make the episode</button>
+    <button id="direct" type="button" class="quiet" hidden disabled data-i18n="go.direct">Direct the shots first</button>
+    <p id="direct_help" class="help" hidden data-i18n="go.direct_help">The play is written, cast and voiced as usual, then it stops after the stills: one picture for every line. Change any picture, try one again, keep the ones you like, then film. Filming is the slow part, so it only films what changed.</p>
+  </div>
+  <p id="projects" class="help" hidden></p>
 
   <section id="run" hidden aria-live="polite">
     <div id="bar"><div id="fill"></div></div>
     <p id="status"></p>
     <p id="error" hidden></p>
     <div id="result" class="done" hidden></div>
+  </section>
+
+  <div class="summary" id="summary" hidden>
+    <strong data-i18n="producer.summary">Directing the shots</strong>
+    <span id="summary_text"></span>
+    <button type="button" class="small quiet" id="change_story" data-i18n="producer.change">Change the story</button>
+  </div>
+
+  <section id="board" hidden aria-live="polite">
+    <div class="stages">
+      <div class="stage" id="stage_stills"><b data-i18n="stage.stills">Stills</b><span></span></div>
+      <div class="stage" id="stage_video"><b data-i18n="stage.video">Video</b><span></span></div>
+      <div class="stage" id="stage_publish"><b data-i18n="stage.publish">Publish</b><span></span></div>
+    </div>
+    <div class="bar"><div class="fill" id="pfill"></div></div>
+    <p id="pstatus"></p>
+    <fieldset id="castbox" hidden>
+      <legend data-i18n="board.cast">Cast</legend>
+      <div class="castrow" id="castrow"></div>
+      <p class="help" data-i18n="board.cast_help">A new portrait repaints every shot that character is in, except the kept ones, so try the shots first.</p>
+    </fieldset>
+    <div id="scenes"></div>
+    <div class="actions">
+      <button type="button" id="b_stills"></button>
+      <button type="button" id="b_video" class="quiet"></button>
+      <button type="button" id="b_publish" class="quiet"></button>
+      <span class="hint" id="hint"></span>
+      <!-- In the sticky bar, beside the buttons that raise it: never scrolled out of sight. -->
+      <span class="error" id="perror" hidden></span>
+      <span class="help" id="saved"></span>
+    </div>
+    <div id="published" class="done" hidden></div>
   </section>
 </main>
 
@@ -291,7 +414,8 @@ function build(list) {
     $("f_bank").addEventListener("change", () => setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic"));
     setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic");
   }
-  go.disabled = running;
+  go.disabled = running || stageBusy;
+  $("direct").disabled = running || stageBusy;
 }
 
 // -- The cast cards: one per character, each with an optional photo ---------
@@ -546,6 +670,8 @@ function setMode(mode) {
   if (!own && bank.value === MY_STORY_BANK) bank.value = lastBank || bank.options[0].value;
   $("group_" + MY_STORY_GROUP.replace(/\W+/g, "_")).hidden = !own;
   for (const key of ["bank", "source_ref"]) if ($("row_" + key)) $("row_" + key).hidden = own;
+  // Directing the shots is a My Story path (planning/scene-producer/PLAN.md).
+  $("direct").hidden = $("direct_help").hidden = !own;
 }
 
 function collect() {
@@ -593,7 +719,7 @@ function watch(id) {
     say($("error"), "error.lost");
     $("error").hidden = false;
     say($("status"), "status.disconnected");
-    running = false; go.disabled = false;
+    running = false; go.disabled = false; refreshBoard();
   };
   es.onmessage = (m) => {
     const ev = JSON.parse(m.data);
@@ -618,24 +744,29 @@ function watch(id) {
       es.close();
       $("fill").style.width = "100%";
       say($("status"), "status.finished");
-      const url = "/episodes/" + ev.run + "/" + encodeURIComponent(ev.file);
-      const v = document.createElement("video");
-      v.controls = true; v.src = url;
-      const a = document.createElement("a");
-      a.href = url; a.download = ev.file; say(a, "result.download", {file: ev.file});
-      $("result").textContent = "";
-      $("result").append(v, a);
-      $("result").hidden = false;
-      running = false; go.disabled = false;
+      showVideo($("result"), ev.run, ev.file);
+      running = false; go.disabled = false; refreshBoard();
     } else if (ev.type === "error") {
       finished = true;
       es.close();
       plain($("error"), ev.message);
       $("error").hidden = false;
       say($("status"), "status.stopped");
-      running = false; go.disabled = false;
+      running = false; go.disabled = false; refreshBoard();
     }
   };
+}
+
+// A finished episode, playing, with its download link.
+function showVideo(box, run, file) {
+  const url = "/episodes/" + run + "/" + encodeURIComponent(file);
+  const v = document.createElement("video");
+  v.controls = true; v.src = url;
+  const a = document.createElement("a");
+  a.href = url; a.download = file; say(a, "result.download", {file});
+  box.textContent = "";
+  box.append(v, a);
+  box.hidden = false;
 }
 
 form.addEventListener("submit", async (e) => {
@@ -659,15 +790,605 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
-// A reload, or a second tab, finds the episode being made and shows it from the
-// start: the app keeps every event of a run and replays them to a new page.
+// -- The Scene Producer: direct the shots, a stage at a time ------------------
+// A project is the app's (projects/<id>/project.json): its bundles, the view of
+// the latest one -- the pack's cards.json, its pictures and clips copied here --
+// and the person's draft. The page edits the draft, saves it a moment after
+// each change, and reads every badge and button from the draft against the
+// view: a still is changed when its words, its scene's note, its take or its
+// character's take differ from what was painted; a clip needs filming when its
+// still changed or was painted again since it was filmed, its action or take
+// changed, or it was never filmed. A kept card is used as it is.
+let project = null, draft = null;
+let stageBusy = false;          // a stage of the open project is running
+let saveTimer = null, saveChain = Promise.resolve(true);
+let edits = 0, savedEdits = 0;  // edits made, and how many of them the app holds
+const SAVE_DELAY_MS = 600;
+const STAGE_TEXT = {
+  stills: {run: "pstatus.stills", done: "pstatus.done_stills"},
+  video: {run: "pstatus.video", done: "pstatus.done_video"},
+  publish: {run: "pstatus.publish", done: "pstatus.done_publish"},
+};
+let cardEls = {}, sceneEls = {}, personEls = {};
+
+function folded(on) {
+  $("form").hidden = $("gobar").hidden = on;
+  $("summary").hidden = $("board").hidden = !on;
+  $("projects").hidden = true;
+}
+
+async function openProject(pid) {
+  const res = await fetch("/api/projects/" + pid);
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || res.statusText);
+  project = body.project;
+  draft = JSON.parse(JSON.stringify(project.draft));
+  history.replaceState(null, "", "#project=" + pid);
+  folded(true);
+  drawBoard();
+}
+
+// Read the project again, once a stage has ended. Unsaved edits are saved
+// first, so the draft the server sends back holds every one of them; one typed
+// while that save was on its way stays in the page's draft, to be saved next.
+async function reloadProject() {
+  if (!project) return;
+  await saveDraft();
+  const typing = edits !== savedEdits;
+  try {
+    const res = await fetch("/api/projects/" + project.project_id);
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    project = body.project;
+    if (!typing) draft = JSON.parse(JSON.stringify(project.draft));
+    drawBoard();
+  } catch (err) { plain($("perror"), err.message); $("perror").hidden = false; }
+}
+
+function closeProject() {
+  project = draft = null;
+  history.replaceState(null, "", location.pathname);
+  folded(false);
+  listProjects();
+}
+
+async function listProjects() {
+  let list = [];
+  try { list = (await (await fetch("/api/projects")).json()).projects || []; }
+  catch (err) { return; }
+  const box = $("projects");
+  box.textContent = "";
+  if (!list.length || project) { box.hidden = true; return; }
+  box.appendChild(tx(document.createElement("span"), "projects.recent", "Shots you are directing:"));
+  box.appendChild(document.createTextNode(" "));
+  for (const p of list.slice(0, 5)) {
+    const a = document.createElement("a");
+    a.href = "#project=" + p.project_id;
+    tx(a, "projects.open", "Started " + new Date(p.created * 1000).toLocaleString(), null,
+       {when: new Date(p.created * 1000).toLocaleString()});
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      openProject(p.project_id).catch((err) => {
+        say($("notice"), "pstatus.missing", {error: err.message}); $("notice").hidden = false;
+      });
+    });
+    box.appendChild(a);
+  }
+  box.hidden = false;
+}
+
+function summaryLine() {
+  const box = $("summary_text");
+  box.textContent = "";
+  const choices = project.choices || {};
+  const parts = [];
+  for (const key of ["bank", "language"]) {
+    if (choices[key]) parts.push(tx(document.createElement("span"), "choice." + key + "." + slug(choices[key]), String(choices[key])));
+  }
+  if (choices.my_author) parts.push(document.createTextNode(String(choices.my_author)));
+  parts.forEach((p, i) => { if (i) box.appendChild(document.createTextNode(" · ")); box.appendChild(p); });
+}
+
+function shown() { return (project && project.view) || {cast: [], scenes: []}; }
+function eachCard(fn) {
+  shown().scenes.forEach((scene) => (scene.shots || []).forEach((card) => fn(card, scene)));
+}
+const has = (list, id) => (list || []).includes(id);
+
+// What one card needs, read from the draft against the view.
+function assess(card, scene) {
+  const sid = card.shot_id, d = draft.cards[sid] || {};
+  const keptStill = has(draft.kept.stills, sid), keptClip = has(draft.kept.clips, sid);
+  const pictureEdit = card.picture_editable && d.picture_text != null && d.picture_text !== card.picture_text;
+  const noteEdit = scene.note_editable && draft.scenes[scene.scene_id] != null
+    && draft.scenes[scene.scene_id].note !== (scene.note || "");
+  const stillTake = (draft.takes.stills[sid] || 0) !== (card.still_take || 0);
+  const charTake = !!card.still_char_id &&
+    (draft.takes.characters[card.still_char_id] || 0) !== (card.still_char_take || 0);
+  // A kept still keeps its picture through a scene note or a new portrait.
+  const stillDirty = !!card.picture_editable && (pictureEdit || stillTake || (!keptStill && (noteEdit || charTake)));
+  // A still the image model refused: filming skips its shot as a gap, so it is
+  // painted again, or the card is kept as it is (a kept clip publishes).
+  const stillFailed = card.still_state === "failed" && !keptStill && !keptClip && !stillDirty;
+  const motionEdit = card.motion_editable && d.motion_text != null && d.motion_text !== card.motion_text;
+  const clipTake = (draft.takes.clips[sid] || 0) !== (card.clip_take || 0);
+  const filmed = !!card.clip && card.clip_state !== "failed";
+  const stale = filmed && !!card.clip_still && card.clip_still !== card.still;
+  // A floor: the shot fell to its scene still, or to black. Filming tries it again.
+  const clipFailed = card.clip_state === "failed" && !keptClip;
+  const toFilm = !keptClip && !stillFailed && (stillDirty || motionEdit || clipTake || stale || !filmed);
+  const changed = stillDirty || motionEdit || clipTake;
+  return {keptStill, keptClip, pictureEdit, motionEdit, stillDirty, stillFailed, clipTake,
+          stale, clipFailed, toFilm, changed, failed: !changed && (stillFailed || clipFailed),
+          filmed: filmed && !toFilm};
+}
+
+function counts() {
+  const c = {cards: 0, painted: 0, changed: 0, toFilm: 0, filmed: 0, failed: 0};
+  eachCard((card, scene) => {
+    const a = assess(card, scene);
+    c.cards += 1;
+    if (card.still) c.painted += 1;
+    if (a.stillDirty) c.changed += 1;
+    if (a.toFilm) c.toFilm += 1;
+    if (a.filmed || a.keptClip) c.filmed += 1;
+    if (a.failed) c.failed += 1;
+  });
+  return c;
+}
+
+function drawBoard() {
+  summaryLine();
+  cardEls = {}; sceneEls = {}; personEls = {};
+  const view = shown();
+  const row = $("castrow");
+  row.textContent = "";
+  for (const member of view.cast || []) row.appendChild(personCard(member));
+  $("castbox").hidden = !(view.cast || []).length;
+  const scenes = $("scenes");
+  scenes.textContent = "";
+  let n = 0;
+  view.scenes.forEach((scene, i) => {
+    const el = sceneBox(scene, i, () => (n += 1));
+    scenes.appendChild(el);
+  });
+  const pub = project.published;
+  if (pub) showVideo($("published"), pub.run, pub.file); else $("published").hidden = true;
+  refreshBoard();
+}
+
+function personCard(member) {
+  const el = document.createElement("div");
+  el.className = "person";
+  const face = document.createElement("div");
+  face.className = "face";
+  if (member.picture) {
+    const img = document.createElement("img");
+    img.src = member.picture; img.alt = member.name || member.char_id;
+    face.appendChild(img);
+  } else {
+    face.textContent = ((member.name || "?").trim()[0] || "?").toUpperCase();
+  }
+  const name = document.createElement("b");
+  name.textContent = member.name || member.char_id;
+  const badge = document.createElement("span");
+  badge.className = "badge changed";
+  tx(badge, "badge.repaint", "To paint again");
+  const again = document.createElement("button");
+  again.type = "button"; again.className = "small quiet";
+  tx(again, "board.paint_again", "Paint again");
+  again.hidden = !member.picture;   // a character with no picture has no take to draw again
+  again.addEventListener("click", () => edit(() => {
+    draft.takes.characters[member.char_id] = (member.take || 0) + 1;
+  }));
+  el.append(face, name, badge, again);
+  personEls[member.char_id] = {member, badge, again};
+  return el;
+}
+
+function sceneBox(scene, index, nextShot) {
+  const el = document.createElement("details");
+  el.className = "scene";
+  const head = document.createElement("summary");
+  const title = tx(document.createElement("b"), "scene.title", "Scene " + (index + 1), null, {n: index + 1});
+  const n = (scene.shots || []).length;
+  const count = document.createElement("span");
+  count.className = "count";
+  tx(count, n === 1 ? "scene.count_one" : "scene.count", n + " shots", null, {n});
+  const changed = document.createElement("span");
+  changed.className = "flag changed";
+  const failed = document.createElement("span");
+  failed.className = "flag failed";
+  head.append(title, count, changed, failed);
+  const body = document.createElement("div");
+  body.className = "scenebody";
+  if (scene.note_editable) {
+    const note = document.createElement("div");
+    note.className = "scenenote";
+    const id = "note_" + slug(scene.scene_id);
+    const label = tx(document.createElement("label"), "scene.note", "Scene note");
+    label.htmlFor = id;
+    const input = document.createElement("input");
+    input.id = id;
+    const d = draft.scenes[scene.scene_id];
+    input.value = d != null ? d.note : (scene.note || "");
+    tx(input, "scene.note_ph", "A few words every picture in this scene should share", "placeholder");
+    input.addEventListener("input", () => edit(() => {
+      if (input.value === (scene.note || "")) delete draft.scenes[scene.scene_id];
+      else draft.scenes[scene.scene_id] = {note: input.value};
+    }));
+    note.append(label, input);
+    body.appendChild(note);
+  }
+  const shots = document.createElement("div");
+  shots.className = "shots";
+  for (const card of scene.shots || []) shots.appendChild(shotCard(card, scene, nextShot()));
+  body.appendChild(shots);
+  el.append(head, body);
+  sceneEls[scene.scene_id] = {el, scene, changed, failed, opened: false};
+  return el;
+}
+
+function castName(charId) {
+  const m = (shown().cast || []).find((c) => c.char_id === charId);
+  return m ? (m.name || m.char_id) : (charId || "");
+}
+
+function shotCard(card, scene, number) {
+  const sid = card.shot_id, d = draft.cards[sid] || {};
+  const el = document.createElement("div");
+  el.className = "shot";
+  const still = document.createElement("div");
+  still.className = "still";
+  if (card.still) {
+    const img = document.createElement("img");
+    img.src = card.still; img.alt = "";
+    still.appendChild(img);
+  }
+  const kind = document.createElement("span");
+  kind.className = "kind";
+  still.appendChild(kind);
+  if (card.clip) {
+    const play = document.createElement("button");
+    play.type = "button"; play.className = "play"; play.textContent = "▶";
+    tx(play, "shot.play", "Play the clip", "title");
+    play.addEventListener("click", () => {
+      const v = document.createElement("video");
+      v.src = card.clip; v.controls = true; v.autoplay = true;
+      if (card.still) v.poster = card.still;
+      still.textContent = "";
+      still.appendChild(v);
+    });
+    still.appendChild(play);
+  }
+  const body = document.createElement("div");
+  const who = document.createElement("span");
+  who.className = "who";
+  tx(who, "shot.title", "Shot " + number, null, {n: number});
+  const name = castName(card.char_id);
+  const whoName = document.createElement("span");
+  whoName.className = "who";
+  whoName.textContent = name ? " · " + name : "";
+  const when = document.createElement("span");
+  when.className = "when";
+  const secs = (Number(card.dur_s) || 0).toFixed(1);
+  tx(when, "shot.seconds", secs + " s", null, {s: secs});
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  const line = document.createElement("p");
+  line.className = "line";
+  line.textContent = card.line || "";
+  body.append(who, whoName, document.createTextNode(" "), when, badge, line);
+
+  let picture = null, motion = null;
+  if (card.picture_editable) {
+    picture = document.createElement("textarea");
+    picture.value = d.picture_text != null ? d.picture_text : (card.picture_text || "");
+    picture.addEventListener("input", () => edit(() => {
+      const c = cardDraft(sid);
+      if (picture.value === card.picture_text) delete c.picture_text; else c.picture_text = picture.value;
+      // A picture edit asks for a new still, so the card keeps neither.
+      unkeep(sid, true);
+      tidy(sid);
+    }));
+    body.appendChild(labelled("shot.picture", "Picture", picture));
+  }
+  if (card.motion_editable) {
+    motion = document.createElement("textarea");
+    motion.value = d.motion_text != null ? d.motion_text : (card.motion_text || "");
+    motion.addEventListener("input", () => edit(() => {
+      const c = cardDraft(sid);
+      if (motion.value === card.motion_text) delete c.motion_text; else c.motion_text = motion.value;
+      // A new action asks for a new clip; the still keeps its keep.
+      unkeep(sid, false);
+      tidy(sid);
+    }));
+    body.appendChild(labelled("shot.motion", "Motion", motion));
+  } else {
+    body.appendChild(tx(Object.assign(document.createElement("p"), {className: "help"}),
+                        "shot.motion_fixed", "This shot's motion is set by its lane."));
+  }
+  const why = document.createElement("p");
+  why.className = "why";
+  const tools = document.createElement("div");
+  tools.className = "tools";
+  const repaint = document.createElement("button");
+  repaint.type = "button"; repaint.className = "small quiet";
+  tx(repaint, "shot.paint_again", "Paint again");
+  repaint.hidden = !card.picture_editable;
+  repaint.addEventListener("click", () => edit(() => {
+    draft.takes.stills[sid] = (card.still_take || 0) + 1;
+    unkeep(sid, true);
+  }));
+  const refilm = document.createElement("button");
+  refilm.type = "button"; refilm.className = "small quiet";
+  tx(refilm, "shot.film_again", "Film again");
+  refilm.hidden = !card.clip;
+  refilm.addEventListener("click", () => edit(() => {
+    draft.takes.clips[sid] = (card.clip_take || 0) + 1;
+    unkeep(sid, false);
+  }));
+  const keep = document.createElement("button");
+  keep.type = "button"; keep.className = "small quiet";
+  keep.hidden = !card.still && !card.clip;
+  keep.addEventListener("click", () => edit(() => {
+    if (has(draft.kept.stills, sid) || has(draft.kept.clips, sid)) { unkeep(sid, true); return; }
+    // Keep accepts the card as it is shown: its still, and its clip or the
+    // floor it fell to, with any edit or take waiting on it put back.
+    delete draft.cards[sid];
+    draft.takes.stills[sid] = card.still_take || 0;
+    draft.takes.clips[sid] = card.clip_take || 0;
+    if (card.still) draft.kept.stills.push(sid);
+    if (["filmed", "failed", "kept"].includes(card.clip_state)) draft.kept.clips.push(sid);
+    if (picture) picture.value = card.picture_text || "";
+    if (motion) motion.value = card.motion_text || "";
+  }));
+  tools.append(repaint, refilm, keep);
+  body.append(why, tools);
+  el.append(still, body);
+  cardEls[sid] = {el, card, scene, kind, badge, why, keep, picture, motion};
+  return el;
+}
+
+function cardDraft(sid) { return (draft.cards[sid] = draft.cards[sid] || {}); }
+function tidy(sid) { if (draft.cards[sid] && !Object.keys(draft.cards[sid]).length) delete draft.cards[sid]; }
+function unkeep(sid, still) {
+  draft.kept.clips = draft.kept.clips.filter((x) => x !== sid);
+  if (still) draft.kept.stills = draft.kept.stills.filter((x) => x !== sid);
+}
+
+// An edit to the draft: redraw what it changes, and save it a moment later.
+function edit(change) {
+  if (!draft) return;
+  change();
+  edits += 1;
+  refreshBoard();
+  clearTimeout(saveTimer);
+  say($("saved"), "pstatus.saving");
+  saveTimer = setTimeout(saveDraft, SAVE_DELAY_MS);
+}
+
+// Saves run one after another, each sending the draft as it stands then, over
+// the revision the last one returned. Resolves true once saved.
+function saveDraft() {
+  clearTimeout(saveTimer); saveTimer = null;
+  saveChain = saveChain.then(postDraft, postDraft);
+  return saveChain;
+}
+async function postDraft() {
+  const sending = edits;
+  if (!project || !draft || sending === savedEdits) return true;
+  const body = {scenes: draft.scenes, cards: draft.cards, takes: draft.takes, kept: draft.kept};
+  try {
+    const res = await fetch("/api/projects/" + project.project_id + "/draft", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({draft: body, revision: draft.revision}),
+    });
+    const out = await res.json();
+    if (!res.ok) {
+      if (res.status === 409) say($("saved"), "pstatus.stale"); else plain($("saved"), out.error);
+      return false;
+    }
+    draft.revision = out.revision;
+    savedEdits = sending;
+    say($("saved"), "pstatus.saved");
+    return true;
+  } catch (err) {
+    plain($("saved"), err.message);
+    return false;
+  }
+}
+
+function refreshBoard() {
+  if (!project || !draft) return;
+  const busy = stageBusy || running;
+  for (const {el, card, scene, kind, badge, why, keep, picture, motion} of Object.values(cardEls)) {
+    const a = assess(card, scene);
+    let state = "", key = "badge.filmed", text = "Filmed";
+    if (a.stillDirty) { state = "changed"; key = "badge.changed"; text = "Changed, not painted yet"; }
+    else if (a.motionEdit) { state = "changed"; key = "badge.action"; text = "Action changed, not filmed yet"; }
+    else if (a.clipTake) { state = "changed"; key = "badge.refilm"; text = "To film again"; }
+    else if (a.failed) { state = "failed"; key = "badge.failed"; text = "Failed"; }
+    else if (a.keptStill || a.keptClip) { state = "kept"; key = "badge.kept"; text = "Kept"; }
+    else if (a.toFilm) { key = "badge.to_film"; text = "Painted, not filmed"; }
+    el.className = "shot" + (state ? " " + state : "");
+    badge.className = "badge " + (state || (a.filmed ? "filmed" : ""));
+    tx(badge, key, text);
+    tx(kind, card.clip && !a.stale ? "kind.clip" : "kind.still", card.clip && !a.stale ? "Clip" : "Still");
+    if (a.failed && a.stillFailed) {
+      // Keep is offered only for a card with a still or a clip to keep.
+      if (keep.hidden) tx(why, "why.still_paint", "This picture could not be painted.");
+      else tx(why, "why.still", "This picture could not be painted.");
+      why.hidden = false;
+    }
+    else if (a.failed) {
+      tx(why, "why.clip", "This shot could not be filmed.", null, {why: card.clip_floor || ""});
+      why.hidden = false;
+    } else why.hidden = true;
+    const kept = a.keptStill || a.keptClip;
+    keep.setAttribute("aria-pressed", kept ? "true" : "false");
+    tx(keep, kept ? "shot.kept" : "shot.keep", kept ? "Kept" : "Keep");
+    if (picture) picture.classList.toggle("dirty", a.pictureEdit);
+    if (motion) motion.classList.toggle("dirty", a.motionEdit);
+  }
+  for (const s of Object.values(sceneEls)) {
+    let changed = 0, failed = 0;
+    for (const card of s.scene.shots || []) {
+      const a = assess(card, s.scene);
+      if (a.changed) changed += 1;
+      if (a.failed) failed += 1;
+    }
+    tx(s.changed, "scene.changed", changed + " changed", null, {n: changed});
+    tx(s.failed, "scene.failed", failed + " failed", null, {n: failed});
+    s.changed.hidden = !changed; s.failed.hidden = !failed;
+    // A scene opens by itself the first time it holds something to do.
+    if ((changed || failed) && !s.opened) { s.el.open = true; s.opened = true; }
+  }
+  for (const {member, badge} of Object.values(personEls)) {
+    badge.hidden = (draft.takes.characters[member.char_id] || 0) === (member.take || 0);
+  }
+  const c = counts();
+  const latest = project.bundles.length ? project.bundles[project.bundles.length - 1] : null;
+  const held = !!project.pending && !stageBusy;
+  const stills = $("b_stills"), video = $("b_video"), publish = $("b_publish");
+  tx(stills, c.changed ? "act.stills_n" : "act.stills", "Paint the stills", null, {n: c.changed});
+  tx(video, c.toFilm ? "act.video_n" : "act.video", "Film the shots", null, {n: c.toFilm});
+  tx(publish, "act.publish", "Publish the episode");
+  const off = busy || held || !latest;
+  stills.disabled = off || !c.changed;
+  video.disabled = off || c.changed > 0 || !c.toFilm;
+  const ready = !!latest && latest.stage === "video" && !c.changed && !c.toFilm && !c.failed;
+  publish.disabled = off || !ready;
+  const hint = $("hint");
+  if (busy) say(hint, "hint.running");
+  else if (held) say(hint, "hint.held");
+  else if (c.changed) say(hint, "hint.dirty");
+  else if (c.toFilm) say(hint, "hint.unfilmed");
+  else if (c.failed) say(hint, "hint.failed", {n: c.failed});
+  else if (project.published && ready) say(hint, "hint.published");
+  else say(hint, "hint.ready");
+  showStage("stills", c.changed === 0 && c.cards > 0, "stage.stills_state", {painted: c.painted, changed: c.changed});
+  showStage("video", c.toFilm === 0 && c.cards > 0, "stage.video_state", {filmed: c.filmed, total: c.cards});
+  const pubKey = project.published && ready ? "stage.publish_done" : ready ? "stage.publish_ready" : "stage.publish_wait";
+  showStage("publish", !!project.published && ready, pubKey, {});
+  go.disabled = $("direct").disabled = busy;
+}
+
+function showStage(name, done, key, vars) {
+  const el = $("stage_" + name);
+  el.classList.toggle("done", done);
+  el.classList.toggle("on", stageBusy && watching === name);
+  say(el.querySelector("span"), key, vars);
+}
+
+let watching = null;   // the stage being watched
+
+async function startStage(stageName) {
+  if (stageBusy || !project) return;
+  $("perror").hidden = true;
+  if (!(await saveDraft())) return;   // the stage carries the draft as saved
+  stageBusy = true; watching = stageName; refreshBoard();
+  try {
+    const res = await fetch("/api/projects/" + project.project_id + "/stages", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({stage: stageName}),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    watchStage(body.id, stageName);
+  } catch (err) {
+    stageBusy = false; watching = null;
+    plain($("perror"), err.message); $("perror").hidden = false;
+    refreshBoard();
+  }
+}
+
+function watchStage(id, stageName) {
+  const pid = project ? project.project_id : null;
+  stageBusy = true; watching = stageName;
+  $("pfill").style.width = "0";
+  say($("pstatus"), STAGE_TEXT[stageName].run);
+  refreshBoard();
+  const es = new EventSource("/api/episodes/" + id + "/events");
+  let finished = false, high = 0;   // a stage's bar is its own, and only moves forward
+  const end = () => {
+    finished = true; es.close();
+    stageBusy = false; watching = null;
+    if (project && project.project_id === pid) reloadProject(); else refreshBoard();
+  };
+  es.onerror = () => {
+    if (finished || es.readyState !== EventSource.CLOSED) return;
+    say($("perror"), "error.lost"); $("perror").hidden = false;
+    end();
+  };
+  es.onmessage = (m) => {
+    const ev = JSON.parse(m.data);
+    if (ev.type === "progress") {
+      high = Math.max(high, Math.round(ev.value * 100));
+      $("pfill").style.width = high + "%";
+      if (ev.nodes_total) say($("pstatus"), "progress.stages", {pct: high, done: ev.nodes_done, total: ev.nodes_total, msg: ""});
+      else say($("pstatus"), "progress.pct", {pct: high, msg: ""});
+    } else if (ev.type === "step") {
+      if (ev.steps) say($("pstatus"), "progress.step", {pct: high, step: ev.step, steps: ev.steps});
+    } else if (ev.type === "submitted") {
+      say($("pstatus"), STAGE_TEXT[stageName].run);
+    } else if (ev.type === "done") {
+      $("pfill").style.width = "100%";
+      say($("pstatus"), STAGE_TEXT[stageName].done);
+      end();
+    } else if (ev.type === "error") {
+      plain($("perror"), ev.message); $("perror").hidden = false;
+      say($("pstatus"), "status.stopped");
+      end();
+    }
+  };
+}
+
+$("b_stills").addEventListener("click", () => startStage("stills"));
+$("b_video").addEventListener("click", () => startStage("video"));
+$("b_publish").addEventListener("click", () => startStage("publish"));
+$("change_story").addEventListener("click", closeProject);
+$("direct").addEventListener("click", async () => {
+  $("direct").disabled = go.disabled = true;
+  $("error").hidden = true;
+  try {
+    const res = await fetch("/api/projects", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({choices: collect()}),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    await openProject(body.project_id);
+    watchStage(body.id, "stills");
+  } catch (err) {
+    $("run").hidden = false; plain($("error"), err.message); $("error").hidden = false;
+    say($("status"), "status.not_started");
+    $("direct").disabled = go.disabled = false;
+  }
+});
+
+// A reload, or a second tab, finds what is being made and shows it from the
+// start: the app keeps every event of a run and replays them to a new page. A
+// stage brings back its project's board; a project named in the address
+// opens; an episode being made shows as it always has.
 async function resume() {
   const wanted = (location.hash.match(/^#run=([0-9a-f]{12})$/) || [])[1];
+  const wantedProject = (location.hash.match(/^#project=([a-z0-9][a-z0-9-]{3,31})$/) || [])[1];
   let list = [];
   try {
     list = (await (await fetch("/api/episodes")).json()).episodes || [];
   } catch (err) { return; }
-  const run = list.find((r) => r.id === wanted) || list.find((r) => !r.finished);
+  const stageRun = list.find((r) => r.project_id && !r.finished);
+  try {
+    if (stageRun) { await openProject(stageRun.project_id); watchStage(stageRun.id, stageRun.stage); }
+    else if (wantedProject) await openProject(wantedProject);
+  } catch (err) {
+    say($("notice"), "pstatus.missing", {error: err.message}); $("notice").hidden = false;
+  }
+  if (!project) listProjects();
+  if (project) return;
+  const episodes = list.filter((r) => !r.project_id);
+  const run = episodes.find((r) => r.id === wanted) || episodes.find((r) => !r.finished);
   if (!run) {
     if (wanted) {
       $("run").hidden = false;
@@ -698,7 +1419,7 @@ function presence(closing) {
 }
 presence(false);
 setInterval(() => presence(false), 20000);
-addEventListener("pagehide", () => presence(true));
+addEventListener("pagehide", () => { if (saveTimer) saveDraft(); presence(true); });
 
 initLang().then(() => { resume(); loadOptions(); });
 </script>

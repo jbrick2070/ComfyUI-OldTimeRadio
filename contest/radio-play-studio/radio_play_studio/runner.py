@@ -307,7 +307,12 @@ class Studio:
         if project["pending"] is not None:
             raise producer.StageInFlight("this project already has a stage in flight")
         direction = producer.build_direction(project, stage)
-        graph, node_ids = self.build_graph_from(Path(project["workflow"]), project["choices"])
+        workflow = Path(project["workflow"])
+        if not workflow.is_file():
+            # A pack update can rename or retire the workflow a project started on.
+            raise producer.ProjectError(f"this project's workflow is not at {workflow} any "
+                                        "more; start a new project")
+        graph, node_ids = self.build_graph_from(workflow, project["choices"])
         latest = producer.latest_bundle(project)
         replay_from = producer.bundle_subfolder(project_id, latest["out"]) if latest else ""
         producer.patch_graph(graph, node_ids, direction, replay_from)

@@ -506,6 +506,15 @@ def test_a_run_sends_the_project_as_it_stands_when_its_attempt_is_saved(studio):
     assert sent["cards"] == {"shot_b002": {"picture_text": "a window at dawn"}}
 
 
+def test_a_project_whose_workflow_has_gone_is_refused_readably(studio, tmp_path):
+    # A pack update can rename the workflow a project started on.
+    project = producer.new_project(studio.settings.out_dir,
+                                   workflow=str(tmp_path / "retired_workflow.json"),
+                                   choices={"bank": "my_story"})
+    with pytest.raises(producer.ProjectError, match="workflow is not at"):
+        studio.prepare_stage(project["project_id"], "stills")
+
+
 def test_a_client_that_cannot_be_built_sends_nothing_and_frees_the_project(studio):
     pid = _project(studio)["project_id"]
 
