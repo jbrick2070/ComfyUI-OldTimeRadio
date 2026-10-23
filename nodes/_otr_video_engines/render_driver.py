@@ -5663,6 +5663,7 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                         sid, bid)
                     new_shots.append(shot)
                     if producer is not None:
+                        producer.check_gap(sid)
                         _producer_floor(producer, shot, None)
                     continue
                 if _cloud_budget_floor_sid(sid, errors, halted):
@@ -5745,6 +5746,7 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                         shot.get("shot_id"), _beat_id_for_shot(shot))
                     new_shots.append(shot)
                     if producer is not None:
+                        producer.check_gap(shot.get("shot_id"))
                         _producer_floor(producer, shot, None)
                     continue
                 # ENGINE-GATED: a spend-cap halt is about money, and a LOCAL

@@ -424,10 +424,11 @@ def _grade_acceptance(ledger, manifest):
 
 
 def _producer_clips(direction, ledger, episode_id, _rd):
-    """A Scene Producer Video run's clip reuse (``_otr_producer_clips``): the
-    project's store, this workspace's episode folder, the reuse map and floor
-    payloads the bundle it replays carries, and the direction's kept clips and
-    clip takes. The folder is resolved by the rule the clip persist uses after
+    """A Scene Producer Video or Publish run's clip reuse
+    (``_otr_producer_clips``): the project's store, this workspace's episode
+    folder, the reuse map and floor payloads the bundle it replays carries,
+    and the direction's kept clips, clip takes and stage -- a Publish films
+    nothing. The folder is resolved by the rule the clip persist uses after
     the render, so a shot committed mid-render lands where the persist would
     have put it."""
     from pathlib import Path
@@ -442,7 +443,8 @@ def _producer_clips(direction, ledger, episode_id, _rd):
         project_id=direction["project_id"],
         episode_root=Path(str(otr_clips_dir(str(workspace)))).parent,
         bundle_map=video.get(_PC.MAP_KEY), bundle_floors=video.get(_PC.FLOOR_KEY),
-        kept=direction["kept"]["clips"], takes=direction["takes"]["clips"])
+        kept=direction["kept"]["clips"], takes=direction["takes"]["clips"],
+        stage=direction["stage"])
 
 
 class OTRVideoRenderBatch:
@@ -654,10 +656,11 @@ class OTRVideoRenderBatch:
         ``master_audio_path``: path to the FROZEN master mix; forwarded to
         :func:`run_real_episode` for per-beat audio slicing.  Read-only.
 
-        ``direction``: a Scene Producer Video run's direction, or None. With
-        one, the render reuses every clip already filmed under its shot's
-        causal key and commits each shot it films the moment it is whole
-        (``_otr_producer_clips``)."""
+        ``direction``: a Scene Producer Video or Publish run's direction, or
+        None. With one, the render reuses every clip already filmed under its
+        shot's causal key and commits each shot it films the moment it is
+        whole (``_otr_producer_clips``); a Publish films nothing, and refuses
+        a shot that has no clip."""
         try:
             ledger = json.loads(patched_ledger_json or "{}")
         except (ValueError, TypeError) as exc:

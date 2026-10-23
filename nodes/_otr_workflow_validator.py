@@ -724,28 +724,20 @@ class WorkflowValidator:
         and refuses nothing. A filled one is checked in full
         (``_otr_producer_direction.admit_prompt_direction``: shape, names, the
         stage rules against the writer's ``replay_from``, the project's own
-        bundle it continues, a bundle name that already exists), and then
-        refused only for what this build cannot honour yet
-        (``not_yet_supported``), so no part of a direction is silently ignored.
+        bundle it continues, a bundle name that already exists, the engines
+        and seed, the ids its cards show, and what a Video or Publish run
+        would film or publish that the bundle does not yet show).
         """
         try:
-            from ._otr_producer_direction import (DirectionError, admit_prompt_direction,
-                                                  not_yet_supported)
+            from ._otr_producer_direction import DirectionError, admit_prompt_direction
         except ImportError:  # flat test imports
             from _otr_producer_direction import (  # type: ignore
-                DirectionError, admit_prompt_direction, not_yet_supported)
+                DirectionError, admit_prompt_direction)
         try:
-            admitted = admit_prompt_direction(prompt)
+            admit_prompt_direction(prompt)
         except DirectionError as exc:
             raise ValueError("OTR_WorkflowValidator: Scene Producer direction "
                              "refused -- %s" % exc) from None
-        if admitted is None:
-            return
-        reason = not_yet_supported(admitted["direction"])
-        if reason:
-            raise ValueError("OTR_WorkflowValidator: Scene Producer direction refused -- "
-                             "%s. Clear Shot Lock's direction_json to make an ordinary "
-                             "episode." % reason)
 
     @staticmethod
     def _admit_story_input(prompt, unique_id) -> None:

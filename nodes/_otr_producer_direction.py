@@ -51,9 +51,10 @@ Video run films only the shots whose causal key changed. Since chunk 4b a clip
 take films a shot again, a kept clip -- or the floor a shot fell to -- is used
 as it is, and ``cards.json`` shows each card's clip and its state.
 
-WHAT IS NOT HERE YET, and which build step adds it beside its caller (a check
-with nothing to compare against is the defect the repo's own rules forbid):
-Publish (chunk 4c). Until then :func:`not_yet_supported` refuses it.
+PUBLISH (chunk 4c) films nothing: node 63 refuses one while a card is not
+filmed as it stands (:func:`unfilmed_shots`) unless it is kept, and the render
+refuses a shot it finds no clip for before any weights load. Every part of a
+direction is now built, so none is refused for being unbuilt.
 
 UTF-8, no BOM. Standard library only.
 """
@@ -136,7 +137,7 @@ _KEPT_GROUPS = ("stills", "clips")
 __all__ = [
     "DIRECTION_VERSION", "STAGES", "WIDGET_NAME", "DirectionError", "is_blank",
     "parse_direction", "check_stage_rules", "bundle_root", "project_dir", "FIRST_OUT",
-    "project_bundle", "not_yet_supported", "RUNTIME_KEY", "attach_runtime",
+    "project_bundle", "unfilmed_shots", "RUNTIME_KEY", "attach_runtime",
     "runtime_direction", "freeze_stage", "execution_blocker",
     "bundle_path", "manifest_digest", "admit_prompt_direction",
     "IMAGE_SLOTS", "META_IMAGE_ENGINES", "MANIFEST_PRODUCER_KEY",
@@ -1024,6 +1025,37 @@ def unpainted_characters(cards: Dict[str, Any], direction: Dict[str, Any]) -> li
             and int(asked.get(str(m.get("char_id")), 0)) != int(m.get("take") or 0)]
 
 
+def unfilmed_shots(cards: Dict[str, Any], direction: Dict[str, Any]) -> list:
+    """The cards a Publish run cannot show as filmed, each with why: no clip
+    yet, a floor -- or a refused-still gap -- that is not kept, or an action or
+    clip take changed since its clip was filmed. A kept card publishes as it
+    is, a kept floor visibly degraded.
+
+    A still repainted since its clip was filmed is not seen here: cards.json
+    does not say which still a clip was filmed from. The Publish render refuses
+    it instead, before any weights load, because the clip's key no longer
+    matches what the shot shows."""
+    kept = set(direction["kept"]["clips"])
+    takes = direction["takes"]["clips"]
+    pending = []
+    for group in cards.get("scenes") or []:
+        for card in group.get("shots") or []:
+            sid = str(card.get("shot_id"))
+            if sid in kept:
+                continue
+            body = direction["cards"].get(sid, {})
+            if card.get("clip_floor"):
+                pending.append("%s (failed: %s)" % (sid, card["clip_floor"]))
+            elif card.get("clip_state") not in ("filmed", "kept"):
+                pending.append("%s (not filmed)" % sid)
+            elif ("motion_text" in body and str(body["motion_text"]).strip()
+                  != str(card.get("motion_text") or "").strip()):
+                pending.append("%s (its action changed)" % sid)
+            elif int(takes.get(sid, 0) or 0) != int(card.get("clip_take") or 0):
+                pending.append("%s (its clip take changed)" % sid)
+    return pending
+
+
 def check_direction_ids(cards: Dict[str, Any], direction: Dict[str, Any]) -> None:
     """Refuse a replay's direction that names what its bundle's ``cards.json``
     does not show, or asks a card for what it cannot take: a card, scene or
@@ -1197,6 +1229,15 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
                 raise DirectionError(
                     "the take of %s differs from the one their pictures were painted "
                     "with; paint the stills first" % ", ".join(recast[:8]))
+        if direction["stage"] == "publish":
+            # UNFILMED (plan, "Publish"): Publish films nothing, so every card
+            # must show a clip filmed as it stands, or be kept as it is.
+            unfilmed = unfilmed_shots(cards, direction)
+            if unfilmed:
+                raise DirectionError(
+                    "%d card(s) are not filmed as they stand: %s; film them in a Video "
+                    "run first, or keep them as they are"
+                    % (len(unfilmed), "; ".join(unfilmed[:8])))
         if direction["out"] is not None:
             # Bundles are numbered in the order they were made, one apart, so
             # "latest" is always the highest number and no number is skipped.
@@ -1266,29 +1307,6 @@ def producer_replay_needs(prompt: Any) -> Optional[Dict[str, Any]]:
         "video_engines": (sorted(str(e) for e in producer.get("video_engines") or [])
                           if stage == "video" else []),
     }
-
-
-# --------------------------------------------------------------------------- #
-# what this build can run
-# --------------------------------------------------------------------------- #
-
-def not_yet_supported(direction: Dict[str, Any]) -> Optional[str]:
-    """What a direction asks for that this build cannot honour yet, in plain
-    words, or ``None``. A direction is refused rather than run with part of it
-    silently ignored: an edit that does nothing would look like a broken edit.
-
-    Each arrives with the build step that makes it real (plan, Build order).
-    Real now: ACTION edits (Shot Lock recomposes them on replay); since chunk
-    3 picture edits, scene notes, character and still takes and kept stills (a
-    stills replay repaints them, and node 63 refuses a Video run that would
-    film stills they have not reached); since chunk 4a clip reuse, so a Video
-    run films only what changed; and since chunk 4b clip takes (another draw
-    of the shot) and kept clips, floors included. Still to come: Publish
-    (chunk 4c).
-    """
-    if direction["stage"] == "publish":
-        return "Publish is not available in this build yet"
-    return None
 
 
 # --------------------------------------------------------------------------- #

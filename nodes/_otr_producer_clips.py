@@ -327,7 +327,10 @@ class ProducerClips:
 
     def __init__(self, *, project_id: str, episode_root: Any, bundle_map: Any,
                  bundle_floors: Any = None, kept: Iterable[Any] = (),
-                 takes: Any = None) -> None:
+                 takes: Any = None, stage: str = "video") -> None:
+        #: "video" films what it does not find; "publish" films nothing, and
+        #: refuses a shot it finds no clip for (plan, "Publish").
+        self.stage = str(stage)
         self.store = store_dir(project_id)
         self.episode_root = Path(str(episode_root))
         self.clips_dir = self.episode_root.joinpath(*_EPISODE_DIRS["clip"])
@@ -355,8 +358,25 @@ class ProducerClips:
         ``{"clip": ..., "attempts": [...]}`` -- or None, and the shot renders.
         The bundle's own record is used in place when it names this key and
         its files verify; otherwise the store's entry is copied in. A kept
-        card's clip is used whatever its key (:meth:`_keep`)."""
-        shot_id = str(shot_id)
+        card's clip is used whatever its key (:meth:`_keep`). A PUBLISH run
+        renders nothing: a shot it finds no clip for refuses the run, before
+        any weights load (plan, "Publish")."""
+        found = self._find(str(shot_id), key)
+        if found is None and self.stage == "publish":
+            raise ClipStoreError(
+                "Publish has no filmed clip for shot %s as it stands now: film it in a "
+                "Video run first, or keep the clip it has" % shot_id)
+        return found
+
+    def check_gap(self, shot_id: str) -> None:
+        """A shot skipped as a refused-still gap. A Publish run publishes one
+        only when its card is kept: otherwise the gap refuses the run."""
+        if self.stage == "publish" and str(shot_id) not in self.kept:
+            raise ClipStoreError(
+                "Publish refuses shot %s: its still was refused, so it has no clip; "
+                "paint it again, or keep the card to publish the gap" % shot_id)
+
+    def _find(self, shot_id: str, key: str) -> Optional[Dict[str, Any]]:
         with self._lock:
             self._keys[shot_id] = key
         if shot_id in self.kept:

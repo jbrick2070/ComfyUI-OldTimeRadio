@@ -332,7 +332,7 @@ def test_the_validator_asks_before_either_readiness_gate():
     assert ask < src.index("_queue_time_readiness_gates(")
 
 
-def test_the_validator_admits_a_plain_direction_and_refuses_what_is_not_built(producer_root):
+def test_the_validator_admits_a_plain_direction_and_refuses_a_malformed_one(producer_root):
     from nodes import _otr_workflow_validator as wv
     admit = wv.WorkflowValidator._admit_producer_direction
     assert admit(_prompt("")) is None
@@ -342,22 +342,6 @@ def test_the_validator_admits_a_plain_direction_and_refuses_what_is_not_built(pr
         admit(_prompt(_raw(version=7)))
     with pytest.raises(ValueError, match="first run has no cards yet"):
         admit(_prompt(_raw(cards={"shot_b001": {"picture_text": "a desk"}})))
-    # Since chunk 3 picture edits, notes, still and character takes and kept
-    # stills are real, and since chunk 4b clip takes and kept clips.
-    later = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
-                                    cards={"shot_b001": {"picture_text": "a desk"}},
-                                    scenes={"s01": {"note": "at dusk"}},
-                                    takes={"characters": {"c01": 1}, "stills": {"shot_b001": 2}},
-                                    kept={"stills": ["shot_b002"]}))
-    assert PD.not_yet_supported(later) is None
-    clips = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
-                                    takes={"clips": {"shot_b001": 1}}, kept={"clips": ["shot_b002"]}))
-    assert PD.not_yet_supported(clips) is None
-    action_only = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
-                                          cards={"shot_b001": {"motion_text": "leans in"}}))
-    assert PD.not_yet_supported(action_only) is None
-    publish = PD.parse_direction(_raw(stage="publish", out=_DROP, source="a" * 64))
-    assert "Publish is not available" in PD.not_yet_supported(publish)
 
 
 def test_shot_lock_carries_the_widget_as_an_advanced_input():
@@ -371,10 +355,10 @@ def test_shot_lock_carries_the_widget_as_an_advanced_input():
     assert "socketless" not in opts and "forceInput" not in opts
 
 
-def test_shot_lock_refuses_what_this_build_cannot_honour_before_any_work():
+def test_shot_lock_refuses_a_malformed_direction_before_any_work():
     from nodes.otr_shot_lock import OTRShotLock
-    with pytest.raises(ValueError, match="Publish is not available in this build yet"):
-        OTRShotLock().lock("{}", direction_json=_raw(stage="publish", out=_DROP,
+    with pytest.raises(ValueError, match="OTR_ShotLock: Scene Producer direction refused"):
+        OTRShotLock().lock("{}", direction_json=_raw(stage="publish", out="02-video",
                                                      source="a" * 64))
 
 
@@ -952,3 +936,22 @@ def test_node_63_refuses_what_the_bundle_does_not_show(producer_root, tmp_path, 
     with pytest.raises(PD.DirectionError, match="the take of c02 differs"):
         PD.admit_prompt_direction(run("video", takes={"characters": {"c02": 1}}))
     assert PD.admit_prompt_direction(run("stills", takes={"characters": {"c02": 1}}))
+
+
+def test_node_63_refuses_a_publish_the_bundle_has_not_filmed(producer_root, tmp_path,
+                                                            monkeypatch):
+    # Chunk 4c: a stills bundle has no clip for any card, so nothing in it can
+    # publish -- and a card cannot keep a clip it does not have.
+    bundle = _bundle_with_a_painted_card(tmp_path, monkeypatch)
+    digest = PD.manifest_digest(str(bundle))
+
+    def publish(**changes):
+        return _prompt(_raw(stage="publish", out=_DROP, source=digest, **changes),
+                       replay_from=str(bundle))
+
+    with pytest.raises(PD.DirectionError,
+                       match="1 card\\(s\\) are not filmed as they stand: shot_b001 "
+                             "\\(not filmed\\)"):
+        PD.admit_prompt_direction(publish())
+    with pytest.raises(PD.DirectionError, match="card shot_b001 has no clip to keep"):
+        PD.admit_prompt_direction(publish(kept={"clips": ["shot_b001"]}))

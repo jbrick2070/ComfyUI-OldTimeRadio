@@ -3639,8 +3639,7 @@ class OTRShotLock:
         # Blank -- every shipped graph -- parses to None and nothing below
         # changes. A filled one is read with the SAME rules the Workflow
         # Validator applied at queue time (a graph without that node is caught
-        # here instead), and whatever this build cannot honour yet is refused
-        # rather than silently ignored.
+        # here instead).
         try:
             from . import _otr_producer_direction as _PD
         except ImportError:  # pragma: no cover -- flat imports
@@ -3650,11 +3649,6 @@ class OTRShotLock:
         except _PD.DirectionError as exc:
             raise ValueError("OTR_ShotLock: Scene Producer direction refused -- %s"
                              % exc) from None
-        if direction is not None:
-            _not_yet = _PD.not_yet_supported(direction)
-            if _not_yet:
-                raise ValueError("OTR_ShotLock: Scene Producer direction refused -- %s"
-                                 % _not_yet)
         from . import _otr_ledger_consumers as _OTRLC
         try:
             from .production_ledger import stamp_durable as _stamp_durable

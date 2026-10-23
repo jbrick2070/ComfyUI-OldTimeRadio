@@ -543,3 +543,104 @@ def test_cards_show_each_clip_and_its_state(producer_root, cameras, floors, tmp_
                 card.update(clip=None, clip_state="")
     with pytest.raises(PD.DirectionError, match="card shot_b003 has no clip to keep"):
         PD.check_direction_ids(shown_cards, _direction(kept={"clips": ["shot_b003"]}))
+
+
+# --------------------------------------------------------------------------- #
+# chunk 4c: Publish
+# --------------------------------------------------------------------------- #
+
+def _replayed(tmp_path, first_ep, name, **changes):
+    """A workspace laid out as a replay of ``first_ep``'s bundle: its clips
+    copied in, as the import does."""
+    workspace = _workspace(tmp_path, name, **changes)
+    shutil.copytree(str(first_ep / "clips"), str(workspace[0] / "clips"))
+    return workspace
+
+
+def test_publish_films_nothing_and_refuses_a_shot_it_has_no_clip_for(producer_root, cameras,
+                                                                    tmp_path):
+    camera = cameras()
+    ep_a, ledger, build = _workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger, build))
+    published, filmed, producer = _film(camera, _replayed(tmp_path, ep_a, "ep_p"),
+                                        bundle_map=_map(first), stage="publish")
+    assert filmed == [] and set(producer.reused.values()) == {"bundle"}
+    assert _map(published) == _map(first)
+    # An action nobody has filmed: Publish refuses it, and renders nothing.
+    with pytest.raises(PC.ClipStoreError, match="Publish has no filmed clip for shot shot_b002"):
+        _film(camera, _replayed(tmp_path, ep_a, "ep_q",
+                                prompts={"shot_b002": "a window nobody filmed"}),
+              bundle_map=_map(first), stage="publish")
+    assert camera.filmed == []
+
+
+def test_publish_takes_a_kept_floor_and_refuses_one_that_is_not(producer_root, cameras, floors,
+                                                               tmp_path):
+    camera = cameras("cloud_stub_camera")
+    camera.timeouts = {"shot_b002"}
+    ep_a, ledger, build = _cloud_workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger, build))
+    floored = first["ledger"]["video"][PC.FLOOR_KEY]
+    camera.timeouts.clear()
+
+    def publish(name, **reuse):
+        workspace = _replayed(tmp_path, ep_a, name, engine_id="cloud_stub_camera")
+        workspace[1]["video"]["shots"][1].update(first["ledger"]["video"]["shots"][1])
+        return _film(camera, workspace, bundle_map=_map(first), bundle_floors=floored,
+                     stage="publish", **reuse)
+
+    with pytest.raises(PC.ClipStoreError, match="Publish has no filmed clip for shot shot_b002"):
+        publish("ep_p")
+    published, filmed, producer = publish("ep_q", kept=["shot_b002"])
+    assert filmed == [] and producer.reused["shot_b002"] == "kept floor"
+    assert published["ledger"]["video"]["shots"][1]["cloud_floor"] == "timeout", \
+        "published visibly degraded, never passed off as filmed"
+
+
+def test_publish_refuses_a_refused_still_gap_unless_its_card_is_kept(producer_root, cameras,
+                                                                    tmp_path, monkeypatch):
+    camera = cameras()
+    ep_a, ledger, build = _workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger, build))
+    monkeypatch.setattr(rd, "sanctioned_gap_beat_ids", lambda ledger: {"b002"})
+    with pytest.raises(PC.ClipStoreError, match="Publish refuses shot shot_b002: its still"):
+        _film(camera, _replayed(tmp_path, ep_a, "ep_p"), bundle_map=_map(first),
+              stage="publish")
+    published, filmed, _producer = _film(camera, _replayed(tmp_path, ep_a, "ep_q"),
+                                         bundle_map=_map(first), stage="publish",
+                                         kept=["shot_b002"])
+    assert filmed == [] and "shot_b002" in published["ledger"]["video"][PC.FLOOR_KEY]
+    # A Video run films around a gap as it always has.
+    _again, filmed, _producer = _film(camera, _replayed(tmp_path, ep_a, "ep_v"),
+                                      bundle_map=_map(first))
+    assert filmed == []
+
+
+def test_node_63_refuses_a_publish_over_cards_not_filmed_as_they_stand(
+        producer_root, cameras, floors, tmp_path):
+    camera = cameras("cloud_stub_camera")
+    camera.timeouts = {"shot_b002"}
+    first, _filmed, _producer = _film(camera, _cloud_workspace(tmp_path, "ep_a"),
+                                      takes={"shot_b003": 2})
+    video = first["ledger"]["video"]
+    files = [{"path": r["files"]["clip"]["path"]}
+             for r in list(video[PC.MAP_KEY].values()) + list(video[PC.FLOOR_KEY].values())]
+    cards = PD.build_cards(first["ledger"], PD.manifest_producer_fields(_direction()), files)
+
+    def publish(**changes):
+        return _direction(stage="publish", out=None, **changes)
+
+    takes = {"clips": {"shot_b003": 2}}
+    assert PD.unfilmed_shots(cards, publish(takes=takes)) == ["shot_b002 (failed: timeout)"]
+    assert PD.unfilmed_shots(cards, publish(takes=takes, kept={"clips": ["shot_b002"]})) == []
+    assert PD.unfilmed_shots(cards, publish(kept={"clips": ["shot_b002"]})) == [
+        "shot_b003 (its clip take changed)"], "takes are sent in full"
+    edited = publish(takes=takes, kept={"clips": ["shot_b002"]},
+                     cards={"shot_b001": {"motion_text": "turns to the door"}})
+    assert PD.unfilmed_shots(cards, edited) == ["shot_b001 (its action changed)"]
+    for group in cards["scenes"]:
+        for card in group["shots"]:
+            if card["shot_id"] == "shot_b003":
+                card.update(clip=None, clip_state="", clip_take=0)
+    assert PD.unfilmed_shots(cards, publish(kept={"clips": ["shot_b002"]})) == [
+        "shot_b003 (not filmed)"]
