@@ -2,6 +2,40 @@
 
 # ComfyUI-OldTimeRadio
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon.gif" alt="Old Time Radio" width="400">
+</p>
+
+<p align="center">
+  <a href="https://registry.comfy.org/nodes/comfyui-old-time-radio"><img src="https://img.shields.io/badge/install-ComfyUI%20Manager-0a7bbb" alt="Install from ComfyUI Manager"></a>
+  <a href="https://registry.comfy.org/nodes/comfyui-old-time-radio"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.comfy.org%2Fnodes%2Fcomfyui-old-time-radio&query=%24.downloads&label=registry%20installs&color=0a7bbb" alt="Registry installs"></a>
+  <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjbrick2070%2FComfyUI-OldTimeRadio%2Fmain%2Fpyproject.toml&query=%24.project.version&label=version&color=0a7bbb" alt="Version"></a>
+  <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/stargazers"><img src="https://img.shields.io/github/stars/jbrick2070/ComfyUI-OldTimeRadio?color=0a7bbb" alt="GitHub stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/jbrick2070/ComfyUI-OldTimeRadio?color=0a7bbb" alt="License"></a>
+</p>
+
+> *"Good evening. This is SIGNAL LOST."*
+
+<p align="center">
+  <a href="https://youtu.be/AOn21EG9u-U"><img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_episode_still.jpg" alt="A frame from THE SHIVERING GAUGE: two men over developing tanks in a film lab, drawn in the storybook-engraving style, with a speaker-labelled caption burned in. Click to watch the episode." width="760"></a>
+</p>
+<p align="center"><strong><a href="https://youtu.be/AOn21EG9u-U">Hear a complete episode first -- ninety seconds</a></strong></p>
+<p align="center"><em><strong>The Shivering Gauge</strong>: a film archivist and his apprentice racing
+vinegar syndrome through one night in the lab. Written, cast, performed, scored,
+drawn and cut on one machine, from a Library of Congress feed. Its sound effects
+are not a library: this episode ran the foley lane (<code>otr_16gb_foley</code>),
+where the video model generates the scene's own audio and the workflow mixes it
+under the voices. The default workflow draws its pictures from the audio instead;
+the foley lane is a 16 GB pick, not the starting point.</em></p>
+
+That is how every episode opens. What follows is a radio drama nobody has heard
+before: a script written on your own machine from tonight's news, a public-domain
+story, a scene of Shakespeare, or nothing at all; a cast of neural voices and an
+announcer; a theme composed in the musical style of wherever the story came
+from; pictures to watch while you listen;
+burned captions and a credit roll. One workflow, one press of **Run**, and a
+finished `.mp4` lands in your output folder.
+
 ## Install and run it
 
 1. In ComfyUI open **Extensions -> Node Manager**, search **old time radio**, click **Install**.
@@ -44,40 +78,6 @@ first: the episodes measured there (2026-09-13) used the Qwen writer -- the
 `otr_mac16_*` workflows ship it -- and the canonical's native writer is not yet
 proven on either. No account, no API key, nothing paid. If a step
 fails, [Make an episode](#make-an-episode) below walks through each one.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon.gif" alt="Old Time Radio" width="400">
-</p>
-
-<p align="center">
-  <a href="https://registry.comfy.org/nodes/comfyui-old-time-radio"><img src="https://img.shields.io/badge/install-ComfyUI%20Manager-0a7bbb" alt="Install from ComfyUI Manager"></a>
-  <a href="https://registry.comfy.org/nodes/comfyui-old-time-radio"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.comfy.org%2Fnodes%2Fcomfyui-old-time-radio&query=%24.downloads&label=registry%20installs&color=0a7bbb" alt="Registry installs"></a>
-  <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjbrick2070%2FComfyUI-OldTimeRadio%2Fmain%2Fpyproject.toml&query=%24.project.version&label=version&color=0a7bbb" alt="Version"></a>
-  <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/stargazers"><img src="https://img.shields.io/github/stars/jbrick2070/ComfyUI-OldTimeRadio?color=0a7bbb" alt="GitHub stars"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/jbrick2070/ComfyUI-OldTimeRadio?color=0a7bbb" alt="License"></a>
-</p>
-
-> *"Good evening. This is SIGNAL LOST."*
-
-<p align="center">
-  <a href="https://youtu.be/AOn21EG9u-U"><img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_episode_still.jpg" alt="A frame from THE SHIVERING GAUGE: two men over developing tanks in a film lab, drawn in the storybook-engraving style, with a speaker-labelled caption burned in. Click to watch the episode." width="760"></a>
-</p>
-<p align="center"><strong><a href="https://youtu.be/AOn21EG9u-U">Hear a complete episode first -- ninety seconds</a></strong></p>
-<p align="center"><em><strong>The Shivering Gauge</strong>: a film archivist and his apprentice racing
-vinegar syndrome through one night in the lab. Written, cast, performed, scored,
-drawn and cut on one machine, from a Library of Congress feed. Its sound effects
-are not a library: this episode ran the foley lane (<code>otr_16gb_foley</code>),
-where the video model generates the scene's own audio and the workflow mixes it
-under the voices. The default workflow draws its pictures from the audio instead;
-the foley lane is a 16 GB pick, not the starting point.</em></p>
-
-That is how every episode opens. What follows is a radio drama nobody has heard
-before: a script written on your own machine from tonight's news, a public-domain
-story, a scene of Shakespeare, or nothing at all; a cast of neural voices and an
-announcer; a theme composed in the musical style of wherever the story came
-from; pictures to watch while you listen;
-burned captions and a credit roll. One workflow, one press of **Run**, and a
-finished `.mp4` lands in your output folder.
 
 One `episode_language` switch carries writing, Kokoro casting, captions and
 audience-facing credits. Captions mirror the written line rather than

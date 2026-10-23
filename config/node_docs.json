@@ -1,0 +1,118 @@
+{
+  "_comment": "The hand-written half of each node's help page (js/docs/<node>.md, what ComfyUI shows for the node's ? button). scripts/build_node_docs.py joins each entry with the node's live DESCRIPTION, inputs and outputs and writes the page; tests/test_node_docs_are_generated.py fails when a page differs from what the generator writes. `intro`: what the node is for and where it sits, in plain words, two sentences at most. `guides`: the shipped apple/ pages that explain it, by file name, the most useful first. `touch`: whether a person is expected to change its widgets on the canonical workflow. No counts and no ordinals: lists grow.",
+  "OTR_LedgerScriptWriter": {
+    "intro": "The first node of every episode. It picks or takes the story bank, writes the outline, the cast and every line of dialogue with the writer models, and hands the rest of the workflow a script ledger to perform. The My Story rows on this node are where your own story goes.",
+    "guides": ["BANKS.md", "WRITERS.md", "MULTILINGUAL.md", "CLOUD.md"],
+    "touch": "yes"
+  },
+  "OTR_LedgerFreezeCascade": {
+    "intro": "Checks the script ledger the writer produced and freezes it, so every node after it performs one fixed script. Nothing here is a creative choice; it refuses a ledger that would break downstream.",
+    "guides": ["ARCHITECTURE.md"],
+    "touch": "no"
+  },
+  "OTR_CastLock": {
+    "intro": "Gives each character and the announcer a voice, and locks that cast for the whole episode. The voice engines are chosen here; the voices themselves follow the character's stated gender and the bank's pools.",
+    "guides": ["VOICES.md", "MULTILINGUAL.md"],
+    "touch": "yes"
+  },
+  "OTR_AnnouncerVoice": {
+    "intro": "Speaks the announcer's lines: the opening, the title, the bookends and the closing. The engine comes from Cast Lock.",
+    "guides": ["VOICES.md"],
+    "touch": "no"
+  },
+  "OTR_BatchCharacterVoices": {
+    "intro": "Speaks every character line in the script with the cast that Cast Lock fixed, one audio clip per line.",
+    "guides": ["VOICES.md"],
+    "touch": "no"
+  },
+  "OTR_SceneSequencer": {
+    "intro": "Lays the spoken lines end to end in script order, with the pauses between them, into one dialogue track.",
+    "guides": ["ARCHITECTURE.md"],
+    "touch": "no"
+  },
+  "OTR_AudioEnhance": {
+    "intro": "Masters the dialogue track: a common sample rate, stereo, and optional room and vintage-radio treatments.",
+    "guides": ["VOICES.md"],
+    "touch": "yes"
+  },
+  "OTR_StableAudioTheme": {
+    "intro": "Composes the opening and closing theme cues to fit the episode's setting and mood, with the composer engine chosen here. My Story episodes can ask for their music in words.",
+    "guides": ["MUSIC.md"],
+    "touch": "yes"
+  },
+  "OTR_EpisodeAssembler": {
+    "intro": "Puts the dialogue track and the theme cues together into the episode's master audio, the sound the video is cut to.",
+    "guides": ["ARCHITECTURE.md"],
+    "touch": "no"
+  },
+  "OTR_ImageDirector": {
+    "intro": "Decides how the still pictures are made: which image model draws each role, and the character photos that portraits are painted from.",
+    "guides": ["IMAGE_MODELS.md", "STYLES.md"],
+    "touch": "yes"
+  },
+  "OTR_CharacterPhoto": {
+    "intro": "A photo for one character, for a My Story episode. The character's portrait is painted from it in the episode's style, and every still of them follows that portrait.",
+    "guides": ["IMAGE_MODELS.md"],
+    "touch": "yes"
+  },
+  "OTR_MetaBriefImagePromptGen": {
+    "intro": "Writes the prompts the image model paints from, one per character and scene, from the episode's creative brief and visual style.",
+    "guides": ["STYLES.md", "IMAGE_MODELS.md"],
+    "touch": "no"
+  },
+  "OTR_ImageGenDispatcher": {
+    "intro": "Paints the stills: the character portraits and the scene pictures, with the models Image Director chose, and records each one in the ledger so a repeat run paints only what changed.",
+    "guides": ["IMAGE_MODELS.md"],
+    "touch": "no"
+  },
+  "OTR_VideoDirector": {
+    "intro": "Chooses the video lane for each role, the announcer, the characters and the music beats, and the still each lane starts from. The randomize switches draw one local lane for the whole episode instead.",
+    "guides": ["VIDEO_MODELS.md", "MACHINES.md"],
+    "touch": "yes"
+  },
+  "OTR_ShotLock": {
+    "intro": "Turns the frozen audio timeline into a shot plan: which beat is filmed by which lane, for how many frames, from which still. It is the video authority every render node reads.",
+    "guides": ["VIDEO_MODELS.md"],
+    "touch": "no"
+  },
+  "OTR_VideoRenderBatch": {
+    "intro": "Films every planned shot with the chosen video lanes, one clip per beat, inside the ComfyUI process.",
+    "guides": ["VIDEO_MODELS.md", "MACHINES.md"],
+    "touch": "no"
+  },
+  "OTR_SignalLostVideo": {
+    "intro": "Draws the procedural radio-dial video straight from the episode audio, with no AI model. It is the floor every other lane falls back to, and a lane of its own on small machines.",
+    "guides": ["VIDEO_MODELS.md"],
+    "touch": "no"
+  },
+  "OTR_SilentComposite": {
+    "intro": "Cuts the rendered clips and the procedural base into one silent video at a fixed frame rate, and runs the optional upscaler on each clip.",
+    "guides": ["UPSCALERS.md", "VIDEO_MODELS.md"],
+    "touch": "yes"
+  },
+  "OTR_CaptionBurn": {
+    "intro": "Burns open captions and the title card onto the silent video, when it is switched on.",
+    "guides": ["RUN.md", "MULTILINGUAL.md"],
+    "touch": "yes"
+  },
+  "OTR_CreditsRoll": {
+    "intro": "Appends the credit roll, naming the models and voices that made the episode, to the tail of the silent video.",
+    "guides": ["RUN.md"],
+    "touch": "no"
+  },
+  "OTR_MasterAudioMux": {
+    "intro": "The last node: it lays the master audio under the finished video and publishes the episode to your output folder. The finished .mp4 is its result.",
+    "guides": ["RUN.md"],
+    "touch": "no"
+  },
+  "OTR_ComfyCredential": {
+    "intro": "Carries the Comfy API key for this queue, when you are signed in, so the Comfy Cloud writer slots can run. With nothing signed in it passes nothing and the episode stays local.",
+    "guides": ["CLOUD.md"],
+    "touch": "no"
+  },
+  "OTR_WorkflowValidator": {
+    "intro": "An optional first node that checks the workflow against what this machine can run before anything heavy loads, and names what would fail.",
+    "guides": ["PREFLIGHT.md", "MACHINES.md"],
+    "touch": "no"
+  }
+}

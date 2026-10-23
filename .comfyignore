@@ -338,3 +338,18 @@ apple/FRESH_INSTALL_4060_2026-09-25.md
 contest/radio-play-studio/tests/
 contest/radio-play-studio/demo_video/
 contest/radio-play-studio/.gitignore
+
+# 2026-10-23 (docs audit, planning/docs-ui-best-practice/PLAN.md): internal
+# records that were shipping beside the guides. The README's guide table is
+# the shipped set; none of these is on it, and nothing under nodes/ reads
+# them. Their siblings (the H3 and Ideogram attestations, the other model
+# licence notes) were already excluded. The FLUX3 attestation stays: the
+# README's licence section points readers at it.
+apple/CONTEST_DEMO_SCRIPT.md
+apple/CONTEST_DEMO_STORYBOARD.md
+apple/CONTEST_EXPLAINER_PROMPT.md
+apple/CONTEST_SUBMISSION_DRAFT.md
+apple/RESEARCH_PROMPT_TTS_KILLER.md
+apple/SPEC_pack_owned_vram_residency.md
+apple/RIGHTS_DECISION_LEMMY_VOICE.md
+apple/model-license-comfy-org--gemma-4.md

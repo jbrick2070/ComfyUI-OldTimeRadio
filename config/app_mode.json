@@ -14,47 +14,223 @@
   "my_story_note": "My Story, selected or rolled",
   "roll_pool_note": "With the roll; none = all",
   "lane_roll_note": "Suggested for 16 GB+",
+  "language_note": "Spoken, written and captioned",
+  "bank_note": "What kind of show it is",
+  "style_note": "The look of every picture",
+  "char_video_note": "Films the talking shots",
+  "char_still_note": "Draws the character stills",
+  "music_video_note": "Films the music beats",
+  "music_still_note": "Draws the music stills",
+  "composer_note": "Composes the theme cues",
+  "story_writer_note": "Writes outline and dialogue",
+  "structure_writer_note": "Checks and shapes the script",
+  "photos_note": "Name = file, one per line",
+  "plot_note": "Events, conflict, ending",
+  "setting_note": "Place, era, mood",
+  "author_note": "Your name, or a pen name",
+  "music_words_note": "Your music, in your words",
+  "cleanup_note": "off keeps every file",
   "form": [
-    ["OTR_LedgerScriptWriter", "episode_language"],
-    ["OTR_LedgerScriptWriter", "num_characters", "cast_note"],
-    ["OTR_LedgerScriptWriter", "act_count", "acts_note"],
-    ["OTR_LedgerScriptWriter", "source_bank"],
-    ["OTR_LedgerScriptWriter", "source_ref", "source_ref_note"],
-    ["OTR_LedgerScriptWriter", "visual_style"],
-    ["OTR_VideoDirector", "roll_video_lanes", "lane_roll_note"],
-    ["OTR_VideoDirector", "roll_still_models", "lane_roll_note"],
-    ["OTR_VideoDirector", "announcer_video_model", "pickers_note"],
-    ["OTR_VideoDirector", "announcer_image_model", "still_note"],
-    ["OTR_VideoDirector", "character_video_model"],
-    ["OTR_VideoDirector", "character_image_model"],
-    ["OTR_VideoDirector", "music_video_model"],
-    ["OTR_VideoDirector", "music_image_model"],
-    ["OTR_CastLock", "roll_audio_engines", "lane_roll_note"],
-    ["OTR_CastLock", "announcer_voice_engine", "announcer_voice_note"],
-    ["OTR_CastLock", "char_voice_engine"],
-    ["OTR_StableAudioTheme", "engine"],
-    ["OTR_LedgerScriptWriter", "creative_writing_model"],
-    ["OTR_LedgerScriptWriter", "technical_model"],
-    ["OTR_LedgerScriptWriter", "openrouter_slot_a_model", "cloud_note"],
-    ["OTR_LedgerScriptWriter", "openrouter_slot_b_model"],
-    ["OTR_LedgerScriptWriter", "comfy_slot_a_model"],
-    ["OTR_LedgerScriptWriter", "comfy_slot_b_model"],
-    ["OTR_LedgerScriptWriter", "google_api_slot_a_model"],
-    ["OTR_LedgerScriptWriter", "google_api_slot_b_model"],
-    ["OTR_SilentComposite", "upscale_engine", "upscale_note"],
-    ["OTR_LedgerScriptWriter", "lemmy_cameo", "lemmy_note"],
-    ["OTR_LedgerScriptWriter", "story_characters", "my_story_note"],
-    ["OTR_ImageDirector", "character_photos"],
-    ["OTR_LedgerScriptWriter", "story_plot"],
-    ["OTR_LedgerScriptWriter", "story_setting"],
-    ["OTR_LedgerScriptWriter", "story_author"],
-    ["OTR_StableAudioTheme", "music_style"],
-    ["OTR_LedgerScriptWriter", "asset_cleanup"],
-    ["OTR_LedgerScriptWriter", "language_roll_pool", "roll_pool_note"],
-    ["OTR_LedgerScriptWriter", "bank_roll_pool", "roll_pool_note"],
-    ["OTR_LedgerScriptWriter", "style_roll_pool", "roll_pool_note"],
-    ["OTR_VideoDirector", "video_roll_pool", "roll_pool_note"],
-    ["OTR_VideoDirector", "still_roll_pool", "roll_pool_note"]
+    [
+      "OTR_LedgerScriptWriter",
+      "episode_language",
+      "language_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "num_characters",
+      "cast_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "act_count",
+      "acts_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "source_bank",
+      "bank_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "source_ref",
+      "source_ref_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "visual_style",
+      "style_note"
+    ],
+    [
+      "OTR_VideoDirector",
+      "roll_video_lanes",
+      "lane_roll_note"
+    ],
+    [
+      "OTR_VideoDirector",
+      "roll_still_models",
+      "lane_roll_note"
+    ],
+    [
+      "OTR_VideoDirector",
+      "announcer_video_model",
+      "pickers_note"
+    ],
+    [
+      "OTR_VideoDirector",
+      "announcer_image_model",
+      "still_note"
+    ],
+    [
+      "OTR_VideoDirector",
+      "character_video_model",
+      "char_video_note"
+    ],
+    [
+      "OTR_VideoDirector",
+      "character_image_model",
+      "char_still_note"
+    ],
+    [
+      "OTR_VideoDirector",
+      "music_video_model",
+      "music_video_note"
+    ],
+    [
+      "OTR_VideoDirector",
+      "music_image_model",
+      "music_still_note"
+    ],
+    [
+      "OTR_CastLock",
+      "roll_audio_engines",
+      "lane_roll_note"
+    ],
+    [
+      "OTR_CastLock",
+      "announcer_voice_engine",
+      "announcer_voice_note"
+    ],
+    [
+      "OTR_CastLock",
+      "char_voice_engine",
+      "announcer_voice_note"
+    ],
+    [
+      "OTR_StableAudioTheme",
+      "engine",
+      "composer_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "creative_writing_model",
+      "story_writer_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "technical_model",
+      "structure_writer_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "openrouter_slot_a_model",
+      "cloud_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "openrouter_slot_b_model",
+      "cloud_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "comfy_slot_a_model",
+      "cloud_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "comfy_slot_b_model",
+      "cloud_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "google_api_slot_a_model",
+      "cloud_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "google_api_slot_b_model",
+      "cloud_note"
+    ],
+    [
+      "OTR_SilentComposite",
+      "upscale_engine",
+      "upscale_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "lemmy_cameo",
+      "lemmy_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "story_characters",
+      "my_story_note"
+    ],
+    [
+      "OTR_ImageDirector",
+      "character_photos",
+      "photos_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "story_plot",
+      "plot_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "story_setting",
+      "setting_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "story_author",
+      "author_note"
+    ],
+    [
+      "OTR_StableAudioTheme",
+      "music_style",
+      "music_words_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "asset_cleanup",
+      "cleanup_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "language_roll_pool",
+      "roll_pool_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "bank_roll_pool",
+      "roll_pool_note"
+    ],
+    [
+      "OTR_LedgerScriptWriter",
+      "style_roll_pool",
+      "roll_pool_note"
+    ],
+    [
+      "OTR_VideoDirector",
+      "video_roll_pool",
+      "roll_pool_note"
+    ],
+    [
+      "OTR_VideoDirector",
+      "still_roll_pool",
+      "roll_pool_note"
+    ]
   ],
   "labels": {
     "OTR_LedgerScriptWriter.source_bank": "Story bank",
