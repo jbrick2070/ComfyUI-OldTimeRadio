@@ -1,14 +1,19 @@
 # ONE FORM, ONE RADIO PLAY
 ### How to use Old-Time Radio through ComfyUI's App Mode form
 
-**Estimated runtime:** ~4:30 (≈145 wpm, dry narration)
+**Estimated runtime:** ~4:55 (≈145 wpm, dry narration)
 **Visual style:** 3D wireframe / isometric vector motion graphics
 **Audio:** dry narration, no music (one non-musical cue — see AUDIO SYSTEM)
 **Pipeline:** NotebookLM-compatible scene blocks
 **Palette:** locked — deep-violet base (#120A2E), paper-white (#F2EFE8), signal-magenta (#F02B8F), dial-cyan (#3EE9FF)
 **Data convention:** SOLID magenta = documented fact (what the form and the README say) · DASHED cyan = the viewer's own choice or our expectation
 **Scene count:** 12 (+ end card)
-**Narration word count:** ~650
+**Narration word count:** ~715
+
+**v2 changes from v1:**
+- Scenes 05, 07, 08 and 11 quote the help lines as the form says them after the 2026-10-23 QA fold (05e51de4): Source "Blank, or an id + a named bank"; Visual style "Visualizer frames ignore it"; the still rows "Not every video lane uses it"; the voice rows "kokoro: ja/zh may need extras"; the checklists "… roll only; none = all".
+- Narration follows: an id needs a named bank; the credits still name the style; some lanes take no still without saying so; Japanese and Mandarin may need two libraries; an empty checklist is all.
+- End card: BANKS.md is the guide to the banks; it does not list source ids.
 
 Facts in this script come from three places only: the pack's README, `config/app_mode.json` (the form's labels and help lines), and the form as it renders in ComfyUI. Every row name and help line below is quoted as the form draws it.
 
@@ -70,9 +75,9 @@ Dry narration over silence. One cue: a tuning dial — a dry, dead-air crackle w
 
 ## SCENE 05 — STORY BANK AND STYLE
 
-**VISUAL:** Three rows. STORY BANK, "Pick my_story to tell yours", with its dropdown drawn as a wireframe list fanning out: original, scifi_news_pro, media_archive, shakespeare, public_domain, my_story, and a top entry "roll (any eligible bank)" in solid magenta. SOURCE TO ADAPT, "Blank, or an id (see BANKS.md)". VISUAL STYLE, "Not seen on visualizer video", with its own "roll (any style)" entry lit.
+**VISUAL:** Three rows. STORY BANK, "Pick my_story to tell yours", with its dropdown drawn as a wireframe list fanning out: original, scifi_news_pro, media_archive, shakespeare, public_domain, my_story, and a top entry "roll (any eligible bank)" in solid magenta. SOURCE TO ADAPT, "Blank, or an id + a named bank". VISUAL STYLE, "Visualizer frames ignore it", with its own "roll (any style)" entry lit.
 
-**NARRATION:** Story bank decides what kind of show it is. Leave it on roll and the pack picks one: an original drama, science fiction from tonight's science news, a story from the media archives, a scene of Shakespeare, a public-domain classic. Pick my story to tell your own. Source to adapt stays blank unless you have a source id; the BANKS guide lists them. Visual style restyles the pictures — but note the help line: on the visualizer video lanes the form ships with, you will not see it.
+**NARRATION:** Story bank decides what kind of show it is. Leave it on roll and the pack picks one: an original drama, science fiction from tonight's science news, a story from the media archives, a scene of Shakespeare, a public-domain classic. Pick my story to tell your own. Source to adapt stays blank unless you have a source id, and an id needs a bank picked by name, not rolled. Visual style restyles the pictures — but note the help line: the visualizer lanes the form ships with ignore it in their frames. The credits still name it.
 
 **ON-SCREEN TEXT:** STORY BANK · roll · my_story · SOURCE TO ADAPT · VISUAL STYLE
 
@@ -94,11 +99,11 @@ Dry narration over silence. One cue: a tuning dial — a dry, dead-air crackle w
 
 ## SCENE 07 — THE PICKERS, ROLE BY ROLE
 
-**VISUAL:** Six rows in two columns of the same wireframe: ANNOUNCER - VIDEO, "Films the announcer's lines"; ANNOUNCER - STILL IMAGE, "Unused if video says no still"; CHARACTERS - VIDEO, "Films the talking shots"; CHARACTERS - STILL IMAGE; MUSIC - VIDEO, "Films the music beats"; MUSIC - STILL IMAGE. The video rows carry their shipped value in cyan: "viz_… (audio-reactive, no scene image)". A dashed cyan line links each still row to the words "no scene image" in the video row above it.
+**VISUAL:** Six rows in two columns of the same wireframe: ANNOUNCER - VIDEO, "Films the announcer's lines"; ANNOUNCER - STILL IMAGE, "Not every video lane uses it"; CHARACTERS - VIDEO, "Films the talking shots"; CHARACTERS - STILL IMAGE; MUSIC - VIDEO, "Films the music beats"; MUSIC - STILL IMAGE. The video rows carry their shipped value in cyan: "viz_… (audio-reactive, no scene image)". A dashed cyan line links each still row to the words "no scene image" in the video row above it.
 
-**NARRATION:** The pickers come in roles: the announcer, the characters, the music. Each role has a video lane and a still image model. The lanes the form ships with are visualizers — they draw from the sound and take no still. So the still rows are unused until you pick a video lane that starts from a picture. The help line says exactly that.
+**NARRATION:** The pickers come in roles: the announcer, the characters, the music. Each role has a video lane and a still image model. The lanes the form ships with are visualizers — they draw from the sound and take no still. So the still rows are unused until you pick a video lane that starts from a picture — and a few lanes whose names do not say so take no still either. The help line says it plainly: not every video lane uses it.
 
-**ON-SCREEN TEXT:** ANNOUNCER · CHARACTERS · MUSIC · VIDEO / STILL IMAGE · "Unused if video says no still"
+**ON-SCREEN TEXT:** ANNOUNCER · CHARACTERS · MUSIC · VIDEO / STILL IMAGE · "Not every video lane uses it"
 
 **TRANSITION:** The six rows compress into a stack; scroll.
 
@@ -106,9 +111,9 @@ Dry narration over silence. One cue: a tuning dial — a dry, dead-air crackle w
 
 ## SCENE 08 — VOICES, MUSIC, WRITERS
 
-**VISUAL:** Five rows. ANNOUNCER - VOICE and CHARACTERS - VOICES, both "kokoro speaks every language", value kokoro. MUSIC - COMPOSER, "sonilo = paid; google = key". WRITER - STORY, "Writes outline and dialogue". WRITER - STRUCTURE, "Checks and shapes the script". The two writer rows share one solid magenta bracket.
+**VISUAL:** Five rows. ANNOUNCER - VOICE and CHARACTERS - VOICES, both "kokoro: ja/zh may need extras", value kokoro. MUSIC - COMPOSER, "sonilo = paid; google = key". WRITER - STORY, "Writes outline and dialogue". WRITER - STRUCTURE, "Checks and shapes the script". The two writer rows share one solid magenta bracket.
 
-**NARRATION:** Voices: kokoro ships with the pack and speaks every language the form offers. Music composer: the shipped engine is local; sonilo is paid, and the google engine needs your key. Two writers: one writes the outline and the dialogue, the other checks and shapes the script. Both run on your machine by default.
+**NARRATION:** Voices: kokoro ships with the pack and speaks every language the form offers; for Japanese and Mandarin it may need two extra libraries, and the help line says so. Music composer: the shipped engine is local; sonilo is paid, and the google engine needs your key. Two writers: one writes the outline and the dialogue, the other checks and shapes the script. Both run on your machine by default.
 
 **ON-SCREEN TEXT:** VOICES · kokoro · MUSIC - COMPOSER · WRITER - STORY · WRITER - STRUCTURE
 
@@ -142,9 +147,9 @@ Dry narration over silence. One cue: a tuning dial — a dry, dead-air crackle w
 
 ## SCENE 11 — MY STORY
 
-**VISUAL:** The My Story block: MY STORY - WHO IS IN IT, "Set Story bank to my_story"; CHARACTER PHOTOS (NAME = FILE), "Needs still: flux3_klein_ref"; MY STORY - WHAT HAPPENS, "Events, conflict, ending"; MY STORY - WHERE AND WHEN, "Place, era, mood"; MY STORY - BY, "Your name, or a pen name"; MY STORY - MUSIC IN WORDS, "e.g. surf rock, solo cello". A solid magenta line runs from the first row's help text up the form to STORY BANK. Below, SPACE SAVER, "Finished video is always kept", and the five roll checklists, drawn as collapsed wireframe chevrons, each with its help line "Only if … is roll" or "Only if Randomize … is on".
+**VISUAL:** The My Story block: MY STORY - WHO IS IN IT, "Set Story bank to my_story"; CHARACTER PHOTOS (NAME = FILE), "Needs still: flux3_klein_ref"; MY STORY - WHAT HAPPENS, "Events, conflict, ending"; MY STORY - WHERE AND WHEN, "Place, era, mood"; MY STORY - BY, "Your name, or a pen name"; MY STORY - MUSIC IN WORDS, "e.g. surf rock, solo cello". A solid magenta line runs from the first row's help text up the form to STORY BANK. Below, SPACE SAVER, "Finished video is always kept", and the five roll checklists, drawn as collapsed wireframe chevrons, each with its help line "… roll only; none = all".
 
-**NARRATION:** My Story is where your own play goes: who is in it, what happens, where and when, who it is by, and your music, in words. The first help line is the one to read: set Story bank to my story, or these boxes are not read. Character photos paint a character from a picture, and need the flux3 klein ref still model. Space saver tidies the episode's folder; the finished video is always kept. The checklists at the foot narrow a roll, and each is read only by its own roll.
+**NARRATION:** My Story is where your own play goes: who is in it, what happens, where and when, who it is by, and your music, in words. The first help line is the one to read: set Story bank to my story, or these boxes are not read. Character photos paint a character from a picture, and need the flux3 klein ref still model. Space saver tidies the episode's folder; the finished video is always kept. The checklists at the foot narrow a roll; each is read only by its own roll, and an empty checklist means all of them.
 
 **ON-SCREEN TEXT:** MY STORY · "Set Story bank to my_story" · SPACE SAVER · CHECKLISTS
 
@@ -172,18 +177,18 @@ Dry narration over silence. One cue: a tuning dial — a dry, dead-air crackle w
 SOURCES
 • README.md, "Install and run it" — github.com/jbrick2070/ComfyUI-OldTimeRadio
 • config/app_mode.json — the form's rows, labels and help lines (2026-10-23)
-• apple/BANKS.md — the story banks and source ids
+• apple/BANKS.md — the story banks
 • docs.comfy.org/interface/app-mode — App Mode
 • Registry: comfyui-old-time-radio (publisher fluxus)
 
 ---
 
-**Runtime estimate:** ~4:30 at ≈145 wpm
+**Runtime estimate:** ~4:55 at ≈145 wpm
 **Scene count:** 12 (+ end card)
-**Narration word count:** ~650
+**Narration word count:** ~715
 
 **Production notes:**
-- Scene 7 is the one that saves a stranger from a silent failure (stills unused under a visualizer lane); hold the dashed link between "no scene image" and the still rows a beat longer than feels natural.
+- Scene 7 is the one that saves a stranger from a silent failure (stills unused under a visualizer lane); hold the dashed link between "no scene image" and the still rows a beat longer than feels natural (and the narration's aside that some lanes take no still without saying so).
 - Scene 11's magenta line from "Set Story bank to my_story" up to the STORY BANK row is the second such save; let it draw slowly.
 - If runtime is tight, scenes 9 and 10 collapse into one (cloud slots, upscaler and Lemmy as three quick rows) and lose about twenty seconds.
 - Every quoted help line is the form's own text at `config/app_mode.json`; if a line changes there, re-quote it here before recording.
