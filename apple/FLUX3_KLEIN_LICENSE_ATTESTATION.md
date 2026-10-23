@@ -1,7 +1,7 @@
 # FLUX 3 Image Klein -- licence attestation
 
 Records the terms this build honors for the `flux3_klein` still engine. Modelled
-on `IDEOGRAM4_LICENSE_ATTESTATION.md`. **This is NOT a grant**: Black Forest Labs
+on [IDEOGRAM4_LICENSE_ATTESTATION.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/IDEOGRAM4_LICENSE_ATTESTATION.md). **This is NOT a grant**: Black Forest Labs
 published public weights under a standing public licence and no individual grant
 exists or was sought. What is recorded is the PUBLIC agreement and the narrow
 reading this build adopts. Not legal advice.

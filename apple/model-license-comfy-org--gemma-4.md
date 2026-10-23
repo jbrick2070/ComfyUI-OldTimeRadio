@@ -17,7 +17,7 @@ The Hugging Face model API for `Comfy-Org/gemma-4` reports card license
 token on 2026-09-26 at revision `63d0f7c476756b88910170c1df75e2384ea1af31`,
 the revision OTR pins. The repo holds Comfy-Org's ComfyUI conversions of
 Google's Gemma 4 weights, which Google ships under Apache 2.0 (see
-`model-license-google--gemma-4-e2b-it.md`). Catalog `license_audit_status`
+[model-license-google--gemma-4-e2b-it.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/model-license-google--gemma-4-e2b-it.md)). Catalog `license_audit_status`
 is `mit_equivalent`.
 
 ## Source

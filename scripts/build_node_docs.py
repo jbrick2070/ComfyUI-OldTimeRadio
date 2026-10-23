@@ -113,9 +113,10 @@ def _default(spec):
     if isinstance(value, str):
         if not value.strip():
             return "empty"
-        if "/" in value or "\\" in value or ":" in value:
+        if os.path.isabs(value) or "\\" in value or value.startswith(("./", "../", "~")):
             # A path, which a node derives from its own checkout: the page
-            # must read the same on every machine (Codex QA, 2026-10-23).
+            # must read the same on every machine (Codex QA, 2026-10-23). A
+            # model slug with a colon or a slash in it is not one.
             return "a path on this machine"
         return f"`{value}`"
     return f"`{value}`"

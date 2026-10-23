@@ -46,7 +46,7 @@ class decorated with `@register`, with a capabilities row (which devices it
 runs on, which vendor, which weights), and nothing heavy imported at module
 scope. The dropdowns are built from the registries, so adding an engine adds a
 menu entry. A hosted engine is never chosen automatically. Most local engines
-fetch their own weights on first use; the engine matrices (`DROPDOWN_MATRIX.md`)
+fetch their own weights on first use; the engine matrices ([DROPDOWN_MATRIX.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/DROPDOWN_MATRIX.md))
 mark the exceptions as manual (you fetch the weights) or gated (a licence and a
 Hugging Face token).
 

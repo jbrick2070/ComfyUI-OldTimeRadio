@@ -13,7 +13,7 @@ On the shipped workflows these are the widgets a person changes; the ones on the
 
 **Story bank** (`source_bank`) -- a choice from the dropdown; starts as `roll (any eligible bank)`.
 
-Story-path SOURCE BANK (multi-modal story schema). Selects which registered story pack supplies the pack-routed creative prompts and which lane the episode runs. scifi_news_pro = the local default sci-fi bank, an LLM-first multipass lane using the configured model slots. Each lane is an INDEPENDENT bank (own pack + bank metadata). The only non-runnable row is '+ Add Your Own' (custom_source_bank) -- picking it FAILS LOUD before any story work (no fallback), with its guide_ref naming the real path: author a bundle under user_packs/source_banks/, run 'otr_check bank <path> --activate' (scripts/otr_check.py, in a git clone), restart, and your bank joins this list as its own entry (contract: apple/EXTENDING.md, which ships with the pack; apple/EXTENDING_OTR.md is the longer version in the git tree). A bank's own default_story_model picks its story pack -- there is no separate pack widget. ROLL: pick 'roll (any eligible bank)' to let the run choose for you, uniformly, from every runnable bank whose lane can build the requested shape. This is INDEPENDENT of the visual_style roll -- rolling one does not roll the other. The choice is recorded in the ledger at meta.bank_roll (selected id, seed, and the exact pool it drew from); set OTR_BANK_SEED to replay a past roll. A pinned source_ref cannot be combined with the roll -- a pinned source belongs to one bank.
+Story-path SOURCE BANK (multi-modal story schema). Selects which registered story pack supplies the pack-routed creative prompts and which lane the episode runs. scifi_news_pro = the local default sci-fi bank, an LLM-first multipass lane using the configured model slots. Each lane is an INDEPENDENT bank (own pack + bank metadata). The only non-runnable row is '+ Add Your Own' (custom_source_bank) -- picking it FAILS LOUD before any story work (no fallback), with its guide_ref naming the real path: author a bundle under user_packs/source_banks/, run 'otr_check bank <path> --activate' (scripts/otr_check.py, in a git clone), restart, and your bank joins this list as its own entry (contract: apple/EXTENDING.md, which ships with the pack; the longer apple/EXTENDING_OTR.md is in the git tree at https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/EXTENDING_OTR.md). A bank's own default_story_model picks its story pack -- there is no separate pack widget. ROLL: pick 'roll (any eligible bank)' to let the run choose for you, uniformly, from every runnable bank whose lane can build the requested shape. This is INDEPENDENT of the visual_style roll -- rolling one does not roll the other. The choice is recorded in the ledger at meta.bank_roll (selected id, seed, and the exact pool it drew from); set OTR_BANK_SEED to replay a past roll. A pinned source_ref cannot be combined with the roll -- a pinned source belongs to one bank.
 
 ### Optional
 
@@ -118,7 +118,7 @@ Per-line max_new_tokens ceiling on the composer hot-path.
 
 Default 200 preserves current behavior. The Attempt-1 uses this cap directly; attempt-2 retry uses the full cap. It is a per-CALL decode budget, not a length target -- it was scaled from target_words until 2026-08-14, which made it a token ceiling derived from a word request.
 
-**Writer - story** (`creative_writing_model`) -- a choice from the dropdown; starts as a path on this machine.
+**Writer - story** (`creative_writing_model`) -- a choice from the dropdown; starts as `openrouter:slot-a`.
 
 LLM for the creative/narrative passes (outline, cast, dialogue composer, style picker invention). To use a remote OpenRouter model, set OPENROUTER_API_KEY and pick OpenRouter A/B (see https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/openrouter-setup.md).
 
@@ -136,7 +136,7 @@ Writers -- download size and where each fits:
 - comfy_native:gemma4-12b-int8-convrot: about 12.1 GB; run by ComfyUI itself; fit not rated by these tags
 nv8 / nv16 / nv24: fits an NVIDIA card of that many GB at full precision; -nf4: only as a 4-bit load; mac16: a 16 GB Apple Silicon Mac; -tight: fits with nothing to spare. Sizes are the one-time download, not the memory it uses while running.
 
-**Writer - structure** (`technical_model`) -- a choice from the dropdown; starts as a path on this machine.
+**Writer - structure** (`technical_model`) -- a choice from the dropdown; starts as `comfy_native:gemma4-e2b-it-int8-convrot`.
 
 LLM for the technical/structured passes (JSON validators, GBNF grammar output, reviewer verdicts, cast contract checks, format normalization, news interpreter). Profile/platform-owned baseline: your hardware profile pins it, and a direct headless -Set override is sanctioned and wins over the profile when supplied. Pick a smaller model here when you want Slot 1 != Slot 2 routing for VRAM headroom. To use a remote OpenRouter model, set OPENROUTER_API_KEY and pick OpenRouter A/B (see https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/openrouter-setup.md).
 

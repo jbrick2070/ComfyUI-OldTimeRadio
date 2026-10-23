@@ -13,7 +13,7 @@ On the shipped workflows these are the widgets a person changes; the ones on the
 
 **`script_json`** -- a connection from another node (`STRING`).
 
-Frozen v2 ledger JSON from OTR_LedgerFreezeCascade (node 62 slot 1). CastLock rewrites it into the canonical ledger_json; the legacy raw path keeps reading this untouched string.
+Frozen v2 ledger JSON from OTR_LedgerFreezeCascade (its first output). CastLock rewrites it into the canonical ledger_json; the legacy raw path keeps reading this untouched string.
 
 ### Optional
 

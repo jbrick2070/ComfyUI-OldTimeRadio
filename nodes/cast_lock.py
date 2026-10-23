@@ -522,7 +522,7 @@ class CastLock:
                     "forceInput": True,
                     "tooltip": (
                         "Frozen v2 ledger JSON from OTR_LedgerFreezeCascade "
-                        "(node 62 slot 1). CastLock rewrites it into the "
+                        "(its first output). CastLock rewrites it into the "
                         "canonical ledger_json; the legacy raw path keeps "
                         "reading this untouched string."
                     ),

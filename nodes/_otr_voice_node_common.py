@@ -445,7 +445,7 @@ def voice_input_types(role, fallback) -> dict:
                 "forceInput": True,
                 "tooltip": (
                     "Frozen v2 ledger JSON from OTR_LedgerFreezeCascade "
-                    "(node 62 slot 1). Passed VERBATIM to the legacy engine on "
+                    "(its first output). Passed VERBATIM to the legacy engine on "
                     "the byte-identical batch path."
                 ),
             }),

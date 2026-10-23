@@ -278,13 +278,14 @@ class Handler(BaseHTTPRequestHandler):
     #: that declares a body and sends only part of it holds a handler thread
     #: for good (Codex QA, 2026-10-23). It is a deadline per call, not per
     #: request: a body that keeps arriving, an event stream that writes a
-    #: keep-alive every HEARTBEAT_S, and a download read at any steady pace
-    #: never meet it, since a file goes out in SEND_CHUNK pieces. A reader
-    #: that stops for longer -- a paused download -- is cut, and comes back
-    #: with a Range request for the rest (Sonnet QA, 2026-10-23).
+    #: keep-alive every HEARTBEAT_S, and a download read at about 1 KB/s or
+    #: faster never meet it, since a file goes out in SEND_CHUNK pieces and
+    #: each piece has the whole deadline. A reader that stops for longer -- a
+    #: paused download -- is cut, and comes back with a Range request for the
+    #: rest (Sonnet QA, 2026-10-23).
     timeout = 60
-    #: A file is sent in pieces this size, so the deadline above is a floor
-    #: on a reader's pace (about 1 KB/s), never a cap on a file's size.
+    #: A file is sent in pieces this size, so the deadline above bounds a
+    #: reader's pace, never a file's size.
     SEND_CHUNK = 64 * 1024
 
     # -- plumbing -----------------------------------------------------------

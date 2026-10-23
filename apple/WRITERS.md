@@ -192,7 +192,7 @@ runs at its provider's default. One preset map for every model had Qwen3
 running hotter and Gemma 4 cooler than their makers intend, and
 Mistral-Nemo at more than double its card's value. If you want the show to
 read differently, pick a different writer model; the sampling follows the
-pick. The per-model table lives in `OTR_STANDING_RULINGS.md` under "NO
+pick. The per-model table lives in [OTR_STANDING_RULINGS.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/OTR_STANDING_RULINGS.md) under "NO
 CREATIVITY DIAL".
 
 ---
