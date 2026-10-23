@@ -64,9 +64,11 @@ _DATA_EXT = {".json", ".md", ".txt", ".yaml", ".yml", ".cfg", ".ini", ".toml"}
 
 def _shipped_files(all_tracked: bool):
     """The files a publish would pack: git-tracked minus ``.comfyignore``."""
+    # -z: without it git quotes a non-ASCII name ("caf\303\251.mp4"), which then
+    # matches no .comfyignore line and no path prefix a caller checks.
     tracked = subprocess.run(  # noqa: S603
-        ["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True
-    ).stdout.split("\n")
+        ["git", "ls-files", "-z"], cwd=REPO, capture_output=True, text=True, encoding="utf-8", check=True
+    ).stdout.split("\0")
     tracked = [p for p in tracked if p]
     if all_tracked:
         return tracked

@@ -37,8 +37,10 @@ def _oracle():
 #: verdict, knowing the replica predicts a Flag for its environment reads and its
 #: HTTP calls to the local ComfyUI. Those calls are what the app does, so they are
 #: not respelled. If the registry Flags the version, restore `contest/` in
-#: .comfyignore and delete this; if it goes Active, the replica over-reports these
-#: rules for this code. The rest of the pack is held to zero, as before.
+#: .comfyignore, delete this and the two app tests below, and drop the "ships
+#: inside the pack" note from contest/radio-play-studio/README.md; if it goes
+#: Active, the replica over-reports these rules for this code. The rest of the
+#: pack is held to zero, as before.
 SHIPPED_APP = "contest/radio-play-studio/radio_play_studio/"
 
 
@@ -80,3 +82,8 @@ def test_only_the_app_itself_ships_from_contest():
                    and p not in top
                    and not (p.startswith(SHIPPED_APP) and Path(p).suffix in {".py", ".html", ".json"}))
     assert extra == [], "these would ship from contest/; decide, then list them here or ignore them"
+    # Non-vacuity, and the other direction: the app ships with its page and its languages.
+    shipped = set(_oracle()._shipped_files(False))
+    needed = {SHIPPED_APP + name for name in ("__main__.py", "server.py", "static/index.html",
+                                               "static/i18n/en.json")}
+    assert sorted(needed - shipped) == [], "the app would ship without these"

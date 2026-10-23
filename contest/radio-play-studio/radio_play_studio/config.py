@@ -66,20 +66,19 @@ def validate_url(label: str, value: str) -> str:
 
 
 def _configured_workflow_sources() -> list:
-    """`[(where, path)]` for each place the person pointed at, most specific
-    first. These are promises: if one is set, the file must be there."""
+    """`[(where, [paths])]` for each place the person pointed at, most specific
+    first. These are promises: if one is set, one of its paths must be there."""
     sources: list = []
     env_file = os.environ.get("OTR_APP_WORKFLOW", "").strip()
     if env_file:
-        sources.append(("OTR_APP_WORKFLOW", Path(env_file).expanduser()))
+        sources.append(("OTR_APP_WORKFLOW", [Path(env_file).expanduser()]))
     pack_dir = os.environ.get("OTR_PACK_DIR", "").strip()
     if pack_dir:
-        sources.append(("OTR_PACK_DIR", Path(pack_dir).expanduser() / "workflows" / WORKFLOW_NAME))
+        sources.append(("OTR_PACK_DIR", [Path(pack_dir).expanduser() / "workflows" / WORKFLOW_NAME]))
     comfy_dir = os.environ.get("COMFYUI_DIR", "").strip()
     if comfy_dir:
-        candidates = [Path(comfy_dir).expanduser() / "custom_nodes" / name / "workflows" / WORKFLOW_NAME
-                      for name in PACK_DIR_NAMES]
-        sources.append(("COMFYUI_DIR", next((p for p in candidates if p.is_file()), candidates[0])))
+        sources.append(("COMFYUI_DIR", [Path(comfy_dir).expanduser() / "custom_nodes" / name / "workflows"
+                                        / WORKFLOW_NAME for name in PACK_DIR_NAMES]))
     return sources
 
 
@@ -94,10 +93,13 @@ def find_workflow(explicit: str | None = None) -> Path:
         if not path.is_file():
             raise WorkflowNotFound(f"--workflow {path} does not exist")
         return path
-    for where, path in _configured_workflow_sources():
-        if path.is_file():
-            return path
-        raise WorkflowNotFound(f"{where} points at {path}, which does not exist")
+    for where, paths in _configured_workflow_sources():
+        found = next((path for path in paths if path.is_file()), None)
+        if found:
+            return found
+        if len(paths) == 1:
+            raise WorkflowNotFound(f"{where} points at {paths[0]}, which does not exist")
+        raise WorkflowNotFound(f"{where} is set, but none of these exists: {', '.join(map(str, paths))}")
     checkout = _checkout_workflow()
     if checkout.is_file():
         return checkout

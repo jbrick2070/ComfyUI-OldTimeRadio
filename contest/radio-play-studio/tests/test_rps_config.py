@@ -53,6 +53,13 @@ def test_comfyui_dir_finds_a_git_clone_and_a_registry_install(monkeypatch, tmp_p
     assert find_workflow() == target
 
 
+def test_a_missing_pack_under_comfyui_dir_names_both_folders_it_tried(monkeypatch, tmp_path):
+    monkeypatch.setenv("COMFYUI_DIR", str(tmp_path))
+    with pytest.raises(WorkflowNotFound) as err:
+        find_workflow()
+    assert all(name in str(err.value) for name in config.PACK_DIR_NAMES)
+
+
 def test_a_configured_pack_dir_wins_over_the_checkout(monkeypatch, tmp_path):
     (tmp_path / "workflows").mkdir()
     target = tmp_path / "workflows" / config.WORKFLOW_NAME
