@@ -608,6 +608,13 @@ def finish_publish(out_dir: Path, project_id: str, attempt_id: str, run: str,
 # reading a bundle
 # --------------------------------------------------------------------------- #
 
+def _get(url: str, timeout: float) -> bytes:
+    """One GET from the configured ComfyUI -- every read Studio makes of it
+    goes through here. An HTTP error status passes through as HTTPError."""
+    with urllib.request.urlopen(url, timeout=timeout) as resp:
+        return resp.read()
+
+
 def read_output(comfyui_url: str, subfolder: str, name: str, timeout: float = 120.0) -> bytes:
     """A file from ComfyUI's output folder, through its own ``/view``.
     BundleMissing when ComfyUI has no such file, ServerUnreachable when
@@ -615,8 +622,7 @@ def read_output(comfyui_url: str, subfolder: str, name: str, timeout: float = 12
     query = urllib.parse.urlencode({"filename": name, "subfolder": subfolder, "type": "output"})
     url = comfyui_url.rstrip("/") + "/view?" + query
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
-            return resp.read()
+        return _get(url, timeout)
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
             raise BundleMissing(f"ComfyUI's output folder has no {subfolder}/{name}") from None
@@ -642,8 +648,7 @@ def read_json(comfyui_url: str, path: str, timeout: float = 30.0) -> Any:
     ServerUnreachable when it cannot be asked."""
     url = comfyui_url.rstrip("/") + path
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        return json.loads(_get(url, timeout).decode("utf-8"))
     except (urllib.error.URLError, OSError, ValueError) as exc:
         raise ServerUnreachable(f"could not read {url} ({exc})") from None
 
