@@ -731,11 +731,11 @@ def _seed_from_hash(request_hash, shot_id):
 
 
 def _segment_seed(seed, segment_index):
-    """The seed one segment of a beat samples from: segment 0 is the beat's
-    seed itself, byte for byte, and each later segment a different,
+    """The seed one segment of a hashed beat samples from: segment 0 is the
+    beat's seed itself, byte for byte, and each later segment a different,
     reproducible draw of it. Mixed into the seed, never passed to
     ``_seed_from_hash`` as its second argument: that is read only when a shot
-    has no request hash, and every real shot has one."""
+    has no request hash."""
     if not segment_index:
         return seed
     return int(hashlib.sha256(("%d#seg%d" % (int(seed), int(segment_index)))
@@ -3915,15 +3915,22 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # Segment 0 keeps the historical value, so every single-clip beat in the
     # archive re-renders byte-identically; only successors move.
     #
-    # THE FIRST FORM OF THIS NEVER VARIED ANYTHING (found 2026-10-22, fixed
-    # 2026-10-23). It passed "<shot>#seg<n>" as ``_seed_from_hash``'s second
-    # argument, which is read only when a shot has no request hash -- and
-    # every shot on this path has one. So from 2026-08-02 every segment of a
-    # multi-clip beat still sampled segment 0's seed, the very repetition this
-    # block exists to break. The segment is now mixed into the seed itself
-    # (_segment_seed), as the clip take below is.
+    # THE FIRST FORM OF THIS VARIED ONLY HALF THE SHOTS (found 2026-10-22,
+    # fixed 2026-10-23). It passed "<shot>#seg<n>" as ``_seed_from_hash``'s
+    # second argument, which is read only when a shot has no request hash. A
+    # shot without one -- the announcer and music rows of the time -- did get
+    # a seed per segment; every shot WITH one, the character beats this block
+    # was written for, kept sampling segment 0's seed at every cut. A hashed
+    # shot now mixes the segment into its seed (_segment_seed), as the clip
+    # take below does; a hashless one keeps the seeds it has always had, byte
+    # for byte (Codex QA, 2026-10-23).
     _seg_index = int(segment_index or 0)
-    _video_seed = _segment_seed(_seed_from_hash(req_hash, shot.get("shot_id")), _seg_index)
+    if req_hash:
+        _video_seed = _segment_seed(_seed_from_hash(req_hash, shot.get("shot_id")),
+                                    _seg_index)
+    else:
+        _video_seed = _seed_from_hash(None, ("%s#seg%d" % (shot.get("shot_id"), _seg_index))
+                                      if _seg_index else shot.get("shot_id"))
     # A SCENE PRODUCER CLIP TAKE ("Film again", chunk 4b) is another draw of
     # the same shot. Mixed into the seed itself: ``_seed_from_hash`` reads the
     # request hash alone whenever there is one, so a take passed through its
@@ -4566,12 +4573,29 @@ def _bring_clip_into(clip, dest, name):
             shutil.copyfile(src, part)
             replace_held(part, target)
         except BaseException:
-            try:
-                os.remove(part)
-            except OSError:
-                pass
+            _remove_held(part)
             raise
+        # A copy leaves the source behind, where a move would not (Sonnet
+        # QA, 2026-10-23); it is scratch, so a held one is the janitor's.
+        _remove_held(src)
     clip["path"] = target
+
+
+def _remove_held(path):
+    """Remove a file, again while a scanner holds it for a moment; one that
+    stays held is left, never raised."""
+    for wait in (0.05, 0.1, 0.2, 0.4, 0.8, None):
+        try:
+            os.remove(path)
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            if wait is None:
+                return
+            time.sleep(wait)
+        except OSError:
+            return
 
 
 def _producer_floor(producer, row, clip):
@@ -7224,6 +7248,20 @@ except ImportError:  # pragma: no cover -- flat test imports
     from foley_stems import FOLEY_RECEIPT_KEYS as _FOLEY_RECEIPT_KEYS
 
 
+def _segment_seeds(clip):
+    """Each segment's seed, in play order, for a clip made of more than one
+    segment receipt; None for one receipt or none. ``request_seed`` names the
+    first segment's alone, and since 2026-10-23 a later segment samples its
+    own (Codex QA: the manifest said one seed for a beat filmed from three)."""
+    if not isinstance(clip, dict):
+        return None
+    rows = [r for r in (clip.get("receipts") or []) if isinstance(r, dict)]
+    if len(rows) < 2:
+        return None
+    seeds = [r.get("seed") for r in rows]
+    return seeds if any(s not in (None, "") for s in seeds) else None
+
+
 def _first_receipt_field(clip, key):
     """The first segment receipt's ``key`` on a clip, or None."""
     if not isinstance(clip, dict):
@@ -7368,6 +7406,9 @@ def build_clip_manifest(result, *, episode_id=""):
             # attached; None when no receipt was built.
             "prompt_sha8": _first_receipt_field(clip, "prompt_sha8"),
             "request_seed": _first_receipt_field(clip, "seed"),
+            # Every segment's seed, for a beat filmed in more than one. PRESENT-
+            # KEY-ONLY, as the cadence keys below: a one-clip row keeps its shape.
+            **({"segment_seeds": _segment_seeds(clip)} if _segment_seeds(clip) else {}),
             "actual_request_sha": _first_receipt_field(clip, "actual_request_sha"),
             # THE CADENCE AND DELIVERY RECEIPTS (Ghost Signal, 2026-08-22).
             # PRESENT-KEY-ONLY, and that is the whole care in this block: a

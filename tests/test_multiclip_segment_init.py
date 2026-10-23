@@ -333,9 +333,10 @@ def test_the_DRIVER_keeps_the_fodder_for_a_mesh_lane(monkeypatch):
 def test_each_segment_of_a_beat_samples_its_own_seed(monkeypatch):
     """9aab2481 meant every segment of a multi-clip beat to draw a seed of its
     own, but passed the segment through ``_seed_from_hash``'s second argument,
-    which a shot with a request hash -- every real shot -- never reads. Each
-    segment came out with segment 0's seed, the repeated opening at every cut
-    that change was written to break."""
+    which a shot with a request hash never reads. Each segment of a hashed
+    beat came out with segment 0's seed, the repeated opening at every cut
+    that change was written to break. A hashless shot always varied, and keeps
+    the very seeds it had."""
     monkeypatch.setattr(rd, "_confined_ledger_path", lambda path, _field: path)
     # Each segment hears its own slice of the line; the cut itself is not this test's.
     monkeypatch.setattr(rd, "_slice_master_audio",
@@ -360,9 +361,20 @@ def test_each_segment_of_a_beat_samples_its_own_seed(monkeypatch):
         return req["seed_bundle"]["request_seed"]
 
     first = seed(0)
-    assert first == rd._seed_from_hash("hash_b001", "shot_b001"), \
+    assert first == 870365226, \
         "segment 0 keeps the beat's seed, so a one-clip beat re-renders byte for byte"
     seeds = [first, seed(1), seed(2)]
     assert len(set(seeds)) == 3, "every segment draws its own seed"
     assert seeds == [seed(0), seed(1), seed(2)], "and draws it the same way every time"
     assert all(0 <= s <= 0x7FFFFFFF for s in seeds)
+    # A hashless shot keeps the seeds 9aab2481 already gave it.
+    del shot["render_request_hash"]
+    assert [seed(0), seed(1), seed(2)] == [944021193, 508530881, 1493271646]
+
+
+def test_the_manifest_names_every_segments_seed_and_a_one_clip_row_keeps_its_shape():
+    many = {"receipts": [{"seed": 1}, {"seed": 2}, {"seed": 3}]}
+    assert rd._segment_seeds(many) == [1, 2, 3]
+    assert rd._segment_seeds({"receipts": [{"seed": 1}]}) is None
+    assert rd._segment_seeds({"receipt": {"seed": 1}}) is None
+    assert rd._segment_seeds({"receipts": [{"x": 1}, {"x": 2}]}) is None

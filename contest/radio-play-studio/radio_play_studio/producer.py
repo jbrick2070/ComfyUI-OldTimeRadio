@@ -293,31 +293,42 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
+def composed(picture: Any, note: Any) -> str:
+    """The prompt a still is painted from, as node 63 composes it
+    (compose_picture): the picture text, then the scene's note."""
+    picture, note = _text(picture), _text(note)
+    return f"{picture}, {note}" if picture and note else picture or note
+
+
 def unpainted(project: dict) -> list:
     """The cards whose still the draft asks to paint and no Stills run has
-    painted yet: a new picture text or still take, or -- unless the still is
-    kept -- a new scene note or a new take of the character in it. Video and
-    Publish film what is painted, so node 63 refuses them while any is left,
-    and Studio does too, before anything is sent."""
+    painted yet: a new prompt -- the picture text and the scene's note as
+    node 63 composes them, so words moved between the two, or spaces, are no
+    change -- or a new still take or take of the character in it. A kept
+    still is used as it is, and node 63 never asks it to be painted. Video
+    and Publish film what is painted, so node 63 refuses them while any is
+    left, and Studio does too, before anything is sent."""
     view = project.get("view") or {}
     draft = project["draft"]
     kept = set(draft["kept"]["stills"])
     waiting = []
     for scene in view.get("scenes", []):
         note = draft["scenes"].get(scene["scene_id"]) or {}
-        note_changed = (bool(scene.get("note_editable")) and "note" in note
-                        and _text(note["note"]) != _text(scene.get("note")))
+        shown_note = scene.get("note", "")
+        asked_note = (note["note"] if scene.get("note_editable") and "note" in note
+                      else shown_note)
         for card in scene["shots"]:
-            if not card.get("picture_editable"):
+            sid = card["shot_id"]
+            if not card.get("picture_editable") or sid in kept:
                 continue
-            sid, body = card["shot_id"], draft["cards"].get(card["shot_id"], {})
+            body = draft["cards"].get(sid, {})
             char = card.get("still_char_id") or ""
             char_changed = bool(char) and (draft["takes"]["characters"].get(char, 0)
                                            != card.get("still_char_take", 0))
-            if (("picture_text" in body
-                 and _text(body["picture_text"]) != _text(card.get("picture_text")))
+            asked = composed(body.get("picture_text", card.get("picture_text")), asked_note)
+            if (asked != composed(card.get("picture_text"), shown_note)
                     or draft["takes"]["stills"].get(sid, 0) != card.get("still_take", 0)
-                    or (sid not in kept and (note_changed or char_changed))):
+                    or char_changed):
                 waiting.append(sid)
     return waiting
 

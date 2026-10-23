@@ -343,6 +343,21 @@ def test_an_edit_of_spaces_alone_is_no_edit_as_node_63_reads_it():
         producer.build_direction(project, "stills")
 
 
+def test_a_still_changes_when_its_prompt_does_as_node_63_composes_it():
+    # Sonnet QA, 2026-10-23: words moved from the scene note into the picture
+    # paint the same prompt, and node 63 takes a kept still as it is.
+    project = _shown()
+    project["view"]["scenes"][0]["note_editable"] = True
+    project["draft"]["cards"] = {"shot_b001": {"picture_text": TEXTS["shot_b001"] + ", rain"}}
+    project["draft"]["scenes"] = {"scene_1": {"note": ""}}
+    assert "shot_b001" not in producer.unpainted(project)
+    assert producer.unpainted(project) == ["shot_b002", "shot_b003"], "the note left them"
+    project["draft"]["kept"]["stills"] = ["shot_b002", "shot_b003"]
+    assert producer.unpainted(project) == []
+    project["draft"]["takes"]["stills"] = {"shot_b002": 1}
+    assert producer.unpainted(project) == [], "a kept still is not painted again"
+
+
 def test_a_new_portrait_waits_for_a_stills_run_whether_or_not_a_still_names_it():
     # Codex QA, 2026-10-23: no card's still names c1, so only the portrait
     # shows the take; node 63 refuses Video until a Stills run paints it.

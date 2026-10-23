@@ -923,6 +923,11 @@ const has = (list, id) => (list || []).includes(id);
 const PY_SPACE = "[\\t\\n\\v\\f\\r \\x1c-\\x1f\\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]";
 const PY_STRIP = new RegExp("^" + PY_SPACE + "+|" + PY_SPACE + "+$", "g");
 const stripped = (s) => String(s == null ? "" : s).replace(PY_STRIP, "");
+// The prompt a still is painted from, as node 63 composes it (compose_picture).
+const composed = (picture, note) => {
+  const p = stripped(picture), n = stripped(note);
+  return p && n ? p + ", " + n : p || n;
+};
 
 // What one card needs, read from the draft against the view.
 function assess(card, scene) {
@@ -932,14 +937,17 @@ function assess(card, scene) {
     && stripped(d.picture_text) !== stripped(card.picture_text);
   // Studio refuses a still with no words, so the page never offers to paint one.
   const blank = pictureEdit && !stripped(d.picture_text);
-  const noteEdit = scene.note_editable && draft.scenes[scene.scene_id] != null
-    && draft.scenes[scene.scene_id].note != null
-    && stripped(draft.scenes[scene.scene_id].note) !== stripped(scene.note);
+  const askedNote = scene.note_editable && draft.scenes[scene.scene_id] != null
+    && draft.scenes[scene.scene_id].note != null ? draft.scenes[scene.scene_id].note : scene.note;
+  // A new prompt, as node 63 reads it: words moved between the picture and the
+  // note, or spaces, are no change (Sonnet QA, 2026-10-23).
+  const promptEdit = composed(d.picture_text != null ? d.picture_text : card.picture_text, askedNote)
+    !== composed(card.picture_text, scene.note);
   const stillTake = (draft.takes.stills[sid] || 0) !== (card.still_take || 0);
   const charTake = !!card.still_char_id &&
     (draft.takes.characters[card.still_char_id] || 0) !== (card.still_char_take || 0);
-  // A kept still keeps its picture through a scene note or a new portrait.
-  const stillDirty = !!card.picture_editable && (pictureEdit || stillTake || (!keptStill && (noteEdit || charTake)));
+  // A kept still is used as it is: node 63 never asks it to be painted.
+  const stillDirty = !!card.picture_editable && !keptStill && (promptEdit || stillTake || charTake);
   // A still the image model refused: filming skips its shot as a gap, so it is
   // painted again, or the card keeps the clip it has -- a kept still does not
   // stand in for it, as node 63 reads it too.
@@ -993,6 +1001,9 @@ function drawBoard() {
     const el = sceneBox(scene, i, () => (n += 1));
     scenes.appendChild(el);
   });
+  // The last run ended without a result: say why, as the app recorded it.
+  const failed = !project.pending && project.last_error;
+  if (failed && failed.message) { plain($("perror"), failed.message); $("perror").hidden = false; }
   const pub = project.published;
   if (pub) showVideo($("published"), pub.run, pub.file); else $("published").hidden = true;
   refreshBoard();
@@ -1432,8 +1443,9 @@ $("change_story").addEventListener("click", closeProject);
 // A pending run Studio cannot settle by itself -- it lost touch, or ComfyUI
 // could not say -- is looked at again on a press, and is never sent twice.
 $("b_look").addEventListener("click", async () => {
-  if (!project || stageBusy) return;
+  if (!project || stageBusy || $("b_look").disabled) return;
   const pid = project.project_id;
+  $("b_look").disabled = true;           // one look per press
   $("perror").hidden = true;
   try {
     const res = await fetch("/api/projects/" + pid + "/reconcile", {
@@ -1442,7 +1454,7 @@ $("b_look").addEventListener("click", async () => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
     watchStage(body.id, body.stage, pid);
-  } catch (err) { plain($("perror"), err.message); $("perror").hidden = false; }
+  } catch (err) { plain($("perror"), err.message); $("perror").hidden = false; refreshBoard(); }
 });
 // Or it is given up, after the person says so: the project may run the stage again.
 $("b_forget").addEventListener("click", async () => {
@@ -1469,11 +1481,14 @@ $("direct").addEventListener("click", async () => {
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
-    // The Stills run is the app's now: follow it first, so a board that
-    // fails to open never turns the buttons back on while it runs.
-    watchStage(body.id, "stills", body.project_id);
+    // The Stills run is the app's now: busy at once, so a board that fails to
+    // open never turns the buttons back on, then followed once the board is
+    // open, so every event -- an error at launch too -- lands on it (the app
+    // replays a run's events from the start).
+    stageBusy = true; watching = "stills"; stagePid = body.project_id; buttons();
     try { await openProject(body.project_id); }
     catch (err) { say($("notice"), "pstatus.missing", {error: err.message}); $("notice").hidden = false; }
+    watchStage(body.id, "stills", body.project_id);
   } catch (err) {
     $("run").hidden = false; plain($("error"), err.message); $("error").hidden = false;
     say($("status"), "status.not_started");
