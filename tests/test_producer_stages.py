@@ -129,22 +129,31 @@ def test_what_this_build_cannot_honour_is_refused_before_any_work():
 # the image dispatcher ends a stills stage
 # --------------------------------------------------------------------------- #
 
-def _dispatch(monkeypatch, wire, episode_id="signal_lost_ep_1"):
+def _dispatch(monkeypatch, wire, episode_id="signal_lost_ep_1", quiets=None):
     from nodes import otr_image_gen_dispatcher as D
-    monkeypatch.setattr(D, "dispatch_images",
-                        lambda led, policy, prompts, gen_fn=None, episode_id="": (
-                            led, "image_done:ok", "made=2 reused=0", []))
+
+    def fake_dispatch_images(led, policy, prompts, gen_fn=None, episode_id="",
+                             quiet_inner_bars=None):
+        if quiets is not None:
+            quiets.append(quiet_inner_bars)
+        return led, "image_done:ok", "made=2 reused=0", []
+
+    monkeypatch.setattr(D, "dispatch_images", fake_dispatch_images)
     return D.OTRImageGenDispatcher().dispatch(json.dumps(wire), episode_id=episode_id)
 
 
 def test_a_stills_stage_freezes_then_blocks_every_output(monkeypatch, recorded):
+    from nodes._otr_shared.node_progress import QuietInnerBars
     calls, sentinel = recorded
     wire = {"episode_id": "signal_lost_ep_1", "meta": {},
             PD.RUNTIME_KEY: PD.parse_direction(_direction(stage="stills", out="01-stills",
                                                           source=None))}
-    out = _dispatch(monkeypatch, wire)
+    quiets = []
+    out = _dispatch(monkeypatch, wire, quiets=quiets)
     assert out == (sentinel, sentinel, sentinel)
     assert calls == [("01-stills", "signal_lost_ep_1", False)]
+    # A producer run hands the render loop a quiet for its stage bar.
+    assert len(quiets) == 1 and isinstance(quiets[0], QuietInnerBars)
 
 
 def test_a_video_stage_passes_the_direction_on_to_batch(monkeypatch, recorded):
@@ -158,9 +167,12 @@ def test_a_video_stage_passes_the_direction_on_to_batch(monkeypatch, recorded):
 
 def test_an_ordinary_dispatch_is_unchanged(monkeypatch, recorded):
     calls, _sentinel = recorded
-    patched, done, report = _dispatch(monkeypatch, {"episode_id": "e", "meta": {}})
+    quiets = []
+    patched, done, report = _dispatch(monkeypatch, {"episode_id": "e", "meta": {}},
+                                      quiets=quiets)
     assert PD.RUNTIME_KEY not in json.loads(patched)
     assert (done, report) == ("image_done:ok", "made=2 reused=0") and calls == []
+    assert quiets == [None], "no stage bar and no quiet on an ordinary run"
 
 
 # --------------------------------------------------------------------------- #

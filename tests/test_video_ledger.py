@@ -735,7 +735,7 @@ def test_post_audio_hash_survives_image_dispatcher_wire_serialization(
     monkeypatch.setattr(
         image_dispatcher,
         "dispatch_images",
-        lambda led, policy, prompts, gen_fn, episode_id: (
+        lambda led, policy, prompts, gen_fn, episode_id, quiet_inner_bars=None: (
             led, "image:done", "ok", []
         ),
     )

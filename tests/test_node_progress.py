@@ -160,7 +160,29 @@ def test_voices_step_per_line_unless_a_partner_heartbeat_draws_the_bar():
     assert len(serial) == 1
 
 
-def test_the_helper_has_production_callers_only_at_those_three_sites():
+def test_the_dispatcher_draws_one_stage_bar_on_a_producer_run():
+    # Scene Producer chunk 2 (plan, "Progress"): one node-level bar over the
+    # objects, the inner samplers quieted, the quiet closed by the node.
+    tree = _tree("nodes/otr_image_gen_dispatcher.py")
+    (loop,) = _loops_over(tree, "enumerate(objects)")
+    assert _first_call(loop) == "_stage_bar.at(_object_index)"
+    assert _assigned(tree, "_stage_bar") == [
+        "_NodeProgress(_stage_bar_items(objects, image_policy) if quiet_inner_bars is not "
+        "None else 0, 'Scene Producer stills')"]
+    (images,) = [n for n in ast.walk(tree)
+                 if isinstance(n, ast.FunctionDef) and n.name == "dispatch_images"]
+    body = ast.unparse(images)
+    assert "_stage_bar.finish()" in body
+    # The node's own bar is built before the quiet opens, so it keeps the real hook.
+    assert body.index("_stage_bar = _NodeProgress(") < body.index("quiet_inner_bars.open()")
+    (node,) = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "dispatch"]
+    assert "quiet = _QuietInnerBars() if direction is not None else None" in ast.unparse(node)
+    finals = [ast.unparse(st) for n in ast.walk(node) if isinstance(n, ast.Try)
+              for st in n.finalbody]
+    assert any("quiet.close()" in text for text in finals)
+
+
+def test_the_helper_has_production_callers_only_at_those_four_sites():
     callers = sorted(
         p.relative_to(REPO).as_posix()
         for p in (REPO / "nodes").rglob("*.py")
@@ -168,8 +190,117 @@ def test_the_helper_has_production_callers_only_at_those_three_sites():
         and p.name != "node_progress.py")
     assert callers == ["nodes/OTR_LedgerScriptWriter.py",
                        "nodes/_otr_voice_node_common.py",
+                       "nodes/otr_image_gen_dispatcher.py",
                        "nodes/scene_sequencer.py"]
     assert np_mod.__all__ == ["NodeProgress", "QuietInnerBars", "WeightedProgress"]
+
+
+@pytest.fixture()
+def fake_comfy_bars(monkeypatch):
+    """A stand-in ComfyUI with the real ProgressBar contract: a bar reads the
+    global hook when it is BUILT, and reports ``(value, total)`` through it."""
+    sent, interrupts = [], []
+    utils = types.ModuleType("comfy.utils")
+    mm = types.ModuleType("comfy.model_management")
+
+    def real(value, total, preview, prompt_id=None, node_id=None):
+        sent.append((value, total))
+
+    utils.PROGRESS_BAR_HOOK = real
+
+    def set_hook(fn):
+        utils.PROGRESS_BAR_HOOK = fn
+
+    class ProgressBar:
+        def __init__(self, total, node_id=None):
+            self.total, self.hook = total, utils.PROGRESS_BAR_HOOK
+
+        def update_absolute(self, value, total=None, preview=None):
+            if total is not None:
+                self.total = total
+            if self.hook is not None:
+                self.hook(min(value, self.total), self.total, preview)
+
+    utils.ProgressBar = ProgressBar
+    utils.set_progress_bar_global_hook = set_hook
+    mm.throw_exception_if_processing_interrupted = lambda: interrupts.append(1)
+    comfy = types.ModuleType("comfy")
+    comfy.utils, comfy.model_management = utils, mm
+    monkeypatch.setitem(sys.modules, "comfy", comfy)
+    monkeypatch.setitem(sys.modules, "comfy.utils", utils)
+    monkeypatch.setitem(sys.modules, "comfy.model_management", mm)
+    return utils, real, sent, interrupts
+
+
+def _dispatch_two_portraits(tmp_path, quiet):
+    """Two portraits through the real dispatch loop on a local stand-in
+    engine whose render builds a 20-step sampler bar on this thread."""
+    import numpy as np
+
+    from nodes import otr_image_gen_dispatcher as disp
+    from nodes._otr_image_engines import registry as ireg
+    from nodes._otr_shared import role_compat as rc
+
+    saved = dict(ireg._IMAGE_REGISTRY._registry)
+    ireg._IMAGE_REGISTRY._registry.clear()
+    ireg.register(types.SimpleNamespace(
+        name="flux_gen1", roles=rc.ROLES, default_roles=rc.ROLES, commercial_clean=True,
+        requires_flag=None, required_inputs=("text_prompt",), engine_version="1"))
+    policy = {"policy_version": 2,
+              "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": {"announcer_video_model": {"engine_id": "viz_mxc_cpu"},
+                               "music_video_model": {"engine_id": "viz_mxc_mandala"},
+                               "character_video_model": {"engine_id": "still_motion"}},
+              "seed": {"request_seed": 0}}
+    payload = {"version": 1, "objects": [
+        {"object_id": cid, "kind": "portrait", "role": "character_video", "char_id": cid,
+         "w": 832, "h": 1216, "prompt": "a radio actor " + cid, "prompt_hash": "ph_" + cid,
+         "source": "llm"} for cid in ("c1", "c2")]}
+
+    def render(_request):
+        sampler = sys.modules["comfy.utils"].ProgressBar(20)
+        sampler.update_absolute(10)
+        sampler.update_absolute(20)
+        return np.full((8, 8, 3), 9, dtype=np.uint8)
+
+    try:
+        return disp.dispatch_images(
+            {"episode_id": "ep_stage_bar", "cast": [{"char_id": "c1"}, {"char_id": "c2"}]},
+            policy, payload, gen_fn=render, output_dir=str(tmp_path),
+            lockdir=tmp_path / "lease.lockdir", quiet_inner_bars=quiet)
+    finally:
+        ireg._IMAGE_REGISTRY._registry.clear()
+        ireg._IMAGE_REGISTRY._registry.update(saved)
+
+
+def test_a_producer_run_shows_its_items_and_hides_its_samplers(fake_comfy_bars, tmp_path):
+    utils, real, sent, interrupts = fake_comfy_bars
+    quiet = np_mod.QuietInnerBars()
+    try:
+        _dispatch_two_portraits(tmp_path, quiet)
+    finally:
+        quiet.close()
+    assert sent == [(0, 2), (1, 2), (2, 2)], "only the stage bar reached the node"
+    assert len(interrupts) == 4, "every quieted sampler step still checked for Cancel"
+    assert utils.PROGRESS_BAR_HOOK is real
+
+
+def test_a_partner_engine_keeps_its_own_heartbeat_bar():
+    # Two bars on one node fight: a cloud_* engine's wait loop redraws this
+    # node's bar from fan-out threads the quiet does not reach.
+    from nodes import otr_image_gen_dispatcher as disp
+    objects = [{"role": "character_video"}, {"role": "character_video"}]
+    local = {"image_models": {"character_image_model": {"engine_id": "flux_gen1"}}}
+    partner = {"image_models": {"character_image_model": {"engine_id": "cloud_flux_pro"}}}
+    assert disp._stage_bar_items(objects, local) == 2
+    assert disp._stage_bar_items(objects, partner) == 0
+
+
+def test_an_ordinary_run_draws_no_stage_bar_and_quiets_nothing(fake_comfy_bars, tmp_path):
+    utils, real, sent, interrupts = fake_comfy_bars
+    _dispatch_two_portraits(tmp_path, None)
+    assert sent == [(10, 20), (20, 20), (10, 20), (20, 20)], "the samplers' own bars, as before"
+    assert interrupts == [] and utils.PROGRESS_BAR_HOOK is real
 
 
 # ---------------------------------------------------------------------------

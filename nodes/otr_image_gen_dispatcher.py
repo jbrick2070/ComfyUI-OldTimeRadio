@@ -45,6 +45,10 @@ from ._otr_shared import gpu_residency as _lease
 from ._otr_shared import portrait_ledger as _pl
 from ._otr_shared import role_slots as _role_slots
 from ._otr_shared import still_receipt as _receipt
+# Cold-import clean: node_progress is stdlib-only, and reaches ComfyUI only
+# through modules that are already loaded.
+from ._otr_shared.node_progress import (NodeProgress as _NodeProgress,
+                                        QuietInnerBars as _QuietInnerBars)
 # Cold-import clean: route_freeze is stdlib-only at module scope.
 from ._otr_shared.route_freeze import RouteFreezeError as _RouteFreezeError
 from ._otr_story_brief_helpers import (
@@ -1496,13 +1500,39 @@ def _flush_pending_cloud_stills(pending, ctx):
             packed["laplacian"], ctx)
 
 
+def _stage_bar_items(objects, image_policy) -> int:
+    """How many items the Scene Producer's stage bar counts: every object, or
+    none when any of them renders on a partner engine (``cloud_*``). A partner
+    call's wait loop redraws this node's bar with its own heartbeat
+    (``cloud_media_invoke``), from fan-out worker threads the quiet does not
+    reach, and two bars on one node fight -- the same rule the voice loop keeps
+    (``cloud_fanout.adapter_draws_partner_heartbeat``). A role whose slot
+    cannot resolve is left to the loop below, which refuses it in its place."""
+    for obj in objects:
+        if not isinstance(obj, dict):
+            continue
+        try:
+            engine_id, _slot, _fell_back = resolve_engine_for_role(
+                image_policy, str(obj.get("role") or "character_video"))
+        except ValueError:
+            continue
+        if str(engine_id or "").startswith("cloud_"):
+            return 0
+    return len(objects)
+
+
 def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     gen_fn=None, output_dir=None, lockdir=None, lease_timeout_s=120.0,
                     handoff_min_bytes: int = _MIN_PNG_BYTES,
                     handoff_wait_attempts: int = 40, handoff_wait_sleep_s: float = 0.05,
-                    episode_id: str = ""):
+                    episode_id: str = "", quiet_inner_bars=None):
     """Generate (or cache-reuse) every image OBJECT (portraits + scene
     stills); stamp the ledger.
+
+    ``quiet_inner_bars`` is given only on a Scene Producer run: an UNOPENED
+    ``QuietInnerBars``. This node then draws one stage bar over its objects and
+    opens the quiet once that bar exists, so the samplers inside each still
+    cannot restart it. The CALLER closes it, on every path.
 
     ``image_prompts`` is the ONE versioned ``{"version": 1, "objects": [...]}``
     payload from ``derive_image_prompts`` (still-spine ST-2 / pass-02 item 1:
@@ -1723,7 +1753,20 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         "vstyle": _vstyle,
         "made": 0,
     }
-    for obj in objects:
+    # THE SCENE PRODUCER'S STAGE BAR (plan, "Progress"). On a producer run this
+    # node draws ONE bar over its objects -- portraits and scene stills alike --
+    # and the samplers inside each still are quieted, so they cannot restart it
+    # once a still; Radio Play Studio reads this node's step and total as the
+    # stage bar. The node's own bar is built FIRST, so it keeps the real hook
+    # (a bar reads the hook when it is built). No bar when a partner engine
+    # draws its heartbeat here; on an ordinary run, no bar and no quiet at all.
+    _stage_bar = _NodeProgress(
+        _stage_bar_items(objects, image_policy) if quiet_inner_bars is not None else 0,
+        "Scene Producer stills")
+    if quiet_inner_bars is not None and _stage_bar.total:
+        quiet_inner_bars.open()
+    for _object_index, obj in enumerate(objects):
+        _stage_bar.at(_object_index)
         if not isinstance(obj, dict):
             continue
         oid = str(obj.get("object_id") or "")
@@ -2293,6 +2336,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         _mint_still_serial(still_job, ctx, take_lease=True)
 
     _flush_pending_cloud_stills(pending_cloud, ctx)
+    _stage_bar.finish()
     made = ctx["made"]
 
     # ST-3 completion contract: the producer-owned target manifest is the
@@ -2732,10 +2776,18 @@ class OTRImageGenDispatcher:
             # fails closed and the dispatcher degrades that object to the radio
             # floor LOUD (never a crash). The CPU platform tests bypass this by
             # calling dispatch_images() directly with an injected gen_fn.
-            led, image_done, report, _warn = dispatch_images(
-                led, policy, prompts, gen_fn=_inprocess_gen_fn,
-                episode_id=str(episode_id or ""),
-            )
+            # A Scene Producer run draws the stage bar; its quiet is closed
+            # here on every path, so a refused still never leaves this thread's
+            # later bars dark.
+            quiet = _QuietInnerBars() if direction is not None else None
+            try:
+                led, image_done, report, _warn = dispatch_images(
+                    led, policy, prompts, gen_fn=_inprocess_gen_fn,
+                    episode_id=str(episode_id or ""), quiet_inner_bars=quiet,
+                )
+            finally:
+                if quiet is not None:
+                    quiet.close()
         if direction is not None:
             if direction["stage"] == "stills":
                 return self._finish_stills_stage(led, direction, episode_id, report)
