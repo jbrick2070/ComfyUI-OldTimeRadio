@@ -170,7 +170,7 @@ def request_cache_key(role, object_id, prompt_hash, seed, engine_id, engine_vers
 
 def resolve_seed_and_mode(
     seed_cfg, object_id, prompt_hash, *, kind="", char_id="",
-    portrait_prompt_hash="",
+    portrait_prompt_hash="", identity_take=0, take=0,
 ) -> "tuple[int, str]":
     """Per-object seed AND how it was chosen, as ``(seed, mode)``.
 
@@ -201,6 +201,14 @@ def resolve_seed_and_mode(
     env-overridable via ``OTR_RADIO_BOOKEND_SEED``) so the opening radio still is
     reproducible run-to-run independent of the request hash -- exactly the 6/5
     behavior the rewrite lost.
+
+    SCENE PRODUCER TAKES (chunk 3c, 2026-10-22). A take above zero redraws, in
+    every branch above (:func:`_seed_for_take`); take 0 is today's seed, byte
+    for byte. ``identity_take`` is the character's take: it enters a portrait's
+    seed and the identity seed of every scene still of that character, so the
+    face and the stills that follow it move together. ``take`` is the still's
+    own take, entered last, on that still alone. Both are 0 on every run that
+    is not a producer run.
     """
     # The radio BOOKEND still (scene_open) AND the radio-HOST FACE object
     # (2026-07-01 brief-driven radio-host; object_id "radio_host_portrait",
@@ -210,13 +218,14 @@ def resolve_seed_and_mode(
     _oid = str(object_id or "")
     if str(kind or "") == "scene_open" or _oid == "radio_host_portrait":
         try:
-            return (int(otr_env.get("OTR_RADIO_BOOKEND_SEED", 4242)), "")
+            bookend = int(otr_env.get("OTR_RADIO_BOOKEND_SEED", 4242))
         except (TypeError, ValueError):
-            return (4242, "")
+            bookend = 4242
+        return (_seed_for_take(bookend, take), "")
     cfg = seed_cfg if isinstance(seed_cfg, dict) else {}
     base = int(cfg.get("request_seed") or 0)
     if str(cfg.get("mode") or "request_hash") != "request_hash":
-        return (base, "")
+        return (_seed_for_take(_seed_for_take(base, identity_take), take), "")
     # AFTER the mode gate, never before it. `base` does not exist until the line
     # above, so a branch placed earlier raises UnboundLocalError inside a call
     # that dispatch_images makes outside any try/except -- the whole dispatch
@@ -230,10 +239,44 @@ def resolve_seed_and_mode(
         # portrait itself byte-identical.
         digest = hashlib.sha256(
             f"{base}:{char_id}:{portrait_prompt_hash}".encode()).hexdigest()
-        return (int(digest[:8], 16), "seed")
+        identity = _seed_for_take(int(digest[:8], 16), identity_take)
+        return (_seed_for_take(identity, take), "seed")
     digest = hashlib.sha256(
         f"{base}:{object_id}:{prompt_hash}".encode()).hexdigest()
-    return (int(digest[:8], 16), "")
+    # A character's take enters any object tied to that character: its portrait
+    # (whose draw IS the identity seed above) and, with the identity seed
+    # switched off, its scene stills too.
+    seed = _seed_for_take(int(digest[:8], 16), identity_take if char_id else 0)
+    return (_seed_for_take(seed, take), "")
+
+
+def _seed_for_take(seed: int, take) -> int:
+    """A Scene Producer take above zero is a different, reproducible draw;
+    take 0 is the seed itself, byte for byte."""
+    try:
+        take = int(take or 0)
+    except (TypeError, ValueError):
+        take = 0
+    if take <= 0:
+        return seed
+    return int(hashlib.sha256(f"{seed}:take:{take}".encode()).hexdigest()[:8], 16)
+
+
+def _producer_takes(direction, kind, char_id, beat_id) -> "tuple[int, int]":
+    """``(identity take, still take)`` for one image object on a Scene
+    Producer run, both 0 on any other. The character's take follows its
+    char_id; a still's take follows the shot its beat makes (``shot_<beat>``,
+    as Shot Lock names it), so a beat's jump segments are redrawn with it. A
+    portrait has no shot."""
+    if not isinstance(direction, dict):
+        return 0, 0
+    takes = direction.get("takes") if isinstance(direction.get("takes"), dict) else {}
+    characters = takes.get("characters") if isinstance(takes.get("characters"), dict) else {}
+    stills = takes.get("stills") if isinstance(takes.get("stills"), dict) else {}
+    identity = int(characters.get(str(char_id), 0) or 0) if char_id else 0
+    still = (int(stills.get("shot_%s" % beat_id, 0) or 0)
+             if beat_id and str(kind or "") != "portrait" else 0)
+    return identity, still
 
 
 def resolve_engine_for_role(image_policy, role):
@@ -2124,9 +2167,11 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                         f"{oid}: no portrait for {_co_id!r}, who is in this "
                         f"frame; they are drawn without a reference (LOUD)")
 
+        _identity_take, _still_take = _producer_takes(_producer, kind, char_id, beat_id)
         seed, anchor_mode = resolve_seed_and_mode(
             seed_cfg, oid, prompt_hash, kind=kind, char_id=char_id,
             portrait_prompt_hash=identity_basis,
+            identity_take=_identity_take, take=_still_take,
         )
         # Captured BEFORE any later override: `mode="fixed"` exits the resolver
         # early, the kill switch bypasses the identity branch, and a real
