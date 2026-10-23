@@ -1,0 +1,54 @@
+# The registry-card batch from planning/docs-ui-best-practice/PLAN.md, section A.
+# pyproject.toml fires a publish on push, so this lands with the next version
+# bump, as one commit: `git apply planning/docs-ui-best-practice/pyproject_next_bump.diff`,
+# then bump `version`. Needs assets/otr_icon_400.gif, which is committed.
+diff --git a/pyproject.toml b/pyproject.toml
+index 45ff034c..d9fec070 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -1,7 +1,7 @@
+ [project]
+ name = "comfyui-old-time-radio"
+ version = "2.3.37"
+-description = "Press Queue once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. No account, no API key, nothing paid. Needs an NVIDIA card with 8 GB or more, a 16 GB Apple Silicon Mac, or a CPU (start ComfyUI with --cpu), plus about 25 GB of free disk; the first run fetches several GB of models."
++description = "Press Run once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. No account, no API key, nothing paid. Needs an NVIDIA card with 8 GB or more, a 16 GB Apple Silicon Mac, or a CPU (start ComfyUI with --cpu), plus about 25 GB of free disk; the first run fetches several GB of models."
+ readme = "README.md"
+ license = {file = "LICENSE"}
+ requires-python = ">=3.10"
+@@ -145,22 +145,31 @@ classifiers = [
+     "Topic :: Multimedia :: Sound/Audio :: Speech",
+     "Topic :: Multimedia :: Video",
+     "Topic :: Scientific/Engineering :: Artificial Intelligence",
++    # The registry reads OS and GPU classifiers to help people find a pack
++    # that fits their machine (registry specification).
++    "Operating System :: Microsoft :: Windows",
++    "Operating System :: MacOS",
++    "Operating System :: POSIX :: Linux",
++    "Environment :: GPU :: NVIDIA CUDA",
+ ]
+ 
+ [project.urls]
+ Homepage = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio"
+ Repository = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio"
+ Issues = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues"
++Documentation = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio#readme"
+ 
+ [tool.comfy]
+ PublisherId = "fluxus"
+-DisplayName = "ComfyUI-OldTimeRadio"
+-# Registry card art. Must be a URL (SVG/PNG/JPG/GIF, max 800x400) -- the raw
+-# GitHub path on the publish branch, so editing that file updates the LIVE
+-# listing with no version bump. The card is hand-finished; there is no
++DisplayName = "Old-Time Radio"
++# Registry card art, as URLs -- the raw GitHub path on the publish branch, so
++# editing a file updates the LIVE listing with no version bump. The registry
++# specification: Icon is square, at most 400x400 (SVG/PNG/JPG/GIF); Banner is
++# 21:9. Both show on the registry page and in ComfyUI-Manager. The card is hand-finished; there is no
+ # generator for it. No node or bank COUNT goes on the art (operator,
+ # 2026-09-21) -- it was wrong and it rots.
+-Icon = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon.gif"
++Icon = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon_400.gif"
++Banner = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_banner.jpg"
+ 
+ [tool.pytest.ini_options]
+ testpaths = ["tests"]

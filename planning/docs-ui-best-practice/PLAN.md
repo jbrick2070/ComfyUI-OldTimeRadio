@@ -32,7 +32,7 @@ claim below was read from one of those, never remembered.
 | Finding | The practice | Fix |
 |---|---|---|
 | `DisplayName = "ComfyUI-OldTimeRadio"` | The spec says a name should not carry "ComfyUI"; `DisplayName` is the user-friendly name. The template category already says "Old-Time Radio". | `DisplayName = "Old-Time Radio"`. The id `comfyui-old-time-radio` cannot change (a new listing). |
-| `Icon` is 800x400 | The spec: Icon is square, at most 400x400; `Banner` is 21:9. The pyproject comment still says "max 800x400", an older rule. | A 400x400 icon (`assets/otr_icon_400.gif`, a centre crop of the animated card art); `Banner = assets/otr_banner.jpg` (1672x717 -- already 21:9); fix the comment. |
+| `Icon` is 800x400 | The spec: Icon is square, at most 400x400; `Banner` is 21:9. The pyproject comment still says "max 800x400", an older rule. | A 400x400 icon: `assets/otr_icon_400.gif`, the whole animated card art letterboxed on its own background (a centre crop cut the title in half); `Banner = assets/otr_banner.jpg` (1672x717 -- already 21:9); fix the comment. The exact edit is `pyproject_next_bump.diff` beside this plan; the icon is his art to replace if the letterbox reads as a placeholder. |
 | `banner_url` empty on the live listing | Icon and Banner are "displayed on the ComfyUI Registry and ComfyUI-Manager". | As above. |
 | `description` opens "Press Queue once" | ComfyUI's button is **Run**; the README already says Run. | "Press Run once". |
 | `classifiers` name no OS or GPU | The spec: OS and GPU classifiers "help users find nodes for their systems". | Add `Operating System :: Microsoft :: Windows`, `:: MacOS`, `:: POSIX :: Linux`, `Environment :: GPU :: NVIDIA CUDA`. |
