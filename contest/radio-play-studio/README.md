@@ -166,7 +166,7 @@ On the **Tell my own story** path a second, quieter button sits beside **Make th
 the stills. The page becomes a board at once and fills in when the stills are done, so you
 can change any picture before a frame is filmed.
 
-Three stages run across the top, each with its state in plain words: **Stills** (how many
+Three stages, each a lamp with its state in plain words (down the left on a wide screen, across the top on a phone): **Stills** (how many
 painted, how many to paint), **Video** (how many of the shots are filmed), **Publish** (after
 every shot is filmed). Under them:
 

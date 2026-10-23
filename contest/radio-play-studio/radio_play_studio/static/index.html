@@ -5,54 +5,82 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Radio Play Studio</title>
 <style>
+  /* Radio Play Studio -- "Three lamps" (planning/studio-ui/DESIGN_ANCHOR.md).
+     A dark room, paper cards, and three things that can glow: the stage lamps.
+     By day (a light OS theme) the same room with the blinds open. */
   :root {
-    --bg: #f4efe6; --panel: #fffdf8; --ink: #2a2118; --muted: #6f6254;
-    --line: #d9ccb8; --accent: #b4491f; --accent-ink: #fff8f0; --ok: #2f6b3a; --bad: #a3261a;
-    --bar: #e5d9c5; --kept: #8a7d6b;
+    color-scheme: light dark;
+    --bg: #f4efe6; --panel: #fffdf8; --strip: #ece4d6; --ink: #2a2118; --muted: #6f6254;
+    --line: #d9ccb8; --field-line: #9a8a72; --accent: #b4491f; --accent-ink: #fff8f0;
+    --ok: #2f6b3a; --bad: #a3261a; --bar: #e5d9c5; --kept: #70644f;
+    --lamp: #8a5200; --lamp-glow: transparent; --focus: #8a5200;
+    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Noto Serif", serif;
+    --sans: system-ui, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial,
+            "Noto Sans Devanagari", "Hiragino Sans", "Yu Gothic", "Microsoft YaHei", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #17130f; --panel: #211b15; --ink: #f0e6d6; --muted: #a89a86;
-      --line: #3a3026; --accent: #e0703f; --accent-ink: #1a1007; --ok: #7ec28a; --bad: #f08a7e;
-      --bar: #3a3026; --kept: #8f826f;
+      color-scheme: dark;
+      --bg: #17130f; --panel: #211b15; --strip: #2a221b; --ink: #f0e6d6; --muted: #a89a86;
+      --line: #3a3026; --field-line: #867560; --accent: #e0703f; --accent-ink: #1a1007;
+      --ok: #7ec28a; --bad: #f08a7e; --bar: #3a3026; --kept: #8f826f;
+      --lamp: #ffd98a; --lamp-glow: rgba(255, 217, 138, .35); --focus: #ffd98a;
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 16px/1.5 Georgia, "Times New Roman", serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
-  h1 { font-size: 2rem; margin: 0 0 4px; letter-spacing: .02em; }
-  .tag { color: var(--muted); margin: 0 0 24px; }
-  fieldset { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
-             padding: 16px; margin: 0 0 16px; }
-  legend { padding: 0 8px; font-weight: bold; }
-  label { display: block; margin: 12px 0 4px; font-weight: bold; }
-  .help { color: var(--muted); font-size: .875rem; margin: 2px 0 0; }
-  select, input, textarea { width: 100%; padding: 8px 10px; font: inherit; color: var(--ink);
-    background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
-  textarea { min-height: 72px; resize: vertical; }
-  button { font: inherit; font-weight: bold; padding: 12px 22px; border: 0; border-radius: 8px;
-           background: var(--accent); color: var(--accent-ink); cursor: pointer; }
-  button:disabled { opacity: .5; cursor: default; }
-  #bar, .bar { height: 10px; background: var(--bar); border-radius: 5px; overflow: hidden; margin: 12px 0 6px; }
-  #fill, .fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
-  #status { color: var(--muted); min-height: 1.5em; }
-  #error, .error { color: var(--bad); white-space: pre-wrap; }
-  #notice { color: var(--bad); }
-  video { width: 100%; border-radius: 8px; background: #000; margin-top: 12px; }
-  .done a { color: var(--ok); }
-  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 16px; }
-  @media (max-width: 560px) { .modes { grid-template-columns: 1fr; } }
-  .mode { display: block; margin: 0; padding: 14px 16px; border: 2px solid var(--line);
-          border-radius: 10px; background: var(--panel); cursor: pointer; font-weight: normal; }
-  .mode strong { display: block; font-size: 1.1rem; }
-  .mode span { color: var(--muted); font-size: .875rem; }
-  .mode input { width: auto; margin: 0 6px 0 0; }
-  .mode:has(input:checked) { border-color: var(--accent); }
   [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--serif); }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 64px; }
+  /* The board takes the room it needs; the landing and the single run keep a reading measure. */
+  main:has(#board:not([hidden])) { max-width: min(1360px, 100%); }
+  html:has(#board:not([hidden])) { scroll-padding-bottom: 8rem; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- masthead ---- */
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 6px; letter-spacing: .01em; }
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .tag { color: var(--muted); margin: 0 0 24px; max-width: 40rem; }
+  #lang { width: auto; max-width: 12rem; min-height: 44px; padding: 6px 10px; font: .9rem var(--sans); }
+
+  /* ---- forms ---- */
+  fieldset { border: 1px solid var(--line); background: var(--panel); border-radius: 12px;
+             padding: 16px 18px; margin: 0 0 16px; min-width: 0; }
+  legend { padding: 0 8px; font: 600 1rem var(--sans); }
+  label { display: block; margin: 14px 0 4px; font: 600 .95rem var(--sans); }
+  .help { color: var(--muted); font: .875rem/1.45 var(--sans); margin: 3px 0 0; }
+  select, input, textarea { width: 100%; min-height: 44px; padding: 9px 11px; font: inherit; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--field-line); border-radius: 8px; }
+  textarea { min-height: 72px; resize: vertical; }
+  button { font: 600 1rem var(--sans); min-height: 44px; padding: 10px 22px; border: 1px solid var(--accent);
+           border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .small { padding: 8px 14px; font-size: .875rem; }
+  .quiet { background: transparent; color: var(--accent); border: 1px solid var(--field-line); }
+  .quiet[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
+  #error, .error { color: var(--bad); white-space: pre-wrap; }
+  #notice { color: var(--bad); font-family: var(--sans); }
+  video { width: 100%; border-radius: 8px; background: #000; margin-top: 12px; }
+  /* The download link is the episode's long file name: it wraps rather than widen a phone's page. */
+  .done a { color: var(--ok); font-family: var(--sans); display: inline-block; max-width: 100%;
+            overflow-wrap: anywhere; margin-top: 6px; }
+
+  /* ---- the two ways in ---- */
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 18px; }
+  @media (max-width: 560px) { .modes { grid-template-columns: 1fr; } }
+  .mode { display: block; margin: 0; padding: 16px 18px; border: 2px solid var(--line);
+          border-radius: 12px; background: var(--panel); cursor: pointer; font: inherit; }
+  .mode strong { display: block; font: 600 1.2rem/1.3 var(--serif); }
+  .mode strong .mt { color: inherit; font-size: inherit; }
+  .mode span { color: var(--muted); font: .9rem/1.45 var(--sans); }
+  .mode input { width: auto; min-height: 0; margin: 0 8px 0 0; accent-color: var(--accent); }
+  .mode:has(input:checked) { border-color: var(--accent); }
+  .mode:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- the cast editor on the landing (unchanged in shape) ---- */
   .cast { display: grid; gap: 12px; margin-top: 8px; }
   .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg);
-          display: grid; grid-template-columns: 96px 1fr; gap: 12px; }
+          display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; }
   @media (max-width: 560px) { .card, .card .who { grid-template-columns: 1fr; } }
   .face { width: 96px; height: 96px; border-radius: 8px; border: 1px dashed var(--line);
           display: flex; align-items: center; justify-content: center; overflow: hidden;
@@ -62,103 +90,191 @@
   .thumb { position: relative; width: 48px; height: 48px; border-radius: 6px; overflow: hidden;
            border: 1px solid var(--line); }
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .thumb button { position: absolute; top: 0; right: 0; padding: 0 5px; font-size: .75rem;
+  .thumb button { position: absolute; top: 0; right: 0; min-height: 0; padding: 0 5px; font-size: .75rem;
                   border-radius: 0 0 0 6px; }
-  .card .who { display: grid; grid-template-columns: 1fr 150px; gap: 8px; }
+  .card .who { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 8px; }
   .card label { margin: 6px 0 2px; font-size: .875rem; }
   .card textarea { min-height: 56px; }
   .card .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
-  .small { padding: 6px 12px; font-size: .875rem; }
-  .quiet { background: transparent; color: var(--accent); border: 1px solid var(--line); }
-  .quiet[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
   .castbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-  #lang { width: auto; max-width: 11rem; padding: 6px 8px; font-size: .875rem; }
-  .mode strong .mt { color: inherit; font-size: inherit; }
-  .gobar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  /* ---- the press ---- */
+  .gobar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+  .gobar #go { font-size: 1.05rem; padding: 12px 26px; }
   #direct_help { flex-basis: 100%; }
-  #projects { margin-top: 12px; }
+  #projects { margin-top: 14px; }
   #projects a { color: var(--accent); margin-right: 10px; }
 
-  /* The Scene Producer: the form folded to one line, and the board */
+  /* ---- the single run ---- */
+  #run { max-width: 760px; margin-top: 18px; }
+  #bar, .bar { height: 8px; background: var(--bar); border-radius: 4px; overflow: hidden; margin: 12px 0 6px; }
+  #fill, .fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  #status { color: var(--muted); min-height: 1.5em; font-family: var(--sans); }
+  /* While the episode is being made, its lamp is lit beside the status line. */
+  #run:has(#result[hidden]):has(#error[hidden]) #status::before {
+    content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 10px; vertical-align: -1px;
+    border-radius: 50%; background: var(--lamp); box-shadow: 0 0 10px 2px var(--lamp-glow);
+  }
+
+  /* ---- the board: the folded form, then a rail and the stage floor ---- */
   .summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
-             border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
-             padding: 12px 16px; margin: 0 0 16px; }
-  .summary strong { font-size: 1.05rem; }
-  .summary span { color: var(--muted); }
+             border: 1px solid var(--line); background: var(--panel); border-radius: 12px;
+             padding: 12px 16px; margin: 0 0 18px; }
+  .summary strong { font: 600 1.1rem var(--serif); }
+  .summary span { color: var(--muted); font-family: var(--sans); font-size: .9rem; }
   .summary .quiet { margin-left: auto; }
-  .stages { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 0 0 8px; }
-  .stage { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
-  .stage b { display: block; }
-  .stage span { color: var(--muted); font-size: .875rem; }
-  .stage.on { border-color: var(--accent); }
-  .stage.done b::after { content: " \2713"; color: var(--ok); }
-  #pstatus { color: var(--muted); min-height: 1.5em; margin: 0 0 16px; }
-  .castrow { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
-  .person { width: 128px; text-align: center; }
-  .person .face { width: 128px; height: 128px; border-style: solid; }
-  .person b { display: block; margin: 6px 0 2px; }
-  details.scene { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
-                  margin: 0 0 12px; }
+  .board-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (min-width: 1000px) {
+    .board-grid { grid-template-columns: 300px minmax(0, 1fr); gap: 24px; }
+    /* Sticky, and short enough that the console never covers its foot. */
+    .rail { position: sticky; top: 16px; max-height: calc(100vh - 190px); overflow: auto; }
+  }
+  .stage-floor { min-width: 0; }
+  .rail .panel { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 14px 16px; }
+
+  /* The three lamps. A stage cell is: the lamp (::before), its name (<b>), its state line
+     (its FIRST <span>, which showStage() writes). Shape carries the state as well as colour:
+     waiting = an empty ring, running = a lit core with a halo, done = a filled disc with a check. */
+  .stages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0;
+            align-items: start; }
+  @media (min-width: 1000px) { .stages { grid-template-columns: minmax(0, 1fr); gap: 14px; } }
+  .stage { display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 12px; align-items: center;
+           align-content: start;
+           border: 0; padding: 0; background: none; min-width: 0; }
+  .stage::before { content: ""; grid-row: 1 / span 2; width: 22px; height: 22px; border-radius: 50%;
+                   border: 2px solid var(--field-line); box-sizing: border-box; justify-self: center;
+                   display: flex; align-items: center; justify-content: center;
+                   font: 700 12px/1 var(--sans); color: var(--accent-ink); }
+  .stage b { font: 600 1rem var(--sans); }
+  .stage span { color: var(--muted); font: .82rem/1.35 var(--mono); font-variant-numeric: tabular-nums;
+                overflow-wrap: anywhere; }
+  .stage.done::before { content: "\2713"; background: var(--accent); border-color: var(--accent); }
+  .stage.on::before { content: ""; background: var(--lamp); border-color: var(--lamp);
+                      box-shadow: 0 0 0 3px var(--panel), 0 0 16px 4px var(--lamp-glow); }
+  @media (prefers-reduced-motion: no-preference) {
+    .stage.on::before { animation: lamp 2.4s ease-in-out infinite; }
+    /* A held run is lit but steady: nothing is moving until it is looked at again. */
+    #board:has(#b_look:not([hidden])) .stage.on::before { animation: none; }
+  }
+  @keyframes lamp { 50% { opacity: .72; } }
+  @media (max-width: 560px) {
+    .stage { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
+    .stage::before { grid-row: auto; justify-self: start; }
+  }
+  #pstatus { color: var(--muted); min-height: 1.5em; margin: 10px 0 0; font-family: var(--sans); font-size: .9rem; }
+  .rail .bar { margin: 14px 0 4px; }
+
+  /* The cast: square portraits in a mat. */
+  #castbox { margin: 16px 0 0; }
+  .castrow { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 14px; margin-top: 8px; }
+  .person { text-align: center; min-width: 0; }
+  .person .face { width: 100%; height: auto; aspect-ratio: 1; border: 1px solid var(--line);
+                  box-shadow: inset 0 0 0 4px var(--panel); padding: 4px; background: var(--bg); }
+  .person .face img { border-radius: 4px; }
+  .person b { display: block; margin: 6px 0 4px; font: 600 .95rem var(--sans); overflow-wrap: anywhere; }
+  .person .badge { margin: 0 0 6px; }
+  .person .small { width: 100%; }
+
+  /* The published episode: the one lit screen in the room. */
+  #published { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+               padding: 10px 12px 12px; margin: 0 0 18px; max-width: 960px; }
+  #published video { margin-top: 0; }
+
+  /* Scenes: a header strip, then the shot cards. */
+  details.scene { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; margin: 0 0 14px; }
   details.scene > summary { list-style: none; cursor: pointer; padding: 12px 16px; display: flex;
-                            align-items: center; gap: 10px; flex-wrap: wrap; }
+                            align-items: center; gap: 10px; flex-wrap: wrap; background: var(--strip);
+                            border-radius: 12px; min-height: 48px; }
+  details[open].scene > summary { border-radius: 12px 12px 0 0; border-bottom: 1px solid var(--line); }
   details.scene > summary::-webkit-details-marker { display: none; }
   details.scene > summary::before { content: "\25B8"; color: var(--muted); }
   details[open].scene > summary::before { content: "\25BE"; }
-  details.scene > summary b { font-size: 1.05rem; }
-  details.scene > summary .count { color: var(--muted); font-size: .875rem; }
-  .flag { font-size: .8rem; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line);
-          color: var(--muted); }
+  details.scene > summary b { font: 600 1.1rem var(--serif); }
+  details.scene > summary .count { color: var(--muted); font: .85rem var(--mono); font-variant-numeric: tabular-nums; }
+  .flag { font: 600 .78rem var(--sans); padding: 2px 9px; border-radius: 10px; border: 1px solid var(--line);
+          color: var(--muted); background: var(--panel); }
   .flag.changed { border-color: var(--accent); color: var(--accent); }
   .flag.failed { border-color: var(--bad); color: var(--bad); }
-  .scenebody { padding: 0 16px 16px; }
-  .scenenote { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center;
-               margin: 4px 0 12px; }
+  .scenebody { padding: 14px 16px 16px; container-type: inline-size; }
+  .scenenote { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center;
+               margin: 0 0 14px; }
   .scenenote label { margin: 0; font-size: .875rem; }
-  .scenenote input { padding: 6px 10px; font-size: .95rem; }
-  .shots { display: grid; gap: 10px; }
+  .scenenote input { padding: 8px 10px; font-size: .95rem; }
+  .shots { display: grid; gap: 12px; }
+
+  /* A shot card: the still, the script, the three presses. Layout follows the card's own width. */
   .shot { border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; padding: 12px;
-          background: var(--bg); display: grid; grid-template-columns: 176px 1fr; gap: 12px; }
+          background: var(--bg); display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  @container (min-width: 480px) {
+    .shot { grid-template-columns: 176px minmax(0, 1fr); }
+    .shot > .tools { grid-column: 2; }
+  }
+  @container (min-width: 700px) {
+    .shot { grid-template-columns: 200px minmax(0, 1fr) 150px; }
+    .shot > .tools { grid-column: 3; flex-direction: column; align-items: stretch; margin-top: 0; }
+    .shot > .tools button { width: 100%; }
+  }
   .shot.changed { border-left-color: var(--accent); }
   .shot.failed { border-left-color: var(--bad); border-color: var(--bad); }
   .shot.kept { border-left-color: var(--kept); }
-  .still { position: relative; width: 176px; height: 99px; border-radius: 6px; overflow: hidden;
-           border: 1px solid var(--line); background: var(--panel); }
-  .still img, .still video { width: 100%; height: 100%; object-fit: cover; margin: 0; border-radius: 0; }
-  .still .kind { position: absolute; left: 6px; bottom: 4px; font-size: .7rem; color: #fff;
-                 background: rgba(0,0,0,.45); padding: 0 6px; border-radius: 8px; }
-  .still .play { position: absolute; right: 6px; bottom: 4px; width: 26px; height: 26px; padding: 0;
-                 border-radius: 13px; background: rgba(0,0,0,.55); color: #fff; font-size: .75rem; }
+  .still { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden;
+           border: 1px solid var(--line); background: var(--panel); align-self: start; }
+  .still img, .still video { width: 100%; height: 100%; object-fit: cover; margin: 0; border-radius: 0; display: block; }
+  .still .kind { position: absolute; left: 6px; bottom: 6px; font: .7rem var(--sans); color: #fff;
+                 background: rgba(0, 0, 0, .7); padding: 1px 7px; border-radius: 8px; }
+  .still .play { position: absolute; right: 6px; bottom: 6px; width: 44px; height: 44px; min-height: 44px;
+                 padding: 0; border-radius: 22px; border: 0; background: rgba(0, 0, 0, .7); color: #fff;
+                 font-size: .85rem; }
   .shot.failed .still img { filter: grayscale(1) brightness(.6); }
-  .badge { display: inline-block; font-size: .8rem; padding: 1px 8px; border-radius: 10px;
+  .badge { display: inline-block; font: 600 .78rem var(--sans); padding: 2px 9px; border-radius: 10px;
            border: 1px solid var(--line); color: var(--muted); margin-left: 6px; vertical-align: middle; }
   .badge.changed { border-color: var(--accent); color: var(--accent); }
   .badge.failed { border-color: var(--bad); color: var(--bad); }
   .badge.kept { border-color: var(--kept); color: var(--kept); }
   .badge.filmed { border-color: var(--ok); color: var(--ok); }
-  .shot .who { font-weight: bold; }
-  .shot .when { color: var(--muted); font-size: .875rem; }
-  .shot .line { font-style: italic; color: var(--muted); margin: 2px 0 6px; }
-  .shot label { margin: 6px 0 2px; font-size: .875rem; }
-  .shot textarea { min-height: 48px; font-size: .95rem; }
+  .shot .who { font: 600 .95rem var(--sans); }
+  .shot .when { color: var(--muted); font: .82rem var(--mono); font-variant-numeric: tabular-nums; }
+  /* The spoken line: upright (it is in the play's language, which may not be the page's). */
+  .shot .line { margin: 8px 0 10px; padding-left: 12px; border-left: 2px solid var(--line);
+                color: var(--ink); font: 1rem/1.5 var(--serif); }
+  .shot label { margin: 8px 0 3px; font-size: .85rem; }
+  .shot textarea { min-height: 52px; font: .95rem/1.45 var(--sans); }
   .shot textarea.dirty { border-color: var(--accent); }
-  .shot .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
-  .why { color: var(--bad); font-size: .875rem; margin: 4px 0 0; }
-  .actions { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0 8px;
-             border-top: 1px solid var(--line); display: flex; gap: 10px; flex-wrap: wrap;
-             align-items: center; margin-top: 8px; }
-  .actions button { padding: 10px 16px; }
-  .actions .hint, .actions .error { font-size: .875rem; flex-basis: 100%; }
+  .shot > .tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .why { color: var(--ink); font: .92rem var(--serif); margin: 8px 0 0; padding-left: 10px;
+         border-left: 3px solid var(--bad); }
+
+  /* The console: the presses and why one is off, stuck to the bottom of the window. */
+  .actions { position: sticky; bottom: 0; z-index: 2; background: var(--panel); margin-top: 16px;
+             padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px 12px 0 0;
+             display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .actions button { padding: 10px 18px; }
+  .actions #b_stills:disabled, .actions #b_video:disabled, .actions #b_publish:disabled {
+    background: transparent; color: var(--muted); border: 1px solid var(--line); opacity: 1; }
+  /* The press that can be made now is the one that looks like a press. */
+  .actions #b_stills:enabled, .actions #b_video:enabled, .actions #b_publish:enabled {
+    background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .actions .hint, .actions .error, .actions .help { font: .875rem/1.4 var(--sans); flex-basis: 100%; }
   .actions .hint { color: var(--muted); }
+  #saved.error { color: var(--bad); }
+  @media (max-height: 520px) { .actions { position: static; } }
+
   @media (max-width: 560px) {
-    .shot { grid-template-columns: 1fr; }
-    .still { width: 100%; height: auto; aspect-ratio: 16 / 9; }
-    .stages { gap: 6px; }
-    .stage { padding: 6px 8px; } .stage b { font-size: .95rem; } .stage span { font-size: .78rem; }
+    main { padding: 20px 12px 48px; }
+    h1 { font-size: 1.75rem; }
+    html:has(#board:not([hidden])) { scroll-padding-bottom: 14rem; }
     .summary .quiet { margin-left: 0; }
-    .actions { padding: 8px 0 6px; gap: 6px; }
-    .actions button { padding: 8px 12px; font-size: .9rem; flex: 1 1 auto; }
-    .actions .hint { font-size: .8rem; line-height: 1.3; }
+    .actions { padding: 10px 12px; gap: 8px; border-radius: 10px 10px 0 0; }
+    .actions button { flex: 1 1 auto; padding: 8px 12px; font-size: .95rem; }
+    /* Only the press that can be made now; the line beside it says why the others are off. */
+    .actions #b_stills:disabled, .actions #b_video:disabled, .actions #b_publish:disabled { display: none; }
+    .actions .hint { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  }
+  @media (forced-colors: active) {
+    .stage::before { border: 2px solid CanvasText; }
+    .stage.done::before { background: CanvasText; color: Canvas; }
+    .stage.on::before { background: Highlight; border-color: Highlight; }
+    #run:has(#result[hidden]):has(#error[hidden]) #status::before { background: Highlight; }
   }
 </style>
 </head>
@@ -192,20 +308,33 @@
     <button type="button" class="small quiet" id="change_story" data-i18n="producer.change">Change the story</button>
   </div>
 
-  <section id="board" hidden aria-live="polite">
-    <div class="stages">
-      <div class="stage" id="stage_stills"><b data-i18n="stage.stills">Stills</b><span></span></div>
-      <div class="stage" id="stage_video"><b data-i18n="stage.video">Video</b><span></span></div>
-      <div class="stage" id="stage_publish"><b data-i18n="stage.publish">Publish</b><span></span></div>
+  <!-- The board (planning/studio-ui/DESIGN_ANCHOR.md): a rail with the three lamps and the
+       cast, the stage floor with the published episode and the scenes, and the console LAST,
+       a direct child of #board, so it sticks to the bottom of the window across the board. -->
+  <section id="board" hidden>
+    <div class="board-grid">
+      <div class="rail">
+        <div class="panel">
+          <div class="stages">
+            <!-- showStage() writes each stage's FIRST span; the lamp is the cell's ::before. -->
+            <div class="stage" id="stage_stills"><b data-i18n="stage.stills">Stills</b><span></span></div>
+            <div class="stage" id="stage_video"><b data-i18n="stage.video">Video</b><span></span></div>
+            <div class="stage" id="stage_publish"><b data-i18n="stage.publish">Publish</b><span></span></div>
+          </div>
+          <div class="bar"><div class="fill" id="pfill"></div></div>
+          <p id="pstatus" role="status"></p>
+        </div>
+        <fieldset id="castbox" hidden>
+          <legend data-i18n="board.cast">Cast</legend>
+          <div class="castrow" id="castrow"></div>
+          <p class="help" data-i18n="board.cast_help">A new portrait repaints every shot that character is in, except the kept ones, so try the shots first.</p>
+        </fieldset>
+      </div>
+      <div class="stage-floor">
+        <div id="published" class="done" hidden></div>
+        <div id="scenes"></div>
+      </div>
     </div>
-    <div class="bar"><div class="fill" id="pfill"></div></div>
-    <p id="pstatus"></p>
-    <fieldset id="castbox" hidden>
-      <legend data-i18n="board.cast">Cast</legend>
-      <div class="castrow" id="castrow"></div>
-      <p class="help" data-i18n="board.cast_help">A new portrait repaints every shot that character is in, except the kept ones, so try the shots first.</p>
-    </fieldset>
-    <div id="scenes"></div>
     <div class="actions">
       <button type="button" id="b_stills"></button>
       <button type="button" id="b_video" class="quiet"></button>
@@ -213,12 +342,11 @@
       <!-- A run Studio lost track of: looked at again, never sent twice, or given up. -->
       <button type="button" id="b_look" class="quiet" hidden data-i18n="act.look_again">Look again</button>
       <button type="button" id="b_forget" class="quiet" hidden data-i18n="act.forget">Forget this run</button>
-      <span class="hint" id="hint"></span>
+      <span class="hint" id="hint" role="status"></span>
       <!-- In the sticky bar, beside the buttons that raise it: never scrolled out of sight. -->
-      <span class="error" id="perror" hidden></span>
+      <span class="error" id="perror" role="alert" hidden></span>
       <span class="help" id="saved"></span>
     </div>
-    <div id="published" class="done" hidden></div>
   </section>
 </main>
 
@@ -992,6 +1120,8 @@ function counts() {
 
 function drawBoard() {
   summaryLine();
+  // The scenes the person had open stay open when the board is drawn again.
+  const wasOpen = new Set(Object.values(sceneEls).filter((s) => s.el.open).map((s) => s.scene.scene_id));
   cardEls = {}; sceneEls = {}; personEls = {};
   const view = shown();
   const row = $("castrow");
@@ -1003,6 +1133,7 @@ function drawBoard() {
   let n = 0;
   view.scenes.forEach((scene, i) => {
     const el = sceneBox(scene, i, () => (n += 1));
+    if (wasOpen.has(scene.scene_id)) el.open = true;
     scenes.appendChild(el);
   });
   // The last run ended without a result: say why, as the app recorded it.
@@ -1201,8 +1332,9 @@ function shotCard(card, scene, number) {
     if (motion) motion.value = card.motion_text || "";
   }));
   tools.append(repaint, refilm, keep);
-  body.append(why, tools);
-  el.append(still, body);
+  body.append(why);
+  // The presses are the card's third child, so a wide card can give them a column.
+  el.append(still, body, tools);
   cardEls[sid] = {el, card, scene, kind, badge, why, keep, picture, motion};
   return el;
 }
@@ -1221,6 +1353,7 @@ function edit(change) {
   edits += 1;
   refreshBoard();
   clearTimeout(saveTimer);
+  $("saved").classList.remove("error");
   say($("saved"), "pstatus.saving");
   saveTimer = setTimeout(saveDraft, SAVE_DELAY_MS);
 }
@@ -1247,15 +1380,16 @@ async function postDraft() {
     const out = await res.json();
     if (!res.ok) {
       if (current()) {
+        $("saved").classList.add("error");
         if (res.status === 409) say($("saved"), "pstatus.stale"); else plain($("saved"), out.error);
       }
       return false;
     }
     d.revision = out.revision;
-    if (current()) { savedEdits = sending; say($("saved"), "pstatus.saved"); }
+    if (current()) { savedEdits = sending; $("saved").classList.remove("error"); say($("saved"), "pstatus.saved"); }
     return true;
   } catch (err) {
-    if (current()) plain($("saved"), err.message);
+    if (current()) { $("saved").classList.add("error"); plain($("saved"), err.message); }
     return false;
   }
 }
@@ -1356,7 +1490,9 @@ function buttons() {
 function showStage(name, done, key, vars) {
   const el = $("stage_" + name);
   el.classList.toggle("done", done);
-  el.classList.toggle("on", stageBusy && watching === name && stageShown());
+  const on = stageBusy && watching === name && stageShown();
+  el.classList.toggle("on", on);
+  if (on) el.setAttribute("aria-current", "step"); else el.removeAttribute("aria-current");
   say(el.querySelector("span"), key, vars);
 }
 
