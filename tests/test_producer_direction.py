@@ -483,9 +483,17 @@ def test_a_later_run_continues_the_latest_bundle_into_the_next_number(producer_r
     second = _producer_freeze(ep, PD.bundle_path(PID, "02-stills"))
     with pytest.raises(PD.DirectionError, match="latest bundle is 02-stills"):
         PD.admit_prompt_direction(_continue(first, "03-video"))
-    with pytest.raises(PD.DirectionError, match="does not follow .* this run writes 03-video"):
-        PD.admit_prompt_direction(_continue(second, "04-video"))
+    # A number at or below the latest is refused; any number past it is a
+    # run that comes after. Gaps are abandoned attempts: Studio never sends a
+    # number twice, and a run that died before its bundle was written keeps
+    # its number (a crash mid-Video, 2026-10-23, left every later run refused
+    # while the very next number was required).
+    with pytest.raises(PD.DirectionError, match="does not come after .* latest bundle 02-stills"):
+        PD.admit_prompt_direction(_continue(second, "02-video"))
+    with pytest.raises(PD.DirectionError, match="does not come after"):
+        PD.admit_prompt_direction(_continue(second, "01-video"))
     assert PD.admit_prompt_direction(_continue(second, "03-video"))["replay_from"] == str(second)
+    assert PD.admit_prompt_direction(_continue(second, "05-video"))["replay_from"] == str(second)
 
 
 def test_nothing_to_continue_and_a_shared_number_are_refused(producer_root, tmp_path, monkeypatch):

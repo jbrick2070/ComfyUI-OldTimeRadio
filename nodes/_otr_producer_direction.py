@@ -1269,17 +1269,19 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
                     "run first, or keep them as they are"
                     % (len(unfilmed), "; ".join(unfilmed[:8])))
         if direction["out"] is not None:
-            # Bundles are numbered in the order they were made, one apart, so
-            # "latest" is always the highest number and no number is skipped.
-            following = int(latest[:2]) + 1
-            if following > 99:
+            # Bundles are numbered in the order they were made, so "latest" is
+            # the highest number and a run's out comes AFTER it. Numbers may be
+            # skipped: Studio never sends a number twice, and an attempt that
+            # died before its bundle was written (a crash mid-Video, measured
+            # 2026-10-23) keeps its number. Until then this required the very
+            # next number, and every run after such a crash was refused.
+            if int(latest[:2]) >= 99:
                 raise DirectionError("project %s has used every bundle number up to 99; "
                                      "start a new project" % project_id)
-            if int(direction["out"][:2]) != following:
+            if int(direction["out"][:2]) <= int(latest[:2]):
                 raise DirectionError(
-                    "out %s does not follow project %s's latest bundle %s; this run "
-                    "writes %02d-%s" % (direction["out"], project_id, latest, following,
-                                        direction["stage"]))
+                    "out %s does not come after project %s's latest bundle %s; this run "
+                    "writes a bundle numbered past it" % (direction["out"], project_id, latest))
     return {"direction": direction, "replay_from": replay_from, "manifest": manifest}
 
 

@@ -346,9 +346,11 @@ def test_the_diff_limit_holds_on_every_branch_and_walks_in_tree_order():
 
 
 def test_a_deep_container_against_a_scalar_never_raises():
+    import sys
     deep: dict = {}
     node = deep
-    for _ in range(3000):
+    # Deeper than json.dumps can print at this process's recursion limit.
+    for _ in range(sys.getrecursionlimit() * 3):
         node["d"] = {}
         node = node["d"]
     moved = PC.key_body_diff({"x": deep}, {"x": 1})
@@ -384,6 +386,25 @@ def test_a_miss_line_says_40_plus_only_past_forty(producer_root, cameras, tmp_pa
         assert len(said) == 1, said
         expected = "differs in 40 place(s)" if n == 40 else "differs in 40+ place(s)"
         assert expected in said[0], (n, base, said[0][:160])
+
+
+def test_a_failing_explanation_never_fails_the_run(producer_root, cameras, tmp_path,
+                                                    monkeypatch, caplog):
+    import logging
+    camera = cameras()
+    first, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a"))
+
+    def broken(*_args, **_kw):
+        raise RuntimeError("diff exploded")
+
+    monkeypatch.setattr(PC, "key_body_diff", broken)
+    with caplog.at_level(logging.WARNING, logger=PC.log.name):
+        _again, filmed, _producer = _film(camera, _workspace(
+            tmp_path, "ep_b", prompts={"shot_b002": "a window lashed by a storm"}),
+            bundle_map=_map(first))
+    assert filmed == ["shot_b002"]
+    assert any("the explanation failed (RuntimeError: diff exploded)" in r.getMessage()
+               for r in caplog.records)
 
 
 def test_the_body_diff_is_bounded_iterative_and_nan_safe():
