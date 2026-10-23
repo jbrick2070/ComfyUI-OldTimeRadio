@@ -841,12 +841,61 @@ that actually failed in a real run get in.
 
 ---
 
+## Workflow sources and acknowledgments
+
+Several lanes run a recipe that someone else worked out and published first.
+This section credits them by name, links the exact file each one came from, and
+says what the pack took from it. The adapter beside each lane carries the
+detail in its comments.
+
+**Workflows and recipes the pack follows:**
+
+| Creator | Source | What the pack reused or adapted |
+|---|---|---|
+| ByteDance | [AnimateDiff-Lightning: `comfyui/animatediff_lightning_workflow.json`](https://huggingface.co/ByteDance/AnimateDiff-Lightning/blob/main/comfyui/animatediff_lightning_workflow.json) | The Lightning lane's graph: its loader and sampler settings (8 steps, cfg 1.0, euler, sgm_uniform) and its layout with no LoRA. |
+| Lightricks | [ComfyUI-LTXVideo: `ltxvideo-i2v-distilled.json`](https://github.com/Lightricks/ComfyUI-LTXVideo/blob/864ffa6183ba39a9d799c465465d157f7cf93ba0/example_workflows/low_level/ltxvideo-i2v-distilled.json) (removed upstream in January 2026; linked at its last version) and [LTX-Video: `configs/ltxv-2b-0.9.8-distilled.yaml`](https://github.com/Lightricks/LTX-Video/blob/main/configs/ltxv-2b-0.9.8-distilled.yaml) | The distilled sigma schedule, offered as an opt-in setting on the 8 GB LTX lane. |
+| Black Forest Labs | [flux-3-image-klein-comfy: `workflows/flux3_klein_int8_t2i.json`](https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/blob/main/workflows/flux3_klein_int8_t2i.json) (gated: sign in and accept the licence on Hugging Face) | The FLUX 3 Klein still recipe: 16 steps, cfg 1.0, euler, simple, with ModelSamplingFlux. |
+| Comfy-Org | [Template `image_moss_image_t2i`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_moss_image_t2i.json) | The MOSS-Image recipe: 25 steps, cfg 2.5, er_sde, simple. |
+| Comfy-Org | [Template `image_ideogram4_t2i`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_ideogram4_t2i.json) | The local Ideogram 4 graph, its canvas arithmetic, and the three-key caption schema from its magic-prompt subgraph. |
+| Comfy-Org | [Template `llm_gemma4_text_gen`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/llm_gemma4_text_gen.json) | The Comfy-native Gemma 4 writer: a stock CLIPLoader feeding core TextGenerate. |
+| Comfy-Org | [Templates `audio_stable_audio_3_medium`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/audio_stable_audio_3_medium.json) and [`audio_stable_audio_3_medium_base`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/audio_stable_audio_3_medium_base.json) | The reference for Stable Audio 3's settings, one recipe per checkpoint. |
+| Comfy-Org | [Template `audio_stable_audio_example`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/audio_stable_audio_example.json) (Stable Audio 1.0) | Stable Audio 3's sampler pair: dpmpp_3m_sde_gpu with exponential, at 100 steps. |
+| Comfy-Org | [Template `api_ltx2_5_i2v`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/api_ltx2_5_i2v.json) | The cloud LTX 2.5 lane's defaults: Fast mode, 8 seconds, 1920x1080, 25 fps, sound on. |
+| Comfy-Org | [Template `video_humo`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/video_humo.json), announced in [HuMo and Chroma1-Radiance support](https://blog.comfy.org/p/humo-and-chroma1-radiance-support) | The HuMo lane's graph and sampler recipe: 6 steps, cfg 1.0, uni_pc, simple, shift 8 with the lightx2v distill LoRA. |
+| Comfy-Org | [Blueprint "Image to Model (Hunyuan3d 2.1)"](https://github.com/Comfy-Org/ComfyUI/blob/master/blueprints/Image%20to%20Model%20(Hunyuan3d%202.1).json) | The mesh stage's node layout and its shift of 1. |
+| Comfy-Org | [Blueprint "Text to Image (NetaYume Lumina)"](https://github.com/Comfy-Org/ComfyUI/blob/master/blueprints/Text%20to%20Image%20(NetaYume%20Lumina).json) and [`comfy_extras/nodes_lumina2.py`](https://github.com/Comfy-Org/ComfyUI/blob/master/comfy_extras/nodes_lumina2.py) | The Lumina engine's system prompts, copied word for word, and the way it composes them into the text encoder. |
+| Comfy-Org | [`comfy_extras/nodes_minimax_h3.py`](https://github.com/Comfy-Org/ComfyUI/blob/master/comfy_extras/nodes_minimax_h3.py) and [`nodes.py`](https://github.com/Comfy-Org/ComfyUI/blob/master/nodes.py) in ComfyUI core | Two small functions, copied so they run without ComfyUI loaded: MiniMax H3's frame-count alignment and the body of RepeatLatentBatch. |
+
+**Node packs, weights and graphs that made a lane possible:**
+
+- **Kosinkadink** -- [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved)
+  and [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite),
+  the node packs the AnimateDiff lanes build their graphs from.
+- **Kijai** -- hosts the 14B HuMo weights in
+  [WanVideo_comfy_fp8_scaled](https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled)
+  and the lightx2v distill LoRA in
+  [WanVideo_comfy](https://huggingface.co/Kijai/WanVideo_comfy), which the
+  HuMo lane downloads. His Wan 2.2 and SVI Pro native example was studied while
+  planning the video lanes; no public link was recorded for it, and nothing from
+  it ships.
+- **amao2001** -- the community
+  [HuMo native unlimited workflow](https://github.com/amao2001/ganloss-latent-space/blob/main/workflow/2025-09-27%20video_humo_native_unlimited_workflow.json),
+  the reference for running HuMo landscape at 832x480, which the wide HuMo
+  variant uses. Its sliding-window length technique was studied and not adopted.
+
+If your work shaped a lane and it is missing here, open an issue and it will be
+added.
+
+---
+
 ## Licence and credits
 
 The pack is [MIT](LICENSE). It is built on ComfyUI and the open-weight LTX, Wan,
 HuMo, AnimateDiff, Z-Image-Turbo, Lumina, Kokoro, Stable Audio,
 Qwen and Gemma ecosystems, plus the optional MOSS-Image, Chatterbox, Bark,
-MusicGen and IndexTTS2 engines -- thanks to all of their authors.
+MusicGen and IndexTTS2 engines -- thanks to all of their authors. The workflows
+and recipes the lanes follow are credited by name, with links, in
+[Workflow sources and acknowledgments](#workflow-sources-and-acknowledgments).
 
 **The shipped defaults are not a blanket commercial clearance.** A few optional,
 off-by-default pieces carry restricted terms:
