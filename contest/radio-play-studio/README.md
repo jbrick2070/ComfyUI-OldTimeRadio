@@ -159,6 +159,46 @@ python -m radio_play_studio run --bank my_story --acts 1 --stills flux3_klein ^
 read only with the `my_story` bank: text in them with another bank picked by hand is refused
 before anything is sent, because the pack would stop that run.
 
+## Direct the shots
+
+On the **Tell my own story** path a second, quieter button sits beside **Make the episode**:
+**Direct the shots first**. The play is written, cast and voiced as usual, then it stops after
+the stills and the page becomes a board, so you can change any picture before a frame is
+filmed.
+
+Three stages run across the top, each with its state in plain words: **Stills** (how many
+painted, how many to paint), **Video** (how many of the shots are filmed), **Publish** (after
+every shot is filmed). Under them:
+
+- **Cast:** one picture per character, with **Paint again**. A new portrait repaints every shot
+  that character is in, except the kept ones, so try the shots first.
+- **Scenes**, each holding its shot cards. A card shows the still, who speaks and the line, a
+  **Picture** box (the words the still is painted from) and a **Motion** box (the words the
+  clip is filmed from -- shown only where the shot's lane lets you set it; elsewhere the card
+  says the motion is set by its lane), and three buttons: **Paint again** (another draw of the
+  same picture), **Film again** (keep the still, film a new take) and **Keep** (freeze the card
+  as it is). A badge names the card's state: changed and not painted yet, painted and not
+  filmed, filmed, kept, failed.
+- One bar at the foot: **Paint the stills (N changed)**, **Film the shots (N to film)**,
+  **Publish the episode**, each with a one-line reason when it is off.
+
+Only what changed is made again. A Stills run paints the changed stills and keeps the rest; a
+Video run films the shots that are not filmed yet, or that you changed, and takes every other
+clip from the project's own store; Publish mixes the voices and music under the filmed clips
+and loads no generation weights. Measured on 2026-10-23 on the author's 16 GB laptop, on a
+22-shot play: one picture edit repainted one still; one Film again re-filmed one clip and
+reused 21; one motion edit re-filmed one clip and reused 21.
+
+A directed project survives a restart. Its draft and its one pending run live in a project
+file; start the app again and it looks at every project it left pending, re-attaches to a run
+that is still going, finds a submit whose answer was lost, saves a result that finished while
+it was away, and -- when ComfyUI no longer has the run -- gives it up so you can press again.
+A Video run after a crash reuses every shot that finished before it; only the rest are filmed.
+
+Where things land: each stage's bundle under ComfyUI's output folder at
+`otr/episodes/_replay/p/<project>/NN-stage/`, the clip store beside them, the page's own copies
+under `./episodes/projects/<project>/`, and the published episode in `otr/obs/` like any other.
+
 ## What a person can choose
 
 Story bank, the classic to adapt, language, acts, cast size, visual style, the still model
@@ -229,9 +269,11 @@ Run length follows the story: the number and length of the beats decide how many
 ## Known limits
 
 - There is no cancel button. Cancel a run from ComfyUI's own queue.
-- Restarting the app drops its memory of a run. The render keeps going on your ComfyUI and its
-  episode still lands in `otr/obs/`, but the page cannot re-attach to it.
-- No per-shot camera control: the pack's director picks each beat's camera move.
+- Restarting the app drops its memory of an ordinary **Make the episode** run. The render keeps
+  going on your ComfyUI and its episode still lands in `otr/obs/`, but the page cannot re-attach
+  to it. A directed project (**Direct the shots first**) is the exception: it is re-attached.
+- Per-shot control is the Picture and Motion text on a card. Where a card says the motion is
+  set by its lane, the pack's director picks that beat's camera move.
 - The app listens only on this machine and has no login, so it refuses `--host` values beyond
   loopback.
 
