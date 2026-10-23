@@ -206,13 +206,68 @@ def clip_reuse_key(*, shot_id: str, requests: Iterable[Any], coverage_plan: Any,
     ``settings`` the environment settings that change bytes. Workspace paths,
     run ids and trace stamps never enter it, so the same shot keys the same in
     a fresh replay workspace."""
-    body = {"v": CLIP_KEY_VERSION, "shot_id": str(shot_id),
+    return key_of_body(_key_body(shot_id=shot_id, requests=requests,
+                                 coverage_plan=coverage_plan, engine=engine,
+                                 render_policy=render_policy, settings=settings))
+
+
+def _key_body(*, shot_id, requests, coverage_plan, engine, render_policy, settings) -> dict:
+    return {"v": CLIP_KEY_VERSION, "shot_id": str(shot_id),
             "requests": [request_projection(r) for r in requests],
             "coverage_plan": coverage_plan, "engine": engine,
             "render_policy": render_policy, "settings": settings}
+
+
+def key_of_body(body: Any) -> str:
+    """The key of a causal body, as :func:`clip_reuse_key` hashes it."""
     return hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=True,
                                      separators=(",", ":"), default=str)
                           .encode("utf-8")).hexdigest()
+
+
+def clip_key_body(*, shot_id: str, requests: Iterable[Any], coverage_plan: Any,
+                  engine: Dict[str, Any], render_policy: Dict[str, Any],
+                  settings: Dict[str, Any]) -> Dict[str, Any]:
+    """The body :func:`clip_reuse_key` hashes, JSON-native, so a record can
+    keep it and a miss can name the field that moved (2026-10-23: a Film
+    again run re-filmed every chained shot of a project whose ledger had not
+    changed, and nothing could say why). ``key_of_body`` of this is the key."""
+    return json.loads(json.dumps(_key_body(shot_id=shot_id, requests=list(requests),
+                                           coverage_plan=coverage_plan, engine=engine,
+                                           render_policy=render_policy, settings=settings),
+                                 sort_keys=True, ensure_ascii=True, default=str))
+
+
+def key_body_diff(old: Any, new: Any, path: str = "", limit: int = 40) -> list:
+    """The dotted paths at which two causal bodies differ, deepest first
+    where a value is a dict or a list, at most ``limit`` of them."""
+    out: list = []
+
+    def walk(a: Any, b: Any, at: str) -> None:
+        if len(out) >= limit:
+            return
+        if isinstance(a, dict) and isinstance(b, dict):
+            for name in sorted(set(a) | set(b)):
+                here = "%s.%s" % (at, name) if at else str(name)
+                if name not in a or name not in b:
+                    out.append(here + (" (new)" if name not in a else " (gone)"))
+                else:
+                    walk(a[name], b[name], here)
+        elif isinstance(a, list) and isinstance(b, list):
+            if len(a) != len(b):
+                out.append("%s (%d -> %d items)" % (at, len(a), len(b)))
+            for i, (x, y) in enumerate(zip(a, b)):
+                walk(x, y, "%s[%d]" % (at, i))
+        elif a != b:
+            out.append("%s (%s -> %s)" % (at, _short(a), _short(b)))
+
+    walk(old, new, path)
+    return out
+
+
+def _short(value: Any, width: int = 48) -> str:
+    text = json.dumps(value, ensure_ascii=True, default=str)
+    return text if len(text) <= width else text[:width - 3] + "..."
 
 
 # --------------------------------------------------------------------------- #
@@ -449,6 +504,8 @@ class ProducerClips:
         self.takes = {str(sid): int(take or 0) for sid, take in dict(takes or {}).items()}
         self._lock = threading.Lock()
         self._keys: Dict[str, str] = {}
+        #: Shot id -> the causal body its key hashes, kept in its record.
+        self._bodies: Dict[str, Dict[str, Any]] = {}
         self._records: Dict[str, Dict[str, Any]] = {}
         self._floors: Dict[str, Dict[str, Any]] = {}
         #: Shot id -> where its clip came from this run: "bundle", "store",
@@ -456,7 +513,8 @@ class ProducerClips:
         self.reused: Dict[str, str] = {}
 
     # -- finding ---------------------------------------------------------- #
-    def find(self, shot_id: str, key: str) -> Optional[Dict[str, Any]]:
+    def find(self, shot_id: str, key: str,
+             body: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """The clip filmed under ``key`` for this shot, in this workspace, as
         ``{"clip": ..., "attempts": [...]}`` -- or None, and the shot renders.
         The bundle's own record is used in place when it names this key and
@@ -464,7 +522,7 @@ class ProducerClips:
         run renders nothing: a shot it finds no clip for refuses the run,
         before any weights load (plan, "Publish"). A kept card is never looked
         up by key: :meth:`take_kept` takes it."""
-        found = self._find(str(shot_id), key)
+        found = self._find(str(shot_id), key, body)
         if found is None and self.stage == "publish":
             raise ClipStoreError(
                 "Publish has no filmed clip for shot %s as it stands now: film it in a "
@@ -485,9 +543,12 @@ class ProducerClips:
         for and none is computed (:meth:`_keep`)."""
         return self._keep(str(shot_id))
 
-    def _find(self, shot_id: str, key: str) -> Optional[Dict[str, Any]]:
+    def _find(self, shot_id: str, key: str,
+              body: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         with self._lock:
             self._keys[shot_id] = key
+            if body is not None:
+                self._bodies[shot_id] = body
         record = self._bundle.get(shot_id)
         if record is not None and record.get("key") == key:
             try:
@@ -501,6 +562,7 @@ class ProducerClips:
             log.error("[OTR.producer_clips] shot %s: %s; filming it again", shot_id, exc)
             return None
         if entry is None:
+            self._explain_miss(shot_id, key, body)
             return None
         try:
             return self._take(shot_id, entry, self._from_store(key, entry), "store")
@@ -508,6 +570,27 @@ class ProducerClips:
             log.error("[OTR.producer_clips] shot %s: the stored clip could not be copied "
                       "in (%s); filming it again", shot_id, exc)
             return None
+
+    def _explain_miss(self, shot_id: str, key: str, body: Optional[Dict[str, Any]]) -> None:
+        """A shot the last bundle filmed that this run cannot reuse says WHY:
+        the fields of the causal body that moved, when the old record kept
+        its body; this run's whole body otherwise, so the next run can. A
+        shot the bundle never filmed is simply new and says nothing."""
+        previous = self._bundle.get(shot_id)
+        if previous is None or body is None:
+            return
+        old = previous.get("key_body")
+        if isinstance(old, dict):
+            moved = key_body_diff(old, body)
+            log.warning("[OTR.producer_clips] shot %s NOT reused: filmed before under key "
+                        "%s; this run's key %s differs in %d place(s): %s",
+                        shot_id, str(previous.get("key", ""))[:12], key[:12], len(moved),
+                        "; ".join(moved) or "nothing the body shows (a non-JSON value?)")
+            return
+        log.warning("[OTR.producer_clips] shot %s NOT reused: filmed before under key %s, "
+                    "whose record keeps no causal body (written before 2026-10-23); this "
+                    "run's key %s, body: %s", shot_id, str(previous.get("key", ""))[:12],
+                    key[:12], json.dumps(body, sort_keys=True, ensure_ascii=True, default=str))
 
     def _keep(self, shot_id: str) -> Dict[str, Any]:
         """A KEPT card's clip, used as it is whatever has changed since: the
@@ -607,10 +690,14 @@ class ProducerClips:
                  if clip.get(field)}
         # JSON-native from here on, so the record on disk, in the map and in
         # the next run's ledger are the same record.
+        with self._lock:
+            key_body = self._bodies.get(shot_id)
         body = json.loads(json.dumps(
             {"shot_id": shot_id, "attempts": [str(a) for a in attempts or ()],
              "clip_take": self.takes.get(shot_id, 0),
-             "clip": {k: v for k, v in clip.items() if k not in _PATH_FIELDS.values()}},
+             "clip": {k: v for k, v in clip.items() if k not in _PATH_FIELDS.values()},
+             # The body the key hashes, so the next run can say what moved.
+             **({"key_body": key_body} if key_body is not None else {})},
             ensure_ascii=True, default=str))
         try:
             record = _check_record(dict(body, version=RECORD_VERSION, key=key, files={

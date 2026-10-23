@@ -4431,7 +4431,7 @@ def _producer_clips_module():
     return _mod
 
 
-def _producer_clip_key(shot, requests, profile):
+def _producer_clip_inputs(shot, requests, profile):
     """A shot's causal clip key (``_otr_producer_clips.clip_reuse_key``): its
     requests as built, its coverage plan, its engine as registered -- id,
     versions, recipe and any model files it declares -- the episode's render
@@ -4472,10 +4472,15 @@ def _producer_clip_key(shot, requests, profile):
                 "fear_cape_min_segments": int(_wb2.fear_cape_min_segments()),
                 "foley_join_soften_ms": int(_foley.foley_join_soften_ms()),
                 "env": clips_module.causal_env()}
-    return clips_module.clip_reuse_key(
-        shot_id=str(shot.get("shot_id") or ""), requests=requests,
-        coverage_plan=shot.get("coverage_plan"), engine=identity,
-        render_policy=dict(profile or {}), settings=settings)
+    return dict(shot_id=str(shot.get("shot_id") or ""), requests=requests,
+                coverage_plan=shot.get("coverage_plan"), engine=identity,
+                render_policy=dict(profile or {}), settings=settings)
+
+
+def _producer_clip_key(shot, requests, profile):
+    """The shot's versioned causal key (nodes/_otr_producer_clips)."""
+    return _producer_clips_module().clip_reuse_key(
+        **_producer_clip_inputs(shot, requests, profile))
 
 
 def _reuse_filmed_clip(reuse, shot, requests, profile):
@@ -4488,8 +4493,11 @@ def _reuse_filmed_clip(reuse, shot, requests, profile):
     what the episode took even when a run films nothing; its receipts say
     where it came from (:func:`_mark_reused_receipts`)."""
     sid = str(shot.get("shot_id") or "")
-    key = _producer_clip_key(shot, requests, profile)
-    found = reuse.find(sid, key)
+    clips_module = _producer_clips_module()
+    inputs = _producer_clip_inputs(shot, requests, profile)
+    key = clips_module.clip_reuse_key(**inputs)
+    # The body travels with the key so a miss can say what moved.
+    found = reuse.find(sid, key, clips_module.clip_key_body(**inputs))
     if found is None:
         return None
     _LOG.warning("[OTR video] REUSED shot %s: filmed before under key %s, taken from "

@@ -220,6 +220,60 @@ def test_an_edited_shot_is_the_only_one_filmed_again(producer_root, cameras, tmp
     assert set(_map(again)) == set(PROMPTS)
 
 
+def test_a_miss_against_the_last_bundle_names_the_fields_that_moved(
+        producer_root, cameras, tmp_path, caplog):
+    """2026-10-23: a Film-again run re-filmed every chained shot of a project
+    whose ledger had not changed, and nothing said why. A record now keeps
+    the body its key hashes, and a shot the last bundle filmed that this run
+    cannot reuse names the fields that moved."""
+    import logging
+    camera = cameras()
+    first, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a"))
+    record = _map(first)["shot_b002"]
+    assert PC.key_of_body(record["key_body"]) == record["key"]
+    with caplog.at_level(logging.WARNING, logger=PC.log.name):
+        _again, filmed, _producer = _film(camera, _workspace(
+            tmp_path, "ep_b", prompts={"shot_b002": "a window lashed by a storm"}),
+            bundle_map=_map(first))
+    assert filmed == ["shot_b002"]
+    said = [r.getMessage() for r in caplog.records if "NOT reused" in r.getMessage()]
+    assert len(said) == 1 and "shot_b002" in said[0], said
+    assert "requests[0].text_prompt" in said[0], said[0]
+    assert "1 place(s)" in said[0], said[0]
+
+
+def test_a_miss_against_a_record_with_no_body_logs_this_runs_body(
+        producer_root, cameras, tmp_path, caplog):
+    """A record written before bodies were kept cannot be diffed; the run
+    logs its own body so the run after it can."""
+    import logging
+    camera = cameras()
+    first, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a"))
+    bundle = {sid: {k: v for k, v in rec.items() if k != "key_body"}
+              for sid, rec in _map(first).items()}
+    with caplog.at_level(logging.WARNING, logger=PC.log.name):
+        _film(camera, _workspace(tmp_path, "ep_b",
+                                 prompts={"shot_b002": "a window lashed by a storm"}),
+              bundle_map=bundle)
+    said = [r.getMessage() for r in caplog.records if "NOT reused" in r.getMessage()]
+    assert len(said) == 1 and "keeps no causal body" in said[0], said
+    assert '"shot_id": "shot_b002"' in said[0] and "a window lashed by a storm" in said[0]
+
+
+def test_the_key_body_is_json_and_hashes_to_the_key():
+    """The body a record keeps is the one the key hashes, JSON-native."""
+    kw = dict(shot_id="shot_x", requests=[{"text_prompt": "a", "frames": (1, 2),
+                                           "plate_path": "C:/gone", "request_id": "r"}],
+              coverage_plan={"join": "chain"}, engine={"engine_id": "stub"},
+              render_policy={"device": "cuda"}, settings={"env": {}})
+    body = PC.clip_key_body(**kw)
+    assert json.loads(json.dumps(body)) == body
+    assert body["requests"][0] == {"text_prompt": "a", "frames": [1, 2]}
+    assert PC.key_of_body(body) == PC.clip_reuse_key(**kw)
+    assert PC.key_body_diff(body, dict(body, settings={"env": {"OTR_X": "1"}})) == [
+        "settings.env.OTR_X (new)"]
+
+
 def test_a_run_that_dies_keeps_every_shot_it_finished(producer_root, cameras, tmp_path):
     camera = cameras()
     camera.broken = {"shot_b002"}
@@ -722,10 +776,10 @@ def test_a_store_refusal_is_never_read_as_an_empty_wallet(
     camera = cameras("cloud_stub_camera")
     real_find = PC.ProducerClips.find
 
-    def refusing(self, shot_id, key):
+    def refusing(self, shot_id, key, body=None):
         if shot_id == "shot_b002":
             raise PC.ClipStoreError("Publish has no filmed clip for shot 402")
-        return real_find(self, shot_id, key)
+        return real_find(self, shot_id, key, body)
 
     monkeypatch.setattr(PC.ProducerClips, "find", refusing)
     with pytest.raises(PC.ClipStoreError, match="no filmed clip for shot 402"):
