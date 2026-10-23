@@ -15,7 +15,7 @@ On the shipped workflows these are the widgets a person changes; the ones on the
 
 Frozen v2 ledger JSON from OTR_LedgerFreezeCascade. Passed VERBATIM to the legacy engine on the batch path; read for cue mood on the clip path.
 
-**Music - composer** (`engine`) -- a choice from the dropdown; starts as `stable_audio_3`.
+**Music - composer** (`engine`) -- a choice from the dropdown.
 
 Theme-music engine. `stable_audio_3` is the shipped default and is ungated; `musicgen` is selectable and is noncommercial; `stable_audio_music` needs a Hugging Face licence acceptance. Unusable selections fail closed with a named error.
 

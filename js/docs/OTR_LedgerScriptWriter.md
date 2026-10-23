@@ -11,7 +11,7 @@ Authors the radio drama outline, cast roster, and beat-by-beat dialogue using lo
 
 On the shipped workflows these are the widgets a person changes; the ones on the app form are named as the form names them.
 
-**Story bank** (`source_bank`) -- a choice from the dropdown; starts as `roll (any eligible bank)`.
+**Story bank** (`source_bank`) -- a choice from the dropdown.
 
 Story-path SOURCE BANK (multi-modal story schema). Selects which registered story pack supplies the pack-routed creative prompts and which lane the episode runs. scifi_news_pro = the local default sci-fi bank, an LLM-first multipass lane using the configured model slots. Each lane is an INDEPENDENT bank (own pack + bank metadata). The only non-runnable row is '+ Add Your Own' (custom_source_bank) -- picking it FAILS LOUD before any story work (no fallback), with its guide_ref naming the real path: author a bundle under user_packs/source_banks/, run 'otr_check bank <path> --activate' (scripts/otr_check.py, in a git clone), restart, and your bank joins this list as its own entry (contract: apple/EXTENDING.md, which ships with the pack; the longer apple/EXTENDING_OTR.md is in the git tree at https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/EXTENDING_OTR.md). A bank's own default_story_model picks its story pack -- there is no separate pack widget. ROLL: pick 'roll (any eligible bank)' to let the run choose for you, uniformly, from every runnable bank whose lane can build the requested shape. This is INDEPENDENT of the visual_style roll -- rolling one does not roll the other. The choice is recorded in the ledger at meta.bank_roll (selected id, seed, and the exact pool it drew from); set OTR_BANK_SEED to replay a past roll. A pinned source_ref cannot be combined with the roll -- a pinned source belongs to one bank.
 
@@ -21,7 +21,7 @@ Story-path SOURCE BANK (multi-modal story schema). Selects which registered stor
 
 Optional source reference for source-bank lanes (for example a public-domain URL/id/title). Blank uses the bank's default source selection. This is not a fallback; unsupported nonblank references must fail loud in the consuming bank.
 
-**Visual style** (`visual_style`) -- a choice from the dropdown; starts as `roll (any style)`.
+**Visual style** (`visual_style`) -- a choice from the dropdown.
 
 NO VISIBLE EFFECT ON THE SHIPPED GRAPH. It styles the still and video prompts, and the canonical's three video lanes are procedural -- they draw from the audio and read no still, so this changes the filename and the receipt and nothing you can see. Switch a video lane to a still or diffusion engine first, then it is one of the strongest controls here. Story content is never touched either way. 'roll (any style)' picks one for you, recorded at meta.style_roll.
 
@@ -61,7 +61,7 @@ MY STORY ONLY. Who the story is by. Put your own name here, or a pen name, or an
 
 The announcer says it out loud and the closing credits print it. Leave it empty and the episode credits 'one of our listeners' -- no name is ever filled in for you.
 
-**Acts** (`act_count`) -- a choice from the dropdown; starts as `3`.
+**Acts** (`act_count`) -- a choice from the dropdown.
 
 Number of acts, 1-7. This is the only knob that shapes episode length, and your pick is always honoured.
 
@@ -84,7 +84,7 @@ The sci-fi news lane builds its own running order and does not read this switch.
 
 REQUESTED number of speaking characters (plus ANNOUNCER bookends). 1 = monologue/diary mode. This is a request, not a cap: a story that genuinely needs another voice may use one. The real ceiling is the voice stock, because two characters never share a voice.
 
-**Lemmy cameo** (`lemmy_cameo`) -- a choice from the dropdown; starts as `roll (~11% chance)`.
+**Lemmy cameo** (`lemmy_cameo`) -- a choice from the dropdown.
 
 LEMMY easter-egg cameo -- the genial Cockney communications officer who occasionally joins the cast.
 
@@ -94,7 +94,7 @@ LEMMY easter-egg cameo -- the genial Cockney communications officer who occasion
 
 'always' consumes one of the num_characters slots, exactly as a natural roll does; 'never' leaves every slot to the cast.
 
-**`story_scaffold`** -- a choice from the dropdown; starts as `auto`.
+**`story_scaffold`** -- a choice from the dropdown.
 
 How much the radio-drama SCAFFOLD shapes the story. off = a story drawn straight from the news seed (the base prompt only -- no style catalog, no climax-shape grammar, no grounding gate; the writer's own take). on = the news story shaped by ONE of the ~100 radio-drama styles (varied climax + ending + the premise-grounding body gate). auto (default) = follow the OTR_ENABLE_STYLE_GRAMMAR env / its default (ON). on/off override that env for THIS run.
 
@@ -118,7 +118,7 @@ Per-line max_new_tokens ceiling on the composer hot-path.
 
 Default 200 preserves current behavior. The Attempt-1 uses this cap directly; attempt-2 retry uses the full cap. It is a per-CALL decode budget, not a length target -- it was scaled from target_words until 2026-08-14, which made it a token ceiling derived from a word request.
 
-**Writer - story** (`creative_writing_model`) -- a choice from the dropdown; starts as `openrouter:slot-a`.
+**Writer - story** (`creative_writing_model`) -- a choice from the dropdown.
 
 LLM for the creative/narrative passes (outline, cast, dialogue composer, style picker invention). To use a remote OpenRouter model, set OPENROUTER_API_KEY and pick OpenRouter A/B (see https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/openrouter-setup.md).
 
@@ -136,7 +136,7 @@ Writers -- download size and where each fits:
 - comfy_native:gemma4-12b-int8-convrot: about 12.1 GB; run by ComfyUI itself; fit not rated by these tags
 nv8 / nv16 / nv24: fits an NVIDIA card of that many GB at full precision; -nf4: only as a 4-bit load; mac16: a 16 GB Apple Silicon Mac; -tight: fits with nothing to spare. Sizes are the one-time download, not the memory it uses while running.
 
-**Writer - structure** (`technical_model`) -- a choice from the dropdown; starts as `comfy_native:gemma4-e2b-it-int8-convrot`.
+**Writer - structure** (`technical_model`) -- a choice from the dropdown.
 
 LLM for the technical/structured passes (JSON validators, GBNF grammar output, reviewer verdicts, cast contract checks, format normalization, news interpreter). Profile/platform-owned baseline: your hardware profile pins it, and a direct headless -Set override is sanctioned and wins over the profile when supplied. Pick a smaller model here when you want Slot 1 != Slot 2 routing for VRAM headroom. To use a remote OpenRouter model, set OPENROUTER_API_KEY and pick OpenRouter A/B (see https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/openrouter-setup.md).
 
@@ -154,39 +154,39 @@ Writers -- download size and where each fits:
 - comfy_native:gemma4-12b-int8-convrot: about 12.1 GB; run by ComfyUI itself; fit not rated by these tags
 nv8 / nv16 / nv24: fits an NVIDIA card of that many GB at full precision; -nf4: only as a 4-bit load; mac16: a 16 GB Apple Silicon Mac; -tight: fits with nothing to spare. Sizes are the one-time download, not the memory it uses while running.
 
-**Cloud writer - OpenRouter A** (`openrouter_slot_a_model`) -- a choice from the dropdown; starts as `(enable OpenRouter)`.
+**Cloud writer - OpenRouter A** (`openrouter_slot_a_model`) -- a choice from the dropdown.
 
 OpenRouter model slug bound to the 'openrouter:slot-a' handle (the creative slot). Passive: only used when creative_writing_model is set to 'openrouter:slot-a'. Choices are the curated '~family-latest' aliases (which resolve upstream, so they never go stale) plus your favourites from the cached catalog; run the refresh script or set OTR_OPENROUTER_FULL_CATALOG=1 to browse every cached slug. Shows '(enable OpenRouter)' until OPENROUTER_API_KEY is set. A saved slug is preserved even if absent from a stale cache. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/openrouter-setup.md.
 
-**Cloud writer - OpenRouter B** (`openrouter_slot_b_model`) -- a choice from the dropdown; starts as `(enable OpenRouter)`.
+**Cloud writer - OpenRouter B** (`openrouter_slot_b_model`) -- a choice from the dropdown.
 
 OpenRouter model slug bound to the 'openrouter:slot-b' handle (the technical slot). Passive: only used when technical_model is set to 'openrouter:slot-b'. Choices are the curated '~family-latest' aliases plus your favourites from the cached catalog; shows '(enable OpenRouter)' until remote is enabled. OTR_OPENROUTER_SLOT_B_REQUIRE_JSON=1 limits the CACHED CATALOG rows to structured-output models; the curated aliases are policy, not catalog discovery, so they are still offered -- check the family before binding one here. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/openrouter-setup.md.
 
-**Cloud writer - Comfy A** (`comfy_slot_a_model`) -- a choice from the dropdown; starts as `(enable Comfy Credits)`.
+**Cloud writer - Comfy A** (`comfy_slot_a_model`) -- a choice from the dropdown.
 
 Comfy Credits model slug bound to the 'comfy:slot-a' handle (the creative slot). Passive: only used when creative_writing_model is set to 'comfy:slot-a'. Choices are the pinned ComfyUI partner-node catalog (Sonnet 5, Luna and Sol are always listed so a saved cloud graph loads). The enable-sentinel remains choices[0]. Credit-billed at generate() when a Comfy API key is present. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/comfy-credits-setup.md.
 
-**Cloud writer - Comfy B** (`comfy_slot_b_model`) -- a choice from the dropdown; starts as `(enable Comfy Credits)`.
+**Cloud writer - Comfy B** (`comfy_slot_b_model`) -- a choice from the dropdown.
 
 Comfy Credits model slug bound to the 'comfy:slot-b' handle (the technical slot). Passive: only used when technical_model is set to 'comfy:slot-b'. Choices are the pinned ComfyUI partner-node catalog (Sonnet 5, Luna and Sol are always listed so a saved cloud graph loads). The enable-sentinel remains choices[0]. Credit-billed at generate() when a Comfy API key is present. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/comfy-credits-setup.md.
 
-**Cloud writer - Google A** (`google_api_slot_a_model`) -- a choice from the dropdown; starts as `(select Google API model)`.
+**Cloud writer - Google A** (`google_api_slot_a_model`) -- a choice from the dropdown.
 
 Google Gemini API model bound to 'google_api:slot-a' (creative slot). Env-only auth: OTR_GOOGLE_API_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY. Passive until the main model dropdown selects google_api:slot-a. No local fallback.
 
-**Cloud writer - Google B** (`google_api_slot_b_model`) -- a choice from the dropdown; starts as `(select Google API model)`.
+**Cloud writer - Google B** (`google_api_slot_b_model`) -- a choice from the dropdown.
 
 Google Gemini API model bound to 'google_api:slot-b' (technical slot). Use a structured-output capable text model for JSON passes. Env-only auth, no local fallback.
 
-**`llm_device`** -- a choice from the dropdown; starts as `default`.
+**`llm_device`** -- a choice from the dropdown.
 
 LLM device. 'default' asks ComfyUI what this machine has and RECORDS what it chose; an explicit device is never second-guessed and still fails loud if it is not there.
 
-**`llm_attn_impl`** -- a choice from the dropdown; starts as `sdpa`.
+**`llm_attn_impl`** -- a choice from the dropdown.
 
 Attention implementation for the transformers lane (the FA2 auto-probe is gone). sdpa = the proven baseline.
 
-**`llm_quant_policy`** -- a choice from the dropdown; starts as `bnb_nf4`.
+**`llm_quant_policy`** -- a choice from the dropdown.
 
 Quantization for the transformers lane. bnb lanes are OFF on ROCm/MPS/CPU tiers (missing bitsandbytes fails loud).
 
@@ -210,7 +210,7 @@ ON (default): typed non-quality source-interpreter failures stay fail-loud. OFF:
 
 CANONICAL REPLAY (2026-09-02). Empty = normal authorship. A frozen replay bundle directory (scripts/otr_freeze_replay_bundle.py, in a git clone) = re-render THAT episode's ledger through the whole canonical graph as a new episode: no writer, no TTS, no music, no stills minted; same seeds, same audio, only the video phase runs, on the engine the bundle froze (derive a bundle with --derive-engine to replay on another lane). The A/A null.
 
-**Language** (`episode_language`) -- a choice from the dropdown; starts as `English`.
+**Language** (`episode_language`) -- a choice from the dropdown.
 
 The language the EPISODE is in -- spoken dialogue, the announcer, the title card, the captions and the closing credits.
 
@@ -222,7 +222,7 @@ Off is not a language -- it is off: nothing is stamped and the episode runs exac
 
 Every language here speaks through Kokoro, and Google TTS (your own Google API key) voices every one of them too. The Shakespeare and Public Domain banks perform the author's own words: in English as written; in another language, a real translator's public-domain text when the corpus holds that scene (config/source_banks/<bank>/translations -- the manifest there is the list), and otherwise the writer model's own translation of the selected passage, which the ledger says so.
 
-**Space saver** (`asset_cleanup`) -- a choice from the dropdown; starts as `full (keep only the published video)`.
+**Space saver** (`asset_cleanup`) -- a choice from the dropdown.
 
 What to delete from this episode's folder once it has been published.
 

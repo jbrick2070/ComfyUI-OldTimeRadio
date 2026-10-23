@@ -29,7 +29,7 @@ News JSON (pipeline compat)
 
 Frames per second. Keep it equal to the rate on Caption Burn and Mux and Publish -- they are timing declarations, not converters.
 
-**`resolution`** -- a choice from the dropdown; starts as `1920x1080`.
+**`resolution`** -- a choice from the dropdown.
 
 Procgen output resolution. 1920x1080 = delivery res (BUG-030 Phase B default). 832x480 was the prior default (rendered cheap, then upscaled with everything else; legacy mode). 1280x720 / 854x480 / 3840x2160 retained for one-off needs.
 

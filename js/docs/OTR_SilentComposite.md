@@ -41,7 +41,7 @@ Optional ordering signal (opaque STRING).
 
 OTR_VideoRenderBatch clip manifest. When it carries per-beat clips the composite ASSEMBLES a frame-accurate CFR timeline (each beat conformed to its audio-derived frame count; gaps filled from base_video_path). Empty -> the single-base floor path.
 
-**Upscaler** (`upscale_engine`) -- a choice from the dropdown; starts as `off`.
+**Upscaler** (`upscale_engine`) -- a choice from the dropdown.
 
 Post-render upscale/enhance stage. Runs INSIDE the composite per-clip (sharpen=True branch only); floor / directory / black paths are unchanged. off = today's lanczos+unsharp, byte-identical. spandrel_esrgan = Real-ESRGAN x2 (any device, slow). rtx_vsr = NVIDIA RTX Video Super Resolution (RTX card; installs NVIDIA's nvidia-vfx package itself on first use, ~540 MB; ~100x faster than ESRGAN; falls back to off with a warning where it cannot run).
 

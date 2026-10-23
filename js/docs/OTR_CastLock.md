@@ -13,11 +13,11 @@ On the shipped workflows these are the widgets a person changes; the ones on the
 
 **`script_json`** -- a connection from another node (`STRING`).
 
-Frozen v2 ledger JSON from OTR_LedgerFreezeCascade (its first output). CastLock rewrites it into the canonical ledger_json; the legacy raw path keeps reading this untouched string.
+Frozen v2 ledger JSON from OTR_LedgerFreezeCascade (its v2_ledger_json output). CastLock rewrites it into the canonical ledger_json; the legacy raw path keeps reading this untouched string.
 
 ### Optional
 
-**`cast_voice_policy`** -- a choice from the dropdown; starts as `auto_registry`.
+**`cast_voice_policy`** -- a choice from the dropdown.
 
 Who picks the voices. auto_registry casts them from the bank, the same way every time; preserve_ledger keeps whatever the writer already assigned.
 
@@ -25,11 +25,11 @@ Who picks the voices. auto_registry casts them from the bank, the same way every
 
 Let two characters share a voice when the bank runs out of distinct ones. Off asks for a distinct voice per character wherever the bank has them; a language with only a few voices, or keeping a character's gender right, can still reuse one rather than stop.
 
-**Characters - voices** (`char_voice_engine`) -- a choice from the dropdown; starts as `auto`.
+**Characters - voices** (`char_voice_engine`) -- a choice from the dropdown.
 
 Which engine speaks the characters. auto keeps the shipped Kokoro voice. Character Voices inherits this stamp -- there is no second engine dropdown.
 
-**Announcer - voice** (`announcer_voice_engine`) -- a choice from the dropdown; starts as `auto`.
+**Announcer - voice** (`announcer_voice_engine`) -- a choice from the dropdown.
 
 Which engine reads the announcer. auto keeps the shipped Kokoro voice. Announcer Voice inherits this stamp -- there is no second engine dropdown.
 
@@ -37,7 +37,7 @@ Which engine reads the announcer. auto keeps the shipped Kokoro voice. Announcer
 
 Optional ordering signal (wire an upstream done).
 
-**`voice_device`** -- a choice from the dropdown; starts as `default`.
+**`voice_device`** -- a choice from the dropdown.
 
 Device for local voice and music engines. 'default' asks ComfyUI what this machine has and RECORDS what it chose; an explicit device is never second-guessed and still fails loud if it is not there.
 

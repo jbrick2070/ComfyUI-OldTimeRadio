@@ -1,13 +1,17 @@
-"""Nothing that ships may point a reader at a file that does not.
+"""No shipped document may point a reader at an apple/ file that does not ship.
 
 The registry zip carries README.md, the Studio's README, every apple/*.md not
 named in .comfyignore, and the node help pages under js/docs/. On 2026-10-23 a
 sweep excluded internal records from the zip and, for one of them, a shipped
 guide and a shipped code comment still named it (Codex QA): a reader of the
-installed pack would have followed a path to nothing. Every apple/ file a
-shipped document names -- as `apple/<file>` or as the bare file name -- must
-exist in git and ship. A link into this repository on GitHub is the one way to
-name a file that does not ship, and the link's target must exist too.
+installed pack would have followed a path to nothing. Every apple/ path a
+shipped document names -- `apple/<file>`, `apple/<folder>/<file>`, or the bare
+file name of an apple/ file -- must exist in git and ship. The one way to name
+a file that does not ship is to link it on GitHub, on that line, and the link's
+target must exist in git. Links to this repository's root, its issues, a folder
+on /tree/main or a raw file are the reader's to follow and are not held here;
+nor are references to scripts/ or tests/, which the guides for people working
+in the git tree name on purpose.
 """
 from __future__ import annotations
 
@@ -20,9 +24,9 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 GITHUB_BLOB = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/"
-_REF = re.compile(r"(?<![/\w])apple/([A-Za-z0-9_.\-]+\.(?:md|yaml|json|txt))")
+_REF = re.compile(r"(?<![/\w])apple/((?:[A-Za-z0-9_.\-]+/)*[A-Za-z0-9_.\-]+\.(?:md|yaml|json|txt))")
 _BARE = re.compile(r"(?<![/\w])([A-Za-z0-9_\-]+(?:--[A-Za-z0-9_.\-]+)?\.(?:md|yaml|json|txt))\b")
-_LINK = re.compile(r"\[[^\]]*\]\((https?://[^)\s]+)\)")
+_BLOB = re.compile(re.escape(GITHUB_BLOB) + r"([^\s)\]<>\"'#?]+)")
 
 
 def _tracked(prefix: str) -> set:
@@ -64,28 +68,29 @@ def _apple_names() -> set:
 
 def _problems(text: str, patterns: list, names: set, tracked_all: set) -> list:
     problems = []
-    for url in _LINK.findall(text):
-        if url.startswith(GITHUB_BLOB):
-            target = url[len(GITHUB_BLOB):].split("#")[0]
+    for line in text.splitlines():
+        # Every file this line links on GitHub, bare URL or markdown link alike.
+        linked = set()
+        for target in _BLOB.findall(line):
+            target = target.rstrip(".,;:")       # a bare URL at the end of a sentence
             if target not in tracked_all:
                 problems.append(f"GitHub link to {target}, which git does not hold")
-        # Other links into the repository -- its root, /issues, a folder on
-        # /tree/main -- are the reader's to follow; only a file link is held.
-    # A line that links into this repository on GitHub may name the file it links.
-    for line in text.splitlines():
-        if GITHUB_BLOB in line:
-            continue
-        for name in set(_REF.findall(line)):
-            rel = f"apple/{name}"
-            if not (REPO / rel).exists():
-                problems.append(f"{rel} does not exist")
+            linked.add(target)
+        # A reference is exempt only when THIS line links that same file.
+        for rel in {f"apple/{m}" for m in _REF.findall(line)}:
+            if rel in linked:
+                continue
+            if rel not in tracked_all:
+                problems.append(f"{rel} is not in git")
             elif _excluded(rel, patterns):
                 problems.append(f"{rel} is excluded by .comfyignore")
-        # A bare file name is held only when it is an apple/ file's, and every
+        # A bare file name is held only when it is an apple/ file's and every
         # tracked file of that name is excluded: a style's `anime.json` that
         # also ships from config/ is the shipped one.
         for name in {n for n in _BARE.findall(line) if n in names}:
             holders = [rel for rel in tracked_all if rel.rsplit("/", 1)[-1] == name]
+            if any(h in linked for h in holders):
+                continue
             if holders and all(_excluded(rel, patterns) for rel in holders):
                 problems.append(f"{name} ({', '.join(sorted(holders))}) is excluded by .comfyignore")
     return sorted(set(problems))
@@ -98,21 +103,31 @@ def test_every_apple_file_a_shipped_document_names_exists_and_ships(doc):
     assert problems == [], f"{doc.relative_to(REPO).as_posix()} names: " + "; ".join(problems)
 
 
-def test_a_bare_file_name_and_a_bad_github_link_are_caught():
-    names = {"IDEOGRAM4_LICENSE_ATTESTATION.md", "INSTALL.md"}
-    patterns = ["apple/IDEOGRAM4_LICENSE_ATTESTATION.md"]
-    tracked = {"apple/INSTALL.md", "apple/IDEOGRAM4_LICENSE_ATTESTATION.md"}
-    text = ("see `IDEOGRAM4_LICENSE_ATTESTATION.md` and apple/INSTALL.md\n"
-            "and [the plan](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/NOPE.md)\n"
-            "but [this](" + GITHUB_BLOB + "apple/IDEOGRAM4_LICENSE_ATTESTATION.md) is fine, "
-            "as is this IDEOGRAM4_LICENSE_ATTESTATION.md beside it\n")
-    assert _problems(text, patterns, names, tracked) == [
+def test_the_rule_catches_what_it_must_and_nothing_else():
+    names = {"IDEOGRAM4_LICENSE_ATTESTATION.md", "INSTALL.md", "anime.json", "manifest.json"}
+    patterns = ["apple/IDEOGRAM4_LICENSE_ATTESTATION.md", "apple/evidence/", "apple/schema/"]
+    tracked = {"apple/INSTALL.md", "apple/IDEOGRAM4_LICENSE_ATTESTATION.md", "apple/evidence/manifest.json",
+               "apple/schema/anime.json", "config/styles/anime.json"}
+    held = _problems(
+        "see `IDEOGRAM4_LICENSE_ATTESTATION.md` and apple/INSTALL.md\n"
+        "and [the plan](" + GITHUB_BLOB + "apple/NOPE.md)\n"
+        "the receipts in apple/evidence/manifest.json\n"
+        # A link on the line exempts only the file it links.
+        "[ok](" + GITHUB_BLOB + "apple/INSTALL.md) beside apple/IDEOGRAM4_LICENSE_ATTESTATION.md\n",
+        patterns, names, tracked)
+    assert held == [
         "GitHub link to apple/NOPE.md, which git does not hold",
-        "IDEOGRAM4_LICENSE_ATTESTATION.md (apple/IDEOGRAM4_LICENSE_ATTESTATION.md) is "
-        "excluded by .comfyignore"]
-    # A name that also ships from elsewhere is the shipped one.
-    assert _problems("see `anime.json`", ["apple/schema/"], {"anime.json"},
-                     {"apple/schema/anime.json", "config/styles/anime.json"}) == []
+        "IDEOGRAM4_LICENSE_ATTESTATION.md (apple/IDEOGRAM4_LICENSE_ATTESTATION.md) is excluded by .comfyignore",
+        "apple/IDEOGRAM4_LICENSE_ATTESTATION.md is excluded by .comfyignore",
+        "apple/evidence/manifest.json is excluded by .comfyignore"]
+    fine = _problems(
+        # A bare URL counts as a link; a query string or fragment is not part of the path.
+        "it is at " + GITHUB_BLOB + "apple/IDEOGRAM4_LICENSE_ATTESTATION.md?plain=1#top, "
+        "the IDEOGRAM4_LICENSE_ATTESTATION.md note\n"
+        "see `anime.json`, which ships from config/\n"
+        "and https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues\n",
+        patterns, names, tracked)
+    assert fine == []
 
 
 def test_the_readme_guide_table_is_the_shipped_set():

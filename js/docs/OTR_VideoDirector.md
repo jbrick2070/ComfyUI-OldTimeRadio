@@ -57,11 +57,11 @@ When a role is set to '+ Add Custom Model', map the role key to a custom engine 
 
 Optional ordering signal (opaque STRING).
 
-**`device_policy`** -- a choice from the dropdown; starts as `default`.
+**`device_policy`** -- a choice from the dropdown.
 
 Recorded on the episode receipt only. It does not choose the device -- each engine resolves that itself at render time.
 
-**`dtype_policy`** -- a choice from the dropdown; starts as `fp8_ok`.
+**`dtype_policy`** -- a choice from the dropdown.
 
 Recorded on the episode receipt only. No video engine currently reads it to choose a precision.
 

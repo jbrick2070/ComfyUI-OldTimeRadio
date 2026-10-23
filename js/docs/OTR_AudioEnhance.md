@@ -37,7 +37,7 @@ Low-freq warmth shelf (0=off, default; 0.1=subtle)
 
 Optional low-pass cutoff Hz for a voice engine that leaves high-frequency chirp artifacts (0=off, default; 16000 is a gentle cleanup). Applies only below half the target sample rate: a cutoff at or above it is skipped silently, not clamped.
 
-**`tape_emulation`** -- a choice from the dropdown; starts as `off`.
+**`tape_emulation`** -- a choice from the dropdown.
 
 Deterministic analog tape emulation. Each step up adds more period character (saturation, wow/flutter; no synthetic hiss) and costs more clarity -- 'heavy' audibly softens dialogue. 'off' is the clean master; this is an audible episode-facing choice, not a technical knob.
 

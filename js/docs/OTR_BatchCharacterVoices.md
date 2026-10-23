@@ -13,7 +13,7 @@ The shipped workflows set these; most people never change them.
 
 **`script_json`** -- a connection from another node (`STRING`).
 
-Frozen v2 ledger JSON from OTR_LedgerFreezeCascade (its first output). Passed VERBATIM to the legacy engine on the byte-identical batch path.
+Frozen v2 ledger JSON from OTR_LedgerFreezeCascade (its script_json output). Passed VERBATIM to the legacy engine on the byte-identical batch path.
 
 ### Optional
 

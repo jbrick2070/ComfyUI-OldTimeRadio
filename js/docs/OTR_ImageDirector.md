@@ -15,7 +15,7 @@ On the shipped workflows these are the widgets a person changes; the ones on the
 
 Recorded on the image policy and used by the cloud cost estimate before a paid run: the estimate assumes this many stills per image role, never fewer than the default. It does NOT limit how many stills render -- the still count follows the episode's beats (docs review, 2026-10-14).
 
-**`seed_mode`** -- a choice from the dropdown; starts as `request_hash`.
+**`seed_mode`** -- a choice from the dropdown.
 
 request_hash: seeds derive deterministically from each request (same episode re-renders byte-identical stills). fixed: every still uses request_seed verbatim -- for A/B comparisons.
 
@@ -37,7 +37,7 @@ Declare custom image engines on OTR_VideoDirector's custom_models_json instead -
 
 Optional ordering signal (opaque STRING).
 
-**`dtype_policy`** -- a choice from the dropdown; starts as `fp8_ok`.
+**`dtype_policy`** -- a choice from the dropdown.
 
 Recorded on the episode receipt only. No image engine currently reads it to choose a precision.
 

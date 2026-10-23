@@ -21,7 +21,7 @@ Silent video from OTR_SilentComposite. Captions burn here; audio is added later 
 
 Burn open captions into the video. On by default, matching the shipped graph. Needs an ffmpeg with the ass filter and libx264 -- without them the episode still finishes, just without captions.
 
-**`caption_style`** -- a choice from the dropdown; starts as `sdh_standard`.
+**`caption_style`** -- a choice from the dropdown.
 
 Visual style of the burned SDH captions. The OTR_CAPTION_STYLE env var may override the STYLE only -- no env var can turn burning on; only the burn_captions widget (or a supplied title-card plan, which forces the hero-title burn alone) does that.
 

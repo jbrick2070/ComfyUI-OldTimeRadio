@@ -108,6 +108,11 @@ def _default(spec):
     value = opts["default"]
     if opts.get("forceInput"):
         return None
+    if isinstance(spec[0], (list, tuple)):
+        # A dropdown's starting choice can depend on the machine -- the writer
+        # picks by host and by which cloud keys exist (Sonnet QA, 2026-10-23)
+        # -- and the node shows it anyway. The page names no choice.
+        return None
     if isinstance(value, bool):
         return "on" if value else "off"
     if isinstance(value, str):
@@ -179,9 +184,27 @@ def render(key: str, entry: dict, display_name: str, cls, labels: dict) -> str:
     return "\n".join(lines)
 
 
+#: Settings that change what a node offers or starts on: cloud keys and the
+#: switches that turn a cloud lane on. The pages are rendered without them,
+#: so a page reads the same on a machine that has a key and one that does not.
+_MACHINE_ENV_PREFIXES = ("OPENROUTER_", "OTR_OPENROUTER", "OTR_ENABLE_", "GOOGLE_API",
+                         "OTR_GOOGLE", "COMFY_API", "OTR_COMFY", "GEMINI_API")
+
+
 def render_all() -> dict:
-    """``{key: page}`` for every registered node."""
+    """``{key: page}`` for every registered node, rendered as a machine with
+    no cloud key would render them."""
     _prepare_runtime()
+    scrubbed = {k: v for k, v in os.environ.items() if k.startswith(_MACHINE_ENV_PREFIXES)}
+    for key in scrubbed:
+        del os.environ[key]
+    try:
+        return _render_all()
+    finally:
+        os.environ.update(scrubbed)
+
+
+def _render_all() -> dict:
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
     config.pop("_comment", None)
     table = node_table()
