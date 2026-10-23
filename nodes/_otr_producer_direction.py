@@ -1026,10 +1026,11 @@ def unpainted_characters(cards: Dict[str, Any], direction: Dict[str, Any]) -> li
 
 
 def unfilmed_shots(cards: Dict[str, Any], direction: Dict[str, Any]) -> list:
-    """The cards a Publish run cannot show as filmed, each with why: no clip
-    yet, a floor -- or a refused-still gap -- that is not kept, or an action or
-    clip take changed since its clip was filmed. A kept card publishes as it
-    is, a kept floor visibly degraded.
+    """The cards a Publish run cannot show as filmed, each with why: a still
+    the image model refused, no clip yet, a floor -- or a refused-still gap --
+    that is not kept, or an action or clip take changed since its clip was
+    filmed. A kept card publishes as it is, a kept floor visibly degraded, a
+    kept clip on a refused still as the clip it shows.
 
     A still repainted since its clip was filmed is not seen here: cards.json
     does not say which still a clip was filmed from. The Publish render refuses
@@ -1044,7 +1045,11 @@ def unfilmed_shots(cards: Dict[str, Any], direction: Dict[str, Any]) -> list:
             if sid in kept:
                 continue
             body = direction["cards"].get(sid, {})
-            if card.get("clip_floor"):
+            if card.get("picture_editable") and not card.get("still"):
+                # The render skips a shot whose still was refused, as a gap,
+                # and refuses that gap in a Publish its card does not keep.
+                pending.append("%s (its still was refused)" % sid)
+            elif card.get("clip_floor"):
                 pending.append("%s (failed: %s)" % (sid, card["clip_floor"]))
             elif card.get("clip_state") not in ("filmed", "kept"):
                 pending.append("%s (not filmed)" % sid)

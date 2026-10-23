@@ -4339,7 +4339,9 @@ def _rendered_shot(shot):
     """A shot as it leaves a successful render: without any floor mark. A
     replay plans from the video section its source stamped, floors included,
     and old marks on a clip that rendered would report it floored for good
-    (plan, "Floors are failed cards": a successful retry becomes filmed)."""
+    (plan, "Floors are failed cards": a successful retry becomes filmed). A
+    shot that floors again starts from here too, so it carries the marks of
+    the floor it fell to now and none of the last one's."""
     return {k: v for k, v in (shot or {}).items() if k not in _FLOOR_MARKS}
 
 
@@ -4465,17 +4467,39 @@ def _reuse_filmed_clip(reuse, shot, requests, profile):
     found = reuse.find(sid, key)
     if found is None:
         return None
-    source = reuse.reused.get(sid, "?")
     _LOG.warning("[OTR video] REUSED shot %s: filmed before under key %s, taken from "
-                 "the %s, not rendered", sid, key[:12], source)
+                 "the %s, not rendered", sid, key[:12], reuse.reused.get(sid, "?"))
+    return _as_rendered(reuse, shot, found)
+
+
+def _take_kept_clip(producer, shot):
+    """A KEPT card's clip, or the floor it fell to, as :func:`render_shot`
+    returns a clip. A keep is used whatever has changed since -- an edited
+    action, a refused still, an empty wallet -- so no request is built for
+    it and no key computed; ``ProducerClips.take_kept`` verifies its files
+    and refuses one that does not verify."""
+    found = producer.take_kept(str(shot.get("shot_id") or ""))
+    _LOG.warning("[OTR video] KEPT shot %s: used as it is, not rendered",
+                 shot.get("shot_id"))
+    return _as_rendered(producer, shot, found)
+
+
+def _as_rendered(producer, shot, found):
+    """A clip a producer run took instead of rendering, in :func:`render_shot`'s
+    shape. Its VRAM peak is the one measured when it was filmed, so the
+    credits name what the episode took even when a run films nothing; its
+    receipts say where it came from (:func:`_mark_reused_receipts`). A kept
+    FLOOR stays visibly a floor: it carries back the floor marks it fell with
+    -- those and no other field, whatever its payload holds -- and nothing
+    else a replayed row might have."""
+    sid = str(shot.get("shot_id") or "")
     clip = found["clip"]
-    _mark_reused_receipts(clip, source)
+    _mark_reused_receipts(clip, producer.reused.get(sid, "?"))
     peak = clip.get("vram_peak_mb")
     used = (int(peak) if isinstance(peak, (int, float)) and not isinstance(peak, bool)
             and math.isfinite(peak) else None)
-    # A kept FLOOR stays visibly a floor: it carries back the marks it fell
-    # with, and nothing else a replayed row might have.
-    out_shot = dict(_rendered_shot(shot), **found.get("marks", {}))
+    marks = {k: v for k, v in (found.get("marks") or {}).items() if k in _FLOOR_MARKS}
+    out_shot = dict(_rendered_shot(shot), **marks)
     return clip, out_shot, list(found["attempts"]), used
 
 
@@ -5219,7 +5243,7 @@ def _stamp_budget_floor_shot(shot):
     stays False -- paid clips never reach obs. This reuses the gap
     ACCOUNTING channel, not a claim the image model refused.
     """
-    row = dict(shot or {})
+    row = _rendered_shot(shot)
     row["status"] = _receipt.STATUS_SANCTIONED_GAP
     row["budget_floor"] = True
     return row
@@ -5268,7 +5292,7 @@ def _stamp_cloud_floor_shot(shot, reason):
     stays as its own boolean because the content case is the one with an
     operator ruling attached.
     """
-    row = dict(shot or {})
+    row = _rendered_shot(shot)
     row["status"] = _receipt.STATUS_SANCTIONED_GAP
     row["cloud_floor"] = str(reason or "")
     if str(reason or "") == "content_refused":
@@ -5625,6 +5649,20 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                          "release that would evict other owners too",
                          engine_id, _exc)
 
+    def _book_kept(shot):
+        """Book a KEPT card's clip, or the floor it fell to (``kept``, taken
+        before any shot was filmed): a clip as a reused clip is booked, a
+        floor as a floor -- on screen, still degraded, and with no trace row,
+        since nothing rendered it. Returns the clip's recorded VRAM peak."""
+        sid = str(shot.get("shot_id") or "")
+        clip, out_shot, attempts, used = kept[sid]
+        if clip.get("path"):
+            clips[sid] = clip
+        new_shots.append(out_shot)
+        if producer.reused.get(sid) != "kept floor":
+            trace.append(_trace_row_from_shot(None, clip, out_shot, attempts))
+        return used
+
     def _commit_still_floor(shot, stamped_row):
         """Commit a floored cloud beat WITH its scene-still clip.
 
@@ -5668,6 +5706,18 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
         # Beats whose required still the image model REFUSED. Read once, not
         # per beat: the receipt is frozen by the time the render starts.
         _gap_beats = sanctioned_gap_beat_ids(ledger)
+        # A KEPT card is used as it is, whatever has changed since -- an
+        # edited action, a still the image model refused, an empty wallet --
+        # so each is taken and verified here, before any shot is filmed: a
+        # keep that does not verify refuses the run before anything is paid
+        # for, and a kept shot never reaches a request builder, a gap or a
+        # halt (plan, "Floors are failed cards").
+        kept = {}
+        if producer is not None:
+            for shot in section["shots"]:
+                sid = str(shot.get("shot_id") or "")
+                if sid in producer.kept:
+                    kept[sid] = _take_kept_clip(producer, shot)
         if _should_fanout_cloud_episode(section, _gap_beats):
             # CLOUD-ONLY FAN-OUT. Partner HTTP waits, not VRAM.
             # Every beat is requested through run_cloud_fanout, at most
@@ -5681,7 +5731,8 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
             # render one-after-another inside render_beat_coverage.
             work_shots = []
             for shot in section["shots"]:
-                if shot_is_sanctioned_gap(shot, _gap_beats):
+                if (shot_is_sanctioned_gap(shot, _gap_beats)
+                        or str(shot.get("shot_id") or "") in kept):
                     continue
                 work_shots.append(shot)
                 _begin_engine_scope(str(shot.get("engine_id") or ""))
@@ -5730,17 +5781,29 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
             for shot in section["shots"]:
                 bid = _beat_id_for_shot(shot)
                 sid = str(shot.get("shot_id") or "")
+                if sid in kept:
+                    used = _book_kept(shot)
+                    if used is not None:
+                        vram_peak = (used if vram_peak is None else max(vram_peak, used))
+                    continue
                 if shot_is_sanctioned_gap(shot, _gap_beats):
                     _LOG.warning(
                         "[OTR.render_driver] SANCTIONED GAP shot %s (beat %s): not "
                         "rendered -- the image model refused its required still. "
                         "The beat keeps its place in the timeline and is floored.",
                         sid, bid)
-                    new_shots.append(shot)
+                    gap_row = _rendered_shot(shot)
+                    new_shots.append(gap_row)
                     if producer is not None:
                         producer.check_gap(sid)
-                        _producer_floor(producer, shot, None)
+                        _producer_floor(producer, gap_row, None)
                     continue
+                if producer is not None and isinstance(
+                        errors.get(sid), _producer_clips_module().ClipStoreError):
+                    # A refusal of the clip store -- Publish with no filmed
+                    # clip, a keep that does not verify -- is never a floor,
+                    # whatever words its message happens to hold.
+                    raise errors[sid]
                 if _cloud_budget_floor_sid(sid, errors, halted):
                     _LOG.error(
                         "[OTR video] BUDGET floor shot %s -- "
@@ -5805,7 +5868,8 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                 # scope and every raise site, so a beat nobody will render also
                 # never loads an engine's weights.
                 #
-                # The ORIGINAL ShotLock shot is kept, not a synthesized stand-in:
+                # The ORIGINAL ShotLock shot is kept, not a synthesized stand-in
+                # (less any floor marks a replay carried from an earlier run):
                 # the beat is a real fact about the episode and it keeps its id,
                 # role, family, position and frame budget. What it does not get is
                 # a clip -- ``build_clip_manifest`` derives existence from the clip
@@ -5813,16 +5877,22 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                 # composite's existing floor-fill covers the hole. Nothing is
                 # substituted and nothing is silent: the gap row in the receipt is
                 # the record, and the warning below is the log.
+                if str(shot.get("shot_id") or "") in kept:
+                    used = _book_kept(shot)
+                    if used is not None:
+                        vram_peak = (used if vram_peak is None else max(vram_peak, used))
+                    continue
                 if shot_is_sanctioned_gap(shot, _gap_beats):
                     _LOG.warning(
                         "[OTR.render_driver] SANCTIONED GAP shot %s (beat %s): not "
                         "rendered -- the image model refused its required still. "
                         "The beat keeps its place in the timeline and is floored.",
                         shot.get("shot_id"), _beat_id_for_shot(shot))
-                    new_shots.append(shot)
+                    gap_row = _rendered_shot(shot)
+                    new_shots.append(gap_row)
                     if producer is not None:
                         producer.check_gap(shot.get("shot_id"))
-                        _producer_floor(producer, shot, None)
+                        _producer_floor(producer, gap_row, None)
                     continue
                 # ENGINE-GATED: a spend-cap halt is about money, and a LOCAL
                 # beat costs none -- it renders normally. Nor does a producer
@@ -5907,6 +5977,11 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                     _commit_still_floor(shot, _stamp_budget_floor_shot(shot))
                     continue
                 except Exception as exc:
+                    if producer is not None and isinstance(
+                            exc, _producer_clips_module().ClipStoreError):
+                        # A refusal of the clip store is never a floor,
+                        # whatever words its message happens to hold.
+                        raise
                     sid = str(shot.get("shot_id") or "")
                     if _cloud_budget_floor_sid(sid, {sid: exc}, ()):
                         _LOG.error(

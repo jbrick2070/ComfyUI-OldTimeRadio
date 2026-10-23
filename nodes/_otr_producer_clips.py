@@ -375,9 +375,10 @@ def commit(store: Path, key: str, body: Dict[str, Any],
 class ProducerClips:
     """One producer Video run's clip reuse: what it found, what it filmed, and
     the map its bundle carries. Built by OTR_VideoRenderBatch only when a
-    direction is on the wire; the render driver calls :meth:`find` before a
-    shot's weights load and :meth:`commit` once the shot is whole. Safe to
-    call from the cloud fan-out's worker threads."""
+    direction is on the wire; the render driver takes every kept card with
+    :meth:`take_kept` before any shot is filmed, calls :meth:`find` for each
+    other shot before its weights load, and :meth:`commit` once a shot is
+    whole. Safe to call from the cloud fan-out's worker threads."""
 
     def __init__(self, *, project_id: str, episode_root: Any, bundle_map: Any,
                  bundle_floors: Any = None, kept: Iterable[Any] = (),
@@ -411,10 +412,10 @@ class ProducerClips:
         """The clip filmed under ``key`` for this shot, in this workspace, as
         ``{"clip": ..., "attempts": [...]}`` -- or None, and the shot renders.
         The bundle's own record is used in place when it names this key and
-        its files verify; otherwise the store's entry is copied in. A kept
-        card's clip is used whatever its key (:meth:`_keep`). A PUBLISH run
-        renders nothing: a shot it finds no clip for refuses the run, before
-        any weights load (plan, "Publish")."""
+        its files verify; otherwise the store's entry is copied in. A PUBLISH
+        run renders nothing: a shot it finds no clip for refuses the run,
+        before any weights load (plan, "Publish"). A kept card is never looked
+        up by key: :meth:`take_kept` takes it."""
         found = self._find(str(shot_id), key)
         if found is None and self.stage == "publish":
             raise ClipStoreError(
@@ -430,11 +431,15 @@ class ProducerClips:
                 "Publish refuses shot %s: its still was refused, so it has no clip; "
                 "paint it again, or keep the card to publish the gap" % shot_id)
 
+    def take_kept(self, shot_id: str) -> Dict[str, Any]:
+        """A KEPT card's clip, or the floor it fell to, taken by its shot id
+        alone: a keep is used whatever has changed since, so no key is asked
+        for and none is computed (:meth:`_keep`)."""
+        return self._keep(str(shot_id))
+
     def _find(self, shot_id: str, key: str) -> Optional[Dict[str, Any]]:
         with self._lock:
             self._keys[shot_id] = key
-        if shot_id in self.kept:
-            return self._keep(shot_id)
         record = self._bundle.get(shot_id)
         if record is not None and record.get("key") == key:
             try:

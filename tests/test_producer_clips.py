@@ -545,6 +545,84 @@ def test_a_shot_that_renders_sheds_the_floor_marks_its_replay_carried(producer_r
         assert not set(rd._FLOOR_MARKS) & set(result["ledger"]["video"]["shots"][1])
 
 
+@pytest.mark.parametrize("producer", [True, False])
+def test_a_shot_that_floors_again_carries_only_its_new_floors_marks(
+        producer_root, cameras, floors, tmp_path, monkeypatch, producer):
+    # Its replay carries the marks of the floor it fell to last time. Kept
+    # beside the new ones, a timeout read as a budget floor, and a refused
+    # still as the timeout it no longer is.
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "1")
+    camera = cameras("cloud_stub_camera")
+    camera.timeouts = {"shot_b002"}
+    monkeypatch.setattr(rd, "sanctioned_gap_beat_ids", lambda ledger: {"b003"})
+    ep, ledger, build = _cloud_workspace(tmp_path, "ep_%s" % producer)
+    ledger["video"]["shots"][1].update(status="sanctioned_gap", budget_floor=True,
+                                       floor_render="still_pan")
+    ledger["video"]["shots"][2].update(status="sanctioned_gap", cloud_floor="timeout",
+                                       floor_render="still_pan")
+    if producer:
+        result, _filmed, _p = _film(camera, (ep, ledger, build))
+        payloads = result["ledger"]["video"][PC.FLOOR_KEY]
+        assert payloads["shot_b002"]["marks"] == {
+            "status": "sanctioned_gap", "cloud_floor": "timeout", "floor_render": "still_pan"}
+        assert payloads["shot_b003"]["marks"] == {"status": "sanctioned_gap"}
+    else:
+        result = rd.run_episode(ledger, request_builder=build)
+    shots = result["ledger"]["video"]["shots"]
+    assert "budget_floor" not in shots[1] and shots[1]["cloud_floor"] == "timeout"
+    assert not set(rd._FLOOR_MARKS) & set(shots[2]), "a gap row as its first run made it"
+
+
+@pytest.mark.parametrize("fanout", ["1", "2"])
+def test_a_store_refusal_is_never_read_as_an_empty_wallet(
+        producer_root, cameras, floors, tmp_path, monkeypatch, fanout):
+    # A provider's 402 means an empty wallet; a store refusal that happens to
+    # hold the number in its message must still refuse the run.
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", fanout)
+    camera = cameras("cloud_stub_camera")
+    real_find = PC.ProducerClips.find
+
+    def refusing(self, shot_id, key):
+        if shot_id == "shot_b002":
+            raise PC.ClipStoreError("Publish has no filmed clip for shot 402")
+        return real_find(self, shot_id, key)
+
+    monkeypatch.setattr(PC.ProducerClips, "find", refusing)
+    with pytest.raises(PC.ClipStoreError, match="no filmed clip for shot 402"):
+        _film(camera, _cloud_workspace(tmp_path, "ep_a"))
+    assert floors == [], "no floor was drawn for it"
+
+
+def test_a_keep_that_does_not_verify_refuses_before_any_shot_is_filmed(
+        producer_root, cameras, tmp_path):
+    camera = cameras()
+    ep_a, ledger, build = _workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger, build))
+    workspace = _replayed(tmp_path, ep_a, "ep_b", prompts={"shot_b001": "an edited desk"})
+    name = _map(first)["shot_b003"]["files"]["clip"]["name"]
+    (workspace[0] / "clips" / name).write_bytes(b"not the clip that was kept")
+    with pytest.raises(PC.ClipStoreError, match="card shot_b003 keeps its clip, but"):
+        _film(camera, workspace, bundle_map=_map(first), kept=["shot_b003"])
+    assert camera.filmed == [], "nothing is filmed, or paid for, before the keeps verify"
+
+
+def test_a_kept_shot_never_reaches_its_request_builder(producer_root, cameras, tmp_path):
+    camera = cameras()
+    ep_a, ledger, build = _workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger, build))
+    ep_b, ledger_b, build_b = _replayed(tmp_path, ep_a, "ep_b")
+
+    def builder(shot, ledger, canvas=None, segment_index=0):
+        if shot["shot_id"] == "shot_b002":
+            raise RuntimeError("the builder could not make a request for this shot")
+        return build_b(shot, ledger, canvas=canvas, segment_index=segment_index)
+
+    again, filmed, producer = _film(camera, (ep_b, ledger_b, builder),
+                                    bundle_map=_map(first), kept=["shot_b002"])
+    assert filmed == [] and producer.reused["shot_b002"] == "kept"
+    assert pathlib.Path(again["clips"]["shot_b002"]["path"]).parent == ep_b / "clips"
+
+
 @pytest.fixture
 def floors(monkeypatch, tmp_path):
     """The still_pan floor drawn as a stand-in file in scratch: these tests are
@@ -680,6 +758,25 @@ def test_a_kept_floor_is_used_as_it_is_and_stays_a_floor(producer_root, cameras,
     assert (shot["cloud_floor"], shot["floor_render"]) == ("timeout", "still_pan")
     assert pathlib.Path(again["clips"]["shot_b002"]["path"]).parent == ep_b / "clips"
     assert again["ledger"]["video"][PC.FLOOR_KEY] == floored, "the floor rides on"
+    assert [row["shot_id"] for row in again["trace"]] == ["shot_b001", "shot_b003"], \
+        "nothing rendered a kept floor, as nothing renders a fresh one"
+
+
+def test_a_floor_payload_cannot_rewrite_its_shot(producer_root, cameras, floors, tmp_path):
+    camera = cameras("cloud_stub_camera")
+    camera.timeouts = {"shot_b002"}
+    ep_a, ledger_a, build_a = _cloud_workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger_a, build_a))
+    floored = json.loads(json.dumps(first["ledger"]["video"][PC.FLOOR_KEY]))
+    floored["shot_b002"]["marks"].update(shot_id="shot_b001", target_frame_count=1)
+    camera.timeouts.clear()
+    again, _filmed, _producer = _film(camera, _replayed(tmp_path, ep_a, "ep_b",
+                                                        engine_id="cloud_stub_camera"),
+                                      bundle_map=_map(first), bundle_floors=floored,
+                                      kept=["shot_b002"])
+    shots = again["ledger"]["video"]["shots"]
+    assert [s["shot_id"] for s in shots] == list(PROMPTS)
+    assert shots[1]["target_frame_count"] == 25 and shots[1]["cloud_floor"] == "timeout"
 
 
 def test_a_kept_clip_is_used_whatever_changed_and_a_missing_one_refuses(
@@ -803,14 +900,25 @@ def test_publish_refuses_a_refused_still_gap_unless_its_card_is_kept(producer_ro
     with pytest.raises(PC.ClipStoreError, match="Publish refuses shot shot_b002: its still"):
         _film(camera, _replayed(tmp_path, ep_a, "ep_p"), bundle_map=_map(first),
               stage="publish")
-    published, filmed, _producer = _film(camera, _replayed(tmp_path, ep_a, "ep_q"),
-                                         bundle_map=_map(first), stage="publish",
-                                         kept=["shot_b002"])
-    assert filmed == [] and "shot_b002" in published["ledger"]["video"][PC.FLOOR_KEY]
-    # A Video run films around a gap as it always has.
-    _again, filmed, _producer = _film(camera, _replayed(tmp_path, ep_a, "ep_v"),
+    # Kept, the card publishes the clip it shows, filmed before its still was
+    # refused.
+    published, filmed, producer = _film(camera, _replayed(tmp_path, ep_a, "ep_q"),
+                                        bundle_map=_map(first), stage="publish",
+                                        kept=["shot_b002"])
+    assert filmed == [] and producer.reused["shot_b002"] == "kept"
+    assert "shot_b002" in _map(published)
+    assert not published["ledger"]["video"][PC.FLOOR_KEY]
+    # A Video run films around a gap as it always has, and a card that was a
+    # gap when last filmed publishes, kept, as the gap it is.
+    gapped, filmed, _producer = _film(camera, _replayed(tmp_path, ep_a, "ep_v"),
                                       bundle_map=_map(first))
-    assert filmed == []
+    assert filmed == [] and "shot_b002" in gapped["ledger"]["video"][PC.FLOOR_KEY]
+    published, filmed, producer = _film(
+        camera, _replayed(tmp_path, ep_a, "ep_r"), bundle_map=_map(gapped),
+        bundle_floors=gapped["ledger"]["video"][PC.FLOOR_KEY], stage="publish",
+        kept=["shot_b002"])
+    assert filmed == [] and producer.reused["shot_b002"] == "kept floor"
+    assert "shot_b002" in published["ledger"]["video"][PC.FLOOR_KEY]
 
 
 def test_node_63_refuses_a_publish_over_cards_not_filmed_as_they_stand(
@@ -841,3 +949,12 @@ def test_node_63_refuses_a_publish_over_cards_not_filmed_as_they_stand(
                 card.update(clip=None, clip_state="", clip_take=0)
     assert PD.unfilmed_shots(cards, publish(kept={"clips": ["shot_b002"]})) == [
         "shot_b003 (not filmed)"]
+    # A still the image model refused: the render would skip it as a gap.
+    for group in cards["scenes"]:
+        for card in group["shots"]:
+            if card["shot_id"] == "shot_b001":
+                card.update(still=None, still_state="failed", picture_editable=True)
+    assert PD.unfilmed_shots(cards, publish(kept={"clips": ["shot_b002"]}))[0] == \
+        "shot_b001 (its still was refused)"
+    assert "shot_b001 (its still was refused)" not in PD.unfilmed_shots(
+        cards, publish(kept={"clips": ["shot_b001", "shot_b002"]}))
