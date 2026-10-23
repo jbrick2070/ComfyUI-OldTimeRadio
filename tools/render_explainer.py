@@ -209,9 +209,11 @@ def draw_row(frame: Image.Image, d: ImageDraw.ImageDraw, row: dict, x: int, y: i
         d.rectangle((x, y, x + w, y + h), outline=MAGENTA, width=3)
     else:
         d.rectangle((x, y, x + w, y + h), outline=outline, width=2)
-    d.text((x + 18, y + 10 if compact else y + 12), row["label"], font=font("bold", 26), fill=PAPER if not dim else DIM)
-    d.text((x + 18, y + 42 if compact else y + 46), row["note"], font=font("body", 20), fill=(205, 200, 220) if not dim else DIM)
-    cy = y + h - (40 if compact else 44)
+    # Compact rows (six to a panel) keep the note clear of the control: the
+    # note ends 8 px above the control box (rough cut v3 ran them together).
+    d.text((x + 18, y + 8 if compact else y + 12), row["label"], font=font("bold", 26), fill=PAPER if not dim else DIM)
+    d.text((x + 18, y + 36 if compact else y + 46), row["note"], font=font("body", 20), fill=(205, 200, 220) if not dim else DIM)
+    cy = y + h - (36 if compact else 44)
     if row["key"] in SWITCHES:
         d.rounded_rectangle((x + w - 92, cy - 2, x + w - 30, cy + 26), radius=14, outline=outline, width=2)
         d.ellipse((x + w - 88, cy + 2, x + w - 68, cy + 22), fill=outline)
